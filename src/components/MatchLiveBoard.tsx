@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { registerGoal, finishMatch, deleteEvent, updateMatchTimer, resetMatchTimer } from "@/lib/actions/matches";
 import { ArrowLeft, Plus, Clock, Trophy, Trash2, Play, Pause, RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { getInitials } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { PlayerAvatar } from "./PlayerAvatar";
 
 type MatchLiveBoardProps = {
   match: any;
@@ -314,9 +314,11 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
                     onClick={() => setGoalModal(p => ({ ...p, scorerId: tp.player_id }))}
                     className="w-full flex items-center gap-3 p-3 bg-surface hover:bg-surface-hover border border-border rounded-xl transition-colors text-left"
                   >
-                    <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-xs font-bold">
-                      {getInitials(tp.players?.name)}
-                    </div>
+                    <PlayerAvatar
+                      name={tp.players?.name || "Jogador"}
+                      avatarUrl={tp.players?.avatar_url}
+                      className="w-10 h-10 rounded-full bg-background text-xs font-bold flex-shrink-0"
+                    />
                     <span className="font-bold text-foreground flex-1">{tp.players?.nickname || tp.players?.name}</span>
                     <span className="text-xl">⚽</span>
                   </button>
@@ -341,9 +343,11 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
                       disabled={loading}
                       className="w-full flex items-center gap-3 p-3 bg-surface hover:bg-surface-hover border border-border rounded-xl transition-colors text-left disabled:opacity-50"
                     >
-                      <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-xs font-bold">
-                        {getInitials(tp.players?.name)}
-                      </div>
+                      <PlayerAvatar
+                        name={tp.players?.name || "Jogador"}
+                        avatarUrl={tp.players?.avatar_url}
+                        className="w-10 h-10 rounded-full bg-background text-xs font-bold flex-shrink-0"
+                      />
                       <span className="font-bold text-foreground flex-1">{tp.players?.nickname || tp.players?.name}</span>
                       <span className="text-xl">🎯</span>
                     </button>

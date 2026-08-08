@@ -1,7 +1,7 @@
 import { Trophy, Medal, Flame, Search, SlidersHorizontal, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { getRanking } from "@/lib/actions/stats";
-import { getInitials } from "@/lib/utils";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 
 export const revalidate = 0;
 
@@ -56,9 +56,11 @@ export default async function RankingPage() {
                     
                     {/* Avatar & Medalha */}
                     <div className={`relative mb-2 ${isFirst ? '-mt-4' : ''}`}>
-                      <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-sm font-bold shadow-xl border-2 z-10 relative bg-background ${isFirst ? 'border-accent text-accent' : 'border-border text-muted'}`}>
-                        {getInitials(playerStat.player.name)}
-                      </div>
+                      <PlayerAvatar
+                        name={playerStat.player.name}
+                        avatarUrl={playerStat.player.avatar_url}
+                        className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full text-sm font-bold shadow-xl border-2 z-10 relative bg-background ${isFirst ? 'border-accent text-accent' : 'border-border text-muted'}`}
+                      />
                       <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-20">
                         <Medal className={`w-6 h-6 drop-shadow-md ${medalColor} ${isFirst ? 'scale-125' : ''}`} fill="currentColor" />
                       </div>
@@ -102,9 +104,11 @@ export default async function RankingPage() {
                     {/* Info */}
                     <div className="flex-1 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center text-xs font-bold text-foreground border border-border">
-                          {getInitials(playerStat.player.name)}
-                        </div>
+                        <PlayerAvatar
+                          name={playerStat.player.name}
+                          avatarUrl={playerStat.player.avatar_url}
+                          className="w-10 h-10 rounded-full bg-surface text-xs font-bold text-foreground border border-border flex-shrink-0"
+                        />
                         <div>
                           <p className="text-sm font-bold text-foreground">{playerStat.player.nickname || playerStat.player.name}</p>
                           <div className="flex gap-2 text-[10px] text-muted">

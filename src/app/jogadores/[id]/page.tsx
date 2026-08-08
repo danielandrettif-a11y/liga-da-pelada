@@ -1,5 +1,6 @@
 import { getPlayer, getPlayerRoundHistory, getPlayersWithStats } from "@/lib/actions/players";
-import { getInitials, getDisplayName, calculateWinRate, formatDateShort } from "@/lib/utils";
+import { getDisplayName, calculateWinRate, formatDateShort } from "@/lib/utils";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ChevronRight } from "lucide-react";
@@ -54,9 +55,11 @@ export default async function JogadorPerfilPage({
 
       {/* Hero Card */}
       <div className="glass-card p-6 animate-fade-in flex flex-col items-center text-center">
-        <div className="w-20 h-20 rounded-full bg-surface flex items-center justify-center text-2xl font-bold text-muted mb-4 ring-2 ring-border shadow-lg">
-          {getInitials(player.name)}
-        </div>
+        <PlayerAvatar
+          name={player.name}
+          avatarUrl={player.avatar_url}
+          className="w-24 h-24 rounded-full bg-surface text-2xl font-bold text-muted mb-4 ring-2 ring-border shadow-lg"
+        />
         <h2 className="text-2xl font-bold text-foreground mb-1">
           {getDisplayName(player.name, player.nickname)}
         </h2>

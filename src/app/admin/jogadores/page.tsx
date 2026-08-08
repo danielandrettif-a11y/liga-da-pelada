@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getPlayers } from "@/lib/actions/players";
 import { Plus, ChevronRight, UserPlus, ArrowLeft } from "lucide-react";
-import { getInitials } from "@/lib/utils";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 
 export const revalidate = 0;
 
@@ -44,9 +44,11 @@ export default async function AdminJogadoresPage() {
               `}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-surface-hover border border-border flex items-center justify-center text-xs font-bold text-muted">
-                  {getInitials(player.name)}
-                </div>
+                <PlayerAvatar
+                  name={player.name}
+                  avatarUrl={player.avatar_url}
+                  className="w-10 h-10 rounded-full bg-surface-hover border border-border text-xs font-bold text-muted flex-shrink-0"
+                />
                 <div>
                   <p className="text-sm font-bold text-foreground">
                     {player.name}

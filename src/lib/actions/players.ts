@@ -2,7 +2,49 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
+import { createClient as createServerClient } from "../supabase/server";
 import type { Player, CreatePlayerInput } from "../types";
+
+const AVATAR_BUCKET = "player-avatars";
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+const AVATAR_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+function revalidatePlayerPaths(id?: string) {
+  revalidatePath("/");
+  revalidatePath("/jogadores");
+  revalidatePath("/ranking");
+  revalidatePath("/admin/jogadores");
+  revalidatePath("/admin/rodada");
+  if (id) revalidatePath(`/jogadores/${id}`);
+}
+
+function avatarPathFromUrl(avatarUrl: string | null) {
+  if (!avatarUrl) return null;
+
+  try {
+    const marker = `/storage/v1/object/public/${AVATAR_BUCKET}/`;
+    const pathname = new URL(avatarUrl).pathname;
+    const markerIndex = pathname.indexOf(marker);
+    return markerIndex >= 0
+      ? decodeURIComponent(pathname.slice(markerIndex + marker.length))
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getAuthenticatedClient() {
+  const client = await createServerClient();
+  const {
+    data: { user },
+  } = await client.auth.getUser();
+
+  return user ? client : null;
+}
 
 export async function getPlayers() {
   const { data, error } = await supabase
@@ -101,7 +143,10 @@ export async function getPlayerRoundHistory(playerId: string) {
 }
 
 export async function createPlayer(input: CreatePlayerInput) {
-  const { data, error } = await supabase
+  const client = await getAuthenticatedClient();
+  if (!client) return { success: false, error: "Sessão expirada. Entre novamente." };
+
+  const { data, error } = await client
     .from("players")
     .insert([
       {
@@ -118,15 +163,23 @@ export async function createPlayer(input: CreatePlayerInput) {
     return { success: false, error: error.message };
   }
 
-  revalidatePath("/jogadores");
-  revalidatePath("/admin/jogadores");
+  revalidatePlayerPaths(data.id);
   return { success: true, data };
 }
 
 export async function updatePlayer(id: string, input: Partial<CreatePlayerInput>) {
-  const { data, error } = await supabase
+  const client = await getAuthenticatedClient();
+  if (!client) return { success: false, error: "Sessão expirada. Entre novamente." };
+
+  const safeInput = {
+    ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+    ...(input.nickname !== undefined ? { nickname: input.nickname.trim() || null } : {}),
+    ...(input.avatar_url !== undefined ? { avatar_url: input.avatar_url || null } : {}),
+  };
+
+  const { data, error } = await client
     .from("players")
-    .update(input)
+    .update(safeInput)
     .eq("id", id)
     .select()
     .single();
@@ -136,14 +189,116 @@ export async function updatePlayer(id: string, input: Partial<CreatePlayerInput>
     return { success: false, error: error.message };
   }
 
-  revalidatePath("/jogadores");
-  revalidatePath(`/jogadores/${id}`);
-  revalidatePath("/admin/jogadores");
+  revalidatePlayerPaths(id);
   return { success: true, data };
 }
 
+export async function savePlayer(playerId: string | null, formData: FormData) {
+  const client = await getAuthenticatedClient();
+  if (!client) return { success: false, error: "Sessão expirada. Entre novamente." };
+
+  const name = String(formData.get("name") || "").trim();
+  const nickname = String(formData.get("nickname") || "").trim();
+  const removeAvatar = formData.get("remove_avatar") === "true";
+  const avatar = formData.get("avatar");
+  const hasNewAvatar = avatar instanceof File && avatar.size > 0;
+
+  if (!name) return { success: false, error: "O nome é obrigatório." };
+  if (name.length > 120) return { success: false, error: "O nome deve ter no máximo 120 caracteres." };
+  if (nickname.length > 60) return { success: false, error: "O apelido deve ter no máximo 60 caracteres." };
+
+  if (hasNewAvatar) {
+    if (!AVATAR_EXTENSIONS[avatar.type]) {
+      return { success: false, error: "Use uma imagem JPG, PNG ou WebP." };
+    }
+    if (avatar.size > MAX_AVATAR_SIZE) {
+      return { success: false, error: "A foto deve ter no máximo 5 MB." };
+    }
+  }
+
+  let currentAvatarUrl: string | null = null;
+  const id = playerId || crypto.randomUUID();
+
+  if (playerId) {
+    const { data: currentPlayer, error: currentPlayerError } = await client
+      .from("players")
+      .select("avatar_url")
+      .eq("id", playerId)
+      .single();
+
+    if (currentPlayerError) {
+      return { success: false, error: "Jogador não encontrado." };
+    }
+    currentAvatarUrl = currentPlayer.avatar_url;
+  }
+
+  let uploadedPath: string | null = null;
+  let nextAvatarUrl = removeAvatar ? null : currentAvatarUrl;
+
+  if (hasNewAvatar) {
+    const extension = AVATAR_EXTENSIONS[avatar.type];
+    uploadedPath = `${id}/${crypto.randomUUID()}.${extension}`;
+    const bytes = await avatar.arrayBuffer();
+    const { error: uploadError } = await client.storage
+      .from(AVATAR_BUCKET)
+      .upload(uploadedPath, bytes, {
+        contentType: avatar.type,
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error("Erro ao enviar foto do jogador:", uploadError);
+      return { success: false, error: `Não foi possível enviar a foto: ${uploadError.message}` };
+    }
+
+    nextAvatarUrl = client.storage.from(AVATAR_BUCKET).getPublicUrl(uploadedPath).data.publicUrl;
+  }
+
+  const playerData = {
+    id,
+    name,
+    nickname: nickname || null,
+    avatar_url: nextAvatarUrl,
+  };
+
+  const query = playerId
+    ? client.from("players").update({
+        name: playerData.name,
+        nickname: playerData.nickname,
+        avatar_url: playerData.avatar_url,
+      }).eq("id", id)
+    : client.from("players").insert([playerData]);
+
+  const { error: saveError } = await query;
+
+  if (saveError) {
+    if (uploadedPath) await client.storage.from(AVATAR_BUCKET).remove([uploadedPath]);
+    console.error("Erro ao salvar jogador:", saveError);
+    return { success: false, error: saveError.message };
+  }
+
+  const oldAvatarPath = avatarPathFromUrl(currentAvatarUrl);
+  if ((hasNewAvatar || removeAvatar) && oldAvatarPath && oldAvatarPath !== uploadedPath) {
+    const { error: cleanupError } = await client.storage.from(AVATAR_BUCKET).remove([oldAvatarPath]);
+    if (cleanupError) console.error("Erro ao remover foto antiga:", cleanupError);
+  }
+
+  revalidatePlayerPaths(id);
+  return { success: true, data: { id } };
+}
+
 export async function deletePlayer(id: string) {
-  const { error } = await supabase
+  const client = await getAuthenticatedClient();
+  if (!client) return { success: false, error: "Sessão expirada. Entre novamente." };
+
+  const { data: player } = await client
+    .from("players")
+    .select("avatar_url")
+    .eq("id", id)
+    .single();
+
+  const { error } = await client
     .from("players")
     .delete()
     .eq("id", id);
@@ -153,7 +308,12 @@ export async function deletePlayer(id: string) {
     return { success: false, error: error.message };
   }
 
-  revalidatePath("/jogadores");
-  revalidatePath("/admin/jogadores");
+  const avatarPath = avatarPathFromUrl(player?.avatar_url || null);
+  if (avatarPath) {
+    const { error: storageError } = await client.storage.from(AVATAR_BUCKET).remove([avatarPath]);
+    if (storageError) console.error("Erro ao remover foto do jogador:", storageError);
+  }
+
+  revalidatePlayerPaths(id);
   return { success: true };
 }

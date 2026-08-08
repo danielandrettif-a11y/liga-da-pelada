@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createRoundWithTeams, type TeamInput } from "@/lib/actions/rounds";
 import type { Player } from "@/lib/types";
-import { getInitials } from "@/lib/utils";
 import { Users, Calendar, CheckCircle2, ChevronRight } from "lucide-react";
+import { PlayerAvatar } from "./PlayerAvatar";
 
 const DEFAULT_TEAMS = [
   { id: "team1", name: "Azul", color: "#3B82F6", players: [] as Player[] },
@@ -183,12 +183,15 @@ export function RoundCreator({ allPlayers }: { allPlayers: Player[] }) {
                   `}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`
-                      w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold transition-colors
-                      ${isSelected ? "bg-accent text-background" : "bg-surface text-muted border border-border"}
-                    `}>
-                      {getInitials(player.name)}
-                    </div>
+                    <PlayerAvatar
+                      name={player.name}
+                      avatarUrl={player.avatar_url}
+                      className={`w-10 h-10 rounded-full text-xs font-bold transition-colors flex-shrink-0 ${
+                        isSelected
+                          ? "bg-accent text-background ring-2 ring-accent"
+                          : "bg-surface text-muted border border-border"
+                      }`}
+                    />
                     <div>
                       <p className={`text-sm font-bold ${isSelected ? "text-accent" : "text-foreground"}`}>
                         {player.nickname || player.name}

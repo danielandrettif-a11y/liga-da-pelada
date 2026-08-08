@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getPlayersWithStats } from "@/lib/actions/players";
-import { getInitials, getDisplayName, calculateWinRate } from "@/lib/utils";
+import { getDisplayName, calculateWinRate } from "@/lib/utils";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 
 export const revalidate = 0; // Para garantir que sempre busca do banco ao recarregar (em produção podemos mudar para ISR)
 
@@ -26,9 +27,11 @@ export default async function JogadoresPage() {
             >
               {/* Avatar */}
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-11 h-11 rounded-full bg-surface-hover flex items-center justify-center text-sm font-bold text-muted flex-shrink-0 ring-1 ring-border">
-                  {getInitials(player.name)}
-                </div>
+                <PlayerAvatar
+                  name={player.name}
+                  avatarUrl={player.avatar_url}
+                  className="w-11 h-11 rounded-full bg-surface-hover text-sm font-bold text-muted flex-shrink-0 ring-1 ring-border"
+                />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-foreground truncate">
                     {getDisplayName(player.name, player.nickname)}
