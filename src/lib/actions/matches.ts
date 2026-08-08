@@ -15,7 +15,7 @@ export async function createMatch(input: CreateMatchInput) {
         team_a_id: input.team_a_id,
         team_b_id: input.team_b_id,
         match_order: input.match_order || 1,
-        status: "in_progress",
+        status: "live",
         score_a: 0,
         score_b: 0,
       })
