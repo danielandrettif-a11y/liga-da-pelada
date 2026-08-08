@@ -1,22 +1,8 @@
 import { CalendarDays, ChevronRight, TrendingUp } from "lucide-react";
 import Link from "next/link";
+import { getDashboardData } from "@/lib/actions/dashboard";
 
-// Dados mock para demonstrar o layout (serão substituídos por dados do Supabase)
-const MOCK_HIGHLIGHTS = {
-  nextRound: { number: 3, date: "08/08/2026", confirmed: 15 },
-  lastRound: { number: 2, date: "01/08/2026" },
-  topScorer: { name: "Daniel", nickname: "Daniel", goals: 5 },
-  topAssists: { name: "JP", nickname: "JP", assists: 3 },
-  topWins: { name: "Daniel", nickname: "Daniel", wins: 4 },
-};
-
-const MOCK_RANKING = [
-  { rank: 1, name: "Daniel", points: 27, goals: 5, assists: 2 },
-  { rank: 2, name: "Gabigol", points: 15, goals: 4, assists: 0 },
-  { rank: 3, name: "Luquinha", points: 16, goals: 2, assists: 1 },
-  { rank: 4, name: "JP", points: 12, goals: 2, assists: 3 },
-  { rank: 5, name: "Dedé", points: 11, goals: 2, assists: 1 },
-];
+export const dynamic = "force-dynamic";
 
 function RankBadge({ rank }: { rank: number }) {
   if (rank <= 3) {
@@ -51,67 +37,105 @@ function StatHighlightCard({
           {label}
         </span>
       </div>
-      <p className="text-base font-bold text-foreground truncate">{playerName}</p>
+      <p className="text-base font-bold text-foreground truncate">{playerName || "-"}</p>
       <div className="flex items-baseline gap-1 mt-1">
-        <span className="stat-number text-2xl gradient-text">{value}</span>
+        <span className="stat-number text-2xl gradient-text">{value || 0}</span>
         <span className="text-xs text-muted font-medium">{unit}</span>
       </div>
     </div>
   );
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const { data } = await getDashboardData();
+  
+  if (!data) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center animate-fade-in">
+        <div className="w-16 h-16 rounded-full bg-surface-hover flex items-center justify-center mb-4">
+          <TrendingUp className="w-8 h-8 text-muted" />
+        </div>
+        <h2 className="text-xl font-bold text-foreground mb-2">Bem-vindo à Liga</h2>
+        <p className="text-muted text-sm mb-6">
+          Comece criando a primeira rodada e chamando seus amigos!
+        </p>
+        <Link href="/rodadas" className="btn-primary w-full">
+          Ir para Rodadas
+        </Link>
+      </div>
+    );
+  }
+
+  const { nextRound, lastRound, rankingPreview, highlights } = data;
+
   return (
     <div className="space-y-6">
       {/* Next Round Card */}
-      <Link href="/rodadas" className="block">
-        <div className="glass-card glass-card-hover p-5 animate-fade-in">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center">
-                <CalendarDays className="w-5 h-5 text-accent" />
+      {nextRound ? (
+        <Link href={`/rodadas/${nextRound.id}`} className="block">
+          <div className="glass-card glass-card-hover p-5 animate-fade-in">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center">
+                  <CalendarDays className="w-5 h-5 text-accent" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted font-semibold uppercase tracking-wider">
+                    {nextRound.status === 'active' ? 'Rodada em Andamento' : 'Próxima Pelada'}
+                  </p>
+                  <p className="text-lg font-bold text-foreground">
+                    Rodada {String(nextRound.number).padStart(2, "0")}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted" />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div>
+                  <p className="text-xs text-muted mb-0.5">Data</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {new Date(nextRound.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+                <div className="w-px h-8 bg-border" />
+                <div>
+                  <p className="text-xs text-muted mb-0.5">Confirmados</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {nextRound.confirmedPlayers} jogadores
+                  </p>
+                </div>
+              </div>
+              <div className="px-3 py-1.5 rounded-full bg-accent/15 text-accent text-xs font-bold">
+                ACESSAR
+              </div>
+            </div>
+          </div>
+        </Link>
+      ) : (
+        <Link href="/rodadas" className="block">
+          <div className="glass-card glass-card-hover p-5 animate-fade-in flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-surface-hover flex items-center justify-center">
+                <CalendarDays className="w-5 h-5 text-muted" />
               </div>
               <div>
-                <p className="text-xs text-muted font-semibold uppercase tracking-wider">
-                  Próxima Pelada
-                </p>
-                <p className="text-lg font-bold text-foreground">
-                  Rodada {String(MOCK_HIGHLIGHTS.nextRound.number).padStart(2, "0")}
-                </p>
+                <p className="text-sm font-bold text-foreground">Nenhuma rodada agendada</p>
+                <p className="text-xs text-muted">Clique para criar a próxima pelada</p>
               </div>
             </div>
             <ChevronRight className="w-5 h-5 text-muted" />
           </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div>
-                <p className="text-xs text-muted mb-0.5">Data</p>
-                <p className="text-sm font-semibold text-foreground">
-                  {MOCK_HIGHLIGHTS.nextRound.date}
-                </p>
-              </div>
-              <div className="w-px h-8 bg-border" />
-              <div>
-                <p className="text-xs text-muted mb-0.5">Confirmados</p>
-                <p className="text-sm font-semibold text-foreground">
-                  {MOCK_HIGHLIGHTS.nextRound.confirmed} jogadores
-                </p>
-              </div>
-            </div>
-            <div className="px-3 py-1.5 rounded-full bg-accent/15 text-accent text-xs font-bold">
-              VER RODADA
-            </div>
-          </div>
-        </div>
-      </Link>
+        </Link>
+      )}
 
       {/* Highlights Section */}
       <section>
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp className="w-4 h-4 text-accent" />
           <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">
-            Destaques
+            Destaques da Temporada
           </h2>
         </div>
 
@@ -119,24 +143,24 @@ export default function HomePage() {
           <StatHighlightCard
             emoji="⚽"
             label="Artilheiro"
-            playerName={MOCK_HIGHLIGHTS.topScorer.nickname}
-            value={MOCK_HIGHLIGHTS.topScorer.goals}
+            playerName={highlights?.topScorer?.player?.nickname || highlights?.topScorer?.player?.name}
+            value={highlights?.topScorer?.goals}
             unit="gols"
             delay="stagger-1"
           />
           <StatHighlightCard
             emoji="🎯"
             label="Assistências"
-            playerName={MOCK_HIGHLIGHTS.topAssists.nickname}
-            value={MOCK_HIGHLIGHTS.topAssists.assists}
+            playerName={highlights?.topAssists?.player?.nickname || highlights?.topAssists?.player?.name}
+            value={highlights?.topAssists?.assists}
             unit="assists"
             delay="stagger-2"
           />
           <StatHighlightCard
             emoji="🏆"
             label="Vitórias"
-            playerName={MOCK_HIGHLIGHTS.topWins.nickname}
-            value={MOCK_HIGHLIGHTS.topWins.wins}
+            playerName={highlights?.topWins?.player?.nickname || highlights?.topWins?.player?.name}
+            value={highlights?.topWins?.wins}
             unit="vitórias"
             delay="stagger-3"
           />
@@ -147,7 +171,7 @@ export default function HomePage() {
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">
-            🏅 Ranking
+            🏅 Top 5 Ranking
           </h2>
           <Link
             href="/ranking"
@@ -158,123 +182,135 @@ export default function HomePage() {
         </div>
 
         <div className="glass-card overflow-hidden">
-          {MOCK_RANKING.map((player, index) => (
-            <div
-              key={player.rank}
-              className={`
-                flex items-center gap-3 px-4 py-3.5 animate-fade-in
-                ${index < MOCK_RANKING.length - 1 ? "border-b border-border" : ""}
-                stagger-${index + 1}
-                hover:bg-surface-hover transition-colors cursor-pointer
-              `}
-            >
-              <RankBadge rank={player.rank} />
-              
-              {/* Avatar */}
-              <div className="w-9 h-9 rounded-full bg-surface-hover flex items-center justify-center text-xs font-bold text-muted flex-shrink-0">
-                {player.name.slice(0, 2).toUpperCase()}
-              </div>
+          {rankingPreview && rankingPreview.length > 0 ? (
+            rankingPreview.map((stats: any, index: number) => {
+              const name = stats.player?.nickname || stats.player?.name || "Desconhecido";
+              return (
+                <Link
+                  href={`/jogadores/${stats.player.id}`}
+                  key={stats.player.id}
+                  className={`
+                    flex items-center gap-3 px-4 py-3.5 animate-fade-in
+                    ${index < rankingPreview.length - 1 ? "border-b border-border" : ""}
+                    stagger-${index + 1}
+                    hover:bg-surface-hover transition-colors
+                  `}
+                >
+                  <RankBadge rank={index + 1} />
+                  
+                  {/* Avatar */}
+                  <div className="w-9 h-9 rounded-full bg-surface-hover flex items-center justify-center text-xs font-bold text-muted flex-shrink-0">
+                    {name.slice(0, 2).toUpperCase()}
+                  </div>
 
-              {/* Name */}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground truncate">
-                  {player.name}
-                </p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] text-muted">
-                    ⚽ {player.goals}
-                  </span>
-                  <span className="text-[10px] text-muted">
-                    🎯 {player.assists}
-                  </span>
-                </div>
-              </div>
+                  {/* Name */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {name}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-muted">
+                        ⚽ {stats.goals}
+                      </span>
+                      <span className="text-[10px] text-muted">
+                        🎯 {stats.assists}
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Points */}
-              <div className="text-right">
-                <p className="stat-number text-lg gradient-text">
-                  {player.points}
-                </p>
-                <p className="text-[10px] text-muted font-medium">pts</p>
-              </div>
+                  {/* Points */}
+                  <div className="text-right">
+                    <p className="stat-number text-lg gradient-text">
+                      {stats.points}
+                    </p>
+                    <p className="text-[10px] text-muted font-medium">pts</p>
+                  </div>
+                </Link>
+              );
+            })
+          ) : (
+            <div className="p-6 text-center text-muted text-sm">
+              Nenhuma pontuação registrada ainda.
             </div>
-          ))}
+          )}
         </div>
       </section>
 
       {/* Last Round Summary */}
-      <section>
-        <h2 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">
-          📋 Última Rodada
-        </h2>
+      {lastRound && (
+        <section>
+          <h2 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">
+            📋 Última Rodada
+          </h2>
 
-        <Link href="/rodadas" className="block">
-          <div className="glass-card glass-card-hover p-4 animate-fade-in-up">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-foreground">
-                Rodada {String(MOCK_HIGHLIGHTS.lastRound.number).padStart(2, "0")}
-              </p>
-              <span className="text-xs text-muted">
-                {MOCK_HIGHLIGHTS.lastRound.date}
-              </span>
-            </div>
+          <Link href={`/rodadas/${lastRound.id}`} className="block">
+            <div className="glass-card glass-card-hover p-4 animate-fade-in-up">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-bold text-foreground">
+                  Rodada {String(lastRound.number).padStart(2, "0")}
+                </p>
+                <span className="text-xs text-muted">
+                  {new Date(lastRound.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                </span>
+              </div>
 
-            {/* Mini match results */}
-            <div className="space-y-2">
-              {[
-                { a: "Azul", b: "Vermelho", sa: 1, sb: 2, ca: "#3B82F6", cb: "#EF4444" },
-                { a: "Preto", b: "Azul", sa: 0, sb: 2, ca: "#374151", cb: "#3B82F6" },
-                { a: "Vermelho", b: "Preto", sa: 3, sb: 1, ca: "#EF4444", cb: "#374151" },
-              ].map((match, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 py-1.5 text-xs"
-                >
-                  <div className="flex items-center gap-1.5 flex-1 justify-end">
-                    <span className="font-semibold text-foreground/80">
-                      {match.a}
-                    </span>
-                    <span
-                      className="team-dot"
-                      style={{ backgroundColor: match.ca }}
-                    />
-                  </div>
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface min-w-[3.5rem] justify-center">
-                    <span
-                      className={`font-bold ${
-                        match.sa > match.sb
-                          ? "text-accent"
-                          : "text-foreground/60"
-                      }`}
+              {/* Mini match results */}
+              <div className="space-y-2">
+                {lastRound.matches && lastRound.matches.length > 0 ? (
+                  lastRound.matches.map((match: any) => (
+                    <div
+                      key={match.id}
+                      className="flex items-center gap-2 py-1.5 text-xs"
                     >
-                      {match.sa}
-                    </span>
-                    <span className="text-muted">×</span>
-                    <span
-                      className={`font-bold ${
-                        match.sb > match.sa
-                          ? "text-accent"
-                          : "text-foreground/60"
-                      }`}
-                    >
-                      {match.sb}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-1">
-                    <span
-                      className="team-dot"
-                      style={{ backgroundColor: match.cb }}
-                    />
-                    <span className="font-semibold text-foreground/80">
-                      {match.b}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                      <div className="flex items-center gap-1.5 flex-1 justify-end">
+                        <span className="font-semibold text-foreground/80 truncate">
+                          {match.teamA?.name || "Time A"}
+                        </span>
+                        <span
+                          className="team-dot flex-shrink-0"
+                          style={{ backgroundColor: match.teamA?.color || "#fff" }}
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface min-w-[3.5rem] justify-center">
+                        <span
+                          className={`font-bold ${
+                            match.score_a > match.score_b
+                              ? "text-accent"
+                              : "text-foreground/60"
+                          }`}
+                        >
+                          {match.score_a}
+                        </span>
+                        <span className="text-muted">×</span>
+                        <span
+                          className={`font-bold ${
+                            match.score_b > match.score_a
+                              ? "text-accent"
+                              : "text-foreground/60"
+                          }`}
+                        >
+                          {match.score_b}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <span
+                          className="team-dot flex-shrink-0"
+                          style={{ backgroundColor: match.teamB?.color || "#fff" }}
+                        />
+                        <span className="font-semibold text-foreground/80 truncate">
+                          {match.teamB?.name || "Time B"}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-center text-muted py-2">Sem partidas registradas</p>
+                )}
+              </div>
             </div>
-          </div>
-        </Link>
-      </section>
+          </Link>
+        </section>
+      )}
     </div>
   );
 }
