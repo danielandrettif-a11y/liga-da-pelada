@@ -23,6 +23,7 @@ export function RoundCreator({ allPlayers }: { allPlayers: Player[] }) {
   
   // Step 3: Times
   const [teams, setTeams] = useState(DEFAULT_TEAMS);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -211,23 +212,31 @@ export function RoundCreator({ allPlayers }: { allPlayers: Player[] }) {
               </p>
               <div className="flex flex-wrap gap-2 glass-card p-3 min-h-[4rem]">
                 {unassignedPlayers.map(p => (
-                  <div key={p.id} className="relative group">
-                    <div className="px-3 py-1.5 bg-surface-hover border border-border rounded-lg text-xs font-bold text-foreground cursor-pointer">
+                  <div key={p.id} className="relative">
+                    <div 
+                      onClick={() => setOpenDropdownId(openDropdownId === p.id ? null : p.id)}
+                      className="px-3 py-1.5 bg-surface-hover border border-border rounded-lg text-xs font-bold text-foreground cursor-pointer"
+                    >
                       {p.nickname || p.name}
                     </div>
-                    {/* Tooltip p/ escolher time rápido */}
-                    <div className="absolute top-full left-0 mt-1 hidden group-hover:flex bg-surface border border-border rounded-lg shadow-xl overflow-hidden z-10 flex-col w-28">
-                      {teams.map(t => (
-                        <button
-                          key={t.id}
-                          onClick={() => assignToTeam(p, t.id)}
-                          className="px-3 py-2 text-left text-[10px] font-bold text-foreground hover:bg-surface-hover flex items-center gap-2 border-b border-border last:border-0"
-                        >
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }} />
-                          {t.name}
-                        </button>
-                      ))}
-                    </div>
+                    {/* Menu de times (aberto ao clicar) */}
+                    {openDropdownId === p.id && (
+                      <div className="absolute top-full left-0 mt-1 flex bg-surface border border-border rounded-lg shadow-xl overflow-hidden z-10 flex-col w-28">
+                        {teams.map(t => (
+                          <button
+                            key={t.id}
+                            onClick={() => {
+                              assignToTeam(p, t.id);
+                              setOpenDropdownId(null);
+                            }}
+                            className="px-3 py-2 text-left text-[10px] font-bold text-foreground hover:bg-surface-hover flex items-center gap-2 border-b border-border last:border-0"
+                          >
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: t.color }} />
+                            <span className="truncate">{t.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
