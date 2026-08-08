@@ -45,7 +45,6 @@ export async function calculateRoundStats(roundId: string) {
             player_id: tp.player_id,
             round_id: roundId,
             league_id: round.league_id,
-            team_id: team.id,
             games: 0,
             wins: 0,
             draws: 0,
