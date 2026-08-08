@@ -179,6 +179,7 @@ export async function finishRound(roundId: string) {
 
     revalidatePath(`/rodadas/${roundId}`);
     revalidatePath("/rodadas");
+    revalidatePath("/ranking");
     return { success: true };
   } catch (err: any) {
     console.error("Erro ao encerrar rodada:", err);

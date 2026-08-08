@@ -167,6 +167,7 @@ export async function finishMatch(matchId: string) {
 
     revalidatePath(`/partidas/${matchId}`);
     revalidatePath(`/rodadas/${match.round_id}`);
+    revalidatePath("/ranking");
     
     // Atualiza as estatísticas de todos os jogadores da rodada
     await calculateRoundStats(match.round_id);
