@@ -61,6 +61,25 @@ export function RoundCreator({ allPlayers }: { allPlayers: Player[] }) {
     })));
   }
 
+  function handleRandomDraw() {
+    const playersToDraw = [...selectedPlayers];
+    
+    // Fisher-Yates shuffle
+    for (let i = playersToDraw.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [playersToDraw[i], playersToDraw[j]] = [playersToDraw[j], playersToDraw[i]];
+    }
+
+    // Distribui iterativamente
+    const newTeams = teams.map(t => ({ ...t, players: [] as Player[] }));
+    playersToDraw.forEach((player, index) => {
+      const teamIndex = index % newTeams.length;
+      newTeams[teamIndex].players.push(player);
+    });
+
+    setTeams(newTeams);
+  }
+
   async function handleSave() {
     if (unassignedPlayers.length > 0) {
       if (!confirm(`Ainda há ${unassignedPlayers.length} jogadores sem time. Deseja salvar mesmo assim?`)) {
@@ -204,6 +223,23 @@ export function RoundCreator({ allPlayers }: { allPlayers: Player[] }) {
       {step === 3 && (
         <div className="space-y-6 animate-fade-in">
           
+          {/* Sorteio */}
+          <div className="flex gap-2">
+            <button
+              onClick={handleRandomDraw}
+              className="flex-1 bg-surface border border-border text-foreground hover:bg-surface-hover font-bold py-2.5 rounded-xl transition-all text-xs flex items-center justify-center gap-2"
+            >
+              🎲 Sorteio Aleatório
+            </button>
+            <button
+              disabled
+              className="flex-1 bg-surface/50 border border-border/50 text-muted font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 cursor-not-allowed relative overflow-hidden"
+            >
+              📊 Por Estatísticas
+              <span className="absolute top-0 right-0 bg-accent text-[8px] text-background px-1.5 py-0.5 rounded-bl-lg font-black uppercase tracking-wider">Breve</span>
+            </button>
+          </div>
+
           {/* Unassigned Pool */}
           {unassignedPlayers.length > 0 && (
             <div>
