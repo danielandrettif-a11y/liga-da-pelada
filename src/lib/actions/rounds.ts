@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
+import { getActiveSeason } from "./seasons";
 
 export async function getActiveLeague() {
   const { data, error } = await supabase
@@ -27,6 +28,10 @@ export async function getActiveLeague() {
 }
 
 export async function getRounds() {
+  const league = await getActiveLeague();
+  const season = await getActiveSeason(league.id);
+  if (!season) return [];
+
   const { data, error } = await supabase
     .from("rounds")
     .select(`
@@ -34,6 +39,7 @@ export async function getRounds() {
       round_players (count),
       matches (count)
     `)
+    .eq("season_id", season.id)
     .order("number", { ascending: false });
 
   if (error) {
@@ -86,12 +92,15 @@ export type TeamInput = {
 export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
   try {
     const league = await getActiveLeague();
+    const season = await getActiveSeason(league.id);
+    if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
 
     // 1. Descobrir o número da nova rodada (maior number + 1)
     const { data: lastRound } = await supabase
       .from("rounds")
       .select("number")
       .eq("league_id", league.id)
+      .eq("season_id", season.id)
       .order("number", { ascending: false })
       .limit(1)
       .single();
@@ -103,6 +112,7 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
       .from("rounds")
       .insert({
         league_id: league.id,
+        season_id: season.id,
         number: nextNumber,
         date,
         status: "draft",

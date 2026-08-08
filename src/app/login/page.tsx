@@ -27,7 +27,7 @@ export default function LoginPage() {
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent to-accent-light flex items-center justify-center shadow-lg shadow-accent/20 mb-4">
             <Trophy className="w-8 h-8 text-black" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Liga da Pelada</h1>
+          <h1 className="text-2xl font-bold text-foreground text-center">Pelada de Baixa Qualidade</h1>
           <p className="text-muted text-sm mt-1">Faça login para gerenciar a liga</p>
         </div>
 
@@ -51,7 +51,7 @@ export default function LoginPage() {
                   type="email"
                   name="email"
                   required
-                  placeholder="admin@ligadapelada.com"
+                  placeholder="admin@peladabaixa.com"
                   className="w-full bg-surface-hover border border-border rounded-xl py-3 pl-10 pr-4 text-sm text-foreground focus:outline-none focus:border-accent transition-colors"
                 />
               </div>

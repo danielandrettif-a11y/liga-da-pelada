@@ -5,24 +5,29 @@ import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, Trash2 } from "lucide-react";
 import { deletePlayer, savePlayer } from "@/lib/actions/players";
 import type { Player } from "@/lib/types";
+import { AvatarCropModal } from "./AvatarCropModal";
 import { PlayerAvatar } from "./PlayerAvatar";
 
-const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+const MAX_SOURCE_SIZE = 20 * 1024 * 1024;
 
 export function PlayerForm({ player }: { player?: Player }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const objectUrlRef = useRef<string | null>(null);
+  const previewObjectUrlRef = useRef<string | null>(null);
+  const cropSourceUrlRef = useRef<string | null>(null);
   const isEditing = !!player;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [previewUrl, setPreviewUrl] = useState(player?.avatar_url || "");
   const [removeAvatar, setRemoveAvatar] = useState(false);
+  const [croppedFile, setCroppedFile] = useState<File | null>(null);
+  const [cropSourceUrl, setCropSourceUrl] = useState("");
 
   useEffect(() => {
     return () => {
-      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      if (previewObjectUrlRef.current) URL.revokeObjectURL(previewObjectUrlRef.current);
+      if (cropSourceUrlRef.current) URL.revokeObjectURL(cropSourceUrlRef.current);
     };
   }, []);
 
@@ -30,32 +35,56 @@ export function PlayerForm({ player }: { player?: Player }) {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setError("Use uma imagem JPG, PNG ou WebP.");
+    if (!file.type.startsWith("image/")) {
+      setError("Escolha um arquivo de imagem.");
       event.target.value = "";
       return;
     }
 
-    if (file.size > MAX_AVATAR_SIZE) {
-      setError("A foto deve ter no máximo 5 MB.");
+    if (file.size > MAX_SOURCE_SIZE) {
+      setError("A imagem original deve ter no máximo 20 MB.");
       event.target.value = "";
       return;
     }
 
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    objectUrlRef.current = URL.createObjectURL(file);
-    setPreviewUrl(objectUrlRef.current);
+    if (cropSourceUrlRef.current) URL.revokeObjectURL(cropSourceUrlRef.current);
+    cropSourceUrlRef.current = URL.createObjectURL(file);
+    setCropSourceUrl(cropSourceUrlRef.current);
+    setError("");
+  }
+
+  function handleCropCancel() {
+    if (cropSourceUrlRef.current) {
+      URL.revokeObjectURL(cropSourceUrlRef.current);
+      cropSourceUrlRef.current = null;
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setCropSourceUrl("");
+  }
+
+  function handleCropConfirm(file: File) {
+    if (cropSourceUrlRef.current) {
+      URL.revokeObjectURL(cropSourceUrlRef.current);
+      cropSourceUrlRef.current = null;
+    }
+    if (previewObjectUrlRef.current) URL.revokeObjectURL(previewObjectUrlRef.current);
+
+    previewObjectUrlRef.current = URL.createObjectURL(file);
+    setPreviewUrl(previewObjectUrlRef.current);
+    setCroppedFile(file);
     setRemoveAvatar(false);
+    setCropSourceUrl("");
     setError("");
   }
 
   function handleRemoveAvatar() {
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = null;
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+      previewObjectUrlRef.current = null;
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
     setPreviewUrl("");
+    setCroppedFile(null);
     setRemoveAvatar(true);
   }
 
@@ -66,6 +95,7 @@ export function PlayerForm({ player }: { player?: Player }) {
 
     const formData = new FormData(event.currentTarget);
     formData.set("remove_avatar", String(removeAvatar));
+    if (croppedFile) formData.set("avatar", croppedFile, croppedFile.name);
 
     try {
       const result = await savePlayer(player?.id || null, formData);
@@ -102,6 +132,13 @@ export function PlayerForm({ player }: { player?: Player }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 glass-card p-5">
+      {cropSourceUrl && (
+        <AvatarCropModal
+          imageUrl={cropSourceUrl}
+          onCancel={handleCropCancel}
+          onConfirm={handleCropConfirm}
+        />
+      )}
       {error && (
         <div role="alert" className="p-3 rounded-lg bg-danger/10 text-danger text-xs font-semibold">
           {error}
@@ -131,7 +168,7 @@ export function PlayerForm({ player }: { player?: Player }) {
           id="avatar"
           name="avatar"
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/*"
           onChange={handleAvatarChange}
           className="sr-only"
         />
@@ -158,7 +195,7 @@ export function PlayerForm({ player }: { player?: Player }) {
             </button>
           )}
         </div>
-        <p className="text-[10px] text-muted text-center">JPG, PNG ou WebP · máximo de 5 MB</p>
+        <p className="text-[10px] text-muted text-center">Escolha uma imagem e ajuste o enquadramento antes de salvar</p>
       </div>
 
       <div className="space-y-1.5">

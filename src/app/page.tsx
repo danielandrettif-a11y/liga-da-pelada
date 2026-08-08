@@ -1,6 +1,8 @@
 import { CalendarDays, ChevronRight, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { getDashboardData } from "@/lib/actions/dashboard";
+import { getLatestFinishedSeason } from "@/lib/actions/seasons";
+import { PreviousSeasonBanner } from "@/components/PreviousSeasonBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +49,10 @@ function StatHighlightCard({
 }
 
 export default async function HomePage() {
-  const { data } = await getDashboardData();
+  const [{ data }, previousSeason] = await Promise.all([
+    getDashboardData(),
+    getLatestFinishedSeason(),
+  ]);
   
   if (!data) {
     return (
@@ -70,6 +75,8 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
+      {previousSeason && <PreviousSeasonBanner summary={previousSeason} />}
+
       {/* Next Round Card */}
       {nextRound ? (
         <Link href={`/rodadas/${nextRound.id}`} className="block">

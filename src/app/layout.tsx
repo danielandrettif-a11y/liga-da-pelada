@@ -17,10 +17,10 @@ const oswald = Oswald({
 });
 
 export const metadata: Metadata = {
-  title: "Liga da Pelada",
+  title: "Pelada de Baixa Qualidade",
   description: "O Cartola da sua pelada. Acompanhe gols, assistências, rankings e muito mais.",
   keywords: ["pelada", "futebol", "ranking", "estatísticas", "liga"],
-  authors: [{ name: "Liga da Pelada" }],
+  authors: [{ name: "Pelada de Baixa Qualidade" }],
 };
 
 export const viewport: Viewport = {

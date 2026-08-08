@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
 import { createClient as createServerClient } from "../supabase/server";
 import type { Player, CreatePlayerInput } from "../types";
+import { getActiveSeasonRoundIds } from "./seasons";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -86,9 +87,11 @@ export async function getPlayersWithStats() {
     return [];
   }
 
-  const { data: stats, error: statsError } = await supabase
-    .from("player_round_stats")
-    .select("*");
+  const roundIds = await getActiveSeasonRoundIds();
+  const statsResult = roundIds.length > 0
+    ? await supabase.from("player_round_stats").select("*").in("round_id", roundIds)
+    : { data: [], error: null };
+  const { data: stats, error: statsError } = statsResult;
 
   if (statsError) {
     console.error("Erro ao buscar estatísticas:", statsError);
@@ -122,6 +125,9 @@ export async function getPlayersWithStats() {
 }
 
 export async function getPlayerRoundHistory(playerId: string) {
+  const roundIds = await getActiveSeasonRoundIds();
+  if (roundIds.length === 0) return [];
+
   const { data, error } = await supabase
     .from("player_round_stats")
     .select(`
@@ -132,6 +138,7 @@ export async function getPlayerRoundHistory(playerId: string) {
       )
     `)
     .eq("player_id", playerId)
+    .in("round_id", roundIds)
     .order("rounds(number)", { ascending: false });
 
   if (error) {

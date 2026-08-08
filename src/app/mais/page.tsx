@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { FinishSeasonCard } from "@/components/FinishSeasonCard";
+import { createClient } from "@/lib/supabase/server";
 import {
   UserPlus,
   CalendarPlus,
@@ -57,7 +59,10 @@ const ADMIN_SECTIONS = [
   },
 ];
 
-export default function MaisPage() {
+export default async function MaisPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-bold text-foreground">Mais</h1>
@@ -94,9 +99,11 @@ export default function MaisPage() {
         </div>
       ))}
 
+      {user && <FinishSeasonCard />}
+
       {/* Version info */}
       <div className="text-center pt-4 pb-2">
-        <p className="text-xs text-muted/50">Liga da Pelada v0.1.0</p>
+        <p className="text-xs text-muted/50">Pelada de Baixa Qualidade v0.1.0</p>
         <p className="text-[10px] text-muted/30 mt-0.5">
           Feito com ⚽ para peladas entre amigos
         </p>

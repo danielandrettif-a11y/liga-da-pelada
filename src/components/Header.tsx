@@ -13,10 +13,10 @@ export function Header() {
           </div>
           <div>
             <h1 className="text-sm font-bold tracking-tight text-foreground leading-none">
-              LIGA DA PELADA
+              PELADA DE BAIXA QUALIDADE
             </h1>
             <p className="text-[10px] text-muted font-medium tracking-widest uppercase">
-              Season 01
+              Temporadas
             </p>
           </div>
         </Link>

@@ -2,14 +2,19 @@
 
 import { supabase } from "../supabase";
 import { getRanking } from "./stats";
+import { getActiveSeason } from "./seasons";
 
 export async function getDashboardData() {
   try {
+    const season = await getActiveSeason();
+    if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
+
     // 1. Próxima Rodada (draft ou active)
     const { data: nextRoundData } = await supabase
       .from("rounds")
       .select("*, round_players(count)")
       .in("status", ["draft", "active"])
+      .eq("season_id", season.id)
       .order("date", { ascending: true })
       .limit(1)
       .single();
@@ -23,6 +28,7 @@ export async function getDashboardData() {
         teams(*)
       `)
       .eq("status", "finished")
+      .eq("season_id", season.id)
       .order("date", { ascending: false })
       .limit(1)
       .single();

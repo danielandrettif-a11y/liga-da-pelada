@@ -56,11 +56,51 @@ export type RoundStatus = 'draft' | 'active' | 'finished';
 export type Round = {
   id: string;
   league_id: string;
+  season_id: string;
   number: number;
   date: string;
   status: RoundStatus;
   notes: string | null;
   created_at: string;
+};
+
+export type SeasonStatus = 'active' | 'finished';
+
+export type Season = {
+  id: string;
+  league_id: string;
+  number: number;
+  status: SeasonStatus;
+  started_at: string;
+  ended_at: string | null;
+  stats_snapshot: SeasonSummary | null;
+  created_at: string;
+};
+
+export type SeasonPlayerSummary = {
+  id: string;
+  name: string;
+  nickname: string | null;
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goals: number;
+  assists: number;
+  points: number;
+};
+
+export type SeasonSummary = {
+  seasonId: string;
+  seasonNumber: number;
+  leagueName: string;
+  startedAt: string;
+  endedAt: string;
+  roundCount: number;
+  matchCount: number;
+  goalCount: number;
+  playerCount: number;
+  ranking: SeasonPlayerSummary[];
 };
 
 export type RoundPlayer = {
@@ -263,6 +303,11 @@ export type Database = {
         Row: Round;
         Insert: Omit<Round, 'id' | 'created_at' | 'status'> & { id?: string; created_at?: string; status?: RoundStatus };
         Update: Partial<Omit<Round, 'id'>>;
+      };
+      seasons: {
+        Row: Season;
+        Insert: Omit<Season, 'id' | 'created_at' | 'status' | 'started_at' | 'ended_at' | 'stats_snapshot'> & { id?: string; created_at?: string; status?: SeasonStatus; started_at?: string; ended_at?: string | null; stats_snapshot?: SeasonSummary | null };
+        Update: Partial<Omit<Season, 'id'>>;
       };
       round_players: {
         Row: RoundPlayer;

@@ -1,6 +1,7 @@
 "use server";
 
 import { supabase } from "../supabase";
+import { getActiveSeasonRoundIds } from "./seasons";
 
 // Regras de Pontuação Padrão
 const POINTS = {
@@ -120,6 +121,9 @@ export async function calculateRoundStats(roundId: string) {
 }
 
 export async function getRanking() {
+  const roundIds = await getActiveSeasonRoundIds();
+  if (roundIds.length === 0) return [];
+
   // O ideal em produção seria usar uma View SQL
   // Para o MVP, buscamos todos os stats e agrupamos no servidor
   const { data, error } = await supabase
@@ -127,7 +131,8 @@ export async function getRanking() {
     .select(`
       *,
       player:player_id (*)
-    `);
+    `)
+    .in("round_id", roundIds);
 
   if (error) {
     console.error("Erro ao buscar ranking:", error);
