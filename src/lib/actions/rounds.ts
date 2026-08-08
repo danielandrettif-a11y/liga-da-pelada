@@ -163,3 +163,25 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
     return { success: false, error: err.message };
   }
 }
+
+export async function finishRound(roundId: string) {
+  try {
+    const { error } = await supabase
+      .from("rounds")
+      .update({ status: "finished" })
+      .eq("id", roundId);
+
+    if (error) throw new Error(error.message);
+
+    // Recalcula estatísticas por precaução
+    const { calculateRoundStats } = await import("./stats");
+    await calculateRoundStats(roundId);
+
+    revalidatePath(`/rodadas/${roundId}`);
+    revalidatePath("/rodadas");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Erro ao encerrar rodada:", err);
+    return { success: false, error: err.message };
+  }
+}

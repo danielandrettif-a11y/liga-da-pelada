@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarDays, Plus } from "lucide-react";
 import { getRound } from "@/lib/actions/rounds";
 import { formatDateShort } from "@/lib/utils";
+import { FinishRoundButton } from "@/components/FinishRoundButton";
 
 export const revalidate = 0;
 
@@ -85,13 +86,15 @@ export default async function RodadaDetalhePage({
           <h2 className="text-xs font-bold text-muted uppercase tracking-wider">
             Partidas
           </h2>
-          <Link
-            href={`/rodadas/${round.id}/nova-partida`}
-            className="flex items-center gap-1 text-xs font-bold text-accent hover:text-accent-light transition-colors"
-          >
-            <Plus className="w-3 h-3" />
-            Nova Partida
-          </Link>
+          {round.status !== "finished" && (
+            <Link
+              href={`/rodadas/${round.id}/nova-partida`}
+              className="flex items-center gap-1 text-xs font-bold text-accent hover:text-accent-light transition-colors"
+            >
+              <Plus className="w-3 h-3" />
+              Nova Partida
+            </Link>
+          )}
         </div>
         
         <div className="space-y-3">
@@ -145,6 +148,8 @@ export default async function RodadaDetalhePage({
           )}
         </div>
       </section>
+      
+      <FinishRoundButton roundId={round.id} status={round.status} />
     </div>
   );
 }
