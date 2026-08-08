@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { registerGoal, finishMatch, deleteEvent } from "@/lib/actions/matches";
+import { registerGoal, finishMatch, deleteEvent, updateMatchTimer, resetMatchTimer } from "@/lib/actions/matches";
 import { ArrowLeft, Plus, Clock, Trophy, Trash2, Play, Pause, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { getInitials } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 type MatchLiveBoardProps = {
   match: any;
@@ -20,24 +21,58 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
   // Timer State
   const initialSeconds = matchDuration * 60;
   const [secondsLeft, setSecondsLeft] = useState(initialSeconds);
-  const [isRunning, setIsRunning] = useState(false);
+  const isRunning = !!match.timer_started_at;
 
+  // Atualiza o timer visualmente a cada segundo, baseado na hora do banco
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isRunning && secondsLeft > 0) {
-      interval = setInterval(() => {
-        setSecondsLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (secondsLeft === 0) {
-      setIsRunning(false);
-    }
-    return () => clearInterval(interval);
-  }, [isRunning, secondsLeft]);
+    
+    const updateTimer = () => {
+      if (match.timer_started_at) {
+        const elapsedSinceStart = Math.floor((new Date().getTime() - new Date(match.timer_started_at).getTime()) / 1000);
+        const totalElapsed = (match.timer_accumulated_seconds || 0) + elapsedSinceStart;
+        setSecondsLeft(Math.max(0, initialSeconds - totalElapsed));
+      } else {
+        const totalElapsed = match.timer_accumulated_seconds || 0;
+        setSecondsLeft(Math.max(0, initialSeconds - totalElapsed));
+      }
+    };
 
-  const toggleTimer = () => setIsRunning(!isRunning);
-  const resetTimer = () => {
-    setIsRunning(false);
-    setSecondsLeft(initialSeconds);
+    updateTimer(); // Calcula logo de cara
+
+    if (match.timer_started_at) {
+      interval = setInterval(updateTimer, 1000);
+    }
+    
+    return () => clearInterval(interval);
+  }, [match.timer_started_at, match.timer_accumulated_seconds, initialSeconds]);
+
+  // Escuta mudanças em tempo real no banco
+  useEffect(() => {
+    const channel = supabase
+      .channel(`match-${match.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `id=eq.${match.id}` }, () => {
+        router.refresh();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'match_events', filter: `match_id=eq.${match.id}` }, () => {
+        router.refresh();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [match.id, router]);
+
+  const toggleTimer = async () => {
+    if (isRunning) await updateMatchTimer(match.id, "pause");
+    else await updateMatchTimer(match.id, "start");
+  };
+
+  const resetTimer = async () => {
+    if (confirm("Deseja realmente zerar o cronômetro?")) {
+      await resetMatchTimer(match.id);
+    }
   };
 
   const formatTime = (totalSeconds: number) => {

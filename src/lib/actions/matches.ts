@@ -177,3 +177,58 @@ export async function finishMatch(matchId: string) {
     return { success: false, error: err.message };
   }
 }
+
+export async function updateMatchTimer(matchId: string, action: "start" | "pause") {
+  try {
+    const match = await getMatch(matchId);
+    if (!match) throw new Error("Partida não encontrada");
+
+    if (action === "start") {
+      const { error } = await supabase
+        .from("matches")
+        .update({ timer_started_at: new Date().toISOString() })
+        .eq("id", matchId);
+      if (error) throw new Error(error.message);
+    } else if (action === "pause") {
+      if (match.timer_started_at) {
+        const elapsed = Math.floor((new Date().getTime() - new Date(match.timer_started_at).getTime()) / 1000);
+        const newAccumulated = (match.timer_accumulated_seconds || 0) + elapsed;
+        
+        const { error } = await supabase
+          .from("matches")
+          .update({ 
+            timer_accumulated_seconds: newAccumulated,
+            timer_started_at: null 
+          })
+          .eq("id", matchId);
+        if (error) throw new Error(error.message);
+      }
+    }
+
+    revalidatePath(`/partidas/${matchId}`);
+    return { success: true };
+  } catch (err: any) {
+    console.error("Erro ao atualizar timer:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function resetMatchTimer(matchId: string) {
+  try {
+    const { error } = await supabase
+      .from("matches")
+      .update({ 
+        timer_accumulated_seconds: 0,
+        timer_started_at: null 
+      })
+      .eq("id", matchId);
+      
+    if (error) throw new Error(error.message);
+
+    revalidatePath(`/partidas/${matchId}`);
+    return { success: true };
+  } catch (err: any) {
+    console.error("Erro ao resetar timer:", err);
+    return { success: false, error: err.message };
+  }
+}
