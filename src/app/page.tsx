@@ -133,37 +133,44 @@ export default async function HomePage() {
       {/* Highlights Section */}
       <section>
         <div className="flex items-center gap-2 mb-3">
-          <TrendingUp className="w-4 h-4 text-accent" />
+          <TrendingUp className="w-5 h-5 text-accent" />
           <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">
             Destaques da Temporada
           </h2>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          <StatHighlightCard
-            emoji="⚽"
-            label="Artilheiro"
-            playerName={highlights?.topScorer?.player?.nickname || highlights?.topScorer?.player?.name}
-            value={highlights?.topScorer?.goals}
-            unit="gols"
-            delay="stagger-1"
-          />
-          <StatHighlightCard
-            emoji="🎯"
-            label="Assistências"
-            playerName={highlights?.topAssists?.player?.nickname || highlights?.topAssists?.player?.name}
-            value={highlights?.topAssists?.assists}
-            unit="assists"
-            delay="stagger-2"
-          />
-          <StatHighlightCard
-            emoji="🏆"
-            label="Vitórias"
-            playerName={highlights?.topWins?.player?.nickname || highlights?.topWins?.player?.name}
-            value={highlights?.topWins?.wins}
-            unit="vitórias"
-            delay="stagger-3"
-          />
+        {/* Carrossel Horizontal para Mobile */}
+        <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-4 -mx-4 px-4 hide-scrollbar">
+          <div className="min-w-[150px] snap-center shrink-0">
+            <StatHighlightCard
+              emoji="⚽"
+              label="Artilheiro"
+              playerName={highlights?.topScorer?.player?.nickname || highlights?.topScorer?.player?.name}
+              value={highlights?.topScorer?.goals}
+              unit="gols"
+              delay="stagger-1"
+            />
+          </div>
+          <div className="min-w-[150px] snap-center shrink-0">
+            <StatHighlightCard
+              emoji="🎯"
+              label="Assistências"
+              playerName={highlights?.topAssists?.player?.nickname || highlights?.topAssists?.player?.name}
+              value={highlights?.topAssists?.assists}
+              unit="assists"
+              delay="stagger-2"
+            />
+          </div>
+          <div className="min-w-[150px] snap-center shrink-0">
+            <StatHighlightCard
+              emoji="🏆"
+              label="Vitórias"
+              playerName={highlights?.topWins?.player?.nickname || highlights?.topWins?.player?.name}
+              value={highlights?.topWins?.wins}
+              unit="vitórias"
+              delay="stagger-3"
+            />
+          </div>
         </div>
       </section>
 

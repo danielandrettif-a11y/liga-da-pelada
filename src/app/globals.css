@@ -2,8 +2,8 @@
 
 /* ============================================
    Liga da Pelada — Design System
-   Tema: Dark Sports Premium
-   Referências: FotMob, Sofascore, EA FC
+   Tema: Futebol Premium (Dark Forest & Neon)
+   Referências: EA FC, Sofascore, Nike Football
    ============================================ */
 
 @theme inline {
@@ -19,33 +19,26 @@
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --font-sans: var(--font-inter);
+  --font-athletic: var(--font-oswald), var(--font-inter), sans-serif;
 }
 
 :root {
   /* Core */
-  --background: #0B0E14;
-  --foreground: #F1F5F9;
-  --surface: #151921;
-  --surface-hover: #1C2130;
-  --border-color: #1E2433;
+  --background: #05100B; /* Verde floresta quase preto */
+  --foreground: #F8FAFC;
+  --surface: #0C1E14; /* Verde escuro para cartões */
+  --surface-hover: #132E1F;
+  --border-color: #1A3F2A;
   
-  /* Accent — verde esportivo */
-  --accent: #10B981;
-  --accent-light: #34D399;
+  /* Accent — Neon/Volt (clássico de chuteiras) */
+  --accent: #CCFF00;
+  --accent-light: #D9FF4D;
   
   /* Semantic */
-  --muted: #64748B;
+  --muted: #82A391;
   --success: #22C55E;
   --danger: #EF4444;
   --warning: #F59E0B;
-  
-  /* Team colors */
-  --team-blue: #3B82F6;
-  --team-red: #EF4444;
-  --team-black: #374151;
-  --team-green: #22C55E;
-  --team-yellow: #EAB308;
-  --team-white: #F8FAFC;
   
   /* Spacing */
   --bottom-nav-height: 5rem;
@@ -53,11 +46,14 @@
 }
 
 /* ============================================
-   Base Styles
+   Base Styles & Texture
    ============================================ */
 
 body {
-  background: var(--background);
+  background-color: var(--background);
+  /* Textura sutil pontilhada (estilo tecido/mesh) */
+  background-image: radial-gradient(rgba(204, 255, 0, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -69,20 +65,10 @@ main {
 }
 
 /* ============================================
-   Scrollbar
+   Scrollbar escondida
    ============================================ */
-
 ::-webkit-scrollbar {
-  width: 4px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 999px;
+  display: none; /* Oculta a barra para deixar o carrossel limpo */
 }
 
 /* ============================================
@@ -104,19 +90,9 @@ main {
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-  50% { box-shadow: 0 0 12px 4px rgba(16, 185, 129, 0.15); }
-}
-
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
-}
-
-@keyframes count-up {
-  from { opacity: 0; transform: scale(0.5); }
-  to { opacity: 1; transform: scale(1); }
 }
 
 .animate-fade-in {
@@ -129,14 +105,6 @@ main {
 
 .animate-slide-in-bottom {
   animation: slide-in-bottom 0.3s ease-out both;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-.animate-count-up {
-  animation: count-up 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 /* Staggered animation delays */
@@ -153,8 +121,8 @@ main {
 .glass-card {
   background: linear-gradient(
     135deg,
-    rgba(21, 25, 33, 0.8) 0%,
-    rgba(21, 25, 33, 0.6) 100%
+    rgba(12, 30, 20, 0.8) 0%,
+    rgba(12, 30, 20, 0.6) 100%
   );
   backdrop-filter: blur(12px);
   border: 1px solid var(--border-color);
@@ -168,15 +136,15 @@ main {
 .glass-card-hover:hover {
   background: linear-gradient(
     135deg,
-    rgba(28, 33, 48, 0.9) 0%,
-    rgba(28, 33, 48, 0.7) 100%
+    rgba(19, 46, 31, 0.9) 0%,
+    rgba(19, 46, 31, 0.7) 100%
   );
-  border-color: rgba(16, 185, 129, 0.3);
+  border-color: rgba(204, 255, 0, 0.3); /* Brilho neon na borda */
   transform: translateY(-1px);
 }
 
 /* ============================================
-   Gradient Text
+   Gradient Text & Buttons
    ============================================ */
 
 .gradient-text {
@@ -186,14 +154,31 @@ main {
   background-clip: text;
 }
 
+.btn-primary {
+  background: var(--accent);
+  color: #05100B; /* Texto bem escuro pra dar contraste */
+  font-weight: 800;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.btn-primary:hover {
+  background: var(--accent-light);
+  transform: scale(0.98);
+}
+
 /* ============================================
-   Stat Number (large prominent numbers)
+   Stat Number (Font Atlética)
    ============================================ */
 
 .stat-number {
+  font-family: var(--font-athletic);
   font-variant-numeric: tabular-nums;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   line-height: 1;
 }
 
@@ -208,23 +193,24 @@ main {
   width: 2rem;
   height: 2rem;
   border-radius: 0.5rem;
+  font-family: var(--font-athletic);
   font-weight: 700;
-  font-size: 0.875rem;
+  font-size: 1.125rem;
 }
 
 .rank-1 {
   background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
-  color: #0B0E14;
+  color: #05100B;
 }
 
 .rank-2 {
   background: linear-gradient(135deg, #94A3B8 0%, #64748B 100%);
-  color: #0B0E14;
+  color: #05100B;
 }
 
 .rank-3 {
   background: linear-gradient(135deg, #CD7F32 0%, #A0522D 100%);
-  color: #F1F5F9;
+  color: #F8FAFC;
 }
 
 /* ============================================
@@ -240,17 +226,12 @@ main {
 }
 
 /* ============================================
-   Skeleton Loading
+   Hide Scrollbar class util
    ============================================ */
-
-.skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--surface) 25%,
-    var(--surface-hover) 50%,
-    var(--surface) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: 0.5rem;
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
