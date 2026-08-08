@@ -259,7 +259,7 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
 
       {/* MODAL DE REGISTRO DE GOL */}
       {goalModal.open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-fade-in">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-fade-in pb-8">
           <div className="glass-card w-full max-w-sm overflow-hidden flex flex-col max-h-[85vh] animate-slide-in-bottom">
             <div className="p-4 bg-surface border-b border-border flex items-center justify-between">
               <h3 className="font-bold text-foreground">
