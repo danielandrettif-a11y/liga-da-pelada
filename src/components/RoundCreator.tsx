@@ -210,9 +210,9 @@ export function RoundCreator({ allPlayers }: { allPlayers: Player[] }) {
               <p className="text-xs font-bold text-warning uppercase tracking-wider mb-2 px-1">
                 Sem time ({unassignedPlayers.length})
               </p>
-              <div className="flex flex-wrap gap-2 glass-card p-3 min-h-[4rem]">
+              <div className="flex flex-wrap gap-2 glass-card p-3 min-h-[4rem] relative z-50">
                 {unassignedPlayers.map(p => (
-                  <div key={p.id} className="relative">
+                  <div key={p.id} className={`relative ${openDropdownId === p.id ? 'z-50' : 'z-10'}`}>
                     <div 
                       onClick={() => setOpenDropdownId(openDropdownId === p.id ? null : p.id)}
                       className="px-3 py-1.5 bg-surface-hover border border-border rounded-lg text-xs font-bold text-foreground cursor-pointer"
