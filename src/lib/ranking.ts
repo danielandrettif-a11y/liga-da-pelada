@@ -1,0 +1,36 @@
+import type { Player } from "./types";
+
+export type RankingAwards = {
+  topScorer: number;
+  topAssister: number;
+  bestGoalkeeper: number;
+};
+
+export type RankingEntry = {
+  player: Player;
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goals: number;
+  assists: number;
+  points: number;
+  winRate: number;
+  awards: RankingAwards;
+  seasonPosition: number;
+  positionChange: number | null;
+};
+
+export type RankingExperienceData = {
+  seasonLabel: string;
+  general: RankingEntry[];
+  latestRound: {
+    id: string;
+    number: number;
+    date: string;
+    entries: RankingEntry[];
+  } | null;
+};
+
+export type RankingFilter = "general" | "goals" | "assists" | "wins" | "winRate" | "awards";
+export type RankingView = "season" | "latest";

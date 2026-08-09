@@ -1,10 +1,10 @@
-import { getPlayer, getPlayerGoalkeeperAwards, getPlayerRoundHistory, getPlayersWithStats } from "@/lib/actions/players";
+import { getPlayer, getPlayerGoalkeeperAwards, getPlayerRoundHistory, getPlayerRoundLeaderAwards, getPlayersWithStats } from "@/lib/actions/players";
 import { getDisplayName, calculateWinRate, formatDateShort } from "@/lib/utils";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerProfileBadge } from "@/components/PlayerProfileBadge";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ChevronRight, Medal } from "lucide-react";
+import { ArrowLeft, ChevronRight, Medal, Sparkles, Target } from "lucide-react";
 
 export const revalidate = 0;
 
@@ -16,11 +16,12 @@ export default async function JogadorPerfilPage({
   const { id } = await params;
 
   // Busca dados em paralelo
-  const [player, history, allStats, goalkeeperAwards] = await Promise.all([
+  const [player, history, allStats, goalkeeperAwards, leaderAwards] = await Promise.all([
     getPlayer(id),
     getPlayerRoundHistory(id),
     getPlayersWithStats(),
     getPlayerGoalkeeperAwards(id),
+    getPlayerRoundLeaderAwards(id),
   ]);
 
   if (!player) {
@@ -113,6 +114,31 @@ export default async function JogadorPerfilPage({
           <div className="glass-card p-4">
             <p className="text-xs text-muted mb-1">Assistências</p>
             <p className="stat-number text-2xl text-foreground">{stats.assists}</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="animate-fade-in-up stagger-2">
+        <div className="mb-3 px-1">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted">Destaques por rodada</h3>
+          <p className="mt-1 text-[10px] text-muted/70">Lideranças calculadas pelas estatísticas das peladas finalizadas.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="glass-card p-4">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10">
+              <Target className="h-5 w-5 text-accent" />
+            </div>
+            <p className="stat-number text-3xl text-foreground">{leaderAwards.topScorerRounds.length}</p>
+            <p className="mt-1 text-xs font-black text-foreground">Artilheiro</p>
+            <p className="mt-0.5 text-[10px] text-muted">vezes com mais gols na rodada</p>
+          </div>
+          <div className="glass-card p-4">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10">
+              <Sparkles className="h-5 w-5 text-accent" />
+            </div>
+            <p className="stat-number text-3xl text-foreground">{leaderAwards.topAssisterRounds.length}</p>
+            <p className="mt-1 text-xs font-black text-foreground">Garçom</p>
+            <p className="mt-0.5 text-[10px] text-muted">vezes com mais assistências</p>
           </div>
         </div>
       </section>

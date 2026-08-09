@@ -175,6 +175,53 @@ export async function getPlayerGoalkeeperAwards(playerId: string) {
   return data || [];
 }
 
+export async function getPlayerRoundLeaderAwards(playerId: string) {
+  const emptyResult = {
+    topScorerRounds: [] as Array<{ id: string; number: number; date: string }>,
+    topAssisterRounds: [] as Array<{ id: string; number: number; date: string }>,
+  };
+
+  const { data: rounds, error: roundsError } = await supabase
+    .from("rounds")
+    .select("id, number, date")
+    .eq("status", "finished")
+    .order("date", { ascending: false });
+
+  if (roundsError) {
+    console.error("Erro ao buscar rodadas para os destaques:", roundsError);
+    return emptyResult;
+  }
+  if (!rounds || rounds.length === 0) return emptyResult;
+
+  const { data: stats, error: statsError } = await supabase
+    .from("player_round_stats")
+    .select("round_id, player_id, goals, assists")
+    .in("round_id", rounds.map((round) => round.id));
+
+  if (statsError) {
+    console.error("Erro ao calcular artilheiros e garçons:", statsError);
+    return emptyResult;
+  }
+
+  for (const round of rounds) {
+    const roundStats = (stats || []).filter((entry) => entry.round_id === round.id);
+    const playerStats = roundStats.find((entry) => entry.player_id === playerId);
+    if (!playerStats) continue;
+
+    const mostGoals = Math.max(0, ...roundStats.map((entry) => entry.goals));
+    const mostAssists = Math.max(0, ...roundStats.map((entry) => entry.assists));
+
+    if (mostGoals > 0 && playerStats.goals === mostGoals) {
+      emptyResult.topScorerRounds.push(round);
+    }
+    if (mostAssists > 0 && playerStats.assists === mostAssists) {
+      emptyResult.topAssisterRounds.push(round);
+    }
+  }
+
+  return emptyResult;
+}
+
 export async function createPlayer(input: CreatePlayerInput) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem criar jogadores." };
