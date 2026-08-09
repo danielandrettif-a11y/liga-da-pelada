@@ -196,17 +196,19 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
 
       {/* STEP 1: Data */}
       {step === 1 && (
-        <div className="glass-card p-5 space-y-4 animate-fade-in">
+        <div className="glass-card min-w-0 overflow-hidden p-5 space-y-4 animate-fade-in">
           <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
             <Calendar className="w-4 h-4 text-accent" />
             Quando será a pelada?
           </h2>
-          <input
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            className="w-full bg-surface-hover border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-accent transition-colors"
-          />
+          <div className="grid min-w-0 w-full">
+            <input
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              className="block min-w-0 max-w-full w-full appearance-none bg-surface-hover border border-border rounded-xl px-4 py-3 text-base text-foreground focus:outline-none focus:border-accent transition-colors"
+            />
+          </div>
           <button
             onClick={() => setStep(2)}
             className="w-full bg-accent hover:bg-accent-light text-background font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] mt-4 flex items-center justify-center gap-2"
