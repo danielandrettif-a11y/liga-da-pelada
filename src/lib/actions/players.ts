@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
-import type { Player, CreatePlayerInput, PlayerProfile } from "../types";
+import { buildAwardSeasonsByPlayer } from "../awards";
+import type { Player, CreatePlayerInput, PlayerProfile, SeasonStatus } from "../types";
 import { getActiveSeasonRoundIds } from "./seasons";
 import { getAdminClient, getCurrentAccount } from "../auth";
 
@@ -169,39 +170,23 @@ export async function getPlayerRoundHistory(playerId: string) {
   return data;
 }
 
-export async function getPlayerGoalkeeperAwards(playerId: string) {
-  const { data, error } = await supabase
-    .from("rounds")
-    .select("id, number, date")
-    .eq("best_goalkeeper_player_id", playerId)
-    .eq("status", "finished")
-    .order("date", { ascending: false });
+export async function getPlayerAwardSeasons(playerId: string) {
+  const [seasonsResult, roundsResult] = await Promise.all([
+    supabase.from("seasons").select("id, number, status"),
+    supabase
+      .from("rounds")
+      .select("id, number, date, season_id, best_goalkeeper_player_id")
+      .eq("status", "finished")
+      .order("date", { ascending: false }),
+  ]);
 
-  if (error) {
-    console.error("Erro ao buscar premios de melhor goleiro:", error);
+  if (seasonsResult.error || roundsResult.error) {
+    console.error("Erro ao buscar histórico de insígnias:", seasonsResult.error || roundsResult.error);
     return [];
   }
 
-  return data || [];
-}
-
-export async function getPlayerRoundLeaderAwards(playerId: string) {
-  const emptyResult = {
-    topScorerRounds: [] as Array<{ id: string; number: number; date: string }>,
-    topAssisterRounds: [] as Array<{ id: string; number: number; date: string }>,
-  };
-
-  const { data: rounds, error: roundsError } = await supabase
-    .from("rounds")
-    .select("id, number, date")
-    .eq("status", "finished")
-    .order("date", { ascending: false });
-
-  if (roundsError) {
-    console.error("Erro ao buscar rodadas para os destaques:", roundsError);
-    return emptyResult;
-  }
-  if (!rounds || rounds.length === 0) return emptyResult;
+  const rounds = roundsResult.data || [];
+  if (rounds.length === 0) return [];
 
   const { data: stats, error: statsError } = await supabase
     .from("player_round_stats")
@@ -209,27 +194,28 @@ export async function getPlayerRoundLeaderAwards(playerId: string) {
     .in("round_id", rounds.map((round) => round.id));
 
   if (statsError) {
-    console.error("Erro ao calcular artilheiros e garçons:", statsError);
-    return emptyResult;
+    console.error("Erro ao calcular histórico de insígnias:", statsError);
+    return [];
   }
 
-  for (const round of rounds) {
-    const roundStats = (stats || []).filter((entry) => entry.round_id === round.id);
-    const playerStats = roundStats.find((entry) => entry.player_id === playerId);
-    if (!playerStats) continue;
+  const seasonsById = new Map((seasonsResult.data || []).map((season) => [season.id, season]));
+  const awardSeasons = buildAwardSeasonsByPlayer(
+    rounds.flatMap((round) => {
+      const season = seasonsById.get(round.season_id);
+      return season ? [{
+        id: round.id,
+        number: round.number,
+        date: round.date,
+        seasonId: season.id,
+        seasonNumber: season.number,
+        seasonStatus: season.status as SeasonStatus,
+        bestGoalkeeperPlayerId: round.best_goalkeeper_player_id,
+      }] : [];
+    }),
+    stats || [],
+  );
 
-    const mostGoals = Math.max(0, ...roundStats.map((entry) => entry.goals));
-    const mostAssists = Math.max(0, ...roundStats.map((entry) => entry.assists));
-
-    if (mostGoals > 0 && playerStats.goals === mostGoals) {
-      emptyResult.topScorerRounds.push(round);
-    }
-    if (mostAssists > 0 && playerStats.assists === mostAssists) {
-      emptyResult.topAssisterRounds.push(round);
-    }
-  }
-
-  return emptyResult;
+  return awardSeasons.get(playerId) || [];
 }
 
 export async function createPlayer(input: CreatePlayerInput) {

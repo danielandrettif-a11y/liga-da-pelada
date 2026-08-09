@@ -224,10 +224,11 @@ export function PlayerForm({ player, mode = "admin" }: { player?: Player; mode?:
           name="nickname"
           type="text"
           defaultValue={player?.nickname || ""}
-          placeholder="Ex: Ney"
+          placeholder="Ex: Pontinha insinuante"
           maxLength={60}
           className="w-full bg-surface-hover border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-accent transition-colors"
         />
+        <p className="text-[10px] text-muted">Aparece como subnome somente no perfil e na carta do jogador.</p>
       </div>
 
       <fieldset className="space-y-2">

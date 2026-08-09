@@ -176,7 +176,7 @@ export default async function HomePage() {
             <StatHighlightCard
               emoji="⚽"
               label="Artilheiro"
-              playerName={highlights?.topScorer?.player?.nickname || highlights?.topScorer?.player?.name}
+              playerName={highlights?.topScorer?.player?.name}
               value={highlights?.topScorer?.goals}
               unit="gols"
               delay="stagger-1"
@@ -186,7 +186,7 @@ export default async function HomePage() {
             <StatHighlightCard
               emoji="🎯"
               label="Assistências"
-              playerName={highlights?.topAssists?.player?.nickname || highlights?.topAssists?.player?.name}
+              playerName={highlights?.topAssists?.player?.name}
               value={highlights?.topAssists?.assists}
               unit="assists"
               delay="stagger-2"
@@ -196,7 +196,7 @@ export default async function HomePage() {
             <StatHighlightCard
               emoji="🏆"
               label="Vitórias"
-              playerName={highlights?.topWins?.player?.nickname || highlights?.topWins?.player?.name}
+              playerName={highlights?.topWins?.player?.name}
               value={highlights?.topWins?.wins}
               unit="vitórias"
               delay="stagger-3"
@@ -222,7 +222,7 @@ export default async function HomePage() {
         <div className="glass-card overflow-hidden">
           {rankingPreview && rankingPreview.length > 0 ? (
             rankingPreview.map((stats: any, index: number) => {
-              const name = stats.player?.nickname || stats.player?.name || "Desconhecido";
+              const name = stats.player?.name || "Desconhecido";
               return (
                 <Link
                   href={`/jogadores/${stats.player.id}`}

@@ -69,7 +69,7 @@ function sortRanking(entries: RankingEntry[], filter: RankingFilter) {
     if (b.points !== a.points) return b.points - a.points;
     if (b.wins !== a.wins) return b.wins - a.wins;
     if (b.goals !== a.goals) return b.goals - a.goals;
-    return (a.player.nickname || a.player.name).localeCompare(b.player.nickname || b.player.name, "pt-BR");
+    return a.player.name.localeCompare(b.player.name, "pt-BR");
   });
 }
 
@@ -175,7 +175,7 @@ async function createPodiumStory(
 
   for (const item of visualOrder) {
     if (!item.entry) continue;
-    const displayName = item.entry.player.nickname || item.entry.player.name;
+    const displayName = item.entry.player.name;
     const image = await loadCanvasImage(item.entry.player.avatar_url);
 
     ctx.save();
@@ -392,7 +392,7 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                   type="button"
                   onClick={() => setSelected({ entry, position })}
                   className={`relative flex w-1/3 max-w-[112px] flex-col items-center rounded-t-2xl transition-transform hover:-translate-y-1 focus:outline-none animate-slide-in-bottom stagger-${position}`}
-                  aria-label={`Abrir carta de ${entry.player.nickname || entry.player.name}, ${position}º lugar`}
+                  aria-label={`Abrir carta de ${entry.player.name}, ${position}º lugar`}
                 >
                   {position === 1 && (
                     <Crown className="absolute -top-8 h-8 w-8 rotate-[-7deg] text-[#f5d45e] drop-shadow-lg" fill="currentColor" />
@@ -414,7 +414,7 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                     )}
                   </div>
                   <div className="mb-2 mt-4 w-full px-1 text-center">
-                    <p className="truncate text-xs font-black text-foreground">{entry.player.nickname || entry.player.name}</p>
+                    <p className="truncate text-xs font-black text-foreground">{entry.player.name}</p>
                     <p className={`mt-0.5 text-xs font-black ${style.label}`}>{metricDisplay(entry, filter)} <span className="text-[8px] uppercase opacity-70">{FILTER_LABELS[filter]}</span></p>
                   </div>
                   <div className={`w-full rounded-t-2xl border-x border-t bg-gradient-to-b pt-3 ${height} ${style.base}`}>
@@ -440,7 +440,7 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
           const position = index + 1;
           const above = index > 0 ? ranking[index - 1] : null;
           const gap = above ? Math.max(1, metricValue(above, filter) - metricValue(entry, filter) + 1) : 0;
-          const displayName = entry.player.nickname || entry.player.name;
+          const displayName = entry.player.name;
           return (
             <button
               key={entry.player.id}
@@ -500,7 +500,7 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
             className="h-10 w-10 rounded-full border border-accent/40 bg-surface text-xs font-black"
           />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-black text-foreground">Sua posição · {pinnedEntry.player.nickname || pinnedEntry.player.name}</p>
+            <p className="truncate text-xs font-black text-foreground">Sua posição · {pinnedEntry.player.name}</p>
             <p className="text-[9px] text-muted">Toque para abrir sua carta</p>
           </div>
           <span className="stat-number text-xl text-accent">{metricDisplay(pinnedEntry, filter)}</span>

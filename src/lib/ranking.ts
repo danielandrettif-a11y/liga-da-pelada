@@ -1,4 +1,5 @@
 import type { Player } from "./types";
+import type { PlayerAwardSeason } from "./awards";
 
 export type RankingAwards = {
   topScorer: number;
@@ -17,6 +18,7 @@ export type RankingEntry = {
   points: number;
   winRate: number;
   awards: RankingAwards;
+  awardSeasons: PlayerAwardSeason[];
   seasonPosition: number;
   positionChange: number | null;
 };

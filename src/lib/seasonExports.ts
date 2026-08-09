@@ -11,7 +11,7 @@ const FOREGROUND = "#F8FAFC";
 const MUTED = "#82A391";
 
 function playerName(player?: SeasonPlayerSummary) {
-  return player ? player.nickname || player.name : "Sem classificação";
+  return player ? player.name : "Sem classificação";
 }
 
 function fileSlug(summary: SeasonSummary) {

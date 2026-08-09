@@ -256,7 +256,7 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
                     />
                     <div>
                       <p className={`text-sm font-bold ${isSelected ? "text-accent" : "text-foreground"}`}>
-                        {player.nickname || player.name}
+                        {player.name}
                       </p>
                       <div className="mt-0.5 flex items-center gap-2">
                         <PlayerProfileBadge profile={player.player_profile} />
@@ -356,7 +356,7 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
                       onClick={() => setOpenDropdownId(openDropdownId === p.id ? null : p.id)}
                       className="px-3 py-1.5 bg-surface-hover border border-border rounded-lg text-xs font-bold text-foreground cursor-pointer"
                     >
-                      <span>{p.nickname || p.name}</span>
+                      <span>{p.name}</span>
                       <PlayerProfileBadge profile={p.player_profile} />
                     </div>
                     {/* Menu de times (aberto ao clicar) */}
@@ -404,7 +404,7 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
                       onClick={() => removeFromTeam(p)}
                       className="px-2 py-1 bg-background border border-border rounded-md text-xs font-semibold text-foreground flex items-center gap-1.5 cursor-pointer hover:border-danger/50 hover:text-danger transition-colors group"
                     >
-                      <span>{p.nickname || p.name}</span>
+                      <span>{p.name}</span>
                       <PlayerProfileBadge profile={p.player_profile} />
                       <span className="text-[10px] opacity-0 group-hover:opacity-100">✕</span>
                     </div>

@@ -74,7 +74,8 @@ export default function CadastroPage() {
 
         <div className="space-y-1.5">
           <label className="text-xs font-bold uppercase tracking-wider text-muted">Apelido <span className="normal-case text-muted/50">(opcional)</span></label>
-          <input name="nickname" maxLength={60} placeholder="Como aparece no app" className="w-full rounded-xl border border-border bg-surface-hover px-4 py-3 text-sm text-foreground outline-none focus:border-accent" />
+          <input name="nickname" maxLength={60} placeholder="Ex: Pontinha insinuante" className="w-full rounded-xl border border-border bg-surface-hover px-4 py-3 text-sm text-foreground outline-none focus:border-accent" />
+          <p className="mt-1 text-[10px] text-muted">O apelido aparece como subnome no perfil e na carta.</p>
         </div>
 
         <fieldset className="space-y-2">

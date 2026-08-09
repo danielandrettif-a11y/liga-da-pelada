@@ -33,7 +33,7 @@ const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
 ];
 
 function alphabeticalCompare(a: PlayerStats, b: PlayerStats) {
-  return getDisplayName(a.name, a.nickname).localeCompare(getDisplayName(b.name, b.nickname), "pt-BR");
+  return getDisplayName(a.name).localeCompare(getDisplayName(b.name), "pt-BR");
 }
 
 export function PlayersStatsGrid({ players }: { players: PlayerStats[] }) {
@@ -67,7 +67,7 @@ export function PlayersStatsGrid({ players }: { players: PlayerStats[] }) {
               <div className="mb-3 flex items-center gap-3">
                 <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-11 w-11 flex-shrink-0 rounded-full bg-surface-hover text-sm font-bold text-muted ring-1 ring-border" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-foreground">{getDisplayName(player.name, player.nickname)}</p>
+                  <p className="truncate text-sm font-bold text-foreground">{getDisplayName(player.name)}</p>
                   <PlayerProfileBadge profile={player.player_profile} />
                 </div>
               </div>

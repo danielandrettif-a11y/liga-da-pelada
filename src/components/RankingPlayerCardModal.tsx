@@ -2,9 +2,10 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { Crown, Medal, Sparkles, Target, Trophy, X } from "lucide-react";
+import { Crown, Medal, Trophy, X } from "lucide-react";
 import type { RankingEntry } from "@/lib/ranking";
 import { PlayerAvatar } from "./PlayerAvatar";
+import { PlayerAwards } from "./PlayerAwards";
 
 type Props = {
   entry: RankingEntry;
@@ -61,8 +62,8 @@ function cardTheme(position: number) {
 
 export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   const theme = cardTheme(position);
-  const displayName = entry.player.nickname || entry.player.name;
-  const totalAwards = entry.awards.topScorer + entry.awards.topAssister + entry.awards.bestGoalkeeper;
+  const displayName = entry.player.name;
+  const awardSeasons = [...entry.awardSeasons].sort((a, b) => a.seasonNumber - b.seasonNumber);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -135,6 +136,9 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
           <div className="relative -mt-2 text-center">
             <div className="mx-auto mb-2 h-px w-4/5 bg-current opacity-30" />
             <h2 className="truncate font-athletic text-2xl font-black uppercase tracking-wide">{displayName}</h2>
+            {entry.player.nickname && (
+              <p className="mt-0.5 truncate text-[11px] font-bold italic opacity-80">“{entry.player.nickname}”</p>
+            )}
             <p className="mt-0.5 text-[10px] font-black uppercase tracking-[0.3em] opacity-70">
               {position}º lugar · carta {theme.label}
             </p>
@@ -148,31 +152,16 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
               [entry.wins, "VIT"],
               [entry.games, "JOG"],
               [`${entry.winRate}%`, "APR"],
-              [totalAwards, "PRÊ"],
             ].map(([value, label], index) => (
-              <div key={label} className={`flex items-baseline justify-center gap-2 text-xl font-black ${index % 2 === 0 ? "border-r border-current/20" : ""}`}>
+              <div key={label} className={`flex items-baseline justify-center gap-2 text-xl font-black ${index === 4 ? "col-span-2" : index % 2 === 0 ? "border-r border-current/20" : ""}`}>
                 <span>{value}</span>
                 <span className="text-sm tracking-wider opacity-75">{label}</span>
               </div>
             ))}
           </div>
 
-          <div className="relative mt-5 flex flex-wrap justify-center gap-1.5 text-[9px] font-black uppercase tracking-wide">
-            {entry.awards.topScorer > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-current/25 bg-white/15 px-2 py-1">
-                <Target className="h-3 w-3" /> Artilheiro {entry.awards.topScorer}x
-              </span>
-            )}
-            {entry.awards.topAssister > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-current/25 bg-white/15 px-2 py-1">
-                <Sparkles className="h-3 w-3" /> Garçom {entry.awards.topAssister}x
-              </span>
-            )}
-            {entry.awards.bestGoalkeeper > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-current/25 bg-white/15 px-2 py-1">
-                <Medal className="h-3 w-3" /> Goleiro {entry.awards.bestGoalkeeper}x
-              </span>
-            )}
+          <div className="relative mt-5">
+            <PlayerAwards seasons={awardSeasons} context="card" />
           </div>
         </div>
 

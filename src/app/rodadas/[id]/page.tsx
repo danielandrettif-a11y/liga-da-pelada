@@ -32,7 +32,7 @@ export default async function RodadaDetalhePage({
   const participants = (round.round_players || [])
     .map((entry: any) => entry.players)
     .filter(Boolean)
-    .sort((a: any, b: any) => (a.nickname || a.name).localeCompare(b.nickname || b.name, "pt-BR"));
+    .sort((a: any, b: any) => a.name.localeCompare(b.name, "pt-BR"));
   return (
     <div className="space-y-6">
       {/* Top bar */}
@@ -87,7 +87,7 @@ export default async function RodadaDetalhePage({
                 {team.team_players.map((tp: any) => (
                   <div key={tp.player_id} className="text-xs font-semibold text-foreground/80 flex items-center gap-2">
                     <span className="w-1 h-1 bg-border rounded-full" />
-                    {tp.players?.nickname || tp.players?.name}
+                    {tp.players?.name}
                   </div>
                 ))}
                 {team.team_players.length === 0 && (

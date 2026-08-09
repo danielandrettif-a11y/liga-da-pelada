@@ -271,11 +271,11 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                     <div className="text-2xl">⚽</div>
                     <div className="flex-1">
                       <p className="text-sm font-bold text-foreground">
-                        {ev.player?.nickname || ev.player?.name}
+                        {ev.player?.name}
                       </p>
                       {ev.assist_player && (
                         <p className="text-[10px] text-muted flex items-center gap-1 justify-start">
-                          <span className={`${!isTeamA && 'ml-auto'}`}>Pass: {ev.assist_player?.nickname || ev.assist_player?.name}</span>
+                          <span className={`${!isTeamA && 'ml-auto'}`}>Pass: {ev.assist_player?.name}</span>
                         </p>
                       )}
                     </div>
@@ -338,7 +338,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                       avatarUrl={tp.players?.avatar_url}
                       className="w-10 h-10 rounded-full bg-background text-xs font-bold flex-shrink-0"
                     />
-                    <span className="font-bold text-foreground flex-1">{tp.players?.nickname || tp.players?.name}</span>
+                    <span className="font-bold text-foreground flex-1">{tp.players?.name}</span>
                     <span className="text-xl">⚽</span>
                   </button>
                 ))
@@ -367,7 +367,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                         avatarUrl={tp.players?.avatar_url}
                         className="w-10 h-10 rounded-full bg-background text-xs font-bold flex-shrink-0"
                       />
-                      <span className="font-bold text-foreground flex-1">{tp.players?.nickname || tp.players?.name}</span>
+                      <span className="font-bold text-foreground flex-1">{tp.players?.name}</span>
                       <span className="text-xl">🎯</span>
                     </button>
                   ))}

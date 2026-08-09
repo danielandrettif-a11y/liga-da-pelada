@@ -50,10 +50,10 @@ export function calculateWinRate(wins: number, draws: number, games: number): nu
 }
 
 /**
- * Retorna o nome de exibição do jogador (nickname se disponível, senão primeiro nome).
+ * Retorna o nome do jogador para listas e seleções.
  */
-export function getDisplayName(name: string, nickname: string | null): string {
-  return nickname || name.split(' ')[0];
+export function getDisplayName(name: string): string {
+  return name.trim();
 }
 
 /**

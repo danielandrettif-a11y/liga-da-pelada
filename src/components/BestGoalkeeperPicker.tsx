@@ -95,7 +95,7 @@ export function BestGoalkeeperPicker({
             className="h-12 w-12 rounded-full bg-surface-hover text-sm font-black text-muted ring-2 ring-accent/30"
           />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-base font-black text-foreground">{winner.nickname || winner.name}</p>
+            <p className="truncate text-base font-black text-foreground">{winner.name}</p>
             <p className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-accent">
               <ShieldCheck className="h-3.5 w-3.5" /> Destaque da rodada
             </p>
@@ -140,7 +140,7 @@ export function BestGoalkeeperPicker({
                     className="h-10 w-10 rounded-full bg-surface-hover text-xs font-black text-muted"
                   />
                   <span className="min-w-0 flex-1 truncate text-sm font-bold text-foreground">
-                    {participant.nickname || participant.name}
+                    {participant.name}
                   </span>
                   <span className={`h-4 w-4 rounded-full border-2 ${checked ? "border-accent bg-accent shadow-[inset_0_0_0_3px_#05100B]" : "border-muted"}`} />
                 </button>

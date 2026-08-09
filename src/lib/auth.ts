@@ -50,7 +50,7 @@ export async function getAccountDisplayName(
       .eq("id", account.profile.player_id)
       .maybeSingle();
 
-    const playerName = player?.nickname || player?.name;
+    const playerName = player?.name;
     if (playerName) return playerName.trim().split(/\s+/)[0];
   }
 
@@ -76,7 +76,7 @@ export async function getAccountDisplayName(
       return candidates.some((candidate) => candidate.length >= 4
         && (normalizedEmail.startsWith(candidate) || candidate.startsWith(normalizedEmail)));
     });
-    if (matchedPlayer) return (matchedPlayer.nickname || matchedPlayer.name).trim().split(/\s+/)[0];
+    if (matchedPlayer) return matchedPlayer.name.trim().split(/\s+/)[0];
   }
 
   const emailName = emailPrefix.split(/[._-]/)[0] || "Jogador";

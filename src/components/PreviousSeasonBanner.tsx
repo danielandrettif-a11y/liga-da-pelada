@@ -45,7 +45,7 @@ export function PreviousSeasonBanner({ summary }: { summary: SeasonSummary }) {
           <p className="text-[10px] font-bold text-accent uppercase tracking-widest">Temporada anterior</p>
           <p className="text-sm font-bold text-foreground mt-0.5">Veja como foi a Temporada {summary.seasonNumber}</p>
           <p className="text-xs text-muted truncate mt-0.5">
-            Campeão: {champion?.nickname || champion?.name || "Sem classificação"}
+            Campeão: {champion?.name || "Sem classificação"}
           </p>
         </div>
         <ChevronDown className={`w-5 h-5 text-accent transition-transform ${expanded ? "rotate-180" : ""}`} />

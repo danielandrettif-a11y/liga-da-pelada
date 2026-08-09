@@ -4,9 +4,10 @@ import { supabase } from "../supabase";
 import { getActiveSeason, getActiveSeasonRoundIds } from "./seasons";
 import { getAdminClient } from "../auth";
 import { DEFAULT_SCORING_POINTS } from "../scoring";
-import type { EventType } from "../types";
+import { buildAwardSeasonsByPlayer, countAwards } from "../awards";
+import type { EventType, SeasonStatus } from "../types";
 import type { Player } from "../types";
-import type { RankingAwards, RankingEntry, RankingExperienceData } from "../ranking";
+import type { RankingEntry, RankingExperienceData } from "../ranking";
 
 type RankingStatsRow = {
   player_id: string;
@@ -31,7 +32,7 @@ function sortRankingEntries<T extends Pick<RankingEntry, "points" | "wins" | "go
 }
 
 function aggregateRankingRows(rows: RankingStatsRow[]) {
-  const map = new Map<string, Omit<RankingEntry, "awards" | "seasonPosition" | "positionChange">>();
+  const map = new Map<string, Omit<RankingEntry, "awards" | "awardSeasons" | "seasonPosition" | "positionChange">>();
 
   for (const row of rows) {
     const current = map.get(row.player_id) || {
@@ -263,15 +264,31 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
 
   const seasonYear = new Date(season.started_at).getFullYear();
   const seasonLabel = `Temporada ${season.number} · ${seasonYear}`;
+  const { data: previousSeasons, error: previousSeasonError } = await supabase
+    .from("seasons")
+    .select("id, number, status")
+    .eq("league_id", season.league_id)
+    .eq("status", "finished")
+    .order("number", { ascending: false })
+    .limit(1);
+
+  if (previousSeasonError) console.error("Erro ao buscar temporada anterior:", previousSeasonError);
+
+  const visibleSeasons = [
+    { id: season.id, number: season.number, status: season.status },
+    ...(previousSeasons || []),
+  ];
+  const visibleSeasonsById = new Map(visibleSeasons.map((item) => [item.id, item]));
   const { data: rounds, error: roundsError } = await supabase
     .from("rounds")
-    .select("id, number, date, best_goalkeeper_player_id")
-    .eq("season_id", season.id)
+    .select("id, number, date, season_id, best_goalkeeper_player_id")
+    .in("season_id", visibleSeasons.map((item) => item.id))
     .eq("status", "finished")
     .order("date", { ascending: false })
     .order("number", { ascending: false });
 
-  if (roundsError || !rounds || rounds.length === 0) {
+  const currentRounds = (rounds || []).filter((round) => round.season_id === season.id);
+  if (roundsError || currentRounds.length === 0) {
     if (roundsError) console.error("Erro ao buscar rodadas do ranking:", roundsError);
     return { ...emptyData, seasonLabel };
   }
@@ -290,7 +307,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       points,
       player:player_id (*)
     `)
-    .in("round_id", rounds.map((round) => round.id));
+    .in("round_id", (rounds || []).map((round) => round.id));
 
   if (statsError || !rawStats) {
     if (statsError) console.error("Erro ao buscar dados detalhados do ranking:", statsError);
@@ -298,52 +315,40 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   }
 
   const stats = rawStats as unknown as RankingStatsRow[];
-  const latestRound = rounds[0];
-  const generalBase = aggregateRankingRows(stats);
-  const previousBase = aggregateRankingRows(stats.filter((row) => row.round_id !== latestRound.id));
-  const latestBase = aggregateRankingRows(stats.filter((row) => row.round_id === latestRound.id));
+  const currentRoundIds = new Set(currentRounds.map((round) => round.id));
+  const currentStats = stats.filter((row) => currentRoundIds.has(row.round_id));
+  const latestRound = currentRounds[0];
+  const generalBase = aggregateRankingRows(currentStats);
+  const previousBase = aggregateRankingRows(currentStats.filter((row) => row.round_id !== latestRound.id));
+  const latestBase = aggregateRankingRows(currentStats.filter((row) => row.round_id === latestRound.id));
   const previousPositions = new Map(previousBase.map((entry, index) => [entry.player.id, index + 1]));
   const seasonPositions = new Map(generalBase.map((entry, index) => [entry.player.id, index + 1]));
-  const awards = new Map<string, RankingAwards>();
-  const statsByRound = new Map<string, RankingStatsRow[]>();
+  const awardSeasonsByPlayer = buildAwardSeasonsByPlayer(
+    (rounds || []).flatMap((round) => {
+      const roundSeason = visibleSeasonsById.get(round.season_id);
+      return roundSeason ? [{
+        id: round.id,
+        number: round.number,
+        date: round.date,
+        seasonId: roundSeason.id,
+        seasonNumber: roundSeason.number,
+        seasonStatus: roundSeason.status as SeasonStatus,
+        bestGoalkeeperPlayerId: round.best_goalkeeper_player_id,
+      }] : [];
+    }),
+    stats,
+  );
 
-  for (const row of stats) {
-    const roundStats = statsByRound.get(row.round_id) || [];
-    roundStats.push(row);
-    statsByRound.set(row.round_id, roundStats);
-  }
-
-  function getAwards(playerId: string) {
-    const current = awards.get(playerId) || {
-      topScorer: 0,
-      topAssister: 0,
-      bestGoalkeeper: 0,
-    };
-    awards.set(playerId, current);
-    return current;
-  }
-
-  for (const round of rounds) {
-    const roundStats = statsByRound.get(round.id) || [];
-    const mostGoals = Math.max(0, ...roundStats.map((row) => row.goals));
-    const mostAssists = Math.max(0, ...roundStats.map((row) => row.assists));
-
-    for (const row of roundStats) {
-      const playerAwards = getAwards(row.player_id);
-      if (mostGoals > 0 && row.goals === mostGoals) playerAwards.topScorer += 1;
-      if (mostAssists > 0 && row.assists === mostAssists) playerAwards.topAssister += 1;
-    }
-
-    if (round.best_goalkeeper_player_id) {
-      getAwards(round.best_goalkeeper_player_id).bestGoalkeeper += 1;
-    }
+  function getAwardSeasons(playerId: string) {
+    return awardSeasonsByPlayer.get(playerId) || [];
   }
 
   const general = generalBase.map((entry, index): RankingEntry => {
     const previousPosition = previousPositions.get(entry.player.id);
     return {
       ...entry,
-      awards: getAwards(entry.player.id),
+      awards: countAwards(getAwardSeasons(entry.player.id), "active"),
+      awardSeasons: getAwardSeasons(entry.player.id),
       seasonPosition: index + 1,
       positionChange: previousPosition ? previousPosition - (index + 1) : null,
     };
@@ -352,7 +357,8 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
 
   const latestEntries = latestBase.map((entry): RankingEntry => ({
     ...entry,
-    awards: getAwards(entry.player.id),
+    awards: countAwards(getAwardSeasons(entry.player.id), "active"),
+    awardSeasons: getAwardSeasons(entry.player.id),
     seasonPosition: seasonPositions.get(entry.player.id) || general.length + 1,
     positionChange: generalByPlayer.get(entry.player.id)?.positionChange ?? null,
   }));

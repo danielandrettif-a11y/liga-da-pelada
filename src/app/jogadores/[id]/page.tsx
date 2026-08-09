@@ -1,10 +1,11 @@
-import { getPlayer, getPlayerGoalkeeperAwards, getPlayerRoundHistory, getPlayerRoundLeaderAwards, getPlayersWithStats } from "@/lib/actions/players";
-import { getDisplayName, calculateWinRate, formatDateShort } from "@/lib/utils";
+import { getPlayer, getPlayerAwardSeasons, getPlayerRoundHistory, getPlayersWithStats } from "@/lib/actions/players";
+import { calculateWinRate, formatDateShort } from "@/lib/utils";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerProfileBadge } from "@/components/PlayerProfileBadge";
+import { PlayerAwards } from "@/components/PlayerAwards";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ChevronRight, Medal, Sparkles, Target } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 
 export const revalidate = 0;
 
@@ -16,12 +17,11 @@ export default async function JogadorPerfilPage({
   const { id } = await params;
 
   // Busca dados em paralelo
-  const [player, history, allStats, goalkeeperAwards, leaderAwards] = await Promise.all([
+  const [player, history, allStats, awardSeasons] = await Promise.all([
     getPlayer(id),
     getPlayerRoundHistory(id),
     getPlayersWithStats(),
-    getPlayerGoalkeeperAwards(id),
-    getPlayerRoundLeaderAwards(id),
+    getPlayerAwardSeasons(id),
   ]);
 
   if (!player) {
@@ -64,17 +64,10 @@ export default async function JogadorPerfilPage({
           className="w-24 h-24 rounded-full bg-surface text-2xl font-bold text-muted mb-4 ring-2 ring-border shadow-lg"
         />
         <h2 className="text-2xl font-bold text-foreground mb-1">
-          {getDisplayName(player.name, player.nickname)}
+          {player.name}
         </h2>
-        <p className="text-sm text-muted">{player.name}</p>
+        {player.nickname && <p className="text-sm font-semibold italic text-muted">“{player.nickname}”</p>}
         <div className="mt-2"><PlayerProfileBadge profile={player.player_profile} /></div>
-
-        {goalkeeperAwards.length > 0 && (
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-black text-accent">
-            <Medal className="h-4 w-4" />
-            Melhor goleiro {goalkeeperAwards.length > 1 ? `× ${goalkeeperAwards.length}` : "da rodada"}
-          </div>
-        )}
 
         <div className="mt-6 py-3 px-6 rounded-2xl bg-surface/50 border border-border inline-flex items-center gap-4">
           <div className="flex flex-col items-center">
@@ -120,50 +113,11 @@ export default async function JogadorPerfilPage({
 
       <section className="animate-fade-in-up stagger-2">
         <div className="mb-3 px-1">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-muted">Destaques por rodada</h3>
-          <p className="mt-1 text-[10px] text-muted/70">Lideranças calculadas pelas estatísticas das peladas finalizadas.</p>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted">Insígnias por temporada</h3>
+          <p className="mt-1 text-[10px] text-muted/70">Toque em uma insígnia para ver a rodada e a data.</p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="glass-card p-4">
-            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10">
-              <Target className="h-5 w-5 text-accent" />
-            </div>
-            <p className="stat-number text-3xl text-foreground">{leaderAwards.topScorerRounds.length}</p>
-            <p className="mt-1 text-xs font-black text-foreground">Artilheiro</p>
-            <p className="mt-0.5 text-[10px] text-muted">vezes com mais gols na rodada</p>
-          </div>
-          <div className="glass-card p-4">
-            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10">
-              <Sparkles className="h-5 w-5 text-accent" />
-            </div>
-            <p className="stat-number text-3xl text-foreground">{leaderAwards.topAssisterRounds.length}</p>
-            <p className="mt-1 text-xs font-black text-foreground">Garçom</p>
-            <p className="mt-0.5 text-[10px] text-muted">vezes com mais assistências</p>
-          </div>
-        </div>
+        <PlayerAwards seasons={awardSeasons} />
       </section>
-
-      {goalkeeperAwards.length > 0 && (
-        <section className="animate-fade-in-up stagger-2">
-          <h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">Prêmios de goleiro</h3>
-          <div className="glass-card overflow-hidden">
-            {goalkeeperAwards.map((award, index) => (
-              <Link key={award.id} href={`/rodadas/${award.id}`}>
-                <div className={`flex items-center gap-3 px-4 py-3.5 hover:bg-surface-hover ${index < goalkeeperAwards.length - 1 ? "border-b border-border" : ""}`}>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10">
-                    <Medal className="h-5 w-5 text-accent" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-foreground">Melhor goleiro · Rodada {String(award.number).padStart(2, "0")}</p>
-                    <p className="mt-0.5 text-xs text-muted">{formatDateShort(award.date)} · Prêmio da rodada</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* History */}
       <section className="animate-fade-in-up stagger-2">
