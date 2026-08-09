@@ -7,6 +7,7 @@ import { FinishRoundButton } from "@/components/FinishRoundButton";
 import { BestGoalkeeperPicker } from "@/components/BestGoalkeeperPicker";
 import { getCurrentAccount } from "@/lib/auth";
 import { getGoalkeeperScoringPoints } from "@/lib/actions/scoring";
+import { TeamMiniPitch } from "@/components/TeamMiniPitch";
 
 export const revalidate = 0;
 
@@ -71,30 +72,9 @@ export default async function RodadaDetalhePage({
         <h2 className="text-xs font-bold text-muted uppercase tracking-wider mb-3 px-1">
           Times Formados
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {round.teams.map((team: any) => (
-            <div key={team.id} className="glass-card overflow-hidden">
-              <div className="px-3 py-2 bg-surface flex items-center justify-between border-b border-border">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: team.color }} />
-                  <span className="text-sm font-bold text-foreground">{team.name}</span>
-                </div>
-                <span className="text-[10px] font-bold text-muted bg-surface-hover px-2 py-0.5 rounded-md">
-                  {team.team_players.length}
-                </span>
-              </div>
-              <div className="p-3 space-y-1">
-                {team.team_players.map((tp: any) => (
-                  <div key={tp.player_id} className="text-xs font-semibold text-foreground/80 flex items-center gap-2">
-                    <span className="w-1 h-1 bg-border rounded-full" />
-                    {tp.players?.name}
-                  </div>
-                ))}
-                {team.team_players.length === 0 && (
-                  <div className="text-xs text-muted italic">Nenhum jogador</div>
-                )}
-              </div>
-            </div>
+        <div className="grid grid-cols-1 gap-4">
+          {round.teams.map((team: any, index: number) => (
+            <TeamMiniPitch key={team.id} team={team} index={index} />
           ))}
           {round.teams.length === 0 && (
             <div className="col-span-full p-6 text-center text-muted text-sm glass-card">

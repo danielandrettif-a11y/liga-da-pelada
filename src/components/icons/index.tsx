@@ -129,6 +129,7 @@ export const Save = createSportIcon(<><path d="M4 4h13l3 3v13H4Z" /><path d="M8 
 
 export const Mail = createSportIcon(<><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m4 7 8 6 8-6" /></>);
 export const MailCheck = createSportIcon(<><rect x="3" y="5" width="14" height="14" rx="2.5" /><path d="m4 7 6 4.5L16 7M16 15l2 2 3.5-4" /></>);
+export const Bell = createSportIcon(<><path d="M6.5 10.5c0-3.5 2.1-6 5.5-6s5.5 2.5 5.5 6v3.2l2 3.3h-15l2-3.3Z" /><path d="M9.5 20h5M10 17v.5a2 2 0 0 0 4 0V17M12 2.5v2" /><path d="M7.2 7 5.5 5.5M16.8 7l1.7-1.5" opacity=".6" /></>);
 export const Lock = createSportIcon(<><rect x="4.5" y="10" width="15" height="10.5" rx="2.5" /><path d="M8 10V7.5a4 4 0 0 1 8 0V10M12 14v3" /></>);
 export const LockKeyhole = createSportIcon(<><rect x="4.5" y="10" width="15" height="10.5" rx="2.5" /><path d="M8 10V7.5a4 4 0 0 1 8 0V10" /><circle cx="12" cy="14.5" r="1" /><path d="M12 15.5v2" /></>);
 export const LogIn = createSportIcon(<><path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10M13 8l4 4-4 4M8 12h9" /></>);

@@ -24,6 +24,15 @@ export const metadata: Metadata = {
   keywords: ["pelada", "futebol", "ranking", "estatísticas", "liga"],
   authors: [{ name: "Pelada de Baixa Qualidade" }],
   applicationName: "Pelada de Baixa Qualidade",
+  icons: {
+    icon: [
+      { url: "/icons/pelada-bq-v2-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/pelada-bq-v2-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/pelada-bq-v2-apple-180.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
   appleWebApp: {
     capable: true,
     title: "Pelada BQ",

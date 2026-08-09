@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { supabase } from "../supabase";
 import type { CreateMatchInput, RegisterGoalInput } from "../types";
 import { calculateRoundStats } from "./stats";
 import { getAdminClient } from "../auth";
+import { sendMatchFinishedNotifications } from "../push-notifications";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 
@@ -185,12 +187,25 @@ export async function finishMatch(matchId: string) {
 
     const { data: match, error } = await client
       .from("matches")
-      .update({ status: "finished" })
+      .update({
+        status: "finished",
+        finished_at: new Date().toISOString(),
+        timer_started_at: null,
+      })
       .eq("id", matchId)
-      .select()
-      .single();
+      .neq("status", "finished")
+      .select(`
+        id,
+        round_id,
+        score_a,
+        score_b,
+        team_a:team_a_id (name),
+        team_b:team_b_id (name)
+      `)
+      .maybeSingle();
 
     if (error) throw new Error(error.message);
+    if (!match) return { success: true, alreadyFinished: true };
 
     revalidatePath(`/partidas/${matchId}`);
     revalidatePath(`/rodadas/${match.round_id}`);
@@ -198,6 +213,16 @@ export async function finishMatch(matchId: string) {
     
     // Atualiza as estatísticas de todos os jogadores da rodada
     await calculateRoundStats(match.round_id);
+
+    // Envia depois da resposta para não atrasar o encerramento da partida.
+    // Os destinatários são as contas vinculadas aos jogadores inscritos na rodada.
+    after(async () => {
+      try {
+        await sendMatchFinishedNotifications(client, match);
+      } catch (notificationError) {
+        console.error("Erro ao notificar fim de partida:", notificationError);
+      }
+    });
     
     return { success: true, roundId: match.round_id };
   } catch (err: any) {

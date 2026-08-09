@@ -321,7 +321,7 @@ export function InstallAppPrompt({
           </button>
 
           <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl shadow-[0_0_24px_rgba(204,255,0,.18)]">
-            <Image src="/icons/app-icon.svg" alt="" width={64} height={64} priority />
+            <Image src="/icons/pelada-bq-v2-192.png" alt="" width={64} height={64} priority />
           </div>
           <p className="mb-1 font-athletic text-[10px] font-black uppercase tracking-[.22em] text-accent">
             Leve a pelada com você

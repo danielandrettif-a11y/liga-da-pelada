@@ -3,6 +3,7 @@ import { FinishSeasonCard } from "@/components/FinishSeasonCard";
 import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
 import { logout } from "@/app/login/actions";
 import { InstallAppEntry } from "@/components/InstallAppPrompt";
+import { PushNotificationSettings } from "@/components/PushNotificationSettings";
 import {
   UserPlus,
   CalendarPlus,
@@ -95,6 +96,8 @@ export default async function MaisPage() {
       {account.user && (
         <InstallAppEntry userId={account.user.id} />
       )}
+
+      {account.user && <PushNotificationSettings />}
 
       {account.isAdmin && ADMIN_SECTIONS.map((section) => (
         <div key={section.title}>

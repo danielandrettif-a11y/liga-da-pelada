@@ -132,6 +132,18 @@ export type RoundPlayer = {
   player_id: string;
 };
 
+export type PushSubscriptionRecord = {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  expiration_time: number | null;
+  user_agent: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Team = {
   id: string;
   round_id: string;
@@ -342,6 +354,11 @@ export type Database = {
         Row: RoundPlayer;
         Insert: Omit<RoundPlayer, 'id'> & { id?: string };
         Update: Partial<Omit<RoundPlayer, 'id'>>;
+      };
+      push_subscriptions: {
+        Row: PushSubscriptionRecord;
+        Insert: Omit<PushSubscriptionRecord, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string };
+        Update: Partial<Omit<PushSubscriptionRecord, 'id' | 'user_id'>>;
       };
       round_payments: {
         Row: RoundPayment;
