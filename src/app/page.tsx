@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronRight, LogIn, TrendingUp } from "lucide-react";
+import { CalendarDays, Camera, ChevronRight, LogIn, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { getDashboardData } from "@/lib/actions/dashboard";
 import { getLatestFinishedSeason } from "@/lib/actions/seasons";
@@ -63,20 +63,51 @@ function JoinSelectionButton() {
   );
 }
 
+function IncompleteProfileBanner() {
+  return (
+    <Link
+      href="/meu-perfil"
+      className="block overflow-hidden rounded-xl border border-warning/50 bg-warning/10 py-3 text-warning"
+      aria-label="Cadastro incompleto. Adicione uma foto ao seu perfil."
+    >
+      <span className="profile-reminder-track flex w-max items-center gap-2 whitespace-nowrap px-4 text-xs font-black uppercase tracking-wide">
+        <Camera className="h-4 w-4" />
+        Cadastro incompleto: falta adicionar sua foto — toque aqui
+      </span>
+    </Link>
+  );
+}
+
 export default async function HomePage() {
   const accountPromise = getCurrentAccount();
-  const [{ data }, previousSeason, account, accountName] = await Promise.all([
+  const playerAvatarPromise = accountPromise.then(async (account) => {
+    if (!account.profile?.player_id) return undefined;
+
+    const { data: player } = await account.client
+      .from("players")
+      .select("avatar_url")
+      .eq("id", account.profile.player_id)
+      .maybeSingle();
+
+    return player ? player.avatar_url : undefined;
+  });
+  const [{ data }, previousSeason, account, accountName, playerAvatarUrl] = await Promise.all([
     getDashboardData(),
     getLatestFinishedSeason(),
     accountPromise,
     accountPromise.then(getAccountDisplayName),
+    playerAvatarPromise,
   ]);
+  const hasIncompleteProfile = Boolean(
+    account.user && account.profile?.player_id && playerAvatarUrl === null,
+  );
   
   if (!data) {
     return (
       <div className="space-y-8">
         <GreetingBanner name={accountName} />
         {!account.user && <JoinSelectionButton />}
+        {hasIncompleteProfile && <IncompleteProfileBanner />}
         <div className="flex flex-col items-center justify-center p-8 text-center animate-fade-in">
           <div className="w-16 h-16 rounded-full bg-surface-hover flex items-center justify-center mb-4">
             <TrendingUp className="w-8 h-8 text-muted" />
@@ -100,6 +131,7 @@ export default async function HomePage() {
       <GreetingBanner name={accountName} />
 
       {!account.user && <JoinSelectionButton />}
+      {hasIncompleteProfile && <IncompleteProfileBanner />}
 
       <LiveMatchBanner
         initialMatch={liveMatch as unknown as HomeLiveMatch | null}

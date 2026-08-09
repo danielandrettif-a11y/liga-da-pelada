@@ -95,6 +95,11 @@ main {
   100% { background-position: 200% 0; }
 }
 
+@keyframes profile-reminder-slide {
+  from { transform: translateX(65%); }
+  to { transform: translateX(-65%); }
+}
+
 .animate-fade-in {
   animation: fade-in 0.4s ease-out both;
 }
@@ -105,6 +110,16 @@ main {
 
 .animate-slide-in-bottom {
   animation: slide-in-bottom 0.3s ease-out both;
+}
+
+.profile-reminder-track {
+  animation: profile-reminder-slide 8s linear infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-reminder-track {
+    animation: none;
+  }
 }
 
 /* Staggered animation delays */
