@@ -46,13 +46,13 @@ export function AvatarCropModal({ imageUrl, onCancel, onConfirm }: AvatarCropMod
 
   return (
     <div
-      className="fixed inset-0 z-[200] bg-background/95 backdrop-blur-md flex items-end sm:items-center justify-center sm:p-4"
+      className="fixed inset-0 z-[200] flex items-stretch justify-center bg-background/95 backdrop-blur-md sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="crop-avatar-title"
     >
-      <div className="max-h-[100dvh] w-full max-w-md overflow-y-auto bg-background shadow-2xl animate-slide-in-bottom sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl sm:border sm:border-border">
-        <div className="h-16 px-4 flex items-center justify-between border-b border-border bg-surface">
+      <div className="flex h-dvh w-full max-w-md flex-col overflow-hidden bg-background shadow-2xl animate-slide-in-bottom sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl sm:border sm:border-border">
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
           <button
             type="button"
             onClick={onCancel}
@@ -66,10 +66,19 @@ export function AvatarCropModal({ imageUrl, onCancel, onConfirm }: AvatarCropMod
             <h2 id="crop-avatar-title" className="text-sm font-bold text-foreground">Ajustar foto</h2>
             <p className="text-[10px] text-muted">Arraste para posicionar</p>
           </div>
-          <div className="w-10" />
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={processing || !croppedArea}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-background disabled:opacity-40 sm:hidden"
+            aria-label="Usar foto"
+          >
+            <Check className="h-5 w-5" />
+          </button>
+          <div className="hidden w-10 sm:block" />
         </div>
 
-        <div className="relative h-[min(45dvh,430px)] bg-black sm:h-[min(55vh,430px)]">
+        <div className="relative min-h-0 flex-1 bg-black sm:h-[min(55vh,430px)] sm:flex-none">
           <Cropper
             image={imageUrl}
             crop={crop}
@@ -88,7 +97,7 @@ export function AvatarCropModal({ imageUrl, onCancel, onConfirm }: AvatarCropMod
           />
         </div>
 
-        <div className="p-5 space-y-5 bg-surface">
+        <div className="shrink-0 space-y-3 bg-surface p-4 sm:space-y-5 sm:p-5">
           <div className="flex items-center gap-3">
             <Minus className="w-4 h-4 text-muted flex-shrink-0" />
             <input
