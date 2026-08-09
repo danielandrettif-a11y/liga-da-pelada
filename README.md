@@ -28,6 +28,12 @@ O aplicativo usa o Google como provedor OAuth do Supabase. Para habilitar o bot�
 
 Novos usuários autenticados pelo Google recebem automaticamente o papel `player`. A migration `012_google_auth_player_profiles.sql` também usa o nome e a foto fornecidos pelo Google ao criar o jogador.
 
+Em produção, configure `NEXT_PUBLIC_SITE_URL` com o domínio público canônico. O aplicativo também possui o domínio atual como fallback para impedir callbacks em `localhost` quando estiver atrás de um proxy reverso:
+
+```bash
+NEXT_PUBLIC_SITE_URL=https://pelada-de-baixa-qualidade.179.197.75.220.sslip.io
+```
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getAuthSiteUrl } from "@/lib/siteUrl";
 import { headers } from "next/headers";
 
 export async function signup(formData: FormData) {
@@ -22,13 +23,12 @@ export async function signup(formData: FormData) {
 
   const client = await createClient();
   const requestHeaders = await headers();
-  const origin = requestHeaders.get("origin")
-    || `${requestHeaders.get("x-forwarded-proto") || "https"}://${requestHeaders.get("x-forwarded-host") || requestHeaders.get("host")}`;
+  const siteUrl = getAuthSiteUrl(requestHeaders);
   const { data, error } = await client.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: `${origin}/auth/callback`,
+      emailRedirectTo: `${siteUrl}/auth/callback`,
       data: {
         name,
         nickname,

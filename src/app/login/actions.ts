@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getAuthSiteUrl } from "@/lib/siteUrl";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -38,13 +39,12 @@ export async function login(formData: FormData) {
 export async function signInWithGoogle() {
   const supabase = await createClient();
   const requestHeaders = await headers();
-  const origin = requestHeaders.get("origin")
-    || `${requestHeaders.get("x-forwarded-proto") || "https"}://${requestHeaders.get("x-forwarded-host") || requestHeaders.get("host")}`;
+  const siteUrl = getAuthSiteUrl(requestHeaders);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${origin}/auth/callback`,
+      redirectTo: `${siteUrl}/auth/callback`,
     },
   });
 
