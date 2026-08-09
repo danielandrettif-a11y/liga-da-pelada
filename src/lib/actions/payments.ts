@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
-import { getAdminClient } from "../auth";
+import { getCurrentAccount } from "../auth";
 import type { Player, RoundStatus } from "../types";
 import { getActiveSeason } from "./seasons";
 import { getActiveLeague } from "./rounds";
@@ -13,6 +13,7 @@ export type PaymentRound = {
   date: string;
   status: RoundStatus;
   payment_pix: string | null;
+  payment_total: number | null;
 };
 
 export type PaymentPlayer = Player & {
@@ -27,7 +28,7 @@ export async function getPaymentRounds(): Promise<PaymentRound[]> {
 
   const { data, error } = await supabase
     .from("rounds")
-    .select("id, number, date, status, payment_pix")
+    .select("id, number, date, status, payment_pix, payment_total")
     .eq("season_id", season.id)
     .order("number", { ascending: false });
 
@@ -73,8 +74,19 @@ export async function getRoundPaymentPlayers(roundId: string): Promise<PaymentPl
 }
 
 export async function setPlayerPayment(roundId: string, playerId: string, paid: boolean) {
-  const client = await getAdminClient();
-  if (!client) return { success: false, error: "Somente administradores podem alterar pagamentos." };
+  const account = await getCurrentAccount();
+  if (!account.user) return { success: false, error: "Entre na sua conta para confirmar pagamentos." };
+  const client = account.client;
+
+  const { data: round } = await client
+    .from("rounds")
+    .select("status")
+    .eq("id", roundId)
+    .maybeSingle();
+
+  if (round?.status !== "finished") {
+    return { success: false, error: "Os pagamentos so podem ser marcados depois do fim da rodada." };
+  }
 
   const { data: participant } = await client
     .from("round_players")

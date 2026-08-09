@@ -3,6 +3,8 @@ import Link from "next/link";
 import { getDashboardData } from "@/lib/actions/dashboard";
 import { getLatestFinishedSeason } from "@/lib/actions/seasons";
 import { PreviousSeasonBanner } from "@/components/PreviousSeasonBanner";
+import { GreetingBanner } from "@/components/GreetingBanner";
+import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -49,13 +51,17 @@ function StatHighlightCard({
 }
 
 export default async function HomePage() {
-  const [{ data }, previousSeason] = await Promise.all([
+  const [{ data }, previousSeason, account] = await Promise.all([
     getDashboardData(),
     getLatestFinishedSeason(),
+    getCurrentAccount(),
   ]);
+  const accountName = await getAccountDisplayName(account);
   
   if (!data) {
     return (
+      <div className="space-y-8">
+        <GreetingBanner name={accountName} />
       <div className="flex flex-col items-center justify-center p-8 text-center animate-fade-in">
         <div className="w-16 h-16 rounded-full bg-surface-hover flex items-center justify-center mb-4">
           <TrendingUp className="w-8 h-8 text-muted" />
@@ -68,6 +74,7 @@ export default async function HomePage() {
           Ir para Rodadas
         </Link>
       </div>
+      </div>
     );
   }
 
@@ -75,6 +82,7 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
+      <GreetingBanner name={accountName} />
       {previousSeason && <PreviousSeasonBanner summary={previousSeason} />}
 
       {/* Next Round Card */}

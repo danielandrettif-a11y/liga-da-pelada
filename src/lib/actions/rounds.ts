@@ -62,6 +62,10 @@ export async function getRound(id: string) {
     .from("rounds")
     .select(`
       *,
+      round_players (
+        player_id,
+        players (*)
+      ),
       teams (
         *,
         team_players (
@@ -96,6 +100,21 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem criar rodadas." };
 
+    const normalizedTeams = teams.map((team) => ({
+      ...team,
+      name: team.name.trim(),
+    }));
+    if (normalizedTeams.some((team) => !team.name)) {
+      return { success: false, error: "Todos os times precisam ter um nome." };
+    }
+    if (normalizedTeams.some((team) => team.name.length > 40)) {
+      return { success: false, error: "O nome de cada time deve ter no máximo 40 caracteres." };
+    }
+    const uniqueNames = new Set(normalizedTeams.map((team) => team.name.toLocaleLowerCase("pt-BR")));
+    if (uniqueNames.size !== normalizedTeams.length) {
+      return { success: false, error: "Use um nome diferente para cada time." };
+    }
+
     const league = await getActiveLeague();
     const season = await getActiveSeason(league.id);
     if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
@@ -128,7 +147,7 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
     if (roundError) throw new Error(`Erro ao criar rodada: ${roundError.message}`);
 
     // 3. Obter todos os jogadores únicos selecionados
-    const allPlayerIds = Array.from(new Set(teams.flatMap(t => t.playerIds)));
+    const allPlayerIds = Array.from(new Set(normalizedTeams.flatMap(t => t.playerIds)));
 
     // 4. Inserir round_players
     if (allPlayerIds.length > 0) {
@@ -144,7 +163,7 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
     }
 
     // 5. Inserir times e team_players
-    for (const team of teams) {
+    for (const team of normalizedTeams) {
       const { data: teamData, error: teamError } = await client
         .from("teams")
         .insert({
@@ -179,18 +198,27 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
   }
 }
 
-export async function finishRound(roundId: string, paymentPix: string) {
+export async function finishRound(roundId: string, paymentPix: string, paymentTotal: number) {
   try {
     const pix = paymentPix.trim();
     if (!pix) return { success: false, error: "Informe a chave PIX que recebera os pagamentos." };
     if (pix.length > 200) return { success: false, error: "A chave PIX deve ter no maximo 200 caracteres." };
+    const total = Number(paymentTotal);
+    if (!Number.isFinite(total) || total <= 0) {
+      return { success: false, error: "Informe um valor total valido para a pelada." };
+    }
+    if (total > 99999999.99) return { success: false, error: "O valor informado e muito alto." };
 
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem encerrar rodadas." };
 
     const { error } = await client
       .from("rounds")
-      .update({ status: "finished", payment_pix: pix })
+      .update({
+        status: "finished",
+        payment_pix: pix,
+        payment_total: Math.round(total * 100) / 100,
+      })
       .eq("id", roundId);
 
     if (error) throw new Error(error.message);

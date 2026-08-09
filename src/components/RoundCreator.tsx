@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createRoundWithTeams, type TeamInput } from "@/lib/actions/rounds";
 import type { Player } from "@/lib/types";
-import { Users, Calendar, CheckCircle2, ChevronRight } from "lucide-react";
+import { Users, Calendar, CheckCircle2, ChevronRight, PencilLine } from "lucide-react";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
 
@@ -123,7 +123,24 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
     })));
   }
 
+  function updateTeamName(teamId: string, name: string) {
+    setTeams((current) => current.map((team) => (
+      team.id === teamId ? { ...team, name } : team
+    )));
+    setError("");
+  }
+
   async function handleSave() {
+    const normalizedNames = teams.map((team) => team.name.trim());
+    if (normalizedNames.some((name) => !name)) {
+      setError("Todos os times precisam ter um nome.");
+      return;
+    }
+    if (new Set(normalizedNames.map((name) => name.toLocaleLowerCase("pt-BR"))).size !== normalizedNames.length) {
+      setError("Use um nome diferente para cada time.");
+      return;
+    }
+
     if (unassignedPlayers.length > 0) {
       if (!confirm(`Ainda há ${unassignedPlayers.length} jogadores sem time. Deseja salvar mesmo assim?`)) {
         return;
@@ -134,7 +151,7 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
     setError("");
 
     const teamsInput: TeamInput[] = teams.map(t => ({
-      name: t.name,
+      name: t.name.trim(),
       color: t.color,
       playerIds: t.players.map(p => p.id)
     }));
@@ -272,6 +289,41 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
       {/* STEP 3: Divisão dos Times */}
       {step === 3 && (
         <div className="space-y-6 animate-fade-in">
+
+          <div className="glass-card p-4">
+            <div className="mb-4 flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10">
+                <PencilLine className="h-5 w-5 text-accent" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black text-foreground">Nome dos times</h2>
+                <p className="mt-0.5 text-xs text-muted">Mantenha os nomes padrão ou personalize para esta rodada.</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {teams.map((team, index) => (
+                <label key={team.id} className="block" htmlFor={`team-name-${team.id}`}>
+                  <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted">
+                    Time {index + 1}
+                  </span>
+                  <div className="flex items-center gap-3 rounded-xl border border-border bg-background/50 px-3 focus-within:border-accent">
+                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: team.color }} />
+                    <input
+                      id={`team-name-${team.id}`}
+                      type="text"
+                      value={team.name}
+                      onChange={(event) => updateTeamName(team.id, event.target.value)}
+                      maxLength={40}
+                      placeholder={`Nome do time ${index + 1}`}
+                      className="min-w-0 flex-1 bg-transparent py-3 text-sm font-bold text-foreground outline-none placeholder:text-muted/50"
+                    />
+                    <span className="text-[9px] font-bold text-muted/60">{team.name.length}/40</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
           
           {/* Sorteio */}
           <div className="flex gap-2">
@@ -337,12 +389,7 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
                 <div className="px-4 py-2 bg-surface flex items-center justify-between border-b border-border">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: team.color }} />
-                    <input
-                      type="text"
-                      value={team.name}
-                      onChange={e => setTeams(teams.map(t => t.id === team.id ? { ...t, name: e.target.value } : t))}
-                      className="bg-transparent text-sm font-bold text-foreground focus:outline-none max-w-[100px]"
-                    />
+                    <span className="max-w-[170px] truncate text-sm font-bold text-foreground">{team.name || "Sem nome"}</span>
                   </div>
                   <span className="text-[10px] font-bold text-muted bg-surface-hover px-2 py-0.5 rounded-md">
                     {team.players.length} jogadores
@@ -380,7 +427,7 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
               disabled={loading}
               className="flex-[2] bg-accent hover:bg-accent-light text-background font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50"
             >
-              {loading ? "Salvando..." : "Finalizar Rodada"}
+              {loading ? "Criando..." : "Criar Rodada"}
             </button>
           </div>
         </div>

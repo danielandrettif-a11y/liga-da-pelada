@@ -8,6 +8,7 @@ import { finishRound } from "@/lib/actions/rounds";
 export function FinishRoundButton({ roundId, status, canManage }: { roundId: string; status: string; canManage: boolean }) {
   const [open, setOpen] = useState(false);
   const [pix, setPix] = useState("");
+  const [paymentTotal, setPaymentTotal] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -35,10 +36,15 @@ export function FinishRoundButton({ roundId, status, canManage }: { roundId: str
       setError("Informe a chave PIX antes de encerrar a rodada.");
       return;
     }
+    const total = Number(paymentTotal.replace(",", "."));
+    if (!Number.isFinite(total) || total <= 0) {
+      setError("Informe o valor total da pelada.");
+      return;
+    }
 
     setLoading(true);
     setError("");
-    const result = await finishRound(roundId, pix);
+    const result = await finishRound(roundId, pix, total);
     if (!result.success) {
       setError(result.error || "Nao foi possivel encerrar a rodada.");
       setLoading(false);
@@ -83,6 +89,22 @@ export function FinishRoundButton({ roundId, status, canManage }: { roundId: str
               autoFocus
               className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-accent"
             />
+
+            <label htmlFor="payment-total" className="mt-4 block text-xs font-bold uppercase tracking-wider text-muted">Valor total da pelada</label>
+            <div className="relative mt-2">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-muted">R$</span>
+              <input
+                id="payment-total"
+                type="number"
+                inputMode="decimal"
+                min="0.01"
+                step="0.01"
+                value={paymentTotal}
+                onChange={(event) => setPaymentTotal(event.target.value)}
+                placeholder="0,00"
+                className="w-full rounded-xl border border-border bg-background py-3 pl-12 pr-4 text-sm text-foreground outline-none focus:border-accent"
+              />
+            </div>
 
             {error && <p role="alert" className="mt-3 rounded-lg bg-danger/10 p-3 text-xs font-bold text-danger">{error}</p>}
 

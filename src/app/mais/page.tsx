@@ -1,14 +1,12 @@
 import Link from "next/link";
 import { FinishSeasonCard } from "@/components/FinishSeasonCard";
-import { getCurrentAccount } from "@/lib/auth";
+import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
 import { logout } from "@/app/login/actions";
 import {
   UserPlus,
   CalendarPlus,
-  Settings,
   Shield,
   ChevronRight,
-  Database,
   Sliders,
   UserRound,
   LogIn,
@@ -50,25 +48,31 @@ const ADMIN_SECTIONS = [
       },
     ],
   },
-  {
-    title: "Dados",
-    items: [
-      {
-        href: "/admin/banco",
-        icon: Database,
-        label: "Banco de Dados",
-        description: "Conexão Supabase e migrações",
-      },
-    ],
-  },
 ];
 
 export default async function MaisPage() {
   const account = await getCurrentAccount();
+  const accountName = await getAccountDisplayName(account);
 
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-bold text-foreground">Mais</h1>
+
+      {account.user && (
+        <div className="glass-card flex items-center gap-3 p-4">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-accent/15 text-lg font-black text-accent">
+            {(accountName || "U").slice(0, 1).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Conta conectada</p>
+            <p className="truncate text-base font-black text-foreground">{accountName}</p>
+            <p className="truncate text-xs text-muted">{account.user.email}</p>
+          </div>
+          <span className="rounded-full bg-accent/10 px-2 py-1 text-[9px] font-black uppercase text-accent">
+            {account.isAdmin ? "ADM" : "Jogador"}
+          </span>
+        </div>
+      )}
 
       {account.user && account.profile?.player_id && (
         <div>

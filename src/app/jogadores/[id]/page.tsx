@@ -1,10 +1,10 @@
-import { getPlayer, getPlayerRoundHistory, getPlayersWithStats } from "@/lib/actions/players";
+import { getPlayer, getPlayerGoalkeeperAwards, getPlayerRoundHistory, getPlayersWithStats } from "@/lib/actions/players";
 import { getDisplayName, calculateWinRate, formatDateShort } from "@/lib/utils";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerProfileBadge } from "@/components/PlayerProfileBadge";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight, Medal } from "lucide-react";
 
 export const revalidate = 0;
 
@@ -16,10 +16,11 @@ export default async function JogadorPerfilPage({
   const { id } = await params;
 
   // Busca dados em paralelo
-  const [player, history, allStats] = await Promise.all([
+  const [player, history, allStats, goalkeeperAwards] = await Promise.all([
     getPlayer(id),
     getPlayerRoundHistory(id),
     getPlayersWithStats(),
+    getPlayerGoalkeeperAwards(id),
   ]);
 
   if (!player) {
@@ -67,6 +68,13 @@ export default async function JogadorPerfilPage({
         <p className="text-sm text-muted">{player.name}</p>
         <div className="mt-2"><PlayerProfileBadge profile={player.player_profile} /></div>
 
+        {goalkeeperAwards.length > 0 && (
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-black text-accent">
+            <Medal className="h-4 w-4" />
+            Melhor goleiro {goalkeeperAwards.length > 1 ? `× ${goalkeeperAwards.length}` : "da rodada"}
+          </div>
+        )}
+
         <div className="mt-6 py-3 px-6 rounded-2xl bg-surface/50 border border-border inline-flex items-center gap-4">
           <div className="flex flex-col items-center">
             <span className="text-[10px] text-muted font-bold uppercase tracking-wider mb-1">Pontos</span>
@@ -108,6 +116,28 @@ export default async function JogadorPerfilPage({
           </div>
         </div>
       </section>
+
+      {goalkeeperAwards.length > 0 && (
+        <section className="animate-fade-in-up stagger-2">
+          <h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">Prêmios de goleiro</h3>
+          <div className="glass-card overflow-hidden">
+            {goalkeeperAwards.map((award, index) => (
+              <Link key={award.id} href={`/rodadas/${award.id}`}>
+                <div className={`flex items-center gap-3 px-4 py-3.5 hover:bg-surface-hover ${index < goalkeeperAwards.length - 1 ? "border-b border-border" : ""}`}>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10">
+                    <Medal className="h-5 w-5 text-accent" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-foreground">Melhor goleiro · Rodada {String(award.number).padStart(2, "0")}</p>
+                    <p className="mt-0.5 text-xs text-muted">{formatDateShort(award.date)} · +6 pontos</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* History */}
       <section className="animate-fade-in-up stagger-2">

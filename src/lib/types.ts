@@ -65,6 +65,8 @@ export type Round = {
   status: RoundStatus;
   notes: string | null;
   payment_pix: string | null;
+  payment_total: number | null;
+  best_goalkeeper_player_id: string | null;
   created_at: string;
 };
 
@@ -323,7 +325,7 @@ export type Database = {
       };
       rounds: {
         Row: Round;
-        Insert: Omit<Round, 'id' | 'created_at' | 'status' | 'payment_pix'> & { id?: string; created_at?: string; status?: RoundStatus; payment_pix?: string | null };
+        Insert: Omit<Round, 'id' | 'created_at' | 'status' | 'payment_pix' | 'payment_total' | 'best_goalkeeper_player_id'> & { id?: string; created_at?: string; status?: RoundStatus; payment_pix?: string | null; payment_total?: number | null; best_goalkeeper_player_id?: string | null };
         Update: Partial<Omit<Round, 'id'>>;
       };
       account_profiles: {

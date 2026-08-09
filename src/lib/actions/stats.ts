@@ -3,15 +3,8 @@
 import { supabase } from "../supabase";
 import { getActiveSeasonRoundIds } from "./seasons";
 import { getAdminClient } from "../auth";
-
-// Regras de Pontuação Padrão
-const POINTS = {
-  WIN: 3,
-  DRAW: 1,
-  LOSS: 0,
-  GOAL: 2,
-  ASSIST: 1,
-};
+import { BEST_GOALKEEPER_POINTS, DEFAULT_SCORING_POINTS } from "../scoring";
+import type { EventType } from "../types";
 
 export async function calculateRoundStats(roundId: string) {
   try {
@@ -19,7 +12,7 @@ export async function calculateRoundStats(roundId: string) {
     if (!client) return { success: false, error: "Somente administradores podem recalcular estatisticas." };
 
     // 1. Buscar a rodada e todas as partidas finalizadas
-    const { data: round, error } = await supabase
+    const { data: round, error } = await client
       .from("rounds")
       .select(`
         *,
@@ -36,6 +29,20 @@ export async function calculateRoundStats(roundId: string) {
       .single();
 
     if (error || !round) throw new Error("Erro ao buscar rodada para estatísticas");
+
+    const points = { ...DEFAULT_SCORING_POINTS };
+    const { data: configuredRules, error: rulesError } = await client
+      .from("ranking_rules")
+      .select("event_type, points")
+      .eq("league_id", round.league_id);
+
+    if (rulesError) throw new Error(`Erro ao buscar regras de pontuação: ${rulesError.message}`);
+
+    for (const rule of configuredRules || []) {
+      if (rule.event_type in points) {
+        points[rule.event_type as EventType] = rule.points;
+      }
+    }
 
     const finishedMatches = round.matches.filter((m: any) => m.status === "finished");
     
@@ -76,9 +83,9 @@ export async function calculateRoundStats(roundId: string) {
           const s = statsMap[tp.player_id];
           if (!s) continue;
           s.games += 1;
-          if (result === 'win') { s.wins += 1; s.points += POINTS.WIN; }
-          if (result === 'draw') { s.draws += 1; s.points += POINTS.DRAW; }
-          if (result === 'loss') { s.losses += 1; s.points += POINTS.LOSS; }
+          if (result === 'win') { s.wins += 1; s.points += points.win; }
+          if (result === 'draw') { s.draws += 1; s.points += points.draw; }
+          if (result === 'loss') { s.losses += 1; s.points += points.loss; }
         }
       };
 
@@ -92,18 +99,25 @@ export async function calculateRoundStats(roundId: string) {
           const scorer = statsMap[ev.player_id];
           if (scorer) {
             scorer.goals += 1;
-            scorer.points += POINTS.GOAL;
+            scorer.points += points.goal;
           }
           // Assistências
           if (ev.assist_player_id) {
             const assister = statsMap[ev.assist_player_id];
             if (assister) {
               assister.assists += 1;
-              assister.points += POINTS.ASSIST;
+              assister.points += points.assist;
             }
           }
         }
       }
+    }
+
+    const bestGoalkeeper = round.best_goalkeeper_player_id
+      ? statsMap[round.best_goalkeeper_player_id]
+      : null;
+    if (bestGoalkeeper) {
+      bestGoalkeeper.points += BEST_GOALKEEPER_POINTS;
     }
 
     // 4. Salvar tudo (Upsert)

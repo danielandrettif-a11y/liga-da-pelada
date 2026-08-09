@@ -159,6 +159,22 @@ export async function getPlayerRoundHistory(playerId: string) {
   return data;
 }
 
+export async function getPlayerGoalkeeperAwards(playerId: string) {
+  const { data, error } = await supabase
+    .from("rounds")
+    .select("id, number, date")
+    .eq("best_goalkeeper_player_id", playerId)
+    .eq("status", "finished")
+    .order("date", { ascending: false });
+
+  if (error) {
+    console.error("Erro ao buscar premios de melhor goleiro:", error);
+    return [];
+  }
+
+  return data || [];
+}
+
 export async function createPlayer(input: CreatePlayerInput) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem criar jogadores." };

@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarDays, Plus } from "lucide-react";
 import { getRound } from "@/lib/actions/rounds";
 import { formatDateShort } from "@/lib/utils";
 import { FinishRoundButton } from "@/components/FinishRoundButton";
+import { BestGoalkeeperPicker } from "@/components/BestGoalkeeperPicker";
 import { getCurrentAccount } from "@/lib/auth";
 
 export const revalidate = 0;
@@ -20,6 +21,11 @@ export default async function RodadaDetalhePage({
   if (!round) {
     notFound();
   }
+
+  const participants = (round.round_players || [])
+    .map((entry: any) => entry.players)
+    .filter(Boolean)
+    .sort((a: any, b: any) => (a.nickname || a.name).localeCompare(b.nickname || b.name, "pt-BR"));
 
   return (
     <div className="space-y-6">
@@ -43,6 +49,16 @@ export default async function RodadaDetalhePage({
           </div>
         </div>
       </div>
+
+      {round.status !== "finished" && account.isAdmin && (
+        <Link
+          href={`/rodadas/${round.id}/nova-partida`}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-accent px-5 py-4 text-sm font-black uppercase tracking-wide text-background shadow-lg shadow-accent/20 transition-all hover:bg-accent-light active:scale-[0.98]"
+        >
+          <Plus className="h-5 w-5" strokeWidth={3} />
+          Nova Partida
+        </Link>
+      )}
 
       {/* Teams Grid */}
       <section>
@@ -88,15 +104,6 @@ export default async function RodadaDetalhePage({
           <h2 className="text-xs font-bold text-muted uppercase tracking-wider">
             Partidas
           </h2>
-          {round.status !== "finished" && account.isAdmin && (
-            <Link
-              href={`/rodadas/${round.id}/nova-partida`}
-              className="flex items-center gap-1 text-xs font-bold text-accent hover:text-accent-light transition-colors"
-            >
-              <Plus className="w-3 h-3" />
-              Nova Partida
-            </Link>
-          )}
         </div>
         
         <div className="space-y-3">
@@ -109,39 +116,38 @@ export default async function RodadaDetalhePage({
             round.matches.map((match: any, index: number) => {
               const teamA = round.teams.find((t: any) => t.id === match.team_a_id);
               const teamB = round.teams.find((t: any) => t.id === match.team_b_id);
+              const isFinished = match.status === "finished";
+              const isLive = match.status === "live";
               
               return (
                 <Link key={match.id} href={`/partidas/${match.id}`} className="block">
-                  <div className="glass-card glass-card-hover p-4 flex items-center justify-between animate-fade-in stagger-1">
-                    
-                    {/* Team A */}
-                    <div className="flex items-center gap-2 flex-1 justify-end">
-                      <span className="text-sm font-bold text-foreground truncate">{teamA?.name}</span>
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: teamA?.color }} />
-                    </div>
-
-                    {/* Score */}
-                    <div className="px-3 flex items-center justify-center flex-shrink-0 gap-2">
-                      <span className={`text-xl font-bold ${match.score_a > match.score_b ? "text-accent" : "text-foreground"}`}>
-                        {match.score_a}
+                  <div className={`glass-card glass-card-hover overflow-hidden p-4 animate-fade-in stagger-${Math.min(index + 1, 5)} ${isLive ? "border-accent/40 shadow-[0_0_24px_rgba(190,255,0,0.06)]" : ""}`}>
+                    <div className="mb-3 flex items-center justify-between border-b border-border pb-2.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-muted">
+                        Partida {String(index + 1).padStart(2, "0")}
                       </span>
-                      <span className="text-xs text-muted font-black">×</span>
-                      <span className={`text-xl font-bold ${match.score_b > match.score_a ? "text-accent" : "text-foreground"}`}>
-                        {match.score_b}
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${isFinished ? "bg-muted/15 text-muted" : isLive ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>
+                        {isLive && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
+                        {isFinished ? "Finalizada" : isLive ? "Ao vivo" : "Aguardando"}
                       </span>
                     </div>
 
-                    {/* Team B */}
-                    <div className="flex items-center gap-2 flex-1">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: teamB?.color }} />
-                      <span className="text-sm font-bold text-foreground truncate">{teamB?.name}</span>
-                    </div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+                      <div className="flex min-w-0 items-center justify-end gap-2 text-right">
+                        <span className="truncate text-sm font-bold text-foreground">{teamA?.name}</span>
+                        <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: teamA?.color }} />
+                      </div>
 
-                    {/* Status badge */}
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2">
-                      <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-sm ${match.status === 'finished' ? 'bg-muted/20 text-muted' : 'bg-accent/20 text-accent'}`}>
-                        {match.status === 'finished' ? 'Fim' : 'Ao vivo'}
-                      </span>
+                      <div className="flex min-w-[5.75rem] items-center justify-center gap-2 rounded-xl border border-border bg-background/60 px-3 py-2">
+                        <span className={`stat-number text-2xl ${isFinished && match.score_a > match.score_b ? "text-accent" : "text-foreground"}`}>{match.score_a}</span>
+                        <span className="text-xs font-black text-muted">×</span>
+                        <span className={`stat-number text-2xl ${isFinished && match.score_b > match.score_a ? "text-accent" : "text-foreground"}`}>{match.score_b}</span>
+                      </div>
+
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: teamB?.color }} />
+                        <span className="truncate text-sm font-bold text-foreground">{teamB?.name}</span>
+                      </div>
                     </div>
                   </div>
                 </Link>
@@ -152,6 +158,15 @@ export default async function RodadaDetalhePage({
       </section>
       
       <FinishRoundButton roundId={round.id} status={round.status} canManage={account.isAdmin} />
+
+      {round.status === "finished" && (
+        <BestGoalkeeperPicker
+          roundId={round.id}
+          participants={participants}
+          selectedPlayerId={round.best_goalkeeper_player_id || null}
+          canManage={account.isAdmin}
+        />
+      )}
     </div>
   );
 }
