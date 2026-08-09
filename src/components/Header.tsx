@@ -1,21 +1,35 @@
-import { Trophy } from "@/components/icons";
+import Image from "next/image";
 import Link from "next/link";
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-40 border-b border-border backdrop-blur-xl bg-background/80">
-      <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center group-hover:bg-accent/25 transition-colors">
-            <Trophy className="w-4.5 h-4.5 text-accent" />
+    <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-lg items-center px-4">
+        <Link
+          href="/"
+          className="group flex items-center gap-2.5"
+          aria-label="Pelada de Baixa Qualidade — página inicial"
+        >
+          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-[#020b07] shadow-[0_0_20px_rgba(204,255,0,.08)] transition-transform group-hover:scale-[1.03]">
+            <Image
+              src="/brand-logo.png"
+              alt=""
+              width={203}
+              height={255}
+              priority
+              className="absolute -left-[7px] -top-[10px] h-[68px] w-[54px] max-w-none"
+            />
           </div>
-          <div>
-            <h1 className="text-sm font-bold tracking-tight text-foreground leading-none">
-              PELADA DE BAIXA QUALIDADE
-            </h1>
-            <p className="text-[10px] text-muted font-medium tracking-widest uppercase">
-              Temporadas
-            </p>
+
+          <div className="font-athletic uppercase italic leading-none">
+            <span className="block text-[20px] font-black tracking-tight text-accent">
+              Pelada
+            </span>
+            <span className="mt-0.5 flex items-baseline gap-1 text-[13px] font-black tracking-[0.025em]">
+              <span className="text-accent">de</span>
+              <span className="text-white">Baixa</span>
+              <span className="text-accent">Qualidade</span>
+            </span>
           </div>
         </Link>
       </div>
