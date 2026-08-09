@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Oswald } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
-import { BottomNav } from "@/components/BottomNav";
+import { SessionBottomNav } from "@/components/SessionBottomNav";
 import { Header } from "@/components/Header";
 
 const inter = Inter({
@@ -39,7 +40,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <main className="flex-1 px-4 pt-4 pb-24 max-w-lg mx-auto w-full">
           {children}
         </main>
-        <BottomNav />
+        <Suspense fallback={null}>
+          <SessionBottomNav />
+        </Suspense>
       </body>
     </html>
   );

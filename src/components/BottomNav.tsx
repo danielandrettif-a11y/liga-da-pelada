@@ -13,13 +13,19 @@ const NAV_ITEMS = [
   { href: "/mais", label: "Mais", icon: MoreHorizontal },
 ] as const;
 
-export function BottomNav() {
+export function BottomNav({ isAuthenticated }: { isAuthenticated: boolean }) {
   const pathname = usePathname();
+  const visibleItems = isAuthenticated
+    ? NAV_ITEMS
+    : NAV_ITEMS.filter((item) => item.href !== "/pagamentos" && item.href !== "/mais");
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
-      <div className="mx-auto grid h-16 w-full max-w-lg grid-cols-6 items-stretch px-1">
-        {NAV_ITEMS.map((item) => {
+      <div
+        className="mx-auto grid h-16 w-full max-w-lg items-stretch px-1"
+        style={{ gridTemplateColumns: `repeat(${visibleItems.length}, minmax(0, 1fr))` }}
+      >
+        {visibleItems.map((item) => {
           const isActive =
             item.href === "/"
               ? pathname === "/"

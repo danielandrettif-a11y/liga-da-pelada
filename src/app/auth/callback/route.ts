@@ -8,8 +8,17 @@ export async function GET(request: Request) {
 
   if (code) {
     const client = await createClient();
-    const { error } = await client.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(new URL("/meu-perfil", SITE_URL));
+    const { data, error } = await client.auth.exchangeCodeForSession(code);
+    if (!error && data.user) {
+      const { data: profile } = await client
+        .from("account_profiles")
+        .select("player_id")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
+
+      const destination = profile?.player_id ? "/" : "/meu-perfil";
+      return NextResponse.redirect(new URL(destination, SITE_URL));
+    }
   }
 
   return NextResponse.redirect(new URL("/login", SITE_URL));

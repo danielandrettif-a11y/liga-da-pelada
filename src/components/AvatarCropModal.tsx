@@ -51,7 +51,7 @@ export function AvatarCropModal({ imageUrl, onCancel, onConfirm }: AvatarCropMod
       aria-modal="true"
       aria-labelledby="crop-avatar-title"
     >
-      <div className="w-full max-w-md bg-background sm:border sm:border-border sm:rounded-2xl overflow-hidden shadow-2xl animate-slide-in-bottom">
+      <div className="max-h-[100dvh] w-full max-w-md overflow-y-auto bg-background shadow-2xl animate-slide-in-bottom sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl sm:border sm:border-border">
         <div className="h-16 px-4 flex items-center justify-between border-b border-border bg-surface">
           <button
             type="button"
@@ -69,7 +69,7 @@ export function AvatarCropModal({ imageUrl, onCancel, onConfirm }: AvatarCropMod
           <div className="w-10" />
         </div>
 
-        <div className="relative h-[min(55vh,430px)] bg-black">
+        <div className="relative h-[min(45dvh,430px)] bg-black sm:h-[min(55vh,430px)]">
           <Cropper
             image={imageUrl}
             crop={crop}

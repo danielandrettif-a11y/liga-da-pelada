@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronRight, TrendingUp } from "lucide-react";
+import { CalendarDays, ChevronRight, LogIn, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { getDashboardData } from "@/lib/actions/dashboard";
 import { getLatestFinishedSeason } from "@/lib/actions/seasons";
@@ -51,11 +51,24 @@ function StatHighlightCard({
   );
 }
 
+function JoinSelectionButton() {
+  return (
+    <Link
+      href="/login"
+      className="flex w-full items-center justify-center gap-2 rounded-xl border border-accent/50 bg-accent/10 px-4 py-3.5 text-sm font-black text-accent transition-colors hover:bg-accent/15"
+    >
+      <LogIn className="h-5 w-5" />
+      Entrar na Seleção
+    </Link>
+  );
+}
+
 export default async function HomePage() {
   const accountPromise = getCurrentAccount();
-  const [{ data }, previousSeason, accountName] = await Promise.all([
+  const [{ data }, previousSeason, account, accountName] = await Promise.all([
     getDashboardData(),
     getLatestFinishedSeason(),
+    accountPromise,
     accountPromise.then(getAccountDisplayName),
   ]);
   
@@ -63,18 +76,19 @@ export default async function HomePage() {
     return (
       <div className="space-y-8">
         <GreetingBanner name={accountName} />
-      <div className="flex flex-col items-center justify-center p-8 text-center animate-fade-in">
-        <div className="w-16 h-16 rounded-full bg-surface-hover flex items-center justify-center mb-4">
-          <TrendingUp className="w-8 h-8 text-muted" />
+        {!account.user && <JoinSelectionButton />}
+        <div className="flex flex-col items-center justify-center p-8 text-center animate-fade-in">
+          <div className="w-16 h-16 rounded-full bg-surface-hover flex items-center justify-center mb-4">
+            <TrendingUp className="w-8 h-8 text-muted" />
+          </div>
+          <h2 className="text-xl font-bold text-foreground mb-2">Bem-vindo à Liga</h2>
+          <p className="text-muted text-sm mb-6">
+            Comece criando a primeira rodada e chamando seus amigos!
+          </p>
+          <Link href="/rodadas" className="btn-primary w-full">
+            Ir para Rodadas
+          </Link>
         </div>
-        <h2 className="text-xl font-bold text-foreground mb-2">Bem-vindo à Liga</h2>
-        <p className="text-muted text-sm mb-6">
-          Comece criando a primeira rodada e chamando seus amigos!
-        </p>
-        <Link href="/rodadas" className="btn-primary w-full">
-          Ir para Rodadas
-        </Link>
-      </div>
       </div>
     );
   }
@@ -84,6 +98,8 @@ export default async function HomePage() {
   return (
     <div className="space-y-6">
       <GreetingBanner name={accountName} />
+
+      {!account.user && <JoinSelectionButton />}
 
       <LiveMatchBanner
         initialMatch={liveMatch as unknown as HomeLiveMatch | null}
