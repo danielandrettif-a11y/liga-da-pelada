@@ -9,6 +9,20 @@ import { getAdminClient } from "../auth";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 
+async function getMatchState(
+  client: NonNullable<Awaited<ReturnType<typeof getAdminClient>>>,
+  matchId: string,
+) {
+  const { data, error } = await client
+    .from("matches")
+    .select("round_id, team_a_id, score_a, score_b, timer_started_at, timer_accumulated_seconds")
+    .eq("id", matchId)
+    .single();
+
+  if (error || !data) throw new Error("Partida não encontrada");
+  return data;
+}
+
 export async function createMatch(input: CreateMatchInput) {
   try {
     const client = await getAdminClient();
@@ -101,8 +115,7 @@ export async function registerGoal(input: RegisterGoalInput) {
     if (eventError) throw new Error(eventError.message);
 
     // 2. Atualizar o placar da partida
-    const match = await getMatch(input.match_id);
-    if (!match) throw new Error("Partida não encontrada");
+    const match = await getMatchState(client, input.match_id);
 
     const isTeamA = match.team_a_id === input.team_id;
     const newScoreA = isTeamA ? match.score_a + 1 : match.score_a;
@@ -141,8 +154,7 @@ export async function deleteEvent(eventId: string, matchId: string, teamId: stri
     if (error) throw new Error(error.message);
 
     // Subtrair 1 do placar
-    const match = await getMatch(matchId);
-    if (!match) throw new Error("Partida não encontrada");
+    const match = await getMatchState(client, matchId);
 
     const isTeamA = match.team_a_id === teamId;
     const newScoreA = isTeamA ? Math.max(0, match.score_a - 1) : match.score_a;
@@ -199,8 +211,7 @@ export async function updateMatchTimer(matchId: string, action: "start" | "pause
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
 
-    const match = await getMatch(matchId);
-    if (!match) throw new Error("Partida não encontrada");
+    const match = await getMatchState(client, matchId);
 
     if (action === "start") {
       const { error } = await client

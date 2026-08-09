@@ -25,8 +25,10 @@ const STATUS_STYLES = {
 };
 
 export default async function RodadasPage() {
-  const rounds = await getRounds();
-  const account = await getCurrentAccount();
+  const [rounds, account] = await Promise.all([
+    getRounds(),
+    getCurrentAccount(),
+  ]);
 
   return (
     <div className="space-y-5">

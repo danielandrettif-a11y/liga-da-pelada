@@ -1,4 +1,4 @@
-import { Banknote, Clock3 } from "lucide-react";
+import { ArrowLeftRight, Clock3 } from "lucide-react";
 import { PaymentChecklist } from "@/components/PaymentChecklist";
 import { getPaymentRounds, getRoundPaymentPlayers } from "@/lib/actions/payments";
 import { getCurrentAccount } from "@/lib/auth";
@@ -6,25 +6,32 @@ import { getCurrentAccount } from "@/lib/auth";
 export const revalidate = 0;
 
 export default async function PagamentosPage() {
-  const rounds = await getPaymentRounds();
+  const roundsPromise = getPaymentRounds();
+  const playersPromise = roundsPromise.then((availableRounds) => {
+    const round = availableRounds[0];
+    const released = round?.status === "finished"
+      && !!round.payment_pix
+      && Number(round.payment_total) > 0;
+    return released ? getRoundPaymentPlayers(round.id) : [];
+  });
+  const [rounds, account, players] = await Promise.all([
+    roundsPromise,
+    getCurrentAccount(),
+    playersPromise,
+  ]);
   const currentRound = rounds[0] || null;
-  const account = await getCurrentAccount();
 
   const paymentsReleased = currentRound?.status === "finished"
     && !!currentRound.payment_pix
     && Number(currentRound.payment_total) > 0;
-  const players = paymentsReleased
-    ? await getRoundPaymentPlayers(currentRound.id)
-    : [];
-
   return (
     <div className="space-y-5">
       <div>
         <div className="flex items-center gap-2">
-          <Banknote className="h-5 w-5 text-accent" />
-          <h1 className="text-xl font-black text-foreground">Pagamento da Pelada</h1>
+          <ArrowLeftRight className="h-5 w-5 text-accent" />
+          <h1 className="text-xl font-black text-foreground">Transfermarket</h1>
         </div>
-        <p className="mt-1 text-xs text-muted">O pagamento da rodada mais recente aparece aqui.</p>
+        <p className="mt-1 text-xs text-muted">A central de pagamentos da rodada mais recente.</p>
       </div>
 
       {!currentRound || !paymentsReleased ? (

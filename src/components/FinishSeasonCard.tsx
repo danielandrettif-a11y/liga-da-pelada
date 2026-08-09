@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Download, FileText, Flag, Image, X } from "lucide-react";
 import { finishSeason } from "@/lib/actions/seasons";
-import { downloadSeasonPdf, downloadSeasonStory } from "@/lib/seasonExports";
 import type { SeasonSummary } from "@/lib/types";
 
 export function FinishSeasonCard() {
@@ -40,10 +39,11 @@ export function FinishSeasonCard() {
     router.refresh();
   }
 
-  function handlePdfDownload() {
+  async function handlePdfDownload() {
     if (!summary) return;
     setExportError("");
     try {
+      const { downloadSeasonPdf } = await import("@/lib/seasonExports");
       downloadSeasonPdf(summary);
     } catch (caughtError) {
       setExportError(caughtError instanceof Error ? caughtError.message : "Erro ao gerar o PDF.");
@@ -54,6 +54,7 @@ export function FinishSeasonCard() {
     if (!summary) return;
     setExportError("");
     try {
+      const { downloadSeasonStory } = await import("@/lib/seasonExports");
       await downloadSeasonStory(summary);
     } catch (caughtError) {
       setExportError(caughtError instanceof Error ? caughtError.message : "Erro ao gerar a imagem.");

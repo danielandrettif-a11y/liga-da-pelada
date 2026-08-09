@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { registerGoal, finishMatch, deleteEvent, updateMatchTimer, resetMatchTimer } from "@/lib/actions/matches";
 import { ArrowLeft, Plus, Clock, Trophy, Trash2, Play, Pause, RotateCcw } from "lucide-react";
@@ -16,6 +16,7 @@ type MatchLiveBoardProps = {
 
 export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoardProps) {
   const router = useRouter();
+  const refreshTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   
@@ -50,17 +51,23 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
 
   // Escuta mudanças em tempo real no banco
   useEffect(() => {
+    const scheduleRefresh = () => {
+      if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
+      refreshTimeout.current = setTimeout(() => router.refresh(), 120);
+    };
+
     const channel = supabase
       .channel(`match-${match.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `id=eq.${match.id}` }, () => {
-        router.refresh();
+        scheduleRefresh();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'match_events', filter: `match_id=eq.${match.id}` }, () => {
-        router.refresh();
+        scheduleRefresh();
       })
       .subscribe();
 
     return () => {
+      if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
       supabase.removeChannel(channel);
     };
   }, [match.id, router]);

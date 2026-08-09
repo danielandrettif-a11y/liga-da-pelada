@@ -51,12 +51,12 @@ function StatHighlightCard({
 }
 
 export default async function HomePage() {
-  const [{ data }, previousSeason, account] = await Promise.all([
+  const accountPromise = getCurrentAccount();
+  const [{ data }, previousSeason, accountName] = await Promise.all([
     getDashboardData(),
     getLatestFinishedSeason(),
-    getCurrentAccount(),
+    accountPromise.then(getAccountDisplayName),
   ]);
-  const accountName = await getAccountDisplayName(account);
   
   if (!data) {
     return (

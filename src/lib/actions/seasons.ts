@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cache } from "react";
 import { supabase } from "../supabase";
 import { createClient as createServerClient } from "../supabase/server";
 import type { Season, SeasonPlayerSummary, SeasonSummary } from "../types";
@@ -8,7 +9,7 @@ import { getAdminClient } from "../auth";
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerClient>>;
 
-export async function getActiveSeason(leagueId?: string) {
+const getActiveSeasonCached = cache(async (leagueId?: string) => {
   let resolvedLeagueId = leagueId;
 
   if (!resolvedLeagueId) {
@@ -33,9 +34,13 @@ export async function getActiveSeason(leagueId?: string) {
 
   if (error || !data) return null;
   return data as Season;
+});
+
+export async function getActiveSeason(leagueId?: string) {
+  return getActiveSeasonCached(leagueId);
 }
 
-export async function getActiveSeasonRoundIds(leagueId?: string) {
+const getActiveSeasonRoundIdsCached = cache(async (leagueId?: string) => {
   const season = await getActiveSeason(leagueId);
   if (!season) return [];
 
@@ -46,6 +51,10 @@ export async function getActiveSeasonRoundIds(leagueId?: string) {
 
   if (error) return [];
   return data.map((round) => round.id as string);
+});
+
+export async function getActiveSeasonRoundIds(leagueId?: string) {
+  return getActiveSeasonRoundIdsCached(leagueId);
 }
 
 export async function getLatestFinishedSeason() {

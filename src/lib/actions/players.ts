@@ -69,24 +69,25 @@ export async function getPlayer(id: string) {
 
 export async function getPlayersWithStats() {
   // Busca jogadores e suas estatísticas agregadas de todas as rodadas
-  const { data: players, error: playersError } = await supabase
-    .from("players")
-    .select("*");
+  const [playersResult, roundIds] = await Promise.all([
+    supabase.from("players").select("*"),
+    getActiveSeasonRoundIds(),
+  ]);
+  const { data: players, error: playersError } = playersResult;
 
   if (playersError) {
     console.error("Erro ao buscar jogadores:", playersError);
     return [];
   }
 
-  const roundIds = await getActiveSeasonRoundIds();
-  const statsResult = roundIds.length > 0
-    ? await supabase.from("player_round_stats").select("*").in("round_id", roundIds)
-    : { data: [], error: null };
+  const [statsResult, finishedRoundsResult] = roundIds.length > 0
+    ? await Promise.all([
+      supabase.from("player_round_stats").select("*").in("round_id", roundIds),
+      supabase.from("rounds").select("id").in("id", roundIds).eq("status", "finished"),
+    ])
+    : [{ data: [], error: null }, { data: [], error: null }];
   const { data: stats, error: statsError } = statsResult;
 
-  const finishedRoundsResult = roundIds.length > 0
-    ? await supabase.from("rounds").select("id").in("id", roundIds).eq("status", "finished")
-    : { data: [], error: null };
   const finishedRoundIds = finishedRoundsResult.data?.map((round) => round.id) || [];
   const attendanceResult = finishedRoundIds.length > 0
     ? await supabase.from("round_players").select("player_id, round_id").in("round_id", finishedRoundIds)
@@ -104,8 +105,21 @@ export async function getPlayersWithStats() {
     return [];
   }
 
+  const statsByPlayer = new Map<string, typeof stats>();
+  for (const stat of stats) {
+    const playerStats = statsByPlayer.get(stat.player_id) || [];
+    playerStats.push(stat);
+    statsByPlayer.set(stat.player_id, playerStats);
+  }
+  const roundsByPlayer = new Map<string, Set<string>>();
+  for (const entry of attendance) {
+    const playerRounds = roundsByPlayer.get(entry.player_id) || new Set<string>();
+    playerRounds.add(entry.round_id);
+    roundsByPlayer.set(entry.player_id, playerRounds);
+  }
+
   const playersWithStats = players.map((player) => {
-    const playerStats = stats.filter((s) => s.player_id === player.id);
+    const playerStats = statsByPlayer.get(player.id) || [];
     
     const aggregated = playerStats.reduce(
       (acc, curr) => ({
@@ -122,11 +136,7 @@ export async function getPlayersWithStats() {
 
     return {
       ...player,
-      rounds: new Set(
-        attendance
-          .filter((entry) => entry.player_id === player.id)
-          .map((entry) => entry.round_id)
-      ).size,
+      rounds: roundsByPlayer.get(player.id)?.size || 0,
       ...aggregated,
     };
   });

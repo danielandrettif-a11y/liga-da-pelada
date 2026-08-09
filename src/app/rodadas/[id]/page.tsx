@@ -16,8 +16,14 @@ export default async function RodadaDetalhePage({
   params: { id: string };
 }) {
   const { id } = await params;
-  const round = await getRound(id);
-  const account = await getCurrentAccount();
+  const roundPromise = getRound(id);
+  const [round, account, goalkeeperPoints] = await Promise.all([
+    roundPromise,
+    getCurrentAccount(),
+    roundPromise.then((currentRound) => currentRound?.status === "finished"
+      ? getGoalkeeperScoringPoints(currentRound.league_id)
+      : 0),
+  ]);
 
   if (!round) {
     notFound();
@@ -27,8 +33,6 @@ export default async function RodadaDetalhePage({
     .map((entry: any) => entry.players)
     .filter(Boolean)
     .sort((a: any, b: any) => (a.nickname || a.name).localeCompare(b.nickname || b.name, "pt-BR"));
-  const goalkeeperPoints = await getGoalkeeperScoringPoints(round.league_id);
-
   return (
     <div className="space-y-6">
       {/* Top bar */}

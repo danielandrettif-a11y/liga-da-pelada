@@ -3,16 +3,16 @@
 import { useState } from "react";
 import { ChevronDown, Download, FileText, Image, Trophy } from "lucide-react";
 import type { SeasonSummary } from "@/lib/types";
-import { downloadSeasonPdf, downloadSeasonStory } from "@/lib/seasonExports";
 
 export function PreviousSeasonBanner({ summary }: { summary: SeasonSummary }) {
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState("");
   const champion = summary.ranking[0];
 
-  function downloadPdf() {
+  async function downloadPdf() {
     setError("");
     try {
+      const { downloadSeasonPdf } = await import("@/lib/seasonExports");
       downloadSeasonPdf(summary);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Erro ao gerar o PDF.");
@@ -22,6 +22,7 @@ export function PreviousSeasonBanner({ summary }: { summary: SeasonSummary }) {
   async function downloadStory() {
     setError("");
     try {
+      const { downloadSeasonStory } = await import("@/lib/seasonExports");
       await downloadSeasonStory(summary);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Erro ao gerar a imagem.");

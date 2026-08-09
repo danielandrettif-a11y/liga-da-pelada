@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { cache } from "react";
 
 export type AccountRole = "admin" | "player";
 
@@ -10,7 +11,7 @@ export type AccountProfile = {
   updated_at: string;
 };
 
-export async function getCurrentAccount() {
+export const getCurrentAccount = cache(async function getCurrentAccount() {
   const client = await createClient();
   const { data: { user } } = await client.auth.getUser();
 
@@ -30,7 +31,7 @@ export async function getCurrentAccount() {
     profile: profile as AccountProfile | null,
     isAdmin: profile?.role === "admin",
   };
-}
+});
 
 export async function getAdminClient() {
   const account = await getCurrentAccount();

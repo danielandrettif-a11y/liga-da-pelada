@@ -10,7 +10,7 @@ export async function getDashboardData() {
     if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
 
     // 1. Próxima Rodada (draft ou active)
-    const { data: nextRoundData } = await supabase
+    const nextRoundPromise = supabase
       .from("rounds")
       .select("*, round_players(count)")
       .in("status", ["draft", "active"])
@@ -20,7 +20,7 @@ export async function getDashboardData() {
       .single();
 
     // 2. Última Rodada (finished) com partidas e times
-    const { data: lastRoundData } = await supabase
+    const lastRoundPromise = supabase
       .from("rounds")
       .select(`
         *,
@@ -34,7 +34,11 @@ export async function getDashboardData() {
       .single();
 
     // 3. Ranking e Destaques
-    const ranking = await getRanking();
+    const [
+      { data: nextRoundData },
+      { data: lastRoundData },
+      ranking,
+    ] = await Promise.all([nextRoundPromise, lastRoundPromise, getRanking()]);
     
     let topScorer = null;
     let topAssists = null;

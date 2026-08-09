@@ -12,15 +12,17 @@ export default async function PartidaAoVivoPage({
   params: { id: string };
 }) {
   const { id } = await params;
-  const match = await getMatch(id);
+  const [match, league, account] = await Promise.all([
+    getMatch(id),
+    getLeagueConfig(),
+    getCurrentAccount(),
+  ]);
 
   if (!match) {
     notFound();
   }
 
-  const league = await getLeagueConfig();
   const duration = league?.match_duration || 7;
-  const account = await getCurrentAccount();
 
   return (
     <MatchLiveBoard match={match} matchDuration={duration} canManage={account.isAdmin} />

@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarDays, Trophy, Users, MoreHorizontal, Banknote } from "lucide-react";
+import { Home, CalendarDays, Trophy, Users, MoreHorizontal, ArrowLeftRight } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Início", icon: Home },
   { href: "/rodadas", label: "Rodadas", icon: CalendarDays },
   { href: "/ranking", label: "Ranking", icon: Trophy },
   { href: "/jogadores", label: "Jogadores", icon: Users },
-  { href: "/pagamentos", label: "Pagar", icon: Banknote },
+  { href: "/pagamentos", label: "Transfermarket", icon: ArrowLeftRight },
   { href: "/mais", label: "Mais", icon: MoreHorizontal },
 ] as const;
 

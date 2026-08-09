@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   ArrowDown,
   ArrowUp,
@@ -20,7 +21,10 @@ import type {
 } from "@/lib/ranking";
 import { formatDateShort, getInitials } from "@/lib/utils";
 import { PlayerAvatar } from "./PlayerAvatar";
-import { RankingPlayerCardModal } from "./RankingPlayerCardModal";
+
+const RankingPlayerCardModal = dynamic(() =>
+  import("./RankingPlayerCardModal").then((module) => module.RankingPlayerCardModal),
+);
 
 type Props = {
   data: RankingExperienceData;

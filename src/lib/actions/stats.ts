@@ -305,6 +305,13 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   const previousPositions = new Map(previousBase.map((entry, index) => [entry.player.id, index + 1]));
   const seasonPositions = new Map(generalBase.map((entry, index) => [entry.player.id, index + 1]));
   const awards = new Map<string, RankingAwards>();
+  const statsByRound = new Map<string, RankingStatsRow[]>();
+
+  for (const row of stats) {
+    const roundStats = statsByRound.get(row.round_id) || [];
+    roundStats.push(row);
+    statsByRound.set(row.round_id, roundStats);
+  }
 
   function getAwards(playerId: string) {
     const current = awards.get(playerId) || {
@@ -317,7 +324,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   }
 
   for (const round of rounds) {
-    const roundStats = stats.filter((row) => row.round_id === round.id);
+    const roundStats = statsByRound.get(round.id) || [];
     const mostGoals = Math.max(0, ...roundStats.map((row) => row.goals));
     const mostAssists = Math.max(0, ...roundStats.map((row) => row.assists));
 
@@ -341,12 +348,13 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       positionChange: previousPosition ? previousPosition - (index + 1) : null,
     };
   });
+  const generalByPlayer = new Map(general.map((entry) => [entry.player.id, entry]));
 
   const latestEntries = latestBase.map((entry): RankingEntry => ({
     ...entry,
     awards: getAwards(entry.player.id),
     seasonPosition: seasonPositions.get(entry.player.id) || general.length + 1,
-    positionChange: general.find((item) => item.player.id === entry.player.id)?.positionChange ?? null,
+    positionChange: generalByPlayer.get(entry.player.id)?.positionChange ?? null,
   }));
 
   return {
