@@ -1,4 +1,4 @@
-import { CalendarDays, Plus, ChevronRight } from "lucide-react";
+import { CalendarDays, Plus, ChevronRight, Users, Football } from "@/components/icons";
 import Link from "next/link";
 import { getRounds } from "@/lib/actions/rounds";
 import { formatDateShort } from "@/lib/utils";
@@ -85,10 +85,16 @@ export default async function RodadasPage() {
                         {formatDateShort(round.date)}
                       </span>
                       {round.playersCount > 0 && (
-                        <span>👥 {round.playersCount} jogadores</span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <Users className="h-3.5 w-3.5" />
+                          {round.playersCount} jogadores
+                        </span>
                       )}
                       {round.matchesCount > 0 && (
-                        <span>⚽ {round.matchesCount} partidas</span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <Football className="h-3.5 w-3.5" />
+                          {round.matchesCount} partidas
+                        </span>
                       )}
                     </div>
                   </div>

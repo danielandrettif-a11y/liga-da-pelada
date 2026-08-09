@@ -4,7 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createRoundWithTeams, type TeamInput } from "@/lib/actions/rounds";
 import type { Player } from "@/lib/types";
-import { Users, Calendar, CheckCircle2, ChevronRight, PencilLine } from "lucide-react";
+import {
+  Users,
+  Calendar,
+  CheckCircle2,
+  ChevronRight,
+  PencilLine,
+  Sparkles,
+  Sliders,
+  X,
+} from "@/components/icons";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
 
@@ -333,13 +342,15 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
               onClick={handleRandomDraw}
               className="flex-1 bg-surface border border-border text-foreground hover:bg-surface-hover font-bold py-2.5 rounded-xl transition-all text-xs flex items-center justify-center gap-2"
             >
-              🎲 Sorteio Aleatório
+              <Sparkles className="h-4 w-4" />
+              Sorteio Aleatório
             </button>
             <button
               onClick={handleBalancedDraw}
               className="flex-1 bg-accent/10 border border-accent/30 text-accent hover:bg-accent/15 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2"
             >
-              ⚖️ Times Equilibrados
+              <Sliders className="h-4 w-4" />
+              Times Equilibrados
             </button>
           </div>
 
@@ -406,7 +417,7 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
                     >
                       <span>{p.name}</span>
                       <PlayerProfileBadge profile={p.player_profile} />
-                      <span className="text-[10px] opacity-0 group-hover:opacity-100">✕</span>
+                      <X className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
                     </div>
                   ))}
                   {team.players.length === 0 && (

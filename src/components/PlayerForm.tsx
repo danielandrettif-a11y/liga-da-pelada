@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, ImagePlus, Trash2 } from "lucide-react";
+import { Camera, ImagePlus, Trash2 } from "@/components/icons";
 import { deletePlayer, savePlayer } from "@/lib/actions/players";
 import type { Player } from "@/lib/types";
 import { AvatarCropModal } from "./AvatarCropModal";

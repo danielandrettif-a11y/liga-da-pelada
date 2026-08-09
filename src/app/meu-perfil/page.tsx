@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, UserRound } from "lucide-react";
+import { ArrowLeft, UserRound } from "@/components/icons";
 import { PlayerForm } from "@/components/PlayerForm";
 import { getCurrentAccount } from "@/lib/auth";
 import { getPlayer } from "@/lib/actions/players";

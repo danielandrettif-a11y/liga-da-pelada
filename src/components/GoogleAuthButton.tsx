@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "@/components/icons";
 import { signInWithGoogle } from "@/app/login/actions";
 
 type GoogleAuthButtonProps = {

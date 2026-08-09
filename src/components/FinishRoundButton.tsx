@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CheckCircle2, X } from "lucide-react";
+import { CheckCircle2, X } from "@/components/icons";
 import { finishRound } from "@/lib/actions/rounds";
 
 export function FinishRoundButton({ roundId, status, canManage }: { roundId: string; status: string; canManage: boolean }) {

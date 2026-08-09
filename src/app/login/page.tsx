@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { login } from "./actions";
-import { Lock, Mail, Trophy, Loader2 } from "lucide-react";
+import { Lock, Mail, Trophy, Loader2 } from "@/components/icons";
 import Link from "next/link";
 import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 

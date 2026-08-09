@@ -12,7 +12,7 @@ import {
   Sparkles,
   Target,
   Trophy,
-} from "lucide-react";
+} from "@/components/icons";
 import type {
   RankingEntry,
   RankingExperienceData,

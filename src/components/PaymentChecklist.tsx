@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Check, CheckCircle2, Copy, LockKeyhole } from "lucide-react";
+import { Check, CheckCircle2, Copy, LockKeyhole } from "@/components/icons";
 import { setPlayerPayment, type PaymentPlayer, type PaymentRound } from "@/lib/actions/payments";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";

@@ -3,7 +3,19 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { registerGoal, finishMatch, deleteEvent, updateMatchTimer, resetMatchTimer } from "@/lib/actions/matches";
-import { ArrowLeft, Plus, Clock, Trophy, Trash2, Play, Pause, RotateCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  Clock,
+  Trophy,
+  Trash2,
+  Play,
+  Pause,
+  RotateCcw,
+  Football,
+  Target,
+  X,
+} from "@/components/icons";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { PlayerAvatar } from "./PlayerAvatar";
@@ -268,7 +280,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                   <div className={`absolute top-0 bottom-0 w-1 ${isTeamA ? 'left-0' : 'right-0'}`} style={{ backgroundColor: isTeamA ? match.team_a.color : match.team_b.color }} />
                   
                   <div className={`flex items-center gap-3 w-full ${isTeamA ? 'flex-row' : 'flex-row-reverse text-right'}`}>
-                    <div className="text-2xl">⚽</div>
+                    <Football className="h-6 w-6 text-accent" strokeWidth={1.8} />
                     <div className="flex-1">
                       <p className="text-sm font-bold text-foreground">
                         {ev.player?.name}
@@ -320,7 +332,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                 {goalModal.scorerId ? "Quem deu o passe?" : "Quem fez o gol?"}
               </h3>
               <button onClick={() => setGoalModal({ open: false, teamId: "", scorerId: null })} className="text-muted hover:text-foreground">
-                ✕
+                <X className="h-5 w-5" />
               </button>
             </div>
 
@@ -339,7 +351,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                       className="w-10 h-10 rounded-full bg-background text-xs font-bold flex-shrink-0"
                     />
                     <span className="font-bold text-foreground flex-1">{tp.players?.name}</span>
-                    <span className="text-xl">⚽</span>
+                    <Football className="h-5 w-5 text-accent" strokeWidth={1.8} />
                   </button>
                 ))
               ) : (
@@ -368,7 +380,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                         className="w-10 h-10 rounded-full bg-background text-xs font-bold flex-shrink-0"
                       />
                       <span className="font-bold text-foreground flex-1">{tp.players?.name}</span>
-                      <span className="text-xl">🎯</span>
+                      <Target className="h-5 w-5 text-accent" strokeWidth={1.8} />
                     </button>
                   ))}
                 </>

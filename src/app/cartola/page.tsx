@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, ClipboardList, Clock3, Sparkles } from "lucide-react";
+import { CalendarDays, ClipboardList, Clock3, Sparkles } from "@/components/icons";
 
 export default function CartolaPage() {
   return (

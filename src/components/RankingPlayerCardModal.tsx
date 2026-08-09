@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { Crown, Medal, Trophy, X } from "lucide-react";
+import { Crown, Medal, Trophy, X } from "@/components/icons";
 import type { RankingEntry } from "@/lib/ranking";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerAwards } from "./PlayerAwards";

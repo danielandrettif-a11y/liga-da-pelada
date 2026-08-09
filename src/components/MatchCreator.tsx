@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createMatch } from "@/lib/actions/matches";
-import { Swords, ArrowLeft, ChevronRight } from "lucide-react";
+import { Swords, ArrowLeft, ChevronRight } from "@/components/icons";
 import Link from "next/link";
 
 export function MatchCreator({ round }: { round: any }) {

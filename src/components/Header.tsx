@@ -1,4 +1,4 @@
-import { Trophy } from "lucide-react";
+import { Trophy } from "@/components/icons";
 import Link from "next/link";
 
 export function Header() {

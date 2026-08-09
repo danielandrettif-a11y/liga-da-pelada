@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Medal, ShieldCheck } from "lucide-react";
+import { Medal, ShieldCheck } from "@/components/icons";
 import { selectBestGoalkeeper } from "@/lib/actions/goalkeeper";
 import { PlayerAvatar } from "./PlayerAvatar";
 

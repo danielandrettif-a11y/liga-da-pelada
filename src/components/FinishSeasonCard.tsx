@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Download, FileText, Flag, Image, X } from "lucide-react";
+import { AlertTriangle, Download, FileText, Flag, Image, X } from "@/components/icons";
 import { finishSeason } from "@/lib/actions/seasons";
 import type { SeasonSummary } from "@/lib/types";
 

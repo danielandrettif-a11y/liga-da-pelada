@@ -5,7 +5,7 @@ import { PlayerProfileBadge } from "@/components/PlayerProfileBadge";
 import { PlayerAwards } from "@/components/PlayerAwards";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight, Football, Target, Trophy } from "@/components/icons";
 
 export const revalidate = 0;
 
@@ -148,15 +148,15 @@ export default async function JogadorPerfilPage({
                     </p>
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-muted">⚽</span>
+                        <Football className="h-3 w-3 text-muted" />
                         <span className="text-sm font-bold text-foreground">{h.goals}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-muted">🎯</span>
+                        <Target className="h-3 w-3 text-muted" />
                         <span className="text-sm font-bold text-foreground">{h.assists}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-muted">🏆</span>
+                        <Trophy className="h-3 w-3 text-muted" />
                         <span className={`text-sm font-bold ${h.wins > 0 ? "text-success" : h.draws > 0 ? "text-warning" : "text-danger"}`}>
                           {h.wins > 0 ? "V" : h.draws > 0 ? "E" : "D"}
                         </span>

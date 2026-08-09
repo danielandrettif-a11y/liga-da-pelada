@@ -3,6 +3,7 @@ import { Inter, Oswald } from "next/font/google";
 import { Suspense } from "react";
 import "./globals.css";
 import { SessionBottomNav } from "@/components/SessionBottomNav";
+import { SessionInstallAppPrompt } from "@/components/SessionInstallAppPrompt";
 import { Header } from "@/components/Header";
 
 const inter = Inter({
@@ -22,6 +23,15 @@ export const metadata: Metadata = {
   description: "O Cartola da sua pelada. Acompanhe gols, assistências, rankings e muito mais.",
   keywords: ["pelada", "futebol", "ranking", "estatísticas", "liga"],
   authors: [{ name: "Pelada de Baixa Qualidade" }],
+  applicationName: "Pelada de Baixa Qualidade",
+  appleWebApp: {
+    capable: true,
+    title: "Pelada BQ",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export const viewport: Viewport = {
@@ -29,7 +39,9 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
   themeColor: "#0B0E14",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -42,6 +54,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </main>
         <Suspense fallback={null}>
           <SessionBottomNav />
+        </Suspense>
+        <Suspense fallback={null}>
+          <SessionInstallAppPrompt />
         </Suspense>
       </body>
     </html>

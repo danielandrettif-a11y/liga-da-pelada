@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "@/components/icons";
 import { getPlayersWithStats } from "@/lib/actions/players";
 import { RoundCreator } from "@/components/RoundCreator";
 

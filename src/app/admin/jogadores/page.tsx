@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getPlayers } from "@/lib/actions/players";
-import { Plus, ChevronRight, UserPlus, ArrowLeft } from "lucide-react";
+import { Plus, ChevronRight, UserPlus, ArrowLeft } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerProfileBadge } from "@/components/PlayerProfileBadge";
 

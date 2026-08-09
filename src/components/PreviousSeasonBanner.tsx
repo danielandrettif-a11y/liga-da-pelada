@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Download, FileText, Image, Trophy } from "lucide-react";
+import { ChevronDown, Download, FileText, Image, Trophy } from "@/components/icons";
 import type { SeasonSummary } from "@/lib/types";
 
 export function PreviousSeasonBanner({ summary }: { summary: SeasonSummary }) {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, CheckCircle2, Loader2, Mail, MailCheck, Lock, UserRoundPlus } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Mail, MailCheck, Lock, UserRoundPlus } from "@/components/icons";
 import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 import { PLAYER_PROFILE_OPTIONS } from "@/lib/playerProfiles";
 import { signup } from "./actions";

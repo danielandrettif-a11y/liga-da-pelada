@@ -2,6 +2,7 @@ import Link from "next/link";
 import { FinishSeasonCard } from "@/components/FinishSeasonCard";
 import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
 import { logout } from "@/app/login/actions";
+import { InstallAppEntry } from "@/components/InstallAppPrompt";
 import {
   UserPlus,
   CalendarPlus,
@@ -11,7 +12,8 @@ import {
   UserRound,
   LogIn,
   LogOut,
-} from "lucide-react";
+  Football,
+} from "@/components/icons";
 
 const ADMIN_SECTIONS = [
   {
@@ -90,6 +92,10 @@ export default async function MaisPage() {
         </div>
       )}
 
+      {account.user && (
+        <InstallAppEntry userId={account.user.id} />
+      )}
+
       {account.isAdmin && ADMIN_SECTIONS.map((section) => (
         <div key={section.title}>
           <h2 className="text-xs font-bold text-muted uppercase tracking-wider mb-2 px-1">
@@ -140,7 +146,7 @@ export default async function MaisPage() {
       <div className="text-center pt-4 pb-2">
         <p className="text-xs text-muted/50">Pelada de Baixa Qualidade v0.1.0</p>
         <p className="text-[10px] text-muted/30 mt-0.5">
-          Feito com ⚽ para peladas entre amigos
+          Feito com <Football className="mx-1 inline h-3.5 w-3.5" /> para peladas entre amigos
         </p>
       </div>
     </div>

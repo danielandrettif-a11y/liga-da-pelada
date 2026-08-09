@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Medal, Sparkles, Target } from "lucide-react";
+import { Medal, Sparkles, Target } from "@/components/icons";
 import type { PlayerAwardSeason, PlayerAwardType } from "@/lib/awards";
 import { formatDate } from "@/lib/utils";
 

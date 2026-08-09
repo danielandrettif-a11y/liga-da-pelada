@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal } from "@/components/icons";
 import type { Player } from "@/lib/types";
 import { calculateWinRate, getDisplayName } from "@/lib/utils";
 import { PlayerAvatar } from "./PlayerAvatar";

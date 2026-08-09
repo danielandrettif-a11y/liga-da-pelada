@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Clock3 } from "lucide-react";
+import { ArrowLeftRight, Clock3 } from "@/components/icons";
 import { PaymentChecklist } from "@/components/PaymentChecklist";
 import { getPaymentRounds, getRoundPaymentPlayers } from "@/lib/actions/payments";
 import { getCurrentAccount } from "@/lib/auth";

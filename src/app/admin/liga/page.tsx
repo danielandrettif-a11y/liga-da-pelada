@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save } from "@/components/icons";
 import { getLeagueConfig, updateLeagueConfig } from "@/lib/actions/league";
 
 export default function LigaConfigPage() {

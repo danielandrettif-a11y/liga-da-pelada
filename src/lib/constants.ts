@@ -52,12 +52,3 @@ export const MATCH_STATUS_LABELS: Record<string, string> = {
   live: 'Em Andamento',
   finished: 'Finalizada',
 };
-
-/** Emojis para cada tipo de estatística */
-export const STAT_EMOJIS = {
-  goals: '⚽',
-  assists: '🎯',
-  wins: '🏆',
-  games: '📊',
-  points: '⭐',
-} as const;

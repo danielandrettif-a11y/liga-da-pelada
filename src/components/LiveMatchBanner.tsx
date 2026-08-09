@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Clock3, Radio } from "lucide-react";
+import { ChevronRight, Clock3, Radio } from "@/components/icons";
 import { supabase } from "@/lib/supabase";
 
 export type HomeLiveMatch = {

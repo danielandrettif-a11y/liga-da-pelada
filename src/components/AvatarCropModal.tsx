@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Cropper, { type Area, type Point } from "react-easy-crop";
-import { Check, Minus, Plus, X } from "lucide-react";
+import { Check, Minus, Plus, X } from "@/components/icons";
 import { createCroppedAvatar } from "@/lib/cropImage";
 
 type AvatarCropModalProps = {

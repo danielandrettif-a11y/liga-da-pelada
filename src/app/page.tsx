@@ -1,4 +1,17 @@
-import { CalendarDays, Camera, ChevronRight, LogIn, TrendingUp } from "lucide-react";
+import {
+  CalendarDays,
+  Camera,
+  ChevronRight,
+  ClipboardList,
+  Football,
+  LogIn,
+  Medal,
+  Target,
+  TrendingUp,
+  Trophy,
+  type SportIconProps,
+} from "@/components/icons";
+import type { ComponentType } from "react";
 import Link from "next/link";
 import { getDashboardData } from "@/lib/actions/dashboard";
 import { getLatestFinishedSeason } from "@/lib/actions/seasons";
@@ -20,14 +33,14 @@ function RankBadge({ rank }: { rank: number }) {
 }
 
 function StatHighlightCard({
-  emoji,
+  Icon,
   label,
   playerName,
   value,
   unit,
   delay,
 }: {
-  emoji: string;
+  Icon: ComponentType<SportIconProps>;
   label: string;
   playerName: string;
   value: number;
@@ -35,16 +48,17 @@ function StatHighlightCard({
   delay: string;
 }) {
   return (
-    <div className={`glass-card p-4 animate-fade-in-up ${delay}`}>
+    <div className={`relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2417] to-[#06100b] p-4 shadow-[0_14px_32px_rgba(0,0,0,.2)] animate-fade-in-up ${delay}`}>
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent via-accent/40 to-transparent" />
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-lg">{emoji}</span>
-        <span className="text-xs font-semibold text-muted uppercase tracking-wider">
+        <Icon className="h-5 w-5 text-accent" />
+        <span className="font-athletic text-xs font-bold uppercase italic tracking-wider text-muted">
           {label}
         </span>
       </div>
       <p className="text-base font-bold text-foreground truncate">{playerName || "-"}</p>
       <div className="flex items-baseline gap-1 mt-1">
-        <span className="stat-number text-2xl gradient-text">{value || 0}</span>
+        <span className="stat-number text-3xl text-accent">{value || 0}</span>
         <span className="text-xs text-muted font-medium">{unit}</span>
       </div>
     </div>
@@ -147,7 +161,7 @@ export default async function HomePage() {
       {/* Next Round Card */}
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
-          <h2 className="text-xs font-black uppercase tracking-wider text-muted">Rodadas</h2>
+          <h2 className="font-athletic text-sm font-black uppercase italic tracking-wider text-foreground">Rodadas</h2>
           <Link href="/rodadas" className="flex items-center gap-1 text-xs font-bold text-accent">
             Ver todas
             <ChevronRight className="h-4 w-4" />
@@ -219,7 +233,7 @@ export default async function HomePage() {
       <section>
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp className="w-5 h-5 text-accent" />
-          <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">
+          <h2 className="font-athletic text-base font-black uppercase italic tracking-wider text-foreground">
             Destaques da Temporada
           </h2>
         </div>
@@ -228,7 +242,7 @@ export default async function HomePage() {
         <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-4 -mx-4 px-4 hide-scrollbar">
           <div className="min-w-[150px] snap-center shrink-0">
             <StatHighlightCard
-              emoji="⚽"
+              Icon={Football}
               label="Artilheiro"
               playerName={highlights?.topScorer?.player?.name}
               value={highlights?.topScorer?.goals}
@@ -238,7 +252,7 @@ export default async function HomePage() {
           </div>
           <div className="min-w-[150px] snap-center shrink-0">
             <StatHighlightCard
-              emoji="🎯"
+              Icon={Target}
               label="Assistências"
               playerName={highlights?.topAssists?.player?.name}
               value={highlights?.topAssists?.assists}
@@ -248,7 +262,7 @@ export default async function HomePage() {
           </div>
           <div className="min-w-[150px] snap-center shrink-0">
             <StatHighlightCard
-              emoji="🏆"
+              Icon={Trophy}
               label="Vitórias"
               playerName={highlights?.topWins?.player?.name}
               value={highlights?.topWins?.wins}
@@ -262,8 +276,8 @@ export default async function HomePage() {
       {/* Ranking Preview */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">
-            🏅 Top 5 Ranking
+          <h2 className="flex items-center gap-2 font-athletic text-base font-black uppercase italic tracking-wider text-foreground">
+            <Medal className="h-5 w-5 text-accent" /> Top 5 Ranking
           </h2>
           <Link
             href="/ranking"
@@ -301,11 +315,11 @@ export default async function HomePage() {
                       {name}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] text-muted">
-                        ⚽ {stats.goals}
+                      <span className="flex items-center gap-1 text-[10px] text-muted">
+                        <Football className="h-3 w-3" /> {stats.goals}
                       </span>
-                      <span className="text-[10px] text-muted">
-                        🎯 {stats.assists}
+                      <span className="flex items-center gap-1 text-[10px] text-muted">
+                        <Target className="h-3 w-3" /> {stats.assists}
                       </span>
                     </div>
                   </div>
@@ -331,8 +345,8 @@ export default async function HomePage() {
       {/* Last Round Summary */}
       {lastRound && (
         <section>
-          <h2 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">
-            📋 Última Rodada
+          <h2 className="mb-3 flex items-center gap-2 font-athletic text-base font-black uppercase italic tracking-wider text-foreground">
+            <ClipboardList className="h-5 w-5 text-accent" /> Última Rodada
           </h2>
 
           <Link href={`/rodadas/${lastRound.id}`} className="block">

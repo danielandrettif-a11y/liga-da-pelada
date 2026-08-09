@@ -10,7 +10,7 @@ import {
   Sparkles,
   Target,
   Trophy,
-} from "lucide-react";
+} from "@/components/icons";
 import { updateScoringRules } from "@/lib/actions/scoring";
 import { SCORING_RULE_FIELDS, type ScoringPoints } from "@/lib/scoring";
 import type { EventType } from "@/lib/types";

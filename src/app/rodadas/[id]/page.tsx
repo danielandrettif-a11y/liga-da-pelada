@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarDays, Plus } from "lucide-react";
+import { ArrowLeft, CalendarDays, Plus } from "@/components/icons";
 import { getRound } from "@/lib/actions/rounds";
 import { formatDateShort } from "@/lib/utils";
 import { FinishRoundButton } from "@/components/FinishRoundButton";

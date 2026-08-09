@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ClipboardList, Trophy, Users, MoreHorizontal, ArrowLeftRight } from "lucide-react";
+import { Home, ClipboardList, Trophy, Users, MoreHorizontal, ArrowLeftRight } from "@/components/icons";
 
 const NAV_ITEMS = [
   { href: "/", label: "Início", icon: Home },
@@ -47,14 +47,15 @@ export function BottomNav({ isAuthenticated }: { isAuthenticated: boolean }) {
             >
               {/* Active indicator dot */}
               {isActive && (
-                <span className="absolute top-1 h-1 w-1 rounded-full bg-accent animate-fade-in" />
+                <span className="absolute top-0 h-0.5 w-8 rounded-full bg-accent shadow-[0_0_12px_var(--accent)] animate-fade-in" />
               )}
               
               <item.icon
-                className={`w-5 h-5 transition-transform duration-200 ${
-                  isActive ? "scale-110" : ""
+                active={isActive}
+                className={`h-5.5 w-5.5 transition-all duration-200 ${
+                  isActive ? "scale-110 drop-shadow-[0_0_6px_rgba(204,255,0,.45)]" : "opacity-80"
                 }`}
-                strokeWidth={isActive ? 2.5 : 2}
+                strokeWidth={isActive ? 2.1 : 1.8}
               />
               <span
                 className={`block w-full truncate whitespace-nowrap text-center font-semibold leading-none tracking-tight ${
