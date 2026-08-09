@@ -28,10 +28,10 @@ O aplicativo usa o Google como provedor OAuth do Supabase. Para habilitar o bot�
 
 Novos usuários autenticados pelo Google recebem automaticamente o papel `player`. A migration `012_google_auth_player_profiles.sql` também usa o nome e a foto fornecidos pelo Google ao criar o jogador.
 
-Em produção, configure `NEXT_PUBLIC_SITE_URL` com o domínio público canônico, nunca com `localhost`. O aplicativo ignora URLs locais em produção e também possui o domínio atual como fallback para impedir callbacks em `localhost` quando estiver atrás de um proxy reverso:
+Os dois fluxos usam a mesma callback pública fixa para impedir que headers de proxy ou variáveis locais redirecionem usuários de produção para `localhost`:
 
-```bash
-NEXT_PUBLIC_SITE_URL=https://pelada-de-baixa-qualidade.179.197.75.220.sslip.io
+```text
+https://pelada-de-baixa-qualidade.179.197.75.220.sslip.io/auth/callback
 ```
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
