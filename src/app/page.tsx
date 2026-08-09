@@ -98,8 +98,14 @@ export default async function HomePage() {
     accountPromise.then(getAccountDisplayName),
     playerAvatarPromise,
   ]);
+  const inheritedGoogleAvatars = [
+    account.user?.user_metadata?.avatar_url,
+    account.user?.user_metadata?.picture,
+  ].filter(Boolean);
   const hasIncompleteProfile = Boolean(
-    account.user && account.profile?.player_id && playerAvatarUrl === null,
+    account.user
+      && account.profile?.player_id
+      && (playerAvatarUrl === null || inheritedGoogleAvatars.includes(playerAvatarUrl)),
   );
   
   if (!data) {
