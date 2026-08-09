@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarDays, Trophy, Users, MoreHorizontal, ArrowLeftRight } from "lucide-react";
+import { Home, ClipboardList, Trophy, Users, MoreHorizontal, ArrowLeftRight } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Início", icon: Home },
-  { href: "/rodadas", label: "Rodadas", icon: CalendarDays },
+  { href: "/cartola", label: "Cartola", icon: ClipboardList },
   { href: "/ranking", label: "Ranking", icon: Trophy },
-  { href: "/jogadores", label: "Jogadores", icon: Users },
+  { href: "/jogadores", label: "Elenco", icon: Users },
   { href: "/pagamentos", label: "Transfermarket", icon: ArrowLeftRight },
   { href: "/mais", label: "Mais", icon: MoreHorizontal },
 ] as const;
@@ -17,8 +17,8 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/90 backdrop-blur-xl safe-area-bottom">
-      <div className="max-w-lg mx-auto flex items-center justify-around h-16 px-2">
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
+      <div className="mx-auto grid h-16 w-full max-w-lg grid-cols-6 items-stretch px-1">
         {NAV_ITEMS.map((item) => {
           const isActive =
             item.href === "/"
@@ -29,9 +29,10 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label}
               className={`
-                flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 py-1.5 rounded-xl
-                transition-all duration-200 relative
+                relative flex min-w-0 overflow-hidden flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1.5
+                transition-all duration-200
                 ${isActive
                   ? "text-accent"
                   : "text-muted hover:text-foreground/70"
@@ -40,7 +41,7 @@ export function BottomNav() {
             >
               {/* Active indicator dot */}
               {isActive && (
-                <span className="absolute -top-1 w-1 h-1 rounded-full bg-accent animate-fade-in" />
+                <span className="absolute top-1 h-1 w-1 rounded-full bg-accent animate-fade-in" />
               )}
               
               <item.icon
@@ -50,7 +51,11 @@ export function BottomNav() {
                 strokeWidth={isActive ? 2.5 : 2}
               />
               <span
-                className={`text-[10px] font-semibold tracking-wide ${
+                className={`block w-full truncate whitespace-nowrap text-center font-semibold leading-none tracking-tight ${
+                  item.label === "Transfermarket"
+                    ? "text-[7px] min-[360px]:text-[8px] min-[430px]:text-[9px]"
+                    : "text-[9px] min-[390px]:text-[10px]"
+                } ${
                   isActive ? "text-accent" : ""
                 }`}
               >

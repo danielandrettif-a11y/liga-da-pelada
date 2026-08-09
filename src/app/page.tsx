@@ -4,6 +4,7 @@ import { getDashboardData } from "@/lib/actions/dashboard";
 import { getLatestFinishedSeason } from "@/lib/actions/seasons";
 import { PreviousSeasonBanner } from "@/components/PreviousSeasonBanner";
 import { GreetingBanner } from "@/components/GreetingBanner";
+import { LiveMatchBanner, type HomeLiveMatch } from "@/components/LiveMatchBanner";
 import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -78,11 +79,34 @@ export default async function HomePage() {
     );
   }
 
-  const { nextRound, lastRound, rankingPreview, highlights } = data;
+  const { nextRound, liveMatch, matchDuration, lastRound, rankingPreview, highlights } = data;
 
   return (
     <div className="space-y-6">
       <GreetingBanner name={accountName} />
+
+      <LiveMatchBanner
+        initialMatch={liveMatch as unknown as HomeLiveMatch | null}
+        matchDuration={matchDuration}
+      />
+
+      <Link
+        href="/rodadas"
+        className="flex items-center gap-3 rounded-2xl border border-accent/25 bg-accent/10 p-4 transition-all hover:border-accent/45 hover:bg-accent/15 active:scale-[0.99]"
+      >
+        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-accent text-background">
+          <CalendarDays className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-black text-foreground">Central de Rodadas</p>
+          <p className="truncate text-xs text-muted">Agenda, partidas ao vivo e resultados</p>
+        </div>
+        <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-accent">
+          Abrir
+          <ChevronRight className="h-4 w-4" />
+        </span>
+      </Link>
+
       {previousSeason && <PreviousSeasonBanner summary={previousSeason} />}
 
       {/* Next Round Card */}

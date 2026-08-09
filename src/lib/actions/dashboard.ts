@@ -33,12 +33,45 @@ export async function getDashboardData() {
       .limit(1)
       .single();
 
+    const liveMatchPromise = supabase
+      .from("matches")
+      .select(`
+        id,
+        score_a,
+        score_b,
+        status,
+        timer_started_at,
+        timer_accumulated_seconds,
+        round:round_id!inner (id, number, season_id),
+        teamA:team_a_id (id, name, color),
+        teamB:team_b_id (id, name, color)
+      `)
+      .eq("status", "live")
+      .eq("round.season_id", season.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const leaguePromise = supabase
+      .from("leagues")
+      .select("match_duration")
+      .eq("id", season.league_id)
+      .single();
+
     // 3. Ranking e Destaques
     const [
       { data: nextRoundData },
       { data: lastRoundData },
+      { data: liveMatchData },
+      { data: leagueData },
       ranking,
-    ] = await Promise.all([nextRoundPromise, lastRoundPromise, getRanking()]);
+    ] = await Promise.all([
+      nextRoundPromise,
+      lastRoundPromise,
+      liveMatchPromise,
+      leaguePromise,
+      getRanking(),
+    ]);
     
     let topScorer = null;
     let topAssists = null;
@@ -76,6 +109,8 @@ export async function getDashboardData() {
           ...nextRoundData,
           confirmedPlayers: nextRoundData.round_players?.[0]?.count || 0
         } : null,
+        liveMatch: liveMatchData,
+        matchDuration: leagueData?.match_duration || 7,
         lastRound: processedLastRound,
         rankingPreview: ranking.slice(0, 5),
         highlights: {
