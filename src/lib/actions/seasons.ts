@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
 import { createClient as createServerClient } from "../supabase/server";
 import type { Season, SeasonPlayerSummary, SeasonSummary } from "../types";
+import { getAdminClient } from "../auth";
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerClient>>;
 
@@ -176,12 +177,8 @@ export async function finishSeason(confirmation: string) {
     return { success: false, error: 'Digite exatamente "Terminar" para confirmar.' };
   }
 
-  const client = await createServerClient();
-  const {
-    data: { user },
-  } = await client.auth.getUser();
-
-  if (!user) return { success: false, error: "Sessão expirada. Entre novamente." };
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem terminar temporadas." };
 
   const { data: league, error: leagueError } = await client
     .from("leagues")

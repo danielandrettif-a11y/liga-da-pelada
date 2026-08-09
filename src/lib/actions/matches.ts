@@ -5,10 +5,16 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
 import type { CreateMatchInput, RegisterGoalInput } from "../types";
 import { calculateRoundStats } from "./stats";
+import { getAdminClient } from "../auth";
+
+const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 
 export async function createMatch(input: CreateMatchInput) {
   try {
-    const { data, error } = await supabase
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: ADMIN_ERROR };
+
+    const { data, error } = await client
       .from("matches")
       .insert({
         round_id: input.round_id,
@@ -77,8 +83,11 @@ export async function getMatch(matchId: string) {
 
 export async function registerGoal(input: RegisterGoalInput) {
   try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: ADMIN_ERROR };
+
     // 1. Inserir o evento de gol
-    const { error: eventError } = await supabase
+    const { error: eventError } = await client
       .from("match_events")
       .insert({
         match_id: input.match_id,
@@ -99,7 +108,7 @@ export async function registerGoal(input: RegisterGoalInput) {
     const newScoreA = isTeamA ? match.score_a + 1 : match.score_a;
     const newScoreB = !isTeamA ? match.score_b + 1 : match.score_b;
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await client
       .from("matches")
       .update({
         score_a: newScoreA,
@@ -121,7 +130,10 @@ export async function registerGoal(input: RegisterGoalInput) {
 
 export async function deleteEvent(eventId: string, matchId: string, teamId: string) {
   try {
-    const { error } = await supabase
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: ADMIN_ERROR };
+
+    const { error } = await client
       .from("match_events")
       .delete()
       .eq("id", eventId);
@@ -136,7 +148,7 @@ export async function deleteEvent(eventId: string, matchId: string, teamId: stri
     const newScoreA = isTeamA ? Math.max(0, match.score_a - 1) : match.score_a;
     const newScoreB = !isTeamA ? Math.max(0, match.score_b - 1) : match.score_b;
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await client
       .from("matches")
       .update({
         score_a: newScoreA,
@@ -156,7 +168,10 @@ export async function deleteEvent(eventId: string, matchId: string, teamId: stri
 
 export async function finishMatch(matchId: string) {
   try {
-    const { data: match, error } = await supabase
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: ADMIN_ERROR };
+
+    const { data: match, error } = await client
       .from("matches")
       .update({ status: "finished" })
       .eq("id", matchId)
@@ -181,11 +196,14 @@ export async function finishMatch(matchId: string) {
 
 export async function updateMatchTimer(matchId: string, action: "start" | "pause") {
   try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: ADMIN_ERROR };
+
     const match = await getMatch(matchId);
     if (!match) throw new Error("Partida não encontrada");
 
     if (action === "start") {
-      const { error } = await supabase
+      const { error } = await client
         .from("matches")
         .update({ timer_started_at: new Date().toISOString() })
         .eq("id", matchId);
@@ -195,7 +213,7 @@ export async function updateMatchTimer(matchId: string, action: "start" | "pause
         const elapsed = Math.floor((new Date().getTime() - new Date(match.timer_started_at).getTime()) / 1000);
         const newAccumulated = (match.timer_accumulated_seconds || 0) + elapsed;
         
-        const { error } = await supabase
+        const { error } = await client
           .from("matches")
           .update({ 
             timer_accumulated_seconds: newAccumulated,
@@ -216,7 +234,10 @@ export async function updateMatchTimer(matchId: string, action: "start" | "pause
 
 export async function resetMatchTimer(matchId: string) {
   try {
-    const { error } = await supabase
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: ADMIN_ERROR };
+
+    const { error } = await client
       .from("matches")
       .update({ 
         timer_accumulated_seconds: 0,

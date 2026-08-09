@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { getPlayers } from "@/lib/actions/players";
+import { getPlayersWithStats } from "@/lib/actions/players";
 import { RoundCreator } from "@/components/RoundCreator";
 
 export const revalidate = 0;
 
 export default async function NovaRodadaPage() {
-  const players = await getPlayers();
+  const players = await getPlayersWithStats();
 
   return (
     <div className="space-y-6">

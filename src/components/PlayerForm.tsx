@@ -7,10 +7,11 @@ import { deletePlayer, savePlayer } from "@/lib/actions/players";
 import type { Player } from "@/lib/types";
 import { AvatarCropModal } from "./AvatarCropModal";
 import { PlayerAvatar } from "./PlayerAvatar";
+import { PLAYER_PROFILE_OPTIONS } from "@/lib/playerProfiles";
 
 const MAX_SOURCE_SIZE = 20 * 1024 * 1024;
 
-export function PlayerForm({ player }: { player?: Player }) {
+export function PlayerForm({ player, mode = "admin" }: { player?: Player; mode?: "admin" | "self" }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewObjectUrlRef = useRef<string | null>(null);
@@ -101,7 +102,7 @@ export function PlayerForm({ player }: { player?: Player }) {
       const result = await savePlayer(player?.id || null, formData);
       if (!result.success) throw new Error(result.error);
 
-      router.push("/admin/jogadores");
+      router.push(mode === "self" ? "/meu-perfil" : "/admin/jogadores");
       router.refresh();
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Ocorreu um erro ao salvar o jogador.");
@@ -229,6 +230,32 @@ export function PlayerForm({ player }: { player?: Player }) {
         />
       </div>
 
+      <fieldset className="space-y-2">
+        <legend className="text-xs font-bold text-muted uppercase tracking-wider">
+          Perfil de jogo
+        </legend>
+        <div className="grid gap-2">
+          {PLAYER_PROFILE_OPTIONS.map((option) => (
+            <label
+              key={option.value}
+              className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface-hover px-4 py-3 has-[:checked]:border-accent has-[:checked]:bg-accent/5"
+            >
+              <input
+                type="radio"
+                name="player_profile"
+                value={option.value}
+                defaultChecked={(player?.player_profile || "midfield") === option.value}
+                className="mt-0.5 h-4 w-4"
+              />
+              <span>
+                <span className="block text-sm font-bold text-foreground">{option.label}</span>
+                <span className="block text-[11px] leading-4 text-muted">{option.description}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
       <div className="pt-4 flex flex-col gap-3">
         <button
           type="submit"
@@ -238,7 +265,7 @@ export function PlayerForm({ player }: { player?: Player }) {
           {loading ? "Salvando..." : isEditing ? "Salvar alterações" : "Cadastrar jogador"}
         </button>
 
-        {isEditing && (
+        {isEditing && mode === "admin" && (
           <button
             type="button"
             onClick={handleDelete}

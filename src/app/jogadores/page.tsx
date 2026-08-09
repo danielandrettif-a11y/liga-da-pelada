@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getPlayersWithStats } from "@/lib/actions/players";
 import { getDisplayName, calculateWinRate } from "@/lib/utils";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerProfileBadge } from "@/components/PlayerProfileBadge";
 
 export const revalidate = 0; // Para garantir que sempre busca do banco ao recarregar (em produção podemos mudar para ISR)
 
@@ -36,9 +37,18 @@ export default async function JogadoresPage() {
                   <p className="text-sm font-bold text-foreground truncate">
                     {getDisplayName(player.name, player.nickname)}
                   </p>
-                  <p className="text-[10px] text-muted truncate">
-                    {player.games} jogos
-                  </p>
+                  <PlayerProfileBadge profile={player.player_profile} />
+                </div>
+              </div>
+
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                <div className="rounded-lg border border-border bg-surface/60 px-2 py-1.5 text-center">
+                  <p className="text-base font-black text-foreground">{player.rounds}</p>
+                  <p className="text-[9px] font-bold uppercase text-muted">Peladas</p>
+                </div>
+                <div className="rounded-lg border border-border bg-surface/60 px-2 py-1.5 text-center">
+                  <p className="text-base font-black text-foreground">{player.games}</p>
+                  <p className="text-[9px] font-bold uppercase text-muted">Jogos</p>
                 </div>
               </div>
 

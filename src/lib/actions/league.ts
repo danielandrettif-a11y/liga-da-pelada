@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
+import { getAdminClient } from "../auth";
 
 export async function getLeagueConfig() {
   const { data, error } = await supabase
@@ -26,7 +27,10 @@ export async function getLeagueConfig() {
 
 export async function updateLeagueConfig(id: string, matchDuration: number) {
   try {
-    const { error } = await supabase
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem alterar a liga." };
+
+    const { error } = await client
       .from("leagues")
       .update({ match_duration: matchDuration })
       .eq("id", id);

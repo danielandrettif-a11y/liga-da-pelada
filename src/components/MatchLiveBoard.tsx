@@ -11,9 +11,10 @@ import { PlayerAvatar } from "./PlayerAvatar";
 type MatchLiveBoardProps = {
   match: any;
   matchDuration: number;
+  canManage: boolean;
 };
 
-export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
+export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoardProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -65,11 +66,13 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
   }, [match.id, router]);
 
   const toggleTimer = async () => {
+    if (!canManage) return;
     if (isRunning) await updateMatchTimer(match.id, "pause");
     else await updateMatchTimer(match.id, "start");
   };
 
   const resetTimer = async () => {
+    if (!canManage) return;
     if (confirm("Deseja realmente zerar o cronômetro?")) {
       await resetMatchTimer(match.id);
     }
@@ -91,6 +94,7 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
   const isFinished = match.status === "finished";
 
   async function handleFinish() {
+    if (!canManage) return;
     if (!confirm("Tem certeza que deseja encerrar esta partida? O placar não poderá mais ser alterado.")) return;
     
     setLoading(true);
@@ -105,6 +109,7 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
   }
 
   async function handleRegisterGoal(assistPlayerId: string | null = null) {
+    if (!canManage) return;
     if (!goalModal.scorerId) return;
 
     setLoading(true);
@@ -127,6 +132,7 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
   }
 
   async function handleDeleteEvent(eventId: string, teamId: string) {
+    if (!canManage) return;
     if (isFinished) return;
     if (!confirm("Deseja remover este gol?")) return;
 
@@ -170,6 +176,7 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
             <div className={`text-4xl font-black font-mono tracking-wider ${secondsLeft <= 60 && secondsLeft > 0 ? 'text-danger animate-pulse' : 'text-foreground'}`}>
               {formatTime(secondsLeft)}
             </div>
+            {canManage ? (
             <div className="flex items-center gap-3 mt-3">
               <button
                 onClick={toggleTimer}
@@ -184,6 +191,11 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
                 <RotateCcw className="w-4 h-4 text-muted" />
               </button>
             </div>
+            ) : (
+              <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-muted">
+                Acompanhamento ao vivo
+              </p>
+            )}
             <div className="w-full h-px bg-border my-4" />
           </div>
         )}
@@ -196,7 +208,7 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
           </div>
           <span className="stat-number text-5xl text-foreground">{match.score_a}</span>
           
-          {!isFinished && (
+          {!isFinished && canManage && (
             <button
               onClick={() => setGoalModal({ open: true, teamId: match.team_a_id, scorerId: null })}
               disabled={loading}
@@ -216,7 +228,7 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
           </div>
           <span className="stat-number text-5xl text-foreground">{match.score_b}</span>
           
-          {!isFinished && (
+          {!isFinished && canManage && (
             <button
               onClick={() => setGoalModal({ open: true, teamId: match.team_b_id, scorerId: null })}
               disabled={loading}
@@ -261,7 +273,7 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
                       )}
                     </div>
 
-                    {!isFinished && (
+                    {!isFinished && canManage && (
                       <button
                         onClick={() => handleDeleteEvent(ev.id, ev.team_id)}
                         disabled={loading}
@@ -279,7 +291,7 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
       </section>
 
       {/* Finalizar Button */}
-      {!isFinished && (
+      {!isFinished && canManage && (
         <div className="pt-6 animate-fade-in-up stagger-2">
           <button
             onClick={handleFinish}
@@ -293,7 +305,7 @@ export function MatchLiveBoard({ match, matchDuration }: MatchLiveBoardProps) {
       )}
 
       {/* MODAL DE REGISTRO DE GOL */}
-      {goalModal.open && (
+      {goalModal.open && canManage && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-fade-in pb-8">
           <div className="glass-card w-full max-w-sm overflow-hidden flex flex-col max-h-[85vh] animate-slide-in-bottom">
             <div className="p-4 bg-surface border-b border-border flex items-center justify-between">

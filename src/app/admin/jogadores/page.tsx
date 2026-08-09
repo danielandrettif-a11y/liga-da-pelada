@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getPlayers } from "@/lib/actions/players";
 import { Plus, ChevronRight, UserPlus, ArrowLeft } from "lucide-react";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerProfileBadge } from "@/components/PlayerProfileBadge";
 
 export const revalidate = 0;
 
@@ -50,9 +51,10 @@ export default async function AdminJogadoresPage() {
                   className="w-10 h-10 rounded-full bg-surface-hover border border-border text-xs font-bold text-muted flex-shrink-0"
                 />
                 <div>
-                  <p className="text-sm font-bold text-foreground">
-                    {player.name}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold text-foreground">{player.name}</p>
+                    <PlayerProfileBadge profile={player.player_profile} />
+                  </div>
                   {player.nickname && (
                     <p className="text-[10px] text-muted">
                       Apelido: {player.nickname}

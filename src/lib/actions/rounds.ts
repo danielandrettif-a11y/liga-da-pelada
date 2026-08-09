@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
 import { getActiveSeason } from "./seasons";
+import { createClient as createServerClient } from "../supabase/server";
+import { getAdminClient } from "../auth";
 
 export async function getActiveLeague() {
   const { data, error } = await supabase
@@ -91,12 +93,15 @@ export type TeamInput = {
 
 export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
   try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem criar rodadas." };
+
     const league = await getActiveLeague();
     const season = await getActiveSeason(league.id);
     if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
 
     // 1. Descobrir o número da nova rodada (maior number + 1)
-    const { data: lastRound } = await supabase
+    const { data: lastRound } = await client
       .from("rounds")
       .select("number")
       .eq("league_id", league.id)
@@ -108,7 +113,7 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
     const nextNumber = lastRound ? lastRound.number + 1 : 1;
 
     // 2. Criar a rodada
-    const { data: round, error: roundError } = await supabase
+    const { data: round, error: roundError } = await client
       .from("rounds")
       .insert({
         league_id: league.id,
@@ -127,7 +132,7 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
 
     // 4. Inserir round_players
     if (allPlayerIds.length > 0) {
-      const { error: rpError } = await supabase
+      const { error: rpError } = await client
         .from("round_players")
         .insert(
           allPlayerIds.map(playerId => ({
@@ -140,7 +145,7 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
 
     // 5. Inserir times e team_players
     for (const team of teams) {
-      const { data: teamData, error: teamError } = await supabase
+      const { data: teamData, error: teamError } = await client
         .from("teams")
         .insert({
           round_id: round.id,
@@ -153,7 +158,7 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
       if (teamError) throw new Error(`Erro ao criar time ${team.name}: ${teamError.message}`);
 
       if (team.playerIds.length > 0) {
-        const { error: tpError } = await supabase
+        const { error: tpError } = await client
           .from("team_players")
           .insert(
             team.playerIds.map(pid => ({
@@ -174,11 +179,18 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
   }
 }
 
-export async function finishRound(roundId: string) {
+export async function finishRound(roundId: string, paymentPix: string) {
   try {
-    const { error } = await supabase
+    const pix = paymentPix.trim();
+    if (!pix) return { success: false, error: "Informe a chave PIX que recebera os pagamentos." };
+    if (pix.length > 200) return { success: false, error: "A chave PIX deve ter no maximo 200 caracteres." };
+
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem encerrar rodadas." };
+
+    const { error } = await client
       .from("rounds")
-      .update({ status: "finished" })
+      .update({ status: "finished", payment_pix: pix })
       .eq("id", roundId);
 
     if (error) throw new Error(error.message);
@@ -190,6 +202,7 @@ export async function finishRound(roundId: string) {
     revalidatePath(`/rodadas/${roundId}`);
     revalidatePath("/rodadas");
     revalidatePath("/ranking");
+    revalidatePath("/pagamentos");
     return { success: true };
   } catch (err: any) {
     console.error("Erro ao encerrar rodada:", err);

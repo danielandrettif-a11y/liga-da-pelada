@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
-import { createClient as createServerClient } from "../supabase/server";
-import type { Player, CreatePlayerInput } from "../types";
+import type { Player, CreatePlayerInput, PlayerProfile } from "../types";
 import { getActiveSeasonRoundIds } from "./seasons";
+import { getAdminClient, getCurrentAccount } from "../auth";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -36,15 +36,6 @@ function avatarPathFromUrl(avatarUrl: string | null) {
   } catch {
     return null;
   }
-}
-
-async function getAuthenticatedClient() {
-  const client = await createServerClient();
-  const {
-    data: { user },
-  } = await client.auth.getUser();
-
-  return user ? client : null;
 }
 
 export async function getPlayers() {
@@ -93,12 +84,26 @@ export async function getPlayersWithStats() {
     : { data: [], error: null };
   const { data: stats, error: statsError } = statsResult;
 
+  const finishedRoundsResult = roundIds.length > 0
+    ? await supabase.from("rounds").select("id").in("id", roundIds).eq("status", "finished")
+    : { data: [], error: null };
+  const finishedRoundIds = finishedRoundsResult.data?.map((round) => round.id) || [];
+  const attendanceResult = finishedRoundIds.length > 0
+    ? await supabase.from("round_players").select("player_id, round_id").in("round_id", finishedRoundIds)
+    : { data: [], error: null };
+  const { data: attendance, error: attendanceError } = attendanceResult;
+
   if (statsError) {
     console.error("Erro ao buscar estatísticas:", statsError);
     return [];
   }
 
   // Agrega as estatísticas por jogador
+  if (finishedRoundsResult.error || attendanceError) {
+    console.error("Erro ao buscar presencas:", finishedRoundsResult.error || attendanceError);
+    return [];
+  }
+
   const playersWithStats = players.map((player) => {
     const playerStats = stats.filter((s) => s.player_id === player.id);
     
@@ -117,6 +122,11 @@ export async function getPlayersWithStats() {
 
     return {
       ...player,
+      rounds: new Set(
+        attendance
+          .filter((entry) => entry.player_id === player.id)
+          .map((entry) => entry.round_id)
+      ).size,
       ...aggregated,
     };
   });
@@ -150,8 +160,8 @@ export async function getPlayerRoundHistory(playerId: string) {
 }
 
 export async function createPlayer(input: CreatePlayerInput) {
-  const client = await getAuthenticatedClient();
-  if (!client) return { success: false, error: "Sessão expirada. Entre novamente." };
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem criar jogadores." };
 
   const { data, error } = await client
     .from("players")
@@ -160,6 +170,7 @@ export async function createPlayer(input: CreatePlayerInput) {
         name: input.name,
         nickname: input.nickname || null,
         avatar_url: input.avatar_url || null,
+        player_profile: input.player_profile || "midfield",
       },
     ])
     .select()
@@ -175,13 +186,14 @@ export async function createPlayer(input: CreatePlayerInput) {
 }
 
 export async function updatePlayer(id: string, input: Partial<CreatePlayerInput>) {
-  const client = await getAuthenticatedClient();
-  if (!client) return { success: false, error: "Sessão expirada. Entre novamente." };
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem editar outros jogadores." };
 
   const safeInput = {
     ...(input.name !== undefined ? { name: input.name.trim() } : {}),
     ...(input.nickname !== undefined ? { nickname: input.nickname.trim() || null } : {}),
     ...(input.avatar_url !== undefined ? { avatar_url: input.avatar_url || null } : {}),
+    ...(input.player_profile !== undefined ? { player_profile: input.player_profile } : {}),
   };
 
   const { data, error } = await client
@@ -201,14 +213,28 @@ export async function updatePlayer(id: string, input: Partial<CreatePlayerInput>
 }
 
 export async function savePlayer(playerId: string | null, formData: FormData) {
-  const client = await getAuthenticatedClient();
-  if (!client) return { success: false, error: "Sessão expirada. Entre novamente." };
+  const account = await getCurrentAccount();
+  if (!account.user) return { success: false, error: "Sessão expirada. Entre novamente." };
+
+  const ownsPlayer = !!playerId && account.profile?.player_id === playerId;
+  if (!account.isAdmin && !ownsPlayer) {
+    return { success: false, error: "Você só pode editar o seu próprio perfil." };
+  }
+  if (!playerId && !account.isAdmin) {
+    return { success: false, error: "Somente administradores podem criar jogadores." };
+  }
+  const client = account.client;
 
   const name = String(formData.get("name") || "").trim();
   const nickname = String(formData.get("nickname") || "").trim();
+  const playerProfile = String(formData.get("player_profile") || "midfield") as PlayerProfile;
   const removeAvatar = formData.get("remove_avatar") === "true";
   const avatar = formData.get("avatar");
   const hasNewAvatar = avatar instanceof File && avatar.size > 0;
+
+  if (!["offensive", "midfield", "defensive"].includes(playerProfile)) {
+    return { success: false, error: "Escolha um perfil de jogo valido." };
+  }
 
   if (!name) return { success: false, error: "O nome é obrigatório." };
   if (name.length > 120) return { success: false, error: "O nome deve ter no máximo 120 caracteres." };
@@ -267,6 +293,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     name,
     nickname: nickname || null,
     avatar_url: nextAvatarUrl,
+    player_profile: playerProfile,
   };
 
   const query = playerId
@@ -274,6 +301,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
         name: playerData.name,
         nickname: playerData.nickname,
         avatar_url: playerData.avatar_url,
+        player_profile: playerData.player_profile,
       }).eq("id", id)
     : client.from("players").insert([playerData]);
 
@@ -296,8 +324,8 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
 }
 
 export async function deletePlayer(id: string) {
-  const client = await getAuthenticatedClient();
-  if (!client) return { success: false, error: "Sessão expirada. Entre novamente." };
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem excluir jogadores." };
 
   const { data: player } = await client
     .from("players")

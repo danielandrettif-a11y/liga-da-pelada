@@ -15,11 +15,14 @@ export type User = {
   created_at: string;
 };
 
+export type PlayerProfile = 'offensive' | 'midfield' | 'defensive';
+
 export type Player = {
   id: string;
   name: string;
   nickname: string | null;
   avatar_url: string | null;
+  player_profile: PlayerProfile;
   created_at: string;
 };
 
@@ -61,6 +64,24 @@ export type Round = {
   date: string;
   status: RoundStatus;
   notes: string | null;
+  payment_pix: string | null;
+  created_at: string;
+};
+
+export type AccountProfile = {
+  user_id: string;
+  role: 'admin' | 'player';
+  player_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RoundPayment = {
+  id: string;
+  round_id: string;
+  player_id: string;
+  paid: boolean;
+  paid_at: string | null;
   created_at: string;
 };
 
@@ -229,6 +250,7 @@ export type CreatePlayerInput = {
   name: string;
   nickname?: string;
   avatar_url?: string;
+  player_profile?: PlayerProfile;
 };
 
 export type CreateRoundInput = {
@@ -301,8 +323,13 @@ export type Database = {
       };
       rounds: {
         Row: Round;
-        Insert: Omit<Round, 'id' | 'created_at' | 'status'> & { id?: string; created_at?: string; status?: RoundStatus };
+        Insert: Omit<Round, 'id' | 'created_at' | 'status' | 'payment_pix'> & { id?: string; created_at?: string; status?: RoundStatus; payment_pix?: string | null };
         Update: Partial<Omit<Round, 'id'>>;
+      };
+      account_profiles: {
+        Row: AccountProfile;
+        Insert: Omit<AccountProfile, 'created_at' | 'updated_at'> & { created_at?: string; updated_at?: string };
+        Update: Partial<Omit<AccountProfile, 'user_id'>>;
       };
       seasons: {
         Row: Season;
@@ -313,6 +340,11 @@ export type Database = {
         Row: RoundPlayer;
         Insert: Omit<RoundPlayer, 'id'> & { id?: string };
         Update: Partial<Omit<RoundPlayer, 'id'>>;
+      };
+      round_payments: {
+        Row: RoundPayment;
+        Insert: Omit<RoundPayment, 'id' | 'created_at' | 'paid' | 'paid_at'> & { id?: string; created_at?: string; paid?: boolean; paid_at?: string | null };
+        Update: Partial<Omit<RoundPayment, 'id'>>;
       };
       teams: {
         Row: Team;

@@ -30,22 +30,33 @@ export default async function proxy(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
+  const pathname = request.nextUrl.pathname
+  const isAdminRoute =
+    pathname.startsWith('/admin') ||
+    /^\/rodadas\/[^/]+\/nova-partida$/.test(pathname)
+  const isAccountRoute = pathname.startsWith('/meu-perfil')
+  let isAdmin = false
 
-  // Definir rotas protegidas que precisam de login (apenas ações e edição)
-  const isProtectedRoute = 
-    request.nextUrl.pathname.startsWith('/admin') ||
-    request.nextUrl.pathname.includes('/nova') ||
-    request.nextUrl.pathname.includes('/editar') ||
-    request.nextUrl.pathname.includes('/novo') ||
-    // A tela da partida (/partidas/id) tem botões de gols, então bloqueamos para quem não logou
-    (request.nextUrl.pathname.startsWith('/partidas/') && request.nextUrl.pathname !== '/partidas')
+  if (user && (isAdminRoute || pathname === '/login' || pathname === '/cadastro')) {
+    const { data: profile } = await supabase
+      .from('account_profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    isAdmin = profile?.role === 'admin'
+  }
 
-  if (isProtectedRoute && !user) {
+  if (isAdminRoute && !isAdmin) {
+    if (user) return NextResponse.redirect(new URL('/', request.url))
     return NextResponse.redirect(new URL('/login', request.url))
   }
-  
-  if (user && request.nextUrl.pathname === '/login') {
-    return NextResponse.redirect(new URL('/', request.url))
+
+  if (isAccountRoute && !user) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  if (user && (pathname === '/login' || pathname === '/cadastro')) {
+    return NextResponse.redirect(new URL(isAdmin ? '/' : '/meu-perfil', request.url))
   }
 
   return supabaseResponse

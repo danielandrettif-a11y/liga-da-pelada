@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { login } from "./actions";
 import { Lock, Mail, Trophy, Loader2 } from "lucide-react";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +29,7 @@ export default function LoginPage() {
             <Trophy className="w-8 h-8 text-black" />
           </div>
           <h1 className="text-2xl font-bold text-foreground text-center">Pelada de Baixa Qualidade</h1>
-          <p className="text-muted text-sm mt-1">Faça login para gerenciar a liga</p>
+          <p className="text-muted text-sm mt-1">Entre para acessar sua conta</p>
         </div>
 
         {/* Login Card */}
@@ -85,10 +86,20 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-[10px] font-bold uppercase text-muted">ou</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
+          <Link href="/cadastro" className="block w-full rounded-xl border border-accent/40 py-3.5 text-center text-sm font-bold text-accent hover:bg-accent/10">
+            Criar minha conta
+          </Link>
         </div>
         
         <p className="text-center text-xs text-muted mt-8">
-          Apenas administradores podem acessar esta área.
+          Jogadores podem criar a própria conta. Administradores são cadastrados manualmente.
         </p>
 
       </div>

@@ -2,6 +2,7 @@
 
 import { supabase } from "../supabase";
 import { getActiveSeasonRoundIds } from "./seasons";
+import { getAdminClient } from "../auth";
 
 // Regras de Pontuação Padrão
 const POINTS = {
@@ -14,6 +15,9 @@ const POINTS = {
 
 export async function calculateRoundStats(roundId: string) {
   try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem recalcular estatisticas." };
+
     // 1. Buscar a rodada e todas as partidas finalizadas
     const { data: round, error } = await supabase
       .from("rounds")
@@ -105,7 +109,7 @@ export async function calculateRoundStats(roundId: string) {
     // 4. Salvar tudo (Upsert)
     const statsArray = Object.values(statsMap);
     if (statsArray.length > 0) {
-      const { error: upsertError } = await supabase
+      const { error: upsertError } = await client
         .from("player_round_stats")
         .upsert(statsArray, { onConflict: "player_id, round_id" });
         

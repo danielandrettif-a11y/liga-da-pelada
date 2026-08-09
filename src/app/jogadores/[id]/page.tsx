@@ -1,6 +1,7 @@
 import { getPlayer, getPlayerRoundHistory, getPlayersWithStats } from "@/lib/actions/players";
 import { getDisplayName, calculateWinRate, formatDateShort } from "@/lib/utils";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerProfileBadge } from "@/components/PlayerProfileBadge";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ChevronRight } from "lucide-react";
@@ -64,6 +65,7 @@ export default async function JogadorPerfilPage({
           {getDisplayName(player.name, player.nickname)}
         </h2>
         <p className="text-sm text-muted">{player.name}</p>
+        <div className="mt-2"><PlayerProfileBadge profile={player.player_profile} /></div>
 
         <div className="mt-6 py-3 px-6 rounded-2xl bg-surface/50 border border-border inline-flex items-center gap-4">
           <div className="flex flex-col items-center">
@@ -84,6 +86,10 @@ export default async function JogadorPerfilPage({
           Estatísticas
         </h3>
         <div className="grid grid-cols-2 gap-3">
+          <div className="glass-card p-4">
+            <p className="text-xs text-muted mb-1">Peladas</p>
+            <p className="stat-number text-2xl text-foreground">{stats.rounds || 0}</p>
+          </div>
           <div className="glass-card p-4">
             <p className="text-xs text-muted mb-1">Jogos</p>
             <p className="stat-number text-2xl text-foreground">{stats.games}</p>

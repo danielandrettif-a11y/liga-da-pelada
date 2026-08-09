@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarDays, Plus } from "lucide-react";
 import { getRound } from "@/lib/actions/rounds";
 import { formatDateShort } from "@/lib/utils";
 import { FinishRoundButton } from "@/components/FinishRoundButton";
+import { getCurrentAccount } from "@/lib/auth";
 
 export const revalidate = 0;
 
@@ -14,6 +15,7 @@ export default async function RodadaDetalhePage({
 }) {
   const { id } = await params;
   const round = await getRound(id);
+  const account = await getCurrentAccount();
 
   if (!round) {
     notFound();
@@ -86,7 +88,7 @@ export default async function RodadaDetalhePage({
           <h2 className="text-xs font-bold text-muted uppercase tracking-wider">
             Partidas
           </h2>
-          {round.status !== "finished" && (
+          {round.status !== "finished" && account.isAdmin && (
             <Link
               href={`/rodadas/${round.id}/nova-partida`}
               className="flex items-center gap-1 text-xs font-bold text-accent hover:text-accent-light transition-colors"
@@ -149,7 +151,7 @@ export default async function RodadaDetalhePage({
         </div>
       </section>
       
-      <FinishRoundButton roundId={round.id} status={round.status} />
+      <FinishRoundButton roundId={round.id} status={round.status} canManage={account.isAdmin} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { CalendarDays, Plus, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { getRounds } from "@/lib/actions/rounds";
 import { formatDateShort } from "@/lib/utils";
+import { getCurrentAccount } from "@/lib/auth";
 
 export const revalidate = 0;
 
@@ -25,6 +26,7 @@ const STATUS_STYLES = {
 
 export default async function RodadasPage() {
   const rounds = await getRounds();
+  const account = await getCurrentAccount();
 
   return (
     <div className="space-y-5">
@@ -36,10 +38,10 @@ export default async function RodadasPage() {
             {rounds.length} rodadas registradas
           </p>
         </div>
-        <Link href="/admin/rodada" className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-accent hover:bg-accent-light text-background text-sm font-bold transition-all active:scale-95">
+        {account.isAdmin && <Link href="/admin/rodada" className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-accent hover:bg-accent-light text-background text-sm font-bold transition-all active:scale-95">
           <Plus className="w-4 h-4" />
           Nova Rodada
-        </Link>
+        </Link>}
       </div>
 
       {/* Rounds List */}

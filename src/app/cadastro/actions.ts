@@ -1,0 +1,53 @@
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
+
+export async function signup(formData: FormData) {
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const password = String(formData.get("password") || "");
+  const passwordConfirmation = String(formData.get("password_confirmation") || "");
+  const name = String(formData.get("name") || "").trim();
+  const nickname = String(formData.get("nickname") || "").trim();
+  const playerProfile = String(formData.get("player_profile") || "midfield");
+
+  if (!email || !email.includes("@")) return { success: false, error: "Informe um e-mail válido." };
+  if (password.length < 8) return { success: false, error: "A senha precisa ter pelo menos 8 caracteres." };
+  if (password !== passwordConfirmation) return { success: false, error: "As senhas não conferem." };
+  if (!name) return { success: false, error: "Informe o seu nome." };
+  if (name.length > 120 || nickname.length > 60) return { success: false, error: "Nome ou apelido muito longo." };
+  if (!["offensive", "midfield", "defensive"].includes(playerProfile)) {
+    return { success: false, error: "Escolha um estilo de jogo válido." };
+  }
+
+  const client = await createClient();
+  const requestHeaders = await headers();
+  const origin = requestHeaders.get("origin")
+    || `${requestHeaders.get("x-forwarded-proto") || "https"}://${requestHeaders.get("x-forwarded-host") || requestHeaders.get("host")}`;
+  const { data, error } = await client.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${origin}/auth/callback`,
+      data: {
+        name,
+        nickname,
+        player_profile: playerProfile,
+      },
+    },
+  });
+
+  if (error) {
+    if (error.message.toLowerCase().includes("already registered")) {
+      return { success: false, error: "Este e-mail já possui uma conta." };
+    }
+    return { success: false, error: error.message };
+  }
+
+  if (!data.user) return { success: false, error: "Não foi possível criar a conta." };
+
+  return {
+    success: true,
+    requiresConfirmation: !data.session,
+  };
+}

@@ -6,14 +6,21 @@ import { createRoundWithTeams, type TeamInput } from "@/lib/actions/rounds";
 import type { Player } from "@/lib/types";
 import { Users, Calendar, CheckCircle2, ChevronRight } from "lucide-react";
 import { PlayerAvatar } from "./PlayerAvatar";
+import { PlayerProfileBadge } from "./PlayerProfileBadge";
+
+type DrawPlayer = Player & {
+  points?: number;
+  rounds?: number;
+  games?: number;
+};
 
 const DEFAULT_TEAMS = [
-  { id: "team1", name: "Azul", color: "#3B82F6", players: [] as Player[] },
-  { id: "team2", name: "Vermelho", color: "#EF4444", players: [] as Player[] },
-  { id: "team3", name: "Preto", color: "#374151", players: [] as Player[] },
+  { id: "team1", name: "Azul", color: "#3B82F6", players: [] as DrawPlayer[] },
+  { id: "team2", name: "Vermelho", color: "#EF4444", players: [] as DrawPlayer[] },
+  { id: "team3", name: "Preto", color: "#374151", players: [] as DrawPlayer[] },
 ];
 
-export function RoundCreator({ allPlayers }: { allPlayers: Player[] }) {
+export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
@@ -42,7 +49,7 @@ export function RoundCreator({ allPlayers }: { allPlayers: Player[] }) {
     setSelectedPlayerIds(next);
   }
 
-  function assignToTeam(player: Player, teamId: string) {
+  function assignToTeam(player: DrawPlayer, teamId: string) {
     setTeams(prev => prev.map(t => {
       // Remove de outros times se estiver
       const filtered = t.players.filter(p => p.id !== player.id);
@@ -54,7 +61,7 @@ export function RoundCreator({ allPlayers }: { allPlayers: Player[] }) {
     }));
   }
 
-  function removeFromTeam(player: Player) {
+  function removeFromTeam(player: DrawPlayer) {
     setTeams(prev => prev.map(t => ({
       ...t,
       players: t.players.filter(p => p.id !== player.id)
@@ -71,13 +78,49 @@ export function RoundCreator({ allPlayers }: { allPlayers: Player[] }) {
     }
 
     // Distribui iterativamente
-    const newTeams = teams.map(t => ({ ...t, players: [] as Player[] }));
+    const newTeams = teams.map(t => ({ ...t, players: [] as DrawPlayer[] }));
     playersToDraw.forEach((player, index) => {
       const teamIndex = index % newTeams.length;
       newTeams[teamIndex].players.push(player);
     });
 
     setTeams(newTeams);
+  }
+
+  function handleBalancedDraw() {
+    const playersToDraw = selectedPlayers
+      .map((player) => ({ player, tieBreaker: Math.random() }))
+      .sort((a, b) => (b.player.points || 0) - (a.player.points || 0) || a.tieBreaker - b.tieBreaker)
+      .map(({ player }) => player);
+
+    const newTeams = teams.map((team) => ({
+      ...team,
+      players: [] as DrawPlayer[],
+      points: 0,
+    }));
+
+    playersToDraw.forEach((player) => {
+      const profile = player.player_profile || "midfield";
+      const minimumSize = Math.min(...newTeams.map((team) => team.players.length));
+      const orderedTeams = newTeams.filter((team) => team.players.length === minimumSize).sort((a, b) => {
+        const profileDifference =
+          a.players.filter((item) => (item.player_profile || "midfield") === profile).length
+          - b.players.filter((item) => (item.player_profile || "midfield") === profile).length;
+        if (profileDifference !== 0) return profileDifference;
+        if (a.points !== b.points) return a.points - b.points;
+        return 0;
+      });
+
+      orderedTeams[0].players.push(player);
+      orderedTeams[0].points += player.points || 0;
+    });
+
+    setTeams(newTeams.map((team) => ({
+      id: team.id,
+      name: team.name,
+      color: team.color,
+      players: team.players,
+    })));
   }
 
   async function handleSave() {
@@ -196,6 +239,10 @@ export function RoundCreator({ allPlayers }: { allPlayers: Player[] }) {
                       <p className={`text-sm font-bold ${isSelected ? "text-accent" : "text-foreground"}`}>
                         {player.nickname || player.name}
                       </p>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <PlayerProfileBadge profile={player.player_profile} />
+                        <span className="text-[9px] text-muted">{player.points || 0} pts</span>
+                      </div>
                     </div>
                   </div>
                   {isSelected && <CheckCircle2 className="w-5 h-5 text-accent" />}
@@ -235,11 +282,10 @@ export function RoundCreator({ allPlayers }: { allPlayers: Player[] }) {
               🎲 Sorteio Aleatório
             </button>
             <button
-              disabled
-              className="flex-1 bg-surface/50 border border-border/50 text-muted font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 cursor-not-allowed relative overflow-hidden"
+              onClick={handleBalancedDraw}
+              className="flex-1 bg-accent/10 border border-accent/30 text-accent hover:bg-accent/15 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2"
             >
-              📊 Por Estatísticas
-              <span className="absolute top-0 right-0 bg-accent text-[8px] text-background px-1.5 py-0.5 rounded-bl-lg font-black uppercase tracking-wider">Breve</span>
+              ⚖️ Times Equilibrados
             </button>
           </div>
 
@@ -256,7 +302,8 @@ export function RoundCreator({ allPlayers }: { allPlayers: Player[] }) {
                       onClick={() => setOpenDropdownId(openDropdownId === p.id ? null : p.id)}
                       className="px-3 py-1.5 bg-surface-hover border border-border rounded-lg text-xs font-bold text-foreground cursor-pointer"
                     >
-                      {p.nickname || p.name}
+                      <span>{p.nickname || p.name}</span>
+                      <PlayerProfileBadge profile={p.player_profile} />
                     </div>
                     {/* Menu de times (aberto ao clicar) */}
                     {openDropdownId === p.id && (
@@ -308,7 +355,8 @@ export function RoundCreator({ allPlayers }: { allPlayers: Player[] }) {
                       onClick={() => removeFromTeam(p)}
                       className="px-2 py-1 bg-background border border-border rounded-md text-xs font-semibold text-foreground flex items-center gap-1.5 cursor-pointer hover:border-danger/50 hover:text-danger transition-colors group"
                     >
-                      {p.nickname || p.name}
+                      <span>{p.nickname || p.name}</span>
+                      <PlayerProfileBadge profile={p.player_profile} />
                       <span className="text-[10px] opacity-0 group-hover:opacity-100">✕</span>
                     </div>
                   ))}

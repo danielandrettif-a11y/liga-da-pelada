@@ -10,7 +10,7 @@ export async function login(formData: FormData) {
   
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -19,8 +19,14 @@ export async function login(formData: FormData) {
     return { error: "Email ou senha incorretos." };
   }
 
+  const { data: profile } = await supabase
+    .from("account_profiles")
+    .select("role")
+    .eq("user_id", data.user.id)
+    .maybeSingle();
+
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(profile?.role === "admin" ? "/" : "/meu-perfil");
 }
 
 export async function logout() {

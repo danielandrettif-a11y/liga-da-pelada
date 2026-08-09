@@ -1,37 +1,102 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, X } from "lucide-react";
 import { finishRound } from "@/lib/actions/rounds";
 
-export function FinishRoundButton({ roundId, status }: { roundId: string, status: string }) {
+export function FinishRoundButton({ roundId, status, canManage }: { roundId: string; status: string; canManage: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [pix, setPix] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   if (status === "finished") {
     return (
-      <div className="w-full bg-surface border border-accent/20 text-accent font-bold py-4 rounded-xl flex items-center justify-center gap-2 mt-6">
-        <CheckCircle2 className="w-5 h-5" />
-        Rodada Encerrada
+      <div className="mt-6 space-y-2">
+        <div className="w-full bg-surface border border-accent/20 text-accent font-bold py-4 rounded-xl flex items-center justify-center gap-2">
+          <CheckCircle2 className="w-5 h-5" />
+          Rodada Encerrada
+        </div>
+        <Link
+          href={`/pagamentos?rodada=${roundId}`}
+          className="block text-center text-xs font-bold text-muted hover:text-accent"
+        >
+          Ver pagamentos desta rodada
+        </Link>
       </div>
     );
   }
 
-  const handleFinish = async () => {
-    if (!confirm("Tem certeza que deseja encerrar a rodada? Nenhuma nova partida poderá ser criada e os pontos finais serão consolidados no Ranking.")) return;
-    
+  if (!canManage) return null;
+
+  async function handleFinish() {
+    if (!pix.trim()) {
+      setError("Informe a chave PIX antes de encerrar a rodada.");
+      return;
+    }
+
     setLoading(true);
-    await finishRound(roundId);
+    setError("");
+    const result = await finishRound(roundId, pix);
+    if (!result.success) {
+      setError(result.error || "Nao foi possivel encerrar a rodada.");
+      setLoading(false);
+      return;
+    }
+    setOpen(false);
     setLoading(false);
-  };
+  }
 
   return (
-    <button
-      onClick={handleFinish}
-      disabled={loading}
-      className="w-full mt-6 bg-surface border border-danger/30 hover:bg-danger/10 text-danger font-bold py-4 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-    >
-      <CheckCircle2 className="w-5 h-5" />
-      {loading ? "Encerrando..." : "Encerrar Rodada"}
-    </button>
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="w-full mt-6 bg-surface border border-danger/30 hover:bg-danger/10 text-danger font-bold py-4 rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+      >
+        <CheckCircle2 className="w-5 h-5" />
+        Encerrar Rodada
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 p-4 sm:items-center">
+          <div role="dialog" aria-modal="true" aria-labelledby="finish-round-title" className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="finish-round-title" className="text-lg font-black text-foreground">Encerrar a rodada?</h2>
+                <p className="mt-1 text-xs leading-5 text-muted">
+                  Os pontos serao consolidados. Informe o PIX de quem vai receber o valor da pelada.
+                </p>
+              </div>
+              <button onClick={() => setOpen(false)} disabled={loading} aria-label="Fechar" className="rounded-full p-2 text-muted hover:bg-surface-hover">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <label htmlFor="payment-pix" className="mt-5 block text-xs font-bold uppercase tracking-wider text-muted">Chave PIX</label>
+            <input
+              id="payment-pix"
+              value={pix}
+              onChange={(event) => setPix(event.target.value)}
+              placeholder="CPF, telefone, e-mail ou chave aleatoria"
+              maxLength={200}
+              autoFocus
+              className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-accent"
+            />
+
+            {error && <p role="alert" className="mt-3 rounded-lg bg-danger/10 p-3 text-xs font-bold text-danger">{error}</p>}
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button onClick={() => setOpen(false)} disabled={loading} className="rounded-xl border border-border py-3 text-sm font-bold text-foreground disabled:opacity-50">
+                Cancelar
+              </button>
+              <button onClick={handleFinish} disabled={loading} className="rounded-xl bg-danger py-3 text-sm font-bold text-white disabled:opacity-50">
+                {loading ? "Encerrando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
