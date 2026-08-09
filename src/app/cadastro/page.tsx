@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, CheckCircle2, Loader2, Mail, Lock, UserRoundPlus } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Mail, MailCheck, Lock, UserRoundPlus } from "lucide-react";
+import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 import { PLAYER_PROFILE_OPTIONS } from "@/lib/playerProfiles";
 import { signup } from "./actions";
 
@@ -12,6 +13,7 @@ export default function CadastroPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState("");
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -25,6 +27,7 @@ export default function CadastroPage() {
     }
 
     if (result.requiresConfirmation) {
+      setConfirmationEmail(result.email || "");
       setConfirmationSent(true);
       setLoading(false);
       return;
@@ -39,11 +42,21 @@ export default function CadastroPage() {
       <div className="flex min-h-[75vh] items-center justify-center px-4">
         <div className="glass-card w-full max-w-sm p-6 text-center">
           <CheckCircle2 className="mx-auto h-12 w-12 text-accent" />
-          <h1 className="mt-4 text-xl font-black text-foreground">Confira seu e-mail</h1>
+          <h1 className="mt-4 text-xl font-black text-foreground">Falta confirmar seu cadastro</h1>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Enviamos o link de confirmação. Depois de confirmar, entre na conta para adicionar sua foto.
+            Enviamos um link de confirmação para{confirmationEmail ? (
+              <> <strong className="text-foreground">{confirmationEmail}</strong></>
+            ) : " o seu e-mail"}.
           </p>
-          <Link href="/login" className="btn-primary mt-6 block w-full py-3.5">Ir para o login</Link>
+          <div className="mt-5 rounded-xl border border-warning/30 bg-warning/10 p-4 text-left">
+            <p className="text-sm font-black text-warning">Sua conta ainda não está liberada.</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-5 text-muted">
+              <li>Abra a sua caixa de entrada ou spam.</li>
+              <li>Clique no link de confirmação enviado pelo app.</li>
+              <li>Depois da confirmação, você poderá entrar normalmente.</li>
+            </ol>
+          </div>
+          <Link href="/login" className="btn-primary mt-6 block w-full py-3.5">Já confirmei — ir para o login</Link>
         </div>
       </div>
     );
@@ -61,8 +74,31 @@ export default function CadastroPage() {
         </div>
       </div>
 
+      <div className="glass-card p-5">
+        <GoogleAuthButton label="Criar conta com Google" />
+        <p className="mt-2 text-center text-[10px] leading-4 text-muted">
+          A conta do Google já possui e-mail confirmado e cria seu perfil de jogador automaticamente.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-border" />
+        <span className="text-[10px] font-bold uppercase text-muted">ou cadastre-se com e-mail</span>
+        <div className="h-px flex-1 bg-border" />
+      </div>
+
       <form action={handleSubmit} className="glass-card space-y-4 p-5">
         {error && <p role="alert" className="rounded-xl bg-danger/10 p-3 text-xs font-bold text-danger">{error}</p>}
+
+        <div role="note" className="flex gap-3 rounded-xl border border-warning/30 bg-warning/10 p-3">
+          <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+          <div>
+            <p className="text-xs font-black text-warning">Confirmação de e-mail obrigatória</p>
+            <p className="mt-1 text-[10px] leading-4 text-muted">
+              Depois de criar a conta, abra o e-mail enviado pelo app e confirme o cadastro. Sem essa confirmação, o login não será liberado.
+            </p>
+          </div>
+        </div>
 
         <div className="space-y-1.5">
           <label className="text-xs font-bold uppercase tracking-wider text-muted">Nome completo</label>

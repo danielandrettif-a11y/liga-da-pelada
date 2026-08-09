@@ -2,11 +2,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 export async function login(formData: FormData) {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const password = String(formData.get("password") || "");
   
   const supabase = await createClient();
 
@@ -16,6 +17,11 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
+    if (error.code === "email_not_confirmed") {
+      return {
+        error: "Confirme seu cadastro no e-mail antes de entrar. Confira também a caixa de spam.",
+      };
+    }
     return { error: "Email ou senha incorretos." };
   }
 
@@ -27,6 +33,28 @@ export async function login(formData: FormData) {
 
   revalidatePath("/", "layout");
   redirect(profile?.role === "admin" ? "/" : "/meu-perfil");
+}
+
+export async function signInWithGoogle() {
+  const supabase = await createClient();
+  const requestHeaders = await headers();
+  const origin = requestHeaders.get("origin")
+    || `${requestHeaders.get("x-forwarded-proto") || "https"}://${requestHeaders.get("x-forwarded-host") || requestHeaders.get("host")}`;
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${origin}/auth/callback`,
+    },
+  });
+
+  if (error || !data.url) {
+    return {
+      error: "Não foi possível entrar com o Google agora. Tente novamente em instantes.",
+    };
+  }
+
+  redirect(data.url);
 }
 
 export async function logout() {

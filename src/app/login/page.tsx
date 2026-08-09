@@ -4,6 +4,7 @@ import { useState } from "react";
 import { login } from "./actions";
 import { Lock, Mail, Trophy, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
@@ -89,11 +90,16 @@ export default function LoginPage() {
 
           <div className="my-5 flex items-center gap-3">
             <div className="h-px flex-1 bg-border" />
-            <span className="text-[10px] font-bold uppercase text-muted">ou</span>
+            <span className="text-[10px] font-bold uppercase text-muted">ou continue com</span>
             <div className="h-px flex-1 bg-border" />
           </div>
 
-          <Link href="/cadastro" className="block w-full rounded-xl border border-accent/40 py-3.5 text-center text-sm font-bold text-accent hover:bg-accent/10">
+          <GoogleAuthButton />
+          <p className="mt-2 text-center text-[10px] leading-4 text-muted">
+            No primeiro acesso, criaremos automaticamente uma conta de jogador.
+          </p>
+
+          <Link href="/cadastro" className="mt-4 block w-full rounded-xl border border-accent/40 py-3.5 text-center text-sm font-bold text-accent hover:bg-accent/10">
             Criar minha conta
           </Link>
         </div>

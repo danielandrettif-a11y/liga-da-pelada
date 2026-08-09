@@ -45,9 +45,16 @@ export async function signup(formData: FormData) {
   }
 
   if (!data.user) return { success: false, error: "Não foi possível criar a conta." };
+  if (data.user.identities?.length === 0) {
+    return {
+      success: false,
+      error: "Não foi possível concluir o cadastro. Se você já criou uma conta, confirme o e-mail ou tente entrar.",
+    };
+  }
 
   return {
     success: true,
     requiresConfirmation: !data.session,
+    email,
   };
 }
