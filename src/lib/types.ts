@@ -52,7 +52,7 @@ export type RankingRule = {
   points: number;
 };
 
-export type EventType = 'goal' | 'assist' | 'win' | 'draw' | 'loss';
+export type EventType = 'goal' | 'assist' | 'win' | 'draw' | 'loss' | 'best_goalkeeper';
 
 export type RoundStatus = 'draft' | 'active' | 'finished';
 

@@ -129,7 +129,7 @@ export default async function JogadorPerfilPage({
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-black text-foreground">Melhor goleiro · Rodada {String(award.number).padStart(2, "0")}</p>
-                    <p className="mt-0.5 text-xs text-muted">{formatDateShort(award.date)} · +6 pontos</p>
+                    <p className="mt-0.5 text-xs text-muted">{formatDateShort(award.date)} · Prêmio da rodada</p>
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted" />
                 </div>

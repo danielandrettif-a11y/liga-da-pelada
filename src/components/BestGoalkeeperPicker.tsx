@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Medal, ShieldCheck } from "lucide-react";
 import { selectBestGoalkeeper } from "@/lib/actions/goalkeeper";
-import { BEST_GOALKEEPER_POINTS } from "@/lib/scoring";
 import { PlayerAvatar } from "./PlayerAvatar";
 
 type Participant = {
@@ -19,6 +18,7 @@ type Props = {
   participants: Participant[];
   selectedPlayerId: string | null;
   canManage: boolean;
+  points: number;
 };
 
 export function BestGoalkeeperPicker({
@@ -26,6 +26,7 @@ export function BestGoalkeeperPicker({
   participants,
   selectedPlayerId,
   canManage,
+  points,
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(canManage && !selectedPlayerId);
@@ -73,7 +74,7 @@ export function BestGoalkeeperPicker({
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-black text-foreground">Melhor goleiro da rodada</h2>
-          <p className="mt-0.5 text-xs text-muted">Prêmio de +{BEST_GOALKEEPER_POINTS} pontos no ranking</p>
+          <p className="mt-0.5 text-xs text-muted">Prêmio de {points >= 0 ? "+" : ""}{points} pontos no ranking</p>
         </div>
         {winner && !open && canManage && (
           <button
@@ -99,7 +100,7 @@ export function BestGoalkeeperPicker({
               <ShieldCheck className="h-3.5 w-3.5" /> Destaque da rodada
             </p>
           </div>
-          <span className="stat-number text-xl text-accent">+{BEST_GOALKEEPER_POINTS}</span>
+          <span className="stat-number text-xl text-accent">{points >= 0 ? "+" : ""}{points}</span>
         </div>
       )}
 

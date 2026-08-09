@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getAdminClient } from "../auth";
+import { supabase } from "../supabase";
 import { DEFAULT_SCORING_POINTS } from "../scoring";
 import type { ScoringPoints } from "../scoring";
 import type { EventType } from "../types";
@@ -26,6 +27,21 @@ async function getAdminLeague() {
     .maybeSingle();
 
   return { client, league: fallbackLeague };
+}
+
+export async function getGoalkeeperScoringPoints(leagueId: string) {
+  const { data, error } = await supabase
+    .from("ranking_rules")
+    .select("points")
+    .eq("league_id", leagueId)
+    .eq("event_type", "best_goalkeeper")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Erro ao buscar pontuação de melhor goleiro:", error);
+  }
+
+  return data?.points ?? DEFAULT_SCORING_POINTS.best_goalkeeper;
 }
 
 export async function getScoringRules(): Promise<{

@@ -6,6 +6,7 @@ import { formatDateShort } from "@/lib/utils";
 import { FinishRoundButton } from "@/components/FinishRoundButton";
 import { BestGoalkeeperPicker } from "@/components/BestGoalkeeperPicker";
 import { getCurrentAccount } from "@/lib/auth";
+import { getGoalkeeperScoringPoints } from "@/lib/actions/scoring";
 
 export const revalidate = 0;
 
@@ -26,6 +27,7 @@ export default async function RodadaDetalhePage({
     .map((entry: any) => entry.players)
     .filter(Boolean)
     .sort((a: any, b: any) => (a.nickname || a.name).localeCompare(b.nickname || b.name, "pt-BR"));
+  const goalkeeperPoints = await getGoalkeeperScoringPoints(round.league_id);
 
   return (
     <div className="space-y-6">
@@ -165,6 +167,7 @@ export default async function RodadaDetalhePage({
           participants={participants}
           selectedPlayerId={round.best_goalkeeper_player_id || null}
           canManage={account.isAdmin}
+          points={goalkeeperPoints}
         />
       )}
     </div>

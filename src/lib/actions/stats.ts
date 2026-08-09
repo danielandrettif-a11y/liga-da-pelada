@@ -3,7 +3,7 @@
 import { supabase } from "../supabase";
 import { getActiveSeasonRoundIds } from "./seasons";
 import { getAdminClient } from "../auth";
-import { BEST_GOALKEEPER_POINTS, DEFAULT_SCORING_POINTS } from "../scoring";
+import { DEFAULT_SCORING_POINTS } from "../scoring";
 import type { EventType } from "../types";
 
 export async function calculateRoundStats(roundId: string) {
@@ -117,7 +117,7 @@ export async function calculateRoundStats(roundId: string) {
       ? statsMap[round.best_goalkeeper_player_id]
       : null;
     if (bestGoalkeeper) {
-      bestGoalkeeper.points += BEST_GOALKEEPER_POINTS;
+      bestGoalkeeper.points += points.best_goalkeeper;
     }
 
     // 4. Salvar tudo (Upsert)

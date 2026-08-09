@@ -12,7 +12,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { updateScoringRules } from "@/lib/actions/scoring";
-import { BEST_GOALKEEPER_POINTS, SCORING_RULE_FIELDS, type ScoringPoints } from "@/lib/scoring";
+import { SCORING_RULE_FIELDS, type ScoringPoints } from "@/lib/scoring";
 import type { EventType } from "@/lib/types";
 
 const ICONS = {
@@ -21,6 +21,7 @@ const ICONS = {
   win: Trophy,
   draw: Handshake,
   loss: ShieldX,
+  best_goalkeeper: Medal,
 } satisfies Record<EventType, typeof CircleDot>;
 
 type Props = {
@@ -127,18 +128,6 @@ export function ScoringRulesForm({ initialRules, initialError }: Props) {
             </div>
           );
         })}
-        <div className="flex items-center gap-3 border-t border-border p-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10">
-            <Medal className="h-5 w-5 text-accent" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <span className="block text-sm font-bold text-foreground">Melhor goleiro</span>
-            <span className="mt-0.5 block text-[11px] leading-snug text-muted">Prêmio escolhido pelo ADM ao final da rodada.</span>
-          </div>
-          <div className="flex h-11 min-w-16 items-center justify-center rounded-xl border border-accent/20 bg-accent/10 px-3 text-lg font-black text-accent">
-            +{BEST_GOALKEEPER_POINTS}
-          </div>
-        </div>
       </div>
 
       <button

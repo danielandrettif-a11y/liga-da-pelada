@@ -8,9 +8,8 @@ export const DEFAULT_SCORING_POINTS: ScoringPoints = {
   win: 2,
   draw: 1,
   loss: 0,
+  best_goalkeeper: 6,
 };
-
-export const BEST_GOALKEEPER_POINTS = 6;
 
 export const SCORING_RULE_FIELDS: Array<{
   eventType: EventType;
@@ -41,5 +40,10 @@ export const SCORING_RULE_FIELDS: Array<{
     eventType: "loss",
     label: "Derrota",
     description: "Pontos por derrota; pode ser um valor negativo.",
+  },
+  {
+    eventType: "best_goalkeeper",
+    label: "Melhor goleiro",
+    description: "Prêmio escolhido pelo ADM ao final da rodada.",
   },
 ];
