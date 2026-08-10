@@ -22,10 +22,6 @@ const ROWS: Array<{ profile: PlayerProfile; top: string; shortLabel: string }> =
   { profile: "defensive", top: "79%", shortLabel: "DEF" },
 ];
 
-function displayName(player: Player) {
-  return player.nickname || player.name;
-}
-
 export function TeamMiniPitch({ team, index }: TeamMiniPitchProps) {
   const groupedPlayers = new Map<PlayerProfile, Player[]>([
     ["offensive", []],
@@ -95,7 +91,7 @@ export function TeamMiniPitch({ team, index }: TeamMiniPitchProps) {
               style={{ top: row.top }}
             >
               {players.map((player) => {
-                const name = displayName(player);
+                const name = player.name;
                 return (
                   <div key={player.id} className="flex min-w-0 flex-1 flex-col items-center" title={name}>
                     <div
