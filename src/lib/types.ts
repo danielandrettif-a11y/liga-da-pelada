@@ -25,6 +25,7 @@ export type Player = {
   id: string;
   name: string;
   nickname: string | null;
+  profile_bio: string | null;
   avatar_url: string | null;
   player_profile: PlayerProfile | null;
   is_goalkeeper: boolean;
@@ -357,6 +358,7 @@ export type LeagueWithCount = League & {
 export type CreatePlayerInput = {
   name: string;
   nickname?: string;
+  profile_bio?: string;
   avatar_url?: string;
   player_profile?: PlayerProfile;
   is_goalkeeper?: boolean;

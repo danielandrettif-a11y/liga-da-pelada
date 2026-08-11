@@ -299,6 +299,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
 
   const name = String(formData.get("name") || "").trim();
   const nickname = String(formData.get("nickname") || "").trim();
+  const profileBio = String(formData.get("profile_bio") || "").trim();
   const playerProfile = String(formData.get("player_profile") || "midfield") as PlayerProfile;
   const requestedGoalkeeper = formData.get("is_goalkeeper") === "true";
   const requestedCategory = String(formData.get("member_category") || "player") as MemberCategory;
@@ -317,6 +318,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   if (!name) return { success: false, error: "O nome é obrigatório." };
   if (name.length > 120) return { success: false, error: "O nome deve ter no máximo 120 caracteres." };
   if (nickname.length > 60) return { success: false, error: "O apelido deve ter no máximo 60 caracteres." };
+  if (profileBio.length > 500) return { success: false, error: "O texto do perfil deve ter no máximo 500 caracteres." };
 
   if (hasNewAvatar) {
     if (!AVATAR_EXTENSIONS[avatar.type]) {
@@ -378,6 +380,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     id,
     name,
     nickname: nickname || null,
+    ...(account.isAdmin ? { profile_bio: profileBio || null } : {}),
     avatar_url: nextAvatarUrl,
     player_profile: memberCategory === "wag" || memberCategory === "supporter" ? null : playerProfile,
     is_goalkeeper: memberCategory === "wag" || memberCategory === "supporter" ? false : requestedGoalkeeper,
@@ -389,6 +392,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     ? client.from("players").update({
         name: playerData.name,
         nickname: playerData.nickname,
+        ...(account.isAdmin ? { profile_bio: playerData.profile_bio } : {}),
         avatar_url: playerData.avatar_url,
         player_profile: playerData.player_profile,
         is_goalkeeper: playerData.is_goalkeeper,

@@ -234,6 +234,24 @@ export function PlayerForm({ player, mode = "admin" }: { player?: Player; mode?:
 
       {mode === "admin" && (
         <div className="space-y-1.5">
+          <label htmlFor="profile_bio" className="text-xs font-bold uppercase tracking-wider text-muted">
+            Texto do perfil <span className="text-[10px] font-normal normal-case text-muted/50">(Opcional)</span>
+          </label>
+          <textarea
+            id="profile_bio"
+            name="profile_bio"
+            defaultValue={player?.profile_bio || ""}
+            placeholder="Conte um pouco sobre esta pessoa e sua relação com a pelada."
+            maxLength={500}
+            rows={4}
+            className="w-full resize-none rounded-xl border border-border bg-surface-hover px-4 py-3 text-sm leading-5 text-foreground outline-none transition-colors focus:border-accent"
+          />
+          <p className="text-[10px] text-muted">Aparece publicamente no perfil. Somente administradores podem editar.</p>
+        </div>
+      )}
+
+      {mode === "admin" && (
+        <div className="space-y-1.5">
           <label htmlFor="member_category" className="text-xs font-bold uppercase tracking-wider text-muted">Categoria no elenco</label>
           <select id="member_category" name="member_category" value={memberCategory} onChange={(event) => setMemberCategory(event.target.value as MemberCategory)} className="w-full rounded-xl border border-border bg-surface-hover px-4 py-3 text-sm text-foreground outline-none focus:border-accent">
             <option value="player">Jogador oficial</option>
