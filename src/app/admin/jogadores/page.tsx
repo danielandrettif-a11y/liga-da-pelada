@@ -1,13 +1,26 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getPlayers } from "@/lib/actions/players";
-import { Plus, ChevronRight, UserPlus, ArrowLeft } from "@/components/icons";
+import { ChevronRight, UserPlus, ArrowLeft, Shield } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerProfileBadge } from "@/components/PlayerProfileBadge";
+import { getCurrentAccount } from "@/lib/auth";
 
 export const revalidate = 0;
 
 export default async function AdminJogadoresPage() {
-  const players = await getPlayers();
+  const account = await getCurrentAccount();
+  if (!account.isAdmin) redirect("/");
+
+  const [players, { data: adminProfiles }] = await Promise.all([
+    getPlayers(),
+    account.client
+      .from("account_profiles")
+      .select("player_id")
+      .eq("role", "admin")
+      .not("player_id", "is", null),
+  ]);
+  const adminPlayerIds = new Set((adminProfiles || []).map((profile) => profile.player_id));
 
   return (
     <div className="space-y-6">
@@ -51,8 +64,13 @@ export default async function AdminJogadoresPage() {
                   className="w-10 h-10 rounded-full bg-surface-hover border border-border text-xs font-bold text-muted flex-shrink-0"
                 />
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <p className="text-sm font-bold text-foreground">{player.name}</p>
+                    {adminPlayerIds.has(player.id) && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-warning/35 bg-warning/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-wide text-warning">
+                        <Shield className="h-3 w-3" /> ADM
+                      </span>
+                    )}
                     {player.player_profile && <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />}
                     <span className="rounded-full border border-border px-2 py-0.5 text-[8px] font-black uppercase text-muted">
                       {player.member_category === "player" ? "Jogador" : player.member_category === "guest" ? (player.is_selectable ? "Convidado" : "Convidado arquivado") : player.member_category === "wag" ? "WAG" : "Torcedor"}
