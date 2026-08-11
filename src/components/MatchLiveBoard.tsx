@@ -21,6 +21,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { MatchSubstitutionManager } from "./MatchSubstitutionManager";
+import { TeamMiniPitch } from "./TeamMiniPitch";
 import { getOfficialElapsedSeconds } from "@/lib/match-rules";
 
 type MatchLiveBoardProps = {
@@ -296,30 +297,21 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
         <h2 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">
           {isFinished ? "Escalacao no apito final" : "Jogadores em campo"}
         </h2>
-        <div className="grid grid-cols-2 gap-3">
-          {[match.team_a, match.team_b].map((team: any) => {
+        <div className="grid grid-cols-2 gap-2">
+          {[match.team_a, match.team_b].map((team: any, index: number) => {
             const lineup = playersShownForTeam(team.id);
             return (
-              <div key={team.id} className="glass-card overflow-hidden">
-                <div className="flex items-center gap-2 border-b border-border bg-surface px-3 py-2.5">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: team.color }} />
-                  <span className="truncate text-xs font-black text-foreground">{team.name}</span>
-                  <span className="ml-auto text-[9px] font-black text-muted">{lineup.length}</span>
-                </div>
-                <div className="space-y-2 p-3">
-                  {lineup.map((entry: any) => (
-                    <div key={entry.player_id} className="min-w-0">
-                      <p className="truncate text-xs font-bold text-foreground">{entry.player?.name || "Jogador"}</p>
-                      {entry.original_team_id !== entry.team_id && (
-                        <p className="truncate text-[9px] font-bold uppercase tracking-wide text-warning">
-                          Emprestado do {entry.original_team?.name}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                  {lineup.length === 0 && <p className="text-[10px] italic text-muted">Sem jogadores</p>}
-                </div>
-              </div>
+              <TeamMiniPitch
+                key={team.id}
+                index={index}
+                team={{
+                  ...team,
+                  team_players: lineup.map((entry: any) => ({
+                    player_id: entry.player_id,
+                    players: entry.player,
+                  })),
+                }}
+              />
             );
           })}
         </div>

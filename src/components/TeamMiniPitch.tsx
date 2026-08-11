@@ -22,13 +22,14 @@ const POSITIONS: Record<number, Array<[number, number]>> = {
   3: [[50, 23], [26, 70], [74, 70]],
   4: [[26, 28], [74, 28], [26, 72], [74, 72]],
   5: [[50, 17], [26, 48], [74, 48], [26, 79], [74, 79]],
+  6: [[26, 18], [74, 18], [26, 50], [74, 50], [26, 82], [74, 82]],
 };
 
 export function TeamMiniPitch({ team, index }: TeamMiniPitchProps) {
   const players = team.team_players
     .map((entry) => entry.players)
     .filter((player): player is Player => Boolean(player))
-    .slice(0, 5);
+    .slice(0, 6);
   const positions = POSITIONS[Math.max(1, players.length)];
 
   return (
