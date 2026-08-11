@@ -197,6 +197,77 @@ main {
   line-height: 1;
 }
 
+/* Moldura inspirada em cards de transmissao e Ultimate Team. */
+.player-stat-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(145deg, rgba(13, 35, 23, 0.97), rgba(5, 18, 11, 0.96)) padding-box,
+    linear-gradient(135deg, rgba(204, 255, 0, 0.82), rgba(42, 105, 70, 0.7) 28%, rgba(255, 255, 255, 0.08) 62%, rgba(204, 255, 0, 0.42)) border-box;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    inset 0 0 32px rgba(204, 255, 0, 0.025),
+    0 10px 28px rgba(0, 0, 0, 0.2);
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.player-stat-card::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: -28px;
+  right: -30px;
+  width: 92px;
+  height: 92px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(204, 255, 0, 0.14), transparent 68%);
+  pointer-events: none;
+}
+
+.player-stat-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 18px;
+  width: 42px;
+  height: 2px;
+  border-radius: 0 0 999px 999px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  box-shadow: 0 0 12px rgba(204, 255, 0, 0.72);
+  pointer-events: none;
+}
+
+.player-stat-card:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 14px 34px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(204, 255, 0, 0.08),
+    0 0 22px rgba(204, 255, 0, 0.08);
+}
+
+.player-card-number {
+  font-family: var(--font-athletic);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.32);
+}
+
+.player-card-points {
+  font-family: var(--font-athletic);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 0.9;
+  color: var(--accent);
+  text-shadow: 0 0 16px rgba(204, 255, 0, 0.28);
+}
+
 /* ============================================
    Rank Badge
    ============================================ */

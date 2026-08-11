@@ -4,6 +4,8 @@ import { ArrowLeft, UserRound } from "@/components/icons";
 import { PlayerForm } from "@/components/PlayerForm";
 import { getCurrentAccount } from "@/lib/auth";
 import { getPlayer } from "@/lib/actions/players";
+import { FitnessPanel } from "@/components/FitnessPanel";
+import { getMyFitnessRounds, getPlayerFitnessSummaries } from "@/lib/actions/fitness";
 
 export const revalidate = 0;
 
@@ -31,6 +33,10 @@ export default async function MeuPerfilPage() {
 
   const player = await getPlayer(account.profile.player_id);
   if (!player) redirect("/");
+  const [fitnessRounds, fitnessSummaries] = await Promise.all([
+    getMyFitnessRounds(player.id),
+    getPlayerFitnessSummaries(player.id),
+  ]);
 
   return (
     <div className="space-y-5">
@@ -44,6 +50,7 @@ export default async function MeuPerfilPage() {
         </div>
       </div>
       <PlayerForm player={player} mode="self" />
+      <FitnessPanel rounds={fitnessRounds} visible={player.show_fitness_stats} summaries={fitnessSummaries} />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { supabase } from "../supabase";
 import { getActiveSeason } from "./seasons";
 import { createClient as createServerClient } from "../supabase/server";
 import { getAdminClient } from "../auth";
+import type { RoundType } from "../types";
 
 export async function getActiveLeague() {
   const { data, error } = await supabase
@@ -42,7 +43,8 @@ export async function getRounds() {
       matches (count)
     `)
     .eq("season_id", season.id)
-    .order("number", { ascending: false });
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Erro ao buscar rodadas:", error);
@@ -126,7 +128,11 @@ export async function setRoundPlayerAvailability(
   }
 }
 
-export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
+export async function createRoundWithTeams(
+  date: string,
+  teams: TeamInput[],
+  options: { roundType?: RoundType; callupId?: string | null } = {},
+) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem criar rodadas." };
@@ -146,9 +152,46 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
       return { success: false, error: "Use um nome diferente para cada time." };
     }
 
+    const roundType: RoundType = options.roundType === "friendly" ? "friendly" : "official";
+    const rawPlayerIds = normalizedTeams.flatMap((team) => team.playerIds);
+    const allPlayerIds = Array.from(new Set(rawPlayerIds));
+    if (rawPlayerIds.length !== allPlayerIds.length) {
+      return { success: false, error: "Um jogador nao pode aparecer em mais de um time." };
+    }
     const league = await getActiveLeague();
     const season = await getActiveSeason(league.id);
     if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
+
+    if (allPlayerIds.length > 0) {
+      const { data: eligiblePlayers, error: eligibleError } = await client
+        .from("players")
+        .select("id")
+        .in("id", allPlayerIds)
+        .eq("is_selectable", true)
+        .in("member_category", ["player", "guest"]);
+      if (eligibleError || (eligiblePlayers?.length || 0) !== allPlayerIds.length) {
+        return { success: false, error: "A lista contem uma pessoa que nao pode participar de partidas." };
+      }
+    }
+
+    if (options.callupId) {
+      const { data: callup, error: callupReadError } = await client
+        .from("callups")
+        .select("date, round_type, status, callup_entries(player_id, status)")
+        .eq("id", options.callupId)
+        .eq("league_id", league.id)
+        .single();
+      if (callupReadError || !callup || callup.status !== "locked") {
+        return { success: false, error: "A convocacao precisa estar bloqueada antes de montar a rodada." };
+      }
+      const confirmedIds = (callup.callup_entries || [])
+        .filter((entry) => entry.status === "confirmed")
+        .map((entry) => entry.player_id)
+        .sort();
+      if (callup.date !== date || callup.round_type !== roundType || confirmedIds.length !== 15 || confirmedIds.join(",") !== [...allPlayerIds].sort().join(",")) {
+        return { success: false, error: "Use a data, o tipo e os 15 confirmados da convocacao bloqueada." };
+      }
+    }
 
     // 1. Descobrir o número da nova rodada (maior number + 1)
     const { data: lastRound } = await client
@@ -156,6 +199,7 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
       .select("number")
       .eq("league_id", league.id)
       .eq("season_id", season.id)
+      .eq("round_type", roundType)
       .order("number", { ascending: false })
       .limit(1)
       .single();
@@ -171,6 +215,7 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
         number: nextNumber,
         date,
         status: "draft",
+        round_type: roundType,
       })
       .select()
       .single();
@@ -178,8 +223,6 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
     if (roundError) throw new Error(`Erro ao criar rodada: ${roundError.message}`);
 
     // 3. Obter todos os jogadores únicos selecionados
-    const allPlayerIds = Array.from(new Set(normalizedTeams.flatMap(t => t.playerIds)));
-
     // 4. Inserir round_players
     if (allPlayerIds.length > 0) {
       const { error: rpError } = await client
@@ -220,7 +263,19 @@ export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
       }
     }
 
+    if (options.callupId) {
+      const { error: callupError } = await client
+        .from("callups")
+        .update({ status: "converted", round_id: round.id, updated_at: new Date().toISOString() })
+        .eq("id", options.callupId)
+        .eq("league_id", league.id)
+        .in("status", ["open", "locked"]);
+      if (callupError) throw new Error(`Erro ao vincular convocacao: ${callupError.message}`);
+    }
+
     revalidatePath("/rodadas");
+    revalidatePath("/convocacao");
+    revalidatePath("/");
     return { success: true, roundId: round.id };
 
   } catch (err: any) {
@@ -238,6 +293,7 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     if (!Number.isFinite(total) || total <= 0) {
       return { success: false, error: "Informe um valor total valido para a pelada." };
     }
+
     if (total > 99999999.99) return { success: false, error: "O valor informado e muito alto." };
 
     const client = await getAdminClient();
@@ -260,6 +316,8 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
 
     revalidatePath(`/rodadas/${roundId}`);
     revalidatePath("/rodadas");
+    revalidatePath("/convocacao");
+    revalidatePath("/");
     revalidatePath("/ranking");
     revalidatePath("/pagamentos");
     return { success: true };

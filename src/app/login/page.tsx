@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { login } from "./actions";
 import { Lock, Mail, Trophy, Loader2 } from "@/components/icons";
 import Link from "next/link";
 import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 
-export default function LoginPage() {
+function LoginContent() {
+  const searchParams = useSearchParams();
+  const requestedNext = searchParams.get("next") || "";
+  const returnTo = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "";
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -36,6 +40,7 @@ export default function LoginPage() {
         {/* Login Card */}
         <div className="glass-card p-6">
           <form action={handleSubmit} className="space-y-4">
+            <input type="hidden" name="next" value={returnTo} />
             
             {error && (
               <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2">
@@ -94,12 +99,12 @@ export default function LoginPage() {
             <div className="h-px flex-1 bg-border" />
           </div>
 
-          <GoogleAuthButton />
+          <GoogleAuthButton returnTo={returnTo} />
           <p className="mt-2 text-center text-[10px] leading-4 text-muted">
             No primeiro acesso, criaremos automaticamente uma conta de jogador.
           </p>
 
-          <Link href="/cadastro" className="mt-4 block w-full rounded-xl border border-accent/40 py-3.5 text-center text-sm font-bold text-accent hover:bg-accent/10">
+          <Link href={`/cadastro${returnTo ? `?next=${encodeURIComponent(returnTo)}` : ""}`} className="mt-4 block w-full rounded-xl border border-accent/40 py-3.5 text-center text-sm font-bold text-accent hover:bg-accent/10">
             Criar minha conta
           </Link>
         </div>
@@ -111,4 +116,8 @@ export default function LoginPage() {
       </div>
     </div>
   );
+}
+
+export default function LoginPage() {
+  return <Suspense fallback={<div className="min-h-[80vh]" />}><LoginContent /></Suspense>;
 }

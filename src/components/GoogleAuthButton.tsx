@@ -6,6 +6,7 @@ import { signInWithGoogle } from "@/app/login/actions";
 
 type GoogleAuthButtonProps = {
   label?: string;
+  returnTo?: string;
 };
 
 function GoogleLogo() {
@@ -19,7 +20,7 @@ function GoogleLogo() {
   );
 }
 
-export function GoogleAuthButton({ label = "Continuar com Google" }: GoogleAuthButtonProps) {
+export function GoogleAuthButton({ label = "Continuar com Google", returnTo }: GoogleAuthButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -27,7 +28,7 @@ export function GoogleAuthButton({ label = "Continuar com Google" }: GoogleAuthB
     setLoading(true);
     setError("");
 
-    const result = await signInWithGoogle();
+    const result = await signInWithGoogle(returnTo);
     if (result?.error) {
       setError(result.error);
       setLoading(false);

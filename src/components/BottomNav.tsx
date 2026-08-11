@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ClipboardList, Trophy, Users, MoreHorizontal, ArrowLeftRight } from "@/components/icons";
+import { Home, ClipboardList, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag } from "@/components/icons";
 
 const NAV_ITEMS = [
   { href: "/", label: "Início", icon: Home },
@@ -13,11 +13,14 @@ const NAV_ITEMS = [
   { href: "/mais", label: "Mais", icon: MoreHorizontal },
 ] as const;
 
-export function BottomNav({ isAuthenticated }: { isAuthenticated: boolean }) {
+export function BottomNav({ isAuthenticated, hasOpenCallup }: { isAuthenticated: boolean; hasOpenCallup: boolean }) {
   const pathname = usePathname();
+  const baseItems = hasOpenCallup
+    ? [NAV_ITEMS[0], { href: "/convocacao", label: "Convocação", icon: Flag }, ...NAV_ITEMS.slice(1)]
+    : [...NAV_ITEMS];
   const visibleItems = isAuthenticated
-    ? NAV_ITEMS
-    : NAV_ITEMS.filter((item) => item.href !== "/pagamentos" && item.href !== "/mais");
+    ? baseItems
+    : baseItems.filter((item) => item.href !== "/pagamentos" && item.href !== "/mais");
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
@@ -59,7 +62,7 @@ export function BottomNav({ isAuthenticated }: { isAuthenticated: boolean }) {
               />
               <span
                 className={`block w-full truncate whitespace-nowrap text-center font-semibold leading-none tracking-tight ${
-                  item.label === "Transfermarket"
+                  item.label === "Transfermarket" || item.label === "Convocação"
                     ? "text-[7px] min-[360px]:text-[8px] min-[430px]:text-[9px]"
                     : "text-[9px] min-[390px]:text-[10px]"
                 } ${

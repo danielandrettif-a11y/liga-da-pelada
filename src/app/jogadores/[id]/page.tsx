@@ -1,181 +1,69 @@
 import { getPlayer, getPlayerAwardSeasons, getPlayerRoundHistory, getPlayersWithStats } from "@/lib/actions/players";
+import { getPlayerFitnessSummaries } from "@/lib/actions/fitness";
 import { calculateWinRate, formatDateShort } from "@/lib/utils";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerProfileBadge } from "@/components/PlayerProfileBadge";
 import { PlayerAwards } from "@/components/PlayerAwards";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ChevronRight, Football, Target, Trophy } from "@/components/icons";
+import { ArrowLeft, ChevronRight, Football, Target, TrendingUp, Trophy } from "@/components/icons";
 
 export const revalidate = 0;
 
-export default async function JogadorPerfilPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+type HistoryRow = Awaited<ReturnType<typeof getPlayerRoundHistory>>[number];
+
+function History({ rows, friendly = false }: { rows: HistoryRow[]; friendly?: boolean }) {
+  if (rows.length === 0) return <div className="glass-card p-6 text-center text-sm text-muted">Nenhuma participação registrada.</div>;
+  return (
+    <div className="glass-card overflow-hidden">
+      {rows.map((row, index) => (
+        <Link key={row.id} href={`/rodadas/${row.round_id}`} className={`flex items-center gap-4 px-4 py-4 hover:bg-surface-hover ${index < rows.length - 1 ? "border-b border-border" : ""}`}>
+          <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-surface"><span className="text-[9px] font-black text-muted">{friendly ? "AM" : "R"}{String(row.rounds?.number).padStart(2, "0")}</span></div>
+          <div className="min-w-0 flex-1"><p className="mb-1 text-xs text-muted">{row.rounds ? formatDateShort(row.rounds.date) : ""}</p><div className="flex items-center gap-3"><span className="flex items-center gap-1 text-sm font-bold text-foreground"><Football className="h-3 w-3 text-muted" />{row.goals}</span><span className="flex items-center gap-1 text-sm font-bold text-foreground"><Target className="h-3 w-3 text-muted" />{row.assists}</span><span className={`text-sm font-bold ${row.wins > 0 ? "text-success" : row.draws > 0 ? "text-warning" : "text-danger"}`}>{row.wins > 0 ? "V" : row.draws > 0 ? "E" : "D"}</span></div></div>
+          {!friendly && <div className="text-right"><span className="stat-number text-lg text-accent">+{row.points}</span><p className="text-[9px] text-muted">PTS</p></div>}
+          <ChevronRight className="h-4 w-4 text-muted" />
+        </Link>
+      ))}
+    </div>
+  );
+}
+export default async function JogadorPerfilPage({ params }: PageProps<"/jogadores/[id]">) {
   const { id } = await params;
-
-  // Busca dados em paralelo
-  const [player, history, allStats, awardSeasons] = await Promise.all([
+  const [player, officialHistory, friendlyHistory, officialAll, friendlyAll, awardSeasons, fitness] = await Promise.all([
     getPlayer(id),
-    getPlayerRoundHistory(id),
-    getPlayersWithStats(),
+    getPlayerRoundHistory(id, "official"),
+    getPlayerRoundHistory(id, "friendly"),
+    getPlayersWithStats("official"),
+    getPlayersWithStats("friendly"),
     getPlayerAwardSeasons(id),
+    getPlayerFitnessSummaries(id),
   ]);
-
-  if (!player) {
-    notFound();
-  }
-
-  // Encontra as estatísticas agregadas desse jogador
-  const stats = allStats.find((p) => p.id === id) || {
-    games: 0,
-    goals: 0,
-    assists: 0,
-    wins: 0,
-    draws: 0,
-    losses: 0,
-    points: 0,
-  };
-
-  const winRate = calculateWinRate(stats.wins, stats.draws, stats.games);
+  if (!player) notFound();
+  const isAthlete = player.member_category === "player" || player.member_category === "guest";
+  const official = officialAll.find((item) => item.id === id) || { rounds: 0, games: 0, goals: 0, assists: 0, wins: 0, draws: 0, losses: 0, points: 0 };
+  const friendly = friendlyAll.find((item) => item.id === id) || { rounds: 0, games: 0, goals: 0, assists: 0, wins: 0, draws: 0, losses: 0, points: 0 };
+  const categoryLabel = player.member_category === "player" ? "Jogador oficial" : player.member_category === "guest" ? "Convidado" : player.member_category === "wag" ? "WAG" : "Torcida";
 
   return (
     <div className="space-y-6">
-      {/* Top bar */}
-      <div className="flex items-center gap-3">
-        <Link
-          href="/jogadores"
-          className="w-10 h-10 rounded-full bg-surface hover:bg-surface-hover flex items-center justify-center transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 text-muted" />
-        </Link>
-        <h1 className="text-sm font-bold text-foreground uppercase tracking-wider">
-          Perfil
-        </h1>
+      <div className="flex items-center gap-3"><Link href="/jogadores" className="flex h-10 w-10 items-center justify-center rounded-full bg-surface"><ArrowLeft className="h-5 w-5 text-muted" /></Link><h1 className="text-sm font-bold uppercase tracking-wider text-foreground">Perfil</h1></div>
+      <div className="glass-card flex flex-col items-center p-6 text-center">
+        <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="mb-4 h-24 w-24 rounded-full bg-surface text-2xl font-bold text-muted ring-2 ring-border" />
+        <h2 className="text-2xl font-bold text-foreground">{player.name}</h2>
+        {player.nickname && <p className="mt-1 text-sm font-semibold italic text-muted">“{player.nickname}”</p>}
+        <div className="mt-2 flex items-center gap-2"><span className="rounded-full border border-border px-2.5 py-1 text-[9px] font-black uppercase text-muted">{categoryLabel}</span>{isAthlete && <PlayerProfileBadge profile={player.player_profile} />}</div>
+        {isAthlete && <div className="mt-6 inline-flex items-center gap-4 rounded-2xl border border-border bg-surface/50 px-6 py-3"><div><p className="text-[9px] font-bold uppercase text-muted">Pontos</p><p className="stat-number text-2xl text-accent">{official.points}</p></div><div className="h-8 w-px bg-border" /><div><p className="text-[9px] font-bold uppercase text-muted">Aprov.</p><p className="stat-number text-xl text-foreground">{calculateWinRate(official.wins, official.draws, official.games)}%</p></div></div>}
       </div>
 
-      {/* Hero Card */}
-      <div className="glass-card p-6 animate-fade-in flex flex-col items-center text-center">
-        <PlayerAvatar
-          name={player.name}
-          avatarUrl={player.avatar_url}
-          className="w-24 h-24 rounded-full bg-surface text-2xl font-bold text-muted mb-4 ring-2 ring-border shadow-lg"
-        />
-        <h2 className="text-2xl font-bold text-foreground mb-1">
-          {player.name}
-        </h2>
-        {player.nickname && <p className="text-sm font-semibold italic text-muted">“{player.nickname}”</p>}
-        <div className="mt-2"><PlayerProfileBadge profile={player.player_profile} /></div>
+      {!isAthlete ? <div className="glass-card p-6 text-center"><p className="text-sm font-black text-foreground">Parte da comunidade da Pelada</p><p className="mt-1 text-xs text-muted">Este perfil não participa de convocações, sorteios ou estatísticas esportivas.</p></div> : <>
+        {([['Ranked', official], ['Amistosos', friendly]] as const).map(([label, stats]) => <section key={label}><h3 className="mb-3 px-1 text-xs font-black uppercase tracking-wider text-muted">{label}</h3><div className="grid grid-cols-4 gap-2">{([['Peladas', stats.rounds || 0], ['Jogos', stats.games], ['Gols', stats.goals], ['Assists', stats.assists], ['Vitórias', stats.wins], ['Empates', stats.draws], ['Derrotas', stats.losses], ['Aprov.', `${calculateWinRate(stats.wins, stats.draws, stats.games)}%`]] as const).map(([key, value]) => <div key={key} className="glass-card p-3 text-center"><p className="text-lg font-black text-foreground">{value}</p><p className="text-[8px] font-bold uppercase text-muted">{key}</p></div>)}</div></section>)}
 
-        <div className="mt-6 py-3 px-6 rounded-2xl bg-surface/50 border border-border inline-flex items-center gap-4">
-          <div className="flex flex-col items-center">
-            <span className="text-[10px] text-muted font-bold uppercase tracking-wider mb-1">Pontos</span>
-            <span className="stat-number text-2xl gradient-text">{stats.points}</span>
-          </div>
-          <div className="w-px h-8 bg-border" />
-          <div className="flex flex-col items-center">
-            <span className="text-[10px] text-muted font-bold uppercase tracking-wider mb-1">Aprov.</span>
-            <span className="stat-number text-xl text-foreground">{winRate}%</span>
-          </div>
-        </div>
-      </div>
+        {fitness && <section><div className="mb-3 flex items-center gap-2 px-1"><TrendingUp className="h-4 w-4 text-accent" /><h3 className="text-xs font-black uppercase tracking-wider text-muted">Dados físicos autorizados</h3></div><div className="grid grid-cols-2 gap-3">{([['Ranked', fitness.official], ['Amistosos', fitness.friendly]] as const).map(([label, summary]) => <div key={label} className="glass-card p-4"><p className="text-[9px] font-black uppercase text-muted">{label}</p><p className="mt-1 text-xl font-black text-foreground">{summary.distanceKm} km</p><p className="text-[10px] text-muted">média {summary.averageSpeedKmh} km/h</p></div>)}</div></section>}
 
-      {/* Stats Grid */}
-      <section className="animate-fade-in-up stagger-1">
-        <h3 className="text-xs font-bold text-muted uppercase tracking-wider mb-3 px-1">
-          Estatísticas
-        </h3>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="glass-card p-4">
-            <p className="text-xs text-muted mb-1">Peladas</p>
-            <p className="stat-number text-2xl text-foreground">{stats.rounds || 0}</p>
-          </div>
-          <div className="glass-card p-4">
-            <p className="text-xs text-muted mb-1">Jogos</p>
-            <p className="stat-number text-2xl text-foreground">{stats.games}</p>
-          </div>
-          <div className="glass-card p-4">
-            <p className="text-xs text-muted mb-1">Vitórias</p>
-            <p className="stat-number text-2xl text-success">{stats.wins}</p>
-          </div>
-          <div className="glass-card p-4">
-            <p className="text-xs text-muted mb-1">Gols</p>
-            <p className="stat-number text-2xl text-foreground">{stats.goals}</p>
-          </div>
-          <div className="glass-card p-4">
-            <p className="text-xs text-muted mb-1">Assistências</p>
-            <p className="stat-number text-2xl text-foreground">{stats.assists}</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="animate-fade-in-up stagger-2">
-        <div className="mb-3 px-1">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-muted">Insígnias por temporada</h3>
-          <p className="mt-1 text-[10px] text-muted/70">Toque em uma insígnia para ver a rodada e a data.</p>
-        </div>
-        <PlayerAwards seasons={awardSeasons} />
-      </section>
-
-      {/* History */}
-      <section className="animate-fade-in-up stagger-2">
-        <h3 className="text-xs font-bold text-muted uppercase tracking-wider mb-3 px-1">
-          Histórico de Rodadas
-        </h3>
-        {history.length === 0 ? (
-          <div className="glass-card p-6 text-center">
-            <p className="text-sm text-muted">Ainda não participou de nenhuma rodada.</p>
-          </div>
-        ) : (
-          <div className="glass-card overflow-hidden">
-            {history.map((h, idx) => (
-              <Link key={h.id} href={`/rodadas/${h.round_id}`}>
-                <div
-                  className={`
-                    flex items-center gap-4 px-4 py-4 hover:bg-surface-hover transition-colors
-                    ${idx < history.length - 1 ? "border-b border-border" : ""}
-                  `}
-                >
-                  <div className="w-12 h-12 rounded-xl bg-surface flex flex-col items-center justify-center flex-shrink-0">
-                    <span className="text-[10px] text-muted font-bold">R{String(h.rounds?.number).padStart(2, "0")}</span>
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted mb-1">
-                      {h.rounds ? formatDateShort(h.rounds.date) : ""}
-                    </p>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5">
-                        <Football className="h-3 w-3 text-muted" />
-                        <span className="text-sm font-bold text-foreground">{h.goals}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Target className="h-3 w-3 text-muted" />
-                        <span className="text-sm font-bold text-foreground">{h.assists}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Trophy className="h-3 w-3 text-muted" />
-                        <span className={`text-sm font-bold ${h.wins > 0 ? "text-success" : h.draws > 0 ? "text-warning" : "text-danger"}`}>
-                          {h.wins > 0 ? "V" : h.draws > 0 ? "E" : "D"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-end">
-                    <span className="stat-number text-lg text-accent">+{h.points}</span>
-                    <span className="text-[10px] text-muted font-semibold">PTS</span>
-                  </div>
-
-                  <ChevronRight className="w-4 h-4 text-muted ml-2" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
+        <section><div className="mb-3 px-1"><h3 className="text-xs font-bold uppercase tracking-wider text-muted">Prêmios oficiais</h3><p className="mt-1 text-[10px] text-muted/70">Rodadas e títulos da temporada Ranked.</p></div><PlayerAwards seasons={awardSeasons} /></section>
+        <section><h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">Histórico Ranked</h3><History rows={officialHistory} /></section>
+        <section><h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">Histórico de Amistosos</h3><History rows={friendlyHistory} friendly /></section>
+      </>}
     </div>
   );
 }

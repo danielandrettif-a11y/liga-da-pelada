@@ -243,7 +243,7 @@ export default async function HomePage() {
           <div className="min-w-[150px] snap-center shrink-0">
             <StatHighlightCard
               Icon={Football}
-              label="Artilheiro"
+              label="Líder de gols"
               playerName={highlights?.topScorer?.player?.name}
               value={highlights?.topScorer?.goals}
               unit="gols"
@@ -253,7 +253,7 @@ export default async function HomePage() {
           <div className="min-w-[150px] snap-center shrink-0">
             <StatHighlightCard
               Icon={Target}
-              label="Assistências"
+              label="Líder de assistências"
               playerName={highlights?.topAssists?.player?.name}
               value={highlights?.topAssists?.assists}
               unit="assists"

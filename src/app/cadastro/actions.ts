@@ -10,6 +10,8 @@ export async function signup(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const nickname = String(formData.get("nickname") || "").trim();
   const playerProfile = String(formData.get("player_profile") || "midfield");
+  const requestedNext = String(formData.get("next") || "");
+  const returnTo = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "";
 
   if (!email || !email.includes("@")) return { success: false, error: "Informe um e-mail válido." };
   if (password.length < 8) return { success: false, error: "A senha precisa ter pelo menos 8 caracteres." };
@@ -25,7 +27,7 @@ export async function signup(formData: FormData) {
     email,
     password,
     options: {
-      emailRedirectTo: AUTH_CALLBACK_URL,
+      emailRedirectTo: `${AUTH_CALLBACK_URL}${returnTo ? `?next=${encodeURIComponent(returnTo)}` : ""}`,
       data: {
         name,
         nickname,

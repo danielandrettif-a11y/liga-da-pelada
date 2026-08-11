@@ -44,7 +44,7 @@ export default async function PagamentosPage() {
               ? "Aguardando a próxima pelada"
               : currentRound.status === "finished"
                 ? "Aguardando os dados do pagamento"
-                : `Rodada ${String(currentRound.number).padStart(2, "0")} em andamento`}
+                : `${currentRound.round_type === "friendly" ? "Amistoso" : "Rodada"} ${String(currentRound.number).padStart(2, "0")} em andamento`}
           </h2>
           <p className="mt-2 max-w-xs text-sm leading-6 text-muted">
             Aguardando a rodada terminar para liberar o PIX, o valor por pessoa e a lista de pagamentos.

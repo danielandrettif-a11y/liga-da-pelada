@@ -48,12 +48,13 @@ export default async function RodadaDetalhePage({
           </Link>
           <div>
             <h1 className="text-xl font-bold text-foreground">
-              Rodada {String(round.number).padStart(2, "0")}
+              {round.round_type === "friendly" ? "Amistoso" : "Rodada"} {String(round.number).padStart(2, "0")}
             </h1>
             <p className="text-xs text-muted flex items-center gap-1 mt-0.5">
               <CalendarDays className="w-3 h-3" />
               {formatDateShort(round.date)}
             </p>
+            {round.round_type === "friendly" && <p className="mt-1 text-[9px] font-black uppercase text-warning">Estatísticas fora do Ranked</p>}
           </div>
         </div>
       </div>

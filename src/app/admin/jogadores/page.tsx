@@ -19,7 +19,7 @@ export default async function AdminJogadoresPage() {
         >
           <ArrowLeft className="w-5 h-5 text-muted" />
         </Link>
-        <h1 className="text-xl font-bold text-foreground">Gerenciar Jogadores</h1>
+        <h1 className="text-xl font-bold text-foreground">Gerenciar Elenco</h1>
       </div>
 
       <div className="flex justify-between items-center">
@@ -31,7 +31,7 @@ export default async function AdminJogadoresPage() {
           className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-light text-background font-bold text-sm rounded-xl transition-colors"
         >
           <UserPlus className="w-4 h-4" />
-          Novo Jogador
+          Nova pessoa
         </Link>
       </div>
 
@@ -53,7 +53,10 @@ export default async function AdminJogadoresPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold text-foreground">{player.name}</p>
-                    <PlayerProfileBadge profile={player.player_profile} />
+                    {player.player_profile && <PlayerProfileBadge profile={player.player_profile} />}
+                    <span className="rounded-full border border-border px-2 py-0.5 text-[8px] font-black uppercase text-muted">
+                      {player.member_category === "player" ? "Jogador" : player.member_category === "guest" ? (player.is_selectable ? "Convidado" : "Convidado arquivado") : player.member_category === "wag" ? "WAG" : "Torcedor"}
+                    </span>
                   </div>
                   {player.nickname && (
                     <p className="text-[10px] text-muted">

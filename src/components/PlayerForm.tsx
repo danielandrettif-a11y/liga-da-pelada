@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, Trash2 } from "@/components/icons";
 import { deletePlayer, savePlayer } from "@/lib/actions/players";
-import type { Player } from "@/lib/types";
+import type { MemberCategory, Player } from "@/lib/types";
 import { AvatarCropModal } from "./AvatarCropModal";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PLAYER_PROFILE_OPTIONS } from "@/lib/playerProfiles";
@@ -24,6 +24,7 @@ export function PlayerForm({ player, mode = "admin" }: { player?: Player; mode?:
   const [removeAvatar, setRemoveAvatar] = useState(false);
   const [croppedFile, setCroppedFile] = useState<File | null>(null);
   const [cropSourceUrl, setCropSourceUrl] = useState("");
+  const [memberCategory, setMemberCategory] = useState<MemberCategory>(player?.member_category || "player");
 
   useEffect(() => {
     return () => {
@@ -231,7 +232,27 @@ export function PlayerForm({ player, mode = "admin" }: { player?: Player; mode?:
         <p className="text-[10px] text-muted">Aparece como subnome somente no perfil e na carta do jogador.</p>
       </div>
 
-      <fieldset className="space-y-2">
+      {mode === "admin" && (
+        <div className="space-y-1.5">
+          <label htmlFor="member_category" className="text-xs font-bold uppercase tracking-wider text-muted">Categoria no elenco</label>
+          <select id="member_category" name="member_category" value={memberCategory} onChange={(event) => setMemberCategory(event.target.value as MemberCategory)} className="w-full rounded-xl border border-border bg-surface-hover px-4 py-3 text-sm text-foreground outline-none focus:border-accent">
+            <option value="player">Jogador oficial</option>
+            <option value="guest">Convidado</option>
+            <option value="wag">WAG</option>
+            <option value="supporter">Torcedor</option>
+          </select>
+          <p className="text-[10px] text-muted">WAGs e torcedores aparecem no Elenco, mas nunca entram em convocações, sorteios ou partidas.</p>
+          {memberCategory === "guest" && (
+            <label className="flex items-center justify-between rounded-xl border border-border bg-background/40 px-4 py-3 text-sm font-bold text-foreground">
+              Disponível para convocação
+              <input type="checkbox" name="is_selectable_checkbox" defaultChecked={player?.is_selectable ?? true} onChange={(event) => { const hidden = document.getElementById("is_selectable") as HTMLInputElement; if (hidden) hidden.value = String(event.target.checked); }} className="h-5 w-5 accent-[var(--accent)]" />
+              <input id="is_selectable" type="hidden" name="is_selectable" defaultValue={String(player?.is_selectable ?? true)} />
+            </label>
+          )}
+        </div>
+      )}
+
+      {(memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2">
         <legend className="text-xs font-bold text-muted uppercase tracking-wider">
           Perfil de jogo
         </legend>
@@ -255,7 +276,7 @@ export function PlayerForm({ player, mode = "admin" }: { player?: Player; mode?:
             </label>
           ))}
         </div>
-      </fieldset>
+      </fieldset>}
 
       <div className="pt-4 flex flex-col gap-3">
         <button

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
 import { getCurrentAccount } from "../auth";
-import type { Player, RoundStatus } from "../types";
+import type { Player, RoundStatus, RoundType } from "../types";
 import { getActiveSeason } from "./seasons";
 import { getActiveLeague } from "./rounds";
 
@@ -12,6 +12,7 @@ export type PaymentRound = {
   number: number;
   date: string;
   status: RoundStatus;
+  round_type: RoundType;
   payment_pix: string | null;
   payment_total: number | null;
 };
@@ -28,9 +29,10 @@ export async function getPaymentRounds(): Promise<PaymentRound[]> {
 
   const { data, error } = await supabase
     .from("rounds")
-    .select("id, number, date, status, payment_pix, payment_total")
+    .select("id, number, date, status, round_type, payment_pix, payment_total, created_at")
     .eq("season_id", season.id)
-    .order("number", { ascending: false });
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Erro ao buscar rodadas para pagamento:", error);

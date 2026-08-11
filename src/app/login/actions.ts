@@ -5,9 +5,15 @@ import { AUTH_CALLBACK_URL } from "@/lib/siteUrl";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+function safeReturnPath(value: FormDataEntryValue | string | null | undefined) {
+  const path = String(value || "");
+  return path.startsWith("/") && !path.startsWith("//") ? path : null;
+}
+
 export async function login(formData: FormData) {
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
+  const returnTo = safeReturnPath(formData.get("next"));
   
   const supabase = await createClient();
 
@@ -32,16 +38,16 @@ export async function login(formData: FormData) {
     .maybeSingle();
 
   revalidatePath("/", "layout");
-  redirect(profile?.role === "admin" ? "/" : "/meu-perfil");
+  redirect(returnTo || (profile?.role === "admin" ? "/" : "/meu-perfil"));
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(returnPath?: string) {
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: AUTH_CALLBACK_URL,
+      redirectTo: `${AUTH_CALLBACK_URL}${safeReturnPath(returnPath) ? `?next=${encodeURIComponent(returnPath!)}` : ""}`,
     },
   });
 

@@ -2,7 +2,7 @@
 
 import { supabase } from "../supabase";
 import { getActiveSeason, getActiveSeasonRoundIds } from "./seasons";
-import { getAdminClient } from "../auth";
+import { getAdminClient, getCurrentAccount } from "../auth";
 import { DEFAULT_SCORING_POINTS } from "../scoring";
 import { buildAwardSeasonsByPlayer, countAwards } from "../awards";
 import type { EventType, SeasonStatus } from "../types";
@@ -84,6 +84,7 @@ export async function calculateRoundStats(roundId: string) {
       .single();
 
     if (error || !round) throw new Error("Erro ao buscar rodada para estatísticas");
+    const countsForRanking = round.round_type !== "friendly";
 
     const points = { ...DEFAULT_SCORING_POINTS };
     const { data: configuredRules, error: rulesError } = await client
@@ -136,9 +137,9 @@ export async function calculateRoundStats(roundId: string) {
           const s = statsMap[participant.player_id];
           if (!s) continue;
           s.games += 1;
-          if (result === 'win') { s.wins += 1; s.points += points.win; }
-          if (result === 'draw') { s.draws += 1; s.points += points.draw; }
-          if (result === 'loss') { s.losses += 1; s.points += points.loss; }
+          if (result === 'win') { s.wins += 1; if (countsForRanking) s.points += points.win; }
+          if (result === 'draw') { s.draws += 1; if (countsForRanking) s.points += points.draw; }
+          if (result === 'loss') { s.losses += 1; if (countsForRanking) s.points += points.loss; }
         }
       };
 
@@ -152,14 +153,14 @@ export async function calculateRoundStats(roundId: string) {
           const scorer = statsMap[ev.player_id];
           if (scorer) {
             scorer.goals += 1;
-            scorer.points += points.goal;
+            if (countsForRanking) scorer.points += points.goal;
           }
           // Assistências
           if (ev.assist_player_id) {
             const assister = statsMap[ev.assist_player_id];
             if (assister) {
               assister.assists += 1;
-              assister.points += points.assist;
+              if (countsForRanking) assister.points += points.assist;
             }
           }
         }
@@ -170,7 +171,7 @@ export async function calculateRoundStats(roundId: string) {
       ? statsMap[round.best_goalkeeper_player_id]
       : null;
     if (bestGoalkeeper) {
-      bestGoalkeeper.points += points.best_goalkeeper;
+      if (countsForRanking) bestGoalkeeper.points += points.best_goalkeeper;
     }
 
     // 4. Salvar tudo (Upsert)
@@ -280,6 +281,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     .select("id, number, date, season_id, best_goalkeeper_player_id")
     .in("season_id", visibleSeasons.map((item) => item.id))
     .eq("status", "finished")
+    .eq("round_type", "official")
     .order("date", { ascending: false })
     .order("number", { ascending: false });
 
@@ -334,6 +336,24 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     }),
     stats,
   );
+  const rankingAccount = await getCurrentAccount();
+  const fitnessClient = rankingAccount.user ? rankingAccount.client : supabase;
+  const { data: fitnessRows } = await fitnessClient
+    .from("player_round_fitness")
+    .select("player_id, distance_km, average_speed_kmh")
+    .in("round_id", currentRounds.map((round) => round.id));
+  const fitnessByPlayer = new Map<string, { distanceKm: number; speedTotal: number; entries: number }>();
+  for (const row of fitnessRows || []) {
+    const current = fitnessByPlayer.get(row.player_id) || { distanceKm: 0, speedTotal: 0, entries: 0 };
+    current.distanceKm += Number(row.distance_km);
+    current.speedTotal += Number(row.average_speed_kmh);
+    current.entries += 1;
+    fitnessByPlayer.set(row.player_id, current);
+  }
+  function getFitness(playerId: string) {
+    const value = fitnessByPlayer.get(playerId);
+    return value ? { distanceKm: Math.round(value.distanceKm * 100) / 100, averageSpeedKmh: Math.round((value.speedTotal / value.entries) * 100) / 100, entries: value.entries } : null;
+  }
 
   function getAwardSeasons(playerId: string) {
     return awardSeasonsByPlayer.get(playerId) || [];
@@ -347,6 +367,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       awardSeasons: getAwardSeasons(entry.player.id),
       seasonPosition: index + 1,
       positionChange: previousPosition ? previousPosition - (index + 1) : null,
+      fitness: getFitness(entry.player.id),
     };
   });
   const generalByPlayer = new Map(general.map((entry) => [entry.player.id, entry]));
@@ -357,6 +378,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     awardSeasons: getAwardSeasons(entry.player.id),
     seasonPosition: seasonPositions.get(entry.player.id) || general.length + 1,
     positionChange: generalByPlayer.get(entry.player.id)?.positionChange ?? null,
+    fitness: getFitness(entry.player.id),
   }));
 
   return {
@@ -369,4 +391,50 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       entries: latestEntries,
     },
   };
+}
+
+export type FriendlyStatsEntry = {
+  player: Player;
+  rounds: number;
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goals: number;
+  assists: number;
+  bestGoalkeeper: number;
+};
+
+export async function getFriendlyStats(): Promise<FriendlyStatsEntry[]> {
+  const roundIds = await getActiveSeasonRoundIds(undefined, "friendly");
+  if (roundIds.length === 0) return [];
+  const [{ data: rows, error }, { data: rounds, error: roundsError }] = await Promise.all([
+    supabase.from("player_round_stats").select(`
+      player_id, round_id, games, wins, draws, losses, goals, assists,
+      player:player_id (*)
+    `).in("round_id", roundIds),
+    supabase.from("rounds").select("id, best_goalkeeper_player_id").in("id", roundIds).eq("status", "finished"),
+  ]);
+  if (error || roundsError) {
+    console.error("Erro ao buscar estatisticas de amistosos:", error || roundsError);
+    return [];
+  }
+  const goalkeeperCounts = new Map<string, number>();
+  for (const round of rounds || []) {
+    if (round.best_goalkeeper_player_id) goalkeeperCounts.set(round.best_goalkeeper_player_id, (goalkeeperCounts.get(round.best_goalkeeper_player_id) || 0) + 1);
+  }
+  const map = new Map<string, FriendlyStatsEntry>();
+  for (const raw of rows || []) {
+    const row = raw as unknown as Omit<RankingStatsRow, "points">;
+    const current = map.get(row.player_id) || { player: row.player, rounds: 0, games: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, bestGoalkeeper: goalkeeperCounts.get(row.player_id) || 0 };
+    current.rounds += 1;
+    current.games += row.games;
+    current.wins += row.wins;
+    current.draws += row.draws;
+    current.losses += row.losses;
+    current.goals += row.goals;
+    current.assists += row.assists;
+    map.set(row.player_id, current);
+  }
+  return [...map.values()].sort((a, b) => a.player.name.localeCompare(b.player.name, "pt-BR"));
 }

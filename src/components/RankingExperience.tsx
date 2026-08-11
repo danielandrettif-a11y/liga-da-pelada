@@ -466,8 +466,8 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                     )}
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1">
-                    {entry.awards.topScorer > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Artilheiro {entry.awards.topScorer}x</span>}
-                    {entry.awards.topAssister > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Garçom {entry.awards.topAssister}x</span>}
+                    {entry.awards.topScorer > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Artilheiro da rodada {entry.awards.topScorer}x</span>}
+                    {entry.awards.topAssister > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Garçom da rodada {entry.awards.topAssister}x</span>}
                     {entry.awards.bestGoalkeeper > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Goleiro {entry.awards.bestGoalkeeper}x</span>}
                     {awardsTotal(entry) === 0 && <span className="text-[9px] text-muted">V: {entry.wins} · G: {entry.goals} · A: {entry.assists}</span>}
                   </div>

@@ -15,6 +15,7 @@ export async function getDashboardData() {
       .select("*, round_players(count)")
       .in("status", ["draft", "active"])
       .eq("season_id", season.id)
+      .eq("round_type", "official")
       .order("date", { ascending: true })
       .limit(1)
       .single();
@@ -29,6 +30,7 @@ export async function getDashboardData() {
       `)
       .eq("status", "finished")
       .eq("season_id", season.id)
+      .eq("round_type", "official")
       .order("date", { ascending: false })
       .limit(1)
       .single();

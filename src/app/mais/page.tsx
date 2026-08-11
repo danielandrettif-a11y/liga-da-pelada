@@ -4,6 +4,8 @@ import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
 import { logout } from "@/app/login/actions";
 import { InstallAppEntry } from "@/components/InstallAppPrompt";
 import { PushNotificationSettings } from "@/components/PushNotificationSettings";
+import { CallupAdminCard } from "@/components/CallupAdminCard";
+import { getActiveCallup } from "@/lib/actions/callups";
 import {
   UserPlus,
   CalendarPlus,
@@ -23,8 +25,8 @@ const ADMIN_SECTIONS = [
       {
         href: "/admin/jogadores",
         icon: UserPlus,
-        label: "Jogadores",
-        description: "Cadastrar e editar jogadores",
+        label: "Elenco",
+        description: "Cadastrar e classificar pessoas",
       },
       {
         href: "/admin/rodada",
@@ -55,7 +57,10 @@ const ADMIN_SECTIONS = [
 
 export default async function MaisPage() {
   const account = await getCurrentAccount();
-  const accountName = await getAccountDisplayName(account);
+  const [accountName, activeCallup] = await Promise.all([
+    getAccountDisplayName(account),
+    account.isAdmin ? getActiveCallup() : Promise.resolve(null),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -98,6 +103,8 @@ export default async function MaisPage() {
       )}
 
       {account.user && <PushNotificationSettings />}
+
+      {account.isAdmin && <CallupAdminCard callup={activeCallup} />}
 
       {account.isAdmin && ADMIN_SECTIONS.map((section) => (
         <div key={section.title}>

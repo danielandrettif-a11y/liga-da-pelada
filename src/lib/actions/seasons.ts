@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cache } from "react";
 import { supabase } from "../supabase";
 import { createClient as createServerClient } from "../supabase/server";
-import type { Season, SeasonPlayerSummary, SeasonSummary } from "../types";
+import type { RoundType, Season, SeasonPlayerSummary, SeasonSummary } from "../types";
 import { getAdminClient } from "../auth";
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerClient>>;
@@ -40,21 +40,22 @@ export async function getActiveSeason(leagueId?: string) {
   return getActiveSeasonCached(leagueId);
 }
 
-const getActiveSeasonRoundIdsCached = cache(async (leagueId?: string) => {
+const getActiveSeasonRoundIdsCached = cache(async (leagueId: string | undefined, roundType: RoundType) => {
   const season = await getActiveSeason(leagueId);
   if (!season) return [];
 
   const { data, error } = await supabase
     .from("rounds")
     .select("id")
-    .eq("season_id", season.id);
+    .eq("season_id", season.id)
+    .eq("round_type", roundType);
 
   if (error) return [];
   return data.map((round) => round.id as string);
 });
 
-export async function getActiveSeasonRoundIds(leagueId?: string) {
-  return getActiveSeasonRoundIdsCached(leagueId);
+export async function getActiveSeasonRoundIds(leagueId?: string, roundType: RoundType = "official") {
+  return getActiveSeasonRoundIdsCached(leagueId, roundType);
 }
 
 export async function getLatestFinishedSeason() {
@@ -91,6 +92,7 @@ async function buildSeasonSummary(
     .select(`
       id,
       status,
+      round_type,
       round_players (player_id),
       matches (
         id,
@@ -110,13 +112,15 @@ async function buildSeasonSummary(
     return { error: `Finalize ${unfinishedRounds === 1 ? "a rodada pendente" : `as ${unfinishedRounds} rodadas pendentes`} antes de terminar a temporada.` };
   }
 
-  const matches = rounds.flatMap((round) => round.matches || []);
+  const officialRounds = rounds.filter((round) => round.round_type === "official");
+  if (officialRounds.length === 0) return { error: "A temporada ainda não possui rodadas oficiais para arquivar." };
+  const matches = officialRounds.flatMap((round) => round.matches || []);
   const unfinishedMatches = matches.filter((match) => match.status !== "finished").length;
   if (unfinishedMatches > 0) {
     return { error: `Finalize ${unfinishedMatches === 1 ? "a partida pendente" : `as ${unfinishedMatches} partidas pendentes`} antes de terminar a temporada.` };
   }
 
-  const roundIds = rounds.map((round) => round.id);
+  const roundIds = officialRounds.map((round) => round.id);
   const { data: stats, error: statsError } = await client
     .from("player_round_stats")
     .select(`
@@ -162,7 +166,7 @@ async function buildSeasonSummary(
   });
 
   const participantIds = new Set(
-    rounds.flatMap((round) => (round.round_players || []).map((item) => item.player_id)),
+    officialRounds.flatMap((round) => (round.round_players || []).map((item) => item.player_id)),
   );
 
   return {
@@ -172,7 +176,7 @@ async function buildSeasonSummary(
       leagueName: league.name,
       startedAt: season.started_at,
       endedAt: new Date().toISOString(),
-      roundCount: rounds.length,
+      roundCount: officialRounds.length,
       matchCount: matches.length,
       goalCount: matches.reduce((total, match) => total + (match.match_events?.length || 0), 0),
       playerCount: participantIds.size,

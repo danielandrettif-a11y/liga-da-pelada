@@ -16,13 +16,20 @@ export type User = {
 };
 
 export type PlayerProfile = 'offensive' | 'midfield' | 'defensive';
+export type MemberCategory = 'player' | 'guest' | 'wag' | 'supporter';
+export type RoundType = 'official' | 'friendly';
+export type CallupStatus = 'open' | 'locked' | 'converted' | 'closed';
+export type CallupEntryStatus = 'confirmed' | 'waitlist';
 
 export type Player = {
   id: string;
   name: string;
   nickname: string | null;
   avatar_url: string | null;
-  player_profile: PlayerProfile;
+  player_profile: PlayerProfile | null;
+  member_category: MemberCategory;
+  is_selectable: boolean;
+  show_fitness_stats: boolean;
   created_at: string;
 };
 
@@ -63,11 +70,46 @@ export type Round = {
   number: number;
   date: string;
   status: RoundStatus;
+  round_type: RoundType;
   notes: string | null;
   payment_pix: string | null;
   payment_total: number | null;
   best_goalkeeper_player_id: string | null;
   created_at: string;
+};
+
+export type Callup = {
+  id: string;
+  league_id: string;
+  date: string;
+  round_type: RoundType;
+  status: CallupStatus;
+  capacity: number;
+  waitlist_capacity: number;
+  round_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CallupEntry = {
+  id: string;
+  callup_id: string;
+  player_id: string;
+  status: CallupEntryStatus;
+  position: number;
+  joined_by: string | null;
+  created_at: string;
+};
+
+export type PlayerRoundFitness = {
+  id: string;
+  player_id: string;
+  round_id: string;
+  distance_km: number;
+  average_speed_kmh: number;
+  created_at: string;
+  updated_at: string;
 };
 
 export type AccountProfile = {
@@ -301,12 +343,15 @@ export type CreatePlayerInput = {
   nickname?: string;
   avatar_url?: string;
   player_profile?: PlayerProfile;
+  member_category?: MemberCategory;
+  is_selectable?: boolean;
 };
 
 export type CreateRoundInput = {
   league_id: string;
   date: string;
   notes?: string;
+  round_type?: RoundType;
 };
 
 export type CreateTeamInput = {
@@ -390,6 +435,21 @@ export type Database = {
         Insert: Omit<Round, 'id' | 'created_at' | 'status' | 'payment_pix' | 'payment_total' | 'best_goalkeeper_player_id'> & { id?: string; created_at?: string; status?: RoundStatus; payment_pix?: string | null; payment_total?: number | null; best_goalkeeper_player_id?: string | null };
         Update: Partial<Omit<Round, 'id'>>;
       };
+      callups: {
+        Row: Callup;
+        Insert: Omit<Callup, 'id' | 'created_at' | 'updated_at' | 'status' | 'capacity' | 'waitlist_capacity' | 'round_id' | 'created_by'> & { id?: string; created_at?: string; updated_at?: string; status?: CallupStatus; capacity?: number; waitlist_capacity?: number; round_id?: string | null; created_by?: string | null };
+        Update: Partial<Omit<Callup, 'id'>>;
+      };
+      callup_entries: {
+        Row: CallupEntry;
+        Insert: Omit<CallupEntry, 'id' | 'created_at' | 'joined_by'> & { id?: string; created_at?: string; joined_by?: string | null };
+        Update: Partial<Omit<CallupEntry, 'id'>>;
+      };
+      player_round_fitness: {
+        Row: PlayerRoundFitness;
+        Insert: Omit<PlayerRoundFitness, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string };
+        Update: Partial<Omit<PlayerRoundFitness, 'id'>>;
+      };
       account_profiles: {
         Row: AccountProfile;
         Insert: Omit<AccountProfile, 'created_at' | 'updated_at'> & { created_at?: string; updated_at?: string };
@@ -455,6 +515,22 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      join_callup: {
+        Args: { p_callup_id: string };
+        Returns: CallupEntry;
+      };
+      leave_callup: {
+        Args: { p_callup_id: string };
+        Returns: boolean;
+      };
+      admin_add_callup_player: {
+        Args: { p_callup_id: string; p_player_id: string };
+        Returns: CallupEntry;
+      };
+      admin_remove_callup_player: {
+        Args: { p_callup_id: string; p_player_id: string };
+        Returns: boolean;
+      };
       substitute_match_player: {
         Args: {
           p_match_id: string;

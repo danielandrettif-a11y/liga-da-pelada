@@ -21,6 +21,7 @@ export type RankingEntry = {
   awardSeasons: PlayerAwardSeason[];
   seasonPosition: number;
   positionChange: number | null;
+  fitness?: { distanceKm: number; averageSpeedKmh: number; entries: number } | null;
 };
 
 export type RankingExperienceData = {

@@ -8,9 +8,11 @@ const AWARDS: Array<{
   label: string;
   Icon: typeof Target;
 }> = [
-  { type: "topScorer", label: "Artilheiro", Icon: Target },
-  { type: "topAssister", label: "Garçom", Icon: Sparkles },
-  { type: "bestGoalkeeper", label: "Goleiro", Icon: Medal },
+  { type: "topScorer", label: "Artilheiro da rodada", Icon: Target },
+  { type: "topAssister", label: "Garçom da rodada", Icon: Sparkles },
+  { type: "bestGoalkeeper", label: "Melhor goleiro", Icon: Medal },
+  { type: "seasonTopScorer", label: "Artilheiro da temporada", Icon: Target },
+  { type: "seasonTopAssister", label: "Garçom da temporada", Icon: Sparkles },
 ];
 
 export function PlayerAwards({
@@ -50,15 +52,23 @@ export function PlayerAwards({
             {AWARDS.map(({ type, label, Icon }) => {
               const awards = season.awards.filter((award) => award.type === type);
               if (awards.length === 0) return null;
+              const isSeasonAward = type === "seasonTopScorer" || type === "seasonTopAssister";
+              const visibleLabel = isSeasonAward && season.seasonStatus === "active"
+                ? type === "seasonTopScorer" ? "Líder de gols" : "Líder de assistências"
+                : label;
 
               return (
                 <details key={type} className="group rounded-lg border border-current/20 bg-black/5 open:bg-black/10">
                   <summary className="flex cursor-pointer list-none items-center justify-center gap-1 px-2 py-1.5 text-[9px] font-black uppercase tracking-wide [&::-webkit-details-marker]:hidden">
                     <Icon className="h-3 w-3 shrink-0" />
-                    <span className="truncate">{label} {awards.length}x</span>
+                    <span className="truncate">{visibleLabel}{isSeasonAward ? "" : ` ${awards.length}x`}</span>
                   </summary>
                   <div className="space-y-1 border-t border-current/15 px-2 py-2 text-left">
-                    {awards.map((award) => (
+                    {awards.map((award) => isSeasonAward ? (
+                      <div key={`${award.type}-${award.roundId}`} className="rounded px-1 py-1 text-[9px] font-bold leading-tight">
+                        {season.seasonStatus === "active" ? "Liderança provisória" : "Título da temporada"}
+                      </div>
+                    ) : (
                       <Link
                         key={`${award.type}-${award.roundId}`}
                         href={`/rodadas/${award.roundId}`}

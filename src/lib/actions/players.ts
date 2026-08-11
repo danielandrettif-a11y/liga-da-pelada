@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
 import { buildAwardSeasonsByPlayer } from "../awards";
-import type { Player, CreatePlayerInput, PlayerProfile, SeasonStatus } from "../types";
+import type { Player, CreatePlayerInput, MemberCategory, PlayerProfile, RoundType, SeasonStatus } from "../types";
 import { getActiveSeasonRoundIds } from "./seasons";
 import { getAdminClient, getCurrentAccount } from "../auth";
 
@@ -39,11 +39,13 @@ function avatarPathFromUrl(avatarUrl: string | null) {
   }
 }
 
-export async function getPlayers() {
-  const { data, error } = await supabase
+export async function getPlayers(selectableOnly = false) {
+  let query = supabase
     .from("players")
     .select("*")
     .order("name");
+  if (selectableOnly) query = query.eq("is_selectable", true).in("member_category", ["player", "guest"]);
+  const { data, error } = await query;
 
   if (error) {
     console.error("Erro ao buscar jogadores:", error);
@@ -68,11 +70,13 @@ export async function getPlayer(id: string) {
   return data as Player;
 }
 
-export async function getPlayersWithStats() {
+export async function getPlayersWithStats(roundType: RoundType = "official", selectableOnly = false) {
   // Busca jogadores e suas estatísticas agregadas de todas as rodadas
   const [playersResult, roundIds] = await Promise.all([
-    supabase.from("players").select("*"),
-    getActiveSeasonRoundIds(),
+    selectableOnly
+      ? supabase.from("players").select("*").eq("is_selectable", true).in("member_category", ["player", "guest"])
+      : supabase.from("players").select("*"),
+    getActiveSeasonRoundIds(undefined, roundType),
   ]);
   const { data: players, error: playersError } = playersResult;
 
@@ -145,8 +149,8 @@ export async function getPlayersWithStats() {
   return playersWithStats.sort((a, b) => b.points - a.points);
 }
 
-export async function getPlayerRoundHistory(playerId: string) {
-  const roundIds = await getActiveSeasonRoundIds();
+export async function getPlayerRoundHistory(playerId: string, roundType: RoundType = "official") {
+  const roundIds = await getActiveSeasonRoundIds(undefined, roundType);
   if (roundIds.length === 0) return [];
 
   const { data, error } = await supabase
@@ -175,8 +179,9 @@ export async function getPlayerAwardSeasons(playerId: string) {
     supabase.from("seasons").select("id, number, status"),
     supabase
       .from("rounds")
-      .select("id, number, date, season_id, best_goalkeeper_player_id")
+      .select("id, number, date, season_id, best_goalkeeper_player_id, round_type")
       .eq("status", "finished")
+      .eq("round_type", "official")
       .order("date", { ascending: false }),
   ]);
 
@@ -190,7 +195,7 @@ export async function getPlayerAwardSeasons(playerId: string) {
 
   const { data: stats, error: statsError } = await supabase
     .from("player_round_stats")
-    .select("round_id, player_id, goals, assists")
+    .select("round_id, player_id, goals, assists, games")
     .in("round_id", rounds.map((round) => round.id));
 
   if (statsError) {
@@ -230,6 +235,10 @@ export async function createPlayer(input: CreatePlayerInput) {
         nickname: input.nickname || null,
         avatar_url: input.avatar_url || null,
         player_profile: input.player_profile || "midfield",
+        member_category: input.member_category || "player",
+        is_selectable: input.member_category === "wag" || input.member_category === "supporter"
+          ? false
+          : input.is_selectable ?? true,
       },
     ])
     .select()
@@ -253,6 +262,8 @@ export async function updatePlayer(id: string, input: Partial<CreatePlayerInput>
     ...(input.nickname !== undefined ? { nickname: input.nickname.trim() || null } : {}),
     ...(input.avatar_url !== undefined ? { avatar_url: input.avatar_url || null } : {}),
     ...(input.player_profile !== undefined ? { player_profile: input.player_profile } : {}),
+    ...(input.member_category !== undefined ? { member_category: input.member_category } : {}),
+    ...(input.is_selectable !== undefined ? { is_selectable: input.is_selectable } : {}),
   };
 
   const { data, error } = await client
@@ -287,10 +298,15 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const nickname = String(formData.get("nickname") || "").trim();
   const playerProfile = String(formData.get("player_profile") || "midfield") as PlayerProfile;
+  const requestedCategory = String(formData.get("member_category") || "player") as MemberCategory;
+  const requestedSelectable = formData.get("is_selectable") !== "false";
   const removeAvatar = formData.get("remove_avatar") === "true";
   const avatar = formData.get("avatar");
   const hasNewAvatar = avatar instanceof File && avatar.size > 0;
 
+  if (!["player", "guest", "wag", "supporter"].includes(requestedCategory)) {
+    return { success: false, error: "Escolha uma categoria valida." };
+  }
   if (!["offensive", "midfield", "defensive"].includes(playerProfile)) {
     return { success: false, error: "Escolha um perfil de jogo valido." };
   }
@@ -309,12 +325,14 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   }
 
   let currentAvatarUrl: string | null = null;
+  let currentCategory: MemberCategory = "player";
+  let currentSelectable = true;
   const id = playerId || crypto.randomUUID();
 
   if (playerId) {
     const { data: currentPlayer, error: currentPlayerError } = await client
       .from("players")
-      .select("avatar_url")
+      .select("avatar_url, member_category, is_selectable")
       .eq("id", playerId)
       .single();
 
@@ -322,6 +340,8 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
       return { success: false, error: "Jogador não encontrado." };
     }
     currentAvatarUrl = currentPlayer.avatar_url;
+    currentCategory = currentPlayer.member_category as MemberCategory;
+    currentSelectable = currentPlayer.is_selectable;
   }
 
   let uploadedPath: string | null = null;
@@ -347,12 +367,18 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     nextAvatarUrl = client.storage.from(AVATAR_BUCKET).getPublicUrl(uploadedPath).data.publicUrl;
   }
 
+  const memberCategory = account.isAdmin ? requestedCategory : currentCategory;
+  const isSelectable = account.isAdmin
+    ? (memberCategory === "wag" || memberCategory === "supporter" ? false : requestedSelectable)
+    : currentSelectable;
   const playerData = {
     id,
     name,
     nickname: nickname || null,
     avatar_url: nextAvatarUrl,
-    player_profile: playerProfile,
+    player_profile: memberCategory === "wag" || memberCategory === "supporter" ? null : playerProfile,
+    member_category: memberCategory,
+    is_selectable: isSelectable,
   };
 
   const query = playerId
@@ -361,6 +387,8 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
         nickname: playerData.nickname,
         avatar_url: playerData.avatar_url,
         player_profile: playerData.player_profile,
+        member_category: playerData.member_category,
+        is_selectable: playerData.is_selectable,
       }).eq("id", id)
     : client.from("players").insert([playerData]);
 
@@ -380,6 +408,17 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
 
   revalidatePlayerPaths(id);
   return { success: true, data: { id } };
+}
+
+export async function getRosterGroups() {
+  const players = await getPlayersWithStats("official");
+  return {
+    officialPlayers: players.filter((player) => player.member_category === "player"),
+    activeGuests: players.filter((player) => player.member_category === "guest" && player.is_selectable),
+    archivedGuests: players.filter((player) => player.member_category === "guest" && !player.is_selectable),
+    wags: players.filter((player) => player.member_category === "wag"),
+    supporters: players.filter((player) => player.member_category === "supporter"),
+  };
 }
 
 export async function deletePlayer(id: string) {

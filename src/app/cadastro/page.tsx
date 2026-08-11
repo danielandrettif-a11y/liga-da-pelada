@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { ArrowLeft, CheckCircle2, Loader2, Mail, MailCheck, Lock, UserRoundPlus } from "@/components/icons";
 import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 import { PLAYER_PROFILE_OPTIONS } from "@/lib/playerProfiles";
 import { signup } from "./actions";
 
-export default function CadastroPage() {
+function CadastroContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedNext = searchParams.get("next") || "";
+  const returnTo = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [confirmationSent, setConfirmationSent] = useState(false);
@@ -33,7 +36,7 @@ export default function CadastroPage() {
       return;
     }
 
-    router.push("/meu-perfil");
+    router.push(returnTo || "/meu-perfil");
     router.refresh();
   }
 
@@ -56,7 +59,7 @@ export default function CadastroPage() {
               <li>Depois da confirmação, você poderá entrar normalmente.</li>
             </ol>
           </div>
-          <Link href="/login" className="btn-primary mt-6 block w-full py-3.5">Já confirmei — ir para o login</Link>
+          <Link href={`/login${returnTo ? `?next=${encodeURIComponent(returnTo)}` : ""}`} className="btn-primary mt-6 block w-full py-3.5">Já confirmei — ir para o login</Link>
         </div>
       </div>
     );
@@ -65,7 +68,7 @@ export default function CadastroPage() {
   return (
     <div className="mx-auto w-full max-w-sm space-y-5 py-4">
       <div className="flex items-center gap-3">
-        <Link href="/login" className="flex h-10 w-10 items-center justify-center rounded-full bg-surface hover:bg-surface-hover">
+        <Link href={`/login${returnTo ? `?next=${encodeURIComponent(returnTo)}` : ""}`} className="flex h-10 w-10 items-center justify-center rounded-full bg-surface hover:bg-surface-hover">
           <ArrowLeft className="h-5 w-5 text-muted" />
         </Link>
         <div>
@@ -75,7 +78,7 @@ export default function CadastroPage() {
       </div>
 
       <div className="glass-card p-5">
-        <GoogleAuthButton label="Criar conta com Google" />
+        <GoogleAuthButton label="Criar conta com Google" returnTo={returnTo} />
         <p className="mt-2 text-center text-[10px] leading-4 text-muted">
           A conta do Google já possui e-mail confirmado e cria seu perfil de jogador automaticamente.
         </p>
@@ -88,6 +91,7 @@ export default function CadastroPage() {
       </div>
 
       <form action={handleSubmit} className="glass-card space-y-4 p-5">
+        <input type="hidden" name="next" value={returnTo} />
         {error && <p role="alert" className="rounded-xl bg-danger/10 p-3 text-xs font-bold text-danger">{error}</p>}
 
         <div role="note" className="flex gap-3 rounded-xl border border-warning/30 bg-warning/10 p-3">
@@ -158,4 +162,8 @@ export default function CadastroPage() {
       </form>
     </div>
   );
+}
+
+export default function CadastroPage() {
+  return <Suspense fallback={<div className="min-h-[75vh]" />}><CadastroContent /></Suspense>;
 }

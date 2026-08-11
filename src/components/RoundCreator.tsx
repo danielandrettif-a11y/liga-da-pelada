@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createRoundWithTeams, type TeamInput } from "@/lib/actions/rounds";
-import type { Player } from "@/lib/types";
+import type { Player, RoundType } from "@/lib/types";
 import {
   Users,
   Calendar,
@@ -29,13 +29,25 @@ const DEFAULT_TEAMS = [
   { id: "team3", name: "Preto", color: "#374151", players: [] as DrawPlayer[] },
 ];
 
-export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
+export function RoundCreator({
+  allPlayers,
+  initialDate,
+  initialPlayerIds = [],
+  roundType = "official",
+  callupId = null,
+}: {
+  allPlayers: DrawPlayer[];
+  initialDate?: string;
+  initialPlayerIds?: string[];
+  roundType?: RoundType;
+  callupId?: string | null;
+}) {
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [step, setStep] = useState<1 | 2 | 3>(initialPlayerIds.length ? 3 : 1);
+  const [date, setDate] = useState(() => initialDate || new Date().toISOString().split("T")[0]);
   
   // Step 2: Seleção
-  const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set(initialPlayerIds));
   
   // Step 3: Times
   const [teams, setTeams] = useState(DEFAULT_TEAMS);
@@ -52,6 +64,7 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
   );
 
   function togglePlayerSelection(id: string) {
+    if (callupId) return;
     const next = new Set(selectedPlayerIds);
     if (next.has(id)) next.delete(id);
     else next.add(id);
@@ -166,7 +179,7 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
     }));
 
     // Converte a data local para um formato adequado ou salva como YYYY-MM-DD
-    const res = await createRoundWithTeams(date, teamsInput);
+    const res = await createRoundWithTeams(date, teamsInput, { roundType, callupId });
     
     if (!res.success) {
       setError(res.error || "Erro ao salvar rodada");
@@ -179,6 +192,10 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
 
   return (
     <div className="space-y-6">
+      <div className={`rounded-xl border p-3 text-xs font-bold ${roundType === "friendly" ? "border-warning/30 bg-warning/10 text-warning" : "border-accent/25 bg-accent/10 text-accent"}`}>
+        {roundType === "friendly" ? "Amistoso: estatísticas separadas do Ranking oficial" : "Rodada oficial · Ranked"}
+        {callupId && <span className="ml-1 text-muted">· 15 convocados pré-selecionados</span>}
+      </div>
       {/* Progresso */}
       <div className="flex items-center justify-between px-2">
         <div className={`flex flex-col items-center gap-1 ${step >= 1 ? "text-accent" : "text-muted"}`}>
@@ -214,6 +231,7 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
             <input
               type="date"
               value={date}
+              disabled={Boolean(callupId)}
               onChange={e => setDate(e.target.value)}
               className="block min-w-0 max-w-full w-full appearance-none bg-surface-hover border border-border rounded-xl px-4 py-3 text-base text-foreground focus:outline-none focus:border-accent transition-colors"
             />
@@ -429,12 +447,12 @@ export function RoundCreator({ allPlayers }: { allPlayers: DrawPlayer[] }) {
           </div>
 
           <div className="flex gap-3">
-            <button
+            {!callupId && <button
               onClick={() => setStep(2)}
               className="flex-1 bg-surface hover:bg-surface-hover text-foreground font-bold py-3.5 rounded-xl transition-all active:scale-[0.98]"
             >
               Voltar
-            </button>
+            </button>}
             <button
               onClick={handleSave}
               disabled={loading}

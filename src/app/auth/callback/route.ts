@@ -5,6 +5,8 @@ import { SITE_URL } from "@/lib/siteUrl";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
+  const requestedNext = url.searchParams.get("next");
+  const safeNext = requestedNext?.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : null;
 
   if (code) {
     const client = await createClient();
@@ -16,7 +18,7 @@ export async function GET(request: Request) {
         .eq("user_id", data.user.id)
         .maybeSingle();
 
-      const destination = profile?.player_id ? "/" : "/meu-perfil";
+      const destination = safeNext || (profile?.player_id ? "/" : "/meu-perfil");
       return NextResponse.redirect(new URL(destination, SITE_URL));
     }
   }

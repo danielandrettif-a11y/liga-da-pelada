@@ -62,10 +62,10 @@ export function PlayersStatsGrid({ players }: { players: PlayerStats[] }) {
 
       <div className="grid grid-cols-2 gap-3">
         {sortedPlayers.map((player, index) => (
-          <Link key={player.id} href={`/jogadores/${player.id}`}>
-            <div className={`glass-card glass-card-hover p-4 animate-fade-in stagger-${Math.min(index + 1, 5)}`}>
+          <Link key={player.id} href={`/jogadores/${player.id}`} className="block h-full">
+            <div className={`player-stat-card h-full rounded-2xl p-3.5 animate-fade-in stagger-${Math.min(index + 1, 5)}`}>
               <div className="mb-3 flex items-center gap-3">
-                <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-11 w-11 flex-shrink-0 rounded-full bg-surface-hover text-sm font-bold text-muted ring-1 ring-border" />
+                <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-11 w-11 flex-shrink-0 rounded-full border border-accent/25 bg-surface-hover text-sm font-bold text-muted ring-2 ring-background shadow-[0_0_16px_rgba(204,255,0,.08)]" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold text-foreground">{getDisplayName(player.name)}</p>
                   <PlayerProfileBadge profile={player.player_profile} />
@@ -73,20 +73,20 @@ export function PlayersStatsGrid({ players }: { players: PlayerStats[] }) {
               </div>
 
               <div className="mb-3 grid grid-cols-2 gap-2">
-                <div className="rounded-lg border border-border bg-surface/60 px-2 py-1.5 text-center"><p className="text-base font-black text-foreground">{player.rounds}</p><p className="text-[9px] font-bold uppercase text-muted">Peladas</p></div>
-                <div className="rounded-lg border border-border bg-surface/60 px-2 py-1.5 text-center"><p className="text-base font-black text-foreground">{player.games}</p><p className="text-[9px] font-bold uppercase text-muted">Jogos</p></div>
+                <div className="rounded-lg border border-white/5 bg-black/15 px-2 py-2 text-center shadow-inner"><p className="player-card-number text-xl text-foreground">{player.rounds}</p><p className="mt-1 text-[8px] font-black uppercase tracking-wider text-muted">Peladas</p></div>
+                <div className="rounded-lg border border-white/5 bg-black/15 px-2 py-2 text-center shadow-inner"><p className="player-card-number text-xl text-foreground">{player.games}</p><p className="mt-1 text-[8px] font-black uppercase tracking-wider text-muted">Jogos</p></div>
               </div>
 
               <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                <div><p className="text-[10px] text-muted">Gols</p><p className="text-sm font-bold text-foreground">{player.goals}</p></div>
-                <div><p className="text-[10px] text-muted">Assists</p><p className="text-sm font-bold text-foreground">{player.assists}</p></div>
-                <div><p className="text-[10px] text-muted">Vitórias</p><p className="text-sm font-bold text-foreground">{player.wins}</p></div>
-                <div><p className="text-[10px] text-muted">Aprov.</p><p className="text-sm font-bold text-foreground">{calculateWinRate(player.wins, player.draws, player.games)}%</p></div>
+                <div><p className="text-[9px] font-bold uppercase tracking-wide text-muted">Gols</p><p className="player-card-number mt-0.5 text-base text-foreground">{player.goals}</p></div>
+                <div><p className="text-[9px] font-bold uppercase tracking-wide text-muted">Assists</p><p className="player-card-number mt-0.5 text-base text-foreground">{player.assists}</p></div>
+                <div><p className="text-[9px] font-bold uppercase tracking-wide text-muted">Vitórias</p><p className="player-card-number mt-0.5 text-base text-foreground">{player.wins}</p></div>
+                <div><p className="text-[9px] font-bold uppercase tracking-wide text-muted">Aprov.</p><p className="player-card-number mt-0.5 text-base text-foreground">{calculateWinRate(player.wins, player.draws, player.games)}%</p></div>
               </div>
 
               <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-                <span className="text-[10px] font-semibold uppercase text-muted">Pontos</span>
-                <span className="stat-number text-lg gradient-text">{player.points}</span>
+                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted">Pontos</span>
+                <span className="player-card-points text-2xl">{player.points}</span>
               </div>
             </div>
           </Link>

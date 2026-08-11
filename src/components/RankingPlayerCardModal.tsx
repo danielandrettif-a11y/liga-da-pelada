@@ -163,6 +163,12 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
           <div className="relative mt-5">
             <PlayerAwards seasons={awardSeasons} context="card" />
           </div>
+          {entry.fitness && (
+            <div className="relative mt-3 grid grid-cols-2 gap-2 rounded-xl border border-current/20 bg-white/10 p-2 text-center">
+              <div><p className="text-lg font-black">{entry.fitness.distanceKm} km</p><p className="text-[8px] font-black uppercase opacity-70">Distância Ranked</p></div>
+              <div><p className="text-lg font-black">{entry.fitness.averageSpeedKmh} km/h</p><p className="text-[8px] font-black uppercase opacity-70">Velocidade média</p></div>
+            </div>
+          )}
         </div>
 
         <Link
