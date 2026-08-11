@@ -16,6 +16,11 @@ import {
 } from "@/components/icons";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
+import {
+  MAX_PLAYERS_PER_TEAM,
+  MAX_TEAMS_PER_ROUND,
+  MIN_TEAMS_PER_ROUND,
+} from "@/lib/constants";
 
 type DrawPlayer = Player & {
   points?: number;
@@ -23,11 +28,22 @@ type DrawPlayer = Player & {
   games?: number;
 };
 
-const DEFAULT_TEAMS = [
-  { id: "team1", name: "Azul", color: "#3B82F6", players: [] as DrawPlayer[] },
-  { id: "team2", name: "Vermelho", color: "#EF4444", players: [] as DrawPlayer[] },
-  { id: "team3", name: "Preto", color: "#374151", players: [] as DrawPlayer[] },
+const TEAM_PRESETS = [
+  { name: "Azul", color: "#3B82F6" },
+  { name: "Vermelho", color: "#EF4444" },
+  { name: "Preto", color: "#374151" },
+  { name: "Verde", color: "#22C55E" },
+  { name: "Amarelo", color: "#EAB308" },
+  { name: "Branco", color: "#E5E7EB" },
 ];
+
+function createDefaultTeams(count: number) {
+  return TEAM_PRESETS.slice(0, count).map((team, index) => ({
+    id: `team${index + 1}`,
+    ...team,
+    players: [] as DrawPlayer[],
+  }));
+}
 
 export function RoundCreator({
   allPlayers,
@@ -35,12 +51,16 @@ export function RoundCreator({
   initialPlayerIds = [],
   roundType = "official",
   callupId = null,
+  playersPerTeam = 5,
+  teamsPerRound = 3,
 }: {
   allPlayers: DrawPlayer[];
   initialDate?: string;
   initialPlayerIds?: string[];
   roundType?: RoundType;
   callupId?: string | null;
+  playersPerTeam?: number;
+  teamsPerRound?: number;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(initialPlayerIds.length ? 3 : 1);
@@ -50,11 +70,14 @@ export function RoundCreator({
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set(initialPlayerIds));
   
   // Step 3: Times
-  const [teams, setTeams] = useState(DEFAULT_TEAMS);
+  const teamCount = Math.min(MAX_TEAMS_PER_ROUND, Math.max(MIN_TEAMS_PER_ROUND, Math.trunc(teamsPerRound)));
+  const [teams, setTeams] = useState(() => createDefaultTeams(teamCount));
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const teamCapacity = Math.min(MAX_PLAYERS_PER_TEAM, Math.max(1, Math.trunc(playersPerTeam)));
+  const roundCapacity = teamCapacity * teamCount;
 
   const selectedPlayers = allPlayers.filter(p => selectedPlayerIds.has(p.id));
   
@@ -67,11 +90,25 @@ export function RoundCreator({
     if (callupId) return;
     const next = new Set(selectedPlayerIds);
     if (next.has(id)) next.delete(id);
-    else next.add(id);
+    else {
+      if (next.size >= roundCapacity) {
+        setError(`A rodada aceita no máximo ${roundCapacity} jogadores: ${teamCapacity} por time.`);
+        return;
+      }
+      next.add(id);
+    }
+    setError("");
     setSelectedPlayerIds(next);
   }
 
   function assignToTeam(player: DrawPlayer, teamId: string) {
+    const targetTeam = teams.find((team) => team.id === teamId);
+    const alreadyInTarget = targetTeam?.players.some((item) => item.id === player.id);
+    if (!targetTeam || (!alreadyInTarget && targetTeam.players.length >= teamCapacity)) {
+      setError(`Esse time já atingiu o limite de ${teamCapacity} jogadores.`);
+      return;
+    }
+    setError("");
     setTeams(prev => prev.map(t => {
       // Remove de outros times se estiver
       const filtered = t.players.filter(p => p.id !== player.id);
@@ -125,6 +162,12 @@ export function RoundCreator({
       const profile = player.player_profile || "midfield";
       const minimumSize = Math.min(...newTeams.map((team) => team.players.length));
       const orderedTeams = newTeams.filter((team) => team.players.length === minimumSize).sort((a, b) => {
+        if (player.is_goalkeeper) {
+          const goalkeeperDifference =
+            a.players.filter((item) => item.is_goalkeeper).length
+            - b.players.filter((item) => item.is_goalkeeper).length;
+          if (goalkeeperDifference !== 0) return goalkeeperDifference;
+        }
         const profileDifference =
           a.players.filter((item) => (item.player_profile || "midfield") === profile).length
           - b.players.filter((item) => (item.player_profile || "midfield") === profile).length;
@@ -163,6 +206,11 @@ export function RoundCreator({
       return;
     }
 
+    if (teams.some((team) => team.players.length > teamCapacity)) {
+      setError(`Cada time pode ter no máximo ${teamCapacity} jogadores.`);
+      return;
+    }
+
     if (unassignedPlayers.length > 0) {
       if (!confirm(`Ainda há ${unassignedPlayers.length} jogadores sem time. Deseja salvar mesmo assim?`)) {
         return;
@@ -194,7 +242,7 @@ export function RoundCreator({
     <div className="space-y-6">
       <div className={`rounded-xl border p-3 text-xs font-bold ${roundType === "friendly" ? "border-warning/30 bg-warning/10 text-warning" : "border-accent/25 bg-accent/10 text-accent"}`}>
         {roundType === "friendly" ? "Amistoso: estatísticas separadas do Ranking oficial" : "Rodada oficial · Ranked"}
-        {callupId && <span className="ml-1 text-muted">· 15 convocados pré-selecionados</span>}
+        {callupId && <span className="ml-1 text-muted">· {initialPlayerIds.length} convocados pré-selecionados</span>}
       </div>
       {/* Progresso */}
       <div className="flex items-center justify-between px-2">
@@ -254,7 +302,7 @@ export function RoundCreator({
               Quem vai jogar?
             </h2>
             <span className="text-xs font-bold px-2 py-1 bg-surface-hover rounded-lg text-muted">
-              {selectedPlayerIds.size} selecionados
+              {selectedPlayerIds.size}/{roundCapacity} selecionados
             </span>
           </div>
 
@@ -286,7 +334,7 @@ export function RoundCreator({
                         {player.name}
                       </p>
                       <div className="mt-0.5 flex items-center gap-2">
-                        <PlayerProfileBadge profile={player.player_profile} />
+                        <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />
                         <span className="text-[9px] text-muted">{player.points || 0} pts</span>
                       </div>
                     </div>
@@ -386,7 +434,7 @@ export function RoundCreator({
                       className="px-3 py-1.5 bg-surface-hover border border-border rounded-lg text-xs font-bold text-foreground cursor-pointer"
                     >
                       <span>{p.name}</span>
-                      <PlayerProfileBadge profile={p.player_profile} />
+                      <PlayerProfileBadge profile={p.player_profile} isGoalkeeper={p.is_goalkeeper} />
                     </div>
                     {/* Menu de times (aberto ao clicar) */}
                     {openDropdownId === p.id && (
@@ -398,10 +446,11 @@ export function RoundCreator({
                               assignToTeam(p, t.id);
                               setOpenDropdownId(null);
                             }}
-                            className="px-3 py-2 text-left text-[10px] font-bold text-foreground hover:bg-surface-hover flex items-center gap-2 border-b border-border last:border-0"
+                            disabled={t.players.length >= teamCapacity}
+                            className="px-3 py-2 text-left text-[10px] font-bold text-foreground hover:bg-surface-hover flex items-center gap-2 border-b border-border last:border-0 disabled:cursor-not-allowed disabled:opacity-35"
                           >
                             <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: t.color }} />
-                            <span className="truncate">{t.name}</span>
+                            <span className="truncate">{t.name}{t.players.length >= teamCapacity ? " (cheio)" : ""}</span>
                           </button>
                         ))}
                       </div>
@@ -423,7 +472,7 @@ export function RoundCreator({
                     <span className="max-w-[170px] truncate text-sm font-bold text-foreground">{team.name || "Sem nome"}</span>
                   </div>
                   <span className="text-[10px] font-bold text-muted bg-surface-hover px-2 py-0.5 rounded-md">
-                    {team.players.length} jogadores
+                    {team.players.length}/{teamCapacity} jogadores
                   </span>
                 </div>
                 <div className="p-3 min-h-[3rem] flex flex-wrap gap-2">
@@ -434,7 +483,7 @@ export function RoundCreator({
                       className="px-2 py-1 bg-background border border-border rounded-md text-xs font-semibold text-foreground flex items-center gap-1.5 cursor-pointer hover:border-danger/50 hover:text-danger transition-colors group"
                     >
                       <span>{p.name}</span>
-                      <PlayerProfileBadge profile={p.player_profile} />
+                      <PlayerProfileBadge profile={p.player_profile} isGoalkeeper={p.is_goalkeeper} />
                       <X className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
                     </div>
                   ))}

@@ -6,6 +6,14 @@ import { getActiveSeason } from "./seasons";
 import { createClient as createServerClient } from "../supabase/server";
 import { getAdminClient } from "../auth";
 import type { RoundType } from "../types";
+import {
+  DEFAULT_PLAYERS_PER_TEAM,
+  MAX_PLAYERS_PER_TEAM,
+  MAX_TEAMS_PER_ROUND,
+  MIN_TEAMS_PER_ROUND,
+  TEAMS_PER_ROUND,
+} from "../constants";
+import { drawGoalkeeperOrder } from "../goalkeeperOrder";
 
 export async function getActiveLeague() {
   const { data, error } = await supabase
@@ -74,6 +82,7 @@ export async function getRound(id: string) {
         *,
         team_players (
           player_id,
+          goalkeeper_order,
           players (*)
         )
       ),
@@ -159,6 +168,26 @@ export async function createRoundWithTeams(
       return { success: false, error: "Um jogador nao pode aparecer em mais de um time." };
     }
     const league = await getActiveLeague();
+    const { data: leagueConfig, error: leagueConfigError } = await client
+      .from("leagues")
+      .select("players_per_team, teams_per_round")
+      .eq("id", league.id)
+      .single();
+    if (leagueConfigError) throw new Error(`Erro ao consultar configurações da liga: ${leagueConfigError.message}`);
+    const playersPerTeam = Math.min(
+      MAX_PLAYERS_PER_TEAM,
+      Math.max(1, leagueConfig?.players_per_team || DEFAULT_PLAYERS_PER_TEAM),
+    );
+    const teamsPerRound = Math.min(
+      MAX_TEAMS_PER_ROUND,
+      Math.max(MIN_TEAMS_PER_ROUND, leagueConfig?.teams_per_round || TEAMS_PER_ROUND),
+    );
+    if (normalizedTeams.length !== teamsPerRound) {
+      return { success: false, error: `Esta liga usa ${teamsPerRound} times por rodada.` };
+    }
+    if (normalizedTeams.some((team) => team.playerIds.length > playersPerTeam)) {
+      return { success: false, error: `Cada time pode ter no máximo ${playersPerTeam} jogadores.` };
+    }
     const season = await getActiveSeason(league.id);
     if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
 
@@ -177,7 +206,7 @@ export async function createRoundWithTeams(
     if (options.callupId) {
       const { data: callup, error: callupReadError } = await client
         .from("callups")
-        .select("date, round_type, status, callup_entries(player_id, status)")
+        .select("date, round_type, status, capacity, callup_entries(player_id, status)")
         .eq("id", options.callupId)
         .eq("league_id", league.id)
         .single();
@@ -188,8 +217,8 @@ export async function createRoundWithTeams(
         .filter((entry) => entry.status === "confirmed")
         .map((entry) => entry.player_id)
         .sort();
-      if (callup.date !== date || callup.round_type !== roundType || confirmedIds.length !== 15 || confirmedIds.join(",") !== [...allPlayerIds].sort().join(",")) {
-        return { success: false, error: "Use a data, o tipo e os 15 confirmados da convocacao bloqueada." };
+      if (callup.date !== date || callup.round_type !== roundType || confirmedIds.length !== callup.capacity || confirmedIds.join(",") !== [...allPlayerIds].sort().join(",")) {
+        return { success: false, error: `Use a data, o tipo e os ${callup.capacity} confirmados da convocacao bloqueada.` };
       }
     }
 
@@ -251,12 +280,14 @@ export async function createRoundWithTeams(
       if (teamError) throw new Error(`Erro ao criar time ${team.name}: ${teamError.message}`);
 
       if (team.playerIds.length > 0) {
+        const goalkeeperOrder = drawGoalkeeperOrder(team.playerIds);
         const { error: tpError } = await client
           .from("team_players")
           .insert(
-            team.playerIds.map(pid => ({
+            goalkeeperOrder.map(({ playerId, order }) => ({
               team_id: teamData.id,
-              player_id: pid,
+              player_id: playerId,
+              goalkeeper_order: order,
             }))
           );
         if (tpError) throw new Error(`Erro ao vincular jogadores ao time ${team.name}: ${tpError.message}`);

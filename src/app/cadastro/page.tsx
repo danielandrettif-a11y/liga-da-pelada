@@ -129,6 +129,13 @@ function CadastroContent() {
               </label>
             ))}
           </div>
+          <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-xl border border-accent/25 bg-accent/5 px-3 py-3 has-[:checked]:border-accent has-[:checked]:bg-accent/10">
+            <input type="checkbox" name="is_goalkeeper" value="true" className="h-4 w-4 accent-[var(--accent)]" />
+            <span className="text-left">
+              <span className="block text-xs font-black text-foreground">TambÃ©m jogo no gol</span>
+              <span className="mt-0.5 block text-[9px] leading-3 text-muted">GOL aparece junto da sua Ãºnica posiÃ§Ã£o de linha.</span>
+            </span>
+          </label>
         </fieldset>
 
         <div className="space-y-1.5">

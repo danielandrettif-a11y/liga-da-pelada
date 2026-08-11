@@ -14,5 +14,19 @@ describe("limites da convocacao", () => {
   it("recusa a 19a pessoa", () => {
     expect(getCallupPlacement(15, 3)).toBe("full");
   });
-});
 
+  it("respeita uma convocacao configurada para tres times de quatro", () => {
+    expect(getCallupPlacement(11, 0, 12, 3)).toBe("confirmed");
+    expect(getCallupPlacement(12, 0, 12, 3)).toBe("waitlist");
+  });
+
+  it("abre 20 vagas para quatro times de cinco", () => {
+    expect(getCallupPlacement(19, 0, 20, 3)).toBe("confirmed");
+    expect(getCallupPlacement(20, 0, 20, 3)).toBe("waitlist");
+  });
+
+  it("abre 18 vagas para tres times de seis", () => {
+    expect(getCallupPlacement(17, 0, 18, 3)).toBe("confirmed");
+    expect(getCallupPlacement(18, 0, 18, 3)).toBe("waitlist");
+  });
+});

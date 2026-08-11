@@ -10,6 +10,7 @@ export async function signup(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const nickname = String(formData.get("nickname") || "").trim();
   const playerProfile = String(formData.get("player_profile") || "midfield");
+  const isGoalkeeper = formData.get("is_goalkeeper") === "true";
   const requestedNext = String(formData.get("next") || "");
   const returnTo = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "";
 
@@ -32,6 +33,7 @@ export async function signup(formData: FormData) {
         name,
         nickname,
         player_profile: playerProfile,
+        is_goalkeeper: isGoalkeeper,
       },
     },
   });

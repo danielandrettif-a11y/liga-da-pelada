@@ -145,6 +145,7 @@ export function MatchSubstitutionManager({
                           ...team,
                           team_players: lineup.map((entry: any) => ({
                             player_id: entry.player_id,
+                            goalkeeper_order: (team.team_players || []).find((teamPlayer: any) => teamPlayer.player_id === entry.player_id)?.goalkeeper_order ?? null,
                             players: entry.player,
                           })),
                         }}

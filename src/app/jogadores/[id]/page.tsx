@@ -51,7 +51,7 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
         <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="mb-4 h-24 w-24 rounded-full bg-surface text-2xl font-bold text-muted ring-2 ring-border" />
         <h2 className="text-2xl font-bold text-foreground">{player.name}</h2>
         {player.nickname && <p className="mt-1 text-sm font-semibold italic text-muted">“{player.nickname}”</p>}
-        <div className="mt-2 flex items-center gap-2"><span className="rounded-full border border-border px-2.5 py-1 text-[9px] font-black uppercase text-muted">{categoryLabel}</span>{isPlayable && <PlayerProfileBadge profile={player.player_profile} />}</div>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-2"><span className="rounded-full border border-border px-2.5 py-1 text-[9px] font-black uppercase text-muted">{categoryLabel}</span>{isPlayable && <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />}</div>
         {isPlayable && <div className="mt-6 inline-flex items-center gap-4 rounded-2xl border border-border bg-surface/50 px-6 py-3"><div><p className="text-[9px] font-bold uppercase text-muted">Pontos</p><p className="stat-number text-2xl text-accent">{official.points}</p></div><div className="h-8 w-px bg-border" /><div><p className="text-[9px] font-bold uppercase text-muted">Aprov.</p><p className="stat-number text-xl text-foreground">{calculateWinRate(official.wins, official.draws, official.games)}%</p></div></div>}
       </div>
 

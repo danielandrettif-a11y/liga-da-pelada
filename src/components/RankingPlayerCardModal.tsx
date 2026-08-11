@@ -28,7 +28,7 @@ function cardTheme(position: number) {
 export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   const theme = cardTheme(position);
   const displayName = entry.player.name;
-  const profile = PROFILE_LABELS[entry.player.player_profile || "midfield"];
+  const profile = `${PROFILE_LABELS[entry.player.player_profile || "midfield"]}${entry.player.is_goalkeeper ? " / GOL" : ""}`;
   const awardBadges = [
     { label: "Artilheiro", value: entry.awards.topScorer, Icon: Target },
     { label: "Garçom", value: entry.awards.topAssister, Icon: Sparkles },
@@ -70,7 +70,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
                 <span className="player-card-rating text-6xl">{entry.points}</span>
                 <span className="-mt-1 text-xs font-black tracking-[0.25em]">PTS</span>
                 <div className="my-2 h-px w-12 bg-current opacity-30" />
-                <span className="text-2xl font-black">{profile}</span>
+                <span className="text-center text-xl font-black leading-5">{profile}</span>
                 <div className="mt-3 flex h-10 w-10 items-center justify-center rounded-full border border-current/25 bg-white/15 shadow-inner">
                   <Trophy className="h-6 w-6" fill="currentColor" />
                 </div>

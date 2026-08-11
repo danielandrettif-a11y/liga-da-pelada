@@ -68,7 +68,7 @@ export function PlayersStatsGrid({ players }: { players: PlayerStats[] }) {
                 <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-11 w-11 flex-shrink-0 rounded-full border border-accent/25 bg-surface-hover text-sm font-bold text-muted ring-2 ring-background shadow-[0_0_16px_rgba(204,255,0,.08)]" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold text-foreground">{getDisplayName(player.name)}</p>
-                  <PlayerProfileBadge profile={player.player_profile} />
+                  <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />
                 </div>
               </div>
 

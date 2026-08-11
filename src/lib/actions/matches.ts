@@ -204,6 +204,7 @@ export async function getMatch(matchId: string) {
         *,
         team_players (
           player_id,
+          goalkeeper_order,
           players (*)
         )
       ),
@@ -211,6 +212,7 @@ export async function getMatch(matchId: string) {
         *,
         team_players (
           player_id,
+          goalkeeper_order,
           players (*)
         )
       ),
@@ -240,7 +242,7 @@ export async function getMatch(matchId: string) {
           id,
           name,
           color,
-          team_players (player_id)
+          team_players (player_id, goalkeeper_order)
         )
       )
     `)

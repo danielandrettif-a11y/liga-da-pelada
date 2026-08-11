@@ -53,7 +53,7 @@ export default async function AdminJogadoresPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold text-foreground">{player.name}</p>
-                    {player.player_profile && <PlayerProfileBadge profile={player.player_profile} />}
+                    {player.player_profile && <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />}
                     <span className="rounded-full border border-border px-2 py-0.5 text-[8px] font-black uppercase text-muted">
                       {player.member_category === "player" ? "Jogador" : player.member_category === "guest" ? (player.is_selectable ? "Convidado" : "Convidado arquivado") : player.member_category === "wag" ? "WAG" : "Torcedor"}
                     </span>

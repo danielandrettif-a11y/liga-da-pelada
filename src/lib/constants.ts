@@ -25,10 +25,14 @@ export const TEAM_COLORS = {
 export const TEAM_NAMES = Object.keys(TEAM_COLORS) as (keyof typeof TEAM_COLORS)[];
 
 /** Número padrão de jogadores por time */
-export const PLAYERS_PER_TEAM = 5;
+export const DEFAULT_PLAYERS_PER_TEAM = 5;
+export const MAX_PLAYERS_PER_TEAM = 10;
+export const PLAYERS_PER_TEAM = DEFAULT_PLAYERS_PER_TEAM;
 
 /** Número padrão de times por rodada */
 export const TEAMS_PER_ROUND = 3;
+export const MIN_TEAMS_PER_ROUND = 2;
+export const MAX_TEAMS_PER_ROUND = 6;
 
 /** Labels amigáveis para tipos de evento */
 export const EVENT_TYPE_LABELS: Record<string, string> = {

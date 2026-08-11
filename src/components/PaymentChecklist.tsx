@@ -134,7 +134,7 @@ export function PaymentChecklist({
             <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-10 w-10 shrink-0 rounded-full border border-border bg-surface-hover text-xs font-bold text-muted" />
             <div className="min-w-0 flex-1">
               <p className={`truncate text-sm font-bold ${player.paid ? "text-accent" : "text-foreground"}`}>{player.name}</p>
-              <PlayerProfileBadge profile={player.player_profile} />
+              <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />
             </div>
             <span className={`text-[10px] font-black uppercase ${player.paid ? "text-accent" : "text-muted"}`}>{player.paid ? "Pago" : "Pendente"}</span>
           </label>

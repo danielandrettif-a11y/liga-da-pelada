@@ -27,6 +27,7 @@ export type Player = {
   nickname: string | null;
   avatar_url: string | null;
   player_profile: PlayerProfile | null;
+  is_goalkeeper: boolean;
   member_category: MemberCategory;
   is_selectable: boolean;
   show_fitness_stats: boolean;
@@ -40,6 +41,8 @@ export type League = {
   owner_id: string | null;
   is_active: boolean;
   match_duration: number;
+  players_per_team: number;
+  teams_per_round: number;
   created_at: string;
 };
 
@@ -199,6 +202,7 @@ export type TeamPlayer = {
   id: string;
   team_id: string;
   player_id: string;
+  goalkeeper_order: number | null;
 };
 
 export type MatchStatus = 'pending' | 'live' | 'finished';
@@ -343,6 +347,7 @@ export type CreatePlayerInput = {
   nickname?: string;
   avatar_url?: string;
   player_profile?: PlayerProfile;
+  is_goalkeeper?: boolean;
   member_category?: MemberCategory;
   is_selectable?: boolean;
 };
@@ -417,7 +422,7 @@ export type Database = {
       };
       leagues: {
         Row: League;
-        Insert: Omit<League, 'id' | 'created_at' | 'is_active' | 'match_duration'> & { id?: string; created_at?: string; is_active?: boolean; match_duration?: number };
+        Insert: Omit<League, 'id' | 'created_at' | 'is_active' | 'match_duration' | 'players_per_team' | 'teams_per_round'> & { id?: string; created_at?: string; is_active?: boolean; match_duration?: number; players_per_team?: number; teams_per_round?: number };
         Update: Partial<Omit<League, 'id'>>;
       };
       league_members: {

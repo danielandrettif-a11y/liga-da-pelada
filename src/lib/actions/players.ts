@@ -235,6 +235,7 @@ export async function createPlayer(input: CreatePlayerInput) {
         nickname: input.nickname || null,
         avatar_url: input.avatar_url || null,
         player_profile: input.player_profile || "midfield",
+        is_goalkeeper: input.is_goalkeeper ?? false,
         member_category: input.member_category || "player",
         is_selectable: input.member_category === "wag" || input.member_category === "supporter"
           ? false
@@ -262,6 +263,7 @@ export async function updatePlayer(id: string, input: Partial<CreatePlayerInput>
     ...(input.nickname !== undefined ? { nickname: input.nickname.trim() || null } : {}),
     ...(input.avatar_url !== undefined ? { avatar_url: input.avatar_url || null } : {}),
     ...(input.player_profile !== undefined ? { player_profile: input.player_profile } : {}),
+    ...(input.is_goalkeeper !== undefined ? { is_goalkeeper: input.is_goalkeeper } : {}),
     ...(input.member_category !== undefined ? { member_category: input.member_category } : {}),
     ...(input.is_selectable !== undefined ? { is_selectable: input.is_selectable } : {}),
   };
@@ -298,6 +300,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const nickname = String(formData.get("nickname") || "").trim();
   const playerProfile = String(formData.get("player_profile") || "midfield") as PlayerProfile;
+  const requestedGoalkeeper = formData.get("is_goalkeeper") === "true";
   const requestedCategory = String(formData.get("member_category") || "player") as MemberCategory;
   const requestedSelectable = formData.get("is_selectable") !== "false";
   const removeAvatar = formData.get("remove_avatar") === "true";
@@ -377,6 +380,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     nickname: nickname || null,
     avatar_url: nextAvatarUrl,
     player_profile: memberCategory === "wag" || memberCategory === "supporter" ? null : playerProfile,
+    is_goalkeeper: memberCategory === "wag" || memberCategory === "supporter" ? false : requestedGoalkeeper,
     member_category: memberCategory,
     is_selectable: isSelectable,
   };
@@ -387,6 +391,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
         nickname: playerData.nickname,
         avatar_url: playerData.avatar_url,
         player_profile: playerData.player_profile,
+        is_goalkeeper: playerData.is_goalkeeper,
         member_category: playerData.member_category,
         is_selectable: playerData.is_selectable,
       }).eq("id", id)

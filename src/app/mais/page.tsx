@@ -6,6 +6,7 @@ import { InstallAppEntry } from "@/components/InstallAppPrompt";
 import { PushNotificationSettings } from "@/components/PushNotificationSettings";
 import { CallupAdminCard } from "@/components/CallupAdminCard";
 import { getActiveCallup } from "@/lib/actions/callups";
+import { getLeagueConfig } from "@/lib/actions/league";
 import {
   UserPlus,
   CalendarPlus,
@@ -57,9 +58,10 @@ const ADMIN_SECTIONS = [
 
 export default async function MaisPage() {
   const account = await getCurrentAccount();
-  const [accountName, activeCallup] = await Promise.all([
+  const [accountName, activeCallup, leagueConfig] = await Promise.all([
     getAccountDisplayName(account),
     account.isAdmin ? getActiveCallup() : Promise.resolve(null),
+    account.isAdmin ? getLeagueConfig() : Promise.resolve(null),
   ]);
 
   return (
@@ -104,7 +106,13 @@ export default async function MaisPage() {
 
       {account.user && <PushNotificationSettings />}
 
-      {account.isAdmin && <CallupAdminCard callup={activeCallup} />}
+      {account.isAdmin && (
+        <CallupAdminCard
+          callup={activeCallup}
+          playersPerTeam={leagueConfig?.players_per_team || 5}
+          teamsPerRound={leagueConfig?.teams_per_round || 3}
+        />
+      )}
 
       {account.isAdmin && ADMIN_SECTIONS.map((section) => (
         <div key={section.title}>

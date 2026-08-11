@@ -22,6 +22,8 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
   const [error, setError] = useState("");
   const confirmed = callup.entries.filter((entry) => entry.status === "confirmed");
   const waitlist = callup.entries.filter((entry) => entry.status === "waitlist");
+  const capacity = callup.capacity;
+  const waitlistCapacity = callup.waitlist_capacity;
   const myEntry = callup.entries.find((entry) => entry.player_id === currentPlayerId);
   const availableToAdmin = selectablePlayers.filter((player) => !callup.entries.some((entry) => entry.player_id === player.id));
 
@@ -91,8 +93,8 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
           </button>
         </div>
         <div className="mt-5 grid min-w-0 grid-cols-2 gap-2.5">
-          <div className="min-w-0 rounded-xl border border-border bg-background/40 p-3"><p className="text-2xl font-black text-accent">{confirmed.length}/15</p><p className="truncate text-[9px] font-bold uppercase text-muted">Confirmados</p></div>
-          <div className="min-w-0 rounded-xl border border-border bg-background/40 p-3"><p className="text-2xl font-black text-warning">{waitlist.length}/3</p><p className="truncate text-[9px] font-bold uppercase text-muted">Na fila</p></div>
+          <div className="min-w-0 rounded-xl border border-border bg-background/40 p-3"><p className="text-2xl font-black text-accent">{confirmed.length}/{capacity}</p><p className="truncate text-[9px] font-bold uppercase text-muted">Confirmados</p></div>
+          <div className="min-w-0 rounded-xl border border-border bg-background/40 p-3"><p className="text-2xl font-black text-warning">{waitlist.length}/{waitlistCapacity}</p><p className="truncate text-[9px] font-bold uppercase text-muted">Na fila</p></div>
         </div>
       </section>
 
@@ -108,7 +110,7 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
         </button>
       ) : currentPlayerId ? (
         <button onClick={() => run("join", () => joinActiveCallup(callup.id))} disabled={!!loading} className="w-full rounded-xl bg-accent py-3.5 text-sm font-black text-background disabled:opacity-50">
-          {loading === "join" ? "Confirmando..." : confirmed.length < 15 ? "Confirmar presença" : "Entrar na fila"}
+          {loading === "join" ? "Confirmando..." : confirmed.length < capacity ? "Confirmar presença" : "Entrar na fila"}
         </button>
       ) : (
         <div className="rounded-xl border border-warning/25 bg-warning/10 p-4 text-xs font-bold text-warning">Sua conta ainda não está vinculada a um jogador selecionável.</div>
@@ -118,7 +120,7 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
         <div className="flex items-center justify-between px-1"><h2 className="text-xs font-black uppercase tracking-wider text-muted">Relacionados</h2><CheckCircle2 className="h-4 w-4 text-accent" /></div>
         <div className="glass-card space-y-2 p-3">
           {confirmed.map((entry, index) => <EntryRow key={entry.id} entry={entry} position={index + 1} />)}
-          <EmptySlots start={confirmed.length + 1} total={15 - confirmed.length} label="Livre" />
+          <EmptySlots start={confirmed.length + 1} total={capacity - confirmed.length} label="Livre" />
         </div>
       </section>
 
@@ -126,7 +128,7 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
         <div className="flex items-center justify-between px-1"><h2 className="text-xs font-black uppercase tracking-wider text-muted">Banco de espera</h2><Clock className="h-4 w-4 text-warning" /></div>
         <div className="glass-card space-y-2 p-3">
           {waitlist.map((entry, index) => <EntryRow key={entry.id} entry={entry} position={index + 1} />)}
-          <EmptySlots start={waitlist.length + 1} total={3 - waitlist.length} label="Livre" />
+          <EmptySlots start={waitlist.length + 1} total={waitlistCapacity - waitlist.length} label="Livre" />
         </div>
       </section>
 

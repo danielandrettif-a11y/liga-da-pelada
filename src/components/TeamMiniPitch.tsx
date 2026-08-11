@@ -1,10 +1,11 @@
 "use client";
 
-import { getInitials } from "@/lib/utils";
 import type { Player } from "@/lib/types";
+import { PlayerAvatar } from "./PlayerAvatar";
 
 type PitchPlayer = {
   player_id: string;
+  goalkeeper_order?: number | null;
   players: Player | null;
 };
 
@@ -31,8 +32,7 @@ const POSITIONS: Record<number, Array<[number, number]>> = {
 
 export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick }: TeamMiniPitchProps) {
   const players = team.team_players
-    .map((entry) => entry.players)
-    .filter((player): player is Player => Boolean(player))
+    .flatMap((entry) => entry.players ? [{ player: entry.players, goalkeeperOrder: entry.goalkeeper_order ?? null }] : [])
     .slice(0, 6);
   const positions = POSITIONS[Math.max(1, players.length)];
 
@@ -62,7 +62,11 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick }: 
         <div className="absolute left-1/2 top-1.5 h-6 w-12 -translate-x-1/2 border border-t-0 border-white/30" />
         <div className="absolute bottom-1.5 left-1/2 h-6 w-12 -translate-x-1/2 border border-b-0 border-white/30" />
 
-        {players.map((player, playerIndex) => {
+        <span className="absolute left-2 top-2 z-10 rounded bg-black/45 px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.14em] text-white/75">
+          Ordem do gol
+        </span>
+
+        {players.map(({ player, goalkeeperOrder }, playerIndex) => {
           const [left, top] = positions[playerIndex];
           return (
             <button
@@ -73,13 +77,28 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick }: 
               aria-pressed={onPlayerClick ? selectedPlayerId === player.id : undefined}
               className={`absolute flex w-[48%] -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-md transition-transform enabled:active:scale-95 ${selectedPlayerId === player.id ? "z-10 bg-warning/20 ring-2 ring-warning" : ""}`}
               style={{ left: `${left}%`, top: `${top}%` }}
-              title={player.name}
+              title={`${player.name}${goalkeeperOrder ? ` · ${goalkeeperOrder}º no gol` : ""}`}
             >
-              <div
-                className="flex h-7 w-7 items-center justify-center rounded-full border-2 bg-[#07170f] text-[8px] font-black text-white shadow-[0_4px_9px_rgba(0,0,0,.5)]"
-                style={{ borderColor: team.color }}
-              >
-                {getInitials(player.name)}
+              <div className="relative rounded-full border-2" style={{ borderColor: team.color }}>
+                <PlayerAvatar
+                  name={player.name}
+                  avatarUrl={player.avatar_url}
+                  className="h-8 w-8 rounded-full bg-[#07170f] text-[8px] font-black text-white shadow-[0_4px_9px_rgba(0,0,0,.5)]"
+                  imageClassName="object-cover"
+                />
+                {goalkeeperOrder && (
+                  <span
+                    className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-background bg-accent px-0.5 font-athletic text-[8px] font-black leading-none text-background shadow-[0_2px_6px_rgba(0,0,0,.55)]"
+                    aria-label={`${goalkeeperOrder}º na ordem do gol`}
+                  >
+                    {goalkeeperOrder}
+                  </span>
+                )}
+                {player.is_goalkeeper && (
+                  <span className="absolute -bottom-1.5 -left-2 rounded border border-accent/30 bg-background/90 px-1 text-[5px] font-black text-accent">
+                    GOL
+                  </span>
+                )}
               </div>
               <span className="mt-0.5 line-clamp-2 w-full rounded bg-black/75 px-0.5 py-0.5 text-center text-[7px] font-black leading-[1.05] text-white shadow-sm">
                 {player.name}

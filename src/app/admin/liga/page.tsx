@@ -13,6 +13,8 @@ export default function LigaConfigPage() {
   
   const [leagueId, setLeagueId] = useState("");
   const [matchDuration, setMatchDuration] = useState(7);
+  const [playersPerTeam, setPlayersPerTeam] = useState(5);
+  const [teamsPerRound, setTeamsPerRound] = useState(3);
 
   useEffect(() => {
     async function load() {
@@ -20,6 +22,8 @@ export default function LigaConfigPage() {
       if (config) {
         setLeagueId(config.id);
         setMatchDuration(config.match_duration || 7);
+        setPlayersPerTeam(config.players_per_team || 5);
+        setTeamsPerRound(config.teams_per_round || 3);
       }
       setLoading(false);
     }
@@ -31,7 +35,7 @@ export default function LigaConfigPage() {
     setError("");
     setSuccess(false);
 
-    const res = await updateLeagueConfig(leagueId, matchDuration);
+    const res = await updateLeagueConfig(leagueId, matchDuration, playersPerTeam, teamsPerRound);
     if (!res.success) {
       setError(res.error || "Erro ao salvar.");
     } else {
@@ -75,6 +79,40 @@ export default function LigaConfigPage() {
             onChange={(e) => setMatchDuration(Number(e.target.value))}
             className="w-full bg-surface-hover border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-accent transition-colors"
           />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-muted uppercase tracking-wider">
+            Jogadores por time
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="10"
+            value={playersPerTeam}
+            onChange={(e) => setPlayersPerTeam(Number(e.target.value))}
+            className="w-full bg-surface-hover border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-accent transition-colors"
+          />
+          <p className="text-[10px] leading-relaxed text-muted">
+            O padrão é 5. Você pode escolher entre 1 e 10 jogadores em cada time.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-muted uppercase tracking-wider">
+            Quantidade de times
+          </label>
+          <input
+            type="number"
+            min="2"
+            max="6"
+            value={teamsPerRound}
+            onChange={(e) => setTeamsPerRound(Number(e.target.value))}
+            className="w-full bg-surface-hover border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-accent transition-colors"
+          />
+          <p className="text-[10px] leading-relaxed text-muted">
+            O padrão é 3. A convocação abrirá com {playersPerTeam * teamsPerRound} vagas.
+          </p>
         </div>
 
         <button
