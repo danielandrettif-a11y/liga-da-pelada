@@ -8,6 +8,7 @@ import { BestGoalkeeperPicker } from "@/components/BestGoalkeeperPicker";
 import { getCurrentAccount } from "@/lib/auth";
 import { getGoalkeeperScoringPoints } from "@/lib/actions/scoring";
 import { TeamMiniPitch } from "@/components/TeamMiniPitch";
+import { RoundAvailabilityManager } from "@/components/RoundAvailabilityManager";
 
 export const revalidate = 0;
 
@@ -72,7 +73,7 @@ export default async function RodadaDetalhePage({
         <h2 className="text-xs font-bold text-muted uppercase tracking-wider mb-3 px-1">
           Times Formados
         </h2>
-        <div className="grid grid-cols-1 gap-4">
+        <div className="-mx-2 grid grid-cols-3 gap-1.5">
           {round.teams.map((team: any, index: number) => (
             <TeamMiniPitch key={team.id} team={team} index={index} />
           ))}
@@ -83,6 +84,12 @@ export default async function RodadaDetalhePage({
           )}
         </div>
       </section>
+
+      <RoundAvailabilityManager
+        roundId={round.id}
+        entries={round.round_players || []}
+        canManage={account.isAdmin && round.status !== "finished"}
+      />
 
       {/* Partidas */}
       <section>

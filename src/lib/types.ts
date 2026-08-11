@@ -130,6 +130,8 @@ export type RoundPlayer = {
   id: string;
   round_id: string;
   player_id: string;
+  availability_status: 'available' | 'injured';
+  availability_updated_at: string;
 };
 
 export type PushSubscriptionRecord = {
@@ -170,6 +172,40 @@ export type Match = {
   match_order: number | null;
   started_at: string | null;
   finished_at: string | null;
+  timer_started_at: string | null;
+  timer_accumulated_seconds: number;
+  eligibility_elapsed_offset_seconds: number;
+  duration_seconds: number;
+  created_at: string;
+};
+
+export type MatchPlayer = {
+  id: string;
+  match_id: string;
+  player_id: string;
+  team_id: string;
+  original_team_id: string;
+  is_starter: boolean;
+  is_active: boolean;
+  result_eligible: boolean;
+  entered_elapsed_seconds: number;
+  left_elapsed_seconds: number | null;
+  created_at: string;
+};
+
+export type MatchSubstitutionReason = 'tired' | 'injury' | 'other';
+
+export type MatchSubstitution = {
+  id: string;
+  match_id: string;
+  team_id: string;
+  player_out_id: string;
+  player_in_id: string | null;
+  player_in_original_team_id: string | null;
+  reason: MatchSubstitutionReason;
+  marked_injured: boolean;
+  elapsed_seconds: number;
+  created_by: string | null;
   created_at: string;
 };
 
@@ -285,6 +321,20 @@ export type CreateMatchInput = {
   team_a_id: string;
   team_b_id: string;
   match_order?: number;
+  replacements?: Array<{
+    team_id: string;
+    absent_player_id: string;
+    replacement_player_id: string;
+  }>;
+};
+
+export type SubstituteMatchPlayerInput = {
+  match_id: string;
+  team_id: string;
+  player_out_id: string;
+  player_in_id?: string;
+  reason: MatchSubstitutionReason;
+  mark_injured?: boolean;
 };
 
 export type RegisterGoalInput = {
@@ -352,7 +402,7 @@ export type Database = {
       };
       round_players: {
         Row: RoundPlayer;
-        Insert: Omit<RoundPlayer, 'id'> & { id?: string };
+        Insert: Omit<RoundPlayer, 'id' | 'availability_status' | 'availability_updated_at'> & { id?: string; availability_status?: RoundPlayer['availability_status']; availability_updated_at?: string };
         Update: Partial<Omit<RoundPlayer, 'id'>>;
       };
       push_subscriptions: {
@@ -377,8 +427,18 @@ export type Database = {
       };
       matches: {
         Row: Match;
-        Insert: Omit<Match, 'id' | 'created_at' | 'score_a' | 'score_b' | 'status'> & { id?: string; created_at?: string; score_a?: number; score_b?: number; status?: MatchStatus };
+        Insert: Omit<Match, 'id' | 'created_at' | 'score_a' | 'score_b' | 'status' | 'timer_started_at' | 'timer_accumulated_seconds' | 'eligibility_elapsed_offset_seconds' | 'duration_seconds'> & { id?: string; created_at?: string; score_a?: number; score_b?: number; status?: MatchStatus; timer_started_at?: string | null; timer_accumulated_seconds?: number; eligibility_elapsed_offset_seconds?: number; duration_seconds?: number };
         Update: Partial<Omit<Match, 'id'>>;
+      };
+      match_players: {
+        Row: MatchPlayer;
+        Insert: Omit<MatchPlayer, 'id' | 'created_at' | 'is_starter' | 'is_active' | 'result_eligible' | 'entered_elapsed_seconds' | 'left_elapsed_seconds'> & { id?: string; created_at?: string; is_starter?: boolean; is_active?: boolean; result_eligible?: boolean; entered_elapsed_seconds?: number; left_elapsed_seconds?: number | null };
+        Update: Partial<Omit<MatchPlayer, 'id'>>;
+      };
+      match_substitutions: {
+        Row: MatchSubstitution;
+        Insert: Omit<MatchSubstitution, 'id' | 'created_at' | 'created_by'> & { id?: string; created_at?: string; created_by?: string | null };
+        Update: Partial<Omit<MatchSubstitution, 'id'>>;
       };
       match_events: {
         Row: MatchEvent;
@@ -395,7 +455,29 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      substitute_match_player: {
+        Args: {
+          p_match_id: string;
+          p_team_id: string;
+          p_player_out_id: string;
+          p_player_in_id?: string | null;
+          p_reason?: MatchSubstitutionReason;
+          p_mark_injured?: boolean;
+        };
+        Returns: string;
+      };
+      undo_last_match_substitution: {
+        Args: { p_substitution_id: string };
+        Returns: boolean;
+      };
+      set_round_player_availability: {
+        Args: {
+          p_round_id: string;
+          p_player_id: string;
+          p_status: RoundPlayer['availability_status'];
+        };
+        Returns: boolean;
+      };
     };
     Enums: {
       [_ in never]: never;

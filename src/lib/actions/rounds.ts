@@ -64,6 +64,8 @@ export async function getRound(id: string) {
       *,
       round_players (
         player_id,
+        availability_status,
+        availability_updated_at,
         players (*)
       ),
       teams (
@@ -94,6 +96,35 @@ export type TeamInput = {
   color: string;
   playerIds: string[];
 };
+
+export async function setRoundPlayerAvailability(
+  roundId: string,
+  playerId: string,
+  status: "available" | "injured",
+) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem alterar a disponibilidade." };
+    if (!roundId || !playerId || !["available", "injured"].includes(status)) {
+      return { success: false, error: "Dados de disponibilidade invalidos." };
+    }
+
+    const { error } = await client.rpc("set_round_player_availability", {
+      p_round_id: roundId,
+      p_player_id: playerId,
+      p_status: status,
+    });
+
+    if (error) throw new Error(error.message);
+
+    revalidatePath(`/rodadas/${roundId}`);
+    revalidatePath(`/rodadas/${roundId}/nova-partida`);
+    return { success: true };
+  } catch (err: any) {
+    console.error("Erro ao alterar disponibilidade:", err);
+    return { success: false, error: err.message };
+  }
+}
 
 export async function createRoundWithTeams(date: string, teams: TeamInput[]) {
   try {

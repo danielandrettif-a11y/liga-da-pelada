@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { registerGoal, finishMatch, deleteEvent, updateMatchTimer, resetMatchTimer } from "@/lib/actions/matches";
+import { registerGoal, finishMatch, deleteEvent, updateMatchTimer, resetMatchTimer, undoLastMatchSubstitution } from "@/lib/actions/matches";
 import {
   ArrowLeft,
   Plus,
@@ -15,10 +15,13 @@ import {
   Football,
   Target,
   X,
+  ArrowLeftRight,
 } from "@/components/icons";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { PlayerAvatar } from "./PlayerAvatar";
+import { MatchSubstitutionManager } from "./MatchSubstitutionManager";
+import { getOfficialElapsedSeconds } from "@/lib/match-rules";
 
 type MatchLiveBoardProps = {
   match: any;
@@ -33,7 +36,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
   const [error, setError] = useState("");
   
   // Timer State
-  const initialSeconds = matchDuration * 60;
+  const initialSeconds = match.duration_seconds || matchDuration * 60;
   const [secondsLeft, setSecondsLeft] = useState(initialSeconds);
   const isRunning = !!match.timer_started_at;
 
@@ -76,6 +79,12 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       .on('postgres_changes', { event: '*', schema: 'public', table: 'match_events', filter: `match_id=eq.${match.id}` }, () => {
         scheduleRefresh();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'match_players', filter: `match_id=eq.${match.id}` }, () => {
+        scheduleRefresh();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'match_substitutions', filter: `match_id=eq.${match.id}` }, () => {
+        scheduleRefresh();
+      })
       .subscribe();
 
     return () => {
@@ -93,7 +102,8 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
   const resetTimer = async () => {
     if (!canManage) return;
     if (confirm("Deseja realmente zerar o cronômetro?")) {
-      await resetMatchTimer(match.id);
+      const result = await resetMatchTimer(match.id);
+      if (!result.success) setError(result.error || "Nao foi possivel zerar o cronometro.");
     }
   };
 
@@ -137,7 +147,10 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       player_id: goalModal.scorerId,
       assist_player_id: assistPlayerId || undefined,
       team_id: goalModal.teamId,
-      minute: Math.floor((initialSeconds - secondsLeft) / 60),
+      minute: Math.floor(getOfficialElapsedSeconds(
+        initialSeconds - secondsLeft,
+        match.eligibility_elapsed_offset_seconds || 0,
+      ) / 60),
     });
 
     if (!res.success) {
@@ -161,9 +174,28 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
     setLoading(false);
   }
 
+  async function handleUndoSubstitution(substitutionId: string) {
+    if (!canManage || isFinished) return;
+    if (!confirm("Desfazer a ultima substituicao registrada?")) return;
+    setLoading(true);
+    const result = await undoLastMatchSubstitution(substitutionId, match.id);
+    if (!result.success) setError(result.error || "Nao foi possivel desfazer a substituicao.");
+    setLoading(false);
+  }
+
   // Helpers para o Modal
-  const activeTeam = match.team_a_id === goalModal.teamId ? match.team_a : match.team_b;
-  const otherPlayers = activeTeam?.team_players.filter((tp: any) => tp.player_id !== goalModal.scorerId) || [];
+  const activePlayers = (match.match_players || []).filter(
+    (entry: any) => entry.team_id === goalModal.teamId && entry.is_active,
+  );
+  const otherPlayers = activePlayers.filter((entry: any) => entry.player_id !== goalModal.scorerId);
+  const timelineItems = [
+    ...(match.match_events || []).map((event: any) => ({ ...event, timelineType: "goal" as const })),
+    ...(match.match_substitutions || []).map((substitution: any) => ({ ...substitution, timelineType: "substitution" as const })),
+  ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const playersShownForTeam = (teamId: string) => (match.match_players || []).filter(
+    (entry: any) => entry.team_id === teamId
+      && (isFinished ? entry.left_elapsed_seconds === null : entry.is_active),
+  );
 
   return (
     <div className="space-y-6">
@@ -260,6 +292,39 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
         </div>
       </div>
 
+      <section className="animate-fade-in-up">
+        <h2 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">
+          {isFinished ? "Escalacao no apito final" : "Jogadores em campo"}
+        </h2>
+        <div className="grid grid-cols-2 gap-3">
+          {[match.team_a, match.team_b].map((team: any) => {
+            const lineup = playersShownForTeam(team.id);
+            return (
+              <div key={team.id} className="glass-card overflow-hidden">
+                <div className="flex items-center gap-2 border-b border-border bg-surface px-3 py-2.5">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: team.color }} />
+                  <span className="truncate text-xs font-black text-foreground">{team.name}</span>
+                  <span className="ml-auto text-[9px] font-black text-muted">{lineup.length}</span>
+                </div>
+                <div className="space-y-2 p-3">
+                  {lineup.map((entry: any) => (
+                    <div key={entry.player_id} className="min-w-0">
+                      <p className="truncate text-xs font-bold text-foreground">{entry.player?.name || "Jogador"}</p>
+                      {entry.original_team_id !== entry.team_id && (
+                        <p className="truncate text-[9px] font-bold uppercase tracking-wide text-warning">
+                          Emprestado do {entry.original_team?.name}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                  {lineup.length === 0 && <p className="text-[10px] italic text-muted">Sem jogadores</p>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Timeline de Eventos */}
       <section className="animate-fade-in-up stagger-1">
         <h2 className="text-xs font-bold text-muted uppercase tracking-wider mb-3 px-1 flex items-center gap-1.5">
@@ -267,13 +332,44 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
         </h2>
         
         <div className="space-y-2">
-          {match.match_events?.length === 0 ? (
+          {timelineItems.length === 0 ? (
             <div className="glass-card p-4 text-center text-xs text-muted">
-              Nenhum gol registrado ainda.
+              Nenhum evento registrado ainda.
             </div>
           ) : (
-            match.match_events?.map((ev: any) => {
+            timelineItems.map((ev: any, index: number) => {
               const isTeamA = ev.team_id === match.team_a_id;
+              if (ev.timelineType === "substitution") {
+                const minutes = Math.floor(ev.elapsed_seconds / 60).toString().padStart(2, "0");
+                const seconds = (ev.elapsed_seconds % 60).toString().padStart(2, "0");
+                return (
+                  <div key={`sub-${ev.id}`} className="glass-card relative flex items-center gap-3 overflow-hidden p-3">
+                    <div className={`absolute bottom-0 top-0 w-1 ${isTeamA ? "left-0" : "right-0"}`} style={{ backgroundColor: isTeamA ? match.team_a.color : match.team_b.color }} />
+                    <ArrowLeftRight className="h-6 w-6 shrink-0 text-warning" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-black text-foreground">
+                        Sai {ev.player_out?.name}
+                        {ev.player_in ? ` · Entra ${ev.player_in.name}` : " · Sem substituto"}
+                      </p>
+                      <p className="mt-0.5 truncate text-[10px] text-muted">
+                        {ev.player_in_original_team ? `Emprestado do ${ev.player_in_original_team.name} · ` : ""}
+                        {minutes}:{seconds}
+                        {ev.marked_injured ? " · marcado como machucado" : ""}
+                      </p>
+                    </div>
+                    {!isFinished && canManage && index === 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleUndoSubstitution(ev.id)}
+                        disabled={loading}
+                        className="shrink-0 rounded-lg border border-border px-2.5 py-2 text-[9px] font-black uppercase text-muted hover:text-foreground disabled:opacity-50"
+                      >
+                        Desfazer
+                      </button>
+                    )}
+                  </div>
+                );
+              }
               
               return (
                 <div key={ev.id} className="glass-card p-3 flex items-center gap-3 relative overflow-hidden">
@@ -309,6 +405,15 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
         </div>
       </section>
 
+      <MatchSubstitutionManager
+        match={match}
+        canManage={canManage}
+        elapsedSeconds={getOfficialElapsedSeconds(
+          Math.max(0, initialSeconds - secondsLeft),
+          match.eligibility_elapsed_offset_seconds || 0,
+        )}
+      />
+
       {/* Finalizar Button */}
       {!isFinished && canManage && (
         <div className="pt-6 animate-fade-in-up stagger-2">
@@ -339,18 +444,18 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
             <div className="p-4 overflow-y-auto no-scrollbar space-y-2 flex-1">
               {!goalModal.scorerId ? (
                 // SELECIONAR ARTILHEIRO
-                activeTeam?.team_players.map((tp: any) => (
+                activePlayers.map((tp: any) => (
                   <button
                     key={tp.player_id}
                     onClick={() => setGoalModal(p => ({ ...p, scorerId: tp.player_id }))}
                     className="w-full flex items-center gap-3 p-3 bg-surface hover:bg-surface-hover border border-border rounded-xl transition-colors text-left"
                   >
                     <PlayerAvatar
-                      name={tp.players?.name || "Jogador"}
-                      avatarUrl={tp.players?.avatar_url}
+                      name={tp.player?.name || "Jogador"}
+                      avatarUrl={tp.player?.avatar_url}
                       className="w-10 h-10 rounded-full bg-background text-xs font-bold flex-shrink-0"
                     />
-                    <span className="font-bold text-foreground flex-1">{tp.players?.name}</span>
+                    <span className="font-bold text-foreground flex-1">{tp.player?.name}</span>
                     <Football className="h-5 w-5 text-accent" strokeWidth={1.8} />
                   </button>
                 ))
@@ -375,11 +480,11 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                       className="w-full flex items-center gap-3 p-3 bg-surface hover:bg-surface-hover border border-border rounded-xl transition-colors text-left disabled:opacity-50"
                     >
                       <PlayerAvatar
-                        name={tp.players?.name || "Jogador"}
-                        avatarUrl={tp.players?.avatar_url}
+                        name={tp.player?.name || "Jogador"}
+                        avatarUrl={tp.player?.avatar_url}
                         className="w-10 h-10 rounded-full bg-background text-xs font-bold flex-shrink-0"
                       />
-                      <span className="font-bold text-foreground flex-1">{tp.players?.name}</span>
+                      <span className="font-bold text-foreground flex-1">{tp.player?.name}</span>
                       <Target className="h-5 w-5 text-accent" strokeWidth={1.8} />
                     </button>
                   ))}

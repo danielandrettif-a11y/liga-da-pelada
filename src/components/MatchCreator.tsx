@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createMatch } from "@/lib/actions/matches";
-import { Swords, ArrowLeft, ChevronRight } from "@/components/icons";
+import { Swords, ArrowLeft, ChevronRight, AlertTriangle, Check } from "@/components/icons";
 import Link from "next/link";
 
 export function MatchCreator({ round }: { round: any }) {
@@ -12,8 +12,29 @@ export function MatchCreator({ round }: { round: any }) {
   const [teamBId, setTeamBId] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [replacementByAbsent, setReplacementByAbsent] = useState<Record<string, string>>({});
 
   const teams = round?.teams || [];
+  const selectedTeamIds = useMemo(() => [teamAId, teamBId].filter(Boolean), [teamAId, teamBId]);
+  const availability = useMemo(() => new Map(
+    (round?.round_players || []).map((entry: any) => [entry.player_id, entry.availability_status || "available"]),
+  ), [round?.round_players]);
+  const selectedTeams = teams.filter((team: any) => selectedTeamIds.includes(team.id));
+  const injuredPlayers = selectedTeams.flatMap((team: any) =>
+    (team.team_players || [])
+      .filter((entry: any) => availability.get(entry.player_id) === "injured")
+      .map((entry: any) => ({ team, player: entry.players, playerId: entry.player_id })),
+  );
+  const waitingPlayers = teams
+    .filter((team: any) => !selectedTeamIds.includes(team.id))
+    .flatMap((team: any) => (team.team_players || [])
+      .filter((entry: any) => availability.get(entry.player_id) === "available")
+      .map((entry: any) => ({ team, player: entry.players, playerId: entry.player_id })))
+    .filter((entry: any) => entry.player);
+
+  useEffect(() => {
+    setReplacementByAbsent({});
+  }, [teamAId, teamBId]);
 
   async function handleStart() {
     if (!teamAId || !teamBId) {
@@ -24,6 +45,11 @@ export function MatchCreator({ round }: { round: any }) {
       setError("Os times devem ser diferentes.");
       return;
     }
+
+    const uncoveredPlayers = injuredPlayers.filter((entry: any) => !replacementByAbsent[entry.playerId]);
+    if (uncoveredPlayers.length > 0 && !confirm(
+      `${uncoveredPlayers.length} desfalque(s) estao sem substituto. Deseja iniciar a partida com menos jogadores?`,
+    )) return;
 
     setLoading(true);
     setError("");
@@ -36,6 +62,13 @@ export function MatchCreator({ round }: { round: any }) {
       team_a_id: teamAId,
       team_b_id: teamBId,
       match_order: order,
+      replacements: injuredPlayers
+        .filter((entry: any) => replacementByAbsent[entry.playerId])
+        .map((entry: any) => ({
+          team_id: entry.team.id,
+          absent_player_id: entry.playerId,
+          replacement_player_id: replacementByAbsent[entry.playerId],
+        })),
     });
 
     if (!res.success) {
@@ -130,6 +163,61 @@ export function MatchCreator({ round }: { round: any }) {
         </div>
 
       </div>
+
+      {selectedTeamIds.length === 2 && (
+        <section className="glass-card overflow-hidden animate-fade-in-up">
+          <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3">
+            <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${injuredPlayers.length > 0 ? "bg-danger/15 text-danger" : "bg-success/10 text-success"}`}>
+              {injuredPlayers.length > 0 ? <AlertTriangle className="h-4.5 w-4.5" /> : <Check className="h-4.5 w-4.5" />}
+            </span>
+            <div>
+              <h2 className="text-sm font-black text-foreground">Escalacao da partida</h2>
+              <p className="text-[10px] font-semibold text-muted">
+                {injuredPlayers.length > 0 ? `${injuredPlayers.length} desfalque(s) para cobrir` : "Todos os jogadores estao disponiveis"}
+              </p>
+            </div>
+          </div>
+
+          {injuredPlayers.length > 0 && (
+            <div className="space-y-4 p-4">
+              {injuredPlayers.map((entry: any) => {
+                const usedByAnother = new Set(
+                  Object.entries(replacementByAbsent)
+                    .filter(([absentId]) => absentId !== entry.playerId)
+                    .map(([, replacementId]) => replacementId),
+                );
+                return (
+                  <label key={entry.playerId} className="block">
+                    <span className="mb-2 flex items-center justify-between gap-3 text-xs font-bold">
+                      <span className="truncate text-foreground">{entry.player?.name || "Jogador"}</span>
+                      <span className="shrink-0 text-[9px] font-black uppercase text-danger">{entry.team.name} · fora</span>
+                    </span>
+                    <select
+                      value={replacementByAbsent[entry.playerId] || ""}
+                      onChange={(event) => setReplacementByAbsent((current) => ({ ...current, [entry.playerId]: event.target.value }))}
+                      className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-semibold text-foreground outline-none focus:border-accent"
+                    >
+                      <option value="">Jogar com um a menos</option>
+                      {waitingPlayers
+                        .filter((candidate: any) => !usedByAnother.has(candidate.playerId))
+                        .map((candidate: any) => (
+                          <option key={candidate.playerId} value={candidate.playerId}>
+                            {candidate.player.name} · emprestado do {candidate.team.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                );
+              })}
+              {waitingPlayers.length === 0 && (
+                <p className="rounded-xl bg-warning/10 p-3 text-xs font-semibold text-warning">
+                  Nao ha jogadores disponiveis nos times que estao aguardando.
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       <button
         onClick={handleStart}

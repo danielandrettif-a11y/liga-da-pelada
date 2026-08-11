@@ -75,12 +75,10 @@ export async function calculateRoundStats(roundId: string) {
         *,
         matches (
           *,
-          match_events (*)
+          match_events (*),
+          match_players (*)
         ),
-        teams (
-          *,
-          team_players (*)
-        )
+        round_players (*)
       `)
       .eq("id", roundId)
       .single();
@@ -106,23 +104,21 @@ export async function calculateRoundStats(roundId: string) {
     // Objeto temporário para acumular os stats de cada player_id
     const statsMap: Record<string, any> = {};
 
-    // 2. Inicializar os jogadores da rodada
-    for (const team of round.teams) {
-      for (const tp of team.team_players) {
-        if (!statsMap[tp.player_id]) {
-          statsMap[tp.player_id] = {
-            player_id: tp.player_id,
-            round_id: roundId,
-            league_id: round.league_id,
-            games: 0,
-            wins: 0,
-            draws: 0,
-            losses: 0,
-            goals: 0,
-            assists: 0,
-            points: 0,
-          };
-        }
+    // 2. Inicializar todos os inscritos, inclusive machucados e emprestados.
+    for (const roundPlayer of round.round_players || []) {
+      if (!statsMap[roundPlayer.player_id]) {
+        statsMap[roundPlayer.player_id] = {
+          player_id: roundPlayer.player_id,
+          round_id: roundId,
+          league_id: round.league_id,
+          games: 0,
+          wins: 0,
+          draws: 0,
+          losses: 0,
+          goals: 0,
+          assists: 0,
+          points: 0,
+        };
       }
     }
 
@@ -130,14 +126,14 @@ export async function calculateRoundStats(roundId: string) {
     for (const match of finishedMatches) {
       const isDraw = match.score_a === match.score_b;
       const winnerId = isDraw ? null : (match.score_a > match.score_b ? match.team_a_id : match.team_b_id);
-      const loserId = isDraw ? null : (match.score_a < match.score_b ? match.team_a_id : match.team_b_id);
 
-      // Adicionar stats base de partida (win, draw, loss)
+      // Resultado vale somente para participantes marcados como elegiveis.
       const processTeamMatch = (teamId: string, result: 'win' | 'draw' | 'loss') => {
-        const team = round.teams.find((t: any) => t.id === teamId);
-        if (!team) return;
-        for (const tp of team.team_players) {
-          const s = statsMap[tp.player_id];
+        const participants = (match.match_players || []).filter(
+          (participant: any) => participant.team_id === teamId && participant.result_eligible,
+        );
+        for (const participant of participants) {
+          const s = statsMap[participant.player_id];
           if (!s) continue;
           s.games += 1;
           if (result === 'win') { s.wins += 1; s.points += points.win; }
