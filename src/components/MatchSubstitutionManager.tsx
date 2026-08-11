@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeftRight, Loader2, X } from "@/components/icons";
 import { substituteMatchPlayer } from "@/lib/actions/matches";
-import type { MatchSubstitutionReason } from "@/lib/types";
+import type { MatchSubstitutionReason, Player } from "@/lib/types";
 import { isEntryResultEligible } from "@/lib/match-rules";
+import { TeamMiniPitch } from "./TeamMiniPitch";
 
 export function MatchSubstitutionManager({
   match,
@@ -28,13 +29,11 @@ export function MatchSubstitutionManager({
     () => new Set((match.match_players || []).map((entry: any) => entry.player_id)),
     [match.match_players],
   );
-  const activePlayers = (match.match_players || []).filter(
-    (entry: any) => entry.team_id === teamId && entry.is_active,
-  );
   const teams = match.round?.teams || [];
-  const waitingTeamIds = new Set(
-    teams.filter((team: any) => ![match.team_a_id, match.team_b_id].includes(team.id)).map((team: any) => team.id),
+  const waitingTeams = teams.filter(
+    (team: any) => ![match.team_a_id, match.team_b_id].includes(team.id),
   );
+  const waitingTeamIds = new Set(waitingTeams.map((team: any) => team.id));
   const originalTeamByPlayer = new Map<string, any>();
   for (const team of teams) {
     for (const teamPlayer of team.team_players || []) originalTeamByPlayer.set(teamPlayer.player_id, team);
@@ -45,10 +44,11 @@ export function MatchSubstitutionManager({
     .map((entry: any) => ({ ...entry, originalTeam: originalTeamByPlayer.get(entry.player_id) }))
     .filter((entry: any) => entry.players && entry.originalTeam && waitingTeamIds.has(entry.originalTeam.id))
     .sort((a: any, b: any) => a.players.name.localeCompare(b.players.name, "pt-BR"));
+  const selectedOutgoing = (match.match_players || []).find(
+    (entry: any) => entry.player_id === playerOutId && entry.is_active,
+  );
 
-  function close() {
-    if (loading) return;
-    setOpen(false);
+  function resetSelection() {
     setTeamId("");
     setPlayerOutId("");
     setPlayerInId("");
@@ -57,12 +57,25 @@ export function MatchSubstitutionManager({
     setError("");
   }
 
+  function close() {
+    if (loading) return;
+    setOpen(false);
+    resetSelection();
+  }
+
+  function selectOutgoing(team: any, player: Player) {
+    setTeamId(team.id);
+    setPlayerOutId(player.id);
+    setPlayerInId("");
+    setError("");
+  }
+
   async function submit() {
     if (!teamId || !playerOutId) {
-      setError("Escolha o time e quem vai sair.");
+      setError("Toque no jogador que vai sair.");
       return;
     }
-    if (!playerInId && !confirm("Nenhum substituto foi escolhido. O time ficara com um jogador a menos. Continuar?")) return;
+    if (!playerInId && !confirm("Nenhum substituto foi escolhido. O time ficará com um jogador a menos. Continuar?")) return;
 
     setLoading(true);
     setError("");
@@ -75,17 +88,13 @@ export function MatchSubstitutionManager({
       mark_injured: markInjured,
     });
     if (!result.success) {
-      setError(result.error || "Nao foi possivel fazer a substituicao.");
+      setError(result.error || "Não foi possível fazer a substituição.");
       setLoading(false);
       return;
     }
     setLoading(false);
     setOpen(false);
-    setTeamId("");
-    setPlayerOutId("");
-    setPlayerInId("");
-    setReason("tired");
-    setMarkInjured(false);
+    resetSelection();
   }
 
   if (!canManage || match.status !== "live") return null;
@@ -100,121 +109,137 @@ export function MatchSubstitutionManager({
         className="flex w-full items-center justify-center gap-2 rounded-xl border border-warning/35 bg-warning/10 py-3.5 text-sm font-black text-warning transition-colors hover:bg-warning/15 active:scale-[0.98]"
       >
         <ArrowLeftRight className="h-5 w-5" />
-        Fazer substituicao
+        Pedir substituição
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center bg-background/85 p-3 pb-[max(.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center">
-          <div className="glass-card flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden animate-slide-in-bottom">
+        <div className="fixed inset-0 z-[110] flex items-end justify-center bg-background/85 p-2 pb-[max(.5rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:p-3">
+          <div className="glass-card flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden animate-slide-in-bottom">
             <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-3">
               <div>
-                <h3 className="font-black text-foreground">Substituicao temporaria</h3>
-                <p className="text-[10px] font-semibold text-muted">Quem sair nao podera voltar nesta partida.</p>
+                <h3 className="font-black text-foreground">Pedir substituição</h3>
+                <p className="text-[10px] font-semibold text-muted">Toque em quem vai sair e escolha alguém do banco.</p>
               </div>
-              <button type="button" onClick={close} className="rounded-lg p-2 text-muted hover:bg-surface-hover hover:text-foreground">
+              <button type="button" onClick={close} className="rounded-lg p-2 text-muted hover:bg-surface-hover hover:text-foreground" aria-label="Fechar">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="flex-1 space-y-5 overflow-y-auto p-4">
+            <div className="flex-1 space-y-5 overflow-y-auto p-3 sm:p-4">
               {error && <p className="rounded-xl bg-danger/10 p-3 text-xs font-semibold text-danger" role="alert">{error}</p>}
 
-              <div>
-                <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-muted">1. Qual time?</p>
+              <section>
+                <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-muted">1. Toque em quem vai sair</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {[match.team_a, match.team_b].map((team: any) => (
+                  {[match.team_a, match.team_b].map((team: any, index: number) => {
+                    const lineup = (match.match_players || []).filter(
+                      (entry: any) => entry.team_id === team.id && entry.is_active,
+                    );
+                    return (
+                      <TeamMiniPitch
+                        key={team.id}
+                        index={index}
+                        selectedPlayerId={playerOutId}
+                        onPlayerClick={(player) => selectOutgoing(team, player)}
+                        team={{
+                          ...team,
+                          team_players: lineup.map((entry: any) => ({
+                            player_id: entry.player_id,
+                            players: entry.player,
+                          })),
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section>
+                <div className="mb-2 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-muted">2. Banco de reservas</p>
+                    <p className="mt-0.5 text-[9px] font-semibold text-muted">
+                      {waitingTeams.length > 0 ? waitingTeams.map((team: any) => team.name).join(" · ") : "Nenhum time aguardando"}
+                    </p>
+                  </div>
+                  {!playerOutId && <span className="text-[9px] font-bold text-warning">Escolha quem sai primeiro</span>}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {eligiblePlayers.map((entry: any) => (
                     <button
-                      key={team.id}
+                      key={entry.player_id}
                       type="button"
-                      onClick={() => { setTeamId(team.id); setPlayerOutId(""); }}
-                      className={`rounded-xl border p-3 text-sm font-black transition-colors ${teamId === team.id ? "border-accent bg-accent/10 text-accent" : "border-border bg-background text-foreground"}`}
+                      disabled={!playerOutId}
+                      onClick={() => setPlayerInId(entry.player_id)}
+                      className={`min-w-0 rounded-xl border p-3 text-left transition-colors disabled:opacity-45 ${playerInId === entry.player_id ? "border-accent bg-accent/10" : "border-border bg-background"}`}
                     >
-                      {team.name}
+                      <span className="block truncate text-xs font-black text-foreground">{entry.players.name}</span>
+                      <span className="mt-0.5 block truncate text-[9px] font-bold uppercase text-muted">{entry.originalTeam.name}</span>
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    disabled={!playerOutId}
+                    onClick={() => setPlayerInId("")}
+                    className={`rounded-xl border p-3 text-left text-xs font-black transition-colors disabled:opacity-45 ${playerOutId && !playerInId ? "border-warning bg-warning/10 text-warning" : "border-border bg-background text-muted"}`}
+                  >
+                    Sair sem substituto
+                  </button>
                 </div>
-              </div>
+                {eligiblePlayers.length === 0 && (
+                  <p className="mt-2 rounded-xl bg-warning/10 p-3 text-xs font-semibold text-warning">
+                    Não há reservas disponíveis nos times que estão aguardando.
+                  </p>
+                )}
+              </section>
 
-              {teamId && (
-                <div>
-                  <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-muted">2. Quem vai sair?</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {activePlayers.map((entry: any) => (
+              {playerOutId && (
+                <section className="rounded-2xl border border-border bg-background/60 p-3">
+                  <p className="mb-3 text-xs font-black text-foreground">
+                    Sai: <span className="text-warning">{selectedOutgoing?.player?.name || "Jogador"}</span>
+                  </p>
+                  <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-muted">3. Motivo</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      ["tired", "Cansaço"],
+                      ["injury", "Lesão"],
+                      ["other", "Outro"],
+                    ] as Array<[MatchSubstitutionReason, string]>).map(([value, label]) => (
                       <button
-                        key={entry.player_id}
+                        key={value}
                         type="button"
-                        onClick={() => setPlayerOutId(entry.player_id)}
-                        className={`truncate rounded-xl border p-3 text-left text-xs font-bold transition-colors ${playerOutId === entry.player_id ? "border-danger bg-danger/10 text-danger" : "border-border bg-background text-foreground"}`}
+                        onClick={() => { setReason(value); if (value === "injury") setMarkInjured(true); }}
+                        className={`rounded-xl border px-2 py-3 text-xs font-black ${reason === value ? "border-warning bg-warning/10 text-warning" : "border-border bg-background text-muted"}`}
                       >
-                        {entry.player?.name || "Jogador"}
+                        {label}
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
-
-              {playerOutId && (
-                <>
-                  <div>
-                    <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-muted">3. Motivo</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {([
-                        ["tired", "Cansaco"],
-                        ["injury", "Lesao"],
-                        ["other", "Outro"],
-                      ] as Array<[MatchSubstitutionReason, string]>).map(([value, label]) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => { setReason(value); if (value === "injury") setMarkInjured(true); }}
-                          className={`rounded-xl border px-2 py-3 text-xs font-black ${reason === value ? "border-warning bg-warning/10 text-warning" : "border-border bg-background text-muted"}`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                    <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-background p-3">
-                      <input
-                        type="checkbox"
-                        checked={markInjured}
-                        onChange={(event) => setMarkInjured(event.target.checked)}
-                        className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
-                      />
-                      <span>
-                        <span className="block text-xs font-bold text-foreground">Marcar como machucado</span>
-                        <span className="block text-[10px] leading-relaxed text-muted">Ficara fora das proximas partidas ate ser liberado na rodada.</span>
-                      </span>
-                    </label>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-muted">4. Quem entra?</p>
-                    <select
-                      value={playerInId}
-                      onChange={(event) => setPlayerInId(event.target.value)}
-                      className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-semibold text-foreground outline-none focus:border-accent"
-                    >
-                      <option value="">Sair sem substituto</option>
-                      {eligiblePlayers.map((entry: any) => (
-                        <option key={entry.player_id} value={entry.player_id}>
-                          {entry.players.name} · {entry.originalTeam.name}
-                        </option>
-                      ))}
-                    </select>
-                    {playerInId && (
-                      <p className={`mt-2 flex items-start gap-2 rounded-xl p-3 text-[10px] font-semibold ${afterHalf ? "bg-warning/10 text-warning" : "bg-accent/10 text-accent"}`}>
-                        {afterHalf && <AlertTriangle className="h-4 w-4 shrink-0" />}
-                        {afterHalf
-                          ? "A metade da partida ja passou: quem entrar recebe apenas gols e assistencias."
-                          : "Quem entrar agora ainda recebe normalmente o resultado da partida."}
-                      </p>
-                    )}
-                  </div>
-                </>
+                  <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-surface p-3">
+                    <input
+                      type="checkbox"
+                      checked={markInjured}
+                      onChange={(event) => setMarkInjured(event.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+                    />
+                    <span>
+                      <span className="block text-xs font-bold text-foreground">Marcar como machucado</span>
+                      <span className="block text-[10px] leading-relaxed text-muted">Ficará fora das próximas partidas até ser liberado.</span>
+                    </span>
+                  </label>
+                  {playerInId && (
+                    <p className={`mt-3 flex items-start gap-2 rounded-xl p-3 text-[10px] font-semibold ${afterHalf ? "bg-warning/10 text-warning" : "bg-accent/10 text-accent"}`}>
+                      {afterHalf && <AlertTriangle className="h-4 w-4 shrink-0" />}
+                      {afterHalf
+                        ? "A metade da partida já passou: quem entrar recebe apenas gols e assistências."
+                        : "Quem entrar agora ainda recebe normalmente o resultado da partida."}
+                    </p>
+                  )}
+                </section>
               )}
             </div>
 
-            <div className="border-t border-border bg-surface p-4">
+            <div className="border-t border-border bg-surface p-3 sm:p-4">
               <button
                 type="button"
                 onClick={submit}
@@ -222,7 +247,7 @@ export function MatchSubstitutionManager({
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3.5 text-sm font-black text-background disabled:opacity-50"
               >
                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowLeftRight className="h-5 w-5" />}
-                Confirmar substituicao
+                Confirmar substituição
               </button>
             </div>
           </div>

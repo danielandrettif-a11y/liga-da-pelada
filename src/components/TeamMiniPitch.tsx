@@ -14,6 +14,8 @@ type TeamMiniPitchProps = {
     team_players: PitchPlayer[];
   };
   index: number;
+  selectedPlayerId?: string;
+  onPlayerClick?: (player: Player) => void;
 };
 
 const POSITIONS: Record<number, Array<[number, number]>> = {
@@ -25,7 +27,7 @@ const POSITIONS: Record<number, Array<[number, number]>> = {
   6: [[26, 18], [74, 18], [26, 50], [74, 50], [26, 82], [74, 82]],
 };
 
-export function TeamMiniPitch({ team, index }: TeamMiniPitchProps) {
+export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick }: TeamMiniPitchProps) {
   const players = team.team_players
     .map((entry) => entry.players)
     .filter((player): player is Player => Boolean(player))
@@ -61,9 +63,13 @@ export function TeamMiniPitch({ team, index }: TeamMiniPitchProps) {
         {players.map((player, playerIndex) => {
           const [left, top] = positions[playerIndex];
           return (
-            <div
+            <button
               key={player.id}
-              className="absolute flex w-[48%] -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+              type="button"
+              disabled={!onPlayerClick}
+              onClick={() => onPlayerClick?.(player)}
+              aria-pressed={onPlayerClick ? selectedPlayerId === player.id : undefined}
+              className={`absolute flex w-[48%] -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-md transition-transform enabled:active:scale-95 ${selectedPlayerId === player.id ? "z-10 bg-warning/20 ring-2 ring-warning" : ""}`}
               style={{ left: `${left}%`, top: `${top}%` }}
               title={player.name}
             >
@@ -76,7 +82,7 @@ export function TeamMiniPitch({ team, index }: TeamMiniPitchProps) {
               <span className="mt-0.5 line-clamp-2 w-full rounded bg-black/75 px-0.5 py-0.5 text-center text-[7px] font-black leading-[1.05] text-white shadow-sm">
                 {player.name}
               </span>
-            </div>
+            </button>
           );
         })}
       </div>

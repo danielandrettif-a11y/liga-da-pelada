@@ -21,7 +21,6 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { MatchSubstitutionManager } from "./MatchSubstitutionManager";
-import { TeamMiniPitch } from "./TeamMiniPitch";
 import { getOfficialElapsedSeconds } from "@/lib/match-rules";
 
 type MatchLiveBoardProps = {
@@ -193,11 +192,6 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
     ...(match.match_events || []).map((event: any) => ({ ...event, timelineType: "goal" as const })),
     ...(match.match_substitutions || []).map((substitution: any) => ({ ...substitution, timelineType: "substitution" as const })),
   ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  const playersShownForTeam = (teamId: string) => (match.match_players || []).filter(
-    (entry: any) => entry.team_id === teamId
-      && (isFinished ? entry.left_elapsed_seconds === null : entry.is_active),
-  );
-
   return (
     <div className="space-y-6">
       {/* Top bar */}
@@ -292,30 +286,6 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
         </div>
         </div>
       </div>
-
-      <section className="animate-fade-in-up">
-        <h2 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">
-          {isFinished ? "Escalacao no apito final" : "Jogadores em campo"}
-        </h2>
-        <div className="grid grid-cols-2 gap-2">
-          {[match.team_a, match.team_b].map((team: any, index: number) => {
-            const lineup = playersShownForTeam(team.id);
-            return (
-              <TeamMiniPitch
-                key={team.id}
-                index={index}
-                team={{
-                  ...team,
-                  team_players: lineup.map((entry: any) => ({
-                    player_id: entry.player_id,
-                    players: entry.player,
-                  })),
-                }}
-              />
-            );
-          })}
-        </div>
-      </section>
 
       {/* Timeline de Eventos */}
       <section className="animate-fade-in-up stagger-1">
