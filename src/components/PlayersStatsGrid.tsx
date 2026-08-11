@@ -8,7 +8,7 @@ import { calculateWinRate, getDisplayName } from "@/lib/utils";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
 
-type PlayerStats = Player & {
+export type PlayerStats = Player & {
   rounds: number;
   games: number;
   goals: number;
@@ -60,10 +60,10 @@ export function PlayersStatsGrid({ players }: { players: PlayerStats[] }) {
         </select>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid min-w-0 grid-cols-2 gap-3">
         {sortedPlayers.map((player, index) => (
-          <Link key={player.id} href={`/jogadores/${player.id}`} className="block h-full">
-            <div className={`player-stat-card h-full rounded-2xl p-3.5 animate-fade-in stagger-${Math.min(index + 1, 5)}`}>
+          <Link key={player.id} href={`/jogadores/${player.id}`} className="block h-full min-w-0">
+            <div className={`player-stat-card h-full min-w-0 rounded-2xl p-3.5 animate-fade-in stagger-${Math.min(index + 1, 5)}`}>
               <div className="mb-3 flex items-center gap-3">
                 <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-11 w-11 flex-shrink-0 rounded-full border border-accent/25 bg-surface-hover text-sm font-bold text-muted ring-2 ring-background shadow-[0_0_16px_rgba(204,255,0,.08)]" />
                 <div className="min-w-0 flex-1">

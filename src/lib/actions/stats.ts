@@ -22,6 +22,10 @@ type RankingStatsRow = {
   player: Player;
 };
 
+function isSelectableAthlete(player: Player | null | undefined) {
+  return Boolean(player?.is_selectable && (player.member_category === "player" || player.member_category === "guest"));
+}
+
 function sortRankingEntries<T extends Pick<RankingEntry, "points" | "wins" | "goals" | "assists">>(entries: T[]) {
   return [...entries].sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
@@ -214,6 +218,7 @@ export async function getRanking() {
   const map = new Map<string, any>();
 
   for (const row of data) {
+    if (!isSelectableAthlete(row.player as Player | null)) continue;
     const pid = row.player_id;
     if (!map.has(pid)) {
       map.set(pid, {
@@ -314,7 +319,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
 
   const stats = rawStats as unknown as RankingStatsRow[];
   const currentRoundIds = new Set(currentRounds.map((round) => round.id));
-  const currentStats = stats.filter((row) => currentRoundIds.has(row.round_id));
+  const currentStats = stats.filter((row) => currentRoundIds.has(row.round_id) && isSelectableAthlete(row.player));
   const latestRound = currentRounds[0];
   const generalBase = aggregateRankingRows(currentStats);
   const previousBase = aggregateRankingRows(currentStats.filter((row) => row.round_id !== latestRound.id));
@@ -426,6 +431,7 @@ export async function getFriendlyStats(): Promise<FriendlyStatsEntry[]> {
   const map = new Map<string, FriendlyStatsEntry>();
   for (const raw of rows || []) {
     const row = raw as unknown as Omit<RankingStatsRow, "points">;
+    if (!isSelectableAthlete(row.player)) continue;
     const current = map.get(row.player_id) || { player: row.player, rounds: 0, games: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, bestGoalkeeper: goalkeeperCounts.get(row.player_id) || 0 };
     current.rounds += 1;
     current.games += row.games;

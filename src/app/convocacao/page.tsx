@@ -21,6 +21,5 @@ export default async function ConvocacaoPage() {
   }
 
   const selectablePlayers = account.isAdmin ? await getPlayers(true) : [];
-  return <CallupBoard callup={callup} currentPlayerId={account.profile?.player_id || null} isAuthenticated={Boolean(account.user)} isAdmin={account.isAdmin} selectablePlayers={selectablePlayers} />;
+  return <div className="min-w-0 overflow-x-clip"><CallupBoard callup={callup} currentPlayerId={account.profile?.player_id || null} isAuthenticated={Boolean(account.user)} isAdmin={account.isAdmin} selectablePlayers={selectablePlayers} /></div>;
 }
-

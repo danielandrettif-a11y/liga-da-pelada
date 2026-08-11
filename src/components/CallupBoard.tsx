@@ -61,24 +61,38 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
     );
   }
 
+  function EmptySlots({ start, total, label }: { start: number; total: number; label: string }) {
+    if (total <= 0) return null;
+    return (
+      <div className="grid grid-cols-3 gap-2 pt-1">
+        {Array.from({ length: total }, (_, index) => (
+          <div key={start + index} className="flex min-w-0 items-center gap-1.5 rounded-xl border border-dashed border-border bg-background/20 px-2 py-3 text-[10px] text-muted">
+            <span className="font-black text-foreground/60">{start + index}</span>
+            <span className="truncate">{label}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-5">
-      <section className="overflow-hidden rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/15 via-surface to-surface p-5">
+    <div className="min-w-0 space-y-5 overflow-x-clip pb-3">
+      <section className="min-w-0 overflow-hidden rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/15 via-surface to-surface p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[9px] font-black uppercase text-background">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-background" /> Convocação aberta
             </div>
             <h1 className="text-2xl font-black text-foreground">{callup.round_type === "friendly" ? "Amistoso" : "Rodada oficial"}</h1>
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-muted"><Calendar className="h-4 w-4 text-accent" /> {new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(new Date(`${callup.date}T12:00:00`))}</p>
+            <p className="mt-1 flex min-w-0 items-start gap-1.5 text-sm leading-5 text-muted"><Calendar className="mt-0.5 h-4 w-4 shrink-0 text-accent" /><span>{new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(new Date(`${callup.date}T12:00:00`))}</span></p>
           </div>
           <button onClick={copyInvite} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-accent" aria-label="Copiar convite">
             {loading === "copied" ? <CheckCircle2 className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
           </button>
         </div>
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-border bg-background/40 p-3"><p className="text-2xl font-black text-accent">{confirmed.length}/15</p><p className="text-[10px] font-bold uppercase text-muted">Confirmados</p></div>
-          <div className="rounded-xl border border-border bg-background/40 p-3"><p className="text-2xl font-black text-warning">{waitlist.length}/3</p><p className="text-[10px] font-bold uppercase text-muted">Na fila</p></div>
+        <div className="mt-5 grid min-w-0 grid-cols-2 gap-2.5">
+          <div className="min-w-0 rounded-xl border border-border bg-background/40 p-3"><p className="text-2xl font-black text-accent">{confirmed.length}/15</p><p className="truncate text-[9px] font-bold uppercase text-muted">Confirmados</p></div>
+          <div className="min-w-0 rounded-xl border border-border bg-background/40 p-3"><p className="text-2xl font-black text-warning">{waitlist.length}/3</p><p className="truncate text-[9px] font-bold uppercase text-muted">Na fila</p></div>
         </div>
       </section>
 
@@ -103,18 +117,16 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
       <section className="space-y-2">
         <div className="flex items-center justify-between px-1"><h2 className="text-xs font-black uppercase tracking-wider text-muted">Relacionados</h2><CheckCircle2 className="h-4 w-4 text-accent" /></div>
         <div className="glass-card space-y-2 p-3">
-          {Array.from({ length: 15 }, (_, index) => confirmed[index]
-            ? <EntryRow key={confirmed[index].id} entry={confirmed[index]} position={index + 1} />
-            : <div key={index} className="flex h-[58px] items-center gap-3 rounded-xl border border-dashed border-border px-3 text-xs text-muted"><span className="w-6 text-center font-black">{index + 1}</span><span>Vaga disponível</span></div>)}
+          {confirmed.map((entry, index) => <EntryRow key={entry.id} entry={entry} position={index + 1} />)}
+          <EmptySlots start={confirmed.length + 1} total={15 - confirmed.length} label="Livre" />
         </div>
       </section>
 
       <section className="space-y-2">
         <div className="flex items-center justify-between px-1"><h2 className="text-xs font-black uppercase tracking-wider text-muted">Banco de espera</h2><Clock className="h-4 w-4 text-warning" /></div>
         <div className="glass-card space-y-2 p-3">
-          {Array.from({ length: 3 }, (_, index) => waitlist[index]
-            ? <EntryRow key={waitlist[index].id} entry={waitlist[index]} position={index + 1} />
-            : <div key={index} className="flex h-[58px] items-center gap-3 rounded-xl border border-dashed border-border px-3 text-xs text-muted"><span className="w-6 text-center font-black">{index + 1}</span><span>Fila livre</span></div>)}
+          {waitlist.map((entry, index) => <EntryRow key={entry.id} entry={entry} position={index + 1} />)}
+          <EmptySlots start={waitlist.length + 1} total={3 - waitlist.length} label="Livre" />
         </div>
       </section>
 
@@ -133,4 +145,3 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
     </div>
   );
 }
-

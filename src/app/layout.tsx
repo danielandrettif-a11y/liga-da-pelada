@@ -56,9 +56,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${oswald.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col font-sans">
+      <body className="min-h-full overflow-x-clip flex flex-col font-sans">
         <Header />
-        <main className="flex-1 px-4 pt-4 pb-24 max-w-lg mx-auto w-full">
+        <main className="min-w-0 flex-1 overflow-x-clip px-4 pt-4 pb-24 max-w-lg mx-auto w-full">
           {children}
         </main>
         <Suspense fallback={null}>

@@ -241,7 +241,7 @@ export function PlayerForm({ player, mode = "admin" }: { player?: Player; mode?:
             <option value="wag">WAG</option>
             <option value="supporter">Torcedor</option>
           </select>
-          <p className="text-[10px] text-muted">WAGs e torcedores aparecem no Elenco, mas nunca entram em convocações, sorteios ou partidas.</p>
+          <p className="text-[10px] text-muted">WAGs e torcedores aparecem no Elenco, mas nunca entram em convocações, sorteios ou partidas. Se já houver estatísticas, elas serão preservadas e ficarão ocultas.</p>
           {memberCategory === "guest" && (
             <label className="flex items-center justify-between rounded-xl border border-border bg-background/40 px-4 py-3 text-sm font-bold text-foreground">
               Disponível para convocação

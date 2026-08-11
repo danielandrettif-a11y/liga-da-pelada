@@ -1,3 +1,5 @@
+"use client";
+
 import { getInitials } from "@/lib/utils";
 import type { Player } from "@/lib/types";
 

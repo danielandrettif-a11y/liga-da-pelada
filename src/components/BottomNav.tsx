@@ -16,7 +16,9 @@ const NAV_ITEMS = [
 export function BottomNav({ isAuthenticated, hasOpenCallup }: { isAuthenticated: boolean; hasOpenCallup: boolean }) {
   const pathname = usePathname();
   const baseItems = hasOpenCallup
-    ? [NAV_ITEMS[0], { href: "/convocacao", label: "Convocação", icon: Flag }, ...NAV_ITEMS.slice(1)]
+    // Durante uma convocação, ela ocupa o lugar do Cartola (ainda em construção).
+    // Assim a barra nunca passa de seis itens e permanece legível em telas estreitas.
+    ? [NAV_ITEMS[0], { href: "/convocacao", label: "Convocação", icon: Flag }, ...NAV_ITEMS.slice(2)]
     : [...NAV_ITEMS];
   const visibleItems = isAuthenticated
     ? baseItems
