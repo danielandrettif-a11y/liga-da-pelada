@@ -132,6 +132,18 @@ export type RoundPayment = {
   created_at: string;
 };
 
+export type RoundPaymentAudit = {
+  id: number;
+  round_id: string;
+  target_player_id: string | null;
+  target_player_name: string;
+  paid: boolean;
+  changed_by_user_id: string | null;
+  changed_by_player_id: string | null;
+  changed_by_name: string;
+  created_at: string;
+};
+
 export type SeasonStatus = 'active' | 'finished';
 
 export type Season = {
@@ -479,6 +491,11 @@ export type Database = {
         Row: RoundPayment;
         Insert: Omit<RoundPayment, 'id' | 'created_at' | 'paid' | 'paid_at'> & { id?: string; created_at?: string; paid?: boolean; paid_at?: string | null };
         Update: Partial<Omit<RoundPayment, 'id'>>;
+      };
+      round_payment_audit: {
+        Row: RoundPaymentAudit;
+        Insert: Omit<RoundPaymentAudit, 'id' | 'created_at'> & { id?: number; created_at?: string };
+        Update: never;
       };
       teams: {
         Row: Team;

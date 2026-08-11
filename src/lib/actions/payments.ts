@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
-import { getCurrentAccount } from "../auth";
+import { getAdminClient, getCurrentAccount } from "../auth";
 import type { Player, RoundStatus, RoundType } from "../types";
 import { getActiveSeason } from "./seasons";
 import { getActiveLeague } from "./rounds";
@@ -20,6 +20,23 @@ export type PaymentRound = {
 export type PaymentPlayer = Player & {
   paid: boolean;
   paid_at: string | null;
+};
+
+export type PaymentAuditLogEntry = {
+  id: number;
+  round_id: string;
+  target_player_id: string | null;
+  target_player_name: string;
+  paid: boolean;
+  changed_by_player_id: string | null;
+  changed_by_name: string;
+  created_at: string;
+  round: {
+    id: string;
+    number: number;
+    date: string;
+    round_type: RoundType;
+  } | null;
 };
 
 export async function getPaymentRounds(): Promise<PaymentRound[]> {
@@ -40,6 +57,15 @@ export async function getPaymentRounds(): Promise<PaymentRound[]> {
   }
 
   return data as PaymentRound[];
+}
+
+export async function hasReleasedPaymentRound(): Promise<boolean> {
+  const rounds = await getPaymentRounds();
+  const latestRound = rounds[0];
+
+  return latestRound?.status === "finished"
+    && Boolean(latestRound.payment_pix)
+    && Number(latestRound.payment_total) > 0;
 }
 
 export async function getRoundPaymentPlayers(roundId: string): Promise<PaymentPlayer[]> {
@@ -73,6 +99,34 @@ export async function getRoundPaymentPlayers(roundId: string): Promise<PaymentPl
     paid: paymentByPlayer.get(player.id)?.paid || false,
     paid_at: paymentByPlayer.get(player.id)?.paid_at || null,
   }));
+}
+
+export async function getPaymentAuditLog(): Promise<PaymentAuditLogEntry[]> {
+  const client = await getAdminClient();
+  if (!client) return [];
+
+  const { data, error } = await client
+    .from("round_payment_audit")
+    .select(`
+      id,
+      round_id,
+      target_player_id,
+      target_player_name,
+      paid,
+      changed_by_player_id,
+      changed_by_name,
+      created_at,
+      round:round_id (id, number, date, round_type)
+    `)
+    .order("id", { ascending: false })
+    .limit(1000);
+
+  if (error) {
+    console.error("Erro ao buscar auditoria dos pagamentos:", error);
+    return [];
+  }
+
+  return data as unknown as PaymentAuditLogEntry[];
 }
 
 export async function setPlayerPayment(roundId: string, playerId: string, paid: boolean) {
@@ -112,5 +166,6 @@ export async function setPlayerPayment(roundId: string, playerId: string, paid: 
   }
 
   revalidatePath("/pagamentos");
+  revalidatePath("/admin/transfermarket");
   return { success: true };
 }

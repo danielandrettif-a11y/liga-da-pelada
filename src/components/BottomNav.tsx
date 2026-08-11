@@ -13,16 +13,25 @@ const NAV_ITEMS = [
   { href: "/mais", label: "Mais", icon: MoreHorizontal },
 ] as const;
 
-export function BottomNav({ isAuthenticated, hasOpenCallup }: { isAuthenticated: boolean; hasOpenCallup: boolean }) {
+export function BottomNav({
+  isAuthenticated,
+  hasOpenCallup,
+  hasReleasedPayment,
+}: {
+  isAuthenticated: boolean;
+  hasOpenCallup: boolean;
+  hasReleasedPayment: boolean;
+}) {
   const pathname = usePathname();
   const baseItems = hasOpenCallup
     // Durante uma convocação, ela ocupa o lugar do Cartola (ainda em construção).
     // Assim a barra nunca passa de seis itens e permanece legível em telas estreitas.
     ? [NAV_ITEMS[0], { href: "/convocacao", label: "Convocação", icon: Flag }, ...NAV_ITEMS.slice(2)]
     : [...NAV_ITEMS];
+  const contextualItems = baseItems.filter((item) => item.href !== "/pagamentos" || hasReleasedPayment);
   const visibleItems = isAuthenticated
-    ? baseItems
-    : baseItems.filter((item) => item.href !== "/pagamentos" && item.href !== "/mais");
+    ? contextualItems
+    : contextualItems.filter((item) => item.href !== "/mais");
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">

@@ -12,6 +12,22 @@ export type SerializedPushSubscription = {
   userAgent?: string;
 };
 
+export async function getPushPublicKey() {
+  const publicKey = process.env.VAPID_PUBLIC_KEY
+    || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    || "";
+
+  if (!publicKey) {
+    return {
+      success: false,
+      publicKey: "",
+      error: "As chaves VAPID ainda não foram configuradas no servidor.",
+    };
+  }
+
+  return { success: true, publicKey };
+}
+
 function isValidSubscription(subscription: SerializedPushSubscription) {
   return subscription.endpoint.startsWith("https://")
     && subscription.endpoint.length <= 4096

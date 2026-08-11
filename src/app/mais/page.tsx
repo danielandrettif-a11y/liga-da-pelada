@@ -17,6 +17,7 @@ import {
   LogIn,
   LogOut,
   Football,
+  ArrowLeftRight,
 } from "@/components/icons";
 
 const ADMIN_SECTIONS = [
@@ -34,6 +35,12 @@ const ADMIN_SECTIONS = [
         icon: CalendarPlus,
         label: "Nova Rodada",
         description: "Criar rodada e montar times",
+      },
+      {
+        href: "/admin/transfermarket",
+        icon: ArrowLeftRight,
+        label: "Histórico do Transfermarket",
+        description: "Ver quem marcou cada pagamento",
       },
     ],
   },

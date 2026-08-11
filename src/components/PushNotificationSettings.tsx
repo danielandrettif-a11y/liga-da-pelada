@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bell, Check, Loader2 } from "@/components/icons";
 import {
+  getPushPublicKey,
   subscribeToPush,
   unsubscribeFromPush,
   type SerializedPushSubscription,
@@ -110,7 +111,9 @@ export function PushNotificationSettings() {
     setMessage("");
 
     try {
-      const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      const configuration = await getPushPublicKey();
+      const publicKey = configuration.publicKey;
+      if (!configuration.success) throw new Error(configuration.error);
       if (!publicKey) throw new Error("As notificações ainda não foram configuradas no servidor.");
 
       const permission = await Notification.requestPermission();

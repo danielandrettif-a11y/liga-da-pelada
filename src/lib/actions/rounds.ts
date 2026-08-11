@@ -306,7 +306,7 @@ export async function createRoundWithTeams(
 
     revalidatePath("/rodadas");
     revalidatePath("/convocacao");
-    revalidatePath("/");
+    revalidatePath("/", "layout");
     return { success: true, roundId: round.id };
 
   } catch (err: any) {
@@ -348,7 +348,7 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     revalidatePath(`/rodadas/${roundId}`);
     revalidatePath("/rodadas");
     revalidatePath("/convocacao");
-    revalidatePath("/");
+    revalidatePath("/", "layout");
     revalidatePath("/ranking");
     revalidatePath("/pagamentos");
     return { success: true };
