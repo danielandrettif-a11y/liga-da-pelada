@@ -50,6 +50,12 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick }: 
         <span className="shrink-0 text-[7px] font-black text-muted">{players.length}J</span>
       </div>
 
+      <div className="mb-1 flex items-center justify-end px-0.5">
+        <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.12em] text-accent">
+          Números = ordem do gol
+        </span>
+      </div>
+
       <div
         className="relative h-[196px] overflow-hidden rounded-lg border border-white/25 shadow-[inset_0_0_22px_rgba(0,0,0,.3)]"
         style={{
@@ -61,10 +67,6 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick }: 
         <div className="absolute left-1/2 top-1/2 h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30" />
         <div className="absolute left-1/2 top-1.5 h-6 w-12 -translate-x-1/2 border border-t-0 border-white/30" />
         <div className="absolute bottom-1.5 left-1/2 h-6 w-12 -translate-x-1/2 border border-b-0 border-white/30" />
-
-        <span className="absolute left-2 top-2 z-10 rounded bg-black/45 px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.14em] text-white/75">
-          Ordem do gol
-        </span>
 
         {players.map(({ player, goalkeeperOrder }, playerIndex) => {
           const [left, top] = positions[playerIndex];

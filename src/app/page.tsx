@@ -18,6 +18,7 @@ import { getLatestFinishedSeason } from "@/lib/actions/seasons";
 import { PreviousSeasonBanner } from "@/components/PreviousSeasonBanner";
 import { GreetingBanner } from "@/components/GreetingBanner";
 import { LiveMatchBanner, type HomeLiveMatch } from "@/components/LiveMatchBanner";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -304,10 +305,12 @@ export default async function HomePage() {
                 >
                   <RankBadge rank={index + 1} />
                   
-                  {/* Avatar */}
-                  <div className="w-9 h-9 rounded-full bg-surface-hover flex items-center justify-center text-xs font-bold text-muted flex-shrink-0">
-                    {name.slice(0, 2).toUpperCase()}
-                  </div>
+                  {/* Foto do jogador, com iniciais apenas como fallback */}
+                  <PlayerAvatar
+                    name={name}
+                    avatarUrl={stats.player?.avatar_url}
+                    className="h-9 w-9 flex-shrink-0 rounded-full border border-border bg-surface-hover text-xs font-bold text-muted"
+                  />
 
                   {/* Name */}
                   <div className="flex-1 min-w-0">

@@ -5,6 +5,7 @@ import { logout } from "@/app/login/actions";
 import { InstallAppEntry } from "@/components/InstallAppPrompt";
 import { PushNotificationSettings } from "@/components/PushNotificationSettings";
 import { CallupAdminCard } from "@/components/CallupAdminCard";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { getActiveCallup } from "@/lib/actions/callups";
 import { getLeagueConfig } from "@/lib/actions/league";
 import {
@@ -65,10 +66,19 @@ const ADMIN_SECTIONS = [
 
 export default async function MaisPage() {
   const account = await getCurrentAccount();
-  const [accountName, activeCallup, leagueConfig] = await Promise.all([
+  const playerAvatarPromise = account.profile?.player_id
+    ? account.client
+        .from("players")
+        .select("avatar_url")
+        .eq("id", account.profile.player_id)
+        .maybeSingle()
+        .then(({ data }) => data?.avatar_url)
+    : Promise.resolve(undefined);
+  const [accountName, activeCallup, leagueConfig, playerAvatarUrl] = await Promise.all([
     getAccountDisplayName(account),
     account.isAdmin ? getActiveCallup() : Promise.resolve(null),
     account.isAdmin ? getLeagueConfig() : Promise.resolve(null),
+    playerAvatarPromise,
   ]);
 
   return (
@@ -77,9 +87,11 @@ export default async function MaisPage() {
 
       {account.user && (
         <div className="glass-card flex items-center gap-3 p-4">
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-accent/15 text-lg font-black text-accent">
-            {(accountName || "U").slice(0, 1).toUpperCase()}
-          </div>
+          <PlayerAvatar
+            name={accountName || "Usuário"}
+            avatarUrl={playerAvatarUrl}
+            className="h-11 w-11 shrink-0 rounded-full border border-accent/25 bg-accent/15 text-sm font-black text-accent"
+          />
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Conta conectada</p>
             <p className="truncate text-base font-black text-foreground">{accountName}</p>
