@@ -12,13 +12,13 @@ type FriendlyRound = {
 export function PreSeasonBanner({ isAdmin, friendly }: { isAdmin: boolean; friendly: FriendlyRound | null }) {
   const href = friendly ? `/rodadas/${friendly.id}` : isAdmin ? "/admin/rodada?type=friendly" : null;
   const content = (
-    <div className="group relative isolate min-h-64 overflow-hidden rounded-[28px] border border-accent/35 bg-[#07150d] p-5 shadow-[0_22px_60px_rgba(0,0,0,.38),0_0_28px_rgba(204,255,0,.08)] sm:p-6">
+    <div className="group relative isolate h-[300px] overflow-hidden rounded-[28px] border border-accent/35 bg-[#07150d] p-5 shadow-[0_22px_60px_rgba(0,0,0,.38),0_0_28px_rgba(204,255,0,.08)] sm:p-6">
       <div className="pointer-events-none absolute inset-0 opacity-40" style={{ backgroundImage: "linear-gradient(rgba(204,255,0,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(204,255,0,.07) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
       <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-accent/20 blur-3xl transition-transform duration-700 group-hover:scale-125" />
       <div className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-warning/15 blur-3xl" />
       <div className="pointer-events-none absolute right-5 top-5 h-32 w-24 rotate-6 rounded-[45%] border border-accent/20 bg-gradient-to-b from-accent/15 to-transparent" />
 
-      <div className="relative z-10 flex h-full flex-col">
+      <div className="relative z-10 flex h-full flex-col justify-between">
         <div className="flex items-start justify-between gap-3">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-1.5 font-athletic text-[10px] font-black uppercase italic tracking-[0.18em] text-accent">
             <Sparkles className="h-3.5 w-3.5" /> Abertura oficial
@@ -28,7 +28,7 @@ export function PreSeasonBanner({ isAdmin, friendly }: { isAdmin: boolean; frien
           </div>
         </div>
 
-        <div className="mt-6 max-w-[82%]">
+        <div className="max-w-[82%]">
           <p className="font-athletic text-xs font-black uppercase italic tracking-[0.28em] text-warning">Pelada BQ apresenta</p>
           <h2 className="mt-1 font-athletic text-[32px] font-black uppercase italic leading-[.95] tracking-tight text-white sm:text-4xl">
             Pré-Temporada <span className="text-accent">V.1</span>
@@ -36,7 +36,7 @@ export function PreSeasonBanner({ isAdmin, friendly }: { isAdmin: boolean; frien
           <p className="mt-3 text-xs font-semibold leading-5 text-muted">Antes do Ranked, a resenha entra em campo. Amistosos, novos testes e futebol sem pressão no ranking.</p>
         </div>
 
-        <div className="mt-6 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
+        <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-4">
           <div className="flex min-w-0 items-center gap-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-background"><Football className="h-5 w-5" /></div>
             <div className="min-w-0">

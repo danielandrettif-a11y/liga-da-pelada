@@ -56,13 +56,17 @@ export function CallupAdminCard({
   return (
     <section>
       <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-muted">Convocação</h2>
-      <div className="glass-card p-4">
+      <div className="glass-card min-w-0 overflow-hidden p-4">
         {error && <div className="mb-3 rounded-lg bg-danger/10 p-3 text-xs font-bold text-danger">{error}</div>}
         {!callup ? (
-          <form action={create} className="space-y-3">
+          <form action={create} className="min-w-0 space-y-3 overflow-hidden">
             <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10"><CalendarPlus className="h-5 w-5 text-accent" /></div><div><p className="text-sm font-black text-foreground">Abrir convocação</p><p className="text-xs text-muted">{capacity} vagas e {waitlistCapacity} na fila</p></div></div>
-            <input type="date" name="date" required defaultValue={new Date().toISOString().slice(0, 10)} className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground" />
-            <select name="round_type" className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground"><option value="official">Oficial (Ranked)</option><option value="friendly">Amistoso</option></select>
+            <div className="w-full min-w-0 overflow-hidden">
+              <input type="date" name="date" required defaultValue={new Date().toISOString().slice(0, 10)} className="block w-full min-w-0 max-w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground [appearance:none]" style={{ width: "100%", minWidth: 0, maxWidth: "100%" }} />
+            </div>
+            <div className="w-full min-w-0 overflow-hidden">
+              <select name="round_type" className="block w-full min-w-0 max-w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground"><option value="official">Oficial (Ranked)</option><option value="friendly">Amistoso</option></select>
+            </div>
             <button disabled={loading} className="w-full rounded-xl bg-accent py-3 text-sm font-black text-background disabled:opacity-50">{loading ? "Abrindo..." : "Abrir convocação"}</button>
           </form>
         ) : (
