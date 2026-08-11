@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, CheckCircle2, Copy, LockKeyhole } from "@/components/icons";
 import { setPlayerPayment, type PaymentPlayer, type PaymentRound } from "@/lib/actions/payments";
 import { PlayerAvatar } from "./PlayerAvatar";
@@ -21,6 +22,7 @@ export function PaymentChecklist({
   initialPlayers: PaymentPlayer[];
   canEdit: boolean;
 }) {
+  const router = useRouter();
   const [players, setPlayers] = useState(initialPlayers);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -60,6 +62,8 @@ export function PaymentChecklist({
     if (!result.success) {
       setPlayers(previous);
       setError(result.error || "Não foi possível atualizar o pagamento.");
+    } else {
+      router.refresh();
     }
     setSavingId(null);
   }

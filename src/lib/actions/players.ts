@@ -224,8 +224,9 @@ export async function getPlayerAwardSeasons(playerId: string) {
 }
 
 export async function createPlayer(input: CreatePlayerInput) {
-  const client = await getAdminClient();
-  if (!client) return { success: false, error: "Somente administradores podem criar jogadores." };
+  const account = await getCurrentAccount();
+  const client = account.isAdmin ? account.client : null;
+  if (!client || !account.user) return { success: false, error: "Somente administradores podem criar jogadores." };
 
   const { data, error } = await client
     .from("players")
@@ -240,6 +241,8 @@ export async function createPlayer(input: CreatePlayerInput) {
         is_selectable: input.member_category === "wag" || input.member_category === "supporter"
           ? false
           : input.is_selectable ?? true,
+        registration_source: "admin",
+        created_by_user_id: account.user.id,
       },
     ])
     .select()
@@ -386,6 +389,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     is_goalkeeper: memberCategory === "wag" || memberCategory === "supporter" ? false : requestedGoalkeeper,
     member_category: memberCategory,
     is_selectable: isSelectable,
+    ...(playerId ? {} : { registration_source: "admin", created_by_user_id: account.user.id }),
   };
 
   const query = playerId

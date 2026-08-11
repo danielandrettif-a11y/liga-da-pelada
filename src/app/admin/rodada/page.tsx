@@ -9,6 +9,7 @@ export const revalidate = 0;
 
 export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin/rodada">) {
   const params = await searchParams;
+  const requestedType = params.type === "friendly" ? "friendly" : "official";
   const [players, activeCallup, leagueConfig] = await Promise.all([
     getPlayersWithStats("official", true),
     getActiveCallup(),
@@ -27,7 +28,7 @@ export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin
           <ArrowLeft className="w-5 h-5 text-muted" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-foreground">{callup?.round_type === "friendly" ? "Novo Amistoso" : "Nova Rodada"}</h1>
+          <h1 className="text-xl font-bold text-foreground">{(callup?.round_type || requestedType) === "friendly" ? "Novo Amistoso" : "Nova Rodada"}</h1>
           <p className="text-xs text-muted mt-0.5">
             Monte os times para a próxima pelada
           </p>
@@ -38,7 +39,7 @@ export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin
         allPlayers={players}
         initialDate={callup?.date}
         initialPlayerIds={confirmedIds}
-        roundType={callup?.round_type || "official"}
+        roundType={callup?.round_type || requestedType}
         callupId={callup?.id || null}
         playersPerTeam={leagueConfig?.players_per_team || 5}
         teamsPerRound={leagueConfig?.teams_per_round || 3}

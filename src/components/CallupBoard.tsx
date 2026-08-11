@@ -47,16 +47,16 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
 
   function EntryRow({ entry, position }: { entry: CallupWithEntries["entries"][number]; position: number }) {
     return (
-      <div className="flex items-center gap-3 rounded-xl border border-border bg-background/45 px-3 py-2.5">
-        <span className="w-6 text-center text-xs font-black text-muted">{position}</span>
-        <PlayerAvatar name={entry.player.name} avatarUrl={entry.player.avatar_url} className="h-9 w-9 rounded-full bg-surface text-xs font-black text-muted" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-foreground">{entry.player.name}</p>
-          {entry.player.member_category === "guest" && <span className="text-[9px] font-black uppercase text-warning">Convidado</span>}
+      <div className="relative flex min-w-0 items-center gap-2 rounded-xl border border-border bg-background/45 p-2 pr-8">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-surface text-[10px] font-black text-muted">{position}</span>
+        <PlayerAvatar name={entry.player.name} avatarUrl={entry.player.avatar_url} className="h-8 w-8 shrink-0 rounded-full bg-surface text-[9px] font-black text-muted" />
+        <div className="min-w-0">
+          <p className="line-clamp-2 text-[11px] font-black leading-3.5 text-foreground">{entry.player.name}</p>
+          {entry.player.member_category === "guest" && <span className="text-[7px] font-black uppercase text-warning">Convidado</span>}
         </div>
         {isAdmin && callup.status === "open" && (
-          <button onClick={() => run(`remove-${entry.id}`, () => adminRemoveCallupPlayer(callup.id, entry.player_id))} disabled={!!loading} className="rounded-lg p-2 text-muted hover:bg-danger/10 hover:text-danger" aria-label={`Remover ${entry.player.name}`}>
-            {loading === `remove-${entry.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+          <button onClick={() => run(`remove-${entry.id}`, () => adminRemoveCallupPlayer(callup.id, entry.player_id))} disabled={!!loading} className="absolute right-1 top-1 rounded-lg p-1.5 text-muted hover:bg-danger/10 hover:text-danger" aria-label={`Remover ${entry.player.name}`}>
+            {loading === `remove-${entry.id}` ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
           </button>
         )}
       </div>
@@ -66,10 +66,10 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
   function EmptySlots({ start, total, label }: { start: number; total: number; label: string }) {
     if (total <= 0) return null;
     return (
-      <div className="grid grid-cols-3 gap-2 pt-1">
+      <div className="contents">
         {Array.from({ length: total }, (_, index) => (
-          <div key={start + index} className="flex min-w-0 items-center gap-1.5 rounded-xl border border-dashed border-border bg-background/20 px-2 py-3 text-[10px] text-muted">
-            <span className="font-black text-foreground/60">{start + index}</span>
+          <div key={start + index} className="flex min-h-12 min-w-0 items-center gap-2 rounded-xl border border-dashed border-border bg-background/20 px-2 py-2 text-[9px] text-muted">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-surface/60 font-black text-foreground/60">{start + index}</span>
             <span className="truncate">{label}</span>
           </div>
         ))}
@@ -118,7 +118,7 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
 
       <section className="space-y-2">
         <div className="flex items-center justify-between px-1"><h2 className="text-xs font-black uppercase tracking-wider text-muted">Relacionados</h2><CheckCircle2 className="h-4 w-4 text-accent" /></div>
-        <div className="glass-card space-y-2 p-3">
+        <div className="glass-card grid grid-cols-2 gap-2 p-3 sm:grid-cols-3">
           {confirmed.map((entry, index) => <EntryRow key={entry.id} entry={entry} position={index + 1} />)}
           <EmptySlots start={confirmed.length + 1} total={capacity - confirmed.length} label="Livre" />
         </div>
@@ -126,7 +126,7 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
 
       <section className="space-y-2">
         <div className="flex items-center justify-between px-1"><h2 className="text-xs font-black uppercase tracking-wider text-muted">Banco de espera</h2><Clock className="h-4 w-4 text-warning" /></div>
-        <div className="glass-card space-y-2 p-3">
+        <div className="glass-card grid grid-cols-2 gap-2 p-3 sm:grid-cols-3">
           {waitlist.map((entry, index) => <EntryRow key={entry.id} entry={entry} position={index + 1} />)}
           <EmptySlots start={waitlist.length + 1} total={waitlistCapacity - waitlist.length} label="Livre" />
         </div>

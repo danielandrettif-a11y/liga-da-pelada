@@ -20,6 +20,7 @@ export type MemberCategory = 'player' | 'guest' | 'wag' | 'supporter';
 export type RoundType = 'official' | 'friendly';
 export type CallupStatus = 'open' | 'locked' | 'converted' | 'closed';
 export type CallupEntryStatus = 'confirmed' | 'waitlist';
+export type RegistrationSource = 'legacy' | 'site_signup' | 'admin';
 
 export type Player = {
   id: string;
@@ -32,7 +33,25 @@ export type Player = {
   member_category: MemberCategory;
   is_selectable: boolean;
   show_fitness_stats: boolean;
+  registration_source: RegistrationSource;
+  created_by_user_id: string | null;
   created_at: string;
+};
+
+export type PlayerRegistrationEvent = {
+  id: number;
+  player_id: string | null;
+  player_name: string;
+  avatar_url: string | null;
+  member_category: MemberCategory;
+  source: RegistrationSource;
+  created_by_user_id: string | null;
+  created_at: string;
+};
+
+export type RosterUnreadState = {
+  count: number;
+  lastSeenAt: string | null;
 };
 
 export type League = {

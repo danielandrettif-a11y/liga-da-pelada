@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "@/components/icons";
 import { PlayerForm } from "@/components/PlayerForm";
 import { getPlayer } from "@/lib/actions/players";
+import { getRegisteredMergeCandidates } from "@/lib/actions/registrations";
+import { GuestProfileMerge } from "@/components/GuestProfileMerge";
 
 export const revalidate = 0;
 
@@ -17,6 +19,7 @@ export default async function EditarJogadorPage({
   if (!player) {
     notFound();
   }
+  const mergeCandidates = player.member_category === "guest" ? await getRegisteredMergeCandidates(player.id) : [];
 
   return (
     <div className="space-y-6">
@@ -36,6 +39,7 @@ export default async function EditarJogadorPage({
       </div>
 
       <PlayerForm player={player} />
+      {player.member_category === "guest" && <GuestProfileMerge guest={player} candidates={mergeCandidates} />}
     </div>
   );
 }

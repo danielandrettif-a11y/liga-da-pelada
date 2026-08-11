@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Home, ClipboardList, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag } from "@/components/icons";
 
 const NAV_ITEMS = [
@@ -17,12 +18,19 @@ export function BottomNav({
   isAuthenticated,
   hasOpenCallup,
   hasReleasedPayment,
+  newRosterCount,
 }: {
   isAuthenticated: boolean;
   hasOpenCallup: boolean;
   hasReleasedPayment: boolean;
+  newRosterCount: number;
 }) {
   const pathname = usePathname();
+  const [unreadRoster, setUnreadRoster] = useState(newRosterCount);
+  useEffect(() => setUnreadRoster(newRosterCount), [newRosterCount]);
+  useEffect(() => {
+    if (pathname.startsWith("/admin/jogadores")) setUnreadRoster(0);
+  }, [pathname]);
   const baseItems = hasOpenCallup
     // Durante uma convocação, ela ocupa o lugar do Cartola (ainda em construção).
     // Assim a barra nunca passa de seis itens e permanece legível em telas estreitas.
@@ -64,13 +72,20 @@ export function BottomNav({
                 <span className="absolute top-0 h-0.5 w-8 rounded-full bg-accent shadow-[0_0_12px_var(--accent)] animate-fade-in" />
               )}
               
-              <item.icon
-                active={isActive}
-                className={`h-5.5 w-5.5 transition-all duration-200 ${
-                  isActive ? "scale-110 drop-shadow-[0_0_6px_rgba(204,255,0,.45)]" : "opacity-80"
-                }`}
-                strokeWidth={isActive ? 2.1 : 1.8}
-              />
+              <span className="relative">
+                <item.icon
+                  active={isActive}
+                  className={`h-5.5 w-5.5 transition-all duration-200 ${
+                    isActive ? "scale-110 drop-shadow-[0_0_6px_rgba(204,255,0,.45)]" : "opacity-80"
+                  }`}
+                  strokeWidth={isActive ? 2.1 : 1.8}
+                />
+                {item.href === "/jogadores" && unreadRoster > 0 && (
+                  <span className="absolute -right-2.5 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full border border-background bg-danger px-1 text-[8px] font-black leading-none text-white shadow-lg">
+                    {unreadRoster > 99 ? "99+" : unreadRoster}
+                  </span>
+                )}
+              </span>
               <span
                 className={`block w-full truncate whitespace-nowrap text-center font-semibold leading-none tracking-tight ${
                   item.label === "Transfermarket" || item.label === "Convocação"

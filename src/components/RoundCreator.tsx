@@ -65,6 +65,7 @@ export function RoundCreator({
   const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(initialPlayerIds.length ? 3 : 1);
   const [date, setDate] = useState(() => initialDate || new Date().toISOString().split("T")[0]);
+  const [selectedRoundType, setSelectedRoundType] = useState<RoundType>(roundType);
   
   // Step 2: Seleção
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set(initialPlayerIds));
@@ -227,7 +228,7 @@ export function RoundCreator({
     }));
 
     // Converte a data local para um formato adequado ou salva como YYYY-MM-DD
-    const res = await createRoundWithTeams(date, teamsInput, { roundType, callupId });
+    const res = await createRoundWithTeams(date, teamsInput, { roundType: selectedRoundType, callupId });
     
     if (!res.success) {
       setError(res.error || "Erro ao salvar rodada");
@@ -240,8 +241,8 @@ export function RoundCreator({
 
   return (
     <div className="space-y-6">
-      <div className={`rounded-xl border p-3 text-xs font-bold ${roundType === "friendly" ? "border-warning/30 bg-warning/10 text-warning" : "border-accent/25 bg-accent/10 text-accent"}`}>
-        {roundType === "friendly" ? "Amistoso: estatísticas separadas do Ranking oficial" : "Rodada oficial · Ranked"}
+      <div className={`rounded-xl border p-3 text-xs font-bold ${selectedRoundType === "friendly" ? "border-warning/30 bg-warning/10 text-warning" : "border-accent/25 bg-accent/10 text-accent"}`}>
+        {selectedRoundType === "friendly" ? "Amistoso: estatísticas separadas do Ranking oficial" : "Rodada oficial · Ranked"}
         {callupId && <span className="ml-1 text-muted">· {initialPlayerIds.length} convocados pré-selecionados</span>}
       </div>
       {/* Progresso */}
@@ -271,6 +272,14 @@ export function RoundCreator({
       {/* STEP 1: Data */}
       {step === 1 && (
         <div className="glass-card min-w-0 overflow-hidden p-5 space-y-4 animate-fade-in">
+          <fieldset className="space-y-2">
+            <legend className="text-xs font-black uppercase tracking-wider text-muted">Tipo de pelada</legend>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" disabled={Boolean(callupId)} onClick={() => setSelectedRoundType("official")} className={`rounded-xl border px-3 py-3 text-xs font-black transition-colors ${selectedRoundType === "official" ? "border-accent bg-accent text-background" : "border-border bg-background text-muted"}`}>Ranked</button>
+              <button type="button" disabled={Boolean(callupId)} onClick={() => setSelectedRoundType("friendly")} className={`rounded-xl border px-3 py-3 text-xs font-black transition-colors ${selectedRoundType === "friendly" ? "border-warning bg-warning text-background" : "border-border bg-background text-muted"}`}>Amistoso</button>
+            </div>
+            {callupId && <p className="text-[10px] text-muted">O tipo foi definido pela convocação e não pode ser alterado.</p>}
+          </fieldset>
           <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
             <Calendar className="w-4 h-4 text-accent" />
             Quando será a pelada?

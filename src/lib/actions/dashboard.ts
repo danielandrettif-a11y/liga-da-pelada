@@ -35,6 +35,16 @@ export async function getDashboardData() {
       .limit(1)
       .single();
 
+    const nextFriendlyPromise = supabase
+      .from("rounds")
+      .select("*, round_players(count)")
+      .in("status", ["draft", "active"])
+      .eq("season_id", season.id)
+      .eq("round_type", "friendly")
+      .order("date", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
     const liveMatchPromise = supabase
       .from("matches")
       .select(`
@@ -56,19 +66,21 @@ export async function getDashboardData() {
 
     const leaguePromise = supabase
       .from("leagues")
-      .select("match_duration")
+      .select("match_duration, preseason_enabled")
       .eq("id", season.league_id)
       .single();
 
     // 3. Ranking e Destaques
     const [
       { data: nextRoundData },
+      { data: nextFriendlyData },
       { data: lastRoundData },
       { data: liveMatchData },
       { data: leagueData },
       ranking,
     ] = await Promise.all([
       nextRoundPromise,
+      nextFriendlyPromise,
       lastRoundPromise,
       liveMatchPromise,
       leaguePromise,
@@ -111,8 +123,13 @@ export async function getDashboardData() {
           ...nextRoundData,
           confirmedPlayers: nextRoundData.round_players?.[0]?.count || 0
         } : null,
+        nextFriendly: nextFriendlyData ? {
+          ...nextFriendlyData,
+          confirmedPlayers: nextFriendlyData.round_players?.[0]?.count || 0,
+        } : null,
         liveMatch: liveMatchData,
         matchDuration: leagueData?.match_duration || 7,
+        preseasonEnabled: leagueData?.preseason_enabled === true,
         lastRound: processedLastRound,
         rankingPreview: ranking.slice(0, 5),
         highlights: {

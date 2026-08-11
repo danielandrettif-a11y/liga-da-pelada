@@ -6,6 +6,7 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import type { Player, RoundStatus, RoundType } from "../types";
 import { getActiveSeason } from "./seasons";
 import { getActiveLeague } from "./rounds";
+import { isPaymentChecklistComplete } from "../paymentStatus";
 
 export type PaymentRound = {
   id: string;
@@ -63,9 +64,21 @@ export async function hasReleasedPaymentRound(): Promise<boolean> {
   const rounds = await getPaymentRounds();
   const latestRound = rounds[0];
 
-  return latestRound?.status === "finished"
+  const released = latestRound?.status === "finished"
     && Boolean(latestRound.payment_pix)
     && Number(latestRound.payment_total) > 0;
+  if (!released || !latestRound) return false;
+
+  const { data: payments, error } = await supabase
+    .from("round_payments")
+    .select("paid")
+    .eq("round_id", latestRound.id);
+  if (error) {
+    console.error("Erro ao verificar conclusao dos pagamentos:", error);
+    return true;
+  }
+  const allPaid = isPaymentChecklistComplete(payments);
+  return !allPaid;
 }
 
 export async function getRoundPaymentPlayers(roundId: string): Promise<PaymentPlayer[]> {
@@ -167,5 +180,6 @@ export async function setPlayerPayment(roundId: string, playerId: string, paid: 
 
   revalidatePath("/pagamentos");
   revalidatePath("/admin/transfermarket");
+  revalidatePath("/", "layout");
   return { success: true };
 }

@@ -8,6 +8,7 @@ import { CallupAdminCard } from "@/components/CallupAdminCard";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { getActiveCallup } from "@/lib/actions/callups";
 import { getLeagueConfig } from "@/lib/actions/league";
+import { PreSeasonToggle } from "@/components/PreSeasonToggle";
 import {
   UserPlus,
   CalendarPlus,
@@ -19,6 +20,7 @@ import {
   LogOut,
   Football,
   ArrowLeftRight,
+  ClipboardList,
 } from "@/components/icons";
 
 const ADMIN_SECTIONS = [
@@ -42,6 +44,12 @@ const ADMIN_SECTIONS = [
         icon: ArrowLeftRight,
         label: "Histórico do Transfermarket",
         description: "Ver quem marcou cada pagamento",
+      },
+      {
+        href: "/admin/cadastros",
+        icon: ClipboardList,
+        label: "Histórico de Cadastros",
+        description: "Ver quem entrou no elenco",
       },
     ],
   },
@@ -130,6 +138,13 @@ export default async function MaisPage() {
           callup={activeCallup}
           playersPerTeam={leagueConfig?.players_per_team || 5}
           teamsPerRound={leagueConfig?.teams_per_round || 3}
+        />
+      )}
+
+      {account.isAdmin && leagueConfig && (
+        <PreSeasonToggle
+          leagueId={leagueConfig.id}
+          initialEnabled={leagueConfig.preseason_enabled === true}
         />
       )}
 

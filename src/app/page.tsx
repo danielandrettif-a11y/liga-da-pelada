@@ -19,6 +19,10 @@ import { PreviousSeasonBanner } from "@/components/PreviousSeasonBanner";
 import { GreetingBanner } from "@/components/GreetingBanner";
 import { LiveMatchBanner, type HomeLiveMatch } from "@/components/LiveMatchBanner";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PreSeasonBanner } from "@/components/PreSeasonBanner";
+import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
+import { NextRoundBanner } from "@/components/NextRoundBanner";
+import { StandardNextRoundCard } from "@/components/StandardNextRoundCard";
 import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -145,7 +149,7 @@ export default async function HomePage() {
     );
   }
 
-  const { nextRound, liveMatch, matchDuration, lastRound, rankingPreview, highlights } = data;
+  const { nextRound, nextFriendly, preseasonEnabled, liveMatch, matchDuration, lastRound, rankingPreview, highlights } = data;
 
   return (
     <div className="space-y-6">
@@ -159,73 +163,22 @@ export default async function HomePage() {
         matchDuration={matchDuration}
       />
 
-      {/* Next Round Card */}
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
-          <h2 className="font-athletic text-sm font-black uppercase italic tracking-wider text-foreground">Rodadas</h2>
+          <h2 className="font-athletic text-sm font-black uppercase italic tracking-wider text-foreground">{preseasonEnabled ? "Em destaque" : "Rodadas"}</h2>
           <Link href="/rodadas" className="flex items-center gap-1 text-xs font-bold text-accent">
             Ver todas
             <ChevronRight className="h-4 w-4" />
           </Link>
         </div>
-      {nextRound ? (
-        <Link href={`/rodadas/${nextRound.id}`} className="block">
-          <div className="glass-card glass-card-hover p-5 animate-fade-in">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center">
-                  <CalendarDays className="w-5 h-5 text-accent" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted font-semibold uppercase tracking-wider">
-                    {nextRound.status === 'active' ? 'Rodada em Andamento' : 'Próxima Pelada'}
-                  </p>
-                  <p className="text-lg font-bold text-foreground">
-                    Rodada {String(nextRound.number).padStart(2, "0")}
-                  </p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-muted" />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div>
-                  <p className="text-xs text-muted mb-0.5">Data</p>
-                  <p className="text-sm font-semibold text-foreground">
-                    {new Date(nextRound.date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-                <div className="w-px h-8 bg-border" />
-                <div>
-                  <p className="text-xs text-muted mb-0.5">Confirmados</p>
-                  <p className="text-sm font-semibold text-foreground">
-                    {nextRound.confirmedPlayers} jogadores
-                  </p>
-                </div>
-              </div>
-              <div className="px-3 py-1.5 rounded-full bg-accent/15 text-accent text-xs font-bold">
-                ACESSAR
-              </div>
-            </div>
-          </div>
-        </Link>
-      ) : (
-        <Link href="/rodadas" className="block">
-          <div className="glass-card glass-card-hover p-5 animate-fade-in flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-surface-hover flex items-center justify-center">
-                <CalendarDays className="w-5 h-5 text-muted" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-foreground">Nenhuma rodada agendada</p>
-                <p className="text-xs text-muted">Clique para criar a próxima pelada</p>
-              </div>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted" />
-          </div>
-        </Link>
-      )}
+        {preseasonEnabled ? (
+          <HomeHeroCarousel>
+            <PreSeasonBanner isAdmin={account.isAdmin} friendly={nextFriendly} />
+            <NextRoundBanner round={nextRound} />
+          </HomeHeroCarousel>
+        ) : (
+          <StandardNextRoundCard round={nextRound} />
+        )}
       </section>
 
       {previousSeason && <PreviousSeasonBanner summary={previousSeason} />}

@@ -26,6 +26,28 @@ export async function getLeagueConfig() {
   return data;
 }
 
+export async function updatePreSeasonEnabled(id: string, enabled: boolean) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem alterar a pré-temporada." };
+    if (!id) return { success: false, error: "Liga inválida." };
+
+    const { error } = await client
+      .from("leagues")
+      .update({ preseason_enabled: enabled })
+      .eq("id", id);
+
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/");
+    revalidatePath("/mais");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Erro ao alterar pré-temporada:", err);
+    return { success: false, error: err.message };
+  }
+}
+
 export async function updateLeagueConfig(id: string, matchDuration: number, playersPerTeam: number, teamsPerRound: number) {
   try {
     const client = await getAdminClient();
