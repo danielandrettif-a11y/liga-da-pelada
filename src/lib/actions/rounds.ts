@@ -14,6 +14,7 @@ import {
   TEAMS_PER_ROUND,
 } from "../constants";
 import { drawGoalkeeperOrder } from "../goalkeeperOrder";
+import { TEAM_CREST_URLS } from "../teamPresets";
 
 export async function getActiveLeague() {
   const { data, error } = await supabase
@@ -102,9 +103,31 @@ export async function getRound(id: string) {
   return data;
 }
 
+export async function getNextTeamPresetOffset(roundType: RoundType = "official") {
+  const league = await getActiveLeague();
+  const season = await getActiveSeason(league.id);
+  if (!season) return 0;
+
+  const { data, error } = await supabase
+    .from("rounds")
+    .select("number")
+    .eq("league_id", league.id)
+    .eq("season_id", season.id)
+    .eq("round_type", roundType)
+    .order("number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error("Erro ao calcular rodízio dos clubes:", error);
+    return 0;
+  }
+  return (data?.number || 0) % 4;
+}
+
 export type TeamInput = {
   name: string;
   color: string;
+  crestUrl?: string | null;
   playerIds: string[];
 };
 
@@ -149,6 +172,7 @@ export async function createRoundWithTeams(
     const normalizedTeams = teams.map((team) => ({
       ...team,
       name: team.name.trim(),
+      crestUrl: team.crestUrl && TEAM_CREST_URLS.has(team.crestUrl) ? team.crestUrl : null,
     }));
     if (normalizedTeams.some((team) => !team.name)) {
       return { success: false, error: "Todos os times precisam ter um nome." };
@@ -273,6 +297,7 @@ export async function createRoundWithTeams(
           round_id: round.id,
           name: team.name,
           color: team.color,
+          crest_url: team.crestUrl,
         })
         .select()
         .single();

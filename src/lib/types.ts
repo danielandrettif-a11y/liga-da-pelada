@@ -228,6 +228,7 @@ export type Team = {
   round_id: string;
   name: string;
   color: string;
+  crest_url: string | null;
 };
 
 export type TeamPlayer = {

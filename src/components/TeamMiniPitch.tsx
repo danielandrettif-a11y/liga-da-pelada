@@ -2,6 +2,7 @@
 
 import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
+import { TeamCrest } from "./TeamCrest";
 
 type PitchPlayer = {
   player_id: string;
@@ -14,6 +15,7 @@ type TeamMiniPitchProps = {
     id: string;
     name: string;
     color: string;
+    crest_url?: string | null;
     team_players: PitchPlayer[];
   };
   index: number;
@@ -39,11 +41,7 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick }: 
   return (
     <article className={`glass-card min-w-0 overflow-hidden p-1.5 animate-fade-in-up stagger-${Math.min(index + 1, 5)}`}>
       <div className="mb-1.5 flex min-w-0 items-center gap-1.5 px-0.5 py-0.5">
-        <span
-          className="h-2.5 w-2.5 shrink-0 rounded-full shadow-[0_0_8px_currentColor]"
-          style={{ backgroundColor: team.color, color: team.color }}
-          aria-hidden="true"
-        />
+        <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-6 w-6" />
         <h3 className="min-w-0 flex-1 truncate text-[10px] font-black leading-tight text-foreground" title={team.name}>
           {team.name}
         </h3>

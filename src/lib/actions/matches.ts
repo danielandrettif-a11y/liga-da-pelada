@@ -219,7 +219,7 @@ export async function getMatch(matchId: string) {
       match_players (
         *,
         player:player_id (*),
-        original_team:original_team_id (id, name, color)
+        original_team:original_team_id (id, name, color, crest_url)
       ),
       match_events (
         *,
@@ -230,7 +230,7 @@ export async function getMatch(matchId: string) {
         *,
         player_out:player_out_id (*),
         player_in:player_in_id (*),
-        player_in_original_team:player_in_original_team_id (id, name, color)
+        player_in_original_team:player_in_original_team_id (id, name, color, crest_url)
       ),
       round:round_id (
         round_players (
@@ -242,6 +242,7 @@ export async function getMatch(matchId: string) {
           id,
           name,
           color,
+          crest_url,
           team_players (player_id, goalkeeper_order)
         )
       )

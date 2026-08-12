@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createMatch } from "@/lib/actions/matches";
 import { Swords, ArrowLeft, ChevronRight, AlertTriangle, Check } from "@/components/icons";
 import Link from "next/link";
+import { TeamCrest } from "./TeamCrest";
 
 export function MatchCreator({ round }: { round: any }) {
   const router = useRouter();
@@ -111,7 +112,7 @@ export function MatchCreator({ round }: { round: any }) {
           <label className="text-xs font-bold text-muted uppercase tracking-wider pl-1">
             Time 1
           </label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
             {teams.map((t: any) => (
               <button
                 key={t.id}
@@ -125,7 +126,7 @@ export function MatchCreator({ round }: { round: any }) {
                 `}
                 disabled={teamBId === t.id}
               >
-                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.color }} />
+                <TeamCrest name={t.name} crestUrl={t.crest_url} color={t.color} className="h-11 w-11" />
                 <span className="text-xs font-bold truncate w-full text-center">{t.name}</span>
               </button>
             ))}
@@ -141,7 +142,7 @@ export function MatchCreator({ round }: { round: any }) {
           <label className="text-xs font-bold text-muted uppercase tracking-wider pl-1">
             Time 2
           </label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
             {teams.map((t: any) => (
               <button
                 key={t.id}
@@ -155,7 +156,7 @@ export function MatchCreator({ round }: { round: any }) {
                 `}
                 disabled={teamAId === t.id}
               >
-                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.color }} />
+                <TeamCrest name={t.name} crestUrl={t.crest_url} color={t.color} className="h-11 w-11" />
                 <span className="text-xs font-bold truncate w-full text-center">{t.name}</span>
               </button>
             ))}

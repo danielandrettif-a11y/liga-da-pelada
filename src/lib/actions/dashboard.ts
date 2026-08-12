@@ -55,8 +55,8 @@ export async function getDashboardData() {
         timer_started_at,
         timer_accumulated_seconds,
         round:round_id!inner (id, number, season_id),
-        teamA:team_a_id (id, name, color),
-        teamB:team_b_id (id, name, color)
+        teamA:team_a_id (id, name, color, crest_url),
+        teamB:team_b_id (id, name, color, crest_url)
       `)
       .eq("status", "live")
       .eq("round.season_id", season.id)

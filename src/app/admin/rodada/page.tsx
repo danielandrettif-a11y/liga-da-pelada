@@ -4,16 +4,19 @@ import { getPlayersWithStats } from "@/lib/actions/players";
 import { RoundCreator } from "@/components/RoundCreator";
 import { getActiveCallup } from "@/lib/actions/callups";
 import { getLeagueConfig } from "@/lib/actions/league";
+import { getNextTeamPresetOffset } from "@/lib/actions/rounds";
 
 export const revalidate = 0;
 
 export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin/rodada">) {
   const params = await searchParams;
   const requestedType = params.type === "friendly" ? "friendly" : "official";
-  const [players, activeCallup, leagueConfig] = await Promise.all([
+  const [players, activeCallup, leagueConfig, officialPresetOffset, friendlyPresetOffset] = await Promise.all([
     getPlayersWithStats("official", true),
     getActiveCallup(),
     getLeagueConfig(),
+    getNextTeamPresetOffset("official"),
+    getNextTeamPresetOffset("friendly"),
   ]);
   const callup = typeof params.callup === "string" && activeCallup?.id === params.callup ? activeCallup : null;
   const confirmedIds = callup?.entries.filter((entry) => entry.status === "confirmed").map((entry) => entry.player_id) || [];
@@ -43,6 +46,7 @@ export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin
         callupId={callup?.id || null}
         playersPerTeam={leagueConfig?.players_per_team || 5}
         teamsPerRound={leagueConfig?.teams_per_round || 3}
+        teamPresetOffsets={{ official: officialPresetOffset, friendly: friendlyPresetOffset }}
       />
     </div>
   );

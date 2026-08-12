@@ -22,6 +22,7 @@ import { supabase } from "@/lib/supabase";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { MatchSubstitutionManager } from "./MatchSubstitutionManager";
 import { getOfficialElapsedSeconds } from "@/lib/match-rules";
+import { TeamCrest } from "./TeamCrest";
 
 type MatchLiveBoardProps = {
   match: any;
@@ -249,9 +250,8 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
         <div className="flex items-center justify-between w-full">
           {/* Team A */}
         <div className="flex flex-col items-center gap-3 flex-1">
-          <div className="w-16 h-16 rounded-full border-4 flex items-center justify-center bg-surface" style={{ borderColor: match.team_a.color }}>
-            <span className="text-sm font-bold truncate max-w-[3rem]">{match.team_a.name}</span>
-          </div>
+          <TeamCrest name={match.team_a.name} crestUrl={match.team_a.crest_url} color={match.team_a.color} className="h-16 w-16" />
+          <span className="max-w-[8rem] truncate text-center text-xs font-black text-foreground">{match.team_a.name}</span>
           <span className="stat-number text-5xl text-foreground">{match.score_a}</span>
           
           {!isFinished && canManage && (
@@ -269,9 +269,8 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
 
         {/* Team B */}
         <div className="flex flex-col items-center gap-3 flex-1">
-          <div className="w-16 h-16 rounded-full border-4 flex items-center justify-center bg-surface" style={{ borderColor: match.team_b.color }}>
-            <span className="text-sm font-bold truncate max-w-[3rem]">{match.team_b.name}</span>
-          </div>
+          <TeamCrest name={match.team_b.name} crestUrl={match.team_b.crest_url} color={match.team_b.color} className="h-16 w-16" />
+          <span className="max-w-[8rem] truncate text-center text-xs font-black text-foreground">{match.team_b.name}</span>
           <span className="stat-number text-5xl text-foreground">{match.score_b}</span>
           
           {!isFinished && canManage && (

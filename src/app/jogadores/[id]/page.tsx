@@ -1,4 +1,4 @@
-import { getPlayer, getPlayerAwardSeasons, getPlayerRoundHistory, getPlayersWithStats } from "@/lib/actions/players";
+import { getPlayer, getPlayerAwardSeasons, getPlayerGoalsByClub, getPlayerRoundHistory, getPlayersWithStats } from "@/lib/actions/players";
 import { getPlayerFitnessSummaries } from "@/lib/actions/fitness";
 import { calculateWinRate, formatDateShort } from "@/lib/utils";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
@@ -7,6 +7,7 @@ import { PlayerAwards } from "@/components/PlayerAwards";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ChevronRight, Football, Target, TrendingUp, Trophy } from "@/components/icons";
+import { TeamCrest } from "@/components/TeamCrest";
 
 export const revalidate = 0;
 
@@ -29,7 +30,7 @@ function History({ rows, friendly = false }: { rows: HistoryRow[]; friendly?: bo
 }
 export default async function JogadorPerfilPage({ params }: PageProps<"/jogadores/[id]">) {
   const { id } = await params;
-  const [player, officialHistory, friendlyHistory, officialAll, friendlyAll, awardSeasons, fitness] = await Promise.all([
+  const [player, officialHistory, friendlyHistory, officialAll, friendlyAll, awardSeasons, fitness, clubGoals] = await Promise.all([
     getPlayer(id),
     getPlayerRoundHistory(id, "official"),
     getPlayerRoundHistory(id, "friendly"),
@@ -37,6 +38,7 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
     getPlayersWithStats("friendly"),
     getPlayerAwardSeasons(id),
     getPlayerFitnessSummaries(id),
+    getPlayerGoalsByClub(id),
   ]);
   if (!player) notFound();
   const isPlayable = player.is_selectable && (player.member_category === "player" || player.member_category === "guest");
@@ -60,6 +62,42 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
         {([['Ranked', official], ['Amistosos', friendly]] as const).map(([label, stats]) => <section key={label}><h3 className="mb-3 px-1 text-xs font-black uppercase tracking-wider text-muted">{label}</h3><div className="grid grid-cols-4 gap-2">{([['Peladas', stats.rounds || 0], ['Jogos', stats.games], ['Gols', stats.goals], ['Assists', stats.assists], ['Vitórias', stats.wins], ['Empates', stats.draws], ['Derrotas', stats.losses], ['Aprov.', `${calculateWinRate(stats.wins, stats.draws, stats.games)}%`]] as const).map(([key, value]) => <div key={key} className="glass-card p-3 text-center"><p className="text-lg font-black text-foreground">{value}</p><p className="text-[8px] font-bold uppercase text-muted">{key}</p></div>)}</div></section>)}
 
         {fitness && <section><div className="mb-3 flex items-center gap-2 px-1"><TrendingUp className="h-4 w-4 text-accent" /><h3 className="text-xs font-black uppercase tracking-wider text-muted">Dados físicos autorizados</h3></div><div className="grid grid-cols-2 gap-3">{([['Ranked', fitness.official], ['Amistosos', fitness.friendly]] as const).map(([label, summary]) => <div key={label} className="glass-card p-4"><p className="text-[9px] font-black uppercase text-muted">{label}</p><p className="mt-1 text-xl font-black text-foreground">{summary.distanceKm} km</p><p className="text-[10px] text-muted">média {summary.averageSpeedKmh} km/h</p></div>)}</div></section>}
+
+        <section>
+          <div className="mb-3 px-1">
+            <h3 className="text-xs font-black uppercase tracking-wider text-muted">Gols por clube</h3>
+            <p className="mt-1 text-[10px] text-muted/70">Histórico completo em partidas Ranked e amistosas.</p>
+          </div>
+          {clubGoals.length > 0 ? (
+            <div className="space-y-3">
+              <div className="relative overflow-hidden rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/10 via-surface to-surface p-4">
+                <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-accent/10 blur-2xl" />
+                <div className="relative flex items-center gap-4">
+                  <TeamCrest name={clubGoals[0].name} crestUrl={clubGoals[0].crestUrl} color={clubGoals[0].color} className="h-20 w-20" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-accent">Clube em que mais marcou</p>
+                    <p className="mt-1 truncate text-lg font-black text-foreground">{clubGoals[0].name}</p>
+                    <p className="mt-1"><span className="player-card-number text-3xl text-accent">{clubGoals[0].totalGoals}</span> <span className="text-[10px] font-black uppercase text-muted">gols</span></p>
+                  </div>
+                </div>
+              </div>
+              <div className="glass-card overflow-hidden">
+                {clubGoals.map((club, index) => (
+                  <div key={club.key} className={`flex items-center gap-3 px-4 py-3 ${index < clubGoals.length - 1 ? "border-b border-border" : ""}`}>
+                    <TeamCrest name={club.name} crestUrl={club.crestUrl} color={club.color} className="h-11 w-11" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-black text-foreground">{club.name}</p>
+                      <p className="mt-0.5 text-[9px] text-muted">{club.officialGoals} Ranked · {club.friendlyGoals} amistosos</p>
+                    </div>
+                    <div className="text-right"><p className="player-card-number text-2xl text-accent">{club.totalGoals}</p><p className="text-[8px] font-black uppercase text-muted">gols</p></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="glass-card p-5 text-center text-xs text-muted">Nenhum gol por clube registrado ainda.</div>
+          )}
+        </section>
 
         <section><div className="mb-3 px-1"><h3 className="text-xs font-bold uppercase tracking-wider text-muted">Prêmios oficiais</h3><p className="mt-1 text-[10px] text-muted/70">Rodadas e títulos da temporada Ranked.</p></div><PlayerAwards seasons={awardSeasons} /></section>
         <section><h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">Histórico Ranked</h3><History rows={officialHistory} /></section>

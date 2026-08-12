@@ -23,6 +23,7 @@ import { PreSeasonBanner } from "@/components/PreSeasonBanner";
 import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
 import { NextRoundBanner } from "@/components/NextRoundBanner";
 import { StandardNextRoundCard } from "@/components/StandardNextRoundCard";
+import { TeamCrest } from "@/components/TeamCrest";
 import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -328,10 +329,7 @@ export default async function HomePage() {
                         <span className="font-semibold text-foreground/80 truncate">
                           {match.teamA?.name || "Time A"}
                         </span>
-                        <span
-                          className="team-dot flex-shrink-0"
-                          style={{ backgroundColor: match.teamA?.color || "#fff" }}
-                        />
+                        <TeamCrest name={match.teamA?.name || "Time A"} crestUrl={match.teamA?.crest_url} color={match.teamA?.color} className="h-4 w-4" />
                       </div>
                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface min-w-[3.5rem] justify-center">
                         <span
@@ -355,10 +353,7 @@ export default async function HomePage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 flex-1">
-                        <span
-                          className="team-dot flex-shrink-0"
-                          style={{ backgroundColor: match.teamB?.color || "#fff" }}
-                        />
+                        <TeamCrest name={match.teamB?.name || "Time B"} crestUrl={match.teamB?.crest_url} color={match.teamB?.color} className="h-4 w-4" />
                         <span className="font-semibold text-foreground/80 truncate">
                           {match.teamB?.name || "Time B"}
                         </span>

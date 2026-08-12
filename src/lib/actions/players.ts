@@ -6,6 +6,7 @@ import { buildAwardSeasonsByPlayer } from "../awards";
 import type { Player, CreatePlayerInput, MemberCategory, PlayerProfile, RoundType, SeasonStatus } from "../types";
 import { getActiveSeasonRoundIds } from "./seasons";
 import { getAdminClient, getCurrentAccount } from "../auth";
+import { TEAM_PRESETS } from "../teamPresets";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -172,6 +173,58 @@ export async function getPlayerRoundHistory(playerId: string, roundType: RoundTy
   }
 
   return data;
+}
+
+export type PlayerClubGoals = {
+  key: string;
+  name: string;
+  color: string;
+  crestUrl: string | null;
+  officialGoals: number;
+  friendlyGoals: number;
+  totalGoals: number;
+};
+
+export async function getPlayerGoalsByClub(playerId: string): Promise<PlayerClubGoals[]> {
+  const { data, error } = await supabase
+    .from("match_events")
+    .select(`
+      team:team_id (id, name, color, crest_url),
+      match:match_id!inner (
+        round:round_id!inner (round_type)
+      )
+    `)
+    .eq("player_id", playerId)
+    .eq("event_type", "goal");
+
+  if (error) {
+    console.error("Erro ao buscar gols por clube:", error);
+    return [];
+  }
+
+  const goalsByClub = new Map<string, PlayerClubGoals>();
+  for (const event of (data || []) as any[]) {
+    const team = event.team;
+    if (!team) continue;
+    const preset = TEAM_PRESETS.find((item) => item.crestUrl && item.crestUrl === team.crest_url);
+    const key = team.crest_url || `legacy:${String(team.name).toLocaleLowerCase("pt-BR")}:${team.color}`;
+    const current = goalsByClub.get(key) || {
+      key,
+      name: preset?.name || team.name,
+      color: preset?.color || team.color,
+      crestUrl: team.crest_url || null,
+      officialGoals: 0,
+      friendlyGoals: 0,
+      totalGoals: 0,
+    };
+    const roundType = event.match?.round?.round_type === "friendly" ? "friendly" : "official";
+    if (roundType === "friendly") current.friendlyGoals += 1;
+    else current.officialGoals += 1;
+    current.totalGoals += 1;
+    goalsByClub.set(key, current);
+  }
+
+  return [...goalsByClub.values()].sort((a, b) => b.totalGoals - a.totalGoals || a.name.localeCompare(b.name, "pt-BR"));
 }
 
 export async function getPlayerAwardSeasons(playerId: string) {

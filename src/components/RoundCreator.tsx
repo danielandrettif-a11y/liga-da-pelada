@@ -16,11 +16,13 @@ import {
 } from "@/components/icons";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
+import { TeamCrest } from "./TeamCrest";
 import {
   MAX_PLAYERS_PER_TEAM,
   MAX_TEAMS_PER_ROUND,
   MIN_TEAMS_PER_ROUND,
 } from "@/lib/constants";
+import { TEAM_PRESETS } from "@/lib/teamPresets";
 
 type DrawPlayer = Player & {
   points?: number;
@@ -28,17 +30,20 @@ type DrawPlayer = Player & {
   games?: number;
 };
 
-const TEAM_PRESETS = [
-  { name: "Azul", color: "#3B82F6" },
-  { name: "Vermelho", color: "#EF4444" },
-  { name: "Preto", color: "#374151" },
-  { name: "Verde", color: "#22C55E" },
-  { name: "Amarelo", color: "#EAB308" },
-  { name: "Branco", color: "#E5E7EB" },
-];
+type DrawTeam = {
+  id: string;
+  name: string;
+  color: string;
+  crestUrl: string | null;
+  players: DrawPlayer[];
+};
 
-function createDefaultTeams(count: number) {
-  return TEAM_PRESETS.slice(0, count).map((team, index) => ({
+function createDefaultTeams(count: number, offset = 0): DrawTeam[] {
+  const featuredTeams = TEAM_PRESETS.slice(0, 4);
+  const normalizedOffset = ((offset % featuredTeams.length) + featuredTeams.length) % featuredTeams.length;
+  const rotatedFeatured = [...featuredTeams.slice(normalizedOffset), ...featuredTeams.slice(0, normalizedOffset)];
+  const availableTeams = [...rotatedFeatured, ...TEAM_PRESETS.slice(4)];
+  return availableTeams.slice(0, count).map((team, index): DrawTeam => ({
     id: `team${index + 1}`,
     ...team,
     players: [] as DrawPlayer[],
@@ -53,6 +58,7 @@ export function RoundCreator({
   callupId = null,
   playersPerTeam = 5,
   teamsPerRound = 3,
+  teamPresetOffsets = {},
 }: {
   allPlayers: DrawPlayer[];
   initialDate?: string;
@@ -61,6 +67,7 @@ export function RoundCreator({
   callupId?: string | null;
   playersPerTeam?: number;
   teamsPerRound?: number;
+  teamPresetOffsets?: Partial<Record<RoundType, number>>;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(initialPlayerIds.length ? 3 : 1);
@@ -72,13 +79,19 @@ export function RoundCreator({
   
   // Step 3: Times
   const teamCount = Math.min(MAX_TEAMS_PER_ROUND, Math.max(MIN_TEAMS_PER_ROUND, Math.trunc(teamsPerRound)));
-  const [teams, setTeams] = useState(() => createDefaultTeams(teamCount));
+  const [teams, setTeams] = useState<DrawTeam[]>(() => createDefaultTeams(teamCount, teamPresetOffsets[roundType] || 0));
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const teamCapacity = Math.min(MAX_PLAYERS_PER_TEAM, Math.max(1, Math.trunc(playersPerTeam)));
   const roundCapacity = teamCapacity * teamCount;
+
+  function selectRoundType(type: RoundType) {
+    if (callupId) return;
+    setSelectedRoundType(type);
+    setTeams(createDefaultTeams(teamCount, teamPresetOffsets[type] || 0));
+  }
 
   const selectedPlayers = allPlayers.filter(p => selectedPlayerIds.has(p.id));
   
@@ -185,6 +198,7 @@ export function RoundCreator({
       id: team.id,
       name: team.name,
       color: team.color,
+      crestUrl: team.crestUrl,
       players: team.players,
     })));
   }
@@ -224,6 +238,7 @@ export function RoundCreator({
     const teamsInput: TeamInput[] = teams.map(t => ({
       name: t.name.trim(),
       color: t.color,
+      crestUrl: t.crestUrl,
       playerIds: t.players.map(p => p.id)
     }));
 
@@ -275,8 +290,8 @@ export function RoundCreator({
           <fieldset className="space-y-2">
             <legend className="text-xs font-black uppercase tracking-wider text-muted">Tipo de pelada</legend>
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" disabled={Boolean(callupId)} onClick={() => setSelectedRoundType("official")} className={`rounded-xl border px-3 py-3 text-xs font-black transition-colors ${selectedRoundType === "official" ? "border-accent bg-accent text-background" : "border-border bg-background text-muted"}`}>Ranked</button>
-              <button type="button" disabled={Boolean(callupId)} onClick={() => setSelectedRoundType("friendly")} className={`rounded-xl border px-3 py-3 text-xs font-black transition-colors ${selectedRoundType === "friendly" ? "border-warning bg-warning text-background" : "border-border bg-background text-muted"}`}>Amistoso</button>
+              <button type="button" disabled={Boolean(callupId)} onClick={() => selectRoundType("official")} className={`rounded-xl border px-3 py-3 text-xs font-black transition-colors ${selectedRoundType === "official" ? "border-accent bg-accent text-background" : "border-border bg-background text-muted"}`}>Ranked</button>
+              <button type="button" disabled={Boolean(callupId)} onClick={() => selectRoundType("friendly")} className={`rounded-xl border px-3 py-3 text-xs font-black transition-colors ${selectedRoundType === "friendly" ? "border-warning bg-warning text-background" : "border-border bg-background text-muted"}`}>Amistoso</button>
             </div>
             {callupId && <p className="text-[10px] text-muted">O tipo foi definido pela convocação e não pode ser alterado.</p>}
           </fieldset>
@@ -394,7 +409,7 @@ export function RoundCreator({
                     Time {index + 1}
                   </span>
                   <div className="flex items-center gap-3 rounded-xl border border-border bg-background/50 px-3 focus-within:border-accent">
-                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: team.color }} />
+                    <TeamCrest name={team.name || `Time ${index + 1}`} crestUrl={team.crestUrl} color={team.color} className="h-9 w-9" />
                     <input
                       id={`team-name-${team.id}`}
                       type="text"
@@ -458,7 +473,7 @@ export function RoundCreator({
                             disabled={t.players.length >= teamCapacity}
                             className="px-3 py-2 text-left text-[10px] font-bold text-foreground hover:bg-surface-hover flex items-center gap-2 border-b border-border last:border-0 disabled:cursor-not-allowed disabled:opacity-35"
                           >
-                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: t.color }} />
+                            <TeamCrest name={t.name} crestUrl={t.crestUrl} color={t.color} className="h-5 w-5" />
                             <span className="truncate">{t.name}{t.players.length >= teamCapacity ? " (cheio)" : ""}</span>
                           </button>
                         ))}
@@ -477,7 +492,7 @@ export function RoundCreator({
               <div key={team.id} className="glass-card overflow-hidden">
                 <div className="px-4 py-2 bg-surface flex items-center justify-between border-b border-border">
                   <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: team.color }} />
+                    <TeamCrest name={team.name || "Time"} crestUrl={team.crestUrl} color={team.color} className="h-7 w-7" />
                     <span className="max-w-[170px] truncate text-sm font-bold text-foreground">{team.name || "Sem nome"}</span>
                   </div>
                   <span className="text-[10px] font-bold text-muted bg-surface-hover px-2 py-0.5 rounded-md">
