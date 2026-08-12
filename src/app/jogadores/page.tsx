@@ -1,10 +1,14 @@
 import { RosterDirectory } from "@/components/RosterDirectory";
 import { getRosterGroups } from "@/lib/actions/players";
+import { getUnreadRosterPlayers } from "@/lib/actions/registrations";
 
 export const revalidate = 0;
 
 export default async function JogadoresPage() {
-  const roster = await getRosterGroups();
+  const [roster, unreadRoster] = await Promise.all([
+    getRosterGroups(),
+    getUnreadRosterPlayers(),
+  ]);
 
   return (
     <div className="min-w-0 space-y-5">
@@ -18,6 +22,8 @@ export default async function JogadoresPage() {
         activeGuests={roster.activeGuests}
         wags={roster.wags}
         supporters={roster.supporters}
+        unreadPlayerIds={unreadRoster.playerIds}
+        unreadSeenThrough={unreadRoster.seenThrough}
       />
     </div>
   );

@@ -62,6 +62,61 @@ export async function getRosterUnreadState(): Promise<RosterUnreadState> {
   return { count: count || 0, lastSeenAt: readState.last_seen_at };
 }
 
+export async function getUnreadRosterPlayers(): Promise<{ playerIds: string[]; seenThrough: string | null }> {
+  const account = await getCurrentAccount();
+  if (!account.isAdmin || !account.user) return { playerIds: [], seenThrough: null };
+
+  const { data: readState } = await account.client
+    .from("admin_roster_reads")
+    .select("last_seen_at")
+    .eq("user_id", account.user.id)
+    .maybeSingle();
+  if (!readState?.last_seen_at) return { playerIds: [], seenThrough: null };
+
+  const { data, error } = await account.client
+    .from("player_registration_events")
+    .select("player_id, created_at")
+    .gt("created_at", readState.last_seen_at)
+    .not("player_id", "is", null)
+    .order("created_at", { ascending: true });
+  if (error || !data) {
+    if (error) console.error("Erro ao buscar cadastros não vistos:", error);
+    return { playerIds: [], seenThrough: null };
+  }
+
+  return {
+    playerIds: [...new Set(data.map((event) => event.player_id).filter((id): id is string => Boolean(id)))],
+    seenThrough: data.at(-1)?.created_at || null,
+  };
+}
+
+export async function markRosterActivitySeenThrough(seenThrough: string) {
+  const account = await getCurrentAccount();
+  if (!account.isAdmin || !account.user) return { success: false, error: "Somente administradores podem atualizar esta leitura." };
+
+  const parsed = new Date(seenThrough);
+  if (Number.isNaN(parsed.getTime())) return { success: false, error: "Data de leitura inválida." };
+  const safeSeenThrough = new Date(Math.min(parsed.getTime(), Date.now())).toISOString();
+
+  const { data: current } = await account.client
+    .from("admin_roster_reads")
+    .select("last_seen_at")
+    .eq("user_id", account.user.id)
+    .maybeSingle();
+  if (current?.last_seen_at && new Date(current.last_seen_at).getTime() >= new Date(safeSeenThrough).getTime()) {
+    return { success: true };
+  }
+
+  const { error } = await account.client
+    .from("admin_roster_reads")
+    .upsert({ user_id: account.user.id, last_seen_at: safeSeenThrough }, { onConflict: "user_id" });
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  revalidatePath("/jogadores");
+  return { success: true };
+}
+
 export async function markRosterActivitySeen() {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores podem atualizar esta leitura." };

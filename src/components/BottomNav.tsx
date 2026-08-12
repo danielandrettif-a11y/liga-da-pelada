@@ -29,6 +29,11 @@ export function BottomNav({
   const [unreadRoster, setUnreadRoster] = useState(newRosterCount);
   useEffect(() => setUnreadRoster(newRosterCount), [newRosterCount]);
   useEffect(() => {
+    const clearRosterBadge = () => setUnreadRoster(0);
+    window.addEventListener("roster-unread-cleared", clearRosterBadge);
+    return () => window.removeEventListener("roster-unread-cleared", clearRosterBadge);
+  }, []);
+  useEffect(() => {
     if (pathname.startsWith("/admin/jogadores")) setUnreadRoster(0);
   }, [pathname]);
   const baseItems = hasOpenCallup

@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayersStatsGrid, type PlayerStats } from "./PlayersStatsGrid";
+import { RosterUnreadLink } from "./RosterUnreadLink";
 
 type RosterFilter = "all" | "players" | "wags" | "supporters";
 
@@ -13,6 +13,8 @@ type Props = {
   activeGuests: PlayerStats[];
   wags: PlayerStats[];
   supporters: PlayerStats[];
+  unreadPlayerIds?: string[];
+  unreadSeenThrough?: string | null;
 };
 
 const FILTERS: Array<{ value: RosterFilter; label: string }> = [
@@ -38,26 +40,27 @@ function SectionDivider({ title, subtitle, count, tone = "accent" }: { title: st
   );
 }
 
-function CommunityGrid({ players, label }: { players: Player[]; label: "WAG" | "Torcida" }) {
+function CommunityGrid({ players, label, unreadPlayerIds, unreadSeenThrough }: { players: Player[]; label: "WAG" | "Torcida"; unreadPlayerIds: Set<string>; unreadSeenThrough: string | null }) {
   if (players.length === 0) return <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted">Nenhum perfil nesta categoria.</div>;
   return (
     <div className="grid min-w-0 grid-cols-2 gap-3">
       {players.map((player) => (
-        <Link key={player.id} href={`/jogadores/${player.id}`} className="glass-card glass-card-hover min-w-0 overflow-hidden p-3.5 text-center">
+        <RosterUnreadLink key={player.id} href={`/jogadores/${player.id}`} unread={unreadPlayerIds.has(player.id)} seenThrough={unreadSeenThrough} className="glass-card glass-card-hover min-w-0 overflow-hidden p-3.5 text-center">
           <div className="relative mx-auto w-fit">
             <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-20 w-20 rounded-full border-2 border-accent/25 bg-surface text-lg font-black text-muted ring-4 ring-background" />
             <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-accent/25 bg-background px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-accent">{label}</span>
           </div>
           <p className="mt-3 truncate text-sm font-black text-foreground">{player.name}</p>
           {player.nickname && <p className="mt-0.5 truncate text-[10px] italic text-muted">“{player.nickname}”</p>}
-        </Link>
+        </RosterUnreadLink>
       ))}
     </div>
   );
 }
 
-export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters }: Props) {
+export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters, unreadPlayerIds = [], unreadSeenThrough = null }: Props) {
   const [filter, setFilter] = useState<RosterFilter>("all");
+  const unreadIds = new Set(unreadPlayerIds);
   const showPlayers = filter === "all" || filter === "players";
   const showWags = filter === "all" || filter === "wags";
   const showSupporters = filter === "all" || filter === "supporters";
@@ -74,10 +77,10 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
         </div>
       </div>
 
-      {showPlayers && <section className="scroll-mt-36 space-y-4"><SectionDivider title="Jogadores oficiais" subtitle="Atletas que disputam o Ranked" count={officialPlayers.length} /><PlayersStatsGrid players={officialPlayers} /></section>}
-      {showPlayers && activeGuests.length > 0 && <section className="scroll-mt-36 space-y-4"><SectionDivider title="Convidados" subtitle="Participações temporárias com histórico preservado" count={activeGuests.length} tone="warning" /><PlayersStatsGrid players={activeGuests} /></section>}
-      {showWags && <section className="scroll-mt-36 space-y-4"><SectionDivider title="WAGs" subtitle="A comissão que acompanha a resenha" count={wags.length} tone="warning" /><CommunityGrid players={wags} label="WAG" /></section>}
-      {showSupporters && <section className="scroll-mt-36 space-y-4"><SectionDivider title="Torcida" subtitle="Quem empurra a pelada do lado de fora" count={supporters.length} tone="muted" /><CommunityGrid players={supporters} label="Torcida" /></section>}
+      {showPlayers && <section className="scroll-mt-36 space-y-4"><SectionDivider title="Jogadores oficiais" subtitle="Atletas que disputam o Ranked" count={officialPlayers.length} /><PlayersStatsGrid players={officialPlayers} unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} /></section>}
+      {showPlayers && activeGuests.length > 0 && <section className="scroll-mt-36 space-y-4"><SectionDivider title="Convidados" subtitle="Participações temporárias com histórico preservado" count={activeGuests.length} tone="warning" /><PlayersStatsGrid players={activeGuests} unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} /></section>}
+      {showWags && <section className="scroll-mt-36 space-y-4"><SectionDivider title="WAGs" subtitle="A comissão que acompanha a resenha" count={wags.length} tone="warning" /><CommunityGrid players={wags} label="WAG" unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} /></section>}
+      {showSupporters && <section className="scroll-mt-36 space-y-4"><SectionDivider title="Torcida" subtitle="Quem empurra a pelada do lado de fora" count={supporters.length} tone="muted" /><CommunityGrid players={supporters} label="Torcida" unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} /></section>}
     </div>
   );
 }
