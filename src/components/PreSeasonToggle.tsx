@@ -51,7 +51,7 @@ export function PreSeasonToggle({ leagueId, initialEnabled }: { leagueId: string
               onClick={toggle}
               className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors disabled:opacity-60 ${enabled ? "border-accent bg-accent" : "border-border bg-surface-hover"}`}
             >
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full shadow transition-transform ${enabled ? "translate-x-5 bg-background" : "translate-x-0.5 bg-muted"}`} />
+              <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full shadow transition-transform ${enabled ? "translate-x-5 bg-background" : "translate-x-0 bg-muted"}`} />
             </button>
           </div>
           {error && <p className="mt-2 text-[10px] font-semibold text-danger">{error}</p>}
