@@ -86,6 +86,11 @@ export function BottomNav({
                     {unreadRoster > 99 ? "99+" : unreadRoster}
                   </span>
                 )}
+                {item.href === "/cartola" && (
+                  <span className="absolute -right-4 -top-2.5 rounded-full border border-background bg-warning px-1.5 py-0.5 text-[6px] font-black leading-none tracking-wide text-background shadow-[0_2px_8px_rgba(245,158,11,.3)]">
+                    BETA
+                  </span>
+                )}
               </span>
               <span
                 className={`block w-full truncate whitespace-nowrap text-center font-semibold leading-none tracking-tight ${
