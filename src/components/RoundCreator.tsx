@@ -175,7 +175,10 @@ export function RoundCreator({
   }
 
   async function persistPrelist(destination: "list" | "teams") {
-    if (selectedPlayerIds.size === 0) return;
+    if (destination === "teams" && selectedPlayerIds.size === 0) {
+      setError("Adicione jogadores antes de montar os times. A pré-lista vazia pode ser salva para abrir o Cartola.");
+      return;
+    }
     setLoading(true);
     setError("");
     const result = await saveRoundPrelist({
@@ -505,7 +508,7 @@ export function RoundCreator({
             </button>
             <button
               onClick={() => persistPrelist("list")}
-              disabled={loading || selectedPlayerIds.size === 0}
+              disabled={loading}
               className="flex-1 border border-accent/40 bg-accent/10 text-accent font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50"
             >
               {loading ? "Salvando..." : currentPrelistId ? "Salvar e voltar" : "Salvar pre-lista"}

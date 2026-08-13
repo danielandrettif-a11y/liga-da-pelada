@@ -23,6 +23,33 @@ export type CallupStatus = 'open' | 'locked' | 'converted' | 'closed';
 export type CallupEntryStatus = 'confirmed' | 'waitlist';
 export type RegistrationSource = 'legacy' | 'site_signup' | 'admin';
 export type RoundPreparationStage = 'prelist' | 'teams_ready';
+export type FantasyMarketStatus = 'open' | 'in_progress' | 'finished';
+export type FantasyLineupStatus = 'draft' | 'locked' | 'missed' | 'scored' | 'needs_review';
+
+export type FantasyLineupPlayer = {
+  id: string;
+  lineup_id: string;
+  player_id: string;
+  price_locked: number;
+  price_after: number | null;
+  base_points: number;
+  captain_bonus: number;
+  total_points: number;
+};
+
+export type FantasyLineup = {
+  id: string;
+  fantasy_round_id: string;
+  user_id: string;
+  status: FantasyLineupStatus;
+  captain_player_id: string | null;
+  budget_before: number;
+  lineup_cost: number;
+  cash_remaining: number;
+  budget_after: number | null;
+  total_points: number;
+  fantasy_lineup_players?: FantasyLineupPlayer[];
+};
 
 export type Player = {
   id: string;

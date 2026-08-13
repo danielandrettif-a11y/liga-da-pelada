@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, ClipboardList, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag } from "@/components/icons";
+import { Home, ClipboardList, Trophy, Users, MoreHorizontal, ArrowLeftRight } from "@/components/icons";
 
 const NAV_ITEMS = [
   { href: "/", label: "Início", icon: Home },
@@ -36,11 +36,7 @@ export function BottomNav({
   useEffect(() => {
     if (pathname.startsWith("/admin/jogadores")) setUnreadRoster(0);
   }, [pathname]);
-  const baseItems = hasOpenCallup
-    // Durante uma convocação, ela ocupa o lugar do Cartola (ainda em construção).
-    // Assim a barra nunca passa de seis itens e permanece legível em telas estreitas.
-    ? [NAV_ITEMS[0], { href: "/convocacao", label: "Convocação", icon: Flag }, ...NAV_ITEMS.slice(2)]
-    : [...NAV_ITEMS];
+  const baseItems = [...NAV_ITEMS];
   const contextualItems = baseItems.filter((item) => item.href !== "/pagamentos" || hasReleasedPayment);
   const visibleItems = isAuthenticated
     ? contextualItems
@@ -93,7 +89,7 @@ export function BottomNav({
               </span>
               <span
                 className={`block w-full truncate whitespace-nowrap text-center font-semibold leading-none tracking-tight ${
-                  item.label === "Transfermarket" || item.label === "Convocação"
+                  item.label === "Transfermarket"
                     ? "text-[7px] min-[360px]:text-[8px] min-[430px]:text-[9px]"
                     : "text-[9px] min-[390px]:text-[10px]"
                 } ${

@@ -6,6 +6,7 @@ import { getCurrentAccount } from "@/lib/auth";
 import { getPlayer } from "@/lib/actions/players";
 import { FitnessPanel } from "@/components/FitnessPanel";
 import { getMyFitnessRounds, getPlayerFitnessSummaries } from "@/lib/actions/fitness";
+import { getMyFantasySummary } from "@/lib/actions/fantasy";
 
 export const revalidate = 0;
 
@@ -33,9 +34,10 @@ export default async function MeuPerfilPage() {
 
   const player = await getPlayer(account.profile.player_id);
   if (!player) redirect("/");
-  const [fitnessRounds, fitnessSummaries] = await Promise.all([
+  const [fitnessRounds, fitnessSummaries, fantasySummary] = await Promise.all([
     getMyFitnessRounds(player.id),
     getPlayerFitnessSummaries(player.id),
+    getMyFantasySummary(),
   ]);
 
   return (
@@ -50,6 +52,7 @@ export default async function MeuPerfilPage() {
         </div>
       </div>
       <PlayerForm player={player} mode="self" />
+      {fantasySummary && <Link href="/cartola/ranking" className="glass-card flex items-center justify-between p-4"><div><p className="text-[10px] font-black uppercase text-muted">Meu Cartola</p><p className="mt-1 text-sm font-black text-foreground">#{fantasySummary.position} na temporada</p><p className="text-[10px] text-muted">Patrimônio C$ {Number(fantasySummary.current_budget).toFixed(2)}</p></div><strong className="text-2xl text-accent">{Number(fantasySummary.total_points).toFixed(1)}</strong></Link>}
       <FitnessPanel rounds={fitnessRounds} visible={player.show_fitness_stats} summaries={fitnessSummaries} />
     </div>
   );

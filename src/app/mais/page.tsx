@@ -63,6 +63,12 @@ const ADMIN_SECTIONS = [
         description: "Configurar regras de pontuação",
       },
       {
+        href: "/admin/cartola",
+        icon: ClipboardList,
+        label: "Cartola",
+        description: "Configurar Fantasy, preços e reprocessamentos",
+      },
+      {
         href: "/admin/liga",
         icon: Shield,
         label: "Liga",

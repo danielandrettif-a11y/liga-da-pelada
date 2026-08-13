@@ -320,8 +320,6 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
       return { success: false, error: "Informe uma data e um horario validos." };
     }
     const playerIds = [...new Set(input.playerIds.filter(Boolean))];
-    if (playerIds.length === 0) return { success: false, error: "Selecione pelo menos um jogador." };
-
     const league = await getActiveLeague();
     const { data: leagueConfig, error: configError } = await client
       .from("leagues")
@@ -373,6 +371,7 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
     revalidatePath("/admin/prelistas");
     revalidatePath("/rodadas");
     revalidatePath("/convocacao");
+    revalidatePath("/cartola");
     revalidatePath("/", "layout");
     return { success: true, roundId: String(roundId) };
   } catch (err: any) {
@@ -662,12 +661,16 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     const { calculateRoundStats } = await import("./stats");
     await calculateRoundStats(roundId);
 
+    const { error: fantasyError } = await client.rpc("process_fantasy_round", { p_round_id: roundId });
+    if (fantasyError) throw new Error(`A rodada terminou, mas o Cartola não foi processado: ${fantasyError.message}`);
+
     revalidatePath(`/rodadas/${roundId}`);
     revalidatePath("/rodadas");
     revalidatePath("/convocacao");
     revalidatePath("/", "layout");
     revalidatePath("/ranking");
     revalidatePath("/pagamentos");
+    revalidatePath("/cartola", "layout");
     return { success: true };
   } catch (err: any) {
     console.error("Erro ao encerrar rodada:", err);

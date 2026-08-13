@@ -8,6 +8,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ChevronRight, Football, Target, TrendingUp, Trophy } from "@/components/icons";
 import { TeamCrest } from "@/components/TeamCrest";
+import { FantasyPlayerCard } from "@/components/fantasy/FantasyPlayerCard";
+import { getFantasyPlayerSummary } from "@/lib/actions/fantasy";
 
 export const revalidate = 0;
 
@@ -30,7 +32,7 @@ function History({ rows, friendly = false }: { rows: HistoryRow[]; friendly?: bo
 }
 export default async function JogadorPerfilPage({ params }: PageProps<"/jogadores/[id]">) {
   const { id } = await params;
-  const [player, officialHistory, friendlyHistory, officialAll, friendlyAll, awardSeasons, fitness, clubGoals] = await Promise.all([
+  const [player, officialHistory, friendlyHistory, officialAll, friendlyAll, awardSeasons, fitness, clubGoals, fantasySummary] = await Promise.all([
     getPlayer(id),
     getPlayerRoundHistory(id, "official"),
     getPlayerRoundHistory(id, "friendly"),
@@ -39,6 +41,7 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
     getPlayerAwardSeasons(id),
     getPlayerFitnessSummaries(id),
     getPlayerGoalsByClub(id),
+    getFantasyPlayerSummary(id),
   ]);
   if (!player) notFound();
   const isPlayable = player.is_selectable && (player.member_category === "player" || player.member_category === "guest");
@@ -99,6 +102,7 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
           )}
         </section>
 
+        <FantasyPlayerCard summary={fantasySummary} />
         <section><div className="mb-3 px-1"><h3 className="text-xs font-bold uppercase tracking-wider text-muted">Prêmios oficiais</h3><p className="mt-1 text-[10px] text-muted/70">Rodadas e títulos da temporada Ranked.</p></div><PlayerAwards seasons={awardSeasons} /></section>
         <section><h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">Histórico Ranked</h3><History rows={officialHistory} /></section>
         <section><h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">Histórico de Amistosos</h3><History rows={friendlyHistory} friendly /></section>
