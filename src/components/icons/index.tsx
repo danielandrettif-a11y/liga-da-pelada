@@ -102,6 +102,7 @@ export const Clock = createSportIcon(<><circle cx="12" cy="12" r="8.5" /><path d
 export const Clock3 = Clock;
 export const CircleDot = createSportIcon(<><path d="M4 17V8.5L7 5h10l3 3.5V17" /><path d="M4 17h16M8 17v-3.5h8V17" /><circle cx="12" cy="10" r="2.2" /><path d="m10.2 8.7-1.6-1M13.8 8.7l1.6-1" opacity=".6" /></>);
 export const Football = createSportIcon(<><circle cx="12" cy="12" r="9" /><path d="m12 7 3 2.2-1.1 3.5h-3.8L9 9.2ZM10.1 12.7l-3 2.2M13.9 12.7l3 2.2M9 9.2 6.4 7.7M15 9.2l2.6-1.5M7.1 14.9l.8 3.1M16.9 14.9l-.8 3.1" /><path d="M7.9 18h8.2M4.2 11l2.2-3.3M19.8 11l-2.2-3.3" opacity=".65" /></>);
+export const Stadium = createSportIcon(<><path d="M3.5 9.5 12 5l8.5 4.5v8.8H3.5Z" /><path d="M7 9.5v8.8M17 9.5v8.8M3.5 13h17M6 21h12" /><path d="M9.2 13v5.3M14.8 13v5.3" opacity=".6" /></>);
 export const Target = createSportIcon(<><circle cx="11" cy="12" r="7.5" /><circle cx="11" cy="12" r="3.5" /><circle cx="11" cy="12" r=".8" fill="currentColor" stroke="none" /><path d="m15.5 7.5 4-3M16.7 4.3h2.8v2.8" /></>);
 export const TrendingUp = createSportIcon(<><path d="M3.5 18.5 9 13l3.3 3.2L20.5 8" /><path d="M15.5 8h5v5" /><path d="M4 7.5h4M4 11h2" opacity=".55" /></>);
 export const Medal = createSportIcon(<><path d="m8 3.5 4 6 4-6M9.5 3.5l2.5 4 2.5-4" /><circle cx="12" cy="14.5" r="5.2" /><path d="m12 11.7.8 1.6 1.8.2-1.3 1.2.4 1.8-1.7-.9-1.7.9.4-1.8-1.3-1.2 1.8-.2Z" /></>);
@@ -152,6 +153,7 @@ export const Loader2 = createSportIcon(<><path d="M12 3a9 9 0 0 1 9 9M12 21a9 9 
 
 export const Sliders = createSportIcon(<><path d="M4 6h6M14 6h6M4 12h10M18 12h2M4 18h2M10 18h10" /><circle cx="12" cy="6" r="2" /><circle cx="16" cy="12" r="2" /><circle cx="8" cy="18" r="2" /></>);
 export const SlidersHorizontal = Sliders;
+export const Search = createSportIcon(<><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></>);
 export const PencilLine = createSportIcon(<><path d="m4 17-.7 3.7L7 20l11-11-3-3Z" /><path d="m13.5 7.5 3 3M10 20h10" /></>);
 export const Trash2 = createSportIcon(<><path d="M4.5 7h15M9 3.5h6L16 7H8ZM6.5 7l1 13h9l1-13M10 11v5M14 11v5" /></>);
 export const AlertTriangle = createSportIcon(<><path d="M12 3.5 21 20H3Z" /><path d="M12 9v5M12 17.2v.2" /></>);

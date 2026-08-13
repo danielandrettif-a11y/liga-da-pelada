@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CalendarPlus, CheckCircle2, ChevronRight, Copy, Lock, X } from "@/components/icons";
-import { closeCallup, lockCallupForRound, openCallup, type CallupWithEntries } from "@/lib/actions/callups";
+import { closeCallup, openCallup, type CallupWithEntries } from "@/lib/actions/callups";
 
 export function CallupAdminCard({
   callup,
@@ -41,10 +41,7 @@ export function CallupAdminCard({
 
   async function buildRound() {
     if (!callup) return;
-    setLoading(true); setError("");
-    const result = await lockCallupForRound(callup.id);
-    if (!result.success) { setError(result.error || "Erro ao bloquear lista."); setLoading(false); return; }
-    router.push(`/admin/rodada?callup=${callup.id}`);
+    router.push(callup.round_id ? `/admin/rodada?round=${callup.round_id}` : `/admin/rodada?callup=${callup.id}`);
   }
 
   async function copy() {
@@ -76,7 +73,7 @@ export function CallupAdminCard({
               <button type="button" onClick={copy} className="flex items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-xs font-bold text-foreground">{copied ? <CheckCircle2 className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4" />}{copied ? "Copiado" : "Copiar convite"}</button>
               <button type="button" onClick={close} disabled={loading} className="flex items-center justify-center gap-2 rounded-xl border border-danger/30 py-2.5 text-xs font-bold text-danger"><X className="h-4 w-4" /> Fechar</button>
             </div>
-            <button type="button" onClick={buildRound} disabled={loading || confirmed !== capacity} className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-sm font-black text-background disabled:opacity-40"><Lock className="h-4 w-4" /> Montar rodada com os {capacity}</button>
+            <button type="button" onClick={buildRound} disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-sm font-black text-background disabled:opacity-40"><Lock className="h-4 w-4" /> {callup.round_id ? "Retomar pre-lista" : `Criar pre-lista (${confirmed}/${capacity})`}</button>
           </div>
         )}
       </div>

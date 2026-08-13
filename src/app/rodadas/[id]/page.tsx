@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, CalendarDays, Plus } from "@/components/icons";
 import { getRound } from "@/lib/actions/rounds";
 import { formatDateShort } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { TeamMiniPitch } from "@/components/TeamMiniPitch";
 import { RoundAvailabilityManager } from "@/components/RoundAvailabilityManager";
 import { TeamCrest } from "@/components/TeamCrest";
 import { RoundAttendanceManager } from "@/components/RoundAttendanceManager";
+import { StadiumLink } from "@/components/StadiumLink";
 
 export const revalidate = 0;
 
@@ -31,6 +32,10 @@ export default async function RodadaDetalhePage({
 
   if (!round) {
     notFound();
+  }
+  if (round.preparation_stage === "prelist") {
+    if (!account.isAdmin) notFound();
+    redirect(`/admin/rodada?round=${round.id}`);
   }
 
   const participants = (round.round_players || [])
@@ -54,12 +59,14 @@ export default async function RodadaDetalhePage({
             </h1>
             <p className="text-xs text-muted flex items-center gap-1 mt-0.5">
               <CalendarDays className="w-3 h-3" />
-              {formatDateShort(round.date)}
+              {formatDateShort(round.date)}{round.start_time ? ` · ${round.start_time.slice(0, 5)}` : ""}
             </p>
             {round.round_type === "friendly" && <p className="mt-1 text-[9px] font-black uppercase text-warning">Estatísticas fora do Ranked</p>}
           </div>
         </div>
       </div>
+
+      <StadiumLink name={(round.league as any)?.stadium_name} mapUrl={(round.league as any)?.stadium_map_url} />
 
       {round.status !== "finished" && account.isAdmin && (
         <Link

@@ -22,7 +22,6 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PreSeasonBanner } from "@/components/PreSeasonBanner";
 import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
 import { NextRoundBanner } from "@/components/NextRoundBanner";
-import { StandardNextRoundCard } from "@/components/StandardNextRoundCard";
 import { TeamCrest } from "@/components/TeamCrest";
 import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
 
@@ -150,7 +149,7 @@ export default async function HomePage() {
     );
   }
 
-  const { nextRound, nextFriendly, preseasonEnabled, liveMatch, matchDuration, lastRound, rankingPreview, highlights } = data;
+  const { nextRound, nextFriendly, preseasonEnabled, liveMatch, matchDuration, venue, eventDurationMinutes, lastRound, rankingPreview, highlights } = data;
 
   return (
     <div className="space-y-6">
@@ -175,10 +174,10 @@ export default async function HomePage() {
         {preseasonEnabled ? (
           <HomeHeroCarousel>
             <PreSeasonBanner isAdmin={account.isAdmin} friendly={nextFriendly} />
-            <NextRoundBanner round={nextRound} />
+            <NextRoundBanner round={nextRound} isAdmin={account.isAdmin} venue={venue} eventDurationMinutes={eventDurationMinutes} />
           </HomeHeroCarousel>
         ) : (
-          <StandardNextRoundCard round={nextRound} />
+          <NextRoundBanner round={nextRound} isAdmin={account.isAdmin} venue={venue} eventDurationMinutes={eventDurationMinutes} />
         )}
       </section>
 

@@ -22,6 +22,7 @@ export type TeamFormationMode = 'manual' | 'random' | 'balanced';
 export type CallupStatus = 'open' | 'locked' | 'converted' | 'closed';
 export type CallupEntryStatus = 'confirmed' | 'waitlist';
 export type RegistrationSource = 'legacy' | 'site_signup' | 'admin';
+export type RoundPreparationStage = 'prelist' | 'teams_ready';
 
 export type Player = {
   id: string;
@@ -64,6 +65,9 @@ export type League = {
   match_duration: number;
   players_per_team: number;
   teams_per_round: number;
+  stadium_name: string | null;
+  stadium_map_url: string | null;
+  event_duration_minutes: number;
   created_at: string;
 };
 
@@ -93,9 +97,11 @@ export type Round = {
   season_id: string;
   number: number;
   date: string;
+  start_time: string | null;
   status: RoundStatus;
   round_type: RoundType;
   formation_mode: TeamFormationMode;
+  preparation_stage: RoundPreparationStage;
   notes: string | null;
   payment_pix: string | null;
   payment_total: number | null;
@@ -463,7 +469,7 @@ export type Database = {
       };
       leagues: {
         Row: League;
-        Insert: Omit<League, 'id' | 'created_at' | 'is_active' | 'match_duration' | 'players_per_team' | 'teams_per_round'> & { id?: string; created_at?: string; is_active?: boolean; match_duration?: number; players_per_team?: number; teams_per_round?: number };
+        Insert: Omit<League, 'id' | 'created_at' | 'is_active' | 'match_duration' | 'players_per_team' | 'teams_per_round' | 'stadium_name' | 'stadium_map_url' | 'event_duration_minutes'> & { id?: string; created_at?: string; is_active?: boolean; match_duration?: number; players_per_team?: number; teams_per_round?: number; stadium_name?: string | null; stadium_map_url?: string | null; event_duration_minutes?: number };
         Update: Partial<Omit<League, 'id'>>;
       };
       league_members: {
@@ -478,7 +484,7 @@ export type Database = {
       };
       rounds: {
         Row: Round;
-        Insert: Omit<Round, 'id' | 'created_at' | 'status' | 'formation_mode' | 'payment_pix' | 'payment_total' | 'best_goalkeeper_player_id'> & { id?: string; created_at?: string; status?: RoundStatus; formation_mode?: TeamFormationMode; payment_pix?: string | null; payment_total?: number | null; best_goalkeeper_player_id?: string | null };
+        Insert: Omit<Round, 'id' | 'created_at' | 'status' | 'formation_mode' | 'preparation_stage' | 'payment_pix' | 'payment_total' | 'best_goalkeeper_player_id'> & { id?: string; created_at?: string; status?: RoundStatus; formation_mode?: TeamFormationMode; preparation_stage?: RoundPreparationStage; payment_pix?: string | null; payment_total?: number | null; best_goalkeeper_player_id?: string | null };
         Update: Partial<Omit<Round, 'id'>>;
       };
       callups: {

@@ -15,6 +15,9 @@ export default function LigaConfigPage() {
   const [matchDuration, setMatchDuration] = useState(7);
   const [playersPerTeam, setPlayersPerTeam] = useState(5);
   const [teamsPerRound, setTeamsPerRound] = useState(3);
+  const [stadiumName, setStadiumName] = useState("");
+  const [stadiumMapUrl, setStadiumMapUrl] = useState("");
+  const [eventDurationMinutes, setEventDurationMinutes] = useState(120);
 
   useEffect(() => {
     async function load() {
@@ -24,6 +27,9 @@ export default function LigaConfigPage() {
         setMatchDuration(config.match_duration || 7);
         setPlayersPerTeam(config.players_per_team || 5);
         setTeamsPerRound(config.teams_per_round || 3);
+        setStadiumName(config.stadium_name || "");
+        setStadiumMapUrl(config.stadium_map_url || "");
+        setEventDurationMinutes(config.event_duration_minutes || 120);
       }
       setLoading(false);
     }
@@ -35,7 +41,15 @@ export default function LigaConfigPage() {
     setError("");
     setSuccess(false);
 
-    const res = await updateLeagueConfig(leagueId, matchDuration, playersPerTeam, teamsPerRound);
+    const res = await updateLeagueConfig(
+      leagueId,
+      matchDuration,
+      playersPerTeam,
+      teamsPerRound,
+      stadiumName,
+      stadiumMapUrl,
+      eventDurationMinutes,
+    );
     if (!res.success) {
       setError(res.error || "Erro ao salvar.");
     } else {
@@ -79,6 +93,50 @@ export default function LigaConfigPage() {
             onChange={(e) => setMatchDuration(Number(e.target.value))}
             className="w-full bg-surface-hover border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-accent transition-colors"
           />
+        </div>
+
+        <div className="space-y-2 border-t border-border pt-5">
+          <label className="text-xs font-bold text-muted uppercase tracking-wider">
+            Estadio / endereco da pelada
+          </label>
+          <input
+            type="text"
+            maxLength={240}
+            value={stadiumName}
+            onChange={(e) => setStadiumName(e.target.value)}
+            placeholder="Ex.: Arena BQ - Rua..."
+            className="w-full bg-surface-hover border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-accent transition-colors"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-muted uppercase tracking-wider">
+            Link do mapa
+          </label>
+          <input
+            type="url"
+            maxLength={1000}
+            value={stadiumMapUrl}
+            onChange={(e) => setStadiumMapUrl(e.target.value)}
+            placeholder="https://maps.google.com/..."
+            className="w-full bg-surface-hover border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-accent transition-colors"
+          />
+          <p className="text-[10px] leading-relaxed text-muted">Aparece na convocacao e na rodada como “Veja onde fica o estadio”.</p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-muted uppercase tracking-wider">
+            Duracao total da pelada (minutos)
+          </label>
+          <input
+            type="number"
+            min="30"
+            max="720"
+            value={eventDurationMinutes}
+            onChange={(e) => setEventDurationMinutes(Number(e.target.value))}
+            className="w-full bg-surface-hover border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-accent transition-colors"
+          />
+          <p className="text-[10px] leading-relaxed text-muted">Usada para calcular o termino no Google Agenda e Apple Agenda.</p>
         </div>
 
         <div className="space-y-2">

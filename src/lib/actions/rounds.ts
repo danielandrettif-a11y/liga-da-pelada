@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
 import { getActiveSeason } from "./seasons";
 import { createClient as createServerClient } from "../supabase/server";
-import { getAdminClient } from "../auth";
+import { getAdminClient, getCurrentAccount } from "../auth";
 import type { RoundType, TeamFormationMode } from "../types";
 import {
   DEFAULT_PLAYERS_PER_TEAM,
@@ -43,15 +43,19 @@ export async function getRounds() {
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
   if (!season) return [];
+  const account = await getCurrentAccount();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("rounds")
     .select(`
       *,
       round_players (count),
       matches (count)
     `)
-    .eq("season_id", season.id)
+    .eq("season_id", season.id);
+  if (!account.isAdmin) query = query.eq("preparation_stage", "teams_ready");
+
+  const { data, error } = await query
     .order("date", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -93,7 +97,8 @@ export async function getRound(id: string) {
       matches (
         *,
         match_events (*)
-      )
+      ),
+      league:league_id (stadium_name, stadium_map_url, event_duration_minutes)
     `)
     .eq("id", id)
     .single();
@@ -105,6 +110,29 @@ export async function getRound(id: string) {
 
   if (data.teams) data.teams.sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
   return data;
+}
+
+export async function getAdminRoundPrelist(id: string) {
+  const client = await getAdminClient();
+  if (!client || !id) return null;
+  const { data, error } = await client
+    .from("rounds")
+    .select(`
+      *,
+      round_players (player_id, players (*))
+    `)
+    .eq("id", id)
+    .eq("status", "draft")
+    .eq("preparation_stage", "prelist")
+    .maybeSingle();
+  if (error || !data) return null;
+  const { data: callup } = await client
+    .from("callups")
+    .select("id, status")
+    .eq("round_id", id)
+    .in("status", ["open", "locked"])
+    .maybeSingle();
+  return { ...data, callupId: callup?.id || null };
 }
 
 export async function getNextTeamPresetOffset(roundType: RoundType = "official") {
@@ -235,10 +263,87 @@ export async function deleteRound(roundId: string, confirmation: string) {
   }
 }
 
+export type SaveRoundPrelistInput = {
+  roundId?: string | null;
+  date: string;
+  startTime: string;
+  roundType: RoundType;
+  playerIds: string[];
+  callupId?: string | null;
+};
+
+export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem salvar uma pre-lista." };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.startTime)) {
+      return { success: false, error: "Informe uma data e um horario validos." };
+    }
+    const playerIds = [...new Set(input.playerIds.filter(Boolean))];
+    if (playerIds.length === 0) return { success: false, error: "Selecione pelo menos um jogador." };
+
+    const league = await getActiveLeague();
+    const { data: leagueConfig, error: configError } = await client
+      .from("leagues")
+      .select("players_per_team, teams_per_round")
+      .eq("id", league.id)
+      .single();
+    if (configError) throw new Error(configError.message);
+    const capacity = Math.min(MAX_PLAYERS_PER_TEAM, Math.max(1, leagueConfig?.players_per_team || DEFAULT_PLAYERS_PER_TEAM))
+      * Math.min(MAX_TEAMS_PER_ROUND, Math.max(MIN_TEAMS_PER_ROUND, leagueConfig?.teams_per_round || TEAMS_PER_ROUND));
+    if (playerIds.length > capacity) return { success: false, error: `A pre-lista aceita no maximo ${capacity} jogadores.` };
+
+    let effectivePlayerIds = playerIds;
+    let effectiveDate = input.date;
+    let effectiveRoundType = input.roundType;
+    if (input.callupId) {
+      const { error: setError } = await client.rpc("admin_set_callup_confirmed", {
+        p_callup_id: input.callupId,
+        p_player_ids: playerIds,
+      });
+      if (setError) throw new Error(setError.message);
+      const { data: callup, error: callupError } = await client
+        .from("callups")
+        .select("date, round_type, callup_entries(player_id, status)")
+        .eq("id", input.callupId)
+        .eq("status", "open")
+        .single();
+      if (callupError || !callup) throw new Error(callupError?.message || "Convocacao aberta nao encontrada.");
+      effectivePlayerIds = (callup.callup_entries || [])
+        .filter((entry: any) => entry.status === "confirmed")
+        .map((entry: any) => entry.player_id);
+      effectiveDate = callup.date;
+      effectiveRoundType = callup.round_type as RoundType;
+    }
+
+    const { data: roundId, error } = await client.rpc("save_round_prelist", {
+      p_round_id: input.roundId || null,
+      p_date: effectiveDate,
+      p_start_time: input.startTime,
+      p_round_type: effectiveRoundType === "friendly" ? "friendly" : "official",
+      p_player_ids: effectivePlayerIds,
+      p_callup_id: input.callupId || null,
+    });
+    if (error) {
+      if (error.code === "23505") throw new Error("Ja existe uma pre-lista em andamento. Retome ou exclua a atual.");
+      throw new Error(error.message);
+    }
+
+    revalidatePath("/admin/rodada");
+    revalidatePath("/rodadas");
+    revalidatePath("/convocacao");
+    revalidatePath("/", "layout");
+    return { success: true, roundId: String(roundId) };
+  } catch (err: any) {
+    console.error("Erro ao salvar pre-lista:", err);
+    return { success: false, error: err.message };
+  }
+}
+
 export async function createRoundWithTeams(
   date: string,
   teams: TeamInput[],
-  options: { roundType?: RoundType; callupId?: string | null; formationMode?: TeamFormationMode; attendanceOrder?: string[] } = {},
+  options: { roundType?: RoundType; callupId?: string | null; formationMode?: TeamFormationMode; attendanceOrder?: string[]; prelistRoundId?: string | null } = {},
 ) {
   try {
     const client = await getAdminClient();
@@ -324,23 +429,45 @@ export async function createRoundWithTeams(
     if (options.callupId) {
       const { data: callup, error: callupReadError } = await client
         .from("callups")
-        .select("date, round_type, status, capacity, callup_entries(player_id, status)")
+        .select("date, round_type, status, capacity, round_id, callup_entries(player_id, status)")
         .eq("id", options.callupId)
         .eq("league_id", league.id)
         .single();
-      if (callupReadError || !callup || callup.status !== "locked") {
-        return { success: false, error: "A convocacao precisa estar bloqueada antes de montar a rodada." };
+      if (callupReadError || !callup || !["open", "locked"].includes(callup.status)) {
+        return { success: false, error: "A convocacao precisa estar aberta ou bloqueada antes de montar a rodada." };
       }
       const confirmedIds = (callup.callup_entries || [])
         .filter((entry) => entry.status === "confirmed")
         .map((entry) => entry.player_id)
         .sort();
       if (callup.date !== date || callup.round_type !== roundType || confirmedIds.length !== callup.capacity || confirmedIds.join(",") !== [...allPlayerIds].sort().join(",")) {
-        return { success: false, error: `Use a data, o tipo e os ${callup.capacity} confirmados da convocacao bloqueada.` };
+        return { success: false, error: `Use a data, o tipo e os ${callup.capacity} confirmados da convocacao.` };
+      }
+      if (options.prelistRoundId && callup.round_id !== options.prelistRoundId) {
+        return { success: false, error: "A convocacao nao esta vinculada a esta pre-lista." };
       }
     }
 
     // 1. Descobrir o número da nova rodada (maior number + 1)
+    let round: any;
+    if (options.prelistRoundId) {
+      const { data: existingRound, error: existingRoundError } = await client
+        .from("rounds")
+        .select("*, round_players(player_id), teams(id)")
+        .eq("id", options.prelistRoundId)
+        .eq("league_id", league.id)
+        .eq("season_id", season.id)
+        .eq("status", "draft")
+        .eq("preparation_stage", "prelist")
+        .single();
+      if (existingRoundError || !existingRound) return { success: false, error: "Pre-lista editavel nao encontrada." };
+      const prelistIds = (existingRound.round_players || []).map((entry: any) => entry.player_id).sort();
+      if (existingRound.date !== date || existingRound.round_type !== roundType || prelistIds.join(",") !== [...allPlayerIds].sort().join(",")) {
+        return { success: false, error: "Salve a pre-lista com todos os jogadores antes de montar os times." };
+      }
+      if ((existingRound.teams || []).length > 0) return { success: false, error: "Esta rodada ja possui times montados." };
+      round = existingRound;
+    } else {
     const { data: lastRound } = await client
       .from("rounds")
       .select("number")
@@ -349,12 +476,12 @@ export async function createRoundWithTeams(
       .eq("round_type", roundType)
       .order("number", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     const nextNumber = lastRound ? lastRound.number + 1 : 1;
 
     // 2. Criar a rodada
-    const { data: round, error: roundError } = await client
+    const { data: createdRound, error: roundError } = await client
       .from("rounds")
       .insert({
         league_id: league.id,
@@ -364,11 +491,13 @@ export async function createRoundWithTeams(
         status: "draft",
         round_type: roundType,
         formation_mode: formationMode,
+        preparation_stage: "teams_ready",
       })
       .select()
       .single();
 
     if (roundError) throw new Error(`Erro ao criar rodada: ${roundError.message}`);
+    round = createdRound;
 
     // 3. Obter todos os jogadores únicos selecionados
     // 4. Inserir round_players
@@ -376,18 +505,25 @@ export async function createRoundWithTeams(
       const { error: rpError } = await client
         .from("round_players")
         .insert(
-          allPlayerIds.map(playerId => {
-            const attendanceIndex = attendanceOrder.indexOf(playerId);
-            return {
-              round_id: round.id,
-              player_id: playerId,
-              attendance_status: attendanceIndex >= 0 ? "present" as const : "pending" as const,
-              attendance_order: attendanceIndex >= 0 ? attendanceIndex + 1 : null,
-              attendance_marked_at: attendanceIndex >= 0 ? new Date().toISOString() : null,
-            };
-          })
+          allPlayerIds.map((playerId) => ({ round_id: round.id, player_id: playerId }))
         );
       if (rpError) throw new Error(`Erro ao vincular jogadores: ${rpError.message}`);
+    }
+    }
+
+    const { error: clearAttendanceError } = await client.from("round_players").update({
+      attendance_status: "pending",
+      attendance_order: null,
+      attendance_marked_at: null,
+    }).eq("round_id", round.id);
+    if (clearAttendanceError) throw new Error(`Erro ao preparar presencas: ${clearAttendanceError.message}`);
+    for (const [attendanceIndex, playerId] of attendanceOrder.entries()) {
+      const { error: attendanceError } = await client.from("round_players").update({
+        attendance_status: "present",
+        attendance_order: attendanceIndex + 1,
+        attendance_marked_at: new Date().toISOString(),
+      }).eq("round_id", round.id).eq("player_id", playerId);
+      if (attendanceError) throw new Error(`Erro ao registrar presenca: ${attendanceError.message}`);
     }
 
     // 5. Inserir times e team_players
@@ -421,7 +557,19 @@ export async function createRoundWithTeams(
       }
     }
 
+    const { error: readyError } = await client
+      .from("rounds")
+      .update({ preparation_stage: "teams_ready", formation_mode: formationMode })
+      .eq("id", round.id);
+    if (readyError) throw new Error(`Erro ao concluir a rodada: ${readyError.message}`);
+
     if (options.callupId) {
+      const { error: lockError } = await client
+        .from("callups")
+        .update({ status: "locked", updated_at: new Date().toISOString() })
+        .eq("id", options.callupId)
+        .eq("status", "open");
+      if (lockError) throw new Error(`Erro ao bloquear convocacao: ${lockError.message}`);
       const { error: callupError } = await client
         .from("callups")
         .update({ status: "converted", round_id: round.id, updated_at: new Date().toISOString() })

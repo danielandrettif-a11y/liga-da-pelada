@@ -7,6 +7,7 @@ import { Calendar, CheckCircle2, Clock, Copy, Loader2, LogIn, Shield, UserPlus, 
 import { adminAddCallupPlayer, adminRemoveCallupPlayer, joinActiveCallup, leaveActiveCallup, type CallupWithEntries } from "@/lib/actions/callups";
 import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
+import { StadiumLink } from "./StadiumLink";
 
 type Props = {
   callup: CallupWithEntries;
@@ -14,9 +15,11 @@ type Props = {
   isAuthenticated: boolean;
   isAdmin: boolean;
   selectablePlayers: Player[];
+  stadiumName?: string | null;
+  stadiumMapUrl?: string | null;
 };
 
-export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin, selectablePlayers }: Props) {
+export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin, selectablePlayers, stadiumName, stadiumMapUrl }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
@@ -97,6 +100,8 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
           <div className="min-w-0 rounded-xl border border-border bg-background/40 p-3"><p className="text-2xl font-black text-warning">{waitlist.length}/{waitlistCapacity}</p><p className="truncate text-[9px] font-bold uppercase text-muted">Na fila</p></div>
         </div>
       </section>
+
+      <StadiumLink name={stadiumName} mapUrl={stadiumMapUrl} />
 
       {error && <div role="alert" className="rounded-xl border border-danger/20 bg-danger/10 p-3 text-xs font-bold text-danger">{error}</div>}
 

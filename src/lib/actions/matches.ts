@@ -152,6 +152,7 @@ export async function createMatch(input: CreateMatchInput) {
     const durationMinutes = Number((leagueConfig as any)?.match_duration || 7);
     const durationSeconds = Math.max(60, Math.round(durationMinutes * 60));
 
+    const kickoffAt = new Date().toISOString();
     const { data, error } = await client
       .from("matches")
       .insert({
@@ -162,7 +163,9 @@ export async function createMatch(input: CreateMatchInput) {
         status: "live",
         score_a: 0,
         score_b: 0,
-        started_at: new Date().toISOString(),
+        started_at: kickoffAt,
+        timer_started_at: kickoffAt,
+        timer_accumulated_seconds: 0,
         duration_seconds: durationSeconds,
       })
       .select()

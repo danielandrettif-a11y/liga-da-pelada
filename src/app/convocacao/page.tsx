@@ -4,11 +4,12 @@ import { CalendarPlus } from "@/components/icons";
 import { getActiveCallup } from "@/lib/actions/callups";
 import { getPlayers } from "@/lib/actions/players";
 import { getCurrentAccount } from "@/lib/auth";
+import { getLeagueConfig } from "@/lib/actions/league";
 
 export const revalidate = 0;
 
 export default async function ConvocacaoPage() {
-  const [callup, account] = await Promise.all([getActiveCallup(), getCurrentAccount()]);
+  const [callup, account, leagueConfig] = await Promise.all([getActiveCallup(), getCurrentAccount(), getLeagueConfig()]);
   if (!callup) {
     return (
       <div className="flex min-h-[65vh] flex-col items-center justify-center text-center">
@@ -21,5 +22,5 @@ export default async function ConvocacaoPage() {
   }
 
   const selectablePlayers = account.isAdmin ? await getPlayers(true) : [];
-  return <div className="min-w-0 overflow-x-clip"><CallupBoard callup={callup} currentPlayerId={account.profile?.player_id || null} isAuthenticated={Boolean(account.user)} isAdmin={account.isAdmin} selectablePlayers={selectablePlayers} /></div>;
+  return <div className="min-w-0 overflow-x-clip"><CallupBoard callup={callup} currentPlayerId={account.profile?.player_id || null} isAuthenticated={Boolean(account.user)} isAdmin={account.isAdmin} selectablePlayers={selectablePlayers} stadiumName={leagueConfig?.stadium_name} stadiumMapUrl={leagueConfig?.stadium_map_url} /></div>;
 }

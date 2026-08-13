@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Trash2, X } from "@/components/icons";
 import { deleteRound } from "@/lib/actions/rounds";
 
-export function DeleteRoundButton({ round }: { round: { id: string; number: number; round_type: string; date: string; playersCount: number; matchesCount: number } }) {
+export function DeleteRoundButton({ round, redirectTo }: { round: { id: string; number: number; round_type: string; date: string; playersCount: number; matchesCount: number }; redirectTo?: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
@@ -22,7 +22,8 @@ export function DeleteRoundButton({ round }: { round: { id: string; number: numb
       return;
     }
     setOpen(false);
-    router.refresh();
+    if (redirectTo) router.push(redirectTo);
+    else router.refresh();
   }
 
   return <>

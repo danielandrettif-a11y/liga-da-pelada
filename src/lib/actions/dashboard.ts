@@ -17,6 +17,7 @@ export async function getDashboardData() {
       .eq("season_id", season.id)
       .eq("round_type", "official")
       .order("date", { ascending: true })
+      .order("start_time", { ascending: true })
       .limit(1)
       .single();
 
@@ -66,7 +67,7 @@ export async function getDashboardData() {
 
     const leaguePromise = supabase
       .from("leagues")
-      .select("match_duration, preseason_enabled")
+      .select("match_duration, preseason_enabled, stadium_name, stadium_map_url, event_duration_minutes")
       .eq("id", season.league_id)
       .single();
 
@@ -129,6 +130,11 @@ export async function getDashboardData() {
         } : null,
         liveMatch: liveMatchData,
         matchDuration: leagueData?.match_duration || 7,
+        venue: {
+          name: leagueData?.stadium_name || null,
+          mapUrl: leagueData?.stadium_map_url || null,
+        },
+        eventDurationMinutes: leagueData?.event_duration_minutes || 120,
         preseasonEnabled: leagueData?.preseason_enabled === true,
         lastRound: processedLastRound,
         rankingPreview: ranking.slice(0, 5),

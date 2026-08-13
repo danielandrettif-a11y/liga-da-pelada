@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createRoundWithTeams, type TeamInput } from "@/lib/actions/rounds";
+import { createRoundWithTeams, saveRoundPrelist, type TeamInput } from "@/lib/actions/rounds";
 import type { Player, RoundType, TeamFormationMode } from "@/lib/types";
 import { drawTeamsByAttendance } from "@/lib/round-draw";
 import {
@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   ChevronRight,
   PencilLine,
+  Search,
   X,
 } from "@/components/icons";
 import { PlayerAvatar } from "./PlayerAvatar";
@@ -22,6 +23,7 @@ import {
   MIN_TEAMS_PER_ROUND,
 } from "@/lib/constants";
 import { TEAM_PRESETS } from "@/lib/teamPresets";
+import { DeleteRoundButton } from "./DeleteRoundButton";
 
 type DrawPlayer = Player & {
   points?: number;
@@ -55,6 +57,11 @@ export function RoundCreator({
   initialPlayerIds = [],
   roundType = "official",
   callupId = null,
+  prelistRoundId = null,
+  initialTime = "08:00",
+  availableCallup = null,
+  mountTeams = false,
+  prelistNumber = null,
   playersPerTeam = 5,
   teamsPerRound = 3,
   teamPresetOffsets = {},
@@ -64,14 +71,23 @@ export function RoundCreator({
   initialPlayerIds?: string[];
   roundType?: RoundType;
   callupId?: string | null;
+  prelistRoundId?: string | null;
+  initialTime?: string;
+  availableCallup?: { id: string; date: string; roundType: RoundType; playerIds: string[] } | null;
+  mountTeams?: boolean;
+  prelistNumber?: number | null;
   playersPerTeam?: number;
   teamsPerRound?: number;
   teamPresetOffsets?: Partial<Record<RoundType, number>>;
 }) {
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2 | 3>(initialPlayerIds.length ? 3 : 1);
+  const [step, setStep] = useState<1 | 2 | 3>(prelistRoundId ? (mountTeams ? 3 : 2) : 1);
   const [date, setDate] = useState(() => initialDate || new Date().toISOString().split("T")[0]);
+  const [startTime, setStartTime] = useState(initialTime.slice(0, 5));
   const [selectedRoundType, setSelectedRoundType] = useState<RoundType>(roundType);
+  const [sourceCallupId, setSourceCallupId] = useState<string | null>(callupId);
+  const [currentPrelistId, setCurrentPrelistId] = useState<string | null>(prelistRoundId);
+  const [playerSearch, setPlayerSearch] = useState("");
   
   // Step 2: Seleção
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set(initialPlayerIds));
@@ -90,12 +106,17 @@ export function RoundCreator({
   const roundCapacity = teamCapacity * teamCount;
 
   function selectRoundType(type: RoundType) {
-    if (callupId) return;
+    if (sourceCallupId) return;
     setSelectedRoundType(type);
     setTeams(createDefaultTeams(teamCount, teamPresetOffsets[type] || 0));
   }
 
   const selectedPlayers = allPlayers.filter(p => selectedPlayerIds.has(p.id));
+  const visiblePlayers = useMemo(() => {
+    const query = playerSearch.trim().toLocaleLowerCase("pt-BR");
+    if (!query) return allPlayers;
+    return allPlayers.filter((player) => `${player.name} ${player.nickname || ""}`.toLocaleLowerCase("pt-BR").includes(query));
+  }, [allPlayers, playerSearch]);
   
   // Jogadores que estão selecionados para a pelada, mas ainda não foram alocados em nenhum time
   const unassignedPlayers = selectedPlayers.filter(
@@ -103,7 +124,6 @@ export function RoundCreator({
   );
 
   function togglePlayerSelection(id: string) {
-    if (callupId) return;
     const next = new Set(selectedPlayerIds);
     if (next.has(id)) next.delete(id);
     else {
@@ -116,6 +136,44 @@ export function RoundCreator({
     setError("");
     setSelectedPlayerIds(next);
     if (!next.has(id)) setAttendanceOrder((current) => current.filter((playerId) => playerId !== id));
+  }
+
+  function chooseManualSource() {
+    if (currentPrelistId) return;
+    setSourceCallupId(null);
+    setSelectedPlayerIds(new Set());
+  }
+
+  function chooseCallupSource() {
+    if (!availableCallup || currentPrelistId) return;
+    setSourceCallupId(availableCallup.id);
+    setDate(availableCallup.date);
+    setSelectedRoundType(availableCallup.roundType);
+    setSelectedPlayerIds(new Set(availableCallup.playerIds));
+    setTeams(createDefaultTeams(teamCount, teamPresetOffsets[availableCallup.roundType] || 0));
+  }
+
+  async function persistPrelist(openTeams: boolean) {
+    if (selectedPlayerIds.size === 0) return;
+    setLoading(true);
+    setError("");
+    const result = await saveRoundPrelist({
+      roundId: currentPrelistId,
+      date,
+      startTime,
+      roundType: selectedRoundType,
+      playerIds: [...selectedPlayerIds],
+      callupId: sourceCallupId,
+    });
+    if (!result.success || !result.roundId) {
+      setError(result.error || "Nao foi possivel salvar a pre-lista.");
+      setLoading(false);
+      return;
+    }
+    setCurrentPrelistId(result.roundId);
+    router.replace(`/admin/rodada?round=${result.roundId}${openTeams ? "&mount=1" : ""}`);
+    if (openTeams) setStep(3);
+    setLoading(false);
   }
 
   function assignToTeam(player: DrawPlayer, teamId: string) {
@@ -211,9 +269,8 @@ export function RoundCreator({
     }
 
     if (unassignedPlayers.length > 0) {
-      if (!confirm(`Ainda há ${unassignedPlayers.length} jogadores sem time. Deseja salvar mesmo assim?`)) {
-        return;
-      }
+      setError(`Aloque os ${unassignedPlayers.length} jogadores restantes antes de criar a rodada.`);
+      return;
     }
 
     setLoading(true);
@@ -229,9 +286,10 @@ export function RoundCreator({
     // Converte a data local para um formato adequado ou salva como YYYY-MM-DD
     const res = await createRoundWithTeams(date, teamsInput, {
       roundType: selectedRoundType,
-      callupId,
+      callupId: sourceCallupId,
       formationMode,
       attendanceOrder: formationMode === "manual" ? [] : attendanceOrder,
+      prelistRoundId: currentPrelistId,
     });
     
     if (!res.success) {
@@ -247,7 +305,8 @@ export function RoundCreator({
     <div className="space-y-6">
       <div className={`rounded-xl border p-3 text-xs font-bold ${selectedRoundType === "friendly" ? "border-warning/30 bg-warning/10 text-warning" : "border-accent/25 bg-accent/10 text-accent"}`}>
         {selectedRoundType === "friendly" ? "Amistoso: estatísticas separadas do Ranking oficial" : "Rodada oficial · Ranked"}
-        {callupId && <span className="ml-1 text-muted">· {initialPlayerIds.length} convocados pré-selecionados</span>}
+        {currentPrelistId && <span className="ml-2 rounded-full bg-warning/15 px-2 py-0.5 text-[9px] font-black text-warning">PRE-LISTA SALVA</span>}
+        {sourceCallupId && <span className="ml-1 text-muted">· sincronizada com a convocação</span>}
       </div>
       {/* Progresso */}
       <div className="flex items-center justify-between px-2">
@@ -276,13 +335,22 @@ export function RoundCreator({
       {/* STEP 1: Data */}
       {step === 1 && (
         <div className="glass-card min-w-0 overflow-hidden p-5 space-y-4 animate-fade-in">
+          {availableCallup && (
+            <fieldset className="space-y-2">
+              <legend className="text-xs font-black uppercase tracking-wider text-muted">Origem da lista</legend>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={chooseManualSource} className={`rounded-xl border px-3 py-3 text-xs font-black ${!sourceCallupId ? "border-accent bg-accent text-background" : "border-border bg-background text-muted"}`}>Selecao manual</button>
+                <button type="button" onClick={chooseCallupSource} className={`rounded-xl border px-3 py-3 text-xs font-black ${sourceCallupId ? "border-accent bg-accent text-background" : "border-border bg-background text-muted"}`}>Puxar convocacao</button>
+              </div>
+            </fieldset>
+          )}
           <fieldset className="space-y-2">
             <legend className="text-xs font-black uppercase tracking-wider text-muted">Tipo de pelada</legend>
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" disabled={Boolean(callupId)} onClick={() => selectRoundType("official")} className={`rounded-xl border px-3 py-3 text-xs font-black transition-colors ${selectedRoundType === "official" ? "border-accent bg-accent text-background" : "border-border bg-background text-muted"}`}>Ranked</button>
-              <button type="button" disabled={Boolean(callupId)} onClick={() => selectRoundType("friendly")} className={`rounded-xl border px-3 py-3 text-xs font-black transition-colors ${selectedRoundType === "friendly" ? "border-warning bg-warning text-background" : "border-border bg-background text-muted"}`}>Amistoso</button>
+              <button type="button" disabled={Boolean(sourceCallupId)} onClick={() => selectRoundType("official")} className={`rounded-xl border px-3 py-3 text-xs font-black transition-colors ${selectedRoundType === "official" ? "border-accent bg-accent text-background" : "border-border bg-background text-muted"}`}>Ranked</button>
+              <button type="button" disabled={Boolean(sourceCallupId)} onClick={() => selectRoundType("friendly")} className={`rounded-xl border px-3 py-3 text-xs font-black transition-colors ${selectedRoundType === "friendly" ? "border-warning bg-warning text-background" : "border-border bg-background text-muted"}`}>Amistoso</button>
             </div>
-            {callupId && <p className="text-[10px] text-muted">O tipo foi definido pela convocação e não pode ser alterado.</p>}
+            {sourceCallupId && <p className="text-[10px] text-muted">O tipo e a data foram definidos pela convocação.</p>}
           </fieldset>
           <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
             <Calendar className="w-4 h-4 text-accent" />
@@ -292,8 +360,19 @@ export function RoundCreator({
             <input
               type="date"
               value={date}
-              disabled={Boolean(callupId)}
+              disabled={Boolean(sourceCallupId)}
               onChange={e => setDate(e.target.value)}
+              className="block min-w-0 max-w-full w-full appearance-none bg-surface-hover border border-border rounded-xl px-4 py-3 text-base text-foreground focus:outline-none focus:border-accent transition-colors"
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="round-start-time" className="text-xs font-black uppercase tracking-wider text-muted">Horario de inicio</label>
+            <input
+              id="round-start-time"
+              type="time"
+              value={startTime}
+              required
+              onChange={(event) => setStartTime(event.target.value)}
               className="block min-w-0 max-w-full w-full appearance-none bg-surface-hover border border-border rounded-xl px-4 py-3 text-base text-foreground focus:outline-none focus:border-accent transition-colors"
             />
           </div>
@@ -309,6 +388,18 @@ export function RoundCreator({
       {/* STEP 2: Seleção de Jogadores */}
       {step === 2 && (
         <div className="space-y-4 animate-fade-in">
+          {currentPrelistId && (
+            <div className="rounded-2xl border border-warning/30 bg-warning/5 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-warning">Pre-lista</p><p className="text-xs text-muted">Participantes salvos. Edite e salve novamente quando precisar.</p></div>
+                <div className="flex items-center gap-2"><span className="rounded-full bg-warning/15 px-2.5 py-1 text-[9px] font-black text-warning">RASCUNHO</span>{prelistNumber && <DeleteRoundButton redirectTo="/rodadas" round={{ id: currentPrelistId, number: prelistNumber, round_type: selectedRoundType, date, playersCount: selectedPlayerIds.size, matchesCount: 0 }} />}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="date" value={date} disabled={Boolean(sourceCallupId)} onChange={(event) => setDate(event.target.value)} className="min-w-0 rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground disabled:opacity-60" />
+                <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="min-w-0 rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground" />
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <Users className="w-4 h-4 text-accent" />
@@ -319,8 +410,19 @@ export function RoundCreator({
             </span>
           </div>
 
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+            <input
+              type="search"
+              value={playerSearch}
+              onChange={(event) => setPlayerSearch(event.target.value)}
+              placeholder="Buscar jogador pelo nome"
+              className="w-full rounded-xl border border-border bg-surface py-3 pl-10 pr-4 text-sm text-foreground outline-none focus:border-accent"
+            />
+          </label>
+
           <div className="glass-card overflow-hidden max-h-[50vh] overflow-y-auto no-scrollbar">
-            {allPlayers.map((player, idx) => {
+            {visiblePlayers.map((player, idx) => {
               const isSelected = selectedPlayerIds.has(player.id);
               return (
                 <div
@@ -328,7 +430,7 @@ export function RoundCreator({
                   onClick={() => togglePlayerSelection(player.id)}
                   className={`
                     flex items-center justify-between p-3 cursor-pointer transition-colors
-                    ${idx < allPlayers.length - 1 ? "border-b border-border" : ""}
+                    ${idx < visiblePlayers.length - 1 ? "border-b border-border" : ""}
                     ${isSelected ? "bg-accent/5 hover:bg-accent/10" : "hover:bg-surface-hover"}
                   `}
                 >
@@ -361,18 +463,27 @@ export function RoundCreator({
           <div className="flex gap-3">
             <button
               onClick={() => setStep(1)}
+              disabled={Boolean(currentPrelistId)}
               className="flex-1 bg-surface hover:bg-surface-hover text-foreground font-bold py-3.5 rounded-xl transition-all active:scale-[0.98]"
             >
               Voltar
             </button>
             <button
-              onClick={() => setStep(3)}
-              disabled={selectedPlayerIds.size === 0}
-              className="flex-1 bg-accent hover:bg-accent-light text-background font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+              onClick={() => persistPrelist(false)}
+              disabled={loading || selectedPlayerIds.size === 0}
+              className="flex-1 border border-accent/40 bg-accent/10 text-accent font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50"
             >
-              Montar Times <ChevronRight className="w-4 h-4" />
+              {loading ? "Salvando..." : currentPrelistId ? "Salvar alteracoes" : "Salvar pre-lista"}
             </button>
           </div>
+          <button
+            onClick={() => persistPrelist(true)}
+            disabled={loading || selectedPlayerIds.size === 0 || Boolean(sourceCallupId && selectedPlayerIds.size !== roundCapacity)}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3.5 font-bold text-background transition-all active:scale-[0.98] disabled:opacity-50"
+          >
+            Montar Times <ChevronRight className="w-4 h-4" />
+          </button>
+          {sourceCallupId && selectedPlayerIds.size !== roundCapacity && <p className="text-center text-[10px] font-semibold text-warning">Complete as {roundCapacity} vagas da convocacao antes de montar os times.</p>}
         </div>
       )}
 

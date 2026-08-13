@@ -50,7 +50,9 @@ export default async function RodadasPage() {
       {/* Rounds List */}
       <div className="space-y-3">
         {rounds.map((round, index) => {
-          const statusStyle = STATUS_STYLES[round.status as keyof typeof STATUS_STYLES] || STATUS_STYLES.draft;
+          const statusStyle = round.preparation_stage === "prelist"
+            ? { label: "Pre-lista", bg: "bg-warning/15", text: "text-warning" }
+            : STATUS_STYLES[round.status as keyof typeof STATUS_STYLES] || STATUS_STYLES.draft;
 
           return (
             <div key={round.id} className="relative">
@@ -86,6 +88,7 @@ export default async function RodadasPage() {
                       <span className="flex items-center gap-1">
                         <CalendarDays className="w-3 h-3" />
                         {formatDateShort(round.date)}
+                        {round.start_time ? ` · ${round.start_time.slice(0, 5)}` : ""}
                       </span>
                       {round.playersCount > 0 && (
                         <span className="inline-flex items-center gap-1.5">
