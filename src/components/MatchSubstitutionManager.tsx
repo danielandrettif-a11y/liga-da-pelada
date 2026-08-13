@@ -40,6 +40,7 @@ export function MatchSubstitutionManager({
   }
   const eligiblePlayers = (match.round?.round_players || [])
     .filter((entry: any) => entry.availability_status === "available")
+    .filter((entry: any) => match.round?.formation_mode === "manual" || entry.attendance_status === "present")
     .filter((entry: any) => !participantIds.has(entry.player_id))
     .map((entry: any) => ({ ...entry, originalTeam: originalTeamByPlayer.get(entry.player_id) }))
     .filter((entry: any) => entry.players && entry.originalTeam && waitingTeamIds.has(entry.originalTeam.id))

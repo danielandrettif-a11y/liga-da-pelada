@@ -5,7 +5,7 @@ import { supabase } from "../supabase";
 import { getActiveSeason } from "./seasons";
 import { createClient as createServerClient } from "../supabase/server";
 import { getAdminClient } from "../auth";
-import type { RoundType } from "../types";
+import type { RoundType, TeamFormationMode } from "../types";
 import {
   DEFAULT_PLAYERS_PER_TEAM,
   MAX_PLAYERS_PER_TEAM,
@@ -77,6 +77,9 @@ export async function getRound(id: string) {
         player_id,
         availability_status,
         availability_updated_at,
+        attendance_status,
+        attendance_order,
+        attendance_marked_at,
         players (*)
       ),
       teams (
@@ -100,6 +103,7 @@ export async function getRound(id: string) {
     return null;
   }
 
+  if (data.teams) data.teams.sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
   return data;
 }
 
@@ -160,10 +164,81 @@ export async function setRoundPlayerAvailability(
   }
 }
 
+function refreshRoundManagement(roundId: string) {
+  revalidatePath(`/rodadas/${roundId}`);
+  revalidatePath(`/rodadas/${roundId}/nova-partida`);
+  revalidatePath("/rodadas");
+  revalidatePath("/", "layout");
+}
+
+export async function setRoundPlayerAttendance(roundId: string, playerId: string, present: boolean) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem alterar a presenca." };
+    const { error } = await client.rpc("set_round_player_attendance", {
+      p_round_id: roundId,
+      p_player_id: playerId,
+      p_present: present,
+    });
+    if (error) throw new Error(error.message);
+    refreshRoundManagement(roundId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function markRoundTeamArrived(roundId: string, teamId: string) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem alterar a presenca." };
+    const { error } = await client.rpc("mark_round_team_arrived", { p_round_id: roundId, p_team_id: teamId });
+    if (error) throw new Error(error.message);
+    refreshRoundManagement(roundId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function swapRoundTeamPlayers(roundId: string, playerAId: string, playerBId: string) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem trocar jogadores." };
+    const { error } = await client.rpc("swap_round_team_players", {
+      p_round_id: roundId,
+      p_player_a_id: playerAId,
+      p_player_b_id: playerBId,
+    });
+    if (error) throw new Error(error.message);
+    refreshRoundManagement(roundId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteRound(roundId: string, confirmation: string) {
+  try {
+    if (confirmation !== "EXCLUIR") return { success: false, error: "Digite EXCLUIR para confirmar." };
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem excluir rodadas." };
+    const { error } = await client.rpc("delete_round_cascade", { p_round_id: roundId });
+    if (error) throw new Error(error.message);
+    for (const path of ["/rodadas", "/ranking", "/pagamentos", "/admin/transfermarket", "/convocacao", "/mais"]) {
+      revalidatePath(path);
+    }
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 export async function createRoundWithTeams(
   date: string,
   teams: TeamInput[],
-  options: { roundType?: RoundType; callupId?: string | null } = {},
+  options: { roundType?: RoundType; callupId?: string | null; formationMode?: TeamFormationMode; attendanceOrder?: string[] } = {},
 ) {
   try {
     const client = await getAdminClient();
@@ -186,6 +261,9 @@ export async function createRoundWithTeams(
     }
 
     const roundType: RoundType = options.roundType === "friendly" ? "friendly" : "official";
+    const formationMode: TeamFormationMode = options.formationMode === "random" || options.formationMode === "balanced"
+      ? options.formationMode
+      : "manual";
     const rawPlayerIds = normalizedTeams.flatMap((team) => team.playerIds);
     const allPlayerIds = Array.from(new Set(rawPlayerIds));
     if (rawPlayerIds.length !== allPlayerIds.length) {
@@ -211,6 +289,22 @@ export async function createRoundWithTeams(
     }
     if (normalizedTeams.some((team) => team.playerIds.length > playersPerTeam)) {
       return { success: false, error: `Cada time pode ter no máximo ${playersPerTeam} jogadores.` };
+    }
+    const attendanceOrder = [...new Set(options.attendanceOrder || [])];
+    if (formationMode !== "manual") {
+      const minimumPresent = playersPerTeam * 2;
+      if (allPlayerIds.length < minimumPresent) {
+        return { success: false, error: `Selecione pelo menos ${minimumPresent} jogadores para sortear.` };
+      }
+      if (attendanceOrder.length < minimumPresent || attendanceOrder.some((id) => !allPlayerIds.includes(id))) {
+        return { success: false, error: `Marque pelo menos ${minimumPresent} presencas validas.` };
+      }
+      const starterIds = new Set(attendanceOrder.slice(0, minimumPresent));
+      const startingTeamIds = new Set(normalizedTeams.slice(0, 2).flatMap((team) => team.playerIds));
+      if (starterIds.size !== minimumPresent || startingTeamIds.size !== minimumPresent
+        || [...starterIds].some((id) => !startingTeamIds.has(id))) {
+        return { success: false, error: "Os primeiros presentes precisam formar os dois times titulares." };
+      }
     }
     const season = await getActiveSeason(league.id);
     if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
@@ -269,6 +363,7 @@ export async function createRoundWithTeams(
         date,
         status: "draft",
         round_type: roundType,
+        formation_mode: formationMode,
       })
       .select()
       .single();
@@ -281,16 +376,22 @@ export async function createRoundWithTeams(
       const { error: rpError } = await client
         .from("round_players")
         .insert(
-          allPlayerIds.map(playerId => ({
-            round_id: round.id,
-            player_id: playerId,
-          }))
+          allPlayerIds.map(playerId => {
+            const attendanceIndex = attendanceOrder.indexOf(playerId);
+            return {
+              round_id: round.id,
+              player_id: playerId,
+              attendance_status: attendanceIndex >= 0 ? "present" as const : "pending" as const,
+              attendance_order: attendanceIndex >= 0 ? attendanceIndex + 1 : null,
+              attendance_marked_at: attendanceIndex >= 0 ? new Date().toISOString() : null,
+            };
+          })
         );
       if (rpError) throw new Error(`Erro ao vincular jogadores: ${rpError.message}`);
     }
 
     // 5. Inserir times e team_players
-    for (const team of normalizedTeams) {
+    for (const [teamIndex, team] of normalizedTeams.entries()) {
       const { data: teamData, error: teamError } = await client
         .from("teams")
         .insert({
@@ -298,6 +399,7 @@ export async function createRoundWithTeams(
           name: team.name,
           color: team.color,
           crest_url: team.crestUrl,
+          position: teamIndex + 1,
         })
         .select()
         .single();

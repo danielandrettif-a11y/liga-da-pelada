@@ -10,6 +10,7 @@ import { getGoalkeeperScoringPoints } from "@/lib/actions/scoring";
 import { TeamMiniPitch } from "@/components/TeamMiniPitch";
 import { RoundAvailabilityManager } from "@/components/RoundAvailabilityManager";
 import { TeamCrest } from "@/components/TeamCrest";
+import { RoundAttendanceManager } from "@/components/RoundAttendanceManager";
 
 export const revalidate = 0;
 
@@ -92,6 +93,14 @@ export default async function RodadaDetalhePage({
         entries={round.round_players || []}
         canManage={account.isAdmin && round.status !== "finished"}
       />
+
+      {round.formation_mode !== "manual" && (
+        <RoundAttendanceManager
+          roundId={round.id}
+          entries={round.round_players || []}
+          canManage={account.isAdmin && round.status !== "finished"}
+        />
+      )}
 
       {/* Partidas */}
       <section>

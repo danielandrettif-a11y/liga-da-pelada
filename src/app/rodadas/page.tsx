@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getRounds } from "@/lib/actions/rounds";
 import { formatDateShort } from "@/lib/utils";
 import { getCurrentAccount } from "@/lib/auth";
+import { DeleteRoundButton } from "@/components/DeleteRoundButton";
 
 export const revalidate = 0;
 
@@ -52,7 +53,8 @@ export default async function RodadasPage() {
           const statusStyle = STATUS_STYLES[round.status as keyof typeof STATUS_STYLES] || STATUS_STYLES.draft;
 
           return (
-            <Link key={round.id} href={`/rodadas/${round.id}`} className="block">
+            <div key={round.id} className="relative">
+            <Link href={`/rodadas/${round.id}`} className="block">
               <div
                 className={`glass-card glass-card-hover p-4 animate-fade-in stagger-${index + 1}`}
               >
@@ -100,10 +102,12 @@ export default async function RodadasPage() {
                     </div>
                   </div>
 
-                  <ChevronRight className="w-5 h-5 text-muted flex-shrink-0" />
+                  {account.isAdmin ? <div className="mr-10" /> : <ChevronRight className="w-5 h-5 text-muted flex-shrink-0" />}
                 </div>
               </div>
             </Link>
+            {account.isAdmin && <div className="absolute right-3 top-3"><DeleteRoundButton round={round} /></div>}
+            </div>
           );
         })}
         {rounds.length === 0 && (

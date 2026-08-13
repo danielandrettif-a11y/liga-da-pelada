@@ -3,15 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createRoundWithTeams, type TeamInput } from "@/lib/actions/rounds";
-import type { Player, RoundType } from "@/lib/types";
+import type { Player, RoundType, TeamFormationMode } from "@/lib/types";
+import { drawTeamsByAttendance } from "@/lib/round-draw";
 import {
   Users,
   Calendar,
   CheckCircle2,
   ChevronRight,
   PencilLine,
-  Sparkles,
-  Sliders,
   X,
 } from "@/components/icons";
 import { PlayerAvatar } from "./PlayerAvatar";
@@ -81,6 +80,9 @@ export function RoundCreator({
   const teamCount = Math.min(MAX_TEAMS_PER_ROUND, Math.max(MIN_TEAMS_PER_ROUND, Math.trunc(teamsPerRound)));
   const [teams, setTeams] = useState<DrawTeam[]>(() => createDefaultTeams(teamCount, teamPresetOffsets[roundType] || 0));
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [formationMode, setFormationMode] = useState<TeamFormationMode>("manual");
+  const [attendanceOrder, setAttendanceOrder] = useState<string[]>([]);
+  const [pendingDrawMode, setPendingDrawMode] = useState<Exclude<TeamFormationMode, "manual"> | null>(null);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -113,9 +115,12 @@ export function RoundCreator({
     }
     setError("");
     setSelectedPlayerIds(next);
+    if (!next.has(id)) setAttendanceOrder((current) => current.filter((playerId) => playerId !== id));
   }
 
   function assignToTeam(player: DrawPlayer, teamId: string) {
+    setFormationMode("manual");
+    setAttendanceOrder([]);
     const targetTeam = teams.find((team) => team.id === teamId);
     const alreadyInTarget = targetTeam?.players.some((item) => item.id === player.id);
     if (!targetTeam || (!alreadyInTarget && targetTeam.players.length >= teamCapacity)) {
@@ -135,72 +140,51 @@ export function RoundCreator({
   }
 
   function removeFromTeam(player: DrawPlayer) {
+    setFormationMode("manual");
+    setAttendanceOrder([]);
     setTeams(prev => prev.map(t => ({
       ...t,
       players: t.players.filter(p => p.id !== player.id)
     })));
   }
 
-  function handleRandomDraw() {
-    const playersToDraw = [...selectedPlayers];
-    
-    // Fisher-Yates shuffle
-    for (let i = playersToDraw.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [playersToDraw[i], playersToDraw[j]] = [playersToDraw[j], playersToDraw[i]];
+  function requestDraw(mode: Exclude<TeamFormationMode, "manual">) {
+    const minimumPresent = teamCapacity * 2;
+    if (selectedPlayers.length < minimumPresent) {
+      setError(`Selecione pelo menos ${minimumPresent} jogadores para formar dois times completos.`);
+      return;
     }
-
-    // Distribui iterativamente
-    const newTeams = teams.map(t => ({ ...t, players: [] as DrawPlayer[] }));
-    playersToDraw.forEach((player, index) => {
-      const teamIndex = index % newTeams.length;
-      newTeams[teamIndex].players.push(player);
-    });
-
-    setTeams(newTeams);
+    setError("");
+    setPendingDrawMode(mode);
   }
 
-  function handleBalancedDraw() {
-    const playersToDraw = selectedPlayers
-      .map((player) => ({ player, tieBreaker: Math.random() }))
-      .sort((a, b) => (b.player.points || 0) - (a.player.points || 0) || a.tieBreaker - b.tieBreaker)
-      .map(({ player }) => player);
+  function toggleAttendance(playerId: string) {
+    setAttendanceOrder((current) => current.includes(playerId)
+      ? current.filter((id) => id !== playerId)
+      : [...current, playerId]);
+  }
 
-    const newTeams = teams.map((team) => ({
-      ...team,
-      players: [] as DrawPlayer[],
-      points: 0,
-    }));
-
-    playersToDraw.forEach((player) => {
-      const profile = player.player_profile || "midfield";
-      const minimumSize = Math.min(...newTeams.map((team) => team.players.length));
-      const orderedTeams = newTeams.filter((team) => team.players.length === minimumSize).sort((a, b) => {
-        if (player.is_goalkeeper) {
-          const goalkeeperDifference =
-            a.players.filter((item) => item.is_goalkeeper).length
-            - b.players.filter((item) => item.is_goalkeeper).length;
-          if (goalkeeperDifference !== 0) return goalkeeperDifference;
-        }
-        const profileDifference =
-          a.players.filter((item) => (item.player_profile || "midfield") === profile).length
-          - b.players.filter((item) => (item.player_profile || "midfield") === profile).length;
-        if (profileDifference !== 0) return profileDifference;
-        if (a.points !== b.points) return a.points - b.points;
-        return 0;
+  function confirmAttendanceDraw() {
+    if (!pendingDrawMode) return;
+    try {
+      const result = drawTeamsByAttendance({
+        players: selectedPlayers,
+        attendanceOrder,
+        teamCount,
+        playersPerTeam: teamCapacity,
+        mode: pendingDrawMode,
       });
-
-      orderedTeams[0].players.push(player);
-      orderedTeams[0].points += player.points || 0;
-    });
-
-    setTeams(newTeams.map((team) => ({
-      id: team.id,
-      name: team.name,
-      color: team.color,
-      crestUrl: team.crestUrl,
-      players: team.players,
-    })));
+      const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
+      setTeams((current) => current.map((team, index) => ({
+        ...team,
+        players: (result.teams[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
+      })));
+      setFormationMode(pendingDrawMode);
+      setPendingDrawMode(null);
+      setError("");
+    } catch (drawError) {
+      setError(drawError instanceof Error ? drawError.message : "Nao foi possivel sortear os times.");
+    }
   }
 
   function updateTeamName(teamId: string, name: string) {
@@ -243,7 +227,12 @@ export function RoundCreator({
     }));
 
     // Converte a data local para um formato adequado ou salva como YYYY-MM-DD
-    const res = await createRoundWithTeams(date, teamsInput, { roundType: selectedRoundType, callupId });
+    const res = await createRoundWithTeams(date, teamsInput, {
+      roundType: selectedRoundType,
+      callupId,
+      formationMode,
+      attendanceOrder: formationMode === "manual" ? [] : attendanceOrder,
+    });
     
     if (!res.success) {
       setError(res.error || "Erro ao salvar rodada");
@@ -426,23 +415,62 @@ export function RoundCreator({
             </div>
           </div>
           
-          {/* Sorteio */}
-          <div className="flex gap-2">
-            <button
-              onClick={handleRandomDraw}
-              className="flex-1 bg-surface border border-border text-foreground hover:bg-surface-hover font-bold py-2.5 rounded-xl transition-all text-xs flex items-center justify-center gap-2"
-            >
-              <Sparkles className="h-4 w-4" />
-              Sorteio Aleatório
-            </button>
-            <button
-              onClick={handleBalancedDraw}
-              className="flex-1 bg-accent/10 border border-accent/30 text-accent hover:bg-accent/15 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2"
-            >
-              <Sliders className="h-4 w-4" />
-              Times Equilibrados
-            </button>
+          <div className="glass-card p-3">
+            <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-muted">Como montar os times?</p>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => { setFormationMode("manual"); setTeams((current) => current.map((team) => ({ ...team, players: [] }))); }}
+                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-colors ${formationMode === "manual" ? "border-accent bg-accent/15 text-accent" : "border-border bg-surface text-muted"}`}
+              >Manual</button>
+              <button
+                type="button"
+                onClick={() => requestDraw("random")}
+                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-colors ${formationMode === "random" ? "border-accent bg-accent/15 text-accent" : "border-border bg-surface text-muted"}`}
+              >Aleatorio</button>
+              <button
+                type="button"
+                onClick={() => requestDraw("balanced")}
+                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-colors ${formationMode === "balanced" ? "border-accent bg-accent/15 text-accent" : "border-border bg-surface text-muted"}`}
+              >Equilibrado</button>
+            </div>
+            <p className="mt-2 text-[10px] text-muted">
+              {formationMode === "manual" ? "Toque em cada jogador e escolha o time." : `${attendanceOrder.length} chegadas registradas · toque no modo novamente para refazer.`}
+            </p>
           </div>
+
+          {pendingDrawMode && (
+            <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/75 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label="Lista de presenca">
+              <div className="max-h-[88vh] w-full max-w-md overflow-hidden rounded-3xl border border-border bg-background shadow-2xl">
+                <div className="flex items-start justify-between border-b border-border p-5">
+                  <div>
+                    <h2 className="text-lg font-black text-foreground">Lista de Presenca</h2>
+                    <p className="mt-1 text-xs text-muted">Marque na ordem em que as pessoas chegaram.</p>
+                  </div>
+                  <button type="button" onClick={() => setPendingDrawMode(null)} className="rounded-full bg-surface p-2 text-muted"><X className="h-4 w-4" /></button>
+                </div>
+                <div className="max-h-[58vh] divide-y divide-border overflow-y-auto">
+                  {selectedPlayers.map((player) => {
+                    const position = attendanceOrder.indexOf(player.id);
+                    return (
+                      <button key={player.id} type="button" onClick={() => toggleAttendance(player.id)} className={`flex w-full items-center gap-3 px-5 py-3 text-left ${position >= 0 ? "bg-accent/5" : ""}`}>
+                        <span className={`stat-number flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${position >= 0 ? "bg-accent text-background" : "border border-border bg-surface text-muted"}`}>{position >= 0 ? position + 1 : "—"}</span>
+                        <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-10 w-10 rounded-full text-xs font-bold" />
+                        <span className="min-w-0 flex-1 truncate text-sm font-bold text-foreground">{player.name}</span>
+                        {position >= 0 && <CheckCircle2 className="h-5 w-5 text-accent" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="border-t border-border p-4">
+                  <p className="mb-3 text-center text-xs font-bold text-muted">{attendanceOrder.length}/{teamCapacity * 2} presencas minimas</p>
+                  <button type="button" onClick={confirmAttendanceDraw} disabled={attendanceOrder.length < teamCapacity * 2} className="w-full rounded-xl bg-accent py-3.5 text-sm font-black text-background disabled:opacity-40">
+                    Sortear Times
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Unassigned Pool */}
           {unassignedPlayers.length > 0 && (

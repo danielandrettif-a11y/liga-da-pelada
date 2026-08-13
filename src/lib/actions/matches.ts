@@ -39,9 +39,9 @@ export async function createMatch(input: CreateMatchInput) {
     if (replacements.length > 30) return { success: false, error: "Quantidade de substitutos invalida." };
 
     const [{ data: round, error: roundError }, { data: teams, error: teamsError }, { data: roundPlayers, error: roundPlayersError }] = await Promise.all([
-      client.from("rounds").select("id, status, league:league_id (match_duration)").eq("id", input.round_id).single(),
-      client.from("teams").select("id, team_players (player_id)").eq("round_id", input.round_id),
-      client.from("round_players").select("player_id, availability_status").eq("round_id", input.round_id),
+      client.from("rounds").select("id, status, formation_mode, league:league_id (match_duration)").eq("id", input.round_id).single(),
+      client.from("teams").select("id, position, team_players (player_id)").eq("round_id", input.round_id),
+      client.from("round_players").select("player_id, availability_status, attendance_status").eq("round_id", input.round_id),
     ]);
 
     if (roundError || !round) throw new Error("Rodada nao encontrada.");
@@ -53,6 +53,23 @@ export async function createMatch(input: CreateMatchInput) {
     if (selectedTeams.length !== 2) return { success: false, error: "Os times precisam pertencer a esta rodada." };
 
     const availability = new Map(roundPlayers.map((entry: any) => [entry.player_id, entry.availability_status]));
+    const attendance = new Map(roundPlayers.map((entry: any) => [entry.player_id, entry.attendance_status]));
+    const usesAttendance = round.formation_mode !== "manual";
+    const { data: previousMatches, error: previousMatchesError } = await client
+      .from("matches")
+      .select("team_a_id, team_b_id, status, match_order, created_at")
+      .eq("round_id", input.round_id)
+      .order("match_order", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (previousMatchesError) throw new Error(previousMatchesError.message);
+    const previousMatch = previousMatches?.[0];
+    if (!previousMatch && usesAttendance) {
+      const firstTeamIds = teams.filter((team: any) => team.position <= 2).map((team: any) => team.id);
+      if (firstTeamIds.length !== 2 || firstTeamIds.some((id: string) => !selectedTeamIds.includes(id))) {
+        return { success: false, error: "A primeira partida precisa ser disputada pelos dois times titulares." };
+      }
+    }
     const originalTeamByPlayer = new Map<string, string>();
     for (const team of teams as any[]) {
       for (const teamPlayer of team.team_players || []) originalTeamByPlayer.set(teamPlayer.player_id, team.id);
@@ -63,7 +80,7 @@ export async function createMatch(input: CreateMatchInput) {
       unavailableByTeam.set(team.id, new Set(
         (team.team_players || [])
           .map((entry: any) => entry.player_id)
-          .filter((playerId: string) => availability.get(playerId) === "injured"),
+          .filter((playerId: string) => availability.get(playerId) === "injured" || (usesAttendance && attendance.get(playerId) !== "present")),
       ));
     }
 
@@ -81,14 +98,22 @@ export async function createMatch(input: CreateMatchInput) {
       }
 
       const originalTeamId = originalTeamByPlayer.get(replacement.replacement_player_id);
-      if (!originalTeamId || selectedTeamIds.includes(originalTeamId)) {
-        return { success: false, error: "O substituto precisa ser de um time que esteja aguardando." };
+      const previousTeamIds = previousMatch ? [previousMatch.team_a_id, previousMatch.team_b_id] : [];
+      const outgoingTeamIds = previousTeamIds.filter((id) => !selectedTeamIds.includes(id));
+      if (!originalTeamId || selectedTeamIds.includes(originalTeamId)
+        || (previousMatch && !outgoingTeamIds.includes(originalTeamId))) {
+        return { success: false, error: "O substituto precisa vir do time que acabou de sair." };
       }
-      if (availability.get(replacement.replacement_player_id) !== "available") {
+      if (availability.get(replacement.replacement_player_id) !== "available"
+        || (usesAttendance && attendance.get(replacement.replacement_player_id) !== "present")) {
         return { success: false, error: "O substituto escolhido nao esta disponivel." };
       }
       usedAbsentPlayers.add(replacement.absent_player_id);
       usedReplacementPlayers.add(replacement.replacement_player_id);
+    }
+    const missingReplacementCount = [...unavailableByTeam.values()].reduce((total, ids) => total + ids.size, 0) - usedAbsentPlayers.size;
+    if (missingReplacementCount > 0) {
+      return { success: false, error: `Escolha substitutos para as ${missingReplacementCount} vaga(s) desfalcadas.` };
     }
 
     const { data: liveMatches, error: liveMatchesError } = await client
@@ -106,7 +131,7 @@ export async function createMatch(input: CreateMatchInput) {
     const proposedPlayerIds = new Set<string>(usedReplacementPlayers);
     for (const team of selectedTeams as any[]) {
       for (const teamPlayer of team.team_players || []) {
-        if (availability.get(teamPlayer.player_id) !== "injured") proposedPlayerIds.add(teamPlayer.player_id);
+        if (availability.get(teamPlayer.player_id) !== "injured" && (!usesAttendance || attendance.get(teamPlayer.player_id) === "present")) proposedPlayerIds.add(teamPlayer.player_id);
       }
     }
     const liveMatchIds = (liveMatches || []).map((match: any) => match.id);
@@ -148,7 +173,7 @@ export async function createMatch(input: CreateMatchInput) {
     const lineupRows: Array<Record<string, unknown>> = [];
     for (const team of selectedTeams as any[]) {
       for (const teamPlayer of team.team_players || []) {
-        if (availability.get(teamPlayer.player_id) !== "injured") {
+        if (availability.get(teamPlayer.player_id) !== "injured" && (!usesAttendance || attendance.get(teamPlayer.player_id) === "present")) {
           lineupRows.push({
             match_id: data.id,
             player_id: teamPlayer.player_id,
@@ -233,9 +258,11 @@ export async function getMatch(matchId: string) {
         player_in_original_team:player_in_original_team_id (id, name, color, crest_url)
       ),
       round:round_id (
+        formation_mode,
         round_players (
           player_id,
           availability_status,
+          attendance_status,
           players (*)
         ),
         teams (
@@ -343,6 +370,20 @@ export async function substituteMatchPlayer(input: SubstituteMatchPlayerInput) {
     if (!client) return { success: false, error: ADMIN_ERROR };
     if (!input.match_id || !input.team_id || !input.player_out_id) {
       return { success: false, error: "Preencha os dados da substituicao." };
+    }
+    if (input.player_in_id) {
+      const { data: incoming, error: incomingError } = await client
+        .from("matches")
+        .select("round:round_id (formation_mode, round_players!inner(player_id, attendance_status))")
+        .eq("id", input.match_id)
+        .eq("round.round_players.player_id", input.player_in_id)
+        .single();
+      if (incomingError || !incoming) return { success: false, error: "Substituto nao encontrado nesta rodada." };
+      const incomingRound = Array.isArray(incoming.round) ? incoming.round[0] : incoming.round;
+      const incomingEntry = (incomingRound as any)?.round_players?.find((entry: any) => entry.player_id === input.player_in_id);
+      if ((incomingRound as any)?.formation_mode !== "manual" && incomingEntry?.attendance_status !== "present") {
+        return { success: false, error: "O substituto ainda nao foi marcado como presente." };
+      }
     }
 
     const { data, error } = await client.rpc("substitute_match_player", {

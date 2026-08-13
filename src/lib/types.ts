@@ -18,6 +18,7 @@ export type User = {
 export type PlayerProfile = 'offensive' | 'midfield' | 'defensive';
 export type MemberCategory = 'player' | 'guest' | 'wag' | 'supporter';
 export type RoundType = 'official' | 'friendly';
+export type TeamFormationMode = 'manual' | 'random' | 'balanced';
 export type CallupStatus = 'open' | 'locked' | 'converted' | 'closed';
 export type CallupEntryStatus = 'confirmed' | 'waitlist';
 export type RegistrationSource = 'legacy' | 'site_signup' | 'admin';
@@ -94,6 +95,7 @@ export type Round = {
   date: string;
   status: RoundStatus;
   round_type: RoundType;
+  formation_mode: TeamFormationMode;
   notes: string | null;
   payment_pix: string | null;
   payment_total: number | null;
@@ -209,6 +211,9 @@ export type RoundPlayer = {
   player_id: string;
   availability_status: 'available' | 'injured';
   availability_updated_at: string;
+  attendance_status: 'pending' | 'present';
+  attendance_order: number | null;
+  attendance_marked_at: string | null;
 };
 
 export type PushSubscriptionRecord = {
@@ -229,6 +234,7 @@ export type Team = {
   name: string;
   color: string;
   crest_url: string | null;
+  position: number;
 };
 
 export type TeamPlayer = {
@@ -391,6 +397,7 @@ export type CreateRoundInput = {
   date: string;
   notes?: string;
   round_type?: RoundType;
+  formation_mode?: TeamFormationMode;
 };
 
 export type CreateTeamInput = {
@@ -471,7 +478,7 @@ export type Database = {
       };
       rounds: {
         Row: Round;
-        Insert: Omit<Round, 'id' | 'created_at' | 'status' | 'payment_pix' | 'payment_total' | 'best_goalkeeper_player_id'> & { id?: string; created_at?: string; status?: RoundStatus; payment_pix?: string | null; payment_total?: number | null; best_goalkeeper_player_id?: string | null };
+        Insert: Omit<Round, 'id' | 'created_at' | 'status' | 'formation_mode' | 'payment_pix' | 'payment_total' | 'best_goalkeeper_player_id'> & { id?: string; created_at?: string; status?: RoundStatus; formation_mode?: TeamFormationMode; payment_pix?: string | null; payment_total?: number | null; best_goalkeeper_player_id?: string | null };
         Update: Partial<Omit<Round, 'id'>>;
       };
       callups: {
@@ -501,7 +508,7 @@ export type Database = {
       };
       round_players: {
         Row: RoundPlayer;
-        Insert: Omit<RoundPlayer, 'id' | 'availability_status' | 'availability_updated_at'> & { id?: string; availability_status?: RoundPlayer['availability_status']; availability_updated_at?: string };
+        Insert: Omit<RoundPlayer, 'id' | 'availability_status' | 'availability_updated_at' | 'attendance_status' | 'attendance_order' | 'attendance_marked_at'> & { id?: string; availability_status?: RoundPlayer['availability_status']; availability_updated_at?: string; attendance_status?: RoundPlayer['attendance_status']; attendance_order?: number | null; attendance_marked_at?: string | null };
         Update: Partial<Omit<RoundPlayer, 'id'>>;
       };
       push_subscriptions: {
@@ -521,7 +528,7 @@ export type Database = {
       };
       teams: {
         Row: Team;
-        Insert: Omit<Team, 'id'> & { id?: string };
+        Insert: Omit<Team, 'id' | 'position'> & { id?: string; position?: number };
         Update: Partial<Omit<Team, 'id'>>;
       };
       team_players: {
@@ -596,6 +603,22 @@ export type Database = {
           p_player_id: string;
           p_status: RoundPlayer['availability_status'];
         };
+        Returns: boolean;
+      };
+      set_round_player_attendance: {
+        Args: { p_round_id: string; p_player_id: string; p_present: boolean };
+        Returns: boolean;
+      };
+      mark_round_team_arrived: {
+        Args: { p_round_id: string; p_team_id: string };
+        Returns: number;
+      };
+      swap_round_team_players: {
+        Args: { p_round_id: string; p_player_a_id: string; p_player_b_id: string };
+        Returns: boolean;
+      };
+      delete_round_cascade: {
+        Args: { p_round_id: string };
         Returns: boolean;
       };
     };
