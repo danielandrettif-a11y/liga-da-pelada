@@ -41,9 +41,9 @@ export default async function RodadasPage() {
             {rounds.length} rodadas registradas
           </p>
         </div>
-        {account.isAdmin && <Link href="/admin/rodada" className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-accent hover:bg-accent-light text-background text-sm font-bold transition-all active:scale-95">
+        {account.isAdmin && <Link href="/admin/prelistas" className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-accent hover:bg-accent-light text-background text-sm font-bold transition-all active:scale-95">
           <Plus className="w-4 h-4" />
-          Nova Rodada
+          Pré-listas
         </Link>}
       </div>
 

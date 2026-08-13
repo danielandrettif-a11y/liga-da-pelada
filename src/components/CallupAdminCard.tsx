@@ -41,7 +41,7 @@ export function CallupAdminCard({
 
   async function buildRound() {
     if (!callup) return;
-    router.push(callup.round_id ? `/admin/rodada?round=${callup.round_id}` : `/admin/rodada?callup=${callup.id}`);
+    router.push(callup.round_id ? `/admin/rodada?round=${callup.round_id}&mount=1` : `/admin/rodada?callup=${callup.id}`);
   }
 
   async function copy() {

@@ -21,6 +21,7 @@ function refreshCallups() {
   revalidatePath("/convocacao");
   revalidatePath("/mais");
   revalidatePath("/admin/rodada");
+  revalidatePath("/admin/prelistas");
 }
 
 export async function getActiveCallup(): Promise<CallupWithEntries | null> {

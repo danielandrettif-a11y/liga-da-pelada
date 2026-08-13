@@ -71,6 +71,15 @@ export async function getDashboardData() {
       .eq("id", season.league_id)
       .single();
 
+    const activeCallupPromise = supabase
+      .from("callups")
+      .select("id, date, round_type, capacity, waitlist_capacity, callup_entries(status)")
+      .eq("league_id", season.league_id)
+      .eq("status", "open")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     // 3. Ranking e Destaques
     const [
       { data: nextRoundData },
@@ -78,6 +87,7 @@ export async function getDashboardData() {
       { data: lastRoundData },
       { data: liveMatchData },
       { data: leagueData },
+      { data: activeCallupData },
       ranking,
     ] = await Promise.all([
       nextRoundPromise,
@@ -85,6 +95,7 @@ export async function getDashboardData() {
       lastRoundPromise,
       liveMatchPromise,
       leaguePromise,
+      activeCallupPromise,
       getRanking(),
     ]);
     
@@ -136,6 +147,15 @@ export async function getDashboardData() {
         },
         eventDurationMinutes: leagueData?.event_duration_minutes || 120,
         preseasonEnabled: leagueData?.preseason_enabled === true,
+        activeCallup: activeCallupData ? {
+          id: activeCallupData.id,
+          date: activeCallupData.date,
+          roundType: activeCallupData.round_type,
+          capacity: activeCallupData.capacity,
+          waitlistCapacity: activeCallupData.waitlist_capacity,
+          confirmed: (activeCallupData.callup_entries || []).filter((entry: any) => entry.status === "confirmed").length,
+          waiting: (activeCallupData.callup_entries || []).filter((entry: any) => entry.status === "waitlist").length,
+        } : null,
         lastRound: processedLastRound,
         rankingPreview: ranking.slice(0, 5),
         highlights: {

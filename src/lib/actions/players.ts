@@ -22,6 +22,7 @@ function revalidatePlayerPaths(id?: string) {
   revalidatePath("/ranking");
   revalidatePath("/admin/jogadores");
   revalidatePath("/admin/rodada");
+  revalidatePath("/admin/prelistas");
   if (id) revalidatePath(`/jogadores/${id}`);
 }
 

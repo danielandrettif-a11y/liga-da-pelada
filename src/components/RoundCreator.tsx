@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createRoundWithTeams, saveRoundPrelist, type TeamInput } from "@/lib/actions/rounds";
 import type { Player, RoundType, TeamFormationMode } from "@/lib/types";
@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   ChevronRight,
   PencilLine,
+  RotateCcw,
   Search,
   X,
 } from "@/components/icons";
@@ -81,6 +82,7 @@ export function RoundCreator({
   teamPresetOffsets?: Partial<Record<RoundType, number>>;
 }) {
   const router = useRouter();
+  const [refreshingPlayers, startPlayersRefresh] = useTransition();
   const [step, setStep] = useState<1 | 2 | 3>(prelistRoundId ? (mountTeams ? 3 : 2) : 1);
   const [date, setDate] = useState(() => initialDate || new Date().toISOString().split("T")[0]);
   const [startTime, setStartTime] = useState(initialTime.slice(0, 5));
@@ -117,6 +119,19 @@ export function RoundCreator({
     if (!query) return allPlayers;
     return allPlayers.filter((player) => `${player.name} ${player.nickname || ""}`.toLocaleLowerCase("pt-BR").includes(query));
   }, [allPlayers, playerSearch]);
+
+  useEffect(() => {
+    if (step !== 2) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") startPlayersRefresh(() => router.refresh());
+    };
+    const interval = window.setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [router, step]);
   
   // Jogadores que estão selecionados para a pelada, mas ainda não foram alocados em nenhum time
   const unassignedPlayers = selectedPlayers.filter(
@@ -125,7 +140,13 @@ export function RoundCreator({
 
   function togglePlayerSelection(id: string) {
     const next = new Set(selectedPlayerIds);
-    if (next.has(id)) next.delete(id);
+    if (next.has(id)) {
+      next.delete(id);
+      setTeams((current) => current.map((team) => ({
+        ...team,
+        players: team.players.filter((player) => player.id !== id),
+      })));
+    }
     else {
       if (next.size >= roundCapacity) {
         setError(`A rodada aceita no máximo ${roundCapacity} jogadores: ${teamCapacity} por time.`);
@@ -153,7 +174,7 @@ export function RoundCreator({
     setTeams(createDefaultTeams(teamCount, teamPresetOffsets[availableCallup.roundType] || 0));
   }
 
-  async function persistPrelist(openTeams: boolean) {
+  async function persistPrelist(destination: "list" | "teams") {
     if (selectedPlayerIds.size === 0) return;
     setLoading(true);
     setError("");
@@ -171,8 +192,12 @@ export function RoundCreator({
       return;
     }
     setCurrentPrelistId(result.roundId);
-    router.replace(`/admin/rodada?round=${result.roundId}${openTeams ? "&mount=1" : ""}`);
-    if (openTeams) setStep(3);
+    if (destination === "teams") {
+      router.replace(`/admin/rodada?round=${result.roundId}&mount=1`);
+      setStep(3);
+    } else {
+      router.push("/admin/prelistas");
+    }
     setLoading(false);
   }
 
@@ -400,14 +425,25 @@ export function RoundCreator({
               </div>
             </div>
           )}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <Users className="w-4 h-4 text-accent" />
               Quem vai jogar?
             </h2>
-            <span className="text-xs font-bold px-2 py-1 bg-surface-hover rounded-lg text-muted">
-              {selectedPlayerIds.size}/{roundCapacity} selecionados
-            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => startPlayersRefresh(() => router.refresh())}
+                disabled={refreshingPlayers}
+                className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[10px] font-black uppercase text-muted disabled:opacity-50"
+              >
+                <RotateCcw className={`h-3.5 w-3.5 ${refreshingPlayers ? "animate-spin" : ""}`} />
+                Atualizar
+              </button>
+              <span className="rounded-lg bg-surface-hover px-2 py-1 text-xs font-bold text-muted">
+                {selectedPlayerIds.size}/{roundCapacity}
+              </span>
+            </div>
           </div>
 
           <label className="relative block">
@@ -462,22 +498,21 @@ export function RoundCreator({
 
           <div className="flex gap-3">
             <button
-              onClick={() => setStep(1)}
-              disabled={Boolean(currentPrelistId)}
+              onClick={() => currentPrelistId ? router.push("/admin/prelistas") : setStep(1)}
               className="flex-1 bg-surface hover:bg-surface-hover text-foreground font-bold py-3.5 rounded-xl transition-all active:scale-[0.98]"
             >
               Voltar
             </button>
             <button
-              onClick={() => persistPrelist(false)}
+              onClick={() => persistPrelist("list")}
               disabled={loading || selectedPlayerIds.size === 0}
               className="flex-1 border border-accent/40 bg-accent/10 text-accent font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50"
             >
-              {loading ? "Salvando..." : currentPrelistId ? "Salvar alteracoes" : "Salvar pre-lista"}
+              {loading ? "Salvando..." : currentPrelistId ? "Salvar e voltar" : "Salvar pre-lista"}
             </button>
           </div>
           <button
-            onClick={() => persistPrelist(true)}
+            onClick={() => persistPrelist("teams")}
             disabled={loading || selectedPlayerIds.size === 0 || Boolean(sourceCallupId && selectedPlayerIds.size !== roundCapacity)}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3.5 font-bold text-background transition-all active:scale-[0.98] disabled:opacity-50"
           >
@@ -490,6 +525,18 @@ export function RoundCreator({
       {/* STEP 3: Divisão dos Times */}
       {step === 3 && (
         <div className="space-y-6 animate-fade-in">
+
+          {currentPrelistId && (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-warning/30 bg-warning/5 p-3.5">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-warning">Pré-lista salva</p>
+                <p className="truncate text-xs text-muted">Monte os times ou volte para preparar outra data.</p>
+              </div>
+              <button type="button" onClick={() => setStep(2)} className="flex shrink-0 items-center gap-1.5 rounded-xl border border-warning/35 bg-background px-3 py-2.5 text-[10px] font-black uppercase text-warning">
+                <PencilLine className="h-3.5 w-3.5" /> Editar pré-lista
+              </button>
+            </div>
+          )}
 
           <div className="glass-card p-4">
             <div className="mb-4 flex items-start gap-3">
@@ -659,12 +706,12 @@ export function RoundCreator({
           </div>
 
           <div className="flex gap-3">
-            {!callupId && <button
-              onClick={() => setStep(2)}
+            <button
+              onClick={() => currentPrelistId ? router.push("/admin/prelistas") : setStep(2)}
               className="flex-1 bg-surface hover:bg-surface-hover text-foreground font-bold py-3.5 rounded-xl transition-all active:scale-[0.98]"
             >
               Voltar
-            </button>}
+            </button>
             <button
               onClick={handleSave}
               disabled={loading}

@@ -22,6 +22,7 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PreSeasonBanner } from "@/components/PreSeasonBanner";
 import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
 import { NextRoundBanner } from "@/components/NextRoundBanner";
+import { OpenCallupBanner } from "@/components/OpenCallupBanner";
 import { TeamCrest } from "@/components/TeamCrest";
 import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
 
@@ -149,7 +150,7 @@ export default async function HomePage() {
     );
   }
 
-  const { nextRound, nextFriendly, preseasonEnabled, liveMatch, matchDuration, venue, eventDurationMinutes, lastRound, rankingPreview, highlights } = data;
+  const { nextRound, nextFriendly, preseasonEnabled, activeCallup, liveMatch, matchDuration, venue, eventDurationMinutes, lastRound, rankingPreview, highlights } = data;
 
   return (
     <div className="space-y-6">
@@ -162,6 +163,8 @@ export default async function HomePage() {
         initialMatch={liveMatch as unknown as HomeLiveMatch | null}
         matchDuration={matchDuration}
       />
+
+      {activeCallup && <OpenCallupBanner callup={activeCallup} />}
 
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">

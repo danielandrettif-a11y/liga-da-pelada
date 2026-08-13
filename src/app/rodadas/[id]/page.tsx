@@ -35,7 +35,7 @@ export default async function RodadaDetalhePage({
   }
   if (round.preparation_stage === "prelist") {
     if (!account.isAdmin) notFound();
-    redirect(`/admin/rodada?round=${round.id}`);
+    redirect(`/admin/rodada?round=${round.id}&mount=1`);
   }
 
   const participants = (round.round_players || [])

@@ -43,17 +43,16 @@ export async function getRounds() {
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
   if (!season) return [];
-  const account = await getCurrentAccount();
 
-  let query = supabase
+  const query = supabase
     .from("rounds")
     .select(`
       *,
       round_players (count),
       matches (count)
     `)
-    .eq("season_id", season.id);
-  if (!account.isAdmin) query = query.eq("preparation_stage", "teams_ready");
+    .eq("season_id", season.id)
+    .eq("preparation_stage", "teams_ready");
 
   const { data, error } = await query
     .order("date", { ascending: false })
@@ -110,6 +109,47 @@ export async function getRound(id: string) {
 
   if (data.teams) data.teams.sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
   return data;
+}
+
+export async function getAdminRoundPrelists() {
+  const client = await getAdminClient();
+  if (!client) return [];
+  const league = await getActiveLeague();
+  const season = await getActiveSeason(league.id);
+  if (!season) return [];
+
+  const { data, error } = await client
+    .from("rounds")
+    .select(`
+      id,
+      number,
+      date,
+      start_time,
+      round_type,
+      status,
+      created_at,
+      round_players (count),
+      callups (id, status)
+    `)
+    .eq("league_id", league.id)
+    .eq("season_id", season.id)
+    .eq("status", "draft")
+    .eq("preparation_stage", "prelist")
+    .order("date", { ascending: true })
+    .order("start_time", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Erro ao buscar pre-listas:", error);
+    return [];
+  }
+
+  return (data || []).map((round: any) => ({
+    ...round,
+    playersCount: round.round_players?.[0]?.count || 0,
+    callupId: round.callups?.[0]?.id || null,
+    callupStatus: round.callups?.[0]?.status || null,
+  }));
 }
 
 export async function getAdminRoundPrelist(id: string) {
@@ -253,7 +293,7 @@ export async function deleteRound(roundId: string, confirmation: string) {
     if (!client) return { success: false, error: "Somente administradores podem excluir rodadas." };
     const { error } = await client.rpc("delete_round_cascade", { p_round_id: roundId });
     if (error) throw new Error(error.message);
-    for (const path of ["/rodadas", "/ranking", "/pagamentos", "/admin/transfermarket", "/convocacao", "/mais"]) {
+    for (const path of ["/rodadas", "/ranking", "/pagamentos", "/admin/transfermarket", "/admin/prelistas", "/convocacao", "/mais"]) {
       revalidatePath(path);
     }
     revalidatePath("/", "layout");
@@ -325,11 +365,12 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
       p_callup_id: input.callupId || null,
     });
     if (error) {
-      if (error.code === "23505") throw new Error("Ja existe uma pre-lista em andamento. Retome ou exclua a atual.");
+      if (error.code === "23505") throw new Error("Houve um conflito na numeracao. Atualize a pagina e tente novamente.");
       throw new Error(error.message);
     }
 
     revalidatePath("/admin/rodada");
+    revalidatePath("/admin/prelistas");
     revalidatePath("/rodadas");
     revalidatePath("/convocacao");
     revalidatePath("/", "layout");
@@ -580,6 +621,7 @@ export async function createRoundWithTeams(
     }
 
     revalidatePath("/rodadas");
+    revalidatePath("/admin/prelistas");
     revalidatePath("/convocacao");
     revalidatePath("/", "layout");
     return { success: true, roundId: round.id };

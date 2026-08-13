@@ -120,6 +120,7 @@ export async function updateLeagueConfig(
 
     revalidatePath("/admin/liga");
     revalidatePath("/admin/rodada");
+    revalidatePath("/admin/prelistas");
     revalidatePath("/convocacao");
     revalidatePath("/mais");
     return { success: true };

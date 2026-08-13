@@ -25,7 +25,7 @@ export function NextRoundBanner({
 }) {
   const isPrelist = round?.preparation_stage === "prelist";
   const href = round
-    ? isAdmin && isPrelist ? `/admin/rodada?round=${round.id}` : isAdmin ? `/rodadas/${round.id}` : "/rodadas"
+    ? isAdmin && isPrelist ? `/admin/rodada?round=${round.id}&mount=1` : isAdmin ? `/rodadas/${round.id}` : "/rodadas"
     : "/rodadas";
   const formattedDate = round ? new Date(`${round.date}T00:00:00`).toLocaleDateString("pt-BR") : null;
   const formattedTime = round?.start_time?.slice(0, 5) || null;

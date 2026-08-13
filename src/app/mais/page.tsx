@@ -34,10 +34,10 @@ const ADMIN_SECTIONS = [
         description: "Cadastrar e classificar pessoas",
       },
       {
-        href: "/admin/rodada",
+        href: "/admin/prelistas",
         icon: CalendarPlus,
-        label: "Nova Rodada",
-        description: "Criar rodada e montar times",
+        label: "Pré-listas e Rodadas",
+        description: "Preparar datas, jogadores e montar times",
       },
       {
         href: "/admin/transfermarket",
