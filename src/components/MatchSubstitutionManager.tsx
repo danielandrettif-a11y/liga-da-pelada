@@ -6,6 +6,7 @@ import { substituteMatchPlayer } from "@/lib/actions/matches";
 import type { MatchSubstitutionReason, Player } from "@/lib/types";
 import { isEntryResultEligible } from "@/lib/match-rules";
 import { TeamMiniPitch } from "./TeamMiniPitch";
+import { useDialogViewport } from "@/lib/useDialogViewport";
 
 export function MatchSubstitutionManager({
   match,
@@ -24,6 +25,7 @@ export function MatchSubstitutionManager({
   const [markInjured, setMarkInjured] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  useDialogViewport(open);
 
   const participantIds = useMemo(
     () => new Set((match.match_players || []).map((entry: any) => entry.player_id)),
@@ -114,8 +116,8 @@ export function MatchSubstitutionManager({
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center bg-background/85 p-2 pb-[max(.5rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:p-3">
-          <div className="glass-card flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden animate-slide-in-bottom">
+        <div className="mobile-dialog-backdrop bg-background/85 backdrop-blur-sm">
+          <div className="glass-card flex max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-full max-w-lg flex-col overflow-hidden animate-fade-in-up">
             <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-3">
               <div>
                 <h3 className="font-black text-foreground">Pedir substituição</h3>

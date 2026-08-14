@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { CheckCircle2, X } from "@/components/icons";
 import { finishRound } from "@/lib/actions/rounds";
+import { useDialogViewport } from "@/lib/useDialogViewport";
 
 export function FinishRoundButton({ roundId, status, canManage }: { roundId: string; status: string; canManage: boolean }) {
   const [open, setOpen] = useState(false);
@@ -11,6 +12,7 @@ export function FinishRoundButton({ roundId, status, canManage }: { roundId: str
   const [paymentTotal, setPaymentTotal] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  useDialogViewport(open);
 
   if (status === "finished") {
     return (
@@ -65,8 +67,8 @@ export function FinishRoundButton({ roundId, status, canManage }: { roundId: str
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 p-4 sm:items-center">
-          <div role="dialog" aria-modal="true" aria-labelledby="finish-round-title" className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-2xl">
+        <div className="mobile-dialog-backdrop bg-black/75 backdrop-blur-sm animate-fade-in" onMouseDown={(event) => event.target === event.currentTarget && !loading && setOpen(false)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="finish-round-title" className="mobile-dialog-panel max-w-md rounded-2xl border border-border bg-surface p-5 shadow-2xl animate-fade-in-up">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 id="finish-round-title" className="text-lg font-black text-foreground">Encerrar a rodada?</h2>
@@ -86,7 +88,6 @@ export function FinishRoundButton({ roundId, status, canManage }: { roundId: str
               onChange={(event) => setPix(event.target.value)}
               placeholder="CPF, telefone, e-mail ou chave aleatoria"
               maxLength={200}
-              autoFocus
               className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-accent"
             />
 

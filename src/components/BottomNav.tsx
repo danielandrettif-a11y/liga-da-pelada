@@ -41,7 +41,7 @@ export function BottomNav({
   const baseItems = hasOpenCallup
     ? [NAV_ITEMS[0], CALLUP_NAV_ITEM, ...NAV_ITEMS.slice(1)]
     : [...NAV_ITEMS];
-  const contextualItems = baseItems.filter((item) => item.href !== "/pagamentos" || hasReleasedPayment);
+  const contextualItems = baseItems.filter((item) => item.href !== "/pagamentos" || (hasReleasedPayment && !hasOpenCallup));
   const visibleItems = isAuthenticated
     ? contextualItems
     : contextualItems.filter((item) => item.href !== "/mais");

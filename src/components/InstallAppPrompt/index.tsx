@@ -295,7 +295,7 @@ export function InstallAppPrompt({
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/65 px-3 backdrop-blur-[3px] animate-fade-in"
+      className="fixed inset-0 z-[200] flex items-end justify-center bg-black/65 px-3 backdrop-blur-[3px] animate-fade-in"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) closePrompt();

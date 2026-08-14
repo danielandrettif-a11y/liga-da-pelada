@@ -26,6 +26,7 @@ import {
 import { TEAM_PRESETS } from "@/lib/teamPresets";
 import { supabase } from "@/lib/supabase";
 import { DeleteRoundButton } from "./DeleteRoundButton";
+import { useDialogViewport } from "@/lib/useDialogViewport";
 
 type DrawPlayer = Player & {
   points?: number;
@@ -102,6 +103,7 @@ export function RoundCreator({
   const [formationMode, setFormationMode] = useState<TeamFormationMode>("manual");
   const [attendanceOrder, setAttendanceOrder] = useState<string[]>([]);
   const [pendingDrawMode, setPendingDrawMode] = useState<Exclude<TeamFormationMode, "manual"> | null>(null);
+  useDialogViewport(Boolean(pendingDrawMode));
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -633,8 +635,8 @@ export function RoundCreator({
           </div>
 
           {pendingDrawMode && (
-            <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/75 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label="Lista de presenca">
-              <div className="max-h-[88vh] w-full max-w-md overflow-hidden rounded-3xl border border-border bg-background shadow-2xl">
+            <div className="mobile-dialog-backdrop bg-black/75 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Lista de presenca">
+              <div className="flex max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-border bg-background shadow-2xl animate-fade-in-up">
                 <div className="flex items-start justify-between border-b border-border p-5">
                   <div>
                     <h2 className="text-lg font-black text-foreground">Lista de Presenca</h2>
@@ -642,7 +644,7 @@ export function RoundCreator({
                   </div>
                   <button type="button" onClick={() => setPendingDrawMode(null)} className="rounded-full bg-surface p-2 text-muted"><X className="h-4 w-4" /></button>
                 </div>
-                <div className="max-h-[58vh] divide-y divide-border overflow-y-auto">
+                <div className="min-h-0 flex-1 divide-y divide-border overflow-y-auto overscroll-contain">
                   {selectedPlayers.map((player) => {
                     const position = attendanceOrder.indexOf(player.id);
                     return (

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Download, FileText, Flag, Image, X } from "@/components/icons";
 import { finishSeason } from "@/lib/actions/seasons";
 import type { SeasonSummary } from "@/lib/types";
+import { useDialogViewport } from "@/lib/useDialogViewport";
 
 export function FinishSeasonCard() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export function FinishSeasonCard() {
   const [exportError, setExportError] = useState("");
   const [summary, setSummary] = useState<SeasonSummary | null>(null);
   const [newSeasonNumber, setNewSeasonNumber] = useState<number | null>(null);
+  useDialogViewport(modalOpen);
 
   function openModal() {
     setConfirmation("");
@@ -116,8 +118,8 @@ export function FinishSeasonCard() {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-[200] bg-background/90 backdrop-blur-md flex items-end sm:items-center justify-center sm:p-4">
-          <div className="w-full max-w-md bg-surface border border-border rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl animate-slide-in-bottom">
+        <div className="mobile-dialog-backdrop bg-background/90 backdrop-blur-md">
+          <div className="mobile-dialog-panel max-w-md rounded-3xl border border-border bg-surface shadow-2xl animate-fade-in-up">
             <div className="p-5 flex items-start justify-between border-b border-border">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-full bg-danger/15 flex items-center justify-center">
@@ -194,7 +196,6 @@ export function FinishSeasonCard() {
                     onChange={(event) => setConfirmation(event.target.value)}
                     placeholder="Terminar"
                     autoComplete="off"
-                    autoFocus
                     className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-danger"
                   />
                 </div>

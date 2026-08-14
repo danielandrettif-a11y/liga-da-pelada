@@ -23,6 +23,7 @@ import { PlayerAvatar } from "./PlayerAvatar";
 import { MatchSubstitutionManager } from "./MatchSubstitutionManager";
 import { getMatchTimerElapsedSeconds, getOfficialElapsedSeconds, transitionMatchTimer } from "@/lib/match-rules";
 import { TeamCrest } from "./TeamCrest";
+import { useDialogViewport } from "@/lib/useDialogViewport";
 
 type MatchLiveBoardProps = {
   match: any;
@@ -157,6 +158,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
     teamId: string;
     scorerId: string | null;
   }>({ open: false, teamId: "", scorerId: null });
+  useDialogViewport(goalModal.open);
 
   const isFinished = match.status === "finished";
 
@@ -266,7 +268,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       )}
 
       {/* Cronômetro e Placar */}
-      <div className="glass-card p-6 flex flex-col items-center animate-fade-in">
+      <div className="glass-card flex flex-col items-center p-4 animate-fade-in sm:p-6">
         
         {/* Timer Section */}
         {!isFinished && (
@@ -308,8 +310,8 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
 
         <div className="flex items-center justify-between w-full">
           {/* Team A */}
-        <div className="flex flex-col items-center gap-3 flex-1">
-          <TeamCrest name={match.team_a.name} crestUrl={match.team_a.crest_url} color={match.team_a.color} className="h-16 w-16" />
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-2 sm:gap-3">
+          <TeamCrest name={match.team_a.name} crestUrl={match.team_a.crest_url} color={match.team_a.color} className="h-14 w-14 sm:h-16 sm:w-16" />
           <span className="max-w-[8rem] truncate text-center text-xs font-black text-foreground">{match.team_a.name}</span>
           <span className="stat-number text-5xl text-foreground">{displayScore.a}</span>
           
@@ -324,11 +326,11 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
           )}
         </div>
 
-        <div className="text-2xl font-black text-muted px-4">×</div>
+        <div className="px-2 text-2xl font-black text-muted sm:px-4">×</div>
 
         {/* Team B */}
-        <div className="flex flex-col items-center gap-3 flex-1">
-          <TeamCrest name={match.team_b.name} crestUrl={match.team_b.crest_url} color={match.team_b.color} className="h-16 w-16" />
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-2 sm:gap-3">
+          <TeamCrest name={match.team_b.name} crestUrl={match.team_b.crest_url} color={match.team_b.color} className="h-14 w-14 sm:h-16 sm:w-16" />
           <span className="max-w-[8rem] truncate text-center text-xs font-black text-foreground">{match.team_b.name}</span>
           <span className="stat-number text-5xl text-foreground">{displayScore.b}</span>
           
@@ -450,9 +452,9 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
 
       {/* MODAL DE REGISTRO DE GOL */}
       {goalModal.open && canManage && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-fade-in pb-8">
-          <div className="glass-card w-full max-w-sm overflow-hidden flex flex-col max-h-[85vh] animate-slide-in-bottom">
-            <div className="p-4 bg-surface border-b border-border flex items-center justify-between">
+        <div className="mobile-dialog-backdrop bg-background/85 backdrop-blur-sm animate-fade-in">
+          <div className="glass-card flex max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-full max-w-sm flex-col overflow-hidden animate-fade-in-up sm:max-h-[85dvh]">
+            <div className="flex shrink-0 items-center justify-between border-b border-border bg-surface p-4">
               <h3 className="font-bold text-foreground">
                 {goalModal.scorerId ? "Quem deu o passe?" : "Quem fez o gol?"}
               </h3>
@@ -461,7 +463,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
               </button>
             </div>
 
-            <div className="p-4 overflow-y-auto no-scrollbar space-y-2 flex-1">
+            <div className="no-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4 pb-6">
               {!goalModal.scorerId ? (
                 // SELECIONAR ARTILHEIRO
                 activePlayers.map((tp: any) => (

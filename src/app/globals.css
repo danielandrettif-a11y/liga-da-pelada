@@ -50,6 +50,7 @@
    ============================================ */
 
 body {
+  min-height: 100dvh;
   background-color: var(--background);
   /* Textura sutil pontilhada (estilo tecido/mesh) */
   background-image: radial-gradient(rgba(204, 255, 0, 0.05) 1px, transparent 1px);
@@ -68,7 +69,43 @@ a,
 
 /* Safe area for bottom nav */
 main {
-  padding-bottom: calc(var(--bottom-nav-height) + 1rem);
+  padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 1rem);
+}
+
+/* Evita o zoom automático do Safari ao focar formulários no iPhone. */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+/* Base compartilhada para diálogos realmente centrados no viewport mobile. */
+.mobile-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+}
+
+.mobile-dialog-panel {
+  width: 100%;
+  max-height: calc(100dvh - max(2rem, env(safe-area-inset-top)) - max(2rem, env(safe-area-inset-bottom)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: inherit;
+  }
 }
 
 /* Mantem a navegacao presa ao viewport no Safari/PWA, sem o custo do blur. */

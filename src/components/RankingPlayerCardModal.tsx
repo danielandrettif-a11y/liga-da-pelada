@@ -234,7 +234,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   const clipPath = "polygon(10% 0, 90% 0, 100% 7%, 97% 88%, 50% 100%, 3% 88%, 0 7%)";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/90 p-3 backdrop-blur-md" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div className="mobile-dialog-backdrop bg-black/90 backdrop-blur-md" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <div role="dialog" aria-modal="true" aria-label={`Carta de ${displayName}`} className="relative w-full max-w-[350px] py-12">
         <button type="button" onClick={onClose} aria-label="Fechar carta" className="absolute right-1 top-1 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/65 text-white shadow-lg backdrop-blur hover:bg-black/90">
           <X className="h-5 w-5" />

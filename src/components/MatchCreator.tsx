@@ -17,6 +17,7 @@ export function MatchCreator({ round }: { round: any }) {
   const [replacementByAbsent, setReplacementByAbsent] = useState<Record<string, string>>({});
   const [swapPlayerAId, setSwapPlayerAId] = useState("");
   const [swapPlayerBId, setSwapPlayerBId] = useState("");
+  const [swapFeedback, setSwapFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [managementLoading, setManagementLoading] = useState(false);
   const [captainByTeam, setCaptainByTeam] = useState<Record<string, string>>(() => Object.fromEntries(
     (round?.teams || []).map((team: any) => [team.id, team.captain_player_id || ""]),
@@ -122,17 +123,22 @@ export function MatchCreator({ round }: { round: any }) {
     if (!swapPlayerAId || !swapPlayerBId) return;
     setManagementLoading(true);
     setError("");
+    setSwapFeedback(null);
     const result = await swapRoundTeamPlayers(round.id, swapPlayerAId, swapPlayerBId);
-    if (!result.success) setError(result.error || "Nao foi possivel realizar a troca.");
+    if (!result.success) {
+      setSwapFeedback({ type: "error", message: result.error || "Não foi possível realizar a troca." });
+    }
     else {
       setSwapPlayerAId("");
       setSwapPlayerBId("");
+      setSwapFeedback({ type: "success", message: "Troca realizada. Os próximos jogos já usarão os novos times." });
       router.refresh();
     }
     setManagementLoading(false);
   }
 
   function selectSwapPlayer(playerId: string, teamId: string) {
+    setSwapFeedback(null);
     if (swapPlayerAId === playerId) {
       setSwapPlayerAId("");
       return;
@@ -313,6 +319,11 @@ export function MatchCreator({ round }: { round: any }) {
               </div>
             </div>
           ))}
+          {swapFeedback && (
+            <p role="status" className={`rounded-xl p-3 text-center text-[10px] font-bold sm:col-span-2 ${swapFeedback.type === "success" ? "bg-success/10 text-success" : "bg-danger/10 text-danger"}`}>
+              {swapFeedback.message}
+            </p>
+          )}
           <button type="button" disabled={managementLoading || !swapPlayerAId || !swapPlayerBId} onClick={handlePermanentSwap} className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-xs font-black text-warning disabled:opacity-40 sm:col-span-2">
             {managementLoading ? "Salvando..." : "Confirmar troca entre os times"}
           </button>

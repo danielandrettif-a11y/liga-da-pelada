@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { CalendarDays, Download, X } from "@/components/icons";
 import { buildGoogleCalendarUrl, buildIcs, type PeladaCalendarEvent } from "@/lib/calendar";
+import { useDialogViewport } from "@/lib/useDialogViewport";
 
 export function RoundCalendarButton({ event }: { event: PeladaCalendarEvent }) {
   const [open, setOpen] = useState(false);
+  useDialogViewport(open);
 
   function openGoogle() {
     window.open(buildGoogleCalendarUrl(event, window.location.origin), "_blank", "noopener,noreferrer");
@@ -29,8 +31,8 @@ export function RoundCalendarButton({ event }: { event: PeladaCalendarEvent }) {
         <CalendarDays className="h-5 w-5" />
       </button>
       {open && (
-        <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/75 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label="Salvar na agenda">
-          <div className="w-full max-w-sm overflow-hidden rounded-3xl border border-border bg-background shadow-2xl">
+        <div className="mobile-dialog-backdrop bg-black/75 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Salvar na agenda" onMouseDown={(event) => event.target === event.currentTarget && setOpen(false)}>
+          <div className="mobile-dialog-panel max-w-sm overflow-hidden rounded-3xl border border-border bg-background shadow-2xl animate-fade-in-up">
             <div className="flex items-start justify-between border-b border-border p-5">
               <div><h2 className="text-lg font-black text-foreground">Salvar a pelada</h2><p className="mt-1 text-xs text-muted">Escolha onde adicionar o compromisso.</p></div>
               <button type="button" onClick={() => setOpen(false)} className="rounded-full bg-surface p-2 text-muted"><X className="h-4 w-4" /></button>
