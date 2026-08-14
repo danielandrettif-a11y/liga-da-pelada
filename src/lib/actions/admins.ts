@@ -81,7 +81,15 @@ export async function setAccountAdminRole(targetUserId: string, makeAdmin: boole
 
     if (error) {
       const migrationMissing = error.message.includes("manage_account_admin_role") || error.code === "PGRST202";
-      return { success: false, error: migrationMissing ? "Execute a migration 035 no Supabase para liberar a gestão de ADMs." : error.message };
+      const legacyAuditConstraint = error.message.includes("admin_role_audit_previous_role_check");
+      return {
+        success: false,
+        error: migrationMissing
+          ? "Execute as migrations pendentes no Supabase para liberar a gestão de ADMs."
+          : legacyAuditConstraint
+            ? "A correção de contas antigas ainda não foi aplicada no Supabase. Execute a migration 036."
+            : error.message,
+      };
     }
 
     revalidatePath("/admin/administradores");
