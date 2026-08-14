@@ -19,7 +19,15 @@ export type FantasyMarketPlayer = {
   wins: number;
   games: number;
   variation: number;
+  priceChange: number;
   roundPoints: number;
+};
+
+export type FantasyDashboardInsights = {
+  topRoundPlayer: (FantasyMarketPlayer & { selectionCount?: number }) | null;
+  mostSelectedPlayer: (FantasyMarketPlayer & { selectionCount: number }) | null;
+  topValuationPlayer: FantasyMarketPlayer | null;
+  topDepreciationPlayer: FantasyMarketPlayer | null;
 };
 
 export async function getFantasyDashboard() {
@@ -61,13 +69,13 @@ export async function getFantasyDashboard() {
 
   const { data: fantasyRoundRows } = await account.client
     .from("fantasy_rounds")
-    .select("*, round:round_id(id, number, date, start_time, status, round_type, teams(id, name, color), matches(id, status))")
+    .select("*, round:round_id(id, number, date, start_time, status, round_type, preparation_stage, teams(id, name, color), matches(id, status))")
     .eq("fantasy_season_id", fantasySeason.id);
   const officialFantasyRounds = (fantasyRoundRows || []).filter((item: any) => item.round?.round_type === "official");
   const byRoundDateDesc = (a: any, b: any) =>
     `${b.round?.date || ""}-${String(b.round?.number || 0).padStart(4, "0")}`.localeCompare(`${a.round?.date || ""}-${String(a.round?.number || 0).padStart(4, "0")}`);
   const activeOfficialRound = officialFantasyRounds
-    .filter((item: any) => item.market_status === "in_progress" || item.market_status === "open")
+    .filter((item: any) => item.round?.status !== "finished" && (item.market_status === "in_progress" || item.market_status === "open"))
     .sort((a: any, b: any) => {
       if (a.market_status !== b.market_status) return a.market_status === "in_progress" ? -1 : 1;
       return byRoundDateDesc(a, b);
@@ -93,7 +101,7 @@ export async function getFantasyDashboard() {
   const latestLineupRequest = latestFinishedRound
     ? account.client.from("fantasy_lineups").select("*, fantasy_lineup_players(*)").eq("fantasy_round_id", latestFinishedRound.id).eq("user_id", account.user.id).maybeSingle()
     : Promise.resolve({ data: null as any });
-  const [{ data: priceRows }, { data: statRows }, { data: roundParticipants }, { data: rawLineup }, { data: latestLineup }, { data: fantasyAccount }, { data: liveEvents }, { data: selectablePlayers }, { data: portfolio }, { data: priceHistory }] = await Promise.all([
+  const [{ data: priceRows }, { data: statRows }, { data: roundParticipants }, { data: rawLineup }, { data: latestLineup }, { data: fantasyAccount }, { data: liveEvents }, { data: selectablePlayers }, { data: priceHistory }, { data: latestRoundLineups }] = await Promise.all([
     account.client.from("fantasy_player_prices").select("*").eq("fantasy_season_id", fantasySeason.id),
     officialRoundIds.length
       ? account.client.from("player_round_stats").select("round_id, player_id, goals, assists, wins, games").in("round_id", officialRoundIds)
@@ -106,8 +114,10 @@ export async function getFantasyDashboard() {
     account.client.from("fantasy_accounts").select("*").eq("fantasy_season_id", fantasySeason.id).eq("user_id", account.user.id).maybeSingle(),
     matchIds.length ? account.client.from("match_events").select("player_id, assist_player_id").in("match_id", matchIds) : Promise.resolve({ data: [] as any[] }),
     account.client.from("players").select("id, name, avatar_url, player_profile, member_category, is_selectable").eq("is_selectable", true).in("member_category", ["player", "guest"]),
-    account.client.from("fantasy_portfolios").select("*, fantasy_portfolio_players(*)").eq("fantasy_season_id", fantasySeason.id).eq("user_id", account.user.id).maybeSingle(),
-    account.client.from("fantasy_player_price_history").select("player_id, fantasy_round_id, variation_rate, round_points, goals, assists, wins, games, created_at").eq("fantasy_season_id", fantasySeason.id).order("created_at", { ascending: false }),
+    account.client.from("fantasy_player_price_history").select("player_id, fantasy_round_id, price_before, price_after, variation_rate, round_points, goals, assists, wins, games, created_at").eq("fantasy_season_id", fantasySeason.id).order("created_at", { ascending: false }),
+    latestFinishedRound
+      ? account.client.from("fantasy_lineups").select("status, fantasy_lineup_players(player_id)").eq("fantasy_round_id", latestFinishedRound.id).eq("status", "scored")
+      : Promise.resolve({ data: [] as any[] }),
   ]);
   const lineup = isTest && rawLineup
     ? { ...rawLineup, fantasy_lineup_players: rawLineup.fantasy_test_lineup_players || [] }
@@ -143,9 +153,13 @@ export async function getFantasyDashboard() {
     }
   }
   const lastVariation = new Map<string, number>();
+  const lastPriceChange = new Map<string, number>();
   const latestRoundPerformance = new Map<string, number>();
   for (const row of priceHistory || []) {
-    if (!lastVariation.has(row.player_id)) lastVariation.set(row.player_id, Number(row.variation_rate || 0));
+    if (!lastVariation.has(row.player_id)) {
+      lastVariation.set(row.player_id, Number(row.variation_rate || 0));
+      lastPriceChange.set(row.player_id, Number(row.price_after || 0) - Number(row.price_before || 0));
+    }
     if (latestFinishedRound && row.fantasy_round_id === latestFinishedRound.id) {
       latestRoundPerformance.set(row.player_id, Number(row.round_points || 0));
     }
@@ -161,6 +175,7 @@ export async function getFantasyDashboard() {
         totalPoints: isTest ? 0 : Number(price?.total_points || 0),
         roundsPlayed: isTest ? 0 : Number(price?.rounds_played || 0), ...stats,
         variation: isTest ? 0 : lastVariation.get(player.id) || 0,
+        priceChange: isTest ? 0 : lastPriceChange.get(player.id) || 0,
         roundPoints: betweenRounds
           ? latestRoundPerformance.get(player.id) || 0
           : (currentStats.get(player.id)?.goals || 0) * settings.goalPoints + (currentStats.get(player.id)?.assists || 0) * settings.assistPoints + (currentStats.get(player.id)?.wins || 0) * settings.winPoints };
@@ -168,33 +183,57 @@ export async function getFantasyDashboard() {
 
   let effectiveLineup: any = lineup || null;
   if (!effectiveLineup && !isTest) {
-    const savedSelection = portfolio
-      ? {
-          captain_player_id: portfolio.captain_player_id,
-          fantasy_lineup_players: portfolio.fantasy_portfolio_players || [],
-        }
-      : latestLineup;
+    const savedSelection = latestLineup;
     if (savedSelection) {
       const eligible = (savedSelection.fantasy_lineup_players || []).map((item: any) => item.player_id).filter((id: string) => market.some((player) => player.id === id));
       const suggestedCost = eligible.reduce((sum: number, id: string) => sum + (market.find((player) => player.id === id)?.price || 0), 0);
       if (suggestedCost <= Number(fantasyAccount?.current_budget ?? settings.initialBudget)) {
-        effectiveLineup = { ...savedSelection, status: betweenRounds ? "portfolio" : "suggested", fantasy_lineup_players: eligible.map((player_id: string) => ({ player_id })) };
+        effectiveLineup = { ...savedSelection, status: betweenRounds ? "previous" : "suggested", fantasy_lineup_players: eligible.map((player_id: string) => ({ player_id })) };
       }
     }
   }
+
+  const selectionCounts = new Map<string, number>();
+  for (const savedLineup of latestRoundLineups || []) {
+    for (const item of savedLineup.fantasy_lineup_players || []) {
+      selectionCounts.set(item.player_id, (selectionCounts.get(item.player_id) || 0) + 1);
+    }
+  }
+  const topRoundPlayer = [...market].sort((a, b) => b.roundPoints - a.roundPoints || a.name.localeCompare(b.name, "pt-BR"))[0] || null;
+  const mostSelectedBase = [...market].sort((a, b) => (selectionCounts.get(b.id) || 0) - (selectionCounts.get(a.id) || 0) || b.roundPoints - a.roundPoints)[0] || null;
+  const topValuationPlayer = [...market].filter((player) => player.priceChange > 0).sort((a, b) => b.priceChange - a.priceChange)[0] || null;
+  const topDepreciationPlayer = [...market].filter((player) => player.priceChange < 0).sort((a, b) => a.priceChange - b.priceChange)[0] || null;
+  const insights: FantasyDashboardInsights = {
+    topRoundPlayer: topRoundPlayer && topRoundPlayer.roundPoints > 0 ? { ...topRoundPlayer, selectionCount: selectionCounts.get(topRoundPlayer.id) || 0 } : null,
+    mostSelectedPlayer: mostSelectedBase && (selectionCounts.get(mostSelectedBase.id) || 0) > 0
+      ? { ...mostSelectedBase, selectionCount: selectionCounts.get(mostSelectedBase.id) || 0 }
+      : null,
+    topValuationPlayer,
+    topDepreciationPlayer,
+  };
+
+  const officialPrelistOpen = !isTest
+    && fantasyRound?.market_status === "open"
+    && fantasyRound?.round?.status === "draft"
+    && fantasyRound?.round?.preparation_stage === "prelist";
   return {
     authenticated: true as const, available: true as const, isAdmin: account.isAdmin, settings,
     round: displayRound,
     fantasySeasonId: fantasySeason.id,
     fantasyRound: {
       id: fantasyRound?.id || null,
-      status: betweenRounds ? "between_rounds" : fantasyRound.market_status,
+      status: betweenRounds ? "between_rounds" : officialPrelistOpen || isTest ? fantasyRound.market_status : fantasyRound.market_status === "open" ? "scheduled" : fantasyRound.market_status,
       lockedAt: fantasyRound?.locked_at || null,
       isTest,
       betweenRounds,
     },
-    market, lineup: effectiveLineup,
+    market, lineup: effectiveLineup, insights,
     budget: isTest ? settings.initialBudget : Number(fantasyAccount?.current_budget ?? settings.initialBudget),
+    account: {
+      totalPoints: Number(fantasyAccount?.total_points || 0),
+      roundsPlayed: Number(fantasyAccount?.rounds_played || 0),
+      bestRoundPoints: Number(fantasyAccount?.best_round_points || 0),
+    },
     lastRound: latestFinishedRound ? {
       number: latestFinishedRound.round?.number,
       date: latestFinishedRound.round?.date,
@@ -205,11 +244,11 @@ export async function getFantasyDashboard() {
   };
 }
 
-export async function saveFantasyLineup(input: { fantasySeasonId: string; roundId: string | null; playerIds: string[]; captainId: string | null; scorerId: string | null; assistId: string | null; teamId: string | null }) {
+export async function saveFantasyLineup(input: { roundId: string | null; playerIds: string[]; captainId: string | null; scorerId: string | null; assistId: string | null; teamId: string | null }) {
   try {
     const account = await getCurrentAccount();
     if (!account.user) return { success: false, error: "Entre na sua conta para escalar." };
-    if (!input.fantasySeasonId || input.playerIds.length > 5 || new Set(input.playerIds).size !== input.playerIds.length) {
+    if (!input.roundId || input.playerIds.length > 5 || new Set(input.playerIds).size !== input.playerIds.length) {
       return { success: false, error: "A escalação enviada é inválida. Atualize a página e tente novamente." };
     }
     const { data: testSession } = input.roundId
@@ -222,19 +261,22 @@ export async function saveFantasyLineup(input: { fantasySeasonId: string; roundI
       });
       if (error) return { success: false, error: error.message };
     } else {
-      const { error: portfolioError } = await account.client.rpc("save_fantasy_portfolio", {
-        p_fantasy_season_id: input.fantasySeasonId,
-        p_player_ids: input.playerIds,
-        p_captain_player_id: input.captainId,
-      });
-      if (portfolioError) return { success: false, error: portfolioError.message };
-      if (input.roundId) {
-        const { error: lineupError } = await account.client.rpc("save_fantasy_lineup", {
-          p_round_id: input.roundId, p_player_ids: input.playerIds, p_captain_player_id: input.captainId,
-          p_top_scorer_player_id: input.scorerId, p_top_assist_player_id: input.assistId, p_top_team_id: input.teamId,
-        });
-        if (lineupError) return { success: false, error: lineupError.message };
+      const { data: officialPrelist } = await account.client
+        .from("rounds")
+        .select("id")
+        .eq("id", input.roundId)
+        .eq("round_type", "official")
+        .eq("status", "draft")
+        .eq("preparation_stage", "prelist")
+        .maybeSingle();
+      if (!officialPrelist) {
+        return { success: false, error: "A escalação só pode ser alterada enquanto existir uma pré-lista Ranked aberta." };
       }
+      const { error: lineupError } = await account.client.rpc("save_fantasy_prelist_lineup", {
+        p_round_id: input.roundId, p_player_ids: input.playerIds, p_captain_player_id: input.captainId,
+        p_top_scorer_player_id: input.scorerId, p_top_assist_player_id: input.assistId, p_top_team_id: input.teamId,
+      });
+      if (lineupError) return { success: false, error: lineupError.message };
     }
     revalidatePath("/cartola");
     return { success: true };

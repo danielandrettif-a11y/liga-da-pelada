@@ -658,6 +658,15 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem encerrar rodadas." };
 
+    const { data: originalRound, error: originalRoundError } = await client
+      .from("rounds")
+      .select("status, payment_pix, payment_total")
+      .eq("id", roundId)
+      .single();
+    if (originalRoundError || !originalRound) {
+      throw new Error(originalRoundError?.message || "Rodada não encontrada.");
+    }
+
     // Consolida as estatísticas antes de encerrar. Se esta etapa falhar, a rodada
     // continua ativa em vez de ficar finalizada com o Cartola vazio.
     const { calculateRoundStats } = await import("./stats");
@@ -686,7 +695,22 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
       fantasyTest ? "process_fantasy_test_round" : "process_fantasy_round",
       { p_round_id: roundId },
     );
-    if (fantasyError) throw new Error(`A rodada terminou, mas o Cartola não foi processado: ${fantasyError.message}`);
+    if (fantasyError) {
+      // A atualização da rodada e o RPC são requisições diferentes. Se o Cartola
+      // falhar, restaura o estado anterior para o ADM poder corrigir e tentar de novo.
+      const { error: rollbackError } = await client
+        .from("rounds")
+        .update({
+          status: originalRound.status,
+          payment_pix: originalRound.payment_pix,
+          payment_total: originalRound.payment_total,
+        })
+        .eq("id", roundId);
+      if (rollbackError) {
+        throw new Error(`O Cartola não foi processado (${fantasyError.message}) e não foi possível restaurar a rodada (${rollbackError.message}).`);
+      }
+      throw new Error(`O Cartola não foi processado e a rodada foi restaurada para nova tentativa: ${fantasyError.message}`);
+    }
 
     revalidatePath(`/rodadas/${roundId}`);
     revalidatePath("/rodadas");

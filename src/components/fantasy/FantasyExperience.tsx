@@ -6,24 +6,25 @@ import { useRouter } from "next/navigation";
 import { Crown, Search, TrendingUp, Trophy } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { formatFantasyMoney, type FantasySettings } from "@/lib/fantasy/config";
-import { saveFantasyLineup, type FantasyMarketPlayer } from "@/lib/actions/fantasy";
+import { saveFantasyLineup, type FantasyDashboardInsights, type FantasyMarketPlayer } from "@/lib/actions/fantasy";
 import { supabase } from "@/lib/supabase";
 
 type Props = {
   round: { id: string; number: number; date: string; start_time: string | null; teams?: { id: string; name: string; color: string }[] } | null;
-  fantasySeasonId: string;
   status: string;
   settings: FantasySettings;
   market: FantasyMarketPlayer[];
   budget: number;
   lineup: any;
+  insights: FantasyDashboardInsights;
+  account: { totalPoints: number; roundsPlayed: number; bestRoundPoints: number };
   isTest?: boolean;
   lastRound?: { number: number; date: string; playerPoints: number; predictionPoints: number; totalPoints: number } | null;
 };
 
 const positionLabel: Record<string, string> = { defensive: "Defesa", midfield: "Meio", offensive: "Ataque" };
 
-export function FantasyExperience({ round, fantasySeasonId, status, settings, market, budget, lineup, isTest = false, lastRound = null }: Props) {
+export function FantasyExperience({ round, status, settings, market, budget, lineup, insights, account, isTest = false, lastRound = null }: Props) {
   const router = useRouter();
   const initialIds = (lineup?.fantasy_lineup_players || []).map((item: any) => item.player_id as string);
   const [selected, setSelected] = useState<string[]>(initialIds);
@@ -36,13 +37,17 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
   const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
   const betweenRounds = status === "between_rounds";
-  const open = status === "open" || betweenRounds;
+  const open = status === "open";
   const selectedPlayers = selected.map((id) => market.find((player) => player.id === id)).filter(Boolean) as FantasyMarketPlayer[];
   const cost = selectedPlayers.reduce((sum, player) => sum + player.price, 0);
   const remaining = budget - cost;
   const filtered = useMemo(() => [...market]
     .filter((player) => player.name.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR")))
-    .sort((a, b) => sort === "price" ? a.price - b.price : sort === "name" ? a.name.localeCompare(b.name, "pt-BR") : b.totalPoints - a.totalPoints), [market, query, sort]);
+    .sort((a, b) => sort === "price" ? a.price - b.price
+      : sort === "name" ? a.name.localeCompare(b.name, "pt-BR")
+        : sort === "variation" ? b.priceChange - a.priceChange
+          : sort === "lastRound" ? b.roundPoints - a.roundPoints
+            : b.totalPoints - a.totalPoints), [market, query, sort]);
 
   useEffect(() => {
     if (status !== "in_progress" || !round) return;
@@ -54,13 +59,12 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
   }, [round, router, status]);
 
   useEffect(() => {
-    if (!open) return;
     const channel = supabase
-      .channel(`fantasy-market-players-${round?.id || fantasySeasonId}`)
+      .channel(`fantasy-market-players-${round?.id || "analysis"}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "players" }, () => router.refresh())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fantasySeasonId, open, round?.id, router]);
+  }, [round?.id, router]);
 
   function togglePlayer(player: FantasyMarketPlayer) {
     if (!open) return;
@@ -78,18 +82,15 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
     startTransition(async () => {
       try {
         const result = await saveFantasyLineup({
-          fantasySeasonId,
-          roundId: betweenRounds ? null : round?.id || null,
+          roundId: round?.id || null,
           playerIds: selected,
           captainId,
-          scorerId: betweenRounds ? null : scorerId,
-          assistId: betweenRounds ? null : assistId,
-          teamId: betweenRounds ? null : teamId,
+          scorerId,
+          assistId,
+          teamId,
         });
         setMessage(result.success
-          ? betweenRounds
-            ? "Elenco salvo para a próxima Ranked!"
-            : selected.length === 5 && captainId ? "Escalação salva e pronta!" : "Rascunho salvo. Complete antes do primeiro jogo."
+          ? selected.length === 5 && captainId ? "Escalação salva e pronta!" : "Rascunho salvo. Complete enquanto a pré-lista estiver aberta."
           : result.error || "Não foi possível salvar.");
       } catch {
         setMessage("A conexão falhou ao salvar. Sua tela foi mantida; tente novamente.");
@@ -107,21 +108,33 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
       )}
       {betweenRounds && (
         <div className="overflow-hidden rounded-2xl border border-accent/35 bg-accent/10 p-4">
-          <p className="text-[10px] font-black uppercase tracking-[.22em] text-accent">Mercado permanente</p>
-          <p className="mt-1 text-xs font-bold leading-5 text-foreground">Compre e venda jogadores agora. Seu elenco ficará preparado para a próxima rodada Ranked.</p>
+          <p className="text-[10px] font-black uppercase tracking-[.22em] text-accent">Central de análise</p>
+          <p className="mt-1 text-xs font-bold leading-5 text-foreground">O mercado segue visível para acompanhar preços e desempenho. A escalação abre quando existir uma pré-lista Ranked.</p>
         </div>
       )}
       <header className="overflow-hidden rounded-3xl border border-accent/25 bg-[radial-gradient(circle_at_85%_15%,rgba(204,255,0,.2),transparent_28%),linear-gradient(135deg,rgba(204,255,0,.10),rgba(4,24,14,.95)_48%)] p-5">
         <div className="flex items-start justify-between gap-4">
-          <div><p className="text-[10px] font-black uppercase tracking-[.22em] text-accent">Fantasy da Pelada</p><h1 className="mt-1 text-2xl font-black italic text-foreground">CARTOLA</h1><p className="mt-1 text-xs text-muted">{betweenRounds ? "Prepare seu elenco para a próxima Ranked" : `Rodada ${round?.number || ""} · escale cinco craques`}</p></div>
-          <span className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-wider ${isTest ? "bg-warning/15 text-warning" : open ? "bg-accent/15 text-accent" : status === "in_progress" ? "bg-warning/15 text-warning" : "bg-surface text-muted"}`}>{isTest ? `Teste · ${open ? "aberto" : status === "in_progress" ? "em jogo" : "finalizado"}` : betweenRounds ? "Compras abertas" : open ? "Mercado aberto" : status === "in_progress" ? "Em andamento" : "Finalizado"}</span>
+          <div><p className="text-[10px] font-black uppercase tracking-[.22em] text-accent">Fantasy da Pelada</p><h1 className="mt-1 text-2xl font-black italic text-foreground">CARTOLA</h1><p className="mt-1 text-xs text-muted">{betweenRounds ? "Preços, valorizações e destaques da temporada" : status === "scheduled" ? `Ranked ${round?.number || ""} · escalação encerrada` : `Ranked ${round?.number || ""} · escale cinco craques`}</p></div>
+          <span className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-wider ${isTest ? "bg-warning/15 text-warning" : open ? "bg-accent/15 text-accent" : status === "in_progress" ? "bg-warning/15 text-warning" : "bg-surface text-muted"}`}>{isTest ? `Teste · ${open ? "aberto" : status === "in_progress" ? "em jogo" : "finalizado"}` : betweenRounds ? "Modo análise" : open ? "Pré-lista aberta" : status === "in_progress" ? "Em andamento" : status === "scheduled" ? "Escalação fechada" : "Finalizado"}</span>
         </div>
         <div className="mt-5 grid grid-cols-3 gap-2">
           <Metric label="Patrimônio" value={formatFantasyMoney(budget, settings.currencyName)} />
-          <Metric label="Escalação" value={formatFantasyMoney(cost, settings.currencyName)} />
-          <Metric label="Restante" value={formatFantasyMoney(remaining, settings.currencyName)} accent={remaining >= 0} />
+          <Metric label={betweenRounds ? "Pontos" : "Escalação"} value={betweenRounds ? account.totalPoints.toFixed(1) : formatFantasyMoney(cost, settings.currencyName)} />
+          <Metric label={betweenRounds ? "Melhor rodada" : "Restante"} value={betweenRounds ? `${account.bestRoundPoints.toFixed(1)} pts` : formatFantasyMoney(remaining, settings.currencyName)} accent={betweenRounds || remaining >= 0} />
         </div>
       </header>
+
+      {!isTest && (insights.topRoundPlayer || insights.mostSelectedPlayer || insights.topValuationPlayer || insights.topDepreciationPlayer) && (
+        <section className="space-y-3">
+          <div><h2 className="text-sm font-black uppercase text-foreground">Radar da última Ranked</h2><p className="text-[10px] text-muted">Quem pontuou, apareceu nas escalações e movimentou o mercado</p></div>
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <InsightCard label="Craque da rodada" player={insights.topRoundPlayer} value={insights.topRoundPlayer ? `${insights.topRoundPlayer.roundPoints.toFixed(1)} pts` : "—"} />
+            <InsightCard label="Mais escalado" player={insights.mostSelectedPlayer} value={insights.mostSelectedPlayer ? `${insights.mostSelectedPlayer.selectionCount} time${insights.mostSelectedPlayer.selectionCount === 1 ? "" : "s"}` : "—"} />
+            <InsightCard label="Maior valorização" player={insights.topValuationPlayer} value={insights.topValuationPlayer ? formatSignedMoney(insights.topValuationPlayer.priceChange, settings) : "—"} positive />
+            <InsightCard label="Maior queda" player={insights.topDepreciationPlayer} value={insights.topDepreciationPlayer ? formatSignedMoney(insights.topDepreciationPlayer.priceChange, settings) : "—"} />
+          </div>
+        </section>
+      )}
 
       {lastRound && !isTest && (
         <section className="overflow-hidden rounded-2xl border border-border bg-surface">
@@ -140,7 +153,7 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(340px,.9fr)]">
         <section className="space-y-4">
-          <div className="flex items-center justify-between"><div><h2 className="text-sm font-black uppercase text-foreground">Meu time</h2><p className="text-[10px] text-muted">Toque na coroa para escolher o capitão</p></div><strong className="text-sm text-accent">{selected.length}/5</strong></div>
+          <div className="flex items-center justify-between"><div><h2 className="text-sm font-black uppercase text-foreground">{betweenRounds ? "Meu último time" : "Meu time"}</h2><p className="text-[10px] text-muted">{open ? "Toque na coroa para escolher o capitão" : betweenRounds ? "A escalação fica disponível na próxima pré-lista Ranked" : "Escalação somente para consulta"}</p></div><strong className="text-sm text-accent">{selected.length}/5</strong></div>
           <div className="relative min-h-[430px] overflow-hidden rounded-[2rem] border-2 border-emerald-400/25 bg-[linear-gradient(90deg,rgba(255,255,255,.035)_50%,transparent_50%),linear-gradient(#07552e,#064426)] bg-[length:33.333%_100%,100%_100%] p-5 shadow-inner">
             <div className="pointer-events-none absolute inset-5 rounded-2xl border border-white/35"><div className="absolute left-1/2 top-0 h-20 w-36 -translate-x-1/2 border-x border-b border-white/30"/><div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30"/><div className="absolute bottom-0 left-1/2 h-20 w-36 -translate-x-1/2 border-x border-t border-white/30"/></div>
             <div className="relative z-10 grid min-h-[390px] grid-cols-2 content-around gap-x-5 gap-y-5 sm:grid-cols-3">
@@ -153,16 +166,18 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
           </div>
 
           {!betweenRounds && <section className="glass-card space-y-3 p-4"><h2 className="text-sm font-black uppercase text-foreground">Palpites da rodada</h2><Select label={`Artilheiro (+${settings.topScorerPredictionPoints})`} value={scorerId || ""} disabled={!open} onChange={setScorerId} options={market.map(p => ({ id: p.id, name: p.name }))}/><Select label={`Garçom (+${settings.topAssistPredictionPoints})`} value={assistId || ""} disabled={!open} onChange={setAssistId} options={market.map(p => ({ id: p.id, name: p.name }))}/><Select label={`Time com mais vitórias (+${settings.topTeamPredictionPoints})`} value={teamId || ""} disabled={!open || !round?.teams?.length} onChange={setTeamId} options={(round?.teams || []).map(t => ({ id: t.id, name: t.name }))}/>{!round?.teams?.length && <p className="text-[10px] text-warning">Este palpite será liberado quando os times reais forem montados.</p>}</section>}
-          {betweenRounds && <p className="rounded-xl border border-border bg-surface p-3 text-center text-[10px] font-bold text-muted">Os palpites serão liberados quando a próxima Ranked for criada.</p>}
-          {open && <button onClick={save} disabled={pending || remaining < 0} className="w-full rounded-2xl bg-accent py-3.5 text-sm font-black text-background disabled:opacity-50">{pending ? "Salvando..." : betweenRounds ? "Salvar elenco para a próxima Ranked" : selected.length === 5 && captainId ? "Salvar escalação" : "Salvar rascunho"}</button>}
+          {betweenRounds && <p className="rounded-xl border border-border bg-surface p-3 text-center text-[10px] font-bold text-muted">Quando o ADM abrir uma pré-lista Ranked, o botão de escalação será liberado automaticamente.</p>}
+          {open && <button onClick={save} disabled={pending || remaining < 0} className="w-full rounded-2xl bg-accent py-3.5 text-sm font-black text-background disabled:opacity-50">{pending ? "Salvando..." : selected.length === 5 && captainId ? "Salvar escalação" : "Salvar rascunho"}</button>}
           {message && <p role="status" className="rounded-xl border border-border bg-surface p-3 text-center text-xs font-bold text-foreground">{message}</p>}
         </section>
 
-        <aside className="space-y-3"><div className="flex items-end justify-between"><div><h2 className="text-sm font-black uppercase text-foreground">Mercado</h2><p className="text-[10px] text-muted">{isTest ? "Convocados do amistoso · preços fictícios" : "Todos os jogadores disponíveis para compra"}</p></div><select value={sort} onChange={e => setSort(e.target.value)} className="rounded-lg border border-border bg-surface px-2 py-1.5 text-[10px] font-bold text-foreground"><option value="points">Mais pontos</option><option value="price">Menor preço</option><option value="name">Nome</option></select></div><label className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3"><Search className="h-4 w-4 text-muted"/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar jogador" className="h-11 w-full bg-transparent text-sm text-foreground outline-none"/></label><div className="space-y-2 lg:max-h-[760px] lg:overflow-y-auto lg:pr-1">{filtered.map(player => { const bought = selected.includes(player.id); return <button key={player.id} disabled={!open} onClick={() => togglePlayer(player)} className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${bought ? "border-accent/60 bg-accent/10" : "border-border bg-surface hover:border-accent/30"}`}><PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} className="h-11 w-11 rounded-full border border-border bg-background text-xs font-black text-accent"/><div className="min-w-0 flex-1"><p className="truncate text-xs font-black text-foreground">{player.name}</p><p className="text-[9px] text-muted">{positionLabel[player.profile || ""] || "Jogador"} · {player.goals}G {player.assists}A</p><p className="mt-1 text-[10px] font-bold text-accent">{formatFantasyMoney(player.price, settings.currencyName)} <span className={player.variation >= 0 ? "text-success" : "text-danger"}>{player.variation ? `${player.variation > 0 ? "+" : ""}${(player.variation * 100).toFixed(1)}%` : ""}</span></p><p className="text-[8px] font-bold text-muted">Última rodada: {player.roundPoints.toFixed(1)} pts</p></div><div className="text-right"><p className="text-sm font-black text-foreground">{player.totalPoints.toFixed(1)}</p><p className="text-[8px] uppercase text-muted">pontos</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[9px] font-black ${bought ? "bg-danger/15 text-danger" : "bg-accent/15 text-accent"}`}>{bought ? "Vender" : "Comprar"}</span></div></button>; })}</div></aside>
+        <aside className="space-y-3"><div className="flex items-end justify-between gap-2"><div><h2 className="text-sm font-black uppercase text-foreground">Mercado</h2><p className="text-[10px] text-muted">{isTest ? "Convocados do amistoso · preços fictícios" : open ? "Escolha entre todos os jogadores disponíveis" : "Consulte preços, pontos e a última valorização"}</p></div><select value={sort} onChange={e => setSort(e.target.value)} className="max-w-32 rounded-lg border border-border bg-surface px-2 py-1.5 text-[10px] font-bold text-foreground"><option value="points">Mais pontos</option><option value="lastRound">Última rodada</option><option value="variation">Valorização</option><option value="price">Menor preço</option><option value="name">Nome</option></select></div><label className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3"><Search className="h-4 w-4 text-muted"/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar jogador" className="h-11 w-full bg-transparent text-sm text-foreground outline-none"/></label><div className="space-y-2 lg:max-h-[760px] lg:overflow-y-auto lg:pr-1">{filtered.map(player => { const bought = selected.includes(player.id); return <button key={player.id} disabled={!open} onClick={() => togglePlayer(player)} className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition disabled:cursor-default disabled:opacity-100 ${bought ? "border-accent/60 bg-accent/10" : `border-border bg-surface ${open ? "hover:border-accent/30" : ""}`}`}><PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} className="h-11 w-11 rounded-full border border-border bg-background text-xs font-black text-accent"/><div className="min-w-0 flex-1"><p className="truncate text-xs font-black text-foreground">{player.name}</p><p className="text-[9px] text-muted">{positionLabel[player.profile || ""] || "Jogador"} · {player.goals}G {player.assists}A</p><p className="mt-1 text-[10px] font-bold text-accent">{formatFantasyMoney(player.price, settings.currencyName)} <span className={player.variation >= 0 ? "text-success" : "text-danger"}>{player.variation ? `${player.variation > 0 ? "+" : ""}${(player.variation * 100).toFixed(1)}%` : "0,0%"}</span></p><p className={`text-[8px] font-bold ${player.priceChange >= 0 ? "text-success" : "text-danger"}`}>{formatSignedMoney(player.priceChange, settings)} · última: {player.roundPoints.toFixed(1)} pts</p></div><div className="text-right"><p className="text-sm font-black text-foreground">{player.totalPoints.toFixed(1)}</p><p className="text-[8px] uppercase text-muted">pontos</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[9px] font-black ${open ? bought ? "bg-danger/15 text-danger" : "bg-accent/15 text-accent" : "bg-white/5 text-muted"}`}>{open ? bought ? "Vender" : "Comprar" : "Analisar"}</span></div></button>; })}</div></aside>
       </div>
     </div>
   );
 }
 
 function Metric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) { return <div className="rounded-xl border border-white/10 bg-black/20 p-2.5"><p className="text-[8px] font-black uppercase tracking-wider text-muted">{label}</p><p className={`mt-1 truncate text-xs font-black ${accent ? "text-accent" : "text-foreground"}`}>{value}</p></div>; }
+function InsightCard({ label, player, value, positive = false }: { label: string; player: FantasyMarketPlayer | null; value: string; positive?: boolean }) { return <article className="min-w-0 rounded-2xl border border-border bg-surface p-3"><p className="truncate text-[8px] font-black uppercase tracking-[.14em] text-muted">{label}</p>{player ? <div className="mt-2 flex items-center gap-2"><PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} className="h-9 w-9 shrink-0 rounded-full border border-accent/35 bg-background text-[9px] font-black text-accent"/><div className="min-w-0"><p className="truncate text-[10px] font-black text-foreground">{player.name}</p><p className={`truncate text-[10px] font-black ${positive ? "text-success" : label === "Maior queda" ? "text-danger" : "text-accent"}`}>{value}</p></div></div> : <p className="mt-3 text-xs font-bold text-muted">Sem dados</p>}</article>; }
+function formatSignedMoney(value: number, settings: FantasySettings) { const formatted = formatFantasyMoney(Math.abs(value), settings.currencyName); return `${value > 0 ? "+" : value < 0 ? "−" : ""}${formatted}`; }
 function Select({ label, value, disabled, onChange, options }: { label: string; value: string; disabled: boolean; onChange: (value: string | null) => void; options: { id: string; name: string }[] }) { return <label className="block"><span className="mb-1 block text-[10px] font-bold text-muted">{label}</span><select disabled={disabled} value={value} onChange={e => onChange(e.target.value || null)} className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground disabled:opacity-50"><option value="">Sem palpite</option>{options.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select></label>; }

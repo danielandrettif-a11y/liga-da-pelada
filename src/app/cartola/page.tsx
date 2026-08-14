@@ -7,7 +7,7 @@ export default async function CartolaPage() {
   const data = await getFantasyDashboard();
   if (!data.authenticated) return <Empty title="Entre para jogar o Cartola" description="Monte seu time, faça palpites e dispute com seus amigos." login />;
   if (!data.available) return <Empty title="Atualização do Cartola pendente" description="Execute a migration 037 para liberar o mercado permanente desta temporada." />;
-  return <FantasyExperience round={data.round} fantasySeasonId={data.fantasySeasonId} status={data.fantasyRound.status} settings={data.settings} market={data.market} budget={data.budget} lineup={data.lineup} isTest={data.fantasyRound.isTest} lastRound={data.lastRound} />;
+  return <FantasyExperience round={data.round} status={data.fantasyRound.status} settings={data.settings} market={data.market} budget={data.budget} lineup={data.lineup} insights={data.insights} account={data.account} isTest={data.fantasyRound.isTest} lastRound={data.lastRound} />;
 }
 
 function Empty({ title, description, login = false }: { title: string; description: string; login?: boolean }) {
