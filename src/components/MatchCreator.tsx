@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createMatch } from "@/lib/actions/matches";
-import { Swords, ArrowLeft, ChevronRight, AlertTriangle, Check, ArrowLeftRight, Crown, Users } from "@/components/icons";
+import { Swords, ArrowLeft, ChevronRight, ChevronDown, AlertTriangle, Check, ArrowLeftRight, Crown, Users } from "@/components/icons";
 import Link from "next/link";
 import { TeamCrest } from "./TeamCrest";
 import { markRoundTeamArrived, setRoundTeamCaptain, swapRoundTeamPlayers } from "@/lib/actions/rounds";
@@ -17,6 +17,7 @@ export function MatchCreator({ round }: { round: any }) {
   const [replacementByAbsent, setReplacementByAbsent] = useState<Record<string, string>>({});
   const [swapPlayerAId, setSwapPlayerAId] = useState("");
   const [swapPlayerBId, setSwapPlayerBId] = useState("");
+  const [swapPanelOpen, setSwapPanelOpen] = useState(false);
   const [swapFeedback, setSwapFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [managementLoading, setManagementLoading] = useState(false);
   const [captainByTeam, setCaptainByTeam] = useState<Record<string, string>>(() => Object.fromEntries(
@@ -290,11 +291,21 @@ export function MatchCreator({ round }: { round: any }) {
       </div>
 
       <section className="glass-card overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3">
+        <button
+          type="button"
+          onClick={() => setSwapPanelOpen((current) => !current)}
+          aria-expanded={swapPanelOpen}
+          aria-controls="permanent-swap-panel"
+          className={`flex w-full items-center gap-3 bg-surface px-4 py-3 text-left transition-colors hover:bg-surface-hover ${swapPanelOpen ? "border-b border-border" : ""}`}
+        >
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-warning/10 text-warning"><ArrowLeftRight className="h-4.5 w-4.5" /></span>
-          <div><h2 className="text-sm font-black text-foreground">Troca permanente</h2><p className="text-[10px] text-muted">Inverta dois jogadores entre os times para as proximas partidas.</p></div>
-        </div>
-        <div className="grid gap-3 p-4 sm:grid-cols-2">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-black text-foreground">Troca permanente</h2>
+            <p className="text-[10px] text-muted">{swapPanelOpen ? "Escolha um jogador de cada time." : "Toque para abrir e trocar dois jogadores de time."}</p>
+          </div>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${swapPanelOpen ? "rotate-180" : ""}`} />
+        </button>
+        {swapPanelOpen && <div id="permanent-swap-panel" className="grid gap-3 p-4 sm:grid-cols-2">
           {teams.map((team: any) => (
             <div key={team.id} className="overflow-hidden rounded-xl border border-border bg-background/45">
               <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
@@ -327,7 +338,7 @@ export function MatchCreator({ round }: { round: any }) {
           <button type="button" disabled={managementLoading || !swapPlayerAId || !swapPlayerBId} onClick={handlePermanentSwap} className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-xs font-black text-warning disabled:opacity-40 sm:col-span-2">
             {managementLoading ? "Salvando..." : "Confirmar troca entre os times"}
           </button>
-        </div>
+        </div>}
       </section>
 
       {selectedTeamIds.length === 2 && (

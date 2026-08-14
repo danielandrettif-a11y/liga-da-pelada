@@ -48,7 +48,10 @@ export async function getFantasyDashboard() {
   const [{ data: testSession }, { data: fantasySeason }] = await Promise.all([
     account.client.from("fantasy_test_sessions")
       .select("*, round:round_id(id, number, date, start_time, status, round_type, teams(id, name, color), matches(id, status))")
-      .eq("league_id", league.id).eq("season_id", season.id).maybeSingle(),
+      .eq("league_id", league.id)
+      .eq("season_id", season.id)
+      .in("status", ["open", "in_progress"])
+      .maybeSingle(),
     account.client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle(),
   ]);
 

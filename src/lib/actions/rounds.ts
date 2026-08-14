@@ -658,6 +658,14 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem encerrar rodadas." };
 
+    // Consolida as estatísticas antes de encerrar. Se esta etapa falhar, a rodada
+    // continua ativa em vez de ficar finalizada com o Cartola vazio.
+    const { calculateRoundStats } = await import("./stats");
+    const statsResult = await calculateRoundStats(roundId);
+    if (!statsResult.success) {
+      throw new Error(`Não foi possível consolidar as estatísticas da rodada: ${statsResult.error || "erro desconhecido"}`);
+    }
+
     const { error } = await client
       .from("rounds")
       .update({
@@ -668,10 +676,6 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
       .eq("id", roundId);
 
     if (error) throw new Error(error.message);
-
-    // Recalcula estatísticas por precaução
-    const { calculateRoundStats } = await import("./stats");
-    await calculateRoundStats(roundId);
 
     const { data: fantasyTest } = await client
       .from("fantasy_test_sessions")
