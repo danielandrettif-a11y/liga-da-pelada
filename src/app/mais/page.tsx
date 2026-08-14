@@ -21,6 +21,7 @@ import {
   Football,
   ArrowLeftRight,
   ClipboardList,
+  ShieldCheck,
 } from "@/components/icons";
 
 const ADMIN_SECTIONS = [
@@ -50,6 +51,12 @@ const ADMIN_SECTIONS = [
         icon: ClipboardList,
         label: "Histórico de Cadastros",
         description: "Ver quem entrou no elenco",
+      },
+      {
+        href: "/admin/administradores",
+        icon: ShieldCheck,
+        label: "Administradores",
+        description: "Promover e revisar acessos de ADM",
       },
     ],
   },

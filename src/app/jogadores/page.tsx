@@ -5,8 +5,9 @@ import { getUnreadRosterPlayers } from "@/lib/actions/registrations";
 export const revalidate = 0;
 
 export default async function JogadoresPage() {
-  const [roster, unreadRoster] = await Promise.all([
-    getRosterGroups(),
+  const [rankedRoster, friendlyRoster, unreadRoster] = await Promise.all([
+    getRosterGroups("official"),
+    getRosterGroups("friendly"),
     getUnreadRosterPlayers(),
   ]);
 
@@ -18,10 +19,10 @@ export default async function JogadoresPage() {
       </div>
 
       <RosterDirectory
-        officialPlayers={roster.officialPlayers}
-        activeGuests={roster.activeGuests}
-        wags={roster.wags}
-        supporters={roster.supporters}
+        officialPlayers={{ ranked: rankedRoster.officialPlayers, friendly: friendlyRoster.officialPlayers }}
+        activeGuests={{ ranked: rankedRoster.activeGuests, friendly: friendlyRoster.activeGuests }}
+        wags={rankedRoster.wags}
+        supporters={rankedRoster.supporters}
         unreadPlayerIds={unreadRoster.playerIds}
         unreadSeenThrough={unreadRoster.seenThrough}
       />

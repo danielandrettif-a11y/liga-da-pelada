@@ -477,8 +477,8 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   return { success: true, data: { id } };
 }
 
-export async function getRosterGroups() {
-  const players = await getPlayersWithStats("official");
+export async function getRosterGroups(roundType: RoundType = "official") {
+  const players = await getPlayersWithStats(roundType);
   return {
     officialPlayers: players.filter((player) => player.member_category === "player"),
     activeGuests: players.filter((player) => player.member_category === "guest" && player.is_selectable),

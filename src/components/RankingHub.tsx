@@ -23,14 +23,14 @@ export function RankingHub({ data, fantasyRanking, currentPlayerId }: RankingHub
           onClick={() => setMode("ranked")}
           className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-black ${mode === "ranked" ? "bg-accent text-background" : "text-muted"}`}
         >
-          <Trophy className="h-4 w-4" /> Ranked
+          <Trophy className="h-4 w-4" /> Em Campo
         </button>
         <button
           type="button"
           onClick={() => setMode("fantasy")}
           className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-black ${mode === "fantasy" ? "bg-accent text-background" : "text-muted"}`}
         >
-          <ClipboardList className="h-4 w-4" /> Ranking Cartola
+          <ClipboardList className="h-4 w-4" /> Cartola
         </button>
       </div>
 

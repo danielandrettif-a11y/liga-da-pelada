@@ -7,10 +7,11 @@ import { PlayersStatsGrid, type PlayerStats } from "./PlayersStatsGrid";
 import { RosterUnreadLink } from "./RosterUnreadLink";
 
 type RosterFilter = "all" | "players" | "wags" | "supporters";
+type StatsMode = "ranked" | "friendly";
 
 type Props = {
-  officialPlayers: PlayerStats[];
-  activeGuests: PlayerStats[];
+  officialPlayers: Record<StatsMode, PlayerStats[]>;
+  activeGuests: Record<StatsMode, PlayerStats[]>;
   wags: PlayerStats[];
   supporters: PlayerStats[];
   unreadPlayerIds?: string[];
@@ -25,7 +26,12 @@ const FILTERS: Array<{ value: RosterFilter; label: string }> = [
 ];
 
 function SectionDivider({ title, subtitle, count, tone = "accent" }: { title: string; subtitle: string; count: number; tone?: "accent" | "warning" | "muted" }) {
-  const toneClass = tone === "warning" ? "border-warning/30 bg-warning/10 text-warning" : tone === "muted" ? "border-border bg-surface text-muted" : "border-accent/30 bg-accent/10 text-accent";
+  const toneClass = tone === "warning"
+    ? "border-warning/30 bg-warning/10 text-warning"
+    : tone === "muted"
+      ? "border-border bg-surface text-muted"
+      : "border-accent/30 bg-accent/10 text-accent";
+
   return (
     <div className="flex items-center gap-3 py-1">
       <div className="min-w-0">
@@ -41,7 +47,10 @@ function SectionDivider({ title, subtitle, count, tone = "accent" }: { title: st
 }
 
 function CommunityGrid({ players, label, unreadPlayerIds, unreadSeenThrough }: { players: Player[]; label: "WAG" | "Torcida"; unreadPlayerIds: Set<string>; unreadSeenThrough: string | null }) {
-  if (players.length === 0) return <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted">Nenhum perfil nesta categoria.</div>;
+  if (players.length === 0) {
+    return <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted">Nenhum perfil nesta categoria.</div>;
+  }
+
   return (
     <div className="grid min-w-0 grid-cols-2 gap-3">
       {players.map((player) => (
@@ -60,10 +69,13 @@ function CommunityGrid({ players, label, unreadPlayerIds, unreadSeenThrough }: {
 
 export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters, unreadPlayerIds = [], unreadSeenThrough = null }: Props) {
   const [filter, setFilter] = useState<RosterFilter>("all");
+  const [statsMode, setStatsMode] = useState<StatsMode>("ranked");
   const unreadIds = new Set(unreadPlayerIds);
   const showPlayers = filter === "all" || filter === "players";
   const showWags = filter === "all" || filter === "wags";
   const showSupporters = filter === "all" || filter === "supporters";
+  const visibleOfficialPlayers = officialPlayers[statsMode];
+  const visibleGuests = activeGuests[statsMode];
 
   return (
     <div className="space-y-7">
@@ -77,10 +89,47 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
         </div>
       </div>
 
-      {showPlayers && <section className="scroll-mt-36 space-y-4"><SectionDivider title="Jogadores oficiais" subtitle="Atletas que disputam o Ranked" count={officialPlayers.length} /><PlayersStatsGrid players={officialPlayers} unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} /></section>}
-      {showPlayers && activeGuests.length > 0 && <section className="scroll-mt-36 space-y-4"><SectionDivider title="Convidados" subtitle="Participações temporárias com histórico preservado" count={activeGuests.length} tone="warning" /><PlayersStatsGrid players={activeGuests} unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} /></section>}
-      {showWags && <section className="scroll-mt-36 space-y-4"><SectionDivider title="WAGs" subtitle="A comissão que acompanha a resenha" count={wags.length} tone="warning" /><CommunityGrid players={wags} label="WAG" unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} /></section>}
-      {showSupporters && <section className="scroll-mt-36 space-y-4"><SectionDivider title="Torcida" subtitle="Quem empurra a pelada do lado de fora" count={supporters.length} tone="muted" /><CommunityGrid players={supporters} label="Torcida" unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} /></section>}
+      {showPlayers && (
+        <div className="rounded-2xl border border-border bg-surface p-1.5">
+          <p className="px-2 pb-1.5 pt-1 text-[9px] font-black uppercase tracking-[0.16em] text-muted">Estatísticas exibidas</p>
+          <div className="grid grid-cols-2 gap-1" role="tablist" aria-label="Alternar estatísticas por modo de jogo">
+            <button type="button" role="tab" aria-selected={statsMode === "ranked"} onClick={() => setStatsMode("ranked")} className={`rounded-xl py-2.5 text-[11px] font-black transition-colors ${statsMode === "ranked" ? "bg-accent text-background" : "text-muted hover:bg-background"}`}>
+              Ranked
+            </button>
+            <button type="button" role="tab" aria-selected={statsMode === "friendly"} onClick={() => setStatsMode("friendly")} className={`rounded-xl py-2.5 text-[11px] font-black transition-colors ${statsMode === "friendly" ? "bg-warning text-background" : "text-muted hover:bg-background"}`}>
+              Amistosos
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showPlayers && (
+        <section className="scroll-mt-36 space-y-4">
+          <SectionDivider title="Jogadores oficiais" subtitle={statsMode === "ranked" ? "Atletas que disputam o Ranked" : "Desempenho separado nos amistosos"} count={visibleOfficialPlayers.length} />
+          <PlayersStatsGrid players={visibleOfficialPlayers} unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} />
+        </section>
+      )}
+
+      {showPlayers && visibleGuests.length > 0 && (
+        <section className="scroll-mt-36 space-y-4">
+          <SectionDivider title="Convidados" subtitle="Participações temporárias com histórico preservado" count={visibleGuests.length} tone="warning" />
+          <PlayersStatsGrid players={visibleGuests} unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} />
+        </section>
+      )}
+
+      {showWags && (
+        <section className="scroll-mt-36 space-y-4">
+          <SectionDivider title="WAGs" subtitle="A comissão que acompanha a resenha" count={wags.length} tone="warning" />
+          <CommunityGrid players={wags} label="WAG" unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} />
+        </section>
+      )}
+
+      {showSupporters && (
+        <section className="scroll-mt-36 space-y-4">
+          <SectionDivider title="Torcida" subtitle="Quem empurra a pelada do lado de fora" count={supporters.length} tone="muted" />
+          <CommunityGrid players={supporters} label="Torcida" unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} />
+        </section>
+      )}
     </div>
   );
 }

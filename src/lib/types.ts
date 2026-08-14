@@ -600,6 +600,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      manage_account_admin_role: {
+        Args: { p_target_user_id: string; p_make_admin: boolean };
+        Returns: "admin" | "player";
+      };
       join_callup: {
         Args: { p_callup_id: string };
         Returns: CallupEntry;
