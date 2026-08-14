@@ -673,7 +673,15 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     const { calculateRoundStats } = await import("./stats");
     await calculateRoundStats(roundId);
 
-    const { error: fantasyError } = await client.rpc("process_fantasy_round", { p_round_id: roundId });
+    const { data: fantasyTest } = await client
+      .from("fantasy_test_sessions")
+      .select("id")
+      .eq("round_id", roundId)
+      .maybeSingle();
+    const { error: fantasyError } = await client.rpc(
+      fantasyTest ? "process_fantasy_test_round" : "process_fantasy_round",
+      { p_round_id: roundId },
+    );
     if (fantasyError) throw new Error(`A rodada terminou, mas o Cartola não foi processado: ${fantasyError.message}`);
 
     revalidatePath(`/rodadas/${roundId}`);

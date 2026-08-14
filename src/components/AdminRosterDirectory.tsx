@@ -17,7 +17,7 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
 ];
 
 function PersonCard({ player, isAdmin }: { player: Player; isAdmin: boolean }) {
-  const category = player.member_category === "player" ? "Jogador" : player.member_category === "guest" ? (player.is_selectable ? "Convidado" : "Arquivado") : player.member_category === "wag" ? "WAG" : "Torcida";
+  const category = player.member_category === "player" ? "Jogador" : player.member_category === "guest" ? "Convidado" : player.member_category === "wag" ? "WAG" : "Torcida";
   return (
     <Link href={`/admin/jogadores/${player.id}/editar`} className="glass-card glass-card-hover flex min-w-0 items-center gap-3 p-3.5">
       <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-11 w-11 shrink-0 rounded-full border border-border bg-surface text-xs font-black text-muted" />
@@ -55,8 +55,7 @@ export function AdminRosterDirectory({ players, adminPlayerIds }: { players: Pla
   const [filter, setFilter] = useState<Filter>("all");
   const adminIds = new Set(adminPlayerIds);
   const official = players.filter((player) => player.member_category === "player");
-  const activeGuests = players.filter((player) => player.member_category === "guest" && player.is_selectable);
-  const archivedGuests = players.filter((player) => player.member_category === "guest" && !player.is_selectable);
+  const guests = players.filter((player) => player.member_category === "guest");
   const wags = players.filter((player) => player.member_category === "wag");
   const supporters = players.filter((player) => player.member_category === "supporter");
 
@@ -67,8 +66,7 @@ export function AdminRosterDirectory({ players, adminPlayerIds }: { players: Pla
       </div>
 
       {(filter === "all" || filter === "players") && <Group title="Jogadores oficiais" subtitle="Atletas ativos no Ranked" players={official} adminIds={adminIds} />}
-      {(filter === "all" || filter === "guests") && <Group title="Convidados ativos" subtitle="Disponíveis para convocação" players={activeGuests} adminIds={adminIds} />}
-      {(filter === "all" || filter === "guests") && <Group title="Convidados arquivados" subtitle="Histórico preservado após a participação" players={archivedGuests} adminIds={adminIds} />}
+      {(filter === "all" || filter === "guests") && <Group title="Convidados" subtitle="Perfis permanentes e disponíveis para convocação" players={guests} adminIds={adminIds} />}
       {(filter === "all" || filter === "community") && <Group title="WAGs" subtitle="Comunidade fora das quatro linhas" players={wags} adminIds={adminIds} />}
       {(filter === "all" || filter === "community") && <Group title="Torcida" subtitle="Quem acompanha a pelada" players={supporters} adminIds={adminIds} />}
     </div>

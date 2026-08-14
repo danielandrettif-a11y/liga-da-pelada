@@ -260,13 +260,7 @@ export function PlayerForm({ player, mode = "admin" }: { player?: Player; mode?:
             <option value="supporter">Torcedor</option>
           </select>
           <p className="text-[10px] text-muted">WAGs e torcedores aparecem no Elenco, mas nunca entram em convocações, sorteios ou partidas. Se já houver estatísticas, elas serão preservadas e ficarão ocultas.</p>
-          {memberCategory === "guest" && (
-            <label className="flex items-center justify-between rounded-xl border border-border bg-background/40 px-4 py-3 text-sm font-bold text-foreground">
-              Disponível para convocação
-              <input type="checkbox" name="is_selectable_checkbox" defaultChecked={player?.is_selectable ?? true} onChange={(event) => { const hidden = document.getElementById("is_selectable") as HTMLInputElement; if (hidden) hidden.value = String(event.target.checked); }} className="h-5 w-5 accent-[var(--accent)]" />
-              <input id="is_selectable" type="hidden" name="is_selectable" defaultValue={String(player?.is_selectable ?? true)} />
-            </label>
-          )}
+          {memberCategory === "guest" && <p className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-[11px] leading-4 text-muted">Convidados permanecem ativos no elenco e disponíveis para futuras rodadas.</p>}
         </div>
       )}
 

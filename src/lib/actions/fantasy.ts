@@ -45,41 +45,52 @@ export async function getFantasyDashboard() {
     smoothingGames: Number(settingsRow.smoothing_games), maxPriceIncrease: Number(settingsRow.max_price_increase), maxPriceDecrease: Number(settingsRow.max_price_decrease),
   } : DEFAULT_FANTASY_SETTINGS;
 
-  const { data: fantasySeason } = await account.client
-    .from("fantasy_seasons")
-    .select("id")
-    .eq("season_id", season.id)
-    .maybeSingle();
-  if (!fantasySeason) return { authenticated: true as const, available: false as const, settings };
+  const [{ data: testSession }, { data: fantasySeason }] = await Promise.all([
+    account.client.from("fantasy_test_sessions")
+      .select("*, round:round_id(id, number, date, start_time, status, round_type, teams(id, name, color), matches(id, status))")
+      .eq("league_id", league.id).eq("season_id", season.id).maybeSingle(),
+    account.client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle(),
+  ]);
 
-  const { data: fantasyRounds } = await account.client
-    .from("fantasy_rounds")
-    .select("*, round:round_id(id, number, date, start_time, status, round_type, teams(id, name, color), matches(id, status))")
-    .eq("fantasy_season_id", fantasySeason.id);
-  const usableRounds = (fantasyRounds || [])
-    .filter((item: any) => item.round?.round_type === "official")
-    .sort((a: any, b: any) => {
-      const statusOrder: Record<string, number> = { in_progress: 0, open: 1, finished: 2 };
-      const statusDiff = (statusOrder[a.market_status] ?? 9) - (statusOrder[b.market_status] ?? 9);
-      if (statusDiff !== 0) return statusDiff;
-      const direction = a.market_status === "finished" ? -1 : 1;
-      return direction * `${a.round?.date || ""}-${String(a.round?.number || 0).padStart(4, "0")}`.localeCompare(`${b.round?.date || ""}-${String(b.round?.number || 0).padStart(4, "0")}`);
-    });
-  const fantasyRound = usableRounds[0];
+  const isTest = Boolean(testSession);
+  let fantasyRound: any = testSession ? { ...testSession, market_status: testSession.status } : null;
+  if (!fantasyRound && fantasySeason) {
+    const { data: fantasyRounds } = await account.client
+      .from("fantasy_rounds")
+      .select("*, round:round_id(id, number, date, start_time, status, round_type, teams(id, name, color), matches(id, status))")
+      .eq("fantasy_season_id", fantasySeason.id);
+    fantasyRound = (fantasyRounds || [])
+      .filter((item: any) => item.round?.round_type === "official")
+      .sort((a: any, b: any) => {
+        const statusOrder: Record<string, number> = { in_progress: 0, open: 1, finished: 2 };
+        const statusDiff = (statusOrder[a.market_status] ?? 9) - (statusOrder[b.market_status] ?? 9);
+        if (statusDiff !== 0) return statusDiff;
+        const direction = a.market_status === "finished" ? -1 : 1;
+        return direction * `${a.round?.date || ""}-${String(a.round?.number || 0).padStart(4, "0")}`.localeCompare(`${b.round?.date || ""}-${String(b.round?.number || 0).padStart(4, "0")}`);
+      })[0] || null;
+  }
   if (!fantasyRound) return { authenticated: true as const, available: false as const, settings };
 
   const matchIds = (fantasyRound.round.matches || []).map((match: any) => match.id);
-  const [{ data: priceRows }, { data: statRows }, { data: roundGuests }, { data: lineup }, { data: fantasyAccount }, { data: liveEvents }] = await Promise.all([
-    account.client.from("fantasy_player_prices").select("*").eq("fantasy_season_id", fantasySeason.id),
+  const lineupRequest = isTest
+    ? account.client.from("fantasy_test_lineups").select("*, fantasy_test_lineup_players(*)").eq("test_session_id", fantasyRound.id).eq("user_id", account.user.id).maybeSingle()
+    : account.client.from("fantasy_lineups").select("*, fantasy_lineup_players(*)").eq("fantasy_round_id", fantasyRound.id).eq("user_id", account.user.id).maybeSingle();
+  const [{ data: priceRows }, { data: statRows }, { data: roundParticipants }, { data: rawLineup }, { data: fantasyAccount }, { data: liveEvents }, { data: selectablePlayers }] = await Promise.all([
+    !isTest && fantasySeason ? account.client.from("fantasy_player_prices").select("*").eq("fantasy_season_id", fantasySeason.id) : Promise.resolve({ data: [] as any[] }),
     account.client.from("player_round_stats").select("round_id, player_id, goals, assists, wins, games").eq("league_id", league.id),
     account.client.from("round_players").select("player_id").eq("round_id", fantasyRound.round.id),
-    account.client.from("fantasy_lineups").select("*, fantasy_lineup_players(*)").eq("fantasy_round_id", fantasyRound.id).eq("user_id", account.user.id).maybeSingle(),
-    account.client.from("fantasy_accounts").select("*").eq("fantasy_season_id", fantasySeason.id).eq("user_id", account.user.id).maybeSingle(),
+    lineupRequest,
+    !isTest && fantasySeason ? account.client.from("fantasy_accounts").select("*").eq("fantasy_season_id", fantasySeason.id).eq("user_id", account.user.id).maybeSingle() : Promise.resolve({ data: null as any }),
     matchIds.length ? account.client.from("match_events").select("player_id, assist_player_id").in("match_id", matchIds) : Promise.resolve({ data: [] as any[] }),
+    isTest ? Promise.resolve({ data: [] as any[] }) : account.client.from("players").select("id, name, avatar_url, player_profile, member_category, is_selectable").eq("is_selectable", true).in("member_category", ["player", "guest"]),
   ]);
+  const lineup = isTest && rawLineup
+    ? { ...rawLineup, fantasy_lineup_players: rawLineup.fantasy_test_lineup_players || [] }
+    : rawLineup;
   const pricePlayerIds = (priceRows || []).map((row: any) => row.player_id);
-  const guestIds = (roundGuests || []).map((row: any) => row.player_id);
-  const eligibleIds = [...new Set([...pricePlayerIds, ...guestIds])];
+  const participantIds = (roundParticipants || []).map((row: any) => row.player_id);
+  const selectablePlayerIds = (selectablePlayers || []).map((row: any) => row.id);
+  const eligibleIds = isTest ? participantIds : [...new Set([...pricePlayerIds, ...participantIds, ...selectablePlayerIds])];
   const { data: players } = eligibleIds.length
     ? await account.client.from("players").select("id, name, avatar_url, player_profile, member_category, is_selectable").in("id", eligibleIds)
     : { data: [] as any[] };
@@ -106,24 +117,28 @@ export async function getFantasyDashboard() {
       current.wins = Number(official?.wins || 0);
     }
   }
-  const { data: lastPrices } = await account.client.from("fantasy_player_price_history")
-    .select("player_id, variation_rate, created_at").eq("fantasy_season_id", fantasySeason.id).order("created_at", { ascending: false });
+  const { data: lastPrices } = !isTest && fantasySeason
+    ? await account.client.from("fantasy_player_price_history")
+      .select("player_id, variation_rate, created_at").eq("fantasy_season_id", fantasySeason.id).order("created_at", { ascending: false })
+    : { data: [] as any[] };
   const lastVariation = new Map<string, number>();
   for (const row of lastPrices || []) if (!lastVariation.has(row.player_id)) lastVariation.set(row.player_id, Number(row.variation_rate || 0));
 
   const market: FantasyMarketPlayer[] = (players || [])
-    .filter((player: any) => player.is_selectable || (player.member_category === "guest" && guestIds.includes(player.id)))
+    .filter((player: any) => isTest || player.is_selectable || (player.member_category === "guest" && participantIds.includes(player.id)))
     .map((player: any) => {
       const price = priceByPlayer.get(player.id) as any;
       const stats = statsByPlayer.get(player.id) || { goals: 0, assists: 0, wins: 0, games: 0 };
       return { id: player.id, name: player.name, avatarUrl: player.avatar_url, profile: player.player_profile,
-        price: Number(price?.current_price ?? settings.initialPlayerPrice), totalPoints: Number(price?.total_points || 0),
-        roundsPlayed: Number(price?.rounds_played || 0), ...stats, variation: lastVariation.get(player.id) || 0,
+        price: isTest ? settings.initialPlayerPrice : Number(price?.current_price ?? settings.initialPlayerPrice),
+        totalPoints: isTest ? 0 : Number(price?.total_points || 0),
+        roundsPlayed: isTest ? 0 : Number(price?.rounds_played || 0), ...stats,
+        variation: isTest ? 0 : lastVariation.get(player.id) || 0,
         roundPoints: (currentStats.get(player.id)?.goals || 0) * settings.goalPoints + (currentStats.get(player.id)?.assists || 0) * settings.assistPoints + (currentStats.get(player.id)?.wins || 0) * settings.winPoints };
     }).sort((a, b) => b.totalPoints - a.totalPoints || a.name.localeCompare(b.name, "pt-BR"));
 
   let effectiveLineup: any = lineup || null;
-  if (!effectiveLineup) {
+  if (!effectiveLineup && !isTest) {
     const { data: previous } = await account.client.from("fantasy_lineups")
       .select("captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id)")
       .eq("user_id", account.user.id).in("status", ["locked", "scored"]).order("created_at", { ascending: false }).limit(1).maybeSingle();
@@ -137,22 +152,35 @@ export async function getFantasyDashboard() {
   }
   return {
     authenticated: true as const, available: true as const, isAdmin: account.isAdmin, settings,
-    round: fantasyRound.round, fantasyRound: { id: fantasyRound.id, status: fantasyRound.market_status, lockedAt: fantasyRound.locked_at },
+    round: fantasyRound.round, fantasyRound: { id: fantasyRound.id, status: fantasyRound.market_status, lockedAt: fantasyRound.locked_at, isTest },
     market, lineup: effectiveLineup,
-    budget: Number(fantasyAccount?.current_budget ?? settings.initialBudget),
+    budget: isTest ? settings.initialBudget : Number(fantasyAccount?.current_budget ?? settings.initialBudget),
   };
 }
 
 export async function saveFantasyLineup(input: { roundId: string; playerIds: string[]; captainId: string | null; scorerId: string | null; assistId: string | null; teamId: string | null }) {
-  const account = await getCurrentAccount();
-  if (!account.user) return { success: false, error: "Entre na sua conta para escalar." };
-  const { error } = await account.client.rpc("save_fantasy_lineup", {
-    p_round_id: input.roundId, p_player_ids: input.playerIds, p_captain_player_id: input.captainId,
-    p_top_scorer_player_id: input.scorerId, p_top_assist_player_id: input.assistId, p_top_team_id: input.teamId,
-  });
-  if (error) return { success: false, error: error.message };
-  revalidatePath("/cartola");
-  return { success: true };
+  try {
+    const account = await getCurrentAccount();
+    if (!account.user) return { success: false, error: "Entre na sua conta para escalar." };
+    if (!input.roundId || input.playerIds.length > 5 || new Set(input.playerIds).size !== input.playerIds.length) {
+      return { success: false, error: "A escalação enviada é inválida. Atualize a página e tente novamente." };
+    }
+    const { data: testSession } = await account.client
+      .from("fantasy_test_sessions")
+      .select("id")
+      .eq("round_id", input.roundId)
+      .maybeSingle();
+    const { error } = await account.client.rpc(testSession ? "save_fantasy_test_lineup" : "save_fantasy_lineup", {
+      p_round_id: input.roundId, p_player_ids: input.playerIds, p_captain_player_id: input.captainId,
+      p_top_scorer_player_id: input.scorerId, p_top_assist_player_id: input.assistId, p_top_team_id: input.teamId,
+    });
+    if (error) return { success: false, error: error.message };
+    revalidatePath("/cartola");
+    return { success: true };
+  } catch (error) {
+    console.error("Erro inesperado ao salvar escalação do Cartola:", error);
+    return { success: false, error: "Não foi possível salvar agora. Atualize a página e tente novamente." };
+  }
 }
 
 export async function getFantasyRanking() {
@@ -184,8 +212,20 @@ export async function reprocessFantasyRound(roundId: string) {
 export async function getFantasyAdminData() {
   const account = await getCurrentAccount(); if (!account.isAdmin) return null;
   const league = await getActiveLeague();
+  const season = await getActiveSeason(league.id);
   const { data: settings } = await account.client.from("fantasy_settings").select("*").eq("league_id", league.id).maybeSingle();
   const { data: rounds } = await account.client.from("fantasy_rounds").select("id, market_status, processed_at, round:round_id(id, number, date, status, round_type)").order("created_at", { ascending: false }).limit(20);
+  const [{ data: testSession }, { data: friendlyRounds }] = await Promise.all([
+    account.client.from("fantasy_test_sessions")
+      .select("*, round:round_id(id, number, date, start_time, status, round_type, round_players(count), matches(id, status, started_at))")
+      .eq("league_id", league.id).maybeSingle(),
+    season
+      ? account.client.from("rounds")
+        .select("id, number, date, start_time, status, round_type, round_players(count), matches(id, status, started_at)")
+        .eq("league_id", league.id).eq("season_id", season.id).eq("round_type", "friendly")
+        .order("date", { ascending: false }).limit(12)
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
   return { settings: settings || {
     currency_name: DEFAULT_FANTASY_SETTINGS.currencyName,
     initial_budget: DEFAULT_FANTASY_SETTINGS.initialBudget,
@@ -206,7 +246,34 @@ export async function getFantasyAdminData() {
     smoothing_games: DEFAULT_FANTASY_SETTINGS.smoothingGames,
     max_price_increase: DEFAULT_FANTASY_SETTINGS.maxPriceIncrease,
     max_price_decrease: DEFAULT_FANTASY_SETTINGS.maxPriceDecrease,
-  }, rounds: rounds || [] };
+  }, rounds: rounds || [], testSession: testSession || null, friendlyRounds: friendlyRounds || [] };
+}
+
+export async function createFantasyTestSession(roundId: string) {
+  const account = await getCurrentAccount();
+  if (!account.isAdmin) return { success: false, error: "Somente administradores." };
+  const { error } = await account.client.rpc("create_fantasy_test_session", { p_round_id: roundId });
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/cartola"); revalidatePath("/cartola", "layout");
+  return { success: true };
+}
+
+export async function processFantasyTestSession(roundId: string) {
+  const account = await getCurrentAccount();
+  if (!account.isAdmin) return { success: false, error: "Somente administradores." };
+  const { error } = await account.client.rpc("process_fantasy_test_round", { p_round_id: roundId });
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/cartola"); revalidatePath("/cartola", "layout");
+  return { success: true };
+}
+
+export async function resetFantasyTestSession(roundId: string) {
+  const account = await getCurrentAccount();
+  if (!account.isAdmin) return { success: false, error: "Somente administradores." };
+  const { error } = await account.client.rpc("reset_fantasy_test_session", { p_round_id: roundId });
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/cartola"); revalidatePath("/cartola", "layout");
+  return { success: true };
 }
 
 export async function getFantasyPlayerSummary(playerId: string) {

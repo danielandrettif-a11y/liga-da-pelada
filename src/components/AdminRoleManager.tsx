@@ -32,19 +32,23 @@ export function AdminRoleManager({ accounts, currentUserId }: { accounts: Manage
     if (!pendingChange) return;
     const { account, makeAdmin } = pendingChange;
     startTransition(async () => {
-      const result = await setAccountAdminRole(account.userId, makeAdmin);
-      if (!result.success) {
-        setMessage({ type: "error", text: result.error || "Não foi possível alterar o acesso." });
-        return;
+      try {
+        const result = await setAccountAdminRole(account.userId, makeAdmin);
+        if (!result.success) {
+          setMessage({ type: "error", text: result.error || "Não foi possível alterar o acesso." });
+          return;
+        }
+        setPendingChange(null);
+        setMessage({
+          type: "success",
+          text: makeAdmin
+            ? `${account.player?.name || "A conta"} agora é ADM.`
+            : `${account.player?.name || "A conta"} não possui mais acesso de ADM.`,
+        });
+        router.refresh();
+      } catch {
+        setMessage({ type: "error", text: "A conexão falhou. Atualize a página e tente novamente." });
       }
-      setPendingChange(null);
-      setMessage({
-        type: "success",
-        text: makeAdmin
-          ? `${account.player?.name || "A conta"} agora é ADM.`
-          : `${account.player?.name || "A conta"} não possui mais acesso de ADM.`,
-      });
-      router.refresh();
     });
   }
 

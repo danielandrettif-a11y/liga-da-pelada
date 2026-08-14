@@ -16,11 +16,12 @@ type Props = {
   market: FantasyMarketPlayer[];
   budget: number;
   lineup: any;
+  isTest?: boolean;
 };
 
 const positionLabel: Record<string, string> = { defensive: "Defesa", midfield: "Meio", offensive: "Ataque" };
 
-export function FantasyExperience({ round, status, settings, market, budget, lineup }: Props) {
+export function FantasyExperience({ round, status, settings, market, budget, lineup, isTest = false }: Props) {
   const router = useRouter();
   const initialIds = (lineup?.fantasy_lineup_players || []).map((item: any) => item.player_id as string);
   const [selected, setSelected] = useState<string[]>(initialIds);
@@ -49,6 +50,15 @@ export function FantasyExperience({ round, status, settings, market, budget, lin
     return () => { supabase.removeChannel(channel); };
   }, [round.id, router, status]);
 
+  useEffect(() => {
+    if (!open) return;
+    const channel = supabase
+      .channel(`fantasy-market-players-${round.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "players" }, () => router.refresh())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [open, round.id, router]);
+
   function togglePlayer(player: FantasyMarketPlayer) {
     if (!open) return;
     if (selected.includes(player.id)) {
@@ -63,17 +73,27 @@ export function FantasyExperience({ round, status, settings, market, budget, lin
 
   function save() {
     startTransition(async () => {
-      const result = await saveFantasyLineup({ roundId: round.id, playerIds: selected, captainId, scorerId, assistId, teamId });
-      setMessage(result.success ? (selected.length === 5 && captainId ? "Escalação salva e pronta!" : "Rascunho salvo. Complete antes do primeiro jogo.") : result.error || "Não foi possível salvar.");
+      try {
+        const result = await saveFantasyLineup({ roundId: round.id, playerIds: selected, captainId, scorerId, assistId, teamId });
+        setMessage(result.success ? (selected.length === 5 && captainId ? "Escalação salva e pronta!" : "Rascunho salvo. Complete antes do primeiro jogo.") : result.error || "Não foi possível salvar.");
+      } catch {
+        setMessage("A conexão falhou ao salvar. Sua tela foi mantida; tente novamente.");
+      }
     });
   }
 
   return (
     <div className="relative left-1/2 w-[calc(100vw-2rem)] max-w-7xl -translate-x-1/2 space-y-5">
+      {isTest && (
+        <div className="overflow-hidden rounded-2xl border border-warning/45 bg-warning/12 p-4 text-center shadow-[0_0_28px_rgba(245,158,11,.08)]">
+          <p className="text-[10px] font-black uppercase tracking-[.22em] text-warning">Modo teste · amistoso</p>
+          <p className="mt-1 text-xs font-bold leading-5 text-foreground">Esta simulação não altera ranking, preços, patrimônio nem o histórico oficial do Cartola.</p>
+        </div>
+      )}
       <header className="overflow-hidden rounded-3xl border border-accent/25 bg-[radial-gradient(circle_at_85%_15%,rgba(204,255,0,.2),transparent_28%),linear-gradient(135deg,rgba(204,255,0,.10),rgba(4,24,14,.95)_48%)] p-5">
         <div className="flex items-start justify-between gap-4">
           <div><p className="text-[10px] font-black uppercase tracking-[.22em] text-accent">Fantasy da Pelada</p><h1 className="mt-1 text-2xl font-black italic text-foreground">CARTOLA</h1><p className="mt-1 text-xs text-muted">Rodada {round.number} · escale cinco craques</p></div>
-          <span className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-wider ${open ? "bg-accent/15 text-accent" : status === "in_progress" ? "bg-warning/15 text-warning" : "bg-surface text-muted"}`}>{open ? "Mercado aberto" : status === "in_progress" ? "Em andamento" : "Finalizado"}</span>
+          <span className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-wider ${isTest ? "bg-warning/15 text-warning" : open ? "bg-accent/15 text-accent" : status === "in_progress" ? "bg-warning/15 text-warning" : "bg-surface text-muted"}`}>{isTest ? `Teste · ${open ? "aberto" : status === "in_progress" ? "em jogo" : "finalizado"}` : open ? "Mercado aberto" : status === "in_progress" ? "Em andamento" : "Finalizado"}</span>
         </div>
         <div className="mt-5 grid grid-cols-3 gap-2">
           <Metric label="Patrimônio" value={formatFantasyMoney(budget, settings.currencyName)} />
@@ -103,7 +123,7 @@ export function FantasyExperience({ round, status, settings, market, budget, lin
           {message && <p role="status" className="rounded-xl border border-border bg-surface p-3 text-center text-xs font-bold text-foreground">{message}</p>}
         </section>
 
-        <aside className="space-y-3"><div className="flex items-end justify-between"><div><h2 className="text-sm font-black uppercase text-foreground">Mercado</h2><p className="text-[10px] text-muted">Preço e desempenho da temporada</p></div><select value={sort} onChange={e => setSort(e.target.value)} className="rounded-lg border border-border bg-surface px-2 py-1.5 text-[10px] font-bold text-foreground"><option value="points">Mais pontos</option><option value="price">Menor preço</option><option value="name">Nome</option></select></div><label className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3"><Search className="h-4 w-4 text-muted"/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar jogador" className="h-11 w-full bg-transparent text-sm text-foreground outline-none"/></label><div className="space-y-2 lg:max-h-[760px] lg:overflow-y-auto lg:pr-1">{filtered.map(player => { const bought = selected.includes(player.id); return <button key={player.id} disabled={!open} onClick={() => togglePlayer(player)} className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${bought ? "border-accent/60 bg-accent/10" : "border-border bg-surface hover:border-accent/30"}`}><PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} className="h-11 w-11 rounded-full border border-border bg-background text-xs font-black text-accent"/><div className="min-w-0 flex-1"><p className="truncate text-xs font-black text-foreground">{player.name}</p><p className="text-[9px] text-muted">{positionLabel[player.profile || ""] || "Jogador"} · {player.goals}G {player.assists}A</p><p className="mt-1 text-[10px] font-bold text-accent">{formatFantasyMoney(player.price, settings.currencyName)} <span className={player.variation >= 0 ? "text-success" : "text-danger"}>{player.variation ? `${player.variation > 0 ? "+" : ""}${(player.variation * 100).toFixed(1)}%` : ""}</span></p></div><div className="text-right"><p className="text-sm font-black text-foreground">{player.totalPoints.toFixed(1)}</p><p className="text-[8px] uppercase text-muted">pontos</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[9px] font-black ${bought ? "bg-danger/15 text-danger" : "bg-accent/15 text-accent"}`}>{bought ? "Vender" : "Comprar"}</span></div></button>; })}</div></aside>
+        <aside className="space-y-3"><div className="flex items-end justify-between"><div><h2 className="text-sm font-black uppercase text-foreground">Mercado</h2><p className="text-[10px] text-muted">{isTest ? "Convocados do amistoso · preços fictícios" : "Preço e desempenho da temporada"}</p></div><select value={sort} onChange={e => setSort(e.target.value)} className="rounded-lg border border-border bg-surface px-2 py-1.5 text-[10px] font-bold text-foreground"><option value="points">Mais pontos</option><option value="price">Menor preço</option><option value="name">Nome</option></select></div><label className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3"><Search className="h-4 w-4 text-muted"/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar jogador" className="h-11 w-full bg-transparent text-sm text-foreground outline-none"/></label><div className="space-y-2 lg:max-h-[760px] lg:overflow-y-auto lg:pr-1">{filtered.map(player => { const bought = selected.includes(player.id); return <button key={player.id} disabled={!open} onClick={() => togglePlayer(player)} className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${bought ? "border-accent/60 bg-accent/10" : "border-border bg-surface hover:border-accent/30"}`}><PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} className="h-11 w-11 rounded-full border border-border bg-background text-xs font-black text-accent"/><div className="min-w-0 flex-1"><p className="truncate text-xs font-black text-foreground">{player.name}</p><p className="text-[9px] text-muted">{positionLabel[player.profile || ""] || "Jogador"} · {player.goals}G {player.assists}A</p><p className="mt-1 text-[10px] font-bold text-accent">{formatFantasyMoney(player.price, settings.currencyName)} <span className={player.variation >= 0 ? "text-success" : "text-danger"}>{player.variation ? `${player.variation > 0 ? "+" : ""}${(player.variation * 100).toFixed(1)}%` : ""}</span></p></div><div className="text-right"><p className="text-sm font-black text-foreground">{player.totalPoints.toFixed(1)}</p><p className="text-[8px] uppercase text-muted">pontos</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[9px] font-black ${bought ? "bg-danger/15 text-danger" : "bg-accent/15 text-accent"}`}>{bought ? "Vender" : "Comprar"}</span></div></button>; })}</div></aside>
       </div>
     </div>
   );

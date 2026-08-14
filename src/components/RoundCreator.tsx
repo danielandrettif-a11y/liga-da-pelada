@@ -160,6 +160,20 @@ export function RoundCreator({
       supabase.removeChannel(channel);
     };
   }, [router, sourceCallupId]);
+
+  useEffect(() => {
+    if (step !== 2 && step !== 3) return;
+    const channel = supabase
+      .channel("round-creator-players")
+      .on("postgres_changes", { event: "*", schema: "public", table: "players" }, () => {
+        startPlayersRefresh(() => router.refresh());
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [router, step]);
   
   // Jogadores que estão selecionados para a pelada, mas ainda não foram alocados em nenhum time
   const unassignedPlayers = selectedPlayers.filter(

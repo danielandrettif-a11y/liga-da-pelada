@@ -50,18 +50,34 @@ export default async function PrelistasPage() {
         {prelists.map((prelist: any, index: number) => {
           const date = new Intl.DateTimeFormat("pt-BR", { weekday: "short", day: "2-digit", month: "short" })
             .format(new Date(`${prelist.date}T12:00:00`));
+          const isFriendly = prelist.round_type === "friendly";
+          const theme = isFriendly
+            ? {
+                card: "border-warning/35 bg-gradient-to-br from-warning/10 via-surface to-background",
+                tile: "border-warning/30 bg-warning/10",
+                text: "text-warning",
+                badge: "bg-warning/15 text-warning",
+                action: "text-warning",
+              }
+            : {
+                card: "border-accent/35 bg-gradient-to-br from-accent/10 via-surface to-background",
+                tile: "border-accent/30 bg-accent/10",
+                text: "text-accent",
+                badge: "bg-accent/15 text-accent",
+                action: "text-accent",
+              };
           return (
-            <article key={prelist.id} className={`relative overflow-hidden rounded-2xl border border-warning/20 bg-surface animate-fade-in stagger-${Math.min(index + 1, 5)}`}>
+            <article key={prelist.id} className={`relative overflow-hidden rounded-2xl border ${theme.card} animate-fade-in stagger-${Math.min(index + 1, 5)}`}>
               <Link href={`/admin/rodada?round=${prelist.id}&mount=1`} className="block p-4 pr-14">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl border border-warning/20 bg-warning/10">
-                    <span className="text-[8px] font-black uppercase text-warning">{prelist.round_type === "friendly" ? "AM." : "ROD."}</span>
+                  <div className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl border ${theme.tile}`}>
+                    <span className={`text-[8px] font-black uppercase ${theme.text}`}>{isFriendly ? "AM." : "ROD."}</span>
                     <span className="stat-number text-xl text-foreground">{String(prelist.number).padStart(2, "0")}</span>
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="text-sm font-black text-foreground">{prelist.round_type === "friendly" ? "Amistoso" : "Rodada"} {String(prelist.number).padStart(2, "0")}</p>
-                      <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[8px] font-black uppercase text-warning">Pré-lista</span>
+                      <p className="text-sm font-black text-foreground">{isFriendly ? "Amistoso" : "Rodada oficial"} {String(prelist.number).padStart(2, "0")}</p>
+                      <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${theme.badge}`}>{isFriendly ? "Amistoso" : "Ranked"}</span>
                       {prelist.callupId && <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-[8px] font-black uppercase text-accent"><Flag className="h-2.5 w-2.5" /> Convocação</span>}
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-muted">
@@ -69,7 +85,7 @@ export default async function PrelistasPage() {
                       <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {prelist.start_time?.slice(0, 5) || "--:--"}</span>
                       <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" /> {prelist.playersCount} jogadores</span>
                     </div>
-                    <p className="mt-2 flex items-center gap-1 text-[10px] font-black uppercase text-accent">Abrir sorteio dos times <ChevronRight className="h-3 w-3" /></p>
+                    <p className={`mt-2 flex items-center gap-1 text-[10px] font-black uppercase ${theme.action}`}>Abrir sorteio dos times <ChevronRight className="h-3 w-3" /></p>
                   </div>
                 </div>
               </Link>

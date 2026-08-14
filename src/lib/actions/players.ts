@@ -23,6 +23,7 @@ function revalidatePlayerPaths(id?: string) {
   revalidatePath("/admin/jogadores");
   revalidatePath("/admin/rodada");
   revalidatePath("/admin/prelistas");
+  revalidatePath("/cartola");
   if (id) revalidatePath(`/jogadores/${id}`);
 }
 
@@ -294,7 +295,7 @@ export async function createPlayer(input: CreatePlayerInput) {
         member_category: input.member_category || "player",
         is_selectable: input.member_category === "wag" || input.member_category === "supporter"
           ? false
-          : input.is_selectable ?? true,
+          : true,
         registration_source: "admin",
         created_by_user_id: account.user.id,
       },
@@ -431,7 +432,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
 
   const memberCategory = account.isAdmin ? requestedCategory : currentCategory;
   const isSelectable = account.isAdmin
-    ? (memberCategory === "wag" || memberCategory === "supporter" ? false : requestedSelectable)
+    ? (memberCategory === "wag" || memberCategory === "supporter" ? false : memberCategory === "guest" ? true : requestedSelectable)
     : currentSelectable;
   const playerData = {
     id,
@@ -481,8 +482,7 @@ export async function getRosterGroups(roundType: RoundType = "official") {
   const players = await getPlayersWithStats(roundType);
   return {
     officialPlayers: players.filter((player) => player.member_category === "player"),
-    activeGuests: players.filter((player) => player.member_category === "guest" && player.is_selectable),
-    archivedGuests: players.filter((player) => player.member_category === "guest" && !player.is_selectable),
+    activeGuests: players.filter((player) => player.member_category === "guest"),
     wags: players.filter((player) => player.member_category === "wag"),
     supporters: players.filter((player) => player.member_category === "supporter"),
   };
