@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Crown, Search, TrendingUp, Trophy } from "@/components/icons";
+import { Clock, Crown, Lock, Search, Target, TrendingUp, Trophy } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { formatFantasyMoney, type FantasySettings } from "@/lib/fantasy/config";
+import { CHALLENGE_LABELS, fantasyChallengeOffer, type FantasyChallengeType } from "@/lib/fantasy/challenges";
 import { saveFantasyLineup, type FantasyDashboardInsights, type FantasyMarketPlayer } from "@/lib/actions/fantasy";
 import { supabase } from "@/lib/supabase";
 
 type Props = {
   round: { id: string; number: number; date: string; start_time: string | null; teams?: { id: string; name: string; color: string }[] } | null;
+  fantasySeasonId: string;
   status: string;
   settings: FantasySettings;
   market: FantasyMarketPlayer[];
@@ -20,24 +22,27 @@ type Props = {
   account: { totalPoints: number; roundsPlayed: number; bestRoundPoints: number };
   isTest?: boolean;
   lastRound?: { number: number; date: string; playerPoints: number; predictionPoints: number; totalPoints: number } | null;
+  challengeType?: FantasyChallengeType | null;
 };
 
 const positionLabel: Record<string, string> = { defensive: "Defesa", midfield: "Meio", offensive: "Ataque" };
 
-export function FantasyExperience({ round, status, settings, market, budget, lineup, insights, account, isTest = false, lastRound = null }: Props) {
+export function FantasyExperience({ round, fantasySeasonId, status, settings, market, budget, lineup, insights, account, isTest = false, lastRound = null, challengeType = null }: Props) {
   const router = useRouter();
   const initialIds = (lineup?.fantasy_lineup_players || []).map((item: any) => item.player_id as string);
   const [selected, setSelected] = useState<string[]>(initialIds);
   const [captainId, setCaptainId] = useState<string | null>(lineup?.captain_player_id || null);
   const [scorerId, setScorerId] = useState<string | null>(lineup?.top_scorer_player_id || null);
   const [assistId, setAssistId] = useState<string | null>(lineup?.top_assist_player_id || null);
-  const [teamId, setTeamId] = useState<string | null>(lineup?.top_team_id || null);
+  const [challengeId, setChallengeId] = useState<string | null>(lineup?.challenge_player_id || null);
+  const [now, setNow] = useState(() => Date.now());
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("points");
   const [message, setMessage] = useState("");
+  const [savedSignature, setSavedSignature] = useState(() => lineup ? JSON.stringify({ ids: initialIds, captain: lineup?.captain_player_id || null, scorer: lineup?.top_scorer_player_id || null, assist: lineup?.top_assist_player_id || null, challenge: lineup?.challenge_player_id || null }) : "");
   const [pending, startTransition] = useTransition();
   const betweenRounds = status === "between_rounds";
-  const open = status === "open";
+  const open = status === "open" || betweenRounds;
   const selectedPlayers = selected.map((id) => market.find((player) => player.id === id)).filter(Boolean) as FantasyMarketPlayer[];
   const cost = selectedPlayers.reduce((sum, player) => sum + player.price, 0);
   const remaining = budget - cost;
@@ -48,6 +53,15 @@ export function FantasyExperience({ round, status, settings, market, budget, lin
         : sort === "variation" ? b.priceChange - a.priceChange
           : sort === "lastRound" ? b.roundPoints - a.roundPoints
             : b.totalPoints - a.totalPoints), [market, query, sort]);
+  const scheduledAt = round?.date && round.start_time ? new Date(`${round.date}T${round.start_time}`).getTime() : null;
+  const countdown = scheduledAt ? scheduledAt - now : null;
+  const selectedChallengePlayer = market.find((player) => player.id === challengeId) || null;
+  const challengeOffer = challengeType && selectedChallengePlayer
+    ? fantasyChallengeOffer(challengeType, selectedChallengePlayer.price, market.map((player) => player.price), settings)
+    : null;
+  const currentSignature = JSON.stringify({ ids: selected, captain: captainId, scorer: scorerId, assist: assistId, challenge: challengeId });
+  const complete = selected.length === 5 && Boolean(captainId) && remaining >= 0;
+  const saveState = !open ? "Mercado fechado" : savedSignature === currentSignature ? betweenRounds ? "Elenco salvo" : "Escalação salva" : complete ? "Pronta para salvar" : "Escalação incompleta";
 
   useEffect(() => {
     if (status !== "in_progress" || !round) return;
@@ -66,6 +80,12 @@ export function FantasyExperience({ round, status, settings, market, budget, lin
     return () => { supabase.removeChannel(channel); };
   }, [round?.id, router]);
 
+  useEffect(() => {
+    if (!open || betweenRounds || !scheduledAt) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [betweenRounds, open, scheduledAt]);
+
   function togglePlayer(player: FantasyMarketPlayer) {
     if (!open) return;
     if (selected.includes(player.id)) {
@@ -82,16 +102,18 @@ export function FantasyExperience({ round, status, settings, market, budget, lin
     startTransition(async () => {
       try {
         const result = await saveFantasyLineup({
-          roundId: round?.id || null,
+          fantasySeasonId,
+          roundId: betweenRounds ? null : round?.id || null,
           playerIds: selected,
           captainId,
           scorerId,
           assistId,
-          teamId,
+          challengeId: betweenRounds ? null : challengeId,
         });
         setMessage(result.success
-          ? selected.length === 5 && captainId ? "Escalação salva e pronta!" : "Rascunho salvo. Complete enquanto a pré-lista estiver aberta."
+          ? betweenRounds ? "Elenco permanente salvo para a próxima Ranked!" : selected.length === 5 && captainId ? "Escalação salva e pronta!" : "Rascunho salvo. Complete antes do primeiro jogo."
           : result.error || "Não foi possível salvar.");
+        if (result.success) setSavedSignature(currentSignature);
       } catch {
         setMessage("A conexão falhou ao salvar. Sua tela foi mantida; tente novamente.");
       }
@@ -108,14 +130,14 @@ export function FantasyExperience({ round, status, settings, market, budget, lin
       )}
       {betweenRounds && (
         <div className="overflow-hidden rounded-2xl border border-accent/35 bg-accent/10 p-4">
-          <p className="text-[10px] font-black uppercase tracking-[.22em] text-accent">Central de análise</p>
-          <p className="mt-1 text-xs font-bold leading-5 text-foreground">O mercado segue visível para acompanhar preços e desempenho. A escalação abre quando existir uma pré-lista Ranked.</p>
+          <p className="text-[10px] font-black uppercase tracking-[.22em] text-accent">Mercado permanente</p>
+          <p className="mt-1 text-xs font-bold leading-5 text-foreground">Compre, venda e escolha seu capitão agora. O elenco será levado para a próxima Ranked.</p>
         </div>
       )}
       <header className="overflow-hidden rounded-3xl border border-accent/25 bg-[radial-gradient(circle_at_85%_15%,rgba(204,255,0,.2),transparent_28%),linear-gradient(135deg,rgba(204,255,0,.10),rgba(4,24,14,.95)_48%)] p-5">
         <div className="flex items-start justify-between gap-4">
-          <div><p className="text-[10px] font-black uppercase tracking-[.22em] text-accent">Fantasy da Pelada</p><h1 className="mt-1 text-2xl font-black italic text-foreground">CARTOLA</h1><p className="mt-1 text-xs text-muted">{betweenRounds ? "Preços, valorizações e destaques da temporada" : status === "scheduled" ? `Ranked ${round?.number || ""} · escalação encerrada` : `Ranked ${round?.number || ""} · escale cinco craques`}</p></div>
-          <span className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-wider ${isTest ? "bg-warning/15 text-warning" : open ? "bg-accent/15 text-accent" : status === "in_progress" ? "bg-warning/15 text-warning" : "bg-surface text-muted"}`}>{isTest ? `Teste · ${open ? "aberto" : status === "in_progress" ? "em jogo" : "finalizado"}` : betweenRounds ? "Modo análise" : open ? "Pré-lista aberta" : status === "in_progress" ? "Em andamento" : status === "scheduled" ? "Escalação fechada" : "Finalizado"}</span>
+          <div><p className="text-[10px] font-black uppercase tracking-[.22em] text-accent">Fantasy da Pelada</p><h1 className="mt-1 text-2xl font-black italic text-foreground">CARTOLA</h1><p className="mt-1 text-xs text-muted">{betweenRounds ? "Prepare seu elenco para a próxima Ranked" : `Ranked ${round?.number || ""} · escale cinco craques`}</p></div>
+          <span className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-wider ${isTest ? "bg-warning/15 text-warning" : open ? "bg-accent/15 text-accent" : status === "in_progress" ? "bg-warning/15 text-warning" : "bg-surface text-muted"}`}>{isTest ? `Teste · ${open ? "aberto" : status === "in_progress" ? "em jogo" : "finalizado"}` : betweenRounds ? "Compras abertas" : open ? "Mercado aberto" : status === "in_progress" ? "Em andamento" : "Finalizado"}</span>
         </div>
         <div className="mt-5 grid grid-cols-3 gap-2">
           <Metric label="Patrimônio" value={formatFantasyMoney(budget, settings.currencyName)} />
@@ -123,6 +145,20 @@ export function FantasyExperience({ round, status, settings, market, budget, lin
           <Metric label={betweenRounds ? "Melhor rodada" : "Restante"} value={betweenRounds ? `${account.bestRoundPoints.toFixed(1)} pts` : formatFantasyMoney(remaining, settings.currencyName)} accent={betweenRounds || remaining >= 0} />
         </div>
       </header>
+
+      {!betweenRounds && round && (
+        <section className={`flex items-center gap-3 rounded-2xl border p-4 ${open ? "border-accent/35 bg-accent/10" : "border-border bg-surface"}`}>
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${open ? "bg-accent/15 text-accent" : "bg-white/5 text-muted"}`}>
+            {open ? <Clock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[9px] font-black uppercase tracking-[.16em] text-muted">{open ? "Mercado aberto" : "Mercado fechado"}</p>
+            <p className="mt-0.5 text-sm font-black text-foreground">
+              {open && countdown != null && countdown > 0 ? `Horário previsto em ${formatCountdown(countdown)}` : open && countdown != null ? "Horário previsto atingido · aguardando início" : open ? "Fecha quando a primeira partida começar" : "Sua escalação está bloqueada nesta rodada"}
+            </p>
+          </div>
+        </section>
+      )}
 
       {!isTest && (insights.topRoundPlayer || insights.mostSelectedPlayer || insights.topValuationPlayer || insights.topDepreciationPlayer) && (
         <section className="space-y-3">
@@ -153,7 +189,7 @@ export function FantasyExperience({ round, status, settings, market, budget, lin
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(340px,.9fr)]">
         <section className="space-y-4">
-          <div className="flex items-center justify-between"><div><h2 className="text-sm font-black uppercase text-foreground">{betweenRounds ? "Meu último time" : "Meu time"}</h2><p className="text-[10px] text-muted">{open ? "Toque na coroa para escolher o capitão" : betweenRounds ? "A escalação fica disponível na próxima pré-lista Ranked" : "Escalação somente para consulta"}</p></div><strong className="text-sm text-accent">{selected.length}/5</strong></div>
+          <div className="flex items-center justify-between"><div><h2 className="text-sm font-black uppercase text-foreground">{betweenRounds ? "Meu elenco" : "Meu time"}</h2><p className="text-[10px] text-muted">{open ? "Toque na coroa para escolher o capitão" : "Escalação somente para consulta"}</p><p className={`mt-1 text-[9px] font-black uppercase ${saveState.includes("salva") || saveState.includes("Pronta") ? "text-accent" : "text-warning"}`}>{saveState}</p></div><strong className="text-sm text-accent">{selected.length}/5</strong></div>
           <div className="relative min-h-[430px] overflow-hidden rounded-[2rem] border-2 border-emerald-400/25 bg-[linear-gradient(90deg,rgba(255,255,255,.035)_50%,transparent_50%),linear-gradient(#07552e,#064426)] bg-[length:33.333%_100%,100%_100%] p-5 shadow-inner">
             <div className="pointer-events-none absolute inset-5 rounded-2xl border border-white/35"><div className="absolute left-1/2 top-0 h-20 w-36 -translate-x-1/2 border-x border-b border-white/30"/><div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30"/><div className="absolute bottom-0 left-1/2 h-20 w-36 -translate-x-1/2 border-x border-t border-white/30"/></div>
             <div className="relative z-10 grid min-h-[390px] grid-cols-2 content-around gap-x-5 gap-y-5 sm:grid-cols-3">
@@ -165,9 +201,21 @@ export function FantasyExperience({ round, status, settings, market, budget, lin
             </div>
           </div>
 
-          {!betweenRounds && <section className="glass-card space-y-3 p-4"><h2 className="text-sm font-black uppercase text-foreground">Palpites da rodada</h2><Select label={`Artilheiro (+${settings.topScorerPredictionPoints})`} value={scorerId || ""} disabled={!open} onChange={setScorerId} options={market.map(p => ({ id: p.id, name: p.name }))}/><Select label={`Garçom (+${settings.topAssistPredictionPoints})`} value={assistId || ""} disabled={!open} onChange={setAssistId} options={market.map(p => ({ id: p.id, name: p.name }))}/><Select label={`Time com mais vitórias (+${settings.topTeamPredictionPoints})`} value={teamId || ""} disabled={!open || !round?.teams?.length} onChange={setTeamId} options={(round?.teams || []).map(t => ({ id: t.id, name: t.name }))}/>{!round?.teams?.length && <p className="text-[10px] text-warning">Este palpite será liberado quando os times reais forem montados.</p>}</section>}
-          {betweenRounds && <p className="rounded-xl border border-border bg-surface p-3 text-center text-[10px] font-bold text-muted">Quando o ADM abrir uma pré-lista Ranked, o botão de escalação será liberado automaticamente.</p>}
-          {open && <button onClick={save} disabled={pending || remaining < 0} className="w-full rounded-2xl bg-accent py-3.5 text-sm font-black text-background disabled:opacity-50">{pending ? "Salvando..." : selected.length === 5 && captainId ? "Salvar escalação" : "Salvar rascunho"}</button>}
+          {!betweenRounds && <section className="glass-card space-y-4 p-4">
+            <div><h2 className="text-sm font-black uppercase text-foreground">Palpites da rodada</h2><p className="mt-1 text-[10px] text-muted">Palpites vazios valem zero e não invalidam seu time.</p></div>
+            <Select label={`Artilheiro (+${settings.topScorerPredictionPoints})`} value={scorerId || ""} disabled={!open} onChange={setScorerId} options={market.map(p => ({ id: p.id, name: p.name }))}/>
+            <Select label={`Garçom (+${settings.topAssistPredictionPoints})`} value={assistId || ""} disabled={!open} onChange={setAssistId} options={market.map(p => ({ id: p.id, name: p.name }))}/>
+            {challengeType && <div className="rounded-2xl border border-warning/35 bg-warning/10 p-3">
+              <div className="flex items-center gap-2"><Target className="h-4 w-4 text-warning"/><div><p className="text-[9px] font-black uppercase tracking-[.16em] text-warning">Desafio da Rodada</p><p className="text-sm font-black text-foreground">{CHALLENGE_LABELS[challengeType]}</p></div></div>
+              <div className="mt-3"><Select label="Escolha o jogador" value={challengeId || ""} disabled={!open} onChange={setChallengeId} options={market.map(p => ({ id: p.id, name: p.name }))}/></div>
+              {selectedChallengePlayer && challengeOffer && <div className="mt-3 rounded-xl bg-black/20 p-3 text-[10px] font-bold text-foreground">
+                <p>{selectedChallengePlayer.name} · {formatFantasyMoney(selectedChallengePlayer.price, settings.currencyName)}</p>
+                <p className="mt-1 text-warning">{challengeOffer.description} · +{challengeOffer.reward} pts</p>
+              </div>}
+            </div>}
+          </section>}
+          {betweenRounds && <p className="rounded-xl border border-border bg-surface p-3 text-center text-[10px] font-bold text-muted">Os palpites e o Desafio da Rodada serão liberados quando a próxima Ranked for criada.</p>}
+          {open && <button onClick={save} disabled={pending || remaining < 0} className="w-full rounded-2xl bg-accent py-3.5 text-sm font-black text-background disabled:opacity-50">{pending ? "Salvando..." : betweenRounds ? "Salvar elenco para a próxima Ranked" : selected.length === 5 && captainId ? "Salvar escalação" : "Salvar rascunho"}</button>}
           {message && <p role="status" className="rounded-xl border border-border bg-surface p-3 text-center text-xs font-bold text-foreground">{message}</p>}
         </section>
 
@@ -180,4 +228,5 @@ export function FantasyExperience({ round, status, settings, market, budget, lin
 function Metric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) { return <div className="rounded-xl border border-white/10 bg-black/20 p-2.5"><p className="text-[8px] font-black uppercase tracking-wider text-muted">{label}</p><p className={`mt-1 truncate text-xs font-black ${accent ? "text-accent" : "text-foreground"}`}>{value}</p></div>; }
 function InsightCard({ label, player, value, positive = false }: { label: string; player: FantasyMarketPlayer | null; value: string; positive?: boolean }) { return <article className="min-w-0 rounded-2xl border border-border bg-surface p-3"><p className="truncate text-[8px] font-black uppercase tracking-[.14em] text-muted">{label}</p>{player ? <div className="mt-2 flex items-center gap-2"><PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} className="h-9 w-9 shrink-0 rounded-full border border-accent/35 bg-background text-[9px] font-black text-accent"/><div className="min-w-0"><p className="truncate text-[10px] font-black text-foreground">{player.name}</p><p className={`truncate text-[10px] font-black ${positive ? "text-success" : label === "Maior queda" ? "text-danger" : "text-accent"}`}>{value}</p></div></div> : <p className="mt-3 text-xs font-bold text-muted">Sem dados</p>}</article>; }
 function formatSignedMoney(value: number, settings: FantasySettings) { const formatted = formatFantasyMoney(Math.abs(value), settings.currencyName); return `${value > 0 ? "+" : value < 0 ? "−" : ""}${formatted}`; }
+function formatCountdown(value: number) { const seconds = Math.max(0, Math.floor(value / 1000)); const hours = Math.floor(seconds / 3600); const minutes = Math.floor((seconds % 3600) / 60); const rest = seconds % 60; return `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(rest).padStart(2, "0")}s`; }
 function Select({ label, value, disabled, onChange, options }: { label: string; value: string; disabled: boolean; onChange: (value: string | null) => void; options: { id: string; name: string }[] }) { return <label className="block"><span className="mb-1 block text-[10px] font-bold text-muted">{label}</span><select disabled={disabled} value={value} onChange={e => onChange(e.target.value || null)} className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground disabled:opacity-50"><option value="">Sem palpite</option>{options.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select></label>; }

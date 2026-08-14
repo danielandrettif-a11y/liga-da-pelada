@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_FANTASY_SETTINGS } from "./config";
 import { calculateFantasyPlayerPoints, calculateFantasyPrices, predictionIsCorrect, validateFantasyDraft } from "./engine";
+import { fantasyChallengeIsCorrect, fantasyChallengeOffer, fantasyPriceBand } from "./challenges";
 
 describe("Fantasy da Pelada", () => {
   const prices = new Map(["a", "b", "c", "d", "e", "f"].map((id) => [id, 10]));
@@ -33,5 +34,33 @@ describe("Fantasy da Pelada", () => {
     expect(results[0].nextPrice).toBeLessThanOrEqual(25);
     expect(results[1].nextPrice).toBeGreaterThanOrEqual(5);
     expect(results[2].nextPrice).toBe(10);
+  });
+
+  it("mantém preços empatados na mesma faixa do desafio", () => {
+    const prices = [8, 8, 10, 12, 15];
+    expect(fantasyPriceBand(8, prices)).toBe(1);
+    expect(fantasyPriceBand(10, prices)).toBe(3);
+    expect(fantasyPriceBand(15, prices)).toBe(4);
+  });
+
+  it("expõe meta e recompensa dos quatro desafios antes do save", () => {
+    const prices = [8, 10, 12, 15];
+    expect(fantasyChallengeOffer("REI_DAS_VITORIAS", 10, prices, DEFAULT_FANTASY_SETTINGS)).toMatchObject({ reward: 6 });
+    expect(fantasyChallengeOffer("MITO_DA_RODADA", 10, prices, DEFAULT_FANTASY_SETTINGS)).toMatchObject({ reward: 8 });
+    expect(fantasyChallengeOffer("APOSTA_DA_RODADA", 15, prices, DEFAULT_FANTASY_SETTINGS)).toMatchObject({ reward: 8, requiredRank: 2 });
+    expect(fantasyChallengeOffer("VAI_GUARDAR", 8, prices, DEFAULT_FANTASY_SETTINGS)).toMatchObject({ reward: 7 });
+  });
+
+  it("avalia desafios com empate no corte e sem bônus em liderança zerada", () => {
+    const performances = [
+      { playerId: "a", goals: 2, wins: 2, basePoints: 14 },
+      { playerId: "b", goals: 1, wins: 2, basePoints: 10 },
+      { playerId: "c", goals: 0, wins: 0, basePoints: 10 },
+    ];
+    expect(fantasyChallengeIsCorrect({ type: "REI_DAS_VITORIAS", selectedId: "b", performances })).toBe(true);
+    expect(fantasyChallengeIsCorrect({ type: "MITO_DA_RODADA", selectedId: "a", performances })).toBe(true);
+    expect(fantasyChallengeIsCorrect({ type: "APOSTA_DA_RODADA", selectedId: "c", requiredRank: 2, performances })).toBe(true);
+    expect(fantasyChallengeIsCorrect({ type: "VAI_GUARDAR", selectedId: "b", performances })).toBe(true);
+    expect(fantasyChallengeIsCorrect({ type: "REI_DAS_VITORIAS", selectedId: "a", performances: performances.map((item) => ({ ...item, wins: 0 })) })).toBe(false);
   });
 });

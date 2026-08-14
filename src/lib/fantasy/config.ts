@@ -11,6 +11,11 @@ export type FantasySettings = {
   topScorerPredictionPoints: number;
   topAssistPredictionPoints: number;
   topTeamPredictionPoints: number;
+  kingOfWinsPoints: number;
+  mvpPredictionPoints: number;
+  betOfRoundPoints: number;
+  betRequiredRanks: [number, number, number, number];
+  scoreGoalRewards: [number, number, number, number];
   recentWeight: number;
   winRateWeight: number;
   historicalWeight: number;
@@ -33,6 +38,11 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   topScorerPredictionPoints: 8,
   topAssistPredictionPoints: 6,
   topTeamPredictionPoints: 5,
+  kingOfWinsPoints: 6,
+  mvpPredictionPoints: 8,
+  betOfRoundPoints: 8,
+  betRequiredRanks: [5, 4, 3, 2],
+  scoreGoalRewards: [7, 6, 4, 3],
   recentWeight: 0.4,
   winRateWeight: 0.35,
   historicalWeight: 0.15,
@@ -48,4 +58,3 @@ export function formatFantasyMoney(value: number, currencyName = "C$") {
     maximumFractionDigits: 2,
   }).format(value)}`;
 }
-

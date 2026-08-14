@@ -25,6 +25,7 @@ export type RegistrationSource = 'legacy' | 'site_signup' | 'admin';
 export type RoundPreparationStage = 'prelist' | 'teams_ready';
 export type FantasyMarketStatus = 'open' | 'in_progress' | 'finished';
 export type FantasyLineupStatus = 'draft' | 'locked' | 'missed' | 'scored' | 'needs_review';
+export type FantasyChallengeType = 'REI_DAS_VITORIAS' | 'MITO_DA_RODADA' | 'APOSTA_DA_RODADA' | 'VAI_GUARDAR';
 
 export type FantasyLineupPlayer = {
   id: string;
@@ -35,6 +36,8 @@ export type FantasyLineupPlayer = {
   base_points: number;
   captain_bonus: number;
   total_points: number;
+  player_name_locked?: string | null;
+  avatar_url_locked?: string | null;
 };
 
 export type FantasyLineup = {
@@ -43,6 +46,10 @@ export type FantasyLineup = {
   user_id: string;
   status: FantasyLineupStatus;
   captain_player_id: string | null;
+  challenge_player_id?: string | null;
+  challenge_snapshot?: Record<string, unknown>;
+  predictions_snapshot?: Record<string, unknown>;
+  score_breakdown?: Record<string, unknown>;
   budget_before: number;
   lineup_cost: number;
   cash_remaining: number;
