@@ -1,5 +1,41 @@
 -- Corrige o mercado do Cartola, a gestao de ADMs e torna convidados permanentes.
 
+-- O normalizador antigo tratava comandos do SQL Editor (auth.uid() nulo) como
+-- alteracoes de usuarios comuns. Mantemos o bloqueio para usuarios autenticados
+-- que nao sao ADMs, mas liberamos migrations e operacoes internas do banco.
+CREATE OR REPLACE FUNCTION public.normalize_player_category()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE'
+    AND (
+      NEW.member_category IS DISTINCT FROM OLD.member_category
+      OR NEW.is_selectable IS DISTINCT FROM OLD.is_selectable
+    )
+    AND auth.uid() IS NOT NULL
+    AND NOT public.is_app_admin()
+  THEN
+    RAISE EXCEPTION 'Somente administradores podem alterar categoria e elegibilidade.';
+  END IF;
+
+  IF NEW.member_category IN ('wag', 'supporter') THEN
+    NEW.is_selectable := false;
+    NEW.player_profile := NULL;
+    NEW.is_goalkeeper := false;
+  ELSE
+    NEW.player_profile := COALESCE(NEW.player_profile, 'midfield');
+    NEW.is_goalkeeper := COALESCE(NEW.is_goalkeeper, false);
+    IF NEW.member_category IN ('player', 'guest') THEN
+      NEW.is_selectable := true;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
 -- Convidados nao sao mais arquivados automaticamente ao terminar uma rodada.
 DROP TRIGGER IF EXISTS rounds_archive_guests ON public.rounds;
 DROP FUNCTION IF EXISTS public.archive_guest_after_finished_round();
