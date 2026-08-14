@@ -24,6 +24,7 @@ import {
   MIN_TEAMS_PER_ROUND,
 } from "@/lib/constants";
 import { TEAM_PRESETS } from "@/lib/teamPresets";
+import { supabase } from "@/lib/supabase";
 import { DeleteRoundButton } from "./DeleteRoundButton";
 
 type DrawPlayer = Player & {
@@ -121,7 +122,18 @@ export function RoundCreator({
   }, [allPlayers, playerSearch]);
 
   useEffect(() => {
-    if (step !== 2) return;
+    if (!sourceCallupId) return;
+    const synchronizedIds = new Set(initialPlayerIds);
+    setSelectedPlayerIds(synchronizedIds);
+    setTeams((current) => current.map((team) => ({
+      ...team,
+      players: team.players.filter((player) => synchronizedIds.has(player.id)),
+    })));
+    setAttendanceOrder((current) => current.filter((playerId) => synchronizedIds.has(playerId)));
+  }, [initialPlayerIds, sourceCallupId]);
+
+  useEffect(() => {
+    if (step !== 2 && !(sourceCallupId && step === 3)) return;
     const refresh = () => {
       if (document.visibilityState === "visible") startPlayersRefresh(() => router.refresh());
     };
@@ -131,7 +143,21 @@ export function RoundCreator({
       window.clearInterval(interval);
       window.removeEventListener("focus", refresh);
     };
-  }, [router, step]);
+  }, [router, sourceCallupId, step]);
+
+  useEffect(() => {
+    if (!sourceCallupId) return;
+    const channel = supabase
+      .channel(`prelist-callup-${sourceCallupId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "callup_entries" }, () => {
+        startPlayersRefresh(() => router.refresh());
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [router, sourceCallupId]);
   
   // Jogadores que estão selecionados para a pelada, mas ainda não foram alocados em nenhum time
   const unassignedPlayers = selectedPlayers.filter(
@@ -460,15 +486,21 @@ export function RoundCreator({
             />
           </label>
 
+          {sourceCallupId && (
+            <div className="rounded-xl border border-accent/25 bg-accent/[0.06] px-3 py-2.5 text-[10px] font-semibold leading-4 text-muted">
+              Lista sincronizada com a Convocação. Para adicionar ou remover alguém, altere a convocação; esta tela será atualizada automaticamente.
+            </div>
+          )}
+
           <div className="glass-card overflow-hidden max-h-[50vh] overflow-y-auto no-scrollbar">
             {visiblePlayers.map((player, idx) => {
               const isSelected = selectedPlayerIds.has(player.id);
               return (
                 <div
                   key={player.id}
-                  onClick={() => togglePlayerSelection(player.id)}
+                  onClick={() => { if (!sourceCallupId) togglePlayerSelection(player.id); }}
                   className={`
-                    flex items-center justify-between p-3 cursor-pointer transition-colors
+                    flex items-center justify-between p-3 transition-colors ${sourceCallupId ? "cursor-default" : "cursor-pointer"}
                     ${idx < visiblePlayers.length - 1 ? "border-b border-border" : ""}
                     ${isSelected ? "bg-accent/5 hover:bg-accent/10" : "hover:bg-surface-hover"}
                   `}

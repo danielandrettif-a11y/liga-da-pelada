@@ -59,9 +59,26 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Safe area for bottom nav */
 main {
   padding-bottom: calc(var(--bottom-nav-height) + 1rem);
+}
+
+/* Mantem a navegacao presa ao viewport no Safari/PWA, sem o custo do blur. */
+.app-bottom-nav {
+  position: fixed !important;
+  inset-inline: 0 !important;
+  bottom: 0 !important;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  will-change: transform;
 }
 
 /* ============================================
@@ -139,7 +156,6 @@ main {
     rgba(12, 30, 20, 0.8) 0%,
     rgba(12, 30, 20, 0.6) 100%
   );
-  backdrop-filter: blur(12px);
   border: 1px solid var(--border-color);
   border-radius: 1rem;
 }

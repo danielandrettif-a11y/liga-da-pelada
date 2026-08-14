@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, ClipboardList, Trophy, Users, MoreHorizontal, ArrowLeftRight } from "@/components/icons";
+import { Home, ClipboardList, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag } from "@/components/icons";
 
 const NAV_ITEMS = [
   { href: "/", label: "Início", icon: Home },
@@ -13,6 +13,8 @@ const NAV_ITEMS = [
   { href: "/pagamentos", label: "Transfermarket", icon: ArrowLeftRight },
   { href: "/mais", label: "Mais", icon: MoreHorizontal },
 ] as const;
+
+const CALLUP_NAV_ITEM = { href: "/convocacao", label: "Convocação", icon: Flag } as const;
 
 export function BottomNav({
   isAuthenticated,
@@ -36,14 +38,16 @@ export function BottomNav({
   useEffect(() => {
     if (pathname.startsWith("/admin/jogadores")) setUnreadRoster(0);
   }, [pathname]);
-  const baseItems = [...NAV_ITEMS];
+  const baseItems = hasOpenCallup
+    ? [NAV_ITEMS[0], CALLUP_NAV_ITEM, ...NAV_ITEMS.slice(1)]
+    : [...NAV_ITEMS];
   const contextualItems = baseItems.filter((item) => item.href !== "/pagamentos" || hasReleasedPayment);
   const visibleItems = isAuthenticated
     ? contextualItems
     : contextualItems.filter((item) => item.href !== "/mais");
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
+    <nav className="app-bottom-nav fixed inset-x-0 bottom-0 z-[100] border-t border-border bg-background pb-[env(safe-area-inset-bottom)]">
       <div
         className="mx-auto grid h-16 w-full max-w-lg items-stretch px-1"
         style={{ gridTemplateColumns: `repeat(${visibleItems.length}, minmax(0, 1fr))` }}
@@ -94,7 +98,7 @@ export function BottomNav({
               </span>
               <span
                 className={`block w-full truncate whitespace-nowrap text-center font-semibold leading-none tracking-tight ${
-                  item.label === "Transfermarket"
+                  item.label === "Transfermarket" || item.label === "Convocação"
                     ? "text-[7px] min-[360px]:text-[8px] min-[430px]:text-[9px]"
                     : "text-[9px] min-[390px]:text-[10px]"
                 } ${

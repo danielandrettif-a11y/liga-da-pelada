@@ -95,9 +95,14 @@ export function LiveMatchBanner({
             Rodada {String(match.round?.number || 0).padStart(2, "0")}
           </span>
         </div>
-        <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-mono text-xs font-black ${isPaused ? "bg-amber-500/15 text-amber-300" : "bg-white/10 text-white"}`}>
-          <Clock3 className="h-3.5 w-3.5" />
-          {formatClock(secondsLeft)}
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          {secondsLeft <= 60 && secondsLeft > 0 && (
+            <span className="text-[7px] font-black uppercase tracking-[0.18em] text-red-400 animate-pulse">Último minuto</span>
+          )}
+          <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-mono text-xs font-black ${isPaused ? "bg-amber-500/15 text-amber-300" : "bg-white/10 text-white"}`}>
+            <Clock3 className="h-3.5 w-3.5" />
+            {formatClock(secondsLeft)}
+          </div>
         </div>
       </div>
 

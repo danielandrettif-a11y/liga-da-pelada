@@ -286,6 +286,23 @@ export async function swapRoundTeamPlayers(roundId: string, playerAId: string, p
   }
 }
 
+export async function setRoundTeamCaptain(roundId: string, teamId: string, playerId: string | null) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem definir capitaes." };
+    const { error } = await client.rpc("set_round_team_captain", {
+      p_round_id: roundId,
+      p_team_id: teamId,
+      p_player_id: playerId,
+    });
+    if (error) throw new Error(error.message);
+    refreshRoundManagement(roundId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 export async function deleteRound(roundId: string, confirmation: string) {
   try {
     if (confirmation !== "EXCLUIR") return { success: false, error: "Digite EXCLUIR para confirmar." };
@@ -335,11 +352,6 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
     let effectiveDate = input.date;
     let effectiveRoundType = input.roundType;
     if (input.callupId) {
-      const { error: setError } = await client.rpc("admin_set_callup_confirmed", {
-        p_callup_id: input.callupId,
-        p_player_ids: playerIds,
-      });
-      if (setError) throw new Error(setError.message);
       const { data: callup, error: callupError } = await client
         .from("callups")
         .select("date, round_type, callup_entries(player_id, status)")

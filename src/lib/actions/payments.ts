@@ -183,3 +183,29 @@ export async function setPlayerPayment(roundId: string, playerId: string, paid: 
   revalidatePath("/", "layout");
   return { success: true };
 }
+
+export async function updateRoundPaymentDetails(roundId: string, paymentPix: string, paymentTotal: number) {
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem editar os dados do PIX." };
+
+  const pix = paymentPix.trim();
+  const total = Number(paymentTotal);
+  if (!pix) return { success: false, error: "Informe a chave PIX." };
+  if (!Number.isFinite(total) || total <= 0) return { success: false, error: "Informe um valor total valido." };
+
+  const { data, error } = await client
+    .from("rounds")
+    .update({ payment_pix: pix, payment_total: Math.round(total * 100) / 100 })
+    .eq("id", roundId)
+    .eq("status", "finished")
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { success: false, error: error.message };
+  if (!data) return { success: false, error: "Rodada finalizada nao encontrada." };
+
+  revalidatePath("/pagamentos");
+  revalidatePath("/admin/transfermarket");
+  revalidatePath("/", "layout");
+  return { success: true };
+}

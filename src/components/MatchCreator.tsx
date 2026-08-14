@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createMatch } from "@/lib/actions/matches";
-import { Swords, ArrowLeft, ChevronRight, AlertTriangle, Check, ArrowLeftRight, Users } from "@/components/icons";
+import { Swords, ArrowLeft, ChevronRight, AlertTriangle, Check, ArrowLeftRight, Crown, Users } from "@/components/icons";
 import Link from "next/link";
 import { TeamCrest } from "./TeamCrest";
-import { markRoundTeamArrived, swapRoundTeamPlayers } from "@/lib/actions/rounds";
+import { markRoundTeamArrived, setRoundTeamCaptain, swapRoundTeamPlayers } from "@/lib/actions/rounds";
 
 export function MatchCreator({ round }: { round: any }) {
   const router = useRouter();
@@ -18,8 +18,14 @@ export function MatchCreator({ round }: { round: any }) {
   const [swapPlayerAId, setSwapPlayerAId] = useState("");
   const [swapPlayerBId, setSwapPlayerBId] = useState("");
   const [managementLoading, setManagementLoading] = useState(false);
+  const [captainByTeam, setCaptainByTeam] = useState<Record<string, string>>(() => Object.fromEntries(
+    (round?.teams || []).map((team: any) => [team.id, team.captain_player_id || ""]),
+  ));
 
-  const teams = round?.teams || [];
+  const teams = useMemo(() => round?.teams || [], [round?.teams]);
+  const playerTeamById = useMemo(() => new Map(
+    teams.flatMap((team: any) => (team.team_players || []).map((entry: any) => [entry.player_id, team.id] as const)),
+  ), [teams]);
   const selectedTeamIds = useMemo(() => [teamAId, teamBId].filter(Boolean), [teamAId, teamBId]);
   const availability = useMemo(() => new Map(
     (round?.round_players || []).map((entry: any) => [entry.player_id, entry.availability_status || "available"]),
@@ -51,6 +57,12 @@ export function MatchCreator({ round }: { round: any }) {
   useEffect(() => {
     setReplacementByAbsent({});
   }, [teamAId, teamBId]);
+
+  useEffect(() => {
+    setCaptainByTeam(Object.fromEntries(
+      teams.map((team: any) => [team.id, team.captain_player_id || ""]),
+    ));
+  }, [teams]);
 
   async function handleStart() {
     if (!teamAId || !teamBId) {
@@ -120,6 +132,38 @@ export function MatchCreator({ round }: { round: any }) {
     setManagementLoading(false);
   }
 
+  function selectSwapPlayer(playerId: string, teamId: string) {
+    if (swapPlayerAId === playerId) {
+      setSwapPlayerAId("");
+      return;
+    }
+    if (swapPlayerBId === playerId) {
+      setSwapPlayerBId("");
+      return;
+    }
+    const firstTeamId = playerTeamById.get(swapPlayerAId);
+    const secondTeamId = playerTeamById.get(swapPlayerBId);
+    if (!swapPlayerAId || firstTeamId === teamId) setSwapPlayerAId(playerId);
+    else if (!swapPlayerBId || secondTeamId === teamId) setSwapPlayerBId(playerId);
+    else setSwapPlayerBId(playerId);
+    setError("");
+  }
+
+  async function handleCaptainChange(teamId: string, playerId: string) {
+    const previous = captainByTeam[teamId] || "";
+    setCaptainByTeam((current) => ({ ...current, [teamId]: playerId }));
+    setManagementLoading(true);
+    setError("");
+    const result = await setRoundTeamCaptain(round.id, teamId, playerId || null);
+    if (!result.success) {
+      setCaptainByTeam((current) => ({ ...current, [teamId]: previous }));
+      setError(result.error || "Nao foi possivel definir o capitao.");
+    } else {
+      router.refresh();
+    }
+    setManagementLoading(false);
+  }
+
   return (
     <div className="space-y-6">
       {/* Top bar */}
@@ -137,6 +181,31 @@ export function MatchCreator({ round }: { round: any }) {
           </p>
         </div>
       </div>
+
+      <section className="glass-card overflow-hidden">
+        <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent"><Crown className="h-4.5 w-4.5" /></span>
+          <div><h2 className="text-sm font-black text-foreground">Capitães de referência</h2><p className="text-[10px] text-muted">O nome aparece nos cartões para facilitar quem joga contra quem.</p></div>
+        </div>
+        <div className="divide-y divide-border">
+          {teams.map((team: any) => (
+            <label key={team.id} className="flex min-w-0 items-center gap-3 px-4 py-3">
+              <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-9 w-9 shrink-0" />
+              <span className="min-w-0 flex-1 truncate text-xs font-black text-foreground">{team.name}</span>
+              <select
+                value={captainByTeam[team.id] || ""}
+                onChange={(event) => handleCaptainChange(team.id, event.target.value)}
+                disabled={managementLoading}
+                aria-label={`Capitão do ${team.name}`}
+                className="min-w-0 max-w-[48%] rounded-xl border border-border bg-background px-2.5 py-2 text-[10px] font-bold text-foreground disabled:opacity-50"
+              >
+                <option value="">Sem capitão</option>
+                {(team.team_players || []).map((entry: any) => <option key={entry.player_id} value={entry.player_id}>{entry.players?.name}</option>)}
+              </select>
+            </label>
+          ))}
+        </div>
+      </section>
 
       <div className="glass-card p-6 flex flex-col items-center gap-6 animate-fade-in-up">
         
@@ -168,6 +237,10 @@ export function MatchCreator({ round }: { round: any }) {
               >
                 <TeamCrest name={t.name} crestUrl={t.crest_url} color={t.color} className="h-11 w-11" />
                 <span className="text-xs font-bold truncate w-full text-center">{t.name}</span>
+                <span className="flex min-w-0 items-center gap-1 text-[8px] font-black uppercase text-accent">
+                  <Crown className="h-2.5 w-2.5 shrink-0" />
+                  <span className="truncate">{(t.team_players || []).find((entry: any) => entry.player_id === captainByTeam[t.id])?.players?.name || "Sem capitão"}</span>
+                </span>
               </button>
             ))}
           </div>
@@ -199,6 +272,10 @@ export function MatchCreator({ round }: { round: any }) {
               >
                 <TeamCrest name={t.name} crestUrl={t.crest_url} color={t.color} className="h-11 w-11" />
                 <span className="text-xs font-bold truncate w-full text-center">{t.name}</span>
+                <span className="flex min-w-0 items-center gap-1 text-[8px] font-black uppercase text-accent">
+                  <Crown className="h-2.5 w-2.5 shrink-0" />
+                  <span className="truncate">{(t.team_players || []).find((entry: any) => entry.player_id === captainByTeam[t.id])?.players?.name || "Sem capitão"}</span>
+                </span>
               </button>
             ))}
           </div>
@@ -211,11 +288,34 @@ export function MatchCreator({ round }: { round: any }) {
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-warning/10 text-warning"><ArrowLeftRight className="h-4.5 w-4.5" /></span>
           <div><h2 className="text-sm font-black text-foreground">Troca permanente</h2><p className="text-[10px] text-muted">Inverta dois jogadores entre os times para as proximas partidas.</p></div>
         </div>
-        <div className="grid gap-3 p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-          {[{ value: swapPlayerAId, set: setSwapPlayerAId, label: "Jogador 1" }, { value: swapPlayerBId, set: setSwapPlayerBId, label: "Jogador 2" }].map((field) => (
-            <label key={field.label} className="block"><span className="mb-1.5 block text-[9px] font-black uppercase text-muted">{field.label}</span><select value={field.value} onChange={(event) => field.set(event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-xs font-bold text-foreground"><option value="">Selecionar</option>{teams.flatMap((team: any) => (team.team_players || []).map((entry: any) => <option key={entry.player_id} value={entry.player_id}>{entry.players?.name} · {team.name}</option>))}</select></label>
+        <div className="grid gap-3 p-4 sm:grid-cols-2">
+          {teams.map((team: any) => (
+            <div key={team.id} className="overflow-hidden rounded-xl border border-border bg-background/45">
+              <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
+                <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-7 w-7" />
+                <span className="min-w-0 flex-1 truncate text-xs font-black text-foreground">{team.name}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 p-2">
+                {(team.team_players || []).map((entry: any) => {
+                  const position = swapPlayerAId === entry.player_id ? 1 : swapPlayerBId === entry.player_id ? 2 : 0;
+                  return (
+                    <button
+                      key={entry.player_id}
+                      type="button"
+                      onClick={() => selectSwapPlayer(entry.player_id, team.id)}
+                      className={`relative min-w-0 rounded-lg border px-2 py-2 text-left text-[10px] font-bold transition-colors ${position ? "border-warning bg-warning/10 text-warning" : "border-border bg-surface text-foreground"}`}
+                    >
+                      <span className="block truncate">{entry.players?.name}</span>
+                      {position > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-warning text-[8px] font-black text-background">{position}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           ))}
-          <button type="button" disabled={managementLoading || !swapPlayerAId || !swapPlayerBId} onClick={handlePermanentSwap} className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-xs font-black text-warning disabled:opacity-40">Trocar</button>
+          <button type="button" disabled={managementLoading || !swapPlayerAId || !swapPlayerBId} onClick={handlePermanentSwap} className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-xs font-black text-warning disabled:opacity-40 sm:col-span-2">
+            {managementLoading ? "Salvando..." : "Confirmar troca entre os times"}
+          </button>
         </div>
       </section>
 

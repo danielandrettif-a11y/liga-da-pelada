@@ -268,6 +268,7 @@ export type Team = {
   color: string;
   crest_url: string | null;
   position: number;
+  captain_player_id: string | null;
 };
 
 export type TeamPlayer = {
@@ -561,7 +562,7 @@ export type Database = {
       };
       teams: {
         Row: Team;
-        Insert: Omit<Team, 'id' | 'position'> & { id?: string; position?: number };
+        Insert: Omit<Team, 'id' | 'position' | 'captain_player_id'> & { id?: string; position?: number; captain_player_id?: string | null };
         Update: Partial<Omit<Team, 'id'>>;
       };
       team_players: {
@@ -648,6 +649,10 @@ export type Database = {
       };
       swap_round_team_players: {
         Args: { p_round_id: string; p_player_a_id: string; p_player_b_id: string };
+        Returns: boolean;
+      };
+      set_round_team_captain: {
+        Args: { p_round_id: string; p_team_id: string; p_player_id: string | null };
         Returns: boolean;
       };
       delete_round_cascade: {

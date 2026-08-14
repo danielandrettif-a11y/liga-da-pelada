@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, CheckCircle2, Clock, Copy, Loader2, LogIn, Shield, UserPlus, X } from "@/components/icons";
-import { adminAddCallupPlayer, adminRemoveCallupPlayer, joinActiveCallup, leaveActiveCallup, type CallupWithEntries } from "@/lib/actions/callups";
+import { Calendar, CheckCircle2, ClipboardList, Clock, Copy, Loader2, LogIn, Shield, UserPlus, X } from "@/components/icons";
+import { adminAddCallupPlayer, adminRemoveCallupPlayer, createCallupPrelist, joinActiveCallup, leaveActiveCallup, type CallupWithEntries } from "@/lib/actions/callups";
 import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { StadiumLink } from "./StadiumLink";
@@ -46,6 +46,18 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
     await navigator.clipboard.writeText(text);
     setLoading("copied");
     setTimeout(() => setLoading(""), 1600);
+  }
+
+  async function handlePrelist() {
+    setLoading("prelist");
+    setError("");
+    const result = await createCallupPrelist(callup.id);
+    if (!result.success || !result.roundId) {
+      setError(result.error || "Nao foi possivel criar a pre-lista.");
+      setLoading("");
+      return;
+    }
+    router.push(`/admin/rodada?round=${result.roundId}`);
   }
 
   function EntryRow({ entry, position }: { entry: CallupWithEntries["entries"][number]; position: number }) {
@@ -104,6 +116,31 @@ export function CallupBoard({ callup, currentPlayerId, isAuthenticated, isAdmin,
       <StadiumLink name={stadiumName} mapUrl={stadiumMapUrl} />
 
       {error && <div role="alert" className="rounded-xl border border-danger/20 bg-danger/10 p-3 text-xs font-bold text-danger">{error}</div>}
+
+      {isAdmin && (
+        <section className="overflow-hidden rounded-2xl border border-accent/30 bg-accent/[0.06]">
+          <div className="flex items-start gap-3 p-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+              <ClipboardList className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black text-foreground">Pré-lista da convocação</p>
+              <p className="mt-1 text-[11px] leading-4 text-muted">
+                Entradas e saídas atualizam automaticamente os jogadores da pré-lista.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handlePrelist}
+            disabled={Boolean(loading)}
+            className="flex w-full items-center justify-center gap-2 border-t border-accent/20 bg-accent px-4 py-3.5 text-sm font-black text-background disabled:opacity-50"
+          >
+            {loading === "prelist" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
+            {callup.round_id ? "Abrir pré-lista sincronizada" : "Fazer pré-lista"}
+          </button>
+        </section>
+      )}
 
       {callup.status === "locked" ? (
         <div className="rounded-xl border border-warning/25 bg-warning/10 p-4 text-sm font-bold text-warning">Lista fechada pelo ADM. Os times estão sendo montados.</div>

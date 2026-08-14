@@ -132,6 +132,58 @@ export async function adminRemoveCallupPlayer(callupId: string, playerId: string
   return { success: true };
 }
 
+export async function createCallupPrelist(callupId: string) {
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem criar a pre-lista." };
+
+  const { data: callup, error: callupError } = await client
+    .from("callups")
+    .select("id, date, round_type, status, round_id, callup_entries(player_id, status)")
+    .eq("id", callupId)
+    .maybeSingle();
+
+  if (callupError || !callup) {
+    return { success: false, error: callupError?.message || "Convocacao nao encontrada." };
+  }
+
+  if (callup.round_id) {
+    const { data: linkedRound, error: linkedRoundError } = await client
+      .from("rounds")
+      .select("id, status, preparation_stage")
+      .eq("id", callup.round_id)
+      .maybeSingle();
+
+    if (linkedRoundError) return { success: false, error: linkedRoundError.message };
+    if (linkedRound?.status === "draft" && linkedRound.preparation_stage === "prelist") {
+      return { success: true, roundId: linkedRound.id };
+    }
+    return { success: false, error: "Esta convocacao ja foi convertida em rodada." };
+  }
+
+  if (callup.status !== "open") {
+    return { success: false, error: "A convocacao precisa estar aberta para criar a pre-lista." };
+  }
+
+  const confirmedPlayerIds = (callup.callup_entries || [])
+    .filter((entry) => entry.status === "confirmed")
+    .map((entry) => entry.player_id);
+
+  const { data: roundId, error } = await client.rpc("save_round_prelist", {
+    p_round_id: null,
+    p_date: callup.date,
+    p_start_time: "08:00",
+    p_round_type: callup.round_type === "friendly" ? "friendly" : "official",
+    p_player_ids: confirmedPlayerIds,
+    p_callup_id: callup.id,
+  });
+
+  if (error) return { success: false, error: error.message };
+
+  refreshCallups();
+  revalidatePath("/cartola");
+  return { success: true, roundId: String(roundId) };
+}
+
 export async function closeCallup(callupId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem fechar convocacoes." };

@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CheckCircle2, Copy, LockKeyhole } from "@/components/icons";
-import { setPlayerPayment, type PaymentPlayer, type PaymentRound } from "@/lib/actions/payments";
+import { Check, CheckCircle2, Copy, LockKeyhole, PencilLine, X } from "@/components/icons";
+import { setPlayerPayment, updateRoundPaymentDetails, type PaymentPlayer, type PaymentRound } from "@/lib/actions/payments";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
 
@@ -17,10 +17,12 @@ export function PaymentChecklist({
   round,
   initialPlayers,
   canEdit,
+  canManagePayment,
 }: {
   round: PaymentRound;
   initialPlayers: PaymentPlayer[];
   canEdit: boolean;
+  canManagePayment: boolean;
 }) {
   const router = useRouter();
   const [players, setPlayers] = useState(initialPlayers);
@@ -28,14 +30,19 @@ export function PaymentChecklist({
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [showCompletedList, setShowCompletedList] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState({ pix: round.payment_pix || "", total: Number(round.payment_total) || 0 });
+  const [draftPix, setDraftPix] = useState(paymentDetails.pix);
+  const [draftTotal, setDraftTotal] = useState(String(paymentDetails.total || ""));
+  const [editingPayment, setEditingPayment] = useState(false);
+  const [savingDetails, setSavingDetails] = useState(false);
   const paidCount = useMemo(() => players.filter((player) => player.paid).length, [players]);
   const allPaid = players.length > 0 && paidCount === players.length;
-  const total = Number(round.payment_total) || 0;
+  const total = paymentDetails.total;
   const perPlayer = players.length > 0 ? total / players.length : 0;
 
   async function copyPix() {
-    if (!round.payment_pix) return;
-    const text = `Pagamento da pelada - Rodada ${round.number}\nValor por pessoa: ${currency.format(perPlayer)}\nPIX: ${round.payment_pix}`;
+    if (!paymentDetails.pix) return;
+    const text = `Pagamento da pelada - Rodada ${round.number}\nValor por pessoa: ${currency.format(perPlayer)}\nPIX: ${paymentDetails.pix}`;
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -50,6 +57,21 @@ export function PaymentChecklist({
     }
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function savePaymentDetails() {
+    setSavingDetails(true);
+    setError("");
+    const parsedTotal = Number(draftTotal.replace(",", "."));
+    const result = await updateRoundPaymentDetails(round.id, draftPix, parsedTotal);
+    if (!result.success) {
+      setError(result.error || "Nao foi possivel atualizar os dados do PIX.");
+    } else {
+      setPaymentDetails({ pix: draftPix.trim(), total: parsedTotal });
+      setEditingPayment(false);
+      router.refresh();
+    }
+    setSavingDetails(false);
   }
 
   async function togglePayment(playerId: string, paid: boolean) {
@@ -77,9 +99,16 @@ export function PaymentChecklist({
         <h2 className="mt-5 text-xl font-black text-foreground">Todo mundo pagou!</h2>
         <p className="mt-2 text-sm text-muted">Contas fechadas. Agora é só aguardar a próxima pelada.</p>
         {canEdit && (
-          <button onClick={() => setShowCompletedList(true)} className="mt-5 text-xs font-bold text-muted underline hover:text-accent">
-            Corrigir algum pagamento
-          </button>
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            <button onClick={() => setShowCompletedList(true)} className="text-xs font-bold text-muted underline hover:text-accent">
+              Corrigir algum pagamento
+            </button>
+            {canManagePayment && (
+              <button onClick={() => { setShowCompletedList(true); setEditingPayment(true); }} className="text-xs font-bold text-accent underline">
+                Editar PIX e valor
+              </button>
+            )}
+          </div>
         )}
       </div>
     );
@@ -88,6 +117,28 @@ export function PaymentChecklist({
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-accent/30 bg-accent/10 p-4">
+        {canManagePayment && (
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-[9px] font-black uppercase tracking-widest text-accent">Dados de cobrança</p>
+            <button type="button" onClick={() => setEditingPayment((current) => !current)} className="flex items-center gap-1.5 rounded-lg border border-accent/25 px-2.5 py-1.5 text-[9px] font-black uppercase text-accent">
+              {editingPayment ? <X className="h-3.5 w-3.5" /> : <PencilLine className="h-3.5 w-3.5" />}
+              {editingPayment ? "Cancelar" : "Editar"}
+            </button>
+          </div>
+        )}
+        {editingPayment && canManagePayment && (
+          <div className="mb-4 grid gap-3 rounded-xl border border-accent/20 bg-background/50 p-3">
+            <label className="text-[9px] font-black uppercase tracking-wider text-muted">Chave PIX
+              <input value={draftPix} onChange={(event) => setDraftPix(event.target.value)} className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs font-bold normal-case text-foreground outline-none focus:border-accent" />
+            </label>
+            <label className="text-[9px] font-black uppercase tracking-wider text-muted">Valor total
+              <input type="number" min="0.01" step="0.01" inputMode="decimal" value={draftTotal} onChange={(event) => setDraftTotal(event.target.value)} className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs font-bold normal-case text-foreground outline-none focus:border-accent" />
+            </label>
+            <button type="button" onClick={savePaymentDetails} disabled={savingDetails || !draftPix.trim() || Number(draftTotal.replace(",", ".")) <= 0} className="rounded-xl bg-accent py-2.5 text-xs font-black text-background disabled:opacity-50">
+              {savingDetails ? "Salvando..." : "Salvar PIX e valor"}
+            </button>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3 border-b border-accent/20 pb-3">
           <div>
             <p className="text-[9px] font-black uppercase tracking-widest text-muted">Valor total</p>
@@ -100,7 +151,7 @@ export function PaymentChecklist({
         </div>
         <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-accent">PIX para pagamento</p>
         <div className="mt-2 flex items-center gap-3">
-          <p className="min-w-0 flex-1 break-all text-sm font-bold text-foreground">{round.payment_pix}</p>
+          <p className="min-w-0 flex-1 break-all text-sm font-bold text-foreground">{paymentDetails.pix}</p>
           <button onClick={copyPix} className="flex shrink-0 items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-black text-background">
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             {copied ? "Copiado" : "Copiar"}

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   getMatchHalfSeconds,
+  getMatchTimerElapsedSeconds,
   getOfficialElapsedSeconds,
   isEntryResultEligible,
+  transitionMatchTimer,
 } from "./match-rules";
 
 describe("match participation rules", () => {
@@ -33,5 +35,12 @@ describe("match participation rules", () => {
   it("never produces negative time from invalid inputs", () => {
     expect(getMatchHalfSeconds(-1)).toBe(0);
     expect(getOfficialElapsedSeconds(-10, -20)).toBe(0);
+  });
+
+  it("starts immediately and preserves the elapsed time when paused", () => {
+    const started = transitionMatchTimer({ startedAt: null, accumulated: 12 }, "start", 10_000);
+    expect(started).toEqual({ startedAt: "1970-01-01T00:00:10.000Z", accumulated: 12 });
+    expect(getMatchTimerElapsedSeconds(started, 15_900)).toBe(17);
+    expect(transitionMatchTimer(started, "pause", 15_900)).toEqual({ startedAt: null, accumulated: 17 });
   });
 });

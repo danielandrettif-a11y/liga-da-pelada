@@ -21,7 +21,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { MatchSubstitutionManager } from "./MatchSubstitutionManager";
-import { getOfficialElapsedSeconds } from "@/lib/match-rules";
+import { getMatchTimerElapsedSeconds, getOfficialElapsedSeconds, transitionMatchTimer } from "@/lib/match-rules";
 import { TeamCrest } from "./TeamCrest";
 
 type MatchLiveBoardProps = {
@@ -39,31 +39,46 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
   // Timer State
   const initialSeconds = match.duration_seconds || matchDuration * 60;
   const [secondsLeft, setSecondsLeft] = useState(initialSeconds);
-  const isRunning = !!match.timer_started_at;
+  const [timerState, setTimerState] = useState({
+    startedAt: match.timer_started_at as string | null,
+    accumulated: Number(match.timer_accumulated_seconds || 0),
+  });
+  const [timerSaving, setTimerSaving] = useState(false);
+  const [displayScore, setDisplayScore] = useState({ a: Number(match.score_a || 0), b: Number(match.score_b || 0) });
+  const [eligibilityOffset, setEligibilityOffset] = useState(Number(match.eligibility_elapsed_offset_seconds || 0));
+  const isRunning = !!timerState.startedAt;
+
+  useEffect(() => {
+    setTimerState({
+      startedAt: match.timer_started_at as string | null,
+      accumulated: Number(match.timer_accumulated_seconds || 0),
+    });
+  }, [match.timer_started_at, match.timer_accumulated_seconds]);
+
+  useEffect(() => {
+    setDisplayScore({ a: Number(match.score_a || 0), b: Number(match.score_b || 0) });
+  }, [match.score_a, match.score_b]);
+
+  useEffect(() => {
+    setEligibilityOffset(Number(match.eligibility_elapsed_offset_seconds || 0));
+  }, [match.eligibility_elapsed_offset_seconds]);
 
   // Atualiza o timer visualmente a cada segundo, baseado na hora do banco
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
     const updateTimer = () => {
-      if (match.timer_started_at) {
-        const elapsedSinceStart = Math.floor((new Date().getTime() - new Date(match.timer_started_at).getTime()) / 1000);
-        const totalElapsed = (match.timer_accumulated_seconds || 0) + elapsedSinceStart;
-        setSecondsLeft(Math.max(0, initialSeconds - totalElapsed));
-      } else {
-        const totalElapsed = match.timer_accumulated_seconds || 0;
-        setSecondsLeft(Math.max(0, initialSeconds - totalElapsed));
-      }
+      setSecondsLeft(Math.max(0, initialSeconds - getMatchTimerElapsedSeconds(timerState)));
     };
 
     updateTimer(); // Calcula logo de cara
 
-    if (match.timer_started_at) {
+    if (timerState.startedAt) {
       interval = setInterval(updateTimer, 1000);
     }
     
     return () => clearInterval(interval);
-  }, [match.timer_started_at, match.timer_accumulated_seconds, initialSeconds]);
+  }, [timerState, initialSeconds]);
 
   // Escuta mudanças em tempo real no banco
   useEffect(() => {
@@ -95,16 +110,38 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
   }, [match.id, router]);
 
   const toggleTimer = async () => {
-    if (!canManage) return;
-    if (isRunning) await updateMatchTimer(match.id, "pause");
-    else await updateMatchTimer(match.id, "start");
+    if (!canManage || timerSaving) return;
+    const previous = timerState;
+    const action = isRunning ? "pause" : "start";
+    const next = transitionMatchTimer(timerState, action);
+    setTimerState(next);
+    setTimerSaving(true);
+    setError("");
+    const result = await updateMatchTimer(match.id, action);
+    if (!result.success) {
+      setTimerState(previous);
+      setError(result.error || "Nao foi possivel atualizar o cronometro.");
+    }
+    setTimerSaving(false);
   };
 
   const resetTimer = async () => {
     if (!canManage) return;
     if (confirm("Deseja realmente zerar o cronômetro?")) {
+      const previous = timerState;
+      const previousOffset = eligibilityOffset;
+      const elapsedBeforeReset = getMatchTimerElapsedSeconds(timerState);
+      setTimerState({ startedAt: null, accumulated: 0 });
+      setEligibilityOffset((current) => current + elapsedBeforeReset);
+      setSecondsLeft(initialSeconds);
+      setTimerSaving(true);
       const result = await resetMatchTimer(match.id);
-      if (!result.success) setError(result.error || "Nao foi possivel zerar o cronometro.");
+      if (!result.success) {
+        setTimerState(previous);
+        setEligibilityOffset(previousOffset);
+        setError(result.error || "Nao foi possivel zerar o cronometro.");
+      }
+      setTimerSaving(false);
     }
   };
 
@@ -142,25 +179,32 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
     if (!canManage) return;
     if (!goalModal.scorerId) return;
 
+    const request = goalModal;
+    const previousScore = displayScore;
+    setDisplayScore((current) => match.team_a_id === request.teamId
+      ? { ...current, a: current.a + 1 }
+      : { ...current, b: current.b + 1 });
+    setGoalModal({ open: false, teamId: "", scorerId: null });
     setLoading(true);
     const res = await registerGoal({
       match_id: match.id,
-      player_id: goalModal.scorerId,
+      player_id: request.scorerId!,
       assist_player_id: assistPlayerId || undefined,
-      team_id: goalModal.teamId,
+      team_id: request.teamId,
       minute: Math.floor(getOfficialElapsedSeconds(
         initialSeconds - secondsLeft,
-        match.eligibility_elapsed_offset_seconds || 0,
+        eligibilityOffset,
       ) / 60),
     });
 
     if (!res.success) {
+      setDisplayScore(previousScore);
+      setGoalModal(request);
       setError(res.error || "Erro ao registrar gol");
       setLoading(false);
       return;
     }
 
-    setGoalModal({ open: false, teamId: "", scorerId: null });
     setLoading(false);
   }
 
@@ -169,9 +213,16 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
     if (isFinished) return;
     if (!confirm("Deseja remover este gol?")) return;
 
+    const previousScore = displayScore;
+    setDisplayScore((current) => match.team_a_id === teamId
+      ? { ...current, a: Math.max(0, current.a - 1) }
+      : { ...current, b: Math.max(0, current.b - 1) });
     setLoading(true);
     const res = await deleteEvent(eventId, match.id, teamId);
-    if (!res.success) setError(res.error || "Erro ao deletar");
+    if (!res.success) {
+      setDisplayScore(previousScore);
+      setError(res.error || "Erro ao deletar");
+    }
     setLoading(false);
   }
 
@@ -220,20 +271,28 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
         {/* Timer Section */}
         {!isFinished && (
           <div className="flex flex-col items-center mb-6 w-full">
-            <div className={`text-4xl font-black font-mono tracking-wider ${secondsLeft <= 60 && secondsLeft > 0 ? 'text-danger animate-pulse' : 'text-foreground'}`}>
+            {secondsLeft <= 60 && secondsLeft > 0 && (
+              <div className="mb-1 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.22em] text-danger animate-pulse">
+                <span className="h-1.5 w-1.5 rounded-full bg-danger shadow-[0_0_8px_var(--danger)]" />
+                Último minuto
+              </div>
+            )}
+            <div className="text-4xl font-black font-mono tracking-wider text-foreground">
               {formatTime(secondsLeft)}
             </div>
             {canManage ? (
             <div className="flex items-center gap-3 mt-3">
               <button
                 onClick={toggleTimer}
-                className="w-10 h-10 rounded-full bg-surface hover:bg-surface-hover border border-border flex items-center justify-center text-foreground transition-all active:scale-95"
+                disabled={timerSaving}
+                className="w-10 h-10 rounded-full bg-surface hover:bg-surface-hover border border-border flex items-center justify-center text-foreground transition-all active:scale-95 disabled:opacity-60"
               >
                 {isRunning ? <Pause className="w-4 h-4 text-warning" /> : <Play className="w-4 h-4 text-accent" />}
               </button>
               <button
                 onClick={resetTimer}
-                className="w-10 h-10 rounded-full bg-surface hover:bg-surface-hover border border-border flex items-center justify-center text-foreground transition-all active:scale-95"
+                disabled={timerSaving}
+                className="w-10 h-10 rounded-full bg-surface hover:bg-surface-hover border border-border flex items-center justify-center text-foreground transition-all active:scale-95 disabled:opacity-60"
               >
                 <RotateCcw className="w-4 h-4 text-muted" />
               </button>
@@ -252,7 +311,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
         <div className="flex flex-col items-center gap-3 flex-1">
           <TeamCrest name={match.team_a.name} crestUrl={match.team_a.crest_url} color={match.team_a.color} className="h-16 w-16" />
           <span className="max-w-[8rem] truncate text-center text-xs font-black text-foreground">{match.team_a.name}</span>
-          <span className="stat-number text-5xl text-foreground">{match.score_a}</span>
+          <span className="stat-number text-5xl text-foreground">{displayScore.a}</span>
           
           {!isFinished && canManage && (
             <button
@@ -271,7 +330,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
         <div className="flex flex-col items-center gap-3 flex-1">
           <TeamCrest name={match.team_b.name} crestUrl={match.team_b.crest_url} color={match.team_b.color} className="h-16 w-16" />
           <span className="max-w-[8rem] truncate text-center text-xs font-black text-foreground">{match.team_b.name}</span>
-          <span className="stat-number text-5xl text-foreground">{match.score_b}</span>
+          <span className="stat-number text-5xl text-foreground">{displayScore.b}</span>
           
           {!isFinished && canManage && (
             <button
