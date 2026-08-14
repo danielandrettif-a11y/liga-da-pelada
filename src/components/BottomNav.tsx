@@ -38,10 +38,13 @@ export function BottomNav({
   useEffect(() => {
     if (pathname.startsWith("/admin/jogadores")) setUnreadRoster(0);
   }, [pathname]);
-  const baseItems = hasOpenCallup
+  // Pagamentos pendentes têm prioridade na barra mobile. A convocação continua
+  // acessível pela tela inicial/Mais sem criar uma navegação com sete itens.
+  const showCallupInNav = hasOpenCallup && !hasReleasedPayment;
+  const baseItems = showCallupInNav
     ? [NAV_ITEMS[0], CALLUP_NAV_ITEM, ...NAV_ITEMS.slice(1)]
     : [...NAV_ITEMS];
-  const contextualItems = baseItems.filter((item) => item.href !== "/pagamentos" || (hasReleasedPayment && !hasOpenCallup));
+  const contextualItems = baseItems.filter((item) => item.href !== "/pagamentos" || hasReleasedPayment);
   const visibleItems = isAuthenticated
     ? contextualItems
     : contextualItems.filter((item) => item.href !== "/mais");

@@ -2,28 +2,24 @@ import { ArrowLeftRight, Clock3 } from "@/components/icons";
 import { PaymentChecklist } from "@/components/PaymentChecklist";
 import { getPaymentRounds, getRoundPaymentPlayers } from "@/lib/actions/payments";
 import { getCurrentAccount } from "@/lib/auth";
+import { findLatestReleasedPaymentRound } from "@/lib/paymentStatus";
 
 export const revalidate = 0;
 
 export default async function PagamentosPage() {
   const roundsPromise = getPaymentRounds();
   const playersPromise = roundsPromise.then((availableRounds) => {
-    const round = availableRounds[0];
-    const released = round?.status === "finished"
-      && !!round.payment_pix
-      && Number(round.payment_total) > 0;
-    return released ? getRoundPaymentPlayers(round.id) : [];
+    const round = findLatestReleasedPaymentRound(availableRounds);
+    return round ? getRoundPaymentPlayers(round.id) : [];
   });
   const [rounds, account, players] = await Promise.all([
     roundsPromise,
     getCurrentAccount(),
     playersPromise,
   ]);
-  const currentRound = rounds[0] || null;
-
-  const paymentsReleased = currentRound?.status === "finished"
-    && !!currentRound.payment_pix
-    && Number(currentRound.payment_total) > 0;
+  const currentRound = findLatestReleasedPaymentRound(rounds);
+  const latestScheduledRound = rounds[0] || null;
+  const paymentsReleased = Boolean(currentRound);
   return (
     <div className="space-y-5">
       <div>
@@ -34,17 +30,17 @@ export default async function PagamentosPage() {
         <p className="mt-1 text-xs text-muted">A central de pagamentos da rodada mais recente.</p>
       </div>
 
-      {!currentRound || !paymentsReleased ? (
+      {!paymentsReleased || !currentRound ? (
         <div className="glass-card flex min-h-64 flex-col items-center justify-center p-8 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/10">
             <Clock3 className="h-8 w-8 text-accent" />
           </div>
           <h2 className="mt-4 text-lg font-black text-foreground">
-            {!currentRound
+            {!latestScheduledRound
               ? "Aguardando a próxima pelada"
-              : currentRound.status === "finished"
+              : latestScheduledRound.status === "finished"
                 ? "Aguardando os dados do pagamento"
-                : `${currentRound.round_type === "friendly" ? "Amistoso" : "Rodada"} ${String(currentRound.number).padStart(2, "0")} em andamento`}
+                : `${latestScheduledRound.round_type === "friendly" ? "Amistoso" : "Rodada"} ${String(latestScheduledRound.number).padStart(2, "0")} em andamento`}
           </h2>
           <p className="mt-2 max-w-xs text-sm leading-6 text-muted">
             Aguardando a rodada terminar para liberar o PIX, o valor por pessoa e a lista de pagamentos.

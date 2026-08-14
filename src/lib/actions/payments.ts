@@ -6,7 +6,7 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import type { Player, RoundStatus, RoundType } from "../types";
 import { getActiveSeason } from "./seasons";
 import { getActiveLeague } from "./rounds";
-import { isPaymentChecklistComplete } from "../paymentStatus";
+import { findLatestReleasedPaymentRound, isPaymentChecklistComplete } from "../paymentStatus";
 
 export type PaymentRound = {
   id: string;
@@ -62,12 +62,8 @@ export async function getPaymentRounds(): Promise<PaymentRound[]> {
 
 export async function hasReleasedPaymentRound(): Promise<boolean> {
   const rounds = await getPaymentRounds();
-  const latestRound = rounds[0];
-
-  const released = latestRound?.status === "finished"
-    && Boolean(latestRound.payment_pix)
-    && Number(latestRound.payment_total) > 0;
-  if (!released || !latestRound) return false;
+  const latestRound = findLatestReleasedPaymentRound(rounds);
+  if (!latestRound) return false;
 
   const { data: payments, error } = await supabase
     .from("round_payments")
