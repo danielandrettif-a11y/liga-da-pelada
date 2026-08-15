@@ -12,6 +12,10 @@ import { RoundAvailabilityManager } from "@/components/RoundAvailabilityManager"
 import { TeamCrest } from "@/components/TeamCrest";
 import { RoundAttendanceManager } from "@/components/RoundAttendanceManager";
 import { StadiumLink } from "@/components/StadiumLink";
+import { getRoundStatistics } from "@/lib/actions/stats";
+import { RoundHistoryTabs } from "@/components/RoundHistoryTabs";
+import { RoundAdminPlayerTools } from "@/components/RoundAdminPlayerTools";
+import { getPlayers } from "@/lib/actions/players";
 
 export const revalidate = 0;
 
@@ -22,12 +26,15 @@ export default async function RodadaDetalhePage({
 }) {
   const { id } = await params;
   const roundPromise = getRound(id);
-  const [round, account, goalkeeperPoints] = await Promise.all([
+  const [round, account, goalkeeperPoints, roundStatistics] = await Promise.all([
     roundPromise,
     getCurrentAccount(),
     roundPromise.then((currentRound) => currentRound?.status === "finished"
       ? getGoalkeeperScoringPoints(currentRound.league_id)
       : 0),
+    roundPromise.then((currentRound) => currentRound?.status === "finished"
+      ? getRoundStatistics(currentRound.id)
+      : null),
   ]);
 
   if (!round) {
@@ -42,7 +49,8 @@ export default async function RodadaDetalhePage({
     .map((entry: any) => entry.players)
     .filter(Boolean)
     .sort((a: any, b: any) => a.name.localeCompare(b.name, "pt-BR"));
-  return (
+  const allSelectablePlayers = account.isAdmin ? await getPlayers(true) : [];
+  const overview = (
     <div className="space-y-6">
       {/* Top bar */}
       <div className="flex items-center justify-between">
@@ -170,6 +178,16 @@ export default async function RodadaDetalhePage({
       
       <FinishRoundButton roundId={round.id} status={round.status} canManage={account.isAdmin} />
 
+      {account.isAdmin && (
+        <RoundAdminPlayerTools
+          roundId={round.id}
+          status={round.status}
+          participants={round.round_players || []}
+          teams={round.teams || []}
+          allPlayers={allSelectablePlayers}
+        />
+      )}
+
       {round.status === "finished" && (
         <BestGoalkeeperPicker
           roundId={round.id}
@@ -181,4 +199,8 @@ export default async function RodadaDetalhePage({
       )}
     </div>
   );
+
+  return roundStatistics
+    ? <RoundHistoryTabs overview={overview} statistics={roundStatistics} />
+    : overview;
 }

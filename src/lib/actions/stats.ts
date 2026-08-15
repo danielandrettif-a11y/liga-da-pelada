@@ -22,6 +22,31 @@ type RankingStatsRow = {
   player: Player;
 };
 
+export type RoundStatisticEntry = {
+  player: Player;
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goals: number;
+  assists: number;
+  points: number;
+  winRate: number;
+  isBestGoalkeeper: boolean;
+};
+
+export type RoundStatistics = {
+  roundId: string;
+  roundType: "official" | "friendly";
+  entries: RoundStatisticEntry[];
+  highlights: {
+    scorers: RoundStatisticEntry[];
+    assisters: RoundStatisticEntry[];
+    topPoints: RoundStatisticEntry[];
+    goalkeepers: RoundStatisticEntry[];
+  };
+};
+
 function isSelectableAthlete(player: Player | null | undefined) {
   return Boolean(player?.is_selectable && (player.member_category === "player" || player.member_category === "guest"));
 }
@@ -252,6 +277,63 @@ export async function getRanking() {
   });
 
   return ranking;
+}
+
+export async function getRoundStatistics(roundId: string): Promise<RoundStatistics | null> {
+  const [{ data: round, error: roundError }, { data: rows, error: statsError }] = await Promise.all([
+    supabase
+      .from("rounds")
+      .select("id, status, round_type, best_goalkeeper_player_id")
+      .eq("id", roundId)
+      .maybeSingle(),
+    supabase
+      .from("player_round_stats")
+      .select("games, wins, draws, losses, goals, assists, points, player:player_id(*)")
+      .eq("round_id", roundId),
+  ]);
+
+  if (roundError || statsError || !round || round.status !== "finished") {
+    if (roundError || statsError) console.error("Erro ao buscar estatísticas da rodada:", roundError || statsError);
+    return null;
+  }
+
+  const entries = (rows || []).flatMap((raw: any) => {
+    const player = Array.isArray(raw.player) ? raw.player[0] : raw.player;
+    if (!player) return [];
+    const games = Number(raw.games || 0);
+    const wins = Number(raw.wins || 0);
+    const draws = Number(raw.draws || 0);
+    return [{
+      player: player as Player,
+      games,
+      wins,
+      draws,
+      losses: Number(raw.losses || 0),
+      goals: Number(raw.goals || 0),
+      assists: Number(raw.assists || 0),
+      points: Number(raw.points || 0),
+      winRate: games > 0 ? Math.round(((wins * 3 + draws) / (games * 3)) * 100) : 0,
+      isBestGoalkeeper: player.id === round.best_goalkeeper_player_id,
+    } satisfies RoundStatisticEntry];
+  }).sort((a, b) => b.goals - a.goals || b.assists - a.assists || b.points - a.points || a.player.name.localeCompare(b.player.name, "pt-BR"));
+
+  const leaders = (key: "goals" | "assists" | "points", requirePositive = true) => {
+    const maximum = Math.max(0, ...entries.map((entry) => entry[key]));
+    if (requirePositive && maximum <= 0) return [];
+    return entries.filter((entry) => entry[key] === maximum);
+  };
+
+  return {
+    roundId,
+    roundType: round.round_type === "friendly" ? "friendly" : "official",
+    entries,
+    highlights: {
+      scorers: leaders("goals"),
+      assisters: leaders("assists"),
+      topPoints: round.round_type === "friendly" ? [] : leaders("points"),
+      goalkeepers: entries.filter((entry) => entry.isBestGoalkeeper),
+    },
+  };
 }
 
 export async function getRankingExperienceData(): Promise<RankingExperienceData> {

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentAccount } from "@/lib/auth";
 import type { Player, PlayerRegistrationEvent, RosterUnreadState } from "@/lib/types";
+import { calculateRoundStats } from "./stats";
 
 export async function getRegistrationHistory(): Promise<PlayerRegistrationEvent[]> {
   const account = await getCurrentAccount();
@@ -130,22 +131,12 @@ export async function getRegisteredMergeCandidates(guestId: string): Promise<Pla
   const account = await getCurrentAccount();
   if (!account.isAdmin) return [];
 
-  const { data: profiles, error: profileError } = await account.client
-    .from("account_profiles")
-    .select("player_id")
-    .not("player_id", "is", null);
-  if (profileError) {
-    console.error("Erro ao buscar contas vinculadas:", profileError);
-    return [];
-  }
-
-  const ids = profiles.map((profile) => profile.player_id).filter((id): id is string => Boolean(id && id !== guestId));
-  if (ids.length === 0) return [];
   const { data, error } = await account.client
     .from("players")
     .select("*")
-    .in("id", ids)
-    .eq("member_category", "player")
+    .neq("id", guestId)
+    .eq("is_selectable", true)
+    .in("member_category", ["player", "guest"])
     .order("name");
   if (error) {
     console.error("Erro ao buscar candidatos para uniao:", error);
@@ -157,16 +148,33 @@ export async function getRegisteredMergeCandidates(guestId: string): Promise<Pla
 export async function mergeGuestWithRegistered(guestId: string, registeredId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores podem unir perfis." };
-  const { data, error } = await account.client.rpc("merge_player_profiles", {
-    p_guest_id: guestId,
-    p_registered_id: registeredId,
+  const { data, error } = await account.client.rpc("merge_selectable_player_profiles", {
+    p_target_id: guestId,
+    p_source_id: registeredId,
   });
   if (error) return { success: false, error: error.message };
+
+  const affectedRoundIds = Array.isArray(data) ? data.map(String) : [];
+  for (const roundId of affectedRoundIds) {
+    const result = await calculateRoundStats(roundId);
+    if (!result.success) return { success: false, error: `Perfis unidos, mas a rodada precisa ser recalculada: ${result.error}` };
+  }
+  if (affectedRoundIds.length) {
+    const { data: rounds } = await account.client.from("rounds").select("id, date, number, status, round_type").in("id", affectedRoundIds).order("date").order("number");
+    const firstOfficial = (rounds || []).find((round) => round.status === "finished" && round.round_type === "official");
+    if (firstOfficial) {
+      const { data: fantasyRound } = await account.client.from("fantasy_rounds").select("id").eq("round_id", firstOfficial.id).maybeSingle();
+      if (fantasyRound) {
+        const { error: fantasyError } = await account.client.rpc("reprocess_fantasy_from_round", { p_round_id: firstOfficial.id });
+        if (fantasyError) return { success: false, error: `Perfis unidos, mas o Cartola precisa ser reprocessado: ${fantasyError.message}` };
+      }
+    }
+  }
 
   revalidatePath("/");
   revalidatePath("/jogadores");
   revalidatePath("/ranking");
   revalidatePath("/admin/jogadores");
   revalidatePath(`/jogadores/${guestId}`);
-  return { success: true, playerId: String(data || guestId) };
+  return { success: true, playerId: guestId };
 }

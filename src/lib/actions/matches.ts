@@ -469,6 +469,35 @@ export async function deleteEvent(eventId: string, matchId: string, teamId: stri
   }
 }
 
+export async function correctFinishedGoal(eventId: string) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: ADMIN_ERROR };
+    const { data, error } = await client.rpc("correct_finished_goal", { p_event_id: eventId });
+    if (error) throw new Error(error.message);
+    const result = data as { round_id?: string; match_id?: string } | null;
+    if (!result?.round_id || !result.match_id) throw new Error("A correção não retornou a rodada afetada.");
+
+    const statsResult = await calculateRoundStats(result.round_id);
+    if (!statsResult.success) throw new Error(statsResult.error || "Não foi possível recalcular as estatísticas.");
+
+    const { data: fantasyRound } = await client.from("fantasy_rounds").select("id").eq("round_id", result.round_id).maybeSingle();
+    if (fantasyRound) {
+      const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: result.round_id });
+      if (fantasyError) throw new Error(`Gol corrigido, mas o Cartola precisa ser reprocessado: ${fantasyError.message}`);
+    }
+
+    revalidatePath(`/partidas/${result.match_id}`);
+    revalidatePath(`/rodadas/${result.round_id}`);
+    revalidatePath("/ranking");
+    revalidatePath("/cartola", "layout");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Erro ao corrigir gol finalizado:", err);
+    return { success: false, error: err.message };
+  }
+}
+
 export async function finishMatch(matchId: string) {
   try {
     const client = await getAdminClient();

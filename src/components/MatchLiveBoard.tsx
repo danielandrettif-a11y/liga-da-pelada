@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { registerGoal, finishMatch, deleteEvent, updateMatchTimer, resetMatchTimer, undoLastMatchSubstitution } from "@/lib/actions/matches";
+import { registerGoal, finishMatch, deleteEvent, correctFinishedGoal, updateMatchTimer, resetMatchTimer, undoLastMatchSubstitution } from "@/lib/actions/matches";
 import {
   ArrowLeft,
   Plus,
@@ -212,7 +212,15 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
 
   async function handleDeleteEvent(eventId: string, teamId: string) {
     if (!canManage) return;
-    if (isFinished) return;
+    if (isFinished) {
+      const confirmation = window.prompt("Esta correção recalculará placar, Ranking e Cartola. Digite CORRIGIR para remover o gol.");
+      if (confirmation !== "CORRIGIR") return;
+      setLoading(true);
+      const result = await correctFinishedGoal(eventId);
+      if (!result.success) setError(result.error || "Não foi possível corrigir o gol.");
+      setLoading(false);
+      return;
+    }
     if (!confirm("Deseja remover este gol?")) return;
 
     const previousScore = displayScore;
@@ -410,10 +418,11 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                       )}
                     </div>
 
-                    {!isFinished && canManage && (
+                    {canManage && (
                       <button
                         onClick={() => handleDeleteEvent(ev.id, ev.team_id)}
                         disabled={loading}
+                        title={isFinished ? "Corrigir gol finalizado" : "Remover gol"}
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-danger hover:bg-danger/10 transition-colors disabled:opacity-50"
                       >
                         <Trash2 className="w-4 h-4" />

@@ -18,6 +18,7 @@ export type FantasyMarketPlayer = {
   goals: number;
   assists: number;
   wins: number;
+  losses: number;
   games: number;
   variation: number;
   priceChange: number;
@@ -47,7 +48,7 @@ export async function getFantasyDashboard() {
   const settings: FantasySettings = settingsRow ? {
     currencyName: settingsRow.currency_name, initialBudget: Number(settingsRow.initial_budget), initialPlayerPrice: Number(settingsRow.initial_player_price),
     minPlayerPrice: Number(settingsRow.min_player_price), maxPlayerPrice: Number(settingsRow.max_player_price), goalPoints: Number(settingsRow.goal_points),
-    assistPoints: Number(settingsRow.assist_points), winPoints: Number(settingsRow.win_points), captainMultiplier: Number(settingsRow.captain_multiplier),
+    assistPoints: Number(settingsRow.assist_points), winPoints: Number(settingsRow.win_points), lossPoints: Number(settingsRow.loss_points ?? -1), captainMultiplier: Number(settingsRow.captain_multiplier),
     topScorerPredictionPoints: Number(settingsRow.top_scorer_prediction_points), topAssistPredictionPoints: Number(settingsRow.top_assist_prediction_points),
     topTeamPredictionPoints: Number(settingsRow.top_team_prediction_points), recentWeight: Number(settingsRow.recent_weight),
     kingOfWinsPoints: Number(settingsRow.king_of_wins_points ?? 6), mvpPredictionPoints: Number(settingsRow.mvp_prediction_points ?? 8),
@@ -68,7 +69,7 @@ export async function getFantasyDashboard() {
     account.client.from("fantasy_seasons").select("id, initial_budget, initial_player_price").eq("season_id", season.id).maybeSingle(),
   ]);
 
-  if (!fantasySeason || !settingsRow || !("king_of_wins_points" in settingsRow)) {
+  if (!fantasySeason || !settingsRow || !("king_of_wins_points" in settingsRow) || !("loss_points" in settingsRow)) {
     return { authenticated: true as const, available: false as const, settings, migrationRequired: true as const };
   }
 
@@ -112,7 +113,7 @@ export async function getFantasyDashboard() {
   const [{ data: priceRows }, { data: statRows }, { data: roundParticipants }, { data: rawLineup }, { data: latestLineup }, { data: fantasyAccount }, { data: liveEvents }, { data: selectablePlayers }, { data: priceHistory }, { data: latestRoundLineups }, { data: rawPortfolio }] = await Promise.all([
     account.client.from("fantasy_player_prices").select("*").eq("fantasy_season_id", fantasySeason.id),
     officialRoundIds.length
-      ? account.client.from("player_round_stats").select("round_id, player_id, goals, assists, wins, games").in("round_id", officialRoundIds)
+      ? account.client.from("player_round_stats").select("round_id, player_id, goals, assists, wins, losses, games").in("round_id", officialRoundIds)
       : Promise.resolve({ data: [] as any[] }),
     displayRoundId
       ? account.client.from("round_players").select("player_id").eq("round_id", displayRoundId)
@@ -139,12 +140,12 @@ export async function getFantasyDashboard() {
     ? await account.client.from("players").select("id, name, avatar_url, player_profile, member_category, is_selectable").in("id", eligibleIds)
     : { data: [] as any[] };
   const priceByPlayer = new Map((priceRows || []).map((row: any) => [row.player_id, row]));
-  const statsByPlayer = new Map<string, { goals: number; assists: number; wins: number; games: number }>();
+  const statsByPlayer = new Map<string, { goals: number; assists: number; wins: number; losses: number; games: number }>();
   const currentStats = new Map<string, { goals: number; assists: number; wins: number }>();
   for (const row of statRows || []) {
-    const current = statsByPlayer.get(row.player_id) || { goals: 0, assists: 0, wins: 0, games: 0 };
+    const current = statsByPlayer.get(row.player_id) || { goals: 0, assists: 0, wins: 0, losses: 0, games: 0 };
     current.goals += Number(row.goals || 0); current.assists += Number(row.assists || 0);
-    current.wins += Number(row.wins || 0); current.games += Number(row.games || 0);
+    current.wins += Number(row.wins || 0); current.losses += Number(row.losses || 0); current.games += Number(row.games || 0);
     statsByPlayer.set(row.player_id, current);
     if (row.round_id === displayRoundId) currentStats.set(row.player_id, { goals: Number(row.goals || 0), assists: Number(row.assists || 0), wins: Number(row.wins || 0) });
   }
@@ -182,7 +183,7 @@ export async function getFantasyDashboard() {
         : player.member_category === "player" && player.is_selectable)
     .map((player: any) => {
       const price = priceByPlayer.get(player.id) as any;
-      const stats = statsByPlayer.get(player.id) || { goals: 0, assists: 0, wins: 0, games: 0 };
+      const stats = statsByPlayer.get(player.id) || { goals: 0, assists: 0, wins: 0, losses: 0, games: 0 };
       return { id: player.id, name: player.name, avatarUrl: player.avatar_url, profile: player.player_profile,
         price: isTest ? settings.initialPlayerPrice : Number(price?.current_price ?? settings.initialPlayerPrice),
         totalPoints: isTest ? 0 : Number(price?.total_points || 0),
@@ -343,8 +344,13 @@ export async function getFantasyRanking(scope: "general" | "round" = "general", 
 
 export async function updateFantasySettings(values: Partial<FantasySettings>) {
   const account = await getCurrentAccount(); if (!account.isAdmin) return { success: false, error: "Somente administradores." };
-  const { error } = await account.client.rpc("update_fantasy_settings", { p_settings: values });
+  const { lossPoints, ...otherValues } = values;
+  const { error } = await account.client.rpc("update_fantasy_settings", { p_settings: otherValues });
   if (error) return { success: false, error: error.message };
+  if (lossPoints !== undefined) {
+    const { error: lossError } = await account.client.rpc("update_fantasy_loss_points", { p_loss_points: lossPoints });
+    if (lossError) return { success: false, error: lossError.message };
+  }
   revalidatePath("/admin/cartola"); revalidatePath("/cartola"); return { success: true };
 }
 
@@ -381,6 +387,7 @@ export async function getFantasyAdminData() {
     goal_points: DEFAULT_FANTASY_SETTINGS.goalPoints,
     assist_points: DEFAULT_FANTASY_SETTINGS.assistPoints,
     win_points: DEFAULT_FANTASY_SETTINGS.winPoints,
+    loss_points: DEFAULT_FANTASY_SETTINGS.lossPoints,
     captain_multiplier: DEFAULT_FANTASY_SETTINGS.captainMultiplier,
     top_scorer_prediction_points: DEFAULT_FANTASY_SETTINGS.topScorerPredictionPoints,
     top_assist_prediction_points: DEFAULT_FANTASY_SETTINGS.topAssistPredictionPoints,

@@ -725,3 +725,51 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     return { success: false, error: err.message };
   }
 }
+
+export async function transferRoundPlayerIdentity(roundId: string, sourcePlayerId: string, targetPlayerId: string) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem corrigir participantes." };
+    const { error } = await client.rpc("transfer_round_player_identity", {
+      p_round_id: roundId,
+      p_source_player_id: sourcePlayerId,
+      p_target_player_id: targetPlayerId,
+    });
+    if (error) throw new Error(error.message);
+    const { calculateRoundStats } = await import("./stats");
+    const stats = await calculateRoundStats(roundId);
+    if (!stats.success) throw new Error(stats.error || "Não foi possível recalcular a rodada.");
+    const { data: fantasyRound } = await client.from("fantasy_rounds").select("id").eq("round_id", roundId).maybeSingle();
+    if (fantasyRound) {
+      const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: roundId });
+      if (fantasyError) throw new Error(`Participação transferida, mas o Cartola precisa ser reprocessado: ${fantasyError.message}`);
+    }
+    revalidatePath(`/rodadas/${roundId}`);
+    revalidatePath("/ranking");
+    revalidatePath("/cartola", "layout");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function addRoundEmergencySubstitute(roundId: string, outPlayerId: string, inPlayerId: string, teamId: string) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem incluir substitutos." };
+    const { error } = await client.rpc("add_round_emergency_substitute", {
+      p_round_id: roundId,
+      p_out_player_id: outPlayerId,
+      p_in_player_id: inPlayerId,
+      p_team_id: teamId,
+    });
+    if (error) throw new Error(error.message);
+    revalidatePath(`/rodadas/${roundId}`);
+    revalidatePath(`/rodadas/${roundId}/nova-partida`);
+    revalidatePath("/convocacao");
+    revalidatePath("/pagamentos");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}

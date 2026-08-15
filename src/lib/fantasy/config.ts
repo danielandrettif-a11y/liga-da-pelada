@@ -7,6 +7,7 @@ export type FantasySettings = {
   goalPoints: number;
   assistPoints: number;
   winPoints: number;
+  lossPoints: number;
   captainMultiplier: number;
   topScorerPredictionPoints: number;
   topAssistPredictionPoints: number;
@@ -34,6 +35,7 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   goalPoints: 5,
   assistPoints: 3,
   winPoints: 2,
+  lossPoints: -1,
   captainMultiplier: 2,
   topScorerPredictionPoints: 8,
   topAssistPredictionPoints: 6,

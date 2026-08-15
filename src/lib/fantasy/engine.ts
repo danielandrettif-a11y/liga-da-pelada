@@ -5,6 +5,7 @@ export type FantasyPerformance = {
   games: number;
   wins: number;
   draws: number;
+  losses?: number;
   goals: number;
   assists: number;
   recentPoints: number[];
@@ -24,12 +25,13 @@ export function roundMoney(value: number) {
 }
 
 export function calculateFantasyPlayerPoints(
-  stats: Pick<FantasyPerformance, "goals" | "assists" | "wins">,
+  stats: Pick<FantasyPerformance, "goals" | "assists" | "wins" | "losses">,
   settings: FantasySettings,
 ) {
   return stats.goals * settings.goalPoints
     + stats.assists * settings.assistPoints
-    + stats.wins * settings.winPoints;
+    + stats.wins * settings.winPoints
+    + (stats.losses || 0) * settings.lossPoints;
 }
 
 export function predictionIsCorrect<T>(choice: T | null | undefined, leaders: T[], leaderValue: number) {
@@ -118,4 +120,3 @@ export function calculateFantasyPrices(players: FantasyPerformance[], settings: 
   }));
   return players.map((player) => byId.get(player.playerId) || ({ ...player, roundPoints: 0, score: 0.5, variationRate: 0, nextPrice: player.currentPrice }));
 }
-

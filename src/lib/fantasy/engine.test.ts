@@ -19,6 +19,10 @@ describe("Fantasy da Pelada", () => {
     expect(calculateFantasyPlayerPoints({ goals: 2, assists: 1, wins: 2 }, DEFAULT_FANTASY_SETTINGS)).toBe(17);
   });
 
+  it("aplica a penalidade configurada por derrota", () => {
+    expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 3 }, DEFAULT_FANTASY_SETTINGS)).toBe(-3);
+  });
+
   it("aceita líderes empatados, mas não concede bônus em empate zerado", () => {
     expect(predictionIsCorrect("a", ["a", "b"], 2)).toBe(true);
     expect(predictionIsCorrect("a", ["a", "b"], 0)).toBe(false);
