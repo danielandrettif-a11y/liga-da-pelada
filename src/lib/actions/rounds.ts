@@ -310,7 +310,7 @@ export async function deleteRound(roundId: string, confirmation: string) {
     if (!client) return { success: false, error: "Somente administradores podem excluir rodadas." };
     const { error } = await client.rpc("delete_round_cascade", { p_round_id: roundId });
     if (error) throw new Error(error.message);
-    for (const path of ["/rodadas", "/ranking", "/pagamentos", "/admin/transfermarket", "/admin/prelistas", "/convocacao", "/mais"]) {
+    for (const path of ["/rodadas", "/ranking", "/pagamentos", "/cartola", "/cartola/ranking", "/cartola/historico", "/admin/cartola", "/admin/transfermarket", "/admin/prelistas", "/convocacao", "/mais"]) {
       revalidatePath(path);
     }
     revalidatePath("/", "layout");

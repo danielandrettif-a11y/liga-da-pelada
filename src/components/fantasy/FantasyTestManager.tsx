@@ -68,6 +68,15 @@ export function FantasyTestManager({ testSession, friendlyRounds }: { testSessio
       </div>
 
       <div className="space-y-4 p-4">
+        <div className="rounded-2xl border border-success/25 bg-success/8 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[.16em] text-success">Como testar sem sujar a temporada</p>
+          <ol className="mt-2 space-y-1.5 text-xs leading-5 text-muted">
+            <li><strong className="text-foreground">1.</strong> Crie uma pré-lista do tipo <strong className="text-foreground">Amistoso</strong>.</li>
+            <li><strong className="text-foreground">2.</strong> Selecione o amistoso aqui e crie o ambiente Sandbox.</li>
+            <li><strong className="text-foreground">3.</strong> Teste escalações e pontuação; depois use <strong className="text-foreground">Resetar teste</strong>.</li>
+          </ol>
+          <p className="mt-2 text-[11px] font-bold leading-4 text-warning">Não use uma Ranked real para simulação: ela altera preços, patrimônio e histórico oficial.</p>
+        </div>
         {testSession && activeRound ? (
           <>
             <div className="rounded-2xl border border-warning/25 bg-warning/8 p-4">
