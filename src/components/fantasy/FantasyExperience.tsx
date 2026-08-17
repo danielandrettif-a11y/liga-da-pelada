@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Clock, Crown, HelpCircle, Lock, Search, Target, TrendingUp, Trophy, X } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
@@ -43,7 +44,24 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
   const [message, setMessage] = useState("");
   const [showTutorial, setShowTutorial] = useState(false);
   const [infoModal, setInfoModal] = useState<{ title: string; description: string } | null>(null);
+  const [mounted, setMounted] = useState(false);
   useDialogViewport(Boolean(infoModal));
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (infoModal) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.documentElement.style.overflow = "";
+      };
+    }
+  }, [infoModal]);
 
   useEffect(() => {
     try {
@@ -301,47 +319,48 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
       <FantasyTutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} />
 
       {/* POPUP BÁSICO DE AJUDA DOS PALPITES / DESAFIO */}
-      {infoModal && (
+      {mounted && infoModal && typeof document !== "undefined" && createPortal(
         <div
-          className="mobile-dialog-backdrop fixed inset-0 z-[300] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md animate-fade-in touch-none overscroll-none"
           onClick={() => setInfoModal(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={infoModal.title}
         >
           <div
-            className="relative flex w-full max-w-xs flex-col overflow-hidden rounded-3xl border border-accent/40 bg-[#07150d] p-5 shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-fade-in-up"
+            className="relative flex w-full max-w-sm flex-col overflow-hidden rounded-3xl border border-accent/40 bg-[#07150d] p-6 shadow-[0_0_60px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto"
             onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={infoModal.title}
           >
             <button
               onClick={() => setInfoModal(null)}
-              className="absolute right-3.5 top-3.5 flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
               aria-label="Fechar"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" />
             </button>
 
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
                 <HelpCircle className="h-5 w-5" />
               </div>
-              <h3 className="font-athletic text-sm font-black uppercase italic tracking-wide text-foreground pr-6 leading-tight">
+              <h3 className="font-athletic text-base font-black uppercase italic tracking-wide text-foreground pr-6 leading-tight">
                 {infoModal.title}
               </h3>
             </div>
 
-            <p className="mt-3 text-xs leading-relaxed text-muted">
+            <p className="mt-3.5 text-xs leading-relaxed text-muted">
               {infoModal.description}
             </p>
 
             <button
               onClick={() => setInfoModal(null)}
-              className="mt-4 w-full rounded-xl bg-accent py-2.5 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_15px_rgba(204,255,0,0.2)] transition-transform active:scale-95"
+              className="mt-5 w-full rounded-xl bg-accent py-3 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_20px_rgba(204,255,0,0.2)] transition-transform active:scale-95"
             >
               Entendido
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
