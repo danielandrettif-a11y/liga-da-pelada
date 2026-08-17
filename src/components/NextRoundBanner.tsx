@@ -30,13 +30,13 @@ export function NextRoundBanner({
   const formattedTime = round?.start_time?.slice(0, 5) || null;
 
   return (
-    <article className="group relative isolate h-[300px] overflow-hidden rounded-[28px] border border-sky-400/30 bg-[#07131a] p-5 shadow-[0_22px_60px_rgba(0,0,0,.38),0_0_28px_rgba(56,189,248,.08)] sm:p-6">
+    <article className="group relative isolate flex h-full min-h-[350px] sm:min-h-[360px] flex-col justify-between overflow-hidden rounded-[28px] border border-sky-400/30 bg-[#07131a] p-5 shadow-[0_22px_60px_rgba(0,0,0,.38),0_0_28px_rgba(56,189,248,.08)] sm:p-6">
       <Link href={href} className="absolute inset-0 z-10" aria-label={round ? (isAdmin && isPrelist ? "Retomar pre-lista" : "Abrir historico de rodadas") : "Abrir historico de rodadas"} />
       <div className="pointer-events-none absolute inset-0 opacity-35" style={{ backgroundImage: "linear-gradient(rgba(56,189,248,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(56,189,248,.08) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
       <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-sky-400/20 blur-3xl transition-transform duration-700 group-hover:scale-125" />
       <div className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-accent/10 blur-3xl" />
 
-      <div className="pointer-events-none relative z-20 flex h-full flex-col justify-between">
+      <div className="pointer-events-none relative z-20 flex h-full flex-col justify-between gap-4">
         <div className="flex items-start justify-between gap-3">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1.5 font-athletic text-[10px] font-black uppercase italic tracking-[0.18em] text-sky-300">
             <Football className="h-3.5 w-3.5" /> Temporada oficial

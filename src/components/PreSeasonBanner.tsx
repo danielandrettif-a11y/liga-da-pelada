@@ -12,13 +12,13 @@ type FriendlyRound = {
 export function PreSeasonBanner({ isAdmin, friendly }: { isAdmin: boolean; friendly: FriendlyRound | null }) {
   const href = friendly ? `/rodadas/${friendly.id}` : isAdmin ? "/admin/rodada?type=friendly" : null;
   const content = (
-    <div className="group relative isolate h-[300px] overflow-hidden rounded-[28px] border border-accent/35 bg-[#07150d] p-5 shadow-[0_22px_60px_rgba(0,0,0,.38),0_0_28px_rgba(204,255,0,.08)] sm:p-6">
+    <div className="group relative isolate flex h-full min-h-[350px] sm:min-h-[360px] flex-col justify-between overflow-hidden rounded-[28px] border border-accent/35 bg-[#07150d] p-5 shadow-[0_22px_60px_rgba(0,0,0,.38),0_0_28px_rgba(204,255,0,.08)] sm:p-6">
       <div className="pointer-events-none absolute inset-0 opacity-40" style={{ backgroundImage: "linear-gradient(rgba(204,255,0,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(204,255,0,.07) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
       <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-accent/20 blur-3xl transition-transform duration-700 group-hover:scale-125" />
       <div className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-warning/15 blur-3xl" />
       <div className="pointer-events-none absolute right-5 top-5 h-32 w-24 rotate-6 rounded-[45%] border border-accent/20 bg-gradient-to-b from-accent/15 to-transparent" />
 
-      <div className="relative z-10 flex h-full flex-col justify-between">
+      <div className="relative z-10 flex h-full flex-col justify-between gap-4">
         <div className="flex items-start justify-between gap-3">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-1.5 font-athletic text-[10px] font-black uppercase italic tracking-[0.18em] text-accent">
             <Sparkles className="h-3.5 w-3.5" /> Abertura oficial

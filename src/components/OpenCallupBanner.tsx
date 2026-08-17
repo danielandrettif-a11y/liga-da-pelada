@@ -90,7 +90,7 @@ export function OpenCallupBanner({
   }
 
   return (
-    <div className="group relative isolate block overflow-hidden rounded-[26px] border border-accent/45 bg-[#07150d] p-5 shadow-[0_18px_45px_rgba(0,0,0,.34),0_0_28px_rgba(204,255,0,.08)]">
+    <div className="group relative isolate flex h-full min-h-[350px] sm:min-h-[360px] flex-col justify-between overflow-hidden rounded-[28px] border border-accent/45 bg-[#07150d] p-5 shadow-[0_18px_45px_rgba(0,0,0,.34),0_0_28px_rgba(204,255,0,.08)] sm:p-6">
       <div
         className="pointer-events-none absolute inset-0 opacity-35"
         style={{
@@ -102,7 +102,7 @@ export function OpenCallupBanner({
       <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-accent/20 blur-3xl transition-transform duration-500 group-hover:scale-125" />
       <div className="pointer-events-none absolute -bottom-20 -left-12 h-40 w-40 rounded-full bg-warning/15 blur-3xl" />
 
-      <div className="relative z-10 space-y-4">
+      <div className="relative z-10 flex h-full flex-col justify-between gap-3">
         {/* Header Badges */}
         <div className="flex items-center justify-between gap-3">
           <span
