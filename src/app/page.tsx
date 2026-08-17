@@ -171,14 +171,10 @@ export default async function HomePage() {
 
       {/* Carrossel Principal Unificado (Convocação + Rodada/Pré-lista) */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between px-1">
+        <div className="px-1">
           <h2 className="font-athletic text-sm font-black uppercase italic tracking-wider text-foreground">
             {activeCallup && (nextRound || nextFriendly) ? "Em destaque" : activeCallup ? "Convocação" : "Próxima Rodada"}
           </h2>
-          <Link href="/rodadas" prefetch={true} className="flex items-center gap-1 text-xs font-bold text-accent">
-            Ver todas
-            <ChevronRight className="h-4 w-4" />
-          </Link>
         </div>
 
         {(() => {
