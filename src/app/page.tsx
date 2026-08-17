@@ -169,24 +169,49 @@ export default async function HomePage() {
         matchDuration={matchDuration}
       />
 
-      {activeCallup && <OpenCallupBanner callup={activeCallup} userEntry={userEntry} />}
-
+      {/* Carrossel Principal Unificado (Convocação + Rodada/Pré-lista) */}
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
-          <h2 className="font-athletic text-sm font-black uppercase italic tracking-wider text-foreground">{preseasonEnabled ? "Em destaque" : "Rodadas"}</h2>
+          <h2 className="font-athletic text-sm font-black uppercase italic tracking-wider text-foreground">
+            {activeCallup && (nextRound || nextFriendly) ? "Em destaque" : activeCallup ? "Convocação" : "Próxima Rodada"}
+          </h2>
           <Link href="/rodadas" prefetch={true} className="flex items-center gap-1 text-xs font-bold text-accent">
             Ver todas
             <ChevronRight className="h-4 w-4" />
           </Link>
         </div>
-        {preseasonEnabled ? (
-          <HomeHeroCarousel>
-            <PreSeasonBanner isAdmin={account.isAdmin} friendly={nextFriendly} />
-            <NextRoundBanner round={nextRound} isAdmin={account.isAdmin} venue={venue} eventDurationMinutes={eventDurationMinutes} />
-          </HomeHeroCarousel>
-        ) : (
-          <NextRoundBanner round={nextRound} isAdmin={account.isAdmin} venue={venue} eventDurationMinutes={eventDurationMinutes} />
-        )}
+
+        {(() => {
+          const isConfirmed = userEntry?.status === "confirmed";
+
+          const callupSlide = activeCallup ? (
+            <OpenCallupBanner key="callup" callup={activeCallup} userEntry={userEntry} />
+          ) : null;
+
+          const roundSlide = preseasonEnabled ? (
+            <PreSeasonBanner key="friendly" isAdmin={account.isAdmin} friendly={nextFriendly} />
+          ) : (
+            <NextRoundBanner
+              key="round"
+              round={nextRound}
+              isAdmin={account.isAdmin}
+              venue={venue}
+              eventDurationMinutes={eventDurationMinutes}
+            />
+          );
+
+          // Se já confirmou presença: Banner Azul (Rodada) fica na frente
+          // Se ainda não aceitou/confirmou: Banner de Convocação fica na frente
+          const slides = isConfirmed
+            ? [roundSlide, callupSlide].filter(Boolean)
+            : [callupSlide, roundSlide].filter(Boolean);
+
+          if (slides.length > 1) {
+            return <HomeHeroCarousel>{slides}</HomeHeroCarousel>;
+          }
+
+          return slides[0] || null;
+        })()}
       </section>
 
       {previousSeason && <PreviousSeasonBanner summary={previousSeason} />}

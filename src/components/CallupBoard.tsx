@@ -39,6 +39,7 @@ import type { Player, Stadium } from "@/lib/types";
 import type { FantasyQuickHighlight } from "@/lib/actions/fantasy";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
+import { RoundCalendarButton } from "./RoundCalendarButton";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 
 type Props = {
@@ -176,6 +177,18 @@ export function CallupBoard({
 
           {/* Botões de Ação do Topo */}
           <div className="flex items-center gap-2">
+            <RoundCalendarButton
+              event={{
+                title: `Pelada BQ - ${callup.round_type === "friendly" ? "Amistoso" : "Rodada Oficial"}`,
+                date: callup.date,
+                startTime: startTime,
+                durationMinutes: 120,
+                location: stadiumName || undefined,
+                mapUrl: stadiumMapUrl || undefined,
+                appUrl: "/convocacao",
+              }}
+              variant="glass"
+            />
             {isAdmin && (
               <button
                 type="button"

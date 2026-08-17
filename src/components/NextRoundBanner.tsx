@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Football, Trophy } from "@/components/icons";
-import { RoundCalendarButton } from "@/components/RoundCalendarButton";
+import { ChevronRight, ClipboardList, Clock, Football, Trophy } from "@/components/icons";
 
 type NextRound = {
   id: string;
@@ -42,7 +41,14 @@ export function NextRoundBanner({
           <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1.5 font-athletic text-[10px] font-black uppercase italic tracking-[0.18em] text-sky-300">
             <Football className="h-3.5 w-3.5" /> Temporada oficial
           </span>
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-accent/25 bg-accent/10 text-accent"><Trophy className="h-6 w-6" /></div>
+          <Link
+            href="/ranking"
+            className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-accent/30 bg-accent/15 text-accent hover:bg-accent/25 transition-colors shadow-sm"
+            title="Ver Ranking da Liga"
+            aria-label="Ver Ranking da Liga"
+          >
+            <Trophy className="h-6 w-6" />
+          </Link>
         </div>
 
         <div className="max-w-[88%]">
@@ -57,23 +63,34 @@ export function NextRoundBanner({
           </p>
         </div>
 
-        <div className="pointer-events-auto relative z-30 flex items-center justify-between gap-2 border-t border-white/10 pt-4">
-          <div className="pointer-events-none min-w-0 flex-1">
-            <p className="truncate text-[10px] font-black uppercase tracking-wider text-foreground">{isAdmin && isPrelist ? "Retomar pre-lista" : "Historico de rodadas"}</p>
-            <p className="truncate text-[9px] text-muted">{isAdmin && isPrelist ? "Editar participantes e montar times" : "Resultados e partidas anteriores"}</p>
+        <div className="pointer-events-auto relative z-30 flex items-center justify-between gap-2 border-t border-white/10 pt-3.5">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+            <Link
+              href="/rodadas"
+              className="flex items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-2.5 py-2 text-[10px] font-black uppercase text-foreground hover:bg-white/10 transition-colors"
+              title="Histórico de partidas"
+            >
+              <Clock className="h-3.5 w-3.5 text-sky-300" />
+              <span>Partidas</span>
+            </Link>
+
+            <Link
+              href="/admin/prelistas"
+              className="flex items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-2.5 py-2 text-[10px] font-black uppercase text-foreground hover:bg-white/10 transition-colors"
+              title="Pré-listas salvas"
+            >
+              <ClipboardList className="h-3.5 w-3.5 text-accent" />
+              <span>Pré-listas</span>
+            </Link>
           </div>
-          {round && formattedTime && (
-            <RoundCalendarButton event={{
-              title: `Pelada BQ - Rodada ${String(round.number).padStart(2, "0")}`,
-              date: round.date,
-              startTime: formattedTime,
-              durationMinutes: eventDurationMinutes,
-              location: venue?.name,
-              mapUrl: venue?.mapUrl,
-              appUrl: `/rodadas/${round.id}`,
-            }} />
-          )}
-          <span className="pointer-events-none flex shrink-0 items-center gap-1 rounded-xl bg-sky-400 px-3 py-3 text-[10px] font-black uppercase text-[#04131a]">Abrir<ChevronRight className="h-3.5 w-3.5" /></span>
+
+          <Link
+            href={href}
+            className="flex shrink-0 items-center gap-1 rounded-xl bg-sky-400 px-3.5 py-2 text-[10px] font-black uppercase text-[#04131a] shadow-[0_0_15px_rgba(56,189,248,0.3)] hover:brightness-110 transition-all ml-auto"
+          >
+            {isAdmin && isPrelist ? "Retomar" : "Abrir"}
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
       </div>
     </article>
