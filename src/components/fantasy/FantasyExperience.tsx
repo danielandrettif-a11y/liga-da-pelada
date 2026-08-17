@@ -227,14 +227,217 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(340px,.9fr)]">
         <section className="space-y-4">
           <div className="flex items-center justify-between"><div><h2 className="text-sm font-black uppercase text-foreground">{betweenRounds ? "Meu elenco" : "Meu time"}</h2><p className="text-[10px] text-muted">{open ? "Toque na coroa para escolher o capitão" : "Escalação somente para consulta"}</p><p className={`mt-1 text-[9px] font-black uppercase ${saveState.includes("salva") || saveState.includes("Pronta") ? "text-accent" : "text-warning"}`}>{saveState}</p></div><strong className="text-sm text-accent">{selected.length}/5</strong></div>
-          <div className="relative min-h-[430px] overflow-hidden rounded-[2rem] border-2 border-emerald-400/25 bg-[linear-gradient(90deg,rgba(255,255,255,.035)_50%,transparent_50%),linear-gradient(#07552e,#064426)] bg-[length:33.333%_100%,100%_100%] p-5 shadow-inner">
-            <div className="pointer-events-none absolute inset-5 rounded-2xl border border-white/35"><div className="absolute left-1/2 top-0 h-20 w-36 -translate-x-1/2 border-x border-b border-white/30"/><div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30"/><div className="absolute bottom-0 left-1/2 h-20 w-36 -translate-x-1/2 border-x border-t border-white/30"/></div>
-            <div className="relative z-10 grid min-h-[390px] grid-cols-2 content-around gap-x-5 gap-y-5 sm:grid-cols-3">
-              {[0,1,2,3,4].map((slot) => { const player = selectedPlayers[slot]; return player ? (
-                <div key={player.id} className={`relative mx-auto flex w-full max-w-32 flex-col items-center ${slot === 4 ? "col-span-2 sm:col-span-1" : ""}`}>
-                  <button type="button" disabled={!open} onClick={() => setCaptainId(player.id)} className={`absolute -right-1 -top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border ${captainId === player.id ? "border-accent bg-accent text-background" : "border-white/20 bg-background text-muted"}`} aria-label={`Escolher ${player.name} como capitão`}><Crown className="h-4 w-4" /></button>
-                  <button type="button" onClick={() => togglePlayer(player)} className="flex flex-col items-center"><PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} className="h-14 w-14 rounded-full border-2 border-accent bg-background text-sm font-black text-accent"/><span className="mt-1 max-w-32 rounded-lg bg-background/95 px-2 py-1 text-center text-[10px] font-black leading-tight text-white">{player.name}</span><span className="mt-1 text-[9px] font-bold text-accent">{status === "in_progress" ? `${(player.roundPoints * (captainId === player.id ? settings.captainMultiplier : 1)).toFixed(1)} pts` : formatFantasyMoney(player.price, settings.currencyName)}</span>{betweenRounds && <span className="text-[8px] font-bold text-white/65">Última: {player.roundPoints.toFixed(1)} pts</span>}</button>
-                </div>) : <div key={slot} className={`mx-auto flex h-20 w-24 items-center justify-center rounded-2xl border border-dashed border-white/25 bg-black/15 text-[10px] font-bold text-white/45 ${slot === 4 ? "col-span-2 sm:col-span-1" : ""}`}>Vaga {slot + 1}</div>; })}
+          {/* CAMPO DE FUTEBOL REALISTA (MEIO CAMPO TÁTICO) */}
+          <div className="relative min-h-[480px] overflow-hidden rounded-[2.5rem] border-2 border-emerald-400/35 bg-[#083b1f] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.7),inset_0_0_50px_rgba(0,0,0,0.6)]">
+            {/* Padrão de Grama Cortada com Faixas Verticais e Iluminação Realista */}
+            <div
+              className="pointer-events-none absolute inset-0 opacity-40"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 55px, transparent 55px, transparent 110px), radial-gradient(circle at 50% 30%, rgba(204,255,0,0.12), transparent 70%)",
+              }}
+            />
+
+            {/* Linhas de Marcação de Meio Campo */}
+            <div className="pointer-events-none absolute inset-4 rounded-[2rem] border-2 border-white/40">
+              {/* Linha de Meio-Campo (Topo) */}
+              <div className="absolute inset-x-0 top-0 h-0.5 border-t-2 border-white/50" />
+
+              {/* Círculo Central Cortado ao Meio (Semicírculo no Topo) */}
+              <div className="absolute -top-0.5 left-1/2 h-16 w-32 -translate-x-1/2 rounded-b-full border-b-2 border-x-2 border-white/40" />
+              <div className="absolute top-0 left-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70 shadow-sm" />
+
+              {/* Meia-lua da Grande Área */}
+              <div className="absolute bottom-28 left-1/2 h-12 w-28 -translate-x-1/2 rounded-t-full border-t-2 border-x-2 border-white/40" />
+
+              {/* Grande Área (Base) */}
+              <div className="absolute bottom-0 left-1/2 h-28 w-64 -translate-x-1/2 border-t-2 border-x-2 border-white/45 bg-white/[0.015]" />
+
+              {/* Marca do Pênalti */}
+              <div className="absolute bottom-18 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-white/80 shadow-sm" />
+
+              {/* Pequena Área do Goleiro */}
+              <div className="absolute bottom-0 left-1/2 h-12 w-32 -translate-x-1/2 border-t-2 border-x-2 border-white/45 bg-white/[0.02]" />
+
+              {/* Linha do Gol */}
+              <div className="absolute -bottom-1 left-1/2 h-2 w-20 -translate-x-1/2 border-t-2 border-x-2 border-white/60 bg-white/10 rounded-t-xs" />
+            </div>
+
+            {/* Jogadores em Formação de Meio Campo (2 Atacantes na Frente, 2 Meias/Alas no Centro, 1 Goleiro/Base Atrás) */}
+            <div className="relative z-10 flex min-h-[448px] flex-col justify-between py-2">
+              {/* Linha 1: Ataque (2 Jogadores na Frente, perto do Meio-Campo) */}
+              <div>
+                <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                  Ataque
+                </span>
+                <div className="grid grid-cols-2 gap-4 px-3 sm:px-8">
+                  {[0, 1].map((slot) => {
+                    const player = selectedPlayers[slot];
+                    return player ? (
+                      <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
+                        <button
+                          type="button"
+                          disabled={!open}
+                          onClick={() => setCaptainId(player.id)}
+                          className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
+                            captainId === player.id
+                              ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
+                              : "border-white/20 bg-background text-muted hover:text-white"
+                          }`}
+                          aria-label={`Escolher ${player.name} como capitão`}
+                          title="Tornar Capitão (Pontos x1.5)"
+                        >
+                          <Crown className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={() => togglePlayer(player)} className="flex flex-col items-center">
+                          <PlayerAvatar
+                            name={player.name}
+                            avatarUrl={player.avatarUrl}
+                            className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform active:scale-95 ${
+                              captainId === player.id ? "border-accent ring-2 ring-accent/50" : "border-emerald-300"
+                            }`}
+                          />
+                          <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
+                            {player.name}
+                          </span>
+                          <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
+                            {status === "in_progress"
+                              ? `${(player.roundPoints * (captainId === player.id ? settings.captainMultiplier : 1)).toFixed(1)} pts`
+                              : formatFantasyMoney(player.price, settings.currencyName)}
+                          </span>
+                          {betweenRounds && (
+                            <span className="text-[8px] font-bold text-white/60">Última: {player.roundPoints.toFixed(1)} pts</span>
+                          )}
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        key={slot}
+                        className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-white/30 bg-black/25 text-center shadow-inner"
+                      >
+                        <span className="text-[10px] font-bold text-white/70">+ Vaga {slot + 1}</span>
+                        <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">Atacante</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Linha 2: Meio / Alas (2 Jogadores no Meio) */}
+              <div>
+                <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                  Meio-Campo & Alas
+                </span>
+                <div className="grid grid-cols-2 gap-8 px-1 sm:px-4">
+                  {[2, 3].map((slot) => {
+                    const player = selectedPlayers[slot];
+                    return player ? (
+                      <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
+                        <button
+                          type="button"
+                          disabled={!open}
+                          onClick={() => setCaptainId(player.id)}
+                          className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
+                            captainId === player.id
+                              ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
+                              : "border-white/20 bg-background text-muted hover:text-white"
+                          }`}
+                          aria-label={`Escolher ${player.name} como capitão`}
+                          title="Tornar Capitão (Pontos x1.5)"
+                        >
+                          <Crown className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={() => togglePlayer(player)} className="flex flex-col items-center">
+                          <PlayerAvatar
+                            name={player.name}
+                            avatarUrl={player.avatarUrl}
+                            className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform active:scale-95 ${
+                              captainId === player.id ? "border-accent ring-2 ring-accent/50" : "border-emerald-300"
+                            }`}
+                          />
+                          <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
+                            {player.name}
+                          </span>
+                          <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
+                            {status === "in_progress"
+                              ? `${(player.roundPoints * (captainId === player.id ? settings.captainMultiplier : 1)).toFixed(1)} pts`
+                              : formatFantasyMoney(player.price, settings.currencyName)}
+                          </span>
+                          {betweenRounds && (
+                            <span className="text-[8px] font-bold text-white/60">Última: {player.roundPoints.toFixed(1)} pts</span>
+                          )}
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        key={slot}
+                        className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-white/30 bg-black/25 text-center shadow-inner"
+                      >
+                        <span className="text-[10px] font-bold text-white/70">+ Vaga {slot + 1}</span>
+                        <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">Meia/Ala</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Linha 3: Goleiro / Base (1 Jogador na Grande Área) */}
+              <div>
+                <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                  Goleiro & Defesa
+                </span>
+                <div className="flex justify-center">
+                  {[4].map((slot) => {
+                    const player = selectedPlayers[slot];
+                    return player ? (
+                      <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
+                        <button
+                          type="button"
+                          disabled={!open}
+                          onClick={() => setCaptainId(player.id)}
+                          className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
+                            captainId === player.id
+                              ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
+                              : "border-white/20 bg-background text-muted hover:text-white"
+                          }`}
+                          aria-label={`Escolher ${player.name} como capitão`}
+                          title="Tornar Capitão (Pontos x1.5)"
+                        >
+                          <Crown className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={() => togglePlayer(player)} className="flex flex-col items-center">
+                          <PlayerAvatar
+                            name={player.name}
+                            avatarUrl={player.avatarUrl}
+                            className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform active:scale-95 ${
+                              captainId === player.id ? "border-accent ring-2 ring-accent/50" : "border-emerald-300"
+                            }`}
+                          />
+                          <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
+                            {player.name}
+                          </span>
+                          <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
+                            {status === "in_progress"
+                              ? `${(player.roundPoints * (captainId === player.id ? settings.captainMultiplier : 1)).toFixed(1)} pts`
+                              : formatFantasyMoney(player.price, settings.currencyName)}
+                          </span>
+                          {betweenRounds && (
+                            <span className="text-[8px] font-bold text-white/60">Última: {player.roundPoints.toFixed(1)} pts</span>
+                          )}
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        key={slot}
+                        className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-white/30 bg-black/25 text-center shadow-inner"
+                      >
+                        <span className="text-[10px] font-bold text-white/70">+ Vaga 5</span>
+                        <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">Goleiro/Defesa</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 
