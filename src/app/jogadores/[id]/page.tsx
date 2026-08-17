@@ -1,6 +1,6 @@
-import { getPlayer, getPlayerAwardSeasons, getPlayerGoalsByClub, getPlayerRoundHistory, getPlayersWithStats } from "@/lib/actions/players";
+import { getPlayer, getPlayerAwardSeasons, getPlayerGoalsByClub, getPlayerRoundHistory } from "@/lib/actions/players";
 import { getPlayerFitnessSummaries } from "@/lib/actions/fitness";
-import { calculateWinRate, formatDateShort } from "@/lib/utils";
+import { aggregatePlayerStats, calculateWinRate, formatDateShort } from "@/lib/utils";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerProfileBadge } from "@/components/PlayerProfileBadge";
 import { PlayerAwards } from "@/components/PlayerAwards";
@@ -32,12 +32,10 @@ function History({ rows, friendly = false }: { rows: HistoryRow[]; friendly?: bo
 }
 export default async function JogadorPerfilPage({ params }: PageProps<"/jogadores/[id]">) {
   const { id } = await params;
-  const [player, officialHistory, friendlyHistory, officialAll, friendlyAll, awardSeasons, fitness, clubGoals, fantasySummary] = await Promise.all([
+  const [player, officialHistory, friendlyHistory, awardSeasons, fitness, clubGoals, fantasySummary] = await Promise.all([
     getPlayer(id),
     getPlayerRoundHistory(id, "official"),
     getPlayerRoundHistory(id, "friendly"),
-    getPlayersWithStats("official"),
-    getPlayersWithStats("friendly"),
     getPlayerAwardSeasons(id),
     getPlayerFitnessSummaries(id),
     getPlayerGoalsByClub(id),
@@ -45,9 +43,10 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
   ]);
   if (!player) notFound();
   const isPlayable = player.is_selectable && (player.member_category === "player" || player.member_category === "guest");
-  const official = officialAll.find((item) => item.id === id) || { rounds: 0, games: 0, goals: 0, assists: 0, wins: 0, draws: 0, losses: 0, points: 0 };
-  const friendly = friendlyAll.find((item) => item.id === id) || { rounds: 0, games: 0, goals: 0, assists: 0, wins: 0, draws: 0, losses: 0, points: 0 };
+  const official = aggregatePlayerStats(officialHistory);
+  const friendly = aggregatePlayerStats(friendlyHistory);
   const categoryLabel = player.member_category === "player" ? "Jogador oficial" : player.member_category === "guest" ? "Convidado" : player.member_category === "wag" ? "WAG" : "Torcida";
+
 
   return (
     <div className="space-y-6">

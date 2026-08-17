@@ -14,6 +14,7 @@ import {
   Loader2,
   LogIn,
   MapPin,
+  PencilLine,
   Shield,
   Sparkles,
   Stadium as StadiumIcon,
@@ -29,11 +30,13 @@ import {
   createCallupPrelist,
   joinActiveCallup,
   leaveActiveCallup,
+  updateCallup,
   type CallupWithEntries,
 } from "@/lib/actions/callups";
-import type { Player } from "@/lib/types";
+import type { Player, Stadium } from "@/lib/types";
 import type { FantasyQuickHighlight } from "@/lib/actions/fantasy";
 import { PlayerAvatar } from "./PlayerAvatar";
+import { useDialogViewport } from "@/lib/useDialogViewport";
 
 type Props = {
   callup: CallupWithEntries;
@@ -43,6 +46,7 @@ type Props = {
   selectablePlayers: Player[];
   stadiumName?: string | null;
   stadiumMapUrl?: string | null;
+  stadiums?: Stadium[];
   fantasyHighlights?: FantasyQuickHighlight | null;
 };
 
@@ -54,12 +58,18 @@ export function CallupBoard({
   selectablePlayers,
   stadiumName,
   stadiumMapUrl,
+  stadiums = [],
   fantasyHighlights,
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
   const [showCartolaPopup, setShowCartolaPopup] = useState(false);
+  const [editingCallup, setEditingCallup] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState("");
+  useDialogViewport(editingCallup);
+
   const confirmed = callup.entries.filter((entry) => entry.status === "confirmed");
   const waitlist = callup.entries.filter((entry) => entry.status === "waitlist");
   const capacity = callup.capacity;
@@ -72,6 +82,20 @@ export function CallupBoard({
   const startTime = callup.start_time ? callup.start_time.slice(0, 5) : "08:00";
   const formattedFullDate = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" })
     .format(new Date(`${callup.date}T12:00:00`));
+
+  async function handleEditCallup(formData: FormData) {
+    setEditLoading(true);
+    setEditError("");
+    const result = await updateCallup(formData);
+    if (!result.success) {
+      setEditError(result.error || "Erro ao atualizar convocação.");
+      setEditLoading(false);
+    } else {
+      setEditingCallup(false);
+      setEditLoading(false);
+      router.refresh();
+    }
+  }
 
   async function run(key: string, action: () => Promise<{ success: boolean; error?: string }>) {
     setLoading(key);
@@ -181,13 +205,27 @@ export function CallupBoard({
               {callup.round_type === "friendly" ? "Amistoso" : "Rodada oficial"}
             </h1>
           </div>
-          <button
-            onClick={copyInvite}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
-            aria-label="Copiar convite"
-          >
-            {loading === "copied" ? <CheckCircle2 className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setEditingCallup(true)}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+                title="Editar data, horário e estádio"
+                aria-label="Editar convocação"
+              >
+                <PencilLine className="h-5 w-5" />
+              </button>
+            )}
+            <button
+              onClick={copyInvite}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+              title="Copiar convite"
+              aria-label="Copiar convite"
+            >
+              {loading === "copied" ? <CheckCircle2 className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
 
         {/* AS 3 INFORMAÇÕES OBRIGATÓRIAS: DIA, HORÁRIO E ESTÁDIO */}
@@ -512,6 +550,116 @@ export function CallupBoard({
                 Ver convocação
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Edição da Convocação (ADM) */}
+      {editingCallup && (
+        <div
+          className="mobile-dialog-backdrop bg-black/75 backdrop-blur-sm"
+          onMouseDown={(e) => e.target === e.currentTarget && !editLoading && setEditingCallup(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Editar Convocação"
+            className="mobile-dialog-panel max-w-md rounded-3xl border border-border bg-background p-5 shadow-2xl animate-fade-in-up"
+          >
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2">
+                <PencilLine className="h-5 w-5 text-accent" />
+                <h2 className="text-base font-black text-foreground">Editar Convocação</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCallup(false)}
+                className="rounded-full bg-surface p-1 text-muted hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {editError && (
+              <div className="mt-3 rounded-xl bg-danger/10 p-3 text-xs font-bold text-danger">
+                {editError}
+              </div>
+            )}
+
+            <form action={handleEditCallup} className="mt-4 space-y-3.5">
+              <input type="hidden" name="callup_id" value={callup.id} />
+
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase text-muted">Data da Pelada</label>
+                  <input
+                    type="date"
+                    name="date"
+                    required
+                    defaultValue={callup.date}
+                    className="block w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-xs text-foreground [appearance:none]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase text-muted">Horário de Início</label>
+                  <input
+                    type="time"
+                    name="start_time"
+                    required
+                    defaultValue={callup.start_time?.slice(0, 5) || "08:00"}
+                    className="block w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-xs text-foreground [appearance:none]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[10px] font-bold uppercase text-muted">Campo / Estádio</label>
+                <select
+                  name="stadium_id"
+                  defaultValue={callup.stadium_id || (stadiums && stadiums[0]?.id) || ""}
+                  className="block w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-xs text-foreground"
+                >
+                  {stadiums && stadiums.length > 0 ? (
+                    stadiums.map((stadium) => (
+                      <option key={stadium.id} value={stadium.id}>
+                        {stadium.name} {stadium.address ? `(${stadium.address})` : ""}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">Estádio Padrão da Liga</option>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[10px] font-bold uppercase text-muted">Tipo de Rodada</label>
+                <select
+                  name="round_type"
+                  defaultValue={callup.round_type}
+                  className="block w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-xs text-foreground"
+                >
+                  <option value="official">Oficial (Ranked)</option>
+                  <option value="friendly">Amistoso</option>
+                </select>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingCallup(false)}
+                  className="rounded-xl border border-border py-3 text-xs font-bold text-foreground hover:bg-surface"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={editLoading}
+                  className="rounded-xl bg-accent py-3 text-xs font-black text-background transition-transform active:scale-[0.99] disabled:opacity-50"
+                >
+                  {editLoading ? "Salvando..." : "Salvar alterações"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

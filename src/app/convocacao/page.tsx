@@ -7,15 +7,17 @@ import { getCurrentAccount } from "@/lib/auth";
 import { getLeagueConfig } from "@/lib/actions/league";
 
 import { getFantasyQuickHighlights } from "@/lib/actions/fantasy";
+import { getStadiums } from "@/lib/actions/stadiums";
 
 export const revalidate = 0;
 
 export default async function ConvocacaoPage() {
-  const [callup, account, leagueConfig, fantasyHighlights] = await Promise.all([
+  const [callup, account, leagueConfig, fantasyHighlights, stadiums] = await Promise.all([
     getActiveCallup(),
     getCurrentAccount(),
     getLeagueConfig(),
     getFantasyQuickHighlights(),
+    getStadiums(),
   ]);
   if (!callup) {
     return (
@@ -42,6 +44,7 @@ export default async function ConvocacaoPage() {
         selectablePlayers={selectablePlayers}
         stadiumName={stadiumName}
         stadiumMapUrl={stadiumMapUrl}
+        stadiums={stadiums}
         fantasyHighlights={fantasyHighlights}
       />
     </div>

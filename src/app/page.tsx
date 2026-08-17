@@ -174,7 +174,7 @@ export default async function HomePage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h2 className="font-athletic text-sm font-black uppercase italic tracking-wider text-foreground">{preseasonEnabled ? "Em destaque" : "Rodadas"}</h2>
-          <Link href="/rodadas" className="flex items-center gap-1 text-xs font-bold text-accent">
+          <Link href="/rodadas" prefetch={true} className="flex items-center gap-1 text-xs font-bold text-accent">
             Ver todas
             <ChevronRight className="h-4 w-4" />
           </Link>
@@ -243,6 +243,7 @@ export default async function HomePage() {
           </h2>
           <Link
             href="/ranking"
+            prefetch={true}
             className="text-xs font-semibold text-accent hover:text-accent-light transition-colors"
           >
             Ver completo →

@@ -9,6 +9,7 @@ import {
   Users,
   Calendar,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   PencilLine,
   RotateCcw,
@@ -117,6 +118,7 @@ export function RoundCreator({
   const teamCount = Math.min(MAX_TEAMS_PER_ROUND, Math.max(MIN_TEAMS_PER_ROUND, Math.trunc(teamsPerRound)));
   const [teams, setTeams] = useState<DrawTeam[]>(() => createDefaultTeams(teamCount, teamPresetOffsets[roundType] || 0));
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [openVestPickerTeamId, setOpenVestPickerTeamId] = useState<string | null>(null);
   const [formationMode, setFormationMode] = useState<TeamFormationMode>("manual");
   const [attendanceOrder, setAttendanceOrder] = useState<string[]>([]);
   const [pendingDrawMode, setPendingDrawMode] = useState<Exclude<TeamFormationMode, "manual"> | null>(null);
@@ -694,34 +696,61 @@ export function RoundCreator({
                       <span className="text-[9px] font-bold text-muted/60">{team.name.length}/40</span>
                     </div>
 
-                    {/* Paleta de Coletes */}
+                    {/* Seletor Retrátil de Colete */}
                     <div className="pt-1">
-                      <p className="mb-2 text-[9px] font-bold uppercase tracking-wider text-muted">
-                        Cor do Colete em Jogo:
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {VEST_COLORS.map((vest) => {
-                          const isSelected = team.color?.toLowerCase() === vest.color.toLowerCase();
-                          return (
-                            <button
-                              key={vest.color}
-                              type="button"
-                              onClick={() => updateTeamColor(team.id, vest.color)}
-                              className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-black transition-all ${
-                                isSelected
-                                  ? "border-white bg-white/20 text-white shadow-sm scale-105"
-                                  : "border-border/60 bg-black/20 text-muted hover:border-border hover:text-foreground"
-                              }`}
-                            >
-                              <span
-                                className="h-3 w-3 rounded-full border border-black/30"
-                                style={{ backgroundColor: vest.color }}
-                              />
-                              {vest.label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setOpenVestPickerTeamId(openVestPickerTeamId === team.id ? null : team.id)}
+                        className="flex w-full items-center justify-between rounded-xl border border-border/70 bg-surface/70 px-3 py-2 text-left transition-all hover:border-accent/40 hover:bg-surface"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="h-3 w-3 rounded-full border border-black/30 shadow-sm"
+                            style={{ backgroundColor: team.color || "#CCFF00" }}
+                          />
+                          <span className="text-[11px] font-bold text-foreground">
+                            Colete: <span className="font-black text-accent">{currentVest.label}</span>
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] font-black uppercase text-muted">
+                          <span>{openVestPickerTeamId === team.id ? "Fechar" : "Escolher cor do colete"}</span>
+                          <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${openVestPickerTeamId === team.id ? "rotate-180 text-accent" : ""}`} />
+                        </div>
+                      </button>
+
+                      {openVestPickerTeamId === team.id && (
+                        <div className="mt-2.5 rounded-xl border border-border bg-background/80 p-2.5 animate-fade-in">
+                          <p className="mb-2 text-[9px] font-bold uppercase tracking-wider text-muted">
+                            Selecione a cor do colete:
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {VEST_COLORS.map((vest) => {
+                              const isSelected = team.color?.toLowerCase() === vest.color.toLowerCase();
+                              return (
+                                <button
+                                  key={vest.color}
+                                  type="button"
+                                  onClick={() => {
+                                    updateTeamColor(team.id, vest.color);
+                                    setOpenVestPickerTeamId(null);
+                                  }}
+                                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-black transition-all ${
+                                    isSelected
+                                      ? "border-white bg-white/20 text-white shadow-sm scale-105"
+                                      : "border-border/60 bg-black/20 text-muted hover:border-border hover:text-foreground"
+                                  }`}
+                                >
+                                  <span
+                                    className="h-3 w-3 rounded-full border border-black/30"
+                                    style={{ backgroundColor: vest.color }}
+                                  />
+                                  {vest.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

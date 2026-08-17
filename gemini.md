@@ -11,6 +11,11 @@ Plataforma determinística e intuitiva para gestão de peladas semanais, com con
   - Camada 1: Diretrizes e POPs de regras de negócio.
   - Camada 2: Orquestração e roteamento de dados.
   - Camada 3: Execução determinística (ações e RPCs).
+- **Invariantes de Performance (V1)**:
+  - Feedback visual imediato ao toque (<100ms) em todos os links e BottomNav.
+  - Skeletons dedicados por rota (`loading.tsx`) replicando fielmente a geometria do layout sem CLS (Cumulative Layout Shift).
+  - Consultas pontuais (Single Player) no lugar de carregar todo o elenco para ler dados individuais.
+  - Streaming com Suspense em seções secundárias e cache inteligente com revalidação direcionada.
 
 ## 3. Esquemas de Dados e Migrations
 
@@ -47,18 +52,18 @@ ALTER TABLE public.rounds
 ```
 
 ## 4. Regras Comportamentais
-1. **Banner de Convocação na Home**:
-   - Se o usuário NÃO confirmou e há vagas normais: Apresentar chamada para confirmação de presença.
-   - Se o usuário NÃO confirmou e vagas normais estão cheias: Apresentar chamada para "Entrar na Lista de Espera".
-   - Se o usuário JÁ confirmou: Apresentar estado de presença confirmada com mensagem positiva e link para gerenciar.
-   - Se o usuário está na lista de espera: Apresentar posição na fila de espera.
-   - Fornecer botão direto de "Ver onde fica" (Google Maps) quando houver local configurado.
-2. **Aba de Convocação (`/convocacao`)**:
-   - Exibir com destaque: **Dia**, **Horário** e **Estádio / Local com Link**.
-   - Texto de convite WhatsApp gerado com dia, horário, local (com link) e URL de confirmação.
-3. **Cartola - Ranking da Rodada (`/cartola/ranking?scope=round`)**:
-   - Durante o período de mercado/escalação: Exibir lista de quem já salvou o time (confirmados) e quem ainda não escalou (pendentes).
-   - Após a rodada encerrada: Exibir a pontuação habitual da rodada.
-4. **Gestão de Estádios (`/mais/estadios`)**:
-   - Aba em "Mais" para listar, cadastrar, editar, excluir e reordenar estádios com links do Google Maps.
-   - Ordem definida nesta aba deve ser a mesma exibida nos selects de criação de rodada e abertura de convocação.
+1. **Compartilhamento do App na Tela Inicial**:
+   - Disponibilizar botão de compartilhamento com suporte nativo a Web Share API, WhatsApp e cópia de link para facilitar o engajamento dos atletas.
+2. **Exclusão Segura de Rodadas e Pré-listas**:
+   - Rodadas em rascunho ou pré-listas (sem partidas finalizadas e sem pontuação travada no Cartola) podem ser excluídas livremente por administradores.
+   - A exclusão de uma rodada desvincula com segurança a convocação correspondente, sem ser bloqueada por outras convocações ativas da liga.
+3. **Edição de Convocação Aberta**:
+   - Administradores podem atualizar Data, Horário e Estádio de uma convocação aberta a qualquer momento.
+   - Mudanças na convocação são propagadas para a pré-lista correspondente.
+   - O texto de convite do WhatsApp deve sempre conter Data, Horário, Local/Estádio e link do Google Maps.
+4. **Coletes Dinâmicos nos Confrontos & Seletor Retraído**:
+   - A tela de seleção de confronto (`MatchCreator`) estiliza as caixas dos times com as cores dos coletes definidos (`team.color`).
+   - A escolha de coletes na criação de rodadas (`RoundCreator`) deve iniciar recolhida por time e expandir ao clique.
+5. **Navegação Instantânea e Loading States**:
+   - Todas as rotas de navegação possuem skeletons correspondentes que aparecem no primeiro frame após o clique.
+   - A `BottomNav` responde imediatamente ao toque com indicador de transição ativo, sem deixar o usuário em dúvida sobre o clique.

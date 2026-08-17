@@ -6,10 +6,10 @@ import { getRosterUnreadState } from "@/lib/actions/registrations";
 
 export async function SessionBottomNav() {
   const [account, callup, hasReleasedPayment, rosterUnread] = await Promise.all([
-    getCurrentAccount(),
-    getActiveCallup(),
-    hasReleasedPaymentRound(),
-    getRosterUnreadState(),
+    getCurrentAccount().catch(() => ({ client: null as any, user: null, profile: null, isAdmin: false })),
+    getActiveCallup().catch(() => null),
+    hasReleasedPaymentRound().catch(() => false),
+    getRosterUnreadState().catch(() => ({ count: 0, lastSeenAt: null })),
   ]);
 
   return (
@@ -21,3 +21,4 @@ export async function SessionBottomNav() {
     />
   );
 }
+

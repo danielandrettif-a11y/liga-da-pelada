@@ -166,13 +166,22 @@ textarea {
   animation: slide-in-bottom 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.profile-reminder-track {
-  animation: profile-reminder-slide 8s linear infinite alternate;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .profile-reminder-track {
-    animation: none;
+  .animate-fade-in,
+  .animate-fade-in-up,
+  .animate-slide-in-bottom,
+  .profile-reminder-track,
+  .animate-pulse {
+    animation: none !important;
+  }
+  .stagger-1, .stagger-2, .stagger-3, .stagger-4, .stagger-5 {
+    animation-delay: 0s !important;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

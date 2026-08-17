@@ -227,46 +227,93 @@ export async function getMatch(matchId: string) {
   const { data, error } = await supabase
     .from("matches")
     .select(`
-      *,
+      id,
+      round_id,
+      team_a_id,
+      team_b_id,
+      score_a,
+      score_b,
+      status,
+      match_order,
+      started_at,
+      finished_at,
+      timer_started_at,
+      timer_accumulated_seconds,
+      duration_seconds,
+      eligibility_elapsed_offset_seconds,
+      created_at,
       team_a:team_a_id (
-        *,
+        id,
+        name,
+        color,
+        crest_url,
+        position,
         team_players (
           player_id,
           goalkeeper_order,
-          players (*)
+          players (id, name, nickname, avatar_url, player_profile, is_goalkeeper)
         )
       ),
       team_b:team_b_id (
-        *,
+        id,
+        name,
+        color,
+        crest_url,
+        position,
         team_players (
           player_id,
           goalkeeper_order,
-          players (*)
+          players (id, name, nickname, avatar_url, player_profile, is_goalkeeper)
         )
       ),
       match_players (
-        *,
-        player:player_id (*),
+        id,
+        match_id,
+        player_id,
+        team_id,
+        original_team_id,
+        is_starter,
+        is_active,
+        result_eligible,
+        entered_elapsed_seconds,
+        player:player_id (id, name, nickname, avatar_url, player_profile, is_goalkeeper),
         original_team:original_team_id (id, name, color, crest_url)
       ),
       match_events (
-        *,
-        player:player_id (*),
-        assist_player:assist_player_id (*)
+        id,
+        match_id,
+        event_type,
+        player_id,
+        assist_player_id,
+        team_id,
+        minute,
+        created_at,
+        player:player_id (id, name, nickname, avatar_url),
+        assist_player:assist_player_id (id, name, nickname, avatar_url)
       ),
       match_substitutions (
-        *,
-        player_out:player_out_id (*),
-        player_in:player_in_id (*),
+        id,
+        match_id,
+        player_out_id,
+        player_in_id,
+        player_in_original_team_id,
+        team_id,
+        elapsed_seconds,
+        created_at,
+        player_out:player_out_id (id, name, nickname, avatar_url),
+        player_in:player_in_id (id, name, nickname, avatar_url),
         player_in_original_team:player_in_original_team_id (id, name, color, crest_url)
       ),
       round:round_id (
+        id,
+        number,
+        date,
         formation_mode,
         round_players (
           player_id,
           availability_status,
           attendance_status,
-          players (*)
+          players (id, name, nickname, avatar_url, player_profile, is_goalkeeper)
         ),
         teams (
           id,
@@ -304,63 +351,41 @@ export async function registerGoal(input: RegisterGoalInput) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
-
-    const match = await getMatchState(client, input.match_id);
-    if (match.status !== "live") return { success: false, error: "A partida nao esta em andamento." };
-    if (input.team_id !== match.team_a_id && input.team_id !== match.team_b_id) {
-      return { success: false, error: "O time informado nao participa da partida." };
+    if (!input.match_id || !input.team_id || !input.player_id) {
+      return { success: false, error: "Dados do gol incompletos." };
     }
 
-    const participantIds = [input.player_id, input.assist_player_id].filter(Boolean) as string[];
-    if (new Set(participantIds).size !== participantIds.length) {
-      return { success: false, error: "O autor do gol nao pode dar assistencia para si mesmo." };
-    }
-    const { data: activeParticipants, error: participantsError } = await client
-      .from("match_players")
-      .select("player_id")
-      .eq("match_id", input.match_id)
-      .eq("team_id", input.team_id)
-      .eq("is_active", true)
-      .in("player_id", participantIds);
+    const { data, error } = await client.rpc("register_goal", {
+      p_match_id: input.match_id,
+      p_player_id: input.player_id,
+      p_team_id: input.team_id,
+      p_assist_player_id: input.assist_player_id || null,
+      p_minute: input.minute ?? null,
+      p_idempotency_key: input.idempotency_key || null,
+    });
 
-    if (participantsError) throw new Error(participantsError.message);
-    if ((activeParticipants || []).length !== participantIds.length) {
-      return { success: false, error: "Gol e assistencia so podem ser registrados para jogadores em campo." };
-    }
+    if (error) throw new Error(error.message);
 
-    // 1. Inserir o evento de gol
-    const { error: eventError } = await client
-      .from("match_events")
-      .insert({
-        match_id: input.match_id,
-        player_id: input.player_id,
-        assist_player_id: input.assist_player_id || null,
-        team_id: input.team_id,
-        event_type: "goal",
-        minute: input.minute || null,
-      });
-
-    if (eventError) throw new Error(eventError.message);
-
-    // 2. Atualizar o placar da partida
-    const isTeamA = match.team_a_id === input.team_id;
-    const newScoreA = isTeamA ? match.score_a + 1 : match.score_a;
-    const newScoreB = !isTeamA ? match.score_b + 1 : match.score_b;
-
-    const { error: updateError } = await client
-      .from("matches")
-      .update({
-        score_a: newScoreA,
-        score_b: newScoreB,
-      })
-      .eq("id", input.match_id);
-
-    if (updateError) throw new Error(updateError.message);
+    const result = data as {
+      event_id: string;
+      idempotent: boolean;
+      score_a: number;
+      score_b: number;
+      round_id?: string;
+    } | null;
 
     revalidatePath(`/partidas/${input.match_id}`);
-    revalidatePath(`/rodadas/${match.round_id}`);
-    
-    return { success: true };
+    if (result?.round_id) {
+      revalidatePath(`/rodadas/${result.round_id}`);
+    }
+
+    return {
+      success: true,
+      eventId: result?.event_id,
+      idempotent: result?.idempotent,
+      scoreA: result?.score_a,
+      scoreB: result?.score_b,
+    };
   } catch (err: any) {
     console.error("Erro ao registrar gol:", err);
     return { success: false, error: err.message };
@@ -432,37 +457,38 @@ export async function undoLastMatchSubstitution(substitutionId: string, matchId:
   }
 }
 
-export async function deleteEvent(eventId: string, matchId: string, teamId: string) {
+export async function deleteEvent(eventId: string, matchId: string, teamId?: string) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    if (!eventId || !matchId) {
+      return { success: false, error: "Identificadores inválidos para exclusão do evento." };
+    }
 
-    const { error } = await client
-      .from("match_events")
-      .delete()
-      .eq("id", eventId);
+    const { data, error } = await client.rpc("delete_match_event", {
+      p_event_id: eventId,
+      p_match_id: matchId,
+    });
 
     if (error) throw new Error(error.message);
 
-    // Subtrair 1 do placar
-    const match = await getMatchState(client, matchId);
-
-    const isTeamA = match.team_a_id === teamId;
-    const newScoreA = isTeamA ? Math.max(0, match.score_a - 1) : match.score_a;
-    const newScoreB = !isTeamA ? Math.max(0, match.score_b - 1) : match.score_b;
-
-    const { error: updateError } = await client
-      .from("matches")
-      .update({
-        score_a: newScoreA,
-        score_b: newScoreB,
-      })
-      .eq("id", matchId);
-
-    if (updateError) throw new Error(updateError.message);
+    const result = data as {
+      deleted: boolean;
+      score_a: number;
+      score_b: number;
+      round_id?: string;
+    } | null;
 
     revalidatePath(`/partidas/${matchId}`);
-    return { success: true };
+    if (result?.round_id) {
+      revalidatePath(`/rodadas/${result.round_id}`);
+    }
+
+    return {
+      success: true,
+      scoreA: result?.score_a,
+      scoreB: result?.score_b,
+    };
   } catch (err: any) {
     console.error("Erro ao deletar evento:", err);
     return { success: false, error: err.message };

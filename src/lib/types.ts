@@ -494,6 +494,7 @@ export type RegisterGoalInput = {
   assist_player_id?: string;
   team_id: string;
   minute?: number;
+  idempotency_key?: string;
 };
 
 export type UpdateRankingRulesInput = {

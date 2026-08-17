@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "../supabase";
 import { buildAwardSeasonsByPlayer } from "../awards";
 import type { Player, CreatePlayerInput, MemberCategory, PlayerProfile, RoundType, SeasonStatus } from "../types";
-import { getActiveSeasonRoundIds } from "./seasons";
+import { getActiveSeason, getActiveSeasonRoundIds } from "./seasons";
 import { getAdminClient, getCurrentAccount } from "../auth";
 import { TEAM_PRESETS } from "../teamPresets";
 
@@ -61,7 +61,19 @@ export async function getPlayers(selectableOnly = false) {
 export async function getPlayer(id: string) {
   const { data, error } = await supabase
     .from("players")
-    .select("*")
+    .select(`
+      id,
+      name,
+      nickname,
+      avatar_url,
+      profile_bio,
+      player_profile,
+      is_goalkeeper,
+      member_category,
+      is_selectable,
+      registration_source,
+      created_at
+    `)
     .eq("id", id)
     .single();
 
@@ -74,17 +86,73 @@ export async function getPlayer(id: string) {
 }
 
 export async function getPlayersWithStats(roundType: RoundType = "official", selectableOnly = false) {
-  // Busca jogadores e suas estatísticas agregadas de todas as rodadas
+  const season = await getActiveSeason();
+
+  // 1. Tentar buscar jogadores e stats agregados via View SQL
+  if (season) {
+    const playersQuery = selectableOnly
+      ? supabase
+          .from("players")
+          .select("*")
+          .eq("is_selectable", true)
+          .in("member_category", ["player", "guest"])
+          .order("name")
+      : supabase.from("players").select("*").order("name");
+
+    const statsQuery = supabase
+      .from("player_season_stats")
+      .select(`
+        player_id,
+        rounds_count,
+        games,
+        goals,
+        assists,
+        wins,
+        draws,
+        losses,
+        points
+      `)
+      .eq("season_id", season.id)
+      .eq("round_type", roundType);
+
+    const [playersResult, statsResult] = await Promise.all([playersQuery, statsQuery]);
+
+    if (!playersResult.error && !statsResult.error && playersResult.data) {
+      const statsMap = new Map<string, any>();
+      for (const stat of statsResult.data || []) {
+        statsMap.set(stat.player_id, stat);
+      }
+
+      const playersWithStats = (playersResult.data as Player[]).map((player) => {
+        const stat = statsMap.get(player.id);
+        return {
+          ...player,
+          rounds: Number(stat?.rounds_count || 0),
+          games: Number(stat?.games || 0),
+          goals: Number(stat?.goals || 0),
+          assists: Number(stat?.assists || 0),
+          wins: Number(stat?.wins || 0),
+          draws: Number(stat?.draws || 0),
+          losses: Number(stat?.losses || 0),
+          points: Number(stat?.points || 0),
+        };
+      });
+
+      return playersWithStats.sort((a, b) => b.points - a.points);
+    }
+  }
+
+  // Fallback seguro se a view ainda não estiver criada no banco
   const [playersResult, roundIds] = await Promise.all([
     selectableOnly
       ? supabase.from("players").select("*").eq("is_selectable", true).in("member_category", ["player", "guest"])
       : supabase.from("players").select("*"),
-    getActiveSeasonRoundIds(undefined, roundType),
+    getActiveSeasonRoundIds(season?.league_id, roundType),
   ]);
   const { data: players, error: playersError } = playersResult;
 
-  if (playersError) {
-    console.error("Erro ao buscar jogadores:", playersError);
+  if (playersError || !players) {
+    if (playersError) console.error("Erro ao buscar jogadores:", playersError);
     return [];
   }
 
@@ -102,25 +170,19 @@ export async function getPlayersWithStats(roundType: RoundType = "official", sel
     : { data: [], error: null };
   const { data: attendance, error: attendanceError } = attendanceResult;
 
-  if (statsError) {
-    console.error("Erro ao buscar estatísticas:", statsError);
-    return [];
-  }
-
-  // Agrega as estatísticas por jogador
-  if (finishedRoundsResult.error || attendanceError) {
-    console.error("Erro ao buscar presencas:", finishedRoundsResult.error || attendanceError);
+  if (statsError || finishedRoundsResult.error || attendanceError) {
+    console.error("Erro ao buscar dados complementares de jogadores:", statsError || finishedRoundsResult.error || attendanceError);
     return [];
   }
 
   const statsByPlayer = new Map<string, typeof stats>();
-  for (const stat of stats) {
+  for (const stat of stats || []) {
     const playerStats = statsByPlayer.get(stat.player_id) || [];
     playerStats.push(stat);
     statsByPlayer.set(stat.player_id, playerStats);
   }
   const roundsByPlayer = new Map<string, Set<string>>();
-  for (const entry of attendance) {
+  for (const entry of attendance || []) {
     const playerRounds = roundsByPlayer.get(entry.player_id) || new Set<string>();
     playerRounds.add(entry.round_id);
     roundsByPlayer.set(entry.player_id, playerRounds);

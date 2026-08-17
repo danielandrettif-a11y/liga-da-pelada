@@ -28,7 +28,9 @@ export function BottomNav({
   newRosterCount: number;
 }) {
   const pathname = usePathname();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [unreadRoster, setUnreadRoster] = useState(newRosterCount);
+
   useEffect(() => setUnreadRoster(newRosterCount), [newRosterCount]);
   useEffect(() => {
     const clearRosterBadge = () => setUnreadRoster(0);
@@ -37,7 +39,10 @@ export function BottomNav({
   }, []);
   useEffect(() => {
     if (pathname.startsWith("/admin/jogadores")) setUnreadRoster(0);
+    // Limpa o estado pendente quando a rota realmente terminar de navegar
+    setPendingHref(null);
   }, [pathname]);
+
   // Pagamentos pendentes têm prioridade na barra mobile. A convocação continua
   // acessível pela tela inicial/Mais sem criar uma navegação com sete itens.
   const showCallupInNav = hasOpenCallup && !hasReleasedPayment;
@@ -56,26 +61,35 @@ export function BottomNav({
         style={{ gridTemplateColumns: `repeat(${visibleItems.length}, minmax(0, 1fr))` }}
       >
         {visibleItems.map((item) => {
-          const isActive =
+          const isCurrentRoute =
             item.href === "/"
               ? pathname === "/"
               : pathname.startsWith(item.href);
+
+          const isPending = pendingHref === item.href;
+          const isActive = pendingHref ? isPending : isCurrentRoute;
 
           return (
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
               aria-label={item.label}
+              onClick={() => {
+                if (!isCurrentRoute) {
+                  setPendingHref(item.href);
+                }
+              }}
               className={`
                 relative flex min-w-0 overflow-hidden flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1.5
-                transition-all duration-200
+                transition-all duration-150 active:scale-90
                 ${isActive
                   ? "text-accent"
                   : "text-muted hover:text-foreground/70"
                 }
               `}
             >
-              {/* Active indicator dot */}
+              {/* Active indicator bar */}
               {isActive && (
                 <span className="absolute top-0 h-0.5 w-8 rounded-full bg-accent shadow-[0_0_12px_var(--accent)] animate-fade-in" />
               )}
@@ -83,7 +97,7 @@ export function BottomNav({
               <span className="relative">
                 <item.icon
                   active={isActive}
-                  className={`h-5.5 w-5.5 transition-all duration-200 ${
+                  className={`h-5.5 w-5.5 transition-all duration-150 ${
                     isActive ? "scale-110 drop-shadow-[0_0_6px_rgba(204,255,0,.45)]" : "opacity-80"
                   }`}
                   strokeWidth={isActive ? 2.1 : 1.8}
@@ -100,7 +114,7 @@ export function BottomNav({
                 )}
               </span>
               <span
-                className={`block w-full truncate whitespace-nowrap text-center font-semibold leading-none tracking-tight ${
+                className={`block w-full truncate whitespace-nowrap text-center font-semibold leading-none tracking-tight transition-colors duration-150 ${
                   item.label === "Transfermarket" || item.label === "Convocação"
                     ? "text-[7px] min-[360px]:text-[8px] min-[430px]:text-[9px]"
                     : "text-[9px] min-[390px]:text-[10px]"

@@ -27,15 +27,19 @@ export default async function RodadaDetalhePage({
 }) {
   const { id } = await params;
   const roundPromise = getRound(id);
-  const [round, account, goalkeeperPoints, roundStatistics] = await Promise.all([
+  const accountPromise = getCurrentAccount();
+  const allSelectablePlayersPromise = accountPromise.then((acc) => acc.isAdmin ? getPlayers(true) : []);
+
+  const [round, account, goalkeeperPoints, roundStatistics, allSelectablePlayers] = await Promise.all([
     roundPromise,
-    getCurrentAccount(),
+    accountPromise,
     roundPromise.then((currentRound) => currentRound?.status === "finished"
       ? getGoalkeeperScoringPoints(currentRound.league_id)
       : 0),
     roundPromise.then((currentRound) => currentRound?.status === "finished"
       ? getRoundStatistics(currentRound.id)
       : null),
+    allSelectablePlayersPromise,
   ]);
 
   if (!round) {
@@ -50,7 +54,6 @@ export default async function RodadaDetalhePage({
     .map((entry: any) => entry.players)
     .filter(Boolean)
     .sort((a: any, b: any) => a.name.localeCompare(b.name, "pt-BR"));
-  const allSelectablePlayers = account.isAdmin ? await getPlayers(true) : [];
   const overview = (
     <div className="space-y-6">
       {/* Top bar */}

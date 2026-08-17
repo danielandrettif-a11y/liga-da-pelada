@@ -265,3 +265,80 @@ export async function lockCallupForRound(callupId: string) {
   refreshCallups();
   return { success: true };
 }
+
+export async function updateCallup(formData: FormData) {
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem editar convocações." };
+  const callupId = String(formData.get("callup_id") || "");
+  const date = String(formData.get("date") || "");
+  const startTime = String(formData.get("start_time") || "08:00").slice(0, 5) || "08:00";
+  const stadiumId = formData.get("stadium_id") ? String(formData.get("stadium_id")) : null;
+  const roundType: RoundType = formData.get("round_type") === "friendly" ? "friendly" : "official";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { success: false, error: "Informe uma data válida." };
+
+  const league = await getActiveLeague();
+  let stadiumName: string | null = null;
+  let stadiumMapUrl: string | null = null;
+
+  if (stadiumId) {
+    const { data: stadiumData } = await client
+      .from("stadiums")
+      .select("name, google_maps_url")
+      .eq("id", stadiumId)
+      .maybeSingle();
+
+    if (stadiumData) {
+      stadiumName = stadiumData.name;
+      stadiumMapUrl = stadiumData.google_maps_url;
+    }
+  } else {
+    const { data: leagueConfig } = await client
+      .from("leagues")
+      .select("stadium_name, stadium_map_url")
+      .eq("id", league.id)
+      .single();
+    stadiumName = leagueConfig?.stadium_name || null;
+    stadiumMapUrl = leagueConfig?.stadium_map_url || null;
+  }
+
+  const { error } = await client
+    .from("callups")
+    .update({
+      date,
+      start_time: startTime,
+      stadium_id: stadiumId,
+      stadium_name: stadiumName,
+      stadium_map_url: stadiumMapUrl,
+      round_type: roundType,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", callupId);
+
+  if (error) return { success: false, error: error.message };
+
+  const { data: callup } = await client
+    .from("callups")
+    .select("round_id")
+    .eq("id", callupId)
+    .maybeSingle();
+
+  if (callup?.round_id) {
+    await client
+      .from("rounds")
+      .update({
+        date,
+        start_time: startTime,
+        stadium_id: stadiumId,
+        stadium_name: stadiumName,
+        stadium_map_url: stadiumMapUrl,
+        round_type: roundType,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", callup.round_id)
+      .eq("status", "draft");
+  }
+
+  refreshCallups();
+  return { success: true };
+}
+

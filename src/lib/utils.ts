@@ -49,6 +49,55 @@ export function calculateWinRate(wins: number, draws: number, games: number): nu
   return Math.round(((wins * 3 + draws) / (games * 3)) * 100);
 }
 
+export type AggregatedPlayerStats = {
+  rounds: number;
+  games: number;
+  goals: number;
+  assists: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  points: number;
+};
+
+/**
+ * Agrega estatísticas pontuais a partir de um array de histórico de partidas.
+ */
+export function aggregatePlayerStats(rows: Array<{
+  games?: number | null;
+  goals?: number | null;
+  assists?: number | null;
+  wins?: number | null;
+  draws?: number | null;
+  losses?: number | null;
+  points?: number | null;
+}> = []): AggregatedPlayerStats {
+  const initial: AggregatedPlayerStats = {
+    rounds: 0,
+    games: 0,
+    goals: 0,
+    assists: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    points: 0,
+  };
+
+  return rows.reduce<AggregatedPlayerStats>(
+    (acc, curr) => ({
+      rounds: acc.rounds + 1,
+      games: acc.games + (Number(curr.games) || 0),
+      goals: acc.goals + (Number(curr.goals) || 0),
+      assists: acc.assists + (Number(curr.assists) || 0),
+      wins: acc.wins + (Number(curr.wins) || 0),
+      draws: acc.draws + (Number(curr.draws) || 0),
+      losses: acc.losses + (Number(curr.losses) || 0),
+      points: acc.points + (Number(curr.points) || 0),
+    }),
+    initial
+  );
+}
+
 /**
  * Retorna o nome do jogador para listas e seleções.
  */

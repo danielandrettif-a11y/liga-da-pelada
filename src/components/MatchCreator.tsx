@@ -228,28 +228,48 @@ export function MatchCreator({ round }: { round: any }) {
             Time 1
           </label>
           <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
-            {teams.map((t: any) => (
-              <button
-                key={t.id}
-                onClick={() => setTeamAId(t.id)}
-                className={`
-                  p-3 rounded-xl border flex flex-col items-center gap-2 transition-all
-                  ${teamAId === t.id 
-                    ? "border-accent bg-accent/10 shadow-[0_0_10px_rgba(16,185,129,0.2)]" 
-                    : "border-border bg-surface hover:bg-surface-hover"}
-                  ${teamBId === t.id ? "opacity-50 cursor-not-allowed" : ""}
-                  ${!previousMatch && usesAttendance && !firstMatchAllowedIds.has(t.id) ? "opacity-35 cursor-not-allowed" : ""}
-                `}
-                disabled={teamBId === t.id || (!previousMatch && usesAttendance && !firstMatchAllowedIds.has(t.id))}
-              >
-                <TeamCrest name={t.name} crestUrl={t.crest_url} color={t.color} className="h-11 w-11" />
-                <span className="text-xs font-bold truncate w-full text-center">{t.name}</span>
-                <span className="flex min-w-0 items-center gap-1 text-[8px] font-black uppercase text-accent">
-                  <Crown className="h-2.5 w-2.5 shrink-0" />
-                  <span className="truncate">{(t.team_players || []).find((entry: any) => entry.player_id === captainByTeam[t.id])?.players?.name || "Sem capitão"}</span>
-                </span>
-              </button>
-            ))}
+            {teams.map((t: any) => {
+              const isSelected = teamAId === t.id;
+              const isDisabled = teamBId === t.id || (!previousMatch && usesAttendance && !firstMatchAllowedIds.has(t.id));
+              const vestColor = t.color || "#CCFF00";
+
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTeamAId(t.id)}
+                  style={{
+                    backgroundColor: isSelected ? `${vestColor}30` : `${vestColor}0d`,
+                    borderColor: isSelected ? vestColor : `${vestColor}35`,
+                    boxShadow: isSelected ? `0 0 16px ${vestColor}45` : undefined,
+                  }}
+                  className={`
+                    p-3 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-200
+                    ${isSelected ? "scale-[1.03] ring-1 ring-white/20" : "hover:border-white/30 hover:bg-surface-hover"}
+                    ${teamBId === t.id ? "opacity-40 cursor-not-allowed" : ""}
+                    ${!previousMatch && usesAttendance && !firstMatchAllowedIds.has(t.id) ? "opacity-35 cursor-not-allowed" : ""}
+                  `}
+                  disabled={isDisabled}
+                >
+                  <TeamCrest name={t.name} crestUrl={t.crest_url} color={t.color} className="h-11 w-11" />
+                  <span className="text-xs font-black truncate w-full text-center text-foreground">{t.name}</span>
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-black uppercase"
+                    style={{
+                      backgroundColor: `${vestColor}25`,
+                      color: vestColor,
+                      border: `1px solid ${vestColor}50`,
+                    }}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: vestColor }} />
+                    Colete
+                  </span>
+                  <span className="flex min-w-0 items-center gap-1 text-[8px] font-black uppercase text-accent">
+                    <Crown className="h-2.5 w-2.5 shrink-0" />
+                    <span className="truncate">{(t.team_players || []).find((entry: any) => entry.player_id === captainByTeam[t.id])?.players?.name || "Sem capitão"}</span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -263,28 +283,48 @@ export function MatchCreator({ round }: { round: any }) {
             Time 2
           </label>
           <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
-            {teams.map((t: any) => (
-              <button
-                key={t.id}
-                onClick={() => setTeamBId(t.id)}
-                className={`
-                  p-3 rounded-xl border flex flex-col items-center gap-2 transition-all
-                  ${teamBId === t.id 
-                    ? "border-accent bg-accent/10 shadow-[0_0_10px_rgba(16,185,129,0.2)]" 
-                    : "border-border bg-surface hover:bg-surface-hover"}
-                  ${teamAId === t.id ? "opacity-50 cursor-not-allowed" : ""}
-                  ${!previousMatch && usesAttendance && !firstMatchAllowedIds.has(t.id) ? "opacity-35 cursor-not-allowed" : ""}
-                `}
-                disabled={teamAId === t.id || (!previousMatch && usesAttendance && !firstMatchAllowedIds.has(t.id))}
-              >
-                <TeamCrest name={t.name} crestUrl={t.crest_url} color={t.color} className="h-11 w-11" />
-                <span className="text-xs font-bold truncate w-full text-center">{t.name}</span>
-                <span className="flex min-w-0 items-center gap-1 text-[8px] font-black uppercase text-accent">
-                  <Crown className="h-2.5 w-2.5 shrink-0" />
-                  <span className="truncate">{(t.team_players || []).find((entry: any) => entry.player_id === captainByTeam[t.id])?.players?.name || "Sem capitão"}</span>
-                </span>
-              </button>
-            ))}
+            {teams.map((t: any) => {
+              const isSelected = teamBId === t.id;
+              const isDisabled = teamAId === t.id || (!previousMatch && usesAttendance && !firstMatchAllowedIds.has(t.id));
+              const vestColor = t.color || "#CCFF00";
+
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTeamBId(t.id)}
+                  style={{
+                    backgroundColor: isSelected ? `${vestColor}30` : `${vestColor}0d`,
+                    borderColor: isSelected ? vestColor : `${vestColor}35`,
+                    boxShadow: isSelected ? `0 0 16px ${vestColor}45` : undefined,
+                  }}
+                  className={`
+                    p-3 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-200
+                    ${isSelected ? "scale-[1.03] ring-1 ring-white/20" : "hover:border-white/30 hover:bg-surface-hover"}
+                    ${teamAId === t.id ? "opacity-40 cursor-not-allowed" : ""}
+                    ${!previousMatch && usesAttendance && !firstMatchAllowedIds.has(t.id) ? "opacity-35 cursor-not-allowed" : ""}
+                  `}
+                  disabled={isDisabled}
+                >
+                  <TeamCrest name={t.name} crestUrl={t.crest_url} color={t.color} className="h-11 w-11" />
+                  <span className="text-xs font-black truncate w-full text-center text-foreground">{t.name}</span>
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-black uppercase"
+                    style={{
+                      backgroundColor: `${vestColor}25`,
+                      color: vestColor,
+                      border: `1px solid ${vestColor}50`,
+                    }}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: vestColor }} />
+                    Colete
+                  </span>
+                  <span className="flex min-w-0 items-center gap-1 text-[8px] font-black uppercase text-accent">
+                    <Crown className="h-2.5 w-2.5 shrink-0" />
+                    <span className="truncate">{(t.team_players || []).find((entry: any) => entry.player_id === captainByTeam[t.id])?.players?.name || "Sem capitão"}</span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 

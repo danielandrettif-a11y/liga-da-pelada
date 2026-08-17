@@ -40,14 +40,24 @@ export async function getActiveLeague() {
 }
 
 export async function getRounds() {
-  const league = await getActiveLeague();
-  const season = await getActiveSeason(league.id);
+  const season = await getActiveSeason();
   if (!season) return [];
 
   const query = supabase
     .from("rounds")
     .select(`
-      *,
+      id,
+      number,
+      date,
+      start_time,
+      status,
+      round_type,
+      preparation_stage,
+      notes,
+      created_at,
+      season_id,
+      league_id,
+      best_goalkeeper_player_id,
       round_players (count),
       matches (count)
     `)
@@ -66,8 +76,8 @@ export async function getRounds() {
   // Transformar o count que vem como array de objetos
   return data.map((round: any) => ({
     ...round,
-    playersCount: round.round_players[0]?.count || 0,
-    matchesCount: round.matches[0]?.count || 0,
+    playersCount: round.round_players?.[0]?.count || 0,
+    matchesCount: round.matches?.[0]?.count || 0,
   }));
 }
 
@@ -305,7 +315,7 @@ export async function setRoundTeamCaptain(roundId: string, teamId: string, playe
 
 export async function deleteRound(roundId: string, confirmation: string) {
   try {
-    if (confirmation !== "EXCLUIR") return { success: false, error: "Digite EXCLUIR para confirmar." };
+    if (confirmation.trim().toUpperCase() !== "EXCLUIR") return { success: false, error: "Digite EXCLUIR para confirmar." };
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem excluir rodadas." };
     const { error } = await client.rpc("delete_round_cascade", { p_round_id: roundId });

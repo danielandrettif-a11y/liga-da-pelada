@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CalendarPlus, CheckCircle2, ChevronRight, Clock, Copy, Lock, MapPin, Stadium as StadiumIcon, X } from "@/components/icons";
-import { closeCallup, openCallup, type CallupWithEntries } from "@/lib/actions/callups";
+import { CalendarPlus, CheckCircle2, ChevronRight, Clock, Copy, Lock, MapPin, PencilLine, Stadium as StadiumIcon, X } from "@/components/icons";
+import { closeCallup, openCallup, updateCallup, type CallupWithEntries } from "@/lib/actions/callups";
 import type { Stadium } from "@/lib/types";
 
 export function CallupAdminCard({
@@ -20,6 +20,7 @@ export function CallupAdminCard({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const confirmed = callup?.entries.filter((entry) => entry.status === "confirmed").length || 0;
@@ -32,6 +33,19 @@ export function CallupAdminCard({
     const result = await openCallup(formData);
     if (!result.success) setError(result.error || "Erro ao abrir convocação.");
     else router.refresh();
+    setLoading(false);
+  }
+
+  async function handleEdit(formData: FormData) {
+    setLoading(true);
+    setError("");
+    const result = await updateCallup(formData);
+    if (!result.success) {
+      setError(result.error || "Erro ao atualizar convocação.");
+    } else {
+      setEditing(false);
+      router.refresh();
+    }
     setLoading(false);
   }
 
@@ -67,7 +81,18 @@ export function CallupAdminCard({
 
   return (
     <section>
-      <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-muted">Convocação</h2>
+      <div className="mb-2 flex items-center justify-between px-1">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-muted">Convocação</h2>
+        {callup && !editing && (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="flex items-center gap-1 text-[10px] font-black uppercase text-accent hover:underline"
+          >
+            <PencilLine className="h-3 w-3" /> Editar dados
+          </button>
+        )}
+      </div>
       <div className="glass-card min-w-0 overflow-hidden p-4">
         {error && <div className="mb-3 rounded-lg bg-danger/10 p-3 text-xs font-bold text-danger">{error}</div>}
         {!callup ? (
@@ -142,6 +167,96 @@ export function CallupAdminCard({
             >
               {loading ? "Abrindo..." : "Abrir convocação"}
             </button>
+          </form>
+        ) : editing ? (
+          <form action={handleEdit} className="min-w-0 space-y-3 overflow-hidden animate-fade-in">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <PencilLine className="h-4 w-4 text-accent" />
+                <p className="text-xs font-black uppercase text-foreground">Editar Dados da Convocação</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className="rounded-full bg-surface p-1 text-muted hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <input type="hidden" name="callup_id" value={callup.id} />
+
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <div className="w-full min-w-0">
+                <label className="mb-1 block text-[10px] font-bold uppercase text-muted">Data</label>
+                <input
+                  type="date"
+                  name="date"
+                  required
+                  defaultValue={callup.date}
+                  className="block w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground [appearance:none]"
+                />
+              </div>
+
+              <div className="w-full min-w-0">
+                <label className="mb-1 block text-[10px] font-bold uppercase text-muted">Horário da pelada</label>
+                <input
+                  type="time"
+                  name="start_time"
+                  required
+                  defaultValue={callup.start_time?.slice(0, 5) || "08:00"}
+                  className="block w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground [appearance:none]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="mb-1 block text-[10px] font-bold uppercase text-muted">Campo / Estádio</label>
+              <select
+                name="stadium_id"
+                defaultValue={callup.stadium_id || stadiums[0]?.id || ""}
+                className="block w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground"
+              >
+                {stadiums.length > 0 ? (
+                  stadiums.map((stadium) => (
+                    <option key={stadium.id} value={stadium.id}>
+                      {stadium.name} {stadium.address ? `(${stadium.address})` : ""}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Estádio Padrão da Liga</option>
+                )}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="mb-1 block text-[10px] font-bold uppercase text-muted">Tipo de Rodada</label>
+              <select
+                name="round_type"
+                defaultValue={callup.round_type}
+                className="block w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground"
+              >
+                <option value="official">Oficial (Ranked)</option>
+                <option value="friendly">Amistoso</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className="rounded-xl border border-border py-2.5 text-xs font-bold text-foreground hover:bg-surface-hover"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="rounded-xl bg-accent py-2.5 text-xs font-black text-background transition-transform active:scale-[0.99] disabled:opacity-50"
+              >
+                {loading ? "Salvando..." : "Salvar alterações"}
+              </button>
+            </div>
           </form>
         ) : (
           <div className="space-y-3">

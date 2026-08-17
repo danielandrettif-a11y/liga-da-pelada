@@ -97,17 +97,36 @@ export async function calculateRoundStats(roundId: string) {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem recalcular estatisticas." };
 
-    // 1. Buscar a rodada e todas as partidas finalizadas
+    // 1. Buscar a rodada e todas as partidas finalizadas com colunas explícitas
     const { data: round, error } = await client
       .from("rounds")
       .select(`
-        *,
+        id,
+        league_id,
+        round_type,
+        best_goalkeeper_player_id,
         matches (
-          *,
-          match_events (*),
-          match_players (*)
+          id,
+          status,
+          team_a_id,
+          team_b_id,
+          score_a,
+          score_b,
+          match_events (
+            id,
+            event_type,
+            player_id,
+            assist_player_id
+          ),
+          match_players (
+            player_id,
+            team_id,
+            result_eligible
+          )
         ),
-        round_players (*)
+        round_players (
+          player_id
+        )
       `)
       .eq("id", roundId)
       .single();
@@ -222,32 +241,104 @@ export async function calculateRoundStats(roundId: string) {
 }
 
 export async function getRanking() {
-  const roundIds = await getActiveSeasonRoundIds();
+  const season = await getActiveSeason();
+  if (!season) return [];
+
+  // 1. Tentar buscar direto da View SQL otimizada (PostgreSQL SUM + GROUP BY + ORDER BY)
+  const { data: viewData, error: viewError } = await supabase
+    .from("player_season_stats")
+    .select(`
+      player_id,
+      player_name,
+      player_nickname,
+      player_avatar_url,
+      player_profile,
+      player_is_goalkeeper,
+      player_member_category,
+      player_is_selectable,
+      games,
+      wins,
+      draws,
+      losses,
+      goals,
+      assists,
+      points,
+      win_rate
+    `)
+    .eq("season_id", season.id)
+    .eq("round_type", "official")
+    .eq("player_is_selectable", true)
+    .in("player_member_category", ["player", "guest"])
+    .order("points", { ascending: false })
+    .order("wins", { ascending: false })
+    .order("goals", { ascending: false })
+    .order("assists", { ascending: false });
+
+  if (!viewError && viewData) {
+    return viewData.map((row: any) => ({
+      player: {
+        id: row.player_id,
+        name: row.player_name,
+        nickname: row.player_nickname,
+        avatar_url: row.player_avatar_url,
+        player_profile: row.player_profile,
+        is_goalkeeper: row.player_is_goalkeeper,
+        member_category: row.player_member_category,
+        is_selectable: row.player_is_selectable,
+      } as Player,
+      games: Number(row.games || 0),
+      wins: Number(row.wins || 0),
+      draws: Number(row.draws || 0),
+      losses: Number(row.losses || 0),
+      goals: Number(row.goals || 0),
+      assists: Number(row.assists || 0),
+      points: Number(row.points || 0),
+      winRate: Number(row.win_rate || 0),
+    }));
+  }
+
+  // Fallback seguro se a view ainda não estiver no banco
+  const roundIds = await getActiveSeasonRoundIds(season.league_id, "official");
   if (roundIds.length === 0) return [];
 
-  // O ideal em produção seria usar uma View SQL
-  // Para o MVP, buscamos todos os stats e agrupamos no servidor
   const { data, error } = await supabase
     .from("player_round_stats")
     .select(`
-      *,
-      player:player_id (*)
+      player_id,
+      round_id,
+      games,
+      wins,
+      draws,
+      losses,
+      goals,
+      assists,
+      points,
+      player:player_id (
+        id,
+        name,
+        nickname,
+        avatar_url,
+        player_profile,
+        is_goalkeeper,
+        member_category,
+        is_selectable
+      )
     `)
     .in("round_id", roundIds);
 
-  if (error) {
-    console.error("Erro ao buscar ranking:", error);
+  if (error || !data) {
+    if (error) console.error("Erro ao buscar ranking:", error);
     return [];
   }
 
   const map = new Map<string, any>();
 
   for (const row of data) {
-    if (!isSelectableAthlete(row.player as Player | null)) continue;
+    if (!isSelectableAthlete(row.player as unknown as Player | null)) continue;
     const pid = row.player_id;
     if (!map.has(pid)) {
       map.set(pid, {
-        player: row.player,
+        player: row.player as unknown as Player,
         games: 0,
         wins: 0,
         draws: 0,
@@ -269,7 +360,6 @@ export async function getRanking() {
   }
 
   const ranking = Array.from(map.values());
-  // Ordenar por pontos (desc), saldo de vitórias, gols (desc)
   ranking.sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
     if (b.wins !== a.wins) return b.wins - a.wins;
@@ -493,28 +583,132 @@ export type FriendlyStatsEntry = {
 };
 
 export async function getFriendlyStats(): Promise<FriendlyStatsEntry[]> {
-  const roundIds = await getActiveSeasonRoundIds(undefined, "friendly");
+  const season = await getActiveSeason();
+  if (!season) return [];
+
+  // 1. Tentar buscar estatísticas de amistosos via VIEW SQL
+  const [{ data: viewData, error: viewError }, { data: rounds, error: roundsError }] = await Promise.all([
+    supabase
+      .from("player_season_stats")
+      .select(`
+        player_id,
+        player_name,
+        player_nickname,
+        player_avatar_url,
+        player_profile,
+        player_is_goalkeeper,
+        player_member_category,
+        player_is_selectable,
+        rounds_count,
+        games,
+        wins,
+        draws,
+        losses,
+        goals,
+        assists
+      `)
+      .eq("season_id", season.id)
+      .eq("round_type", "friendly")
+      .eq("player_is_selectable", true)
+      .in("player_member_category", ["player", "guest"]),
+    supabase
+      .from("rounds")
+      .select("id, best_goalkeeper_player_id")
+      .eq("season_id", season.id)
+      .eq("round_type", "friendly")
+      .eq("status", "finished"),
+  ]);
+
+  if (!viewError && viewData) {
+    const goalkeeperCounts = new Map<string, number>();
+    for (const round of rounds || []) {
+      if (round.best_goalkeeper_player_id) {
+        goalkeeperCounts.set(
+          round.best_goalkeeper_player_id,
+          (goalkeeperCounts.get(round.best_goalkeeper_player_id) || 0) + 1
+        );
+      }
+    }
+
+    return viewData
+      .map((row: any) => ({
+        player: {
+          id: row.player_id,
+          name: row.player_name,
+          nickname: row.player_nickname,
+          avatar_url: row.player_avatar_url,
+          player_profile: row.player_profile,
+          is_goalkeeper: row.player_is_goalkeeper,
+          member_category: row.player_member_category,
+          is_selectable: row.player_is_selectable,
+        } as Player,
+        rounds: Number(row.rounds_count || 0),
+        games: Number(row.games || 0),
+        wins: Number(row.wins || 0),
+        draws: Number(row.draws || 0),
+        losses: Number(row.losses || 0),
+        goals: Number(row.goals || 0),
+        assists: Number(row.assists || 0),
+        bestGoalkeeper: goalkeeperCounts.get(row.player_id) || 0,
+      }))
+      .sort((a, b) => a.player.name.localeCompare(b.player.name, "pt-BR"));
+  }
+
+  // Fallback seguro
+  const roundIds = await getActiveSeasonRoundIds(season.league_id, "friendly");
   if (roundIds.length === 0) return [];
-  const [{ data: rows, error }, { data: rounds, error: roundsError }] = await Promise.all([
-    supabase.from("player_round_stats").select(`
-      player_id, round_id, games, wins, draws, losses, goals, assists,
-      player:player_id (*)
-    `).in("round_id", roundIds),
+  const [{ data: rows, error }, { data: fallbackRounds, error: fbRoundsError }] = await Promise.all([
+    supabase
+      .from("player_round_stats")
+      .select(`
+        player_id,
+        round_id,
+        games,
+        wins,
+        draws,
+        losses,
+        goals,
+        assists,
+        player:player_id (
+          id,
+          name,
+          nickname,
+          avatar_url,
+          player_profile,
+          is_goalkeeper,
+          member_category,
+          is_selectable
+        )
+      `)
+      .in("round_id", roundIds),
     supabase.from("rounds").select("id, best_goalkeeper_player_id").in("id", roundIds).eq("status", "finished"),
   ]);
-  if (error || roundsError) {
-    console.error("Erro ao buscar estatisticas de amistosos:", error || roundsError);
+
+  if (error || fbRoundsError) {
+    console.error("Erro ao buscar estatisticas de amistosos:", error || fbRoundsError);
     return [];
   }
   const goalkeeperCounts = new Map<string, number>();
-  for (const round of rounds || []) {
-    if (round.best_goalkeeper_player_id) goalkeeperCounts.set(round.best_goalkeeper_player_id, (goalkeeperCounts.get(round.best_goalkeeper_player_id) || 0) + 1);
+  for (const round of fallbackRounds || []) {
+    if (round.best_goalkeeper_player_id) {
+      goalkeeperCounts.set(round.best_goalkeeper_player_id, (goalkeeperCounts.get(round.best_goalkeeper_player_id) || 0) + 1);
+    }
   }
   const map = new Map<string, FriendlyStatsEntry>();
   for (const raw of rows || []) {
     const row = raw as unknown as Omit<RankingStatsRow, "points">;
     if (!isSelectableAthlete(row.player)) continue;
-    const current = map.get(row.player_id) || { player: row.player, rounds: 0, games: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, bestGoalkeeper: goalkeeperCounts.get(row.player_id) || 0 };
+    const current = map.get(row.player_id) || {
+      player: row.player,
+      rounds: 0,
+      games: 0,
+      wins: 0,
+      draws: 0,
+      losses: 0,
+      goals: 0,
+      assists: 0,
+      bestGoalkeeper: goalkeeperCounts.get(row.player_id) || 0,
+    };
     current.rounds += 1;
     current.games += row.games;
     current.wins += row.wins;
