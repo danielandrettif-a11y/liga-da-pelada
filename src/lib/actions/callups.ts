@@ -33,6 +33,11 @@ export async function getActiveCallup(): Promise<CallupWithEntries | null> {
       callup_entries (
         *,
         player:player_id (*)
+      ),
+      round:round_id (
+        id,
+        status,
+        matches (id, status)
       )
     `)
     .eq("league.is_active", true)
@@ -44,6 +49,18 @@ export async function getActiveCallup(): Promise<CallupWithEntries | null> {
   if (error || !data) {
     if (error) console.error("Erro ao buscar convocacao:", error);
     return null;
+  }
+
+  // Se a rodada vinculada ja iniciou ou finalizou, a convocacao nao deve mais aparecer
+  const linkedRound = (data as any).round;
+  if (linkedRound) {
+    const isRoundStarted = linkedRound.status === "in_progress" || linkedRound.status === "finished";
+    const hasStartedMatches = (linkedRound.matches || []).some(
+      (m: any) => m.status === "in_progress" || m.status === "finished"
+    );
+    if (isRoundStarted || hasStartedMatches) {
+      return null;
+    }
   }
 
   const rawEntries = (data.callup_entries || []) as unknown as CallupEntryWithPlayer[];
@@ -58,16 +75,35 @@ export async function openCallup(formData: FormData) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem abrir convocacoes." };
   const date = String(formData.get("date") || "");
+  const startTime = String(formData.get("start_time") || "08:00").slice(0, 5) || "08:00";
+  const stadiumId = formData.get("stadium_id") ? String(formData.get("stadium_id")) : null;
   const roundType: RoundType = formData.get("round_type") === "friendly" ? "friendly" : "official";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { success: false, error: "Informe uma data valida." };
 
   const league = await getActiveLeague();
   const { data: leagueConfig, error: configError } = await client
     .from("leagues")
-    .select("players_per_team, teams_per_round")
+    .select("players_per_team, teams_per_round, stadium_name, stadium_map_url")
     .eq("id", league.id)
     .single();
   if (configError) return { success: false, error: configError.message };
+
+  let stadiumName: string | null = leagueConfig?.stadium_name || null;
+  let stadiumMapUrl: string | null = leagueConfig?.stadium_map_url || null;
+
+  if (stadiumId) {
+    const { data: stadiumData } = await client
+      .from("stadiums")
+      .select("name, google_maps_url")
+      .eq("id", stadiumId)
+      .maybeSingle();
+
+    if (stadiumData) {
+      stadiumName = stadiumData.name;
+      stadiumMapUrl = stadiumData.google_maps_url;
+    }
+  }
+
   const playersPerTeam = Math.min(
     MAX_PLAYERS_PER_TEAM,
     Math.max(1, leagueConfig?.players_per_team || DEFAULT_PLAYERS_PER_TEAM),
@@ -79,7 +115,17 @@ export async function openCallup(formData: FormData) {
   const capacity = playersPerTeam * teamsPerRound;
   const { data, error } = await client
     .from("callups")
-    .insert({ league_id: league.id, date, round_type: roundType, status: "open", capacity })
+    .insert({
+      league_id: league.id,
+      date,
+      start_time: startTime,
+      stadium_id: stadiumId,
+      stadium_name: stadiumName,
+      stadium_map_url: stadiumMapUrl,
+      round_type: roundType,
+      status: "open",
+      capacity,
+    })
     .select("id")
     .single();
   if (error) {
@@ -138,7 +184,7 @@ export async function createCallupPrelist(callupId: string) {
 
   const { data: callup, error: callupError } = await client
     .from("callups")
-    .select("id, date, round_type, status, round_id, callup_entries(player_id, status)")
+    .select("id, date, start_time, stadium_id, stadium_name, stadium_map_url, round_type, status, round_id, callup_entries(player_id, status)")
     .eq("id", callupId)
     .maybeSingle();
 
@@ -171,10 +217,13 @@ export async function createCallupPrelist(callupId: string) {
   const { data: roundId, error } = await client.rpc("save_round_prelist", {
     p_round_id: null,
     p_date: callup.date,
-    p_start_time: "08:00",
+    p_start_time: callup.start_time || "08:00",
     p_round_type: callup.round_type === "friendly" ? "friendly" : "official",
     p_player_ids: confirmedPlayerIds,
     p_callup_id: callup.id,
+    p_stadium_id: callup.stadium_id || null,
+    p_stadium_name: callup.stadium_name || null,
+    p_stadium_map_url: callup.stadium_map_url || null,
   });
 
   if (error) return { success: false, error: error.message };

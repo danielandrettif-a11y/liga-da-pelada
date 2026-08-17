@@ -6,10 +6,17 @@ import { getPlayers } from "@/lib/actions/players";
 import { getCurrentAccount } from "@/lib/auth";
 import { getLeagueConfig } from "@/lib/actions/league";
 
+import { getFantasyQuickHighlights } from "@/lib/actions/fantasy";
+
 export const revalidate = 0;
 
 export default async function ConvocacaoPage() {
-  const [callup, account, leagueConfig] = await Promise.all([getActiveCallup(), getCurrentAccount(), getLeagueConfig()]);
+  const [callup, account, leagueConfig, fantasyHighlights] = await Promise.all([
+    getActiveCallup(),
+    getCurrentAccount(),
+    getLeagueConfig(),
+    getFantasyQuickHighlights(),
+  ]);
   if (!callup) {
     return (
       <div className="flex min-h-[65vh] flex-col items-center justify-center text-center">
@@ -22,5 +29,21 @@ export default async function ConvocacaoPage() {
   }
 
   const selectablePlayers = account.isAdmin ? await getPlayers(true) : [];
-  return <div className="min-w-0 overflow-x-clip"><CallupBoard callup={callup} currentPlayerId={account.profile?.player_id || null} isAuthenticated={Boolean(account.user)} isAdmin={account.isAdmin} selectablePlayers={selectablePlayers} stadiumName={leagueConfig?.stadium_name} stadiumMapUrl={leagueConfig?.stadium_map_url} /></div>;
+  const stadiumName = callup.stadium_name || leagueConfig?.stadium_name || null;
+  const stadiumMapUrl = callup.stadium_map_url || leagueConfig?.stadium_map_url || null;
+
+  return (
+    <div className="min-w-0 overflow-x-clip">
+      <CallupBoard
+        callup={callup}
+        currentPlayerId={account.profile?.player_id || null}
+        isAuthenticated={Boolean(account.user)}
+        isAdmin={account.isAdmin}
+        selectablePlayers={selectablePlayers}
+        stadiumName={stadiumName}
+        stadiumMapUrl={stadiumMapUrl}
+        fantasyHighlights={fantasyHighlights}
+      />
+    </div>
+  );
 }

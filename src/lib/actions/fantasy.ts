@@ -342,6 +342,195 @@ export async function getFantasyRanking(scope: "general" | "round" = "general", 
   });
 }
 
+export type FantasyLineupStatusEntry = {
+  userId: string;
+  playerName: string;
+  avatarUrl: string | null;
+  hasSaved: boolean;
+  savedAt: string | null;
+  points?: number | null;
+  isCurrentUser: boolean;
+};
+
+export type FantasyRoundLineupOverview = {
+  isRoundOpen: boolean;
+  roundNumber?: number | null;
+  roundDate?: string | null;
+  roundId?: string | null;
+  confirmedCount: number;
+  pendingCount: number;
+  confirmed: FantasyLineupStatusEntry[];
+  pending: FantasyLineupStatusEntry[];
+  ranking: any[];
+};
+
+export async function getFantasyRoundLineupOverview(roundId?: string): Promise<FantasyRoundLineupOverview> {
+  const account = await getCurrentAccount();
+  if (!account.user) {
+    return {
+      isRoundOpen: false,
+      confirmedCount: 0,
+      pendingCount: 0,
+      confirmed: [],
+      pending: [],
+      ranking: [],
+    };
+  }
+
+  const league = await getActiveLeague();
+  const season = await getActiveSeason(league.id);
+  if (!season) {
+    return {
+      isRoundOpen: false,
+      confirmedCount: 0,
+      pendingCount: 0,
+      confirmed: [],
+      pending: [],
+      ranking: [],
+    };
+  }
+
+  const { data: fs } = await account.client
+    .from("fantasy_seasons")
+    .select("id")
+    .eq("season_id", season.id)
+    .maybeSingle();
+
+  if (!fs) {
+    return {
+      isRoundOpen: false,
+      confirmedCount: 0,
+      pendingCount: 0,
+      confirmed: [],
+      pending: [],
+      ranking: [],
+    };
+  }
+
+  // Buscar todas as rodadas do fantasy da temporada
+  const { data: fantasyRounds } = await account.client
+    .from("fantasy_rounds")
+    .select("id, market_status, round_id, round:round_id(id, number, date, status, round_type)")
+    .eq("fantasy_season_id", fs.id);
+
+  const officialFantasyRounds = (fantasyRounds || []).filter((fr: any) => fr.round?.round_type === "official");
+
+  // Ordenar por data mais recente
+  const sortedRounds = [...officialFantasyRounds].sort((a: any, b: any) =>
+    `${b.round?.date || ""}-${String(b.round?.number || 0).padStart(4, "0")}`.localeCompare(
+      `${a.round?.date || ""}-${String(a.round?.number || 0).padStart(4, "0")}`
+    )
+  );
+
+  let targetFantasyRound: any = null;
+  if (roundId) {
+    targetFantasyRound = sortedRounds.find((fr: any) => fr.round_id === roundId || fr.id === roundId) || null;
+  } else {
+    // A rodada ativa (se houver uma aberta/em andamento) ou a mais recente
+    targetFantasyRound = sortedRounds.find((fr: any) => fr.market_status !== "finished" && fr.round?.status !== "finished") || sortedRounds[0] || null;
+  }
+
+  if (!targetFantasyRound) {
+    return {
+      isRoundOpen: false,
+      confirmedCount: 0,
+      pendingCount: 0,
+      confirmed: [],
+      pending: [],
+      ranking: [],
+    };
+  }
+
+  const isRoundOpen = targetFantasyRound.market_status !== "finished" && targetFantasyRound.round?.status !== "finished";
+
+  // Buscar ranking tradicional da rodada
+  const ranking = await getFantasyRanking("round", targetFantasyRound.round?.id);
+
+  if (!isRoundOpen) {
+    return {
+      isRoundOpen: false,
+      roundNumber: targetFantasyRound.round?.number,
+      roundDate: targetFantasyRound.round?.date,
+      roundId: targetFantasyRound.round?.id,
+      confirmedCount: ranking.length,
+      pendingCount: 0,
+      confirmed: [],
+      pending: [],
+      ranking,
+    };
+  }
+
+  // Rodada está aberta: listar quem já escalou e quem falta escalar
+  // 1. Buscar todas as contas de fantasy / jogadores na liga
+  const [{ data: fantasyAccounts }, { data: allProfiles }, { data: lineups }] = await Promise.all([
+    account.client.from("fantasy_accounts").select("user_id").eq("fantasy_season_id", fs.id),
+    account.client.from("account_profiles").select("user_id, players(name, avatar_url)").not("player_id", "is", null),
+    account.client.from("fantasy_lineups").select("id, user_id, status, updated_at, created_at").eq("fantasy_round_id", targetFantasyRound.id),
+  ]);
+
+  const lineupByUser = new Map((lineups || []).map((l: any) => [l.user_id, l]));
+  const profileByUser = new Map((allProfiles || []).map((p: any) => [p.user_id, p.players]));
+
+  // Combinar todos os user_ids relevantes
+  const allUserIds = new Set<string>([
+    ...(fantasyAccounts || []).map((fa: any) => fa.user_id),
+    ...(allProfiles || []).map((ap: any) => ap.user_id),
+    ...(lineups || []).map((l: any) => l.user_id),
+  ]);
+
+  const confirmed: FantasyLineupStatusEntry[] = [];
+  const pending: FantasyLineupStatusEntry[] = [];
+
+  for (const userId of allUserIds) {
+    const profile = profileByUser.get(userId);
+    const playerName = (profile as any)?.name || "Cartoleiro";
+    const avatarUrl = (profile as any)?.avatar_url || null;
+    const lineup = lineupByUser.get(userId);
+    const isCurrentUser = userId === account.user.id;
+
+    if (lineup && lineup.status !== "missed") {
+      confirmed.push({
+        userId,
+        playerName,
+        avatarUrl,
+        hasSaved: true,
+        savedAt: lineup.updated_at || lineup.created_at || null,
+        isCurrentUser,
+      });
+    } else {
+      pending.push({
+        userId,
+        playerName,
+        avatarUrl,
+        hasSaved: false,
+        savedAt: null,
+        isCurrentUser,
+      });
+    }
+  }
+
+  // Ordenar confirmados pelos que salvaram mais recentemente (ou alfabético)
+  confirmed.sort((a, b) => {
+    if (a.savedAt && b.savedAt) return b.savedAt.localeCompare(a.savedAt);
+    return a.playerName.localeCompare(b.playerName, "pt-BR");
+  });
+
+  // Ordenar pendentes por nome alfabético
+  pending.sort((a, b) => a.playerName.localeCompare(b.playerName, "pt-BR"));
+
+  return {
+    isRoundOpen: true,
+    roundNumber: targetFantasyRound.round?.number,
+    roundDate: targetFantasyRound.round?.date,
+    roundId: targetFantasyRound.round?.id,
+    confirmedCount: confirmed.length,
+    pendingCount: pending.length,
+    confirmed,
+    pending,
+    ranking,
+  };
+}
+
 export async function updateFantasySettings(values: Partial<FantasySettings>) {
   const account = await getCurrentAccount(); if (!account.isAdmin) return { success: false, error: "Somente administradores." };
   const { lossPoints, ...otherValues } = values;
@@ -463,4 +652,49 @@ export async function getMyFantasyHistory() {
   const { data } = await account.client.from("fantasy_lineups").select("*, fantasy_rounds(round_id, market_status, rounds(number, date))")
     .eq("user_id", account.user.id).order("created_at", { ascending: false });
   return data || [];
+}
+
+export type FantasyQuickHighlight = {
+  topScorer: { name: string; avatarUrl: string | null; points: number } | null;
+  topGain: { name: string; avatarUrl: string | null; variation: number; priceChange: number } | null;
+  topDrop: { name: string; avatarUrl: string | null; variation: number; priceChange: number } | null;
+};
+
+export async function getFantasyQuickHighlights(): Promise<FantasyQuickHighlight | null> {
+  const account = await getCurrentAccount();
+  if (!account.user) return null;
+  const league = await getActiveLeague();
+  const season = await getActiveSeason(league.id);
+  if (!season) return null;
+  const { data: fs } = await account.client
+    .from("fantasy_seasons")
+    .select("id")
+    .eq("season_id", season.id)
+    .maybeSingle();
+  if (!fs) return null;
+
+  const { data: prices } = await account.client
+    .from("fantasy_player_prices")
+    .select("player_id, current_price, last_round_points, last_price_change, variation_rate, players(name, avatar_url)")
+    .eq("fantasy_season_id", fs.id);
+
+  if (!prices || prices.length === 0) return null;
+
+  const validPrices = prices.map((item: any) => ({
+    name: item.players?.name || "Jogador",
+    avatarUrl: item.players?.avatar_url || null,
+    points: Number(item.last_round_points || 0),
+    priceChange: Number(item.last_price_change || 0),
+    variation: Number(item.variation_rate || 0),
+  }));
+
+  const sortedPoints = [...validPrices].sort((a, b) => b.points - a.points);
+  const sortedGain = [...validPrices].sort((a, b) => b.variation - a.variation);
+  const sortedDrop = [...validPrices].sort((a, b) => a.variation - b.variation);
+
+  return {
+    topScorer: sortedPoints[0]?.points > 0 ? sortedPoints[0] : null,
+    topGain: sortedGain[0]?.variation > 0 ? sortedGain[0] : null,
+    topDrop: sortedDrop[0]?.variation < 0 ? sortedDrop[0] : null,
+  };
 }

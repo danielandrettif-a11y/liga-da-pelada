@@ -90,6 +90,18 @@ export type RosterUnreadState = {
   lastSeenAt: string | null;
 };
 
+export type Stadium = {
+  id: string;
+  league_id: string;
+  name: string;
+  address: string | null;
+  google_maps_url: string;
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type League = {
   id: string;
   name: string;
@@ -136,6 +148,9 @@ export type Round = {
   round_type: RoundType;
   formation_mode: TeamFormationMode;
   preparation_stage: RoundPreparationStage;
+  stadium_id?: string | null;
+  stadium_name?: string | null;
+  stadium_map_url?: string | null;
   notes: string | null;
   payment_pix: string | null;
   payment_total: number | null;
@@ -147,10 +162,14 @@ export type Callup = {
   id: string;
   league_id: string;
   date: string;
+  start_time?: string | null;
   round_type: RoundType;
   status: CallupStatus;
   capacity: number;
   waitlist_capacity: number;
+  stadium_id?: string | null;
+  stadium_name?: string | null;
+  stadium_map_url?: string | null;
   round_id: string | null;
   created_by: string | null;
   created_at: string;

@@ -5,6 +5,7 @@ import { RoundCreator } from "@/components/RoundCreator";
 import { getActiveCallup } from "@/lib/actions/callups";
 import { getLeagueConfig } from "@/lib/actions/league";
 import { getAdminRoundPrelist, getNextTeamPresetOffset } from "@/lib/actions/rounds";
+import { getStadiums } from "@/lib/actions/stadiums";
 
 export const revalidate = 0;
 
@@ -12,13 +13,14 @@ export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin
   const params = await searchParams;
   const requestedType = params.type === "friendly" ? "friendly" : "official";
   const requestedRoundId = typeof params.round === "string" ? params.round : null;
-  const [players, activeCallup, leagueConfig, officialPresetOffset, friendlyPresetOffset, prelist] = await Promise.all([
+  const [players, activeCallup, leagueConfig, officialPresetOffset, friendlyPresetOffset, prelist, stadiums] = await Promise.all([
     getPlayersWithStats("official", true),
     getActiveCallup(),
     getLeagueConfig(),
     getNextTeamPresetOffset("official"),
     getNextTeamPresetOffset("friendly"),
     requestedRoundId ? getAdminRoundPrelist(requestedRoundId) : Promise.resolve(null),
+    getStadiums(),
   ]);
   const requestedCallup = typeof params.callup === "string" && activeCallup?.id === params.callup ? activeCallup : null;
   const linkedCallup = prelist?.callupId && activeCallup?.id === prelist.callupId ? activeCallup : null;
@@ -53,8 +55,10 @@ export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin
 
       <RoundCreator
         allPlayers={players}
+        stadiums={stadiums}
         initialDate={prelist?.date || callup?.date}
-        initialTime={prelist?.start_time || "08:00"}
+        initialTime={prelist?.start_time || callup?.start_time || "08:00"}
+        initialStadiumId={prelist?.stadium_id || callup?.stadium_id || stadiums[0]?.id || null}
         initialPlayerIds={confirmedIds}
         roundType={prelist?.round_type || callup?.round_type || requestedType}
         callupId={callup?.id || null}

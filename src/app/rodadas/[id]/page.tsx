@@ -16,6 +16,7 @@ import { getRoundStatistics } from "@/lib/actions/stats";
 import { RoundHistoryTabs } from "@/components/RoundHistoryTabs";
 import { RoundAdminPlayerTools } from "@/components/RoundAdminPlayerTools";
 import { getPlayers } from "@/lib/actions/players";
+import { RoundInstagramStoryGenerator } from "@/components/RoundInstagramStoryGenerator";
 
 export const revalidate = 0;
 
@@ -177,6 +178,10 @@ export default async function RodadaDetalhePage({
       </section>
       
       <FinishRoundButton roundId={round.id} status={round.status} canManage={account.isAdmin} />
+
+      {round.status === "finished" && (
+        <RoundInstagramStoryGenerator round={round} statistics={roundStatistics} />
+      )}
 
       {account.isAdmin && (
         <RoundAdminPlayerTools

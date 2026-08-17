@@ -1,4 +1,9 @@
+"use client";
+
+import { useState } from "react";
+import { CheckCircle2, Clock } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import type { FantasyRoundLineupOverview } from "@/lib/actions/fantasy";
 
 export type FantasyRankingEntry = {
   id: string;
@@ -12,11 +17,167 @@ export type FantasyRankingEntry = {
   } | null;
 };
 
-export function FantasyRankingList({ ranking }: { ranking: FantasyRankingEntry[] }) {
+export function FantasyRankingList({
+  ranking,
+  roundOverview,
+  scope = "general",
+}: {
+  ranking: FantasyRankingEntry[];
+  roundOverview?: FantasyRoundLineupOverview | null;
+  scope?: "general" | "round";
+}) {
+  const [activeTab, setActiveTab] = useState<"confirmed" | "pending">("confirmed");
+
+  // Se o escopo for rodada e a rodada estiver aberta para escalação
+  if (scope === "round" && roundOverview?.isRoundOpen) {
+    const { confirmed, pending, confirmedCount, pendingCount, roundNumber } = roundOverview;
+
+    return (
+      <div className="space-y-4">
+        {/* Banner de status da rodada aberta */}
+        <div className="rounded-2xl border border-accent/30 bg-accent/10 p-4 text-xs font-semibold text-foreground">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-accent animate-pulse shrink-0" />
+            <strong className="text-accent uppercase tracking-wider font-black">
+              {roundNumber ? `Rodada ${String(roundNumber).padStart(2, "0")} em Aberto` : "Rodada em Aberto"}
+            </strong>
+          </div>
+          <p className="mt-1.5 text-muted leading-relaxed">
+            Acompanhe em tempo real quem já escalou e salvou o time para a rodada. Logo após salvar no Cartola, o nome aparece como confirmado aqui.
+          </p>
+        </div>
+
+        {/* Abas de alternância entre Confirmados e Pendentes */}
+        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-surface p-1.5">
+          <button
+            type="button"
+            onClick={() => setActiveTab("confirmed")}
+            className={`flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-black transition-colors ${
+              activeTab === "confirmed"
+                ? "bg-success text-background shadow-[0_0_20px_rgba(34,197,94,.2)]"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            Já Salvaram ({confirmedCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("pending")}
+            className={`flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-black transition-colors ${
+              activeTab === "pending"
+                ? "bg-warning text-background shadow-[0_0_20px_rgba(234,179,8,.2)]"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            <Clock className="h-4 w-4" />
+            Faltam Escalar ({pendingCount})
+          </button>
+        </div>
+
+        {/* Lista de Confirmados */}
+        {activeTab === "confirmed" && (
+          <div className="space-y-2">
+            {confirmed.length === 0 ? (
+              <div className="glass-card p-6 text-center text-sm text-muted">
+                Nenhum cartoleiro salvou o time para esta rodada ainda. Seja o primeiro!
+              </div>
+            ) : (
+              confirmed.map((item, index) => (
+                <div
+                  key={item.userId}
+                  className={`glass-card flex items-center gap-3 p-3.5 ${
+                    item.isCurrentUser ? "border-accent/40 bg-accent/5" : ""
+                  }`}
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-success/15 text-xs font-black text-success">
+                    {index + 1}
+                  </span>
+                  <PlayerAvatar
+                    name={item.playerName}
+                    avatarUrl={item.avatarUrl}
+                    className="h-10 w-10 shrink-0 rounded-full bg-surface text-xs font-black text-accent"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate text-sm font-black text-foreground">{item.playerName}</p>
+                      {item.isCurrentUser && (
+                        <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[8px] font-black uppercase text-accent">
+                          Você
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted">
+                      {item.savedAt
+                        ? `Escalação salva em ${new Intl.DateTimeFormat("pt-BR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }).format(new Date(item.savedAt))}`
+                        : "Escalação confirmada"}
+                    </p>
+                  </div>
+                  <span className="flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[9px] font-black uppercase text-success">
+                    <CheckCircle2 className="h-3 w-3" /> Escalado
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Lista de Pendentes */}
+        {activeTab === "pending" && (
+          <div className="space-y-2">
+            {pending.length === 0 ? (
+              <div className="glass-card p-6 text-center text-sm text-muted">
+                Todos os participantes já escalaram o time para esta rodada! 🚀
+              </div>
+            ) : (
+              pending.map((item, index) => (
+                <div
+                  key={item.userId}
+                  className={`glass-card flex items-center gap-3 p-3.5 opacity-85 ${
+                    item.isCurrentUser ? "border-warning/40 bg-warning/5" : ""
+                  }`}
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface text-xs font-black text-muted">
+                    {index + 1}
+                  </span>
+                  <PlayerAvatar
+                    name={item.playerName}
+                    avatarUrl={item.avatarUrl}
+                    className="h-10 w-10 shrink-0 rounded-full bg-surface text-xs font-black text-muted"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate text-sm font-black text-foreground">{item.playerName}</p>
+                      {item.isCurrentUser && (
+                        <span className="rounded-full bg-warning/20 px-2 py-0.5 text-[8px] font-black uppercase text-warning">
+                          Você
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted">Ainda não enviou escalação</p>
+                  </div>
+                  <span className="flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-[9px] font-black uppercase text-warning">
+                    <Clock className="h-3 w-3" /> Pendente
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Visualização de Ranking tradicional (geral ou rodada concluída)
   if (ranking.length === 0) {
     return (
       <p className="glass-card p-6 text-center text-sm text-muted">
-        O ranking aparecerá após as primeiras escalações.
+        O ranking aparecerá após as primeiras escalações e partidas finalizadas.
       </p>
     );
   }
@@ -25,7 +186,11 @@ export function FantasyRankingList({ ranking }: { ranking: FantasyRankingEntry[]
     <div className="space-y-2">
       {ranking.map((item) => (
         <div key={item.id} className="glass-card flex items-center gap-3 p-4">
-          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black ${item.position <= 3 ? "bg-accent text-background" : "bg-surface text-muted"}`}>
+          <span
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black ${
+              item.position <= 3 ? "bg-accent text-background" : "bg-surface text-muted"
+            }`}
+          >
             {item.position}
           </span>
           <PlayerAvatar
@@ -36,7 +201,8 @@ export function FantasyRankingList({ ranking }: { ranking: FantasyRankingEntry[]
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-black text-foreground">{item.player?.name || "Cartoleiro"}</p>
             <p className="text-[10px] text-muted">
-              {Number(item.rounds_played)} rodadas · patrimônio C$ {Number(item.current_budget).toFixed(2)}
+              {Number(item.rounds_played)} {Number(item.rounds_played) === 1 ? "rodada" : "rodadas"} · patrimônio C${" "}
+              {Number(item.current_budget).toFixed(2)}
             </p>
           </div>
           <div className="shrink-0 text-right">

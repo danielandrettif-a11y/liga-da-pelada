@@ -327,6 +327,9 @@ export type SaveRoundPrelistInput = {
   roundType: RoundType;
   playerIds: string[];
   callupId?: string | null;
+  stadiumId?: string | null;
+  stadiumName?: string | null;
+  stadiumMapUrl?: string | null;
 };
 
 export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
@@ -340,7 +343,7 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
     const league = await getActiveLeague();
     const { data: leagueConfig, error: configError } = await client
       .from("leagues")
-      .select("players_per_team, teams_per_round")
+      .select("players_per_team, teams_per_round, stadium_name, stadium_map_url")
       .eq("id", league.id)
       .single();
     if (configError) throw new Error(configError.message);
@@ -351,10 +354,14 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
     let effectivePlayerIds = playerIds;
     let effectiveDate = input.date;
     let effectiveRoundType = input.roundType;
+    let effectiveStadiumId = input.stadiumId || null;
+    let effectiveStadiumName = input.stadiumName || null;
+    let effectiveStadiumMapUrl = input.stadiumMapUrl || null;
+
     if (input.callupId) {
       const { data: callup, error: callupError } = await client
         .from("callups")
-        .select("date, round_type, callup_entries(player_id, status)")
+        .select("date, round_type, start_time, stadium_id, stadium_name, stadium_map_url, callup_entries(player_id, status)")
         .eq("id", input.callupId)
         .eq("status", "open")
         .single();
@@ -364,6 +371,22 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
         .map((entry: any) => entry.player_id);
       effectiveDate = callup.date;
       effectiveRoundType = callup.round_type as RoundType;
+      effectiveStadiumId = effectiveStadiumId || callup.stadium_id;
+      effectiveStadiumName = effectiveStadiumName || callup.stadium_name;
+      effectiveStadiumMapUrl = effectiveStadiumMapUrl || callup.stadium_map_url;
+    }
+
+    if (effectiveStadiumId && (!effectiveStadiumName || !effectiveStadiumMapUrl)) {
+      const { data: stadiumData } = await client
+        .from("stadiums")
+        .select("name, google_maps_url")
+        .eq("id", effectiveStadiumId)
+        .maybeSingle();
+
+      if (stadiumData) {
+        effectiveStadiumName = stadiumData.name;
+        effectiveStadiumMapUrl = stadiumData.google_maps_url;
+      }
     }
 
     const { data: roundId, error } = await client.rpc("save_round_prelist", {
@@ -373,6 +396,9 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
       p_round_type: effectiveRoundType === "friendly" ? "friendly" : "official",
       p_player_ids: effectivePlayerIds,
       p_callup_id: input.callupId || null,
+      p_stadium_id: effectiveStadiumId,
+      p_stadium_name: effectiveStadiumName,
+      p_stadium_map_url: effectiveStadiumMapUrl,
     });
     if (error) {
       if (error.code === "23505") throw new Error("Houve um conflito na numeracao. Atualize a pagina e tente novamente.");
@@ -392,10 +418,22 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
   }
 }
 
+export type CreateRoundOptions = {
+  roundType?: RoundType;
+  callupId?: string | null;
+  formationMode?: TeamFormationMode;
+  attendanceOrder?: string[];
+  prelistRoundId?: string | null;
+  startTime?: string;
+  stadiumId?: string | null;
+  stadiumName?: string | null;
+  stadiumMapUrl?: string | null;
+};
+
 export async function createRoundWithTeams(
   date: string,
   teams: TeamInput[],
-  options: { roundType?: RoundType; callupId?: string | null; formationMode?: TeamFormationMode; attendanceOrder?: string[]; prelistRoundId?: string | null } = {},
+  options: CreateRoundOptions = {},
 ) {
   try {
     const client = await getAdminClient();
@@ -500,6 +538,23 @@ export async function createRoundWithTeams(
       }
     }
 
+    let stadiumId = options.stadiumId || null;
+    let stadiumName = options.stadiumName || null;
+    let stadiumMapUrl = options.stadiumMapUrl || null;
+    let startTime = options.startTime || "08:00";
+
+    if (stadiumId && (!stadiumName || !stadiumMapUrl)) {
+      const { data: stadiumData } = await client
+        .from("stadiums")
+        .select("name, google_maps_url")
+        .eq("id", stadiumId)
+        .maybeSingle();
+      if (stadiumData) {
+        stadiumName = stadiumData.name;
+        stadiumMapUrl = stadiumData.google_maps_url;
+      }
+    }
+
     // 1. Descobrir o número da nova rodada (maior number + 1)
     let round: any;
     if (options.prelistRoundId) {
@@ -518,6 +573,15 @@ export async function createRoundWithTeams(
         return { success: false, error: "Salve a pre-lista com todos os jogadores antes de montar os times." };
       }
       if ((existingRound.teams || []).length > 0) return { success: false, error: "Esta rodada ja possui times montados." };
+      
+      if (stadiumId || startTime) {
+        await client.from("rounds").update({
+          start_time: startTime || existingRound.start_time,
+          stadium_id: stadiumId || existingRound.stadium_id,
+          stadium_name: stadiumName || existingRound.stadium_name,
+          stadium_map_url: stadiumMapUrl || existingRound.stadium_map_url,
+        }).eq("id", existingRound.id);
+      }
       round = existingRound;
     } else {
     const { data: lastRound } = await client
@@ -540,6 +604,10 @@ export async function createRoundWithTeams(
         season_id: season.id,
         number: nextNumber,
         date,
+        start_time: startTime,
+        stadium_id: stadiumId,
+        stadium_name: stadiumName,
+        stadium_map_url: stadiumMapUrl,
         status: "draft",
         round_type: roundType,
         formation_mode: formationMode,

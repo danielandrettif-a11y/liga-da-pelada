@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createRoundWithTeams, saveRoundPrelist, type TeamInput } from "@/lib/actions/rounds";
-import type { Player, RoundType, TeamFormationMode } from "@/lib/types";
+import type { Player, RoundType, Stadium, TeamFormationMode } from "@/lib/types";
 import { drawTeamsByAttendance } from "@/lib/round-draw";
 import {
   Users,
@@ -13,6 +13,7 @@ import {
   PencilLine,
   RotateCcw,
   Search,
+  Stadium as StadiumIcon,
   X,
 } from "@/components/icons";
 import { PlayerAvatar } from "./PlayerAvatar";
@@ -42,6 +43,17 @@ type DrawTeam = {
   players: DrawPlayer[];
 };
 
+export const VEST_COLORS = [
+  { label: "Verde Limão", color: "#22c55e", bg: "bg-emerald-500", text: "text-emerald-400" },
+  { label: "Laranja", color: "#f97316", bg: "bg-orange-500", text: "text-orange-400" },
+  { label: "Azul Royal", color: "#3b82f6", bg: "bg-blue-500", text: "text-blue-400" },
+  { label: "Vermelho", color: "#ef4444", bg: "bg-red-500", text: "text-red-400" },
+  { label: "Amarelo", color: "#eab308", bg: "bg-yellow-400", text: "text-yellow-300" },
+  { label: "Preto", color: "#1e293b", bg: "bg-slate-800", text: "text-slate-200" },
+  { label: "Branco", color: "#f8fafc", bg: "bg-slate-100", text: "text-slate-800" },
+  { label: "Rosa", color: "#ec4899", bg: "bg-pink-500", text: "text-pink-400" },
+];
+
 function createDefaultTeams(count: number, offset = 0): DrawTeam[] {
   const featuredTeams = TEAM_PRESETS.slice(0, 4);
   const normalizedOffset = ((offset % featuredTeams.length) + featuredTeams.length) % featuredTeams.length;
@@ -56,12 +68,14 @@ function createDefaultTeams(count: number, offset = 0): DrawTeam[] {
 
 export function RoundCreator({
   allPlayers,
+  stadiums = [],
   initialDate,
   initialPlayerIds = [],
   roundType = "official",
   callupId = null,
   prelistRoundId = null,
   initialTime = "08:00",
+  initialStadiumId = null,
   availableCallup = null,
   mountTeams = false,
   prelistNumber = null,
@@ -70,12 +84,14 @@ export function RoundCreator({
   teamPresetOffsets = {},
 }: {
   allPlayers: DrawPlayer[];
+  stadiums?: Stadium[];
   initialDate?: string;
   initialPlayerIds?: string[];
   roundType?: RoundType;
   callupId?: string | null;
   prelistRoundId?: string | null;
   initialTime?: string;
+  initialStadiumId?: string | null;
   availableCallup?: { id: string; date: string; roundType: RoundType; playerIds: string[] } | null;
   mountTeams?: boolean;
   prelistNumber?: number | null;
@@ -88,6 +104,7 @@ export function RoundCreator({
   const [step, setStep] = useState<1 | 2 | 3>(prelistRoundId ? (mountTeams ? 3 : 2) : 1);
   const [date, setDate] = useState(() => initialDate || new Date().toISOString().split("T")[0]);
   const [startTime, setStartTime] = useState(initialTime.slice(0, 5));
+  const [selectedStadiumId, setSelectedStadiumId] = useState<string | null>(initialStadiumId || stadiums[0]?.id || null);
   const [selectedRoundType, setSelectedRoundType] = useState<RoundType>(roundType);
   const [sourceCallupId, setSourceCallupId] = useState<string | null>(callupId);
   const [currentPrelistId, setCurrentPrelistId] = useState<string | null>(prelistRoundId);
@@ -230,6 +247,7 @@ export function RoundCreator({
       roundType: selectedRoundType,
       playerIds: [...selectedPlayerIds],
       callupId: sourceCallupId,
+      stadiumId: selectedStadiumId,
     });
     if (!result.success || !result.roundId) {
       setError(result.error || "Nao foi possivel salvar a pre-lista.");
@@ -322,6 +340,12 @@ export function RoundCreator({
     setError("");
   }
 
+  function updateTeamColor(teamId: string, color: string) {
+    setTeams((current) => current.map((team) => (
+      team.id === teamId ? { ...team, color } : team
+    )));
+  }
+
   async function handleSave() {
     const normalizedNames = teams.map((team) => team.name.trim());
     if (normalizedNames.some((name) => !name)) {
@@ -338,11 +362,10 @@ export function RoundCreator({
       return;
     }
 
-    if (unassignedPlayers.length > 0) {
-      setError(`Aloque os ${unassignedPlayers.length} jogadores restantes antes de criar a rodada.`);
-      return;
-    }
+    await handleCreateRound();
+  }
 
+  async function handleCreateRound() {
     setLoading(true);
     setError("");
 
@@ -360,6 +383,8 @@ export function RoundCreator({
       formationMode,
       attendanceOrder: formationMode === "manual" ? [] : attendanceOrder,
       prelistRoundId: currentPrelistId,
+      startTime,
+      stadiumId: selectedStadiumId,
     });
     
     if (!res.success) {
@@ -445,6 +470,28 @@ export function RoundCreator({
               onChange={(event) => setStartTime(event.target.value)}
               className="block min-w-0 max-w-full w-full appearance-none bg-surface-hover border border-border rounded-xl px-4 py-3 text-base text-foreground focus:outline-none focus:border-accent transition-colors"
             />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="round-stadium-select" className="text-xs font-black uppercase tracking-wider text-muted flex items-center gap-1.5">
+              <StadiumIcon className="w-3.5 h-3.5 text-accent" />
+              Campo / Estádio
+            </label>
+            <select
+              id="round-stadium-select"
+              value={selectedStadiumId || ""}
+              onChange={(e) => setSelectedStadiumId(e.target.value || null)}
+              className="block min-w-0 max-w-full w-full bg-surface-hover border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-accent transition-colors"
+            >
+              {stadiums.length > 0 ? (
+                stadiums.map((stadium) => (
+                  <option key={stadium.id} value={stadium.id}>
+                    {stadium.name} {stadium.address ? `(${stadium.address})` : ""}
+                  </option>
+                ))
+              ) : (
+                <option value="">Estádio Padrão da Liga</option>
+              )}
+            </select>
           </div>
           <button
             onClick={() => setStep(2)}
@@ -600,27 +647,85 @@ export function RoundCreator({
               </div>
             </div>
 
-            <div className="space-y-3">
-              {teams.map((team, index) => (
-                <label key={team.id} className="block" htmlFor={`team-name-${team.id}`}>
-                  <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted">
-                    Time {index + 1}
-                  </span>
-                  <div className="flex items-center gap-3 rounded-xl border border-border bg-background/50 px-3 focus-within:border-accent">
-                    <TeamCrest name={team.name || `Time ${index + 1}`} crestUrl={team.crestUrl} color={team.color} className="h-9 w-9" />
-                    <input
-                      id={`team-name-${team.id}`}
-                      type="text"
-                      value={team.name}
-                      onChange={(event) => updateTeamName(team.id, event.target.value)}
-                      maxLength={40}
-                      placeholder={`Nome do time ${index + 1}`}
-                      className="min-w-0 flex-1 bg-transparent py-3 text-sm font-bold text-foreground outline-none placeholder:text-muted/50"
-                    />
-                    <span className="text-[9px] font-bold text-muted/60">{team.name.length}/40</span>
+            <div className="space-y-4">
+              {teams.map((team, index) => {
+                const currentVest = VEST_COLORS.find(
+                  (v) => v.color.toLowerCase() === team.color?.toLowerCase()
+                ) || { label: "Personalizado", color: team.color, bg: "bg-accent", text: "text-accent" };
+
+                return (
+                  <div key={team.id} className="rounded-2xl border border-border bg-background/50 p-3.5 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-muted">
+                        Time {index + 1}
+                      </span>
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black uppercase"
+                        style={{
+                          backgroundColor: `${team.color}20`,
+                          color: team.color || "#CCFF00",
+                          border: `1px solid ${team.color}40`,
+                        }}
+                      >
+                        <span
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: team.color || "#CCFF00" }}
+                        />
+                        Colete {currentVest.label}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 focus-within:border-accent">
+                      <TeamCrest
+                        name={team.name || `Time ${index + 1}`}
+                        crestUrl={team.crestUrl}
+                        color={team.color}
+                        className="h-9 w-9"
+                      />
+                      <input
+                        id={`team-name-${team.id}`}
+                        type="text"
+                        value={team.name}
+                        onChange={(event) => updateTeamName(team.id, event.target.value)}
+                        maxLength={40}
+                        placeholder={`Nome do time ${index + 1}`}
+                        className="min-w-0 flex-1 bg-transparent py-3 text-sm font-bold text-foreground outline-none placeholder:text-muted/50"
+                      />
+                      <span className="text-[9px] font-bold text-muted/60">{team.name.length}/40</span>
+                    </div>
+
+                    {/* Paleta de Coletes */}
+                    <div className="pt-1">
+                      <p className="mb-2 text-[9px] font-bold uppercase tracking-wider text-muted">
+                        Cor do Colete em Jogo:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {VEST_COLORS.map((vest) => {
+                          const isSelected = team.color?.toLowerCase() === vest.color.toLowerCase();
+                          return (
+                            <button
+                              key={vest.color}
+                              type="button"
+                              onClick={() => updateTeamColor(team.id, vest.color)}
+                              className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-black transition-all ${
+                                isSelected
+                                  ? "border-white bg-white/20 text-white shadow-sm scale-105"
+                                  : "border-border/60 bg-black/20 text-muted hover:border-border hover:text-foreground"
+                              }`}
+                            >
+                              <span
+                                className="h-3 w-3 rounded-full border border-black/30"
+                                style={{ backgroundColor: vest.color }}
+                              />
+                              {vest.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
-                </label>
-              ))}
+                );
+              })}
             </div>
           </div>
           

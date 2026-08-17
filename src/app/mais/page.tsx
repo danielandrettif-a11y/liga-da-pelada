@@ -22,7 +22,9 @@ import {
   ArrowLeftRight,
   ClipboardList,
   ShieldCheck,
+  Stadium,
 } from "@/components/icons";
+import { getStadiums } from "@/lib/actions/stadiums";
 
 const ADMIN_SECTIONS = [
   {
@@ -33,6 +35,12 @@ const ADMIN_SECTIONS = [
         icon: UserPlus,
         label: "Elenco",
         description: "Cadastrar e classificar pessoas",
+      },
+      {
+        href: "/mais/estadios",
+        icon: Stadium,
+        label: "Campos e Estádios",
+        description: "Cadastrar locais e links do Google Maps",
       },
       {
         href: "/admin/prelistas",
@@ -95,11 +103,12 @@ export default async function MaisPage() {
         .maybeSingle()
         .then(({ data }) => data?.avatar_url)
     : Promise.resolve(undefined);
-  const [accountName, activeCallup, leagueConfig, playerAvatarUrl] = await Promise.all([
+  const [accountName, activeCallup, leagueConfig, playerAvatarUrl, stadiums] = await Promise.all([
     getAccountDisplayName(account),
     account.isAdmin ? getActiveCallup() : Promise.resolve(null),
     account.isAdmin ? getLeagueConfig() : Promise.resolve(null),
     playerAvatarPromise,
+    account.isAdmin ? getStadiums() : Promise.resolve([]),
   ]);
 
   return (
@@ -149,6 +158,7 @@ export default async function MaisPage() {
       {account.isAdmin && (
         <CallupAdminCard
           callup={activeCallup}
+          stadiums={stadiums}
           playersPerTeam={leagueConfig?.players_per_team || 5}
           teamsPerRound={leagueConfig?.teams_per_round || 3}
         />

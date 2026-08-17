@@ -152,6 +152,11 @@ export default async function HomePage() {
 
   const { nextRound, nextFriendly, preseasonEnabled, activeCallup, liveMatch, matchDuration, venue, eventDurationMinutes, lastRound, rankingPreview, highlights } = data;
 
+  const currentPlayerId = account.profile?.player_id || null;
+  const userEntry = activeCallup && currentPlayerId
+    ? (activeCallup.entries || []).find((entry: any) => entry.playerId === currentPlayerId) || null
+    : null;
+
   return (
     <div className="space-y-6">
       <GreetingBanner name={accountName} />
@@ -164,7 +169,7 @@ export default async function HomePage() {
         matchDuration={matchDuration}
       />
 
-      {activeCallup && <OpenCallupBanner callup={activeCallup} />}
+      {activeCallup && <OpenCallupBanner callup={activeCallup} userEntry={userEntry} />}
 
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
