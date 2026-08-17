@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { createRoundWithTeams, saveRoundPrelist, type TeamInput } from "@/lib/actions/rounds";
 import type { Player, RoundType, Stadium, TeamFormationMode } from "@/lib/types";
@@ -123,7 +124,12 @@ export function RoundCreator({
   const [formationMode, setFormationMode] = useState<TeamFormationMode>("manual");
   const [attendanceOrder, setAttendanceOrder] = useState<string[]>([]);
   const [pendingDrawMode, setPendingDrawMode] = useState<Exclude<TeamFormationMode, "manual"> | null>(null);
+  const [mounted, setMounted] = useState(false);
   useDialogViewport(Boolean(pendingDrawMode));
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -839,19 +845,25 @@ export function RoundCreator({
             </p>
           </div>
 
-          {pendingDrawMode && (
+          {mounted && pendingDrawMode && typeof document !== "undefined" && createPortal(
             <div
-              className="fixed inset-0 z-[500] flex flex-col items-center justify-center bg-black/90 p-3 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-md animate-fade-in"
+              className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center items-center bg-black/85 backdrop-blur-sm p-0 sm:p-4 animate-fade-in"
               role="dialog"
               aria-modal="true"
               aria-label="Sorteio de times"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setPendingDrawMode(null);
+              }}
             >
               <div
-                className="relative flex max-h-[84dvh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-accent/40 bg-[#07150d] shadow-[0_0_60px_rgba(0,0,0,0.9)] animate-fade-in-up my-auto"
+                className="relative flex w-full max-w-lg flex-col max-h-[85dvh] rounded-t-[2rem] sm:rounded-3xl border-t sm:border border-accent/40 bg-[#07150d] shadow-[0_-20px_60px_rgba(0,0,0,0.9)] overflow-hidden animate-slide-in-bottom sm:animate-fade-in-up pb-[max(0.5rem,env(safe-area-inset-bottom))]"
                 onClick={(e) => e.stopPropagation()}
               >
+                {/* Puxador visual no mobile */}
+                <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-white/20 sm:hidden" />
+
                 {/* Header fixo do Modal */}
-                <div className="shrink-0 flex items-start justify-between border-b border-border/70 bg-[#07150d] p-4">
+                <div className="shrink-0 flex items-start justify-between border-b border-border/70 bg-[#07150d] px-5 py-3.5">
                   <div>
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-accent" />
@@ -867,13 +879,14 @@ export function RoundCreator({
                     type="button"
                     onClick={() => setPendingDrawMode(null)}
                     className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                    aria-label="Fechar"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
 
                 {/* Ações rápidas de presença fixas */}
-                <div className="shrink-0 flex items-center justify-between border-b border-border/50 bg-black/30 px-4 py-2.5 text-xs">
+                <div className="shrink-0 flex items-center justify-between border-b border-border/50 bg-black/30 px-5 py-2 text-xs">
                   <span className="text-[10px] font-bold text-muted">
                     {attendanceOrder.length} de {selectedPlayers.length} marcados
                   </span>
@@ -906,7 +919,7 @@ export function RoundCreator({
                         key={player.id}
                         type="button"
                         onClick={() => toggleAttendance(player.id)}
-                        className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${position >= 0 ? "bg-accent/10" : "hover:bg-surface/50"}`}
+                        className={`flex w-full items-center gap-3 px-5 py-2.5 text-left transition-colors ${position >= 0 ? "bg-accent/10" : "hover:bg-surface/50"}`}
                       >
                         <span
                           className={`stat-number flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-black ${
@@ -951,7 +964,8 @@ export function RoundCreator({
                   </button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
 
           {/* Unassigned Pool */}
