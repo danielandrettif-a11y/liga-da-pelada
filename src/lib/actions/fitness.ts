@@ -17,6 +17,7 @@ export type FitnessRoundEntry = {
 export type FitnessSummary = {
   distanceKm: number;
   averageSpeedKmh: number;
+  metersPerMinute: number;
   entries: number;
 };
 
@@ -55,14 +56,23 @@ export async function getMyFitnessRounds(playerId: string): Promise<FitnessRound
   }).sort((a, b) => b.date.localeCompare(a.date));
 }
 
-export async function saveMyFitness(roundId: string, distance: number, averageSpeed: number) {
+export async function saveMyFitness(roundId: string, distance: number, paceInput: number) {
   const account = await getCurrentAccount();
   const playerId = account.profile?.player_id;
   if (!account.user || !playerId) return { success: false, error: "Conta sem jogador vinculado." };
   const distanceKm = Number(distance);
-  const speedKmh = Number(averageSpeed);
-  if (!Number.isFinite(distanceKm) || distanceKm < 0.01 || distanceKm > 100) return { success: false, error: "A distância deve ficar entre 0,01 e 100 km." };
-  if (!Number.isFinite(speedKmh) || speedKmh < 0.1 || speedKmh > 60) return { success: false, error: "A velocidade deve ficar entre 0,1 e 60 km/h." };
+  const rawPace = Number(paceInput);
+  if (!Number.isFinite(distanceKm) || distanceKm < 0.01 || distanceKm > 100) {
+    return { success: false, error: "A distância deve ficar entre 0,01 e 100 km." };
+  }
+  if (!Number.isFinite(rawPace) || rawPace < 0.1 || rawPace > 1000) {
+    return { success: false, error: "O ritmo deve ficar entre 1 e 1000 m/min." };
+  }
+
+  // Se o valor fornecido for no formato m/min (ex: > 35), converte para km/h no banco
+  // Ex: 100 m/min = 6 km/h. Se < 35 (ex: 6.5), assume km/h
+  const speedKmh = rawPace > 35 ? (rawPace * 60) / 1000 : rawPace;
+
   const { error } = await account.client.from("player_round_fitness").upsert({
     player_id: playerId,
     round_id: roundId,
@@ -106,9 +116,11 @@ export async function getPlayerFitnessSummaries(playerId: string): Promise<{ off
   if (error) return null;
   function summarize(type: RoundType): FitnessSummary {
     const entries = (data || []).filter((item: any) => item.round?.round_type === type);
+    const avgSpeed = entries.length ? Math.round((entries.reduce((sum: number, item: any) => sum + Number(item.average_speed_kmh), 0) / entries.length) * 100) / 100 : 0;
     return {
       distanceKm: Math.round(entries.reduce((sum: number, item: any) => sum + Number(item.distance_km), 0) * 100) / 100,
-      averageSpeedKmh: entries.length ? Math.round((entries.reduce((sum: number, item: any) => sum + Number(item.average_speed_kmh), 0) / entries.length) * 100) / 100 : 0,
+      averageSpeedKmh: avgSpeed,
+      metersPerMinute: Math.round((avgSpeed * 1000) / 60),
       entries: entries.length,
     };
   }

@@ -669,3 +669,29 @@ export async function resetMatchTimer(matchId: string) {
     return { success: false, error: err.message };
   }
 }
+
+export async function addMatchExtraTime(matchId: string, extraSeconds: number) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: ADMIN_ERROR };
+
+    const match = await getMatchState(client, matchId);
+    if (match.status !== "live") return { success: false, error: "A partida não está em andamento." };
+
+    const currentDuration = Number(match.duration_seconds || 420);
+    const newDuration = Math.max(60, currentDuration + extraSeconds);
+
+    const { error } = await client
+      .from("matches")
+      .update({ duration_seconds: newDuration })
+      .eq("id", matchId);
+
+    if (error) throw new Error(error.message);
+
+    revalidatePath(`/partidas/${matchId}`);
+    return { success: true, newDuration };
+  } catch (err: any) {
+    console.error("Erro ao adicionar acréscimo:", err);
+    return { success: false, error: err.message };
+  }
+}

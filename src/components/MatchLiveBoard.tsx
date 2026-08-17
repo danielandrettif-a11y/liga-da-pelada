@@ -9,6 +9,7 @@ import {
   correctFinishedGoal,
   updateMatchTimer,
   resetMatchTimer,
+  addMatchExtraTime,
   undoLastMatchSubstitution,
 } from "@/lib/actions/matches";
 import {
@@ -47,6 +48,7 @@ type MatchTimerProps = {
   timerSaving: boolean;
   onToggle: () => void;
   onReset: () => void;
+  onAddExtraTime: (seconds: number) => void;
 };
 
 const MatchTimer = memo(function MatchTimer({
@@ -56,6 +58,7 @@ const MatchTimer = memo(function MatchTimer({
   timerSaving,
   onToggle,
   onReset,
+  onAddExtraTime,
 }: MatchTimerProps) {
   const [secondsLeft, setSecondsLeft] = useState(() =>
     Math.max(0, initialSeconds - getMatchTimerElapsedSeconds(timerState))
@@ -93,23 +96,59 @@ const MatchTimer = memo(function MatchTimer({
         {formatTime(secondsLeft)}
       </div>
       {canManage ? (
-        <div className="flex items-center gap-3 mt-3">
-          <button
-            onClick={onToggle}
-            disabled={timerSaving}
-            className="w-10 h-10 rounded-full bg-surface hover:bg-surface-hover border border-border flex items-center justify-center text-foreground transition-all active:scale-95 disabled:opacity-60"
-            aria-label={isRunning ? "Pausar cronômetro" : "Iniciar cronômetro"}
-          >
-            {isRunning ? <Pause className="w-4 h-4 text-warning" /> : <Play className="w-4 h-4 text-accent" />}
-          </button>
-          <button
-            onClick={onReset}
-            disabled={timerSaving}
-            className="w-10 h-10 rounded-full bg-surface hover:bg-surface-hover border border-border flex items-center justify-center text-foreground transition-all active:scale-95 disabled:opacity-60"
-            aria-label="Zerar cronômetro"
-          >
-            <RotateCcw className="w-4 h-4 text-muted" />
-          </button>
+        <div className="flex flex-col items-center gap-2 mt-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onToggle}
+              disabled={timerSaving}
+              className="w-10 h-10 rounded-full bg-surface hover:bg-surface-hover border border-border flex items-center justify-center text-foreground transition-all active:scale-95 disabled:opacity-60"
+              aria-label={isRunning ? "Pausar cronômetro" : "Iniciar cronômetro"}
+            >
+              {isRunning ? <Pause className="w-4 h-4 text-warning" /> : <Play className="w-4 h-4 text-accent" />}
+            </button>
+            <button
+              onClick={onReset}
+              disabled={timerSaving}
+              className="w-10 h-10 rounded-full bg-surface hover:bg-surface-hover border border-border flex items-center justify-center text-foreground transition-all active:scale-95 disabled:opacity-60"
+              aria-label="Zerar cronômetro"
+            >
+              <RotateCcw className="w-4 h-4 text-muted" />
+            </button>
+          </div>
+
+          {/* Botões de Acréscimo */}
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="text-[9px] font-black uppercase tracking-wider text-muted mr-1">
+              Acréscimos:
+            </span>
+            <button
+              type="button"
+              disabled={timerSaving}
+              onClick={() => onAddExtraTime(60)}
+              className="rounded-lg border border-accent/40 bg-accent/15 px-2.5 py-1 text-[10px] font-black text-accent transition-transform active:scale-95 disabled:opacity-50"
+              title="Adicionar 1 minuto de acréscimo"
+            >
+              +1&apos;
+            </button>
+            <button
+              type="button"
+              disabled={timerSaving}
+              onClick={() => onAddExtraTime(120)}
+              className="rounded-lg border border-accent/40 bg-accent/15 px-2.5 py-1 text-[10px] font-black text-accent transition-transform active:scale-95 disabled:opacity-50"
+              title="Adicionar 2 minutos de acréscimo"
+            >
+              +2&apos;
+            </button>
+            <button
+              type="button"
+              disabled={timerSaving}
+              onClick={() => onAddExtraTime(180)}
+              className="rounded-lg border border-border bg-surface px-2.5 py-1 text-[10px] font-bold text-muted hover:text-foreground transition-transform active:scale-95 disabled:opacity-50"
+              title="Adicionar 3 minutos de acréscimo"
+            >
+              +3&apos;
+            </button>
+          </div>
         </div>
       ) : (
         <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-muted">
@@ -148,6 +187,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
 
   // Timer State
   const initialSeconds = match.duration_seconds || matchDuration * 60;
+  const [durationSeconds, setDurationSeconds] = useState(initialSeconds);
   const [timerState, setTimerState] = useState({
     startedAt: match.timer_started_at as string | null,
     accumulated: Number(match.timer_accumulated_seconds || 0),
@@ -160,6 +200,12 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
   const isFinished = match.status === "finished";
 
   // Sincronizações com props vindas do servidor
+  useEffect(() => {
+    if (match.duration_seconds) {
+      setDurationSeconds(match.duration_seconds);
+    }
+  }, [match.duration_seconds]);
+
   useEffect(() => {
     setTimerState({
       startedAt: match.timer_started_at as string | null,
@@ -246,6 +292,20 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       setTimerSaving(false);
     }
   }, [canManage, timerSaving, timerState, eligibilityOffset, match.id]);
+
+  const addExtraTime = useCallback(async (seconds: number) => {
+    if (!canManage || timerSaving) return;
+    setDurationSeconds((current: number) => current + seconds);
+    setTimerSaving(true);
+    setError("");
+
+    const result = await addMatchExtraTime(match.id, seconds);
+    if (!result.success) {
+      setDurationSeconds((current: number) => Math.max(60, current - seconds));
+      setError(result.error || "Não foi possível adicionar acréscimo.");
+    }
+    setTimerSaving(false);
+  }, [canManage, timerSaving, match.id]);
 
   // Modal de Gol
   const [goalModal, setGoalModal] = useState<{
@@ -454,12 +514,13 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
         {/* Timer Section (Isolado com memo) */}
         {!isFinished && (
           <MatchTimer
-            initialSeconds={initialSeconds}
+            initialSeconds={durationSeconds}
             timerState={timerState}
             canManage={canManage}
             timerSaving={timerSaving}
             onToggle={toggleTimer}
             onReset={resetTimer}
+            onAddExtraTime={addExtraTime}
           />
         )}
 
