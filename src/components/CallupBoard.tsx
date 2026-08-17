@@ -132,10 +132,9 @@ export function CallupBoard({
     const type = callup.round_type === "friendly" ? "Amistoso" : "Pelada Oficial (Ranked)";
     const dateFormatted = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })
       .format(new Date(`${callup.date}T12:00:00`));
-    const venueText = stadiumName ? `\n📍 Local: ${stadiumName}` : "";
-    const mapText = stadiumMapUrl ? `\n🗺️ Como chegar: ${stadiumMapUrl}` : "";
+    const venueText = stadiumName ? `\n📍 *Local:* ${stadiumName}` : "";
 
-    const text = `⚽ Convocação aberta para ${type}!\n📅 Data: ${dateFormatted}\n⏰ Horário: ${startTime}${venueText}${mapText}\n\n👉 Confirme sua presença: ${window.location.origin}/convocacao`;
+    const text = `⚽ *CONVOCAÇÃO ABERTA*\n${window.location.origin}/convocacao\n\n🏆 *${type}*\n📅 *Data:* ${dateFormatted}\n⏰ *Horário:* ${startTime}${venueText}\n\n👉 Toque no link acima para confirmar sua presença e ver a lista!`;
 
     await navigator.clipboard.writeText(text);
     setLoading("copied");

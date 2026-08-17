@@ -19,6 +19,9 @@ const oswald = Oswald({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "https://pelada-de-baixa-qualidade.179.197.75.220.sslip.io"
+  ),
   title: "Pelada de Baixa Qualidade",
   description: "O Cartola da sua pelada. Acompanhe gols, assistências, rankings e muito mais.",
   keywords: ["pelada", "futebol", "ranking", "estatísticas", "liga"],
@@ -32,6 +35,27 @@ export const metadata: Metadata = {
     apple: [
       { url: "/icons/pelada-bq-v2-apple-180.png", sizes: "180x180", type: "image/png" },
     ],
+  },
+  openGraph: {
+    type: "website",
+    locale: "pt_BR",
+    siteName: "Pelada de Baixa Qualidade",
+    title: "Pelada de Baixa Qualidade - Convocação & Cartola",
+    description: "Confirme sua presença na pelada, acompanhe rankings e escale seu time!",
+    images: [
+      {
+        url: "/icons/pelada-bq-v2-512.png",
+        width: 512,
+        height: 512,
+        alt: "Pelada de Baixa Qualidade",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Pelada de Baixa Qualidade",
+    description: "O Cartola da sua pelada. Acompanhe gols, assistências, rankings e muito mais.",
+    images: ["/icons/pelada-bq-v2-512.png"],
   },
   appleWebApp: {
     capable: true,
