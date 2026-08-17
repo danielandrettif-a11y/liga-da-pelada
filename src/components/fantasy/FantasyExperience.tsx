@@ -9,6 +9,7 @@ import { formatFantasyMoney, type FantasySettings } from "@/lib/fantasy/config";
 import { CHALLENGE_LABELS, fantasyChallengeOffer, type FantasyChallengeType } from "@/lib/fantasy/challenges";
 import { saveFantasyLineup, type FantasyDashboardInsights, type FantasyMarketPlayer } from "@/lib/actions/fantasy";
 import { supabase } from "@/lib/supabase";
+import { useDialogViewport } from "@/lib/useDialogViewport";
 import { FantasyTutorialModal } from "./FantasyTutorialModal";
 
 type Props = {
@@ -42,6 +43,7 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
   const [message, setMessage] = useState("");
   const [showTutorial, setShowTutorial] = useState(false);
   const [infoModal, setInfoModal] = useState<{ title: string; description: string } | null>(null);
+  useDialogViewport(Boolean(infoModal));
 
   useEffect(() => {
     try {
@@ -298,14 +300,14 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
       {/* MODAL DE TUTORIAL */}
       <FantasyTutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} />
 
-      {/* MODAL DE AJUDA DOS PALPITES */}
+      {/* POPUP BÁSICO DE AJUDA DOS PALPITES / DESAFIO */}
       {infoModal && (
         <div
           className="mobile-dialog-backdrop fixed inset-0 z-[300] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in"
           onClick={() => setInfoModal(null)}
         >
           <div
-            className="relative flex max-h-[90vh] w-full max-w-sm flex-col overflow-hidden rounded-3xl border border-accent/40 bg-[#07150d] p-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-fade-in-up"
+            className="relative flex w-full max-w-xs flex-col overflow-hidden rounded-3xl border border-accent/40 bg-[#07150d] p-5 shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-fade-in-up"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -313,28 +315,28 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
           >
             <button
               onClick={() => setInfoModal(null)}
-              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+              className="absolute right-3.5 top-3.5 flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
               aria-label="Fechar"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </button>
 
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
-                <HelpCircle className="h-6 w-6" />
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                <HelpCircle className="h-5 w-5" />
               </div>
-              <h3 className="font-athletic text-lg font-black uppercase italic tracking-wide text-foreground">
+              <h3 className="font-athletic text-sm font-black uppercase italic tracking-wide text-foreground pr-6 leading-tight">
                 {infoModal.title}
               </h3>
             </div>
 
-            <p className="mt-4 text-xs leading-relaxed text-muted">
+            <p className="mt-3 text-xs leading-relaxed text-muted">
               {infoModal.description}
             </p>
 
             <button
               onClick={() => setInfoModal(null)}
-              className="mt-6 w-full rounded-xl bg-accent py-3 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_20px_rgba(204,255,0,0.2)] transition-transform active:scale-95"
+              className="mt-4 w-full rounded-xl bg-accent py-2.5 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_15px_rgba(204,255,0,0.2)] transition-transform active:scale-95"
             >
               Entendido
             </button>

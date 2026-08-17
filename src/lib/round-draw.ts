@@ -24,7 +24,7 @@ function shuffle<T>(items: T[], random: () => number): T[] {
   return result;
 }
 
-function distributeBalanced(players: AttendanceDrawPlayer[], teamCount: number, random: () => number): string[][] {
+export function distributeBalanced(players: AttendanceDrawPlayer[], teamCount: number, random: () => number = Math.random): string[][] {
   const teams = Array.from({ length: teamCount }, () => ({ players: [] as AttendanceDrawPlayer[], points: 0 }));
   const ordered = players
     .map((player) => ({ player, tieBreaker: random() }))
@@ -54,6 +54,37 @@ function distributeBalanced(players: AttendanceDrawPlayer[], teamCount: number, 
   }
 
   return teams.map((team) => team.players.map((player) => player.id));
+}
+
+export function drawTeamsDirect({
+  players,
+  teamCount,
+  playersPerTeam,
+  mode,
+  random = Math.random,
+}: {
+  players: AttendanceDrawPlayer[];
+  teamCount: number;
+  playersPerTeam: number;
+  mode: Exclude<TeamFormationMode, "manual">;
+  random?: () => number;
+}): string[][] {
+  const capacity = teamCount * playersPerTeam;
+  const available = players.slice(0, capacity);
+
+  if (mode === "random") {
+    const shuffled = shuffle(available, random);
+    const teams = Array.from({ length: teamCount }, () => [] as string[]);
+    shuffled.forEach((p, idx) => {
+      const teamIdx = idx % teamCount;
+      if (teams[teamIdx].length < playersPerTeam) {
+        teams[teamIdx].push(p.id);
+      }
+    });
+    return teams;
+  }
+
+  return distributeBalanced(available, teamCount, random);
 }
 
 export function drawTeamsByAttendance({

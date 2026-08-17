@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createRoundWithTeams, saveRoundPrelist, type TeamInput } from "@/lib/actions/rounds";
 import type { Player, RoundType, Stadium, TeamFormationMode } from "@/lib/types";
-import { drawTeamsByAttendance } from "@/lib/round-draw";
+import { drawTeamsByAttendance, drawTeamsDirect } from "@/lib/round-draw";
 import {
   Users,
   Calendar,
@@ -14,6 +14,7 @@ import {
   PencilLine,
   RotateCcw,
   Search,
+  Sparkles,
   Stadium as StadiumIcon,
   X,
 } from "@/components/icons";
@@ -296,10 +297,34 @@ export function RoundCreator({
     })));
   }
 
+  function executeDirectDraw(mode: Exclude<TeamFormationMode, "manual">) {
+    if (selectedPlayers.length === 0) {
+      setError("Selecione os jogadores antes de sortear os times.");
+      return;
+    }
+    try {
+      const result = drawTeamsDirect({
+        players: selectedPlayers,
+        teamCount,
+        playersPerTeam: teamCapacity,
+        mode,
+      });
+      const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
+      setTeams((current) => current.map((team, index) => ({
+        ...team,
+        players: (result[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
+      })));
+      setFormationMode(mode);
+      setPendingDrawMode(null);
+      setError("");
+    } catch (drawError) {
+      setError(drawError instanceof Error ? drawError.message : "Não foi possível sortear os times.");
+    }
+  }
+
   function requestDraw(mode: Exclude<TeamFormationMode, "manual">) {
-    const minimumPresent = teamCapacity * 2;
-    if (selectedPlayers.length < minimumPresent) {
-      setError(`Selecione pelo menos ${minimumPresent} jogadores para formar dois times completos.`);
+    if (selectedPlayers.length < 2) {
+      setError("Selecione pelo menos 2 jogadores para sortear.");
       return;
     }
     setError("");
@@ -312,26 +337,58 @@ export function RoundCreator({
       : [...current, playerId]);
   }
 
+  function markAllAttendance() {
+    setAttendanceOrder(selectedPlayers.map((p) => p.id));
+  }
+
+  function clearAttendance() {
+    setAttendanceOrder([]);
+  }
+
   function confirmAttendanceDraw() {
     if (!pendingDrawMode) return;
+    if (attendanceOrder.length === 0) {
+      executeDirectDraw(pendingDrawMode);
+      return;
+    }
     try {
-      const result = drawTeamsByAttendance({
-        players: selectedPlayers,
-        attendanceOrder,
-        teamCount,
-        playersPerTeam: teamCapacity,
-        mode: pendingDrawMode,
-      });
-      const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
-      setTeams((current) => current.map((team, index) => ({
-        ...team,
-        players: (result.teams[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
-      })));
+      const minimumPresent = Math.min(selectedPlayers.length, teamCapacity * 2);
+      if (attendanceOrder.length < minimumPresent) {
+        // Se marcou apenas alguns, completa com os outros selecionados
+        const remaining = selectedPlayers.filter((p) => !attendanceOrder.includes(p.id)).map((p) => p.id);
+        const fullOrder = [...attendanceOrder, ...remaining];
+        const result = drawTeamsByAttendance({
+          players: selectedPlayers,
+          attendanceOrder: fullOrder,
+          teamCount,
+          playersPerTeam: teamCapacity,
+          mode: pendingDrawMode,
+        });
+        const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
+        setTeams((current) => current.map((team, index) => ({
+          ...team,
+          players: (result.teams[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
+        })));
+      } else {
+        const result = drawTeamsByAttendance({
+          players: selectedPlayers,
+          attendanceOrder,
+          teamCount,
+          playersPerTeam: teamCapacity,
+          mode: pendingDrawMode,
+        });
+        const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
+        setTeams((current) => current.map((team, index) => ({
+          ...team,
+          players: (result.teams[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
+        })));
+      }
       setFormationMode(pendingDrawMode);
       setPendingDrawMode(null);
       setError("");
     } catch (drawError) {
-      setError(drawError instanceof Error ? drawError.message : "Nao foi possivel sortear os times.");
+      // Fallback para sorteio direto
+      executeDirectDraw(pendingDrawMode);
     }
   }
 
@@ -783,32 +840,111 @@ export function RoundCreator({
           </div>
 
           {pendingDrawMode && (
-            <div className="mobile-dialog-backdrop bg-black/75 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Lista de presenca">
-              <div className="flex max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-border bg-background shadow-2xl animate-fade-in-up">
-                <div className="flex items-start justify-between border-b border-border p-5">
+            <div
+              className="mobile-dialog-backdrop fixed inset-0 z-[300] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Sorteio de times"
+            >
+              <div
+                className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-accent/40 bg-[#07150d] shadow-2xl animate-fade-in-up"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between border-b border-border/70 p-4">
                   <div>
-                    <h2 className="text-lg font-black text-foreground">Lista de Presenca</h2>
-                    <p className="mt-1 text-xs text-muted">Marque na ordem em que as pessoas chegaram.</p>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-accent" />
+                      <h2 className="text-base font-black uppercase tracking-wide text-foreground">
+                        {pendingDrawMode === "random" ? "Sorteio Aleatório" : "Sorteio Equilibrado"}
+                      </h2>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-muted">
+                      Marque a ordem de chegada ou sorteie todos diretamente.
+                    </p>
                   </div>
-                  <button type="button" onClick={() => setPendingDrawMode(null)} className="rounded-full bg-surface p-2 text-muted"><X className="h-4 w-4" /></button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingDrawMode(null)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-                <div className="min-h-0 flex-1 divide-y divide-border overflow-y-auto overscroll-contain">
+
+                {/* Ações rápidas de presença */}
+                <div className="flex items-center justify-between border-b border-border/50 bg-black/20 px-4 py-2 text-xs">
+                  <span className="text-[10px] font-bold text-muted">
+                    {attendanceOrder.length} de {selectedPlayers.length} marcados
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={markAllAttendance}
+                      className="text-[10px] font-bold text-accent hover:underline"
+                    >
+                      Marcar todos
+                    </button>
+                    {attendanceOrder.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={clearAttendance}
+                        className="text-[10px] font-bold text-danger hover:underline"
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="min-h-0 flex-1 divide-y divide-border/40 overflow-y-auto overscroll-contain">
                   {selectedPlayers.map((player) => {
                     const position = attendanceOrder.indexOf(player.id);
                     return (
-                      <button key={player.id} type="button" onClick={() => toggleAttendance(player.id)} className={`flex w-full items-center gap-3 px-5 py-3 text-left ${position >= 0 ? "bg-accent/5" : ""}`}>
-                        <span className={`stat-number flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${position >= 0 ? "bg-accent text-background" : "border border-border bg-surface text-muted"}`}>{position >= 0 ? position + 1 : "—"}</span>
-                        <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-10 w-10 rounded-full text-xs font-bold" />
-                        <span className="min-w-0 flex-1 truncate text-sm font-bold text-foreground">{player.name}</span>
-                        {position >= 0 && <CheckCircle2 className="h-5 w-5 text-accent" />}
+                      <button
+                        key={player.id}
+                        type="button"
+                        onClick={() => toggleAttendance(player.id)}
+                        className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${position >= 0 ? "bg-accent/10" : "hover:bg-surface/50"}`}
+                      >
+                        <span
+                          className={`stat-number flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-black ${
+                            position >= 0 ? "bg-accent text-background" : "border border-border bg-surface text-muted"
+                          }`}
+                        >
+                          {position >= 0 ? position + 1 : "—"}
+                        </span>
+                        <PlayerAvatar
+                          name={player.name}
+                          avatarUrl={player.avatar_url}
+                          className="h-8 w-8 rounded-full text-[10px] font-bold"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-bold text-foreground">{player.name}</p>
+                          <div className="flex items-center gap-1.5 text-[9px] text-muted">
+                            <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />
+                            <span>{player.points || 0} pts</span>
+                          </div>
+                        </div>
+                        {position >= 0 && <CheckCircle2 className="h-4 w-4 text-accent" />}
                       </button>
                     );
                   })}
                 </div>
-                <div className="border-t border-border p-4">
-                  <p className="mb-3 text-center text-xs font-bold text-muted">{attendanceOrder.length}/{teamCapacity * 2} presencas minimas</p>
-                  <button type="button" onClick={confirmAttendanceDraw} disabled={attendanceOrder.length < teamCapacity * 2} className="w-full rounded-xl bg-accent py-3.5 text-sm font-black text-background disabled:opacity-40">
-                    Sortear Times
+
+                <div className="space-y-2 border-t border-border/70 p-4">
+                  <button
+                    type="button"
+                    onClick={confirmAttendanceDraw}
+                    className="w-full rounded-xl bg-accent py-3 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_20px_rgba(204,255,0,0.2)] transition-transform active:scale-95"
+                  >
+                    {attendanceOrder.length > 0 ? "Sortear por Ordem de Chegada" : "Sortear Imediatamente"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => executeDirectDraw(pendingDrawMode)}
+                    className="w-full rounded-xl border border-border bg-surface py-2.5 text-[11px] font-bold text-muted hover:text-foreground transition-colors"
+                  >
+                    ⚡ Sortear todos diretamente (ignorar chegadas)
                   </button>
                 </div>
               </div>

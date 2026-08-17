@@ -39,11 +39,13 @@ export function RoundInstagramStoryGenerator({
   statistics?: RoundStatistics | null;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [step, setStep] = useState<"pick" | "preview">("pick");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputCameraRef = useRef<HTMLInputElement | null>(null);
+  const fileInputGalleryRef = useRef<HTMLInputElement | null>(null);
 
   useDialogViewport(isOpen);
 
@@ -110,23 +112,33 @@ export function RoundInstagramStoryGenerator({
     return b.goalsFor - a.goalsFor;
   });
 
-  function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileSelected(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => {
-      setPhotoUrl(e.target?.result as string);
+      const url = e.target?.result as string;
+      setPhotoUrl(url);
+      setStep("preview");
+      drawStory(url);
     };
     reader.readAsDataURL(file);
+    event.target.value = "";
   }
 
-  useEffect(() => {
-    if (isOpen) {
-      drawStory();
-    }
-  }, [isOpen, photoUrl]);
+  function handleNoPhoto() {
+    setPhotoUrl(null);
+    setStep("preview");
+    drawStory(null);
+  }
 
-  async function drawStory() {
+  function openGenerator() {
+    setIsOpen(true);
+    setStep("pick");
+  }
+
+  async function drawStory(customPhoto?: string | null) {
+    const targetPhoto = customPhoto !== undefined ? customPhoto : photoUrl;
     setGenerating(true);
     const canvas = canvasRef.current || document.createElement("canvas");
     canvas.width = 1080;
@@ -138,7 +150,7 @@ export function RoundInstagramStoryGenerator({
     ctx.fillStyle = "#05100B";
     ctx.fillRect(0, 0, 1080, 1920);
 
-    if (photoUrl) {
+    if (targetPhoto) {
       await new Promise<void>((resolve) => {
         const img = new window.Image();
         img.crossOrigin = "anonymous";
@@ -152,7 +164,8 @@ export function RoundInstagramStoryGenerator({
           ctx.drawImage(img, 0, 0, img.width, img.height, centerShiftX, centerShiftY, img.width * ratio, img.height * ratio);
           resolve();
         };
-        img.src = photoUrl;
+        img.onerror = () => resolve();
+        img.src = targetPhoto;
       });
     }
 
@@ -394,7 +407,7 @@ export function RoundInstagramStoryGenerator({
     <>
       <button
         type="button"
-        onClick={() => setIsOpen(true)}
+        onClick={openGenerator}
         className="flex w-full items-center justify-center gap-2 rounded-2xl border border-accent/40 bg-accent/15 px-4 py-3.5 text-xs font-black uppercase tracking-wider text-accent shadow-[0_0_20px_rgba(204,255,0,0.1)] transition-transform hover:bg-accent/20 active:scale-[0.98]"
       >
         <Sparkles className="h-4 w-4" /> Gerar Arte para Instagram Story
@@ -406,7 +419,7 @@ export function RoundInstagramStoryGenerator({
           onClick={() => setIsOpen(false)}
         >
           <div
-            className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-accent/40 bg-[#07150d] p-5 shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-fade-in-up"
+            className="relative flex max-h-[90vh] w-full max-w-sm flex-col overflow-hidden rounded-3xl border border-accent/40 bg-[#07150d] p-5 shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-fade-in-up"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -421,78 +434,154 @@ export function RoundInstagramStoryGenerator({
               <X className="h-4 w-4" />
             </button>
 
-            <div className="flex items-center gap-2.5">
-              <Sparkles className="h-5 w-5 text-accent" />
-              <h2 className="font-athletic text-xl font-black uppercase italic tracking-wide text-foreground">
-                Arte para Instagram Story
-              </h2>
-            </div>
-            <p className="mt-1 text-xs text-muted">
-              Tire ou envie uma foto da pelada para criar a arte com placar dos 3 times, artilheiros e garçons.
-            </p>
+            {/* Inputs Ocultos de Câmera e Galeria */}
+            <input
+              ref={fileInputCameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileSelected}
+              className="hidden"
+            />
+            <input
+              ref={fileInputGalleryRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelected}
+              className="hidden"
+            />
 
-            {/* Input de Foto */}
-            <div className="mt-4 flex gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handlePhotoUpload}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-accent/30 bg-surface px-3 py-2.5 text-xs font-bold text-foreground hover:bg-surface-hover transition-colors"
-              >
-                <Camera className="h-4 w-4 text-accent" />
-                {photoUrl ? "Trocar foto de fundo" : "Tirar / Escolher foto"}
-              </button>
-              {photoUrl && (
-                <button
-                  type="button"
-                  onClick={() => setPhotoUrl(null)}
-                  className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2.5 text-xs font-bold text-danger hover:bg-danger/20 transition-colors"
-                >
-                  Remover foto
-                </button>
-              )}
-            </div>
+            {/* ETAPA 1: ESCOLHER FOTO / FUNDO */}
+            {step === "pick" ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="font-athletic text-lg font-black uppercase italic tracking-wide text-foreground">
+                      Arte do Instagram
+                    </h2>
+                    <p className="text-[11px] text-muted">
+                      Escolha a imagem de fundo para os resultados:
+                    </p>
+                  </div>
+                </div>
 
-            {/* Preview do Story */}
-            <div className="mt-4 flex flex-1 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/40 p-2 max-h-[50vh]">
-              {previewUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={previewUrl}
-                  alt="Prévia da arte para Instagram"
-                  className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
-                />
-              ) : (
-                <div className="py-12 text-center text-xs text-muted">Gerando prévia...</div>
-              )}
-            </div>
+                <div className="space-y-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputCameraRef.current?.click()}
+                    className="flex w-full items-center gap-3.5 rounded-2xl border border-accent/40 bg-accent/10 p-3.5 text-left transition-all hover:bg-accent/20 active:scale-[0.98]"
+                  >
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent text-background shadow-md">
+                      <Camera className="h-6 w-6" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-black uppercase tracking-wide text-foreground">
+                        Tirar Foto Agora
+                      </p>
+                      <p className="text-[10px] text-muted">
+                        Abra a câmera e fotografe a resenha
+                      </p>
+                    </div>
+                  </button>
 
-            {/* Ações */}
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={handleDownload}
-                disabled={generating || !previewUrl}
-                className="flex items-center justify-center gap-1.5 rounded-xl bg-accent py-3.5 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_20px_rgba(204,255,0,0.2)] transition-transform active:scale-95 disabled:opacity-50"
-              >
-                <Download className="h-4 w-4" /> Baixar Story
-              </button>
-              <button
-                type="button"
-                onClick={handleShare}
-                disabled={generating || !previewUrl}
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-accent/40 bg-accent/10 py-3.5 text-xs font-black uppercase tracking-wider text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
-              >
-                <Share2 className="h-4 w-4" /> Compartilhar
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputGalleryRef.current?.click()}
+                    className="flex w-full items-center gap-3.5 rounded-2xl border border-border bg-surface p-3.5 text-left transition-all hover:border-accent/40 hover:bg-surface-hover active:scale-[0.98]"
+                  >
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-accent">
+                      <ImageIcon className="h-6 w-6" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-black uppercase tracking-wide text-foreground">
+                        Escolher da Galeria
+                      </p>
+                      <p className="text-[10px] text-muted">
+                        Selecione uma foto já salva no celular
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleNoPhoto}
+                    className="flex w-full items-center gap-3.5 rounded-2xl border border-border/60 bg-black/20 p-3 text-left transition-all hover:border-border hover:bg-surface active:scale-[0.98]"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/5 text-muted">
+                      <Football className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-bold text-foreground">
+                        Fundo Oficial da Liga
+                      </p>
+                      <p className="text-[9px] text-muted">
+                        Gerar direto com o design Neon padrão
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* ETAPA 2: PRÉVIA E COMPARTILHAMENTO */
+              <div className="flex flex-col space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-accent" />
+                    <h2 className="font-athletic text-sm font-black uppercase italic tracking-wide text-foreground">
+                      Prévia do Story
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStep("pick")}
+                    className="text-[10px] font-bold text-accent hover:underline"
+                  >
+                    Trocar foto
+                  </button>
+                </div>
+
+                {/* Preview do Story */}
+                <div className="flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/50 p-2 max-h-[45vh]">
+                  {generating ? (
+                    <div className="py-16 text-center text-xs font-bold text-muted animate-pulse">
+                      Desenhando arte em alta resolução...
+                    </div>
+                  ) : previewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={previewUrl}
+                      alt="Prévia da arte para Instagram"
+                      className="max-h-[40vh] w-auto rounded-xl object-contain shadow-2xl"
+                    />
+                  ) : (
+                    <div className="py-16 text-center text-xs text-muted">Nenhuma prévia disponível</div>
+                  )}
+                </div>
+
+                {/* Ações */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    disabled={generating || !previewUrl}
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-accent py-3 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_20px_rgba(204,255,0,0.2)] transition-transform active:scale-95 disabled:opacity-50"
+                  >
+                    <Download className="h-4 w-4" /> Baixar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    disabled={generating || !previewUrl}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-accent/40 bg-accent/10 py-3 text-xs font-black uppercase tracking-wider text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                  >
+                    <Share2 className="h-4 w-4" /> Compartilhar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

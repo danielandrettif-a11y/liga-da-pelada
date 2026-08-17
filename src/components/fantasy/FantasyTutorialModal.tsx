@@ -65,7 +65,7 @@ export function FantasyTutorialModal({
       onClick={onClose}
     >
       <div
-        className="relative flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-accent/40 bg-[#07150d] p-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-fade-in-up"
+        className="relative flex max-h-[85vh] w-full max-w-xs flex-col overflow-hidden rounded-3xl border border-accent/40 bg-[#07150d] p-5 shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -74,18 +74,18 @@ export function FantasyTutorialModal({
         {/* Fechar */}
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+          className="absolute right-3.5 top-3.5 flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
           aria-label="Fechar tutorial"
         >
-          <X className="h-4 w-4" />
+          <X className="h-3.5 w-3.5" />
         </button>
 
         {/* Indicador de Passos */}
-        <div className="flex items-center gap-1.5 mb-4">
+        <div className="flex items-center gap-1.5 mb-3 pr-8">
           {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className={`h-1.5 flex-1 rounded-full transition-all ${
+              className={`h-1 flex-1 rounded-full transition-all ${
                 i === step ? "bg-accent" : i < step ? "bg-accent/40" : "bg-white/10"
               }`}
             />
@@ -93,35 +93,35 @@ export function FantasyTutorialModal({
         </div>
 
         {/* Ícone */}
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_30px_rgba(204,255,0,0.15)]">
+        <div className="mx-auto mt-1 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_20px_rgba(204,255,0,0.12)]">
           {current.icon}
         </div>
 
-        <div className="mt-4 text-center">
-          <span className="font-athletic text-[10px] font-black uppercase italic tracking-[0.2em] text-accent">
+        <div className="mt-3 text-center">
+          <span className="font-athletic text-[9px] font-black uppercase italic tracking-[0.2em] text-accent">
             {current.tag}
           </span>
-          <h2 className="mt-1 font-athletic text-2xl font-black uppercase italic leading-tight text-white">
+          <h2 className="mt-0.5 font-athletic text-lg font-black uppercase italic leading-tight text-white">
             {current.title}
           </h2>
-          <p className="mt-3 text-xs leading-relaxed text-muted">
+          <p className="mt-2 text-xs leading-relaxed text-muted">
             {current.description}
           </p>
         </div>
 
         {/* Ações */}
-        <div className="mt-6 flex items-center justify-between gap-3">
+        <div className="mt-4 flex items-center justify-between gap-2 pt-2 border-t border-border/40">
           {step > 1 ? (
             <button
               onClick={() => setStep(step - 1)}
-              className="rounded-xl border border-white/10 px-4 py-3 text-xs font-bold text-muted hover:text-white transition-colors"
+              className="rounded-xl border border-white/10 px-3 py-2 text-xs font-bold text-muted hover:text-white transition-colors"
             >
               Anterior
             </button>
           ) : (
             <button
               onClick={onClose}
-              className="rounded-xl px-4 py-3 text-xs font-bold text-muted hover:text-white transition-colors"
+              className="rounded-xl px-3 py-2 text-xs font-bold text-muted hover:text-white transition-colors"
             >
               Pular
             </button>
@@ -130,16 +130,16 @@ export function FantasyTutorialModal({
           {step < 4 ? (
             <button
               onClick={() => setStep(step + 1)}
-              className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-accent py-3 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_20px_rgba(204,255,0,0.2)] transition-transform active:scale-95"
+              className="flex-1 flex items-center justify-center gap-1 rounded-xl bg-accent py-2.5 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_15px_rgba(204,255,0,0.2)] transition-transform active:scale-95"
             >
               Próximo <ChevronRight className="h-3.5 w-3.5" />
             </button>
           ) : (
             <button
               onClick={onClose}
-              className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-accent py-3 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_20px_rgba(204,255,0,0.2)] transition-transform active:scale-95"
+              className="flex-1 flex items-center justify-center gap-1 rounded-xl bg-accent py-2.5 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_15px_rgba(204,255,0,0.2)] transition-transform active:scale-95"
             >
-              <CheckCircle2 className="h-4 w-4" /> Entendido, vamos jogar!
+              <CheckCircle2 className="h-4 w-4" /> Vamos jogar!
             </button>
           )}
         </div>
