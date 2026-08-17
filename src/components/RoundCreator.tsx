@@ -841,16 +841,17 @@ export function RoundCreator({
 
           {pendingDrawMode && (
             <div
-              className="mobile-dialog-backdrop fixed inset-0 z-[300] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in"
+              className="fixed inset-0 z-[500] flex flex-col items-center justify-center bg-black/90 p-3 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-md animate-fade-in"
               role="dialog"
               aria-modal="true"
               aria-label="Sorteio de times"
             >
               <div
-                className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-accent/40 bg-[#07150d] shadow-2xl animate-fade-in-up"
+                className="relative flex max-h-[84dvh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-accent/40 bg-[#07150d] shadow-[0_0_60px_rgba(0,0,0,0.9)] animate-fade-in-up my-auto"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-start justify-between border-b border-border/70 p-4">
+                {/* Header fixo do Modal */}
+                <div className="shrink-0 flex items-start justify-between border-b border-border/70 bg-[#07150d] p-4">
                   <div>
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-accent" />
@@ -871,8 +872,8 @@ export function RoundCreator({
                   </button>
                 </div>
 
-                {/* Ações rápidas de presença */}
-                <div className="flex items-center justify-between border-b border-border/50 bg-black/20 px-4 py-2 text-xs">
+                {/* Ações rápidas de presença fixas */}
+                <div className="shrink-0 flex items-center justify-between border-b border-border/50 bg-black/30 px-4 py-2.5 text-xs">
                   <span className="text-[10px] font-bold text-muted">
                     {attendanceOrder.length} de {selectedPlayers.length} marcados
                   </span>
@@ -896,6 +897,7 @@ export function RoundCreator({
                   </div>
                 </div>
 
+                {/* Lista de jogadores com scroll interno suave */}
                 <div className="min-h-0 flex-1 divide-y divide-border/40 overflow-y-auto overscroll-contain">
                   {selectedPlayers.map((player) => {
                     const position = attendanceOrder.indexOf(player.id);
@@ -931,7 +933,8 @@ export function RoundCreator({
                   })}
                 </div>
 
-                <div className="space-y-2 border-t border-border/70 p-4">
+                {/* Rodapé fixo com os botões de ação */}
+                <div className="shrink-0 space-y-2 border-t border-border/70 bg-[#07150d] p-4">
                   <button
                     type="button"
                     onClick={confirmAttendanceDraw}
