@@ -4,7 +4,19 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Clock, Crown, HelpCircle, Lock, Search, Target, TrendingUp, Trophy, X } from "@/components/icons";
+import {
+  CheckCircle2,
+  Clock,
+  Crown,
+  HelpCircle,
+  Loader2,
+  Lock,
+  Search,
+  Target,
+  TrendingUp,
+  Trophy,
+  X,
+} from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { formatFantasyMoney, type FantasySettings } from "@/lib/fantasy/config";
 import { CHALLENGE_LABELS, fantasyChallengeOffer, type FantasyChallengeType } from "@/lib/fantasy/challenges";
@@ -499,7 +511,38 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
             </div>}
           </section>}
           {betweenRounds && <p className="rounded-xl border border-border bg-surface p-3 text-center text-[10px] font-bold text-muted">Os palpites e o Desafio da Rodada serão liberados quando a próxima Ranked for criada.</p>}
-          {open && <button onClick={save} disabled={pending || remaining < 0} className="w-full rounded-2xl bg-accent py-3.5 text-sm font-black text-background disabled:opacity-50">{pending ? "Salvando..." : betweenRounds ? "Salvar elenco para a próxima Ranked" : selected.length === 5 && captainId ? "Salvar escalação" : "Salvar rascunho"}</button>}
+          {open && (
+            <button
+              type="button"
+              onClick={save}
+              disabled={pending || remaining < 0 || isSaved}
+              className={`flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-black uppercase tracking-wider transition-all duration-300 active:scale-[0.99] ${
+                isSaved
+                  ? "border border-success/40 bg-success/15 text-success shadow-[0_0_20px_rgba(34,197,94,0.15)] cursor-default"
+                  : complete
+                  ? "bg-accent text-background shadow-[0_0_25px_rgba(204,255,0,0.25)] hover:brightness-110"
+                  : "border border-warning/40 bg-warning text-background shadow-[0_0_20px_rgba(234,179,8,0.2)]"
+              } disabled:opacity-80`}
+            >
+              {pending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Salvando...</span>
+                </>
+              ) : isSaved ? (
+                <>
+                  <CheckCircle2 className="h-5 w-5 text-success" />
+                  <span>{betweenRounds ? "Elenco Salvo" : "Escalação Salva"}</span>
+                </>
+              ) : betweenRounds ? (
+                "Salvar Elenco para a Próxima Ranked"
+              ) : complete ? (
+                "Salvar Escalação"
+              ) : (
+                "Salvar Rascunho"
+              )}
+            </button>
+          )}
           {message && <p role="status" className="rounded-xl border border-border bg-surface p-3 text-center text-xs font-bold text-foreground">{message}</p>}
         </section>
 
