@@ -96,7 +96,8 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
     : null;
   const currentSignature = JSON.stringify({ ids: selected, captain: captainId, scorer: scorerId, assist: assistId, challenge: challengeId });
   const complete = selected.length === 5 && Boolean(captainId) && remaining >= 0;
-  const saveState = !open ? "Mercado fechado" : savedSignature === currentSignature ? betweenRounds ? "Elenco salvo" : "Escalação salva" : complete ? "Pronta para salvar" : "Escalação incompleta";
+  const isSaved = Boolean(savedSignature && savedSignature === currentSignature);
+  const saveState = !open ? "Mercado fechado" : isSaved ? betweenRounds ? "Elenco salvo" : "Escalação salva" : complete ? "Pronta para salvar" : "Escalação incompleta";
 
   useEffect(() => {
     if (status !== "in_progress" || !round) return;
