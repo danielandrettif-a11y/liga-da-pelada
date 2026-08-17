@@ -2,17 +2,20 @@
 
 import { useEffect } from "react";
 
-/** Impede que a página atrás do diálogo role no iOS/Android. */
+/** Impede que a página atrás do diálogo role no iOS/Android e restaura 100% ao fechar. */
 export function useDialogViewport(open: boolean) {
   useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    const previousOverscroll = document.body.style.overscrollBehavior;
-    document.body.style.overflow = "hidden";
-    document.body.style.overscrollBehavior = "none";
+    if (!open || typeof document === "undefined") return;
+    const body = document.body;
+    const previousOverflow = body.style.overflow;
+    const previousTouchAction = body.style.touchAction;
+
+    body.style.overflow = "hidden";
+    body.style.touchAction = "none";
+
     return () => {
-      document.body.style.overflow = previousOverflow;
-      document.body.style.overscrollBehavior = previousOverscroll;
+      body.style.overflow = previousOverflow || "";
+      body.style.touchAction = previousTouchAction || "";
     };
   }, [open]);
 }

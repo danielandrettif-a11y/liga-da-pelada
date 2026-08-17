@@ -52,18 +52,6 @@ export function FantasyExperience({ round, fantasySeasonId, status, settings, ma
   }, []);
 
   useEffect(() => {
-    if (infoModal) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      document.documentElement.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = originalOverflow;
-        document.documentElement.style.overflow = "";
-      };
-    }
-  }, [infoModal]);
-
-  useEffect(() => {
     try {
       const hasSeen = localStorage.getItem("fantasy_tutorial_seen");
       if (!hasSeen) {
