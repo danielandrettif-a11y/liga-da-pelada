@@ -107,6 +107,7 @@ export function FantasyExperience({
   const [now, setNow] = useState(() => Date.now());
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("points");
+  const [activeTab, setActiveTab] = useState<"team" | "market">("team");
   const [filterTag, setFilterTag] = useState<string>("ALL");
   const [message, setMessage] = useState("");
   const [showTutorial, setShowTutorial] = useState(false);
@@ -350,7 +351,7 @@ export function FantasyExperience({
                 Fantasy da Pelada
               </p>
               <span className="rounded-md bg-accent/20 px-1.5 py-0.5 text-[8px] font-black uppercase text-accent border border-accent/30">
-                V2
+                V3
               </span>
             </div>
             <h1 className="mt-1 text-2xl font-black italic text-foreground">CARTOLA</h1>
@@ -436,12 +437,27 @@ export function FantasyExperience({
         </section>
       )}
 
-      {/* RADAR CARTOLA V2 (Carrossel Dinâmico de Mercado Vivo) */}
-      {radar && (
-        <FantasyRadarCarousel
-          radar={radar}
-          onSelectPlayer={(player) => setSelectedDrawerPlayer(player)}
-        />
+      {/* Resumo da Última Rodada */}
+      {lastRound && !isTest && (
+        <section className="overflow-hidden rounded-2xl border border-border bg-surface">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[.18em] text-muted">
+                Última rodada
+              </p>
+              <p className="mt-0.5 text-sm font-black text-foreground">
+                Ranked {String(lastRound.number).padStart(2, "0")}
+              </p>
+            </div>
+            <strong className="text-2xl font-black text-accent">
+              {lastRound.totalPoints.toFixed(1)} pts
+            </strong>
+          </div>
+          <div className="grid grid-cols-2 gap-px bg-border">
+            <Metric label="Jogadores" value={`${lastRound.playerPoints.toFixed(1)} pts`} />
+            <Metric label="Palpites" value={`${lastRound.predictionPoints.toFixed(1)} pts`} />
+          </div>
+        </section>
       )}
 
       {/* Botão de Revelação de Escalações Pós-Fechamento */}
@@ -473,29 +489,6 @@ export function FantasyExperience({
             Ver Times →
           </span>
         </button>
-      )}
-
-      {/* Resumo da Última Rodada */}
-      {lastRound && !isTest && (
-        <section className="overflow-hidden rounded-2xl border border-border bg-surface">
-          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-[.18em] text-muted">
-                Última rodada
-              </p>
-              <p className="mt-0.5 text-sm font-black text-foreground">
-                Ranked {String(lastRound.number).padStart(2, "0")}
-              </p>
-            </div>
-            <strong className="text-2xl font-black text-accent">
-              {lastRound.totalPoints.toFixed(1)} pts
-            </strong>
-          </div>
-          <div className="grid grid-cols-2 gap-px bg-border">
-            <Metric label="Jogadores" value={`${lastRound.playerPoints.toFixed(1)} pts`} />
-            <Metric label="Palpites" value={`${lastRound.predictionPoints.toFixed(1)} pts`} />
-          </div>
-        </section>
       )}
 
       {/* Ações Rápidas */}
@@ -532,618 +525,741 @@ export function FantasyExperience({
         </button>
       </div>
 
-      {/* Grid Principal: Campo + Mercado */}
-      <div className="grid gap-5 w-full">
-        {/* LADO ESQUERDO: CAMPO E PALPITES */}
-        <section className="space-y-4 w-full">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-black uppercase text-foreground">
-                {betweenRounds ? "Meu elenco" : "Meu time"}
-              </h2>
-              <p className="text-[10px] text-muted">
-                {open ? "Toque na coroa para escolher o capitão (2x)" : "Escalação somente para consulta"}
-              </p>
-              <p
-                className={`mt-1 text-[9px] font-black uppercase ${
-                  saveState.includes("salva") || saveState.includes("Pronta")
-                    ? "text-accent"
-                    : "text-warning"
-                }`}
-              >
-                {saveState}
-              </p>
-            </div>
-            <strong className="text-sm text-accent">{selected.length}/5</strong>
-          </div>
+      {/* SELETOR DE ABAS PRINCIPAIS (MEU TIME × MERCADO) */}
+      <div className="sticky top-[4.25rem] z-30 rounded-2xl border border-accent/30 bg-[#05100B]/98 p-1.5 backdrop-blur-xl shadow-lg">
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            onClick={() => setActiveTab("team")}
+            className={`relative flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+              activeTab === "team"
+                ? "bg-accent text-background shadow-[0_0_15px_rgba(204,255,0,0.35)]"
+                : "bg-surface/70 text-muted hover:text-foreground hover:bg-surface"
+            }`}
+          >
+            <span>👕 Meu Time</span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[9px] font-black leading-none ${
+                activeTab === "team"
+                  ? "bg-background/25 text-background"
+                  : selected.length === 5
+                  ? "bg-success/20 text-success"
+                  : "bg-white/10 text-muted"
+              }`}
+            >
+              {selected.length}/5
+            </span>
+          </button>
 
-          {/* CAMPO DE FUTEBOL REALISTA */}
-          <div className="relative min-h-[480px] w-full max-w-full overflow-hidden rounded-[2.5rem] border-2 border-emerald-400/35 bg-[#083b1f] p-3 sm:p-4 shadow-[0_20px_50px_rgba(0,0,0,0.7),inset_0_0_50px_rgba(0,0,0,0.6)]">
-            <div
-              className="pointer-events-none absolute inset-0 opacity-40"
-              style={{
-                backgroundImage:
-                  "repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 55px, transparent 55px, transparent 110px), radial-gradient(circle at 50% 30%, rgba(204,255,0,0.12), transparent 70%)",
-              }}
-            />
+          <button
+            type="button"
+            onClick={() => setActiveTab("market")}
+            className={`relative flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+              activeTab === "market"
+                ? "bg-accent text-background shadow-[0_0_15px_rgba(204,255,0,0.35)]"
+                : "bg-surface/70 text-muted hover:text-foreground hover:bg-surface"
+            }`}
+          >
+            <span>🛒 Mercado</span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[9px] font-black leading-none ${
+                activeTab === "market"
+                  ? "bg-background/25 text-background"
+                  : "bg-white/10 text-muted"
+              }`}
+            >
+              {market.length}
+            </span>
+          </button>
+        </div>
+      </div>
 
-            <div className="pointer-events-none absolute inset-3 sm:inset-4 rounded-[2rem] border-2 border-white/40">
-              <div className="absolute inset-x-0 top-0 h-0.5 border-t-2 border-white/50" />
-              <div className="absolute -top-0.5 left-1/2 h-16 w-32 -translate-x-1/2 rounded-b-full border-b-2 border-x-2 border-white/40" />
-              <div className="absolute top-0 left-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70 shadow-sm" />
-              <div className="absolute bottom-28 left-1/2 h-12 w-28 -translate-x-1/2 rounded-t-full border-t-2 border-x-2 border-white/40" />
-              <div className="absolute bottom-0 left-1/2 h-28 w-64 -translate-x-1/2 border-t-2 border-x-2 border-white/45 bg-white/[0.015]" />
-              <div className="absolute bottom-18 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-white/80 shadow-sm" />
-              <div className="absolute bottom-0 left-1/2 h-12 w-32 -translate-x-1/2 border-t-2 border-x-2 border-white/45 bg-white/[0.02]" />
-              <div className="absolute -bottom-1 left-1/2 h-2 w-20 -translate-x-1/2 border-t-2 border-x-2 border-white/60 bg-white/10 rounded-t-xs" />
-            </div>
-
-            <div className="relative z-10 flex min-h-[448px] flex-col justify-between py-2">
-              {/* Ataque */}
+      {/* CONTEÚDO PRINCIPAL: MEU TIME OU MERCADO */}
+      <div className="w-full">
+        {/* ABA: MEU TIME */}
+        {activeTab === "team" && (
+          <section className="space-y-4 w-full animate-fade-in">
+            <div className="flex items-center justify-between">
               <div>
-                <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                  Ataque
-                </span>
-                <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                  {[0, 1].map((slot) => {
-                    const player = selectedPlayers[slot];
-                    return player ? (
-                      <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
-                        <button
-                          type="button"
-                          disabled={!open}
-                          onClick={() => setCaptainId(player.id)}
-                          className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
-                            captainId === player.id
-                              ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
-                              : "border-white/20 bg-background text-muted hover:text-white"
-                          }`}
-                          aria-label={`Escolher ${player.name} como capitão`}
-                          title="Tornar Capitão (Pontos 2x)"
-                        >
-                          <Crown className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDrawerPlayer(player)}
-                          className="flex flex-col items-center group"
-                        >
-                          <PlayerAvatar
-                            name={player.name}
-                            avatarUrl={player.avatarUrl}
-                            clickable={false}
-                            className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
-                              captainId === player.id
-                                ? "border-accent ring-2 ring-accent/50"
-                                : "border-emerald-300"
-                            }`}
-                          />
-                          <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
-                            {player.name}
-                          </span>
-                          <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
-                            {status === "in_progress"
-                              ? `${(
-                                  player.roundPoints *
-                                  (captainId === player.id ? settings.captainMultiplier : 1)
-                                ).toFixed(1)} pts`
-                              : formatFantasyMoney(player.price, settings.currencyName)}
-                          </span>
-                          {betweenRounds && (
-                            <span className="text-[8px] font-bold text-white/60">
-                              Última: {player.roundPoints.toFixed(1)} pts
-                            </span>
-                          )}
-                        </button>
-                      </div>
-                    ) : (
-                      <div
-                        key={slot}
-                        className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-white/30 bg-black/25 text-center shadow-inner"
-                      >
-                        <span className="text-[10px] font-bold text-white/70">+ Vaga {slot + 1}</span>
-                        <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">Atacante</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Meio-Campo */}
-              <div>
-                <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                  Meio-Campo & Alas
-                </span>
-                <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                  {[2, 3].map((slot) => {
-                    const player = selectedPlayers[slot];
-                    return player ? (
-                      <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
-                        <button
-                          type="button"
-                          disabled={!open}
-                          onClick={() => setCaptainId(player.id)}
-                          className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
-                            captainId === player.id
-                              ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
-                              : "border-white/20 bg-background text-muted hover:text-white"
-                          }`}
-                          aria-label={`Escolher ${player.name} como capitão`}
-                          title="Tornar Capitão (Pontos 2x)"
-                        >
-                          <Crown className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDrawerPlayer(player)}
-                          className="flex flex-col items-center group"
-                        >
-                          <PlayerAvatar
-                            name={player.name}
-                            avatarUrl={player.avatarUrl}
-                            clickable={false}
-                            className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
-                              captainId === player.id
-                                ? "border-accent ring-2 ring-accent/50"
-                                : "border-emerald-300"
-                            }`}
-                          />
-                          <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
-                            {player.name}
-                          </span>
-                          <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
-                            {status === "in_progress"
-                              ? `${(
-                                  player.roundPoints *
-                                  (captainId === player.id ? settings.captainMultiplier : 1)
-                                ).toFixed(1)} pts`
-                              : formatFantasyMoney(player.price, settings.currencyName)}
-                          </span>
-                          {betweenRounds && (
-                            <span className="text-[8px] font-bold text-white/60">
-                              Última: {player.roundPoints.toFixed(1)} pts
-                            </span>
-                          )}
-                        </button>
-                      </div>
-                    ) : (
-                      <div
-                        key={slot}
-                        className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-white/30 bg-black/25 text-center shadow-inner"
-                      >
-                        <span className="text-[10px] font-bold text-white/70">+ Vaga {slot + 1}</span>
-                        <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">Meia/Ala</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Defesa */}
-              <div>
-                <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                  Goleiro & Defesa
-                </span>
-                <div className="flex justify-center">
-                  {[4].map((slot) => {
-                    const player = selectedPlayers[slot];
-                    return player ? (
-                      <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
-                        <button
-                          type="button"
-                          disabled={!open}
-                          onClick={() => setCaptainId(player.id)}
-                          className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
-                            captainId === player.id
-                              ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
-                              : "border-white/20 bg-background text-muted hover:text-white"
-                          }`}
-                          aria-label={`Escolher ${player.name} como capitão`}
-                          title="Tornar Capitão (Pontos 2x)"
-                        >
-                          <Crown className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDrawerPlayer(player)}
-                          className="flex flex-col items-center group"
-                        >
-                          <PlayerAvatar
-                            name={player.name}
-                            avatarUrl={player.avatarUrl}
-                            clickable={false}
-                            className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
-                              captainId === player.id
-                                ? "border-accent ring-2 ring-accent/50"
-                                : "border-emerald-300"
-                            }`}
-                          />
-                          <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
-                            {player.name}
-                          </span>
-                          <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
-                            {status === "in_progress"
-                              ? `${(
-                                  player.roundPoints *
-                                  (captainId === player.id ? settings.captainMultiplier : 1)
-                                ).toFixed(1)} pts`
-                              : formatFantasyMoney(player.price, settings.currencyName)}
-                          </span>
-                          {betweenRounds && (
-                            <span className="text-[8px] font-bold text-white/60">
-                              Última: {player.roundPoints.toFixed(1)} pts
-                            </span>
-                          )}
-                        </button>
-                      </div>
-                    ) : (
-                      <div
-                        key={slot}
-                        className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-white/30 bg-black/25 text-center shadow-inner"
-                      >
-                        <span className="text-[10px] font-bold text-white/70">+ Vaga 5</span>
-                        <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">
-                          Goleiro/Defesa
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* V3: SLOT DE CARTA ESPECIAL ATIVA */}
-          {!betweenRounds && round && (
-            <FantasyActiveCardSlot
-              roundId={round.id}
-              activeCard={activeCard}
-              isMarketOpen={open}
-              marketPlayers={market}
-              onRefresh={() => router.refresh()}
-            />
-          )}
-
-          {/* Palpites da Rodada */}
-          {!betweenRounds && (
-            <section className="glass-card space-y-4 p-4">
-              <div>
-                <h2 className="text-sm font-black uppercase text-foreground">Palpites da rodada</h2>
-                <p className="mt-1 text-[10px] text-muted">
-                  Palpites vazios valem zero e não invalidam sua escalação.
+                <h2 className="text-sm font-black uppercase text-foreground">
+                  {betweenRounds ? "Meu elenco" : "Meu time"}
+                </h2>
+                <p className="text-[10px] text-muted">
+                  {open ? "Toque na coroa para escolher o capitão (2x)" : "Escalação somente para consulta"}
                 </p>
-              </div>
-
-              <Select
-                label={`Artilheiro (+${settings.topScorerPredictionPoints} pts)`}
-                value={scorerId || ""}
-                disabled={!open}
-                onChange={setScorerId}
-                options={market.map((p) => ({ id: p.id, name: p.name }))}
-                onInfoClick={() =>
-                  setInfoModal({
-                    title: "Palpite: Artilheiro da Rodada",
-                    description: `Aposte no jogador que você acredita que fará o maior número de gols nesta rodada. Se ele for o artilheiro, você fatura +${settings.topScorerPredictionPoints} pontos de bônus!`,
-                  })
-                }
-              />
-
-              <Select
-                label={`Garçom (+${settings.topAssistPredictionPoints} pts)`}
-                value={assistId || ""}
-                disabled={!open}
-                onChange={setAssistId}
-                options={market.map((p) => ({ id: p.id, name: p.name }))}
-                onInfoClick={() =>
-                  setInfoModal({
-                    title: "Palpite: Garçom da Rodada",
-                    description: `Aposte no jogador que dará o maior número de passes para gol. Se ele for o líder de assistências, você fatura +${settings.topAssistPredictionPoints} pontos de bônus!`,
-                  })
-                }
-              />
-
-              {challengeType && (
-                <div className="rounded-2xl border border-warning/35 bg-warning/10 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Target className="h-4 w-4 text-warning" />
-                      <div>
-                        <p className="text-[9px] font-black uppercase tracking-[.16em] text-warning">
-                          Desafio da Rodada
-                        </p>
-                        <p className="text-sm font-black text-foreground">
-                          {CHALLENGE_LABELS[challengeType]}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setInfoModal({
-                          title: `Desafio: ${CHALLENGE_LABELS[challengeType]}`,
-                          description: challengeOffer
-                            ? `Objetivo especial da rodada. Escale o jogador para cumprir a meta "${challengeOffer.description}" e garantir +${challengeOffer.reward} pontos extras!`
-                            : "Objetivo especial da rodada. Escale o jogador correto para faturar pontos extras no Cartola!",
-                        })
-                      }
-                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-warning/20 text-warning hover:bg-warning/30 transition-colors"
-                      aria-label="Informações sobre o desafio da rodada"
-                    >
-                      <HelpCircle className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div className="mt-3">
-                    <Select
-                      label="Escolha o jogador do desafio"
-                      value={challengeId || ""}
-                      disabled={!open}
-                      onChange={setChallengeId}
-                      options={market.map((p) => ({ id: p.id, name: p.name }))}
-                    />
-                  </div>
-                  {selectedChallengePlayer && challengeOffer && (
-                    <div className="mt-3 rounded-xl bg-black/20 p-3 text-[10px] font-bold text-foreground">
-                      <p>
-                        {selectedChallengePlayer.name} ·{" "}
-                        {formatFantasyMoney(selectedChallengePlayer.price, settings.currencyName)}
-                      </p>
-                      <p className="mt-1 text-warning">
-                        {challengeOffer.description} · +{challengeOffer.reward} pts
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-          )}
-
-          {betweenRounds && (
-            <p className="rounded-xl border border-border bg-surface p-3 text-center text-[10px] font-bold text-muted">
-              Os palpites e o Desafio da Rodada serão liberados quando a próxima Ranked for criada.
-            </p>
-          )}
-
-          {/* Botão de Salvar */}
-          {open && (
-            <button
-              type="button"
-              onClick={save}
-              disabled={pending || remaining < 0 || isSaved}
-              className={`flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-black uppercase tracking-wider transition-all duration-300 active:scale-[0.99] ${
-                isSaved
-                  ? "border border-success/40 bg-success/15 text-success shadow-[0_0_20px_rgba(34,197,94,0.15)] cursor-default"
-                  : complete
-                  ? "bg-accent text-background shadow-[0_0_25px_rgba(204,255,0,0.25)] hover:brightness-110"
-                  : "border border-warning/40 bg-warning text-background shadow-[0_0_20px_rgba(234,179,8,0.2)]"
-              } disabled:opacity-80`}
-            >
-              {pending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Salvando...</span>
-                </>
-              ) : isSaved ? (
-                <>
-                  <CheckCircle2 className="h-5 w-5 text-success" />
-                  <span>{betweenRounds ? "Elenco Salvo" : "Escalação Salva"}</span>
-                </>
-              ) : betweenRounds ? (
-                "Salvar Elenco para a Próxima Ranked"
-              ) : complete ? (
-                "Salvar Escalação"
-              ) : (
-                "Salvar Rascunho"
-              )}
-            </button>
-          )}
-
-          {message && (
-            <p
-              role="status"
-              className="rounded-xl border border-border bg-surface p-3 text-center text-xs font-bold text-foreground"
-            >
-              {message}
-            </p>
-          )}
-        </section>
-
-        {/* LADO DIREITO: MERCADO VIVO COM FILTROS E BUSCA */}
-        <aside className="space-y-3">
-          <div className="flex items-end justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-black uppercase text-foreground">Mercado de Jogadores</h2>
-              <p className="text-[10px] text-muted">
-                {isTest
-                  ? "Convocados do amistoso · preços fictícios"
-                  : open
-                  ? "Preços vivos, valorização e histórico"
-                  : "Mercado fechado · consulte estatísticas"}
-              </p>
-            </div>
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              className="max-w-36 rounded-lg border border-border bg-surface px-2 py-1.5 text-[10px] font-bold text-foreground"
-            >
-              <option value="points">Mais pontos</option>
-              <option value="lastRound">Última rodada</option>
-              <option value="variation">Valorização</option>
-              <option value="form">Melhor forma</option>
-              <option value="costBenefit">Custo-benefício</option>
-              <option value="popularity">Mais escalado</option>
-              <option value="priceLow">Menor preço</option>
-              <option value="priceHigh">Maior preço</option>
-              <option value="name">Nome (A-Z)</option>
-            </select>
-          </div>
-
-          {/* Chips de Filtros Rápidos */}
-          <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1 text-[9px] font-black uppercase tracking-wider">
-            {[
-              { id: "ALL", label: "Todos" },
-              { id: "TREND_UP", label: "🔥 Em Alta" },
-              { id: "TREND_DOWN", label: "📉 Em Baixa" },
-              { id: "HIGH_VALUE", label: "💎 Custo-Benefício" },
-              { id: "REVELATION", label: "🚀 Revelação" },
-              { id: "BUDGET", label: "💰 Baratos" },
-              { id: "PREMIUM", label: "💸 Premium" },
-            ].map((chip) => (
-              <button
-                key={chip.id}
-                type="button"
-                onClick={() => setFilterTag(chip.id)}
-                className={`shrink-0 rounded-xl px-2.5 py-1.5 transition-colors border ${
-                  filterTag === chip.id
-                    ? "border-accent bg-accent text-background"
-                    : "border-white/10 bg-surface/60 text-muted hover:text-foreground"
-                }`}
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Campo de Busca */}
-          <label className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3">
-            <Search className="h-4 w-4 text-muted" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por nome do atleta..."
-              className="h-11 w-full bg-transparent text-xs font-bold text-foreground outline-none"
-            />
-          </label>
-
-          {/* Lista de Atletas do Mercado */}
-          <div className="space-y-2 w-full">
-            {filtered.map((player) => {
-              const bought = selected.includes(player.id);
-              const simulatedRemaining = bought ? remaining + player.price : remaining - player.price;
-
-              return (
-                <div
-                  key={player.id}
-                  className={`flex flex-col gap-2 rounded-2xl border p-3 text-left transition ${
-                    bought
-                      ? "border-accent/60 bg-accent/10 shadow-[0_0_15px_rgba(204,255,0,0.06)]"
-                      : "border-border bg-surface hover:border-accent/30"
+                <p
+                  className={`mt-1 text-[9px] font-black uppercase ${
+                    saveState.includes("salva") || saveState.includes("Pronta")
+                      ? "text-accent"
+                      : "text-warning"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    {/* Botão de Perfil / Drawer */}
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDrawerPlayer(player)}
-                      className="shrink-0 relative group"
-                      title="Ver perfil completo do Cartola"
-                    >
-                      <PlayerAvatar
-                        name={player.name}
-                        avatarUrl={player.avatarUrl}
-                        clickable={false}
-                        className="h-12 w-12 rounded-full border border-border bg-background text-xs font-black text-accent group-hover:border-accent transition-colors"
-                      />
-                      <span className="absolute -bottom-1 -right-1 text-[10px]">
-                        {player.trendIcon}
-                      </span>
-                    </button>
+                  {saveState}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab("market")}
+                className="rounded-xl border border-accent/40 bg-accent/15 px-3 py-1.5 text-xs font-black text-accent hover:bg-accent/25 transition-colors shadow-sm"
+              >
+                + Mercado ({market.length})
+              </button>
+            </div>
 
-                    {/* Dados Centrais */}
-                    <div
-                      className="min-w-0 flex-1 cursor-pointer"
-                      onClick={() => setSelectedDrawerPlayer(player)}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <p className="truncate text-xs font-black text-foreground hover:text-accent transition-colors">
-                          {player.name}
+            {/* CAMPO DE FUTEBOL REALISTA */}
+            <div className="relative min-h-[480px] w-full max-w-full overflow-hidden rounded-[2.5rem] border-2 border-emerald-400/35 bg-[#083b1f] p-3 sm:p-4 shadow-[0_20px_50px_rgba(0,0,0,0.7),inset_0_0_50px_rgba(0,0,0,0.6)]">
+              <div
+                className="pointer-events-none absolute inset-0 opacity-40"
+                style={{
+                  backgroundImage:
+                    "repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 55px, transparent 55px, transparent 110px), radial-gradient(circle at 50% 30%, rgba(204,255,0,0.12), transparent 70%)",
+                }}
+              />
+
+              <div className="pointer-events-none absolute inset-3 sm:inset-4 rounded-[2rem] border-2 border-white/40">
+                <div className="absolute inset-x-0 top-0 h-0.5 border-t-2 border-white/50" />
+                <div className="absolute -top-0.5 left-1/2 h-16 w-32 -translate-x-1/2 rounded-b-full border-b-2 border-x-2 border-white/40" />
+                <div className="absolute top-0 left-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70 shadow-sm" />
+                <div className="absolute bottom-28 left-1/2 h-12 w-28 -translate-x-1/2 rounded-t-full border-t-2 border-x-2 border-white/40" />
+                <div className="absolute bottom-0 left-1/2 h-28 w-64 -translate-x-1/2 border-t-2 border-x-2 border-white/45 bg-white/[0.015]" />
+                <div className="absolute bottom-18 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-white/80 shadow-sm" />
+                <div className="absolute bottom-0 left-1/2 h-12 w-32 -translate-x-1/2 border-t-2 border-x-2 border-white/45 bg-white/[0.02]" />
+                <div className="absolute -bottom-1 left-1/2 h-2 w-20 -translate-x-1/2 border-t-2 border-x-2 border-white/60 bg-white/10 rounded-t-xs" />
+              </div>
+
+              <div className="relative z-10 flex min-h-[448px] flex-col justify-between py-2">
+                {/* Ataque */}
+                <div>
+                  <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                    Ataque
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                    {[0, 1].map((slot) => {
+                      const player = selectedPlayers[slot];
+                      return player ? (
+                        <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
+                          <button
+                            type="button"
+                            disabled={!open}
+                            onClick={() => setCaptainId(player.id)}
+                            className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
+                              captainId === player.id
+                                ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
+                                : "border-white/20 bg-background text-muted hover:text-white"
+                            }`}
+                            aria-label={`Escolher ${player.name} como capitão`}
+                            title="Tornar Capitão (Pontos 2x)"
+                          >
+                            <Crown className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDrawerPlayer(player)}
+                            className="flex flex-col items-center group"
+                          >
+                            <PlayerAvatar
+                              name={player.name}
+                              avatarUrl={player.avatarUrl}
+                              clickable={false}
+                              className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
+                                captainId === player.id
+                                  ? "border-accent ring-2 ring-accent/50"
+                                  : "border-emerald-300"
+                              }`}
+                            />
+                            <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
+                              {player.name}
+                            </span>
+                            <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
+                              {status === "in_progress"
+                                ? `${(
+                                    player.roundPoints *
+                                    (captainId === player.id ? settings.captainMultiplier : 1)
+                                  ).toFixed(1)} pts`
+                                : formatFantasyMoney(player.price, settings.currencyName)}
+                            </span>
+                            {betweenRounds && (
+                              <span className="text-[8px] font-bold text-white/60">
+                                Última: {player.roundPoints.toFixed(1)} pts
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          key={slot}
+                          type="button"
+                          onClick={() => {
+                            setFilterTag("ALL");
+                            setActiveTab("market");
+                          }}
+                          className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/40 bg-black/25 text-center shadow-inner transition hover:border-accent hover:bg-black/40 active:scale-95"
+                        >
+                          <span className="text-[10px] font-bold text-accent">+ Vaga {slot + 1}</span>
+                          <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">Atacante</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Meio-Campo */}
+                <div>
+                  <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                    Meio-Campo & Alas
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                    {[2, 3].map((slot) => {
+                      const player = selectedPlayers[slot];
+                      return player ? (
+                        <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
+                          <button
+                            type="button"
+                            disabled={!open}
+                            onClick={() => setCaptainId(player.id)}
+                            className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
+                              captainId === player.id
+                                ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
+                                : "border-white/20 bg-background text-muted hover:text-white"
+                            }`}
+                            aria-label={`Escolher ${player.name} como capitão`}
+                            title="Tornar Capitão (Pontos 2x)"
+                          >
+                            <Crown className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDrawerPlayer(player)}
+                            className="flex flex-col items-center group"
+                          >
+                            <PlayerAvatar
+                              name={player.name}
+                              avatarUrl={player.avatarUrl}
+                              clickable={false}
+                              className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
+                                captainId === player.id
+                                  ? "border-accent ring-2 ring-accent/50"
+                                  : "border-emerald-300"
+                              }`}
+                            />
+                            <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
+                              {player.name}
+                            </span>
+                            <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
+                              {status === "in_progress"
+                                ? `${(
+                                    player.roundPoints *
+                                    (captainId === player.id ? settings.captainMultiplier : 1)
+                                  ).toFixed(1)} pts`
+                                : formatFantasyMoney(player.price, settings.currencyName)}
+                            </span>
+                            {betweenRounds && (
+                              <span className="text-[8px] font-bold text-white/60">
+                                Última: {player.roundPoints.toFixed(1)} pts
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          key={slot}
+                          type="button"
+                          onClick={() => {
+                            setFilterTag("ALL");
+                            setActiveTab("market");
+                          }}
+                          className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/40 bg-black/25 text-center shadow-inner transition hover:border-accent hover:bg-black/40 active:scale-95"
+                        >
+                          <span className="text-[10px] font-bold text-accent">+ Vaga {slot + 1}</span>
+                          <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">Meia/Ala</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Defesa */}
+                <div>
+                  <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                    Goleiro & Defesa
+                  </span>
+                  <div className="flex justify-center">
+                    {[4].map((slot) => {
+                      const player = selectedPlayers[slot];
+                      return player ? (
+                        <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
+                          <button
+                            type="button"
+                            disabled={!open}
+                            onClick={() => setCaptainId(player.id)}
+                            className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
+                              captainId === player.id
+                                ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
+                                : "border-white/20 bg-background text-muted hover:text-white"
+                            }`}
+                            aria-label={`Escolher ${player.name} como capitão`}
+                            title="Tornar Capitão (Pontos 2x)"
+                          >
+                            <Crown className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDrawerPlayer(player)}
+                            className="flex flex-col items-center group"
+                          >
+                            <PlayerAvatar
+                              name={player.name}
+                              avatarUrl={player.avatarUrl}
+                              clickable={false}
+                              className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
+                                captainId === player.id
+                                  ? "border-accent ring-2 ring-accent/50"
+                                  : "border-emerald-300"
+                              }`}
+                            />
+                            <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
+                              {player.name}
+                            </span>
+                            <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
+                              {status === "in_progress"
+                                ? `${(
+                                    player.roundPoints *
+                                    (captainId === player.id ? settings.captainMultiplier : 1)
+                                  ).toFixed(1)} pts`
+                                : formatFantasyMoney(player.price, settings.currencyName)}
+                            </span>
+                            {betweenRounds && (
+                              <span className="text-[8px] font-bold text-white/60">
+                                Última: {player.roundPoints.toFixed(1)} pts
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          key={slot}
+                          type="button"
+                          onClick={() => {
+                            setFilterTag("ALL");
+                            setActiveTab("market");
+                          }}
+                          className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/40 bg-black/25 text-center shadow-inner transition hover:border-accent hover:bg-black/40 active:scale-95"
+                        >
+                          <span className="text-[10px] font-bold text-accent">+ Vaga 5</span>
+                          <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">
+                            Goleiro/Defesa
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* V3: SLOT DE CARTA ESPECIAL ATIVA */}
+            {!betweenRounds && round && (
+              <FantasyActiveCardSlot
+                roundId={round.id}
+                activeCard={activeCard}
+                isMarketOpen={open}
+                marketPlayers={market}
+                onRefresh={() => router.refresh()}
+              />
+            )}
+
+            {/* Palpites da Rodada */}
+            {!betweenRounds && (
+              <section className="glass-card space-y-4 p-4">
+                <div>
+                  <h2 className="text-sm font-black uppercase text-foreground">Palpites da rodada</h2>
+                  <p className="mt-1 text-[10px] text-muted">
+                    Palpites vazios valem zero e não invalidam sua escalação.
+                  </p>
+                </div>
+
+                <Select
+                  label={`Artilheiro (+${settings.topScorerPredictionPoints} pts)`}
+                  value={scorerId || ""}
+                  disabled={!open}
+                  onChange={setScorerId}
+                  options={market.map((p) => ({ id: p.id, name: p.name }))}
+                  onInfoClick={() =>
+                    setInfoModal({
+                      title: "Palpite: Artilheiro da Rodada",
+                      description: `Aposte no jogador que você acredita que fará o maior número de gols nesta rodada. Se ele for o artilheiro, você fatura +${settings.topScorerPredictionPoints} pontos de bônus!`,
+                    })
+                  }
+                />
+
+                <Select
+                  label={`Garçom (+${settings.topAssistPredictionPoints} pts)`}
+                  value={assistId || ""}
+                  disabled={!open}
+                  onChange={setAssistId}
+                  options={market.map((p) => ({ id: p.id, name: p.name }))}
+                  onInfoClick={() =>
+                    setInfoModal({
+                      title: "Palpite: Garçom da Rodada",
+                      description: `Aposte no jogador que dará o maior número de passes para gol. Se ele for o líder de assistências, você fatura +${settings.topAssistPredictionPoints} pontos de bônus!`,
+                    })
+                  }
+                />
+
+                {challengeType && (
+                  <div className="rounded-2xl border border-warning/35 bg-gradient-to-br from-warning/15 via-[#1a1405] to-[#0d160e] p-3.5 space-y-2.5 shadow-inner">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-warning/20 text-warning">
+                          <Target className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black uppercase tracking-[.16em] text-warning">
+                            Desafio da Rodada
+                          </p>
+                          <p className="text-xs font-black text-foreground">
+                            {CHALLENGE_LABELS[challengeType]}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setInfoModal({
+                            title: `Desafio: ${CHALLENGE_LABELS[challengeType]}`,
+                            description: challengeOffer
+                              ? `Objetivo especial da rodada. Escale o jogador para cumprir a meta "${challengeOffer.description}" e garantir +${challengeOffer.reward} pontos extras!`
+                              : "Objetivo especial da rodada. Escale o jogador correto para faturar pontos extras no Cartola!",
+                          })
+                        }
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-warning/20 text-warning hover:bg-warning/30 transition-colors"
+                        aria-label="Informações sobre o desafio da rodada"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div>
+                      <Select
+                        label="Escolha o jogador do desafio"
+                        value={challengeId || ""}
+                        disabled={!open}
+                        onChange={setChallengeId}
+                        options={market.map((p) => ({ id: p.id, name: p.name }))}
+                      />
+                    </div>
+                    {selectedChallengePlayer && challengeOffer && (
+                      <div className="rounded-xl border border-warning/25 bg-black/40 p-2.5 text-[10px] font-bold text-foreground">
+                        <p className="text-white">
+                          {selectedChallengePlayer.name} ·{" "}
+                          <span className="text-accent font-black">{formatFantasyMoney(selectedChallengePlayer.price, settings.currencyName)}</span>
                         </p>
-                        <span className="text-[8px] font-bold text-muted">
-                          {player.formIcon} {player.formLabel}
+                        <p className="mt-0.5 text-warning font-semibold">
+                          {challengeOffer.description} · <span className="font-black text-accent">+{challengeOffer.reward} pts</span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {betweenRounds && (
+              <p className="rounded-xl border border-border bg-surface p-3 text-center text-[10px] font-bold text-muted">
+                Os palpites e o Desafio da Rodada serão liberados quando a próxima Ranked for criada.
+              </p>
+            )}
+
+            {/* Botão de Salvar */}
+            {open && (
+              <button
+                type="button"
+                onClick={save}
+                disabled={pending || remaining < 0 || isSaved}
+                className={`flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-black uppercase tracking-wider transition-all duration-300 active:scale-[0.99] ${
+                  isSaved
+                    ? "border border-success/40 bg-success/15 text-success shadow-[0_0_20px_rgba(34,197,94,0.15)] cursor-default"
+                    : complete
+                    ? "bg-accent text-background shadow-[0_0_25px_rgba(204,255,0,0.25)] hover:brightness-110"
+                    : "border border-warning/40 bg-warning text-background shadow-[0_0_20px_rgba(234,179,8,0.2)]"
+                } disabled:opacity-80`}
+              >
+                {pending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Salvando...</span>
+                  </>
+                ) : isSaved ? (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 text-success" />
+                    <span>{betweenRounds ? "Elenco Salvo" : "Escalação Salva"}</span>
+                  </>
+                ) : betweenRounds ? (
+                  "Salvar Elenco para a Próxima Ranked"
+                ) : complete ? (
+                  "Salvar Escalação"
+                ) : (
+                  "Salvar Rascunho"
+                )}
+              </button>
+            )}
+
+            {message && (
+              <p
+                role="status"
+                className="rounded-xl border border-border bg-surface p-3 text-center text-xs font-bold text-foreground"
+              >
+                {message}
+              </p>
+            )}
+          </section>
+        )}
+
+        {/* ABA: MERCADO DE JOGADORES */}
+        {activeTab === "market" && (
+          <aside className="space-y-4 w-full animate-fade-in">
+            {/* Barra de Resumo de Orçamento e Acesso Rápido ao Time */}
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-accent/30 bg-gradient-to-r from-accent/15 via-[#06180e] to-surface p-3.5 shadow-md">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-wider text-muted">
+                  {betweenRounds ? "Elenco em Montagem" : "Orçamento da Rodada"}
+                </p>
+                <div className="flex items-baseline gap-2 mt-0.5">
+                  <span className={`text-xs font-black ${remaining >= 0 ? "text-foreground" : "text-danger"}`}>
+                    {formatFantasyMoney(remaining, settings.currencyName)}{" "}
+                    <span className="text-[9px] font-bold text-muted">livres</span>
+                  </span>
+                  <span className="text-[10px] font-bold text-accent">
+                    · {selected.length}/5 escalados
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab("team")}
+                className="shrink-0 rounded-xl bg-accent px-3 py-1.5 text-xs font-black uppercase tracking-tight text-background shadow transition-transform active:scale-95"
+              >
+                Ver Time ({selected.length}/5) →
+              </button>
+            </div>
+
+            {/* RADAR CARTOLA V2 (Carrossel Dinâmico de Mercado Vivo) */}
+            {radar && (
+              <FantasyRadarCarousel
+                radar={radar}
+                onSelectPlayer={(player) => setSelectedDrawerPlayer(player)}
+              />
+            )}
+
+            {/* Cabeçalho Responsivo do Mercado */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div>
+                <h2 className="text-sm font-black uppercase text-foreground">Mercado de Jogadores</h2>
+                <p className="text-[10px] text-muted">
+                  {isTest
+                    ? "Convocados do amistoso · preços fictícios"
+                    : open
+                    ? "Preços vivos, valorização e histórico"
+                    : "Mercado fechado · consulte estatísticas"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-muted shrink-0">Ordenar:</span>
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value)}
+                  className="w-full sm:w-auto rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-bold text-foreground"
+                >
+                  <option value="points">Mais pontos</option>
+                  <option value="lastRound">Última rodada</option>
+                  <option value="variation">Valorização</option>
+                  <option value="form">Melhor forma</option>
+                  <option value="costBenefit">Custo-benefício</option>
+                  <option value="popularity">Mais escalado</option>
+                  <option value="priceLow">Menor preço</option>
+                  <option value="priceHigh">Maior preço</option>
+                  <option value="name">Nome (A-Z)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Chips de Filtros Rápidos */}
+            <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 text-[9px] font-black uppercase tracking-wider">
+              {[
+                { id: "ALL", label: "Todos" },
+                { id: "TREND_UP", label: "🔥 Em Alta" },
+                { id: "TREND_DOWN", label: "📉 Em Baixa" },
+                { id: "HIGH_VALUE", label: "💎 Custo-Benefício" },
+                { id: "REVELATION", label: "🚀 Revelação" },
+                { id: "BUDGET", label: "💰 Baratos" },
+                { id: "PREMIUM", label: "💸 Premium" },
+              ].map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => setFilterTag(chip.id)}
+                  className={`shrink-0 rounded-xl px-2.5 py-1.5 transition-colors border ${
+                    filterTag === chip.id
+                      ? "border-accent bg-accent text-background font-black shadow-sm"
+                      : "border-white/10 bg-surface/60 text-muted hover:text-foreground"
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Campo de Busca */}
+            <label className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3">
+              <Search className="h-4 w-4 text-muted shrink-0" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar por nome do atleta..."
+                className="h-11 w-full bg-transparent text-xs font-bold text-foreground outline-none placeholder:text-muted/60"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="text-muted hover:text-foreground text-xs p-1"
+                  aria-label="Limpar busca"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </label>
+
+            {/* Lista de Atletas do Mercado */}
+            <div className="space-y-2.5 w-full">
+              {filtered.map((player) => {
+                const bought = selected.includes(player.id);
+                const simulatedRemaining = bought ? remaining + player.price : remaining - player.price;
+
+                return (
+                  <div
+                    key={player.id}
+                    className={`flex flex-col gap-2 rounded-2xl border p-3 text-left transition ${
+                      bought
+                        ? "border-accent/60 bg-accent/10 shadow-[0_0_15px_rgba(204,255,0,0.06)]"
+                        : "border-border bg-surface hover:border-accent/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Botão de Perfil / Drawer */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDrawerPlayer(player)}
+                        className="shrink-0 relative group"
+                        title="Ver perfil completo do Cartola"
+                      >
+                        <PlayerAvatar
+                          name={player.name}
+                          avatarUrl={player.avatarUrl}
+                          clickable={false}
+                          className="h-12 w-12 rounded-full border border-border bg-background text-xs font-black text-accent group-hover:border-accent transition-colors"
+                        />
+                        <span className="absolute -bottom-1 -right-1 text-[10px]">
+                          {player.trendIcon}
                         </span>
+                      </button>
+
+                      {/* Dados Centrais */}
+                      <div
+                        className="min-w-0 flex-1 cursor-pointer"
+                        onClick={() => setSelectedDrawerPlayer(player)}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate text-xs font-black text-foreground hover:text-accent transition-colors">
+                            {player.name}
+                          </p>
+                          <span className="text-[8px] font-bold text-muted">
+                            {player.formIcon} {player.formLabel}
+                          </span>
+                        </div>
+
+                        {/* Tags Compactas */}
+                        {player.compactTags.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {player.compactTags.map((t) => (
+                              <span
+                                key={t.type}
+                                className="rounded bg-black/40 px-1.5 py-0.2 text-[7px] font-black uppercase text-accent border border-accent/20"
+                              >
+                                {t.icon} {t.label}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="mt-1 flex items-center gap-2 text-[9px]">
+                          <span className="font-black text-accent">
+                            {formatFantasyMoney(player.price, settings.currencyName)}
+                          </span>
+                          <span
+                            className={`font-black ${
+                              player.variation >= 0 ? "text-success" : "text-danger"
+                            }`}
+                          >
+                            {player.variation > 0 ? "+" : ""}
+                            {(player.variation * 100).toFixed(1)}%
+                          </span>
+                          {player.popularityPercent > 0 && (
+                            <span className="text-muted font-semibold">
+                              · {player.popularityPercent}% escalado
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Tags Compactas */}
-                      {player.compactTags.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {player.compactTags.map((t) => (
-                            <span
-                              key={t.type}
-                              className="rounded bg-black/40 px-1.5 py-0.2 text-[7px] font-black uppercase text-accent border border-accent/20"
-                            >
-                              {t.icon} {t.label}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      {/* Pontos & Ação */}
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-black text-foreground">
+                          {player.totalPoints.toFixed(1)}
+                        </p>
+                        <p className="text-[8px] uppercase text-muted">pontos</p>
 
-                      <div className="mt-1 flex items-center gap-2 text-[9px]">
-                        <span className="font-black text-accent">
-                          {formatFantasyMoney(player.price, settings.currencyName)}
-                        </span>
-                        <span
-                          className={`font-black ${
-                            player.variation >= 0 ? "text-success" : "text-danger"
-                          }`}
-                        >
-                          {player.variation > 0 ? "+" : ""}
-                          {(player.variation * 100).toFixed(1)}%
-                        </span>
-                        {player.popularityPercent > 0 && (
-                          <span className="text-muted font-semibold">
-                            · {player.popularityPercent}% escalado
-                          </span>
+                        {open && (
+                          <button
+                            type="button"
+                            onClick={() => togglePlayer(player)}
+                            disabled={!bought && player.price > remaining}
+                            className={`mt-1.5 rounded-xl px-3 py-1 text-[9px] font-black uppercase transition-transform active:scale-90 ${
+                              bought
+                                ? "bg-danger/20 text-danger border border-danger/30 hover:bg-danger/30"
+                                : player.price > remaining
+                                ? "bg-white/5 text-muted cursor-not-allowed opacity-50"
+                                : "bg-accent text-background hover:brightness-110 shadow-sm"
+                            }`}
+                          >
+                            {bought ? "Vender" : "Comprar"}
+                          </button>
                         )}
                       </div>
                     </div>
 
-                    {/* Pontos & Ação */}
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-black text-foreground">
-                        {player.totalPoints.toFixed(1)}
-                      </p>
-                      <p className="text-[8px] uppercase text-muted">pontos</p>
-
-                      {open && (
+                    {/* Informação de Saldo Simulado */}
+                    {open && (
+                      <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-1 border-t border-white/5 pt-1.5 text-[9px] text-muted min-w-0">
+                        <span className="truncate">
+                          {bought
+                            ? `Saldo após venda: ${formatFantasyMoney(simulatedRemaining, settings.currencyName)}`
+                            : `Saldo após compra: ${formatFantasyMoney(simulatedRemaining, settings.currencyName)}`}
+                        </span>
                         <button
                           type="button"
-                          onClick={() => togglePlayer(player)}
-                          disabled={!bought && player.price > remaining}
-                          className={`mt-1.5 rounded-xl px-3 py-1 text-[9px] font-black uppercase transition-transform active:scale-90 ${
-                            bought
-                              ? "bg-danger/20 text-danger border border-danger/30 hover:bg-danger/30"
-                              : player.price > remaining
-                              ? "bg-white/5 text-muted cursor-not-allowed opacity-50"
-                              : "bg-accent text-background hover:brightness-110 shadow-sm"
-                          }`}
+                          onClick={() => setSelectedDrawerPlayer(player)}
+                          className="text-accent font-bold hover:underline shrink-0"
                         >
-                          {bought ? "Vender" : "Comprar"}
+                          Gráfico & histórico →
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
-
-                  {/* Informação de Saldo Simulado */}
-                  {open && (
-                    <div className="flex items-center justify-between border-t border-white/5 pt-1.5 text-[8px] text-muted">
-                      <span>
-                        {bought
-                          ? `Saldo após venda: ${formatFantasyMoney(simulatedRemaining, settings.currencyName)}`
-                          : `Saldo após compra: ${formatFantasyMoney(simulatedRemaining, settings.currencyName)}`}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedDrawerPlayer(player)}
-                        className="text-accent font-bold hover:underline"
-                      >
-                        Ver gráfico & histórico →
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </aside>
+                );
+              })}
+            </div>
+          </aside>
+        )}
       </div>
 
       {/* DRAWER INTERATIVO DE DETALHES DO JOGADOR */}
@@ -1272,9 +1388,9 @@ function Select({
   onInfoClick?: () => void;
 }) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold text-muted">{label}</span>
+        <span className="text-[10px] font-black uppercase tracking-wider text-muted">{label}</span>
         {onInfoClick && (
           <button
             type="button"
@@ -1287,19 +1403,24 @@ function Select({
           </button>
         )}
       </div>
-      <select
-        disabled={disabled}
-        value={value}
-        onChange={(e) => onChange(e.target.value || null)}
-        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground disabled:opacity-50"
-      >
-        <option value="">Sem palpite</option>
-        {options.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.name}
-          </option>
-        ))}
-      </select>
+      <div className="relative">
+        <select
+          disabled={disabled}
+          value={value}
+          onChange={(e) => onChange(e.target.value || null)}
+          className="h-11 w-full appearance-none rounded-xl border border-border bg-[#05100B] px-3.5 pr-8 text-xs font-bold text-foreground disabled:opacity-50 focus:border-accent outline-none transition-colors"
+        >
+          <option value="">Sem palpite</option>
+          {options.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name}
+            </option>
+          ))}
+        </select>
+        <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted text-[10px]">
+          ▼
+        </div>
+      </div>
     </div>
   );
 }

@@ -22,15 +22,8 @@
   - Cartas econômicas (`extra_credit` e `bargain`) concedem margem temporária para montar o time na rodada, mas **NÃO alteram o patrimônio real** nem o preço dos jogadores.
   - Cartas de pontuação (`super_captain`, `double_prediction`, `vice_captain`, `golden_goal`, `golden_assist`, `scout`, `duo`, `all_in`) aplicam bônus após a pontuação base, de forma aditiva e transparente, com breakdown detalhado no histórico.
 
-## 2. Catálogo Oficial das 10 Cartas
-1. 👑 **Super Capitão** (`LEGENDARY`, `CAPTAIN_MULTIPLIER`): Capitão pontua 3x total.
-2. 💰 **Crédito Extra** (`COMMON`, `BUDGET_BONUS`): +C$5 de orçamento na rodada sem alterar patrimônio permanente.
-3. 🎯 **Palpite Duplo** (`RARE`, `PREDICTION_MULTIPLIER`): Dobra a recompensa do palpite selecionado (Artilheiro, Garçom ou Desafio).
-4. 🤑 **Barganha** (`COMMON`, `PLAYER_DISCOUNT`): 20% de desconto no preço de 1 atleta para montagem de time.
-5. 🛡️ **Vice-Capitão** (`RARE`, `VICE_CAPTAIN`): Se o capitão oficial não jogar (`games = 0`), o vice vira 2x.
-6. ⚽ **Gol de Ouro** (`COMMON`, `CONDITIONAL_PLAYER_BONUS`): +3 pontos se o jogador escalado fizer 1+ gol.
-7. 🍽️ **Passe de Ouro** (`COMMON`, `CONDITIONAL_PLAYER_BONUS`): +3 pontos se o jogador escalado der 1+ assistência.
-8. 💎 **Caça-Talentos** (`EPIC`, `CONDITIONAL_PLAYER_BONUS`): 50% dos pontos base (limite +6 pts) para jogador abaixo da mediana de preço.
-9. ⚡ **Dobradinha** (`RARE`, `CONDITIONAL_DUO_BONUS`): +5 pontos se 2 jogadores escalados ficarem acima da média da rodada.
-10. 🎰 **All-In** (`EPIC`, `CONDITIONAL_PLAYER_BONUS`): +6 pontos se jogador dos 50% mais baratos ficar no TOP 5 da rodada.
-- Experimentais (desabilitadas): `safe_prediction` (Palpite Seguro), `emergency_sub` (Reserva de Emergência).
+## 2. Diagnóstico de Layout & UI Mobile (Encaixe da Página do Cartola)
+- **Header Occlusion**: O Header fixo possuía 90% de opacidade com blur, permitindo vazamento ótico de textos escuros/neon por trás da logo no scroll.
+- **Safe Area Inferior**: `main` estava com `pb-24` fixo sobrepondo a `padding-bottom` dinâmica do safe-area do iOS + altura da barra (`BottomNav`), fazendo os cards inferiores ficarem ocultos.
+- **Overflow de Ordenação e Cards**: O header do Mercado com `flex items-end justify-between` comprimia o dropdown em telas menores (<400px), truncando textos (`Mais po...`).
+- **Navegação em Abas (Meu Time × Mercado)**: Padrão moderno e oficial dos melhores fantasy games para evitar rolagem infinita vertical de 10 telas em smartphones.

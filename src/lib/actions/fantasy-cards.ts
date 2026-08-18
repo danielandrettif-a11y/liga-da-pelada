@@ -117,8 +117,7 @@ export async function openPack(packId: string): Promise<{
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Não autenticado." };
 
-  const client = await getAdminClient();
-  if (!client) return { success: false, error: "Erro de conexão administrativa." };
+  const client = account.client;
 
   // Buscar pacote
   const { data: pack, error: packErr } = await client
@@ -206,8 +205,7 @@ export async function claimPackCard(
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Não autenticado." };
 
-  const client = await getAdminClient();
-  if (!client) return { success: false, error: "Erro de conexão administrativa." };
+  const client = account.client;
 
   // Buscar pacote e ofertas
   const { data: pack, error: packErr } = await client
@@ -404,8 +402,7 @@ export async function activateCardForRound({
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Não autenticado." };
 
-  const client = await getAdminClient();
-  if (!client) return { success: false, error: "Erro administrativo." };
+  const client = account.client;
 
   // 1. Verificar status da rodada e mercado
   const { data: round } = await client
@@ -505,8 +502,7 @@ export async function removeActiveCardForRound(
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Não autenticado." };
 
-  const client = await getAdminClient();
-  if (!client) return { success: false, error: "Erro administrativo." };
+  const client = account.client;
 
   const { data: act } = await client
     .from("fantasy_card_activations")
@@ -584,9 +580,9 @@ export async function generatePacksForFinishedRound(roundId: string): Promise<nu
 export async function giveMyAccountTestPack(): Promise<{ success: boolean; error?: string }> {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Não autenticado." };
+  if (!account.isAdmin) return { success: false, error: "Apenas administradores podem gerar pacotes de teste." };
 
-  const client = await getAdminClient();
-  if (!client) return { success: false, error: "Erro administrativo." };
+  const client = account.client;
 
   // Buscar uma rodada qualquer para associar o pacote
   const { data: round } = await client
