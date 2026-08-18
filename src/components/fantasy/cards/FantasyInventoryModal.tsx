@@ -174,7 +174,7 @@ export function FantasyInventoryModal({
         </div>
 
         {/* Lista de Cartas / Seleção de Alvo */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3 touch-auto overscroll-contain">
           {loading ? (
             <div className="py-12 text-center text-sm font-bold text-muted animate-pulse">
               Carregando inventário...

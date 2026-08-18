@@ -97,7 +97,7 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
       aria-label="Abertura de Pacote Cartola"
     >
       <div
-        className="relative flex w-full max-w-lg max-h-[90vh] flex-col overflow-y-auto rounded-[2.5rem] border border-amber-400/40 bg-[#06160d] p-5 sm:p-7 shadow-[0_0_70px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto"
+        className="relative flex w-full max-w-lg max-h-[90vh] flex-col overflow-y-auto rounded-[2.5rem] border border-amber-400/40 bg-[#06160d] p-5 sm:p-7 shadow-[0_0_70px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto touch-auto overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Botão Fechar */}

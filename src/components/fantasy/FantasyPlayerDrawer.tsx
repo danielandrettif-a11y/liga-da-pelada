@@ -89,7 +89,7 @@ export function FantasyPlayerDrawer({
       aria-label={`Perfil Cartola de ${player.name}`}
     >
       <div
-        className="relative flex w-full max-w-lg max-h-[85vh] flex-col overflow-y-auto rounded-3xl border border-accent/40 bg-[#06160d] p-5 sm:p-6 shadow-[0_0_60px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto"
+        className="relative flex w-full max-w-lg max-h-[85vh] flex-col overflow-y-auto rounded-3xl border border-accent/40 bg-[#06160d] p-5 sm:p-6 shadow-[0_0_60px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto touch-auto overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Botão Fechar */}

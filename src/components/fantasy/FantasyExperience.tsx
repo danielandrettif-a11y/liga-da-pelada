@@ -116,7 +116,7 @@ export function FantasyExperience({
   const [showRevealedLineups, setShowRevealedLineups] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  useDialogViewport(Boolean(infoModal || selectedDrawerPlayer || showRevealedLineups || showInventoryModal));
+  useDialogViewport(Boolean(infoModal));
 
   useEffect(() => {
     setMounted(true);
@@ -308,7 +308,7 @@ export function FantasyExperience({
   }
 
   return (
-    <div className="relative left-1/2 w-[calc(100vw-2rem)] max-w-7xl -translate-x-1/2 space-y-5">
+    <div className="w-full space-y-5">
       {/* Banner de Modo Teste */}
       {isTest && (
         <div className="overflow-hidden rounded-2xl border border-warning/45 bg-warning/12 p-4 text-center shadow-[0_0_28px_rgba(245,158,11,.08)]">
@@ -533,9 +533,9 @@ export function FantasyExperience({
       </div>
 
       {/* Grid Principal: Campo + Mercado */}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(340px,.9fr)]">
+      <div className="grid gap-5 w-full">
         {/* LADO ESQUERDO: CAMPO E PALPITES */}
-        <section className="space-y-4">
+        <section className="space-y-4 w-full">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-sm font-black uppercase text-foreground">
@@ -558,7 +558,7 @@ export function FantasyExperience({
           </div>
 
           {/* CAMPO DE FUTEBOL REALISTA */}
-          <div className="relative min-h-[480px] overflow-hidden rounded-[2.5rem] border-2 border-emerald-400/35 bg-[#083b1f] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.7),inset_0_0_50px_rgba(0,0,0,0.6)]">
+          <div className="relative min-h-[480px] w-full max-w-full overflow-hidden rounded-[2.5rem] border-2 border-emerald-400/35 bg-[#083b1f] p-3 sm:p-4 shadow-[0_20px_50px_rgba(0,0,0,0.7),inset_0_0_50px_rgba(0,0,0,0.6)]">
             <div
               className="pointer-events-none absolute inset-0 opacity-40"
               style={{
@@ -567,7 +567,7 @@ export function FantasyExperience({
               }}
             />
 
-            <div className="pointer-events-none absolute inset-4 rounded-[2rem] border-2 border-white/40">
+            <div className="pointer-events-none absolute inset-3 sm:inset-4 rounded-[2rem] border-2 border-white/40">
               <div className="absolute inset-x-0 top-0 h-0.5 border-t-2 border-white/50" />
               <div className="absolute -top-0.5 left-1/2 h-16 w-32 -translate-x-1/2 rounded-b-full border-b-2 border-x-2 border-white/40" />
               <div className="absolute top-0 left-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70 shadow-sm" />
@@ -584,7 +584,7 @@ export function FantasyExperience({
                 <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
                   Ataque
                 </span>
-                <div className="grid grid-cols-2 gap-4 px-3 sm:px-8">
+                <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
                   {[0, 1].map((slot) => {
                     const player = selectedPlayers[slot];
                     return player ? (
@@ -654,7 +654,7 @@ export function FantasyExperience({
                 <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
                   Meio-Campo & Alas
                 </span>
-                <div className="grid grid-cols-2 gap-8 px-1 sm:px-4">
+                <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
                   {[2, 3].map((slot) => {
                     const player = selectedPlayers[slot];
                     return player ? (
@@ -1015,7 +1015,7 @@ export function FantasyExperience({
           </label>
 
           {/* Lista de Atletas do Mercado */}
-          <div className="space-y-2 lg:max-h-[760px] lg:overflow-y-auto lg:pr-1">
+          <div className="space-y-2 w-full">
             {filtered.map((player) => {
               const bought = selected.includes(player.id);
               const simulatedRemaining = bought ? remaining + player.price : remaining - player.price;

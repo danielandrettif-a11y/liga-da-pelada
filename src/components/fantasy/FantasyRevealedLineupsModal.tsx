@@ -114,7 +114,7 @@ export function FantasyRevealedLineupsModal({
         </div>
 
         {/* Conteúdo das Escalações */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 touch-auto overscroll-contain">
           {loading ? (
             <div className="py-12 text-center text-sm font-bold text-muted animate-pulse">
               Carregando escalações reveladas...
