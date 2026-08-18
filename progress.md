@@ -26,5 +26,9 @@
 6. **Contador de Fechamento do Mercado (`FantasyExperience.tsx`)**:
    - Mensagem clara indicando quanto tempo falta para o mercado fechar ("Mercado fecha em MM:SS").
 
-7. **Validação & Build**:
-   - `npm run build` validado com sucesso em todas as rotas sem erros de tipagem.
+8. **Abertura Interativa de Pacotes & Sistema de Artes das Cartas**:
+   - `PackTearInteraction.tsx`: Gesto físico de rasgo via Pointer Events com física direta na DOM e 0 re-renders.
+   - `CardRevealStage.tsx`: Revelação 3D das 2 cartas sorteadas com efeito de flip escalonado.
+   - `card-assets.ts`: Mapeador de artes individuais na pasta `public/images/cards/[slug].png` com fallback vetorial de alta qualidade.
+   - `globals.css`: Keyframes acelerados por hardware (`pack-strip-eject`, `pack-glow-pulse`, `card-emerge`, `card-3d-flipper`).
+   - `npm run build` compilado com 100% de sucesso.
