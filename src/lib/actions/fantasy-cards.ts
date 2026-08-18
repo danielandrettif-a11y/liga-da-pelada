@@ -577,3 +577,53 @@ export async function generatePacksForFinishedRound(roundId: string): Promise<nu
 
   return inserted?.length || 0;
 }
+
+/**
+ * Cria ou reseta um pacote de teste para a conta logada do administrador.
+ */
+export async function giveMyAccountTestPack(): Promise<{ success: boolean; error?: string }> {
+  const account = await getCurrentAccount();
+  if (!account.user) return { success: false, error: "Não autenticado." };
+
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Erro administrativo." };
+
+  // Buscar uma rodada qualquer para associar o pacote
+  const { data: round } = await client
+    .from("rounds")
+    .select("id, number")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!round) {
+    return { success: false, error: "Nenhuma rodada encontrada no sistema para associar o pacote." };
+  }
+
+  // Deletar pacotes anteriores desta rodada para o usuário poder testar abertura do zero
+  const { data: existingPack } = await client
+    .from("fantasy_round_packs")
+    .select("id")
+    .eq("user_id", account.user.id)
+    .eq("round_id", round.id)
+    .maybeSingle();
+
+  if (existingPack) {
+    await client.from("fantasy_pack_offers").delete().eq("pack_id", existingPack.id);
+    await client.from("fantasy_round_packs").delete().eq("id", existingPack.id);
+  }
+
+  // Inserir pacote novo
+  const { error: insErr } = await client.from("fantasy_round_packs").insert({
+    user_id: account.user.id,
+    round_id: round.id,
+    status: "available",
+  });
+
+  if (insErr) {
+    return { success: false, error: `Erro ao criar pacote: ${insErr.message}` };
+  }
+
+  revalidatePath("/cartola");
+  return { success: true };
+}
