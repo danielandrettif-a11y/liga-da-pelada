@@ -42,7 +42,9 @@ export type FantasyActiveCardDTO = {
   card: FantasyCardDefinition;
   status: "RESERVED" | "LOCKED" | "RESOLVED";
   targetPlayerId?: string | null;
+  targetPlayerName?: string | null;
   targetPlayer2Id?: string | null;
+  targetPlayer2Name?: string | null;
   targetPrediction?: "TOP_SCORER" | "TOP_ASSIST" | "CHALLENGE" | null;
   resultBonus?: number;
   resultDetails?: any;
@@ -368,6 +370,30 @@ export async function getActiveCardForRound(roundId: string): Promise<FantasyAct
   };
 
   const targetSnap = (activation.target_snapshot || {}) as any;
+  let targetPlayerName = targetSnap.targetPlayerName || null;
+  let targetPlayer2Name = targetSnap.targetPlayer2Name || null;
+
+  // Se não estiver no snapshot, busca os nomes dos jogadores
+  const playerIdsToFetch: string[] = [];
+  if (targetSnap.targetPlayerId && !targetPlayerName) playerIdsToFetch.push(targetSnap.targetPlayerId);
+  if (targetSnap.targetPlayer2Id && !targetPlayer2Name) playerIdsToFetch.push(targetSnap.targetPlayer2Id);
+
+  if (playerIdsToFetch.length > 0) {
+    const { data: fetchedPlayers } = await account.client
+      .from("players")
+      .select("id, name")
+      .in("id", playerIdsToFetch);
+
+    if (fetchedPlayers) {
+      const nameMap = new Map(fetchedPlayers.map((p) => [p.id, p.name]));
+      if (targetSnap.targetPlayerId && !targetPlayerName) {
+        targetPlayerName = nameMap.get(targetSnap.targetPlayerId) || null;
+      }
+      if (targetSnap.targetPlayer2Id && !targetPlayer2Name) {
+        targetPlayer2Name = nameMap.get(targetSnap.targetPlayer2Id) || null;
+      }
+    }
+  }
 
   return {
     id: activation.id,
@@ -376,7 +402,9 @@ export async function getActiveCardForRound(roundId: string): Promise<FantasyAct
     card: cardDef,
     status: activation.status,
     targetPlayerId: targetSnap.targetPlayerId || null,
+    targetPlayerName,
     targetPlayer2Id: targetSnap.targetPlayer2Id || null,
+    targetPlayer2Name,
     targetPrediction: targetSnap.targetPrediction || null,
     resultBonus: Number(activation.result_bonus || 0),
     resultDetails: activation.result_details,

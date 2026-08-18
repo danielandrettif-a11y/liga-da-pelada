@@ -53,60 +53,100 @@ export function FantasyActiveCardSlot({
         {activeCard ? (
           /* CARTA ATIVA CONFIGURADA */
           <div
-            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border p-3.5 ${
+            className={`flex flex-col gap-3 rounded-2xl border p-3.5 ${
               RARITY_CONFIG[activeCard.card.rarity].border
             } ${RARITY_CONFIG[activeCard.card.rarity].bg} shadow-md`}
           >
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="text-3xl shrink-0">{activeCard.card.icon}</span>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h4
-                    className={`truncate text-sm font-black uppercase italic ${
-                      RARITY_CONFIG[activeCard.card.rarity].text
-                    }`}
-                  >
-                    {activeCard.card.name}
-                  </h4>
-                  <span
-                    className={`rounded px-1.5 py-0.2 text-[7px] font-black uppercase ${
-                      RARITY_CONFIG[activeCard.card.rarity].badgeBg
-                    }`}
-                  >
-                    {RARITY_CONFIG[activeCard.card.rarity].label}
-                  </span>
-                  {!isMarketOpen && (
-                    <span className="rounded bg-black/40 px-1.5 py-0.2 text-[7px] font-black text-warning flex items-center gap-0.5">
-                      <Lock className="h-2.5 w-2.5 inline" /> Travada
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-3xl shrink-0">{activeCard.card.icon}</span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h4
+                      className={`truncate text-sm font-black uppercase italic ${
+                        RARITY_CONFIG[activeCard.card.rarity].text
+                      }`}
+                    >
+                      {activeCard.card.name}
+                    </h4>
+                    <span
+                      className={`rounded px-1.5 py-0.2 text-[7px] font-black uppercase ${
+                        RARITY_CONFIG[activeCard.card.rarity].badgeBg
+                      }`}
+                    >
+                      {RARITY_CONFIG[activeCard.card.rarity].label}
                     </span>
-                  )}
+                    {!isMarketOpen && (
+                      <span className="rounded bg-black/40 px-1.5 py-0.2 text-[7px] font-black text-warning flex items-center gap-0.5">
+                        <Lock className="h-2.5 w-2.5 inline" /> Travada
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted leading-tight">
+                    {activeCard.card.description}
+                  </p>
                 </div>
-                <p className="mt-0.5 text-xs text-muted leading-tight">
-                  {activeCard.card.description}
-                </p>
               </div>
+
+              {/* Ações (Trocar / Remover) */}
+              {isMarketOpen && (
+                <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5 shrink-0 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setShowInventory(true)}
+                    className="rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase text-white hover:bg-white/20 transition-colors"
+                  >
+                    Trocar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRemove}
+                    disabled={pending}
+                    className="rounded-xl border border-danger/30 bg-danger/10 px-2.5 py-1.5 text-[10px] font-black uppercase text-danger hover:bg-danger/20 transition-colors"
+                    title="Remover carta ativa"
+                    aria-label="Remover carta ativa"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Ações (Trocar / Remover) */}
-            {isMarketOpen && (
-              <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowInventory(true)}
-                  className="rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase text-white hover:bg-white/20 transition-colors"
-                >
-                  Trocar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRemove}
-                  disabled={pending}
-                  className="rounded-xl border border-danger/30 bg-danger/10 px-2.5 py-1.5 text-[10px] font-black uppercase text-danger hover:bg-danger/20 transition-colors"
-                  title="Remover carta ativa"
-                  aria-label="Remover carta ativa"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+            {/* DESTAQUE DO JOGADOR SELECIONADO NA CARTA */}
+            {(activeCard.targetPlayerId || activeCard.targetPlayer2Id || activeCard.targetPrediction) && (
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs">
+                {activeCard.targetPlayerId && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-accent font-black">🎯 Jogador Selecionado:</span>
+                    <span className="font-black text-foreground underline decoration-accent/50 underline-offset-2">
+                      {activeCard.targetPlayerName ||
+                        marketPlayers.find((p) => p.id === activeCard.targetPlayerId)?.name ||
+                        "Jogador escolhido"}
+                    </span>
+                  </div>
+                )}
+                {activeCard.targetPlayer2Id && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-muted font-bold">&</span>
+                    <span className="font-black text-foreground underline decoration-accent/50 underline-offset-2">
+                      {activeCard.targetPlayer2Name ||
+                        marketPlayers.find((p) => p.id === activeCard.targetPlayer2Id)?.name ||
+                        "2º Jogador"}
+                    </span>
+                  </div>
+                )}
+                {activeCard.targetPrediction && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-warning font-black">🔮 Palpite:</span>
+                    <span className="font-black text-foreground">
+                      {activeCard.targetPrediction === "TOP_SCORER"
+                        ? "Artilheiro da Rodada"
+                        : activeCard.targetPrediction === "TOP_ASSIST"
+                        ? "Líder de Assistências"
+                        : "Cumprir Desafio"}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>

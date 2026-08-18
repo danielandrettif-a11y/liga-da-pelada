@@ -178,6 +178,154 @@ export async function adminRemoveCallupPlayer(callupId: string, playerId: string
   return { success: true };
 }
 
+/**
+ * Contrata um amigo (cria perfil de convidado e adiciona na convocação/fila).
+ * Disponível para qualquer usuário autenticado.
+ */
+export async function inviteGuestToCallup({
+  callupId,
+  name,
+  playerProfile = "midfield",
+  isGoalkeeper = false,
+}: {
+  callupId: string;
+  name: string;
+  playerProfile?: "offensive" | "midfield" | "defensive";
+  isGoalkeeper?: boolean;
+}) {
+  const account = await getCurrentAccount();
+  if (!account.user) {
+    return { success: false, error: "Entre na sua conta para contratar um amigo." };
+  }
+
+  const cleanName = name.trim();
+  if (cleanName.length < 2) {
+    return { success: false, error: "Informe o nome do seu amigo (pelo menos 2 letras)." };
+  }
+
+  const adminClient = await getAdminClient();
+  const client = adminClient || account.client;
+
+  // 1. Buscar a convocação
+  const { data: callup, error: callupError } = await client
+    .from("callups")
+    .select("id, league_id, capacity, status")
+    .eq("id", callupId)
+    .single();
+
+  if (callupError || !callup) {
+    return { success: false, error: "Convocação não encontrada." };
+  }
+
+  if (callup.status !== "open") {
+    return { success: false, error: "A convocação já foi fechada." };
+  }
+
+  // 2. Criar o perfil de convidado
+  const { data: createdPlayer, error: playerError } = await client
+    .from("players")
+    .insert({
+      league_id: callup.league_id,
+      name: cleanName,
+      member_category: "guest",
+      is_selectable: true,
+      is_goalkeeper: isGoalkeeper,
+      player_profile: playerProfile,
+      registration_source: "site_signup",
+      created_by_user_id: account.user.id,
+    })
+    .select("id, name")
+    .single();
+
+  if (playerError || !createdPlayer) {
+    return { success: false, error: playerError?.message || "Não foi possível criar o perfil do convidado." };
+  }
+
+  // 3. Adicionar o convidado na convocação
+  const { data: confirmedEntries } = await client
+    .from("callup_entries")
+    .select("id")
+    .eq("callup_id", callupId)
+    .eq("status", "confirmed");
+
+  const { data: waitlistEntries } = await client
+    .from("callup_entries")
+    .select("id")
+    .eq("callup_id", callupId)
+    .eq("status", "waitlist");
+
+  const confirmedCount = confirmedEntries?.length || 0;
+  const waitlistCount = waitlistEntries?.length || 0;
+  const isConfirmed = confirmedCount < callup.capacity;
+
+  const { error: entryError } = await client.from("callup_entries").insert({
+    callup_id: callupId,
+    player_id: createdPlayer.id,
+    status: isConfirmed ? "confirmed" : "waitlist",
+    position: isConfirmed ? confirmedCount + 1 : waitlistCount + 1,
+    joined_by: account.user.id,
+  });
+
+  if (entryError) {
+    return { success: false, error: entryError.message };
+  }
+
+  refreshCallups();
+  return { success: true, isConfirmed, playerId: createdPlayer.id };
+}
+
+/**
+ * Remove uma entrada da convocação (feita pelo próprio criador do convidado ou por administrador).
+ */
+export async function removeCallupEntry(callupId: string, playerId: string) {
+  const account = await getCurrentAccount();
+  if (!account.user) {
+    return { success: false, error: "Entre na sua conta para alterar a lista." };
+  }
+
+  const adminClient = await getAdminClient();
+  const client = adminClient || account.client;
+
+  // 1. Buscar a entrada
+  const { data: entry, error: entryError } = await client
+    .from("callup_entries")
+    .select("id, joined_by, player_id, player:players(created_by_user_id)")
+    .eq("callup_id", callupId)
+    .eq("player_id", playerId)
+    .maybeSingle();
+
+  if (entryError || !entry) {
+    return { success: false, error: "Jogador não encontrado na convocação." };
+  }
+
+  // 2. Verificar permissão: Admin ou usuário que cadastrou
+  const isCreator = entry.joined_by === account.user.id || (entry.player as any)?.created_by_user_id === account.user.id;
+  if (!account.isAdmin && !isCreator) {
+    return { success: false, error: "Você só pode remover convidados cadastrados por você." };
+  }
+
+  // 3. Remover a entrada
+  const { error: deleteError } = await client
+    .from("callup_entries")
+    .delete()
+    .eq("callup_id", callupId)
+    .eq("player_id", playerId);
+
+  if (deleteError) {
+    return { success: false, error: deleteError.message };
+  }
+
+  // 4. Normalizar posições e promover da fila se necessário
+  try {
+    await client.rpc("normalize_callup_positions", { p_callup_id: callupId });
+  } catch {
+    // Ignora se não existir ou se a RPC falhar
+  }
+
+  refreshCallups();
+  return { success: true };
+}
+
 export async function createCallupPrelist(callupId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem criar a pre-lista." };

@@ -80,6 +80,7 @@ export default async function ConvocacaoPage() {
     <div className="min-w-0 overflow-x-clip">
       <CallupBoard
         callup={callup}
+        currentUserId={account.user?.id || null}
         currentPlayerId={account.profile?.player_id || null}
         isAuthenticated={Boolean(account.user)}
         isAdmin={account.isAdmin}

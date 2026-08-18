@@ -116,38 +116,34 @@ const MatchTimer = memo(function MatchTimer({
             </button>
           </div>
 
-          {/* Botões de Acréscimo */}
-          <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-[9px] font-black uppercase tracking-wider text-muted mr-1">
-              Acréscimos:
+          {/* Botões de Acréscimo com Proteção Anti-Toque Acidental (Segure para confirmar) */}
+          <div className="flex flex-col items-center gap-1.5 mt-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] font-black uppercase tracking-wider text-muted mr-1">
+                Acréscimos:
+              </span>
+              <HoldExtraTimeButton
+                label="+1'"
+                seconds={60}
+                disabled={timerSaving}
+                onConfirm={onAddExtraTime}
+              />
+              <HoldExtraTimeButton
+                label="+2'"
+                seconds={120}
+                disabled={timerSaving}
+                onConfirm={onAddExtraTime}
+              />
+              <HoldExtraTimeButton
+                label="+3'"
+                seconds={180}
+                disabled={timerSaving}
+                onConfirm={onAddExtraTime}
+              />
+            </div>
+            <span className="text-[8px] font-bold uppercase tracking-wider text-muted/60">
+              Segure para adicionar tempo
             </span>
-            <button
-              type="button"
-              disabled={timerSaving}
-              onClick={() => onAddExtraTime(60)}
-              className="rounded-lg border border-accent/40 bg-accent/15 px-2.5 py-1 text-[10px] font-black text-accent transition-transform active:scale-95 disabled:opacity-50"
-              title="Adicionar 1 minuto de acréscimo"
-            >
-              +1&apos;
-            </button>
-            <button
-              type="button"
-              disabled={timerSaving}
-              onClick={() => onAddExtraTime(120)}
-              className="rounded-lg border border-accent/40 bg-accent/15 px-2.5 py-1 text-[10px] font-black text-accent transition-transform active:scale-95 disabled:opacity-50"
-              title="Adicionar 2 minutos de acréscimo"
-            >
-              +2&apos;
-            </button>
-            <button
-              type="button"
-              disabled={timerSaving}
-              onClick={() => onAddExtraTime(180)}
-              className="rounded-lg border border-border bg-surface px-2.5 py-1 text-[10px] font-bold text-muted hover:text-foreground transition-transform active:scale-95 disabled:opacity-50"
-              title="Adicionar 3 minutos de acréscimo"
-            >
-              +3&apos;
-            </button>
           </div>
         </div>
       ) : (
@@ -161,8 +157,104 @@ const MatchTimer = memo(function MatchTimer({
 });
 
 // ============================================
-// MatchLiveBoard: Tabuleiro Principal
+// HoldExtraTimeButton: Proteção Anti-Acidente (Long-press)
 // ============================================
+function HoldExtraTimeButton({
+  label,
+  seconds,
+  disabled,
+  onConfirm,
+}: {
+  label: string;
+  seconds: number;
+  disabled: boolean;
+  onConfirm: (sec: number) => void;
+}) {
+  const [progress, setProgress] = useState(0);
+  const [isPressing, setIsPressing] = useState(false);
+  const [confirmedFlash, setConfirmedFlash] = useState(false);
+  const pressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef<number>(0);
+  const HOLD_DURATION_MS = 550;
+
+  const cancelPress = useCallback(() => {
+    setIsPressing(false);
+    setProgress(0);
+    if (pressTimer.current) {
+      clearInterval(pressTimer.current);
+      pressTimer.current = null;
+    }
+  }, []);
+
+  const startPress = useCallback(
+    (e: React.SyntheticEvent) => {
+      if (disabled) return;
+      setIsPressing(true);
+      setProgress(0);
+      startTimeRef.current = Date.now();
+
+      if (pressTimer.current) clearInterval(pressTimer.current);
+
+      pressTimer.current = setInterval(() => {
+        const elapsed = Date.now() - startTimeRef.current;
+        const currentProgress = Math.min(100, Math.round((elapsed / HOLD_DURATION_MS) * 100));
+        setProgress(currentProgress);
+
+        if (elapsed >= HOLD_DURATION_MS) {
+          if (pressTimer.current) {
+            clearInterval(pressTimer.current);
+            pressTimer.current = null;
+          }
+          setIsPressing(false);
+          setProgress(0);
+          setConfirmedFlash(true);
+          setTimeout(() => setConfirmedFlash(false), 800);
+
+          try {
+            if (typeof window !== "undefined" && "vibrate" in navigator) {
+              navigator.vibrate(40);
+            }
+          } catch {
+            // Ignore vibration errors
+          }
+
+          onConfirm(seconds);
+        }
+      }, 20);
+    },
+    [disabled, onConfirm, seconds]
+  );
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onMouseDown={startPress}
+      onMouseUp={cancelPress}
+      onMouseLeave={cancelPress}
+      onTouchStart={startPress}
+      onTouchEnd={cancelPress}
+      onTouchCancel={cancelPress}
+      className={`relative overflow-hidden rounded-xl border px-3 py-1.5 text-xs font-black select-none transition-all active:scale-95 disabled:opacity-50 ${
+        confirmedFlash
+          ? "border-emerald-400 bg-emerald-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.5)]"
+          : isPressing
+          ? "border-accent bg-accent/20 text-accent scale-105"
+          : "border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
+      }`}
+      title={`Segure para adicionar ${label} de acréscimo`}
+    >
+      {/* Barra de progresso de preenchimento ao segurar */}
+      {isPressing && (
+        <span
+          className="absolute inset-0 bg-accent/40 transition-all ease-linear"
+          style={{ width: `${progress}%` }}
+        />
+      )}
+      <span className="relative z-10">{confirmedFlash ? "Adicionado!" : label}</span>
+    </button>
+  );
+}
 type MatchLiveBoardProps = {
   match: any;
   matchDuration: number;

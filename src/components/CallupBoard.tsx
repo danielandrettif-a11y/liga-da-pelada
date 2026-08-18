@@ -30,12 +30,14 @@ import {
   adminAddCallupPlayer,
   adminRemoveCallupPlayer,
   createCallupPrelist,
+  inviteGuestToCallup,
   joinActiveCallup,
   leaveActiveCallup,
+  removeCallupEntry,
   updateCallup,
   type CallupWithEntries,
 } from "@/lib/actions/callups";
-import type { Player, Stadium } from "@/lib/types";
+import type { Player, PlayerProfile, Stadium } from "@/lib/types";
 import type { FantasyQuickHighlight } from "@/lib/actions/fantasy";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
@@ -44,6 +46,7 @@ import { useDialogViewport } from "@/lib/useDialogViewport";
 
 type Props = {
   callup: CallupWithEntries;
+  currentUserId?: string | null;
   currentPlayerId: string | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
@@ -56,6 +59,7 @@ type Props = {
 
 export function CallupBoard({
   callup,
+  currentUserId,
   currentPlayerId,
   isAuthenticated,
   isAdmin,
@@ -73,12 +77,17 @@ export function CallupBoard({
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
   const [activeTab, setActiveTab] = useState<"confirmed" | "waitlist">("confirmed");
+
+  // Estado para Contratação de Amigo (Convidado)
+  const [guestName, setGuestName] = useState("");
+  const [guestProfile, setGuestProfile] = useState<PlayerProfile>("midfield");
+  const [isGuestGk, setIsGuestGk] = useState(false);
+
   useDialogViewport(editingCallup);
 
   const confirmed = callup.entries.filter((entry) => entry.status === "confirmed");
   const waitlist = callup.entries.filter((entry) => entry.status === "waitlist");
   const capacity = callup.capacity;
-  const waitlistCapacity = callup.waitlist_capacity;
   const myEntry = callup.entries.find((entry) => entry.player_id === currentPlayerId);
   const myPosition = myEntry
     ? (myEntry.status === "confirmed"
@@ -124,6 +133,27 @@ export function CallupBoard({
       if (key === "join") {
         setShowCartolaPopup(true);
       }
+      router.refresh();
+    }
+    setLoading("");
+  }
+
+  async function handleInviteGuest(e: React.FormEvent) {
+    e.preventDefault();
+    if (!guestName.trim()) return;
+    setLoading("guest");
+    setError("");
+    const res = await inviteGuestToCallup({
+      callupId: callup.id,
+      name: guestName.trim(),
+      playerProfile: guestProfile,
+      isGoalkeeper: isGuestGk,
+    });
+    if (!res.success) {
+      setError(res.error || "Erro ao contratar amigo.");
+    } else {
+      setGuestName("");
+      setIsGuestGk(false);
       router.refresh();
     }
     setLoading("");
@@ -272,7 +302,7 @@ export function CallupBoard({
         </div>
       </section>
 
-      {/* 2. CTA DE AÇÃO / STATUS DO JOGADOR LOGADO (POSICIONADO NO TOPO) */}
+      {/* 2. CTA DE AÇÃO / STATUS DO JOGADOR LOGADO */}
       <section className="space-y-2">
         {error && (
           <div role="alert" className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs font-bold text-danger animate-fade-in">
@@ -381,49 +411,111 @@ export function CallupBoard({
           </button>
         ) : (
           <div className="rounded-2xl border border-warning/25 bg-warning/10 p-3.5 text-center text-xs font-bold text-warning">
-            Sua conta ainda não está vinculada a um jogador selecionável. Peça ao ADM para vincular seu perfil.
+            Sua conta ainda não está vinculada a um jogador selecionável. Você pode contratar amigos ou pedir ao ADM para vincular seu perfil.
           </div>
         )}
       </section>
 
-      {/* 3. AÇÕES DO ADMINISTRADOR (PRÉ-LISTA & ADICIONAR JOGADOR) */}
-      {isAdmin && (
-        <section className="overflow-hidden rounded-2xl border border-accent/25 bg-accent/[0.04]">
-          <div className="flex items-center justify-between p-3.5">
+      {/* 3. PAINEL DE CONTRATAÇÃO DE AMIGO (CONVIDADO) & ADMIN */}
+      {callup.status === "open" && (
+        <section className="overflow-hidden rounded-2xl border border-accent/25 bg-accent/[0.04] p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
-                <Shield className="h-4 w-4" />
+                <UserPlus className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-xs font-black text-foreground">Painel do Administrador</p>
-                <p className="text-[10px] text-muted">Pré-lista e gestão de convidados</p>
+                <p className="text-xs font-black text-foreground">Contratar Amigo (Convidado)</p>
+                <p className="text-[10px] text-muted">Adicione um amigo para entrar na lista ou na fila de espera</p>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handlePrelist}
-              disabled={Boolean(loading)}
-              className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-black text-background transition-transform active:scale-95 disabled:opacity-50"
-            >
-              {loading === "prelist" ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <ClipboardList className="h-3.5 w-3.5" />
-              )}
-              {callup.round_id ? "Ver Pré-lista" : "Criar Pré-lista"}
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={handlePrelist}
+                disabled={Boolean(loading)}
+                className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-[11px] font-black text-background transition-transform active:scale-95 disabled:opacity-50"
+              >
+                {loading === "prelist" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ClipboardList className="h-3.5 w-3.5" />
+                )}
+                {callup.round_id ? "Ver Pré-lista" : "Criar Pré-lista"}
+              </button>
+            )}
           </div>
 
-          {callup.status === "open" && (
-            <div className="border-t border-accent/15 bg-black/20 p-3 flex gap-2">
+          {/* Formulário de criação de perfil de convidado */}
+          {isAuthenticated ? (
+            <form onSubmit={handleInviteGuest} className="space-y-2 pt-1 border-t border-accent/15">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                <input
+                  type="text"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  placeholder="Nome do amigo / convidado..."
+                  required
+                  className="sm:col-span-6 rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted/60 focus:border-accent outline-none"
+                />
+                <select
+                  value={guestProfile}
+                  onChange={(e) => setGuestProfile(e.target.value as PlayerProfile)}
+                  className="sm:col-span-3 rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-accent outline-none"
+                >
+                  <option value="midfield">Meio-Campo</option>
+                  <option value="offensive">Ataque</option>
+                  <option value="defensive">Defesa</option>
+                </select>
+                <button
+                  type="submit"
+                  disabled={loading === "guest" || !guestName.trim()}
+                  className="sm:col-span-3 flex items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-black text-background transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {loading === "guest" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <UserPlus className="h-3.5 w-3.5" />
+                  )}
+                  Contratar Amigo
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1.5 text-[11px] text-muted cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isGuestGk}
+                    onChange={(e) => setIsGuestGk(e.target.checked)}
+                    className="rounded border-border bg-background text-accent focus:ring-accent"
+                  />
+                  <span>É goleiro</span>
+                </label>
+                <span className="text-[10px] text-muted/60 ml-auto">
+                  {confirmed.length < capacity ? "Entrará como Titular" : "Entrará na Fila de Espera"}
+                </span>
+              </div>
+            </form>
+          ) : (
+            <div className="text-center pt-2 text-[11px] text-muted">
+              <Link href="/login?next=/convocacao" className="text-accent font-bold hover:underline">
+                Faça login
+              </Link>{" "}
+              para cadastrar e convidar amigos para a pelada.
+            </div>
+          )}
+
+          {/* Opção rápida de ADM para adicionar jogadores cadastrados */}
+          {isAdmin && availableToAdmin.length > 0 && (
+            <div className="pt-2 border-t border-accent/15 flex gap-2">
               <select
                 id="admin-callup-player"
                 defaultValue=""
-                className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground"
+                className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-xs text-foreground"
               >
                 <option value="" disabled>
-                  Adicionar jogador ou convidado manual...
+                  Adicionar do elenco já cadastrado...
                 </option>
                 {availableToAdmin.map((player) => (
                   <option key={player.id} value={player.id}>
@@ -438,10 +530,10 @@ export function CallupBoard({
                   if (select?.value) run("add", () => adminAddCallupPlayer(callup.id, select.value));
                 }}
                 disabled={!!loading}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-background"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/20 text-accent hover:bg-accent hover:text-background transition-colors"
                 title="Adicionar à convocação"
               >
-                <UserPlus className="h-4 w-4" />
+                <UserPlus className="h-3.5 w-3.5" />
               </button>
             </div>
           )}
@@ -474,7 +566,7 @@ export function CallupBoard({
             }`}
           >
             <Clock className="h-3.5 w-3.5" />
-            <span>Fila ({waitlist.length}/{waitlistCapacity})</span>
+            <span>Fila ({waitlist.length})</span>
           </button>
         </div>
 
@@ -484,6 +576,13 @@ export function CallupBoard({
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {confirmed.map((entry, index) => {
                 const isMe = entry.player_id === currentPlayerId;
+                const isMyGuest = Boolean(
+                  currentUserId &&
+                    (entry.joined_by === currentUserId ||
+                      (entry.player as any)?.created_by_user_id === currentUserId)
+                );
+                const canRemove = (isAdmin || isMyGuest) && callup.status === "open";
+
                 return (
                   <div
                     key={entry.id}
@@ -509,7 +608,9 @@ export function CallupBoard({
 
                     <div className="min-w-0 flex-1 pr-6">
                       <p className="truncate text-xs font-black text-foreground">
-                        {entry.player.name} {isMe && <span className="text-[10px] text-accent font-normal">(você)</span>}
+                        {entry.player.name}{" "}
+                        {isMe && <span className="text-[10px] text-accent font-normal">(você)</span>}
+                        {isMyGuest && !isMe && <span className="text-[10px] text-accent font-normal">(seu amigo)</span>}
                       </p>
                       <div className="mt-0.5 flex items-center gap-1.5 text-[9px] text-muted">
                         <PlayerProfileBadge profile={entry.player.player_profile} isGoalkeeper={entry.player.is_goalkeeper} />
@@ -521,11 +622,12 @@ export function CallupBoard({
                       </div>
                     </div>
 
-                    {isAdmin && callup.status === "open" && (
+                    {canRemove && (
                       <button
-                        onClick={() => run(`remove-${entry.id}`, () => adminRemoveCallupPlayer(callup.id, entry.player_id))}
+                        onClick={() => run(`remove-${entry.id}`, () => removeCallupEntry(callup.id, entry.player_id))}
                         disabled={!!loading}
                         className="absolute right-2 top-2.5 rounded-lg p-1 text-muted hover:bg-danger/10 hover:text-danger transition-colors"
+                        title={isMyGuest ? "Remover meu convidado" : `Remover ${entry.player.name}`}
                         aria-label={`Remover ${entry.player.name}`}
                       >
                         {loading === `remove-${entry.id}` ? (
@@ -559,6 +661,13 @@ export function CallupBoard({
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {waitlist.map((entry, index) => {
                   const isMe = entry.player_id === currentPlayerId;
+                  const isMyGuest = Boolean(
+                    currentUserId &&
+                      (entry.joined_by === currentUserId ||
+                        (entry.player as any)?.created_by_user_id === currentUserId)
+                  );
+                  const canRemove = (isAdmin || isMyGuest) && callup.status === "open";
+
                   return (
                     <div
                       key={entry.id}
@@ -584,7 +693,9 @@ export function CallupBoard({
 
                       <div className="min-w-0 flex-1 pr-6">
                         <p className="truncate text-xs font-black text-foreground">
-                          {entry.player.name} {isMe && <span className="text-[10px] text-warning font-normal">(você)</span>}
+                          {entry.player.name}{" "}
+                          {isMe && <span className="text-[10px] text-warning font-normal">(você)</span>}
+                          {isMyGuest && !isMe && <span className="text-[10px] text-warning font-normal">(seu amigo)</span>}
                         </p>
                         <div className="mt-0.5 flex items-center gap-1.5 text-[9px] text-muted">
                           <PlayerProfileBadge profile={entry.player.player_profile} isGoalkeeper={entry.player.is_goalkeeper} />
@@ -596,11 +707,12 @@ export function CallupBoard({
                         </div>
                       </div>
 
-                      {isAdmin && callup.status === "open" && (
+                      {canRemove && (
                         <button
-                          onClick={() => run(`remove-${entry.id}`, () => adminRemoveCallupPlayer(callup.id, entry.player_id))}
+                          onClick={() => run(`remove-${entry.id}`, () => removeCallupEntry(callup.id, entry.player_id))}
                           disabled={!!loading}
                           className="absolute right-2 top-2.5 rounded-lg p-1 text-muted hover:bg-danger/10 hover:text-danger transition-colors"
+                          title={isMyGuest ? "Remover meu convidado da fila" : `Remover ${entry.player.name}`}
                           aria-label={`Remover ${entry.player.name}`}
                         >
                           {loading === `remove-${entry.id}` ? (

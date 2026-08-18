@@ -426,12 +426,12 @@ export function FantasyExperience({
             </p>
             <p className="mt-0.5 text-sm font-black text-foreground">
               {open && countdown != null && countdown > 0
-                ? `Horário previsto em ${formatCountdown(countdown)}`
+                ? `Mercado fecha em ${formatCountdown(countdown)}`
                 : open && countdown != null
-                ? "Horário previsto atingido · aguardando início"
+                ? "Fechando mercado · Início da rodada iminente"
                 : open
-                ? "Fecha quando a primeira partida começar"
-                : "Escalações bloqueadas nesta rodada"}
+                ? "Mercado fecha no início da primeira partida"
+                : "Mercado Fechado · Escalações bloqueadas"}
             </p>
           </div>
         </section>

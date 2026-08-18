@@ -334,6 +334,15 @@ export function RoundCreator({
       return;
     }
     setError("");
+    executeDirectDraw(mode);
+  }
+
+  function openAttendanceDrawModal(mode: Exclude<TeamFormationMode, "manual">) {
+    if (selectedPlayers.length < 2) {
+      setError("Selecione pelo menos 2 jogadores para marcar presenças.");
+      return;
+    }
+    setError("");
     setPendingDrawMode(mode);
   }
 
@@ -822,26 +831,48 @@ export function RoundCreator({
           </div>
           
           <div className="glass-card p-3">
-            <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-muted">Como montar os times?</p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => { setFormationMode("manual"); setTeams((current) => current.map((team) => ({ ...team, players: [] }))); }}
-                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-colors ${formationMode === "manual" ? "border-accent bg-accent/15 text-accent" : "border-border bg-surface text-muted"}`}
-              >Manual</button>
+            <div className="mb-2.5 flex items-center justify-between">
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted">Como montar os times?</p>
+              <span className="text-[9px] font-bold text-accent">Sorteio com 1 toque</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
                 onClick={() => requestDraw("random")}
-                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-colors ${formationMode === "random" ? "border-accent bg-accent/15 text-accent" : "border-border bg-surface text-muted"}`}
-              >Aleatorio</button>
+                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "random" ? "border-accent bg-accent/15 text-accent shadow-sm" : "border-border bg-surface text-foreground hover:border-accent/40"}`}
+              >
+                ⚡ Sorteio Aleatório
+              </button>
               <button
                 type="button"
                 onClick={() => requestDraw("balanced")}
-                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-colors ${formationMode === "balanced" ? "border-accent bg-accent/15 text-accent" : "border-border bg-surface text-muted"}`}
-              >Equilibrado</button>
+                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "balanced" ? "border-accent bg-accent/15 text-accent shadow-sm" : "border-border bg-surface text-foreground hover:border-accent/40"}`}
+              >
+                ⚖️ Sorteio Equilibrado
+              </button>
+              <button
+                type="button"
+                onClick={() => openAttendanceDrawModal("random")}
+                className="rounded-xl border border-border bg-surface px-2 py-3 text-[10px] font-black uppercase text-muted hover:text-foreground hover:border-border/80 transition-all active:scale-95"
+              >
+                📋 Ordem de Chegada
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFormationMode("manual"); setTeams((current) => current.map((team) => ({ ...team, players: [] }))); }}
+                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "manual" ? "border-accent bg-accent/15 text-accent" : "border-border bg-surface text-muted"}`}
+              >
+                ✋ Manual
+              </button>
             </div>
             <p className="mt-2 text-[10px] text-muted">
-              {formationMode === "manual" ? "Toque em cada jogador e escolha o time." : `${attendanceOrder.length} chegadas registradas · toque no modo novamente para refazer.`}
+              {formationMode === "manual"
+                ? "Toque em cada jogador e escolha o time manualmente."
+                : formationMode === "random"
+                ? "Times sorteados aleatoriamente com sucesso!"
+                : formationMode === "balanced"
+                ? "Times equilibrados por pontuação e posições com sucesso!"
+                : "Escolha um modo acima para montar os times."}
             </p>
           </div>
 
@@ -868,11 +899,11 @@ export function RoundCreator({
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-accent" />
                       <h2 className="text-base font-black uppercase tracking-wide text-foreground">
-                        {pendingDrawMode === "random" ? "Sorteio Aleatório" : "Sorteio Equilibrado"}
+                        Ordem de Chegada (1º Jogo)
                       </h2>
                     </div>
                     <p className="mt-0.5 text-[11px] text-muted">
-                      Marque a ordem de chegada ou sorteie todos diretamente.
+                      Marque quem chegou primeiro para jogar a primeira partida ou faça o sorteio direto.
                     </p>
                   </div>
                   <button
@@ -953,15 +984,17 @@ export function RoundCreator({
                     onClick={confirmAttendanceDraw}
                     className="w-full rounded-xl bg-accent py-3 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_20px_rgba(204,255,0,0.2)] transition-transform active:scale-95"
                   >
-                    {attendanceOrder.length > 0 ? "Sortear por Ordem de Chegada" : "Sortear Imediatamente"}
+                    {attendanceOrder.length > 0 ? "Sortear por Ordem de Chegada" : "⚡ Sortear Imediatamente"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => executeDirectDraw(pendingDrawMode)}
-                    className="w-full rounded-xl border border-border bg-surface py-2.5 text-[11px] font-bold text-muted hover:text-foreground transition-colors"
-                  >
-                    ⚡ Sortear todos diretamente (ignorar chegadas)
-                  </button>
+                  {attendanceOrder.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => executeDirectDraw(pendingDrawMode)}
+                      className="w-full rounded-xl border border-border bg-surface py-2.5 text-[11px] font-bold text-muted hover:text-foreground transition-colors"
+                    >
+                      ⚡ Ignorar chegadas e sortear imediatamente
+                    </button>
+                  )}
                 </div>
               </div>
             </div>,
