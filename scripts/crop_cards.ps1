@@ -1,62 +1,92 @@
 Add-Type -AssemblyName System.Drawing
 
-$srcPath = "C:\Users\danie\.gemini\antigravity-ide\brain\a617151f-3adc-4343-9f33-f4c8e72a73c4\.user_uploaded\media_1787095595538.jpg"
-$outDir = "C:\Users\danie\OneDrive\Documents\Antigravity Projetos\liga-da-pelada\public\images\cards"
+$srcPath = "C:\Users\danie\.gemini\antigravity-ide\brain\a617151f-3adc-4343-9f33-f4c8e72a73c4\.user_uploaded\media_1787096886733.jpg"
+$outDir  = "C:\Users\danie\OneDrive\Documents\Antigravity Projetos\liga-da-pelada\public\images\cards"
 
-if (-not (Test-Path $outDir)) {
-    New-Item -ItemType Directory -Path $outDir -Force | Out-Null
-}
+if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
 
-$bmp = New-Object System.Drawing.Bitmap($srcPath)
-Write-Host "Source image: $($bmp.Width) x $($bmp.Height)"
+$src = New-Object System.Drawing.Bitmap($srcPath)
+Write-Host "Imagem fonte: $($src.Width) x $($src.Height)"
 
-# Função para cortar e salvar
-function Crop-Card($name, $x, $y, $w, $h) {
-    $rect = New-Object System.Drawing.Rectangle($x, $y, $w, $h)
-    $cropped = $bmp.Clone($rect, $bmp.PixelFormat)
-    $targetFile = Join-Path $outDir "$name.png"
-    $cropped.Save($targetFile, [System.Drawing.Imaging.ImageFormat]::Png)
+$W = $src.Width
+$H = $src.Height
+
+# Fator de upscale — cada carta sera salva 3x maior que o recorte original
+$scale = 3
+
+function Crop-AndUpscale($name, $xRel, $yRel, $wRel, $hRel) {
+    $x = [int]($W * $xRel)
+    $y = [int]($H * $yRel)
+    $w = [int]($W * $wRel)
+    $h = [int]($H * $hRel)
+
+    # Recorte na resolucao original
+    $rect    = New-Object System.Drawing.Rectangle($x, $y, $w, $h)
+    $cropped = $src.Clone($rect, $src.PixelFormat)
+
+    # Upscale com interpolacao Bicubica (melhor qualidade)
+    $dstW   = $w * $scale
+    $dstH   = $h * $scale
+    $scaled = New-Object System.Drawing.Bitmap($dstW, $dstH)
+    $g      = [System.Drawing.Graphics]::FromImage($scaled)
+    $g.InterpolationMode  = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $g.SmoothingMode      = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+    $g.PixelOffsetMode    = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+    $g.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+    $g.DrawImage($cropped, 0, 0, $dstW, $dstH)
+    $g.Dispose()
     $cropped.Dispose()
-    Write-Host "Saved: $targetFile ($w x $h)"
+
+    # Salvar como PNG (sem perda)
+    $outFile = Join-Path $outDir "$name.png"
+    $scaled.Save($outFile, [System.Drawing.Imaging.ImageFormat]::Png)
+    $scaled.Dispose()
+
+    Write-Host "OK: $name.png  =>  ${dstW} x ${dstH} px"
 }
 
-# Coordenadas relativas aproximadas baseadas na proporção da imagem:
-# Imagem total: 1040 x 585 (ou proporcional)
-$wTotal = $bmp.Width
-$hTotal = $bmp.Height
+# ============================================================
+# FILEIRA SUPERIOR  (y: 0.02 a 0.50)
+# ============================================================
+# 1. Caca-Talentos (scout)
+Crop-AndUpscale "scout"               0.008  0.02   0.140  0.47
 
-# Medições das cartas na imagem:
-# Fileira Superior:
-# 1. Caça-Talentos (scout): x: 0.026, y: 0.075, w: 0.128, h: 0.380
-# 2. All-In (all_in): x: 0.177, y: 0.075, w: 0.130, h: 0.380
-# 3. Super Capitão (super_captain): x: 0.407, y: 0.075, w: 0.186, h: 0.490
-# 4. Palpite Duplo (double_prediction): x: 0.693, y: 0.075, w: 0.130, h: 0.380
-# 5. Reserva de Emergência (emergency_sub): x: 0.843, y: 0.075, w: 0.130, h: 0.380
+# 2. All-In (all_in)
+Crop-AndUpscale "all_in"              0.165  0.02   0.155  0.47
 
-# Fileira Inferior:
-# 6. Dobradinha (duo): x: 0.028, y: 0.620, w: 0.128, h: 0.360
-# 7. Palpite Seguro (safe_prediction): x: 0.185, y: 0.620, w: 0.128, h: 0.360
-# 8. Crédito Extra (extra_credit): x: 0.355, y: 0.620, w: 0.128, h: 0.360
-# 9. Barganha (bargain): x: 0.520, y: 0.620, w: 0.128, h: 0.360
-# 10. Gol de Ouro (golden_goal): x: 0.686, y: 0.620, w: 0.128, h: 0.360
-# 11. Passe de Ouro (golden_assist): x: 0.844, y: 0.620, w: 0.128, h: 0.360
+# 3. Super Capitao (super_captain) — carta maior, centralizada
+Crop-AndUpscale "super_captain"       0.375  0.01   0.250  0.56
 
-Crop-Card "scout" ([int]($wTotal * 0.026)) ([int]($hTotal * 0.075)) ([int]($wTotal * 0.130)) ([int]($hTotal * 0.380))
-Crop-Card "all_in" ([int]($wTotal * 0.177)) ([int]($hTotal * 0.075)) ([int]($wTotal * 0.130)) ([int]($hTotal * 0.380))
-Crop-Card "super_captain" ([int]($wTotal * 0.407)) ([int]($hTotal * 0.075)) ([int]($wTotal * 0.186)) ([int]($hTotal * 0.490))
-Crop-Card "double_prediction" ([int]($wTotal * 0.693)) ([int]($hTotal * 0.075)) ([int]($wTotal * 0.130)) ([int]($hTotal * 0.380))
-Crop-Card "emergency_sub" ([int]($wTotal * 0.843)) ([int]($hTotal * 0.075)) ([int]($wTotal * 0.130)) ([int]($hTotal * 0.380))
+# 4. Palpite Duplo (double_prediction)
+Crop-AndUpscale "double_prediction"   0.640  0.02   0.155  0.47
 
-Crop-Card "duo" ([int]($wTotal * 0.028)) ([int]($hTotal * 0.620)) ([int]($wTotal * 0.128)) ([int]($hTotal * 0.360))
-Crop-Card "safe_prediction" ([int]($wTotal * 0.185)) ([int]($hTotal * 0.620)) ([int]($wTotal * 0.128)) ([int]($hTotal * 0.360))
-Crop-Card "extra_credit" ([int]($wTotal * 0.355)) ([int]($hTotal * 0.620)) ([int]($wTotal * 0.128)) ([int]($hTotal * 0.360))
-Crop-Card "bargain" ([int]($wTotal * 0.520)) ([int]($hTotal * 0.620)) ([int]($wTotal * 0.128)) ([int]($hTotal * 0.360))
-Crop-Card "golden_goal" ([int]($wTotal * 0.686)) ([int]($hTotal * 0.620)) ([int]($wTotal * 0.128)) ([int]($hTotal * 0.360))
-Crop-Card "golden_assist" ([int]($wTotal * 0.844)) ([int]($hTotal * 0.620)) ([int]($wTotal * 0.128)) ([int]($hTotal * 0.360))
+# 5. Reserva de Emergencia (emergency_sub)
+Crop-AndUpscale "emergency_sub"       0.805  0.02   0.190  0.47
 
-# Para o vice_captain, usamos a base da carta de dupla/rara ou geramos uma específica
-# Criamos uma cópia elegante
-Copy-Item (Join-Path $outDir "duo.png") (Join-Path $outDir "vice_captain.png") -Force
+# ============================================================
+# FILEIRA INFERIOR  (y: 0.52 a 0.98)
+# ============================================================
+# 6. Dobradiinha (duo)
+Crop-AndUpscale "duo"                 0.008  0.52   0.155  0.46
 
-$bmp.Dispose()
-Write-Host "All cards cropped successfully!"
+# 7. Palpite Seguro (safe_prediction)
+Crop-AndUpscale "safe_prediction"     0.175  0.52   0.155  0.46
+
+# 8. Credito Extra (extra_credit)
+Crop-AndUpscale "extra_credit"        0.343  0.52   0.155  0.46
+
+# 9. Barganha (bargain)
+Crop-AndUpscale "bargain"             0.510  0.52   0.155  0.46
+
+# 10. Gol de Ouro (golden_goal)
+Crop-AndUpscale "golden_goal"         0.677  0.52   0.155  0.46
+
+# 11. Passe de Ouro (golden_assist)
+Crop-AndUpscale "golden_assist"       0.843  0.52   0.155  0.46
+
+# vice_captain usa arte propria - copia do double_prediction como placeholder
+Copy-Item (Join-Path $outDir 'double_prediction.png') (Join-Path $outDir 'vice_captain.png') -Force
+Write-Host 'OK: vice_captain.png (placeholder - copiar arte propria quando disponivel)'
+
+$src.Dispose()
+Write-Host 'Todas as cartas recortadas e ampliadas com sucesso!'
