@@ -51,8 +51,8 @@ export function CardRevealStage({ offers, onSelectCard }: Props) {
         </p>
       </div>
 
-      {/* GRID LADO A LADO COM ESPAÇAMENTO OTIMIZADO */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-4 pt-1 w-full max-w-lg mx-auto">
+      {/* GRID LADO A LADO COM AS CARTAS */}
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 pt-1 w-full max-w-lg mx-auto">
         {offers.map((card, idx) => {
           const rarityInfo = RARITY_CONFIG[card.rarity];
           const isFlipped = flippedCards[idx];
@@ -67,7 +67,7 @@ export function CardRevealStage({ offers, onSelectCard }: Props) {
               }`}
             >
               <div
-                className={`relative w-full min-h-[380px] sm:min-h-[420px] card-3d-flipper ${
+                className={`relative w-full h-[370px] sm:h-[410px] card-3d-flipper ${
                   isFlipped ? "is-flipped" : ""
                 }`}
               >
@@ -103,7 +103,7 @@ export function CardRevealStage({ offers, onSelectCard }: Props) {
                   </div>
                 </div>
 
-                {/* FRENTE DA CARTA (FRENTE COM HIERARQUIA VISUAL PERFEITA) */}
+                {/* FRENTE DA CARTA */}
                 <button
                   type="button"
                   onClick={() => onSelectCard(card)}
@@ -111,93 +111,79 @@ export function CardRevealStage({ offers, onSelectCard }: Props) {
                     rarityInfo.border
                   } ${
                     rarityInfo.bg
-                  } p-2.5 sm:p-3.5 text-left shadow-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.97] ${
+                  } p-2 sm:p-2.5 text-left shadow-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.97] ${
                     rarityInfo.glow
                   } overflow-hidden`}
                 >
-                  {/* Textura sutil de fundo */}
-                  <div className="pointer-events-none absolute inset-0 opacity-15 bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px]" />
-
-                  {/* 1. TOPO: BADGE DE RARIDADE E ÍCONE */}
-                  <div className="relative z-10 flex items-center justify-between gap-1 border-b border-white/15 pb-1.5">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[8px] sm:text-[9px] font-black uppercase tracking-wider shadow-sm ${rarityInfo.badgeBg}`}
-                    >
-                      {rarityInfo.icon} {rarityInfo.label}
-                    </span>
-                    <span className="text-xl sm:text-2xl drop-shadow-md">{card.icon}</span>
-                  </div>
-
-                  {/* 2. PLACA DO NOME (DESTAQUE NÍTIDO) */}
-                  <div className="relative z-10 my-1 rounded-xl bg-black/50 border border-white/15 py-1.5 px-2 text-center backdrop-blur-md shadow-sm">
-                    <h3
-                      className={`font-athletic text-xs sm:text-sm font-black uppercase italic tracking-wide ${rarityInfo.text} leading-tight`}
-                    >
-                      {card.name}
-                    </h3>
-                  </div>
-
-                  {/* 3. ARTE CENTRAL / EMBLEMA HOLOGRÁFICO */}
-                  <div className="relative z-10 my-0.5 flex flex-col items-center justify-center">
-                    {hasImage ? (
-                      /* Imagem Customizada */
-                      <div className="relative w-full h-24 sm:h-28 rounded-xl overflow-hidden border border-white/15 shadow-inner">
+                  {hasImage ? (
+                    /* RENDERIZAÇÃO COM A ARTE OFICIAL EXTRAÍDA DO PAINEL */
+                    <div className="relative w-full h-full flex flex-col justify-between">
+                      {/* Arte da Carta Oficial */}
+                      <div className="relative w-full flex-1 rounded-xl sm:rounded-2xl overflow-hidden drop-shadow-md">
                         <Image
                           src={customArtUrl!}
                           alt={card.name}
                           fill
                           sizes="(max-width: 640px) 50vw, 220px"
-                          className="object-cover group-hover:scale-105 transition-transform duration-300"
+                          className="object-contain group-hover:scale-105 transition-transform duration-300"
                           onError={() => handleImageError(card.slug)}
                         />
                       </div>
-                    ) : (
-                      /* Emblema Vetorial Reduzido para dar Espaço ao Texto */
-                      <div className="relative flex items-center justify-center">
+
+                      {/* Botão de Escolha no Rodapé */}
+                      <div className="relative z-10 pt-1.5 text-center">
+                        <span className="block w-full rounded-xl bg-gradient-to-r from-accent via-accent-light to-accent text-[#05130b] py-2 text-[9px] sm:text-[10px] font-black uppercase tracking-wider shadow-[0_0_15px_rgba(204,255,0,0.35)] group-hover:brightness-110 active:scale-95 transition-all">
+                          Escolher Esta Carta →
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    /* MODO VETORIAL FALLBACK */
+                    <div className="relative w-full h-full flex flex-col justify-between">
+                      {/* Textura sutil */}
+                      <div className="pointer-events-none absolute inset-0 opacity-15 bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px]" />
+
+                      {/* Topo */}
+                      <div className="relative z-10 flex items-center justify-between gap-1 border-b border-white/15 pb-1.5">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[8px] sm:text-[9px] font-black uppercase tracking-wider shadow-sm ${rarityInfo.badgeBg}`}
+                        >
+                          {rarityInfo.icon} {rarityInfo.label}
+                        </span>
+                        <span className="text-xl sm:text-2xl drop-shadow-md">{card.icon}</span>
+                      </div>
+
+                      {/* Placa do Nome */}
+                      <div className="relative z-10 my-1 rounded-xl bg-black/50 border border-white/15 py-1.5 px-2 text-center backdrop-blur-md shadow-sm">
+                        <h3
+                          className={`font-athletic text-xs sm:text-sm font-black uppercase italic tracking-wide ${rarityInfo.text} leading-tight`}
+                        >
+                          {card.name}
+                        </h3>
+                      </div>
+
+                      {/* Ícone */}
+                      <div className="relative z-10 my-0.5 flex flex-col items-center justify-center">
                         <div className="relative flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl border border-white/15 bg-gradient-to-br from-white/10 via-black/40 to-black/80 text-2xl sm:text-3xl shadow-[0_0_15px_rgba(0,0,0,0.6)] group-hover:rotate-6 transition-transform">
                           {card.icon}
-                          <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-transparent via-white/10 to-transparent" />
                         </div>
                       </div>
-                    )}
-                  </div>
 
-                  {/* 4. CAIXA DE TEXTO DA HABILIDADE (LEITURA 100% NÍTIDA E SEM CORTES) */}
-                  <div className="relative z-10 flex-1 flex flex-col justify-center rounded-xl bg-black/45 border border-white/10 p-2 sm:p-2.5 my-1 text-center backdrop-blur-sm">
-                    <p className="text-[10.5px] sm:text-[12px] text-slate-100 font-sans leading-snug">
-                      {card.description}
-                    </p>
+                      {/* Descrição */}
+                      <div className="relative z-10 flex-1 flex flex-col justify-center rounded-xl bg-black/45 border border-white/10 p-2 text-center backdrop-blur-sm">
+                        <p className="text-[10.5px] sm:text-[12px] text-slate-100 font-sans leading-snug">
+                          {card.description}
+                        </p>
+                      </div>
 
-                    {/* Tag de Alvo se houver */}
-                    {card.requiresTarget === "SINGLE_PLAYER" && (
-                      <div className="mt-1.5">
-                        <span className="inline-block rounded-md bg-amber-500/15 border border-amber-400/30 px-1.5 py-0.5 text-[8px] font-bold text-amber-300 uppercase tracking-wider">
-                          🎯 1 Jogador
+                      {/* Botão */}
+                      <div className="relative z-10 pt-1 text-center">
+                        <span className="block w-full rounded-xl bg-gradient-to-r from-accent via-accent-light to-accent text-[#05130b] py-2 text-[9px] sm:text-[10px] font-black uppercase tracking-wider shadow-[0_0_15px_rgba(204,255,0,0.35)] group-hover:brightness-110 active:scale-95 transition-all">
+                          Escolher Esta Carta →
                         </span>
                       </div>
-                    )}
-                    {card.requiresTarget === "DUO_PLAYERS" && (
-                      <div className="mt-1.5">
-                        <span className="inline-block rounded-md bg-amber-500/15 border border-amber-400/30 px-1.5 py-0.5 text-[8px] font-bold text-amber-300 uppercase tracking-wider">
-                          👥 2 Jogadores
-                        </span>
-                      </div>
-                    )}
-                    {card.requiresTarget === "PREDICTION_TYPE" && (
-                      <div className="mt-1.5">
-                        <span className="inline-block rounded-md bg-amber-500/15 border border-amber-400/30 px-1.5 py-0.5 text-[8px] font-bold text-amber-300 uppercase tracking-wider">
-                          🔮 Palpite
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 5. BOTÃO DE ESCOLHA NO RODAPÉ */}
-                  <div className="relative z-10 pt-1 text-center">
-                    <span className="block w-full rounded-xl bg-gradient-to-r from-accent via-accent-light to-accent text-[#05130b] py-2 text-[9px] sm:text-[10px] font-black uppercase tracking-wider shadow-[0_0_15px_rgba(204,255,0,0.35)] group-hover:brightness-110 active:scale-95 transition-all">
-                      Escolher Esta Carta →
-                    </span>
-                  </div>
+                    </div>
+                  )}
                 </button>
               </div>
             </div>
