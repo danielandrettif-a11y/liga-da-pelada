@@ -35,6 +35,10 @@ import { FantasyTutorialModal } from "./FantasyTutorialModal";
 import { FantasyRadarCarousel } from "./FantasyRadarCarousel";
 import { FantasyPlayerDrawer } from "./FantasyPlayerDrawer";
 import { FantasyRevealedLineupsModal } from "./FantasyRevealedLineupsModal";
+import { FantasyPackClaimBanner } from "./cards/FantasyPackClaimBanner";
+import { FantasyActiveCardSlot } from "./cards/FantasyActiveCardSlot";
+import { FantasyInventoryModal } from "./cards/FantasyInventoryModal";
+import type { FantasyActiveCardDTO, FantasyPackDTO } from "@/lib/actions/fantasy-cards";
 
 type Props = {
   round: {
@@ -62,6 +66,10 @@ type Props = {
     totalPoints: number;
   } | null;
   challengeType?: FantasyChallengeType | null;
+  activeCard?: FantasyActiveCardDTO | null;
+  availablePacks?: FantasyPackDTO[];
+  availablePacksCount?: number;
+  inventoryCount?: number;
 };
 
 const positionLabel: Record<string, string> = {
@@ -84,6 +92,10 @@ export function FantasyExperience({
   isTest = false,
   lastRound = null,
   challengeType = null,
+  activeCard = null,
+  availablePacks = [],
+  availablePacksCount = 0,
+  inventoryCount = 0,
 }: Props) {
   const router = useRouter();
   const initialIds = (lineup?.fantasy_lineup_players || []).map((item: any) => item.player_id as string);
@@ -98,12 +110,13 @@ export function FantasyExperience({
   const [filterTag, setFilterTag] = useState<string>("ALL");
   const [message, setMessage] = useState("");
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
   const [infoModal, setInfoModal] = useState<{ title: string; description: string } | null>(null);
   const [selectedDrawerPlayer, setSelectedDrawerPlayer] = useState<FantasyMarketPlayer | null>(null);
   const [showRevealedLineups, setShowRevealedLineups] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  useDialogViewport(Boolean(infoModal || selectedDrawerPlayer || showRevealedLineups));
+  useDialogViewport(Boolean(infoModal || selectedDrawerPlayer || showRevealedLineups || showInventoryModal));
 
   useEffect(() => {
     setMounted(true);
@@ -137,11 +150,24 @@ export function FantasyExperience({
   const open = status === "open" || betweenRounds;
   const isMarketClosed = !open && (status === "in_progress" || status === "finished");
 
+  // V3: Bônus de orçamento temporário da carta Crédito Extra
+  const budgetBonus = activeCard?.card?.effectType === "BUDGET_BONUS" ? (activeCard.card.effectConfig?.bonus || 5) : 0;
+  const effectiveBudget = budget + budgetBonus;
+
+  // V3: Desconto temporário no preço do jogador da carta Barganha
+  const discountedPlayerId = activeCard?.card?.effectType === "PLAYER_DISCOUNT" ? activeCard.targetPlayerId : null;
+
   const selectedPlayers = selected
     .map((id) => market.find((player) => player.id === id))
     .filter(Boolean) as FantasyMarketPlayer[];
-  const cost = selectedPlayers.reduce((sum, player) => sum + player.price, 0);
-  const remaining = budget - cost;
+
+  const cost = selectedPlayers.reduce((sum, player) => {
+    const isDiscounted = discountedPlayerId === player.id;
+    const price = isDiscounted ? player.price * 0.8 : player.price;
+    return sum + price;
+  }, 0);
+
+  const remaining = effectiveBudget - cost;
 
   // Filtros e ordenação no mercado
   const filtered = useMemo(() => {
@@ -307,6 +333,14 @@ export function FantasyExperience({
         </div>
       )}
 
+      {/* V3: BANNER DE PACOTES DISPONÍVEIS */}
+      {availablePacks && availablePacks.length > 0 && (
+        <FantasyPackClaimBanner
+          packs={availablePacks}
+          onPackClaimed={() => router.refresh()}
+        />
+      )}
+
       {/* Cabeçalho do Cartola */}
       <header className="overflow-hidden rounded-3xl border border-accent/25 bg-[radial-gradient(circle_at_85%_15%,rgba(204,255,0,.2),transparent_28%),linear-gradient(135deg,rgba(204,255,0,.10),rgba(4,24,14,.95)_48%)] p-5">
         <div className="flex items-start justify-between gap-4">
@@ -465,16 +499,16 @@ export function FantasyExperience({
       )}
 
       {/* Ações Rápidas */}
-      <div className="flex gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <Link
-          className="flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-center text-xs font-bold text-foreground hover:border-accent/40 transition-colors"
+          className="rounded-xl border border-border bg-surface px-3 py-2 text-center text-xs font-bold text-foreground hover:border-accent/40 transition-colors"
           href="/cartola/ranking"
         >
           <Trophy className="mr-1 inline h-4 w-4 text-accent" />
           Ranking
         </Link>
         <Link
-          className="flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-center text-xs font-bold text-foreground hover:border-accent/40 transition-colors"
+          className="rounded-xl border border-border bg-surface px-3 py-2 text-center text-xs font-bold text-foreground hover:border-accent/40 transition-colors"
           href="/cartola/historico"
         >
           <TrendingUp className="mr-1 inline h-4 w-4 text-accent" />
@@ -482,8 +516,16 @@ export function FantasyExperience({
         </Link>
         <button
           type="button"
+          onClick={() => setShowInventoryModal(true)}
+          className="rounded-xl border border-accent/40 bg-accent/15 px-3 py-2 text-center text-xs font-black text-accent hover:bg-accent/25 transition-colors shadow-sm"
+        >
+          <span className="mr-1">🎒</span>
+          Cartas ({inventoryCount})
+        </button>
+        <button
+          type="button"
           onClick={() => setShowTutorial(true)}
-          className="flex-1 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-center text-xs font-bold text-accent hover:bg-accent/20 transition-colors"
+          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-bold text-muted hover:bg-white/10 hover:text-white transition-colors"
         >
           <HelpCircle className="mr-1 inline h-4 w-4" />
           Tutorial
@@ -750,6 +792,17 @@ export function FantasyExperience({
               </div>
             </div>
           </div>
+
+          {/* V3: SLOT DE CARTA ESPECIAL ATIVA */}
+          {!betweenRounds && round && (
+            <FantasyActiveCardSlot
+              roundId={round.id}
+              activeCard={activeCard}
+              isMarketOpen={open}
+              marketPlayers={market}
+              onRefresh={() => router.refresh()}
+            />
+          )}
 
           {/* Palpites da Rodada */}
           {!betweenRounds && (
@@ -1110,6 +1163,16 @@ export function FantasyExperience({
         roundNumber={round?.number}
         isOpen={showRevealedLineups}
         onClose={() => setShowRevealedLineups(false)}
+      />
+
+      {/* V3: MODAL DE INVENTÁRIO */}
+      <FantasyInventoryModal
+        isOpen={showInventoryModal}
+        onClose={() => setShowInventoryModal(false)}
+        roundId={round?.id}
+        isMarketOpen={open}
+        marketPlayers={market}
+        onCardActivated={() => router.refresh()}
       />
 
       {/* MODAL DE TUTORIAL */}

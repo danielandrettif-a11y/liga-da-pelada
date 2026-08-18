@@ -790,6 +790,16 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
       throw new Error(`O Cartola não foi processado e a rodada foi restaurada para nova tentativa: ${fantasyError.message}`);
     }
 
+    // Gerar pacotes de recompensa V3 para participantes da rodada oficial finalizada
+    if (!fantasyTest) {
+      try {
+        const { generatePacksForFinishedRound } = await import("./fantasy-cards");
+        await generatePacksForFinishedRound(roundId);
+      } catch (packErr) {
+        console.error("Erro ao gerar pacotes da rodada:", packErr);
+      }
+    }
+
     revalidatePath(`/rodadas/${roundId}`);
     revalidatePath("/rodadas");
     revalidatePath("/convocacao");

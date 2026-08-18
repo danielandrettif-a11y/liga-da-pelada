@@ -22,6 +22,10 @@ export default async function CartolaPage() {
       isTest={data.fantasyRound.isTest}
       lastRound={data.lastRound}
       challengeType={data.fantasyRound.challengeType}
+      activeCard={data.activeCard}
+      availablePacks={data.availablePacks}
+      availablePacksCount={data.availablePacksCount}
+      inventoryCount={data.inventoryCount}
     />
   );
 }

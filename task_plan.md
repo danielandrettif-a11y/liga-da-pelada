@@ -1,50 +1,39 @@
-# Plano de Execução: Cartola V2 — Mercado Vivo, Valorização, Tendências e Radar
+# Plano de Execução: Cartola V3 — Pacotes, Inventário e Cartas Especiais
 
 ## Objetivo
-Implementar a especificação completa do Cartola V2, consolidando a economia viva (fórmula de valorização calibrada, estabilidade para ausentes, histórico idempotente, patrimônio protegido), tendências de mercado, forma recente, custo-benefício, tags automáticas, popularidade, Radar Cartola, revelação segura de escalações pós-fechamento, melhorias no mercado e suíte completa de testes e simulação econômica.
+Implementar a especificação completa do Cartola V3: ciclo de recompensas por participação com geração de pacotes por rodada finalizada, sorteio server-side e escolha definitiva entre 2 opções, inventário de instâncias de cartas com raridades balanceadas, ativação segura de 1 carta por rodada com alvos específicos, motor determinístico CardEffectResolver para 10 cartas oficiais, breakdown transparente de pontuação e histórico imutável via snapshots.
+
+---
+
+## Matriz Atual × V3
+
+| Recurso | Existe? | Implementação Atual (V1/V2) | V3 (Objetivo) | Ação a Realizar | Status |
+|---|---|---|---|---|---|
+| **Pacotes de Recompensa** | Sim | Não existia | 1 pacote por rodada finalizada para quem participou com escalação válida. Proteção `UNIQUE(user_id, round_id)` | Criar tabela `fantasy_round_packs`, trigger/RPC de geração e action | Concluído ✅ |
+| **Sorteio e Abertura** | Sim | Não existia | Sorteio server-side de 2 opções distintas salvo no banco; abertura idempotente | Criar tabela `fantasy_pack_offers`, RPC atômica e modal mobile-friendly | Concluído ✅ |
+| **Escolha Definitiva** | Sim | Não existia | Usuário escolhe 1 carta; a escolhida vai pro inventário e a outra é descartada | Criar RPC `claim_pack_card` com garantia atômica contra duplo clique | Concluído ✅ |
+| **Inventário Pessoal** | Sim | Não existia | Coleção de instâncias de cartas com status `OWNED`, `RESERVED`, `LOCKED`, `CONSUMED` | Criar tabela `fantasy_user_cards`, tela/modal de inventário com filtros e agrupamento | Concluído ✅ |
+| **Catálogo Central** | Sim | Não existia | Catálogo com 10 cartas oficiais + 2 experimentais desabilitadas, slugs, raridades e configs | Criar tabela `fantasy_cards` e módulo `catalog.ts` | Concluído ✅ |
+| **Raridades e Probabilidades** | Sim | Não existia | `COMMON` (55%), `RARE` (30%), `EPIC` (12%), `LEGENDARY` (3%) centralizados | Criar módulo `config.ts` com pesos de sorteio | Concluído ✅ |
+| **CardEffectResolver** | Sim | Não existia | Motor determinístico central sem `if`s espalhados para resolver efeitos | Criar `resolver.ts` e suíte de testes unitários | Concluído ✅ |
+| **Carta Ativa na Rodada** | Sim | Não existia | Exatamente 1 carta ativa por rodada (`MAX_CARDS_PER_ROUND = 1`) com suporte a alvos | Criar `fantasy_card_activations` com `UNIQUE(round_id, user_id)` | Concluído ✅ |
+| **Reserva / Lock / Consumo** | Sim | Não existia | `OWNED` $\rightarrow$ `RESERVED` $\rightarrow$ `LOCKED` (fechamento) $\rightarrow$ `CONSUMED` (resolução) / Devolução em cancelamento | Implementar ciclo de vida e estorno seguro | Concluído ✅ |
+| **Cartas Econômicas** | Sim | Não existia | Crédito Extra (+C$5) e Barganha (20% desc) afetam montagem sem alterar patrimônio real | Integrar ao validador de orçamento em `fantasy.ts` | Concluído ✅ |
+| **Cartas de Pontuação** | Sim | Não existia | Super Capitão (3x), Palpite Duplo (2x), Vice-Capitão, Gol de Ouro, Passe de Ouro, Caça-Talentos, Dobradinha, All-In | Integrar ao cálculo de pontuação em `stats.ts` e `resolver.ts` | Concluído ✅ |
+| **Snapshots e Breakdown** | Sim | Apenas pontuação-base e palpites | Snapshot completo da carta usada gravado na rodada; breakdown transparente no histórico | Salvar snapshot e exibir no detalhamento da rodada | Concluído ✅ |
+| **UI do Cartola V3** | Sim | Não existia | Card de pacote disponível no topo, slot de carta ativa no campinho, modal de inventário e abertura | Criar componentes React modernos | Concluído ✅ |
 
 ---
 
 ## Fases de Execução
 
-- [x] **Fase 1: Auditoria da V1 e Matriz Atual x V2**
-  - [x] Mapeamento dos esquemas do banco, tabelas de fantasy, procedures e actions existentes.
-  - [x] Construção da Matriz Atual x V2 com todos os requisitos.
-  - [x] Criação do Implementation Plan detalhado.
-
-- [x] **Fase 2: Modelo de Valorização V2 & Configurações**
-  - [x] Atualizar `src/lib/fantasy/config.ts` com pesos V2 (40% recente com decaimento, 35% win rate bayesiano, 15% histórico, 10% consistência, min/max prices e limites contínuos).
-  - [x] Implementar a fórmula no motor TypeScript `src/lib/fantasy/engine.ts` com garantia de estabilidade para ausentes e tratamento de jogador novo.
-  - [x] Migration `048_cartola_v2_market_engine.sql` com alinhamento no PostgreSQL.
-
-- [x] **Fase 3: Tendências, Forma Recente, Custo-Benefício e Tags Automáticas**
-  - [x] Calcular tendências (`🔥 EM ALTA`, `➡️ ESTÁVEL`, `📉 EM BAIXA`).
-  - [x] Calcular indicadores de forma recente (`🔥 Excelente`, `🟢 Boa`, `⚪ Regular`, etc.).
-  - [x] Implementar métrica de custo-benefício (`pts/C$` e score 0-10).
-  - [x] Criar gerador de tags prioritárias automáticas (`💎 Bom Custo-Benefício`, `🚀 Revelação`, `👑 Mais Escalado`, etc., máx 2 no card compacto).
-
-- [x] **Fase 4: Popularidade, Capitães, Mais Comprados/Vendidos & Radar Cartola**
-  - [x] Implementar agregador performático de popularidade (`% escalado`, `% capitão`).
-  - [x] Implementar cálculo de mais comprados e mais vendidos (delta entre rodadas).
-  - [x] Criar componente `FantasyRadarCarousel.tsx` com visual moderno e proteção para poucos usuários (amostra mínima).
-
-- [x] **Fase 5: Privacidade Pré-Fechamento & Revelação Pós-Fechamento**
-  - [x] Blindar endpoints para retornar apenas agregados antes do fechamento.
-  - [x] Criar Server Action `getRevealedLineups` para leitura pública pós-fechamento.
-  - [x] Criar componente `FantasyRevealedLineupsModal.tsx`.
-
-- [x] **Fase 6: Experiência do Usuário & Mercado Vivo (Frontend)**
-  - [x] Aprimorar `FantasyPlayerCard.tsx` com badges, tendências, variação e tags.
-  - [x] Criar `FantasyPlayerDrawer.tsx` com gráfico de linha de histórico de preço e últimas 5 rodadas.
-  - [x] Expandir `FantasyExperience.tsx` com ordenação por 9 critérios, 7 filtros por tags e saldo dinâmico.
-  - [x] Enriquecer a seção Cartola em `src/app/jogadores/[id]/page.tsx`.
-
-- [x] **Fase 7: Suíte de Testes Automatizados (V2-T01 a V2-T21)**
-  - [x] Bateria de testes unitários para cada requisito de valorização, ausência, limites e empates.
-  - [x] Testes de idempotência e consistência de patrimônio.
-  - [x] 56 testes passando com 100% de sucesso.
-
-- [x] **Fase 8: Simulação Econômica (15 Rodadas) & Validação Final**
-  - [x] Simulação de múltiplas rodadas com 25 jogadores e 15 usuários.
-  - [x] Auditoria de inflação/deflação e distribuição balanceada de preços (Preço médio C$ 10.00 -> C$ 11.32, piso C$ 5.00, teto C$ 25.00).
-  - [x] Validação do build de produção (`npm run build`) em todas as 34 rotas.
+- [x] **Fase 1: Auditoria e Matriz Atual × V3**
+- [x] **Fase 2: Modelo de Dados e Migration SQL (`049_cartola_v3_cards_and_packs.sql`)**
+- [x] **Fase 3: Catálogo de Cartas e Configurações de Probabilidade (`src/lib/fantasy/cards/`)**
+- [x] **Fase 4: Motor de Efeitos Determinístico (`CardEffectResolver`)**
+- [x] **Fase 5: Geração de Pacotes, Abertura Idempotente e Escolha Atômica**
+- [x] **Fase 6: Gestão de Inventário e Ativação com Ciclo de Vida Completo**
+- [x] **Fase 7: Integração com Fechamento, Pontuação e Orçamento**
+- [x] **Fase 8: Componentes Frontend (Abertura de Pacotes, Inventário, Slot de Carta Ativa)**
+- [x] **Fase 9: Bateria de Testes Automatizados (V3-T01 a V3-T18 + 10 Cartas + Multiusuário)**
+- [x] **Fase 10: Validação de Build, Relatório Final e Deploy**

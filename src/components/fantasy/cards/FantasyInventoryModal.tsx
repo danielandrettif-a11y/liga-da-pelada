@@ -1,0 +1,358 @@
+"use client";
+
+import { useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
+import { CheckCircle2, Loader2, Sparkles, X } from "@/components/icons";
+import { RARITY_CONFIG, type FantasyCardRarity } from "@/lib/fantasy/cards/config";
+import type { FantasyCardDefinition } from "@/lib/fantasy/cards/catalog";
+import type { FantasyUserCardDTO } from "@/lib/actions/fantasy-cards";
+import { activateCardForRound, getMyInventory } from "@/lib/actions/fantasy-cards";
+import { useDialogViewport } from "@/lib/useDialogViewport";
+
+type Props = {
+  isOpen: boolean;
+  onClose: () => void;
+  roundId?: string | null;
+  isMarketOpen?: boolean;
+  onCardActivated?: () => void;
+  marketPlayers?: Array<{ id: string; name: string; price: number }>;
+};
+
+export function FantasyInventoryModal({
+  isOpen,
+  onClose,
+  roundId,
+  isMarketOpen = true,
+  onCardActivated,
+  marketPlayers = [],
+}: Props) {
+  const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [inventoryData, setInventoryData] = useState<{
+    cards: FantasyUserCardDTO[];
+    groupedBySlug: Record<string, { count: number; card: FantasyCardDefinition; instances: FantasyUserCardDTO[] }>;
+    availableCount: number;
+  } | null>(null);
+  const [rarityFilter, setRarityFilter] = useState<string>("ALL");
+  const [selectedToUse, setSelectedToUse] = useState<{
+    card: FantasyCardDefinition;
+    instance: FantasyUserCardDTO;
+  } | null>(null);
+  const [targetPlayerId, setTargetPlayerId] = useState<string>("");
+  const [targetPlayer2Id, setTargetPlayer2Id] = useState<string>("");
+  const [targetPrediction, setTargetPrediction] = useState<"TOP_SCORER" | "TOP_ASSIST" | "CHALLENGE">("TOP_SCORER");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  useDialogViewport(isOpen);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setLoading(true);
+      getMyInventory()
+        .then((res) => setInventoryData(res))
+        .catch(() => setInventoryData(null))
+        .finally(() => setLoading(false));
+    } else {
+      setSelectedToUse(null);
+      setError(null);
+    }
+  }, [isOpen]);
+
+  if (!mounted || !isOpen || typeof document === "undefined") return null;
+
+  const grouped = inventoryData?.groupedBySlug || {};
+  const groupsList = Object.values(grouped).filter((item) => {
+    if (rarityFilter === "ALL") return true;
+    return item.card.rarity === rarityFilter;
+  });
+
+  function handleSelectInstance(card: FantasyCardDefinition, instances: FantasyUserCardDTO[]) {
+    const availableInstance = instances.find((i) => i.status === "OWNED");
+    if (!availableInstance) return;
+
+    setSelectedToUse({ card, instance: availableInstance });
+    setTargetPlayerId(marketPlayers[0]?.id || "");
+    setTargetPlayer2Id(marketPlayers[1]?.id || "");
+    setTargetPrediction("TOP_SCORER");
+  }
+
+  function handleConfirmActivation() {
+    if (!selectedToUse || !roundId) return;
+    setError(null);
+
+    startTransition(async () => {
+      try {
+        const res = await activateCardForRound({
+          roundId,
+          userCardId: selectedToUse.instance.id,
+          targetPlayerId: selectedToUse.card.requiresTarget === "SINGLE_PLAYER" || selectedToUse.card.requiresTarget === "DUO_PLAYERS" ? targetPlayerId : undefined,
+          targetPlayer2Id: selectedToUse.card.requiresTarget === "DUO_PLAYERS" ? targetPlayer2Id : undefined,
+          targetPrediction: selectedToUse.card.requiresTarget === "PREDICTION_TYPE" ? targetPrediction : undefined,
+        });
+
+        if (res.success) {
+          onCardActivated?.();
+          onClose();
+        } else {
+          setError(res.error || "Não foi possível ativar a carta.");
+        }
+      } catch (err: any) {
+        setError(err.message || "Erro de conexão ao ativar carta.");
+      }
+    });
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md animate-fade-in touch-none overscroll-none"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Inventário de Cartas"
+    >
+      <div
+        className="relative flex w-full max-w-xl max-h-[88vh] flex-col overflow-hidden rounded-[2.5rem] border border-accent/40 bg-[#06160d] shadow-[0_0_60px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-white/10 p-5 sm:p-6 bg-surface/50">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent/20 text-accent text-xl">
+              🎒
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-black uppercase text-foreground">
+                  Minhas Cartas Especiais
+                </h2>
+                <span className="rounded-full bg-accent/20 text-accent px-2 py-0.5 text-[8px] font-black uppercase">
+                  {inventoryData?.availableCount || 0} Disponíveis
+                </span>
+              </div>
+              <p className="text-xs text-muted">
+                Gerencie suas cartas e selecione 1 para ativar na rodada atual
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Chips de Filtro por Raridade */}
+        <div className="no-scrollbar flex gap-1.5 overflow-x-auto p-4 border-b border-white/5 bg-black/20 text-[9px] font-black uppercase tracking-wider">
+          {[
+            { id: "ALL", label: "Todas" },
+            { id: "COMMON", label: "⚪ Comuns" },
+            { id: "RARE", label: "🔵 Raras" },
+            { id: "EPIC", label: "🟣 Épicas" },
+            { id: "LEGENDARY", label: "👑 Lendárias" },
+          ].map((chip) => (
+            <button
+              key={chip.id}
+              type="button"
+              onClick={() => setRarityFilter(chip.id)}
+              className={`shrink-0 rounded-xl px-3 py-1.5 transition-colors border ${
+                rarityFilter === chip.id
+                  ? "border-accent bg-accent text-background"
+                  : "border-white/10 bg-surface/60 text-muted hover:text-foreground"
+              }`}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Lista de Cartas / Seleção de Alvo */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3">
+          {loading ? (
+            <div className="py-12 text-center text-sm font-bold text-muted animate-pulse">
+              Carregando inventário...
+            </div>
+          ) : selectedToUse ? (
+            /* CONFIGURAÇÃO DE ALVO E ATIVAÇÃO */
+            <div className="rounded-3xl border border-accent/40 bg-surface/80 p-5 space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">{selectedToUse.card.icon}</span>
+                <div>
+                  <h3 className="font-athletic text-lg font-black uppercase italic text-white">
+                    Ativar {selectedToUse.card.name}
+                  </h3>
+                  <p className="text-xs text-muted">{selectedToUse.card.description}</p>
+                </div>
+              </div>
+
+              {/* Seletor de Jogador Único */}
+              {selectedToUse.card.requiresTarget === "SINGLE_PLAYER" && marketPlayers.length > 0 && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-muted block">
+                    Escolha o jogador alvo desta carta:
+                  </label>
+                  <select
+                    value={targetPlayerId}
+                    onChange={(e) => setTargetPlayerId(e.target.value)}
+                    className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground"
+                  >
+                    {marketPlayers.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} (C$ {p.price.toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Seletor de Dupla de Jogadores */}
+              {selectedToUse.card.requiresTarget === "DUO_PLAYERS" && marketPlayers.length >= 2 && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted block">Jogador 1:</label>
+                    <select
+                      value={targetPlayerId}
+                      onChange={(e) => setTargetPlayerId(e.target.value)}
+                      className="h-10 w-full rounded-xl border border-border bg-background px-2 text-xs font-bold text-foreground"
+                    >
+                      {marketPlayers.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted block">Jogador 2:</label>
+                    <select
+                      value={targetPlayer2Id}
+                      onChange={(e) => setTargetPlayer2Id(e.target.value)}
+                      className="h-10 w-full rounded-xl border border-border bg-background px-2 text-xs font-bold text-foreground"
+                    >
+                      {marketPlayers.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Seletor de Tipo de Palpite */}
+              {selectedToUse.card.requiresTarget === "PREDICTION_TYPE" && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-muted block">
+                    Qual palpite deseja dobrar?
+                  </label>
+                  <select
+                    value={targetPrediction}
+                    onChange={(e) => setTargetPrediction(e.target.value as any)}
+                    className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground"
+                  >
+                    <option value="TOP_SCORER">⚽ Artilheiro da Rodada</option>
+                    <option value="TOP_ASSIST">🍽️ Garçom da Rodada</option>
+                    <option value="CHALLENGE">🎯 Desafio da Rodada</option>
+                  </select>
+                </div>
+              )}
+
+              {error && <p className="text-xs text-danger font-bold">{error}</p>}
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedToUse(null)}
+                  disabled={pending}
+                  className="flex-1 rounded-2xl border border-white/10 py-3 text-xs font-bold text-muted hover:text-white"
+                >
+                  Voltar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmActivation}
+                  disabled={pending}
+                  className="flex-2 flex items-center justify-center gap-1.5 rounded-2xl bg-accent py-3 text-xs font-black uppercase text-background shadow-[0_0_20px_rgba(204,255,0,0.3)] hover:brightness-110 active:scale-95 transition-all"
+                >
+                  {pending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Ativando...</span>
+                    </>
+                  ) : (
+                    <span>Confirmar Ativação</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          ) : groupsList.length === 0 ? (
+            <div className="py-12 text-center text-sm font-bold text-muted space-y-2">
+              <span className="text-3xl block">🃏</span>
+              <p>Você ainda não possui cartas desta categoria.</p>
+              <p className="text-xs font-normal">Participe das rodadas oficiais do Cartola para ganhar pacotes!</p>
+            </div>
+          ) : (
+            groupsList.map((group) => {
+              const { card, count, instances } = group;
+              const rarityInfo = RARITY_CONFIG[card.rarity];
+              const available = count > 0;
+
+              return (
+                <div
+                  key={card.slug}
+                  className={`flex items-center justify-between gap-3 rounded-2xl border ${rarityInfo.border} ${rarityInfo.bg} p-4 transition-all ${
+                    available ? "opacity-100" : "opacity-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-3xl shrink-0">{card.icon}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className={`truncate text-sm font-black uppercase italic ${rarityInfo.text}`}>
+                          {card.name}
+                        </h3>
+                        <span className="rounded-full bg-white/10 px-1.5 py-0.2 text-[8px] font-black text-white">
+                          ×{count}
+                        </span>
+                        <span className={`rounded px-1.5 py-0.2 text-[7px] font-black uppercase ${rarityInfo.badgeBg}`}>
+                          {rarityInfo.label}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted leading-tight line-clamp-2">
+                        {card.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  {roundId && isMarketOpen && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectInstance(card, instances)}
+                      disabled={!available}
+                      className={`shrink-0 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-wider transition-transform active:scale-95 ${
+                        available
+                          ? "bg-accent text-background hover:brightness-110 shadow-sm"
+                          : "bg-white/5 text-muted cursor-not-allowed opacity-50"
+                      }`}
+                    >
+                      {available ? "Usar" : "Esgotada"}
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}

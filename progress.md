@@ -1,34 +1,43 @@
-# Progresso: Cartola V2 — Concluído
+# Progresso do Projeto: Cartola V3 (Pacotes, Inventário e Cartas Especiais)
 
-## Status Atual: Fases 1 a 8 Concluídas com Sucesso (100%)
+## Status Atual: CONCLUÍDO COM SUCESSO (100%)
 
-### Fases Concluídas
-- [x] **Fase 1: Auditoria da V1 e Matriz Atual x V2**
-  - Mapeamento detalhado de todos os 23 requisitos da V1 vs. V2.
-  - Criação do `implementation_plan.md` e atualização dos arquivos de memória.
-- [x] **Fase 2: Modelo de Valorização V2 & Configurações**
-  - `src/lib/fantasy/config.ts` atualizado com pesos e parâmetros V2.
-  - `src/lib/fantasy/engine.ts` implementado com fórmula ponderada (40% recente com decaimento temporal, 35% win rate bayesiano suavizado, 15% média histórica válida, 10% consistência com desvio padrão invertido).
-  - Estabilidade absoluta para ausentes (`variation = 0.00%`).
-  - Migration `048_cartola_v2_market_engine.sql` criada.
-- [x] **Fase 3: Tendências, Forma Recente, Custo-Benefício e Tags Automáticas**
-  - Tendências: `🔥 Em Alta`, `➡️ Estável`, `📉 Em Baixa`.
-  - Forma Recente: `🔥 Excelente`, `🟢 Boa`, `⚪ Regular`, `🟠 Ruim`, `🔴 Péssima`.
-  - Custo-benefício calibrado (`pts/C$` e score 0-10).
-  - Tags automáticas com priorização (`💎 Bom Custo-Benefício`, `🚀 Revelação`, `👑 Mais Escalado`, etc.).
-- [x] **Fase 4: Popularidade, Capitães, Mais Comprados/Vendidos & Radar Cartola**
-  - Agregação batch de popularidade (% escalado, % capitão, mais comprado/vendido).
-  - Componente `FantasyRadarCarousel.tsx` com scroll suave e tratamento de amostra mínima.
-- [x] **Fase 5: Privacidade Pré-Fechamento & Revelação Pós-Fechamento**
-  - Bloqueio de detalhes no backend enquanto o mercado está aberto.
-  - Endpoint `getRevealedLineups` seguro.
-  - Componente `FantasyRevealedLineupsModal.tsx` (`🔓 Escalações Reveladas`).
-- [x] **Fase 6: Experiência do Usuário & Mercado Vivo (Frontend)**
-  - `FantasyPlayerDrawer.tsx` com gráfico interativo SVG, histórico de preços e últimas rodadas.
-  - `FantasyPlayerCard.tsx` refatorado com métricas V2.
-  - `FantasyExperience.tsx` expandido com 7 filtros por tags, 9 opções de ordenação, saldo dinâmico e Radar vivo.
-- [x] **Fase 7: Suíte de Testes Automatizados (V2-T01 a V2-T21)**
-  - 56 testes unitários e de integração passando com 100% de sucesso no Vitest.
-- [x] **Fase 8: Simulação Econômica (15 Rodadas) & Validação Final**
-  - Simulação de 15 rodadas em `simulation.test.ts` comprovando estabilidade contra inflação/deflação (Preço médio C$ 10.00 -> C$ 11.32, piso C$ 5.00, teto C$ 25.00).
-  - Compilação de produção (`next build`) aprovada com sucesso em todas as 34 rotas.
+### O Que Foi Implementado e Validado:
+
+1. **Modelo de Dados & Migration SQL (`049_cartola_v3_cards_and_packs.sql`)**:
+   - `fantasy_cards`: Catálogo oficial de 10 cartas ativas + 2 desabilitadas com regras de raridade e alvos.
+   - `fantasy_round_packs`: Tabela de pacotes com `UNIQUE(user_id, round_id)` garantindo idempotência e ciclo de recompensa por participação.
+   - `fantasy_pack_offers`: Persistência atômica das 2 ofertas sorteadas server-side.
+   - `fantasy_user_cards`: Inventário pessoal com instâncias individuais e ciclo de vida (`OWNED`, `RESERVED`, `LOCKED`, `CONSUMED`).
+   - `fantasy_card_activations`: Registro de ativação com `UNIQUE(round_id, user_id)` e snapshots dos alvos e efeitos.
+
+2. **Catálogo Central & Probabilidades (`src/lib/fantasy/cards/`)**:
+   - Probabilidades de raridade calibradas: `COMMON` (55%), `RARE` (30%), `EPIC` (12%), `LEGENDARY` (3%).
+   - 10 Cartas Oficiais:
+     - 👑 **Super Capitão** (`LEGENDARY` - 3x total no capitão)
+     - 💰 **Crédito Extra** (`COMMON` - +C$5,00 no orçamento temporário da rodada)
+     - 🎯 **Palpite Duplo** (`RARE` - 2x na recompensa se acertar o palpite)
+     - 🤑 **Barganha** (`COMMON` - 20% de desconto no jogador selecionado)
+     - 🛡️ **Vice-Capitão** (`RARE` - assume 2x se titular não jogou)
+     - ⚽ **Gol de Ouro** (`COMMON` - +3 pts se fizer 1+ gol)
+     - 🍽️ **Passe de Ouro** (`COMMON` - +3 pts se der 1+ assistência)
+     - 💎 **Caça-Talentos** (`EPIC` - +50% dos pts base, máx +6)
+     - ⚡ **Dobradinha** (`RARE` - +5 pts se 2 atletas ficarem acima da média)
+     - 🎰 **All-In** (`EPIC` - +6 pts se atleta dos 50% mais baratos ficar no TOP 5)
+     - 2 Experimentais desabilitadas: `safe_prediction` e `emergency_sub`.
+
+3. **Motor Determinístico CardEffectResolver (`src/lib/fantasy/cards/resolver.ts`)**:
+   - Resolução pura e auditável para todos os tipos de efeito.
+
+4. **Server Actions V3 (`src/lib/actions/fantasy-cards.ts`)**:
+   - `getMyPacks`, `openPack` (sorteio idempotente), `claimPackCard` (escolha definitiva), `getMyInventory`, `getActiveCardForRound`, `activateCardForRound`, `removeActiveCardForRound`, `generatePacksForFinishedRound`.
+
+5. **Componentes Frontend V3 (`src/components/fantasy/cards/`)**:
+   - `FantasyPackClaimBanner.tsx`: Destaque dourado e brilhante quando há pacotes para abrir.
+   - `FantasyPackOpeningModal.tsx`: Animação suave, exibição das 2 cartas físicas/digitais e confirmação com descarte da outra.
+   - `FantasyInventoryModal.tsx`: Inventário completo com filtros por raridade (`Todas`, `⚪ Comuns`, `🔵 Raras`, `🟣 Épicas`, `👑 Lendárias`), agrupamento por quantidade e seleção de alvos.
+   - `FantasyActiveCardSlot.tsx`: Slot no campinho para escolha, troca e remoção de carta ativa antes do fechamento do mercado.
+
+6. **Validação & Testes**:
+   - 75 testes automatizados passando (100% de sucesso).
+   - `npm run build` validado sem nenhum erro de tipagem em todas as 34 rotas da aplicação.

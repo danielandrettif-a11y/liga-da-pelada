@@ -207,6 +207,27 @@ export async function getFantasyDashboard() {
   const officialRoundIds = officialFantasyRounds.map((item: any) => item.round?.id).filter(Boolean);
   const matchIds = (displayRound?.matches || []).map((match: any) => match.id);
 
+  // V3: Carregar pacotes, inventário e carta ativa do usuário
+  let availablePacks: any[] = [];
+  let availablePacksCount = 0;
+  let inventoryCount = 0;
+  let activeCard: any = null;
+
+  try {
+    const { getMyPacks, getMyInventory, getActiveCardForRound } = await import("./fantasy-cards");
+    const [packsRes, invRes, activeCardRes] = await Promise.all([
+      getMyPacks(),
+      getMyInventory(),
+      displayRoundId ? getActiveCardForRound(displayRoundId) : Promise.resolve(null),
+    ]);
+    availablePacks = packsRes.availablePacks;
+    availablePacksCount = packsRes.availablePacks.length;
+    inventoryCount = invRes.availableCount;
+    activeCard = activeCardRes;
+  } catch (err) {
+    console.error("Erro ao carregar dados V3 das cartas:", err);
+  }
+
   const lineupRequest = isTest
     ? account.client
         .from("fantasy_test_lineups")
@@ -770,6 +791,11 @@ export async function getFantasyDashboard() {
           totalPoints: Number(latestLineup?.total_points || 0),
         }
       : null,
+    // V3: Pacotes, Inventário e Carta Ativa
+    activeCard,
+    availablePacks,
+    availablePacksCount,
+    inventoryCount,
   };
 }
 
