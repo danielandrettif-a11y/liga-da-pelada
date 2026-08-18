@@ -24,6 +24,7 @@ export type FantasySettings = {
   smoothingGames: number;
   maxPriceIncrease: number;
   maxPriceDecrease: number;
+  minSampleForRadar?: number;
 };
 
 export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
@@ -45,14 +46,17 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   betOfRoundPoints: 8,
   betRequiredRanks: [5, 4, 3, 2],
   scoreGoalRewards: [7, 6, 4, 3],
-  recentWeight: 0.4,
+  recentWeight: 0.40,
   winRateWeight: 0.35,
   historicalWeight: 0.15,
-  consistencyWeight: 0.1,
+  consistencyWeight: 0.10,
   smoothingGames: 5,
   maxPriceIncrease: 0.12,
-  maxPriceDecrease: 0.1,
+  maxPriceDecrease: 0.10,
+  minSampleForRadar: 3,
 };
+
+export const FANTASY_RECENT_ROUND_WEIGHTS = [0.40, 0.25, 0.15, 0.12, 0.08] as const;
 
 export function formatFantasyMoney(value: number, currencyName = "C$") {
   return `${currencyName} ${new Intl.NumberFormat("pt-BR", {
@@ -60,3 +64,4 @@ export function formatFantasyMoney(value: number, currencyName = "C$") {
     maximumFractionDigits: 2,
   }).format(value)}`;
 }
+

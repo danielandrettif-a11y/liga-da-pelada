@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { getInitials } from "@/lib/utils";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { X, ZoomIn } from "@/components/icons";
@@ -22,7 +23,12 @@ export function PlayerAvatar({
 }: PlayerAvatarProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   useDialogViewport(isOpen);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     setImageFailed(false);
@@ -75,50 +81,54 @@ export function PlayerAvatar({
         )}
       </div>
 
-      {isOpen && (
-        <div
-          className="mobile-dialog-backdrop fixed inset-0 z-[300] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsOpen(false);
-          }}
-        >
+      {isOpen &&
+        mounted &&
+        typeof document !== "undefined" &&
+        createPortal(
           <div
-            className="relative flex max-h-[90vh] w-full max-w-sm flex-col items-center overflow-hidden rounded-3xl border border-accent/40 bg-[#07150d] p-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-fade-in-up"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md animate-fade-in touch-none overscroll-none"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsOpen(false);
+            }}
             role="dialog"
             aria-modal="true"
             aria-label={`Foto ampliada de ${name}`}
           >
-            {/* Botão Fechar */}
-            <button
-              onClick={() => setIsOpen(false)}
-              className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
-              aria-label="Fechar foto"
+            <div
+              className="relative flex max-h-[85vh] w-full max-w-sm flex-col items-center overflow-hidden rounded-3xl border border-accent/40 bg-[#07150d] p-6 shadow-[0_0_60px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto"
+              onClick={(e) => e.stopPropagation()}
             >
-              <X className="h-5 w-5" />
-            </button>
+              {/* Botão Fechar */}
+              <button
+                onClick={() => setIsOpen(false)}
+                className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                aria-label="Fechar foto"
+              >
+                <X className="h-5 w-5" />
+              </button>
 
-            {/* Imagem Ampliada */}
-            <div className="relative mt-2 aspect-square w-64 max-w-full overflow-hidden rounded-2xl border-2 border-accent shadow-[0_0_30px_rgba(204,255,0,0.2)]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={avatarUrl!}
-                alt={`Foto de ${name}`}
-                className="h-full w-full object-cover"
-              />
-            </div>
+              {/* Imagem Ampliada */}
+              <div className="relative mt-2 aspect-square w-64 max-w-full overflow-hidden rounded-2xl border-2 border-accent shadow-[0_0_30px_rgba(204,255,0,0.25)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={avatarUrl!}
+                  alt={`Foto de ${name}`}
+                  className="h-full w-full object-cover"
+                />
+              </div>
 
-            {/* Informações do Jogador */}
-            <div className="mt-5 text-center">
-              <h3 className="font-athletic text-2xl font-black uppercase italic tracking-wide text-foreground">
-                {name}
-              </h3>
-              <p className="mt-1 text-xs font-semibold text-accent">Jogador da Liga da Pelada</p>
+              {/* Informações do Jogador */}
+              <div className="mt-5 text-center">
+                <h3 className="font-athletic text-2xl font-black uppercase italic tracking-wide text-foreground">
+                  {name}
+                </h3>
+                <p className="mt-1 text-xs font-semibold text-accent">Jogador da Liga da Pelada</p>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </>
   );
 }
