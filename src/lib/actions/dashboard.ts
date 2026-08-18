@@ -141,16 +141,25 @@ export async function getDashboardData() {
       };
     }
 
+    const callupConfirmedCount = (activeCallupData?.callup_entries || []).filter(
+      (entry: any) => entry.status === "confirmed"
+    ).length;
+    const roundPlayersCount = nextRoundData?.round_players?.[0]?.count || 0;
+    const effectiveConfirmed = roundPlayersCount > 0 ? roundPlayersCount : (activeCallupData && !isCallupHidden ? callupConfirmedCount : 0);
+
+    const friendlyPlayersCount = nextFriendlyData?.round_players?.[0]?.count || 0;
+    const effectiveFriendlyConfirmed = friendlyPlayersCount > 0 ? friendlyPlayersCount : (activeCallupData && !isCallupHidden && activeCallupData.round_type === "friendly" ? callupConfirmedCount : 0);
+
     return {
       success: true,
       data: {
         nextRound: nextRoundData ? {
           ...nextRoundData,
-          confirmedPlayers: nextRoundData.round_players?.[0]?.count || 0
+          confirmedPlayers: effectiveConfirmed
         } : null,
         nextFriendly: nextFriendlyData ? {
           ...nextFriendlyData,
-          confirmedPlayers: nextFriendlyData.round_players?.[0]?.count || 0,
+          confirmedPlayers: effectiveFriendlyConfirmed,
         } : null,
         liveMatch: liveMatchData,
         matchDuration: leagueData?.match_duration || 7,

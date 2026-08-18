@@ -193,6 +193,7 @@ export default async function HomePage() {
               isAdmin={account.isAdmin}
               venue={venue}
               eventDurationMinutes={eventDurationMinutes}
+              activeCallup={activeCallup}
             />
           );
 

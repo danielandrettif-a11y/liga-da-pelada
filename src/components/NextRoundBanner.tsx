@@ -25,18 +25,27 @@ export function NextRoundBanner({
   isAdmin = false,
   venue,
   eventDurationMinutes = 120,
+  activeCallup = null,
 }: {
   round: NextRound | null;
   isAdmin?: boolean;
   venue?: { name?: string | null; mapUrl?: string | null } | null;
   eventDurationMinutes?: number;
+  activeCallup?: { id?: string; confirmed?: number; capacity?: number } | null;
 }) {
   const isPrelist = round?.preparation_stage === "prelist";
+  const hasOpenCallup = Boolean(activeCallup);
+  const confirmedCount = (activeCallup && activeCallup.confirmed != null)
+    ? activeCallup.confirmed
+    : (round?.confirmedPlayers || 0);
+
   const href = round
     ? isAdmin && isPrelist
       ? `/admin/rodada?round=${round.id}&mount=1`
       : isAdmin
       ? `/rodadas/${round.id}`
+      : hasOpenCallup
+      ? "/convocacao"
       : "/rodadas"
     : "/rodadas";
 
@@ -143,11 +152,21 @@ export function NextRoundBanner({
               </span>
             )}
 
-            {round && round.confirmedPlayers != null && (
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-accent/30 bg-accent/15 px-2.5 py-1 text-[11px] font-black text-accent backdrop-blur-md">
-                <Users className="h-3.5 w-3.5" />
-                <span>{round.confirmedPlayers} convocados</span>
-              </span>
+            {round && (
+              hasOpenCallup || confirmedCount > 0 ? (
+                <span className="inline-flex items-center gap-1.5 rounded-xl border border-accent/30 bg-accent/15 px-2.5 py-1 text-[11px] font-black text-accent backdrop-blur-md">
+                  <Users className="h-3.5 w-3.5" />
+                  <span>
+                    {confirmedCount} {confirmedCount === 1 ? "convocado" : "convocados"}
+                    {hasOpenCallup && confirmedCount === 0 ? " · Lista aberta" : ""}
+                  </span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/30 bg-amber-500/15 px-2.5 py-1 text-[11px] font-black text-amber-300 backdrop-blur-md">
+                  <Clock className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
+                  <span>Aguardando abertura da lista</span>
+                </span>
+              )
             )}
 
             {venue?.name && (
