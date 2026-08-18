@@ -7,7 +7,7 @@ import type { FantasyCardDefinition } from "@/lib/fantasy/cards/catalog";
 import type { FantasyPackDTO } from "@/lib/actions/fantasy-cards";
 import { claimPackCard, openPack } from "@/lib/actions/fantasy-cards";
 import { useDialogViewport } from "@/lib/useDialogViewport";
-import { PackTearInteraction } from "./PackTearInteraction";
+import { PackVideoOpening } from "./PackVideoOpening";
 import { CardRevealStage } from "./CardRevealStage";
 
 type Props = {
@@ -31,7 +31,6 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
   );
   const [selectedCard, setSelectedCard] = useState<FantasyCardDefinition | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isOpeningServer, setIsOpeningServer] = useState(false);
   const serverOffersPromiseRef = useRef<Promise<any> | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -44,13 +43,12 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
   if (!mounted || !isOpen || typeof document === "undefined") return null;
 
   /**
-   * Disparado no primeiro toque/arraste do usuário no pacote.
-   * Faz o fetch em background para que os dados já estejam prontos quando o rasgo terminar.
+   * Disparado no início da reprodução do vídeo de abertura do pacote.
+   * Faz o fetch em background para que as cartas já estejam sorteadas e prontas quando o vídeo terminar.
    */
-  function handleTearStart() {
+  function handleOpeningStart() {
     if (offers || serverOffersPromiseRef.current) return;
     setError(null);
-    setIsOpeningServer(true);
 
     serverOffersPromiseRef.current = openPack(pack.id)
       .then((res) => {
@@ -65,16 +63,13 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
       .catch((err: any) => {
         setError(err.message || "Erro de conexão ao abrir pacote.");
         return null;
-      })
-      .finally(() => {
-        setIsOpeningServer(false);
       });
   }
 
   /**
-   * Disparado quando a animação de rasgo do pacote completa 100%.
+   * Disparado quando o vídeo de abertura do pacote termina (ou quando o usuário pula).
    */
-  async function handleTearComplete() {
+  async function handleOpeningComplete() {
     if (offers) {
       setStage("REVEALED");
       return;
@@ -89,8 +84,8 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
         setStage("SEALED");
       }
     } else {
-      // Fallback se não disparou no start
-      handleTearStart();
+      // Fallback
+      handleOpeningStart();
       if (serverOffersPromiseRef.current) {
         const fetched = await serverOffersPromiseRef.current;
         if (fetched) {
@@ -131,14 +126,14 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/92 p-4 backdrop-blur-md animate-fade-in touch-none overscroll-none"
+      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/92 p-3 sm:p-4 backdrop-blur-md animate-fade-in touch-none overscroll-none"
       onClick={stage === "SEALED" || stage === "REVEALED" ? onClose : undefined}
       role="dialog"
       aria-modal="true"
       aria-label="Abertura de Pacote BQ Cartola"
     >
       <div
-        className="relative flex w-full max-w-lg max-h-[92vh] flex-col overflow-y-auto rounded-[2.5rem] border border-amber-400/40 bg-[#06160d] p-5 sm:p-7 shadow-[0_0_70px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto touch-auto overscroll-contain"
+        className="relative flex w-full max-w-lg max-h-[94vh] flex-col overflow-y-auto rounded-[2.5rem] border border-amber-400/40 bg-[#06160d] p-5 sm:p-7 shadow-[0_0_70px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto touch-auto overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Botão Fechar */}
@@ -156,16 +151,16 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
           </div>
         )}
 
-        {/* ESTÁGIO 1: EXPERIÊNCIA DE RASGO INTERATIVO */}
+        {/* ESTÁGIO 1: ABERTURA COM O VÍDEO DO PACOTE BQ */}
         {stage === "SEALED" && (
-          <PackTearInteraction
+          <PackVideoOpening
             roundNumber={pack.roundNumber}
-            onTearStart={handleTearStart}
-            onTearComplete={handleTearComplete}
+            onStart={handleOpeningStart}
+            onComplete={handleOpeningComplete}
           />
         )}
 
-        {/* ESTÁGIO 2: CARTAS REVELADAS (3D FLIP + ESCOLHA) */}
+        {/* ESTÁGIO 2: REVELAÇÃO 3D DAS CARTAS COM ESCOLHA */}
         {stage === "REVEALED" && offers && (
           <CardRevealStage offers={offers} onSelectCard={handleSelectCard} />
         )}
