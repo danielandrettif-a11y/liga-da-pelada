@@ -31,9 +31,16 @@ export const CARD_ART_MAP: Record<string, string> = {
 };
 
 /**
- * Retorna a URL da arte customizada da carta pelo slug.
+ * Versão dos assets para forçar atualização no cache de navegadores e celulares.
+ */
+const ASSET_VERSION = "v=20260818_hd_3";
+
+/**
+ * Retorna a URL da arte customizada da carta pelo slug (com cache-buster).
  */
 export function getCardArtUrl(slug?: string): string | null {
   if (!slug) return null;
-  return CARD_ART_MAP[slug] || null;
+  const path = CARD_ART_MAP[slug];
+  if (!path) return null;
+  return `${path}?${ASSET_VERSION}`;
 }

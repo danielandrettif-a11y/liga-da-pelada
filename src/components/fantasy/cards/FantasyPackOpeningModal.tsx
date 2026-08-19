@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import { CheckCircle2, Loader2, X } from "@/components/icons";
 import type { FantasyCardDefinition } from "@/lib/fantasy/cards/catalog";
 import type { FantasyPackDTO } from "@/lib/actions/fantasy-cards";
@@ -133,9 +134,23 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
       aria-label="Abertura de Pacote BQ Cartola"
     >
       <div
-        className="relative flex w-full max-w-lg max-h-[94vh] flex-col overflow-y-auto rounded-[2.5rem] border border-amber-400/40 bg-[#06160d] p-3.5 sm:p-6 shadow-[0_0_70px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto touch-auto overscroll-contain"
+        className="relative flex w-full max-w-lg max-h-[94vh] flex-col overflow-y-auto rounded-[2.5rem] border border-amber-400/50 bg-[#06160d] p-4 sm:p-6 shadow-[0_0_80px_rgba(0,0,0,0.98)] animate-fade-in-up my-auto touch-auto overscroll-contain overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* FUNDO DESFOCADO DO ESTÁDIO NO POPUP INTEIRO */}
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+          <Image
+            src="/images/pack-stadium-bg.jpg"
+            alt="Atmosfera do Estádio"
+            fill
+            priority
+            className="object-cover opacity-35 scale-105"
+          />
+          {/* Gradients para fusão e legibilidade perfeita dos textos */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#06160d]/75 via-[#06160d]/55 to-[#06160d]/90" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(204,255,0,0.12),transparent_70%)]" />
+        </div>
+
         {/* Botão Fechar */}
         <button
           onClick={onClose}
@@ -146,28 +161,32 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
         </button>
 
         {error && (
-          <div className="mb-4 rounded-xl bg-danger/20 border border-danger/40 p-2.5 text-center text-xs text-danger font-bold">
+          <div className="relative z-10 mb-4 rounded-xl bg-danger/20 border border-danger/40 p-2.5 text-center text-xs text-danger font-bold">
             {error}
           </div>
         )}
 
         {/* ESTÁGIO 1: ABERTURA COM O VÍDEO DO PACOTE BQ */}
         {stage === "SEALED" && (
-          <PackVideoOpening
-            roundNumber={pack.roundNumber}
-            onStart={handleOpeningStart}
-            onComplete={handleOpeningComplete}
-          />
+          <div className="relative z-10 w-full">
+            <PackVideoOpening
+              roundNumber={pack.roundNumber}
+              onStart={handleOpeningStart}
+              onComplete={handleOpeningComplete}
+            />
+          </div>
         )}
 
         {/* ESTÁGIO 2: REVELAÇÃO 3D DAS CARTAS COM ESCOLHA */}
         {stage === "REVEALED" && offers && (
-          <CardRevealStage offers={offers} onSelectCard={handleSelectCard} />
+          <div className="relative z-10 w-full">
+            <CardRevealStage offers={offers} onSelectCard={handleSelectCard} />
+          </div>
         )}
 
         {/* ESTÁGIO 3: CONFIRMAÇÃO DA ESCOLHA */}
         {stage === "CONFIRMING" && selectedCard && (
-          <div className="space-y-4 text-center py-4">
+          <div className="relative z-10 space-y-4 text-center py-4">
             <div className="text-5xl animate-bounce">{selectedCard.icon}</div>
             <div>
               <span className="font-athletic text-[10px] font-black uppercase italic tracking-[0.2em] text-amber-300">
@@ -215,7 +234,7 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
 
         {/* ESTÁGIO 4: RESGATADO COM SUCESSO */}
         {stage === "CLAIMED" && selectedCard && (
-          <div className="flex flex-col items-center justify-center py-10 space-y-3 text-center animate-fade-in">
+          <div className="relative z-10 flex flex-col items-center justify-center py-10 space-y-3 text-center animate-fade-in">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-success/20 text-success shadow-[0_0_30px_rgba(34,197,94,0.3)]">
               <CheckCircle2 className="h-10 w-10" />
             </div>

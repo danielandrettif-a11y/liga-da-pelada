@@ -2,9 +2,11 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import { CheckCircle2, Loader2, Sparkles, X } from "@/components/icons";
 import { RARITY_CONFIG, type FantasyCardRarity } from "@/lib/fantasy/cards/config";
 import type { FantasyCardDefinition } from "@/lib/fantasy/cards/catalog";
+import { getCardArtUrl } from "@/lib/fantasy/cards/card-assets";
 import type { FantasyUserCardDTO } from "@/lib/actions/fantasy-cards";
 import { activateCardForRound, getMyInventory } from "@/lib/actions/fantasy-cards";
 import { useDialogViewport } from "@/lib/useDialogViewport";
@@ -182,8 +184,20 @@ export function FantasyInventoryModal({
           ) : selectedToUse ? (
             /* CONFIGURAÇÃO DE ALVO E ATIVAÇÃO */
             <div className="rounded-3xl border border-accent/40 bg-surface/80 p-5 space-y-4">
-              <div className="flex items-center gap-3">
-                <span className="text-3xl">{selectedToUse.card.icon}</span>
+              <div className="flex items-center gap-3.5">
+                {getCardArtUrl(selectedToUse.card.slug) ? (
+                  <div className="relative h-20 w-14 shrink-0 rounded-xl overflow-hidden border border-white/20 shadow-lg">
+                    <Image
+                      src={getCardArtUrl(selectedToUse.card.slug)!}
+                      alt={selectedToUse.card.name}
+                      fill
+                      sizes="60px"
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <span className="text-3xl">{selectedToUse.card.icon}</span>
+                )}
                 <div>
                   <h3 className="font-athletic text-lg font-black uppercase italic text-white">
                     Ativar {selectedToUse.card.name}
@@ -308,12 +322,24 @@ export function FantasyInventoryModal({
               return (
                 <div
                   key={card.slug}
-                  className={`flex items-center justify-between gap-3 rounded-2xl border ${rarityInfo.border} ${rarityInfo.bg} p-4 transition-all ${
+                  className={`flex items-center justify-between gap-3 rounded-2xl border ${rarityInfo.border} ${rarityInfo.bg} p-3.5 sm:p-4 transition-all ${
                     available ? "opacity-100" : "opacity-50"
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-3xl shrink-0">{card.icon}</span>
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    {getCardArtUrl(card.slug) ? (
+                      <div className="relative h-16 w-11 shrink-0 rounded-xl overflow-hidden border border-white/20 shadow-md">
+                        <Image
+                          src={getCardArtUrl(card.slug)!}
+                          alt={card.name}
+                          fill
+                          sizes="50px"
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-3xl shrink-0">{card.icon}</span>
+                    )}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <h3 className={`truncate text-sm font-black uppercase italic ${rarityInfo.text}`}>

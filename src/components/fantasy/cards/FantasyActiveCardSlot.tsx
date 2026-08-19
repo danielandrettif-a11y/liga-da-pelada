@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Image from "next/image";
 import { Lock, Sparkles, Trash2, X } from "@/components/icons";
 import { RARITY_CONFIG } from "@/lib/fantasy/cards/config";
+import { getCardArtUrl } from "@/lib/fantasy/cards/card-assets";
 import type { FantasyActiveCardDTO } from "@/lib/actions/fantasy-cards";
 import { removeActiveCardForRound } from "@/lib/actions/fantasy-cards";
 import { FantasyInventoryModal } from "./FantasyInventoryModal";
@@ -59,7 +61,19 @@ export function FantasyActiveCardSlot({
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <span className="text-3xl shrink-0">{activeCard.card.icon}</span>
+                {getCardArtUrl(activeCard.card.slug) ? (
+                  <div className="relative h-16 w-11 shrink-0 rounded-xl overflow-hidden border border-amber-400/40 shadow-lg">
+                    <Image
+                      src={getCardArtUrl(activeCard.card.slug)!}
+                      alt={activeCard.card.name}
+                      fill
+                      sizes="50px"
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <span className="text-3xl shrink-0">{activeCard.card.icon}</span>
+                )}
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <h4

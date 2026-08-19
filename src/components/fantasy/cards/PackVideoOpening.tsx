@@ -42,7 +42,7 @@ export function PackVideoOpening({ roundNumber, onStart, onComplete }: Props) {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center py-2 select-none">
+    <div className="flex flex-col items-center justify-center py-2 select-none w-full">
       {!isPlaying ? (
         /* ESTADO INICIAL: PACOTE OFICIAL FLUTUANDO (LEVITATING) */
         <div className="flex flex-col items-center text-center space-y-4 py-2 w-full animate-fade-in">
@@ -63,23 +63,25 @@ export function PackVideoOpening({ roundNumber, onStart, onComplete }: Props) {
             onClick={handleStartOpening}
             className="group relative cursor-pointer flex flex-col items-center justify-center py-3 my-2"
           >
-            {/* Halo de iluminação de fundo */}
-            <div className="pointer-events-none absolute h-52 w-52 rounded-full bg-accent/20 blur-3xl animate-pulse" />
-            <div className="pointer-events-none absolute h-40 w-40 rounded-full bg-amber-400/20 blur-2xl" />
+            {/* Halo de iluminação e brilho de fundo */}
+            <div className="pointer-events-none absolute h-60 w-60 rounded-full bg-accent/25 blur-3xl animate-pulse" />
+            <div className="pointer-events-none absolute h-44 w-44 rounded-full bg-amber-400/20 blur-2xl" />
 
-            {/* Imagem do Pacote com Efeito de Levitação */}
-            <div className="relative w-48 h-72 sm:w-56 sm:h-84 animate-pack-levitate transition-transform duration-300 group-hover:scale-105 active:scale-95">
+            {/* Imagem do Pacote com Efeito de Levitação e Fusão Orgânica */}
+            <div className="relative w-52 h-76 sm:w-60 sm:h-88 animate-pack-levitate transition-transform duration-300 group-hover:scale-105 active:scale-95 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.85)]">
               <Image
                 src="/images/pack-cover.png"
                 alt="Pacote Oficial BQ"
                 fill
                 priority
-                className="object-contain drop-shadow-[0_20px_35px_rgba(0,0,0,0.9)]"
+                className="object-cover"
               />
+              {/* Brilho reflexivo sobre o pacote */}
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-black/20 via-transparent to-white/15" />
             </div>
 
-            {/* Indicador sutil de toque */}
-            <span className="mt-2 font-athletic text-xs font-black uppercase italic tracking-widest text-accent group-hover:text-amber-300 transition-colors drop-shadow-md flex items-center gap-1">
+            {/* Indicador de toque */}
+            <span className="mt-3 font-athletic text-xs font-black uppercase italic tracking-widest text-accent group-hover:text-amber-300 transition-colors drop-shadow-md flex items-center gap-1">
               <span>Toque no pacote para abrir</span>
               <span className="text-sm">✨</span>
             </span>
