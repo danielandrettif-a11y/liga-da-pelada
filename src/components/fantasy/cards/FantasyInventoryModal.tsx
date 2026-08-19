@@ -333,6 +333,7 @@ export function FantasyInventoryModal({
                           src={getCardArtUrl(card.slug)!}
                           alt={card.name}
                           fill
+                          unoptimized
                           sizes="50px"
                           className="object-cover"
                         />

@@ -1,11 +1,8 @@
 /**
  * Mapeamento e Gerenciador de Artes Visuais das Cartas do Cartola V3.
  * 
- * COMO ADICIONAR OU TROCAR A ARTE DE UMA CARTA:
- * 1. Salve a imagem da carta na pasta `/public/images/cards/` com o nome do slug (ex: `super_captain.png`, `scout.webp`, etc.)
- * 2. Ou declare a URL diretamente no objeto `CARD_ART_MAP` abaixo.
- * 3. Se a imagem não for encontrada ou ainda não tiver sido criada, o sistema renderiza automaticamente
- *    um design premium vetorial com os ícones, badges de raridade e acabamento metálico/foil.
+ * Todas as artes oficiais em alta resolução (PNG ~700x1080px com fundo preto orgânico)
+ * estão localizadas em `/public/images/cards/`.
  */
 
 export const CARD_ART_MAP: Record<string, string> = {
@@ -31,16 +28,9 @@ export const CARD_ART_MAP: Record<string, string> = {
 };
 
 /**
- * Versão dos assets para forçar atualização no cache de navegadores e celulares.
- */
-const ASSET_VERSION = "v=20260818_hd_3";
-
-/**
- * Retorna a URL da arte customizada da carta pelo slug (com cache-buster).
+ * Retorna o caminho direto e limpo da arte oficial da carta pelo slug.
  */
 export function getCardArtUrl(slug?: string): string | null {
   if (!slug) return null;
-  const path = CARD_ART_MAP[slug];
-  if (!path) return null;
-  return `${path}?${ASSET_VERSION}`;
+  return CARD_ART_MAP[slug] || null;
 }

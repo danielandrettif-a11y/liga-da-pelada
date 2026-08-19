@@ -67,6 +67,7 @@ export function FantasyActiveCardSlot({
                       src={getCardArtUrl(activeCard.card.slug)!}
                       alt={activeCard.card.name}
                       fill
+                      unoptimized
                       sizes="50px"
                       className="object-cover"
                     />
