@@ -1290,6 +1290,8 @@ export function FantasyExperience({
         roundId={round?.id}
         isMarketOpen={open}
         marketPlayers={market}
+        lineupPlayers={selectedPlayers}
+        captainPlayerId={captainId}
         onCardActivated={() => router.refresh()}
       />
 

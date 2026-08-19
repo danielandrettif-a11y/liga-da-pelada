@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Calendar,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   ClipboardList,
   Clock,
@@ -79,6 +80,7 @@ export function CallupBoard({
   const [activeTab, setActiveTab] = useState<"confirmed" | "waitlist">("confirmed");
 
   // Estado para Contratação de Amigo (Convidado)
+  const [isHireGuestOpen, setIsHireGuestOpen] = useState(false);
   const [guestName, setGuestName] = useState("");
   const [guestProfile, setGuestProfile] = useState<PlayerProfile>("midfield");
   const [isGuestGk, setIsGuestGk] = useState(false);
@@ -418,8 +420,12 @@ export function CallupBoard({
 
       {/* 3. PAINEL DE CONTRATAÇÃO DE AMIGO (CONVIDADO) & ADMIN */}
       {callup.status === "open" && (
-        <section className="overflow-hidden rounded-2xl border border-accent/25 bg-accent/[0.04] p-4 space-y-3">
-          <div className="flex items-center justify-between gap-2">
+        <section className="overflow-hidden rounded-2xl border border-accent/25 bg-accent/[0.04]">
+          <button
+            type="button"
+            onClick={() => setIsHireGuestOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-accent/[0.08]"
+          >
             <div className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
                 <UserPlus className="h-4 w-4" />
@@ -430,111 +436,110 @@ export function CallupBoard({
               </div>
             </div>
 
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={handlePrelist}
-                disabled={Boolean(loading)}
-                className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-[11px] font-black text-background transition-transform active:scale-95 disabled:opacity-50"
-              >
-                {loading === "prelist" ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <ClipboardList className="h-3.5 w-3.5" />
-                )}
-                {callup.round_id ? "Ver Pré-lista" : "Criar Pré-lista"}
-              </button>
-            )}
-          </div>
-
-          {/* Formulário de criação de perfil de convidado */}
-          {isAuthenticated ? (
-            <form onSubmit={handleInviteGuest} className="space-y-2 pt-1 border-t border-accent/15">
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                <input
-                  type="text"
-                  value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
-                  placeholder="Nome do amigo / convidado..."
-                  required
-                  className="sm:col-span-6 rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted/60 focus:border-accent outline-none"
-                />
-                <select
-                  value={guestProfile}
-                  onChange={(e) => setGuestProfile(e.target.value as PlayerProfile)}
-                  className="sm:col-span-3 rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-accent outline-none"
-                >
-                  <option value="midfield">Meio-Campo</option>
-                  <option value="offensive">Ataque</option>
-                  <option value="defensive">Defesa</option>
-                </select>
-                <button
-                  type="submit"
-                  disabled={loading === "guest" || !guestName.trim()}
-                  className="sm:col-span-3 flex items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-black text-background transition-all active:scale-95 disabled:opacity-50"
-                >
-                  {loading === "guest" ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <UserPlus className="h-3.5 w-3.5" />
-                  )}
-                  Contratar Amigo
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-1.5 text-[11px] text-muted cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isGuestGk}
-                    onChange={(e) => setIsGuestGk(e.target.checked)}
-                    className="rounded border-border bg-background text-accent focus:ring-accent"
-                  />
-                  <span>É goleiro</span>
-                </label>
-                <span className="text-[10px] text-muted/60 ml-auto">
-                  {confirmed.length < capacity ? "Entrará como Titular" : "Entrará na Fila de Espera"}
-                </span>
-              </div>
-            </form>
-          ) : (
-            <div className="text-center pt-2 text-[11px] text-muted">
-              <Link href="/login?next=/convocacao" className="text-accent font-bold hover:underline">
-                Faça login
-              </Link>{" "}
-              para cadastrar e convidar amigos para a pelada.
+            <div className="flex items-center gap-1.5 text-accent">
+              <span className="text-[10px] font-bold hidden sm:inline">
+                {isHireGuestOpen ? "Recolher" : "Contratar"}
+              </span>
+              <ChevronDown
+                className={`h-4 w-4 transition-transform duration-200 ${
+                  isHireGuestOpen ? "rotate-180" : ""
+                }`}
+              />
             </div>
-          )}
+          </button>
 
-          {/* Opção rápida de ADM para adicionar jogadores cadastrados */}
-          {isAdmin && availableToAdmin.length > 0 && (
-            <div className="pt-2 border-t border-accent/15 flex gap-2">
-              <select
-                id="admin-callup-player"
-                defaultValue=""
-                className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-xs text-foreground"
-              >
-                <option value="" disabled>
-                  Adicionar do elenco já cadastrado...
-                </option>
-                {availableToAdmin.map((player) => (
-                  <option key={player.id} value={player.id}>
-                    {player.name}
-                    {player.member_category === "guest" ? " (convidado)" : ""}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => {
-                  const select = document.getElementById("admin-callup-player") as HTMLSelectElement;
-                  if (select?.value) run("add", () => adminAddCallupPlayer(callup.id, select.value));
-                }}
-                disabled={!!loading}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/20 text-accent hover:bg-accent hover:text-background transition-colors"
-                title="Adicionar à convocação"
-              >
-                <UserPlus className="h-3.5 w-3.5" />
-              </button>
+          {isHireGuestOpen && (
+            <div className="p-4 pt-0 space-y-3 animate-fade-in border-t border-accent/15">
+              {/* Formulário de criação de perfil de convidado */}
+              {isAuthenticated ? (
+                <form onSubmit={handleInviteGuest} className="space-y-2 pt-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                    <input
+                      type="text"
+                      value={guestName}
+                      onChange={(e) => setGuestName(e.target.value)}
+                      placeholder="Nome do amigo / convidado..."
+                      required
+                      className="sm:col-span-6 rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted/60 focus:border-accent outline-none"
+                    />
+                    <select
+                      value={guestProfile}
+                      onChange={(e) => setGuestProfile(e.target.value as PlayerProfile)}
+                      className="sm:col-span-3 rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-accent outline-none"
+                    >
+                      <option value="midfield">Meio-Campo</option>
+                      <option value="offensive">Ataque</option>
+                      <option value="defensive">Defesa</option>
+                    </select>
+                    <button
+                      type="submit"
+                      disabled={loading === "guest" || !guestName.trim()}
+                      className="sm:col-span-3 flex items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-black text-background transition-all active:scale-95 disabled:opacity-50"
+                    >
+                      {loading === "guest" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <UserPlus className="h-3.5 w-3.5" />
+                      )}
+                      Contratar Amigo
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1.5 text-[11px] text-muted cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isGuestGk}
+                        onChange={(e) => setIsGuestGk(e.target.checked)}
+                        className="rounded border-border bg-background text-accent focus:ring-accent"
+                      />
+                      <span>É goleiro</span>
+                    </label>
+                    <span className="text-[10px] text-muted/60 ml-auto">
+                      {confirmed.length < capacity ? "Entrará como Titular" : "Entrará na Fila de Espera"}
+                    </span>
+                  </div>
+                </form>
+              ) : (
+                <div className="text-center pt-3 text-[11px] text-muted">
+                  <Link href="/login?next=/convocacao" className="text-accent font-bold hover:underline">
+                    Faça login
+                  </Link>{" "}
+                  para cadastrar e convidar amigos para a pelada.
+                </div>
+              )}
+
+              {/* Opção rápida de ADM para adicionar jogadores cadastrados */}
+              {isAdmin && availableToAdmin.length > 0 && (
+                <div className="pt-3 border-t border-accent/15 flex gap-2">
+                  <select
+                    id="admin-callup-player"
+                    defaultValue=""
+                    className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-xs text-foreground"
+                  >
+                    <option value="" disabled>
+                      Adicionar do elenco já cadastrado...
+                    </option>
+                    {availableToAdmin.map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.name}
+                        {player.member_category === "guest" ? " (convidado)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => {
+                      const select = document.getElementById("admin-callup-player") as HTMLSelectElement;
+                      if (select?.value) run("add", () => adminAddCallupPlayer(callup.id, select.value));
+                    }}
+                    disabled={!!loading}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/20 text-accent hover:bg-accent hover:text-background transition-colors"
+                    title="Adicionar à convocação"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </section>

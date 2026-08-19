@@ -22,8 +22,19 @@
   - Cartas econômicas (`extra_credit` e `bargain`) concedem margem temporária para montar o time na rodada, mas **NÃO alteram o patrimônio real** nem o preço dos jogadores.
   - Cartas de pontuação (`super_captain`, `double_prediction`, `vice_captain`, `golden_goal`, `golden_assist`, `scout`, `duo`, `all_in`) aplicam bônus após a pontuação base, de forma aditiva e transparente, com breakdown detalhado no histórico.
 
-## 2. Diagnóstico de Layout & UI Mobile (Encaixe da Página do Cartola)
-- **Header Occlusion**: O Header fixo possuía 90% de opacidade com blur, permitindo vazamento ótico de textos escuros/neon por trás da logo no scroll.
-- **Safe Area Inferior**: `main` estava com `pb-24` fixo sobrepondo a `padding-bottom` dinâmica do safe-area do iOS + altura da barra (`BottomNav`), fazendo os cards inferiores ficarem ocultos.
-- **Overflow de Ordenação e Cards**: O header do Mercado com `flex items-end justify-between` comprimia o dropdown em telas menores (<400px), truncando textos (`Mais po...`).
-- **Navegação em Abas (Meu Time × Mercado)**: Padrão moderno e oficial dos melhores fantasy games para evitar rolagem infinita vertical de 10 telas em smartphones.
+
+## 3. Diagnóstico e Regras de Negócio Adicionais
+- **Sorteio de Times (Rounds)**:
+  - O sorteio direto (`random` ou `balanced`) não deve exigir `attendanceOrder`, permitindo que o administrador sorteie imediatamente com 1 toque sem marcar ordem de chegada prévia.
+  - A validação no backend `createRoundWithTeams` exigia `attendanceOrder.length >= minimumPresent` compulsoriamente para qualquer modo não-manual. Ajustado para exigir presenças apenas quando a ordem de chegada foi explicitamente utilizada.
+- **Cartas Dobradinha (`duo`) e Vice-Capitão (`vice_captain`) no Fantasy**:
+  - Ambas as cartas devem operar exclusivamente sobre os atletas do time escalado (`lineupPlayers`).
+  - O modal de inventário precisava receber `lineupPlayers` e `captainPlayerId` na chamada de topo de `FantasyExperience.tsx`.
+  - A Dobradinha exige 2 atletas distintos do time escalado e validação de duplicidade.
+- **Convocação & Painel Contratar Amigo**:
+  - A seção de contratar convidado deve ser colapsada por padrão para não poluir visualmente o fluxo da convocação.
+  - O botão de pré-lista lateral foi removido da área de convidados.
+- **Banner da Rodada no Mobile**:
+  - A imagem de fundo e troféu exigem enquadramento responsivo (`bg-[center_right_25%]` e opacidade otimizada) com gradientes laterais mais suaves para não ofuscar o troféu.
+  - O título da rodada com `bg-clip-text` em fonte itálica necessita de `inline-block pr-1.5` e line-height adequado para não truncar caracteres em celulares.
+

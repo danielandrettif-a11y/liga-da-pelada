@@ -75,16 +75,16 @@ export function NextRoundBanner({
 
       {/* Imagem de Fundo com Troféu e Estádio */}
       <div
-        className="pointer-events-none absolute inset-0 bg-cover bg-right sm:bg-center opacity-45 transition-transform duration-700 ease-out group-hover:scale-105"
+        className="pointer-events-none absolute inset-0 bg-cover bg-[center_right_25%] sm:bg-center opacity-65 sm:opacity-55 transition-transform duration-700 ease-out group-hover:scale-105"
         style={{
           backgroundImage: "url('/images/championship-trophy-banner.jpg')",
         }}
       />
 
       {/* Gradientes e Iluminação Dinâmica para Contraste Boleiro Perfeito */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#030d07] via-[#04130b]/80 to-transparent" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#030e07] via-[#04140b]/90 to-transparent sm:via-[#04140b]/70" />
-      <div className="pointer-events-none absolute -right-12 -top-12 h-64 w-64 rounded-full bg-amber-500/15 blur-3xl transition-transform duration-700 group-hover:scale-125" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#030d07] via-[#04130b]/60 to-transparent" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#030e07] via-[#04140b]/70 to-transparent sm:via-[#04140b]/60" />
+      <div className="pointer-events-none absolute -right-12 -top-12 h-64 w-64 rounded-full bg-amber-500/20 blur-3xl transition-transform duration-700 group-hover:scale-125" />
       <div className="pointer-events-none absolute -bottom-16 -left-16 h-60 w-60 rounded-full bg-accent/20 blur-3xl" />
 
       {/* Conteúdo do Banner */}
@@ -109,7 +109,7 @@ export function NextRoundBanner({
         </div>
 
         {/* Informações Centrais: Título Boleiro e Convocados */}
-        <div className="max-w-[85%] space-y-1.5">
+        <div className="w-full space-y-1.5">
           <div className="flex items-center gap-2">
             <span className="flex h-2 w-2 rounded-full bg-accent shadow-[0_0_8px_rgba(204,255,0,0.8)]" />
             <p className="font-athletic text-xs font-black uppercase italic tracking-[0.25em] text-amber-300">
@@ -121,17 +121,17 @@ export function NextRoundBanner({
             </p>
           </div>
 
-          <h2 className="font-athletic text-[34px] sm:text-5xl font-black uppercase italic leading-[.9] tracking-tight text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
+          <h2 className="font-athletic text-[30px] xs:text-[34px] sm:text-5xl font-black uppercase italic leading-[1.05] sm:leading-none tracking-tight text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
             {round ? (
               <>
                 Rodada{" "}
-                <span className="bg-gradient-to-r from-accent via-emerald-300 to-amber-300 bg-clip-text text-transparent">
+                <span className="inline-block pr-1.5 pb-0.5 bg-gradient-to-r from-accent via-emerald-300 to-amber-300 bg-clip-text text-transparent">
                   {String(round.number).padStart(2, "0")}
                 </span>
               </>
             ) : (
               <>
-                Agenda <span className="text-accent">Oficial</span>
+                Agenda <span className="inline-block pr-1.5 text-accent">Oficial</span>
               </>
             )}
           </h2>

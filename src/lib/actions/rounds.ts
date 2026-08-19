@@ -496,13 +496,13 @@ export async function createRoundWithTeams(
       return { success: false, error: `Cada time pode ter no máximo ${playersPerTeam} jogadores.` };
     }
     const attendanceOrder = [...new Set(options.attendanceOrder || [])];
-    if (formationMode !== "manual") {
-      const minimumPresent = playersPerTeam * 2;
+    const minimumPresent = playersPerTeam * 2;
+    if (attendanceOrder.length > 0) {
       if (allPlayerIds.length < minimumPresent) {
-        return { success: false, error: `Selecione pelo menos ${minimumPresent} jogadores para sortear.` };
+        return { success: false, error: `Selecione pelo menos ${minimumPresent} jogadores para sortear por ordem de chegada.` };
       }
       if (attendanceOrder.length < minimumPresent || attendanceOrder.some((id) => !allPlayerIds.includes(id))) {
-        return { success: false, error: `Marque pelo menos ${minimumPresent} presencas validas.` };
+        return { success: false, error: `Marque pelo menos ${minimumPresent} presenças válidas.` };
       }
       const starterIds = new Set(attendanceOrder.slice(0, minimumPresent));
       const startingTeamIds = new Set(normalizedTeams.slice(0, 2).flatMap((team) => team.playerIds));

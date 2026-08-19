@@ -508,6 +508,35 @@ export async function activateCardForRound({
     }
   }
 
+  // 3.2. Validação específica da carta Dobradinha (deve conter 2 atletas escalados diferentes)
+  if (userCardObj?.slug === "duo") {
+    if (!targetPlayerId || !targetPlayer2Id) {
+      return { success: false, error: "Selecione 2 jogadores escalados para a Dobradinha." };
+    }
+    if (targetPlayerId === targetPlayer2Id) {
+      return { success: false, error: "Selecione 2 jogadores diferentes para a Dobradinha." };
+    }
+
+    const { data: lineup } = await client
+      .from("fantasy_lineups")
+      .select("id, fantasy_lineup_players(player_id)")
+      .eq("round_id", roundId)
+      .eq("user_id", account.user.id)
+      .maybeSingle();
+
+    if (lineup) {
+      const lineupPlayerIds = (lineup.fantasy_lineup_players || []).map((p: any) => p.player_id);
+      if (lineupPlayerIds.length > 0) {
+        if (!lineupPlayerIds.includes(targetPlayerId) || !lineupPlayerIds.includes(targetPlayer2Id)) {
+          return {
+            success: false,
+            error: "Ambos os jogadores da Dobradinha devem estar escalados no seu time titular.",
+          };
+        }
+      }
+    }
+  }
+
   // 4. Salvar snapshot do efeito e dos alvos
   const effectSnapshot = {
     slug: userCardObj?.slug || "",

@@ -140,7 +140,7 @@ export const FANTASY_CARDS_CATALOG: FantasyCardDefinition[] = [
     rarity: "RARE",
     effectType: "SAFE_PREDICTION",
     effectConfig: { rewardMultiplier: 0.6 },
-    enabled: true,
+    enabled: false,
     requiresTarget: "NONE",
   },
   {
@@ -151,7 +151,7 @@ export const FANTASY_CARDS_CATALOG: FantasyCardDefinition[] = [
     rarity: "EPIC",
     effectType: "EMERGENCY_SUB",
     effectConfig: {},
-    enabled: true,
+    enabled: false,
     requiresTarget: "SINGLE_PLAYER",
   },
 ];

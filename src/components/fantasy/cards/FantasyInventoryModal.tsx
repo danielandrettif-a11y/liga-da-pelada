@@ -80,12 +80,16 @@ export function FantasyInventoryModal({
   /**
    * Retorna os jogadores elegíveis para o alvo da carta selecionada.
    * - Para Vice-Capitão: apenas jogadores escalados no time, excluindo o capitão oficial.
+   * - Para Dobradinha (DUO_PLAYERS / duo): apenas jogadores escalados no time.
    * - Para cartas de escalação (ANY_IN_LINEUP): jogadores escalados no time.
    * - Para cartas gerais: jogadores do mercado.
    */
   function getEligiblePlayers(card: FantasyCardDefinition) {
     if (card.slug === "vice_captain") {
       return lineupPlayers.filter((p) => p.id !== captainPlayerId);
+    }
+    if (card.slug === "duo" || card.requiresTarget === "DUO_PLAYERS") {
+      return lineupPlayers;
     }
     if (card.targetFilter === "ANY_IN_LINEUP" || card.slug === "emergency_sub") {
       return lineupPlayers.length > 0 ? lineupPlayers : marketPlayers;
@@ -100,7 +104,7 @@ export function FantasyInventoryModal({
     const eligible = getEligiblePlayers(card);
     setSelectedToUse({ card, instance: availableInstance });
     setTargetPlayerId(eligible[0]?.id || "");
-    setTargetPlayer2Id(eligible[1]?.id || eligible[0]?.id || "");
+    setTargetPlayer2Id(eligible[1]?.id || (eligible.length > 1 ? eligible[1]?.id : eligible[0]?.id) || "");
     setTargetPrediction("TOP_SCORER");
   }
 
@@ -268,36 +272,59 @@ export function FantasyInventoryModal({
               {/* Seletor de Dupla de Jogadores */}
               {selectedToUse.card.requiresTarget === "DUO_PLAYERS" && (() => {
                 const eligible = getEligiblePlayers(selectedToUse.card);
+                if (eligible.length < 2) {
+                  return (
+                    <div className="rounded-2xl border border-warning/40 bg-warning/10 p-3.5 text-center text-xs text-warning space-y-1">
+                      <p className="font-bold">⚠️ Menos de 2 jogadores escalados no time.</p>
+                      <p className="text-[11px] text-muted">
+                        Escale pelo menos 2 atletas no seu campinho para poder ativar a Dobradinha.
+                      </p>
+                    </div>
+                  );
+                }
+
+                const isSamePlayer = targetPlayerId && targetPlayer2Id && targetPlayerId === targetPlayer2Id;
+
                 return (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-muted block">Jogador 1:</label>
-                      <select
-                        value={targetPlayerId}
-                        onChange={(e) => setTargetPlayerId(e.target.value)}
-                        className="h-10 w-full rounded-xl border border-border bg-background px-2 text-xs font-bold text-foreground"
-                      >
-                        {eligible.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold text-muted">
+                      Escolha 2 atletas do seu time escalado para a Dobradinha:
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted block">Jogador 1:</label>
+                        <select
+                          value={targetPlayerId}
+                          onChange={(e) => setTargetPlayerId(e.target.value)}
+                          className="h-10 w-full rounded-xl border border-border bg-background px-2 text-xs font-bold text-foreground"
+                        >
+                          {eligible.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} (C$ {p.price.toFixed(2)})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted block">Jogador 2:</label>
+                        <select
+                          value={targetPlayer2Id}
+                          onChange={(e) => setTargetPlayer2Id(e.target.value)}
+                          className="h-10 w-full rounded-xl border border-border bg-background px-2 text-xs font-bold text-foreground"
+                        >
+                          {eligible.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} (C$ {p.price.toFixed(2)})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-muted block">Jogador 2:</label>
-                      <select
-                        value={targetPlayer2Id}
-                        onChange={(e) => setTargetPlayer2Id(e.target.value)}
-                        className="h-10 w-full rounded-xl border border-border bg-background px-2 text-xs font-bold text-foreground"
-                      >
-                        {eligible.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {isSamePlayer && (
+                      <p className="text-[11px] text-danger font-bold">
+                        ⚠️ Escolha 2 jogadores diferentes do time escalado.
+                      </p>
+                    )}
                   </div>
                 );
               })()}
@@ -338,7 +365,13 @@ export function FantasyInventoryModal({
                   disabled={
                     pending ||
                     (selectedToUse.card.requiresTarget === "SINGLE_PLAYER" && !targetPlayerId) ||
-                    (selectedToUse.card.slug === "vice_captain" && getEligiblePlayers(selectedToUse.card).length === 0)
+                    (selectedToUse.card.slug === "vice_captain" && getEligiblePlayers(selectedToUse.card).length === 0) ||
+                    (selectedToUse.card.requiresTarget === "DUO_PLAYERS" && (
+                      getEligiblePlayers(selectedToUse.card).length < 2 ||
+                      !targetPlayerId ||
+                      !targetPlayer2Id ||
+                      targetPlayerId === targetPlayer2Id
+                    ))
                   }
                   className="flex-2 flex items-center justify-center gap-1.5 rounded-2xl bg-accent py-3 text-xs font-black uppercase text-background shadow-[0_0_20px_rgba(204,255,0,0.3)] hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >

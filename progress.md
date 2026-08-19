@@ -26,9 +26,21 @@
 6. **Contador de Fechamento do Mercado (`FantasyExperience.tsx`)**:
    - Mensagem clara indicando quanto tempo falta para o mercado fechar ("Mercado fecha em MM:SS").
 
-8. **Abertura Interativa de Pacotes & Sistema de Artes das Cartas**:
-   - `PackTearInteraction.tsx`: Gesto físico de rasgo via Pointer Events com física direta na DOM e 0 re-renders.
-   - `CardRevealStage.tsx`: Revelação 3D das 2 cartas sorteadas com efeito de flip escalonado.
-   - `card-assets.ts`: Mapeador de artes individuais na pasta `public/images/cards/[slug].png` com fallback vetorial de alta qualidade.
-   - `globals.css`: Keyframes acelerados por hardware (`pack-strip-eject`, `pack-glow-pulse`, `card-emerge`, `card-3d-flipper`).
-   - `npm run build` compilado com 100% de sucesso.
+
+9. **Sorteio Direto Sem Exigência de Presença (`rounds.ts` & `RoundCreator.tsx`)**:
+   - Ajustada validação do backend `createRoundWithTeams`: o sorteio direto (aleatório ou equilibrado) agora salva e cria a rodada imediatamente sem travar por falta de lista de presença.
+   - Sorteio por ordem de chegada continua disponível e validado quando o organizador opta por registrar os primeiros presentes.
+
+10. **Cartas Dobradinha e Vice-Capitão no Fantasy (`FantasyInventoryModal.tsx`, `FantasyExperience.tsx`, `fantasy-cards.ts`)**:
+    - `FantasyInventoryModal` agora recebe a lista de atletas escalados (`lineupPlayers`) e o capitão oficial em todos os pontos de abertura.
+    - As cartas Dobradinha e Vice-Capitão filtram estritamente os atletas do time escalado.
+    - A Dobradinha exige e valida 2 atletas escalados diferentes, com feedback visual em tempo real e validação segura no backend.
+
+11. **Painel de Contratar Amigo Retrátil (`CallupBoard.tsx`)**:
+    - Painel "Contratar Amigo (Convidado)" inicia recolhido por padrão com animação suave e ícone chevron rotativo.
+    - Removido o botão de pré-lista lateral redundante.
+
+12. **Banner da Rodada no Mobile (`NextRoundBanner.tsx`)**:
+    - Ajustado o enquadramento de fundo (`bg-[center_right_25%] sm:bg-center bg-cover`) e opacidade para o troféu aparecer com nitidez e destaque no celular.
+    - Corrigido o corte do número da rodada ajustando line-height, largura flexível e padding direito no texto itálico com gradiente (`bg-clip-text`).
+
