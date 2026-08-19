@@ -18,6 +18,8 @@ type Props = {
   isMarketOpen?: boolean;
   onCardActivated?: () => void;
   marketPlayers?: Array<{ id: string; name: string; price: number }>;
+  lineupPlayers?: Array<{ id: string; name: string; price: number }>;
+  captainPlayerId?: string | null;
 };
 
 export function FantasyInventoryModal({
@@ -27,6 +29,8 @@ export function FantasyInventoryModal({
   isMarketOpen = true,
   onCardActivated,
   marketPlayers = [],
+  lineupPlayers = [],
+  captainPlayerId = null,
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -73,13 +77,30 @@ export function FantasyInventoryModal({
     return item.card.rarity === rarityFilter;
   });
 
+  /**
+   * Retorna os jogadores elegíveis para o alvo da carta selecionada.
+   * - Para Vice-Capitão: apenas jogadores escalados no time, excluindo o capitão oficial.
+   * - Para cartas de escalação (ANY_IN_LINEUP): jogadores escalados no time.
+   * - Para cartas gerais: jogadores do mercado.
+   */
+  function getEligiblePlayers(card: FantasyCardDefinition) {
+    if (card.slug === "vice_captain") {
+      return lineupPlayers.filter((p) => p.id !== captainPlayerId);
+    }
+    if (card.targetFilter === "ANY_IN_LINEUP" || card.slug === "emergency_sub") {
+      return lineupPlayers.length > 0 ? lineupPlayers : marketPlayers;
+    }
+    return marketPlayers;
+  }
+
   function handleSelectInstance(card: FantasyCardDefinition, instances: FantasyUserCardDTO[]) {
     const availableInstance = instances.find((i) => i.status === "OWNED");
     if (!availableInstance) return;
 
+    const eligible = getEligiblePlayers(card);
     setSelectedToUse({ card, instance: availableInstance });
-    setTargetPlayerId(marketPlayers[0]?.id || "");
-    setTargetPlayer2Id(marketPlayers[1]?.id || "");
+    setTargetPlayerId(eligible[0]?.id || "");
+    setTargetPlayer2Id(eligible[1]?.id || eligible[0]?.id || "");
     setTargetPrediction("TOP_SCORER");
   }
 
@@ -207,58 +228,79 @@ export function FantasyInventoryModal({
               </div>
 
               {/* Seletor de Jogador Único */}
-              {selectedToUse.card.requiresTarget === "SINGLE_PLAYER" && marketPlayers.length > 0 && (
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-muted block">
-                    Escolha o jogador alvo desta carta:
-                  </label>
-                  <select
-                    value={targetPlayerId}
-                    onChange={(e) => setTargetPlayerId(e.target.value)}
-                    className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground"
-                  >
-                    {marketPlayers.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} (C$ {p.price.toFixed(2)})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {selectedToUse.card.requiresTarget === "SINGLE_PLAYER" && (() => {
+                const eligible = getEligiblePlayers(selectedToUse.card);
+                const isVice = selectedToUse.card.slug === "vice_captain";
 
-              {/* Seletor de Dupla de Jogadores */}
-              {selectedToUse.card.requiresTarget === "DUO_PLAYERS" && marketPlayers.length >= 2 && (
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted block">Jogador 1:</label>
+                if (isVice && eligible.length === 0) {
+                  return (
+                    <div className="rounded-2xl border border-warning/40 bg-warning/10 p-3.5 text-center text-xs text-warning space-y-1">
+                      <p className="font-bold">⚠️ Nenhum jogador escalado no time elegível.</p>
+                      <p className="text-[11px] text-muted">
+                        Escale seus atletas no campinho e defina seu Capitão primeiro para poder nomear o Vice-Capitão.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-muted block">
+                      {isVice
+                        ? "Escolha quem será o Vice-Capitão do seu time (apenas atletas escalados):"
+                        : "Escolha o jogador alvo desta carta:"}
+                    </label>
                     <select
                       value={targetPlayerId}
                       onChange={(e) => setTargetPlayerId(e.target.value)}
-                      className="h-10 w-full rounded-xl border border-border bg-background px-2 text-xs font-bold text-foreground"
+                      className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground"
                     >
-                      {marketPlayers.map((p) => (
+                      {eligible.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.name}
+                          {p.name} (C$ {p.price.toFixed(2)})
                         </option>
                       ))}
                     </select>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted block">Jogador 2:</label>
-                    <select
-                      value={targetPlayer2Id}
-                      onChange={(e) => setTargetPlayer2Id(e.target.value)}
-                      className="h-10 w-full rounded-xl border border-border bg-background px-2 text-xs font-bold text-foreground"
-                    >
-                      {marketPlayers.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
+                );
+              })()}
+
+              {/* Seletor de Dupla de Jogadores */}
+              {selectedToUse.card.requiresTarget === "DUO_PLAYERS" && (() => {
+                const eligible = getEligiblePlayers(selectedToUse.card);
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted block">Jogador 1:</label>
+                      <select
+                        value={targetPlayerId}
+                        onChange={(e) => setTargetPlayerId(e.target.value)}
+                        className="h-10 w-full rounded-xl border border-border bg-background px-2 text-xs font-bold text-foreground"
+                      >
+                        {eligible.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted block">Jogador 2:</label>
+                      <select
+                        value={targetPlayer2Id}
+                        onChange={(e) => setTargetPlayer2Id(e.target.value)}
+                        className="h-10 w-full rounded-xl border border-border bg-background px-2 text-xs font-bold text-foreground"
+                      >
+                        {eligible.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Seletor de Tipo de Palpite */}
               {selectedToUse.card.requiresTarget === "PREDICTION_TYPE" && (
@@ -293,8 +335,12 @@ export function FantasyInventoryModal({
                 <button
                   type="button"
                   onClick={handleConfirmActivation}
-                  disabled={pending}
-                  className="flex-2 flex items-center justify-center gap-1.5 rounded-2xl bg-accent py-3 text-xs font-black uppercase text-background shadow-[0_0_20px_rgba(204,255,0,0.3)] hover:brightness-110 active:scale-95 transition-all"
+                  disabled={
+                    pending ||
+                    (selectedToUse.card.requiresTarget === "SINGLE_PLAYER" && !targetPlayerId) ||
+                    (selectedToUse.card.slug === "vice_captain" && getEligiblePlayers(selectedToUse.card).length === 0)
+                  }
+                  className="flex-2 flex items-center justify-center gap-1.5 rounded-2xl bg-accent py-3 text-xs font-black uppercase text-background shadow-[0_0_20px_rgba(204,255,0,0.3)] hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {pending ? (
                     <>

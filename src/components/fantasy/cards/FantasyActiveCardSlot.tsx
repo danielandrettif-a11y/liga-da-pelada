@@ -15,6 +15,8 @@ type Props = {
   isMarketOpen: boolean;
   onRefresh?: () => void;
   marketPlayers?: Array<{ id: string; name: string; price: number }>;
+  lineupPlayers?: Array<{ id: string; name: string; price: number }>;
+  captainPlayerId?: string | null;
 };
 
 export function FantasyActiveCardSlot({
@@ -23,6 +25,8 @@ export function FantasyActiveCardSlot({
   isMarketOpen,
   onRefresh,
   marketPlayers = [],
+  lineupPlayers = [],
+  captainPlayerId = null,
 }: Props) {
   const [showInventory, setShowInventory] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -196,6 +200,8 @@ export function FantasyActiveCardSlot({
         roundId={roundId}
         isMarketOpen={isMarketOpen}
         marketPlayers={marketPlayers}
+        lineupPlayers={lineupPlayers}
+        captainPlayerId={captainPlayerId}
         onCardActivated={() => {
           onRefresh?.();
         }}

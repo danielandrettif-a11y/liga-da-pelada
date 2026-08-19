@@ -476,8 +476,39 @@ export async function activateCardForRound({
       .eq("id", existingAct.user_card_id);
   }
 
-  // 4. Salvar snapshot do efeito e dos alvos
   const userCardObj = Array.isArray(userCard.card) ? userCard.card[0] : userCard.card;
+
+  // 3.1. Validação específica da carta Vice-Capitão (deve ser do time escalado e diferente do Capitão)
+  if (userCardObj?.slug === "vice_captain") {
+    if (!targetPlayerId) {
+      return { success: false, error: "Selecione um jogador escalado para ser o Vice-Capitão." };
+    }
+
+    const { data: lineup } = await client
+      .from("fantasy_lineups")
+      .select("id, captain_player_id, fantasy_lineup_players(player_id)")
+      .eq("round_id", roundId)
+      .eq("user_id", account.user.id)
+      .maybeSingle();
+
+    if (lineup) {
+      const lineupPlayerIds = (lineup.fantasy_lineup_players || []).map((p: any) => p.player_id);
+      if (lineupPlayerIds.length > 0 && !lineupPlayerIds.includes(targetPlayerId)) {
+        return {
+          success: false,
+          error: "O Vice-Capitão deve ser um jogador titular escalado no seu time.",
+        };
+      }
+      if (lineup.captain_player_id && lineup.captain_player_id === targetPlayerId) {
+        return {
+          success: false,
+          error: "O Vice-Capitão deve ser diferente do Capitão oficial do seu time.",
+        };
+      }
+    }
+  }
+
+  // 4. Salvar snapshot do efeito e dos alvos
   const effectSnapshot = {
     slug: userCardObj?.slug || "",
     name: userCardObj?.name || "",
