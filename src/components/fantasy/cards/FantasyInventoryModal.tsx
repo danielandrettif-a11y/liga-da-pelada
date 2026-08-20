@@ -85,7 +85,7 @@ export function FantasyInventoryModal({
     return item.card.rarity === rarityFilter;
   });
   const catalogCards = FANTASY_CARDS_CATALOG.filter((card) =>
-    rarityFilter === "ALL" ? true : card.rarity === rarityFilter,
+    card.enabled && (rarityFilter === "ALL" ? true : card.rarity === rarityFilter),
   );
 
   /**

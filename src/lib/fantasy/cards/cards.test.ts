@@ -5,9 +5,9 @@ import { FANTASY_CARDS_CATALOG, getCardBySlug } from "./catalog";
 import { MAX_SPECIAL_CARDS_PER_ROUND, FANTASY_RARITY_PROBABILITIES } from "./config";
 
 describe("Cartola V3 — Catálogo & Probabilidades", () => {
-  it("contém todas as 10 cartas oficiais habilitadas", () => {
+  it("contém as 20 cartas oficiais habilitadas e nenhuma experimental", () => {
     const enabled = FANTASY_CARDS_CATALOG.filter((c) => c.enabled);
-    expect(enabled.length).toBe(10);
+    expect(enabled.length).toBe(20);
 
     const slugs = enabled.map((c) => c.slug);
     expect(slugs).toContain("super_captain");
@@ -20,6 +20,12 @@ describe("Cartola V3 — Catálogo & Probabilidades", () => {
     expect(slugs).toContain("scout");
     expect(slugs).toContain("duo");
     expect(slugs).toContain("all_in");
+    expect(slugs).toContain("dream_team");
+    expect(slugs).toContain("bagre_insurance");
+    expect(slugs).toContain("bagre_value_shield");
+    expect(slugs).not.toContain("safe_prediction");
+    expect(slugs).not.toContain("emergency_sub");
+    expect(getCardBySlug("vice_captain")?.rarity).toBe("EPIC");
   });
 
   it("garante soma 100% nas probabilidades de raridade", () => {
@@ -36,6 +42,56 @@ describe("Cartola V3 — Catálogo & Probabilidades", () => {
 
   it("respeita a regra de no máximo 1 carta ativa por rodada", () => {
     expect(MAX_SPECIAL_CARDS_PER_ROUND).toBe(1);
+  });
+});
+
+describe("Cartola V3.2 — Novas cartas", () => {
+  const players: CardResolverPlayer[] = [
+    { playerId: "a", name: "A", price: 10, priceAfter: 8, basePoints: -2, goals: 0, assists: 0, wins: 2, losses: 1, games: 3 },
+    { playerId: "b", name: "B", price: 10, priceAfter: 11, basePoints: 6, goals: 1, assists: 1, wins: 1, losses: 0, games: 2 },
+    { playerId: "c", name: "C", price: 10, basePoints: 8, goals: 0, assists: 1, wins: 2, losses: 0, games: 2 },
+    { playerId: "d", name: "D", price: 10, basePoints: 10, goals: 1, assists: 0, wins: 2, losses: 0, games: 2 },
+    { playerId: "e", name: "E", price: 10, basePoints: 12, goals: 1, assists: 1, wins: 2, losses: 0, games: 2 },
+  ];
+  const context: CardResolverContext = {
+    roundAverageBasePoints: 6.8,
+    allRoundPlayers: players.map((player) => ({
+      playerId: player.playerId,
+      price: player.price,
+      basePoints: player.basePoints,
+    })),
+  };
+
+  it("separa proteção de pontos e proteção de patrimônio", () => {
+    const insurance = CardEffectResolver.resolveScoreEffect(
+      getCardBySlug("bagre_insurance")!, { targetPlayerId: "a" }, players, null, context,
+    );
+    const valueShield = CardEffectResolver.resolveScoreEffect(
+      getCardBySlug("bagre_value_shield")!, { targetPlayerId: "a" }, players, null, context,
+    );
+    expect(insurance.bonusPoints).toBe(2);
+    expect(valueShield.bonusPoints).toBe(0);
+    expect(valueShield.budgetRecovery).toBe(2);
+  });
+
+  it("aplica menor, maior e Tríplice Coroa", () => {
+    expect(CardEffectResolver.resolveScoreEffect(getCardBySlug("tava_em_campo")!, { targetPlayerId: "a" }, players, null, context).bonusPoints).toBe(2);
+    expect(CardEffectResolver.resolveScoreEffect(getCardBySlug("my_mvp")!, { targetPlayerId: "e" }, players, null, context).bonusPoints).toBe(4);
+    expect(CardEffectResolver.resolveScoreEffect(getCardBySlug("triple_crown")!, { targetPlayerId: "e" }, players, null, context).bonusPoints).toBe(6);
+  });
+
+  it("resolve Duelo Direto e Seleção dos Sonhos", () => {
+    const duel = CardEffectResolver.resolveScoreEffect(
+      getCardBySlug("head_to_head")!, { targetPlayerId: "e", targetPlayer2Id: "b" }, players, null, context,
+    );
+    const dream = CardEffectResolver.resolveScoreEffect(getCardBySlug("dream_team")!, {}, players, null, context);
+    expect(duel.bonusPoints).toBe(5);
+    expect(dream.bonusPoints).toBe(8);
+  });
+
+  it("aplica Samu e Bagre ou Craque sem duplicar a regra", () => {
+    expect(CardEffectResolver.resolveScoreEffect(getCardBySlug("samu_do_cartola")!, { targetPlayerId: "a" }, players, null, context).bonusPoints).toBe(2);
+    expect(CardEffectResolver.resolveScoreEffect(getCardBySlug("bagre_or_craque")!, { targetPlayerId: "e" }, players, null, context).bonusPoints).toBe(5);
   });
 });
 

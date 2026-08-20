@@ -225,7 +225,6 @@ export async function inviteGuestToCallup({
   const { data: createdPlayer, error: playerError } = await client
     .from("players")
     .insert({
-      league_id: callup.league_id,
       name: cleanName,
       member_category: "guest",
       is_selectable: true,
@@ -239,6 +238,20 @@ export async function inviteGuestToCallup({
 
   if (playerError || !createdPlayer) {
     return { success: false, error: playerError?.message || "Não foi possível criar o perfil do convidado." };
+  }
+
+  const { error: membershipError } = await client
+    .from("league_members")
+    .insert({
+      league_id: callup.league_id,
+      player_id: createdPlayer.id,
+      role: "player",
+      is_active: true,
+    });
+
+  if (membershipError) {
+    await client.from("players").delete().eq("id", createdPlayer.id).eq("created_by_user_id", account.user.id);
+    return { success: false, error: membershipError.message };
   }
 
   // 3. A posição é reservada transacionalmente no banco para evitar duas

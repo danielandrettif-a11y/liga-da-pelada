@@ -496,6 +496,13 @@ export async function activateCardForRound({
 
   const lineupPlayerIds = (lineup?.fantasy_lineup_players || []).map((player: any) => player.player_id);
 
+  const catalogCard = getCardBySlug(userCardObj?.slug || "");
+  if (catalogCard?.requiresTarget === "SINGLE_PLAYER") {
+    if (!targetPlayerId || !lineupPlayerIds.includes(targetPlayerId)) {
+      return { success: false, error: "Escolha um atleta que esteja na sua escalação." };
+    }
+  }
+
   // 3.1. Validação específica da carta Vice-Capitão (deve ser do time escalado e diferente do Capitão)
   if (userCardObj?.slug === "vice_captain") {
     if (!targetPlayerId) {
@@ -565,6 +572,31 @@ export async function activateCardForRound({
     }
   }
 
+
+  // Duelo Direto: o usuário escolhe somente seu atleta. O adversário é
+  // sorteado no servidor entre os demais participantes da rodada.
+  let resolvedTargetPlayer2Id = targetPlayer2Id || null;
+  if (userCardObj?.slug === "head_to_head") {
+    const { data: roundPlayers, error: roundPlayersError } = await client
+      .from("round_players")
+      .select("player_id")
+      .eq("round_id", roundId);
+
+    if (roundPlayersError) {
+      return { success: false, error: "Não foi possível sortear o adversário do Duelo Direto." };
+    }
+
+    const candidates = Array.from(new Set(
+      (roundPlayers || [])
+        .map((entry: any) => entry.player_id as string)
+        .filter((playerId: string) => playerId && playerId !== targetPlayerId),
+    ));
+    if (candidates.length === 0) {
+      return { success: false, error: "Não há outro participante disponível para o Duelo Direto." };
+    }
+    resolvedTargetPlayer2Id = candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
   // 4. Salvar snapshot do efeito e dos alvos
   const effectSnapshot = {
     slug: userCardObj?.slug || "",
@@ -576,7 +608,7 @@ export async function activateCardForRound({
 
   const targetSnapshot = {
     targetPlayerId: targetPlayerId || null,
-    targetPlayer2Id: targetPlayer2Id || null,
+    targetPlayer2Id: resolvedTargetPlayer2Id,
     targetPrediction: targetPrediction || null,
   };
 

@@ -6,6 +6,7 @@ export type CardResolverPlayer = {
   playerId: string;
   name?: string;
   price: number;
+  priceAfter?: number;
   basePoints: number;
   goals: number;
   assists: number;
@@ -48,6 +49,7 @@ export type CardResolutionResult = {
   budgetBonus?: number;
   playerDiscountPercent?: number;
   discountedPlayerId?: string;
+  budgetRecovery?: number;
 };
 
 export class CardEffectResolver {
@@ -248,6 +250,49 @@ export class CardEffectResolver {
           };
         }
 
+        if (config.maxGoals === 0 && config.maxAssists === 0 && config.minWins) {
+          const applied = targetPlayer.goals === 0
+            && targetPlayer.assists === 0
+            && targetPlayer.wins >= Number(config.minWins);
+          const bonus = applied ? Number(config.bonus || 3) : 0;
+          return {
+            applied,
+            bonusPoints: bonus,
+            description: applied
+              ? `Só Vim Pela Resenha concluída por ${targetPlayer.name || "Jogador"} (+${bonus.toFixed(1)} pts).`
+              : "Só Vim Pela Resenha não cumpriu 0 gols, 0 assistências e 2+ vitórias.",
+          };
+        }
+
+        if (config.lineupRank === "LOWEST" || config.lineupRank === "HIGHEST") {
+          const comparison = config.lineupRank === "LOWEST"
+            ? Math.min(...lineupPlayers.map((player) => player.basePoints))
+            : Math.max(...lineupPlayers.map((player) => player.basePoints));
+          const applied = lineupPlayers.length > 0 && targetPlayer.basePoints === comparison;
+          const bonus = applied ? Number(config.bonus || 0) : 0;
+          return {
+            applied,
+            bonusPoints: bonus,
+            description: applied
+              ? `${card.slug === "my_mvp" ? "Craque do Meu Time" : "Tava em Campo?"} concluída (+${bonus.toFixed(1)} pts).`
+              : "O jogador escolhido não terminou na posição exigida dentro da escalação.",
+          };
+        }
+
+        if (config.minGoals && config.minAssists && config.minWins) {
+          const applied = targetPlayer.goals >= Number(config.minGoals)
+            && targetPlayer.assists >= Number(config.minAssists)
+            && targetPlayer.wins >= Number(config.minWins);
+          const bonus = applied ? Number(config.bonus || 6) : 0;
+          return {
+            applied,
+            bonusPoints: bonus,
+            description: applied
+              ? `Tríplice Coroa concluída por ${targetPlayer.name || "Jogador"} (+${bonus.toFixed(1)} pts).`
+              : "Tríplice Coroa não completada: era necessário gol, assistência e vitória.",
+          };
+        }
+
         // Caça-Talentos (percentage = 0.5, maxBonus = 6, belowMedianPrice = true)
         if (config.belowMedianPrice) {
           const eligible = isFantasyPriceEligible(
@@ -348,6 +393,104 @@ export class CardEffectResolver {
           applied: false,
           bonusPoints: 0,
           description: `Dobradinha falhou: ${failedNames} abaixo da média da rodada (${avg.toFixed(1)} pts).`,
+        };
+      }
+
+      case "PLAYER_SCORE_PROTECTION": {
+        const targetPlayer = lineupPlayers.find((player) => player.playerId === target.targetPlayerId);
+        if (!targetPlayer) {
+          return { applied: false, bonusPoints: 0, description: "Jogador protegido não encontrado na escalação." };
+        }
+
+        if (targetPlayer.basePoints < 0) {
+          const bonus = -targetPlayer.basePoints;
+          return {
+            applied: true,
+            bonusPoints: bonus,
+            description: `${card.slug === "samu_do_cartola" ? "Samu do Cartola" : card.slug === "bagre_or_craque" ? "Bagre ou Craque?" : "Seguro contra Bagres"}: pontuação negativa ajustada para 0 (+${bonus.toFixed(1)} pts).`,
+          };
+        }
+
+        if (card.slug === "bagre_insurance") {
+          const bases = context.allRoundPlayers.map((player) => player.basePoints).sort((a, b) => a - b);
+          const middle = Math.floor(bases.length / 2);
+          const median = bases.length === 0 ? 0 : bases.length % 2
+            ? bases[middle]
+            : (bases[middle - 1] + bases[middle]) / 2;
+          const applied = targetPlayer.basePoints > 0 && targetPlayer.basePoints < median;
+          const bonus = applied ? Number(config.belowMedianBonus || 2) : 0;
+          return {
+            applied,
+            bonusPoints: bonus,
+            description: applied
+              ? `Seguro contra Bagres: pontuação positiva abaixo da mediana (+${bonus.toFixed(1)} pts).`
+              : "Seguro contra Bagres não foi acionado.",
+          };
+        }
+
+        if (card.slug === "bagre_or_craque") {
+          const rank = 1 + context.allRoundPlayers.filter((player) => player.basePoints > targetPlayer.basePoints).length;
+          const applied = targetPlayer.games > 0 && rank <= Number(config.topRank || 5);
+          const bonus = applied ? Number(config.topBonus || 5) : 0;
+          return {
+            applied,
+            bonusPoints: bonus,
+            description: applied
+              ? `Bagre ou Craque?: jogador terminou em ${rank}º (+${bonus.toFixed(1)} pts).`
+              : "Bagre ou Craque? não foi acionada.",
+          };
+        }
+
+        return { applied: false, bonusPoints: 0, description: "O jogador não terminou com pontuação negativa." };
+      }
+
+      case "PLAYER_VALUE_SHIELD": {
+        const targetPlayer = lineupPlayers.find((player) => player.playerId === target.targetPlayerId);
+        if (!targetPlayer) {
+          return { applied: false, bonusPoints: 0, budgetRecovery: 0, description: "Jogador protegido não encontrado." };
+        }
+        const loss = Math.max(0, targetPlayer.price - Number(targetPlayer.priceAfter ?? targetPlayer.price));
+        const recovery = Math.min(Number(config.maxRecovery || 2), loss);
+        return {
+          applied: recovery > 0,
+          bonusPoints: 0,
+          budgetRecovery: recovery,
+          description: recovery > 0
+            ? `Fundo Garantidor recuperou C$${recovery.toFixed(2)} da desvalorização.`
+            : "O jogador protegido não desvalorizou.",
+        };
+      }
+
+      case "HEAD_TO_HEAD_BONUS": {
+        const chosen = lineupPlayers.find((player) => player.playerId === target.targetPlayerId);
+        const opponent = context.allRoundPlayers.find((player) => player.playerId === target.targetPlayer2Id);
+        if (!chosen || !opponent) {
+          return { applied: false, bonusPoints: 0, description: "Duelo Direto sem os dois jogadores definidos." };
+        }
+        const applied = chosen.basePoints > opponent.basePoints;
+        const bonus = applied ? Number(config.bonus || 5) : 0;
+        return {
+          applied,
+          bonusPoints: bonus,
+          description: applied
+            ? `Duelo Direto vencido: ${chosen.basePoints.toFixed(1)} x ${opponent.basePoints.toFixed(1)} (+${bonus.toFixed(1)} pts).`
+            : `Duelo Direto não vencido: ${chosen.basePoints.toFixed(1)} x ${opponent.basePoints.toFixed(1)}.`,
+        };
+      }
+
+      case "LINEUP_CONDITION_BONUS": {
+        const maxRank = Number(config.allPlayersTopRank || 8);
+        const allInside = lineupPlayers.length === 5 && lineupPlayers.every((player) => {
+          const rank = 1 + context.allRoundPlayers.filter((entry) => entry.basePoints > player.basePoints).length;
+          return player.games > 0 && rank <= maxRank;
+        });
+        const bonus = allInside ? Number(config.bonus || 8) : 0;
+        return {
+          applied: allInside,
+          bonusPoints: bonus,
+          description: allInside
+            ? `Seleção dos Sonhos completa: os 5 ficaram no TOP ${maxRank} (+${bonus.toFixed(1)} pts).`
+            : `Seleção dos Sonhos não completada: os 5 precisavam ficar no TOP ${maxRank}.`,
         };
       }
 
