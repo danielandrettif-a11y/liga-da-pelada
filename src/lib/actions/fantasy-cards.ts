@@ -711,3 +711,155 @@ export async function giveMyAccountTestPack(): Promise<{ success: boolean; error
   revalidatePath("/cartola");
   return { success: true };
 }
+
+/**
+ * Zera todas as cartas, ativações e pacotes da conta do usuário autenticado.
+ * Deixa o inventário com 0 cartas para permitir um teste limpo do zero.
+ */
+export async function resetMyAccountCards(): Promise<{
+  success: boolean;
+  deletedCardsCount?: number;
+  deletedActivationsCount?: number;
+  deletedPacksCount?: number;
+  error?: string;
+}> {
+  const account = await getCurrentAccount();
+  if (!account.user) return { success: false, error: "Não autenticado." };
+
+  const client = account.client;
+  const userId = account.user.id;
+
+  try {
+    // 1. Deletar ativações de cartas do usuário
+    const { count: actCount, error: actErr } = await client
+      .from("fantasy_card_activations")
+      .delete({ count: "exact" })
+      .eq("user_id", userId);
+
+    if (actErr) {
+      return { success: false, error: `Erro ao remover ativações: ${actErr.message}` };
+    }
+
+    // 2. Deletar inventário de cartas do usuário
+    const { count: cardsCount, error: cardsErr } = await client
+      .from("fantasy_user_cards")
+      .delete({ count: "exact" })
+      .eq("user_id", userId);
+
+    if (cardsErr) {
+      return { success: false, error: `Erro ao zerar inventário: ${cardsErr.message}` };
+    }
+
+    // 3. Buscar pacotes do usuário para remover ofertas e pacotes
+    const { data: userPacks } = await client
+      .from("fantasy_round_packs")
+      .select("id")
+      .eq("user_id", userId);
+
+    const packIds = (userPacks || []).map((p: any) => p.id);
+    if (packIds.length > 0) {
+      await client.from("fantasy_pack_offers").delete().in("pack_id", packIds);
+      await client.from("fantasy_round_packs").delete().in("id", packIds);
+    }
+
+    revalidatePath("/cartola");
+    revalidatePath("/admin/cartola");
+
+    return {
+      success: true,
+      deletedCardsCount: cardsCount || 0,
+      deletedActivationsCount: actCount || 0,
+      deletedPacksCount: packIds.length,
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro inesperado ao zerar cartas." };
+  }
+}
+
+/**
+ * Concede 1 pacote de cartas para todos os usuários que já escalaram no Cartola.
+ * Remove eventuais pacotes abertos/pendentes dessa mesma rodada para garantir que todos recebam um pacote 'available' novinho.
+ */
+export async function distributePackToAllLineupUsers(): Promise<{
+  success: boolean;
+  awardedUsersCount?: number;
+  roundNumber?: number;
+  error?: string;
+}> {
+  const account = await getCurrentAccount();
+  if (!account.user) return { success: false, error: "Não autenticado." };
+  if (!account.isAdmin) return { success: false, error: "Apenas administradores podem distribuir pacotes em massa." };
+
+  const client = account.client;
+
+  try {
+    // 1. Buscar a rodada mais recente ou ativa/draft
+    const { data: rounds } = await client
+      .from("rounds")
+      .select("id, number, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (!rounds || rounds.length === 0) {
+      return { success: false, error: "Nenhuma rodada encontrada no sistema para associar os pacotes." };
+    }
+
+    const targetRound = rounds.find((r: any) => r.status === "draft" || r.status === "active") || rounds[0];
+
+    // 2. Buscar todos os usuários únicos que já escalaram (em fantasy_lineups)
+    const { data: lineups, error: lineupErr } = await client
+      .from("fantasy_lineups")
+      .select("user_id");
+
+    if (lineupErr) {
+      return { success: false, error: `Erro ao buscar escalações: ${lineupErr.message}` };
+    }
+
+    const uniqueUserIds = Array.from(
+      new Set((lineups || []).map((l: any) => l.user_id).filter(Boolean))
+    ) as string[];
+
+    if (uniqueUserIds.length === 0) {
+      return { success: false, error: "Nenhum usuário com escalação registrada foi encontrado." };
+    }
+
+    // 3. Limpar pacotes anteriores desta rodada para estes usuários para garantir um pacote 'available' novo
+    const { data: existingPacks } = await client
+      .from("fantasy_round_packs")
+      .select("id, user_id")
+      .eq("round_id", targetRound.id)
+      .in("user_id", uniqueUserIds);
+
+    const existingPackIds = (existingPacks || []).map((p: any) => p.id);
+    if (existingPackIds.length > 0) {
+      await client.from("fantasy_pack_offers").delete().in("pack_id", existingPackIds);
+      await client.from("fantasy_round_packs").delete().in("id", existingPackIds);
+    }
+
+    // 4. Inserir os novos pacotes com status 'available'
+    const newPacks = uniqueUserIds.map((userId) => ({
+      user_id: userId,
+      round_id: targetRound.id,
+      status: "available",
+    }));
+
+    const { error: insertErr } = await client
+      .from("fantasy_round_packs")
+      .insert(newPacks);
+
+    if (insertErr) {
+      return { success: false, error: `Erro ao inserir pacotes: ${insertErr.message}` };
+    }
+
+    revalidatePath("/cartola");
+    revalidatePath("/admin/cartola");
+
+    return {
+      success: true,
+      awardedUsersCount: uniqueUserIds.length,
+      roundNumber: targetRound.number,
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro inesperado ao distribuir pacotes." };
+  }
+}

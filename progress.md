@@ -44,3 +44,9 @@
     - Ajustado o enquadramento de fundo (`bg-[center_right_25%] sm:bg-center bg-cover`) e opacidade para o troféu aparecer com nitidez e destaque no celular.
     - Corrigido o corte do número da rodada ajustando line-height, largura flexível e padding direito no texto itálico com gradiente (`bg-clip-text`).
 
+13. **Zerar Cartas da Conta & Distribuição em Massa de Pacotes para Quem Escalou (`fantasy-cards.ts`, `FantasyCardTester.tsx`, `reset_cards_and_award_packs.sql`)**:
+    - Criada a Server Action `resetMyAccountCards()` que remove com segurança todas as cartas do inventário (`fantasy_user_cards`), ativações (`fantasy_card_activations`) e ofertas/pacotes pendentes (`fantasy_round_packs`, `fantasy_pack_offers`) da conta autenticada, deixando-a com 0 cartas para testes do zero.
+    - Criada a Server Action `distributePackToAllLineupUsers()` que identifica todos os usuários únicos com escalação registrada em `fantasy_lineups`, limpa pacotes anteriores da rodada de referência e concede 1 pacote novo (`available`) para cada um deles.
+    - Atualizado o componente `FantasyCardTester.tsx` no painel de administração (`/admin/cartola`) com botões dedicados e modal de confirmação para exclusão acidental.
+    - Criado o script SQL complementar `scripts/reset_cards_and_award_packs.sql`.
+    - Todos os 75 testes automatizados (12 arquivos) passaram e a compilação do Next.js foi concluída com 100% de sucesso.

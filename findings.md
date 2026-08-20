@@ -37,4 +37,7 @@
 - **Banner da Rodada no Mobile**:
   - A imagem de fundo e troféu exigem enquadramento responsivo (`bg-[center_right_25%]` e opacidade otimizada) com gradientes laterais mais suaves para não ofuscar o troféu.
   - O título da rodada com `bg-clip-text` em fonte itálica necessita de `inline-block pr-1.5` e line-height adequado para não truncar caracteres em celulares.
-
+- **Reset de Cartas e Distribuição em Massa de Pacotes (Simulação e Testes Finais)**:
+  - `resetMyAccountCards()` limpa em cascata `fantasy_card_activations`, `fantasy_user_cards`, `fantasy_pack_offers` e `fantasy_round_packs` da conta autenticada, garantindo inventário zerado e pronto para novos ciclos.
+  - `distributePackToAllLineupUsers()` busca todos os `user_id`s com histórico em `fantasy_lineups`, garante remoção de ofertas/pacotes pendentes da rodada alvo e insere um pacote com status `available` para cada um deles.
+  - O painel de administração em `/admin/cartola` (`FantasyCardTester.tsx`) disponibiliza os botões com confirmação visual e feedback instantâneo.
