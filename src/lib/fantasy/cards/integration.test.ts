@@ -176,7 +176,7 @@ describe("Cartola V3 — Simulação Integrada do Ciclo de Jogo e Multiusuário"
     const cardDefA = getCardBySlug("super_captain")!;
     const resA = CardEffectResolver.resolveScoreEffect(cardDefA, {}, roundPlayers, "pl-craque", ctx);
     expect(resA.applied).toBe(true);
-    expect(resA.bonusPoints).toBe(12);
+    expect(resA.bonusPoints).toBe(8);
 
     // Resolução Usuário B (Gol de Ouro no Artilheiro que fez 1 gol: +3 bônus)
     const cardDefB = getCardBySlug("golden_goal")!;

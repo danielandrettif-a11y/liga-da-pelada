@@ -133,7 +133,7 @@ export type RankingRule = {
   points: number;
 };
 
-export type EventType = 'goal' | 'assist' | 'win' | 'draw' | 'loss' | 'best_goalkeeper';
+export type EventType = 'goal' | 'assist' | 'win' | 'draw' | 'loss' | 'best_goalkeeper' | 'goalkeeper_appearance' | 'goal_conceded';
 
 export type RoundStatus = 'draft' | 'active' | 'finished';
 
@@ -378,6 +378,9 @@ export type PlayerRoundStats = {
   wins: number;
   draws: number;
   losses: number;
+  goalkeeper_games: number;
+  clean_sheets: number;
+  goals_conceded: number;
   points: number;
 };
 
@@ -472,6 +475,8 @@ export type CreateMatchInput = {
   team_a_id: string;
   team_b_id: string;
   match_order?: number;
+  goalkeeper_a_id: string;
+  goalkeeper_b_id: string;
   replacements?: Array<{
     team_id: string;
     absent_player_id: string;

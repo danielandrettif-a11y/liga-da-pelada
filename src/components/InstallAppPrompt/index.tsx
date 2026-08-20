@@ -168,12 +168,40 @@ export function InstallAppPrompt({
     };
   }, [userId]);
 
+  useEffect(() => {
+    if (!isReady || !isProfileReady || isInstalled || isOpen) return;
+    if (pathname.startsWith("/login") || pathname.startsWith("/cadastro")) return;
+
+    const preference = readPreference(userId);
+    if (preference.disableAutomaticPrompt || (preference.snoozeUntil || 0) > Date.now()) return;
+
+    try {
+      if (!countedSessionRef.current && !window.sessionStorage.getItem(sessionKey(userId))) {
+        preference.visitCount = Number(preference.visitCount || 0) + 1;
+        writePreference(userId, preference);
+        window.sessionStorage.setItem(sessionKey(userId), "1");
+        countedSessionRef.current = true;
+      }
+    } catch {
+      // Sem armazenamento, o atalho manual em Mais continua disponível.
+    }
+
+    if (preference.visitCount < 2) return;
+    const timer = window.setTimeout(() => {
+      setOpenedManually(false);
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
+      setIsOpen(true);
+    }, 1800);
+    return () => window.clearTimeout(timer);
+  }, [isReady, isProfileReady, isInstalled, isOpen, pathname, userId]);
+
   function closePrompt() {
     if (!openedManually) {
       const preference = readPreference(userId);
       writePreference(userId, { ...preference, snoozeUntil: Date.now() + SNOOZE_DURATION });
     }
     setIsOpen(false);
+    previousFocusRef.current?.focus?.();
   }
 
   async function installOnAndroid() {

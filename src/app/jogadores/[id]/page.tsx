@@ -30,6 +30,14 @@ function History({ rows, friendly = false }: { rows: HistoryRow[]; friendly?: bo
     </div>
   );
 }
+
+function aggregateGoalkeeperStats(rows: HistoryRow[]) {
+  return rows.reduce((total, row) => ({
+    games: total.games + Number((row as any).goalkeeper_games || 0),
+    cleanSheets: total.cleanSheets + Number((row as any).clean_sheets || 0),
+    conceded: total.conceded + Number((row as any).goals_conceded || 0),
+  }), { games: 0, cleanSheets: 0, conceded: 0 });
+}
 export default async function JogadorPerfilPage({ params }: PageProps<"/jogadores/[id]">) {
   const { id } = await params;
   const [player, officialHistory, friendlyHistory, awardSeasons, fitness, clubGoals, fantasySummary] = await Promise.all([
@@ -45,6 +53,8 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
   const isPlayable = player.is_selectable && (player.member_category === "player" || player.member_category === "guest");
   const official = aggregatePlayerStats(officialHistory);
   const friendly = aggregatePlayerStats(friendlyHistory);
+  const officialGoalkeeper = aggregateGoalkeeperStats(officialHistory);
+  const friendlyGoalkeeper = aggregateGoalkeeperStats(friendlyHistory);
   const categoryLabel = player.member_category === "player" ? "Jogador oficial" : player.member_category === "guest" ? "Convidado" : player.member_category === "wag" ? "WAG" : "Torcida";
 
 
@@ -62,6 +72,8 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
 
       {!isPlayable ? <div className="glass-card p-6 text-center"><p className="text-sm font-black text-foreground">Parte da comunidade da Pelada</p><p className="mt-1 text-xs text-muted">O histórico esportivo está preservado, mas fica oculto enquanto este perfil não for um jogador selecionável.</p></div> : <>
         {([['Ranked', official], ['Amistosos', friendly]] as const).map(([label, stats]) => <section key={label}><h3 className="mb-3 px-1 text-xs font-black uppercase tracking-wider text-muted">{label}</h3><div className="grid grid-cols-4 gap-2">{([['Peladas', stats.rounds || 0], ['Jogos', stats.games], ['Gols', stats.goals], ['Assists', stats.assists], ['Vitórias', stats.wins], ['Empates', stats.draws], ['Derrotas', stats.losses], ['Aprov.', `${calculateWinRate(stats.wins, stats.draws, stats.games)}%`]] as const).map(([key, value]) => <div key={key} className="glass-card p-3 text-center"><p className="text-lg font-black text-foreground">{value}</p><p className="text-[8px] font-bold uppercase text-muted">{key}</p></div>)}</div></section>)}
+
+        {(officialGoalkeeper.games > 0 || friendlyGoalkeeper.games > 0) && <section><div className="mb-3 px-1"><h3 className="text-xs font-black uppercase tracking-wider text-muted">Histórico no gol</h3><p className="mt-1 text-[10px] text-muted/70">Atuações registradas como goleiro efetivo da partida.</p></div><div className="grid gap-3 sm:grid-cols-2">{([['Ranked', officialGoalkeeper], ['Amistosos', friendlyGoalkeeper]] as const).map(([label, stats]) => <div key={label} className="glass-card p-4"><p className="text-[9px] font-black uppercase text-accent">{label}</p><div className="mt-3 grid grid-cols-3 gap-2 text-center">{([['Jogos no gol', stats.games], ['Sem sofrer', stats.cleanSheets], ['Gols sofridos', stats.conceded]] as const).map(([key, value]) => <div key={key}><p className="stat-number text-xl text-foreground">{value}</p><p className="mt-1 text-[8px] font-bold uppercase leading-tight text-muted">{key}</p></div>)}</div></div>)}</div></section>}
 
         {fitness && <section><div className="mb-3 flex items-center gap-2 px-1"><TrendingUp className="h-4 w-4 text-accent" /><h3 className="text-xs font-black uppercase tracking-wider text-muted">Dados físicos autorizados</h3></div><div className="grid grid-cols-2 gap-3">{([['Ranked', fitness.official], ['Amistosos', fitness.friendly]] as const).map(([label, summary]) => <div key={label} className="glass-card p-4"><p className="text-[9px] font-black uppercase text-muted">{label}</p><p className="mt-1 text-xl font-black text-foreground">{summary.distanceKm} km</p><p className="text-[10px] text-muted">média {summary.metersPerMinute || Math.round((summary.averageSpeedKmh * 1000) / 60)} m/min</p></div>)}</div></section>}
 

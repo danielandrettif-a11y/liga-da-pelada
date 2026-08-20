@@ -9,6 +9,8 @@ export const DEFAULT_SCORING_POINTS: ScoringPoints = {
   draw: 1,
   loss: 0,
   best_goalkeeper: 6,
+  goalkeeper_appearance: 3,
+  goal_conceded: -1,
 };
 
 export const SCORING_RULE_FIELDS: Array<{
@@ -45,5 +47,15 @@ export const SCORING_RULE_FIELDS: Array<{
     eventType: "best_goalkeeper",
     label: "Melhor goleiro",
     description: "Prêmio escolhido pelo ADM ao final da rodada.",
+  },
+  {
+    eventType: "goalkeeper_appearance",
+    label: "Atuação como goleiro",
+    description: "Bônus por iniciar uma partida como goleiro.",
+  },
+  {
+    eventType: "goal_conceded",
+    label: "Gol sofrido",
+    description: "Valor aplicado ao goleiro por cada gol sofrido; normalmente é negativo.",
   },
 ];

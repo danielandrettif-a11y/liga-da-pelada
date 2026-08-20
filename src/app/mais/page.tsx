@@ -66,6 +66,12 @@ const ADMIN_SECTIONS = [
         label: "Administradores",
         description: "Promover e revisar acessos de ADM",
       },
+      {
+        href: "/admin/cartola/pacotes",
+        icon: ClipboardList,
+        label: "Enviar pacote",
+        description: "Presentear uma pessoa com cartas do Cartola",
+      },
     ],
   },
   {

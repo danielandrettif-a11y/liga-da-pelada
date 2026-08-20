@@ -5,6 +5,7 @@ import { getCurrentAccount, getAdminClient } from "@/lib/auth";
 import { FANTASY_CARDS_CATALOG, getCardBySlug, type FantasyCardDefinition } from "@/lib/fantasy/cards/catalog";
 import { generatePackOffers } from "@/lib/fantasy/cards/pack-generator";
 import { MAX_SPECIAL_CARDS_PER_ROUND, type FantasyCardRarity } from "@/lib/fantasy/cards/config";
+import { isFantasyPriceEligible } from "@/lib/fantasy/cards/eligibility";
 
 export type FantasyPackDTO = {
   id: string;
@@ -478,21 +479,30 @@ export async function activateCardForRound({
 
   const userCardObj = Array.isArray(userCard.card) ? userCard.card[0] : userCard.card;
 
+  const { data: fantasyRound } = await client
+    .from("fantasy_rounds")
+    .select("id, fantasy_season_id")
+    .eq("round_id", roundId)
+    .maybeSingle();
+
+  const { data: lineup } = fantasyRound
+    ? await client
+        .from("fantasy_lineups")
+        .select("id, captain_player_id, fantasy_lineup_players(player_id, price_locked)")
+        .eq("fantasy_round_id", fantasyRound.id)
+        .eq("user_id", account.user.id)
+        .maybeSingle()
+    : { data: null as any };
+
+  const lineupPlayerIds = (lineup?.fantasy_lineup_players || []).map((player: any) => player.player_id);
+
   // 3.1. Validação específica da carta Vice-Capitão (deve ser do time escalado e diferente do Capitão)
   if (userCardObj?.slug === "vice_captain") {
     if (!targetPlayerId) {
       return { success: false, error: "Selecione um jogador escalado para ser o Vice-Capitão." };
     }
 
-    const { data: lineup } = await client
-      .from("fantasy_lineups")
-      .select("id, captain_player_id, fantasy_lineup_players(player_id)")
-      .eq("round_id", roundId)
-      .eq("user_id", account.user.id)
-      .maybeSingle();
-
     if (lineup) {
-      const lineupPlayerIds = (lineup.fantasy_lineup_players || []).map((p: any) => p.player_id);
       if (lineupPlayerIds.length > 0 && !lineupPlayerIds.includes(targetPlayerId)) {
         return {
           success: false,
@@ -517,15 +527,7 @@ export async function activateCardForRound({
       return { success: false, error: "Selecione 2 jogadores diferentes para a Dobradinha." };
     }
 
-    const { data: lineup } = await client
-      .from("fantasy_lineups")
-      .select("id, fantasy_lineup_players(player_id)")
-      .eq("round_id", roundId)
-      .eq("user_id", account.user.id)
-      .maybeSingle();
-
     if (lineup) {
-      const lineupPlayerIds = (lineup.fantasy_lineup_players || []).map((p: any) => p.player_id);
       if (lineupPlayerIds.length > 0) {
         if (!lineupPlayerIds.includes(targetPlayerId) || !lineupPlayerIds.includes(targetPlayer2Id)) {
           return {
@@ -534,6 +536,32 @@ export async function activateCardForRound({
           };
         }
       }
+    }
+  }
+
+  // 3.3. Caça-Talentos e All-In: o alvo precisa estar escalado e na faixa
+  // de preço descrita pela carta. Em empate total de preços, todos são elegíveis.
+  if (userCardObj?.slug === "scout" || userCardObj?.slug === "all_in") {
+    if (!targetPlayerId || !lineupPlayerIds.includes(targetPlayerId)) {
+      return { success: false, error: "Escolha um atleta que esteja na sua escalação." };
+    }
+    const { data: marketPrices } = fantasyRound
+      ? await client
+          .from("fantasy_player_prices")
+          .select("player_id, current_price")
+          .eq("fantasy_season_id", fantasyRound.fantasy_season_id)
+      : { data: [] as any[] };
+    const market = (marketPrices || []).map((price: any) => ({ id: price.player_id, price: Number(price.current_price) }));
+    const locked = (lineup?.fantasy_lineup_players || []).find((player: any) => player.player_id === targetPlayerId);
+    const target = { id: targetPlayerId, price: Number(locked?.price_locked ?? market.find((p) => p.id === targetPlayerId)?.price ?? 0) };
+    const targetFilter = userCardObj.slug === "scout" ? "BELOW_MEDIAN_PRICE" : "CHEAPEST_50_PERCENT";
+    if (!isFantasyPriceEligible({ targetFilter }, target, market)) {
+      return {
+        success: false,
+        error: userCardObj.slug === "scout"
+          ? "Esse atleta não está abaixo da mediana de preço."
+          : "Esse atleta não está entre os 50% mais baratos.",
+      };
     }
   }
 
@@ -647,16 +675,27 @@ export async function generatePacksForFinishedRound(roundId: string): Promise<nu
 
   const userIds = Array.from(new Set(lineups.map((l: any) => l.user_id)));
 
-  const packInserts = userIds.map((userId) => ({
+  const { data: existingRewards } = await client
+    .from("fantasy_round_packs")
+    .select("user_id")
+    .eq("round_id", roundId)
+    .eq("source", "round_reward")
+    .in("user_id", userIds);
+  const alreadyRewarded = new Set((existingRewards || []).map((pack: any) => pack.user_id));
+
+  const packInserts = userIds.filter((userId) => !alreadyRewarded.has(userId)).map((userId) => ({
     user_id: userId,
     round_id: roundId,
     status: "available",
+    source: "round_reward",
   }));
+
+  if (packInserts.length === 0) return 0;
 
   // Inserir com ignore de duplicatas
   const { data: inserted } = await client
     .from("fantasy_round_packs")
-    .upsert(packInserts, { onConflict: "user_id, round_id", ignoreDuplicates: true })
+    .insert(packInserts)
     .select("id");
 
   return inserted?.length || 0;
@@ -690,11 +729,12 @@ export async function giveMyAccountTestPack(): Promise<{ success: boolean; error
     .select("id")
     .eq("user_id", account.user.id)
     .eq("round_id", round.id)
-    .maybeSingle();
+    .eq("source", "test");
 
-  if (existingPack) {
-    await client.from("fantasy_pack_offers").delete().eq("pack_id", existingPack.id);
-    await client.from("fantasy_round_packs").delete().eq("id", existingPack.id);
+  const existingPackIds = (existingPack || []).map((pack: any) => pack.id);
+  if (existingPackIds.length > 0) {
+    await client.from("fantasy_pack_offers").delete().in("pack_id", existingPackIds);
+    await client.from("fantasy_round_packs").delete().in("id", existingPackIds);
   }
 
   // Inserir pacote novo
@@ -702,6 +742,8 @@ export async function giveMyAccountTestPack(): Promise<{ success: boolean; error
     user_id: account.user.id,
     round_id: round.id,
     status: "available",
+    source: "test",
+    granted_by: account.user.id,
   });
 
   if (insErr) {
@@ -828,7 +870,8 @@ export async function distributePackToAllLineupUsers(): Promise<{
       .from("fantasy_round_packs")
       .select("id, user_id")
       .eq("round_id", targetRound.id)
-      .in("user_id", uniqueUserIds);
+      .in("user_id", uniqueUserIds)
+      .eq("source", "admin_bulk");
 
     const existingPackIds = (existingPacks || []).map((p: any) => p.id);
     if (existingPackIds.length > 0) {
@@ -841,6 +884,8 @@ export async function distributePackToAllLineupUsers(): Promise<{
       user_id: userId,
       round_id: targetRound.id,
       status: "available",
+      source: "admin_bulk",
+      granted_by: account.user!.id,
     }));
 
     const { error: insertErr } = await client
@@ -862,4 +907,49 @@ export async function distributePackToAllLineupUsers(): Promise<{
   } catch (err: any) {
     return { success: false, error: err.message || "Erro inesperado ao distribuir pacotes." };
   }
+}
+
+/** Concede um pacote individual escolhido pelo ADM, sem substituir recompensas anteriores. */
+export async function grantFantasyPackToUser(targetUserId: string): Promise<{ success: boolean; error?: string }> {
+  const account = await getCurrentAccount();
+  if (!account.user || !account.isAdmin) {
+    return { success: false, error: "Apenas administradores podem enviar pacotes." };
+  }
+  if (!targetUserId) return { success: false, error: "Escolha uma pessoa para receber o pacote." };
+
+  const { data: targetProfile } = await account.client
+    .from("account_profiles")
+    .select("user_id")
+    .eq("user_id", targetUserId)
+    .maybeSingle();
+  if (!targetProfile) return { success: false, error: "A conta selecionada não foi encontrada." };
+
+  const { data: round } = await account.client
+    .from("rounds")
+    .select("id")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!round) return { success: false, error: "Crie ao menos uma rodada antes de enviar pacotes." };
+
+  const { error } = await account.client.from("fantasy_round_packs").insert({
+    user_id: targetUserId,
+    round_id: round.id,
+    status: "available",
+    source: "admin_gift",
+    granted_by: account.user.id,
+  });
+  if (error) {
+    const migrationMissing = error.message.includes("source") || error.message.includes("granted_by");
+    return {
+      success: false,
+      error: migrationMissing
+        ? "Execute a migration 053 no Supabase para liberar pacotes administrativos."
+        : error.message,
+    };
+  }
+
+  revalidatePath("/cartola");
+  revalidatePath("/admin/cartola/pacotes");
+  return { success: true };
 }

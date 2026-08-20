@@ -122,6 +122,10 @@ export async function calculateRoundStats(roundId: string) {
             player_id,
             team_id,
             result_eligible
+          ),
+          match_goalkeepers (
+            player_id,
+            team_id
           )
         ),
         round_players (
@@ -166,6 +170,9 @@ export async function calculateRoundStats(roundId: string) {
           losses: 0,
           goals: 0,
           assists: 0,
+          goalkeeper_games: 0,
+          clean_sheets: 0,
+          goals_conceded: 0,
           points: 0,
         };
       }
@@ -193,6 +200,19 @@ export async function calculateRoundStats(roundId: string) {
 
       processTeamMatch(match.team_a_id, isDraw ? 'draw' : (winnerId === match.team_a_id ? 'win' : 'loss'));
       processTeamMatch(match.team_b_id, isDraw ? 'draw' : (winnerId === match.team_b_id ? 'win' : 'loss'));
+
+      for (const goalkeeper of match.match_goalkeepers || []) {
+        const s = statsMap[goalkeeper.player_id];
+        if (!s) continue;
+        const conceded = goalkeeper.team_id === match.team_a_id ? match.score_b : match.score_a;
+        s.goalkeeper_games += 1;
+        s.goals_conceded += conceded;
+        if (conceded === 0) s.clean_sheets += 1;
+        if (countsForRanking) {
+          s.points += points.goalkeeper_appearance;
+          s.points += conceded * points.goal_conceded;
+        }
+      }
 
       // Processar eventos (gols e assistências)
       for (const ev of match.match_events) {

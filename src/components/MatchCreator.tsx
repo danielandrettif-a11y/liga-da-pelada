@@ -23,6 +23,7 @@ export function MatchCreator({ round }: { round: any }) {
   const [captainByTeam, setCaptainByTeam] = useState<Record<string, string>>(() => Object.fromEntries(
     (round?.teams || []).map((team: any) => [team.id, team.captain_player_id || ""]),
   ));
+  const [goalkeeperByTeam, setGoalkeeperByTeam] = useState<Record<string, string>>({});
 
   const teams = useMemo(() => round?.teams || [], [round?.teams]);
   const playerTeamById = useMemo(() => new Map(
@@ -55,6 +56,20 @@ export function MatchCreator({ round }: { round: any }) {
       .filter((entry: any) => availability.get(entry.player_id) === "available" && (!usesAttendance || attendance.get(entry.player_id) === "present"))
       .map((entry: any) => ({ team, player: entry.players, playerId: entry.player_id })))
     .filter((entry: any) => entry.player);
+  const eligibleGoalkeepersByTeam = useMemo(() => Object.fromEntries(teams.map((team: any) => {
+    const players = (team.team_players || [])
+      .filter((entry: any) => availability.get(entry.player_id) !== "injured" && (!usesAttendance || attendance.get(entry.player_id) === "present"))
+      .map((entry: any) => ({ id: entry.player_id, name: entry.players?.name || "Jogador", isGoalkeeper: Boolean(entry.players?.is_goalkeeper) }));
+    for (const [absentId, replacementId] of Object.entries(replacementByAbsent)) {
+      const absentTeamId = playerTeamById.get(absentId);
+      if (absentTeamId !== team.id || !replacementId) continue;
+      const replacement = waitingPlayers.find((entry: any) => entry.playerId === replacementId);
+      if (replacement && !players.some((player: any) => player.id === replacementId)) {
+        players.push({ id: replacementId, name: replacement.player.name, isGoalkeeper: Boolean(replacement.player.is_goalkeeper) });
+      }
+    }
+    return [team.id, players];
+  })), [teams, availability, attendance, usesAttendance, replacementByAbsent, playerTeamById, waitingPlayers]);
 
   useEffect(() => {
     setReplacementByAbsent({});
@@ -75,6 +90,10 @@ export function MatchCreator({ round }: { round: any }) {
       setError("Os times devem ser diferentes.");
       return;
     }
+    if (!goalkeeperByTeam[teamAId] || !goalkeeperByTeam[teamBId]) {
+      setError("Escolha o goleiro de cada time antes de apitar.");
+      return;
+    }
 
     const uncoveredPlayers = injuredPlayers.filter((entry: any) => !replacementByAbsent[entry.playerId]);
     if (uncoveredPlayers.length > 0) {
@@ -93,6 +112,8 @@ export function MatchCreator({ round }: { round: any }) {
       team_a_id: teamAId,
       team_b_id: teamBId,
       match_order: order,
+      goalkeeper_a_id: goalkeeperByTeam[teamAId],
+      goalkeeper_b_id: goalkeeperByTeam[teamBId],
       replacements: injuredPlayers
         .filter((entry: any) => replacementByAbsent[entry.playerId])
         .map((entry: any) => ({
@@ -440,9 +461,38 @@ export function MatchCreator({ round }: { round: any }) {
         </section>
       )}
 
+      {selectedTeamIds.length === 2 && (
+        <section className="glass-card overflow-hidden animate-fade-in-up">
+          <div className="border-b border-border bg-surface px-4 py-3">
+            <h2 className="text-sm font-black text-foreground">🧤 Goleiros da partida</h2>
+            <p className="mt-1 text-[10px] font-semibold text-muted">Cada goleiro recebe +3 por atuar e −1 por gol sofrido.</p>
+          </div>
+          <div className="grid gap-3 p-4 sm:grid-cols-2">
+            {selectedTeams.map((team: any) => (
+              <label key={team.id} className="block">
+                <span className="mb-2 flex items-center gap-2 text-xs font-black text-foreground">
+                  <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-6 w-6" />
+                  {team.name}
+                </span>
+                <select
+                  value={goalkeeperByTeam[team.id] || ""}
+                  onChange={(event) => setGoalkeeperByTeam((current) => ({ ...current, [team.id]: event.target.value }))}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-semibold text-foreground outline-none focus:border-accent"
+                >
+                  <option value="">Quem começa no gol?</option>
+                  {(eligibleGoalkeepersByTeam[team.id] || [])
+                    .sort((a: any, b: any) => Number(b.isGoalkeeper) - Number(a.isGoalkeeper) || a.name.localeCompare(b.name, "pt-BR"))
+                    .map((player: any) => <option key={player.id} value={player.id}>{player.name}{player.isGoalkeeper ? " · GOL" : ""}</option>)}
+                </select>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
+
       <button
         onClick={handleStart}
-        disabled={loading || !teamAId || !teamBId}
+        disabled={loading || !teamAId || !teamBId || !goalkeeperByTeam[teamAId] || !goalkeeperByTeam[teamBId]}
         className="w-full bg-accent hover:bg-accent-light text-background font-bold py-4 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-accent/20"
       >
         {loading ? "Criando..." : "Apita o Árbitro!"}

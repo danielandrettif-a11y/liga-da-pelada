@@ -107,6 +107,8 @@ export async function getFantasyDashboard() {
         assistPoints: Number(settingsRow.assist_points),
         winPoints: Number(settingsRow.win_points),
         lossPoints: Number(settingsRow.loss_points ?? -1),
+        goalkeeperAppearancePoints: Number(settingsRow.goalkeeper_appearance_points ?? 3),
+        goalConcededPoints: Number(settingsRow.goal_conceded_points ?? -1),
         captainMultiplier: Number(settingsRow.captain_multiplier),
         topScorerPredictionPoints: Number(settingsRow.top_scorer_prediction_points),
         topAssistPredictionPoints: Number(settingsRow.top_assist_prediction_points),
@@ -1417,7 +1419,7 @@ export async function getFantasyRoundLineupOverview(
 export async function updateFantasySettings(values: Partial<FantasySettings>) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
-  const { lossPoints, ...otherValues } = values;
+  const { lossPoints, goalkeeperAppearancePoints, goalConcededPoints, ...otherValues } = values;
   const { error } = await account.client.rpc("update_fantasy_settings", {
     p_settings: otherValues,
   });
@@ -1427,6 +1429,13 @@ export async function updateFantasySettings(values: Partial<FantasySettings>) {
       p_loss_points: lossPoints,
     });
     if (lossError) return { success: false, error: lossError.message };
+  }
+  if (goalkeeperAppearancePoints !== undefined || goalConcededPoints !== undefined) {
+    const { error: goalkeeperError } = await account.client.rpc("update_fantasy_goalkeeper_points", {
+      p_goalkeeper_appearance_points: goalkeeperAppearancePoints ?? DEFAULT_FANTASY_SETTINGS.goalkeeperAppearancePoints,
+      p_goal_conceded_points: goalConcededPoints ?? DEFAULT_FANTASY_SETTINGS.goalConcededPoints,
+    });
+    if (goalkeeperError) return { success: false, error: goalkeeperError.message };
   }
   revalidatePath("/admin/cartola");
   revalidatePath("/cartola");
@@ -1491,6 +1500,8 @@ export async function getFantasyAdminData() {
       assist_points: DEFAULT_FANTASY_SETTINGS.assistPoints,
       win_points: DEFAULT_FANTASY_SETTINGS.winPoints,
       loss_points: DEFAULT_FANTASY_SETTINGS.lossPoints,
+      goalkeeper_appearance_points: DEFAULT_FANTASY_SETTINGS.goalkeeperAppearancePoints,
+      goal_conceded_points: DEFAULT_FANTASY_SETTINGS.goalConcededPoints,
       captain_multiplier: DEFAULT_FANTASY_SETTINGS.captainMultiplier,
       top_scorer_prediction_points: DEFAULT_FANTASY_SETTINGS.topScorerPredictionPoints,
       top_assist_prediction_points: DEFAULT_FANTASY_SETTINGS.topAssistPredictionPoints,

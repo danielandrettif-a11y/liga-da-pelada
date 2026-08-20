@@ -70,9 +70,8 @@ describe("Cartola V3 — Resolução das 10 Cartas Especiais", () => {
     const res = CardEffectResolver.resolveScoreEffect(card, {}, players, "p1", dummyContext);
 
     expect(res.applied).toBe(true);
-    // Pontuação normal de capitão = 20 (base 10 * 2). Super capitão = 30 (base 10 * 3).
-    // Bônus adicional retornado = 10 pts.
-    expect(res.bonusPoints).toBe(10);
+    // A arte atual limita em +8 o bônus adicional da carta.
+    expect(res.bonusPoints).toBe(8);
     expect(res.captainMultiplierOverride).toBe(3);
   });
 
@@ -86,16 +85,18 @@ describe("Cartola V3 — Resolução das 10 Cartas Especiais", () => {
   });
 
   // 3. Palpite Duplo
-  it("CARTA 3: Palpite Duplo (dobra acerto e zera em erro)", () => {
+  it("CARTA 3: Palpite Duplo (+6 somente se gol e assistência forem acertados)", () => {
     const card = getCardBySlug("double_prediction")!;
 
-    // Acertou artilheiro (original 8 -> dobro 16, bônus adicional +8)
-    const hitRes = CardEffectResolver.resolveScoreEffect(card, { targetPrediction: "TOP_SCORER" }, [], null, dummyContext);
+    const hitRes = CardEffectResolver.resolveScoreEffect(card, {}, [], null, {
+      ...dummyContext,
+      predictionsResults: { ...dummyContext.predictionsResults, topAssistHit: true },
+    });
     expect(hitRes.applied).toBe(true);
-    expect(hitRes.bonusPoints).toBe(8);
+    expect(hitRes.bonusPoints).toBe(6);
 
     // Errou garçom -> 0 bônus
-    const missRes = CardEffectResolver.resolveScoreEffect(card, { targetPrediction: "TOP_ASSIST" }, [], null, dummyContext);
+    const missRes = CardEffectResolver.resolveScoreEffect(card, {}, [], null, dummyContext);
     expect(missRes.applied).toBe(false);
     expect(missRes.bonusPoints).toBe(0);
   });
@@ -113,7 +114,7 @@ describe("Cartola V3 — Resolução das 10 Cartas Especiais", () => {
   });
 
   // 5. Vice-Capitão
-  it("CARTA 5: Vice-Capitão (ativa se titular não jogou; não ativa se jogou e fez 0)", () => {
+  it("CARTA 5: Vice-Capitão (ativa se superar o capitão, com teto de +8)", () => {
     const card = getCardBySlug("vice_captain")!;
 
     // Caso A: Titular não jogou (games = 0)
@@ -124,11 +125,20 @@ describe("Cartola V3 — Resolução das 10 Cartas Especiais", () => {
     const resA = CardEffectResolver.resolveScoreEffect(card, { targetPlayerId: "vice" }, playersA, "cap", dummyContext);
     expect(resA.applied).toBe(true);
     expect(resA.viceCaptainActivated).toBe(true);
-    expect(resA.bonusPoints).toBe(10); // Vice pontua 2x (base 10 + bônus 10 = 20)
+    expect(resA.bonusPoints).toBe(8);
 
-    // Caso B: Titular jogou e fez 0 pontos (games = 1) -> Vice NÃO ativa
+    // Caso intermediário: remove o bônus do capitão (6) e passa o 2x ao vice (10).
+    const playersSwap: CardResolverPlayer[] = [
+      { playerId: "cap", name: "Titular", price: 15, basePoints: 6, goals: 0, assists: 0, wins: 1, losses: 0, games: 1, isCaptain: true },
+      { playerId: "vice", name: "Substituto", price: 10, basePoints: 10, goals: 1, assists: 0, wins: 1, losses: 0, games: 1 },
+    ];
+    const resSwap = CardEffectResolver.resolveScoreEffect(card, { targetPlayerId: "vice" }, playersSwap, "cap", dummyContext);
+    expect(resSwap.applied).toBe(true);
+    expect(resSwap.bonusPoints).toBe(4);
+
+    // Caso B: capitão pontuou mais do que o vice -> não ativa.
     const playersB: CardResolverPlayer[] = [
-      { playerId: "cap", name: "Titular", price: 15, basePoints: 0, goals: 0, assists: 0, wins: 0, losses: 1, games: 1, isCaptain: true },
+      { playerId: "cap", name: "Titular", price: 15, basePoints: 12, goals: 1, assists: 1, wins: 1, losses: 0, games: 1, isCaptain: true },
       { playerId: "vice", name: "Substituto", price: 10, basePoints: 10, goals: 1, assists: 0, wins: 1, losses: 0, games: 1 },
     ];
     const resB = CardEffectResolver.resolveScoreEffect(card, { targetPlayerId: "vice" }, playersB, "cap", dummyContext);
@@ -180,14 +190,32 @@ describe("Cartola V3 — Resolução das 10 Cartas Especiais", () => {
 
     // 20 pts -> 50% seria 10, mas bate no teto de +6
     const p2: CardResolverPlayer[] = [
-      { playerId: "p2", name: "Destaque Barato", price: 8, basePoints: 20, goals: 3, assists: 1, wins: 1, losses: 0, games: 1 },
+      { playerId: "p6", name: "Destaque Barato", price: 5, basePoints: 20, goals: 3, assists: 1, wins: 1, losses: 0, games: 1 },
     ];
-    const res2 = CardEffectResolver.resolveScoreEffect(card, { targetPlayerId: "p2" }, p2, null, dummyContext);
+    const res2 = CardEffectResolver.resolveScoreEffect(card, { targetPlayerId: "p6" }, p2, null, dummyContext);
     expect(res2.bonusPoints).toBe(6);
   });
 
+  it("Caça-Talentos e All-In aceitam qualquer escalado quando todos começam no mesmo preço", () => {
+    const equalPriceContext: CardResolverContext = {
+      ...dummyContext,
+      allRoundPlayers: [
+        { playerId: "p1", price: 10, basePoints: 12 },
+        { playerId: "p2", price: 10, basePoints: 8 },
+        { playerId: "p3", price: 10, basePoints: 4 },
+      ],
+    };
+    const player: CardResolverPlayer[] = [
+      { playerId: "p1", name: "Primeira rodada", price: 10, basePoints: 12, goals: 1, assists: 0, wins: 1, losses: 0, games: 1 },
+    ];
+    const scout = CardEffectResolver.resolveScoreEffect(getCardBySlug("scout")!, { targetPlayerId: "p1" }, player, null, equalPriceContext);
+    const allIn = CardEffectResolver.resolveScoreEffect(getCardBySlug("all_in")!, { targetPlayerId: "p1" }, player, null, equalPriceContext);
+    expect(scout.applied).toBe(true);
+    expect(allIn.applied).toBe(true);
+  });
+
   // 9. Dobradinha
-  it("CARTA 9: Dobradinha (+5 se ambos >= média da rodada 9.0)", () => {
+  it("CARTA 9: Dobradinha (+5 se ambos ficarem acima da média da rodada 9.0)", () => {
     const card = getCardBySlug("duo")!;
 
     // Ambos acima (12 e 10 >= 9.0) -> +5

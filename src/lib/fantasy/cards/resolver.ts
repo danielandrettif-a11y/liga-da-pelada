@@ -1,5 +1,6 @@
 import type { FantasyCardDefinition } from "./catalog";
 import type { FantasyCardEffectType } from "./config";
+import { isFantasyPriceEligible } from "./eligibility";
 
 export type CardResolverPlayer = {
   playerId: string;
@@ -78,7 +79,8 @@ export class CardEffectResolver {
         const multiplier = config.multiplier || 3;
         // O capitão normal já recebe (basePoints * 2). O Super Capitão faz ser (basePoints * 3),
         // ou seja, o bônus adicional gerado pela carta é (basePoints * 1) = basePoints * (multiplier - 2).
-        const extraPoints = captain.basePoints * (multiplier - 2);
+        const maxBonus = Number(config.maxBonus ?? Number.POSITIVE_INFINITY);
+        const extraPoints = Math.min(maxBonus, captain.basePoints * (multiplier - 2));
         return {
           applied: true,
           bonusPoints: extraPoints,
@@ -100,6 +102,18 @@ export class CardEffectResolver {
 
       // 3. 🎯 PALPITE DUPLO (Dobra recompensa do palpite selecionado)
       case "PREDICTION_MULTIPLIER": {
+        if (card.slug === "double_prediction") {
+          const preds = context.predictionsResults || {};
+          const hit = Boolean(preds.topScorerHit) && Boolean(preds.topAssistHit);
+          const bonus = Number(config.bonus || 6);
+          return {
+            applied: hit,
+            bonusPoints: hit ? bonus : 0,
+            description: hit
+              ? `Palpite Duplo completo: gol e assistência confirmados (+${bonus.toFixed(1)} pts).`
+              : "Palpite Duplo não completado: era necessário acertar gol e assistência.",
+          };
+        }
         const mult = config.multiplier || 2;
         const predType = target.targetPrediction || "TOP_SCORER";
         const preds = context.predictionsResults || {};
@@ -164,16 +178,18 @@ export class CardEffectResolver {
           };
         }
 
-        const captainDidNotPlay = !captain || captain.games === 0;
+        const viceOutscoredCaptain = !captain || vice.basePoints > captain.basePoints;
 
-        if (captainDidNotPlay) {
-          // O vice pontua 2x em vez de 1x, logo o bônus gerado é (vice.basePoints * 1)
-          const bonus = vice.basePoints * 1;
+        if (viceOutscoredCaptain) {
+          // A escalação normal já contém o bônus 2x do capitão. Para trocar a
+          // braçadeira sem contar os dois multiplicadores, entra apenas a diferença.
+          const swappedBonus = vice.basePoints - (captain?.basePoints || 0);
+          const bonus = Math.min(Number(config.maxBonus ?? 8), Math.max(0, swappedBonus));
           return {
             applied: true,
             bonusPoints: bonus,
             viceCaptainActivated: true,
-            description: `Vice-Capitão ${vice.name || ""} assumiu a braçadeira (Capitão titular ausente): +${bonus.toFixed(1)} pts (2x).`,
+            description: `Vice-Capitão ${vice.name || ""} superou o Capitão e assumiu a braçadeira: +${bonus.toFixed(1)} pts.`,
           };
         }
 
@@ -181,7 +197,7 @@ export class CardEffectResolver {
           applied: false,
           bonusPoints: 0,
           viceCaptainActivated: false,
-          description: `Vice-Capitão não ativado (Capitão titular participou da rodada).`,
+          description: `Vice-Capitão não ativado: sua pontuação-base não superou a do Capitão.`,
         };
       }
 
@@ -234,6 +250,14 @@ export class CardEffectResolver {
 
         // Caça-Talentos (percentage = 0.5, maxBonus = 6, belowMedianPrice = true)
         if (config.belowMedianPrice) {
+          const eligible = isFantasyPriceEligible(
+            { targetFilter: "BELOW_MEDIAN_PRICE" },
+            { id: targetPlayer.playerId, price: targetPlayer.price },
+            context.allRoundPlayers.map((player) => ({ id: player.playerId, price: player.price })),
+          );
+          if (!eligible) {
+            return { applied: false, bonusPoints: 0, description: "Caça-Talentos inválido: atleta fora da faixa de preço elegível." };
+          }
           const percentage = config.percentage || 0.5;
           const maxBonus = config.maxBonus || 6;
           const rawBonus = Math.max(0, targetPlayer.basePoints * percentage);
@@ -248,6 +272,14 @@ export class CardEffectResolver {
 
         // All-In (cheapestPercentile = 0.5, topRank = 5, bonus = 6)
         if (config.topRank) {
+          const eligible = isFantasyPriceEligible(
+            { targetFilter: "CHEAPEST_50_PERCENT" },
+            { id: targetPlayer.playerId, price: targetPlayer.price },
+            context.allRoundPlayers.map((player) => ({ id: player.playerId, price: player.price })),
+          );
+          if (!eligible) {
+            return { applied: false, bonusPoints: 0, description: "All-In inválido: atleta fora dos 50% mais baratos." };
+          }
           const bonus = config.bonus || 6;
           const maxRank = config.topRank || 5;
 
@@ -294,8 +326,8 @@ export class CardEffectResolver {
 
         const bonus = config.bonus || 5;
         const avg = context.roundAverageBasePoints;
-        const p1Ok = p1.games > 0 && p1.basePoints >= avg;
-        const p2Ok = p2.games > 0 && p2.basePoints >= avg;
+        const p1Ok = p1.games > 0 && p1.basePoints > avg;
+        const p2Ok = p2.games > 0 && p2.basePoints > avg;
 
         if (p1Ok && p2Ok) {
           return {

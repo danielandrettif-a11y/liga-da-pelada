@@ -5,6 +5,7 @@ import "./globals.css";
 import { SessionBottomNav } from "@/components/SessionBottomNav";
 import { SessionInstallAppPrompt } from "@/components/SessionInstallAppPrompt";
 import { Header } from "@/components/Header";
+import { PwaRegistration } from "@/components/PwaRegistration";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -81,6 +82,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${oswald.variable} h-full antialiased`}>
       <body className="min-h-dvh flex flex-col font-sans">
+        <PwaRegistration />
         <Header />
         <main className="min-w-0 flex-1 overflow-x-clip px-4 pt-4 pb-[calc(5.5rem+env(safe-area-inset-bottom)+1.5rem)] max-w-lg mx-auto w-full">
           {children}

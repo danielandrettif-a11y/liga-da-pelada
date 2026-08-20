@@ -5,8 +5,12 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { CheckCircle2, Loader2, Sparkles, X } from "@/components/icons";
 import { RARITY_CONFIG, type FantasyCardRarity } from "@/lib/fantasy/cards/config";
-import type { FantasyCardDefinition } from "@/lib/fantasy/cards/catalog";
+import {
+  FANTASY_CARDS_CATALOG,
+  type FantasyCardDefinition,
+} from "@/lib/fantasy/cards/catalog";
 import { getCardArtUrl } from "@/lib/fantasy/cards/card-assets";
+import { filterFantasyCardTargets } from "@/lib/fantasy/cards/eligibility";
 import type { FantasyUserCardDTO } from "@/lib/actions/fantasy-cards";
 import { activateCardForRound, getMyInventory } from "@/lib/actions/fantasy-cards";
 import { useDialogViewport } from "@/lib/useDialogViewport";
@@ -40,6 +44,8 @@ export function FantasyInventoryModal({
     availableCount: number;
   } | null>(null);
   const [rarityFilter, setRarityFilter] = useState<string>("ALL");
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [previewCard, setPreviewCard] = useState<FantasyCardDefinition | null>(null);
   const [selectedToUse, setSelectedToUse] = useState<{
     card: FantasyCardDefinition;
     instance: FantasyUserCardDTO;
@@ -65,6 +71,8 @@ export function FantasyInventoryModal({
         .finally(() => setLoading(false));
     } else {
       setSelectedToUse(null);
+      setShowCatalog(false);
+      setPreviewCard(null);
       setError(null);
     }
   }, [isOpen]);
@@ -76,6 +84,9 @@ export function FantasyInventoryModal({
     if (rarityFilter === "ALL") return true;
     return item.card.rarity === rarityFilter;
   });
+  const catalogCards = FANTASY_CARDS_CATALOG.filter((card) =>
+    rarityFilter === "ALL" ? true : card.rarity === rarityFilter,
+  );
 
   /**
    * Retorna os jogadores elegíveis para o alvo da carta selecionada.
@@ -90,6 +101,9 @@ export function FantasyInventoryModal({
     }
     if (card.slug === "duo" || card.requiresTarget === "DUO_PLAYERS") {
       return lineupPlayers;
+    }
+    if (card.targetFilter === "BELOW_MEDIAN_PRICE" || card.targetFilter === "CHEAPEST_50_PERCENT") {
+      return filterFantasyCardTargets(card, lineupPlayers, marketPlayers);
     }
     if (card.targetFilter === "ANY_IN_LINEUP" || card.slug === "emergency_sub") {
       return lineupPlayers.length > 0 ? lineupPlayers : marketPlayers;
@@ -148,32 +162,54 @@ export function FantasyInventoryModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 p-5 sm:p-6 bg-surface/50">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent/20 text-accent text-xl">
               🎒
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-black uppercase text-foreground">
-                  Minhas Cartas Especiais
+                  {showCatalog ? "Catálogo de Cartas" : "Minhas Cartas Especiais"}
                 </h2>
                 <span className="rounded-full bg-accent/20 text-accent px-2 py-0.5 text-[8px] font-black uppercase">
-                  {inventoryData?.availableCount || 0} Disponíveis
+                  {showCatalog
+                    ? `${FANTASY_CARDS_CATALOG.filter((card) => card.enabled).length} ativas`
+                    : `${inventoryData?.availableCount || 0} disponíveis`}
                 </span>
               </div>
               <p className="text-xs text-muted">
-                Gerencie suas cartas e selecione 1 para ativar na rodada atual
+                {showCatalog
+                  ? "Conheça todas as cartas e regras disponíveis no jogo"
+                  : "Gerencie suas cartas e selecione 1 para ativar na rodada atual"}
               </p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
-            aria-label="Fechar"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowCatalog((current) => !current);
+                setSelectedToUse(null);
+              }}
+              className={`flex h-9 w-9 items-center justify-center rounded-full border text-base font-black transition-colors ${
+                showCatalog
+                  ? "border-accent bg-accent text-background"
+                  : "border-accent/50 bg-accent/10 text-accent hover:bg-accent/20"
+              }`}
+              aria-label={showCatalog ? "Voltar ao meu inventário" : "Ver todas as cartas do jogo"}
+              title={showCatalog ? "Voltar ao inventário" : "Conheça todas as cartas"}
+            >
+              {showCatalog ? "←" : "!"}
+            </button>
+            <button
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+              aria-label="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Chips de Filtro por Raridade */}
@@ -202,7 +238,58 @@ export function FantasyInventoryModal({
 
         {/* Lista de Cartas / Seleção de Alvo */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3 touch-auto overscroll-contain">
-          {loading ? (
+          {showCatalog ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {catalogCards.map((card) => {
+                const rarityInfo = RARITY_CONFIG[card.rarity];
+                const artUrl = getCardArtUrl(card.slug);
+
+                return (
+                  <article
+                    key={card.slug}
+                    className={`overflow-hidden rounded-2xl border ${rarityInfo.border} ${rarityInfo.bg} ${
+                      card.enabled ? "opacity-100" : "opacity-60"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setPreviewCard(card)}
+                      className="group relative block aspect-[2/3] w-full overflow-hidden bg-black/40"
+                      aria-label={`Ampliar carta ${card.name}`}
+                    >
+                      {artUrl ? (
+                        <Image
+                          src={artUrl}
+                          alt={card.name}
+                          fill
+                          unoptimized
+                          sizes="(max-width: 640px) 45vw, 180px"
+                          className="object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                        />
+                      ) : (
+                        <span className="flex h-full items-center justify-center text-5xl">{card.icon}</span>
+                      )}
+                      <span className="absolute bottom-2 right-2 rounded-full bg-black/80 px-2 py-1 text-[9px] font-black uppercase text-white">
+                        Ampliar
+                      </span>
+                    </button>
+                    <div className="space-y-1.5 p-3">
+                      <div className="flex items-start justify-between gap-1">
+                        <h3 className={`text-xs font-black uppercase ${rarityInfo.text}`}>{card.name}</h3>
+                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[7px] font-black uppercase ${rarityInfo.badgeBg}`}>
+                          {rarityInfo.label}
+                        </span>
+                      </div>
+                      <p className="text-[10px] leading-relaxed text-muted">{card.description}</p>
+                      <p className={`text-[9px] font-black uppercase ${card.enabled ? "text-accent" : "text-warning"}`}>
+                        {card.enabled ? "Disponível no jogo" : "Em desenvolvimento"}
+                      </p>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : loading ? (
             <div className="py-12 text-center text-sm font-bold text-muted animate-pulse">
               Carregando inventário...
             </div>
@@ -211,7 +298,12 @@ export function FantasyInventoryModal({
             <div className="rounded-3xl border border-accent/40 bg-surface/80 p-5 space-y-4">
               <div className="flex items-center gap-3.5">
                 {getCardArtUrl(selectedToUse.card.slug) ? (
-                  <div className="relative h-20 w-14 shrink-0 rounded-xl overflow-hidden border border-white/20 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewCard(selectedToUse.card)}
+                    className="relative h-20 w-14 shrink-0 overflow-hidden rounded-xl border border-white/20 shadow-lg"
+                    aria-label={`Ampliar carta ${selectedToUse.card.name}`}
+                  >
                     <Image
                       src={getCardArtUrl(selectedToUse.card.slug)!}
                       alt={selectedToUse.card.name}
@@ -219,7 +311,7 @@ export function FantasyInventoryModal({
                       sizes="60px"
                       className="object-cover"
                     />
-                  </div>
+                  </button>
                 ) : (
                   <span className="text-3xl">{selectedToUse.card.icon}</span>
                 )}
@@ -407,7 +499,12 @@ export function FantasyInventoryModal({
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
                     {getCardArtUrl(card.slug) ? (
-                      <div className="relative h-16 w-11 shrink-0 rounded-xl overflow-hidden border border-white/20 shadow-md">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewCard(card)}
+                        className="relative h-16 w-11 shrink-0 overflow-hidden rounded-xl border border-white/20 shadow-md"
+                        aria-label={`Ampliar carta ${card.name}`}
+                      >
                         <Image
                           src={getCardArtUrl(card.slug)!}
                           alt={card.name}
@@ -416,7 +513,7 @@ export function FantasyInventoryModal({
                           sizes="50px"
                           className="object-cover"
                         />
-                      </div>
+                      </button>
                     ) : (
                       <span className="text-3xl shrink-0">{card.icon}</span>
                     )}
@@ -457,6 +554,44 @@ export function FantasyInventoryModal({
             })
           )}
         </div>
+
+        {previewCard && (
+          <div
+            className="fixed inset-0 z-[100001] flex items-center justify-center bg-black/95 p-4 backdrop-blur-lg"
+            onClick={() => setPreviewCard(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Carta ${previewCard.name} ampliada`}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewCard(null)}
+              className="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/70 text-white"
+              aria-label="Fechar carta ampliada"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="relative h-[82dvh] w-full max-w-md" onClick={(event) => event.stopPropagation()}>
+              {getCardArtUrl(previewCard.slug) ? (
+                <Image
+                  src={getCardArtUrl(previewCard.slug)!}
+                  alt={previewCard.name}
+                  fill
+                  unoptimized
+                  priority
+                  sizes="(max-width: 640px) 92vw, 430px"
+                  className="object-contain drop-shadow-[0_0_35px_rgba(0,0,0,0.9)]"
+                />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-4 rounded-3xl border border-white/20 bg-surface p-6 text-center">
+                  <span className="text-7xl">{previewCard.icon}</span>
+                  <h3 className="text-2xl font-black uppercase text-white">{previewCard.name}</h3>
+                  <p className="text-sm text-muted">{previewCard.description}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>,
     document.body

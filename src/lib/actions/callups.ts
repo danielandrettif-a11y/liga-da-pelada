@@ -241,37 +241,23 @@ export async function inviteGuestToCallup({
     return { success: false, error: playerError?.message || "Não foi possível criar o perfil do convidado." };
   }
 
-  // 3. Adicionar o convidado na convocação
-  const { data: confirmedEntries } = await client
-    .from("callup_entries")
-    .select("id")
-    .eq("callup_id", callupId)
-    .eq("status", "confirmed");
-
-  const { data: waitlistEntries } = await client
-    .from("callup_entries")
-    .select("id")
-    .eq("callup_id", callupId)
-    .eq("status", "waitlist");
-
-  const confirmedCount = confirmedEntries?.length || 0;
-  const waitlistCount = waitlistEntries?.length || 0;
-  const isConfirmed = confirmedCount < callup.capacity;
-
-  const { error: entryError } = await client.from("callup_entries").insert({
-    callup_id: callupId,
-    player_id: createdPlayer.id,
-    status: isConfirmed ? "confirmed" : "waitlist",
-    position: isConfirmed ? confirmedCount + 1 : waitlistCount + 1,
-    joined_by: account.user.id,
+  // 3. A posição é reservada transacionalmente no banco para evitar duas
+  // inscrições ocuparem a mesma vaga quando acontecem ao mesmo tempo.
+  const { data: createdEntry, error: entryError } = await account.client.rpc("add_player_to_callup", {
+    p_callup_id: callupId,
+    p_player_id: createdPlayer.id,
+    p_admin_only: false,
   });
 
   if (entryError) {
+    // Evita deixar um perfil órfão se a convocação fechar no mesmo instante.
+    await client.from("players").delete().eq("id", createdPlayer.id).eq("created_by_user_id", account.user.id);
     return { success: false, error: entryError.message };
   }
 
   refreshCallups();
-  return { success: true, isConfirmed, playerId: createdPlayer.id };
+  const entry = Array.isArray(createdEntry) ? createdEntry[0] : createdEntry;
+  return { success: true, isConfirmed: entry?.status === "confirmed", playerId: createdPlayer.id };
 }
 
 /**

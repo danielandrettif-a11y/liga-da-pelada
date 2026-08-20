@@ -33,6 +33,9 @@ export async function createMatch(input: CreateMatchInput) {
     if (!input.round_id || !input.team_a_id || !input.team_b_id || input.team_a_id === input.team_b_id) {
       return { success: false, error: "Selecione dois times diferentes." };
     }
+    if (!input.goalkeeper_a_id || !input.goalkeeper_b_id || input.goalkeeper_a_id === input.goalkeeper_b_id) {
+      return { success: false, error: "Escolha um goleiro diferente para cada time." };
+    }
 
     const selectedTeamIds = [input.team_a_id, input.team_b_id];
     const replacements = input.replacements || [];
@@ -129,10 +132,21 @@ export async function createMatch(input: CreateMatchInput) {
     }
 
     const proposedPlayerIds = new Set<string>(usedReplacementPlayers);
+    const effectiveTeamByPlayer = new Map<string, string>();
     for (const team of selectedTeams as any[]) {
       for (const teamPlayer of team.team_players || []) {
-        if (availability.get(teamPlayer.player_id) !== "injured" && (!usesAttendance || attendance.get(teamPlayer.player_id) === "present")) proposedPlayerIds.add(teamPlayer.player_id);
+        if (availability.get(teamPlayer.player_id) !== "injured" && (!usesAttendance || attendance.get(teamPlayer.player_id) === "present")) {
+          proposedPlayerIds.add(teamPlayer.player_id);
+          effectiveTeamByPlayer.set(teamPlayer.player_id, team.id);
+        }
       }
+    }
+    for (const replacement of replacements) {
+      effectiveTeamByPlayer.set(replacement.replacement_player_id, replacement.team_id);
+    }
+    if (effectiveTeamByPlayer.get(input.goalkeeper_a_id) !== input.team_a_id
+      || effectiveTeamByPlayer.get(input.goalkeeper_b_id) !== input.team_b_id) {
+      return { success: false, error: "O goleiro precisa estar escalado pelo time nesta partida." };
     }
     const liveMatchIds = (liveMatches || []).map((match: any) => match.id);
     if (liveMatchIds.length > 0 && proposedPlayerIds.size > 0) {
@@ -209,6 +223,15 @@ export async function createMatch(input: CreateMatchInput) {
         await client.from("matches").delete().eq("id", data.id);
         throw new Error(`Erro ao salvar a escalacao: ${lineupError.message}`);
       }
+    }
+
+    const { error: goalkeeperError } = await client.from("match_goalkeepers").insert([
+      { match_id: data.id, team_id: input.team_a_id, player_id: input.goalkeeper_a_id },
+      { match_id: data.id, team_id: input.team_b_id, player_id: input.goalkeeper_b_id },
+    ]);
+    if (goalkeeperError) {
+      await client.from("matches").delete().eq("id", data.id);
+      throw new Error(`Erro ao salvar os goleiros: ${goalkeeperError.message}`);
     }
 
     if (round.status === "draft") {
