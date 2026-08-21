@@ -629,7 +629,7 @@ export function RoundCreator({
             </div>
           )}
 
-          <div className="glass-card overflow-hidden max-h-[50vh] overflow-y-auto no-scrollbar">
+          <div className="glass-card overflow-hidden">
             {visiblePlayers.map((player, idx) => {
               const isSelected = selectedPlayerIds.has(player.id);
               return (
@@ -878,7 +878,7 @@ export function RoundCreator({
 
           {mounted && pendingDrawMode && typeof document !== "undefined" && createPortal(
             <div
-              className="fixed inset-0 z-[99999] flex flex-col justify-end sm:justify-center items-center bg-black/85 backdrop-blur-sm p-0 sm:p-4 animate-fade-in"
+              className="mobile-dialog-backdrop z-[99999] items-end bg-black/85 p-0 backdrop-blur-sm animate-fade-in sm:items-center sm:p-4"
               role="dialog"
               aria-modal="true"
               aria-label="Sorteio de times"
@@ -887,7 +887,7 @@ export function RoundCreator({
               }}
             >
               <div
-                className="relative flex w-full max-w-lg flex-col max-h-[85dvh] rounded-t-[2rem] sm:rounded-3xl border-t sm:border border-accent/40 bg-[#07150d] shadow-[0_-20px_60px_rgba(0,0,0,0.9)] overflow-hidden animate-slide-in-bottom sm:animate-fade-in-up pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+                className="mobile-dialog-panel relative flex max-w-lg flex-col rounded-t-[2rem] border-t border-accent/40 bg-[#07150d] pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-20px_60px_rgba(0,0,0,0.9)] animate-slide-in-bottom sm:rounded-3xl sm:border sm:animate-fade-in-up"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Puxador visual no mobile */}
@@ -942,7 +942,7 @@ export function RoundCreator({
                 </div>
 
                 {/* Lista de jogadores com scroll interno suave */}
-                <div className="min-h-0 flex-1 divide-y divide-border/40 overflow-y-auto overscroll-contain">
+                <div className="mobile-dialog-scroll flex-1 divide-y divide-border/40">
                   {selectedPlayers.map((player) => {
                     const position = attendanceOrder.indexOf(player.id);
                     return (

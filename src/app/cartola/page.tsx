@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { ClipboardList, LogIn, Trophy } from "@/components/icons";
 import { FantasyExperience } from "@/components/fantasy/FantasyExperience";
-import { getFantasyDashboard } from "@/lib/actions/fantasy";
+import { getFantasyDashboard, getSeasonPassDashboard } from "@/lib/actions/fantasy";
 import { SeasonPassBanner } from "@/components/fantasy/SeasonPassBanner";
 
 export default async function CartolaPage() {
-  const data = await getFantasyDashboard();
+  const [data, seasonPass] = await Promise.all([getFantasyDashboard(), getSeasonPassDashboard()]);
   if (!data.authenticated) return <Empty title="Entre para jogar o Cartola" description="Monte seu time, faça palpites e dispute com seus amigos." login />;
   if (!data.available) return <Empty title="Atualização do Cartola pendente" description="Execute as migrations do Cartola até a 039 para liberar a V1 desta temporada." />;
   return (
     <div>
-      <SeasonPassBanner />
+      <SeasonPassBanner pass={seasonPass} compact />
       <FantasyExperience
       round={data.round}
       fantasySeasonId={data.fantasySeasonId}

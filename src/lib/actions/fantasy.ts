@@ -1666,6 +1666,96 @@ export type FantasyQuickHighlight = {
   topDrop: { name: string; avatarUrl: string | null; variation: number; priceChange: number } | null;
 };
 
+export type SeasonPassEvent = {
+  id: string;
+  eventType: "participation" | "valid_lineup" | "full_round" | "goals_assists_cycle" | "participation_streak" | "lineup_streak";
+  houses: number;
+  roundId: string | null;
+  roundNumber: number | null;
+  roundDate: string | null;
+  createdAt: string;
+};
+
+export type SeasonPassDashboard = {
+  authenticated: boolean;
+  available: boolean;
+  progress: number;
+  maxProgress: 40;
+  mode: "athlete" | "community";
+  participations: number;
+  validLineups: number;
+  goalsAssistsRemainder: number;
+  nextMilestone: number | null;
+  events: SeasonPassEvent[];
+};
+
+/** Dados leves da trilha do Passe BQ. A regra e calculada no banco ao fechar a rodada. */
+export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
+  const account = await getCurrentAccount();
+  const empty: SeasonPassDashboard = {
+    authenticated: Boolean(account.user), available: false, progress: 0, maxProgress: 40,
+    mode: "athlete", participations: 0, validLineups: 0, goalsAssistsRemainder: 0,
+    nextMilestone: 1, events: [],
+  };
+  if (!account.user || !account.profile?.player_id) return empty;
+
+  const league = await getActiveLeague();
+  const season = await getActiveSeason(league.id);
+  if (!season) return empty;
+
+  const [{ data: fantasySeason, error: seasonError }, { data: player }] = await Promise.all([
+    account.client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle(),
+    account.client.from("players").select("member_category").eq("id", account.profile.player_id).maybeSingle(),
+  ]);
+  if (seasonError || !fantasySeason) return empty;
+
+  const { data: pass, error: passError } = await account.client
+    .from("fantasy_season_passes")
+    .select("progress, progression_mode, participations, valid_lineups, goals_assists_remainder")
+    .eq("fantasy_season_id", fantasySeason.id)
+    .eq("user_id", account.user.id)
+    .maybeSingle();
+
+  // Enquanto a migration 060 nao estiver aplicada, o restante do app segue utilizavel.
+  if (passError) return empty;
+
+  const { data: rows, error: eventsError } = await account.client
+    .from("fantasy_season_pass_events")
+    .select("id, event_type, houses, source_round_id, created_at, rounds:source_round_id(number, date)")
+    .eq("fantasy_season_id", fantasySeason.id)
+    .eq("user_id", account.user.id)
+    .order("created_at", { ascending: false })
+    .limit(8);
+  if (eventsError) return empty;
+
+  const mode = pass?.progression_mode === "community" || player?.member_category === "wag" || player?.member_category === "supporter"
+    ? "community" as const
+    : "athlete" as const;
+  const progress = Number(pass?.progress || 0);
+  const milestones = [1, 5, 10, 18, 25, 32, 40];
+
+  return {
+    authenticated: true,
+    available: true,
+    progress,
+    maxProgress: 40,
+    mode,
+    participations: Number(pass?.participations || 0),
+    validLineups: Number(pass?.valid_lineups || 0),
+    goalsAssistsRemainder: Number(pass?.goals_assists_remainder || 0),
+    nextMilestone: milestones.find((milestone) => milestone > progress) ?? null,
+    events: (rows || []).map((row: any) => ({
+      id: row.id,
+      eventType: row.event_type,
+      houses: Number(row.houses),
+      roundId: row.source_round_id || null,
+      roundNumber: row.rounds?.number ?? null,
+      roundDate: row.rounds?.date ?? null,
+      createdAt: row.created_at,
+    })),
+  };
+}
+
 export async function getFantasyQuickHighlights(): Promise<FantasyQuickHighlight | null> {
   const account = await getCurrentAccount();
   if (!account.user) return null;

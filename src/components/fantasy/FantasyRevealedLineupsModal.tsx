@@ -60,7 +60,7 @@ export function FantasyRevealedLineupsModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/85 backdrop-blur-md animate-fade-in touch-none overscroll-none p-4"
+      className="mobile-dialog-backdrop z-[99999] bg-black/85 backdrop-blur-md animate-fade-in"
       onClick={onClose}
       role="dialog"
       aria-modal="true"

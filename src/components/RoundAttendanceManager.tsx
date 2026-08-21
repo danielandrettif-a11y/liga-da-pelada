@@ -103,8 +103,8 @@ export function RoundAttendanceManager({ roundId, entries, canManage }: {
             )}
           </div>
 
-          {/* LISTA COM ALTURA LIMITADA E SCROLL SUAVE NO MOBILE */}
-          <div className="max-h-[50vh] divide-y divide-border/50 overflow-y-auto overscroll-contain">
+          {/* A pagina e a dona da rolagem: listas longas nao prendem o gesto no celular. */}
+          <div className="divide-y divide-border/50">
             {ordered.map((entry) => {
               const present = entry.attendance_status === "present";
               return (

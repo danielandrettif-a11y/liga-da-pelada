@@ -127,14 +127,14 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/92 p-3 sm:p-4 backdrop-blur-md animate-fade-in touch-none overscroll-none"
+      className="mobile-dialog-backdrop z-[99999] bg-black/92 backdrop-blur-md animate-fade-in"
       onClick={stage === "SEALED" || stage === "REVEALED" ? onClose : undefined}
       role="dialog"
       aria-modal="true"
       aria-label="Abertura de Pacote BQ Cartola"
     >
       <div
-        className="relative flex w-full max-w-lg max-h-[94vh] flex-col overflow-y-auto rounded-[2.5rem] border border-amber-400/50 bg-[#06160d] p-4 sm:p-6 shadow-[0_0_80px_rgba(0,0,0,0.98)] animate-fade-in-up my-auto touch-auto overscroll-contain overflow-hidden"
+        className="mobile-dialog-panel relative flex max-w-lg flex-col overflow-hidden rounded-[2.5rem] border border-amber-400/50 bg-[#06160d] p-4 sm:p-6 shadow-[0_0_80px_rgba(0,0,0,0.98)] animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* FUNDO DESFOCADO DO ESTÁDIO NO POPUP INTEIRO */}

@@ -182,14 +182,14 @@ export function FantasyInventoryModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md animate-fade-in touch-none overscroll-none"
+      className="mobile-dialog-backdrop z-[99999] bg-black/90 backdrop-blur-md animate-fade-in"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label="Inventário de Cartas"
     >
       <div
-        className="relative flex w-full max-w-xl max-h-[88vh] flex-col overflow-hidden rounded-[2.5rem] border border-accent/40 bg-[#06160d] shadow-[0_0_60px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto"
+        className="mobile-dialog-panel relative flex max-w-xl flex-col overflow-hidden rounded-[2.5rem] border border-accent/40 bg-[#06160d] shadow-[0_0_60px_rgba(0,0,0,0.95)] animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -269,7 +269,7 @@ export function FantasyInventoryModal({
         </div>
 
         {/* Lista de Cartas / Seleção de Alvo */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3 touch-auto overscroll-contain">
+        <div className="mobile-dialog-scroll flex-1 space-y-3 p-4 sm:p-6">
           {showCatalog ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {catalogCards.map((card) => {

@@ -1,14 +1,17 @@
 import { RosterDirectory } from "@/components/RosterDirectory";
 import { getRosterGroups } from "@/lib/actions/players";
 import { getUnreadRosterPlayers } from "@/lib/actions/registrations";
+import { getSeasonPassDashboard } from "@/lib/actions/fantasy";
+import { SeasonPassBanner } from "@/components/fantasy/SeasonPassBanner";
 
 export const revalidate = 0;
 
 export default async function JogadoresPage() {
-  const [rankedRoster, friendlyRoster, unreadRoster] = await Promise.all([
+  const [rankedRoster, friendlyRoster, unreadRoster, seasonPass] = await Promise.all([
     getRosterGroups("official"),
     getRosterGroups("friendly"),
     getUnreadRosterPlayers(),
+    getSeasonPassDashboard(),
   ]);
 
   return (
@@ -25,6 +28,7 @@ export default async function JogadoresPage() {
         supporters={rankedRoster.supporters}
         unreadPlayerIds={unreadRoster.playerIds}
         unreadSeenThrough={unreadRoster.seenThrough}
+        seasonPass={<SeasonPassBanner pass={seasonPass} />}
       />
     </div>
   );

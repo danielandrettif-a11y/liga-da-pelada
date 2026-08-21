@@ -87,16 +87,28 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: pan-y;
   padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
 }
 
 .mobile-dialog-panel {
   width: 100%;
+  min-height: 0;
   max-height: calc(100dvh - max(2rem, env(safe-area-inset-top)) - max(2rem, env(safe-area-inset-bottom)));
   overflow-y: auto;
   overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Listas em modais usam um unico scroller explicito para o gesto vertical. */
+.mobile-dialog-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
 }
 

@@ -86,7 +86,7 @@ export function PlayerAvatar({
         typeof document !== "undefined" &&
         createPortal(
           <div
-            className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md animate-fade-in touch-none overscroll-none"
+            className="mobile-dialog-backdrop z-[99999] bg-black/90 backdrop-blur-md animate-fade-in"
             onClick={(e) => {
               e.stopPropagation();
               setIsOpen(false);

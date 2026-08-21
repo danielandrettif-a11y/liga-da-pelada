@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayersStatsGrid, type PlayerStats } from "./PlayersStatsGrid";
@@ -16,6 +16,7 @@ type Props = {
   supporters: PlayerStats[];
   unreadPlayerIds?: string[];
   unreadSeenThrough?: string | null;
+  seasonPass?: ReactNode;
 };
 
 const FILTERS: Array<{ value: RosterFilter; label: string }> = [
@@ -67,7 +68,7 @@ function CommunityGrid({ players, label, unreadPlayerIds, unreadSeenThrough }: {
   );
 }
 
-export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters, unreadPlayerIds = [], unreadSeenThrough = null }: Props) {
+export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters, unreadPlayerIds = [], unreadSeenThrough = null, seasonPass }: Props) {
   const [filter, setFilter] = useState<RosterFilter>("all");
   const [statsMode, setStatsMode] = useState<StatsMode>("ranked");
   const unreadIds = new Set(unreadPlayerIds);
@@ -116,6 +117,8 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
           <PlayersStatsGrid players={visibleGuests} unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} />
         </section>
       )}
+
+      {filter === "all" && seasonPass}
 
       {showWags && (
         <section className="scroll-mt-36 space-y-4">
