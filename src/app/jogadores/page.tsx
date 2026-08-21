@@ -2,11 +2,12 @@ import { RosterDirectory } from "@/components/RosterDirectory";
 import { getRosterGroups } from "@/lib/actions/players";
 import { getUnreadRosterPlayers } from "@/lib/actions/registrations";
 import { getSeasonPassDashboard } from "@/lib/actions/fantasy";
-import { SeasonPassBanner } from "@/components/fantasy/SeasonPassBanner";
+import { SeasonPassExperience } from "@/components/fantasy/SeasonPassExperience";
 
 export const revalidate = 0;
 
-export default async function JogadoresPage() {
+export default async function JogadoresPage({ searchParams }: PageProps<"/jogadores">) {
+  const { tab } = await searchParams;
   const [rankedRoster, friendlyRoster, unreadRoster, seasonPass] = await Promise.all([
     getRosterGroups("official"),
     getRosterGroups("friendly"),
@@ -28,7 +29,8 @@ export default async function JogadoresPage() {
         supporters={rankedRoster.supporters}
         unreadPlayerIds={unreadRoster.playerIds}
         unreadSeenThrough={unreadRoster.seenThrough}
-        seasonPass={<SeasonPassBanner pass={seasonPass} />}
+        initialFilter={tab === "passe" ? "pass" : "all"}
+        seasonPass={<SeasonPassExperience pass={seasonPass} />}
       />
     </div>
   );

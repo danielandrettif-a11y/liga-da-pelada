@@ -25,6 +25,8 @@ import { NextRoundBanner } from "@/components/NextRoundBanner";
 import { OpenCallupBanner } from "@/components/OpenCallupBanner";
 import { TeamCrest } from "@/components/TeamCrest";
 import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
+import { getSeasonPassDashboard } from "@/lib/actions/fantasy";
+import { SeasonPassBanner } from "@/components/fantasy/SeasonPassBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -111,12 +113,13 @@ export default async function HomePage() {
 
     return player ? player.avatar_url : undefined;
   });
-  const [{ data }, previousSeason, account, accountName, playerAvatarUrl] = await Promise.all([
+  const [{ data }, previousSeason, account, accountName, playerAvatarUrl, seasonPass] = await Promise.all([
     getDashboardData(),
     getLatestFinishedSeason(),
     accountPromise,
     accountPromise.then(getAccountDisplayName),
     playerAvatarPromise,
+    getSeasonPassDashboard(),
   ]);
   const inheritedGoogleAvatars = [
     account.user?.user_metadata?.avatar_url,
@@ -210,6 +213,8 @@ export default async function HomePage() {
           return slides[0] || null;
         })()}
       </section>
+
+      <SeasonPassBanner pass={seasonPass} compact />
 
       {previousSeason && <PreviousSeasonBanner summary={previousSeason} />}
 

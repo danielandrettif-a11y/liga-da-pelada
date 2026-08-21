@@ -180,7 +180,9 @@ export function FantasyInventoryModal({
     });
   }
 
-  return createPortal(
+  return (
+    <>
+      {createPortal(
     <div
       className="mobile-dialog-backdrop z-[99999] bg-black/90 backdrop-blur-md animate-fade-in"
       onClick={onClose}
@@ -235,6 +237,7 @@ export function FantasyInventoryModal({
               {showCatalog ? "←" : "!"}
             </button>
             <button
+              type="button"
               onClick={onClose}
               className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
               aria-label="Fechar"
@@ -608,44 +611,47 @@ export function FantasyInventoryModal({
           )}
         </div>
 
-        {previewCard && (
-          <div
-            className="fixed inset-0 z-[100001] flex items-center justify-center bg-black/95 p-4 backdrop-blur-lg"
-            onClick={() => setPreviewCard(null)}
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Carta ${previewCard.name} ampliada`}
-          >
-            <button
-              type="button"
-              onClick={() => setPreviewCard(null)}
-              className="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/70 text-white"
-              aria-label="Fechar carta ampliada"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <div className="relative h-[82dvh] w-full max-w-md" onClick={(event) => event.stopPropagation()}>
-              {getCardArtUrl(previewCard.slug) ? (
-                <Image
-                  src={getCardArtUrl(previewCard.slug)!}
-                  alt={previewCard.name}
-                  fill
-                  priority
-                  sizes="(max-width: 640px) 92vw, 430px"
-                  className="object-contain drop-shadow-[0_0_35px_rgba(0,0,0,0.9)]"
-                />
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-4 rounded-3xl border border-white/20 bg-surface p-6 text-center">
-                  <span className="text-7xl">{previewCard.icon}</span>
-                  <h3 className="text-2xl font-black uppercase text-white">{previewCard.name}</h3>
-                  <p className="text-sm text-muted">{previewCard.description}</p>
-                </div>
-              )}
-            </div>
+      </div>
+    </div>,
+        document.body,
+      )}
+      {previewCard && createPortal(
+    <div
+      className="fixed inset-0 z-[100001] flex touch-none items-center justify-center bg-black/95 p-4 backdrop-blur-lg"
+      onClick={() => setPreviewCard(null)}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Carta ${previewCard.name} ampliada`}
+    >
+      <button
+        type="button"
+        onClick={() => setPreviewCard(null)}
+        className="absolute right-[max(1.25rem,env(safe-area-inset-right))] top-[max(1.25rem,env(safe-area-inset-top))] z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/80 text-white shadow-lg"
+        aria-label="Fechar carta ampliada"
+      >
+        <X className="h-5 w-5" />
+      </button>
+      <div className="relative h-[min(82dvh,760px)] w-full max-w-md" onClick={(event) => event.stopPropagation()}>
+        {getCardArtUrl(previewCard.slug) ? (
+          <Image
+            src={getCardArtUrl(previewCard.slug)!}
+            alt={previewCard.name}
+            fill
+            priority
+            sizes="(max-width: 640px) 92vw, 430px"
+            className="object-contain drop-shadow-[0_0_35px_rgba(0,0,0,0.9)]"
+          />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-4 rounded-3xl border border-white/20 bg-surface p-6 text-center">
+            <span className="text-7xl">{previewCard.icon}</span>
+            <h3 className="text-2xl font-black uppercase text-white">{previewCard.name}</h3>
+            <p className="text-sm text-muted">{previewCard.description}</p>
           </div>
         )}
       </div>
     </div>,
-    document.body
+        document.body,
+      )}
+    </>
   );
 }

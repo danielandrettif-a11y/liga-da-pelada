@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayersStatsGrid, type PlayerStats } from "./PlayersStatsGrid";
 import { RosterUnreadLink } from "./RosterUnreadLink";
 
-type RosterFilter = "all" | "players" | "wags" | "supporters";
+type RosterFilter = "all" | "players" | "wags" | "supporters" | "pass";
 type StatsMode = "ranked" | "friendly";
 
 type Props = {
@@ -16,6 +16,7 @@ type Props = {
   supporters: PlayerStats[];
   unreadPlayerIds?: string[];
   unreadSeenThrough?: string | null;
+  initialFilter?: RosterFilter;
   seasonPass?: ReactNode;
 };
 
@@ -24,9 +25,10 @@ const FILTERS: Array<{ value: RosterFilter; label: string }> = [
   { value: "players", label: "Jogadores" },
   { value: "wags", label: "WAGs" },
   { value: "supporters", label: "Torcida" },
+  { value: "pass", label: "Passe" },
 ];
 
-function SectionDivider({ title, subtitle, count, tone = "accent" }: { title: string; subtitle: string; count: number; tone?: "accent" | "warning" | "muted" }) {
+function SectionDivider({ title, subtitle, count, tone = "accent" }: { title: string; subtitle: string; count?: number; tone?: "accent" | "warning" | "muted" }) {
   const toneClass = tone === "warning"
     ? "border-warning/30 bg-warning/10 text-warning"
     : tone === "muted"
@@ -38,7 +40,7 @@ function SectionDivider({ title, subtitle, count, tone = "accent" }: { title: st
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <h2 className="whitespace-nowrap text-sm font-black text-foreground">{title}</h2>
-          <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${toneClass}`}>{count}</span>
+          {count != null && <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${toneClass}`}>{count}</span>}
         </div>
         <p className="mt-0.5 text-[10px] text-muted">{subtitle}</p>
       </div>
@@ -68,22 +70,25 @@ function CommunityGrid({ players, label, unreadPlayerIds, unreadSeenThrough }: {
   );
 }
 
-export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters, unreadPlayerIds = [], unreadSeenThrough = null, seasonPass }: Props) {
-  const [filter, setFilter] = useState<RosterFilter>("all");
+export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters, unreadPlayerIds = [], unreadSeenThrough = null, initialFilter = "all", seasonPass }: Props) {
+  const [filter, setFilter] = useState<RosterFilter>(initialFilter);
   const [statsMode, setStatsMode] = useState<StatsMode>("ranked");
   const unreadIds = new Set(unreadPlayerIds);
   const showPlayers = filter === "all" || filter === "players";
   const showWags = filter === "all" || filter === "wags";
   const showSupporters = filter === "all" || filter === "supporters";
+  const showPass = filter === "pass";
   const visibleOfficialPlayers = officialPlayers[statsMode];
   const visibleGuests = activeGuests[statsMode];
+
+  useEffect(() => setFilter(initialFilter), [initialFilter]);
 
   return (
     <div className="space-y-7">
       <div className="sticky top-20 z-30 -mx-1 rounded-2xl border border-border bg-background/95 p-1.5 shadow-xl shadow-black/20 backdrop-blur-xl">
-        <div className="grid grid-cols-4 gap-1" role="tablist" aria-label="Filtrar elenco por categoria">
+        <div className="no-scrollbar flex gap-1 overflow-x-auto" role="tablist" aria-label="Filtrar elenco por categoria">
           {FILTERS.map((item) => (
-            <button key={item.value} type="button" role="tab" aria-selected={filter === item.value} onClick={() => setFilter(item.value)} className={`min-w-0 rounded-xl px-1 py-2.5 text-[10px] font-black transition-colors ${filter === item.value ? "bg-accent text-background shadow-[0_0_18px_rgba(204,255,0,.16)]" : "text-muted hover:bg-surface hover:text-foreground"}`}>
+            <button key={item.value} type="button" role="tab" aria-selected={filter === item.value} onClick={() => setFilter(item.value)} className={`min-w-[74px] shrink-0 rounded-xl px-2 py-2.5 text-[10px] font-black transition-colors ${filter === item.value ? "bg-accent text-background shadow-[0_0_18px_rgba(204,255,0,.16)]" : "text-muted hover:bg-surface hover:text-foreground"}`}>
               <span className="block truncate">{item.label}</span>
             </button>
           ))}
@@ -118,7 +123,7 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
         </section>
       )}
 
-      {filter === "all" && seasonPass}
+      {showPass && <section className="scroll-mt-36 space-y-3"><SectionDivider title="Passe de Temporada" subtitle="Sua trilha de evolução na temporada" /><div>{seasonPass}</div></section>}
 
       {showWags && (
         <section className="scroll-mt-36 space-y-4">

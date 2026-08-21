@@ -89,6 +89,7 @@ textarea {
   justify-content: center;
   overflow: hidden;
   overscroll-behavior: none;
+  /* A página já está travada pelo hook; preserve o gesto vertical na lista interna. */
   touch-action: pan-y;
   padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
 }
@@ -97,10 +98,7 @@ textarea {
   width: 100%;
   min-height: 0;
   max-height: calc(100dvh - max(2rem, env(safe-area-inset-top)) - max(2rem, env(safe-area-inset-bottom)));
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
 }
 
 /* Listas em modais usam um unico scroller explicito para o gesto vertical. */
