@@ -216,15 +216,15 @@ export async function getFantasyDashboard() {
   let activeCard: any = null;
 
   try {
-    const { getMyPacks, getMyInventory, getActiveCardForRound } = await import("./fantasy-cards");
-    const [packsRes, invRes, activeCardRes] = await Promise.all([
+    const { getMyPacks, getMyInventoryCount, getActiveCardForRound } = await import("./fantasy-cards");
+    const [packsRes, inventoryCountResult, activeCardRes] = await Promise.all([
       getMyPacks(),
-      getMyInventory(),
+      getMyInventoryCount(),
       displayRoundId ? getActiveCardForRound(displayRoundId) : Promise.resolve(null),
     ]);
     availablePacks = packsRes.availablePacks;
     availablePacksCount = packsRes.availablePacks.length;
-    inventoryCount = invRes.availableCount;
+    inventoryCount = inventoryCountResult;
     activeCard = activeCardRes;
   } catch (err) {
     console.error("Erro ao carregar dados V3 das cartas:", err);
@@ -349,17 +349,27 @@ export async function getFantasyDashboard() {
 
   const pricePlayerIds = (priceRows || []).map((row: any) => row.player_id);
   const participantIds = (roundParticipants || []).map((row: any) => row.player_id);
-  const selectablePlayerIds = (selectablePlayers || []).map((row: any) => row.id);
-  const eligibleIds = isTest
-    ? participantIds
-    : [...new Set([...pricePlayerIds, ...participantIds, ...selectablePlayerIds])];
 
-  const { data: players } = eligibleIds.length
+  // A consulta de jogadores selecionáveis já trouxe os dados completos do elenco.
+  // Só buscamos separadamente os participantes/preços que não façam parte dela
+  // (por exemplo, convidados da rodada), evitando ler o elenco inteiro duas vezes.
+  const selectableById = new Map((selectablePlayers || []).map((player: any) => [player.id, player]));
+  const additionalPlayerIds = [...new Set([...pricePlayerIds, ...participantIds])].filter(
+    (playerId) => !selectableById.has(playerId),
+  );
+  const { data: additionalPlayers } = additionalPlayerIds.length
     ? await account.client
         .from("players")
         .select("id, name, avatar_url, player_profile, member_category, is_selectable")
-        .in("id", eligibleIds)
+        .in("id", additionalPlayerIds)
     : { data: [] as any[] };
+  const allPlayersById = new Map([
+    ...(selectablePlayers || []).map((player: any) => [player.id, player] as const),
+    ...(additionalPlayers || []).map((player: any) => [player.id, player] as const),
+  ]);
+  const players = isTest
+    ? participantIds.map((playerId) => allPlayersById.get(playerId)).filter(Boolean)
+    : Array.from(allPlayersById.values());
 
   const priceByPlayer = new Map((priceRows || []).map((row: any) => [row.player_id, row]));
   const statsByPlayer = new Map<

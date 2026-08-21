@@ -1,9 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Sparkles, Trophy } from "@/components/icons";
 import type { FantasyPackDTO } from "@/lib/actions/fantasy-cards";
-import { FantasyPackOpeningModal } from "./FantasyPackOpeningModal";
+
+const FantasyPackOpeningModal = dynamic(
+  () => import("./FantasyPackOpeningModal").then((mod) => mod.FantasyPackOpeningModal),
+  { ssr: false },
+);
 
 type Props = {
   packs: FantasyPackDTO[];

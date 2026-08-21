@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
@@ -31,14 +32,31 @@ import {
 } from "@/lib/actions/fantasy";
 import { supabase } from "@/lib/supabase";
 import { useDialogViewport } from "@/lib/useDialogViewport";
-import { FantasyTutorialModal } from "./FantasyTutorialModal";
 import { FantasyRadarCarousel } from "./FantasyRadarCarousel";
-import { FantasyPlayerDrawer } from "./FantasyPlayerDrawer";
-import { FantasyRevealedLineupsModal } from "./FantasyRevealedLineupsModal";
 import { FantasyPackClaimBanner } from "./cards/FantasyPackClaimBanner";
 import { FantasyActiveCardSlot } from "./cards/FantasyActiveCardSlot";
-import { FantasyInventoryModal } from "./cards/FantasyInventoryModal";
 import type { FantasyActiveCardDTO, FantasyPackDTO } from "@/lib/actions/fantasy-cards";
+
+const FantasyTutorialModal = dynamic(
+  () => import("./FantasyTutorialModal").then((mod) => mod.FantasyTutorialModal),
+  { ssr: false },
+);
+const FantasyPlayerDrawer = dynamic(
+  () => import("./FantasyPlayerDrawer").then((mod) => mod.FantasyPlayerDrawer),
+  { ssr: false },
+);
+const FantasyRevealedLineupsModal = dynamic(
+  () => import("./FantasyRevealedLineupsModal").then((mod) => mod.FantasyRevealedLineupsModal),
+  { ssr: false },
+);
+const FantasyInventoryModal = dynamic(
+  () => import("./cards/FantasyInventoryModal").then((mod) => mod.FantasyInventoryModal),
+  { ssr: false },
+);
+
+function preloadInventoryModal() {
+  void import("./cards/FantasyInventoryModal").then((mod) => mod.preloadFantasyInventory());
+}
 
 type Props = {
   round: {
@@ -104,7 +122,6 @@ export function FantasyExperience({
   const [scorerId, setScorerId] = useState<string | null>(lineup?.top_scorer_player_id || null);
   const [assistId, setAssistId] = useState<string | null>(lineup?.top_assist_player_id || null);
   const [challengeId, setChallengeId] = useState<string | null>(lineup?.challenge_player_id || null);
-  const [now, setNow] = useState(() => Date.now());
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("points");
   const [activeTab, setActiveTab] = useState<"team" | "market">("team");
@@ -116,6 +133,7 @@ export function FantasyExperience({
   const [selectedDrawerPlayer, setSelectedDrawerPlayer] = useState<FantasyMarketPlayer | null>(null);
   const [showRevealedLineups, setShowRevealedLineups] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const refreshTimerRef = useRef<number | null>(null);
 
   useDialogViewport(Boolean(infoModal));
 
@@ -205,7 +223,22 @@ export function FantasyExperience({
 
   const scheduledAt =
     round?.date && round.start_time ? new Date(`${round.date}T${round.start_time}`).getTime() : null;
-  const countdown = scheduledAt ? scheduledAt - now : null;
+  const requestRefresh = useCallback(
+    (delay = 300) => {
+      if (refreshTimerRef.current) return;
+      refreshTimerRef.current = window.setTimeout(() => {
+        refreshTimerRef.current = null;
+        router.refresh();
+      }, delay);
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+    };
+  }, []);
   const selectedChallengePlayer = market.find((player) => player.id === challengeId) || null;
   const challengeOffer =
     challengeType && selectedChallengePlayer
@@ -240,29 +273,23 @@ export function FantasyExperience({
     if (status !== "in_progress" || !round) return;
     const channel = supabase
       .channel(`fantasy-${round.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "match_events" }, () => router.refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "player_round_stats", filter: `round_id=eq.${round.id}` }, () => router.refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "match_events" }, () => requestRefresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "player_round_stats", filter: `round_id=eq.${round.id}` }, () => requestRefresh())
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [round, router, status]);
+  }, [requestRefresh, round, status]);
 
   useEffect(() => {
     const channel = supabase
       .channel(`fantasy-market-players-${round?.id || "analysis"}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "players" }, () => router.refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "players" }, () => requestRefresh(750))
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [round?.id, router]);
-
-  useEffect(() => {
-    if (!open || betweenRounds || !scheduledAt) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [betweenRounds, open, scheduledAt]);
+  }, [requestRefresh, round?.id]);
 
   function togglePlayer(player: FantasyMarketPlayer) {
     if (!open) {
@@ -338,7 +365,7 @@ export function FantasyExperience({
       {availablePacks && availablePacks.length > 0 && (
         <FantasyPackClaimBanner
           packs={availablePacks}
-          onPackClaimed={() => router.refresh()}
+          onPackClaimed={() => requestRefresh(0)}
         />
       )}
 
@@ -425,10 +452,8 @@ export function FantasyExperience({
               {open ? "Mercado aberto" : "Mercado fechado"}
             </p>
             <p className="mt-0.5 text-sm font-black text-foreground">
-              {open && countdown != null && countdown > 0
-                ? `Mercado fecha em ${formatCountdown(countdown)}`
-                : open && countdown != null
-                ? "Fechando mercado · Início da rodada iminente"
+              {open && scheduledAt
+                ? <MarketCountdown scheduledAt={scheduledAt} />
                 : open
                 ? "Mercado fecha no início da primeira partida"
                 : "Mercado Fechado · Escalações bloqueadas"}
@@ -510,6 +535,9 @@ export function FantasyExperience({
         <button
           type="button"
           onClick={() => setShowInventoryModal(true)}
+          onPointerEnter={preloadInventoryModal}
+          onFocus={preloadInventoryModal}
+          onTouchStart={preloadInventoryModal}
           className="rounded-xl border border-accent/40 bg-accent/15 px-3 py-2 text-center text-xs font-black text-accent hover:bg-accent/25 transition-colors shadow-sm"
         >
           <span className="mr-1">🎒</span>
@@ -866,7 +894,7 @@ export function FantasyExperience({
                 marketPlayers={market}
                 lineupPlayers={selectedPlayers}
                 captainPlayerId={captainId}
-                onRefresh={() => router.refresh()}
+                onRefresh={() => requestRefresh(0)}
               />
             )}
 
@@ -1265,38 +1293,44 @@ export function FantasyExperience({
       </div>
 
       {/* DRAWER INTERATIVO DE DETALHES DO JOGADOR */}
-      <FantasyPlayerDrawer
-        player={selectedDrawerPlayer}
-        settings={settings}
-        isOpen={Boolean(selectedDrawerPlayer)}
-        onClose={() => setSelectedDrawerPlayer(null)}
-        isBought={Boolean(selectedDrawerPlayer && selected.includes(selectedDrawerPlayer.id))}
-        isMarketOpen={open}
-        onToggleBuy={(p) => togglePlayer(p)}
-      />
+      {selectedDrawerPlayer && (
+        <FantasyPlayerDrawer
+          player={selectedDrawerPlayer}
+          settings={settings}
+          isOpen={Boolean(selectedDrawerPlayer)}
+          onClose={() => setSelectedDrawerPlayer(null)}
+          isBought={Boolean(selectedDrawerPlayer && selected.includes(selectedDrawerPlayer.id))}
+          isMarketOpen={open}
+          onToggleBuy={(p) => togglePlayer(p)}
+        />
+      )}
 
       {/* MODAL DE ESCALAÇÕES REVELADAS */}
-      <FantasyRevealedLineupsModal
-        roundId={round?.id}
-        roundNumber={round?.number}
-        isOpen={showRevealedLineups}
-        onClose={() => setShowRevealedLineups(false)}
-      />
+      {showRevealedLineups && (
+        <FantasyRevealedLineupsModal
+          roundId={round?.id}
+          roundNumber={round?.number}
+          isOpen={showRevealedLineups}
+          onClose={() => setShowRevealedLineups(false)}
+        />
+      )}
 
       {/* V3: MODAL DE INVENTÁRIO */}
-      <FantasyInventoryModal
-        isOpen={showInventoryModal}
-        onClose={() => setShowInventoryModal(false)}
-        roundId={round?.id}
-        isMarketOpen={open}
-        marketPlayers={market}
-        lineupPlayers={selectedPlayers}
-        captainPlayerId={captainId}
-        onCardActivated={() => router.refresh()}
-      />
+      {showInventoryModal && (
+        <FantasyInventoryModal
+          isOpen={showInventoryModal}
+          onClose={() => setShowInventoryModal(false)}
+          roundId={round?.id}
+          isMarketOpen={open}
+          marketPlayers={market}
+          lineupPlayers={selectedPlayers}
+          captainPlayerId={captainId}
+          onCardActivated={() => requestRefresh(0)}
+        />
+      )}
 
       {/* MODAL DE TUTORIAL */}
-      <FantasyTutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} />
+      {showTutorial && <FantasyTutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} />}
 
       {/* POPUP BÁSICO DE AJUDA DOS PALPITES / DESAFIO */}
       {mounted &&
@@ -1374,6 +1408,21 @@ function formatCountdown(value: number) {
   const minutes = Math.floor((seconds % 3600) / 60);
   const rest = seconds % 60;
   return `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(rest).padStart(2, "0")}s`;
+}
+
+function MarketCountdown({ scheduledAt }: { scheduledAt: number }) {
+  const [remaining, setRemaining] = useState(() => scheduledAt - Date.now());
+
+  useEffect(() => {
+    const update = () => setRemaining(scheduledAt - Date.now());
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [scheduledAt]);
+
+  return remaining > 0
+    ? <>Mercado fecha em {formatCountdown(remaining)}</>
+    : <>Fechando mercado · Início da rodada iminente</>;
 }
 
 function Select({

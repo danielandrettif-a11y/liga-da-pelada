@@ -124,8 +124,6 @@ export function CardRevealStage({ offers, onSelectCard }: Props) {
                           src={customArtUrl!}
                           alt={card.name}
                           fill
-                          priority
-                          unoptimized
                           sizes="(max-width: 640px) 50vw, 220px"
                           className="object-contain group-hover:scale-105 transition-transform duration-300"
                           onError={() => handleImageError(card.slug)}

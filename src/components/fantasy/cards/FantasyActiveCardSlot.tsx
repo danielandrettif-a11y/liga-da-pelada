@@ -1,13 +1,22 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { Lock, Sparkles, Trash2, X } from "@/components/icons";
 import { RARITY_CONFIG } from "@/lib/fantasy/cards/config";
 import { getCardArtUrl } from "@/lib/fantasy/cards/card-assets";
 import type { FantasyActiveCardDTO } from "@/lib/actions/fantasy-cards";
 import { removeActiveCardForRound } from "@/lib/actions/fantasy-cards";
-import { FantasyInventoryModal } from "./FantasyInventoryModal";
+
+const FantasyInventoryModal = dynamic(
+  () => import("./FantasyInventoryModal").then((mod) => mod.FantasyInventoryModal),
+  { ssr: false },
+);
+
+function preloadInventoryModal() {
+  void import("./FantasyInventoryModal").then((mod) => mod.preloadFantasyInventory());
+}
 
 type Props = {
   roundId: string | null;
@@ -71,8 +80,8 @@ export function FantasyActiveCardSlot({
                       src={getCardArtUrl(activeCard.card.slug)!}
                       alt={activeCard.card.name}
                       fill
-                      unoptimized
                       sizes="50px"
+                      loading="lazy"
                       className="object-cover"
                     />
                   </div>
@@ -113,6 +122,9 @@ export function FantasyActiveCardSlot({
                   <button
                     type="button"
                     onClick={() => setShowInventory(true)}
+                    onPointerEnter={preloadInventoryModal}
+                    onFocus={preloadInventoryModal}
+                    onTouchStart={preloadInventoryModal}
                     className="rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase text-white hover:bg-white/20 transition-colors"
                   >
                     Trocar
@@ -181,8 +193,11 @@ export function FantasyActiveCardSlot({
 
             {isMarketOpen && (
               <button
-                type="button"
-                onClick={() => setShowInventory(true)}
+                    type="button"
+                    onClick={() => setShowInventory(true)}
+                    onPointerEnter={preloadInventoryModal}
+                    onFocus={preloadInventoryModal}
+                    onTouchStart={preloadInventoryModal}
                 className="shrink-0 flex items-center gap-1 rounded-xl bg-accent px-3 py-2 text-[10px] font-black uppercase tracking-wider text-background shadow-[0_0_15px_rgba(204,255,0,0.2)] hover:brightness-110 active:scale-95 transition-all"
               >
                 <Sparkles className="h-3 w-3" />
@@ -194,18 +209,20 @@ export function FantasyActiveCardSlot({
       </section>
 
       {/* Modal de Inventário */}
-      <FantasyInventoryModal
-        isOpen={showInventory}
-        onClose={() => setShowInventory(false)}
-        roundId={roundId}
-        isMarketOpen={isMarketOpen}
-        marketPlayers={marketPlayers}
-        lineupPlayers={lineupPlayers}
-        captainPlayerId={captainPlayerId}
-        onCardActivated={() => {
-          onRefresh?.();
-        }}
-      />
+      {showInventory && (
+        <FantasyInventoryModal
+          isOpen={showInventory}
+          onClose={() => setShowInventory(false)}
+          roundId={roundId}
+          isMarketOpen={isMarketOpen}
+          marketPlayers={marketPlayers}
+          lineupPlayers={lineupPlayers}
+          captainPlayerId={captainPlayerId}
+          onCardActivated={() => {
+            onRefresh?.();
+          }}
+        />
+      )}
     </>
   );
 }

@@ -26,6 +26,37 @@ type Props = {
   captainPlayerId?: string | null;
 };
 
+type InventoryData = {
+  cards: FantasyUserCardDTO[];
+  groupedBySlug: Record<string, { count: number; card: FantasyCardDefinition; instances: FantasyUserCardDTO[] }>;
+  availableCount: number;
+};
+
+// O inventário é pessoal, então este cache só vive na aba atual do navegador.
+// Ele elimina a segunda espera ao fechar e abrir o modal novamente.
+let cachedInventory: InventoryData | null = null;
+let inventoryRequest: Promise<InventoryData> | null = null;
+
+export function preloadFantasyInventory({ force = false }: { force?: boolean } = {}) {
+  if (!force && cachedInventory) return Promise.resolve(cachedInventory);
+  if (!force && inventoryRequest) return inventoryRequest;
+
+  inventoryRequest = getMyInventory()
+    .then((data) => {
+      cachedInventory = data;
+      return data;
+    })
+    .finally(() => {
+      inventoryRequest = null;
+    });
+
+  return inventoryRequest;
+}
+
+export function invalidateFantasyInventory() {
+  cachedInventory = null;
+}
+
 export function FantasyInventoryModal({
   isOpen,
   onClose,
@@ -38,11 +69,7 @@ export function FantasyInventoryModal({
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [inventoryData, setInventoryData] = useState<{
-    cards: FantasyUserCardDTO[];
-    groupedBySlug: Record<string, { count: number; card: FantasyCardDefinition; instances: FantasyUserCardDTO[] }>;
-    availableCount: number;
-  } | null>(null);
+  const [inventoryData, setInventoryData] = useState<InventoryData | null>(() => cachedInventory);
   const [rarityFilter, setRarityFilter] = useState<string>("ALL");
   const [showCatalog, setShowCatalog] = useState(false);
   const [previewCard, setPreviewCard] = useState<FantasyCardDefinition | null>(null);
@@ -64,8 +91,8 @@ export function FantasyInventoryModal({
 
   useEffect(() => {
     if (isOpen) {
-      setLoading(true);
-      getMyInventory()
+      setLoading(!cachedInventory);
+      preloadFantasyInventory()
         .then((res) => setInventoryData(res))
         .catch(() => setInventoryData(null))
         .finally(() => setLoading(false));
@@ -137,6 +164,7 @@ export function FantasyInventoryModal({
         });
 
         if (res.success) {
+          invalidateFantasyInventory();
           onCardActivated?.();
           onClose();
         } else {
@@ -247,7 +275,7 @@ export function FantasyInventoryModal({
                 return (
                   <article
                     key={card.slug}
-                    className={`overflow-hidden rounded-2xl border ${rarityInfo.border} ${rarityInfo.bg} ${
+                    className={`[content-visibility:auto] [contain-intrinsic-size:280px] overflow-hidden rounded-2xl border ${rarityInfo.border} ${rarityInfo.bg} ${
                       card.enabled ? "opacity-100" : "opacity-60"
                     }`}
                   >
@@ -262,8 +290,8 @@ export function FantasyInventoryModal({
                           src={artUrl}
                           alt={card.name}
                           fill
-                          unoptimized
                           sizes="(max-width: 640px) 45vw, 180px"
+                          loading="lazy"
                           className="object-cover transition-transform duration-200 group-hover:scale-[1.03]"
                         />
                       ) : (
@@ -509,8 +537,8 @@ export function FantasyInventoryModal({
                           src={getCardArtUrl(card.slug)!}
                           alt={card.name}
                           fill
-                          unoptimized
                           sizes="50px"
+                          loading="lazy"
                           className="object-cover"
                         />
                       </button>
@@ -577,7 +605,6 @@ export function FantasyInventoryModal({
                   src={getCardArtUrl(previewCard.slug)!}
                   alt={previewCard.name}
                   fill
-                  unoptimized
                   priority
                   sizes="(max-width: 640px) 92vw, 430px"
                   className="object-contain drop-shadow-[0_0_35px_rgba(0,0,0,0.9)]"

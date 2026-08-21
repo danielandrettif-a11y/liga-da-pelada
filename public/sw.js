@@ -1,4 +1,4 @@
-const CACHE_NAME = "pelada-bq-shell-v1";
+const CACHE_NAME = "pelada-bq-shell-v2";
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (event) => {
@@ -19,9 +19,37 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET" || event.request.mode !== "navigate") return;
+  if (event.request.method !== "GET") return;
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(fetch(event.request).catch(() => caches.match(OFFLINE_URL)));
+    return;
+  }
+
+  const url = new URL(event.request.url);
+  const isCardArt = url.origin === self.location.origin && url.pathname.startsWith("/images/cards/");
+  const isStaticImage = url.origin === self.location.origin && (
+    url.pathname.startsWith("/images/") ||
+    url.pathname.startsWith("/team-crests/") ||
+    url.pathname.startsWith("/_next/image")
+  );
+
+  if (!isCardArt && !isStaticImage) return;
+
+  // Exibe a imagem já disponível imediatamente e atualiza o cache em segundo plano.
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(OFFLINE_URL)),
+    caches.match(event.request).then((cached) => {
+      const network = fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => cached);
+      return cached || network;
+    }),
   );
 });
 

@@ -340,6 +340,23 @@ export async function getMyInventory(): Promise<{
 }
 
 /**
+ * Contagem leve usada no dashboard. Não carrega a definição e o histórico de
+ * cada carta só para exibir um número no botão do inventário.
+ */
+export async function getMyInventoryCount(): Promise<number> {
+  const account = await getCurrentAccount();
+  if (!account.user) return 0;
+
+  const { count } = await account.client
+    .from("fantasy_user_cards")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", account.user.id)
+    .eq("status", "OWNED");
+
+  return count || 0;
+}
+
+/**
  * Busca a carta ativa de uma rodada para o usuário autenticado.
  */
 export async function getActiveCardForRound(roundId: string): Promise<FantasyActiveCardDTO | null> {

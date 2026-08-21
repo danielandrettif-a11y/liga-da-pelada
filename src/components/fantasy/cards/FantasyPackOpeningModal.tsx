@@ -143,7 +143,7 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
             src="/images/pack-stadium-bg.jpg"
             alt="Atmosfera do Estádio"
             fill
-            priority
+            loading="lazy"
             className="object-cover opacity-35 scale-105"
           />
           {/* Gradients para fusão e legibilidade perfeita dos textos */}
