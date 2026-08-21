@@ -28,6 +28,7 @@ export function FantasyRevealedLineupsModal({
     lineups: any[];
   } | null>(null);
   const [search, setSearch] = useState("");
+  const [expandedLineupId, setExpandedLineupId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -49,6 +50,7 @@ export function FantasyRevealedLineupsModal({
     } else {
       setData(null);
       setSearch("");
+      setExpandedLineupId(null);
     }
   }, [isOpen, roundId]);
 
@@ -132,8 +134,9 @@ export function FantasyRevealedLineupsModal({
               Nenhuma escalação encontrada.
             </div>
           ) : (
-            filteredLineups.map((lineup) => (
-              <article
+            filteredLineups.map((lineup) => {
+              const expanded = expandedLineupId === lineup.lineupId;
+              return <article
                 key={lineup.lineupId}
                 className={`rounded-2xl border p-4 transition-colors ${
                   lineup.isCurrentUser
@@ -141,8 +144,13 @@ export function FantasyRevealedLineupsModal({
                     : "border-white/10 bg-surface/60"
                 }`}
               >
-                {/* Header do Cartoleiro */}
-                <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-3">
+                {/* Header do Cartoleiro: toque para abrir o resultado completo. */}
+                <button
+                  type="button"
+                  onClick={() => setExpandedLineupId(expanded ? null : lineup.lineupId)}
+                  className="flex w-full items-center justify-between gap-3 text-left"
+                  aria-expanded={expanded}
+                >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <PlayerAvatar
                       name={lineup.userName}
@@ -167,16 +175,20 @@ export function FantasyRevealedLineupsModal({
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0">
+                  <div className="flex items-center gap-2 text-right shrink-0">
+                    <span className="text-xs font-black text-muted">{expanded ? "−" : "+"}</span>
+                    <div>
                     <span className="text-base font-black text-accent">
                       {lineup.totalPoints.toFixed(1)}
                     </span>
                     <span className="block text-[8px] font-black uppercase text-muted">pts</span>
+                    </div>
                   </div>
-                </div>
+                </button>
 
+                {expanded && <>
                 {/* 5 Jogadores Escalados */}
-                <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2 border-t border-white/5 pt-3">
                   {lineup.players.map((p: any) => (
                     <div
                       key={p.playerId}
@@ -206,6 +218,9 @@ export function FantasyRevealedLineupsModal({
                       <span className="text-[9px] font-bold text-accent">
                         {p.points.toFixed(1)} pts
                       </span>
+                      <span className="mt-0.5 text-[8px] text-muted">
+                        Base {p.basePoints.toFixed(1)}{p.captainBonus ? ` +${p.captainBonus.toFixed(1)} cap.` : ""}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -230,8 +245,20 @@ export function FantasyRevealedLineupsModal({
                     )}
                   </div>
                 )}
+                {lineup.activeCard && (
+                  <div className="mt-3 rounded-xl border border-[#a65cff]/35 bg-[#a65cff]/10 px-3 py-2 text-[10px]">
+                    <p className="font-black text-[#d7adff]">🃏 Carta: {lineup.activeCard.name} <span className="text-muted">· {lineup.activeCard.status}</span></p>
+                    <p className="mt-1 text-muted">Bônus da carta: <strong className="text-foreground">{lineup.activeCard.bonus >= 0 ? "+" : ""}{lineup.activeCard.bonus.toFixed(1)} pts</strong></p>
+                  </div>
+                )}
+                <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-black/20 p-2 text-center text-[9px]">
+                  <span><strong className="block text-foreground">{lineup.playerPoints.toFixed(1)}</strong>jogadores</span>
+                  <span><strong className="block text-foreground">{lineup.predictionPoints.toFixed(1)}</strong>palpites</span>
+                  <span><strong className="block text-accent">{lineup.totalPoints.toFixed(1)}</strong>total</span>
+                </div>
+                </>}
               </article>
-            ))
+            })
           )}
         </div>
       </div>

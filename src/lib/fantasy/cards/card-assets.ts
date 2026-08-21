@@ -44,3 +44,19 @@ export function getCardArtUrl(slug?: string): string | null {
   if (!slug) return null;
   return CARD_ART_MAP[slug] || null;
 }
+
+const preloadedCardArts = new Set<string>();
+
+/**
+ * Antecipação leve da arte sob intenção do usuário (toque/foco/hover).
+ * Evita baixar todo o catálogo, mas deixa a ampliação praticamente imediata.
+ */
+export function preloadCardArt(slug?: string) {
+  const src = getCardArtUrl(slug);
+  if (!src || typeof window === "undefined" || preloadedCardArts.has(src)) return;
+
+  preloadedCardArts.add(src);
+  const image = new window.Image();
+  image.decoding = "async";
+  image.src = src;
+}

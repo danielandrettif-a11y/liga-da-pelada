@@ -209,10 +209,12 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
                 </div>
               </div>
 
-              <div className="mt-2.5 flex items-center justify-between border-t border-white/5 pt-1.5 text-[8px] text-muted">
-                <span>C$ {player.price.toFixed(2)}</span>
-                <span className="font-bold text-accent">Ver detalhes →</span>
+              <div className="mt-2.5 grid grid-cols-3 gap-1 border-t border-white/5 pt-2 text-center text-[8px] text-muted">
+                <span><strong className="block text-[10px] text-foreground">{player.roundPoints.toFixed(1)}</strong>últ. rodada</span>
+                <span><strong className="block text-[10px] text-foreground">{player.goals}G {player.assists}A</strong>temporada</span>
+                <span><strong className={`block text-[10px] ${player.variation >= 0 ? "text-success" : "text-danger"}`}>{player.variation >= 0 ? "+" : ""}{(player.variation * 100).toFixed(1)}%</strong>valor</span>
               </div>
+              <span className="mt-2 block text-right text-[8px] font-bold text-accent">Ver perfil e histórico →</span>
             </button>
           );
         })}

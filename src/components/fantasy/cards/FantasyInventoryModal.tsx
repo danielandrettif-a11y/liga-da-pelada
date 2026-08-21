@@ -9,7 +9,7 @@ import {
   FANTASY_CARDS_CATALOG,
   type FantasyCardDefinition,
 } from "@/lib/fantasy/cards/catalog";
-import { getCardArtUrl } from "@/lib/fantasy/cards/card-assets";
+import { getCardArtUrl, preloadCardArt } from "@/lib/fantasy/cards/card-assets";
 import { filterFantasyCardTargets } from "@/lib/fantasy/cards/eligibility";
 import type { FantasyUserCardDTO } from "@/lib/actions/fantasy-cards";
 import { activateCardForRound, getMyInventory } from "@/lib/actions/fantasy-cards";
@@ -290,7 +290,13 @@ export function FantasyInventoryModal({
                   >
                     <button
                       type="button"
-                      onClick={() => setPreviewCard(card)}
+                      onClick={() => {
+                        preloadCardArt(card.slug);
+                        setPreviewCard(card);
+                      }}
+                      onPointerEnter={() => preloadCardArt(card.slug)}
+                      onFocus={() => preloadCardArt(card.slug)}
+                      onTouchStart={() => preloadCardArt(card.slug)}
                       className="group relative block aspect-[2/3] w-full overflow-hidden bg-black/40"
                       aria-label={`Ampliar carta ${card.name}`}
                     >
@@ -300,6 +306,7 @@ export function FantasyInventoryModal({
                           alt={card.name}
                           fill
                           sizes="(max-width: 640px) 45vw, 180px"
+                          quality={70}
                           loading="lazy"
                           className="object-cover transition-transform duration-200 group-hover:scale-[1.03]"
                         />
@@ -338,6 +345,8 @@ export function FantasyInventoryModal({
                   <button
                     type="button"
                     onClick={() => setPreviewCard(selectedToUse.card)}
+                    onPointerEnter={() => preloadCardArt(selectedToUse.card.slug)}
+                    onFocus={() => preloadCardArt(selectedToUse.card.slug)}
                     className="relative h-20 w-14 shrink-0 overflow-hidden rounded-xl border border-white/20 shadow-lg"
                     aria-label={`Ampliar carta ${selectedToUse.card.name}`}
                   >
@@ -560,6 +569,9 @@ export function FantasyInventoryModal({
                       <button
                         type="button"
                         onClick={() => setPreviewCard(card)}
+                        onPointerEnter={() => preloadCardArt(card.slug)}
+                        onFocus={() => preloadCardArt(card.slug)}
+                        onTouchStart={() => preloadCardArt(card.slug)}
                         className="relative h-16 w-11 shrink-0 overflow-hidden rounded-xl border border-white/20 shadow-md"
                         aria-label={`Ampliar carta ${card.name}`}
                       >
@@ -641,6 +653,7 @@ export function FantasyInventoryModal({
             fill
             priority
             sizes="(max-width: 640px) 92vw, 430px"
+            quality={82}
             className="object-contain drop-shadow-[0_0_35px_rgba(0,0,0,0.9)]"
           />
         ) : (

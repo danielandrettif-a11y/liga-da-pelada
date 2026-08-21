@@ -1022,11 +1022,22 @@ export async function getRevealedLineups(roundId?: string) {
 
   const predictedMap = new Map((predictedPlayers || []).map((p: any) => [p.id, p]));
 
+  const { data: activations } = userIds.length
+    ? await account.client
+        .from("fantasy_card_activations")
+        .select("user_id, status, result_bonus, result_details, cards(name, slug, rarity)")
+        .eq("round_id", targetFantasyRound.round.id)
+        .in("user_id", userIds)
+    : { data: [] as any[] };
+  const activationMap = new Map((activations || []).map((activation: any) => [activation.user_id, activation]));
+
   const revealed = (rawLineups || []).map((l: any) => {
     const prof: any = profileMap.get(l.user_id);
     const scorer: any = predictedMap.get(l.top_scorer_player_id);
     const assist: any = predictedMap.get(l.top_assist_player_id);
     const challenge: any = predictedMap.get(l.challenge_player_id);
+    const activation: any = activationMap.get(l.user_id);
+    const activatedCard: any = activation?.cards;
 
     return {
       lineupId: l.id,
@@ -1042,6 +1053,16 @@ export async function getRevealedLineups(roundId?: string) {
       topScorer: scorer ? { id: scorer.id, name: scorer.name } : null,
       topAssist: assist ? { id: assist.id, name: assist.name } : null,
       challengePlayer: challenge ? { id: challenge.id, name: challenge.name } : null,
+      activeCard: activatedCard
+        ? {
+            name: activatedCard.name,
+            slug: activatedCard.slug,
+            rarity: activatedCard.rarity,
+            status: activation.status,
+            bonus: Number(activation.result_bonus || 0),
+            details: activation.result_details || null,
+          }
+        : null,
       players: (l.fantasy_lineup_players || []).map((lp: any) => ({
         playerId: lp.player_id,
         name: lp.player_name_locked || "Jogador",
@@ -1049,6 +1070,8 @@ export async function getRevealedLineups(roundId?: string) {
         isCaptain: lp.player_id === l.captain_player_id,
         priceLocked: Number(lp.price_locked || 0),
         priceAfter: lp.price_after != null ? Number(lp.price_after) : null,
+        basePoints: Number(lp.base_points || 0),
+        captainBonus: Number(lp.captain_bonus || 0),
         points: Number(lp.total_points || 0),
       })),
     };
@@ -1668,7 +1691,7 @@ export type FantasyQuickHighlight = {
 
 export type SeasonPassEvent = {
   id: string;
-  eventType: "participation" | "valid_lineup" | "full_round" | "goals_assists_cycle" | "participation_streak" | "lineup_streak";
+  eventType: "participation" | "valid_lineup" | "full_round" | "remote_full_round" | "goals_assists_cycle" | "participation_streak" | "active_week_streak" | "lineup_streak";
   houses: number;
   roundId: string | null;
   roundNumber: number | null;
@@ -1683,6 +1706,7 @@ export type SeasonPassDashboard = {
   maxProgress: 40;
   mode: "athlete" | "community";
   participations: number;
+  activeWeeks: number;
   validLineups: number;
   goalsAssistsRemainder: number;
   nextMilestone: number | null;
@@ -1696,7 +1720,7 @@ export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
   const account = await getCurrentAccount();
   const empty: SeasonPassDashboard = {
     authenticated: Boolean(account.user), available: false, progress: 0, maxProgress: 40,
-    mode: "athlete", participations: 0, validLineups: 0, goalsAssistsRemainder: 0,
+    mode: "athlete", participations: 0, activeWeeks: 0, validLineups: 0, goalsAssistsRemainder: 0,
     nextMilestone: 1, playerName: null, playerAvatarUrl: null, events: [],
   };
   if (!account.user || !account.profile?.player_id) return empty;
@@ -1713,7 +1737,7 @@ export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
 
   const { data: pass, error: passError } = await account.client
     .from("fantasy_season_passes")
-    .select("progress, progression_mode, participations, valid_lineups, goals_assists_remainder")
+    .select("progress, progression_mode, participations, active_weeks, valid_lineups, goals_assists_remainder")
     .eq("fantasy_season_id", fantasySeason.id)
     .eq("user_id", account.user.id)
     .maybeSingle();
@@ -1743,6 +1767,7 @@ export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
     maxProgress: 40,
     mode,
     participations: Number(pass?.participations || 0),
+    activeWeeks: Number(pass?.active_weeks || 0),
     validLineups: Number(pass?.valid_lineups || 0),
     goalsAssistsRemainder: Number(pass?.goals_assists_remainder || 0),
     nextMilestone: milestones.find((milestone) => milestone > progress) ?? null,
