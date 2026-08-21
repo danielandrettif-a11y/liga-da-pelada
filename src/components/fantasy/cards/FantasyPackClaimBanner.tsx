@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { Sparkles, Trophy } from "@/components/icons";
+import { Package, Sparkles } from "@/components/icons";
 import type { FantasyPackDTO } from "@/lib/actions/fantasy-cards";
 
 const FantasyPackOpeningModal = dynamic(
@@ -31,8 +31,8 @@ export function FantasyPackClaimBanner({ packs, onPackClaimed }: Props) {
 
         <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-400/40 bg-amber-500/20 text-amber-300 shadow-[0_0_20px_rgba(245,158,11,0.3)] text-2xl">
-              🎁
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-400/40 bg-amber-500/20 text-amber-300 shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+              <Package className="h-6 w-6" />
             </div>
 
             <div>
@@ -61,8 +61,8 @@ export function FantasyPackClaimBanner({ packs, onPackClaimed }: Props) {
             onClick={() => setSelectedPack(currentPack)}
             className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 px-6 py-3.5 text-xs font-black uppercase tracking-wider text-[#05130b] shadow-[0_0_25px_rgba(245,158,11,0.35)] hover:brightness-110 active:scale-95 transition-all"
           >
-            <span>Abrir Pacote</span>
-            <span className="text-base">✨</span>
+            <span>Abrir pacote</span>
+            <Sparkles className="h-4 w-4" />
           </button>
         </div>
       </section>

@@ -165,3 +165,9 @@ export const ZoomIn = createSportIcon(<><circle cx="11" cy="11" r="8" /><path d=
 export const HelpCircle = createSportIcon(<><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01" /></>);
 export const Info = HelpCircle;
 export const TrendingDown = createSportIcon(<><polyline points="22 17 13.5 8.5 8.5 13.5 2 7" /><polyline points="16 17 22 17 22 11" /></>);
+export const History = createSportIcon(<><path d="M4.5 8.5V4.2M4.5 8.5h4.3" /><path d="M5.3 7.2A8.5 8.5 0 1 1 4 15" /><path d="M12 7.5v5l3.2 2" /></>);
+export const ShoppingCart = createSportIcon(<><path d="M3.5 5h2l1.8 10.2h9.8l2.2-7H6.1" /><circle cx="9" cy="19" r="1.3" /><circle cx="17" cy="19" r="1.3" /><path d="M9 11h7.8M12.5 8.3v6.9" opacity=".6" /></>);
+export const Cards = createSportIcon(<><rect x="5" y="3.5" width="12" height="17" rx="2.2" transform="rotate(-5 11 12)" /><path d="M9 7.5h4.5M8.5 11h5.5M9 14.5h3.5" /><path d="M17.2 6.2 20 7v12.3L15.5 21" opacity=".6" /></>);
+export const Shirt = createSportIcon(<><path d="m8 4-4 2.4-1.5 4.3 3 1.7V20h13v-7.6l3-1.7L20 6.4 16 4c-.5 1.8-1.8 2.8-4 2.8S8.5 5.8 8 4Z" /><path d="M9.2 11.5h5.6M12 8.3V20" opacity=".55" /></>);
+export const Eye = createSportIcon(<><path d="M2.7 12s3.3-5.5 9.3-5.5 9.3 5.5 9.3 5.5-3.3 5.5-9.3 5.5S2.7 12 2.7 12Z" /><circle cx="12" cy="12" r="2.6" /></>);
+export const Package = createSportIcon(<><path d="m4 7.5 8-4 8 4v9l-8 4-8-4Z" /><path d="m4 7.5 8 4 8-4M12 11.5v9M8 5.5l8 4" /><path d="M8.2 13.7 10 14.6" opacity=".6" /></>);
