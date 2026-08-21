@@ -26,7 +26,7 @@ export function isFantasyPriceEligible(
   player: PricedFantasyPlayer,
   marketPlayers: PricedFantasyPlayer[],
 ) {
-  if (!card.targetFilter || card.targetFilter === "ANY_IN_LINEUP") return true;
+  if (!card.targetFilter || card.targetFilter === "ANY_IN_LINEUP" || card.targetFilter === "ANY_IN_MARKET") return true;
   const prices = sortedPrices(marketPlayers);
   if (prices.length === 0) return false;
 

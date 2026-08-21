@@ -1,4 +1,4 @@
-import { DEFAULT_FANTASY_SETTINGS, FANTASY_RECENT_ROUND_WEIGHTS, type FantasySettings } from "./config";
+import { DEFAULT_FANTASY_SETTINGS, type FantasySettings } from "./config";
 
 export type FantasyPerformance = {
   playerId: string;
@@ -8,6 +8,9 @@ export type FantasyPerformance = {
   losses?: number;
   goals: number;
   assists: number;
+  goalkeeperGames?: number;
+  goalsConceded?: number;
+  teamGoalsConceded?: number;
   recentPoints: number[];
   seasonPoints: number[];
   currentPrice: number;
@@ -16,6 +19,9 @@ export type FantasyPerformance = {
 export type FantasyPriceResult = FantasyPerformance & {
   roundPoints: number;
   score: number;
+  marketBand: FantasyTrend;
+  roundRank: number | null;
+  roundPercentile: number | null;
   variationRate: number;
   nextPrice: number;
 };
@@ -49,14 +55,21 @@ export function roundMoney(value: number) {
 }
 
 export function calculateFantasyPlayerPoints(
-  stats: Pick<FantasyPerformance, "goals" | "assists" | "wins" | "losses">,
+  stats: Pick<
+    FantasyPerformance,
+    "goals" | "assists" | "wins" | "losses" | "goalkeeperGames" | "goalsConceded" | "teamGoalsConceded"
+  >,
   settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
 ) {
   return (
     stats.goals * settings.goalPoints +
     stats.assists * settings.assistPoints +
     stats.wins * settings.winPoints +
-    (stats.losses || 0) * settings.lossPoints
+    (stats.losses || 0) * settings.lossPoints +
+    (stats.goalkeeperGames || 0) * settings.goalkeeperAppearancePoints +
+    // A penalidade defensiva é compartilhada entre quem entrou em campo.
+    // Para rodadas antigas, o fallback preserva o dado histórico do goleiro.
+    (stats.teamGoalsConceded ?? stats.goalsConceded ?? 0) * settings.teamGoalConcededPoints
   );
 }
 
@@ -106,13 +119,9 @@ export function percentiles(values: Array<{ playerId: string; value: number }>):
 }
 
 /**
- * Fórmula de Valorização V2:
- * 40% Desempenho Recente (decaimento temporal nas últimas 3-5 rodadas válidas)
- * 35% Aproveitamento Suavizado (Bayesian smoothing)
- * 15% Média Histórica (rodadas válidas)
- * 10% Consistência (desvio padrão invertido)
- * Normalização relativa aos atletas que entraram em campo na rodada.
- * Ausentes mantêm preço estável (variação 0.00%).
+ * Balanceamento V2: o preço depende exclusivamente dos pontos-base da rodada.
+ * A posição percentual usa o meio do grupo empatado (midrank), garantindo que
+ * pontuações iguais sempre recebam a mesma faixa e a mesma variação.
  */
 export function calculateFantasyPrices(
   players: FantasyPerformance[],
@@ -124,104 +133,70 @@ export function calculateFantasyPrices(
       ...player,
       roundPoints: 0,
       score: 0.5,
+      marketBand: "STABLE" as const,
+      roundRank: null,
+      roundPercentile: null,
       variationRate: 0,
       nextPrice: player.currentPrice,
     }));
   }
 
-  const roundPoints = new Map(
-    participants.map((player) => [player.playerId, calculateFantasyPlayerPoints(player, settings)])
-  );
+  const ranked = participants
+    .map((player) => ({ player, roundPoints: calculateFantasyPlayerPoints(player, settings) }))
+    .sort((a, b) => b.roundPoints - a.roundPoints || a.player.playerId.localeCompare(b.player.playerId));
+  const allTied = ranked[0]?.roundPoints === ranked[ranked.length - 1]?.roundPoints;
+  const groups: Array<{ start: number; end: number; percentile: number; marketBand: FantasyTrend }> = [];
 
-  // Média de aproveitamento da liga na rodada (para prior Bayesiana)
-  const leagueWinRate = average(
-    participants.map((player) => (player.wins * 3 + player.draws) / Math.max(1, player.games * 3))
-  );
+  for (let start = 0; start < ranked.length;) {
+    let end = start;
+    while (end + 1 < ranked.length && ranked[end + 1].roundPoints === ranked[start].roundPoints) end += 1;
+    const percentile = ranked.length === 1 ? 0.5 : ((start + end) / 2) / (ranked.length - 1);
+    groups.push({
+      start,
+      end,
+      percentile,
+      marketBand: allTied ? "STABLE" : percentile < 0.3 ? "UP" : percentile < 0.6 ? "STABLE" : "DOWN",
+    });
+    start = end + 1;
+  }
 
-  // 1. Desempenho Recente com decaimento temporal
-  const recentValues = participants.map((player) => {
-    const r0 = roundPoints.get(player.playerId) || 0;
-    const history = player.recentPoints.slice(-4).reverse(); // R-1, R-2, R-3, R-4
-    const lagValues = [r0, ...history];
-    let weightedSum = 0;
-    let weightTotal = 0;
-    for (let i = 0; i < lagValues.length && i < FANTASY_RECENT_ROUND_WEIGHTS.length; i++) {
-      const weight = FANTASY_RECENT_ROUND_WEIGHTS[i];
-      weightedSum += lagValues[i] * weight;
-      weightTotal += weight;
-    }
-    const val = weightTotal > 0 ? weightedSum / weightTotal : r0;
-    return { playerId: player.playerId, value: val };
-  });
+  const bandRange = (band: FantasyTrend) => {
+    const percentiles = groups.filter((group) => group.marketBand === band).map((group) => group.percentile);
+    return { min: Math.min(...percentiles), max: Math.max(...percentiles) };
+  };
+  const upRange = bandRange("UP");
+  const downRange = bandRange("DOWN");
+  const byId = new Map<string, FantasyPriceResult>();
 
-  // 2. Aproveitamento Suavizado (Bayesian Smoothing)
-  const winRateValues = participants.map((player) => {
-    const smoothing = settings.smoothingGames || 5;
-    const playerPoints = player.wins * 3 + player.draws;
-    const priorPoints = leagueWinRate * 3 * smoothing;
-    const totalPossible = player.games * 3 + smoothing * 3;
-    const value = (playerPoints + priorPoints) / Math.max(1, totalPossible);
-    return { playerId: player.playerId, value };
-  });
+  for (const { start, end, percentile, marketBand } of groups) {
+    const variationRate = marketBand === "UP"
+      ? upRange.max === upRange.min
+        ? settings.maxPriceIncrease
+        : settings.maxPriceIncrease
+          - ((percentile - upRange.min) / (upRange.max - upRange.min)) * (settings.maxPriceIncrease - 0.03)
+      : marketBand === "DOWN"
+        ? downRange.max === downRange.min
+          ? -settings.maxPriceDecrease
+          : -(0.02 + ((percentile - downRange.min) / (downRange.max - downRange.min)) * (settings.maxPriceDecrease - 0.02))
+        : 0;
 
-  // 3. Média Histórica de rodadas válidas
-  const historicalValues = participants.map((player) => {
-    const validHistory = player.seasonPoints.length > 0 ? player.seasonPoints : [roundPoints.get(player.playerId) || 0];
-    return { playerId: player.playerId, value: average(validHistory) };
-  });
-
-  // 4. Consistência (inverso do desvio padrão)
-  const consistencyValues = participants.map((player) => {
-    const allRecent = [...player.recentPoints.slice(-4), roundPoints.get(player.playerId) || 0];
-    const stdDev = allRecent.length >= 2 ? standardDeviation(allRecent) : 0;
-    return { playerId: player.playerId, value: -stdDev };
-  });
-
-  const recentPercentile = percentiles(recentValues);
-  const winRatePercentile = percentiles(winRateValues);
-  const historicalPercentile = percentiles(historicalValues);
-  const consistencyPercentile = percentiles(consistencyValues);
-
-  const scored = participants.map((player) => {
-    const score =
-      (recentPercentile.get(player.playerId) || 0) * settings.recentWeight +
-      (winRatePercentile.get(player.playerId) || 0) * settings.winRateWeight +
-      (historicalPercentile.get(player.playerId) || 0) * settings.historicalWeight +
-      (consistencyPercentile.get(player.playerId) || 0) * settings.consistencyWeight;
-
-    // Variação contínua proporcional ao desvio do centro (0.5)
-    const rawRate =
-      score >= 0.5
-        ? ((score - 0.5) / 0.5) * settings.maxPriceIncrease
-        : -((0.5 - score) / 0.5) * settings.maxPriceDecrease;
-
-    return { player, score, rawRate };
-  });
-
-  // Centralização de mercado relativa (soma relativa)
-  const meanRate = average(scored.map((item) => item.rawRate));
-
-  const byId = new Map(
-    scored.map(({ player, score, rawRate }) => {
-      const variationRate = Math.max(
-        -settings.maxPriceDecrease,
-        Math.min(settings.maxPriceIncrease, rawRate - meanRate)
-      );
+    for (let index = start; index <= end; index += 1) {
+      const { player, roundPoints } = ranked[index];
       const nextPrice = roundMoney(
         Math.max(settings.minPlayerPrice, Math.min(settings.maxPlayerPrice, player.currentPrice * (1 + variationRate)))
       );
-      return [
-        player.playerId,
-        {
-          ...player,
-          roundPoints: roundPoints.get(player.playerId) || 0,
-          score,
-          variationRate,
-          nextPrice,
-        },
-      ];
-    })
-  );
+      byId.set(player.playerId, {
+        ...player,
+        roundPoints,
+        score: 1 - percentile,
+        marketBand,
+        roundRank: start + 1,
+        roundPercentile: percentile,
+        variationRate,
+        nextPrice,
+      });
+    }
+  }
 
   // Jogadores ausentes mantêm preço e variação = 0
   return players.map(
@@ -230,6 +205,9 @@ export function calculateFantasyPrices(
         ...player,
         roundPoints: 0,
         score: 0.5,
+        marketBand: "STABLE" as const,
+        roundRank: null,
+        roundPercentile: null,
         variationRate: 0,
         nextPrice: player.currentPrice,
       }

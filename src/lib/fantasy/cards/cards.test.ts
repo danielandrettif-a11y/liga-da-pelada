@@ -141,18 +141,26 @@ describe("Cartola V3 — Resolução das 10 Cartas Especiais", () => {
   });
 
   // 3. Palpite Duplo
-  it("CARTA 3: Palpite Duplo (+6 somente se gol e assistência forem acertados)", () => {
+  it("CARTA 3: Palpite Duplo (+6 com 2 gols de um atleta e 2 assistências de outro)", () => {
     const card = getCardBySlug("double_prediction")!;
 
-    const hitRes = CardEffectResolver.resolveScoreEffect(card, {}, [], null, {
+    const hitRes = CardEffectResolver.resolveScoreEffect(card, { targetPlayerId: "p1", targetPlayer2Id: "p2" }, [], null, {
       ...dummyContext,
-      predictionsResults: { ...dummyContext.predictionsResults, topAssistHit: true },
+      allRoundPlayers: [
+        { playerId: "p1", name: "Artilheiro", price: 15, basePoints: 12, goals: 2, assists: 0, games: 1 },
+        { playerId: "p2", name: "Garçom", price: 12, basePoints: 8, goals: 0, assists: 2, games: 1 },
+      ],
     });
     expect(hitRes.applied).toBe(true);
     expect(hitRes.bonusPoints).toBe(6);
 
-    // Errou garçom -> 0 bônus
-    const missRes = CardEffectResolver.resolveScoreEffect(card, {}, [], null, dummyContext);
+    // Uma assistência a menos ou o mesmo jogador para os dois palpites não completa a carta.
+    const missRes = CardEffectResolver.resolveScoreEffect(card, { targetPlayerId: "p1", targetPlayer2Id: "p1" }, [], null, {
+      ...dummyContext,
+      allRoundPlayers: [
+        { playerId: "p1", price: 15, basePoints: 12, goals: 2, assists: 2, games: 1 },
+      ],
+    });
     expect(missRes.applied).toBe(false);
     expect(missRes.bonusPoints).toBe(0);
   });
@@ -252,7 +260,7 @@ describe("Cartola V3 — Resolução das 10 Cartas Especiais", () => {
     expect(res2.bonusPoints).toBe(6);
   });
 
-  it("Caça-Talentos e All-In aceitam qualquer escalado quando todos começam no mesmo preço", () => {
+  it("Caça-Talentos aceita um escalado abaixo da mediana e All-In aceita qualquer atleta do mercado", () => {
     const equalPriceContext: CardResolverContext = {
       ...dummyContext,
       allRoundPlayers: [
@@ -265,7 +273,14 @@ describe("Cartola V3 — Resolução das 10 Cartas Especiais", () => {
       { playerId: "p1", name: "Primeira rodada", price: 10, basePoints: 12, goals: 1, assists: 0, wins: 1, losses: 0, games: 1 },
     ];
     const scout = CardEffectResolver.resolveScoreEffect(getCardBySlug("scout")!, { targetPlayerId: "p1" }, player, null, equalPriceContext);
-    const allIn = CardEffectResolver.resolveScoreEffect(getCardBySlug("all_in")!, { targetPlayerId: "p1" }, player, null, equalPriceContext);
+    const allIn = CardEffectResolver.resolveScoreEffect(getCardBySlug("all_in")!, { targetPlayerId: "p1" }, [], null, {
+      ...equalPriceContext,
+      allRoundPlayers: [
+        { playerId: "p1", price: 30, basePoints: 12, games: 1 },
+        { playerId: "p2", price: 10, basePoints: 8, games: 1 },
+        { playerId: "p3", price: 5, basePoints: 4, games: 1 },
+      ],
+    });
     expect(scout.applied).toBe(true);
     expect(allIn.applied).toBe(true);
   });
@@ -301,7 +316,11 @@ describe("Cartola V3 — Resolução das 10 Cartas Especiais", () => {
     const p5: CardResolverPlayer[] = [
       { playerId: "p5", name: "Barato Bom", price: 6, basePoints: 8, goals: 1, assists: 0, wins: 1, losses: 0, games: 1 },
     ];
-    const resTop5 = CardEffectResolver.resolveScoreEffect(card, { targetPlayerId: "p5" }, p5, null, dummyContext);
+    const playedContext = {
+      ...dummyContext,
+      allRoundPlayers: dummyContext.allRoundPlayers.map((player) => ({ ...player, games: 1 })),
+    };
+    const resTop5 = CardEffectResolver.resolveScoreEffect(card, { targetPlayerId: "p5" }, p5, null, playedContext);
     expect(resTop5.applied).toBe(true);
     expect(resTop5.bonusPoints).toBe(6);
 
@@ -309,7 +328,7 @@ describe("Cartola V3 — Resolução das 10 Cartas Especiais", () => {
     const p7: CardResolverPlayer[] = [
       { playerId: "p7", name: "Barato Ruim", price: 5, basePoints: 6, goals: 0, assists: 0, wins: 0, losses: 1, games: 1 },
     ];
-    const resTop7 = CardEffectResolver.resolveScoreEffect(card, { targetPlayerId: "p7" }, p7, null, dummyContext);
+    const resTop7 = CardEffectResolver.resolveScoreEffect(card, { targetPlayerId: "p7" }, p7, null, playedContext);
     expect(resTop7.applied).toBe(false);
     expect(resTop7.bonusPoints).toBe(0);
   });

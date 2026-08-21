@@ -8,6 +8,7 @@ import { DEFAULT_FANTASY_SETTINGS, type FantasySettings } from "@/lib/fantasy/co
 import {
   calculateCostBenefit,
   calculateFantasyForm,
+  calculateFantasyPlayerPoints,
   calculateFantasyTrend,
   calculateMarketPopularity,
   getFantasyPlayerTags,
@@ -30,6 +31,9 @@ export type FantasyMarketPlayer = {
   wins: number;
   losses: number;
   games: number;
+  goalkeeperGames: number;
+  goalsConceded: number;
+  teamGoalsConceded: number;
   variation: number;
   priceChange: number;
   roundPoints: number;
@@ -109,6 +113,7 @@ export async function getFantasyDashboard() {
         lossPoints: Number(settingsRow.loss_points ?? -1),
         goalkeeperAppearancePoints: Number(settingsRow.goalkeeper_appearance_points ?? 3),
         goalConcededPoints: Number(settingsRow.goal_conceded_points ?? -1),
+        teamGoalConcededPoints: Number(settingsRow.team_goal_conceded_points ?? -1),
         captainMultiplier: Number(settingsRow.captain_multiplier),
         topScorerPredictionPoints: Number(settingsRow.top_scorer_prediction_points),
         topAssistPredictionPoints: Number(settingsRow.top_assist_prediction_points),
@@ -154,7 +159,9 @@ export async function getFantasyDashboard() {
     !fantasySeason ||
     !settingsRow ||
     !("king_of_wins_points" in settingsRow) ||
-    !("loss_points" in settingsRow)
+    !("loss_points" in settingsRow) ||
+    !("market_up_share" in settingsRow) ||
+    !("team_goal_conceded_points" in settingsRow)
   ) {
     return {
       authenticated: true as const,
@@ -204,6 +211,23 @@ export async function getFantasyDashboard() {
     ? { ...testSession, market_status: testSession.status }
     : activeOfficialRound;
   const betweenRounds = !isTest && !activeOfficialRound;
+  const scoringSnapshot = fantasyRound?.settings_snapshot || null;
+  const scoringSettings: FantasySettings = scoringSnapshot
+    ? {
+        ...settings,
+        goalPoints: Number(scoringSnapshot.goal_points ?? settings.goalPoints),
+        assistPoints: Number(scoringSnapshot.assist_points ?? settings.assistPoints),
+        winPoints: Number(scoringSnapshot.win_points ?? settings.winPoints),
+        lossPoints: Number(scoringSnapshot.loss_points ?? settings.lossPoints),
+        goalkeeperAppearancePoints: Number(
+          scoringSnapshot.goalkeeper_appearance_points ?? settings.goalkeeperAppearancePoints,
+        ),
+        goalConcededPoints: Number(scoringSnapshot.goal_conceded_points ?? settings.goalConcededPoints),
+        teamGoalConcededPoints: Number(
+          scoringSnapshot.team_goal_conceded_points ?? settings.teamGoalConcededPoints,
+        ),
+      }
+    : settings;
   const displayRound = fantasyRound?.round || latestFinishedRound?.round || null;
   const displayRoundId = displayRound?.id || null;
   const officialRoundIds = officialFantasyRounds.map((item: any) => item.round?.id).filter(Boolean);
@@ -301,7 +325,7 @@ export async function getFantasyDashboard() {
     officialRoundIds.length
       ? account.client
           .from("player_round_stats")
-          .select("round_id, player_id, goals, assists, wins, losses, games")
+          .select("round_id, player_id, goals, assists, wins, losses, games, goalkeeper_games, goals_conceded, team_goals_conceded")
           .in("round_id", officialRoundIds)
       : Promise.resolve({ data: [] as any[] }),
     displayRoundId
@@ -326,7 +350,7 @@ export async function getFantasyDashboard() {
     account.client
       .from("fantasy_player_price_history")
       .select(
-        "player_id, fantasy_round_id, price_before, price_after, variation_rate, round_points, goals, assists, wins, games, created_at"
+        "player_id, fantasy_round_id, price_before, price_after, price_change, variation_rate, market_band, round_rank, round_points, goals, assists, wins, games, created_at"
       )
       .eq("fantasy_season_id", fantasySeason.id)
       .order("created_at", { ascending: false }),
@@ -374,9 +398,9 @@ export async function getFantasyDashboard() {
   const priceByPlayer = new Map((priceRows || []).map((row: any) => [row.player_id, row]));
   const statsByPlayer = new Map<
     string,
-    { goals: number; assists: number; wins: number; losses: number; games: number }
+    { goals: number; assists: number; wins: number; losses: number; games: number; goalkeeperGames: number; goalsConceded: number; teamGoalsConceded: number }
   >();
-  const currentStats = new Map<string, { goals: number; assists: number; wins: number }>();
+  const currentStats = new Map<string, { goals: number; assists: number; wins: number; losses: number; goalkeeperGames: number; goalsConceded: number; teamGoalsConceded: number }>();
 
   for (const row of statRows || []) {
     const current = statsByPlayer.get(row.player_id) || {
@@ -385,12 +409,18 @@ export async function getFantasyDashboard() {
       wins: 0,
       losses: 0,
       games: 0,
+      goalkeeperGames: 0,
+      goalsConceded: 0,
+      teamGoalsConceded: 0,
     };
     current.goals += Number(row.goals || 0);
     current.assists += Number(row.assists || 0);
     current.wins += Number(row.wins || 0);
     current.losses += Number(row.losses || 0);
     current.games += Number(row.games || 0);
+    current.goalkeeperGames += Number(row.goalkeeper_games || 0);
+    current.goalsConceded += Number(row.goals_conceded || 0);
+    current.teamGoalsConceded += Number(row.team_goals_conceded || 0);
     statsByPlayer.set(row.player_id, current);
 
     if (row.round_id === displayRoundId) {
@@ -398,6 +428,10 @@ export async function getFantasyDashboard() {
         goals: Number(row.goals || 0),
         assists: Number(row.assists || 0),
         wins: Number(row.wins || 0),
+        losses: Number(row.losses || 0),
+        goalkeeperGames: Number(row.goalkeeper_games || 0),
+        goalsConceded: Number(row.goals_conceded || 0),
+        teamGoalsConceded: Number(row.team_goals_conceded || 0),
       });
     }
   }
@@ -408,11 +442,11 @@ export async function getFantasyDashboard() {
       current.assists = 0;
     }
     for (const event of liveEvents) {
-      const scorer = currentStats.get(event.player_id) || { goals: 0, assists: 0, wins: 0 };
+      const scorer = currentStats.get(event.player_id) || { goals: 0, assists: 0, wins: 0, losses: 0, goalkeeperGames: 0, goalsConceded: 0, teamGoalsConceded: 0 };
       scorer.goals += 1;
       currentStats.set(event.player_id, scorer);
       if (event.assist_player_id) {
-        const assister = currentStats.get(event.assist_player_id) || { goals: 0, assists: 0, wins: 0 };
+        const assister = currentStats.get(event.assist_player_id) || { goals: 0, assists: 0, wins: 0, losses: 0, goalkeeperGames: 0, goalsConceded: 0, teamGoalsConceded: 0 };
         assister.assists += 1;
         currentStats.set(event.assist_player_id, assister);
       }
@@ -422,6 +456,10 @@ export async function getFantasyDashboard() {
         (row: any) => row.round_id === displayRoundId && row.player_id === playerId
       );
       current.wins = Number(official?.wins || 0);
+      current.losses = Number(official?.losses || 0);
+      current.goalkeeperGames = Number(official?.goalkeeper_games || 0);
+      current.goalsConceded = Number(official?.goals_conceded || 0);
+      current.teamGoalsConceded = Number(official?.team_goals_conceded || 0);
     }
   }
 
@@ -497,6 +535,9 @@ export async function getFantasyDashboard() {
         wins: 0,
         losses: 0,
         games: 0,
+        goalkeeperGames: 0,
+        goalsConceded: 0,
+        teamGoalsConceded: 0,
       };
       const price = isTest
         ? settings.initialPlayerPrice
@@ -507,9 +548,18 @@ export async function getFantasyDashboard() {
       const priceChange = isTest ? 0 : lastPriceChange.get(player.id) || 0;
       const roundPoints = betweenRounds
         ? latestRoundPerformance.get(player.id) || 0
-        : (currentStats.get(player.id)?.goals || 0) * settings.goalPoints +
-          (currentStats.get(player.id)?.assists || 0) * settings.assistPoints +
-          (currentStats.get(player.id)?.wins || 0) * settings.winPoints;
+        : calculateFantasyPlayerPoints(
+            {
+              goals: currentStats.get(player.id)?.goals || 0,
+              assists: currentStats.get(player.id)?.assists || 0,
+              wins: currentStats.get(player.id)?.wins || 0,
+              losses: currentStats.get(player.id)?.losses || 0,
+              goalkeeperGames: currentStats.get(player.id)?.goalkeeperGames || 0,
+              goalsConceded: currentStats.get(player.id)?.goalsConceded || 0,
+              teamGoalsConceded: currentStats.get(player.id)?.teamGoalsConceded || 0,
+            },
+            scoringSettings,
+          );
 
       const playerRecentPoints = recentPointsByPlayer.get(player.id) || [];
       const playerRecentVars = recentVariationsByPlayer.get(player.id) || [];
@@ -1050,7 +1100,7 @@ export async function getFantasyPlayerDetail(playerId: string) {
     account.client
       .from("fantasy_player_price_history")
       .select(
-        "id, fantasy_round_id, price_before, price_after, variation_rate, round_points, goals, assists, wins, games, created_at, fantasy_rounds(round:round_id(number, date))"
+        "id, fantasy_round_id, price_before, price_after, price_change, variation_rate, market_band, round_rank, round_percentile, round_points, goals, assists, wins, games, created_at, fantasy_rounds(round:round_id(number, date))"
       )
       .eq("fantasy_season_id", fs.id)
       .eq("player_id", playerId)
@@ -1087,6 +1137,10 @@ export async function getFantasyPlayerDetail(playerId: string) {
     priceBefore: Number(h.price_before),
     priceAfter: Number(h.price_after),
     variationRate: Number(h.variation_rate),
+    priceChange: Number(h.price_change ?? Number(h.price_after) - Number(h.price_before)),
+    marketBand: h.market_band || "STABLE",
+    roundRank: h.round_rank == null ? null : Number(h.round_rank),
+    roundPercentile: h.round_percentile == null ? null : Number(h.round_percentile),
     roundPoints: Number(h.round_points),
     goals: Number(h.goals || 0),
     assists: Number(h.assists || 0),
@@ -1429,7 +1483,7 @@ export async function getFantasyRoundLineupOverview(
 export async function updateFantasySettings(values: Partial<FantasySettings>) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
-  const { lossPoints, goalkeeperAppearancePoints, goalConcededPoints, ...otherValues } = values;
+  const { lossPoints, goalkeeperAppearancePoints, goalConcededPoints, teamGoalConcededPoints, ...otherValues } = values;
   const { error } = await account.client.rpc("update_fantasy_settings", {
     p_settings: otherValues,
   });
@@ -1440,10 +1494,15 @@ export async function updateFantasySettings(values: Partial<FantasySettings>) {
     });
     if (lossError) return { success: false, error: lossError.message };
   }
-  if (goalkeeperAppearancePoints !== undefined || goalConcededPoints !== undefined) {
+  if (
+    goalkeeperAppearancePoints !== undefined ||
+    goalConcededPoints !== undefined ||
+    teamGoalConcededPoints !== undefined
+  ) {
     const { error: goalkeeperError } = await account.client.rpc("update_fantasy_goalkeeper_points", {
       p_goalkeeper_appearance_points: goalkeeperAppearancePoints ?? DEFAULT_FANTASY_SETTINGS.goalkeeperAppearancePoints,
       p_goal_conceded_points: goalConcededPoints ?? DEFAULT_FANTASY_SETTINGS.goalConcededPoints,
+      p_team_goal_conceded_points: teamGoalConcededPoints ?? DEFAULT_FANTASY_SETTINGS.teamGoalConcededPoints,
     });
     if (goalkeeperError) return { success: false, error: goalkeeperError.message };
   }
@@ -1512,6 +1571,7 @@ export async function getFantasyAdminData() {
       loss_points: DEFAULT_FANTASY_SETTINGS.lossPoints,
       goalkeeper_appearance_points: DEFAULT_FANTASY_SETTINGS.goalkeeperAppearancePoints,
       goal_conceded_points: DEFAULT_FANTASY_SETTINGS.goalConcededPoints,
+      team_goal_conceded_points: DEFAULT_FANTASY_SETTINGS.teamGoalConcededPoints,
       captain_multiplier: DEFAULT_FANTASY_SETTINGS.captainMultiplier,
       top_scorer_prediction_points: DEFAULT_FANTASY_SETTINGS.topScorerPredictionPoints,
       top_assist_prediction_points: DEFAULT_FANTASY_SETTINGS.topAssistPredictionPoints,

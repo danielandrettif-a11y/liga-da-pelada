@@ -388,27 +388,41 @@ export function FantasyExperience({
                 : `Ranked ${round?.number || ""} · escale cinco craques`}
             </p>
           </div>
-          <span
-            className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-wider ${
-              isTest
-                ? "bg-warning/15 text-warning"
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setInfoModal({
+                title: "Regras de pontuação",
+                description: "Pontuação-base:\n• Vitória: +5\n• Derrota: -3\n• Gol: +4\n• Assistência: +2\n• Atuar como goleiro: +3\n• Gol sofrido pelo time: -1 para quem entrou em campo (máximo de -2 por jogo).\n\nO capitão multiplica a pontuação-base por 2x. Cartas, palpites e desafios somam ao seu total, mas não mudam o preço oficial dos jogadores.\n\nNo mercado, os 30% melhores valorizam, 30% ficam estáveis e 40% desvalorizam."
+              })}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-muted transition-colors hover:border-accent/50 hover:bg-accent/10 hover:text-accent"
+              aria-label="Ver regras de pontuação do Cartola"
+              title="Como funciona a pontuação?"
+            >
+              <span className="text-sm font-black italic">i</span>
+            </button>
+            <span
+              className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-wider ${
+                isTest
+                  ? "bg-warning/15 text-warning"
+                  : open
+                  ? "bg-accent/15 text-accent"
+                  : status === "in_progress"
+                  ? "bg-warning/15 text-warning"
+                  : "bg-surface text-muted"
+              }`}
+            >
+              {isTest
+                ? `Teste · ${open ? "aberto" : status === "in_progress" ? "em jogo" : "finalizado"}`
+                : betweenRounds
+                ? "Compras abertas"
                 : open
-                ? "bg-accent/15 text-accent"
+                ? "Mercado aberto"
                 : status === "in_progress"
-                ? "bg-warning/15 text-warning"
-                : "bg-surface text-muted"
-            }`}
-          >
-            {isTest
-              ? `Teste · ${open ? "aberto" : status === "in_progress" ? "em jogo" : "finalizado"}`
-              : betweenRounds
-              ? "Compras abertas"
-              : open
-              ? "Mercado aberto"
-              : status === "in_progress"
-              ? "Em andamento"
-              : "Finalizado"}
-          </span>
+                ? "Em andamento"
+                : "Finalizado"}
+            </span>
+          </div>
         </div>
 
         <div className="mt-5 grid grid-cols-3 gap-2">
@@ -1365,7 +1379,7 @@ export function FantasyExperience({
                 </h3>
               </div>
 
-              <p className="mt-3.5 text-xs leading-relaxed text-muted">
+              <p className="mt-3.5 whitespace-pre-line text-xs leading-relaxed text-muted">
                 {infoModal.description}
               </p>
 

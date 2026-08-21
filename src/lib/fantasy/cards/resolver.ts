@@ -23,6 +23,10 @@ export type CardResolverContext = {
     price: number;
     basePoints: number;
     rank?: number;
+    goals?: number;
+    assists?: number;
+    games?: number;
+    name?: string;
   }>;
   predictionsResults?: {
     topScorerHit?: boolean;
@@ -102,18 +106,22 @@ export class CardEffectResolver {
         };
       }
 
-      // 3. 🎯 PALPITE DUPLO (Dobra recompensa do palpite selecionado)
+      // 3. 🎯 PALPITE DUPLO (2 gols de um atleta + 2 assistências de outro)
       case "PREDICTION_MULTIPLIER": {
         if (card.slug === "double_prediction") {
-          const preds = context.predictionsResults || {};
-          const hit = Boolean(preds.topScorerHit) && Boolean(preds.topAssistHit);
+          const goalsPlayer = context.allRoundPlayers.find((player) => player.playerId === target.targetPlayerId);
+          const assistsPlayer = context.allRoundPlayers.find((player) => player.playerId === target.targetPlayer2Id);
+          const hit = Boolean(
+            goalsPlayer && assistsPlayer && goalsPlayer.playerId !== assistsPlayer.playerId
+            && (goalsPlayer.goals || 0) >= 2 && (assistsPlayer.assists || 0) >= 2,
+          );
           const bonus = Number(config.bonus || 6);
           return {
             applied: hit,
             bonusPoints: hit ? bonus : 0,
             description: hit
-              ? `Palpite Duplo completo: gol e assistência confirmados (+${bonus.toFixed(1)} pts).`
-              : "Palpite Duplo não completado: era necessário acertar gol e assistência.",
+              ? `Palpite Duplo completo: ${goalsPlayer?.name || "o primeiro atleta"} fez 2 gols e ${assistsPlayer?.name || "o segundo atleta"} deu 2 assistências (+${bonus.toFixed(1)} pts).`
+              : "Palpite Duplo não completado: eram necessários 2 gols do primeiro atleta e 2 assistências do segundo.",
           };
         }
         const mult = config.multiplier || 2;
@@ -205,6 +213,27 @@ export class CardEffectResolver {
 
       // 6. ⚽ GOL DE OURO / 🍽️ PASSE DE OURO / 💎 CAÇA-TALENTOS / 🎰 ALL-IN
       case "CONDITIONAL_PLAYER_BONUS": {
+        // All-In não exige que o atleta esteja na própria escalação.
+        if (card.slug === "all_in" && config.topRank) {
+          const targetPlayer = context.allRoundPlayers.find((player) => player.playerId === target.targetPlayerId);
+          if (!targetPlayer) {
+            return { applied: false, bonusPoints: 0, description: "Jogador alvo não encontrado no mercado." };
+          }
+          const bonus = config.bonus || 6;
+          const maxRank = config.topRank || 5;
+          const playerRank = 1 + context.allRoundPlayers.filter(
+            (player) => player.basePoints > targetPlayer.basePoints,
+          ).length;
+          const applied = playerRank <= maxRank && (targetPlayer.games || 0) > 0;
+          return {
+            applied,
+            bonusPoints: applied ? bonus : 0,
+            description: applied
+              ? `All-In acertou! ${targetPlayer.name || "Jogador"} terminou em ${playerRank}º lugar (+${bonus.toFixed(1)} pts).`
+              : `All-In não atingiu TOP ${maxRank}: ${targetPlayer.name || "Jogador"} ficou em ${playerRank}º lugar (0 pts).`,
+          };
+        }
+
         const targetPlayer = lineupPlayers.find((p) => p.playerId === target.targetPlayerId);
         if (!targetPlayer) {
           return {
@@ -312,40 +341,6 @@ export class CardEffectResolver {
             applied: true,
             bonusPoints: finalBonus,
             description: `Caça-Talentos: ${targetPlayer.name || "Jogador"} fez ${targetPlayer.basePoints.toFixed(1)} pts (+${finalBonus.toFixed(1)} pts bônus).`,
-          };
-        }
-
-        // All-In (cheapestPercentile = 0.5, topRank = 5, bonus = 6)
-        if (config.topRank) {
-          const eligible = isFantasyPriceEligible(
-            { targetFilter: "CHEAPEST_50_PERCENT" },
-            { id: targetPlayer.playerId, price: targetPlayer.price },
-            context.allRoundPlayers.map((player) => ({ id: player.playerId, price: player.price })),
-          );
-          if (!eligible) {
-            return { applied: false, bonusPoints: 0, description: "All-In inválido: atleta fora dos 50% mais baratos." };
-          }
-          const bonus = config.bonus || 6;
-          const maxRank = config.topRank || 5;
-
-          // Cálculo da posição no ranking da rodada com empate justo (1 + contagem de estritamente maiores)
-          const strictlyHigher = context.allRoundPlayers.filter(
-            (p) => p.basePoints > targetPlayer.basePoints
-          ).length;
-          const playerRank = 1 + strictlyHigher;
-
-          if (playerRank <= maxRank && targetPlayer.games > 0) {
-            return {
-              applied: true,
-              bonusPoints: bonus,
-              description: `All-In acertou! ${targetPlayer.name || "Jogador"} terminou em ${playerRank}º lugar (+${bonus.toFixed(1)} pts).`,
-            };
-          }
-
-          return {
-            applied: false,
-            bonusPoints: 0,
-            description: `All-In não atingiu TOP ${maxRank}: ${targetPlayer.name || "Jogador"} ficou em ${playerRank}º lugar (0 pts).`,
           };
         }
 

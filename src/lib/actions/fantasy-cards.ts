@@ -479,20 +479,13 @@ export async function activateCardForRound({
     return { success: false, error: "Esta carta não está disponível para uso." };
   }
 
-  // 3. Se já existia uma ativação anterior para a mesma rodada, liberar a carta anterior para OWNED
+  // Mantemos a ativação atual reservada até que a nova carta passe por todas as validações.
   const { data: existingAct } = await client
     .from("fantasy_card_activations")
     .select("id, user_card_id")
     .eq("round_id", roundId)
     .eq("user_id", account.user.id)
     .maybeSingle();
-
-  if (existingAct && existingAct.user_card_id) {
-    await client
-      .from("fantasy_user_cards")
-      .update({ status: "OWNED" })
-      .eq("id", existingAct.user_card_id);
-  }
 
   const userCardObj = Array.isArray(userCard.card) ? userCard.card[0] : userCard.card;
 
@@ -513,10 +506,43 @@ export async function activateCardForRound({
 
   const lineupPlayerIds = (lineup?.fantasy_lineup_players || []).map((player: any) => player.player_id);
 
+  const marketTargetSlugs = new Set(["double_prediction", "bargain", "all_in"]);
+  const { data: marketPrices } = fantasyRound && marketTargetSlugs.has(userCardObj?.slug || "")
+    ? await client
+        .from("fantasy_player_prices")
+        .select("player_id")
+        .eq("fantasy_season_id", fantasyRound.fantasy_season_id)
+    : { data: [] as any[] };
+  const marketPlayerIds = new Set((marketPrices || []).map((price: any) => price.player_id as string));
+
   const catalogCard = getCardBySlug(userCardObj?.slug || "");
-  if (catalogCard?.requiresTarget === "SINGLE_PLAYER") {
+  if (catalogCard?.requiresTarget === "SINGLE_PLAYER" && !["bargain", "all_in"].includes(userCardObj?.slug || "")) {
     if (!targetPlayerId || !lineupPlayerIds.includes(targetPlayerId)) {
       return { success: false, error: "Escolha um atleta que esteja na sua escalação." };
+    }
+  }
+
+  if (userCardObj?.slug === "bargain") {
+    if (lineupPlayerIds.length > 0) {
+      return { success: false, error: "A Barganha deve ser ativada antes de montar a escalação." };
+    }
+    if (!targetPlayerId || !marketPlayerIds.has(targetPlayerId)) {
+      return { success: false, error: "Escolha um atleta válido do mercado para a Barganha." };
+    }
+  }
+
+  if (userCardObj?.slug === "all_in") {
+    if (!targetPlayerId || !marketPlayerIds.has(targetPlayerId)) {
+      return { success: false, error: "Escolha qualquer atleta válido do mercado para o All-In." };
+    }
+  }
+
+  if (userCardObj?.slug === "double_prediction") {
+    if (!targetPlayerId || !targetPlayer2Id || targetPlayerId === targetPlayer2Id) {
+      return { success: false, error: "Escolha dois jogadores diferentes: um para 2 gols e outro para 2 assistências." };
+    }
+    if (!marketPlayerIds.has(targetPlayerId) || !marketPlayerIds.has(targetPlayer2Id)) {
+      return { success: false, error: "Os dois atletas do Palpite Duplo precisam estar disponíveis no mercado." };
     }
   }
 
@@ -563,9 +589,9 @@ export async function activateCardForRound({
     }
   }
 
-  // 3.3. Caça-Talentos e All-In: o alvo precisa estar escalado e na faixa
-  // de preço descrita pela carta. Em empate total de preços, todos são elegíveis.
-  if (userCardObj?.slug === "scout" || userCardObj?.slug === "all_in") {
+  // 3.3. Caça-Talentos: o alvo precisa estar escalado e abaixo da mediana.
+  // Em empate total de preços, todos os atletas escalados são elegíveis.
+  if (userCardObj?.slug === "scout") {
     if (!targetPlayerId || !lineupPlayerIds.includes(targetPlayerId)) {
       return { success: false, error: "Escolha um atleta que esteja na sua escalação." };
     }
@@ -578,13 +604,11 @@ export async function activateCardForRound({
     const market = (marketPrices || []).map((price: any) => ({ id: price.player_id, price: Number(price.current_price) }));
     const locked = (lineup?.fantasy_lineup_players || []).find((player: any) => player.player_id === targetPlayerId);
     const target = { id: targetPlayerId, price: Number(locked?.price_locked ?? market.find((p) => p.id === targetPlayerId)?.price ?? 0) };
-    const targetFilter = userCardObj.slug === "scout" ? "BELOW_MEDIAN_PRICE" : "CHEAPEST_50_PERCENT";
+    const targetFilter = "BELOW_MEDIAN_PRICE";
     if (!isFantasyPriceEligible({ targetFilter }, target, market)) {
       return {
         success: false,
-        error: userCardObj.slug === "scout"
-          ? "Esse atleta não está abaixo da mediana de preço."
-          : "Esse atleta não está entre os 50% mais baratos.",
+        error: "Esse atleta não está abaixo da mediana de preço.",
       };
     }
   }
@@ -616,6 +640,7 @@ export async function activateCardForRound({
 
   // 4. Salvar snapshot do efeito e dos alvos
   const effectSnapshot = {
+    cardRulesVersion: 2,
     slug: userCardObj?.slug || "",
     name: userCardObj?.name || "",
     rarity: userCardObj?.rarity || "COMMON",
@@ -628,6 +653,14 @@ export async function activateCardForRound({
     targetPlayer2Id: resolvedTargetPlayer2Id,
     targetPrediction: targetPrediction || null,
   };
+
+  // Só agora a carta anteriormente reservada é devolvida ao inventário.
+  if (existingAct?.user_card_id) {
+    await client
+      .from("fantasy_user_cards")
+      .update({ status: "OWNED" })
+      .eq("id", existingAct.user_card_id);
+  }
 
   // Upsert da ativação (UNIQUE(round_id, user_id))
   const { error: actErr } = await client.from("fantasy_card_activations").upsert(

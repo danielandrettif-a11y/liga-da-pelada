@@ -36,13 +36,15 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       ).toBe(false);
     });
 
-    it("calcula gols (+5), assistências (+3), vitórias (+2) e derrotas (-1)", () => {
+    it("calcula gols (+4), assistências (+2), vitórias (+5), derrotas (-3) e goleiro", () => {
       expect(calculateFantasyPlayerPoints({ goals: 2, assists: 1, wins: 2, losses: 0 }, DEFAULT_FANTASY_SETTINGS)).toBe(
-        17
+        20
       );
       expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 3 }, DEFAULT_FANTASY_SETTINGS)).toBe(
-        -3
+        -9
       );
+      expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, goalkeeperGames: 2, goalsConceded: 9, teamGoalsConceded: 3 }, DEFAULT_FANTASY_SETTINGS)).toBe(3);
+      expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, teamGoalsConceded: 2 }, DEFAULT_FANTASY_SETTINGS)).toBe(-2);
     });
   });
 
@@ -352,6 +354,91 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       expect(newbie.nextPrice).toBe(10.0);
       expect(newbie.variationRate).toBe(0);
       expect(Number.isFinite(newbie.score)).toBe(true);
+    });
+  });
+
+  describe("Balanceamento V2 — distribuição 30/30/40", () => {
+    const marketWith = (count: number) => Array.from({ length: count }, (_, index) => ({
+      playerId: `p-${index}`,
+      games: 1,
+      wins: 0,
+      draws: 0,
+      losses: 0,
+      goals: 0,
+      assists: count - index,
+      recentPoints: [999 - index],
+      seasonPoints: [999 - index],
+      currentPrice: 10,
+    }));
+
+    it.each([
+      [10, 3, 3, 4],
+      [15, 5, 4, 6],
+      [18, 6, 5, 7],
+    ])("divide %i participantes em %i altas, %i estáveis e %i baixas", (count, up, stable, down) => {
+      const result = calculateFantasyPrices(marketWith(count), DEFAULT_FANTASY_SETTINGS);
+      expect(result.filter((item) => item.marketBand === "UP")).toHaveLength(up);
+      expect(result.filter((item) => item.marketBand === "STABLE")).toHaveLength(stable);
+      expect(result.filter((item) => item.marketBand === "DOWN")).toHaveLength(down);
+    });
+
+    it("aplica +12% ao melhor, -10% ao pior e ignora o histórico", () => {
+      const input = marketWith(15);
+      input[0].recentPoints = [-500];
+      input[0].seasonPoints = [-500];
+      input[14].recentPoints = [500];
+      input[14].seasonPoints = [500];
+      const result = calculateFantasyPrices(input, DEFAULT_FANTASY_SETTINGS);
+      expect(result.find((item) => item.playerId === "p-0")?.variationRate).toBeCloseTo(0.12, 6);
+      expect(result.find((item) => item.playerId === "p-14")?.variationRate).toBeCloseTo(-0.10, 6);
+    });
+
+    it("aplica exatamente +3% no fim da alta e -2% no início da baixa", () => {
+      const result = calculateFantasyPrices(marketWith(15), DEFAULT_FANTASY_SETTINGS);
+      expect(result.find((item) => item.playerId === "p-4")?.variationRate).toBeCloseTo(0.03, 6);
+      expect(result.find((item) => item.playerId === "p-9")?.variationRate).toBeCloseTo(-0.02, 6);
+    });
+
+    it("faz jogador positivo desvalorizar se ele estiver nos últimos 40%", () => {
+      const result = calculateFantasyPrices(marketWith(10), DEFAULT_FANTASY_SETTINGS);
+      const bottom = result.find((item) => item.playerId === "p-9")!;
+      expect(bottom.roundPoints).toBeGreaterThan(0);
+      expect(bottom.marketBand).toBe("DOWN");
+      expect(bottom.variationRate).toBeLessThan(0);
+    });
+
+    it("mantém todos estáveis quando todos empatam", () => {
+      const tied = marketWith(15).map((player) => ({ ...player, assists: 1 }));
+      const result = calculateFantasyPrices(tied, DEFAULT_FANTASY_SETTINGS);
+      expect(result.every((item) => item.marketBand === "STABLE" && item.variationRate === 0)).toBe(true);
+    });
+
+    it("dá a mesma faixa, posição e variação aos empatados no corte", () => {
+      const tied = marketWith(15);
+      tied[4].assists = 10;
+      tied[5].assists = 10;
+      tied[6].assists = 10;
+      const result = calculateFantasyPrices(tied, DEFAULT_FANTASY_SETTINGS);
+      const group = ["p-4", "p-5", "p-6"].map((id) => result.find((item) => item.playerId === id)!);
+      expect(new Set(group.map((item) => item.marketBand)).size).toBe(1);
+      expect(new Set(group.map((item) => item.roundRank)).size).toBe(1);
+      expect(new Set(group.map((item) => item.variationRate)).size).toBe(1);
+    });
+
+    it("exclui ausentes da divisão e respeita piso e teto", () => {
+      const input = marketWith(10);
+      input[0].currentPrice = 24.9;
+      input[9].currentPrice = 5.1;
+      input.push({ ...input[0], playerId: "absent", games: 0, currentPrice: 13.75 });
+      const result = calculateFantasyPrices(input, DEFAULT_FANTASY_SETTINGS);
+      expect(result.find((item) => item.playerId === "p-0")?.nextPrice).toBe(25);
+      expect(result.find((item) => item.playerId === "p-9")?.nextPrice).toBe(5);
+      expect(result.find((item) => item.playerId === "absent")).toMatchObject({
+        nextPrice: 13.75,
+        variationRate: 0,
+        marketBand: "STABLE",
+        roundRank: null,
+      });
     });
   });
 });

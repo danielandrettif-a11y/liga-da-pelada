@@ -173,6 +173,7 @@ export async function calculateRoundStats(roundId: string) {
           goalkeeper_games: 0,
           clean_sheets: 0,
           goals_conceded: 0,
+          team_goals_conceded: 0,
           points: 0,
         };
       }
@@ -185,6 +186,7 @@ export async function calculateRoundStats(roundId: string) {
 
       // Resultado vale somente para participantes marcados como elegiveis.
       const processTeamMatch = (teamId: string, result: 'win' | 'draw' | 'loss') => {
+        const teamGoalsConceded = teamId === match.team_a_id ? match.score_b : match.score_a;
         const participants = (match.match_players || []).filter(
           (participant: any) => participant.team_id === teamId && participant.result_eligible,
         );
@@ -192,6 +194,7 @@ export async function calculateRoundStats(roundId: string) {
           const s = statsMap[participant.player_id];
           if (!s) continue;
           s.games += 1;
+          s.team_goals_conceded += teamGoalsConceded;
           if (result === 'win') { s.wins += 1; if (countsForRanking) s.points += points.win; }
           if (result === 'draw') { s.draws += 1; if (countsForRanking) s.points += points.draw; }
           if (result === 'loss') { s.losses += 1; if (countsForRanking) s.points += points.loss; }

@@ -11,7 +11,7 @@ export type FantasyCardDefinition = {
   effectConfig: Record<string, any>;
   enabled: boolean;
   requiresTarget: "NONE" | "SINGLE_PLAYER" | "DUO_PLAYERS" | "PREDICTION_TYPE";
-  targetFilter?: "ANY_IN_LINEUP" | "BELOW_MEDIAN_PRICE" | "CHEAPEST_50_PERCENT";
+  targetFilter?: "ANY_IN_LINEUP" | "ANY_IN_MARKET" | "BELOW_MEDIAN_PRICE" | "CHEAPEST_50_PERCENT";
 };
 
 export const FANTASY_CARDS_CATALOG: FantasyCardDefinition[] = [
@@ -41,24 +41,24 @@ export const FANTASY_CARDS_CATALOG: FantasyCardDefinition[] = [
     slug: "double_prediction",
     name: "Palpite Duplo",
     icon: "🎯",
-    description: "Faça um palpite de gol e outro de assistência. Se os dois acontecerem, ganhe +6 pontos.",
+    description: "Escolha 2 jogadores do mercado: um para marcar 2 gols e outro para dar 2 assistências. Se os dois conseguirem, ganhe +6 pontos.",
     rarity: "RARE",
     effectType: "PREDICTION_MULTIPLIER",
     effectConfig: { bonus: 6 },
     enabled: true,
-    requiresTarget: "NONE",
+    requiresTarget: "DUO_PLAYERS",
   },
   {
     slug: "bargain",
     name: "Barganha",
     icon: "🤑",
-    description: "20% de desconto no preço de 1 jogador escalado para fins de orçamento.",
+    description: "Antes de montar a escalação, escolha 1 atleta do mercado: ele terá 20% de desconto no orçamento desta rodada.",
     rarity: "COMMON",
     effectType: "PLAYER_DISCOUNT",
     effectConfig: { discountPercent: 20 },
     enabled: true,
     requiresTarget: "SINGLE_PLAYER",
-    targetFilter: "ANY_IN_LINEUP",
+    targetFilter: "ANY_IN_MARKET",
   },
   {
     slug: "vice_captain",
@@ -124,13 +124,13 @@ export const FANTASY_CARDS_CATALOG: FantasyCardDefinition[] = [
     slug: "all_in",
     name: "All-In",
     icon: "🎰",
-    description: "Escolha um atleta dos 50% mais baratos da rodada. Se ele terminar no TOP 5 da rodada, ganhe +6 pontos.",
+    description: "Escolha qualquer atleta do mercado. Se ele terminar no TOP 5 da rodada, ganhe +6 pontos.",
     rarity: "EPIC",
     effectType: "CONDITIONAL_PLAYER_BONUS",
-    effectConfig: { bonus: 6, cheapestPercentile: 0.5, topRank: 5 },
+    effectConfig: { bonus: 6, topRank: 5 },
     enabled: true,
     requiresTarget: "SINGLE_PLAYER",
-    targetFilter: "CHEAPEST_50_PERCENT",
+    targetFilter: "ANY_IN_MARKET",
   },
   {
     slug: "so_vim_pela_resenha",

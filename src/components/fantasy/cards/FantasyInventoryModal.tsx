@@ -118,7 +118,8 @@ export function FantasyInventoryModal({
   /**
    * Retorna os jogadores elegíveis para o alvo da carta selecionada.
    * - Para Vice-Capitão: apenas jogadores escalados no time, excluindo o capitão oficial.
-   * - Para Dobradinha (DUO_PLAYERS / duo): apenas jogadores escalados no time.
+   * - Para Dobradinha: apenas jogadores escalados no time.
+   * - Para Palpite Duplo: qualquer jogador do mercado.
    * - Para cartas de escalação (ANY_IN_LINEUP): jogadores escalados no time.
    * - Para cartas gerais: jogadores do mercado.
    */
@@ -126,7 +127,10 @@ export function FantasyInventoryModal({
     if (card.slug === "vice_captain") {
       return lineupPlayers.filter((p) => p.id !== captainPlayerId);
     }
-    if (card.slug === "duo" || card.requiresTarget === "DUO_PLAYERS") {
+    if (card.slug === "double_prediction" || card.slug === "bargain" || card.slug === "all_in") {
+      return marketPlayers;
+    }
+    if (card.slug === "duo") {
       return lineupPlayers;
     }
     if (card.targetFilter === "BELOW_MEDIAN_PRICE" || card.targetFilter === "CHEAPEST_50_PERCENT") {
@@ -351,10 +355,18 @@ export function FantasyInventoryModal({
                 </div>
               </div>
 
+              {selectedToUse.card.slug === "bargain" && (
+                <div className="rounded-2xl border border-warning/40 bg-warning/10 px-3.5 py-3 text-xs leading-relaxed text-warning">
+                  <strong>Use antes de escalar.</strong> Escolha o atleta agora; depois ele precisa entrar na sua escalação para o desconto valer.
+                </div>
+              )}
+
               {/* Seletor de Jogador Único */}
               {selectedToUse.card.requiresTarget === "SINGLE_PLAYER" && (() => {
                 const eligible = getEligiblePlayers(selectedToUse.card);
                 const isVice = selectedToUse.card.slug === "vice_captain";
+                const isBargain = selectedToUse.card.slug === "bargain";
+                const isAllIn = selectedToUse.card.slug === "all_in";
 
                 if (isVice && eligible.length === 0) {
                   return (
@@ -372,7 +384,11 @@ export function FantasyInventoryModal({
                     <label className="text-[10px] font-bold text-muted block">
                       {isVice
                         ? "Escolha quem será o Vice-Capitão do seu time (apenas atletas escalados):"
-                        : "Escolha o jogador alvo desta carta:"}
+                        : isBargain
+                          ? "Escolha o atleta do mercado antes de montar sua escalação:"
+                          : isAllIn
+                            ? "Escolha qualquer atleta do mercado:"
+                            : "Escolha o jogador alvo desta carta:"}
                     </label>
                     <select
                       value={targetPlayerId}
@@ -392,12 +408,15 @@ export function FantasyInventoryModal({
               {/* Seletor de Dupla de Jogadores */}
               {selectedToUse.card.requiresTarget === "DUO_PLAYERS" && (() => {
                 const eligible = getEligiblePlayers(selectedToUse.card);
+                const isDoublePrediction = selectedToUse.card.slug === "double_prediction";
                 if (eligible.length < 2) {
                   return (
                     <div className="rounded-2xl border border-warning/40 bg-warning/10 p-3.5 text-center text-xs text-warning space-y-1">
-                      <p className="font-bold">⚠️ Menos de 2 jogadores escalados no time.</p>
+                      <p className="font-bold">⚠️ Menos de 2 jogadores elegíveis.</p>
                       <p className="text-[11px] text-muted">
-                        Escale pelo menos 2 atletas no seu campinho para poder ativar a Dobradinha.
+                        {isDoublePrediction
+                          ? "É preciso haver ao menos 2 jogadores disponíveis no mercado para ativar o Palpite Duplo."
+                          : "Escale pelo menos 2 atletas no seu campinho para poder ativar a Dobradinha."}
                       </p>
                     </div>
                   );
@@ -408,11 +427,15 @@ export function FantasyInventoryModal({
                 return (
                   <div className="space-y-2">
                     <p className="text-[10px] font-bold text-muted">
-                      Escolha 2 atletas do seu time escalado para a Dobradinha:
+                      {isDoublePrediction
+                        ? "Escolha dois jogadores do mercado:"
+                        : "Escolha 2 atletas do seu time escalado para a Dobradinha:"}
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-muted block">Jogador 1:</label>
+                        <label className="text-[10px] font-bold text-muted block">
+                          {isDoublePrediction ? "Quem fará 2 gols:" : "Jogador 1:"}
+                        </label>
                         <select
                           value={targetPlayerId}
                           onChange={(e) => setTargetPlayerId(e.target.value)}
@@ -426,7 +449,9 @@ export function FantasyInventoryModal({
                         </select>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-muted block">Jogador 2:</label>
+                        <label className="text-[10px] font-bold text-muted block">
+                          {isDoublePrediction ? "Quem dará 2 assistências:" : "Jogador 2:"}
+                        </label>
                         <select
                           value={targetPlayer2Id}
                           onChange={(e) => setTargetPlayer2Id(e.target.value)}
@@ -442,7 +467,7 @@ export function FantasyInventoryModal({
                     </div>
                     {isSamePlayer && (
                       <p className="text-[11px] text-danger font-bold">
-                        ⚠️ Escolha 2 jogadores diferentes do time escalado.
+                        ⚠️ Escolha 2 jogadores diferentes.
                       </p>
                     )}
                   </div>
