@@ -28,7 +28,7 @@ import {
   X,
 } from "@/components/icons";
 import {
-  adminAddCallupPlayer,
+  addRosterPlayerToCallup,
   adminRemoveCallupPlayer,
   createCallupPrelist,
   inviteGuestToCallup,
@@ -509,8 +509,8 @@ export function CallupBoard({
                 </div>
               )}
 
-              {/* Opção rápida de ADM para adicionar jogadores cadastrados */}
-              {isAdmin && availableToAdmin.length > 0 && (
+              {/* Qualquer conta logada pode incluir alguém do elenco jogável. */}
+              {isAuthenticated && availableToAdmin.length > 0 && (
                 <div className="pt-3 border-t border-accent/15 flex gap-2">
                   <select
                     id="admin-callup-player"
@@ -518,7 +518,7 @@ export function CallupBoard({
                     className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-xs text-foreground"
                   >
                     <option value="" disabled>
-                      Adicionar do elenco já cadastrado...
+                      Adicionar alguém do elenco...
                     </option>
                     {availableToAdmin.map((player) => (
                       <option key={player.id} value={player.id}>
@@ -530,7 +530,7 @@ export function CallupBoard({
                   <button
                     onClick={() => {
                       const select = document.getElementById("admin-callup-player") as HTMLSelectElement;
-                      if (select?.value) run("add", () => adminAddCallupPlayer(callup.id, select.value));
+                      if (select?.value) run("add", () => addRosterPlayerToCallup(callup.id, select.value));
                     }}
                     disabled={!!loading}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/20 text-accent hover:bg-accent hover:text-background transition-colors"

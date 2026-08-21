@@ -166,6 +166,25 @@ export async function adminAddCallupPlayer(callupId: string, playerId: string) {
   return { success: true };
 }
 
+/**
+ * A convocação é colaborativa: qualquer pessoa autenticada pode adicionar um
+ * perfil jogável do elenco. WAGs e Torcida continuam fora da lista porque não
+ * podem participar de partidas.
+ */
+export async function addRosterPlayerToCallup(callupId: string, playerId: string) {
+  const account = await getCurrentAccount();
+  if (!account.user) return { success: false, error: "Entre na sua conta para alterar a lista." };
+
+  const { error } = await account.client.rpc("add_player_to_callup", {
+    p_callup_id: callupId,
+    p_player_id: playerId,
+    p_admin_only: false,
+  });
+  if (error) return { success: false, error: error.message };
+  refreshCallups();
+  return { success: true };
+}
+
 export async function adminRemoveCallupPlayer(callupId: string, playerId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem alterar a lista." };
