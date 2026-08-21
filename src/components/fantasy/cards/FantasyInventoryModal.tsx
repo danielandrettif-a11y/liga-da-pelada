@@ -248,19 +248,21 @@ export function FantasyInventoryModal({
         </div>
 
         {/* Chips de Filtro por Raridade */}
-        <div className="no-scrollbar flex gap-1.5 overflow-x-auto p-4 border-b border-white/5 bg-black/20 text-[9px] font-black uppercase tracking-wider">
+        <div className="grid grid-cols-6 gap-2 border-b border-white/5 bg-black/20 p-3 text-[9px] font-black uppercase tracking-wider sm:grid-cols-5">
           {[
             { id: "ALL", label: "Todas" },
             { id: "COMMON", label: "⚪ Comuns" },
             { id: "RARE", label: "🔵 Raras" },
             { id: "EPIC", label: "🟣 Épicas" },
             { id: "LEGENDARY", label: "👑 Lendárias" },
-          ].map((chip) => (
+          ].map((chip, index) => (
             <button
               key={chip.id}
               type="button"
               onClick={() => setRarityFilter(chip.id)}
-              className={`shrink-0 rounded-xl px-3 py-1.5 transition-colors border ${
+              className={`flex min-h-10 items-center justify-center rounded-xl border px-2 py-2 leading-tight transition-colors ${
+                index < 3 ? "col-span-2 sm:col-span-1" : "col-span-3 sm:col-span-1"
+              } ${
                 rarityFilter === chip.id
                   ? "border-accent bg-accent text-background"
                   : "border-white/10 bg-surface/60 text-muted hover:text-foreground"

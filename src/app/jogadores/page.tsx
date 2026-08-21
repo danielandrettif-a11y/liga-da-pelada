@@ -29,7 +29,7 @@ export default async function JogadoresPage({ searchParams }: PageProps<"/jogado
         supporters={rankedRoster.supporters}
         unreadPlayerIds={unreadRoster.playerIds}
         unreadSeenThrough={unreadRoster.seenThrough}
-        initialFilter={tab === "passe" ? "pass" : "all"}
+        initialView={tab === "passe" ? "pass" : "roster"}
         seasonPass={<SeasonPassExperience pass={seasonPass} />}
       />
     </div>

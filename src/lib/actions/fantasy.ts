@@ -1686,6 +1686,8 @@ export type SeasonPassDashboard = {
   validLineups: number;
   goalsAssistsRemainder: number;
   nextMilestone: number | null;
+  playerName: string | null;
+  playerAvatarUrl: string | null;
   events: SeasonPassEvent[];
 };
 
@@ -1695,7 +1697,7 @@ export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
   const empty: SeasonPassDashboard = {
     authenticated: Boolean(account.user), available: false, progress: 0, maxProgress: 40,
     mode: "athlete", participations: 0, validLineups: 0, goalsAssistsRemainder: 0,
-    nextMilestone: 1, events: [],
+    nextMilestone: 1, playerName: null, playerAvatarUrl: null, events: [],
   };
   if (!account.user || !account.profile?.player_id) return empty;
 
@@ -1705,7 +1707,7 @@ export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
 
   const [{ data: fantasySeason, error: seasonError }, { data: player }] = await Promise.all([
     account.client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle(),
-    account.client.from("players").select("member_category").eq("id", account.profile.player_id).maybeSingle(),
+    account.client.from("players").select("name, avatar_url, member_category").eq("id", account.profile.player_id).maybeSingle(),
   ]);
   if (seasonError || !fantasySeason) return empty;
 
@@ -1744,6 +1746,8 @@ export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
     validLineups: Number(pass?.valid_lineups || 0),
     goalsAssistsRemainder: Number(pass?.goals_assists_remainder || 0),
     nextMilestone: milestones.find((milestone) => milestone > progress) ?? null,
+    playerName: player?.name || null,
+    playerAvatarUrl: player?.avatar_url || null,
     events: (rows || []).map((row: any) => ({
       id: row.id,
       eventType: row.event_type,

@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { Crown, Sparkles } from "@/components/icons";
+import { Crown } from "@/components/icons";
 import type { SeasonPassDashboard } from "@/lib/actions/fantasy";
+import { SeasonPassPitch } from "./SeasonPassPitch";
 
-const milestones = [1, 5, 10, 18, 25, 32, 40];
 const eventLabels = {
   participation: "Participação em rodada",
   valid_lineup: "Escalação válida",
@@ -27,10 +27,7 @@ export function SeasonPassExperience({ pass }: { pass: SeasonPassDashboard }) {
             ? "Sua trilha avança ao montar escalações válidas nas rodadas Ranked."
             : "Jogue, escale e some gols e assistências nas rodadas Ranked para avançar na trilha."}
         </p>
-        <div className="relative mt-5 h-3 overflow-hidden rounded-full border border-white/10 bg-black/25">
-          <div className="h-full rounded-full bg-gradient-to-r from-[#bd82ff] via-[#d7adff] to-[#ffd34d]" style={{ width: `${Math.min(100, (progress / 40) * 100)}%` }} />
-        </div>
-        <div className="relative mt-2 flex justify-between text-[10px] font-black uppercase tracking-wider text-white/55"><span>Início</span><span>{progress}/40 casas</span><span>Meta final</span></div>
+        <p className="relative mt-5 text-[10px] font-black uppercase tracking-[0.16em] text-[#d7adff]">Da torcida ao centroavante · 40 casas</p>
       </section>
 
       {!pass.authenticated ? (
@@ -43,7 +40,7 @@ export function SeasonPassExperience({ pass }: { pass: SeasonPassDashboard }) {
       ) : (
         <>
           <section className="grid grid-cols-3 gap-2"><Metric label="Peladas" value={pass.participations} /><Metric label="Escalações" value={pass.validLineups} /><Metric label="G+A p/ ciclo" value={`${pass.goalsAssistsRemainder}/5`} /></section>
-          <section className="rounded-3xl border border-border bg-surface p-4"><div className="flex items-center justify-between gap-3"><div><p className="font-athletic text-xs font-black uppercase italic tracking-[0.16em] text-[#c899ff]">Trilha de 40 casas</p><p className="mt-1 text-[11px] text-muted">Marcos cosméticos estão sendo preparados.</p></div><Sparkles className="h-5 w-5 text-[#d7adff]" /></div><ol className="relative mt-5 space-y-2 before:absolute before:bottom-4 before:left-[18px] before:top-4 before:w-px before:bg-[#a65cff]/30">{Array.from({ length: 40 }, (_, index) => { const house = index + 1; const milestone = milestones.includes(house); const unlocked = house <= progress; return <li key={house} className="relative flex items-center gap-3"><span className={`relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-[11px] font-black ${unlocked ? "border-[#d7adff] bg-[#a04dff]/30 text-white shadow-[0_0_14px_rgba(160,77,255,.3)]" : "border-border bg-background text-muted"}`}>{house}</span><div className={`min-w-0 flex-1 rounded-xl border px-3 py-2 ${milestone ? "border-[#d7adff]/35 bg-[#8d3cff]/10" : "border-border/70 bg-background/35"}`}><div className="flex items-center justify-between gap-2"><span className="text-[11px] font-black text-foreground">{milestone ? "Marco cosmético" : unlocked ? "Casa concluída" : "Próxima casa"}</span>{milestone && <span className="rounded-full border border-warning/25 bg-warning/10 px-2 py-0.5 text-[8px] font-black uppercase text-warning">Em desenvolvimento</span>}</div></div></li>; })}</ol></section>
+          <SeasonPassPitch progress={progress} playerName={pass.playerName} playerAvatarUrl={pass.playerAvatarUrl} />
           <section className="rounded-3xl border border-border bg-surface p-4"><p className="font-athletic text-xs font-black uppercase italic tracking-[0.16em] text-accent">Como avançar</p><ul className="mt-3 space-y-2 text-xs leading-5 text-muted">{pass.mode === "community" ? <><li><strong className="text-foreground">+4 casas</strong> por escalação válida em rodada Ranked.</li><li><strong className="text-foreground">+4 casas</strong> extras ao completar 9 escalações.</li></> : <><li><strong className="text-foreground">+2 casas</strong> ao jogar uma rodada Ranked.</li><li><strong className="text-foreground">+1 casa</strong> pela escalação válida; mais <strong className="text-foreground">+1</strong> se você também entrou em campo.</li><li><strong className="text-foreground">+1 casa</strong> a cada ciclo de 5 gols+assistências, no máximo uma vez por rodada.</li><li><strong className="text-foreground">+4 casas</strong> ao completar 9 participações.</li></>}</ul></section>
           {pass.events.length > 0 && <section className="rounded-3xl border border-border bg-surface p-4"><p className="font-athletic text-xs font-black uppercase italic tracking-[0.16em] text-accent">Últimos avanços</p><div className="mt-3 divide-y divide-border/70">{pass.events.map((event) => <div key={event.id} className="flex items-center justify-between gap-3 py-3"><div><p className="text-xs font-black text-foreground">{eventLabels[event.eventType]}</p><p className="mt-0.5 text-[10px] text-muted">{event.roundNumber ? `Rodada ${String(event.roundNumber).padStart(2, "0")}` : "Temporada BQ"}</p></div><span className="font-athletic text-lg font-black text-[#d7adff]">+{event.houses}</span></div>)}</div></section>}
         </>
