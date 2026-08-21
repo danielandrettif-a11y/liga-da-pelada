@@ -43,7 +43,6 @@ export function RankingHub({ data, fantasyRanking, currentPlayerId }: RankingHub
               <h1 className="text-xl font-black text-foreground">Ranking do Cartola</h1>
               <p className="text-xs text-muted">Classificação geral e patrimônio da temporada.</p>
             </div>
-            <span className="rounded-full bg-warning px-2 py-1 text-[8px] font-black uppercase tracking-wider text-background">Beta</span>
           </div>
           <FantasyRankingList ranking={fantasyRanking} />
         </div>
