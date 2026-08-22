@@ -27,6 +27,8 @@ import { TeamCrest } from "@/components/TeamCrest";
 import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
 import { getSeasonPassDashboard } from "@/lib/actions/fantasy";
 import { SeasonPassBanner } from "@/components/fantasy/SeasonPassBanner";
+import { InboxCard } from "@/components/InboxCard";
+import { getMyInboxNotifications } from "@/lib/actions/inbox";
 
 export const dynamic = "force-dynamic";
 
@@ -113,13 +115,14 @@ export default async function HomePage() {
 
     return player ? player.avatar_url : undefined;
   });
-  const [{ data }, previousSeason, account, accountName, playerAvatarUrl, seasonPass] = await Promise.all([
+  const [{ data }, previousSeason, account, accountName, playerAvatarUrl, seasonPass, inbox] = await Promise.all([
     getDashboardData(),
     getLatestFinishedSeason(),
     accountPromise,
     accountPromise.then(getAccountDisplayName),
     playerAvatarPromise,
     getSeasonPassDashboard(),
+    getMyInboxNotifications(),
   ]);
   const inheritedGoogleAvatars = [
     account.user?.user_metadata?.avatar_url,
@@ -166,6 +169,8 @@ export default async function HomePage() {
 
       {!account.user && <JoinSelectionButton />}
       {hasIncompleteProfile && <IncompleteProfileBanner />}
+
+      <InboxCard notifications={inbox} />
 
       <LiveMatchBanner
         initialMatch={liveMatch as unknown as HomeLiveMatch | null}
