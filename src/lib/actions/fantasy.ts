@@ -1967,7 +1967,7 @@ export async function getFantasyUserHistory(userId: string) {
     account.client.from("fantasy_accounts").select("total_points, current_budget, rounds_played, best_round_points").eq("fantasy_season_id", fantasySeason.id).eq("user_id", userId).maybeSingle(),
     account.client
       .from("fantasy_lineups")
-      .select("id, total_points, player_points, prediction_points, budget_after, captain_player_id, top_scorer_player_id, top_assist_player_id, score_breakdown, fantasy_rounds!inner(round_id, market_status, rounds!inner(number, date, status))")
+      .select("id, total_points, player_points, prediction_points, budget_after, captain_player_id, top_scorer_player_id, top_assist_player_id, score_breakdown, fantasy_rounds!inner(round_id, market_status, settings_snapshot, rounds!inner(number, date, status))")
       .eq("user_id", userId)
       .eq("fantasy_rounds.fantasy_season_id", fantasySeason.id)
       .eq("status", "scored")
@@ -2003,7 +2003,22 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
     .eq("id", target.id)
     .eq("status", "scored")
     .maybeSingle();
-  return lineup ? { history, lineup, round: target.round } : null;
+  if (!lineup) return null;
+  const playerIds = (lineup.fantasy_lineup_players || []).map((item: any) => item.player_id);
+  const { data: stats } = playerIds.length
+    ? await account.client
+      .from("player_round_stats")
+      .select("player_id, games, goals, assists, wins, draws, losses, goalkeeper_games, goals_conceded, team_goals_conceded")
+      .eq("round_id", roundId)
+      .in("player_id", playerIds)
+    : { data: [] };
+  return {
+    history,
+    lineup,
+    round: target.round,
+    settingsSnapshot: target.fantasyRound?.settings_snapshot || {},
+    statsByPlayer: Object.fromEntries((stats || []).map((stat: any) => [stat.player_id, stat])),
+  };
 }
 
 export async function getFantasyQuickHighlights(): Promise<FantasyQuickHighlight | null> {
