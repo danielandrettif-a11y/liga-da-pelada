@@ -109,7 +109,7 @@ export function NextRoundBanner({
         </div>
 
         {/* Informações Centrais: Título Boleiro e Convocados */}
-        <div className="w-full space-y-1.5">
+        <div className={`w-full space-y-1.5 ${round ? "" : "mt-auto"}`}>
           <div className="flex items-center gap-2">
             <span className="flex h-2 w-2 rounded-full bg-accent shadow-[0_0_8px_rgba(204,255,0,0.8)]" />
             <p className="font-athletic text-xs font-black uppercase italic tracking-[0.25em] text-amber-300">

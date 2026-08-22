@@ -2,7 +2,6 @@ import {
   CalendarDays,
   Camera,
   ChevronRight,
-  ClipboardList,
   Football,
   LogIn,
   Medal,
@@ -23,7 +22,7 @@ import { PreSeasonBanner } from "@/components/PreSeasonBanner";
 import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
 import { NextRoundBanner } from "@/components/NextRoundBanner";
 import { OpenCallupBanner } from "@/components/OpenCallupBanner";
-import { TeamCrest } from "@/components/TeamCrest";
+import { HomeLastRoundSummary } from "@/components/HomeLastRoundSummary";
 import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
 import { getSeasonPassDashboard } from "@/lib/actions/fantasy";
 import { SeasonPassBanner } from "@/components/fantasy/SeasonPassBanner";
@@ -339,75 +338,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Last Round Summary */}
-      {lastRound && (
-        <section>
-          <h2 className="mb-3 flex items-center gap-2 font-athletic text-base font-black uppercase italic tracking-wider text-foreground">
-            <ClipboardList className="h-5 w-5 text-accent" /> Última Rodada
-          </h2>
-
-          <Link href={`/rodadas/${lastRound.id}`} className="block">
-            <div className="glass-card glass-card-hover p-4 animate-fade-in-up">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-bold text-foreground">
-                  Rodada {String(lastRound.number).padStart(2, "0")}
-                </p>
-                <span className="text-xs text-muted">
-                  {new Date(lastRound.date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                </span>
-              </div>
-
-              {/* Mini match results */}
-              <div className="space-y-2">
-                {lastRound.matches && lastRound.matches.length > 0 ? (
-                  lastRound.matches.map((match: any) => (
-                    <div
-                      key={match.id}
-                      className="flex items-center gap-2 py-1.5 text-xs"
-                    >
-                      <div className="flex items-center gap-1.5 flex-1 justify-end">
-                        <span className="font-semibold text-foreground/80 truncate">
-                          {match.teamA?.name || "Time A"}
-                        </span>
-                        <TeamCrest name={match.teamA?.name || "Time A"} crestUrl={match.teamA?.crest_url} color={match.teamA?.color} className="h-4 w-4" />
-                      </div>
-                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface min-w-[3.5rem] justify-center">
-                        <span
-                          className={`font-bold ${
-                            match.score_a > match.score_b
-                              ? "text-accent"
-                              : "text-foreground/60"
-                          }`}
-                        >
-                          {match.score_a}
-                        </span>
-                        <span className="text-muted">×</span>
-                        <span
-                          className={`font-bold ${
-                            match.score_b > match.score_a
-                              ? "text-accent"
-                              : "text-foreground/60"
-                          }`}
-                        >
-                          {match.score_b}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-1">
-                        <TeamCrest name={match.teamB?.name || "Time B"} crestUrl={match.teamB?.crest_url} color={match.teamB?.color} className="h-4 w-4" />
-                        <span className="font-semibold text-foreground/80 truncate">
-                          {match.teamB?.name || "Time B"}
-                        </span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-center text-muted py-2">Sem partidas registradas</p>
-                )}
-              </div>
-            </div>
-          </Link>
-        </section>
-      )}
+      {lastRound && <HomeLastRoundSummary round={lastRound} />}
     </div>
   );
 }
