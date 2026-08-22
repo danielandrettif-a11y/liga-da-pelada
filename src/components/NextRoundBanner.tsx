@@ -88,7 +88,7 @@ export function NextRoundBanner({
       <div className="pointer-events-none absolute -bottom-16 -left-16 h-60 w-60 rounded-full bg-accent/20 blur-3xl" />
 
       {/* Conteúdo do Banner */}
-      <div className="pointer-events-none relative z-20 flex h-full flex-col justify-between gap-4">
+      <div className="pointer-events-none relative z-20 flex min-h-full flex-col gap-4 pb-16">
         {/* Topo do Banner: Selo da Liga + Troféu Dourado */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -179,7 +179,7 @@ export function NextRoundBanner({
         </div>
 
         {/* Rodapé: Ações Rápidas */}
-        <div className="pointer-events-auto relative z-30 flex items-center justify-between gap-2 border-t border-white/10 pt-3.5">
+        <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-30 flex items-center justify-between gap-2 border-t border-white/10 pt-3.5">
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             <Link
               href="/rodadas"
