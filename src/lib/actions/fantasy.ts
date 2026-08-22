@@ -2012,12 +2012,17 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
       .eq("round_id", roundId)
       .in("player_id", playerIds)
     : { data: [] };
+  const predictionIds = [lineup.top_scorer_player_id, lineup.top_assist_player_id].filter(Boolean) as string[];
+  const { data: predictionPlayers } = predictionIds.length
+    ? await account.client.from("players").select("id, name, avatar_url").in("id", predictionIds)
+    : { data: [] };
   return {
     history,
     lineup,
     round: target.round,
     settingsSnapshot: target.fantasyRound?.settings_snapshot || {},
     statsByPlayer: Object.fromEntries((stats || []).map((stat: any) => [stat.player_id, stat])),
+    predictionPlayers: Object.fromEntries((predictionPlayers || []).map((player: any) => [player.id, player])),
   };
 }
 
