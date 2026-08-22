@@ -146,6 +146,18 @@ export async function calculateRoundStats(roundId: string) {
 
     if (rulesError) throw new Error(`Erro ao buscar regras de pontuação: ${rulesError.message}`);
 
+    // Correções administrativas são persistentes e reaplicadas a cada consolidação.
+    // Isso permite zerar apenas um jogador sem apagar gols/assistências dos demais.
+    const { data: voidedRows, error: voidedError } = await client
+      .from("player_round_stat_overrides")
+      .select("player_id")
+      .eq("round_id", roundId)
+      .eq("override_type", "zero_points");
+    if (voidedError && !/relation .* does not exist/i.test(voidedError.message)) {
+      throw new Error(`Erro ao buscar correções de pontuação: ${voidedError.message}`);
+    }
+    const voidedPlayerIds = new Set((voidedRows || []).map((row: any) => row.player_id));
+
     for (const rule of configuredRules || []) {
       if (rule.event_type in points) {
         points[rule.event_type as EventType] = rule.points;
@@ -188,7 +200,7 @@ export async function calculateRoundStats(roundId: string) {
       const processTeamMatch = (teamId: string, result: 'win' | 'draw' | 'loss') => {
         const teamGoalsConceded = teamId === match.team_a_id ? match.score_b : match.score_a;
         const participants = (match.match_players || []).filter(
-          (participant: any) => participant.team_id === teamId && participant.result_eligible,
+          (participant: any) => participant.team_id === teamId && participant.result_eligible && !voidedPlayerIds.has(participant.player_id),
         );
         for (const participant of participants) {
           const s = statsMap[participant.player_id];
@@ -205,6 +217,7 @@ export async function calculateRoundStats(roundId: string) {
       processTeamMatch(match.team_b_id, isDraw ? 'draw' : (winnerId === match.team_b_id ? 'win' : 'loss'));
 
       for (const goalkeeper of match.match_goalkeepers || []) {
+        if (voidedPlayerIds.has(goalkeeper.player_id)) continue;
         const s = statsMap[goalkeeper.player_id];
         if (!s) continue;
         const conceded = goalkeeper.team_id === match.team_a_id ? match.score_b : match.score_a;
@@ -222,14 +235,14 @@ export async function calculateRoundStats(roundId: string) {
         if (ev.event_type === 'goal') {
           // Gols
           const scorer = statsMap[ev.player_id];
-          if (scorer) {
+          if (scorer && !voidedPlayerIds.has(ev.player_id)) {
             scorer.goals += 1;
             if (countsForRanking) scorer.points += points.goal;
           }
           // Assistências
           if (ev.assist_player_id) {
             const assister = statsMap[ev.assist_player_id];
-            if (assister) {
+            if (assister && !voidedPlayerIds.has(ev.assist_player_id)) {
               assister.assists += 1;
               if (countsForRanking) assister.points += points.assist;
             }
@@ -241,7 +254,7 @@ export async function calculateRoundStats(roundId: string) {
     const bestGoalkeeper = round.best_goalkeeper_player_id
       ? statsMap[round.best_goalkeeper_player_id]
       : null;
-    if (bestGoalkeeper) {
+    if (bestGoalkeeper && !voidedPlayerIds.has(round.best_goalkeeper_player_id)) {
       if (countsForRanking) bestGoalkeeper.points += points.best_goalkeeper;
     }
 

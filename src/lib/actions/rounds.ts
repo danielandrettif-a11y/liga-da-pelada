@@ -855,6 +855,38 @@ export async function transferRoundPlayerIdentity(roundId: string, sourcePlayerI
   }
 }
 
+export async function zeroPlayerRoundPoints(roundId: string, playerId: string, reason: string) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem corrigir pontuação." };
+    const { error } = await client.rpc("zero_player_round_points", {
+      p_round_id: roundId,
+      p_player_id: playerId,
+      p_reason: reason.trim() || "Jogador não participou da rodada",
+    });
+    if (error) throw new Error(error.message);
+
+    const stats = await (await import("./stats")).calculateRoundStats(roundId);
+    if (!stats.success) throw new Error(stats.error || "Não foi possível recalcular as estatísticas.");
+
+    const { data: fantasyRound } = await client.from("fantasy_rounds").select("id").eq("round_id", roundId).maybeSingle();
+    if (fantasyRound) {
+      const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: roundId });
+      if (fantasyError) throw new Error(`Pontuação corrigida, mas o Cartola precisa ser reprocessado: ${fantasyError.message}`);
+    }
+
+    revalidatePath(`/rodadas/${roundId}`);
+    revalidatePath("/ranking");
+    revalidatePath("/jogadores");
+    revalidatePath(`/jogadores/${playerId}`);
+    revalidatePath("/cartola", "layout");
+    revalidatePath("/");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Não foi possível zerar a pontuação." };
+  }
+}
+
 export async function addRoundEmergencySubstitute(roundId: string, outPlayerId: string, inPlayerId: string, teamId: string) {
   try {
     const client = await getAdminClient();
