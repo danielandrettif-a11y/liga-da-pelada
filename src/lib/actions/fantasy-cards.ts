@@ -738,6 +738,9 @@ export async function generatePacksForFinishedRound(roundId: string): Promise<nu
   const client = await getAdminClient();
   if (!client) return 0;
 
+  const { data: ensured, error: ensuredError } = await client.rpc("ensure_fantasy_round_reward_packs", { p_round_id: roundId });
+  if (!ensuredError) return Number(ensured || 0);
+
   // Buscar fantasy_round_id correspondente
   const { data: fantasyRound } = await client
     .from("fantasy_rounds")
@@ -751,7 +754,8 @@ export async function generatePacksForFinishedRound(roundId: string): Promise<nu
   const { data: lineups } = await client
     .from("fantasy_lineups")
     .select("user_id")
-    .eq("fantasy_round_id", fantasyRound.id);
+    .eq("fantasy_round_id", fantasyRound.id)
+    .eq("status", "scored");
 
   if (!lineups || lineups.length === 0) return 0;
 
@@ -989,6 +993,40 @@ export async function distributePackToAllLineupUsers(): Promise<{
   } catch (err: any) {
     return { success: false, error: err.message || "Erro inesperado ao distribuir pacotes." };
   }
+}
+
+export async function auditAndRepairCurrentSeasonPacks() {
+  const account = await getCurrentAccount();
+  if (!account.user || !account.isAdmin) return { success: false as const, error: "Somente administradores podem auditar pacotes." };
+  const { getActiveLeague } = await import("./rounds");
+  const { getActiveSeason } = await import("./seasons");
+  const league = await getActiveLeague();
+  const season = await getActiveSeason(league.id);
+  if (!season) return { success: false as const, error: "Temporada ativa não encontrada." };
+  const { data: fantasySeason } = await account.client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle();
+  if (!fantasySeason) return { success: true as const, rounds: [] as any[] };
+  const { data: rounds } = await account.client
+    .from("fantasy_rounds")
+    .select("id, round_id, round:round_id(number, status)")
+    .eq("fantasy_season_id", fantasySeason.id)
+    .eq("market_status", "finished");
+  const report = [] as any[];
+  for (const fantasyRound of rounds || []) {
+    const [{ data: lineups }, { data: packs }] = await Promise.all([
+      account.client.from("fantasy_lineups").select("user_id").eq("fantasy_round_id", fantasyRound.id).eq("status", "scored"),
+      account.client.from("fantasy_round_packs").select("user_id").eq("round_id", fantasyRound.round_id).eq("source", "round_reward"),
+    ]);
+    const eligible = [...new Set((lineups || []).map((item: any) => item.user_id))];
+    const received = new Set((packs || []).map((item: any) => item.user_id));
+    const missing = eligible.filter((userId) => !received.has(userId));
+    const repaired = missing.length ? await generatePacksForFinishedRound(fantasyRound.round_id) : 0;
+    const { data: profiles } = missing.length
+      ? await account.client.from("account_profiles").select("user_id, players(name)").in("user_id", missing)
+      : { data: [] as any[] };
+    report.push({ roundId: fantasyRound.round_id, roundNumber: (fantasyRound.round as any)?.number || 0, eligible: eligible.length, received: received.size, missing: (profiles || []).map((p: any) => p.players?.name || p.user_id), repaired });
+  }
+  revalidatePath("/admin/cartola/pacotes");
+  return { success: true as const, rounds: report };
 }
 
 /** Concede um pacote individual escolhido pelo ADM, sem substituir recompensas anteriores. */

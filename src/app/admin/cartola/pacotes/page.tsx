@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, Sparkles } from "@/components/icons";
 import { FantasyPackGiftManager } from "@/components/fantasy/FantasyPackGiftManager";
+import { FantasyPackAudit } from "@/components/fantasy/FantasyPackAudit";
 import { getManagedAccounts } from "@/lib/actions/admins";
 import { getCurrentAccount } from "@/lib/auth";
 
@@ -20,6 +21,7 @@ export default async function FantasyAdminPacksPage() {
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/15"><Sparkles className="h-5 w-5 text-accent" /></span>
       </header>
       <section className="rounded-3xl border border-accent/25 bg-gradient-to-br from-accent/10 to-surface p-4"><FantasyPackGiftManager accounts={accounts} /></section>
+      <FantasyPackAudit />
     </div>
   );
 }
