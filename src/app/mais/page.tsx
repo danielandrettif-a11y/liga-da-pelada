@@ -67,6 +67,12 @@ const ADMIN_SECTIONS = [
         description: "Promover e revisar acessos de ADM",
       },
       {
+        href: "/mais/pix",
+        icon: ArrowLeftRight,
+        label: "PIX de recebimento",
+        description: "Cadastrar chaves para encerrar a rodada",
+      },
+      {
         href: "/admin/cartola/pacotes",
         icon: ClipboardList,
         label: "Enviar pacote",

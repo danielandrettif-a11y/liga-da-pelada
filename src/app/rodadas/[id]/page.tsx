@@ -17,6 +17,7 @@ import { RoundHistoryTabs } from "@/components/RoundHistoryTabs";
 import { RoundAdminPlayerTools } from "@/components/RoundAdminPlayerTools";
 import { getPlayers } from "@/lib/actions/players";
 import { RoundInstagramStoryGenerator } from "@/components/RoundInstagramStoryGenerator";
+import { getPaymentRecipients } from "@/lib/actions/payments";
 
 export const revalidate = 0;
 
@@ -29,8 +30,9 @@ export default async function RodadaDetalhePage({
   const roundPromise = getRound(id);
   const accountPromise = getCurrentAccount();
   const allSelectablePlayersPromise = accountPromise.then((acc) => acc.isAdmin ? getPlayers(true) : []);
+  const paymentRecipientsPromise = accountPromise.then((acc) => acc.isAdmin ? getPaymentRecipients() : []);
 
-  const [round, account, goalkeeperPoints, roundStatistics, allSelectablePlayers] = await Promise.all([
+  const [round, account, goalkeeperPoints, roundStatistics, allSelectablePlayers, paymentRecipients] = await Promise.all([
     roundPromise,
     accountPromise,
     roundPromise.then((currentRound) => currentRound?.status === "finished"
@@ -40,6 +42,7 @@ export default async function RodadaDetalhePage({
       ? getRoundStatistics(currentRound.id)
       : null),
     allSelectablePlayersPromise,
+    paymentRecipientsPromise,
   ]);
 
   if (!round) {
@@ -180,7 +183,7 @@ export default async function RodadaDetalhePage({
         </div>
       </section>
       
-      <FinishRoundButton roundId={round.id} status={round.status} canManage={account.isAdmin} />
+      <FinishRoundButton roundId={round.id} status={round.status} canManage={account.isAdmin} recipients={paymentRecipients} />
 
       {round.status === "finished" && (
         <RoundInstagramStoryGenerator round={round} statistics={roundStatistics} />

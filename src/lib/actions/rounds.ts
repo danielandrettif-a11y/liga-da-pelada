@@ -721,11 +721,9 @@ export async function createRoundWithTeams(
   }
 }
 
-export async function finishRound(roundId: string, paymentPix: string, paymentTotal: number) {
+export async function finishRound(roundId: string, paymentPix: string, paymentTotal: number, recipient?: { id?: string | null; name?: string | null }) {
   try {
-    const pix = paymentPix.trim();
-    if (!pix) return { success: false, error: "Informe a chave PIX que recebera os pagamentos." };
-    if (pix.length > 200) return { success: false, error: "A chave PIX deve ter no maximo 200 caracteres." };
+    let pix = paymentPix.trim();
     const total = Number(paymentTotal);
     if (!Number.isFinite(total) || total <= 0) {
       return { success: false, error: "Informe um valor total valido para a pelada." };
@@ -736,9 +734,21 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem encerrar rodadas." };
 
+    let recipientId: string | null = null;
+    let recipientName = recipient?.name?.trim() || null;
+    if (recipient?.id) {
+      const { data: preset } = await client.from("payment_recipients").select("id, name, pix_key, is_active").eq("id", recipient.id).eq("is_active", true).maybeSingle();
+      if (!preset) return { success: false, error: "O PIX escolhido não está disponível." };
+      recipientId = preset.id;
+      recipientName = preset.name;
+      pix = preset.pix_key;
+    }
+    if (!pix) return { success: false, error: "Informe a chave PIX que recebera os pagamentos." };
+    if (pix.length > 200) return { success: false, error: "A chave PIX deve ter no maximo 200 caracteres." };
+
     const { data: originalRound, error: originalRoundError } = await client
       .from("rounds")
-      .select("status, payment_pix, payment_total")
+      .select("status, payment_pix, payment_total, payment_recipient_id, payment_recipient_name")
       .eq("id", roundId)
       .single();
     if (originalRoundError || !originalRound) {
@@ -759,6 +769,8 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
         status: "finished",
         payment_pix: pix,
         payment_total: Math.round(total * 100) / 100,
+        payment_recipient_id: recipientId,
+        payment_recipient_name: recipientName,
       })
       .eq("id", roundId);
 
@@ -782,6 +794,8 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
           status: originalRound.status,
           payment_pix: originalRound.payment_pix,
           payment_total: originalRound.payment_total,
+          payment_recipient_id: originalRound.payment_recipient_id,
+          payment_recipient_name: originalRound.payment_recipient_name,
         })
         .eq("id", roundId);
       if (rollbackError) {

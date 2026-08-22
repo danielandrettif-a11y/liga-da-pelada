@@ -5,13 +5,16 @@ import { useState } from "react";
 import { CheckCircle2, X } from "@/components/icons";
 import { finishRound } from "@/lib/actions/rounds";
 import { useDialogViewport } from "@/lib/useDialogViewport";
+import type { PaymentRecipient } from "@/lib/actions/payments";
 
-export function FinishRoundButton({ roundId, status, canManage }: { roundId: string; status: string; canManage: boolean }) {
+export function FinishRoundButton({ roundId, status, canManage, recipients = [] }: { roundId: string; status: string; canManage: boolean; recipients?: PaymentRecipient[] }) {
   const [open, setOpen] = useState(false);
   const [pix, setPix] = useState("");
   const [paymentTotal, setPaymentTotal] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [recipientId, setRecipientId] = useState("");
+  const [recipientName, setRecipientName] = useState("");
   useDialogViewport(open);
 
   if (status === "finished") {
@@ -34,7 +37,7 @@ export function FinishRoundButton({ roundId, status, canManage }: { roundId: str
   if (!canManage) return null;
 
   async function handleFinish() {
-    if (!pix.trim()) {
+    if (!pix.trim() && !recipientId) {
       setError("Informe a chave PIX antes de encerrar a rodada.");
       return;
     }
@@ -46,7 +49,7 @@ export function FinishRoundButton({ roundId, status, canManage }: { roundId: str
 
     setLoading(true);
     setError("");
-    const result = await finishRound(roundId, pix, total);
+    const result = await finishRound(roundId, pix, total, { id: recipientId || null, name: recipientName || null });
     if (!result.success) {
       setError(result.error || "Nao foi possivel encerrar a rodada.");
       setLoading(false);
@@ -82,10 +85,13 @@ export function FinishRoundButton({ roundId, status, canManage }: { roundId: str
             </div>
 
             <label htmlFor="payment-pix" className="mt-5 block text-xs font-bold uppercase tracking-wider text-muted">Chave PIX</label>
+            {recipients.length > 0 && <label className="mt-2 block text-xs font-bold uppercase tracking-wider text-muted">PIX cadastrado<select value={recipientId} onChange={(event) => { const value = event.target.value; setRecipientId(value); const selected = recipients.find((item) => item.id === value); if (selected) { setPix(selected.pix_key); setRecipientName(selected.name); } }} className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground"><option value="">Digitar outro PIX</option>{recipients.filter((item) => item.is_active).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
+            {!recipientId && <label className="mt-3 block text-xs font-bold uppercase tracking-wider text-muted">Nome de quem recebe<input value={recipientName} onChange={(event) => setRecipientName(event.target.value)} placeholder="Ex.: João Silva" className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm normal-case text-foreground outline-none focus:border-accent" /></label>}
             <input
               id="payment-pix"
               value={pix}
               onChange={(event) => setPix(event.target.value)}
+              disabled={Boolean(recipientId)}
               placeholder="CPF, telefone, e-mail ou chave aleatoria"
               maxLength={200}
               className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-accent"

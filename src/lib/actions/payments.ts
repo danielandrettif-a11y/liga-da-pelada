@@ -16,7 +16,41 @@ export type PaymentRound = {
   round_type: RoundType;
   payment_pix: string | null;
   payment_total: number | null;
+  payment_recipient_name: string | null;
 };
+
+export type PaymentRecipient = { id: string; name: string; pix_key: string; pix_type: string | null; is_active: boolean };
+
+export async function getPaymentRecipients(includeInactive = false): Promise<PaymentRecipient[]> {
+  const client = await getAdminClient();
+  if (!client) return [];
+  const league = await getActiveLeague();
+  let query = client.from("payment_recipients").select("id, name, pix_key, pix_type, is_active").eq("league_id", league.id).order("name");
+  if (!includeInactive) query = query.eq("is_active", true);
+  const { data } = await query;
+  return (data || []) as PaymentRecipient[];
+}
+
+export async function savePaymentRecipient(input: { id?: string; name: string; pixKey: string; pixType?: string | null; active?: boolean }) {
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem gerenciar PIX." };
+  const league = await getActiveLeague();
+  const name = input.name.trim(); const pix = input.pixKey.trim();
+  if (!name || !pix) return { success: false, error: "Informe o nome e a chave PIX." };
+  const payload = { league_id: league.id, name, pix_key: pix, pix_type: input.pixType || null, is_active: input.active !== false, created_by: (await getCurrentAccount()).user?.id };
+  const { error } = input.id ? await client.from("payment_recipients").update(payload).eq("id", input.id).eq("league_id", league.id) : await client.from("payment_recipients").insert(payload);
+  revalidatePath("/mais/pix");
+  return { success: !error, error: error?.message };
+}
+
+export async function setPaymentRecipientActive(id: string, active: boolean) {
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem gerenciar PIX." };
+  const league = await getActiveLeague();
+  const { error } = await client.from("payment_recipients").update({ is_active: active }).eq("id", id).eq("league_id", league.id);
+  revalidatePath("/mais/pix");
+  return { success: !error, error: error?.message };
+}
 
 export type PaymentPlayer = Player & {
   paid: boolean;
@@ -47,7 +81,7 @@ export async function getPaymentRounds(): Promise<PaymentRound[]> {
 
   const { data, error } = await supabase
     .from("rounds")
-    .select("id, number, date, status, round_type, payment_pix, payment_total, created_at")
+    .select("id, number, date, status, round_type, payment_pix, payment_total, payment_recipient_name, created_at")
     .eq("season_id", season.id)
     .order("date", { ascending: false })
     .order("created_at", { ascending: false });
