@@ -731,7 +731,9 @@ export async function removeActiveCardForRound(
 }
 
 /**
- * Gera pacotes para todos os usuários participantes de uma rodada finalizada.
+ * Gera pacotes para todos os usuários que salvaram uma escalação em uma rodada finalizada.
+ * Escalações incompletas (`missed`) também recebem o pacote; o prêmio é pela participação,
+ * não pela pontuação.
  * Idempotente via UNIQUE(user_id, round_id).
  */
 export async function generatePacksForFinishedRound(roundId: string): Promise<number> {
@@ -755,7 +757,8 @@ export async function generatePacksForFinishedRound(roundId: string): Promise<nu
     .from("fantasy_lineups")
     .select("user_id")
     .eq("fantasy_round_id", fantasyRound.id)
-    .eq("status", "scored");
+    .in("status", ["scored", "missed"])
+    .not("saved_at", "is", null);
 
   if (!lineups || lineups.length === 0) return 0;
 
@@ -1013,7 +1016,7 @@ export async function auditAndRepairCurrentSeasonPacks() {
   const report = [] as any[];
   for (const fantasyRound of rounds || []) {
     const [{ data: lineups }, { data: packs }] = await Promise.all([
-      account.client.from("fantasy_lineups").select("user_id").eq("fantasy_round_id", fantasyRound.id).eq("status", "scored"),
+      account.client.from("fantasy_lineups").select("user_id").eq("fantasy_round_id", fantasyRound.id).in("status", ["scored", "missed"]).not("saved_at", "is", null),
       account.client.from("fantasy_round_packs").select("user_id").eq("round_id", fantasyRound.round_id).eq("source", "round_reward"),
     ]);
     const eligible = [...new Set((lineups || []).map((item: any) => item.user_id))];
