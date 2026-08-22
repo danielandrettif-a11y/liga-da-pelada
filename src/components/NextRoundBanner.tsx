@@ -88,7 +88,7 @@ export function NextRoundBanner({
       <div className="pointer-events-none absolute -bottom-16 -left-16 h-60 w-60 rounded-full bg-accent/20 blur-3xl" />
 
       {/* Conteúdo do Banner */}
-      <div className="pointer-events-none relative z-20 flex min-h-full flex-col gap-4 pb-16">
+      <div className="pointer-events-none absolute inset-5 z-20 flex flex-col gap-4 pb-28 sm:inset-6">
         {/* Topo do Banner: Selo da Liga + Troféu Dourado */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -109,7 +109,7 @@ export function NextRoundBanner({
         </div>
 
         {/* Informações Centrais: Título Boleiro e Convocados */}
-        <div className={`w-full space-y-1.5 ${round ? "" : "mt-auto"}`}>
+        <div className="mt-5 w-full space-y-1.5 sm:mt-7">
           <div className="flex items-center gap-2">
             <span className="flex h-2 w-2 rounded-full bg-accent shadow-[0_0_8px_rgba(204,255,0,0.8)]" />
             <p className="font-athletic text-xs font-black uppercase italic tracking-[0.25em] text-amber-300">
@@ -179,7 +179,7 @@ export function NextRoundBanner({
         </div>
 
         {/* Rodapé: Ações Rápidas */}
-        <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-30 flex items-center justify-between gap-2 border-t border-white/10 pt-3.5">
+        <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-30 flex items-end justify-between gap-2 border-t border-white/10 pt-3.5">
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             <Link
               href="/rodadas"
