@@ -1,0 +1,162 @@
+import { calculateFantasyPlayerPoints } from "./engine";
+import type { FantasySettings } from "./config";
+
+export type FantasyLiveEvent = { playerId: string; assistPlayerId?: string | null; teamId: string };
+export type FantasyLiveMatchPlayer = { playerId: string; teamId: string; resultEligible: boolean };
+export type FantasyLiveGoalkeeper = { playerId: string; teamId: string };
+export type FantasyLiveMatch = {
+  id: string;
+  status: "pending" | "live" | "finished";
+  teamAId: string;
+  teamBId: string;
+  scoreA: number;
+  scoreB: number;
+  players: readonly FantasyLiveMatchPlayer[];
+  goalkeepers: readonly FantasyLiveGoalkeeper[];
+  events: readonly FantasyLiveEvent[];
+};
+
+export type FantasyLivePlayerStats = {
+  playerId: string;
+  goals: number;
+  assists: number;
+  wins: number;
+  losses: number;
+  games: number;
+  goalkeeperGames: number;
+  goalsConceded: number;
+  teamGoalsConceded: number;
+  basePoints: number;
+};
+
+export type FantasyLiveLineupInput = {
+  id: string;
+  userId: string;
+  playerIds: string[];
+  captainPlayerId?: string | null;
+  topScorerPlayerId?: string | null;
+  topAssistPlayerId?: string | null;
+  topScorerReward?: number;
+  topAssistReward?: number;
+  cardBonus?: number;
+};
+
+export type FantasyLiveLineupProjection = {
+  lineupId: string;
+  userId: string;
+  playerPoints: number;
+  captainBonus: number;
+  predictionPoints: number;
+  cardPoints: number;
+  totalPoints: number;
+  provisional: true;
+};
+
+/**
+ * Calcula a prévia da rodada sem persistir nada. Resultados (vitória/derrota)
+ * só contam em partidas encerradas; gols, assistências e gols sofridos chegam
+ * imediatamente pelos eventos e placar atuais.
+ */
+export function projectFantasyLiveStats(
+  matches: FantasyLiveMatch[],
+  settings: FantasySettings,
+): Map<string, FantasyLivePlayerStats> {
+  const stats = new Map<string, Omit<FantasyLivePlayerStats, "basePoints">>();
+  const ensure = (playerId: string) => {
+    const existing = stats.get(playerId);
+    if (existing) return existing;
+    const next = {
+      playerId,
+      goals: 0,
+      assists: 0,
+      wins: 0,
+      losses: 0,
+      games: 0,
+      goalkeeperGames: 0,
+      goalsConceded: 0,
+      teamGoalsConceded: 0,
+    };
+    stats.set(playerId, next);
+    return next;
+  };
+
+  for (const match of matches) {
+    if (match.status === "pending") continue;
+    const isFinished = match.status === "finished";
+    const isDraw = match.scoreA === match.scoreB;
+    const winner = isDraw ? null : match.scoreA > match.scoreB ? match.teamAId : match.teamBId;
+
+    for (const participant of match.players) {
+      if (!participant.resultEligible) continue;
+      const current = ensure(participant.playerId);
+      const conceded = participant.teamId === match.teamAId ? match.scoreB : match.scoreA;
+      current.teamGoalsConceded += conceded;
+      if (isFinished) {
+        current.games += 1;
+        if (!isDraw && winner === participant.teamId) current.wins += 1;
+        if (!isDraw && winner !== participant.teamId) current.losses += 1;
+      }
+    }
+
+    for (const goalkeeper of match.goalkeepers) {
+      const current = ensure(goalkeeper.playerId);
+      const conceded = goalkeeper.teamId === match.teamAId ? match.scoreB : match.scoreA;
+      current.goalsConceded += conceded;
+      // A aparição é mostrada ao vivo, mas pode ser retirada caso a partida seja desfeita.
+      current.goalkeeperGames += 1;
+    }
+
+    for (const event of match.events) {
+      ensure(event.playerId).goals += 1;
+      if (event.assistPlayerId) ensure(event.assistPlayerId).assists += 1;
+    }
+  }
+
+  return new Map(
+    [...stats.entries()].map(([playerId, value]) => [
+      playerId,
+      {
+        ...value,
+        basePoints: calculateFantasyPlayerPoints(value, settings),
+      },
+    ]),
+  );
+}
+
+export function projectFantasyLiveLineups(
+  lineups: FantasyLiveLineupInput[],
+  playerStats: Map<string, FantasyLivePlayerStats>,
+  settings: FantasySettings,
+): FantasyLiveLineupProjection[] {
+  const topGoals = Math.max(0, ...[...playerStats.values()].map((item) => item.goals));
+  const topAssists = Math.max(0, ...[...playerStats.values()].map((item) => item.assists));
+
+  return lineups.map((lineup) => {
+    const playerPoints = lineup.playerIds.reduce(
+      (sum, playerId) => sum + (playerStats.get(playerId)?.basePoints || 0),
+      0,
+    );
+    const captainBase = lineup.captainPlayerId ? playerStats.get(lineup.captainPlayerId)?.basePoints || 0 : 0;
+    const captainBonus = captainBase * Math.max(0, settings.captainMultiplier - 1);
+    const scorerHit = Boolean(
+      lineup.topScorerPlayerId && topGoals > 0 && playerStats.get(lineup.topScorerPlayerId)?.goals === topGoals,
+    );
+    const assistHit = Boolean(
+      lineup.topAssistPlayerId && topAssists > 0 && playerStats.get(lineup.topAssistPlayerId)?.assists === topAssists,
+    );
+    const predictionPoints =
+      (scorerHit ? lineup.topScorerReward ?? settings.topScorerPredictionPoints : 0) +
+      (assistHit ? lineup.topAssistReward ?? settings.topAssistPredictionPoints : 0);
+    const cardPoints = lineup.cardBonus || 0;
+    return {
+      lineupId: lineup.id,
+      userId: lineup.userId,
+      playerPoints,
+      captainBonus,
+      predictionPoints,
+      cardPoints,
+      totalPoints: playerPoints + captainBonus + predictionPoints + cardPoints,
+      provisional: true,
+    };
+  });
+}

@@ -18,6 +18,7 @@ import {
   Search,
   Shirt,
   ShoppingCart,
+  RotateCcw,
   Sparkles,
   Target,
   TrendingDown,
@@ -32,6 +33,7 @@ import {
   type FantasyDashboardInsights,
   type FantasyMarketPlayer,
   type FantasyRadarData,
+  type FantasyLiveProjection,
 } from "@/lib/actions/fantasy";
 import { supabase } from "@/lib/supabase";
 import { useDialogViewport } from "@/lib/useDialogViewport";
@@ -91,6 +93,7 @@ type Props = {
   availablePacks?: FantasyPackDTO[];
   availablePacksCount?: number;
   inventoryCount?: number;
+  liveProjection?: FantasyLiveProjection;
 };
 
 const positionLabel: Record<string, string> = {
@@ -117,6 +120,7 @@ export function FantasyExperience({
   availablePacks = [],
   availablePacksCount = 0,
   inventoryCount = 0,
+  liveProjection,
 }: Props) {
   const router = useRouter();
   const initialIds = (lineup?.fantasy_lineup_players || []).map((item: any) => item.player_id as string);
@@ -157,17 +161,16 @@ export function FantasyExperience({
   }, []);
 
   const [savedSignature, setSavedSignature] = useState(() =>
-    lineup
-      ? JSON.stringify({
-          ids: initialIds,
-          captain: lineup?.captain_player_id || null,
-          scorer: lineup?.top_scorer_player_id || null,
-          assist: lineup?.top_assist_player_id || null,
-          challenge: lineup?.challenge_player_id || null,
-        })
-      : ""
+    JSON.stringify({
+      ids: initialIds,
+      captain: lineup?.captain_player_id || null,
+      scorer: lineup?.top_scorer_player_id || null,
+      assist: lineup?.top_assist_player_id || null,
+      challenge: lineup?.challenge_player_id || null,
+    })
   );
   const [pending, startTransition] = useTransition();
+  const [isRefreshing, startRefreshTransition] = useTransition();
   const betweenRounds = status === "between_rounds";
   const open = status === "open" || betweenRounds;
   const isMarketClosed = !open && (status === "in_progress" || status === "finished");
@@ -260,6 +263,7 @@ export function FantasyExperience({
     assist: assistId,
     challenge: challengeId,
   });
+  const hasUnsavedChanges = open && savedSignature !== currentSignature;
   const complete = selected.length === 5 && Boolean(captainId) && remaining >= 0;
   const isSaved = Boolean(savedSignature && savedSignature === currentSignature);
   const saveState = !open
@@ -277,12 +281,30 @@ export function FantasyExperience({
     const channel = supabase
       .channel(`fantasy-${round.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "match_events" }, () => requestRefresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `round_id=eq.${round.id}` }, () => requestRefresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "player_round_stats", filter: `round_id=eq.${round.id}` }, () => requestRefresh())
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [requestRefresh, round, status]);
+
+  useEffect(() => {
+    if (status !== "in_progress") return;
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") requestRefresh(0);
+    };
+    const interval = window.setInterval(refreshIfVisible, 15_000);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
+  }, [requestRefresh, status]);
+
+  function refreshLivePoints() {
+    startRefreshTransition(() => router.refresh());
+  }
 
   useEffect(() => {
     const channel = supabase
@@ -293,6 +315,39 @@ export function FantasyExperience({
       supabase.removeChannel(channel);
     };
   }, [requestRefresh, round?.id]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const message = selected.length === 5 && !captainId
+      ? "Você ainda não escolheu o capitão. Tem certeza que quer sair sem salvar e completar a escalação?"
+      : "Você tem alterações na escalação que ainda não foram salvas. Deseja sair mesmo assim?";
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const interceptLink = (event: MouseEvent) => {
+      const anchor = (event.target as HTMLElement | null)?.closest("a[href]") as HTMLAnchorElement | null;
+      if (!anchor || anchor.target === "_blank" || anchor.href === window.location.href) return;
+      if (!window.confirm(message)) event.preventDefault();
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    document.addEventListener("click", interceptLink, true);
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      document.removeEventListener("click", interceptLink, true);
+    };
+  }, [captainId, hasUnsavedChanges, selected.length]);
+
+  function sellAll() {
+    if (!selected.length) return;
+    if (!window.confirm("Vender todos os jogadores? A mudança só será aplicada quando você salvar a escalação.")) return;
+    setSelected([]);
+    setCaptainId(null);
+    setScorerId(null);
+    setAssistId(null);
+    setChallengeId(null);
+    setMessage("Elenco limpo. Salve para confirmar a venda de todos.");
+  }
 
   function togglePlayer(player: FantasyMarketPlayer) {
     if (!open) {
@@ -413,8 +468,8 @@ export function FantasyExperience({
           <div className="mt-5 grid grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/10 bg-black/20 px-1 py-3 backdrop-blur-sm">
             <Metric label="Patrimônio" value={formatFantasyMoney(budget, settings.currencyName)} />
             <Metric
-              label={betweenRounds ? "Pontos" : "Escalação"}
-              value={betweenRounds ? account.totalPoints.toFixed(1) : formatFantasyMoney(cost, settings.currencyName)}
+              label={status === "in_progress" ? "Ao vivo" : betweenRounds ? "Pontos" : "Escalação"}
+              value={status === "in_progress" ? `${(liveProjection?.currentUser?.totalPoints || 0).toFixed(1)} pts` : betweenRounds ? account.totalPoints.toFixed(1) : formatFantasyMoney(cost, settings.currencyName)}
             />
             <Metric
               label={betweenRounds ? "Melhor rodada" : "Restante"}
@@ -422,6 +477,14 @@ export function FantasyExperience({
               accent={betweenRounds || remaining >= 0}
             />
           </div>
+          {status === "in_progress" && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-accent/20 bg-accent/10 px-3 py-2 text-[10px] font-bold text-accent">
+              <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" /> Prévia ao vivo</span>
+              <button type="button" onClick={refreshLivePoints} disabled={isRefreshing} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-black hover:bg-accent/15 disabled:opacity-50">
+                <RotateCcw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} /> Atualizar pontos
+              </button>
+            </div>
+          )}
         </div>
 
         {!betweenRounds && round && (
@@ -604,14 +667,41 @@ export function FantasyExperience({
                   {saveState}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setActiveTab("market")}
-                className="rounded-xl border border-accent/40 bg-accent/15 px-3 py-1.5 text-xs font-black text-accent hover:bg-accent/25 transition-colors shadow-sm"
-              >
-                + Mercado ({market.length})
-              </button>
+              <div className="flex items-center gap-2">
+                {open && selected.length > 0 && (
+                  <button type="button" onClick={sellAll} className="rounded-xl border border-danger/35 bg-danger/10 px-2.5 py-1.5 text-[10px] font-black text-danger transition-colors hover:bg-danger/20">Vender todos</button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("market")}
+                  className="rounded-xl border border-accent/40 bg-accent/15 px-3 py-1.5 text-xs font-black text-accent hover:bg-accent/25 transition-colors shadow-sm"
+                >
+                  + Mercado ({market.length})
+                </button>
+              </div>
             </div>
+
+            {open && selected.length === 5 && !captainId && (
+              <p className="rounded-xl border border-warning/35 bg-warning/10 px-3 py-2 text-[10px] font-bold text-warning">Falta escolher o capitão antes de concluir sua escalação.</p>
+            )}
+            {open && (!scorerId || !assistId) && (
+              <p className="text-[10px] font-bold text-muted">Palpites são opcionais, mas rendem pontos: {!scorerId && "artilheiro"}{!scorerId && !assistId && " e "}{!assistId && "garçom"} ainda não foram escolhidos.</p>
+            )}
+
+            {status === "in_progress" && (
+              <div className="grid grid-cols-2 gap-2 rounded-2xl border border-accent/30 bg-gradient-to-r from-accent/15 to-surface p-3">
+                <div>
+                  <p className="text-[8px] font-black uppercase tracking-[.16em] text-muted">Sua rodada · prévia</p>
+                  <p className="mt-1 text-2xl font-black text-accent">{(liveProjection?.currentUser?.totalPoints || 0).toFixed(1)} pts</p>
+                </div>
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 self-end text-right text-[9px] font-bold text-muted">
+                  <span>Jogadores</span><strong className="text-foreground">{(liveProjection?.currentUser?.playerPoints || 0).toFixed(1)}</strong>
+                  <span>Capitão</span><strong className="text-foreground">+{(liveProjection?.currentUser?.captainBonus || 0).toFixed(1)}</strong>
+                  <span>Palpites/cartas</span><strong className="text-foreground">+{((liveProjection?.currentUser?.predictionPoints || 0) + (liveProjection?.currentUser?.cardPoints || 0)).toFixed(1)}</strong>
+                </div>
+                <p className="col-span-2 border-t border-accent/15 pt-2 text-[9px] font-bold text-muted">Temporada se terminasse agora: <span className="text-foreground">{(account.totalPoints + (liveProjection?.currentUser?.totalPoints || 0)).toFixed(1)} pts</span></p>
+              </div>
+            )}
 
             {/* CAMPO DE FUTEBOL REALISTA */}
             <div className="relative min-h-[480px] w-full max-w-full overflow-hidden rounded-[2.5rem] border-2 border-emerald-400/35 bg-[#083b1f] p-3 sm:p-4 shadow-[0_20px_50px_rgba(0,0,0,0.7),inset_0_0_50px_rgba(0,0,0,0.6)]">

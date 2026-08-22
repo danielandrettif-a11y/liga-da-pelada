@@ -27,6 +27,7 @@ export default async function CartolaPage() {
       availablePacks={data.availablePacks}
       availablePacksCount={data.availablePacksCount}
       inventoryCount={data.inventoryCount}
+      liveProjection={data.liveProjection}
       />
     </div>
   );
