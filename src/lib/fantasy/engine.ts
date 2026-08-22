@@ -65,7 +65,7 @@ export function calculateFantasyPlayerPoints(
     stats.goals * settings.goalPoints +
     stats.assists * settings.assistPoints +
     stats.wins * settings.winPoints +
-    (stats.losses || 0) * settings.lossPoints +
+    (stats.losses || 0) * ((stats.goalkeeperGames || 0) > 0 ? settings.goalkeeperLossPoints : settings.lossPoints) +
     (stats.goalkeeperGames || 0) * settings.goalkeeperAppearancePoints +
     // A penalidade defensiva é compartilhada entre quem entrou em campo.
     // Para rodadas antigas, o fallback preserva o dado histórico do goleiro.

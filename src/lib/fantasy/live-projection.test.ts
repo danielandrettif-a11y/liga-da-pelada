@@ -43,7 +43,9 @@ describe("live fantasy projection", () => {
     const [lineup] = projectFantasyLiveLineups([
       { id: "lineup", userId: "user", playerIds: ["scorer", "keeper"], captainPlayerId: "scorer", topScorerPlayerId: "scorer", topAssistPlayerId: "keeper" },
     ], stats, DEFAULT_FANTASY_SETTINGS);
-    expect(lineup.captainBonus).toBe(stats.get("scorer")!.basePoints);
+    expect(lineup.captainBonus).toBe(
+      stats.get("scorer")!.basePoints * (DEFAULT_FANTASY_SETTINGS.captainMultiplier - 1)
+    );
     expect(lineup.predictionPoints).toBe(DEFAULT_FANTASY_SETTINGS.topScorerPredictionPoints + DEFAULT_FANTASY_SETTINGS.topAssistPredictionPoints);
   });
 });

@@ -116,6 +116,7 @@ export async function getFantasyDashboard() {
         assistPoints: Number(settingsRow.assist_points),
         winPoints: Number(settingsRow.win_points),
         lossPoints: Number(settingsRow.loss_points ?? -1),
+        goalkeeperLossPoints: Number(settingsRow.goalkeeper_loss_points ?? settingsRow.loss_points ?? -1),
         goalkeeperAppearancePoints: Number(settingsRow.goalkeeper_appearance_points ?? 3),
         goalConcededPoints: Number(settingsRow.goal_conceded_points ?? -1),
         teamGoalConcededPoints: Number(settingsRow.team_goal_conceded_points ?? -1),
@@ -165,6 +166,7 @@ export async function getFantasyDashboard() {
     !settingsRow ||
     !("king_of_wins_points" in settingsRow) ||
     !("loss_points" in settingsRow) ||
+    !("goalkeeper_loss_points" in settingsRow) ||
     !("market_up_share" in settingsRow) ||
     !("team_goal_conceded_points" in settingsRow)
   ) {
@@ -224,6 +226,7 @@ export async function getFantasyDashboard() {
         assistPoints: Number(scoringSnapshot.assist_points ?? settings.assistPoints),
         winPoints: Number(scoringSnapshot.win_points ?? settings.winPoints),
         lossPoints: Number(scoringSnapshot.loss_points ?? settings.lossPoints),
+        goalkeeperLossPoints: Number(scoringSnapshot.goalkeeper_loss_points ?? settings.goalkeeperLossPoints),
         goalkeeperAppearancePoints: Number(
           scoringSnapshot.goalkeeper_appearance_points ?? settings.goalkeeperAppearancePoints,
         ),
@@ -1325,6 +1328,7 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
     assistPoints: Number(settingsRow?.assist_points ?? DEFAULT_FANTASY_SETTINGS.assistPoints),
     winPoints: Number(settingsRow?.win_points ?? DEFAULT_FANTASY_SETTINGS.winPoints),
     lossPoints: Number(settingsRow?.loss_points ?? DEFAULT_FANTASY_SETTINGS.lossPoints),
+    goalkeeperLossPoints: Number(settingsRow?.goalkeeper_loss_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperLossPoints),
     goalkeeperAppearancePoints: Number(settingsRow?.goalkeeper_appearance_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperAppearancePoints),
     goalConcededPoints: Number(settingsRow?.goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.goalConcededPoints),
     teamGoalConcededPoints: Number(settingsRow?.team_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.teamGoalConcededPoints),
@@ -1664,7 +1668,7 @@ export async function getFantasyRoundLineupOverview(
 export async function updateFantasySettings(values: Partial<FantasySettings>) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
-  const { lossPoints, goalkeeperAppearancePoints, goalConcededPoints, teamGoalConcededPoints, ...otherValues } = values;
+  const { lossPoints, goalkeeperLossPoints, goalkeeperAppearancePoints, goalConcededPoints, teamGoalConcededPoints, ...otherValues } = values;
   const { error } = await account.client.rpc("update_fantasy_settings", {
     p_settings: otherValues,
   });
@@ -1674,6 +1678,12 @@ export async function updateFantasySettings(values: Partial<FantasySettings>) {
       p_loss_points: lossPoints,
     });
     if (lossError) return { success: false, error: lossError.message };
+  }
+  if (goalkeeperLossPoints !== undefined) {
+    const { error: goalkeeperLossError } = await account.client.rpc("update_fantasy_goalkeeper_loss_points", {
+      p_goalkeeper_loss_points: goalkeeperLossPoints,
+    });
+    if (goalkeeperLossError) return { success: false, error: goalkeeperLossError.message };
   }
   if (
     goalkeeperAppearancePoints !== undefined ||
@@ -1784,6 +1794,7 @@ export async function getFantasyAdminData() {
       assist_points: DEFAULT_FANTASY_SETTINGS.assistPoints,
       win_points: DEFAULT_FANTASY_SETTINGS.winPoints,
       loss_points: DEFAULT_FANTASY_SETTINGS.lossPoints,
+      goalkeeper_loss_points: DEFAULT_FANTASY_SETTINGS.goalkeeperLossPoints,
       goalkeeper_appearance_points: DEFAULT_FANTASY_SETTINGS.goalkeeperAppearancePoints,
       goal_conceded_points: DEFAULT_FANTASY_SETTINGS.goalConcededPoints,
       team_goal_conceded_points: DEFAULT_FANTASY_SETTINGS.teamGoalConcededPoints,

@@ -36,15 +36,16 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       ).toBe(false);
     });
 
-    it("calcula gols (+4), assistências (+2), vitórias (+5), derrotas (-3) e goleiro", () => {
+    it("calcula gol (+5), assistência (+3), vitória (+4), derrota de linha (-2) e goleiro", () => {
       expect(calculateFantasyPlayerPoints({ goals: 2, assists: 1, wins: 2, losses: 0 }, DEFAULT_FANTASY_SETTINGS)).toBe(
-        20
+        21
       );
       expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 3 }, DEFAULT_FANTASY_SETTINGS)).toBe(
-        -9
+        -6
       );
       expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, goalkeeperGames: 2, goalsConceded: 9, teamGoalsConceded: 3 }, DEFAULT_FANTASY_SETTINGS)).toBe(3);
       expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, teamGoalsConceded: 2 }, DEFAULT_FANTASY_SETTINGS)).toBe(-2);
+      expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 2, goalkeeperGames: 1 }, DEFAULT_FANTASY_SETTINGS)).toBe(3);
     });
   });
 
