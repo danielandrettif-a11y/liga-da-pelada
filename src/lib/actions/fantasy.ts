@@ -1703,6 +1703,40 @@ export async function reprocessFantasyRound(roundId: string) {
   return { success: true };
 }
 
+export async function reprocessFantasyRoundWithCurrentRules(roundId: string) {
+  const account = await getCurrentAccount();
+  if (!account.isAdmin) return { success: false, error: "Somente administradores." };
+
+  // Primeiro recompõe os dados esportivos. As correções manuais persistentes,
+  // como um jogador zerado na rodada, são respeitadas por este cálculo.
+  const { calculateRoundStats } = await import("./stats");
+  const statsResult = await calculateRoundStats(roundId);
+  if (!statsResult.success) {
+    return {
+      success: false,
+      error: `Não foi possível recalcular as estatísticas: ${statsResult.error || "erro desconhecido"}`,
+    };
+  }
+
+  const { data, error } = await account.client.rpc("reprocess_fantasy_with_current_rules", {
+    p_round_id: roundId,
+  });
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/admin/cartola");
+  revalidatePath("/cartola", "layout");
+  revalidatePath("/ranking");
+  revalidatePath(`/rodadas/${roundId}`);
+  revalidatePath("/jogadores", "layout");
+  revalidatePath("/");
+
+  const result = data as { affected_finished_rounds?: number } | null;
+  return {
+    success: true,
+    affectedRounds: Number(result?.affected_finished_rounds || 1),
+  };
+}
+
 export async function getFantasyAdminData() {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return null;
@@ -1715,7 +1749,7 @@ export async function getFantasyAdminData() {
     .maybeSingle();
   const { data: rounds } = await account.client
     .from("fantasy_rounds")
-    .select("id, market_status, processed_at, round:round_id(id, number, date, status, round_type)")
+    .select("id, market_status, processed_at, rules_version, scoring_version, round:round_id(id, number, date, status, round_type)")
     .order("created_at", { ascending: false })
     .limit(20);
   const [{ data: testSession }, { data: friendlyRounds }] = await Promise.all([
