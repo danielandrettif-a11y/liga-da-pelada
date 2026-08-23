@@ -15,81 +15,167 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
     const season = await getActiveSeason(league.id);
     if (!season) return [];
     const maxPlayers = league.players_per_team || 5;
-    const { data: fantasySeason } = await account.client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle();
-    const desired: Array<{ type: string; key: string; title: string; body: string; href: string }> = [
-      {
-        type: "tactical_revolution_r2",
-        key: `announcement:tactical_r2:${league.id}`,
-        title: "🚨 Novas Regras a partir da Rodada 02: Bônus por Posição!",
-        body: "Zagueiros (DEF) agora ganham até +2 pts por jogo sem levar gols, Meias (MEI/ALA) ganham +4,5 por assistência e Atacantes (ATA) +6 por gol. Atualize a tag do seu perfil em 'Meu Perfil' para pontuar com os bônus!",
-        href: "/meu-perfil",
-      },
-    ];
-    if (fantasySeason) {
-      const { data: round } = await account.client
-        .from("fantasy_rounds")
-        .select("id, round_id, market_status, round:round_id(number)")
-        .eq("fantasy_season_id", fantasySeason.id)
-        .eq("market_status", "open")
+
+    const [{ data: testSession }, { data: fantasySeason }] = await Promise.all([
+      account.client
+        .from("fantasy_test_sessions")
+        .select("id, round_id, status, round:round_id(number, date)")
+        .eq("league_id", league.id)
+        .eq("season_id", season.id)
+        .in("status", ["open", "in_progress"])
+        .maybeSingle(),
+      account.client
+        .from("fantasy_seasons")
+        .select("id")
+        .eq("season_id", season.id)
+        .maybeSingle(),
+    ]);
+
+    const { data: officialRounds } = fantasySeason
+      ? await account.client
+          .from("fantasy_rounds")
+          .select("id, round_id, market_status, round:round_id(number, date, status)")
+          .eq("fantasy_season_id", fantasySeason.id)
+          .in("market_status", ["open", "in_progress"])
+          .order("created_at", { ascending: false })
+      : { data: [] as any[] };
+
+    const activeRound = testSession
+      ? {
+          id: testSession.id,
+          roundId: testSession.round_id,
+          isTest: true,
+          roundNumber: (testSession.round as any)?.number,
+          status: testSession.status,
+        }
+      : officialRounds?.[0]
+      ? {
+          id: officialRounds[0].id,
+          roundId: officialRounds[0].round_id,
+          isTest: false,
+          roundNumber: (officialRounds[0].round as any)?.number,
+          status: officialRounds[0].market_status,
+        }
+      : null;
+
+    const desired: Array<{ type: string; key: string; title: string; body: string; href: string }> = [];
+
+    // Notificação educativa de introdução aos novos bônus
+    desired.push({
+      type: "tactical_revolution_r2",
+      key: `announcement:tactical_r2:${league.id}`,
+      title: "⚡ Bônus de Posição Ativos no Cartola!",
+      body: "Zaga com Clean Sheet Regressivo (+4/+2 pts), Meia com Assistência turbinada (+4 pts) e Atacante com Artilharia (+3 pts extras). Confira no Guia de Pontuação!",
+      href: "/cartola",
+    });
+
+    let count = 0;
+    let captainId: string | null = null;
+    let topScorerId: string | null = null;
+    let topAssistId: string | null = null;
+
+    if (activeRound?.isTest) {
+      const { data: testLineup } = await account.client
+        .from("fantasy_test_lineups")
+        .select("captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_test_lineup_players(player_id)")
+        .eq("test_session_id", activeRound.id)
+        .eq("user_id", account.user.id)
         .maybeSingle();
 
-      if (round) {
-        const { data: lineup } = await account.client
-          .from("fantasy_lineups")
-          .select("captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id)")
-          .eq("fantasy_round_id", round.id)
-          .eq("user_id", account.user.id)
-          .maybeSingle();
+      count = testLineup?.fantasy_test_lineup_players?.length || 0;
+      captainId = testLineup?.captain_player_id || null;
+      topScorerId = testLineup?.top_scorer_player_id || null;
+      topAssistId = testLineup?.top_assist_player_id || null;
+    } else if (activeRound) {
+      const { data: lineup } = await account.client
+        .from("fantasy_lineups")
+        .select("captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id)")
+        .eq("fantasy_round_id", activeRound.id)
+        .eq("user_id", account.user.id)
+        .maybeSingle();
 
-        const count = lineup?.fantasy_lineup_players?.length || 0;
-        const roundNum = (round.round as any)?.number || "";
+      count = lineup?.fantasy_lineup_players?.length || 0;
+      captainId = lineup?.captain_player_id || null;
+      topScorerId = lineup?.top_scorer_player_id || null;
+      topAssistId = lineup?.top_assist_player_id || null;
+    } else if (fantasySeason) {
+      const { data: portfolio } = await account.client
+        .from("fantasy_portfolios")
+        .select("captain_player_id, fantasy_portfolio_players(player_id)")
+        .eq("fantasy_season_id", fantasySeason.id)
+        .eq("user_id", account.user.id)
+        .maybeSingle();
 
-        // 1. Falta escalar ou escalação incompleta
-        if (count < maxPlayers) {
-          desired.push({
-            type: "fantasy_lineup_incomplete",
-            key: `cartola:lineup:incomplete:${round.id}`,
-            title: count === 0 ? "⚽ Escale seu time no Cartola" : "⚽ Escalação Incompleta",
-            body:
-              count === 0
-                ? `O mercado da Rodada ${roundNum} está aberto! Escale seus ${maxPlayers} jogadores para pontuar.`
-                : `Você escolheu ${count} de ${maxPlayers} jogadores. Complete seu time antes do mercado fechar!`,
-            href: "/cartola",
-          });
-        }
+      count = portfolio?.fantasy_portfolio_players?.length || 0;
+      captainId = portfolio?.captain_player_id || null;
+    }
 
-        // 2. Falta definir o capitão
-        if (count >= 1 && !lineup?.captain_player_id) {
-          desired.push({
-            type: "fantasy_captain_missing",
-            key: `cartola:captain:missing:${round.id}`,
-            title: "👑 Falta definir o Capitão",
-            body: "Sua escalação no Cartola está sem capitão! O capitão multiplica todos os pontos por 1.5x.",
-            href: "/cartola",
-          });
-        }
+    const roundIdRef = activeRound ? activeRound.id : fantasySeason?.id || "portfolio";
+    const roundNumberStr = activeRound?.roundNumber ? ` da Rodada ${activeRound.roundNumber}` : "";
 
-        // 3. Faltam os palpites da rodada
-        if (count >= 1 && (!lineup?.top_scorer_player_id || !lineup?.top_assist_player_id)) {
-          const missingBoth = !lineup?.top_scorer_player_id && !lineup?.top_assist_player_id;
-          desired.push({
-            type: "fantasy_predictions_missing",
-            key: `cartola:predictions:missing:${round.id}`,
-            title: "🎯 Palpites da Rodada Pendentes",
-            body: missingBoth
-              ? "Envie seus palpites de Artilheiro e Garçom da rodada (+3.0 pts extras em cada)."
-              : !lineup?.top_scorer_player_id
-              ? "Falta enviar seu palpite de Artilheiro da rodada (+3.0 pts extras)."
-              : "Falta enviar seu palpite de Garçom da rodada (+3.0 pts extras).",
-            href: "/cartola",
-          });
-        }
-      }
+    // 1. Falta escalar ou escalação incompleta
+    if (count < maxPlayers) {
+      desired.push({
+        type: "fantasy_lineup_incomplete",
+        key: `cartola:lineup:incomplete:${roundIdRef}`,
+        title: count === 0 ? "⚽ Escale seu time no Cartola" : "⚽ Escalação Incompleta",
+        body:
+          count === 0
+            ? `O mercado${roundNumberStr} está aberto! Escale seus ${maxPlayers} jogadores para pontuar.`
+            : `Você escolheu ${count} de ${maxPlayers} jogadores. Complete seu time antes do mercado fechar!`,
+        href: "/cartola",
+      });
+    }
+
+    // 2. Falta definir o capitão (sempre que tiver atletas escalados e capitão vazio)
+    if (count >= 1 && !captainId) {
+      desired.push({
+        type: "fantasy_captain_missing",
+        key: `cartola:captain:missing:${roundIdRef}`,
+        title: "👑 Falta definir o Capitão",
+        body: "Sua escalação no Cartola está sem capitão! O capitão multiplica todos os pontos por 1.5x.",
+        href: "/cartola",
+      });
+    }
+
+    // 3. Faltam os palpites da rodada
+    if (activeRound && count >= 1 && (!topScorerId || !topAssistId)) {
+      const missingBoth = !topScorerId && !topAssistId;
+      desired.push({
+        type: "fantasy_predictions_missing",
+        key: `cartola:predictions:missing:${activeRound.id}`,
+        title: "🎯 Palpites da Rodada Pendentes",
+        body: missingBoth
+          ? "Envie seus palpites de Artilheiro e Garçom da rodada (+3.0 pts extras em cada)."
+          : !topScorerId
+          ? "Falta enviar seu palpite de Artilheiro da rodada (+3.0 pts extras)."
+          : "Falta enviar seu palpite de Garçom da rodada (+3.0 pts extras).",
+        href: "/cartola",
+      });
     }
 
     const keys = new Set(desired.map((item) => item.key));
-    if (desired.length) {
-      const toUpsert = desired.map((item) => ({
+
+    // Buscar notificações existentes para nunca reabrir notificações já lidas/dispensadas pelo usuário
+    const { data: existing } = await account.client
+      .from("user_inbox_notifications")
+      .select("id, dedupe_key, read_at, state")
+      .eq("user_id", account.user.id)
+      .in("dedupe_key", Array.from(keys));
+
+    const existingMap = new Map((existing || []).map((item: any) => [item.dedupe_key, item]));
+
+    // Criar apenas as que não existem ou que não foram resolvidas/lidas
+    const toInsert = desired
+      .filter((item) => {
+        const ex = existingMap.get(item.key);
+        // Se já existe e o usuário já marcou como lido/resolvido, não reabrir
+        if (ex && (ex.read_at || ex.state === "resolved")) {
+          return false;
+        }
+        return !ex;
+      })
+      .map((item) => ({
         user_id: account.user!.id,
         league_id: league.id,
         notification_type: item.type,
@@ -102,18 +188,23 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
         resolved_at: null,
       }));
 
+    if (toInsert.length) {
       await account.client
         .from("user_inbox_notifications")
-        .upsert(toUpsert, { onConflict: "user_id,dedupe_key" });
+        .upsert(toInsert, { onConflict: "user_id,dedupe_key" });
     }
 
+    // Resolver notificações ativas que já foram solucionadas (ex: usuário escolheu o capitão)
     const { data: activeNotifications } = await account.client
       .from("user_inbox_notifications")
       .select("id, dedupe_key")
       .eq("user_id", account.user.id)
       .eq("state", "active");
 
-    const staleIds = (activeNotifications || []).filter((item) => !keys.has(item.dedupe_key)).map((item) => item.id);
+    const staleIds = (activeNotifications || [])
+      .filter((item) => !keys.has(item.dedupe_key))
+      .map((item) => item.id);
+
     if (staleIds.length) {
       await account.client
         .from("user_inbox_notifications")
@@ -149,5 +240,6 @@ export async function markInboxRead(ids?: string[]) {
   }
   const { error } = await query;
   revalidatePath("/");
+  revalidatePath("/notificacoes");
   return { success: !error };
 }
