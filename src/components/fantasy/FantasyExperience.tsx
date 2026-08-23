@@ -221,6 +221,8 @@ export function FantasyExperience({
   // Drag and drop / reposicionamento de atletas no campo
   const [draggedSlot, setDraggedSlot] = useState<number | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
+  const [touchDragPosition, setTouchDragPosition] = useState<{ x: number; y: number } | null>(null);
+  const [activeSwapSlot, setActiveSwapSlot] = useState<number | null>(null);
 
   // Filtros e ordenação no mercado
   const filtered = useMemo(() => {
@@ -525,6 +527,8 @@ export function FantasyExperience({
     const player = selectedPlayers[slot];
     const isBeingDragged = draggedSlot === slot;
     const isDragOver = dragOverSlot === slot;
+    const isSwapSelected = activeSwapSlot === slot;
+    const isSwapTarget = activeSwapSlot !== null && activeSwapSlot !== slot;
 
     return (
       <div
@@ -562,46 +566,72 @@ export function FantasyExperience({
           setDraggedSlot(null);
           setDragOverSlot(null);
         }}
-        onTouchStart={() => {
-          if (open && player) {
-            setDraggedSlot(slot);
+        onTouchStart={(e) => {
+          if (!open || !player) return;
+          const touch = e.touches[0];
+          setDraggedSlot(slot);
+          setTouchDragPosition({ x: touch.clientX, y: touch.clientY });
+          if (typeof navigator !== "undefined" && navigator.vibrate) {
+            navigator.vibrate(20);
           }
         }}
         onTouchMove={(e) => {
           if (draggedSlot === null) return;
           const touch = e.touches[0];
+          setTouchDragPosition({ x: touch.clientX, y: touch.clientY });
           const element = document.elementFromPoint(touch.clientX, touch.clientY);
           const slotEl = element?.closest("[data-slot-index]");
           if (slotEl) {
             const overIndex = Number(slotEl.getAttribute("data-slot-index"));
             if (!isNaN(overIndex) && dragOverSlot !== overIndex) {
               setDragOverSlot(overIndex);
+              if (typeof navigator !== "undefined" && navigator.vibrate) {
+                navigator.vibrate(10);
+              }
             }
           }
         }}
         onTouchEnd={() => {
           if (draggedSlot !== null && dragOverSlot !== null && draggedSlot !== dragOverSlot) {
             swapSlots(draggedSlot, dragOverSlot);
+            if (typeof navigator !== "undefined" && navigator.vibrate) {
+              navigator.vibrate([20, 30, 20]);
+            }
           }
           setDraggedSlot(null);
           setDragOverSlot(null);
+          setTouchDragPosition(null);
         }}
+        onTouchCancel={() => {
+          setDraggedSlot(null);
+          setDragOverSlot(null);
+          setTouchDragPosition(null);
+        }}
+        style={{ touchAction: open && Boolean(player) ? "none" : "auto" }}
         className={`relative mx-auto flex w-full max-w-32 flex-col items-center transition-all duration-200 select-none ${
           open && Boolean(player) ? "cursor-grab active:cursor-grabbing" : ""
         } ${
           isBeingDragged
-            ? "opacity-35 scale-90 rotate-2"
+            ? "opacity-30 scale-90 rotate-2 ring-2 ring-dashed ring-accent/60 rounded-2xl"
             : isDragOver
-            ? "scale-105 ring-4 ring-accent bg-accent/20 rounded-2xl shadow-[0_0_25px_rgba(204,255,0,0.6)]"
+            ? "scale-110 ring-4 ring-accent bg-accent/30 rounded-2xl shadow-[0_0_30px_rgba(204,255,0,0.8)] z-20"
+            : isSwapSelected
+            ? "scale-105 ring-4 ring-yellow-400 bg-yellow-400/20 rounded-2xl animate-pulse shadow-[0_0_25px_rgba(250,204,21,0.6)] z-10"
+            : isSwapTarget
+            ? "ring-2 ring-dashed ring-accent/70 bg-accent/10 rounded-2xl animate-pulse hover:scale-105"
             : ""
         }`}
       >
         {player ? (
           <div className="relative w-full flex flex-col items-center">
+            {/* Botão de Capitão (Direita) */}
             <button
               type="button"
               disabled={!open}
-              onClick={() => setCaptainId(player.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setCaptainId(player.id);
+              }}
               className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
                 captainId === player.id
                   ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
@@ -612,9 +642,47 @@ export function FantasyExperience({
             >
               <Crown className="h-4 w-4" />
             </button>
+
+            {/* Botão de Troca Rápida de Posição (Esquerda) */}
+            {open && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (activeSwapSlot === null) {
+                    setActiveSwapSlot(slot);
+                    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(20);
+                  } else if (activeSwapSlot === slot) {
+                    setActiveSwapSlot(null);
+                  } else {
+                    swapSlots(activeSwapSlot, slot);
+                    setActiveSwapSlot(null);
+                    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([20, 30, 20]);
+                  }
+                }}
+                className={`absolute -left-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 text-[10px] font-black ${
+                  isSwapSelected
+                    ? "border-yellow-400 bg-yellow-400 text-background scale-110 shadow-[0_0_12px_rgba(250,204,21,0.8)]"
+                    : "border-white/20 bg-background/90 text-accent hover:border-accent hover:bg-background"
+                }`}
+                title={isSwapSelected ? "Cancelar troca" : "Mover / Trocar posição"}
+                aria-label="Trocar posição"
+              >
+                ⇄
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={() => setSelectedDrawerPlayer(player)}
+              onClick={() => {
+                if (activeSwapSlot !== null && activeSwapSlot !== slot) {
+                  swapSlots(activeSwapSlot, slot);
+                  setActiveSwapSlot(null);
+                  if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([20, 30, 20]);
+                  return;
+                }
+                setSelectedDrawerPlayer(player);
+              }}
               className="flex flex-col items-center group"
             >
               <PlayerAvatar
@@ -624,6 +692,8 @@ export function FantasyExperience({
                 className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
                   captainId === player.id
                     ? "border-accent ring-2 ring-accent/50"
+                    : isSwapSelected
+                    ? "border-yellow-400 ring-2 ring-yellow-400/70"
                     : "border-emerald-300"
                 }`}
               />
@@ -647,14 +717,26 @@ export function FantasyExperience({
           <button
             type="button"
             onClick={() => {
+              if (activeSwapSlot !== null) {
+                swapSlots(activeSwapSlot, slot);
+                setActiveSwapSlot(null);
+                if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([20, 30, 20]);
+                return;
+              }
               setTargetSlot(slot);
               setPositionFilter(targetPos);
               setFilterTag("ALL");
               setActiveTab("market");
             }}
-            className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/40 bg-black/25 text-center shadow-inner transition hover:border-accent hover:bg-black/40 active:scale-95 group"
+            className={`mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed transition active:scale-95 group ${
+              isSwapTarget
+                ? "border-accent bg-accent/25 ring-2 ring-accent shadow-[0_0_15px_rgba(204,255,0,0.5)]"
+                : "border-emerald-300/40 bg-black/25 hover:border-accent hover:bg-black/40 shadow-inner"
+            }`}
           >
-            <span className="text-[10px] font-bold text-accent group-hover:scale-105 transition-transform">+ Vaga {slot + 1}</span>
+            <span className="text-[10px] font-bold text-accent group-hover:scale-105 transition-transform">
+              {isSwapTarget ? "⇄ Mover Aqui" : `+ Vaga ${slot + 1}`}
+            </span>
             <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">{roleLabel}</span>
           </button>
         )}
@@ -1009,9 +1091,20 @@ export function FantasyExperience({
                 </div>
               </div>
               {open && validSelectedCount > 1 && (
-                <p className="text-center text-[10px] font-semibold text-emerald-200/60 animate-fade-in">
-                  🖐️ <strong className="text-accent">Dica:</strong> Toque e arraste os jogadores para posicioná-los onde preferir no campo!
-                </p>
+                <div className="flex flex-col items-center gap-0.5 text-center text-[10px] text-emerald-200/70 animate-fade-in">
+                  <p className="font-semibold">
+                    🖐️ <strong className="text-accent">Dica:</strong> Arraste os jogadores pelo campo ou toque no botão <strong className="rounded bg-black/60 px-1 border border-white/20 text-accent">⇄</strong> para trocar posições no celular!
+                  </p>
+                  {activeSwapSlot !== null && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveSwapSlot(null)}
+                      className="mt-0.5 text-[9px] font-bold text-yellow-300 underline hover:text-white"
+                    >
+                      (Toque aqui para cancelar a troca de vaga)
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 
@@ -1775,6 +1868,30 @@ export function FantasyExperience({
                 Entendido
               </button>
             </div>
+          </div>,
+          document.body
+        )}
+
+      {/* PREVIEW FLUTUANTE DE ARRASTAR NO CELULAR */}
+      {touchDragPosition &&
+        draggedSlot !== null &&
+        selectedPlayers[draggedSlot] &&
+        mounted &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-[99999] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center opacity-95 scale-110 drop-shadow-[0_20px_40px_rgba(0,0,0,0.95)]"
+            style={{ left: touchDragPosition.x, top: touchDragPosition.y }}
+          >
+            <PlayerAvatar
+              name={selectedPlayers[draggedSlot]!.name}
+              avatarUrl={selectedPlayers[draggedSlot]!.avatarUrl}
+              clickable={false}
+              className="h-16 w-16 rounded-full border-4 border-accent ring-4 ring-accent/40 shadow-2xl bg-background"
+            />
+            <span className="mt-1 max-w-32 truncate rounded-lg bg-black/95 px-2.5 py-0.5 text-center text-[10px] font-black text-accent border border-accent/40 shadow-lg">
+              {selectedPlayers[draggedSlot]!.name}
+            </span>
           </div>,
           document.body
         )}
