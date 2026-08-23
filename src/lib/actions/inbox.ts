@@ -38,7 +38,37 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
     }
     const keys = new Set(desired.map((item) => item.key));
     if (desired.length) {
-      await account.client.from("user_inbox_notifications").upsert(desired.map((item) => ({ user_id: account.user!.id, league_id: league.id, notification_type: item.type, dedupe_key: item.key, title: item.title, body: item.body, href: item.href, state: "active", read_at: null, resolved_at: null })), { onConflict: "user_id,dedupe_key" });
+      // Busca notificações existentes para não resetar read_at de quem já leu
+      const { data: existing } = await account.client
+        .from("user_inbox_notifications")
+        .select("dedupe_key, read_at, state")
+        .eq("user_id", account.user.id)
+        .in("dedupe_key", Array.from(keys));
+
+      const existingMap = new Map((existing || []).map((item: any) => [item.dedupe_key, item]));
+
+      const toUpsert = desired
+        .filter((item) => {
+          const ex = existingMap.get(item.key);
+          // Se já foi lido e resolvido, não reabre
+          return !ex || !ex.read_at;
+        })
+        .map((item) => ({
+          user_id: account.user!.id,
+          league_id: league.id,
+          notification_type: item.type,
+          dedupe_key: item.key,
+          title: item.title,
+          body: item.body,
+          href: item.href,
+          state: "active",
+          read_at: null,
+          resolved_at: null,
+        }));
+
+      if (toUpsert.length) {
+        await account.client.from("user_inbox_notifications").upsert(toUpsert, { onConflict: "user_id,dedupe_key" });
+      }
     }
     const { data: activeNotifications } = await account.client.from("user_inbox_notifications").select("id, dedupe_key").eq("user_id", account.user.id).eq("state", "active");
     const staleIds = (activeNotifications || []).filter((item) => !keys.has(item.dedupe_key)).map((item) => item.id);
@@ -54,8 +84,15 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
 export async function markInboxRead(ids?: string[]) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false };
-  let query = account.client.from("user_inbox_notifications").update({ read_at: new Date().toISOString() }).eq("user_id", account.user.id).is("read_at", null);
-  if (ids?.length) query = query.in("id", ids);
+  let query = account.client
+    .from("user_inbox_notifications")
+    .update({ read_at: new Date().toISOString(), state: "resolved", resolved_at: new Date().toISOString() })
+    .eq("user_id", account.user.id);
+  if (ids?.length) {
+    query = query.in("id", ids);
+  } else {
+    query = query.is("read_at", null);
+  }
   const { error } = await query;
   revalidatePath("/");
   return { success: !error };

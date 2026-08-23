@@ -200,6 +200,11 @@ export function FantasyExperience({
 
   const remaining = effectiveBudget - cost;
 
+  // Esquema tático selecionado (ex: 2-1-2 ou 2-2-1)
+  const [formation, setFormation] = useState<"2-1-2" | "2-2-1">(
+    playersPerTeam === 6 ? "2-1-2" : "2-2-1"
+  );
+
   // Filtros e ordenação no mercado
   const filtered = useMemo(() => {
     return [...market]
@@ -780,6 +785,42 @@ export function FantasyExperience({
               </div>
             )}
 
+            {/* SELETOR DE ESQUEMA TÁTICO */}
+            <div className="flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-black/40 px-3.5 py-2 shadow-inner">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-[9px] font-black uppercase tracking-wider text-muted truncate">
+                  Esquema Tático:
+                </span>
+                <span className="font-athletic text-xs font-black uppercase italic text-accent shrink-0">
+                  {formation}
+                </span>
+              </div>
+              <div className="flex rounded-xl bg-black/60 p-0.5 border border-white/10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setFormation("2-1-2")}
+                  className={`rounded-lg px-2.5 py-1 font-athletic text-[10px] font-black uppercase transition-all ${
+                    formation === "2-1-2"
+                      ? "bg-accent text-background shadow-sm"
+                      : "text-muted hover:text-white"
+                  }`}
+                >
+                  2-1-2 ({playersPerTeam === 6 ? "2 ATA" : "1 ATA"})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormation("2-2-1")}
+                  className={`rounded-lg px-2.5 py-1 font-athletic text-[10px] font-black uppercase transition-all ${
+                    formation === "2-2-1"
+                      ? "bg-accent text-background shadow-sm"
+                      : "text-muted hover:text-white"
+                  }`}
+                >
+                  2-2-1 ({playersPerTeam === 6 ? "2 MEI" : "2 ATA"})
+                </button>
+              </div>
+            </div>
+
             {/* CAMPO DE FUTEBOL REALISTA */}
             <div className="relative min-h-[480px] w-full max-w-full overflow-hidden rounded-[2.5rem] border-2 border-emerald-400/35 bg-[#083b1f] p-3 sm:p-4 shadow-[0_20px_50px_rgba(0,0,0,0.7),inset_0_0_50px_rgba(0,0,0,0.6)]">
               <div
@@ -803,79 +844,157 @@ export function FantasyExperience({
 
               {/* RENDERIZAÇÃO ADAPTÁVEL DO CAMPO (5 vs 6 JOGADORES) */}
               {playersPerTeam === 6 ? (
-                <div className="relative z-10 flex min-h-[480px] flex-col justify-between py-2">
-                  {/* 1. Pontas Abertos (Ataque) */}
-                  <div>
-                    <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                      Pontas Abertos (Ataque)
-                    </span>
-                    <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                      {[0, 1].map((slot) => renderSlot(slot, "Ponta"))}
+                formation === "2-1-2" ? (
+                  <div className="relative z-10 flex min-h-[480px] flex-col justify-between py-2">
+                    {/* 1. Pontas Abertos (Ataque - 2 vagas) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Pontas Abertos (Ataque)
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                        {[0, 1].map((slot) => renderSlot(slot, "Ponta / ATA"))}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* 2. Meio Avançado (Armador) */}
-                  <div>
-                    <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                      Meio Avançado (Armador)
-                    </span>
-                    <div className="flex justify-center">
-                      {renderSlot(2, "Meia")}
+                    {/* 2. Meio Avançado (Armador - 1 vaga) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Meio Avançado (Armador)
+                      </span>
+                      <div className="flex justify-center">
+                        {renderSlot(2, "Meia / ALA")}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* 3. Linha Defensiva */}
-                  <div>
-                    <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                      Linha Defensiva
-                    </span>
-                    <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                      {[3, 4].map((slot) => renderSlot(slot, "Defensor"))}
+                    {/* 3. Linha Defensiva (2 vagas) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Linha Defensiva
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                        {[3, 4].map((slot) => renderSlot(slot, "Defensor / DEF"))}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* 4. Goleiro */}
-                  <div>
-                    <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                      Goleiro
-                    </span>
-                    <div className="flex justify-center">
-                      {renderSlot(5, "Goleiro")}
+                    {/* 4. Goleiro (1 vaga) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Goleiro
+                      </span>
+                      <div className="flex justify-center">
+                        {renderSlot(5, "Goleiro / GOL")}
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="relative z-10 flex min-h-[480px] flex-col justify-between py-2">
+                    {/* 1. Centroavante (Ataque - 1 vaga) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Centroavante (Ataque)
+                      </span>
+                      <div className="flex justify-center">
+                        {renderSlot(0, "Atacante / ATA")}
+                      </div>
+                    </div>
+
+                    {/* 2. Meio-Campo & Alas (2 vagas) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Meio-Campo & Alas
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                        {[1, 2].map((slot) => renderSlot(slot, "Meia / ALA"))}
+                      </div>
+                    </div>
+
+                    {/* 3. Linha Defensiva (2 vagas) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Linha Defensiva
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                        {[3, 4].map((slot) => renderSlot(slot, "Defensor / DEF"))}
+                      </div>
+                    </div>
+
+                    {/* 4. Goleiro (1 vaga) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Goleiro
+                      </span>
+                      <div className="flex justify-center">
+                        {renderSlot(5, "Goleiro / GOL")}
+                      </div>
+                    </div>
+                  </div>
+                )
               ) : (
-                <div className="relative z-10 flex min-h-[448px] flex-col justify-between py-2">
-                  {/* 1. Ataque (2 vagas) */}
-                  <div>
-                    <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                      Ataque
-                    </span>
-                    <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                      {[0, 1].map((slot) => renderSlot(slot, "Atacante"))}
+                formation === "2-2-1" ? (
+                  <div className="relative z-10 flex min-h-[448px] flex-col justify-between py-2">
+                    {/* 1. Ataque (2 vagas) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Ataque
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                        {[0, 1].map((slot) => renderSlot(slot, "Atacante / ATA"))}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* 2. Meio-Campo & Alas (2 vagas) */}
-                  <div>
-                    <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                      Meio-Campo & Alas
-                    </span>
-                    <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                      {[2, 3].map((slot) => renderSlot(slot, "Meia/Ala"))}
+                    {/* 2. Meio-Campo & Alas (2 vagas) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Meio-Campo & Alas
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                        {[2, 3].map((slot) => renderSlot(slot, "Meia / ALA"))}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* 3. Goleiro & Defesa (1 vaga) */}
-                  <div>
-                    <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                      Goleiro & Defesa
-                    </span>
-                    <div className="flex justify-center">
-                      {renderSlot(4, "Goleiro/Defesa")}
+                    {/* 3. Goleiro & Defesa (1 vaga) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Goleiro & Defesa
+                      </span>
+                      <div className="flex justify-center">
+                        {renderSlot(4, "Goleiro/Defesa")}
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="relative z-10 flex min-h-[448px] flex-col justify-between py-2">
+                    {/* 1. Centroavante (1 vaga) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Centroavante (Ataque)
+                      </span>
+                      <div className="flex justify-center">
+                        {renderSlot(0, "Atacante / ATA")}
+                      </div>
+                    </div>
+
+                    {/* 2. Meio-Campo & Alas (2 vagas) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Meio-Campo & Alas
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                        {[1, 2].map((slot) => renderSlot(slot, "Meia / ALA"))}
+                      </div>
+                    </div>
+
+                    {/* 3. Defesa & Goleiro (2 vagas) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Defesa & Goleiro
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                        {[3, 4].map((slot) => renderSlot(slot, "Defensor / Goleiro"))}
+                      </div>
+                    </div>
+                  </div>
+                )
               )}
             </div>
 
