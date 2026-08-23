@@ -222,7 +222,6 @@ export function FantasyExperience({
   const [draggedSlot, setDraggedSlot] = useState<number | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
   const [touchDragPosition, setTouchDragPosition] = useState<{ x: number; y: number } | null>(null);
-  const [activeSwapSlot, setActiveSwapSlot] = useState<number | null>(null);
 
   // Filtros e ordenação no mercado
   const filtered = useMemo(() => {
@@ -527,8 +526,6 @@ export function FantasyExperience({
     const player = selectedPlayers[slot];
     const isBeingDragged = draggedSlot === slot;
     const isDragOver = dragOverSlot === slot;
-    const isSwapSelected = activeSwapSlot === slot;
-    const isSwapTarget = activeSwapSlot !== null && activeSwapSlot !== slot;
 
     return (
       <div
@@ -615,10 +612,6 @@ export function FantasyExperience({
             ? "opacity-30 scale-90 rotate-2 ring-2 ring-dashed ring-accent/60 rounded-2xl"
             : isDragOver
             ? "scale-110 ring-4 ring-accent bg-accent/30 rounded-2xl shadow-[0_0_30px_rgba(204,255,0,0.8)] z-20"
-            : isSwapSelected
-            ? "scale-105 ring-4 ring-yellow-400 bg-yellow-400/20 rounded-2xl animate-pulse shadow-[0_0_25px_rgba(250,204,21,0.6)] z-10"
-            : isSwapTarget
-            ? "ring-2 ring-dashed ring-accent/70 bg-accent/10 rounded-2xl animate-pulse hover:scale-105"
             : ""
         }`}
       >
@@ -643,46 +636,9 @@ export function FantasyExperience({
               <Crown className="h-4 w-4" />
             </button>
 
-            {/* Botão de Troca Rápida de Posição (Esquerda) */}
-            {open && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (activeSwapSlot === null) {
-                    setActiveSwapSlot(slot);
-                    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(20);
-                  } else if (activeSwapSlot === slot) {
-                    setActiveSwapSlot(null);
-                  } else {
-                    swapSlots(activeSwapSlot, slot);
-                    setActiveSwapSlot(null);
-                    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([20, 30, 20]);
-                  }
-                }}
-                className={`absolute -left-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 text-[10px] font-black ${
-                  isSwapSelected
-                    ? "border-yellow-400 bg-yellow-400 text-background scale-110 shadow-[0_0_12px_rgba(250,204,21,0.8)]"
-                    : "border-white/20 bg-background/90 text-accent hover:border-accent hover:bg-background"
-                }`}
-                title={isSwapSelected ? "Cancelar troca" : "Mover / Trocar posição"}
-                aria-label="Trocar posição"
-              >
-                ⇄
-              </button>
-            )}
-
             <button
               type="button"
-              onClick={() => {
-                if (activeSwapSlot !== null && activeSwapSlot !== slot) {
-                  swapSlots(activeSwapSlot, slot);
-                  setActiveSwapSlot(null);
-                  if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([20, 30, 20]);
-                  return;
-                }
-                setSelectedDrawerPlayer(player);
-              }}
+              onClick={() => setSelectedDrawerPlayer(player)}
               className="flex flex-col items-center group"
             >
               <PlayerAvatar
@@ -692,8 +648,6 @@ export function FantasyExperience({
                 className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
                   captainId === player.id
                     ? "border-accent ring-2 ring-accent/50"
-                    : isSwapSelected
-                    ? "border-yellow-400 ring-2 ring-yellow-400/70"
                     : "border-emerald-300"
                 }`}
               />
@@ -717,26 +671,14 @@ export function FantasyExperience({
           <button
             type="button"
             onClick={() => {
-              if (activeSwapSlot !== null) {
-                swapSlots(activeSwapSlot, slot);
-                setActiveSwapSlot(null);
-                if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([20, 30, 20]);
-                return;
-              }
               setTargetSlot(slot);
               setPositionFilter(targetPos);
               setFilterTag("ALL");
               setActiveTab("market");
             }}
-            className={`mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed transition active:scale-95 group ${
-              isSwapTarget
-                ? "border-accent bg-accent/25 ring-2 ring-accent shadow-[0_0_15px_rgba(204,255,0,0.5)]"
-                : "border-emerald-300/40 bg-black/25 hover:border-accent hover:bg-black/40 shadow-inner"
-            }`}
+            className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/40 bg-black/25 text-center shadow-inner transition hover:border-accent hover:bg-black/40 active:scale-95 group"
           >
-            <span className="text-[10px] font-bold text-accent group-hover:scale-105 transition-transform">
-              {isSwapTarget ? "⇄ Mover Aqui" : `+ Vaga ${slot + 1}`}
-            </span>
+            <span className="text-[10px] font-bold text-accent group-hover:scale-105 transition-transform">+ Vaga {slot + 1}</span>
             <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">{roleLabel}</span>
           </button>
         )}
@@ -1091,20 +1033,9 @@ export function FantasyExperience({
                 </div>
               </div>
               {open && validSelectedCount > 1 && (
-                <div className="flex flex-col items-center gap-0.5 text-center text-[10px] text-emerald-200/70 animate-fade-in">
-                  <p className="font-semibold">
-                    🖐️ <strong className="text-accent">Dica:</strong> Arraste os jogadores pelo campo ou toque no botão <strong className="rounded bg-black/60 px-1 border border-white/20 text-accent">⇄</strong> para trocar posições no celular!
-                  </p>
-                  {activeSwapSlot !== null && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveSwapSlot(null)}
-                      className="mt-0.5 text-[9px] font-bold text-yellow-300 underline hover:text-white"
-                    >
-                      (Toque aqui para cancelar a troca de vaga)
-                    </button>
-                  )}
-                </div>
+                <p className="text-center text-[10px] font-semibold text-emerald-200/70 animate-fade-in">
+                  🖐️ <strong className="text-accent">Dica:</strong> Toque e arraste os jogadores pelo campo para posicioná-los onde preferir!
+                </p>
               )}
             </div>
 
