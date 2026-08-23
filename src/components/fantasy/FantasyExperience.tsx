@@ -527,10 +527,10 @@ export function FantasyExperience({
     const isBeingDragged = draggedSlot === slot;
     const isDragOver = dragOverSlot === slot;
 
-    // Bônus de posição ativo quando o atleta está escalado na sua função natural
+    // Bônus de posição ativo quando o atleta está escalado na sua função natural (ou no gol)
     const isCorrectPosition = Boolean(
       player && (
-        (targetPos === "GOL" && (player.isGoalkeeper || player.isGoodGoalkeeper)) ||
+        targetPos === "GOL" ||
         (targetPos === "DEF" && player.profile === "defensive") ||
         (targetPos === "MEI" && (player.profile === "midfield" || !player.profile)) ||
         (targetPos === "ATA" && player.profile === "offensive")
@@ -1617,22 +1617,6 @@ export function FantasyExperience({
                               MEI/ALA
                             </span>
                           )}
-                          {player.isGoalkeeper ? (
-                            <span className="rounded bg-emerald-500/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-emerald-300 border border-emerald-500/30">
-                              🧤 GOL
-                            </span>
-                          ) : player.isGoodGoalkeeper ? (
-                            <span
-                              className="rounded bg-emerald-500/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-emerald-300 border border-emerald-500/30"
-                              title={`Atuação no Gol: ${player.goalkeeperGames} ${player.goalkeeperGames === 1 ? "jogo" : "jogos"} · ${player.goalsConceded} ${player.goalsConceded === 1 ? "gol sofrido" : "gols sofridos"}`}
-                            >
-                              🧤 {player.goalkeeperGames} {player.goalkeeperGames === 1 ? "jogo" : "jogos"} · {player.goalsConceded} {player.goalsConceded === 1 ? "gol sofrido" : "gols sofridos"}
-                            </span>
-                          ) : player.goalkeeperGames > 0 && positionFilter === "GOL" ? (
-                            <span className="rounded bg-white/10 px-1.5 py-0.2 text-[8px] font-bold text-muted border border-white/10">
-                              🧤 {player.goalkeeperGames} {player.goalkeeperGames === 1 ? "jogo" : "jogos"} · {player.goalsConceded} {player.goalsConceded === 1 ? "gol sofrido" : "gols sofridos"}
-                            </span>
-                          ) : null}
                           <span className="text-[8px] font-bold text-muted ml-auto">
                             {player.formIcon} {player.formLabel}
                           </span>

@@ -471,24 +471,6 @@ export function getFantasyPlayerTags(params: {
     });
   }
 
-  // 11. Bom no Gol (Paredão / Destaque debaixo das traves no rodízio)
-  const isGoodGk =
-    isGoalkeeper ||
-    (goalkeeperGames >= 2 && goalsConceded / goalkeeperGames <= 1.25) ||
-    (goalkeeperGames >= 1 && goalsConceded === 0);
-
-  if (isGoodGk && goalkeeperGames > 0) {
-    const gamesLabel = `${goalkeeperGames} ${goalkeeperGames === 1 ? "jogo" : "jogos"}`;
-    const concededLabel = `${goalsConceded} ${goalsConceded === 1 ? "gol sofrido" : "gols sofridos"}`;
-    tags.push({
-      type: "GOOD_GOALKEEPER",
-      label: `🧤 ${gamesLabel} · ${concededLabel}`,
-      icon: "🧤",
-      variant: "accent",
-      priority: 4,
-    });
-  }
-
   tags.sort((a, b) => a.priority - b.priority);
 
   return {
