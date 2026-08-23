@@ -1024,6 +1024,8 @@ export async function saveFantasyLineup(input: {
       if (lineupError) return { success: false, error: lineupError.message };
     }
     revalidatePath("/cartola");
+    revalidatePath("/");
+    revalidatePath("/notificacoes");
     return { success: true };
   } catch (error) {
     console.error("Erro inesperado ao salvar escalação do Cartola:", error);

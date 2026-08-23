@@ -26,54 +26,108 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
       },
     ];
     if (fantasySeason) {
-      const { data: round } = await account.client.from("fantasy_rounds").select("id, round_id, market_status, round:round_id(number)").eq("fantasy_season_id", fantasySeason.id).eq("market_status", "open").maybeSingle();
+      const { data: round } = await account.client
+        .from("fantasy_rounds")
+        .select("id, round_id, market_status, round:round_id(number)")
+        .eq("fantasy_season_id", fantasySeason.id)
+        .eq("market_status", "open")
+        .maybeSingle();
+
       if (round) {
-        const { data: lineup } = await account.client.from("fantasy_lineups").select("captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id)").eq("fantasy_round_id", round.id).eq("user_id", account.user.id).maybeSingle();
+        const { data: lineup } = await account.client
+          .from("fantasy_lineups")
+          .select("captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id)")
+          .eq("fantasy_round_id", round.id)
+          .eq("user_id", account.user.id)
+          .maybeSingle();
+
         const count = lineup?.fantasy_lineup_players?.length || 0;
-        desired.push({ type: "fantasy_market_open", key: `market:${round.id}`, title: "Escalação disponível", body: `A Rodada ${(round.round as any)?.number || ""} está com mercado aberto.`, href: "/cartola" });
-        if (count < maxPlayers) desired.push({ type: "fantasy_lineup_incomplete", key: `lineup:${round.id}`, title: "Falta escalar o Cartola", body: `Você escolheu ${count} de ${maxPlayers} jogadores.`, href: "/cartola" });
-        if (count === maxPlayers && !lineup?.captain_player_id) desired.push({ type: "fantasy_captain_missing", key: `captain:${round.id}`, title: "Escolha seu capitão", body: "Sua escalação está pronta, mas ainda falta definir o capitão.", href: "/cartola" });
-        if (!lineup?.top_scorer_player_id || !lineup?.top_assist_player_id) desired.push({ type: "fantasy_predictions_missing", key: `predictions:${round.id}`, title: "Palpites pendentes", body: "Você ainda pode enviar os palpites de artilheiro e garçom.", href: "/cartola" });
+        const roundNum = (round.round as any)?.number || "";
+
+        // 1. Falta escalar ou escalação incompleta
+        if (count < maxPlayers) {
+          desired.push({
+            type: "fantasy_lineup_incomplete",
+            key: `cartola:lineup:incomplete:${round.id}`,
+            title: count === 0 ? "⚽ Escale seu time no Cartola" : "⚽ Escalação Incompleta",
+            body:
+              count === 0
+                ? `O mercado da Rodada ${roundNum} está aberto! Escale seus ${maxPlayers} jogadores para pontuar.`
+                : `Você escolheu ${count} de ${maxPlayers} jogadores. Complete seu time antes do mercado fechar!`,
+            href: "/cartola",
+          });
+        }
+
+        // 2. Falta definir o capitão
+        if (count >= 1 && !lineup?.captain_player_id) {
+          desired.push({
+            type: "fantasy_captain_missing",
+            key: `cartola:captain:missing:${round.id}`,
+            title: "👑 Falta definir o Capitão",
+            body: "Sua escalação no Cartola está sem capitão! O capitão multiplica todos os pontos por 1.5x.",
+            href: "/cartola",
+          });
+        }
+
+        // 3. Faltam os palpites da rodada
+        if (count >= 1 && (!lineup?.top_scorer_player_id || !lineup?.top_assist_player_id)) {
+          const missingBoth = !lineup?.top_scorer_player_id && !lineup?.top_assist_player_id;
+          desired.push({
+            type: "fantasy_predictions_missing",
+            key: `cartola:predictions:missing:${round.id}`,
+            title: "🎯 Palpites da Rodada Pendentes",
+            body: missingBoth
+              ? "Envie seus palpites de Artilheiro e Garçom da rodada (+3.0 pts extras em cada)."
+              : !lineup?.top_scorer_player_id
+              ? "Falta enviar seu palpite de Artilheiro da rodada (+3.0 pts extras)."
+              : "Falta enviar seu palpite de Garçom da rodada (+3.0 pts extras).",
+            href: "/cartola",
+          });
+        }
       }
     }
+
     const keys = new Set(desired.map((item) => item.key));
     if (desired.length) {
-      // Busca notificações existentes para não resetar read_at de quem já leu
-      const { data: existing } = await account.client
+      const toUpsert = desired.map((item) => ({
+        user_id: account.user!.id,
+        league_id: league.id,
+        notification_type: item.type,
+        dedupe_key: item.key,
+        title: item.title,
+        body: item.body,
+        href: item.href,
+        state: "active",
+        read_at: null,
+        resolved_at: null,
+      }));
+
+      await account.client
         .from("user_inbox_notifications")
-        .select("dedupe_key, read_at, state")
-        .eq("user_id", account.user.id)
-        .in("dedupe_key", Array.from(keys));
-
-      const existingMap = new Map((existing || []).map((item: any) => [item.dedupe_key, item]));
-
-      const toUpsert = desired
-        .filter((item) => {
-          const ex = existingMap.get(item.key);
-          // Se já foi lido e resolvido, não reabre
-          return !ex || !ex.read_at;
-        })
-        .map((item) => ({
-          user_id: account.user!.id,
-          league_id: league.id,
-          notification_type: item.type,
-          dedupe_key: item.key,
-          title: item.title,
-          body: item.body,
-          href: item.href,
-          state: "active",
-          read_at: null,
-          resolved_at: null,
-        }));
-
-      if (toUpsert.length) {
-        await account.client.from("user_inbox_notifications").upsert(toUpsert, { onConflict: "user_id,dedupe_key" });
-      }
+        .upsert(toUpsert, { onConflict: "user_id,dedupe_key" });
     }
-    const { data: activeNotifications } = await account.client.from("user_inbox_notifications").select("id, dedupe_key").eq("user_id", account.user.id).eq("state", "active");
+
+    const { data: activeNotifications } = await account.client
+      .from("user_inbox_notifications")
+      .select("id, dedupe_key")
+      .eq("user_id", account.user.id)
+      .eq("state", "active");
+
     const staleIds = (activeNotifications || []).filter((item) => !keys.has(item.dedupe_key)).map((item) => item.id);
-    if (staleIds.length) await account.client.from("user_inbox_notifications").update({ state: "resolved", resolved_at: new Date().toISOString() }).in("id", staleIds);
-    const { data } = await account.client.from("user_inbox_notifications").select("id, title, body, href, state, read_at, created_at, updated_at").eq("user_id", account.user.id).order("updated_at", { ascending: false }).limit(30);
+    if (staleIds.length) {
+      await account.client
+        .from("user_inbox_notifications")
+        .update({ state: "resolved", resolved_at: new Date().toISOString() })
+        .in("id", staleIds);
+    }
+
+    const { data } = await account.client
+      .from("user_inbox_notifications")
+      .select("id, title, body, href, state, read_at, created_at, updated_at")
+      .eq("user_id", account.user.id)
+      .order("updated_at", { ascending: false })
+      .limit(30);
+
     return (data || []) as InboxNotification[];
   } catch (error) {
     console.error("Erro ao carregar notificações do inbox:", error);
