@@ -478,10 +478,11 @@ export function getFantasyPlayerTags(params: {
     (goalkeeperGames >= 1 && goalsConceded === 0);
 
   if (isGoodGk && goalkeeperGames > 0) {
-    const avgGk = (goalsConceded / goalkeeperGames).toFixed(1);
+    const gamesLabel = `${goalkeeperGames} ${goalkeeperGames === 1 ? "jogo" : "jogos"}`;
+    const concededLabel = `${goalsConceded} ${goalsConceded === 1 ? "gol sofrido" : "gols sofridos"}`;
     tags.push({
       type: "GOOD_GOALKEEPER",
-      label: `Bom no Gol (${avgGk}/jogo)`,
+      label: `🧤 ${gamesLabel} · ${concededLabel}`,
       icon: "🧤",
       variant: "accent",
       priority: 4,

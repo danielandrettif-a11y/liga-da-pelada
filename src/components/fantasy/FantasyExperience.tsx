@@ -1578,13 +1578,13 @@ export function FantasyExperience({
                           ) : player.isGoodGoalkeeper ? (
                             <span
                               className="rounded bg-emerald-500/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-emerald-300 border border-emerald-500/30"
-                              title={`Média de ${player.goalkeeperConcededAverage ?? 0} gols sofridos/jogo em ${player.goalkeeperGames} jogo(s)`}
+                              title={`Atuação no Gol: ${player.goalkeeperGames} ${player.goalkeeperGames === 1 ? "jogo" : "jogos"} · ${player.goalsConceded} ${player.goalsConceded === 1 ? "gol sofrido" : "gols sofridos"}`}
                             >
-                              🧤 Bom no Gol {player.goalkeeperConcededAverage !== null ? `(${player.goalkeeperConcededAverage.toFixed(1)}/jogo)` : ""}
+                              🧤 {player.goalkeeperGames} {player.goalkeeperGames === 1 ? "jogo" : "jogos"} · {player.goalsConceded} {player.goalsConceded === 1 ? "gol sofrido" : "gols sofridos"}
                             </span>
                           ) : player.goalkeeperGames > 0 && positionFilter === "GOL" ? (
                             <span className="rounded bg-white/10 px-1.5 py-0.2 text-[8px] font-bold text-muted border border-white/10">
-                              🧤 {player.goalkeeperGames}j ({player.goalkeeperConcededAverage?.toFixed(1)}/jogo)
+                              🧤 {player.goalkeeperGames} {player.goalkeeperGames === 1 ? "jogo" : "jogos"} · {player.goalsConceded} {player.goalsConceded === 1 ? "gol sofrido" : "gols sofridos"}
                             </span>
                           ) : null}
                           <span className="text-[8px] font-bold text-muted ml-auto">
