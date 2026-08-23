@@ -527,6 +527,16 @@ export function FantasyExperience({
     const isBeingDragged = draggedSlot === slot;
     const isDragOver = dragOverSlot === slot;
 
+    // Bônus de posição ativo quando o atleta está escalado na sua função natural
+    const isCorrectPosition = Boolean(
+      player && (
+        (targetPos === "GOL" && (player.isGoalkeeper || player.isGoodGoalkeeper)) ||
+        (targetPos === "DEF" && player.profile === "defensive") ||
+        (targetPos === "MEI" && (player.profile === "midfield" || !player.profile)) ||
+        (targetPos === "ATA" && player.profile === "offensive")
+      )
+    );
+
     return (
       <div
         key={slot}
@@ -641,16 +651,28 @@ export function FantasyExperience({
               onClick={() => setSelectedDrawerPlayer(player)}
               className="flex flex-col items-center group"
             >
-              <PlayerAvatar
-                name={player.name}
-                avatarUrl={player.avatarUrl}
-                clickable={false}
-                className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
-                  captainId === player.id
-                    ? "border-accent ring-2 ring-accent/50"
-                    : "border-emerald-300"
-                }`}
-              />
+              <div className="relative">
+                <PlayerAvatar
+                  name={player.name}
+                  avatarUrl={player.avatarUrl}
+                  clickable={false}
+                  className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-all group-active:scale-95 ${
+                    captainId === player.id
+                      ? "border-accent ring-2 ring-accent/60 shadow-[0_0_15px_rgba(204,255,0,0.6)]"
+                      : isCorrectPosition
+                      ? "border-accent ring-2 ring-accent/60 shadow-[0_0_10px_rgba(204,255,0,0.4)]"
+                      : "border-white/25 opacity-90"
+                  }`}
+                />
+                {isCorrectPosition && (
+                  <span
+                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 whitespace-nowrap rounded-full border border-accent/80 bg-[#06180e] px-1.5 py-0.2 text-[7px] font-black uppercase tracking-wider text-accent shadow-[0_0_8px_rgba(204,255,0,0.6)] animate-fade-in"
+                    title="Posição ideal! Bônus tático ativado."
+                  >
+                    ⚡ BÔNUS
+                  </span>
+                )}
+              </div>
               <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
                 {player.name}
               </span>
