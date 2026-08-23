@@ -46,6 +46,10 @@ const FantasyTutorialModal = dynamic(
   () => import("./FantasyTutorialModal").then((mod) => mod.FantasyTutorialModal),
   { ssr: false },
 );
+const FantasyTacticalAnnouncementModal = dynamic(
+  () => import("./FantasyTacticalAnnouncementModal").then((mod) => mod.FantasyTacticalAnnouncementModal),
+  { ssr: false },
+);
 const FantasyPlayerDrawer = dynamic(
   () => import("./FantasyPlayerDrawer").then((mod) => mod.FantasyPlayerDrawer),
   { ssr: false },
@@ -94,6 +98,7 @@ type Props = {
   availablePacksCount?: number;
   inventoryCount?: number;
   liveProjection?: FantasyLiveProjection;
+  playersPerTeam?: number;
 };
 
 const positionLabel: Record<string, string> = {
@@ -121,6 +126,7 @@ export function FantasyExperience({
   availablePacksCount = 0,
   inventoryCount = 0,
   liveProjection,
+  playersPerTeam = 5,
 }: Props) {
   const router = useRouter();
   const initialIds = (lineup?.fantasy_lineup_players || []).map((item: any) => item.player_id as string);
@@ -264,7 +270,7 @@ export function FantasyExperience({
     challenge: challengeId,
   });
   const hasUnsavedChanges = open && savedSignature !== currentSignature;
-  const complete = selected.length === 5 && Boolean(captainId) && remaining >= 0;
+  const complete = selected.length === playersPerTeam && Boolean(captainId) && remaining >= 0;
   const isSaved = Boolean(savedSignature && savedSignature === currentSignature);
   const saveState = !open
     ? "Mercado fechado"
@@ -318,7 +324,7 @@ export function FantasyExperience({
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
-    const message = selected.length === 5 && !captainId
+    const message = selected.length === playersPerTeam && !captainId
       ? "Você ainda não escolheu o capitão. Tem certeza que quer sair sem salvar e completar a escalação?"
       : "Você tem alterações na escalação que ainda não foram salvas. Deseja sair mesmo assim?";
     const beforeUnload = (event: BeforeUnloadEvent) => {
@@ -336,7 +342,7 @@ export function FantasyExperience({
       window.removeEventListener("beforeunload", beforeUnload);
       document.removeEventListener("click", interceptLink, true);
     };
-  }, [captainId, hasUnsavedChanges, selected.length]);
+  }, [captainId, hasUnsavedChanges, playersPerTeam, selected.length]);
 
   function sellAll() {
     if (!selected.length) return;
@@ -359,12 +365,12 @@ export function FantasyExperience({
       if (captainId === player.id) setCaptainId(null);
       return;
     }
-    if (selected.length >= 5) return setMessage("Sua escalação já tem cinco jogadores.");
+    if (selected.length >= playersPerTeam) return setMessage(`Sua escalação já tem ${playersPerTeam} jogadores.`);
     if (player.price > remaining) return setMessage("Patrimônio insuficiente para comprar este jogador.");
     const nextSelected = [...selected, player.id];
     setSelected(nextSelected);
     setMessage("");
-    if (nextSelected.length === 5) {
+    if (nextSelected.length === playersPerTeam) {
       setTimeout(() => {
         setActiveTab("team");
       }, 250);
@@ -387,7 +393,7 @@ export function FantasyExperience({
           result.success
             ? betweenRounds
               ? "Elenco permanente salvo para a próxima Ranked!"
-              : selected.length === 5 && captainId
+              : selected.length === playersPerTeam && captainId
               ? "Escalação salva e pronta!"
               : "Rascunho salvo. Complete antes do primeiro jogo."
             : result.error || "Não foi possível salvar."
@@ -397,6 +403,71 @@ export function FantasyExperience({
         setMessage("A conexão falhou ao salvar. Sua tela foi mantida; tente novamente.");
       }
     });
+  }
+
+  function renderSlot(slot: number, roleLabel: string) {
+    const player = selectedPlayers[slot];
+    return player ? (
+      <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
+        <button
+          type="button"
+          disabled={!open}
+          onClick={() => setCaptainId(player.id)}
+          className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
+            captainId === player.id
+              ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
+              : "border-white/20 bg-background text-muted hover:text-white"
+          }`}
+          aria-label={`Escolher ${player.name} como capitão`}
+          title="Tornar Capitão (Pontos 2x)"
+        >
+          <Crown className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setSelectedDrawerPlayer(player)}
+          className="flex flex-col items-center group"
+        >
+          <PlayerAvatar
+            name={player.name}
+            avatarUrl={player.avatarUrl}
+            clickable={false}
+            className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
+              captainId === player.id
+                ? "border-accent ring-2 ring-accent/50"
+                : "border-emerald-300"
+            }`}
+          />
+          <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
+            {player.name}
+          </span>
+          <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
+            {status === "in_progress"
+              ? `${(
+                  player.roundPoints *
+                  (captainId === player.id ? settings.captainMultiplier : 1)
+                ).toFixed(1)} pts`
+              : `${player.roundPoints.toFixed(1)} pts`}
+          </span>
+          <span className="text-[8px] font-bold text-white/70">
+            {formatFantasyMoney(player.price, settings.currencyName)}
+          </span>
+        </button>
+      </div>
+    ) : (
+      <button
+        key={slot}
+        type="button"
+        onClick={() => {
+          setFilterTag("ALL");
+          setActiveTab("market");
+        }}
+        className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/40 bg-black/25 text-center shadow-inner transition hover:border-accent hover:bg-black/40 active:scale-95"
+      >
+        <span className="text-[10px] font-bold text-accent">+ Vaga {slot + 1}</span>
+        <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">{roleLabel}</span>
+      </button>
+    );
   }
 
   return (
@@ -444,7 +515,7 @@ export function FantasyExperience({
               <p className="mt-2 max-w-[250px] text-xs leading-5 text-muted">
                 {betweenRounds
                   ? "Prepare seu elenco com base em valorização, tendências e custo-benefício"
-                  : `Ranked ${round?.number || ""} · escale cinco craques`}
+                  : `Ranked ${round?.number || ""} · escale ${playersPerTeam} craques`}
               </p>
             </div>
             <span
@@ -552,7 +623,7 @@ export function FantasyExperience({
                 </span>
               </div>
               <p className="text-[10px] text-muted">
-                O mercado fechou! Toque para ver os 5 jogadores, capitão e palpites de todos os rivais.
+                O mercado fechou! Toque para ver os {playersPerTeam} jogadores, capitão e palpites de todos os rivais.
               </p>
             </div>
           </div>
@@ -617,12 +688,12 @@ export function FantasyExperience({
               className={`rounded-full px-2 py-0.5 text-[9px] font-black leading-none ${
                 activeTab === "team"
                   ? "bg-background/25 text-background"
-                  : selected.length === 5
+                  : selected.length === playersPerTeam
                   ? "bg-success/20 text-success"
                   : "bg-white/10 text-muted"
               }`}
             >
-              {selected.length}/5
+              {selected.length}/{playersPerTeam}
             </span>
           </button>
 
@@ -687,7 +758,7 @@ export function FantasyExperience({
               </div>
             </div>
 
-            {open && selected.length === 5 && !captainId && (
+            {open && selected.length === playersPerTeam && !captainId && (
               <p className="rounded-xl border border-warning/35 bg-warning/10 px-3 py-2 text-[10px] font-bold text-warning">Falta escolher o capitão antes de concluir sua escalação.</p>
             )}
             {open && (!scorerId || !assistId) && (
@@ -730,228 +801,82 @@ export function FantasyExperience({
                 <div className="absolute -bottom-1 left-1/2 h-2 w-20 -translate-x-1/2 border-t-2 border-x-2 border-white/60 bg-white/10 rounded-t-xs" />
               </div>
 
-              <div className="relative z-10 flex min-h-[448px] flex-col justify-between py-2">
-                {/* Ataque */}
-                <div>
-                  <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                    Ataque
-                  </span>
-                  <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                    {[0, 1].map((slot) => {
-                      const player = selectedPlayers[slot];
-                      return player ? (
-                        <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
-                          <button
-                            type="button"
-                            disabled={!open}
-                            onClick={() => setCaptainId(player.id)}
-                            className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
-                              captainId === player.id
-                                ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
-                                : "border-white/20 bg-background text-muted hover:text-white"
-                            }`}
-                            aria-label={`Escolher ${player.name} como capitão`}
-                            title="Tornar Capitão (Pontos 2x)"
-                          >
-                            <Crown className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDrawerPlayer(player)}
-                            className="flex flex-col items-center group"
-                          >
-                            <PlayerAvatar
-                              name={player.name}
-                              avatarUrl={player.avatarUrl}
-                              clickable={false}
-                              className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
-                                captainId === player.id
-                                  ? "border-accent ring-2 ring-accent/50"
-                                  : "border-emerald-300"
-                              }`}
-                            />
-                            <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
-                              {player.name}
-                            </span>
-                            <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
-                              {status === "in_progress"
-                                ? `${(
-                                    player.roundPoints *
-                                    (captainId === player.id ? settings.captainMultiplier : 1)
-                                  ).toFixed(1)} pts`
-                                : `${player.roundPoints.toFixed(1)} pts`}
-                            </span>
-                            <span className="text-[8px] font-bold text-white/70">
-                              {formatFantasyMoney(player.price, settings.currencyName)}
-                            </span>
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          key={slot}
-                          type="button"
-                          onClick={() => {
-                            setFilterTag("ALL");
-                            setActiveTab("market");
-                          }}
-                          className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/40 bg-black/25 text-center shadow-inner transition hover:border-accent hover:bg-black/40 active:scale-95"
-                        >
-                          <span className="text-[10px] font-bold text-accent">+ Vaga {slot + 1}</span>
-                          <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">Atacante</span>
-                        </button>
-                      );
-                    })}
+              {/* RENDERIZAÇÃO ADAPTÁVEL DO CAMPO (5 vs 6 JOGADORES) */}
+              {playersPerTeam === 6 ? (
+                <div className="relative z-10 flex min-h-[480px] flex-col justify-between py-2">
+                  {/* 1. Pontas Abertos (Ataque) */}
+                  <div>
+                    <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                      Pontas Abertos (Ataque)
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                      {[0, 1].map((slot) => renderSlot(slot, "Ponta"))}
+                    </div>
                   </div>
-                </div>
 
-                {/* Meio-Campo */}
-                <div>
-                  <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                    Meio-Campo & Alas
-                  </span>
-                  <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                    {[2, 3].map((slot) => {
-                      const player = selectedPlayers[slot];
-                      return player ? (
-                        <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
-                          <button
-                            type="button"
-                            disabled={!open}
-                            onClick={() => setCaptainId(player.id)}
-                            className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
-                              captainId === player.id
-                                ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
-                                : "border-white/20 bg-background text-muted hover:text-white"
-                            }`}
-                            aria-label={`Escolher ${player.name} como capitão`}
-                            title="Tornar Capitão (Pontos 2x)"
-                          >
-                            <Crown className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDrawerPlayer(player)}
-                            className="flex flex-col items-center group"
-                          >
-                            <PlayerAvatar
-                              name={player.name}
-                              avatarUrl={player.avatarUrl}
-                              clickable={false}
-                              className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
-                                captainId === player.id
-                                  ? "border-accent ring-2 ring-accent/50"
-                                  : "border-emerald-300"
-                              }`}
-                            />
-                            <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
-                              {player.name}
-                            </span>
-                            <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
-                              {status === "in_progress"
-                                ? `${(
-                                    player.roundPoints *
-                                    (captainId === player.id ? settings.captainMultiplier : 1)
-                                  ).toFixed(1)} pts`
-                                : `${player.roundPoints.toFixed(1)} pts`}
-                            </span>
-                            <span className="text-[8px] font-bold text-white/70">
-                              {formatFantasyMoney(player.price, settings.currencyName)}
-                            </span>
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          key={slot}
-                          type="button"
-                          onClick={() => {
-                            setFilterTag("ALL");
-                            setActiveTab("market");
-                          }}
-                          className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/40 bg-black/25 text-center shadow-inner transition hover:border-accent hover:bg-black/40 active:scale-95"
-                        >
-                          <span className="text-[10px] font-bold text-accent">+ Vaga {slot + 1}</span>
-                          <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">Meia/Ala</span>
-                        </button>
-                      );
-                    })}
+                  {/* 2. Meio Avançado (Armador) */}
+                  <div>
+                    <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                      Meio Avançado (Armador)
+                    </span>
+                    <div className="flex justify-center">
+                      {renderSlot(2, "Meia")}
+                    </div>
                   </div>
-                </div>
 
-                {/* Defesa */}
-                <div>
-                  <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                    Goleiro & Defesa
-                  </span>
-                  <div className="flex justify-center">
-                    {[4].map((slot) => {
-                      const player = selectedPlayers[slot];
-                      return player ? (
-                        <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
-                          <button
-                            type="button"
-                            disabled={!open}
-                            onClick={() => setCaptainId(player.id)}
-                            className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
-                              captainId === player.id
-                                ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
-                                : "border-white/20 bg-background text-muted hover:text-white"
-                            }`}
-                            aria-label={`Escolher ${player.name} como capitão`}
-                            title="Tornar Capitão (Pontos 2x)"
-                          >
-                            <Crown className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDrawerPlayer(player)}
-                            className="flex flex-col items-center group"
-                          >
-                            <PlayerAvatar
-                              name={player.name}
-                              avatarUrl={player.avatarUrl}
-                              clickable={false}
-                              className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
-                                captainId === player.id
-                                  ? "border-accent ring-2 ring-accent/50"
-                                  : "border-emerald-300"
-                              }`}
-                            />
-                            <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
-                              {player.name}
-                            </span>
-                            <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
-                              {status === "in_progress"
-                                ? `${(
-                                    player.roundPoints *
-                                    (captainId === player.id ? settings.captainMultiplier : 1)
-                                  ).toFixed(1)} pts`
-                                : `${player.roundPoints.toFixed(1)} pts`}
-                            </span>
-                            <span className="text-[8px] font-bold text-white/70">
-                              {formatFantasyMoney(player.price, settings.currencyName)}
-                            </span>
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          key={slot}
-                          type="button"
-                          onClick={() => {
-                            setFilterTag("ALL");
-                            setActiveTab("market");
-                          }}
-                          className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/40 bg-black/25 text-center shadow-inner transition hover:border-accent hover:bg-black/40 active:scale-95"
-                        >
-                          <span className="text-[10px] font-bold text-accent">+ Vaga 5</span>
-                          <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">
-                            Goleiro/Defesa
-                          </span>
-                        </button>
-                      );
-                    })}
+                  {/* 3. Linha Defensiva */}
+                  <div>
+                    <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                      Linha Defensiva
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                      {[3, 4].map((slot) => renderSlot(slot, "Defensor"))}
+                    </div>
+                  </div>
+
+                  {/* 4. Goleiro */}
+                  <div>
+                    <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                      Goleiro
+                    </span>
+                    <div className="flex justify-center">
+                      {renderSlot(5, "Goleiro")}
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="relative z-10 flex min-h-[448px] flex-col justify-between py-2">
+                  {/* 1. Ataque (2 vagas) */}
+                  <div>
+                    <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                      Ataque
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                      {[0, 1].map((slot) => renderSlot(slot, "Atacante"))}
+                    </div>
+                  </div>
+
+                  {/* 2. Meio-Campo & Alas (2 vagas) */}
+                  <div>
+                    <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                      Meio-Campo & Alas
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                      {[2, 3].map((slot) => renderSlot(slot, "Meia/Ala"))}
+                    </div>
+                  </div>
+
+                  {/* 3. Goleiro & Defesa (1 vaga) */}
+                  <div>
+                    <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                      Goleiro & Defesa
+                    </span>
+                    <div className="flex justify-center">
+                      {renderSlot(4, "Goleiro/Defesa")}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* V3: SLOT DE CARTA ESPECIAL ATIVA */}
@@ -1128,7 +1053,7 @@ export function FantasyExperience({
                     <span className="text-[9px] font-bold text-muted">livres</span>
                   </span>
                   <span className="text-[10px] font-bold text-accent">
-                    · {selected.length}/5 escalados
+                    · {selected.length}/{playersPerTeam} escalados
                   </span>
                 </div>
               </div>
@@ -1137,7 +1062,7 @@ export function FantasyExperience({
                 onClick={() => setActiveTab("team")}
                 className="shrink-0 rounded-xl bg-accent px-3 py-1.5 text-xs font-black uppercase tracking-tight text-background shadow transition-transform active:scale-95"
               >
-                Ver Time ({selected.length}/5) →
+                Ver Time ({selected.length}/{playersPerTeam}) →
               </button>
             </div>
 
@@ -1411,6 +1336,9 @@ export function FantasyExperience({
 
       {/* MODAL DE TUTORIAL */}
       {showTutorial && <FantasyTutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} />}
+
+      {/* MODAL DE ANÚNCIO DA REVOLUÇÃO TÁTICA (RODADA 02) */}
+      <FantasyTacticalAnnouncementModal />
 
       {/* POPUP BÁSICO DE AJUDA DOS PALPITES / DESAFIO */}
       {mounted &&

@@ -82,10 +82,12 @@ export function validateFantasyDraft(input: {
   captainPlayerId?: string | null;
   prices: Map<string, number>;
   budget: number;
+  maxPlayers?: number;
 }) {
+  const maxPlayers = input.maxPlayers ?? 5;
   const uniqueIds = [...new Set(input.playerIds)];
   if (uniqueIds.length !== input.playerIds.length) return { valid: false, error: "Jogador repetido na escalação." };
-  if (uniqueIds.length > 5) return { valid: false, error: "A escalação aceita no máximo 5 jogadores." };
+  if (uniqueIds.length > maxPlayers) return { valid: false, error: `A escalação aceita no máximo ${maxPlayers} jogadores.` };
   if (input.captainPlayerId && !uniqueIds.includes(input.captainPlayerId)) {
     return { valid: false, error: "O capitão precisa estar entre os jogadores escalados." };
   }
@@ -94,7 +96,7 @@ export function validateFantasyDraft(input: {
   );
   if (!Number.isFinite(cost)) return { valid: false, error: "Preço de jogador inválido." };
   if (cost > input.budget) return { valid: false, error: "A escalação ultrapassa o patrimônio disponível." };
-  return { valid: true, cost, complete: uniqueIds.length === 5 && Boolean(input.captainPlayerId) };
+  return { valid: true, cost, complete: uniqueIds.length === maxPlayers && Boolean(input.captainPlayerId) };
 }
 
 export function average(values: number[]): number {

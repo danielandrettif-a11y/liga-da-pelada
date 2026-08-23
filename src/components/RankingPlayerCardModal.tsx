@@ -15,7 +15,7 @@ type Props = {
 
 const PROFILE_LABELS = {
   offensive: "ATA",
-  midfield: "MEI",
+  midfield: "MEI/ALA",
   defensive: "DEF",
 };
 

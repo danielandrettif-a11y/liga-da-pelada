@@ -896,11 +896,19 @@ export async function getFantasyDashboard() {
     currentUser: projectedLineups.find((item) => item.userId === account.user!.id) || null,
   };
 
+  const playersPerTeam = league.players_per_team || 5;
+  const dynamicInitialBudget = playersPerTeam * 11.00;
+  const storedBudget = Number(fantasyAccount?.current_budget ?? dynamicInitialBudget);
+  const adjustedBudget = isTest
+    ? dynamicInitialBudget
+    : storedBudget + (playersPerTeam - 5) * 11.00;
+
   return {
     authenticated: true as const,
     available: true as const,
     isAdmin: account.isAdmin,
     settings,
+    playersPerTeam,
     round: displayRound,
     fantasySeasonId: fantasySeason.id,
     fantasyRound: {
@@ -916,9 +924,7 @@ export async function getFantasyDashboard() {
     lineup: effectiveLineup,
     insights,
     radar: radarData,
-    budget: isTest
-      ? settings.initialBudget
-      : Number(fantasyAccount?.current_budget ?? settings.initialBudget),
+    budget: adjustedBudget,
     account: {
       totalPoints: Number(fantasyAccount?.total_points || 0),
       roundsPlayed: Number(fantasyAccount?.rounds_played || 0),
@@ -954,10 +960,12 @@ export async function saveFantasyLineup(input: {
   try {
     const account = await getCurrentAccount();
     if (!account.user) return { success: false, error: "Entre na sua conta para escalar." };
-    if (input.playerIds.length > 5 || new Set(input.playerIds).size !== input.playerIds.length) {
+    const league = await getActiveLeague();
+    const maxPlayers = league.players_per_team || 5;
+    if (input.playerIds.length > maxPlayers || new Set(input.playerIds).size !== input.playerIds.length) {
       return {
         success: false,
-        error: "A escalação enviada é inválida. Atualize a página e tente novamente.",
+        error: `A escalação enviada é inválida. Aceita no máximo ${maxPlayers} jogadores.`,
       };
     }
     if (!input.roundId) {
@@ -1310,7 +1318,7 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
     .maybeSingle();
   if (!activeRound?.round_id) return null;
 
-  const [{ data: settingsRow }, { data: matches }, { data: lineups }] = await Promise.all([
+  const [{ data: settingsRow }, { data: matches }, { data: lineups }, { data: leagueRow }] = await Promise.all([
     client.from("fantasy_settings").select("*").eq("league_id", leagueId).maybeSingle(),
     client
       .from("matches")
@@ -1321,6 +1329,7 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
       .select("id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id)")
       .eq("fantasy_round_id", activeRound.id)
       .neq("status", "missed"),
+    client.from("leagues").select("players_per_team").eq("id", leagueId).maybeSingle(),
   ]);
   const settings: FantasySettings = {
     ...DEFAULT_FANTASY_SETTINGS,
@@ -1350,10 +1359,11 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
     })),
     settings,
   );
-  const projections = projectFantasyLiveLineups(
-    (lineups || [])
-      .filter((lineup: any) => lineup.captain_player_id && (lineup.fantasy_lineup_players || []).length === 5)
-      .map((lineup: any) => ({
+  const maxPlayers = leagueRow?.players_per_team || 5;
+    const projections = projectFantasyLiveLineups(
+      (lineups || [])
+        .filter((lineup: any) => lineup.captain_player_id && (lineup.fantasy_lineup_players || []).length === maxPlayers)
+        .map((lineup: any) => ({
         id: lineup.id,
         userId: lineup.user_id,
         playerIds: (lineup.fantasy_lineup_players || []).map((player: any) => player.player_id),

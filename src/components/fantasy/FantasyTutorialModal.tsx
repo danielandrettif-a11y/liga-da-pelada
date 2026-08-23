@@ -37,16 +37,16 @@ export function FantasyTutorialModal({
     {
       icon: <Users className="h-8 w-8 text-accent" />,
       tag: "Passo 1 de 4",
-      title: "Monte seu Quinteto Ideal",
+      title: "Monte seu Time Ideal",
       description:
-        "Você tem um orçamento em C$ (Cartoletas) para escalar 5 jogadores. Analise os preços, as médias de pontos e as últimas partidas para montar a melhor estratégia.",
+        "Você tem um orçamento em C$ (Cartoletas) para escalar seus jogadores. Analise os preços, as médias de pontos e as últimas partidas para montar a melhor estratégia.",
     },
     {
       icon: <Crown className="h-8 w-8 text-yellow-400" />,
       tag: "Passo 2 de 4",
       title: "Defina o seu Capitão",
       description:
-        "Toque na coroa ao lado de um dos seus 5 jogadores escalados para torná-lo Capitão. A pontuação dele será multiplicada na rodada!",
+        "Toque na coroa ao lado de um dos seus jogadores escalados para torná-lo Capitão. A pontuação dele será multiplicada na rodada!",
     },
     {
       icon: <Target className="h-8 w-8 text-warning" />,

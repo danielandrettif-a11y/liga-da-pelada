@@ -14,16 +14,25 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
     const league = await getActiveLeague();
     const season = await getActiveSeason(league.id);
     if (!season) return [];
+    const maxPlayers = league.players_per_team || 5;
     const { data: fantasySeason } = await account.client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle();
-    const desired: Array<{ type: string; key: string; title: string; body: string; href: string }> = [];
+    const desired: Array<{ type: string; key: string; title: string; body: string; href: string }> = [
+      {
+        type: "tactical_revolution_r2",
+        key: `announcement:tactical_r2:${league.id}`,
+        title: "🚨 Novas Regras a partir da Rodada 02: Bônus por Posição!",
+        body: "Zagueiros (DEF) agora ganham até +2 pts por jogo sem levar gols, Meias (MEI/ALA) ganham +4,5 por assistência e Atacantes (ATA) +6 por gol. Atualize a tag do seu perfil em 'Meu Perfil' para pontuar com os bônus!",
+        href: "/meu-perfil",
+      },
+    ];
     if (fantasySeason) {
       const { data: round } = await account.client.from("fantasy_rounds").select("id, round_id, market_status, round:round_id(number)").eq("fantasy_season_id", fantasySeason.id).eq("market_status", "open").maybeSingle();
       if (round) {
         const { data: lineup } = await account.client.from("fantasy_lineups").select("captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id)").eq("fantasy_round_id", round.id).eq("user_id", account.user.id).maybeSingle();
         const count = lineup?.fantasy_lineup_players?.length || 0;
         desired.push({ type: "fantasy_market_open", key: `market:${round.id}`, title: "Escalação disponível", body: `A Rodada ${(round.round as any)?.number || ""} está com mercado aberto.`, href: "/cartola" });
-        if (count < 5) desired.push({ type: "fantasy_lineup_incomplete", key: `lineup:${round.id}`, title: "Falta escalar o Cartola", body: `Você escolheu ${count} de 5 jogadores.`, href: "/cartola" });
-        if (count === 5 && !lineup?.captain_player_id) desired.push({ type: "fantasy_captain_missing", key: `captain:${round.id}`, title: "Escolha seu capitão", body: "Sua escalação está pronta, mas ainda falta definir o capitão.", href: "/cartola" });
+        if (count < maxPlayers) desired.push({ type: "fantasy_lineup_incomplete", key: `lineup:${round.id}`, title: "Falta escalar o Cartola", body: `Você escolheu ${count} de ${maxPlayers} jogadores.`, href: "/cartola" });
+        if (count === maxPlayers && !lineup?.captain_player_id) desired.push({ type: "fantasy_captain_missing", key: `captain:${round.id}`, title: "Escolha seu capitão", body: "Sua escalação está pronta, mas ainda falta definir o capitão.", href: "/cartola" });
         if (!lineup?.top_scorer_player_id || !lineup?.top_assist_player_id) desired.push({ type: "fantasy_predictions_missing", key: `predictions:${round.id}`, title: "Palpites pendentes", body: "Você ainda pode enviar os palpites de artilheiro e garçom.", href: "/cartola" });
       }
     }

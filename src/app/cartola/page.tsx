@@ -14,6 +14,7 @@ export default async function CartolaPage() {
       fantasySeasonId={data.fantasySeasonId}
       status={data.fantasyRound.status}
       settings={data.settings}
+      playersPerTeam={data.playersPerTeam}
       market={data.market}
       budget={data.budget}
       lineup={data.lineup}

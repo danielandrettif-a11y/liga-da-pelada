@@ -43,6 +43,7 @@ import type { FantasyQuickHighlight } from "@/lib/actions/fantasy";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
 import { RoundCalendarButton } from "./RoundCalendarButton";
+import { CallupTacticalAlertModal } from "./CallupTacticalAlertModal";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 
 type Props = {
@@ -951,6 +952,9 @@ export function CallupBoard({
           </div>
         </div>
       )}
+
+      {/* MODAL DE ALERTA DE POSIÇÃO NO PERFIL (RODADA 02) */}
+      <CallupTacticalAlertModal />
     </div>
   );
 }

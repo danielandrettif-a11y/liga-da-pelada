@@ -14,9 +14,9 @@ export const PLAYER_PROFILE_OPTIONS: Array<{
   },
   {
     value: "midfield",
-    label: "Meio",
-    shortLabel: "MEI",
-    description: "Ajuda na marcacao e na criacao das jogadas.",
+    label: "Meio / Ala",
+    shortLabel: "MEI/ALA",
+    description: "Ajuda na marcação e na criação das jogadas.",
   },
   {
     value: "defensive",

@@ -19,7 +19,7 @@ import { TEAM_CREST_URLS } from "../teamPresets";
 export async function getActiveLeague() {
   const { data, error } = await supabase
     .from("leagues")
-    .select("id")
+    .select("id, players_per_team, teams_per_round, match_duration, stadium_name, stadium_map_url, event_duration_minutes, preseason_enabled")
     .eq("is_active", true)
     .limit(1)
     .single();
@@ -28,7 +28,7 @@ export async function getActiveLeague() {
     // Para o MVP, se não tiver liga ativa, pegamos a primeira que existir
     const { data: fallback, error: err2 } = await supabase
       .from("leagues")
-      .select("id")
+      .select("id, players_per_team, teams_per_round, match_duration, stadium_name, stadium_map_url, event_duration_minutes, preseason_enabled")
       .limit(1)
       .single();
     
