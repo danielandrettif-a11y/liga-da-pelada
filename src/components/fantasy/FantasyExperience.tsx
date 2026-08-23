@@ -130,7 +130,14 @@ export function FantasyExperience({
 }: Props) {
   const router = useRouter();
   const initialIds = (lineup?.fantasy_lineup_players || []).map((item: any) => item.player_id as string);
-  const [selected, setSelected] = useState<string[]>(initialIds);
+  const [selected, setSelected] = useState<string[]>(() => {
+    const slots = Array(playersPerTeam).fill("");
+    initialIds.forEach((id: string, idx: number) => {
+      if (idx < playersPerTeam) slots[idx] = id;
+    });
+    return slots;
+  });
+  const [targetSlot, setTargetSlot] = useState<number | null>(null);
   const [captainId, setCaptainId] = useState<string | null>(lineup?.captain_player_id || null);
   const [scorerId, setScorerId] = useState<string | null>(lineup?.top_scorer_player_id || null);
   const [assistId, setAssistId] = useState<string | null>(lineup?.top_assist_player_id || null);
@@ -188,11 +195,14 @@ export function FantasyExperience({
   // V3: Desconto temporário no preço do jogador da carta Barganha
   const discountedPlayerId = activeCard?.card?.effectType === "PLAYER_DISCOUNT" ? activeCard.targetPlayerId : null;
 
-  const selectedPlayers = selected
-    .map((id) => market.find((player) => player.id === id))
-    .filter(Boolean) as FantasyMarketPlayer[];
+  const selectedPlayers = selected.map((id) =>
+    id ? market.find((player) => player.id === id) || null : null
+  );
 
-  const cost = selectedPlayers.reduce((sum, player) => {
+  const validSelectedPlayers = selectedPlayers.filter(Boolean) as FantasyMarketPlayer[];
+  const validSelectedCount = validSelectedPlayers.length;
+
+  const cost = validSelectedPlayers.reduce((sum, player) => {
     const isDiscounted = discountedPlayerId === player.id;
     const price = isDiscounted ? player.price * 0.8 : player.price;
     return sum + price;
@@ -327,14 +337,14 @@ export function FantasyExperience({
       : null;
 
   const currentSignature = JSON.stringify({
-    ids: selected,
+    ids: selected.filter(Boolean),
     captain: captainId,
     scorer: scorerId,
     assist: assistId,
     challenge: challengeId,
   });
   const hasUnsavedChanges = open && savedSignature !== currentSignature;
-  const complete = selected.length === playersPerTeam && Boolean(captainId) && remaining >= 0;
+  const complete = validSelectedCount === playersPerTeam && Boolean(captainId) && remaining >= 0;
   const isSaved = Boolean(savedSignature && savedSignature === currentSignature);
   const saveState = !open
     ? "Mercado fechado"
@@ -388,7 +398,7 @@ export function FantasyExperience({
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
-    const message = selected.length === playersPerTeam && !captainId
+    const message = validSelectedCount === playersPerTeam && !captainId
       ? "Você ainda não escolheu o capitão. Tem certeza que quer sair sem salvar e completar a escalação?"
       : "Você tem alterações na escalação que ainda não foram salvas. Deseja sair mesmo assim?";
     const beforeUnload = (event: BeforeUnloadEvent) => {
@@ -406,16 +416,17 @@ export function FantasyExperience({
       window.removeEventListener("beforeunload", beforeUnload);
       document.removeEventListener("click", interceptLink, true);
     };
-  }, [captainId, hasUnsavedChanges, playersPerTeam, selected.length]);
+  }, [captainId, hasUnsavedChanges, playersPerTeam, validSelectedCount]);
 
   function sellAll() {
-    if (!selected.length) return;
+    if (!selected.some(Boolean)) return;
     if (!window.confirm("Vender todos os jogadores? A mudança só será aplicada quando você salvar a escalação.")) return;
-    setSelected([]);
+    setSelected(Array(playersPerTeam).fill(""));
     setCaptainId(null);
     setScorerId(null);
     setAssistId(null);
     setChallengeId(null);
+    setTargetSlot(null);
     setMessage("Elenco limpo. Salve para confirmar a venda de todos.");
   }
 
@@ -424,17 +435,39 @@ export function FantasyExperience({
       setSelectedDrawerPlayer(player);
       return;
     }
+    // Se o jogador já está escalado, VENDER / REMOVER ele da vaga dele sem empurrar os demais:
     if (selected.includes(player.id)) {
-      setSelected((current) => current.filter((id) => id !== player.id));
+      setSelected((current) => current.map((id) => (id === player.id ? "" : id)));
       if (captainId === player.id) setCaptainId(null);
       return;
     }
-    if (selected.length >= playersPerTeam) return setMessage(`Sua escalação já tem ${playersPerTeam} jogadores.`);
+
+    const currentCount = selected.filter(Boolean).length;
+    if (currentCount >= playersPerTeam) return setMessage(`Sua escalação já tem ${playersPerTeam} jogadores.`);
     if (player.price > remaining) return setMessage("Patrimônio insuficiente para comprar este jogador.");
-    const nextSelected = [...selected, player.id];
-    setSelected(nextSelected);
+
+    // Inserir no slot de destino clicado ou no primeiro slot vazio:
+    setSelected((current) => {
+      const next = [...current];
+      while (next.length < playersPerTeam) {
+        next.push("");
+      }
+      if (targetSlot !== null && targetSlot >= 0 && targetSlot < playersPerTeam && !next[targetSlot]) {
+        next[targetSlot] = player.id;
+      } else {
+        const firstEmpty = next.findIndex((id) => !id);
+        if (firstEmpty !== -1) {
+          next[firstEmpty] = player.id;
+        } else {
+          next.push(player.id);
+        }
+      }
+      return next;
+    });
+
+    setTargetSlot(null);
     setMessage("");
-    if (nextSelected.length === playersPerTeam) {
+    if (currentCount + 1 === playersPerTeam) {
       setTimeout(() => {
         setActiveTab("team");
       }, 250);
@@ -442,12 +475,13 @@ export function FantasyExperience({
   }
 
   function save() {
+    const validPlayerIds = selected.filter(Boolean);
     startTransition(async () => {
       try {
         const result = await saveFantasyLineup({
           fantasySeasonId,
           roundId: betweenRounds ? null : round?.id || null,
-          playerIds: selected,
+          playerIds: validPlayerIds,
           captainId,
           scorerId,
           assistId,
@@ -457,7 +491,7 @@ export function FantasyExperience({
           result.success
             ? betweenRounds
               ? "Elenco permanente salvo para a próxima Ranked!"
-              : selected.length === playersPerTeam && captainId
+              : validPlayerIds.length === playersPerTeam && captainId
               ? "Escalação salva e pronta!"
               : "Rascunho salvo. Complete antes do primeiro jogo."
             : result.error || "Não foi possível salvar."
@@ -476,10 +510,10 @@ export function FantasyExperience({
       while (next.length <= Math.max(sourceIndex, targetIndex)) {
         next.push("");
       }
-      const temp = next[sourceIndex];
-      next[sourceIndex] = next[targetIndex];
+      const temp = next[sourceIndex] || "";
+      next[sourceIndex] = next[targetIndex] || "";
       next[targetIndex] = temp;
-      return next.filter(Boolean);
+      return next;
     });
   }
 
@@ -613,6 +647,7 @@ export function FantasyExperience({
           <button
             type="button"
             onClick={() => {
+              setTargetSlot(slot);
               setPositionFilter(targetPos);
               setFilterTag("ALL");
               setActiveTab("market");
@@ -845,12 +880,12 @@ export function FantasyExperience({
               className={`rounded-full px-2 py-0.5 text-[9px] font-black leading-none ${
                 activeTab === "team"
                   ? "bg-background/25 text-background"
-                  : selected.length === playersPerTeam
+                  : validSelectedCount === playersPerTeam
                   ? "bg-success/20 text-success"
                   : "bg-white/10 text-muted"
               }`}
             >
-              {selected.length}/{playersPerTeam}
+              {validSelectedCount}/{playersPerTeam}
             </span>
           </button>
 
@@ -973,7 +1008,7 @@ export function FantasyExperience({
                   </button>
                 </div>
               </div>
-              {open && selected.length > 1 && (
+              {open && validSelectedCount > 1 && (
                 <p className="text-center text-[10px] font-semibold text-emerald-200/60 animate-fade-in">
                   🖐️ <strong className="text-accent">Dica:</strong> Toque e arraste os jogadores para posicioná-los onde preferir no campo!
                 </p>
@@ -1164,7 +1199,7 @@ export function FantasyExperience({
                 activeCard={activeCard}
                 isMarketOpen={open}
                 marketPlayers={market}
-                lineupPlayers={selectedPlayers}
+                lineupPlayers={validSelectedPlayers}
                 captainPlayerId={captainId}
                 onRefresh={() => requestRefresh(0)}
               />
@@ -1684,7 +1719,7 @@ export function FantasyExperience({
           roundId={round?.id}
           isMarketOpen={open}
           marketPlayers={market}
-          lineupPlayers={selectedPlayers}
+          lineupPlayers={validSelectedPlayers}
           captainPlayerId={captainId}
           onCardActivated={() => requestRefresh(0)}
         />
