@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Crown,
   HelpCircle,
+  Shield,
   Sparkles,
   Target,
   TrendingUp,
@@ -36,28 +37,35 @@ export function FantasyTutorialModal({
   const steps = [
     {
       icon: <Users className="h-8 w-8 text-accent" />,
-      tag: "Passo 1 de 4",
+      tag: "Passo 1 de 5",
       title: "Monte seu Time Ideal",
       description:
         "Você tem um orçamento em C$ (Cartoletas) para escalar seus jogadores. Analise os preços, as médias de pontos e as últimas partidas para montar a melhor estratégia.",
     },
     {
       icon: <Crown className="h-8 w-8 text-yellow-400" />,
-      tag: "Passo 2 de 4",
+      tag: "Passo 2 de 5",
       title: "Defina o seu Capitão",
       description:
         "Toque na coroa ao lado de um dos seus jogadores escalados para torná-lo Capitão. A pontuação dele será multiplicada na rodada!",
     },
     {
+      icon: <Sparkles className="h-8 w-8 text-accent" />,
+      tag: "Passo 3 de 5 · Novidade V.2",
+      title: "Esquemas & Bônus de Posição",
+      description:
+        "Alterne entre esquemas táticos (2-1-2 ou 2-2-1). Escale os atletas na posição certa (DEF, MEI/ALA, ATA e GOL) para ativar super bônus de Clean Sheet (+2.0/1.0), assistência turbinada (+4.5) e artilharia (+6.0)!",
+    },
+    {
       icon: <Target className="h-8 w-8 text-warning" />,
-      tag: "Passo 3 de 4",
+      tag: "Passo 4 de 5",
       title: "Palpites e Desafio da Rodada",
       description:
         "Aposte em quem será o Artilheiro e o Garçom da rodada. Cumpra também o Desafio da Rodada sorteado para acumular muitos pontos extras.",
     },
     {
       icon: <TrendingUp className="h-8 w-8 text-emerald-400" />,
-      tag: "Passo 4 de 4",
+      tag: "Passo 5 de 5",
       title: "Valorize seu Patrimônio",
       description:
         "Jogadores que superam as expectativas valorizam e aumentam seu caixa C$. Se jogarem mal, desvalorizam. Venda na alta e compre na baixa para enriquecer seu time!",
@@ -89,7 +97,7 @@ export function FantasyTutorialModal({
 
         {/* Indicador de Passos */}
         <div className="flex items-center gap-1.5 mb-3.5 pr-8">
-          {[1, 2, 3, 4].map((i) => (
+          {[1, 2, 3, 4, 5].map((i) => (
             <div
               key={i}
               className={`h-1.5 flex-1 rounded-full transition-all ${
@@ -134,7 +142,7 @@ export function FantasyTutorialModal({
             </button>
           )}
 
-          {step < 4 ? (
+          {step < 5 ? (
             <button
               onClick={() => setStep(step + 1)}
               className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-accent py-3 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_20px_rgba(204,255,0,0.25)] transition-transform active:scale-95"
