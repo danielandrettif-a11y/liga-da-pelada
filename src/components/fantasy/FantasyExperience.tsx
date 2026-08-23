@@ -134,13 +134,125 @@ export function FantasyExperience({
 }: Props) {
   const router = useRouter();
   const initialIds = (lineup?.fantasy_lineup_players || []).map((item: any) => item.player_id as string);
+  const storageKey = `fantasy_slots_${fantasySeasonId}_${round?.id || "portfolio"}`;
+
+  // Esquema tático selecionado (ex: 2-1-2 ou 2-2-1)
+  const [formation, setFormation] = useState<"2-1-2" | "2-2-1">(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(`fantasy_formation_${fantasySeasonId}`);
+        if (saved === "2-1-2" || saved === "2-2-1") return saved;
+      } catch {}
+    }
+    return playersPerTeam === 6 ? "2-1-2" : "2-2-1";
+  });
+
   const [selected, setSelected] = useState<string[]>(() => {
+    // 1. Tentar restaurar o layout exato de vagas salvo pelo usuário
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(storageKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length === playersPerTeam) {
+            const parsedValid = parsed.filter(Boolean);
+            const hasAll =
+              initialIds.length === parsedValid.length &&
+              initialIds.every((id: string) => parsedValid.includes(id));
+            if (hasAll) {
+              return parsed;
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // 2. Se não houver layout em cache, organizar inteligentemente cada jogador no seu setor correto
     const slots = Array(playersPerTeam).fill("");
-    initialIds.forEach((id: string, idx: number) => {
-      if (idx < playersPerTeam) slots[idx] = id;
+    if (!initialIds.length) return slots;
+
+    const playerMap = new Map(market.map((p) => [p.id, p]));
+    const remainingIds = [...initialIds];
+
+    // Goleiro
+    const gkSlot = playersPerTeam === 6 ? 5 : 4;
+    const gkIdx = remainingIds.findIndex((id) => {
+      const p = playerMap.get(id);
+      return Boolean(p && (p.isGoalkeeper || (p.goalkeeperGames || 0) > 0));
     });
+    if (gkIdx >= 0) {
+      slots[gkSlot] = remainingIds[gkIdx];
+      remainingIds.splice(gkIdx, 1);
+    } else if (remainingIds.length === playersPerTeam) {
+      slots[gkSlot] = remainingIds.pop()!;
+    }
+
+    // Atacantes
+    const ataSlots = playersPerTeam === 6 ? (formation === "2-1-2" ? [0, 1] : [0]) : (formation === "2-2-1" ? [0, 1] : [0]);
+    for (const s of ataSlots) {
+      if (slots[s] === "") {
+        const ataIdx = remainingIds.findIndex((id) => playerMap.get(id)?.profile === "offensive");
+        if (ataIdx >= 0) {
+          slots[s] = remainingIds[ataIdx];
+          remainingIds.splice(ataIdx, 1);
+        }
+      }
+    }
+
+    // Meias
+    const meiSlots = playersPerTeam === 6 ? (formation === "2-1-2" ? [2] : [1, 2]) : (formation === "2-2-1" ? [2, 3] : [1, 2]);
+    for (const s of meiSlots) {
+      if (slots[s] === "") {
+        const meiIdx = remainingIds.findIndex((id) => {
+          const p = playerMap.get(id);
+          return p && (p.profile === "midfield" || !p.profile);
+        });
+        if (meiIdx >= 0) {
+          slots[s] = remainingIds[meiIdx];
+          remainingIds.splice(meiIdx, 1);
+        }
+      }
+    }
+
+    // Defensores
+    const defSlots = playersPerTeam === 6 ? [3, 4] : (formation === "2-1-2" ? [3] : []);
+    for (const s of defSlots) {
+      if (slots[s] === "") {
+        const defIdx = remainingIds.findIndex((id) => playerMap.get(id)?.profile === "defensive");
+        if (defIdx >= 0) {
+          slots[s] = remainingIds[defIdx];
+          remainingIds.splice(defIdx, 1);
+        }
+      }
+    }
+
+    // Restantes
+    for (let i = 0; i < playersPerTeam; i++) {
+      if (slots[i] === "" && remainingIds.length > 0) {
+        slots[i] = remainingIds.shift()!;
+      }
+    }
+
     return slots;
   });
+
+  // Salvar posições das vagas no cache local sempre que alterar
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(storageKey, JSON.stringify(selected));
+      }
+    } catch {}
+  }, [selected, storageKey]);
+
+  // Salvar esquema tático no cache local
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`fantasy_formation_${fantasySeasonId}`, formation);
+      }
+    } catch {}
+  }, [formation, fantasySeasonId]);
   const [targetSlot, setTargetSlot] = useState<number | null>(null);
   const [captainId, setCaptainId] = useState<string | null>(lineup?.captain_player_id || null);
   const [scorerId, setScorerId] = useState<string | null>(lineup?.top_scorer_player_id || null);
@@ -215,10 +327,6 @@ export function FantasyExperience({
 
   const remaining = effectiveBudget - cost;
 
-  // Esquema tático selecionado (ex: 2-1-2 ou 2-2-1)
-  const [formation, setFormation] = useState<"2-1-2" | "2-2-1">(
-    playersPerTeam === 6 ? "2-1-2" : "2-2-1"
-  );
 
   // Filtro de posição inicial / ativo no mercado (GOL, DEF, MEI, ATA ou ALL)
   const [positionFilter, setPositionFilter] = useState<"ALL" | "GOL" | "DEF" | "MEI" | "ATA">("ALL");
