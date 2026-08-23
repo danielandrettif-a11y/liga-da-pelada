@@ -26,7 +26,20 @@ export async function getDashboardData() {
       .from("rounds")
       .select(`
         *,
-        matches(*),
+        matches(
+          *,
+          match_events(
+            id,
+            match_id,
+            event_type,
+            player_id,
+            assist_player_id,
+            team_id,
+            minute,
+            player:player_id (id, name, avatar_url),
+            assist_player:assist_player_id (id, name, avatar_url)
+          )
+        ),
         teams(*)
       `)
       .eq("status", "finished")

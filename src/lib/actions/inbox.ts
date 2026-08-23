@@ -36,7 +36,10 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
     if (staleIds.length) await account.client.from("user_inbox_notifications").update({ state: "resolved", resolved_at: new Date().toISOString() }).in("id", staleIds);
     const { data } = await account.client.from("user_inbox_notifications").select("id, title, body, href, state, read_at, created_at, updated_at").eq("user_id", account.user.id).order("updated_at", { ascending: false }).limit(30);
     return (data || []) as InboxNotification[];
-  } catch { return []; }
+  } catch (error) {
+    console.error("Erro ao carregar notificações do inbox:", error);
+    return [];
+  }
 }
 
 export async function markInboxRead(ids?: string[]) {

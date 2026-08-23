@@ -361,8 +361,14 @@ export function FantasyExperience({
     }
     if (selected.length >= 5) return setMessage("Sua escalação já tem cinco jogadores.");
     if (player.price > remaining) return setMessage("Patrimônio insuficiente para comprar este jogador.");
-    setSelected((current) => [...current, player.id]);
+    const nextSelected = [...selected, player.id];
+    setSelected(nextSelected);
     setMessage("");
+    if (nextSelected.length === 5) {
+      setTimeout(() => {
+        setActiveTab("team");
+      }, 250);
+    }
   }
 
   function save() {
@@ -773,13 +779,11 @@ export function FantasyExperience({
                                     player.roundPoints *
                                     (captainId === player.id ? settings.captainMultiplier : 1)
                                   ).toFixed(1)} pts`
-                                : formatFantasyMoney(player.price, settings.currencyName)}
+                                : `${player.roundPoints.toFixed(1)} pts`}
                             </span>
-                            {betweenRounds && (
-                              <span className="text-[8px] font-bold text-white/60">
-                                Última: {player.roundPoints.toFixed(1)} pts
-                              </span>
-                            )}
+                            <span className="text-[8px] font-bold text-white/70">
+                              {formatFantasyMoney(player.price, settings.currencyName)}
+                            </span>
                           </button>
                         </div>
                       ) : (
@@ -848,13 +852,11 @@ export function FantasyExperience({
                                     player.roundPoints *
                                     (captainId === player.id ? settings.captainMultiplier : 1)
                                   ).toFixed(1)} pts`
-                                : formatFantasyMoney(player.price, settings.currencyName)}
+                                : `${player.roundPoints.toFixed(1)} pts`}
                             </span>
-                            {betweenRounds && (
-                              <span className="text-[8px] font-bold text-white/60">
-                                Última: {player.roundPoints.toFixed(1)} pts
-                              </span>
-                            )}
+                            <span className="text-[8px] font-bold text-white/70">
+                              {formatFantasyMoney(player.price, settings.currencyName)}
+                            </span>
                           </button>
                         </div>
                       ) : (
@@ -923,13 +925,11 @@ export function FantasyExperience({
                                     player.roundPoints *
                                     (captainId === player.id ? settings.captainMultiplier : 1)
                                   ).toFixed(1)} pts`
-                                : formatFantasyMoney(player.price, settings.currencyName)}
+                                : `${player.roundPoints.toFixed(1)} pts`}
                             </span>
-                            {betweenRounds && (
-                              <span className="text-[8px] font-bold text-white/60">
-                                Última: {player.roundPoints.toFixed(1)} pts
-                              </span>
-                            )}
+                            <span className="text-[8px] font-bold text-white/70">
+                              {formatFantasyMoney(player.price, settings.currencyName)}
+                            </span>
                           </button>
                         </div>
                       ) : (
@@ -1290,7 +1290,7 @@ export function FantasyExperience({
                           </div>
                         )}
 
-                        <div className="mt-1 flex items-center gap-2 text-[9px]">
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px]">
                           <span className="font-black text-accent">
                             {formatFantasyMoney(player.price, settings.currencyName)}
                           </span>
@@ -1301,7 +1301,18 @@ export function FantasyExperience({
                           >
                             {player.variation > 0 ? "+" : ""}
                             {(player.variation * 100).toFixed(1)}%
+                            {player.priceChange !== 0 && (
+                              <span className="ml-0.5 font-bold opacity-90">
+                                ({player.priceChange > 0 ? "+" : ""}
+                                {formatFantasyMoney(player.priceChange, settings.currencyName)})
+                              </span>
+                            )}
                           </span>
+                          {player.roundPoints !== 0 && (
+                            <span className="text-muted font-semibold">
+                              · Última: <span className="font-bold text-foreground">{player.roundPoints.toFixed(1)} pts</span>
+                            </span>
+                          )}
                           {player.popularityPercent > 0 && (
                             <span className="text-muted font-semibold">
                               · {player.popularityPercent}% escalado
