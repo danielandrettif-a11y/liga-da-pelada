@@ -28,6 +28,7 @@ export type FantasyMarketPlayer = {
   name: string;
   avatarUrl: string | null;
   profile: string | null;
+  isGoalkeeper: boolean;
   price: number;
   totalPoints: number;
   roundsPlayed: number;
@@ -644,6 +645,7 @@ export async function getFantasyDashboard() {
         name: player.name,
         avatarUrl: player.avatar_url,
         profile: player.player_profile,
+        isGoalkeeper: Boolean(player.is_goalkeeper),
         price,
         totalPoints,
         roundsPlayed,

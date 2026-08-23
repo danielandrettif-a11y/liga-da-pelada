@@ -229,7 +229,7 @@ export function FantasyExperience({
         if (positionFilter !== "ALL") {
           const getPosPriority = (p: FantasyMarketPlayer) => {
             if (positionFilter === "GOL") {
-              return (p.goalkeeperGames || 0) > 0 ? 3 : p.profile === "defensive" ? 1 : 0;
+              return p.isGoalkeeper ? 3 : p.profile === "defensive" ? 1 : 0;
             }
             if (positionFilter === "DEF") {
               return p.profile === "defensive" ? 3 : 0;
@@ -1407,7 +1407,7 @@ export function FantasyExperience({
                               MEI/ALA
                             </span>
                           )}
-                          {(player.goalkeeperGames || 0) > 0 && (
+                          {player.isGoalkeeper && (
                             <span className="rounded bg-emerald-500/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-emerald-300 border border-emerald-500/30">
                               🧤 GOL
                             </span>
