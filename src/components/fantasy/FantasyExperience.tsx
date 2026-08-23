@@ -205,6 +205,9 @@ export function FantasyExperience({
     playersPerTeam === 6 ? "2-1-2" : "2-2-1"
   );
 
+  // Filtro de posição inicial / ativo no mercado (GOL, DEF, MEI, ATA ou ALL)
+  const [positionFilter, setPositionFilter] = useState<"ALL" | "GOL" | "DEF" | "MEI" | "ATA">("ALL");
+
   // Filtros e ordenação no mercado
   const filtered = useMemo(() => {
     return [...market]
@@ -222,6 +225,31 @@ export function FantasyExperience({
         return true;
       })
       .sort((a, b) => {
+        // Prioridade por posição: jogadores da posição selecionada vêm primeiro
+        if (positionFilter !== "ALL") {
+          const getPosPriority = (p: FantasyMarketPlayer) => {
+            if (positionFilter === "GOL") {
+              return (p.goalkeeperGames || 0) > 0 ? 3 : p.profile === "defensive" ? 1 : 0;
+            }
+            if (positionFilter === "DEF") {
+              return p.profile === "defensive" ? 3 : 0;
+            }
+            if (positionFilter === "MEI") {
+              return p.profile === "midfield" ? 3 : !p.profile ? 1 : 0;
+            }
+            if (positionFilter === "ATA") {
+              return p.profile === "offensive" ? 3 : 0;
+            }
+            return 0;
+          };
+
+          const prioA = getPosPriority(a);
+          const prioB = getPosPriority(b);
+          if (prioA !== prioB) {
+            return prioB - prioA;
+          }
+        }
+
         if (sort === "priceLow") return a.price - b.price;
         if (sort === "priceHigh") return b.price - a.price;
         if (sort === "name") return a.name.localeCompare(b.name, "pt-BR");
@@ -236,7 +264,7 @@ export function FantasyExperience({
         if (sort === "popularity") return b.popularityPercent - a.popularityPercent;
         return b.totalPoints - a.totalPoints;
       });
-  }, [market, query, sort, filterTag]);
+  }, [market, query, sort, filterTag, positionFilter]);
 
   const scheduledAt =
     round?.date && round.start_time ? new Date(`${round.date}T${round.start_time}`).getTime() : null;
@@ -410,7 +438,11 @@ export function FantasyExperience({
     });
   }
 
-  function renderSlot(slot: number, roleLabel: string) {
+  function renderSlot(
+    slot: number,
+    roleLabel: string,
+    targetPos: "ALL" | "GOL" | "DEF" | "MEI" | "ATA" = "ALL"
+  ) {
     const player = selectedPlayers[slot];
     return player ? (
       <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
@@ -464,12 +496,13 @@ export function FantasyExperience({
         key={slot}
         type="button"
         onClick={() => {
+          setPositionFilter(targetPos);
           setFilterTag("ALL");
           setActiveTab("market");
         }}
-        className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/40 bg-black/25 text-center shadow-inner transition hover:border-accent hover:bg-black/40 active:scale-95"
+        className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/40 bg-black/25 text-center shadow-inner transition hover:border-accent hover:bg-black/40 active:scale-95 group"
       >
-        <span className="text-[10px] font-bold text-accent">+ Vaga {slot + 1}</span>
+        <span className="text-[10px] font-bold text-accent group-hover:scale-105 transition-transform">+ Vaga {slot + 1}</span>
         <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">{roleLabel}</span>
       </button>
     );
@@ -852,7 +885,7 @@ export function FantasyExperience({
                         Pontas Abertos (Ataque)
                       </span>
                       <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[0, 1].map((slot) => renderSlot(slot, "Ponta / ATA"))}
+                        {[0, 1].map((slot) => renderSlot(slot, "Ponta / ATA", "ATA"))}
                       </div>
                     </div>
 
@@ -862,7 +895,7 @@ export function FantasyExperience({
                         Meio Avançado (Armador)
                       </span>
                       <div className="flex justify-center">
-                        {renderSlot(2, "Meia / ALA")}
+                        {renderSlot(2, "Meia / ALA", "MEI")}
                       </div>
                     </div>
 
@@ -872,7 +905,7 @@ export function FantasyExperience({
                         Linha Defensiva
                       </span>
                       <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[3, 4].map((slot) => renderSlot(slot, "Defensor / DEF"))}
+                        {[3, 4].map((slot) => renderSlot(slot, "Defensor / DEF", "DEF"))}
                       </div>
                     </div>
 
@@ -882,7 +915,7 @@ export function FantasyExperience({
                         Goleiro
                       </span>
                       <div className="flex justify-center">
-                        {renderSlot(5, "Goleiro / GOL")}
+                        {renderSlot(5, "Goleiro / GOL", "GOL")}
                       </div>
                     </div>
                   </div>
@@ -894,7 +927,7 @@ export function FantasyExperience({
                         Centroavante (Ataque)
                       </span>
                       <div className="flex justify-center">
-                        {renderSlot(0, "Atacante / ATA")}
+                        {renderSlot(0, "Atacante / ATA", "ATA")}
                       </div>
                     </div>
 
@@ -904,7 +937,7 @@ export function FantasyExperience({
                         Meio-Campo & Alas
                       </span>
                       <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[1, 2].map((slot) => renderSlot(slot, "Meia / ALA"))}
+                        {[1, 2].map((slot) => renderSlot(slot, "Meia / ALA", "MEI"))}
                       </div>
                     </div>
 
@@ -914,7 +947,7 @@ export function FantasyExperience({
                         Linha Defensiva
                       </span>
                       <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[3, 4].map((slot) => renderSlot(slot, "Defensor / DEF"))}
+                        {[3, 4].map((slot) => renderSlot(slot, "Defensor / DEF", "DEF"))}
                       </div>
                     </div>
 
@@ -924,7 +957,7 @@ export function FantasyExperience({
                         Goleiro
                       </span>
                       <div className="flex justify-center">
-                        {renderSlot(5, "Goleiro / GOL")}
+                        {renderSlot(5, "Goleiro / GOL", "GOL")}
                       </div>
                     </div>
                   </div>
@@ -938,7 +971,7 @@ export function FantasyExperience({
                         Ataque
                       </span>
                       <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[0, 1].map((slot) => renderSlot(slot, "Atacante / ATA"))}
+                        {[0, 1].map((slot) => renderSlot(slot, "Atacante / ATA", "ATA"))}
                       </div>
                     </div>
 
@@ -948,7 +981,7 @@ export function FantasyExperience({
                         Meio-Campo & Alas
                       </span>
                       <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[2, 3].map((slot) => renderSlot(slot, "Meia / ALA"))}
+                        {[2, 3].map((slot) => renderSlot(slot, "Meia / ALA", "MEI"))}
                       </div>
                     </div>
 
@@ -958,7 +991,7 @@ export function FantasyExperience({
                         Goleiro & Defesa
                       </span>
                       <div className="flex justify-center">
-                        {renderSlot(4, "Goleiro/Defesa")}
+                        {renderSlot(4, "Goleiro/Defesa", "GOL")}
                       </div>
                     </div>
                   </div>
@@ -970,7 +1003,7 @@ export function FantasyExperience({
                         Centroavante (Ataque)
                       </span>
                       <div className="flex justify-center">
-                        {renderSlot(0, "Atacante / ATA")}
+                        {renderSlot(0, "Atacante / ATA", "ATA")}
                       </div>
                     </div>
 
@@ -980,7 +1013,7 @@ export function FantasyExperience({
                         Meio-Campo & Alas
                       </span>
                       <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[1, 2].map((slot) => renderSlot(slot, "Meia / ALA"))}
+                        {[1, 2].map((slot) => renderSlot(slot, "Meia / ALA", "MEI"))}
                       </div>
                     </div>
 
@@ -990,7 +1023,7 @@ export function FantasyExperience({
                         Defesa & Goleiro
                       </span>
                       <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[3, 4].map((slot) => renderSlot(slot, "Defensor / Goleiro"))}
+                        {[3, 4].map((slot) => renderSlot(slot, "Defensor / Goleiro", "DEF"))}
                       </div>
                     </div>
                   </div>
@@ -1225,10 +1258,55 @@ export function FantasyExperience({
               </div>
             </div>
 
+            {/* Chips de Filtros de Posição */}
+            <div className="no-scrollbar -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5 text-[9px] font-black uppercase tracking-wider">
+              <span className="text-[8px] font-bold text-muted shrink-0 mr-0.5">Posição:</span>
+              {[
+                { id: "ALL", label: "Todas" },
+                { id: "GOL", label: "🧤 Goleiros (GOL)" },
+                { id: "DEF", label: "🛡️ Zaga (DEF)" },
+                { id: "MEI", label: "🎯 Meio (MEI/ALA)" },
+                { id: "ATA", label: "⚡ Ataque (ATA)" },
+              ].map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => setPositionFilter(chip.id as any)}
+                  className={`shrink-0 rounded-xl px-2.5 py-1.5 transition-all border ${
+                    positionFilter === chip.id
+                      ? "border-accent bg-accent text-background font-black shadow-sm"
+                      : "border-white/10 bg-surface/70 text-muted hover:text-foreground"
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Aviso de priorização da posição selecionada */}
+            {positionFilter !== "ALL" && (
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-accent/30 bg-accent/10 px-3 py-1.5 text-[10px] text-accent">
+                <span className="font-bold">
+                  ✨ Atletas de <strong>{
+                    positionFilter === "GOL" ? "Goleiro (GOL)" :
+                    positionFilter === "DEF" ? "Defesa (DEF)" :
+                    positionFilter === "MEI" ? "Meio / Ala (MEI/ALA)" : "Ataque (ATA)"
+                  }</strong> no topo primeiro
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPositionFilter("ALL")}
+                  className="font-black text-[9px] uppercase tracking-wider text-muted hover:text-white underline"
+                >
+                  Limpar
+                </button>
+              </div>
+            )}
+
             {/* Chips de Filtros Rápidos */}
             <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 text-[9px] font-black uppercase tracking-wider">
               {[
-                { id: "ALL", label: "Todos" },
+                { id: "ALL", label: "Todos os Status" },
                 { id: "TREND_UP", label: "🔥 Em Alta" },
                 { id: "TREND_DOWN", label: "📉 Em Baixa" },
                 { id: "HIGH_VALUE", label: "💎 Custo-Benefício" },
@@ -1311,11 +1389,30 @@ export function FantasyExperience({
                         className="min-w-0 flex-1 cursor-pointer"
                         onClick={() => setSelectedDrawerPlayer(player)}
                       >
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <p className="truncate text-xs font-black text-foreground hover:text-accent transition-colors">
                             {player.name}
                           </p>
-                          <span className="text-[8px] font-bold text-muted">
+                          {/* Badge de Posição */}
+                          {player.profile === "defensive" ? (
+                            <span className="rounded bg-blue-500/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-blue-300 border border-blue-500/30">
+                              DEF
+                            </span>
+                          ) : player.profile === "offensive" ? (
+                            <span className="rounded bg-danger/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-danger border border-danger/30">
+                              ATA
+                            </span>
+                          ) : (
+                            <span className="rounded bg-warning/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-warning border border-warning/30">
+                              MEI/ALA
+                            </span>
+                          )}
+                          {(player.goalkeeperGames || 0) > 0 && (
+                            <span className="rounded bg-emerald-500/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-emerald-300 border border-emerald-500/30">
+                              🧤 GOL
+                            </span>
+                          )}
+                          <span className="text-[8px] font-bold text-muted ml-auto">
                             {player.formIcon} {player.formLabel}
                           </span>
                         </div>
