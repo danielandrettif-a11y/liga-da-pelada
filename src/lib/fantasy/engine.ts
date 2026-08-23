@@ -39,6 +39,7 @@ export type FantasyTagType =
   | "REVELATION"
   | "HOT_SCORER"
   | "HOT_PLAYMAKER"
+  | "GOOD_GOALKEEPER"
   | "BUDGET"
   | "PREMIUM";
 
@@ -326,6 +327,9 @@ export function getFantasyPlayerTags(params: {
   recentVariations: number[];
   goals: number;
   assists: number;
+  goalkeeperGames?: number;
+  goalsConceded?: number;
+  isGoalkeeper?: boolean;
   popularityPercent?: number;
   captainPercent?: number;
   isMostSelected?: boolean;
@@ -340,6 +344,9 @@ export function getFantasyPlayerTags(params: {
     recentVariations,
     goals,
     assists,
+    goalkeeperGames = 0,
+    goalsConceded = 0,
+    isGoalkeeper = false,
     popularityPercent = 0,
     captainPercent = 0,
     isMostSelected = false,
@@ -461,6 +468,23 @@ export function getFantasyPlayerTags(params: {
       icon: "💰",
       variant: "muted",
       priority: 10,
+    });
+  }
+
+  // 11. Bom no Gol (Paredão / Destaque debaixo das traves no rodízio)
+  const isGoodGk =
+    isGoalkeeper ||
+    (goalkeeperGames >= 2 && goalsConceded / goalkeeperGames <= 1.25) ||
+    (goalkeeperGames >= 1 && goalsConceded === 0);
+
+  if (isGoodGk && goalkeeperGames > 0) {
+    const avgGk = (goalsConceded / goalkeeperGames).toFixed(1);
+    tags.push({
+      type: "GOOD_GOALKEEPER",
+      label: `Bom no Gol (${avgGk}/j)`,
+      icon: "🧤",
+      variant: "accent",
+      priority: 4,
     });
   }
 

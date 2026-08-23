@@ -227,26 +227,53 @@ export function FantasyExperience({
       .sort((a, b) => {
         // Prioridade por posição: jogadores da posição selecionada vêm primeiro
         if (positionFilter !== "ALL") {
-          const getPosPriority = (p: FantasyMarketPlayer) => {
-            if (positionFilter === "GOL") {
-              return p.isGoalkeeper ? 3 : p.profile === "defensive" ? 1 : 0;
-            }
-            if (positionFilter === "DEF") {
-              return p.profile === "defensive" ? 3 : 0;
-            }
-            if (positionFilter === "MEI") {
-              return p.profile === "midfield" ? 3 : !p.profile ? 1 : 0;
-            }
-            if (positionFilter === "ATA") {
-              return p.profile === "offensive" ? 3 : 0;
-            }
-            return 0;
-          };
+          if (positionFilter === "GOL") {
+            // Nível 1: Quem tem tag de goleiro oficial OU tag de bom no gol
+            // Nível 2: Quem tem jogos no gol (ordenado por melhor aproveitamento / menor média de gols sofridos)
+            // Nível 3: O resto dos atletas
+            const getGkTier = (p: FantasyMarketPlayer) => {
+              if (p.isGoalkeeper || p.isGoodGoalkeeper) return 1;
+              if ((p.goalkeeperGames || 0) > 0) return 2;
+              return 3;
+            };
 
-          const prioA = getPosPriority(a);
-          const prioB = getPosPriority(b);
-          if (prioA !== prioB) {
-            return prioB - prioA;
+            const tierA = getGkTier(a);
+            const tierB = getGkTier(b);
+            if (tierA !== tierB) {
+              return tierA - tierB;
+            }
+
+            // Dentro do Tier 1 ou Tier 2, ordenar por melhor aproveitamento (menor média de gols sofridos)
+            if (tierA <= 2) {
+              const avgA = a.goalkeeperConcededAverage ?? 999;
+              const avgB = b.goalkeeperConcededAverage ?? 999;
+              if (avgA !== avgB) {
+                return avgA - avgB;
+              }
+              // Desempate por mais jogos no gol
+              if ((a.goalkeeperGames || 0) !== (b.goalkeeperGames || 0)) {
+                return (b.goalkeeperGames || 0) - (a.goalkeeperGames || 0);
+              }
+            }
+          } else {
+            const getPosPriority = (p: FantasyMarketPlayer) => {
+              if (positionFilter === "DEF") {
+                return p.profile === "defensive" ? 3 : 0;
+              }
+              if (positionFilter === "MEI") {
+                return p.profile === "midfield" ? 3 : !p.profile ? 1 : 0;
+              }
+              if (positionFilter === "ATA") {
+                return p.profile === "offensive" ? 3 : 0;
+              }
+              return 0;
+            };
+
+            const prioA = getPosPriority(a);
+            const prioB = getPosPriority(b);
+            if (prioA !== prioB) {
+              return prioB - prioA;
+            }
           }
         }
 
@@ -1287,11 +1314,14 @@ export function FantasyExperience({
             {positionFilter !== "ALL" && (
               <div className="flex items-center justify-between gap-2 rounded-xl border border-accent/30 bg-accent/10 px-3 py-1.5 text-[10px] text-accent">
                 <span className="font-bold">
-                  ✨ Atletas de <strong>{
-                    positionFilter === "GOL" ? "Goleiro (GOL)" :
-                    positionFilter === "DEF" ? "Defesa (DEF)" :
-                    positionFilter === "MEI" ? "Meio / Ala (MEI/ALA)" : "Ataque (ATA)"
-                  }</strong> no topo primeiro
+                  {positionFilter === "GOL" ? (
+                    <>✨ <strong>Goleiros e Paredões (Bom no Gol)</strong> no topo, seguidos por melhor aproveitamento</>
+                  ) : (
+                    <>✨ Atletas de <strong>{
+                      positionFilter === "DEF" ? "Defesa (DEF)" :
+                      positionFilter === "MEI" ? "Meio / Ala (MEI/ALA)" : "Ataque (ATA)"
+                    }</strong> no topo primeiro</>
+                  )}
                 </span>
                 <button
                   type="button"
@@ -1407,11 +1437,22 @@ export function FantasyExperience({
                               MEI/ALA
                             </span>
                           )}
-                          {player.isGoalkeeper && (
+                          {player.isGoalkeeper ? (
                             <span className="rounded bg-emerald-500/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-emerald-300 border border-emerald-500/30">
                               🧤 GOL
                             </span>
-                          )}
+                          ) : player.isGoodGoalkeeper ? (
+                            <span
+                              className="rounded bg-emerald-500/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-emerald-300 border border-emerald-500/30"
+                              title={`Média de ${player.goalkeeperConcededAverage ?? 0} gols sofridos/jogo em ${player.goalkeeperGames} jogo(s)`}
+                            >
+                              🧤 Bom no Gol {player.goalkeeperConcededAverage !== null ? `(${player.goalkeeperConcededAverage.toFixed(1)}/j)` : ""}
+                            </span>
+                          ) : player.goalkeeperGames > 0 && positionFilter === "GOL" ? (
+                            <span className="rounded bg-white/10 px-1.5 py-0.2 text-[8px] font-bold text-muted border border-white/10">
+                              🧤 {player.goalkeeperGames}j ({player.goalkeeperConcededAverage?.toFixed(1)}/j)
+                            </span>
+                          ) : null}
                           <span className="text-[8px] font-bold text-muted ml-auto">
                             {player.formIcon} {player.formLabel}
                           </span>

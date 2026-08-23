@@ -29,6 +29,8 @@ export type FantasyMarketPlayer = {
   avatarUrl: string | null;
   profile: string | null;
   isGoalkeeper: boolean;
+  isGoodGoalkeeper: boolean;
+  goalkeeperConcededAverage: number | null;
   price: number;
   totalPoints: number;
   roundsPlayed: number;
@@ -628,6 +630,14 @@ export async function getFantasyDashboard() {
       const costBenefit = calculateCostBenefit(avgPoints, price);
       const popularity = popularityAgg.getPopularity(player.id);
 
+      const gkGames = stats.goalkeeperGames || 0;
+      const gkConceded = stats.goalsConceded || 0;
+      const goalkeeperConcededAverage = gkGames > 0 ? Number((gkConceded / gkGames).toFixed(2)) : null;
+      const isGoodGoalkeeper =
+        Boolean(player.is_goalkeeper) ||
+        (gkGames >= 2 && goalkeeperConcededAverage !== null && goalkeeperConcededAverage <= 1.25) ||
+        (gkGames >= 1 && gkConceded === 0);
+
       const { allTags, compactTags } = getFantasyPlayerTags({
         price,
         totalPoints,
@@ -636,6 +646,9 @@ export async function getFantasyDashboard() {
         recentVariations: playerRecentVars,
         goals: stats.goals,
         assists: stats.assists,
+        goalkeeperGames: gkGames,
+        goalsConceded: gkConceded,
+        isGoalkeeper: Boolean(player.is_goalkeeper),
         popularityPercent: popularity.percent,
         captainPercent: popularity.captainPercent,
       });
@@ -646,6 +659,8 @@ export async function getFantasyDashboard() {
         avatarUrl: player.avatar_url,
         profile: player.player_profile,
         isGoalkeeper: Boolean(player.is_goalkeeper),
+        isGoodGoalkeeper,
+        goalkeeperConcededAverage,
         price,
         totalPoints,
         roundsPlayed,
@@ -1202,7 +1217,7 @@ export async function getFantasyPlayerDetail(playerId: string) {
   ] = await Promise.all([
     account.client
       .from("players")
-      .select("id, name, avatar_url, player_profile, member_category")
+      .select("id, name, avatar_url, player_profile, is_goalkeeper, member_category")
       .eq("id", playerId)
       .maybeSingle(),
     account.client
@@ -1221,7 +1236,7 @@ export async function getFantasyPlayerDetail(playerId: string) {
       .order("created_at", { ascending: true }),
     account.client
       .from("player_round_stats")
-      .select("goals, assists, wins, losses, games")
+      .select("goals, assists, wins, losses, games, goalkeeper_games, goals_conceded")
       .eq("player_id", playerId),
   ]);
 
@@ -1233,15 +1248,17 @@ export async function getFantasyPlayerDetail(playerId: string) {
   const avgPoints = roundsPlayed > 0 ? totalPoints / roundsPlayed : 0;
 
   const stats = (statRows || []).reduce(
-    (acc, row) => {
+    (acc: any, row: any) => {
       acc.goals += Number(row.goals || 0);
       acc.assists += Number(row.assists || 0);
       acc.wins += Number(row.wins || 0);
       acc.losses += Number(row.losses || 0);
       acc.games += Number(row.games || 0);
+      acc.goalkeeperGames += Number(row.goalkeeper_games || 0);
+      acc.goalsConceded += Number(row.goals_conceded || 0);
       return acc;
     },
-    { goals: 0, assists: 0, wins: 0, losses: 0, games: 0 }
+    { goals: 0, assists: 0, wins: 0, losses: 0, games: 0, goalkeeperGames: 0, goalsConceded: 0 }
   );
 
   const history = (historyRows || []).map((h: any) => ({
@@ -1271,6 +1288,9 @@ export async function getFantasyPlayerDetail(playerId: string) {
   const formData = calculateFantasyForm(recentPointsList);
   const costBenefit = calculateCostBenefit(avgPoints, price);
 
+  const gkGames = stats.goalkeeperGames || 0;
+  const gkConceded = stats.goalsConceded || 0;
+
   const { allTags, compactTags } = getFantasyPlayerTags({
     price,
     totalPoints,
@@ -1279,6 +1299,9 @@ export async function getFantasyPlayerDetail(playerId: string) {
     recentVariations,
     goals: stats.goals,
     assists: stats.assists,
+    goalkeeperGames: gkGames,
+    goalsConceded: gkConceded,
+    isGoalkeeper: Boolean(playerRow.is_goalkeeper),
   });
 
   return {
