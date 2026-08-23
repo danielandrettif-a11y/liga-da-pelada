@@ -26,7 +26,6 @@ import { HomeLastRoundSummary } from "@/components/HomeLastRoundSummary";
 import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
 import { getSeasonPassDashboard } from "@/lib/actions/fantasy";
 import { SeasonPassBanner } from "@/components/fantasy/SeasonPassBanner";
-import { InboxCard } from "@/components/InboxCard";
 import { getMyInboxNotifications } from "@/lib/actions/inbox";
 
 export const dynamic = "force-dynamic";
@@ -136,7 +135,7 @@ export default async function HomePage() {
   if (!data) {
     return (
       <div className="space-y-8">
-        <GreetingBanner name={accountName} />
+        <GreetingBanner name={accountName} inbox={inbox} />
         {!account.user && <JoinSelectionButton />}
         {hasIncompleteProfile && <IncompleteProfileBanner />}
         <div className="flex flex-col items-center justify-center p-8 text-center animate-fade-in">
@@ -164,12 +163,10 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
-      <GreetingBanner name={accountName} />
+      <GreetingBanner name={accountName} inbox={inbox} />
 
       {!account.user && <JoinSelectionButton />}
       {hasIncompleteProfile && <IncompleteProfileBanner />}
-
-      <InboxCard notifications={inbox} />
 
       <LiveMatchBanner
         initialMatch={liveMatch as unknown as HomeLiveMatch | null}

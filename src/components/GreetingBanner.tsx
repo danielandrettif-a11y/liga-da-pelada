@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { ShareAppButton } from "./ShareAppButton";
+import { InboxBell } from "./InboxBell";
+import type { InboxNotification } from "@/lib/actions/inbox";
 
 function greetingForHour(hour: number) {
   if (hour >= 5 && hour < 12) return "Bom dia";
@@ -9,7 +11,13 @@ function greetingForHour(hour: number) {
   return "Boa noite";
 }
 
-export function GreetingBanner({ name }: { name: string | null }) {
+export function GreetingBanner({
+  name,
+  inbox = [],
+}: {
+  name: string | null;
+  inbox?: InboxNotification[];
+}) {
   const [greeting, setGreeting] = useState("Olá");
 
   useEffect(() => {
@@ -24,7 +32,10 @@ export function GreetingBanner({ name }: { name: string | null }) {
         </p>
         <p className="mt-0.5 text-sm font-medium text-muted">Vamos jogar?</p>
       </div>
-      <ShareAppButton className="shrink-0 shadow-sm" />
+      <div className="flex items-center gap-2 shrink-0">
+        <InboxBell notifications={inbox} />
+        <ShareAppButton className="shadow-sm" />
+      </div>
     </section>
   );
 }
