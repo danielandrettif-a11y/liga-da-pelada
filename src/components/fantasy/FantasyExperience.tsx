@@ -62,6 +62,10 @@ const FantasyInventoryModal = dynamic(
   () => import("./cards/FantasyInventoryModal").then((mod) => mod.FantasyInventoryModal),
   { ssr: false },
 );
+const FantasyScoringModal = dynamic(
+  () => import("./FantasyScoringModal").then((mod) => mod.FantasyScoringModal),
+  { ssr: false },
+);
 
 function preloadInventoryModal() {
   void import("./cards/FantasyInventoryModal").then((mod) => mod.preloadFantasyInventory());
@@ -148,6 +152,7 @@ export function FantasyExperience({
   const [filterTag, setFilterTag] = useState<string>("ALL");
   const [message, setMessage] = useState("");
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showScoringModal, setShowScoringModal] = useState(false);
   const [showInventoryModal, setShowInventoryModal] = useState(false);
   const [infoModal, setInfoModal] = useState<{ title: string; description: string } | null>(null);
   const [selectedDrawerPlayer, setSelectedDrawerPlayer] = useState<FantasyMarketPlayer | null>(null);
@@ -900,11 +905,13 @@ export function FantasyExperience({
         </button>
         <button
           type="button"
-          onClick={() => setShowTutorial(true)}
-          className="group flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-border bg-surface/80 px-1.5 py-3 text-center transition-colors hover:border-accent/40 hover:bg-surface-hover"
+          onClick={() => setShowScoringModal(true)}
+          className="group flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-accent/30 bg-accent/[.08] px-1.5 py-3 text-center transition-colors hover:border-accent/60 hover:bg-accent/15"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-muted group-hover:bg-accent/10 group-hover:text-accent"><HelpCircle className="h-4.5 w-4.5" /></span>
-          <span className="truncate text-[10px] font-black text-foreground">Como jogar</span>
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-background font-black text-sm shadow-md shadow-accent/25">
+            ⚡
+          </span>
+          <span className="truncate text-[10px] font-black text-accent">Pontuação</span>
         </button>
       </nav>
 
@@ -1054,11 +1061,21 @@ export function FantasyExperience({
                   </button>
                 </div>
               </div>
-              {open && validSelectedCount > 1 && (
-                <p className="text-center text-[10px] font-semibold text-emerald-200/70 animate-fade-in">
-                  🖐️ <strong className="text-accent">Dica:</strong> Toque e arraste os jogadores pelo campo para posicioná-los onde preferir!
-                </p>
-              )}
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => setShowScoringModal(true)}
+                  className="flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/15 px-2.5 py-1 text-[9px] font-black text-accent hover:bg-accent hover:text-background transition-all shadow-xs"
+                >
+                  <span>⚡ Guia de Pontuação & Bônus</span>
+                  <span className="rounded bg-accent/25 px-1 py-0.2 text-[8px] font-black">Ver Tabela</span>
+                </button>
+                {open && validSelectedCount > 1 && (
+                  <p className="text-[9px] font-semibold text-emerald-200/70">
+                    🖐️ Arraste os atletas pelo campo
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* CAMPO DE FUTEBOL REALISTA */}
@@ -1755,8 +1772,9 @@ export function FantasyExperience({
         />
       )}
 
-      {/* MODAL DE TUTORIAL */}
+      {/* MODAL DE TUTORIAL & MODAL DE SISTEMA DE PONTUAÇÃO */}
       {showTutorial && <FantasyTutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} />}
+      {showScoringModal && <FantasyScoringModal isOpen={showScoringModal} onClose={() => setShowScoringModal(false)} />}
 
       {/* MODAL DE ANÚNCIO DA REVOLUÇÃO TÁTICA (RODADA 02) */}
       <FantasyTacticalAnnouncementModal />
