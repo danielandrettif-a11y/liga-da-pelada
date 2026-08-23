@@ -687,6 +687,8 @@ export function FantasyExperience({
           setDragOverSlot(null);
         }}
         onTouchStart={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest("[data-no-drag]")) return;
           if (!open || !player) return;
           const touch = e.touches[0];
           setDraggedSlot(slot);
@@ -740,23 +742,36 @@ export function FantasyExperience({
       >
         {player ? (
           <div className="relative w-full flex flex-col items-center">
-            {/* Botão de Capitão (Direita) */}
+            {/* Botão de Capitão (Direita) - Isolado de eventos de arrasto */}
             <button
               type="button"
+              data-no-drag="true"
               disabled={!open}
               onClick={(e) => {
                 e.stopPropagation();
-                setCaptainId(player.id);
+                setCaptainId((prev) => (prev === player.id ? null : player.id));
               }}
-              className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
+              onTouchStart={(e) => {
+                e.stopPropagation();
+              }}
+              onTouchEnd={(e) => {
+                e.stopPropagation();
+                if (open) {
+                  setCaptainId((prev) => (prev === player.id ? null : player.id));
+                  if (typeof navigator !== "undefined" && navigator.vibrate) {
+                    navigator.vibrate(15);
+                  }
+                }
+              }}
+              className={`absolute -right-1 -top-1.5 z-30 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 touch-manipulation ${
                 captainId === player.id
                   ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
                   : "border-white/20 bg-background text-muted hover:text-white"
               }`}
-              aria-label={`Escolher ${player.name} como capitão`}
-              title="Tornar Capitão (Pontos 2x)"
+              aria-label={captainId === player.id ? `Remover capitão de ${player.name}` : `Escolher ${player.name} como capitão`}
+              title={captainId === player.id ? "Remover Capitão" : "Tornar Capitão (Pontos 1.5x)"}
             >
-              <Crown className="h-4 w-4" />
+              <Crown className="h-4 w-4 pointer-events-none" />
             </button>
 
             <button
