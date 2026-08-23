@@ -208,6 +208,10 @@ export function FantasyExperience({
   // Filtro de posição inicial / ativo no mercado (GOL, DEF, MEI, ATA ou ALL)
   const [positionFilter, setPositionFilter] = useState<"ALL" | "GOL" | "DEF" | "MEI" | "ATA">("ALL");
 
+  // Drag and drop / reposicionamento de atletas no campo
+  const [draggedSlot, setDraggedSlot] = useState<number | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
+
   // Filtros e ordenação no mercado
   const filtered = useMemo(() => {
     return [...market]
@@ -465,73 +469,161 @@ export function FantasyExperience({
     });
   }
 
+  function swapSlots(sourceIndex: number, targetIndex: number) {
+    if (sourceIndex === targetIndex || isNaN(sourceIndex) || isNaN(targetIndex) || !open) return;
+    setSelected((prev) => {
+      const next = [...prev];
+      while (next.length <= Math.max(sourceIndex, targetIndex)) {
+        next.push("");
+      }
+      const temp = next[sourceIndex];
+      next[sourceIndex] = next[targetIndex];
+      next[targetIndex] = temp;
+      return next.filter(Boolean);
+    });
+  }
+
   function renderSlot(
     slot: number,
     roleLabel: string,
     targetPos: "ALL" | "GOL" | "DEF" | "MEI" | "ATA" = "ALL"
   ) {
     const player = selectedPlayers[slot];
-    return player ? (
-      <div key={player.id} className="relative mx-auto flex w-full max-w-32 flex-col items-center">
-        <button
-          type="button"
-          disabled={!open}
-          onClick={() => setCaptainId(player.id)}
-          className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
-            captainId === player.id
-              ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
-              : "border-white/20 bg-background text-muted hover:text-white"
-          }`}
-          aria-label={`Escolher ${player.name} como capitão`}
-          title="Tornar Capitão (Pontos 2x)"
-        >
-          <Crown className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setSelectedDrawerPlayer(player)}
-          className="flex flex-col items-center group"
-        >
-          <PlayerAvatar
-            name={player.name}
-            avatarUrl={player.avatarUrl}
-            clickable={false}
-            className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
-              captainId === player.id
-                ? "border-accent ring-2 ring-accent/50"
-                : "border-emerald-300"
-            }`}
-          />
-          <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
-            {player.name}
-          </span>
-          <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
-            {status === "in_progress"
-              ? `${(
-                  player.roundPoints *
-                  (captainId === player.id ? settings.captainMultiplier : 1)
-                ).toFixed(1)} pts`
-              : `${player.roundPoints.toFixed(1)} pts`}
-          </span>
-          <span className="text-[8px] font-bold text-white/70">
-            {formatFantasyMoney(player.price, settings.currencyName)}
-          </span>
-        </button>
-      </div>
-    ) : (
-      <button
+    const isBeingDragged = draggedSlot === slot;
+    const isDragOver = dragOverSlot === slot;
+
+    return (
+      <div
         key={slot}
-        type="button"
-        onClick={() => {
-          setPositionFilter(targetPos);
-          setFilterTag("ALL");
-          setActiveTab("market");
+        data-slot-index={slot}
+        draggable={open && Boolean(player)}
+        onDragStart={(e) => {
+          if (!open || !player) return;
+          e.dataTransfer.setData("text/plain", String(slot));
+          e.dataTransfer.effectAllowed = "move";
+          setDraggedSlot(slot);
         }}
-        className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/40 bg-black/25 text-center shadow-inner transition hover:border-accent hover:bg-black/40 active:scale-95 group"
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          if (dragOverSlot !== slot) {
+            setDragOverSlot(slot);
+          }
+        }}
+        onDragLeave={() => {
+          if (dragOverSlot === slot) {
+            setDragOverSlot(null);
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          const source = Number(e.dataTransfer.getData("text/plain"));
+          if (!isNaN(source)) {
+            swapSlots(source, slot);
+          }
+          setDraggedSlot(null);
+          setDragOverSlot(null);
+        }}
+        onDragEnd={() => {
+          setDraggedSlot(null);
+          setDragOverSlot(null);
+        }}
+        onTouchStart={() => {
+          if (open && player) {
+            setDraggedSlot(slot);
+          }
+        }}
+        onTouchMove={(e) => {
+          if (draggedSlot === null) return;
+          const touch = e.touches[0];
+          const element = document.elementFromPoint(touch.clientX, touch.clientY);
+          const slotEl = element?.closest("[data-slot-index]");
+          if (slotEl) {
+            const overIndex = Number(slotEl.getAttribute("data-slot-index"));
+            if (!isNaN(overIndex) && dragOverSlot !== overIndex) {
+              setDragOverSlot(overIndex);
+            }
+          }
+        }}
+        onTouchEnd={() => {
+          if (draggedSlot !== null && dragOverSlot !== null && draggedSlot !== dragOverSlot) {
+            swapSlots(draggedSlot, dragOverSlot);
+          }
+          setDraggedSlot(null);
+          setDragOverSlot(null);
+        }}
+        className={`relative mx-auto flex w-full max-w-32 flex-col items-center transition-all duration-200 select-none ${
+          open && Boolean(player) ? "cursor-grab active:cursor-grabbing" : ""
+        } ${
+          isBeingDragged
+            ? "opacity-35 scale-90 rotate-2"
+            : isDragOver
+            ? "scale-105 ring-4 ring-accent bg-accent/20 rounded-2xl shadow-[0_0_25px_rgba(204,255,0,0.6)]"
+            : ""
+        }`}
       >
-        <span className="text-[10px] font-bold text-accent group-hover:scale-105 transition-transform">+ Vaga {slot + 1}</span>
-        <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">{roleLabel}</span>
-      </button>
+        {player ? (
+          <div className="relative w-full flex flex-col items-center">
+            <button
+              type="button"
+              disabled={!open}
+              onClick={() => setCaptainId(player.id)}
+              className={`absolute -right-1 -top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 ${
+                captainId === player.id
+                  ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
+                  : "border-white/20 bg-background text-muted hover:text-white"
+              }`}
+              aria-label={`Escolher ${player.name} como capitão`}
+              title="Tornar Capitão (Pontos 2x)"
+            >
+              <Crown className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDrawerPlayer(player)}
+              className="flex flex-col items-center group"
+            >
+              <PlayerAvatar
+                name={player.name}
+                avatarUrl={player.avatarUrl}
+                clickable={false}
+                className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-transform group-active:scale-95 ${
+                  captainId === player.id
+                    ? "border-accent ring-2 ring-accent/50"
+                    : "border-emerald-300"
+                }`}
+              />
+              <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
+                {player.name}
+              </span>
+              <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
+                {status === "in_progress"
+                  ? `${(
+                      player.roundPoints *
+                      (captainId === player.id ? settings.captainMultiplier : 1)
+                    ).toFixed(1)} pts`
+                  : `${player.roundPoints.toFixed(1)} pts`}
+              </span>
+              <span className="text-[8px] font-bold text-white/70">
+                {formatFantasyMoney(player.price, settings.currencyName)}
+              </span>
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setPositionFilter(targetPos);
+              setFilterTag("ALL");
+              setActiveTab("market");
+            }}
+            className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/40 bg-black/25 text-center shadow-inner transition hover:border-accent hover:bg-black/40 active:scale-95 group"
+          >
+            <span className="text-[10px] font-bold text-accent group-hover:scale-105 transition-transform">+ Vaga {slot + 1}</span>
+            <span className="text-[8px] text-emerald-200/60 font-semibold uppercase">{roleLabel}</span>
+          </button>
+        )}
+      </div>
     );
   }
 
@@ -846,39 +938,46 @@ export function FantasyExperience({
             )}
 
             {/* SELETOR DE ESQUEMA TÁTICO */}
-            <div className="flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-black/40 px-3.5 py-2 shadow-inner">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="text-[9px] font-black uppercase tracking-wider text-muted truncate">
-                  Esquema Tático:
-                </span>
-                <span className="font-athletic text-xs font-black uppercase italic text-accent shrink-0">
-                  {formation}
-                </span>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-black/40 px-3.5 py-2 shadow-inner">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-muted truncate">
+                    Esquema Tático:
+                  </span>
+                  <span className="font-athletic text-xs font-black uppercase italic text-accent shrink-0">
+                    {formation}
+                  </span>
+                </div>
+                <div className="flex rounded-xl bg-black/60 p-0.5 border border-white/10 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setFormation("2-1-2")}
+                    className={`rounded-lg px-2.5 py-1 font-athletic text-[10px] font-black uppercase transition-all ${
+                      formation === "2-1-2"
+                        ? "bg-accent text-background shadow-sm"
+                        : "text-muted hover:text-white"
+                    }`}
+                  >
+                    2-1-2 ({playersPerTeam === 6 ? "2 ATA" : "1 ATA"})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormation("2-2-1")}
+                    className={`rounded-lg px-2.5 py-1 font-athletic text-[10px] font-black uppercase transition-all ${
+                      formation === "2-2-1"
+                        ? "bg-accent text-background shadow-sm"
+                        : "text-muted hover:text-white"
+                    }`}
+                  >
+                    2-2-1 ({playersPerTeam === 6 ? "2 MEI" : "2 ATA"})
+                  </button>
+                </div>
               </div>
-              <div className="flex rounded-xl bg-black/60 p-0.5 border border-white/10 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setFormation("2-1-2")}
-                  className={`rounded-lg px-2.5 py-1 font-athletic text-[10px] font-black uppercase transition-all ${
-                    formation === "2-1-2"
-                      ? "bg-accent text-background shadow-sm"
-                      : "text-muted hover:text-white"
-                  }`}
-                >
-                  2-1-2 ({playersPerTeam === 6 ? "2 ATA" : "1 ATA"})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormation("2-2-1")}
-                  className={`rounded-lg px-2.5 py-1 font-athletic text-[10px] font-black uppercase transition-all ${
-                    formation === "2-2-1"
-                      ? "bg-accent text-background shadow-sm"
-                      : "text-muted hover:text-white"
-                  }`}
-                >
-                  2-2-1 ({playersPerTeam === 6 ? "2 MEI" : "2 ATA"})
-                </button>
-              </div>
+              {open && selected.length > 1 && (
+                <p className="text-center text-[10px] font-semibold text-emerald-200/60 animate-fade-in">
+                  🖐️ <strong className="text-accent">Dica:</strong> Toque e arraste os jogadores para posicioná-los onde preferir no campo!
+                </p>
+              )}
             </div>
 
             {/* CAMPO DE FUTEBOL REALISTA */}
