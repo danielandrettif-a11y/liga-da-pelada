@@ -51,10 +51,10 @@ export function FantasyTutorialModal({
     },
     {
       icon: <Sparkles className="h-8 w-8 text-accent" />,
-      tag: "Passo 3 de 5 · Novidade V.2",
+      tag: "Passo 3 de 5 · Bônus de Posição",
       title: "Esquemas & Bônus de Posição",
       description:
-        "Alterne entre esquemas táticos (2-1-2 ou 2-2-1). Escale os atletas na posição certa (DEF, MEI/ALA, ATA e GOL) para ativar super bônus de Clean Sheet (+2.0/1.0), assistência turbinada (+4.5) e artilharia (+6.0)!",
+        "Escale cada atleta na sua função correta para ativar o selo ⚡ BÔNUS:\n\n• 🛡️ DEF: Clean Sheet Regressivo (+4 pts se 0 gol / +2 pts se 1 gol).\n• 🪄 MEI: Assistências a 4.0 pts (+3 pts extras se der 2+ assistências na rodada).\n• 🎯 ATA: Gols a 5.0 pts (+3 pts extras se fizer 2+ gols na rodada).\n• 🧤 GOL: +3 pts por jogo agarrado no rodízio + 4 pts sem sofrer gol + Imunidade a derrotas!",
     },
     {
       icon: <Target className="h-8 w-8 text-warning" />,

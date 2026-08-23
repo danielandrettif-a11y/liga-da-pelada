@@ -67,10 +67,10 @@ export function FantasyTacticalAnnouncementModal() {
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-black text-blue-300">Zaga & Proteção (DEF)</span>
-                <span className="font-black text-accent text-[10px]">+2,0 / +1,0 pts</span>
+                <span className="font-black text-accent text-[10px]">+4,0 / +2,0 pts</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Zagueiros ganham <strong>+2,0 pts</strong> por jogo sem levar gol e <strong>+1,0 pt</strong> se levar só 1 gol. Zaga consistente agora valoriza!
+                <strong>Clean Sheet Regressivo:</strong> Ganha <strong>+4,0 pts</strong> se a zaga não tomar gol e <strong>+2,0 pts</strong> se tomar só 1 gol. Zaga consistente garante pontuação alta!
               </p>
             </div>
           </div>
@@ -82,11 +82,11 @@ export function FantasyTacticalAnnouncementModal() {
             </div>
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-black text-warning">Armação (MEI/ALA)</span>
-                <span className="font-black text-accent text-[10px]">+4,5 pts / assist</span>
+                <span className="font-black text-warning">Armação & Passes (MEI/ALA)</span>
+                <span className="font-black text-accent text-[10px]">+4,0 pts / assist + bônus</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Garçons valorizados! Meias e alas recebem pontuação turbinada para cada assistência que derem na linha.
+                Assistência valorizada a <strong>+4,0 pts</strong> e ganha <strong>+3,0 pts extras</strong> de Maestro da Rodada se der 2 ou mais assistências!
               </p>
             </div>
           </div>
@@ -98,27 +98,27 @@ export function FantasyTacticalAnnouncementModal() {
             </div>
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-black text-danger">Artilharia (ATA)</span>
-                <span className="font-black text-accent text-[10px]">+6,0 pts / gol</span>
+                <span className="font-black text-danger">Finalização (ATA)</span>
+                <span className="font-black text-accent text-[10px]">5,0 pts / gol + bônus</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Matadores no ataque! Gols de atacantes escalados na frente valem bônus extra de artilharia.
+                Gol vale <strong>5,0 pts</strong> e ganha <strong>+3,0 pts extras</strong> de Artilheiro se fizer 2 ou mais gols na rodada!
               </p>
             </div>
           </div>
 
-          {/* 4. Goleiros */}
+          {/* 4. Goleiros no Rodízio */}
           <div className="flex items-start gap-3 rounded-2xl border border-accent/20 bg-accent/10 p-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/20 text-accent">
               <Users className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-black text-accent">Paredão na Trave (GOL)</span>
-                <span className="font-black text-accent text-[10px]">+3,0 pres / +2,0 SG</span>
+                <span className="font-black text-accent">Paredão no Rodízio (GOL)</span>
+                <span className="font-black text-accent text-[10px]">+3,0 pres / +4,0 SG</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Presença garantida (+3 pts) e bônus para quem fechar o gol no rodízio. Escale quem você sabe que garante debaixo das traves!
+                Qualquer atleta na vaga de GOL ganha <strong>+3,0 pts</strong> por partida agarrada, <strong>+4,0 pts</strong> sem sofrer gol e <strong>imunidade total de derrota</strong> na trave!
               </p>
             </div>
           </div>
