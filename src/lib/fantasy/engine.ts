@@ -481,7 +481,7 @@ export function getFantasyPlayerTags(params: {
     const avgGk = (goalsConceded / goalkeeperGames).toFixed(1);
     tags.push({
       type: "GOOD_GOALKEEPER",
-      label: `Bom no Gol (${avgGk}/j)`,
+      label: `Bom no Gol (${avgGk}/jogo)`,
       icon: "🧤",
       variant: "accent",
       priority: 4,
