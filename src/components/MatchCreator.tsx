@@ -24,6 +24,7 @@ export function MatchCreator({ round }: { round: any }) {
     (round?.teams || []).map((team: any) => [team.id, team.captain_player_id || ""]),
   ));
   const [goalkeeperByTeam, setGoalkeeperByTeam] = useState<Record<string, string>>({});
+  const [goalkeeperModeByTeam, setGoalkeeperModeByTeam] = useState<Record<string, "bq" | "manual">>({});
 
   const teams = useMemo(() => round?.teams || [], [round?.teams]);
   const playerTeamById = useMemo(() => new Map(
@@ -59,21 +60,90 @@ export function MatchCreator({ round }: { round: any }) {
   const eligibleGoalkeepersByTeam = useMemo(() => Object.fromEntries(teams.map((team: any) => {
     const players = (team.team_players || [])
       .filter((entry: any) => availability.get(entry.player_id) !== "injured" && (!usesAttendance || attendance.get(entry.player_id) === "present"))
-      .map((entry: any) => ({ id: entry.player_id, name: entry.players?.name || "Jogador", isGoalkeeper: Boolean(entry.players?.is_goalkeeper) }));
+      .map((entry: any) => ({
+        id: entry.player_id,
+        name: entry.players?.name || "Jogador",
+        isGoalkeeper: Boolean(entry.players?.is_goalkeeper),
+        goalkeeperOrder: Number(entry.goalkeeper_order || Number.MAX_SAFE_INTEGER),
+      }));
     for (const [absentId, replacementId] of Object.entries(replacementByAbsent)) {
       const absentTeamId = playerTeamById.get(absentId);
       if (absentTeamId !== team.id || !replacementId) continue;
       const replacement = waitingPlayers.find((entry: any) => entry.playerId === replacementId);
       if (replacement && !players.some((player: any) => player.id === replacementId)) {
-        players.push({ id: replacementId, name: replacement.player.name, isGoalkeeper: Boolean(replacement.player.is_goalkeeper) });
+        players.push({
+          id: replacementId,
+          name: replacement.player.name,
+          isGoalkeeper: Boolean(replacement.player.is_goalkeeper),
+          goalkeeperOrder: Number.MAX_SAFE_INTEGER,
+        });
       }
     }
     return [team.id, players];
   })), [teams, availability, attendance, usesAttendance, replacementByAbsent, playerTeamById, waitingPlayers]);
 
+  const bqGoalkeeperSuggestionByTeam = useMemo(() => Object.fromEntries(teams.map((team: any) => {
+    const rotation = [...(team.team_players || [])]
+      .map((entry: any) => ({
+        id: entry.player_id,
+        order: Number(entry.goalkeeper_order || Number.MAX_SAFE_INTEGER),
+      }))
+      .sort((a, b) => a.order - b.order);
+    const eligible = [...(eligibleGoalkeepersByTeam[team.id] || [])]
+      .sort((a: any, b: any) => a.goalkeeperOrder - b.goalkeeperOrder || a.name.localeCompare(b.name, "pt-BR"));
+    if (!rotation.length || !eligible.length) return [team.id, null] as const;
+
+    const lastMatchWithGoalkeeper = [...(round?.matches || [])]
+      .filter((item: any) => item.team_a_id === team.id || item.team_b_id === team.id)
+      .sort((a: any, b: any) =>
+        new Date(b.started_at || b.created_at || 0).getTime() - new Date(a.started_at || a.created_at || 0).getTime(),
+      )
+      .find((item: any) => (item.match_goalkeepers || []).some((goalkeeper: any) => goalkeeper.team_id === team.id));
+    const lastGoalkeeper = lastMatchWithGoalkeeper?.match_goalkeepers?.find((goalkeeper: any) => goalkeeper.team_id === team.id);
+    const lastIndex = lastGoalkeeper
+      ? rotation.findIndex((entry: any) => entry.id === lastGoalkeeper.player_id)
+      : -1;
+
+    for (let offset = 1; offset <= rotation.length; offset += 1) {
+      const candidate = rotation[(Math.max(lastIndex, -1) + offset) % rotation.length];
+      const availableCandidate = eligible.find((player: any) => player.id === candidate.id);
+      if (availableCandidate) return [team.id, { ...availableCandidate, order: candidate.order }] as const;
+    }
+
+    return [team.id, null] as const;
+  })), [teams, eligibleGoalkeepersByTeam, round?.matches]);
+
   useEffect(() => {
     setReplacementByAbsent({});
   }, [teamAId, teamBId]);
+
+  useEffect(() => {
+    setGoalkeeperByTeam((current) => {
+      const next: Record<string, string> = {};
+      let changed = false;
+      for (const teamId of selectedTeamIds) {
+        const suggested = bqGoalkeeperSuggestionByTeam[teamId];
+        const eligible = eligibleGoalkeepersByTeam[teamId] || [];
+        const currentPlayerId = current[teamId];
+        const currentMode = goalkeeperModeByTeam[teamId];
+        const keepsManualChoice = currentMode === "manual" && eligible.some((player: any) => player.id === currentPlayerId);
+        const nextPlayerId = keepsManualChoice ? currentPlayerId : suggested?.id || currentPlayerId || "";
+        next[teamId] = nextPlayerId;
+        if (nextPlayerId !== currentPlayerId) changed = true;
+      }
+      return changed ? next : current;
+    });
+    setGoalkeeperModeByTeam((current) => {
+      const next: Record<string, "bq" | "manual"> = {};
+      let changed = false;
+      for (const teamId of selectedTeamIds) {
+        const nextMode = current[teamId] || "bq";
+        next[teamId] = nextMode;
+        if (nextMode !== current[teamId]) changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [selectedTeamIds, bqGoalkeeperSuggestionByTeam, eligibleGoalkeepersByTeam, goalkeeperModeByTeam]);
 
   useEffect(() => {
     setCaptainByTeam(Object.fromEntries(
@@ -475,15 +545,35 @@ export function MatchCreator({ round }: { round: any }) {
                   {team.name}
                 </span>
                 <select
-                  value={goalkeeperByTeam[team.id] || ""}
-                  onChange={(event) => setGoalkeeperByTeam((current) => ({ ...current, [team.id]: event.target.value }))}
+                  value={goalkeeperModeByTeam[team.id] === "bq" && bqGoalkeeperSuggestionByTeam[team.id]
+                    ? "__bq_rotation__"
+                    : goalkeeperByTeam[team.id] || ""}
+                  onChange={(event) => {
+                    const useBqRotation = event.target.value === "__bq_rotation__";
+                    const suggested = bqGoalkeeperSuggestionByTeam[team.id];
+                    setGoalkeeperByTeam((current) => ({
+                      ...current,
+                      [team.id]: useBqRotation ? suggested?.id || "" : event.target.value,
+                    }));
+                    setGoalkeeperModeByTeam((current) => ({ ...current, [team.id]: useBqRotation ? "bq" : "manual" }));
+                  }}
                   className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-semibold text-foreground outline-none focus:border-accent"
                 >
-                  <option value="">Quem começa no gol?</option>
+                  {bqGoalkeeperSuggestionByTeam[team.id] && (
+                    <option value="__bq_rotation__">
+                      Seguir ordem BQ · {bqGoalkeeperSuggestionByTeam[team.id].name} · fila {bqGoalkeeperSuggestionByTeam[team.id].order}
+                    </option>
+                  )}
+                  {!bqGoalkeeperSuggestionByTeam[team.id] && <option value="">Quem começa no gol?</option>}
                   {(eligibleGoalkeepersByTeam[team.id] || [])
-                    .sort((a: any, b: any) => Number(b.isGoalkeeper) - Number(a.isGoalkeeper) || a.name.localeCompare(b.name, "pt-BR"))
-                    .map((player: any) => <option key={player.id} value={player.id}>{player.name}{player.isGoalkeeper ? " · GOL" : ""}</option>)}
+                    .sort((a: any, b: any) => a.goalkeeperOrder - b.goalkeeperOrder || Number(b.isGoalkeeper) - Number(a.isGoalkeeper) || a.name.localeCompare(b.name, "pt-BR"))
+                    .map((player: any) => <option key={player.id} value={player.id}>{player.name}{player.isGoalkeeper ? " · GOL" : ""}{Number.isFinite(player.goalkeeperOrder) ? ` · fila ${player.goalkeeperOrder}` : ""}</option>)}
                 </select>
+                {bqGoalkeeperSuggestionByTeam[team.id] && (
+                  <span className="mt-1.5 block text-[9px] font-semibold leading-relaxed text-muted">
+                    A sugestão usa o próximo da fila após o último goleiro deste time. Você pode escolher outro nome na lista.
+                  </span>
+                )}
               </label>
             ))}
           </div>

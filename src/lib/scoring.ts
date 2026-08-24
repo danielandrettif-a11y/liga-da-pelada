@@ -11,6 +11,7 @@ export const DEFAULT_SCORING_POINTS: ScoringPoints = {
   best_goalkeeper: 6,
   goalkeeper_appearance: 3,
   goal_conceded: -1,
+  own_goal: -2,
 };
 
 export const SCORING_RULE_FIELDS: Array<{
@@ -57,5 +58,10 @@ export const SCORING_RULE_FIELDS: Array<{
     eventType: "goal_conceded",
     label: "Gol sofrido",
     description: "Valor aplicado ao goleiro por cada gol sofrido; normalmente é negativo.",
+  },
+  {
+    eventType: "own_goal",
+    label: "Gol contra",
+    description: "Desconto aplicado ao jogador que fizer gol contra.",
   },
 ];

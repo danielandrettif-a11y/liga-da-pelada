@@ -10,6 +10,7 @@ import {
   updateMatchTimer,
   resetMatchTimer,
   addMatchExtraTime,
+  notifyMatchTimerThreshold,
   undoLastMatchSubstitution,
 } from "@/lib/actions/matches";
 import {
@@ -49,6 +50,7 @@ type MatchTimerProps = {
   onToggle: () => void;
   onReset: () => void;
   onAddExtraTime: (seconds: number) => void;
+  onThreshold: (threshold: "thirty_seconds" | "finished") => void;
 };
 
 const MatchTimer = memo(function MatchTimer({
@@ -59,11 +61,13 @@ const MatchTimer = memo(function MatchTimer({
   onToggle,
   onReset,
   onAddExtraTime,
+  onThreshold,
 }: MatchTimerProps) {
   const [secondsLeft, setSecondsLeft] = useState(() =>
     Math.max(0, initialSeconds - getMatchTimerElapsedSeconds(timerState))
   );
   const isRunning = !!timerState.startedAt;
+  const notifiedThresholds = useRef({ thirtySeconds: false, finished: false });
 
   useEffect(() => {
     const updateTimer = () => {
@@ -78,6 +82,25 @@ const MatchTimer = memo(function MatchTimer({
     }
   }, [timerState, initialSeconds]);
 
+  useEffect(() => {
+    if (secondsLeft > 30) {
+      notifiedThresholds.current = { thirtySeconds: false, finished: false };
+      return;
+    }
+    if (!isRunning) return;
+
+    if (secondsLeft > 0 && !notifiedThresholds.current.thirtySeconds) {
+      notifiedThresholds.current.thirtySeconds = true;
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.([80, 60, 80]);
+      onThreshold("thirty_seconds");
+    }
+    if (secondsLeft === 0 && !notifiedThresholds.current.finished) {
+      notifiedThresholds.current.finished = true;
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.([180, 90, 180, 90, 260]);
+      onThreshold("finished");
+    }
+  }, [isRunning, onThreshold, secondsLeft]);
+
   const formatTime = (totalSeconds: number) => {
     const m = Math.floor(totalSeconds / 60);
     const s = totalSeconds % 60;
@@ -90,6 +113,12 @@ const MatchTimer = memo(function MatchTimer({
         <div className="mb-1 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.22em] text-danger animate-pulse">
           <span className="h-1.5 w-1.5 rounded-full bg-danger shadow-[0_0_8px_var(--danger)]" />
           Último minuto
+        </div>
+      )}
+      {secondsLeft === 0 && (
+        <div className="mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-danger animate-pulse">
+          <span className="h-1.5 w-1.5 rounded-full bg-danger shadow-[0_0_8px_var(--danger)]" />
+          Fim de jogo!!
         </div>
       )}
       <div className="text-4xl font-black font-mono tracking-wider text-foreground">
@@ -399,12 +428,19 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
     setTimerSaving(false);
   }, [canManage, timerSaving, match.id]);
 
+  const notifyTimerThreshold = useCallback((threshold: "thirty_seconds" | "finished") => {
+    void notifyMatchTimerThreshold(match.id, threshold).then((result) => {
+      if (!result.success) setError(result.error || "Não foi possível enviar o aviso do cronômetro.");
+    });
+  }, [match.id]);
+
   // Modal de Gol
   const [goalModal, setGoalModal] = useState<{
     open: boolean;
     teamId: string;
     scorerId: string | null;
-  }>({ open: false, teamId: "", scorerId: null });
+    isOwnGoal: boolean;
+  }>({ open: false, teamId: "", scorerId: null, isOwnGoal: false });
   useDialogViewport(goalModal.open);
 
   // Jogadores ativos para o modal
@@ -417,6 +453,12 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
   const otherPlayers = useMemo(() => {
     return activePlayers.filter((entry: any) => entry.player_id !== goalModal.scorerId);
   }, [activePlayers, goalModal.scorerId]);
+
+  const opposingActivePlayers = useMemo(() => {
+    return (match.match_players || []).filter(
+      (entry: any) => entry.team_id !== goalModal.teamId && entry.is_active,
+    );
+  }, [match.match_players, goalModal.teamId]);
 
   // Timeline unificada e ordenada
   const timelineItems = useMemo(() => {
@@ -442,11 +484,14 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
   }
 
   // Registro de gol (Optimistic UI com proteção double-tap e RPC transacional)
-  async function handleRegisterGoal(assistPlayerId: string | null = null) {
-    if (!canManage || submittingGoalRef.current || !goalModal.scorerId) return;
+  async function handleRegisterGoal(
+    assistPlayerId: string | null = null,
+    requestOverride?: typeof goalModal,
+  ) {
+    const request = requestOverride || { ...goalModal };
+    if (!canManage || submittingGoalRef.current || !request.scorerId) return;
     submittingGoalRef.current = true;
 
-    const request = { ...goalModal };
     const previousScore = displayScore;
     const previousEvents = events;
     const isTeamA = match.team_a_id === request.teamId;
@@ -459,7 +504,8 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
     const minute = Math.floor(getOfficialElapsedSeconds(elapsedSecs, eligibilityOffset) / 60);
 
     // Dados do jogador para UI instantânea
-    const scorerEntry = activePlayers.find((p: any) => p.player_id === request.scorerId);
+    const scorerPool = request.isOwnGoal ? opposingActivePlayers : activePlayers;
+    const scorerEntry = scorerPool.find((p: any) => p.player_id === request.scorerId);
     const assistEntry = assistPlayerId ? activePlayers.find((p: any) => p.player_id === assistPlayerId) : null;
 
     const optimisticEvent = {
@@ -469,6 +515,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       assist_player_id: assistPlayerId || null,
       team_id: request.teamId,
       event_type: "goal",
+      is_own_goal: request.isOwnGoal,
       minute,
       created_at: new Date().toISOString(),
       player: scorerEntry?.player || { name: "Jogador" },
@@ -481,7 +528,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       isTeamA ? { ...current, a: current.a + 1 } : { ...current, b: current.b + 1 }
     );
     setEvents((prev) => [optimisticEvent, ...prev]);
-    setGoalModal({ open: false, teamId: "", scorerId: null });
+    setGoalModal({ open: false, teamId: "", scorerId: null, isOwnGoal: false });
     setError("");
     setLoading(true);
 
@@ -494,6 +541,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
         team_id: request.teamId,
         minute,
         idempotency_key: idempotencyKey,
+        is_own_goal: request.isOwnGoal,
       });
 
       if (!res.success) {
@@ -513,6 +561,10 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       setLoading(false);
       submittingGoalRef.current = false;
     }
+  }
+
+  async function handleRegisterOwnGoal(playerId: string) {
+    await handleRegisterGoal(null, { ...goalModal, scorerId: playerId, isOwnGoal: true });
   }
 
   // Remoção de gol (Optimistic UI com RPC transacional)
@@ -613,6 +665,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
             onToggle={toggleTimer}
             onReset={resetTimer}
             onAddExtraTime={addExtraTime}
+            onThreshold={notifyTimerThreshold}
           />
         )}
 
@@ -632,7 +685,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
 
             {!isFinished && canManage && (
               <button
-                onClick={() => setGoalModal({ open: true, teamId: match.team_a_id, scorerId: null })}
+                onClick={() => setGoalModal({ open: true, teamId: match.team_a_id, scorerId: null, isOwnGoal: false })}
                 disabled={loading}
                 className="mt-2 w-12 h-12 rounded-full bg-surface hover:bg-surface-hover flex items-center justify-center text-foreground border border-border transition-transform active:scale-95 disabled:opacity-50"
                 aria-label={`Registrar gol para ${match.team_a.name}`}
@@ -659,7 +712,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
 
             {!isFinished && canManage && (
               <button
-                onClick={() => setGoalModal({ open: true, teamId: match.team_b_id, scorerId: null })}
+                onClick={() => setGoalModal({ open: true, teamId: match.team_b_id, scorerId: null, isOwnGoal: false })}
                 disabled={loading}
                 className="mt-2 w-12 h-12 rounded-full bg-surface hover:bg-surface-hover flex items-center justify-center text-foreground border border-border transition-transform active:scale-95 disabled:opacity-50"
                 aria-label={`Registrar gol para ${match.team_b.name}`}
@@ -747,6 +800,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                     <Football className="h-6 w-6 text-accent" strokeWidth={1.8} />
                     <div className="flex-1">
                       <p className="text-sm font-bold text-foreground">
+                        {ev.is_own_goal && <span className="mr-1.5 text-danger">Gol contra ·</span>}
                         {ev.player?.name}
                         {ev.minute !== null && ev.minute !== undefined && (
                           <span className="ml-1.5 text-[10px] font-normal text-muted">
@@ -812,10 +866,10 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
           <div className="glass-card flex max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-full max-w-sm flex-col overflow-hidden animate-fade-in-up sm:max-h-[85dvh]">
             <div className="flex shrink-0 items-center justify-between border-b border-border bg-surface p-4">
               <h3 className="font-bold text-foreground">
-                {goalModal.scorerId ? "Quem deu o passe?" : "Quem fez o gol?"}
+                {goalModal.isOwnGoal ? "Quem fez o gol contra?" : goalModal.scorerId ? "Quem deu o passe?" : "Quem fez o gol?"}
               </h3>
               <button
-                onClick={() => setGoalModal({ open: false, teamId: "", scorerId: null })}
+                onClick={() => setGoalModal({ open: false, teamId: "", scorerId: null, isOwnGoal: false })}
                 className="text-muted hover:text-foreground"
                 aria-label="Fechar modal"
               >
@@ -824,23 +878,53 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
             </div>
 
             <div className="no-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4 pb-6">
-              {!goalModal.scorerId ? (
+              {goalModal.isOwnGoal ? (
+                <>
+                  <p className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs font-semibold leading-relaxed text-danger">
+                    Escolha o jogador do outro time que marcou contra. O gol entra no placar do time selecionado e o autor recebe o desconto configurado.
+                  </p>
+                  {opposingActivePlayers.map((tp: any) => (
+                    <button
+                      key={tp.player_id}
+                      onClick={() => handleRegisterOwnGoal(tp.player_id)}
+                      disabled={loading}
+                      className="flex w-full items-center gap-3 rounded-xl border border-danger/30 bg-surface p-3 text-left transition-colors hover:bg-danger/10 disabled:opacity-50"
+                    >
+                      <PlayerAvatar
+                        name={tp.player?.name || "Jogador"}
+                        avatarUrl={tp.player?.avatar_url}
+                        className="h-10 w-10 shrink-0 rounded-full bg-background text-xs font-bold"
+                      />
+                      <span className="flex-1 font-bold text-foreground">{tp.player?.name}</span>
+                      <Football className="h-5 w-5 text-danger" strokeWidth={1.8} />
+                    </button>
+                  ))}
+                </>
+              ) : !goalModal.scorerId ? (
                 // SELECIONAR ARTILHEIRO
-                activePlayers.map((tp: any) => (
+                <>
                   <button
-                    key={tp.player_id}
-                    onClick={() => setGoalModal((p) => ({ ...p, scorerId: tp.player_id }))}
-                    className="w-full flex items-center gap-3 p-3 bg-surface hover:bg-surface-hover border border-border rounded-xl transition-colors text-left"
+                    onClick={() => setGoalModal((current) => ({ ...current, isOwnGoal: true }))}
+                    className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-black text-danger transition-colors hover:bg-danger hover:text-background"
                   >
-                    <PlayerAvatar
-                      name={tp.player?.name || "Jogador"}
-                      avatarUrl={tp.player?.avatar_url}
-                      className="w-10 h-10 rounded-full bg-background text-xs font-bold flex-shrink-0"
-                    />
-                    <span className="font-bold text-foreground flex-1">{tp.player?.name}</span>
-                    <Football className="h-5 w-5 text-accent" strokeWidth={1.8} />
+                    <Football className="h-5 w-5" /> Gol contra
                   </button>
-                ))
+                  {activePlayers.map((tp: any) => (
+                    <button
+                      key={tp.player_id}
+                      onClick={() => setGoalModal((p) => ({ ...p, scorerId: tp.player_id }))}
+                      className="w-full flex items-center gap-3 p-3 bg-surface hover:bg-surface-hover border border-border rounded-xl transition-colors text-left"
+                    >
+                      <PlayerAvatar
+                        name={tp.player?.name || "Jogador"}
+                        avatarUrl={tp.player?.avatar_url}
+                        className="w-10 h-10 rounded-full bg-background text-xs font-bold flex-shrink-0"
+                      />
+                      <span className="font-bold text-foreground flex-1">{tp.player?.name}</span>
+                      <Football className="h-5 w-5 text-accent" strokeWidth={1.8} />
+                    </button>
+                  ))}
+                </>
               ) : (
                 // SELECIONAR ASSISTÊNCIA
                 <>

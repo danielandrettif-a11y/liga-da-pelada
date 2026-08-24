@@ -2,7 +2,7 @@ import webpush, { type PushSubscription, type WebPushError } from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { SITE_URL } from "@/lib/siteUrl";
 
-type FinishedMatchForPush = {
+type MatchForPush = {
   id: string;
   round_id: string;
   score_a: number;
@@ -17,7 +17,7 @@ type StoredSubscription = {
   auth: string;
 };
 
-function teamName(team: FinishedMatchForPush["team_a"], fallback: string) {
+function teamName(team: MatchForPush["team_a"], fallback: string) {
   if (Array.isArray(team)) return team[0]?.name || fallback;
   return team?.name || fallback;
 }
@@ -27,9 +27,10 @@ function isExpiredSubscription(error: unknown) {
   return statusCode === 404 || statusCode === 410;
 }
 
-export async function sendMatchFinishedNotifications(
+async function sendMatchNotifications(
   client: SupabaseClient,
-  match: FinishedMatchForPush,
+  match: MatchForPush,
+  notification: { title: string; body: string; tag: string },
 ) {
   const publicKey = process.env.VAPID_PUBLIC_KEY || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -64,14 +65,12 @@ export async function sendMatchFinishedNotifications(
   if (subscriptionsError) throw subscriptionsError;
   if (!subscriptions?.length) return { sent: 0, failed: 0 };
 
-  const leftTeam = teamName(match.team_a, "Time A");
-  const rightTeam = teamName(match.team_b, "Time B");
   const payload = JSON.stringify({
-    title: "Fim de jogo!",
-    body: `${leftTeam} ${match.score_a} × ${match.score_b} ${rightTeam}`,
+    title: notification.title,
+    body: notification.body,
     icon: "/icons/pelada-bq-v2-192.png",
     badge: "/icons/pelada-bq-v2-192.png",
-    tag: `match-finished-${match.id}`,
+    tag: notification.tag,
     url: `/partidas/${match.id}`,
   });
 
@@ -108,4 +107,34 @@ export async function sendMatchFinishedNotifications(
   }
 
   return { sent, failed };
+}
+
+export async function sendMatchFinishedNotifications(
+  client: SupabaseClient,
+  match: MatchForPush,
+) {
+  const leftTeam = teamName(match.team_a, "Time A");
+  const rightTeam = teamName(match.team_b, "Time B");
+  return sendMatchNotifications(client, match, {
+    title: "Fim de jogo!",
+    body: `${leftTeam} ${match.score_a} × ${match.score_b} ${rightTeam}`,
+    tag: `match-finished-${match.id}`,
+  });
+}
+
+export async function sendMatchTimerNotifications(
+  client: SupabaseClient,
+  match: MatchForPush,
+  threshold: "thirty_seconds" | "finished",
+) {
+  const leftTeam = teamName(match.team_a, "Time A");
+  const rightTeam = teamName(match.team_b, "Time B");
+  const isFinal = threshold === "finished";
+  return sendMatchNotifications(client, match, {
+    title: isFinal ? "Fim de jogo!!" : "30 segundos restantes!",
+    body: isFinal
+      ? `${leftTeam} ${match.score_a} × ${match.score_b} ${rightTeam}`
+      : `${leftTeam} ${match.score_a} × ${match.score_b} ${rightTeam} · prepare o apito final.`,
+    tag: `match-timer-${threshold}-${match.id}`,
+  });
 }

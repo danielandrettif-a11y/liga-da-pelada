@@ -24,6 +24,7 @@ const ICONS = {
   best_goalkeeper: Medal,
   goalkeeper_appearance: Medal,
   goal_conceded: ShieldX,
+  own_goal: ShieldX,
 } satisfies Record<EventType, typeof CircleDot>;
 
 type Props = {

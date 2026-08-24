@@ -116,7 +116,8 @@ export async function calculateRoundStats(roundId: string) {
             id,
             event_type,
             player_id,
-            assist_player_id
+            assist_player_id,
+            is_own_goal
           ),
           match_players (
             player_id,
@@ -185,6 +186,7 @@ export async function calculateRoundStats(roundId: string) {
           goalkeeper_games: 0,
           clean_sheets: 0,
           goals_conceded: 0,
+          own_goals: 0,
           team_goals_conceded: 0,
           points: 0,
         };
@@ -233,6 +235,14 @@ export async function calculateRoundStats(roundId: string) {
       // Processar eventos (gols e assistências)
       for (const ev of match.match_events) {
         if (ev.event_type === 'goal') {
+          if (ev.is_own_goal) {
+            const offender = statsMap[ev.player_id];
+            if (offender && !voidedPlayerIds.has(ev.player_id)) {
+              offender.own_goals += 1;
+              if (countsForRanking) offender.points += points.own_goal;
+            }
+            continue;
+          }
           // Gols
           const scorer = statsMap[ev.player_id];
           if (scorer && !voidedPlayerIds.has(ev.player_id)) {

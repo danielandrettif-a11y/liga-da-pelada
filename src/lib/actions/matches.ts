@@ -7,7 +7,7 @@ import { supabase } from "../supabase";
 import type { CreateMatchInput, RegisterGoalInput, SubstituteMatchPlayerInput } from "../types";
 import { calculateRoundStats } from "./stats";
 import { getAdminClient } from "../auth";
-import { sendMatchFinishedNotifications } from "../push-notifications";
+import { sendMatchFinishedNotifications, sendMatchTimerNotifications } from "../push-notifications";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 
@@ -17,7 +17,7 @@ async function getMatchState(
 ) {
   const { data, error } = await client
     .from("matches")
-    .select("round_id, team_a_id, team_b_id, score_a, score_b, status, timer_started_at, timer_accumulated_seconds, eligibility_elapsed_offset_seconds, duration_seconds")
+    .select("id, round_id, team_a_id, team_b_id, score_a, score_b, status, timer_started_at, timer_accumulated_seconds, eligibility_elapsed_offset_seconds, duration_seconds, timer_thirty_seconds_alerted_at, timer_finished_alerted_at")
     .eq("id", matchId)
     .single();
 
@@ -310,6 +310,7 @@ export async function getMatch(matchId: string) {
         assist_player_id,
         team_id,
         minute,
+        is_own_goal,
         created_at,
         player:player_id (id, name, nickname, avatar_url),
         assist_player:assist_player_id (id, name, nickname, avatar_url)
@@ -385,6 +386,7 @@ export async function registerGoal(input: RegisterGoalInput) {
       p_assist_player_id: input.assist_player_id || null,
       p_minute: input.minute ?? null,
       p_idempotency_key: input.idempotency_key || null,
+      p_is_own_goal: Boolean(input.is_own_goal),
     });
 
     if (error) throw new Error(error.message);
@@ -680,6 +682,8 @@ export async function resetMatchTimer(matchId: string) {
         timer_accumulated_seconds: 0,
         timer_started_at: null,
         eligibility_elapsed_offset_seconds: eligibilityOffset,
+        timer_thirty_seconds_alerted_at: null,
+        timer_finished_alerted_at: null,
       })
       .eq("id", matchId);
       
@@ -706,7 +710,11 @@ export async function addMatchExtraTime(matchId: string, extraSeconds: number) {
 
     const { error } = await client
       .from("matches")
-      .update({ duration_seconds: newDuration })
+      .update({
+        duration_seconds: newDuration,
+        timer_thirty_seconds_alerted_at: null,
+        timer_finished_alerted_at: null,
+      })
       .eq("id", matchId);
 
     if (error) throw new Error(error.message);
@@ -715,6 +723,64 @@ export async function addMatchExtraTime(matchId: string, extraSeconds: number) {
     return { success: true, newDuration };
   } catch (err: any) {
     console.error("Erro ao adicionar acréscimo:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function notifyMatchTimerThreshold(
+  matchId: string,
+  threshold: "thirty_seconds" | "finished",
+) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: ADMIN_ERROR };
+
+    const match = await getMatchState(client, matchId);
+    if (match.status !== "live" || !match.timer_started_at) return { success: true, skipped: true };
+
+    const elapsed = (match.timer_accumulated_seconds || 0)
+      + Math.max(0, Math.floor((Date.now() - new Date(match.timer_started_at).getTime()) / 1000));
+    const secondsLeft = Math.max(0, Number(match.duration_seconds || 420) - elapsed);
+    const shouldSend = threshold === "thirty_seconds"
+      ? secondsLeft > 0 && secondsLeft <= 30
+      : secondsLeft === 0;
+    if (!shouldSend) return { success: true, skipped: true };
+
+    const now = new Date().toISOString();
+    const updates = threshold === "thirty_seconds"
+      ? { timer_thirty_seconds_alerted_at: now }
+      : { timer_finished_alerted_at: now };
+    const alertColumn = threshold === "thirty_seconds"
+      ? "timer_thirty_seconds_alerted_at"
+      : "timer_finished_alerted_at";
+    const { data: claimed, error } = await client
+      .from("matches")
+      .update(updates)
+      .eq("id", matchId)
+      .is(alertColumn, null)
+      .select(`
+        id,
+        round_id,
+        score_a,
+        score_b,
+        team_a:team_a_id (name),
+        team_b:team_b_id (name)
+      `)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!claimed) return { success: true, skipped: true };
+
+    after(async () => {
+      try {
+        await sendMatchTimerNotifications(client, claimed, threshold);
+      } catch (notificationError) {
+        console.error("Erro ao notificar alerta do cronometro:", notificationError);
+      }
+    });
+
+    return { success: true, sent: true };
+  } catch (err: any) {
+    console.error("Erro ao enviar alerta do cronometro:", err);
     return { success: false, error: err.message };
   }
 }

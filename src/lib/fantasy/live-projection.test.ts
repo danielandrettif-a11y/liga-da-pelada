@@ -38,6 +38,19 @@ describe("live fantasy projection", () => {
     expect(withGoal.get("scorer")!.basePoints).toBeGreaterThan(withoutGoal.get("scorer")?.basePoints || 0);
   });
 
+  it("separa gol contra de gol marcado e aplica a penalidade", () => {
+    const stats = projectFantasyLiveStats([
+      {
+        ...baseMatch,
+        status: "live",
+        scoreA: 0,
+        events: [{ playerId: "scorer", teamId: "a", isOwnGoal: true }],
+      },
+    ], DEFAULT_FANTASY_SETTINGS);
+
+    expect(stats.get("scorer")).toMatchObject({ goals: 0, ownGoals: 1, basePoints: -3 });
+  });
+
   it("aplica capitão e palpites como prévia", () => {
     const stats = projectFantasyLiveStats([{ ...baseMatch, status: "live" }], DEFAULT_FANTASY_SETTINGS);
     const [lineup] = projectFantasyLiveLineups([

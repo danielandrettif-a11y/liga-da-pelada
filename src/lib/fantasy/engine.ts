@@ -8,6 +8,8 @@ export type FantasyPerformance = {
   losses?: number;
   goals: number;
   assists: number;
+  ownGoals?: number;
+  playerProfile?: "offensive" | "midfield" | "defensive" | null;
   goalkeeperGames?: number;
   goalsConceded?: number;
   teamGoalsConceded?: number;
@@ -58,19 +60,28 @@ export function roundMoney(value: number) {
 export function calculateFantasyPlayerPoints(
   stats: Pick<
     FantasyPerformance,
-    "goals" | "assists" | "wins" | "losses" | "goalkeeperGames" | "goalsConceded" | "teamGoalsConceded"
+    | "goals"
+    | "assists"
+    | "wins"
+    | "losses"
+    | "goalkeeperGames"
+    | "goalsConceded"
+    | "teamGoalsConceded"
+    | "ownGoals"
+    | "playerProfile"
   >,
   settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
 ) {
   return (
-    stats.goals * settings.goalPoints +
+    stats.goals * (stats.playerProfile === "offensive" ? settings.attackerGoalPoints : settings.goalPoints) +
     stats.assists * settings.assistPoints +
     stats.wins * settings.winPoints +
     (stats.losses || 0) * ((stats.goalkeeperGames || 0) > 0 ? settings.goalkeeperLossPoints : settings.lossPoints) +
     (stats.goalkeeperGames || 0) * settings.goalkeeperAppearancePoints +
     // A penalidade defensiva é compartilhada entre quem entrou em campo.
     // Para rodadas antigas, o fallback preserva o dado histórico do goleiro.
-    (stats.teamGoalsConceded ?? stats.goalsConceded ?? 0) * settings.teamGoalConcededPoints
+    (stats.teamGoalsConceded ?? stats.goalsConceded ?? 0) * settings.teamGoalConcededPoints +
+    (stats.ownGoals || 0) * settings.ownGoalPoints
   );
 }
 

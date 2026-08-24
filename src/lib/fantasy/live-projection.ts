@@ -1,8 +1,13 @@
 import { calculateFantasyPlayerPoints } from "./engine";
 import type { FantasySettings } from "./config";
 
-export type FantasyLiveEvent = { playerId: string; assistPlayerId?: string | null; teamId: string };
-export type FantasyLiveMatchPlayer = { playerId: string; teamId: string; resultEligible: boolean };
+export type FantasyLiveEvent = { playerId: string; assistPlayerId?: string | null; teamId: string; isOwnGoal?: boolean };
+export type FantasyLiveMatchPlayer = {
+  playerId: string;
+  teamId: string;
+  resultEligible: boolean;
+  playerProfile?: "offensive" | "midfield" | "defensive" | null;
+};
 export type FantasyLiveGoalkeeper = { playerId: string; teamId: string };
 export type FantasyLiveMatch = {
   id: string;
@@ -20,6 +25,8 @@ export type FantasyLivePlayerStats = {
   playerId: string;
   goals: number;
   assists: number;
+  ownGoals: number;
+  playerProfile?: "offensive" | "midfield" | "defensive" | null;
   wins: number;
   losses: number;
   games: number;
@@ -62,13 +69,15 @@ export function projectFantasyLiveStats(
   settings: FantasySettings,
 ): Map<string, FantasyLivePlayerStats> {
   const stats = new Map<string, Omit<FantasyLivePlayerStats, "basePoints">>();
-  const ensure = (playerId: string) => {
+  const ensure = (playerId: string, playerProfile?: FantasyLivePlayerStats["playerProfile"]) => {
     const existing = stats.get(playerId);
     if (existing) return existing;
     const next = {
       playerId,
       goals: 0,
       assists: 0,
+      ownGoals: 0,
+      playerProfile,
       wins: 0,
       losses: 0,
       games: 0,
@@ -88,7 +97,7 @@ export function projectFantasyLiveStats(
 
     for (const participant of match.players) {
       if (!participant.resultEligible) continue;
-      const current = ensure(participant.playerId);
+      const current = ensure(participant.playerId, participant.playerProfile);
       const conceded = participant.teamId === match.teamAId ? match.scoreB : match.scoreA;
       current.teamGoalsConceded += conceded;
       if (isFinished) {
@@ -107,8 +116,12 @@ export function projectFantasyLiveStats(
     }
 
     for (const event of match.events) {
-      ensure(event.playerId).goals += 1;
-      if (event.assistPlayerId) ensure(event.assistPlayerId).assists += 1;
+      if (event.isOwnGoal) {
+        ensure(event.playerId).ownGoals += 1;
+      } else {
+        ensure(event.playerId).goals += 1;
+        if (event.assistPlayerId) ensure(event.assistPlayerId).assists += 1;
+      }
     }
   }
 

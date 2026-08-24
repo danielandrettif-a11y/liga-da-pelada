@@ -116,6 +116,7 @@ export async function getFantasyDashboard() {
         minPlayerPrice: Number(settingsRow.min_player_price),
         maxPlayerPrice: Number(settingsRow.max_player_price),
         goalPoints: Number(settingsRow.goal_points),
+        attackerGoalPoints: Number(settingsRow.attacker_goal_points ?? 6),
         assistPoints: Number(settingsRow.assist_points),
         winPoints: Number(settingsRow.win_points),
         lossPoints: Number(settingsRow.loss_points ?? -1),
@@ -123,6 +124,7 @@ export async function getFantasyDashboard() {
         goalkeeperAppearancePoints: Number(settingsRow.goalkeeper_appearance_points ?? 3),
         goalConcededPoints: Number(settingsRow.goal_conceded_points ?? -1),
         teamGoalConcededPoints: Number(settingsRow.team_goal_conceded_points ?? -1),
+        ownGoalPoints: Number(settingsRow.own_goal_points ?? -3),
         captainMultiplier: Number(settingsRow.captain_multiplier),
         topScorerPredictionPoints: Number(settingsRow.top_scorer_prediction_points),
         topAssistPredictionPoints: Number(settingsRow.top_assist_prediction_points),
@@ -226,6 +228,7 @@ export async function getFantasyDashboard() {
     ? {
         ...settings,
         goalPoints: Number(scoringSnapshot.goal_points ?? settings.goalPoints),
+        attackerGoalPoints: Number(scoringSnapshot.attacker_goal_points ?? settings.attackerGoalPoints),
         assistPoints: Number(scoringSnapshot.assist_points ?? settings.assistPoints),
         winPoints: Number(scoringSnapshot.win_points ?? settings.winPoints),
         lossPoints: Number(scoringSnapshot.loss_points ?? settings.lossPoints),
@@ -237,6 +240,7 @@ export async function getFantasyDashboard() {
         teamGoalConcededPoints: Number(
           scoringSnapshot.team_goal_conceded_points ?? settings.teamGoalConcededPoints,
         ),
+        ownGoalPoints: Number(scoringSnapshot.own_goal_points ?? settings.ownGoalPoints),
       }
     : settings;
   const displayRound = fantasyRound?.round || latestFinishedRound?.round || null;
@@ -320,7 +324,7 @@ export async function getFantasyDashboard() {
   const liveMatchesRequest = displayRoundId
     ? account.client
         .from("matches")
-        .select("id, status, team_a_id, team_b_id, score_a, score_b, match_events(player_id, assist_player_id, team_id), match_players(player_id, team_id, result_eligible), match_goalkeepers(player_id, team_id)")
+        .select("id, status, team_a_id, team_b_id, score_a, score_b, match_events(player_id, assist_player_id, team_id, is_own_goal), match_players(player_id, team_id, result_eligible), match_goalkeepers(player_id, team_id)")
         .eq("round_id", displayRoundId)
     : Promise.resolve({ data: [] as any[] });
 
@@ -344,7 +348,7 @@ export async function getFantasyDashboard() {
     officialRoundIds.length
       ? account.client
           .from("player_round_stats")
-          .select("round_id, player_id, goals, assists, wins, losses, games, goalkeeper_games, goals_conceded, team_goals_conceded")
+          .select("round_id, player_id, goals, assists, wins, losses, own_goals, games, goalkeeper_games, goals_conceded, team_goals_conceded")
           .in("round_id", officialRoundIds)
       : Promise.resolve({ data: [] as any[] }),
     displayRoundId
@@ -359,13 +363,13 @@ export async function getFantasyDashboard() {
       .eq("user_id", account.user.id)
       .maybeSingle(),
     matchIds.length
-      ? account.client.from("match_events").select("player_id, assist_player_id").in("match_id", matchIds)
+      ? account.client.from("match_events").select("player_id, assist_player_id, is_own_goal").in("match_id", matchIds)
       : Promise.resolve({ data: [] as any[] }),
     account.client
       .from("players")
       .select("id, name, avatar_url, player_profile, member_category, is_selectable")
       .eq("is_selectable", true)
-      .in("member_category", ["player", "guest"]),
+      .eq("member_category", "player"),
     account.client
       .from("fantasy_player_price_history")
       .select(
@@ -418,14 +422,15 @@ export async function getFantasyDashboard() {
   const priceByPlayer = new Map((priceRows || []).map((row: any) => [row.player_id, row]));
   const statsByPlayer = new Map<
     string,
-    { goals: number; assists: number; wins: number; losses: number; games: number; goalkeeperGames: number; goalsConceded: number; teamGoalsConceded: number }
+    { goals: number; assists: number; ownGoals: number; wins: number; losses: number; games: number; goalkeeperGames: number; goalsConceded: number; teamGoalsConceded: number }
   >();
-  const currentStats = new Map<string, { goals: number; assists: number; wins: number; losses: number; goalkeeperGames: number; goalsConceded: number; teamGoalsConceded: number }>();
+  const currentStats = new Map<string, { goals: number; assists: number; ownGoals: number; wins: number; losses: number; goalkeeperGames: number; goalsConceded: number; teamGoalsConceded: number }>();
 
   for (const row of statRows || []) {
     const current = statsByPlayer.get(row.player_id) || {
       goals: 0,
       assists: 0,
+      ownGoals: 0,
       wins: 0,
       losses: 0,
       games: 0,
@@ -435,6 +440,7 @@ export async function getFantasyDashboard() {
     };
     current.goals += Number(row.goals || 0);
     current.assists += Number(row.assists || 0);
+    current.ownGoals += Number(row.own_goals || 0);
     current.wins += Number(row.wins || 0);
     current.losses += Number(row.losses || 0);
     current.games += Number(row.games || 0);
@@ -447,6 +453,7 @@ export async function getFantasyDashboard() {
       currentStats.set(row.player_id, {
         goals: Number(row.goals || 0),
         assists: Number(row.assists || 0),
+        ownGoals: Number(row.own_goals || 0),
         wins: Number(row.wins || 0),
         losses: Number(row.losses || 0),
         goalkeeperGames: Number(row.goalkeeper_games || 0),
@@ -460,13 +467,15 @@ export async function getFantasyDashboard() {
     for (const current of currentStats.values()) {
       current.goals = 0;
       current.assists = 0;
+      current.ownGoals = 0;
     }
     for (const event of liveEvents) {
-      const scorer = currentStats.get(event.player_id) || { goals: 0, assists: 0, wins: 0, losses: 0, goalkeeperGames: 0, goalsConceded: 0, teamGoalsConceded: 0 };
-      scorer.goals += 1;
+      const scorer = currentStats.get(event.player_id) || { goals: 0, assists: 0, ownGoals: 0, wins: 0, losses: 0, goalkeeperGames: 0, goalsConceded: 0, teamGoalsConceded: 0 };
+      if (event.is_own_goal) scorer.ownGoals += 1;
+      else scorer.goals += 1;
       currentStats.set(event.player_id, scorer);
-      if (event.assist_player_id) {
-        const assister = currentStats.get(event.assist_player_id) || { goals: 0, assists: 0, wins: 0, losses: 0, goalkeeperGames: 0, goalsConceded: 0, teamGoalsConceded: 0 };
+      if (event.assist_player_id && !event.is_own_goal) {
+        const assister = currentStats.get(event.assist_player_id) || { goals: 0, assists: 0, ownGoals: 0, wins: 0, losses: 0, goalkeeperGames: 0, goalsConceded: 0, teamGoalsConceded: 0 };
         assister.assists += 1;
         currentStats.set(event.assist_player_id, assister);
       }
@@ -477,6 +486,7 @@ export async function getFantasyDashboard() {
       );
       current.wins = Number(official?.wins || 0);
       current.losses = Number(official?.losses || 0);
+      current.ownGoals = Number(official?.own_goals || 0);
       current.goalkeeperGames = Number(official?.goalkeeper_games || 0);
       current.goalsConceded = Number(official?.goals_conceded || 0);
       current.teamGoalsConceded = Number(official?.team_goals_conceded || 0);
@@ -495,6 +505,7 @@ export async function getFantasyDashboard() {
         playerId: item.player_id,
         teamId: item.team_id,
         resultEligible: Boolean(item.result_eligible),
+        playerProfile: allPlayersById.get(item.player_id)?.player_profile || null,
       })),
       goalkeepers: (match.match_goalkeepers || []).map((item: any) => ({
         playerId: item.player_id,
@@ -504,6 +515,7 @@ export async function getFantasyDashboard() {
         playerId: item.player_id,
         assistPlayerId: item.assist_player_id,
         teamId: item.team_id,
+        isOwnGoal: Boolean(item.is_own_goal),
       })),
     })),
     scoringSettings,
@@ -514,6 +526,7 @@ export async function getFantasyDashboard() {
       currentStats.set(playerId, {
         goals: item.goals,
         assists: item.assists,
+        ownGoals: item.ownGoals,
         wins: item.wins,
         losses: item.losses,
         goalkeeperGames: item.goalkeeperGames,
@@ -580,18 +593,13 @@ export async function getFantasyDashboard() {
   });
 
   const market: FantasyMarketPlayer[] = (players || [])
-    .filter((player: any) =>
-      isTest
-        ? participantIds.includes(player.id)
-        : player.member_category === "guest"
-        ? Boolean(!betweenRounds && displayRoundId && participantIds.includes(player.id))
-        : player.member_category === "player" && player.is_selectable
-    )
+    .filter((player: any) => player.member_category === "player" && player.is_selectable)
     .map((player: any) => {
       const priceRow = priceByPlayer.get(player.id) as any;
       const stats = statsByPlayer.get(player.id) || {
         goals: 0,
         assists: 0,
+        ownGoals: 0,
         wins: 0,
         losses: 0,
         games: 0,
@@ -612,11 +620,13 @@ export async function getFantasyDashboard() {
             {
               goals: currentStats.get(player.id)?.goals || 0,
               assists: currentStats.get(player.id)?.assists || 0,
+              ownGoals: currentStats.get(player.id)?.ownGoals || 0,
               wins: currentStats.get(player.id)?.wins || 0,
               losses: currentStats.get(player.id)?.losses || 0,
               goalkeeperGames: currentStats.get(player.id)?.goalkeeperGames || 0,
               goalsConceded: currentStats.get(player.id)?.goalsConceded || 0,
               teamGoalsConceded: currentStats.get(player.id)?.teamGoalsConceded || 0,
+              playerProfile: player.player_profile,
             },
             scoringSettings,
           );
@@ -1345,11 +1355,11 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
     .maybeSingle();
   if (!activeRound?.round_id) return null;
 
-  const [{ data: settingsRow }, { data: matches }, { data: lineups }, { data: leagueRow }] = await Promise.all([
+  const [{ data: settingsRow }, { data: matches }, { data: lineups }, { data: leagueRow }, { data: playerRows }] = await Promise.all([
     client.from("fantasy_settings").select("*").eq("league_id", leagueId).maybeSingle(),
     client
       .from("matches")
-      .select("id, status, team_a_id, team_b_id, score_a, score_b, match_events(player_id, assist_player_id, team_id), match_players(player_id, team_id, result_eligible), match_goalkeepers(player_id, team_id)")
+      .select("id, status, team_a_id, team_b_id, score_a, score_b, match_events(player_id, assist_player_id, team_id, is_own_goal), match_players(player_id, team_id, result_eligible), match_goalkeepers(player_id, team_id)")
       .eq("round_id", activeRound.round_id),
     client
       .from("fantasy_lineups")
@@ -1357,10 +1367,12 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
       .eq("fantasy_round_id", activeRound.id)
       .neq("status", "missed"),
     client.from("leagues").select("players_per_team").eq("id", leagueId).maybeSingle(),
+    client.from("players").select("id, player_profile"),
   ]);
   const settings: FantasySettings = {
     ...DEFAULT_FANTASY_SETTINGS,
     goalPoints: Number(settingsRow?.goal_points ?? DEFAULT_FANTASY_SETTINGS.goalPoints),
+    attackerGoalPoints: Number(settingsRow?.attacker_goal_points ?? DEFAULT_FANTASY_SETTINGS.attackerGoalPoints),
     assistPoints: Number(settingsRow?.assist_points ?? DEFAULT_FANTASY_SETTINGS.assistPoints),
     winPoints: Number(settingsRow?.win_points ?? DEFAULT_FANTASY_SETTINGS.winPoints),
     lossPoints: Number(settingsRow?.loss_points ?? DEFAULT_FANTASY_SETTINGS.lossPoints),
@@ -1368,10 +1380,12 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
     goalkeeperAppearancePoints: Number(settingsRow?.goalkeeper_appearance_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperAppearancePoints),
     goalConcededPoints: Number(settingsRow?.goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.goalConcededPoints),
     teamGoalConcededPoints: Number(settingsRow?.team_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.teamGoalConcededPoints),
+    ownGoalPoints: Number(settingsRow?.own_goal_points ?? DEFAULT_FANTASY_SETTINGS.ownGoalPoints),
     captainMultiplier: Number(settingsRow?.captain_multiplier ?? DEFAULT_FANTASY_SETTINGS.captainMultiplier),
     topScorerPredictionPoints: Number(settingsRow?.top_scorer_prediction_points ?? DEFAULT_FANTASY_SETTINGS.topScorerPredictionPoints),
     topAssistPredictionPoints: Number(settingsRow?.top_assist_prediction_points ?? DEFAULT_FANTASY_SETTINGS.topAssistPredictionPoints),
   };
+  const playerProfileById = new Map((playerRows || []).map((player: any) => [player.id, player.player_profile]));
   const stats = projectFantasyLiveStats(
     (matches || []).map((match: any) => ({
       id: match.id,
@@ -1380,9 +1394,9 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
       teamBId: match.team_b_id,
       scoreA: Number(match.score_a || 0),
       scoreB: Number(match.score_b || 0),
-      players: (match.match_players || []).map((item: any) => ({ playerId: item.player_id, teamId: item.team_id, resultEligible: Boolean(item.result_eligible) })),
+      players: (match.match_players || []).map((item: any) => ({ playerId: item.player_id, teamId: item.team_id, resultEligible: Boolean(item.result_eligible), playerProfile: playerProfileById.get(item.player_id) || null })),
       goalkeepers: (match.match_goalkeepers || []).map((item: any) => ({ playerId: item.player_id, teamId: item.team_id })),
-      events: (match.match_events || []).map((item: any) => ({ playerId: item.player_id, assistPlayerId: item.assist_player_id, teamId: item.team_id })),
+      events: (match.match_events || []).map((item: any) => ({ playerId: item.player_id, assistPlayerId: item.assist_player_id, teamId: item.team_id, isOwnGoal: Boolean(item.is_own_goal) })),
     })),
     settings,
   );
@@ -1705,11 +1719,18 @@ export async function getFantasyRoundLineupOverview(
 export async function updateFantasySettings(values: Partial<FantasySettings>) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
-  const { lossPoints, goalkeeperLossPoints, goalkeeperAppearancePoints, goalConcededPoints, teamGoalConcededPoints, ...otherValues } = values;
+  const { attackerGoalPoints, ownGoalPoints, lossPoints, goalkeeperLossPoints, goalkeeperAppearancePoints, goalConcededPoints, teamGoalConcededPoints, ...otherValues } = values;
   const { error } = await account.client.rpc("update_fantasy_settings", {
     p_settings: otherValues,
   });
   if (error) return { success: false, error: error.message };
+  if (attackerGoalPoints !== undefined || ownGoalPoints !== undefined) {
+    const { error: positionError } = await account.client.rpc("update_fantasy_attack_and_own_goal_points", {
+      p_attacker_goal_points: attackerGoalPoints ?? DEFAULT_FANTASY_SETTINGS.attackerGoalPoints,
+      p_own_goal_points: ownGoalPoints ?? DEFAULT_FANTASY_SETTINGS.ownGoalPoints,
+    });
+    if (positionError) return { success: false, error: positionError.message };
+  }
   if (lossPoints !== undefined) {
     const { error: lossError } = await account.client.rpc("update_fantasy_loss_points", {
       p_loss_points: lossPoints,

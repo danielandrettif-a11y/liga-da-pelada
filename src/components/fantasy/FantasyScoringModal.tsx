@@ -13,13 +13,15 @@ import {
   X,
 } from "@/components/icons";
 import { useDialogViewport } from "@/lib/useDialogViewport";
+import { type FantasySettings } from "@/lib/fantasy/config";
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
+  settings: FantasySettings;
 };
 
-export function FantasyScoringModal({ isOpen, onClose }: Props) {
+export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
   const [activeTab, setActiveTab] = useState<"positions" | "base" | "bonuses">("positions");
   const [mounted, setMounted] = useState(false);
 
@@ -115,7 +117,7 @@ export function FantasyScoringModal({ isOpen, onClose }: Props) {
           {activeTab === "positions" && (
             <div className="space-y-3">
               <div className="rounded-2xl border border-accent/30 bg-accent/10 p-3 text-xs text-emerald-100/90 leading-relaxed">
-                💡 <strong>Como ativar:</strong> Escale o atleta na sua posição natural (ou na vaga de GOL) para acender a borda iluminada com o selo <strong>⚡ BÔNUS</strong>!
+                💡 <strong>Regra real:</strong> só o perfil <strong>ATA</strong> recebe gol turbinado. Defesa e meio mantêm a pontuação-base; não existe bônus oculto por escalar alguém em uma vaga específica.
               </div>
 
               {/* 1. Defensores (DEF) */}
@@ -126,25 +128,25 @@ export function FantasyScoringModal({ isOpen, onClose }: Props) {
                       DEF
                     </span>
                     <span className="font-athletic text-sm font-black uppercase text-blue-200">
-                      Zagueiro & Proteção
+                      Defesa
                     </span>
                   </div>
                   <span className="rounded bg-blue-500/20 px-2 py-0.5 text-[9px] font-black text-blue-300">
-                    Clean Sheet Regressivo
+                    Pontuação-base
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-muted">
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🧱 0 gols sofridos no jogo (Bônus Cheio):</span>
-                    <strong className="text-accent font-black">+4.0 pts</strong>
+                    <span>⚽ Gol marcado:</span>
+                    <strong className="text-accent font-black">+{settings.goalPoints.toFixed(1)} pts</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🛡️ 1 gol sofrido no jogo (Metade do Bônus):</span>
-                    <strong className="text-blue-300 font-black">+2.0 pts</strong>
+                    <span>🎯 Assistência:</span>
+                    <strong className="text-blue-300 font-black">+{settings.assistPoints.toFixed(1)} pts</strong>
                   </div>
                   <div className="flex justify-between py-0.5">
-                    <span>❌ 2+ gols sofridos e derrota:</span>
-                    <strong className="text-danger font-black">0.0 pts</strong>
+                    <span>🏆 Vitória:</span>
+                    <strong className="text-success font-black">+{settings.winPoints.toFixed(1)} pts</strong>
                   </div>
                 </div>
               </div>
@@ -157,25 +159,25 @@ export function FantasyScoringModal({ isOpen, onClose }: Props) {
                       MEI
                     </span>
                     <span className="font-athletic text-sm font-black uppercase text-yellow-200">
-                      Meia, Ala & Armação
+                      Meio-campo
                     </span>
                   </div>
                   <span className="rounded bg-warning/20 px-2 py-0.5 text-[9px] font-black text-warning">
-                    Maestro da Rodada
+                    Pontuação-base
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-muted">
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🎯 Assistência turbinada:</span>
-                    <strong className="text-accent font-black">+4.0 pts / assist</strong>
+                    <span>⚽ Gol marcado:</span>
+                    <strong className="text-accent font-black">+{settings.goalPoints.toFixed(1)} pts</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🪄 Bônus Maestro (2+ assistências na rodada):</span>
-                    <strong className="text-warning font-black">+3.0 pts extras</strong>
+                    <span>🎯 Assistência:</span>
+                    <strong className="text-warning font-black">+{settings.assistPoints.toFixed(1)} pts</strong>
                   </div>
                   <div className="flex justify-between py-0.5">
-                    <span>⚽ Gol marcado:</span>
-                    <strong className="text-foreground font-black">+5.0 pts</strong>
+                    <span>🏆 Vitória:</span>
+                    <strong className="text-success font-black">+{settings.winPoints.toFixed(1)} pts</strong>
                   </div>
                 </div>
               </div>
@@ -192,21 +194,21 @@ export function FantasyScoringModal({ isOpen, onClose }: Props) {
                     </span>
                   </div>
                   <span className="rounded bg-danger/20 px-2 py-0.5 text-[9px] font-black text-danger">
-                    Artilheiro da Rodada
+                    Gol turbinado
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-muted">
                   <div className="flex justify-between py-0.5 border-b border-white/5">
                     <span>⚽ Gol marcado:</span>
-                    <strong className="text-accent font-black">+5.0 pts / gol</strong>
+                    <strong className="text-accent font-black">+{settings.attackerGoalPoints.toFixed(1)} pts / gol</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🔥 Bônus Artilheiro (2+ gols na rodada):</span>
-                    <strong className="text-danger font-black">+3.0 pts extras</strong>
+                    <span>🎯 Assistência:</span>
+                    <strong className="text-danger font-black">+{settings.assistPoints.toFixed(1)} pts</strong>
                   </div>
                   <div className="flex justify-between py-0.5">
-                    <span>🎯 Assistência normal:</span>
-                    <strong className="text-foreground font-black">+3.0 pts</strong>
+                    <span>🚫 Gol contra:</span>
+                    <strong className="text-danger font-black">{settings.ownGoalPoints.toFixed(1)} pts</strong>
                   </div>
                 </div>
               </div>
@@ -229,15 +231,15 @@ export function FantasyScoringModal({ isOpen, onClose }: Props) {
                 <div className="space-y-1 text-xs text-muted">
                   <div className="flex justify-between py-0.5 border-b border-white/5">
                     <span>🧤 Presença no gol (por partida agarrada):</span>
-                    <strong className="text-accent font-black">+3.0 pts</strong>
+                    <strong className="text-accent font-black">+{settings.goalkeeperAppearancePoints.toFixed(1)} pts</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🧱 Jogo sem sofrer gol debaixo das traves:</span>
-                    <strong className="text-emerald-300 font-black">+4.0 pts</strong>
+                    <span>🥅 Gol sofrido pelo time:</span>
+                    <strong className="text-danger font-black">{settings.teamGoalConcededPoints.toFixed(1)} pt / gol</strong>
                   </div>
                   <div className="flex justify-between py-0.5">
-                    <span>🛡️ Imunidade de Derrota:</span>
-                    <strong className="text-foreground font-black">0 pts (não perde -2)</strong>
+                    <span>🛡️ Derrota enquanto goleiro:</span>
+                    <strong className="text-foreground font-black">{settings.goalkeeperLossPoints.toFixed(1)} pts</strong>
                   </div>
                 </div>
               </div>
@@ -262,21 +264,21 @@ export function FantasyScoringModal({ isOpen, onClose }: Props) {
                     <span className="font-bold text-white flex items-center gap-1.5">
                       ⚽ Gol Marcado
                     </span>
-                    <span className="font-black text-accent">+5.0 pts</span>
+                    <span className="font-black text-accent">+{settings.goalPoints.toFixed(1)} pts <span className="text-[9px] text-muted">(+{settings.attackerGoalPoints.toFixed(1)} ATA)</span></span>
                   </div>
 
                   <div className="flex items-center justify-between p-3">
                     <span className="font-bold text-white flex items-center gap-1.5">
                       🎯 Assistência (Passe para Gol)
                     </span>
-                    <span className="font-black text-accent">+3.0 pts <span className="text-[9px] text-muted">(+4.0 se MEI)</span></span>
+                    <span className="font-black text-accent">+{settings.assistPoints.toFixed(1)} pts</span>
                   </div>
 
                   <div className="flex items-center justify-between p-3">
                     <span className="font-bold text-white flex items-center gap-1.5">
                       🏆 Vitória do Time
                     </span>
-                    <span className="font-black text-success">+4.0 pts</span>
+                    <span className="font-black text-success">+{settings.winPoints.toFixed(1)} pts</span>
                   </div>
 
                   <div className="flex items-center justify-between p-3">
@@ -290,14 +292,14 @@ export function FantasyScoringModal({ isOpen, onClose }: Props) {
                     <span className="font-bold text-white flex items-center gap-1.5">
                       ❌ Derrota do Time
                     </span>
-                    <span className="font-black text-danger">-2.0 pts <span className="text-[9px] text-muted">(isento no gol)</span></span>
+                    <span className="font-black text-danger">{settings.lossPoints.toFixed(1)} pts <span className="text-[9px] text-muted">(goleiro: {settings.goalkeeperLossPoints.toFixed(1)})</span></span>
                   </div>
 
                   <div className="flex items-center justify-between p-3">
                     <span className="font-bold text-white flex items-center gap-1.5">
                       🥅 Gol Sofrido pelo Time
                     </span>
-                    <span className="font-black text-danger">-1.0 pt / gol</span>
+                    <span className="font-black text-danger">{settings.teamGoalConcededPoints.toFixed(1)} pt / gol</span>
                   </div>
                 </div>
               </div>
@@ -329,11 +331,11 @@ export function FantasyScoringModal({ isOpen, onClose }: Props) {
                     <Target className="h-4 w-4" />
                   </span>
                   <span className="font-athletic text-sm font-black uppercase text-accent">
-                    Palpites da Rodada (+3 pts cada)
+                    Palpites da Rodada
                   </span>
                 </div>
                 <p className="text-muted leading-relaxed">
-                  Antes do mercado fechar, escolha quem você acha que será o <strong>Artilheiro</strong> e o <strong>Garçom</strong> da rodada. Cada acerto garante <strong>+3.0 pts extras</strong> na sua pontuação final!
+                  Antes do mercado fechar, escolha quem será o <strong>Artilheiro</strong> e o <strong>Garçom</strong>. Cada acerto rende respectivamente <strong>+{settings.topScorerPredictionPoints.toFixed(1)}</strong> e <strong>+{settings.topAssistPredictionPoints.toFixed(1)} pts</strong>.
                 </p>
               </div>
 

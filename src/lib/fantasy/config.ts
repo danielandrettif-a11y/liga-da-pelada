@@ -5,6 +5,7 @@ export type FantasySettings = {
   minPlayerPrice: number;
   maxPlayerPrice: number;
   goalPoints: number;
+  attackerGoalPoints: number;
   assistPoints: number;
   winPoints: number;
   lossPoints: number;
@@ -12,6 +13,7 @@ export type FantasySettings = {
   goalkeeperAppearancePoints: number;
   goalConcededPoints: number;
   teamGoalConcededPoints: number;
+  ownGoalPoints: number;
   captainMultiplier: number;
   topScorerPredictionPoints: number;
   topAssistPredictionPoints: number;
@@ -38,6 +40,7 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   minPlayerPrice: 5,
   maxPlayerPrice: 25,
   goalPoints: 5,
+  attackerGoalPoints: 6,
   assistPoints: 3,
   winPoints: 4,
   lossPoints: -2,
@@ -45,6 +48,7 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   goalkeeperAppearancePoints: 3,
   goalConcededPoints: -1,
   teamGoalConcededPoints: -1,
+  ownGoalPoints: -3,
   captainMultiplier: 1.5,
   topScorerPredictionPoints: 8,
   topAssistPredictionPoints: 6,

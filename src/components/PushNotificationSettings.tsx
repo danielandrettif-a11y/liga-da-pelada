@@ -142,7 +142,7 @@ export function PushNotificationSettings() {
       }
 
       setState("active");
-      setMessage("Você receberá os resultados das rodadas em que estiver inscrito.");
+      setMessage("Você receberá o alerta de 30 segundos e o fim das partidas da rodada em que estiver inscrito.");
     } catch (error) {
       setState("inactive");
       setMessage(error instanceof Error ? error.message : "Não foi possível ativar as notificações.");
@@ -180,8 +180,8 @@ export function PushNotificationSettings() {
     : state === "denied"
       ? "Permissão bloqueada. Libere nas configurações do celular."
       : isActive
-        ? "Resultados das rodadas em que você estiver inscrito."
-        : "Receba o placar quando uma partida da sua rodada terminar.";
+        ? "Alertas de 30 segundos, fim de jogo e resultados das rodadas em que você estiver inscrito."
+        : "Receba os avisos de 30 segundos e fim das partidas da sua rodada.";
 
   return (
     <section>
@@ -194,7 +194,7 @@ export function PushNotificationSettings() {
 
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold text-foreground">
-              {isActive ? "Notificações ativadas" : "Avisos de fim de jogo"}
+              {isActive ? "Notificações ativadas" : "Avisos de partida"}
             </span>
             <span className="mt-0.5 block text-xs leading-relaxed text-muted">{description}</span>
           </span>

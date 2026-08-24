@@ -111,6 +111,29 @@ const positionLabel: Record<string, string> = {
   offensive: "Ataque",
 };
 
+function lineupSignature({
+  ids,
+  captain,
+  scorer,
+  assist,
+  challenge,
+}: {
+  ids: Array<string | null | undefined>;
+  captain: string | null | undefined;
+  scorer: string | null | undefined;
+  assist: string | null | undefined;
+  challenge: string | null | undefined;
+}) {
+  return JSON.stringify({
+    // A ordem visual do campo pode mudar com drag-and-drop, mas não é uma alteração da escalação.
+    ids: ids.filter(Boolean).sort(),
+    captain: captain || null,
+    scorer: scorer || null,
+    assist: assist || null,
+    challenge: challenge || null,
+  });
+}
+
 export function FantasyExperience({
   round,
   fantasySeasonId,
@@ -291,12 +314,12 @@ export function FantasyExperience({
   }, []);
 
   const [savedSignature, setSavedSignature] = useState(() =>
-    JSON.stringify({
+    lineupSignature({
       ids: initialIds,
-      captain: lineup?.captain_player_id || null,
-      scorer: lineup?.top_scorer_player_id || null,
-      assist: lineup?.top_assist_player_id || null,
-      challenge: lineup?.challenge_player_id || null,
+      captain: lineup?.captain_player_id,
+      scorer: lineup?.top_scorer_player_id,
+      assist: lineup?.top_assist_player_id,
+      challenge: lineup?.challenge_player_id,
     })
   );
   const [pending, startTransition] = useTransition();
@@ -450,8 +473,8 @@ export function FantasyExperience({
         )
       : null;
 
-  const currentSignature = JSON.stringify({
-    ids: selected.filter(Boolean),
+  const currentSignature = lineupSignature({
+    ids: selected,
     captain: captainId,
     scorer: scorerId,
     assist: assistId,
@@ -945,25 +968,57 @@ export function FantasyExperience({
         )}
       </header>
 
-      {/* Resumo da Última Rodada */}
-      {lastRound && !isTest && (
-        <section className="overflow-hidden rounded-2xl border border-border bg-surface">
-          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-[.18em] text-muted">
-                Última rodada
-              </p>
+      {/* Desafio da rodada: sempre visível, mesmo antes de o usuário escolher o atleta. */}
+      {!betweenRounds && round && (
+        <section className="overflow-hidden rounded-2xl border border-warning/35 bg-gradient-to-br from-warning/15 via-surface to-[#161205] shadow-[0_10px_30px_rgba(0,0,0,.18)]">
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-warning/30 bg-warning/15 text-warning">
+              <Target className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[9px] font-black uppercase tracking-[.18em] text-warning">Desafio desta rodada</p>
               <p className="mt-0.5 text-sm font-black text-foreground">
-                Ranked {String(lastRound.number).padStart(2, "0")}
+                {challengeType ? CHALLENGE_LABELS[challengeType] : "Aguardando sorteio do desafio"}
+              </p>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
+                {challengeType
+                  ? "Escolha seu jogador no bloco de palpites para concorrer ao bônus extra."
+                  : "O desafio será definido antes de o mercado fechar."}
               </p>
             </div>
-            <strong className="text-2xl font-black text-accent">
-              {lastRound.totalPoints.toFixed(1)} pts
-            </strong>
+            <span className="rounded-lg bg-warning/15 px-2 py-1 text-[9px] font-black uppercase text-warning">Extra</span>
           </div>
-          <div className="grid grid-cols-2 gap-px bg-border">
-            <Metric label="Jogadores" value={`${lastRound.playerPoints.toFixed(1)} pts`} />
-            <Metric label="Palpites" value={`${lastRound.predictionPoints.toFixed(1)} pts`} />
+        </section>
+      )}
+
+      {/* Resumo da Última Rodada */}
+      {lastRound && !isTest && (
+        <section className="overflow-hidden rounded-2xl border border-accent/25 bg-gradient-to-br from-[#0b2415] via-surface to-[#10190d] shadow-[0_12px_30px_rgba(0,0,0,.2)]">
+          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3.5">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent ring-1 ring-accent/25">
+                <Trophy className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[.18em] text-accent">Boletim final</p>
+                <p className="mt-0.5 text-sm font-black text-foreground">Ranked {String(lastRound.number).padStart(2, "0")}</p>
+                <p className="text-[10px] text-muted">Sua atuação na última rodada</p>
+              </div>
+            </div>
+            <div className="shrink-0 text-right">
+              <strong className="block text-2xl font-black leading-none text-accent">{lastRound.totalPoints.toFixed(1)}</strong>
+              <span className="text-[9px] font-black uppercase tracking-[.14em] text-muted">pontos</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 p-3">
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <p className="text-[9px] font-black uppercase tracking-[.12em] text-muted">Em campo</p>
+              <p className="mt-1 text-lg font-black text-foreground">{lastRound.playerPoints.toFixed(1)} <span className="text-[10px] text-muted">pts</span></p>
+            </div>
+            <div className="rounded-xl border border-warning/20 bg-warning/10 p-3">
+              <p className="text-[9px] font-black uppercase tracking-[.12em] text-warning">Palpites e extras</p>
+              <p className="mt-1 text-lg font-black text-warning">+{lastRound.predictionPoints.toFixed(1)} <span className="text-[10px] text-warning/70">pts</span></p>
+            </div>
           </div>
         </section>
       )}
@@ -1897,7 +1952,7 @@ export function FantasyExperience({
 
       {/* MODAL DE TUTORIAL & MODAL DE SISTEMA DE PONTUAÇÃO */}
       {showTutorial && <FantasyTutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} />}
-      {showScoringModal && <FantasyScoringModal isOpen={showScoringModal} onClose={() => setShowScoringModal(false)} />}
+      {showScoringModal && <FantasyScoringModal isOpen={showScoringModal} onClose={() => setShowScoringModal(false)} settings={settings} />}
 
       {/* MODAL DE ANÚNCIO DA REVOLUÇÃO TÁTICA (RODADA 02) */}
       <FantasyTacticalAnnouncementModal />

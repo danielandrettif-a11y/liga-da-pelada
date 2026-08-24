@@ -133,7 +133,7 @@ export type RankingRule = {
   points: number;
 };
 
-export type EventType = 'goal' | 'assist' | 'win' | 'draw' | 'loss' | 'best_goalkeeper' | 'goalkeeper_appearance' | 'goal_conceded';
+export type EventType = 'goal' | 'assist' | 'win' | 'draw' | 'loss' | 'best_goalkeeper' | 'goalkeeper_appearance' | 'goal_conceded' | 'own_goal';
 
 export type RoundStatus = 'draft' | 'active' | 'finished';
 
@@ -321,6 +321,8 @@ export type Match = {
   timer_accumulated_seconds: number;
   eligibility_elapsed_offset_seconds: number;
   duration_seconds: number;
+  timer_thirty_seconds_alerted_at?: string | null;
+  timer_finished_alerted_at?: string | null;
   created_at: string;
 };
 
@@ -364,6 +366,7 @@ export type MatchEvent = {
   assist_player_id: string | null;
   team_id: string;
   minute: number | null;
+  is_own_goal: boolean;
   created_at: string;
 };
 
@@ -381,6 +384,7 @@ export type PlayerRoundStats = {
   goalkeeper_games: number;
   clean_sheets: number;
   goals_conceded: number;
+  own_goals: number;
   points: number;
 };
 
@@ -500,6 +504,7 @@ export type RegisterGoalInput = {
   team_id: string;
   minute?: number;
   idempotency_key?: string;
+  is_own_goal?: boolean;
 };
 
 export type UpdateRankingRulesInput = {
@@ -604,7 +609,7 @@ export type Database = {
       };
       matches: {
         Row: Match;
-        Insert: Omit<Match, 'id' | 'created_at' | 'score_a' | 'score_b' | 'status' | 'timer_started_at' | 'timer_accumulated_seconds' | 'eligibility_elapsed_offset_seconds' | 'duration_seconds'> & { id?: string; created_at?: string; score_a?: number; score_b?: number; status?: MatchStatus; timer_started_at?: string | null; timer_accumulated_seconds?: number; eligibility_elapsed_offset_seconds?: number; duration_seconds?: number };
+        Insert: Omit<Match, 'id' | 'created_at' | 'score_a' | 'score_b' | 'status' | 'timer_started_at' | 'timer_accumulated_seconds' | 'eligibility_elapsed_offset_seconds' | 'duration_seconds' | 'timer_thirty_seconds_alerted_at' | 'timer_finished_alerted_at'> & { id?: string; created_at?: string; score_a?: number; score_b?: number; status?: MatchStatus; timer_started_at?: string | null; timer_accumulated_seconds?: number; eligibility_elapsed_offset_seconds?: number; duration_seconds?: number; timer_thirty_seconds_alerted_at?: string | null; timer_finished_alerted_at?: string | null };
         Update: Partial<Omit<Match, 'id'>>;
       };
       match_players: {
@@ -624,7 +629,7 @@ export type Database = {
       };
       player_round_stats: {
         Row: PlayerRoundStats;
-        Insert: Omit<PlayerRoundStats, 'id' | 'games' | 'goals' | 'assists' | 'wins' | 'draws' | 'losses' | 'points'> & { id?: string; games?: number; goals?: number; assists?: number; wins?: number; draws?: number; losses?: number; points?: number };
+        Insert: Omit<PlayerRoundStats, 'id' | 'games' | 'goals' | 'assists' | 'wins' | 'draws' | 'losses' | 'own_goals' | 'points'> & { id?: string; games?: number; goals?: number; assists?: number; wins?: number; draws?: number; losses?: number; own_goals?: number; points?: number };
         Update: Partial<Omit<PlayerRoundStats, 'id'>>;
       };
     };

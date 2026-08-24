@@ -105,7 +105,12 @@ export async function getRound(id: string) {
       ),
       matches (
         *,
-        match_events (*)
+        match_events (*),
+        match_goalkeepers (
+          team_id,
+          player_id,
+          selected_at
+        )
       ),
       league:league_id (stadium_name, stadium_map_url, event_duration_minutes)
     `)
