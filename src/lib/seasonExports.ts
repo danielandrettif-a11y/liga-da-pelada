@@ -1,6 +1,5 @@
 "use client";
 
-import { jsPDF } from "jspdf";
 import type { SeasonPlayerSummary, SeasonSummary } from "./types";
 
 const BRAND_NAME = "Pelada de Baixa Qualidade";
@@ -33,7 +32,8 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(new Date(value));
 }
 
-export function downloadSeasonPdf(summary: SeasonSummary) {
+export async function downloadSeasonPdf(summary: SeasonSummary) {
+  const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();

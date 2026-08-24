@@ -46,7 +46,7 @@ export function FinishSeasonCard() {
     setExportError("");
     try {
       const { downloadSeasonPdf } = await import("@/lib/seasonExports");
-      downloadSeasonPdf(summary);
+      await downloadSeasonPdf(summary);
     } catch (caughtError) {
       setExportError(caughtError instanceof Error ? caughtError.message : "Erro ao gerar o PDF.");
     }

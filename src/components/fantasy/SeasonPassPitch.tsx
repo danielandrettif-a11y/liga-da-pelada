@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { CheckCircle2, Crown, Sparkles, Users } from "@/components/icons";
 
@@ -368,9 +369,12 @@ export function SeasonPassPitch({
       {/* TABULEIRO GRÁFICO OFICIAL COM SOBREPOSIÇÃO INTERATIVA */}
       <div className="relative w-full overflow-hidden rounded-[2rem] border-2 border-accent/30 bg-black shadow-[inset_0_0_40px_rgba(0,0,0,0.9)]">
         {/* Imagem de Fundo Oficial */}
-        <img
+        <Image
           src="/images/season-pass-board.jpg"
           alt="Tabuleiro Oficial do Passe de Temporada"
+          width={683}
+          height={1024}
+          sizes="(max-width: 32rem) calc(100vw - 2rem), 30rem"
           className="w-full h-auto block select-none pointer-events-none"
           loading="eager"
         />

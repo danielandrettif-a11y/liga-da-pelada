@@ -13,7 +13,7 @@ export function PreviousSeasonBanner({ summary }: { summary: SeasonSummary }) {
     setError("");
     try {
       const { downloadSeasonPdf } = await import("@/lib/seasonExports");
-      downloadSeasonPdf(summary);
+      await downloadSeasonPdf(summary);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Erro ao gerar o PDF.");
     }
