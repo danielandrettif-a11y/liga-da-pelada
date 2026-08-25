@@ -2,17 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { supabase } from "../supabase";
 import type { CreateMatchInput, RegisterGoalInput, SubstituteMatchPlayerInput } from "../types";
 import { calculateRoundStats } from "./stats";
 import { getAdminClient } from "../auth";
 import { sendMatchFinishedNotifications, sendMatchTimerNotifications } from "../push-notifications";
+import { scheduleMatchTimerAlerts } from "../match-timer-scheduler";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 
 async function getMatchState(
-  client: NonNullable<Awaited<ReturnType<typeof getAdminClient>>>,
+  client: SupabaseClient,
   matchId: string,
 ) {
   const { data, error } = await client
@@ -630,11 +632,27 @@ export async function updateMatchTimer(matchId: string, action: "start" | "pause
     if (match.status !== "live") return { success: false, error: "A partida nao esta em andamento." };
 
     if (action === "start") {
+      const startedAt = new Date().toISOString();
       const { error } = await client
         .from("matches")
-        .update({ timer_started_at: new Date().toISOString() })
+        .update({ timer_started_at: startedAt })
         .eq("id", matchId);
       if (error) throw new Error(error.message);
+
+      // O PWA pode ser suspenso ao bloquear o celular. Estes jobs continuam
+      // vivos no servidor e chamam o webhook nos dois marcos do cronômetro.
+      after(async () => {
+        try {
+          await scheduleMatchTimerAlerts({
+            matchId,
+            durationSeconds: Number(match.duration_seconds || 420),
+            accumulatedSeconds: Number(match.timer_accumulated_seconds || 0),
+            startedAt,
+          });
+        } catch (schedulerError) {
+          console.error("Erro ao agendar alertas do cronômetro:", schedulerError);
+        }
+      });
     } else if (action === "pause") {
       if (match.timer_started_at) {
         const elapsed = Math.floor((new Date().getTime() - new Date(match.timer_started_at).getTime()) / 1000);
@@ -719,6 +737,21 @@ export async function addMatchExtraTime(matchId: string, extraSeconds: number) {
 
     if (error) throw new Error(error.message);
 
+    if (match.timer_started_at) {
+      after(async () => {
+        try {
+          await scheduleMatchTimerAlerts({
+            matchId,
+            durationSeconds: newDuration,
+            accumulatedSeconds: Number(match.timer_accumulated_seconds || 0),
+            startedAt: match.timer_started_at,
+          });
+        } catch (schedulerError) {
+          console.error("Erro ao reagendar alertas do cronômetro:", schedulerError);
+        }
+      });
+    }
+
     revalidatePath(`/partidas/${matchId}`);
     return { success: true, newDuration };
   } catch (err: any) {
@@ -731,10 +764,18 @@ export async function notifyMatchTimerThreshold(
   matchId: string,
   threshold: "thirty_seconds" | "finished",
 ) {
-  try {
-    const client = await getAdminClient();
-    if (!client) return { success: false, error: ADMIN_ERROR };
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: ADMIN_ERROR };
+  return dispatchMatchTimerThreshold(client, matchId, threshold);
+}
 
+/** Usado pelo webhook do agendador, sem depender de um navegador aberto. */
+export async function dispatchMatchTimerThreshold(
+  client: SupabaseClient,
+  matchId: string,
+  threshold: "thirty_seconds" | "finished",
+) {
+  try {
     const match = await getMatchState(client, matchId);
     if (match.status !== "live" || !match.timer_started_at) return { success: true, skipped: true };
 
@@ -776,7 +817,12 @@ export async function notifyMatchTimerThreshold(
     // navegador. Esperamos o envio terminar para não marcar o alerta como
     // entregue caso a execução em segundo plano seja interrompida.
     try {
-      await sendMatchTimerNotifications(client, claimed, threshold);
+      const delivery = await sendMatchTimerNotifications(client, claimed, threshold);
+      if (delivery.disabled || (delivery.sent === 0 && delivery.failed > 0)) {
+        throw new Error(delivery.disabled
+          ? "As chaves VAPID não estão configuradas no servidor."
+          : "Nenhuma notificação pôde ser entregue.");
+      }
     } catch (notificationError) {
       await client
         .from("matches")

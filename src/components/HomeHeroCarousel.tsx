@@ -25,7 +25,7 @@ export function HomeHeroCarousel({ children }: { children: ReactNode }) {
       <div
         ref={trackRef}
         onScroll={updateActiveSlide}
-        className="flex w-full snap-x snap-mandatory overflow-x-auto hide-scrollbar overscroll-x-contain touch-pan-x"
+        className="flex w-full snap-x snap-mandatory overflow-x-auto hide-scrollbar overscroll-x-contain touch-auto [-webkit-overflow-scrolling:touch]"
         aria-label="Destaques da Pelada BQ"
       >
         {items.map((item, index) => (

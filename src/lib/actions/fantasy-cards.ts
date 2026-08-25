@@ -9,8 +9,10 @@ import { isFantasyPriceEligible } from "@/lib/fantasy/cards/eligibility";
 
 export type FantasyPackDTO = {
   id: string;
-  roundId: string;
+  roundId: string | null;
   roundNumber?: number;
+  source?: string;
+  cardTier?: "bronze" | "gold" | null;
   status: "available" | "opened" | "claimed";
   openedAt: string | null;
   chosenCardId: string | null;
@@ -65,7 +67,7 @@ export async function getMyPacks(): Promise<{
   const { data: packs } = await account.client
     .from("fantasy_round_packs")
     .select(
-      "id, round_id, status, opened_at, chosen_card_id, created_at, rounds:round_id(number), offers:fantasy_pack_offers(slot, card:fantasy_cards(*))"
+      "id, round_id, status, opened_at, chosen_card_id, created_at, source, card_tier, rounds:round_id(number), offers:fantasy_pack_offers(slot, card:fantasy_cards(*))"
     )
     .eq("user_id", account.user.id)
     .order("created_at", { ascending: false });
@@ -76,6 +78,8 @@ export async function getMyPacks(): Promise<{
     id: p.id,
     roundId: p.round_id,
     roundNumber: p.rounds?.number,
+    source: p.source,
+    cardTier: p.card_tier,
     status: p.status,
     openedAt: p.opened_at,
     chosenCardId: p.chosen_card_id,
@@ -125,7 +129,7 @@ export async function openPack(packId: string): Promise<{
   // Buscar pacote
   const { data: pack, error: packErr } = await client
     .from("fantasy_round_packs")
-    .select("id, user_id, status, offers:fantasy_pack_offers(slot, card:fantasy_cards(*))")
+    .select("id, user_id, status, card_tier, offers:fantasy_pack_offers(slot, card:fantasy_cards(*))")
     .eq("id", packId)
     .single();
 
@@ -148,7 +152,7 @@ export async function openPack(packId: string): Promise<{
   }
 
   // Sorteio server-side de 2 opções distintas
-  const [offer1, offer2] = generatePackOffers();
+  const [offer1, offer2] = generatePackOffers(undefined, Math.random, pack.card_tier as "bronze" | "gold" | null);
 
   // Buscar IDs no banco
   const { data: dbCards } = await client

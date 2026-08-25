@@ -34,6 +34,27 @@ Os dois fluxos usam a mesma callback pública fixa para impedir que headers de p
 https://pelada-de-baixa-qualidade.179.197.75.220.sslip.io/auth/callback
 ```
 
+## Notificações do cronômetro com o celular bloqueado
+
+O aviso dentro da tela da partida funciona enquanto ela está aberta, mas iPhone e Android suspendem a página quando a tela bloqueia. Para entregar o alerta real de **00:30** e **00:00**, o app agenda dois Web Push no servidor quando o ADM inicia o cronômetro.
+
+Configure as variáveis de produção abaixo (nunca no navegador):
+
+```text
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+QSTASH_TOKEN=
+MATCH_TIMER_WEBHOOK_SECRET=
+```
+
+1. Gere as chaves VAPID uma vez e mantenha-as fixas.
+2. No [QStash](https://console.upstash.com/qstash), crie um token e use-o em `QSTASH_TOKEN`.
+3. Gere uma frase longa e aleatória para `MATCH_TIMER_WEBHOOK_SECRET`.
+4. Em cada celular, instale o PWA (obrigatório no iPhone), entre em **Mais → Avisos de partida**, toque em **Ativar** e depois em **Testar**.
+
+O QStash chama o webhook interno do app nos horários programados. Pausas, acréscimos e reinícios são validados novamente no banco antes do envio; por isso um alerta antigo nunca encerra uma partida cedo nem gera duplicidade.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

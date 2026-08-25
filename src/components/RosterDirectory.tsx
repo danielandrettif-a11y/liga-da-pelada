@@ -5,6 +5,8 @@ import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayersStatsGrid, type PlayerStats } from "./PlayersStatsGrid";
 import { RosterUnreadLink } from "./RosterUnreadLink";
+import { markRosterActivitySeenThrough } from "@/lib/actions/registrations";
+import { Crown } from "@/components/icons";
 
 type RosterFilter = "all" | "players" | "wags" | "supporters";
 type RosterView = "roster" | "pass";
@@ -19,6 +21,8 @@ type Props = {
   unreadSeenThrough?: string | null;
   initialView?: RosterView;
   seasonPass?: ReactNode;
+  seasonPassProgress?: number;
+  seasonPassMaxProgress?: number;
 };
 
 const FILTERS: Array<{ value: RosterFilter; label: string }> = [
@@ -49,7 +53,7 @@ function SectionDivider({ title, subtitle, count, tone = "accent" }: { title: st
   );
 }
 
-function CommunityGrid({ players, label, unreadPlayerIds, unreadSeenThrough }: { players: Player[]; label: "WAG" | "Torcida"; unreadPlayerIds: Set<string>; unreadSeenThrough: string | null }) {
+function CommunityGrid({ players, label, unreadPlayerIds }: { players: Player[]; label: "WAG" | "Torcida"; unreadPlayerIds: Set<string> }) {
   if (players.length === 0) {
     return <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted">Nenhum perfil nesta categoria.</div>;
   }
@@ -57,7 +61,7 @@ function CommunityGrid({ players, label, unreadPlayerIds, unreadSeenThrough }: {
   return (
     <div className="grid min-w-0 grid-cols-2 gap-3">
       {players.map((player) => (
-        <RosterUnreadLink key={player.id} href={`/jogadores/${player.id}`} unread={unreadPlayerIds.has(player.id)} seenThrough={unreadSeenThrough} className="glass-card glass-card-hover min-w-0 overflow-hidden p-3.5 text-center">
+        <RosterUnreadLink key={player.id} href={`/jogadores/${player.id}`} unread={unreadPlayerIds.has(player.id)} className="glass-card glass-card-hover min-w-0 overflow-hidden p-3.5 text-center">
           <div className="relative mx-auto w-fit">
             <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-20 w-20 rounded-full border-2 border-accent/25 bg-surface text-lg font-black text-muted ring-4 ring-background" />
             <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-accent/25 bg-background px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-accent">{label}</span>
@@ -70,12 +74,13 @@ function CommunityGrid({ players, label, unreadPlayerIds, unreadSeenThrough }: {
   );
 }
 
-export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters, unreadPlayerIds = [], unreadSeenThrough = null, initialView = "roster", seasonPass }: Props) {
+export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters, unreadPlayerIds = [], unreadSeenThrough = null, initialView = "roster", seasonPass, seasonPassProgress = 0, seasonPassMaxProgress = 40 }: Props) {
   const [view, setView] = useState<RosterView>(initialView);
   const [filter, setFilter] = useState<RosterFilter>("all");
   const [statsMode, setStatsMode] = useState<StatsMode>("ranked");
+  const [visibleUnreadPlayerIds, setVisibleUnreadPlayerIds] = useState(unreadPlayerIds);
   const passPanelRef = useRef<HTMLElement>(null);
-  const unreadIds = new Set(unreadPlayerIds);
+  const unreadIds = new Set(visibleUnreadPlayerIds);
   const showPlayers = filter === "all" || filter === "players";
   const showWags = filter === "all" || filter === "wags";
   const showSupporters = filter === "all" || filter === "supporters";
@@ -83,6 +88,25 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
   const visibleGuests = activeGuests[statsMode];
 
   useEffect(() => setView(initialView), [initialView]);
+  useEffect(() => setVisibleUnreadPlayerIds(unreadPlayerIds), [unreadPlayerIds]);
+
+  // A visita ao Elenco é a confirmação de leitura. Antes, a confirmação só
+  // ocorria se o card individual atingisse 55% da tela, o que fazia o aviso
+  // voltar quando a pessoa já tinha visto a novidade pela própria aba.
+  useEffect(() => {
+    if (view !== "roster" || !unreadSeenThrough || visibleUnreadPlayerIds.length === 0) return;
+
+    let cancelled = false;
+    void markRosterActivitySeenThrough(unreadSeenThrough).then((result) => {
+      if (cancelled || !result.success) return;
+      setVisibleUnreadPlayerIds([]);
+      window.dispatchEvent(new CustomEvent("roster-unread-cleared"));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [unreadSeenThrough, view, visibleUnreadPlayerIds.length]);
 
   useEffect(() => {
     if (view !== "pass") return;
@@ -99,7 +123,14 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
       <div className="sticky top-20 z-30 -mx-1 rounded-2xl border border-border bg-background/95 p-1.5 shadow-xl shadow-black/20 backdrop-blur-xl">
         <div className="grid grid-cols-2 gap-1" role="tablist" aria-label="Alternar entre elenco e passe de temporada">
           <button type="button" role="tab" aria-selected={view === "roster"} onClick={() => setView("roster")} className={`rounded-xl py-3 text-xs font-black transition-colors ${view === "roster" ? "bg-accent text-background shadow-[0_0_18px_rgba(204,255,0,.16)]" : "text-muted hover:bg-surface hover:text-foreground"}`}>Elenco</button>
-          <button type="button" role="tab" aria-selected={view === "pass"} onClick={() => setView("pass")} className={`rounded-xl py-3 text-xs font-black transition-colors ${view === "pass" ? "bg-[#9f5cff] text-white shadow-[0_0_18px_rgba(159,92,255,.25)]" : "text-muted hover:bg-surface hover:text-foreground"}`}>Passe</button>
+          <button type="button" role="tab" aria-selected={view === "pass"} onClick={() => setView("pass")} className={`relative overflow-hidden rounded-xl border px-2 py-1.5 text-left transition-all ${view === "pass" ? "border-[#cd91ff] bg-gradient-to-r from-[#7734bb] to-[#a35bea] text-white shadow-[0_0_20px_rgba(159,92,255,.42)]" : "border-[#a761e8]/65 bg-gradient-to-r from-[#27103f] to-[#3f1a63] text-[#f0dfff] shadow-[0_0_16px_rgba(159,92,255,.16)] hover:brightness-110"}`}>
+            <span className="pointer-events-none absolute -right-3 -top-5 h-16 w-16 rounded-full bg-[#d5ff37]/15 blur-xl" />
+            <span className="relative flex items-center gap-2">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/20 bg-black/15 text-[#e7c8ff]"><Crown className="h-4 w-4" /></span>
+              <span className="min-w-0 flex-1"><span className="block text-[11px] font-black leading-none">Passe BQ</span><span className="mt-1 block text-[8px] font-bold uppercase tracking-[0.12em] text-white/70">Sua trilha</span></span>
+              <span className="shrink-0 rounded-lg bg-black/20 px-1.5 py-1 text-[9px] font-black text-[#d5ff37]">{seasonPassProgress}/{seasonPassMaxProgress}</span>
+            </span>
+          </button>
         </div>
       </div>
 
@@ -131,28 +162,28 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
       {showPlayers && (
         <section className="scroll-mt-36 space-y-4">
           <SectionDivider title="Jogadores oficiais" subtitle={statsMode === "ranked" ? "Atletas que disputam o Ranked" : "Desempenho separado nos amistosos"} count={visibleOfficialPlayers.length} />
-          <PlayersStatsGrid players={visibleOfficialPlayers} unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} />
+          <PlayersStatsGrid players={visibleOfficialPlayers} unreadPlayerIds={unreadIds} />
         </section>
       )}
 
       {showPlayers && visibleGuests.length > 0 && (
         <section className="scroll-mt-36 space-y-4">
           <SectionDivider title="Convidados" subtitle="Participações temporárias com histórico preservado" count={visibleGuests.length} tone="warning" />
-          <PlayersStatsGrid players={visibleGuests} unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} />
+          <PlayersStatsGrid players={visibleGuests} unreadPlayerIds={unreadIds} />
         </section>
       )}
 
       {showWags && (
         <section className="scroll-mt-36 space-y-4">
           <SectionDivider title="WAGs" subtitle="A comissão que acompanha a resenha" count={wags.length} tone="warning" />
-          <CommunityGrid players={wags} label="WAG" unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} />
+          <CommunityGrid players={wags} label="WAG" unreadPlayerIds={unreadIds} />
         </section>
       )}
 
       {showSupporters && (
         <section className="scroll-mt-36 space-y-4">
           <SectionDivider title="Torcida" subtitle="Quem empurra a pelada do lado de fora" count={supporters.length} tone="muted" />
-          <CommunityGrid players={supporters} label="Torcida" unreadPlayerIds={unreadIds} unreadSeenThrough={unreadSeenThrough} />
+          <CommunityGrid players={supporters} label="Torcida" unreadPlayerIds={unreadIds} />
         </section>
       )}
       </>}

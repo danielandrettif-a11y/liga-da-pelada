@@ -25,14 +25,15 @@ export function rollRarity(randomFn: () => number = Math.random): FantasyCardRar
  */
 export function generatePackOffers(
   catalog: FantasyCardDefinition[] = FANTASY_CARDS_CATALOG.filter((c) => c.enabled),
-  randomFn: () => number = Math.random
+  randomFn: () => number = Math.random,
+  tier?: "bronze" | "gold" | null,
 ): [FantasyCardDefinition, FantasyCardDefinition] {
   if (catalog.length < 2) {
     throw new Error("O catálogo deve conter pelo menos 2 cartas habilitadas para gerar um pacote.");
   }
 
   function pickOne(excludeSlug?: string): FantasyCardDefinition {
-    const rarity = rollRarity(randomFn);
+    const rarity = tier === "bronze" ? "COMMON" : tier === "gold" ? (randomFn() < .72 ? "RARE" : "EPIC") : rollRarity(randomFn);
     let candidates = catalog.filter((c) => c.rarity === rarity && c.slug !== excludeSlug);
 
     // Fallback se não houver cartas daquela raridade com slug diferente

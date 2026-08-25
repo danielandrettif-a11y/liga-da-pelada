@@ -36,7 +36,7 @@ function alphabeticalCompare(a: PlayerStats, b: PlayerStats) {
   return getDisplayName(a.name).localeCompare(getDisplayName(b.name), "pt-BR");
 }
 
-export function PlayersStatsGrid({ players, unreadPlayerIds = new Set<string>(), unreadSeenThrough = null }: { players: PlayerStats[]; unreadPlayerIds?: Set<string>; unreadSeenThrough?: string | null }) {
+export function PlayersStatsGrid({ players, unreadPlayerIds = new Set<string>() }: { players: PlayerStats[]; unreadPlayerIds?: Set<string> }) {
   const [sortBy, setSortBy] = useState<SortOption>("alphabetical");
   const sortedPlayers = useMemo(() => [...players].sort((a, b) => {
     if (sortBy === "alphabetical") return alphabeticalCompare(a, b);
@@ -62,7 +62,7 @@ export function PlayersStatsGrid({ players, unreadPlayerIds = new Set<string>(),
 
       <div className="grid min-w-0 grid-cols-2 gap-3">
         {sortedPlayers.map((player, index) => (
-          <RosterUnreadLink key={player.id} href={`/jogadores/${player.id}`} unread={unreadPlayerIds.has(player.id)} seenThrough={unreadSeenThrough} className="block h-full min-w-0">
+          <RosterUnreadLink key={player.id} href={`/jogadores/${player.id}`} unread={unreadPlayerIds.has(player.id)} className="block h-full min-w-0">
             <div className={`player-stat-card h-full min-w-0 rounded-2xl p-3.5 animate-fade-in stagger-${Math.min(index + 1, 5)}`}>
               <div className="mb-3 flex items-center gap-3">
                 <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-11 w-11 flex-shrink-0 rounded-full border border-accent/25 bg-surface-hover text-sm font-bold text-muted ring-2 ring-background shadow-[0_0_16px_rgba(204,255,0,.08)]" />

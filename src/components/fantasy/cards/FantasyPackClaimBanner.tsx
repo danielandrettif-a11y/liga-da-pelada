@@ -46,12 +46,14 @@ export function FantasyPackClaimBanner({ packs, onPackClaimed }: Props) {
               </div>
 
               <h3 className="mt-0.5 font-athletic text-lg font-black uppercase italic text-white">
-                {currentPack.roundNumber
+                {currentPack.source === "season_pass"
+                  ? `Pacote ${currentPack.cardTier === "gold" ? "Ouro" : "Bronze"} do Passe`
+                  : currentPack.roundNumber
                   ? `Pacote da Rodada ${String(currentPack.roundNumber).padStart(2, "0")}`
                   : "Pacote da Rodada Finalizada"}
               </h3>
               <p className="text-xs text-muted">
-                Você participou da rodada! Abra agora para sortear 2 cartas e escolher 1 para o seu inventário.
+                {currentPack.source === "season_pass" ? "Você avançou no Passe! Abra agora e escolha uma carta para o seu inventário." : "Você participou da rodada! Abra agora para sortear 2 cartas e escolher 1 para o seu inventário."}
               </p>
             </div>
           </div>

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Bell, Check, Loader2 } from "@/components/icons";
 import {
   getPushPublicKey,
+  getPushSystemStatus,
+  sendPushTest,
   subscribeToPush,
   unsubscribeFromPush,
   type SerializedPushSubscription,
@@ -57,6 +59,7 @@ export function PushNotificationSettings() {
   const [state, setState] = useState<NotificationState>("loading");
   const [isBusy, setIsBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [backgroundAlertsReady, setBackgroundAlertsReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +81,8 @@ export function PushNotificationSettings() {
       }
 
       try {
+        const systemStatus = await getPushSystemStatus();
+        if (!cancelled) setBackgroundAlertsReady(systemStatus.backgroundAlertsConfigured);
         const registration = await registerPushWorker();
         const subscription = await registration.pushManager.getSubscription();
         if (cancelled) return;
@@ -115,6 +120,7 @@ export function PushNotificationSettings() {
       const publicKey = configuration.publicKey;
       if (!configuration.success) throw new Error(configuration.error);
       if (!publicKey) throw new Error("As notificações ainda não foram configuradas no servidor.");
+      setBackgroundAlertsReady(configuration.backgroundAlertsConfigured);
 
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
@@ -172,6 +178,16 @@ export function PushNotificationSettings() {
     }
   }
 
+  async function testNotifications() {
+    setIsBusy(true);
+    setMessage("");
+    const result = await sendPushTest();
+    setMessage(result.success
+      ? "Teste enviado. Bloqueie a tela por um instante: a notificação deve aparecer nela."
+      : result.error || "Não foi possível enviar o teste.");
+    setIsBusy(false);
+  }
+
   if (state === "unsupported") return null;
 
   const isActive = state === "active";
@@ -180,7 +196,9 @@ export function PushNotificationSettings() {
     : state === "denied"
       ? "Permissão bloqueada. Libere nas configurações do celular."
       : isActive
-        ? "Alertas de 30 segundos, fim de jogo e resultados das rodadas em que você estiver inscrito."
+        ? backgroundAlertsReady
+          ? "Alertas de 30 segundos, fim de jogo e resultados das rodadas em que você estiver inscrito."
+          : "Notificações ativadas neste aparelho. O agendador de tela bloqueada ainda precisa ser configurado pelo administrador."
         : "Receba os avisos de 30 segundos e fim das partidas da sua rodada.";
 
   return (
@@ -200,14 +218,26 @@ export function PushNotificationSettings() {
           </span>
 
           {(state === "active" || state === "inactive") && (
-            <button
-              type="button"
-              onClick={isActive ? disableNotifications : enableNotifications}
-              disabled={isBusy}
-              className={`shrink-0 rounded-lg px-3 py-2 text-xs font-black transition-colors disabled:opacity-60 ${isActive ? "border border-border text-muted hover:text-foreground" : "bg-accent text-background hover:bg-accent-light"}`}
-            >
-              {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : isActive ? "Desativar" : "Ativar"}
-            </button>
+            <div className="flex shrink-0 flex-col gap-1.5">
+              {isActive && (
+                <button
+                  type="button"
+                  onClick={testNotifications}
+                  disabled={isBusy}
+                  className="rounded-lg bg-surface px-3 py-2 text-xs font-black text-accent transition-colors hover:bg-surface-hover disabled:opacity-60"
+                >
+                  Testar
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={isActive ? disableNotifications : enableNotifications}
+                disabled={isBusy}
+                className={`rounded-lg px-3 py-2 text-xs font-black transition-colors disabled:opacity-60 ${isActive ? "border border-border text-muted hover:text-foreground" : "bg-accent text-background hover:bg-accent-light"}`}
+              >
+                {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : isActive ? "Desativar" : "Ativar"}
+              </button>
+            </div>
           )}
         </div>
 

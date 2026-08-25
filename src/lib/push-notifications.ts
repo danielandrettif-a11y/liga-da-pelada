@@ -17,6 +17,23 @@ type StoredSubscription = {
   auth: string;
 };
 
+type PushNotification = {
+  title: string;
+  body: string;
+  tag: string;
+  url?: string;
+};
+
+export function getWebPushConfiguration() {
+  const publicKey = process.env.VAPID_PUBLIC_KEY || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  return {
+    publicKey,
+    privateKey,
+    configured: Boolean(publicKey && privateKey),
+  };
+}
+
 function teamName(team: MatchForPush["team_a"], fallback: string) {
   if (Array.isArray(team)) return team[0]?.name || fallback;
   return team?.name || fallback;
@@ -30,11 +47,10 @@ function isExpiredSubscription(error: unknown) {
 async function sendMatchNotifications(
   client: SupabaseClient,
   match: MatchForPush,
-  notification: { title: string; body: string; tag: string },
+  notification: PushNotification,
 ) {
-  const publicKey = process.env.VAPID_PUBLIC_KEY || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-  if (!publicKey || !privateKey) {
+  const { publicKey, privateKey, configured } = getWebPushConfiguration();
+  if (!configured || !publicKey || !privateKey) {
     console.warn("Notificação de fim de jogo ignorada: chaves VAPID não configuradas.");
     return { sent: 0, failed: 0, disabled: true };
   }
@@ -55,6 +71,20 @@ async function sendMatchNotifications(
 
   if (profilesError) throw profilesError;
   const userIds = [...new Set((profiles || []).map((profile) => profile.user_id))];
+  return sendPushNotificationsToUsers(client, userIds, notification, `/partidas/${match.id}`);
+}
+
+async function sendPushNotificationsToUsers(
+  client: SupabaseClient,
+  userIds: string[],
+  notification: PushNotification,
+  fallbackUrl: string,
+) {
+  const { publicKey, privateKey, configured } = getWebPushConfiguration();
+  if (!configured || !publicKey || !privateKey) {
+    console.warn("Notificação push ignorada: chaves VAPID não configuradas.");
+    return { sent: 0, failed: 0, disabled: true };
+  }
   if (userIds.length === 0) return { sent: 0, failed: 0 };
 
   const { data: subscriptions, error: subscriptionsError } = await client
@@ -71,7 +101,7 @@ async function sendMatchNotifications(
     icon: "/icons/pelada-bq-v2-192.png",
     badge: "/icons/pelada-bq-v2-192.png",
     tag: notification.tag,
-    url: `/partidas/${match.id}`,
+    url: notification.url || fallbackUrl,
   });
 
   const expiredEndpoints: string[] = [];
@@ -107,6 +137,15 @@ async function sendMatchNotifications(
   }
 
   return { sent, failed };
+}
+
+export async function sendPushTestNotification(client: SupabaseClient, userId: string) {
+  return sendPushNotificationsToUsers(client, [userId], {
+    title: "Notificações ativadas!",
+    body: "Este é um teste. Os avisos de 30 segundos e fim de jogo chegarão mesmo com o celular bloqueado.",
+    tag: `push-test-${userId}`,
+    url: "/mais",
+  }, "/mais");
 }
 
 export async function sendMatchFinishedNotifications(

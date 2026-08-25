@@ -1,6 +1,7 @@
 "use server";
 
 import { getCurrentAccount } from "@/lib/auth";
+import { getWebPushConfiguration, sendPushTestNotification } from "@/lib/push-notifications";
 
 export type SerializedPushSubscription = {
   endpoint: string;
@@ -13,19 +14,35 @@ export type SerializedPushSubscription = {
 };
 
 export async function getPushPublicKey() {
-  const publicKey = process.env.VAPID_PUBLIC_KEY
-    || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-    || "";
+  const { publicKey, configured } = getWebPushConfiguration();
+  const backgroundAlertsConfigured = Boolean(
+    process.env.QSTASH_TOKEN
+    && process.env.MATCH_TIMER_WEBHOOK_SECRET
+    && process.env.SUPABASE_SERVICE_ROLE_KEY,
+  );
 
-  if (!publicKey) {
+  if (!publicKey || !configured) {
     return {
       success: false,
       publicKey: "",
-      error: "As chaves VAPID ainda não foram configuradas no servidor.",
+      backgroundAlertsConfigured,
+      error: "As chaves VAPID do servidor ainda não estão completas.",
     };
   }
 
-  return { success: true, publicKey };
+  return { success: true, publicKey, backgroundAlertsConfigured };
+}
+
+export async function getPushSystemStatus() {
+  const { configured } = getWebPushConfiguration();
+  return {
+    pushConfigured: configured,
+    backgroundAlertsConfigured: Boolean(
+      process.env.QSTASH_TOKEN
+      && process.env.MATCH_TIMER_WEBHOOK_SECRET
+      && process.env.SUPABASE_SERVICE_ROLE_KEY,
+    ),
+  };
 }
 
 function isValidSubscription(subscription: SerializedPushSubscription) {
@@ -78,4 +95,25 @@ export async function unsubscribeFromPush(endpoint: string) {
   }
 
   return { success: true };
+}
+
+export async function sendPushTest() {
+  const account = await getCurrentAccount();
+  if (!account.user) return { success: false, error: "Entre na sua conta para testar as notificações." };
+
+  try {
+    const delivery = await sendPushTestNotification(account.client, account.user.id);
+    if (delivery.disabled) {
+      return { success: false, error: "As chaves VAPID do servidor ainda não estão completas." };
+    }
+    if (delivery.sent === 0) {
+      return { success: false, error: delivery.failed > 0
+        ? "O celular recusou a notificação. Ative a permissão do app nas configurações."
+        : "Este aparelho ainda não possui uma assinatura de notificação ativa." };
+    }
+    return { success: true };
+  } catch (error) {
+    console.error("Erro ao enviar teste de push:", error);
+    return { success: false, error: "Não foi possível entregar o teste agora." };
+  }
 }

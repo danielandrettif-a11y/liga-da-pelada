@@ -2,17 +2,19 @@ import { RosterDirectory } from "@/components/RosterDirectory";
 import { getRosterGroups } from "@/lib/actions/players";
 import { getUnreadRosterPlayers } from "@/lib/actions/registrations";
 import { getSeasonPassDashboard } from "@/lib/actions/fantasy";
+import { getMyCosmeticsDashboard } from "@/lib/actions/cosmetics";
 import { SeasonPassExperience } from "@/components/fantasy/SeasonPassExperience";
 
 export const revalidate = 0;
 
 export default async function JogadoresPage({ searchParams }: PageProps<"/jogadores">) {
   const { tab } = await searchParams;
-  const [rankedRoster, friendlyRoster, unreadRoster, seasonPass] = await Promise.all([
+  const [rankedRoster, friendlyRoster, unreadRoster, seasonPass, cosmetics] = await Promise.all([
     getRosterGroups("official"),
     getRosterGroups("friendly"),
     getUnreadRosterPlayers(),
     getSeasonPassDashboard(),
+    getMyCosmeticsDashboard(),
   ]);
 
   return (
@@ -30,7 +32,9 @@ export default async function JogadoresPage({ searchParams }: PageProps<"/jogado
         unreadPlayerIds={unreadRoster.playerIds}
         unreadSeenThrough={unreadRoster.seenThrough}
         initialView={tab === "passe" ? "pass" : "roster"}
-        seasonPass={<SeasonPassExperience pass={seasonPass} />}
+        seasonPassProgress={seasonPass.progress}
+        seasonPassMaxProgress={seasonPass.maxProgress}
+        seasonPass={<SeasonPassExperience pass={seasonPass} cosmetics={cosmetics} />}
       />
     </div>
   );
