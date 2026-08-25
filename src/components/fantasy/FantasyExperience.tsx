@@ -1819,6 +1819,21 @@ export function FantasyExperience({
                           </div>
                         )}
 
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-lg border border-emerald-400/15 bg-emerald-400/[0.06] px-2 py-1 text-[8px] font-semibold text-emerald-100/85">
+                          <span className="font-black text-emerald-300">🧤 No gol:</span>
+                          {player.goalkeeperGames > 0 ? (
+                            <>
+                              <span><strong className="text-foreground">{player.goalkeeperGames}</strong> {player.goalkeeperGames === 1 ? "partida" : "partidas"}</span>
+                              <span className="text-emerald-200/45">·</span>
+                              <span><strong className="text-foreground">{player.goalsConceded}</strong> {player.goalsConceded === 1 ? "gol tomado" : "gols tomados"}</span>
+                              <span className="text-emerald-200/45">·</span>
+                              <span>média <strong className="text-accent">{player.goalkeeperConcededAverage?.toFixed(2)}</strong>/jogo</span>
+                            </>
+                          ) : (
+                            <span className="text-muted">sem partidas no rodízio</span>
+                          )}
+                        </div>
+
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px]">
                           <span className="font-black text-accent">
                             {formatFantasyMoney(player.price, settings.currencyName)}

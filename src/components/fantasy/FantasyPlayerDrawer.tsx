@@ -209,6 +209,26 @@ export function FantasyPlayerDrawer({
           </div>
         </div>
 
+        <div className="mt-3 rounded-2xl border border-emerald-400/25 bg-emerald-400/[0.07] p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-wider text-emerald-300">🧤 Histórico no rodízio do gol</p>
+              <p className="mt-1 text-[11px] leading-4 text-muted">Use estes números para decidir sua aposta na vaga GOL.</p>
+            </div>
+            {player.goalkeeperGames > 0 ? (
+              <div className="shrink-0 text-right text-xs">
+                <p className="font-black text-foreground">{player.goalkeeperGames} {player.goalkeeperGames === 1 ? "jogo" : "jogos"}</p>
+                <p className="text-[9px] font-bold text-accent">{player.goalkeeperConcededAverage?.toFixed(2)} sofridos/jogo</p>
+              </div>
+            ) : <span className="shrink-0 text-[10px] font-bold text-muted">Sem histórico</span>}
+          </div>
+          {player.goalkeeperGames > 0 && (
+            <div className="mt-2 border-t border-emerald-400/15 pt-2 text-xs font-bold text-emerald-100">
+              {player.goalsConceded} {player.goalsConceded === 1 ? "gol tomado" : "gols tomados"} em {player.goalkeeperGames} {player.goalkeeperGames === 1 ? "partida" : "partidas"} no gol.
+            </div>
+          )}
+        </div>
+
         {/* Gráfico de Evolução de Preço */}
         <div className="mt-4 rounded-2xl border border-white/10 bg-black/40 p-3.5">
           <div className="flex items-center justify-between text-xs font-black text-muted">
