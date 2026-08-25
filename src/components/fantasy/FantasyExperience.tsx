@@ -179,8 +179,17 @@ export function FantasyExperience({
     if (!initialIds.length) return slots;
 
     // 1. Tentar restaurar o layout direto do banco de dados (slot_index salvo)
-    const dbPlayers = (lineup?.fantasy_lineup_players || []).filter((item: any) => Boolean(item?.player_id));
-    const hasDbSlots = dbPlayers.some((item: any) => typeof item.slot_index === "number" && item.slot_index >= 0 && item.slot_index < playersPerTeam);
+    const dbPlayers = (
+      lineup?.fantasy_lineup_players ||
+      lineup?.fantasy_portfolio_players ||
+      []
+    ).filter((item: any) => Boolean(item?.player_id));
+    const hasDbSlots = dbPlayers.some(
+      (item: any) =>
+        typeof item.slot_index === "number" &&
+        item.slot_index >= 0 &&
+        item.slot_index < playersPerTeam,
+    );
 
     if (hasDbSlots) {
       const placed = new Set<string>();
@@ -208,88 +217,47 @@ export function FantasyExperience({
       return slots;
     }
 
-    // 2. Tentar restaurar o layout exato de vagas salvo no cache do navegador
+    // 2. Tentar restaurar o layout exato de vagas salvo no cache do navegador (mesmo que incompleto)
     if (typeof window !== "undefined") {
       try {
         const cached = localStorage.getItem(storageKey);
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length === playersPerTeam) {
-            const parsedValid = parsed.filter(Boolean);
-            const hasAll =
-              initialIds.length === parsedValid.length &&
-              initialIds.every((id: string) => parsedValid.includes(id));
-            if (hasAll) {
-              return parsed;
+          if (Array.isArray(parsed)) {
+            const cachedSlots = Array(playersPerTeam).fill("");
+            const placed = new Set<string>();
+
+            // Colocar cada jogador exatamente na mesma vaga que ele estava no cache
+            for (let i = 0; i < Math.min(parsed.length, playersPerTeam); i++) {
+              const id = parsed[i];
+              if (id && initialIds.includes(id)) {
+                cachedSlots[i] = id;
+                placed.add(id);
+              }
+            }
+
+            // Alocar eventuais atletas de initialIds que não constavam no cache nas vagas vazias
+            for (const id of initialIds) {
+              if (!placed.has(id)) {
+                const emptyIdx = cachedSlots.indexOf("");
+                if (emptyIdx !== -1) {
+                  cachedSlots[emptyIdx] = id;
+                  placed.add(id);
+                }
+              }
+            }
+
+            if (placed.size === initialIds.length) {
+              return cachedSlots;
             }
           }
         }
       } catch {}
     }
 
-    // 3. Fallback inteligente por perfil (apenas na 1ª vez sem cache/banco)
-    const playerMap = new Map(market.map((p) => [p.id, p]));
-    const remainingIds = [...initialIds];
-
-    if (playersPerTeam === 6) {
-      const gkSlot = 5;
-      const gkIdx = remainingIds.findIndex((id) => (playerMap.get(id)?.goalkeeperGames || 0) > 0);
-      if (gkIdx >= 0) {
-        slots[gkSlot] = remainingIds[gkIdx];
-        remainingIds.splice(gkIdx, 1);
-      } else if (remainingIds.length === playersPerTeam) {
-        slots[gkSlot] = remainingIds.pop()!;
-      }
-    }
-
-    // Atacantes
-    const ataSlots = playersPerTeam === 6
-      ? (formation === "2-1-2" ? [0, 1] : [0])
-      : (formation === "2-1-2" ? [0, 1] : [0]);
-    for (const s of ataSlots) {
-      if (slots[s] === "") {
-        const ataIdx = remainingIds.findIndex((id) => playerMap.get(id)?.profile === "offensive");
-        if (ataIdx >= 0) {
-          slots[s] = remainingIds[ataIdx];
-          remainingIds.splice(ataIdx, 1);
-        }
-      }
-    }
-
-    // Meias
-    const meiSlots = playersPerTeam === 6
-      ? (formation === "2-1-2" ? [2] : [1, 2])
-      : (formation === "2-1-2" ? [2] : [1, 2]);
-    for (const s of meiSlots) {
-      if (slots[s] === "") {
-        const meiIdx = remainingIds.findIndex((id) => {
-          const p = playerMap.get(id);
-          return p && (p.profile === "midfield" || !p.profile);
-        });
-        if (meiIdx >= 0) {
-          slots[s] = remainingIds[meiIdx];
-          remainingIds.splice(meiIdx, 1);
-        }
-      }
-    }
-
-    // Defensores
-    const defSlots = [3, 4];
-    for (const s of defSlots) {
-      if (s < playersPerTeam && slots[s] === "") {
-        const defIdx = remainingIds.findIndex((id) => playerMap.get(id)?.profile === "defensive");
-        if (defIdx >= 0) {
-          slots[s] = remainingIds[defIdx];
-          remainingIds.splice(defIdx, 1);
-        }
-      }
-    }
-
-    // Restantes
-    for (let i = 0; i < playersPerTeam; i++) {
-      if (slots[i] === "" && remainingIds.length > 0) {
-        slots[i] = remainingIds.shift()!;
-      }
+    // 3. Fallback estável: preenche sequencialmente sem reordenar/embaralhar
+    for (let i = 0; i < Math.min(initialIds.length, playersPerTeam); i++) {
+      slots[i] = initialIds[i];
     }
 
     return slots;
@@ -641,17 +609,17 @@ export function FantasyExperience({
       while (next.length < playersPerTeam) {
         next.push("");
       }
-      if (targetSlot !== null && targetSlot >= 0 && targetSlot < playersPerTeam && !next[targetSlot]) {
+      if (targetSlot !== null && targetSlot >= 0 && targetSlot < playersPerTeam) {
         next[targetSlot] = player.id;
       } else {
         const firstEmpty = next.findIndex((id) => !id);
         if (firstEmpty !== -1) {
           next[firstEmpty] = player.id;
         } else {
-          next.push(player.id);
+          next[0] = player.id;
         }
       }
-      return next;
+      return next.slice(0, playersPerTeam);
     });
 
     setTargetSlot(null);

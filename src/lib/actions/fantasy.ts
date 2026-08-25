@@ -747,12 +747,12 @@ export async function getFantasyDashboard() {
   if (!effectiveLineup && !isTest) {
     const savedSelection = latestLineup;
     if (savedSelection) {
-      const eligible = (savedSelection.fantasy_lineup_players || [])
-        .map((item: any) => item.player_id)
-        .filter((id: string) => market.some((player) => player.id === id));
-      const suggestedCost = eligible.reduce(
-        (sum: number, id: string) =>
-          sum + (market.find((player) => player.id === id)?.price || 0),
+      const eligiblePlayers = (savedSelection.fantasy_lineup_players || []).filter(
+        (item: any) => market.some((player) => player.id === item.player_id)
+      );
+      const suggestedCost = eligiblePlayers.reduce(
+        (sum: number, item: any) =>
+          sum + (market.find((player) => player.id === item.player_id)?.price || 0),
         0
       );
       if (
@@ -761,7 +761,7 @@ export async function getFantasyDashboard() {
         effectiveLineup = {
           ...savedSelection,
           status: betweenRounds ? "previous" : "suggested",
-          fantasy_lineup_players: eligible.map((player_id: string) => ({ player_id })),
+          fantasy_lineup_players: eligiblePlayers,
         };
       }
     }
