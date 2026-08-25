@@ -1082,7 +1082,7 @@ export function FantasyExperience({
       </nav>
 
       {/* SELETOR DE ABAS PRINCIPAIS (MEU TIME × MERCADO) */}
-      <div className="sticky top-[4.25rem] z-30 rounded-2xl border border-border bg-[#05100B]/95 p-1.5 backdrop-blur-xl shadow-[0_12px_35px_rgba(0,0,0,.35)]">
+      <div className="sticky top-[calc(4rem+env(safe-area-inset-top)+0.5rem)] z-30 -mx-1 rounded-2xl border border-border bg-[#05100B]/95 p-1.5 backdrop-blur-xl shadow-[0_12px_35px_rgba(0,0,0,.35)]">
         <div className="grid grid-cols-2 gap-1.5">
           <button
             type="button"
