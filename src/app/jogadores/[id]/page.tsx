@@ -10,6 +10,8 @@ import { ArrowLeft, ChevronRight, Football, Target, TrendingUp, Trophy } from "@
 import { TeamCrest } from "@/components/TeamCrest";
 import { FantasyPlayerCard } from "@/components/fantasy/FantasyPlayerCard";
 import { getFantasyPlayerSummary } from "@/lib/actions/fantasy";
+import { getPlayerEquippedCosmetics } from "@/lib/actions/cosmetics";
+import { cosmeticVisual } from "@/lib/fantasy/cosmetics";
 
 export const revalidate = 0;
 
@@ -38,9 +40,10 @@ function aggregateGoalkeeperStats(rows: HistoryRow[]) {
     conceded: total.conceded + Number((row as any).goals_conceded || 0),
   }), { games: 0, cleanSheets: 0, conceded: 0 });
 }
+
 export default async function JogadorPerfilPage({ params }: PageProps<"/jogadores/[id]">) {
   const { id } = await params;
-  const [player, officialHistory, friendlyHistory, awardSeasons, fitness, clubGoals, fantasySummary] = await Promise.all([
+  const [player, officialHistory, friendlyHistory, awardSeasons, fitness, clubGoals, fantasySummary, cosmetics] = await Promise.all([
     getPlayer(id),
     getPlayerRoundHistory(id, "official"),
     getPlayerRoundHistory(id, "friendly"),
@@ -48,6 +51,7 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
     getPlayerFitnessSummaries(id),
     getPlayerGoalsByClub(id),
     getFantasyPlayerSummary(id),
+    getPlayerEquippedCosmetics(id),
   ]);
   if (!player) notFound();
   const isPlayable = player.is_selectable && (player.member_category === "player" || player.member_category === "guest");
@@ -57,15 +61,35 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
   const friendlyGoalkeeper = aggregateGoalkeeperStats(friendlyHistory);
   const categoryLabel = player.member_category === "player" ? "Jogador oficial" : player.member_category === "guest" ? "Convidado" : player.member_category === "wag" ? "WAG" : "Torcida";
 
+  const cardGradient = cosmetics?.bannerAssetKey
+    ? `bg-gradient-to-b ${cosmeticVisual(cosmetics.bannerAssetKey)}/30`
+    : "";
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3"><Link href="/jogadores" className="flex h-10 w-10 items-center justify-center rounded-full bg-surface"><ArrowLeft className="h-5 w-5 text-muted" /></Link><h1 className="text-sm font-bold uppercase tracking-wider text-foreground">Perfil</h1></div>
-      <div className="glass-card flex flex-col items-center p-6 text-center">
-        <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="mb-4 h-24 w-24 rounded-full bg-surface text-2xl font-bold text-muted ring-2 ring-border" />
+      <div className={`glass-card relative overflow-hidden flex flex-col items-center p-6 text-center ${cardGradient}`}>
+        {cosmetics?.bannerAssetKey && (
+          <div className="pointer-events-none absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent via-transparent to-transparent" />
+        )}
+        <div className="relative mb-4">
+          <PlayerAvatar
+            name={player.name}
+            avatarUrl={player.avatar_url}
+            frameKey={cosmetics?.frameKey}
+            auraKey={cosmetics?.auraKey}
+            className="h-24 w-24 rounded-full bg-surface text-2xl font-bold text-muted ring-2 ring-border"
+          />
+        </div>
         <h2 className="text-2xl font-bold text-foreground">{player.name}</h2>
-        {player.nickname && <p className="mt-1 text-sm font-semibold italic text-muted">“{player.nickname}”</p>}
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-2"><span className="rounded-full border border-border px-2.5 py-1 text-[9px] font-black uppercase text-muted">{categoryLabel}</span>{isPlayable && <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />}</div>
+        {cosmetics?.titleName ? (
+          <p className="mt-1 inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/15 px-3 py-0.5 text-xs font-black text-accent uppercase tracking-wide shadow-sm">
+            ✨ {cosmetics.titleName}
+          </p>
+        ) : player.nickname ? (
+          <p className="mt-1 text-sm font-semibold italic text-muted">“{player.nickname}”</p>
+        ) : null}
+        <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2"><span className="rounded-full border border-border px-2.5 py-1 text-[9px] font-black uppercase text-muted">{categoryLabel}</span>{isPlayable && <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />}</div>
         {player.profile_bio && <p className="mt-5 max-w-xl text-sm leading-6 text-muted">{player.profile_bio}</p>}
         {isPlayable && <div className="mt-6 inline-flex items-center gap-4 rounded-2xl border border-border bg-surface/50 px-6 py-3"><div><p className="text-[9px] font-bold uppercase text-muted">Pontos</p><p className="stat-number text-2xl text-accent">{official.points}</p></div><div className="h-8 w-px bg-border" /><div><p className="text-[9px] font-bold uppercase text-muted">Aprov.</p><p className="stat-number text-xl text-foreground">{calculateWinRate(official.wins, official.draws, official.games)}%</p></div></div>}
       </div>

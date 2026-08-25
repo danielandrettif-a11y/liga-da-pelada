@@ -35,12 +35,12 @@ export default async function MeuPerfilPage() {
   }
 
   const player = await getPlayer(account.profile.player_id);
-  if (!player) redirect("/");
-  const [fitnessRounds, fitnessSummaries, fantasySummary, cosmetics] = await Promise.all([
+  const [fitnessRounds, fitnessSummaries, fantasySummary, cosmetics, myEquipped] = await Promise.all([
     getMyFitnessRounds(player.id),
     getPlayerFitnessSummaries(player.id),
     getMyFantasySummary(),
     getMyCosmeticsDashboard(),
+    getMyEquippedCosmetics(),
   ]);
 
   return (
@@ -54,7 +54,12 @@ export default async function MeuPerfilPage() {
           <p className="text-xs text-muted">Atualize sua foto, nome e estilo de jogo</p>
         </div>
       </div>
-      <PlayerForm player={player} mode="self" />
+      <PlayerForm
+        player={player}
+        mode="self"
+        frameKey={myEquipped?.frameKey}
+        auraKey={myEquipped?.auraKey}
+      />
       <CosmeticsCollection cosmetics={cosmetics} />
       {fantasySummary && <Link href="/cartola/ranking" className="glass-card flex items-center justify-between p-4"><div><p className="text-[10px] font-black uppercase text-muted">Meu Cartola</p><p className="mt-1 text-sm font-black text-foreground">#{fantasySummary.position} na temporada</p><p className="text-[10px] text-muted">Patrimônio C$ {Number(fantasySummary.current_budget).toFixed(2)}</p></div><strong className="text-2xl text-accent">{Number(fantasySummary.total_points).toFixed(1)}</strong></Link>}
       <FitnessPanel rounds={fitnessRounds} visible={player.show_fitness_stats} summaries={fitnessSummaries} />

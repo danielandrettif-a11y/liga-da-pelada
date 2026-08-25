@@ -84,10 +84,10 @@ export async function equipCosmetic(slot: CosmeticSlot, cosmeticId: string | nul
   const { data: fantasySeason } = await client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle();
   if (!fantasySeason) return { success: false, error: "Passe indisponível." };
   const { error } = await client.rpc("equip_fantasy_cosmetic", { p_fantasy_season_id: fantasySeason.id, p_slot: slot, p_cosmetic_id: cosmeticId });
-  if (error) return { success: false, error: error.message };
   revalidatePath("/meu-perfil");
   revalidatePath("/jogadores");
-  revalidatePath("/");
+  revalidatePath("/jogadores/[id]", "page");
+  revalidatePath("/", "layout");
   revalidatePath("/ranking");
   return { success: true };
 }
@@ -132,4 +132,99 @@ export async function getMyEquippedCosmetics(): Promise<EquippedCosmeticsSummary
     bannerAssetKey: loadout.banner?.asset_key || null,
     nameplateKey: loadout.nameplate?.asset_key || null,
   };
+}
+
+export async function getPlayerEquippedCosmetics(playerId: string): Promise<EquippedCosmeticsSummary | null> {
+  const account = await getCurrentAccount();
+  const client: any = account.user ? account.client : account.client;
+
+  const { data: profile } = await client
+    .from("account_profiles")
+    .select("user_id")
+    .eq("player_id", playerId)
+    .maybeSingle();
+
+  if (!profile?.user_id) return null;
+
+  const league = await getActiveLeague();
+  const season = await getActiveSeason(league.id);
+  if (!season) return null;
+
+  const { data: fantasySeason } = await client
+    .from("fantasy_seasons")
+    .select("id")
+    .eq("season_id", season.id)
+    .maybeSingle();
+
+  if (!fantasySeason) return null;
+
+  const { data: loadout } = await client
+    .from("fantasy_user_cosmetic_loadouts")
+    .select(`
+      frame:frame_cosmetic_id(asset_key),
+      aura:aura_cosmetic_id(asset_key),
+      title:title_cosmetic_id(name),
+      banner:banner_cosmetic_id(asset_key),
+      nameplate:nameplate_cosmetic_id(asset_key)
+    `)
+    .eq("user_id", profile.user_id)
+    .eq("fantasy_season_id", fantasySeason.id)
+    .maybeSingle();
+
+  if (!loadout) return null;
+
+  return {
+    frameKey: loadout.frame?.asset_key || null,
+    auraKey: loadout.aura?.asset_key || null,
+    titleName: loadout.title?.name || null,
+    bannerAssetKey: loadout.banner?.asset_key || null,
+    nameplateKey: loadout.nameplate?.asset_key || null,
+  };
+}
+
+export async function getAllPlayersEquippedCosmeticsMap(): Promise<Map<string, EquippedCosmeticsSummary>> {
+  const account = await getCurrentAccount();
+  const client: any = account.user ? account.client : account.client;
+
+  const league = await getActiveLeague();
+  const season = await getActiveSeason(league.id);
+  if (!season) return new Map();
+
+  const { data: fantasySeason } = await client
+    .from("fantasy_seasons")
+    .select("id")
+    .eq("season_id", season.id)
+    .maybeSingle();
+
+  if (!fantasySeason) return new Map();
+
+  const [{ data: profiles }, { data: loadouts }] = await Promise.all([
+    client.from("account_profiles").select("user_id, player_id").not("player_id", "is", null),
+    client.from("fantasy_user_cosmetic_loadouts").select(`
+      user_id,
+      frame:frame_cosmetic_id(asset_key),
+      aura:aura_cosmetic_id(asset_key),
+      title:title_cosmetic_id(name),
+      banner:banner_cosmetic_id(asset_key),
+      nameplate:nameplate_cosmetic_id(asset_key)
+    `).eq("fantasy_season_id", fantasySeason.id),
+  ]);
+
+  const userToPlayer = new Map<string, string>((profiles || []).map((p: any) => [p.user_id, p.player_id]));
+  const map = new Map<string, EquippedCosmeticsSummary>();
+
+  for (const loadout of loadouts || []) {
+    const playerId = userToPlayer.get(loadout.user_id);
+    if (playerId) {
+      map.set(playerId, {
+        frameKey: (loadout.frame as any)?.asset_key || null,
+        auraKey: (loadout.aura as any)?.asset_key || null,
+        titleName: (loadout.title as any)?.name || null,
+        bannerAssetKey: (loadout.banner as any)?.asset_key || null,
+        nameplateKey: (loadout.nameplate as any)?.asset_key || null,
+      });
+    }
+  }
+
+  return map;
 }

@@ -11,7 +11,17 @@ import { PLAYER_PROFILE_OPTIONS } from "@/lib/playerProfiles";
 
 const MAX_SOURCE_SIZE = 20 * 1024 * 1024;
 
-export function PlayerForm({ player, mode = "admin" }: { player?: Player; mode?: "admin" | "self" }) {
+export function PlayerForm({
+  player,
+  mode = "admin",
+  frameKey,
+  auraKey,
+}: {
+  player?: Player;
+  mode?: "admin" | "self";
+  frameKey?: string | null;
+  auraKey?: string | null;
+}) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewObjectUrlRef = useRef<string | null>(null);
@@ -158,6 +168,8 @@ export function PlayerForm({ player, mode = "admin" }: { player?: Player; mode?:
           <PlayerAvatar
             name={previewName}
             avatarUrl={previewUrl}
+            frameKey={frameKey}
+            auraKey={auraKey}
             className="w-28 h-28 rounded-full bg-surface-hover border-2 border-border text-2xl font-bold text-muted ring-4 ring-background"
           />
           <span className="absolute bottom-0 right-0 w-9 h-9 rounded-full bg-accent text-background flex items-center justify-center border-4 border-background group-hover:bg-accent-light transition-colors">

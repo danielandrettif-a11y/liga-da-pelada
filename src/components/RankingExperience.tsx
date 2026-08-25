@@ -417,6 +417,8 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                     <PlayerAvatar
                       name={entry.player.name}
                       avatarUrl={entry.player.avatar_url}
+                      frameKey={entry.cosmetics?.frameKey}
+                      auraKey={entry.cosmetics?.auraKey}
                       className={`h-16 w-16 rounded-full border-[3px] bg-background text-sm font-black text-muted ${style.ring}`}
                     />
                     <span className={`absolute -bottom-2 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-gradient-to-br ${style.medal} shadow-lg`}>
@@ -469,11 +471,18 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                 <PlayerAvatar
                   name={entry.player.name}
                   avatarUrl={entry.player.avatar_url}
+                  frameKey={entry.cosmetics?.frameKey}
+                  auraKey={entry.cosmetics?.auraKey}
                   className="h-11 w-11 shrink-0 rounded-full border border-border bg-surface text-xs font-black text-foreground"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-black text-foreground">{displayName}</p>
+                    {entry.cosmetics?.titleName && (
+                      <span className="truncate rounded bg-accent/15 px-1.5 py-0.2 text-[8px] font-black uppercase text-accent border border-accent/25">
+                        {entry.cosmetics.titleName}
+                      </span>
+                    )}
                     {view === "season" && entry.positionChange !== null && (
                       <span className={`inline-flex items-center text-[9px] font-black ${entry.positionChange > 0 ? "text-success" : entry.positionChange < 0 ? "text-danger" : "text-muted"}`}>
                         {entry.positionChange > 0 ? <ArrowUp className="h-3 w-3" /> : entry.positionChange < 0 ? <ArrowDown className="h-3 w-3" /> : "—"}
@@ -513,6 +522,8 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
           <PlayerAvatar
             name={pinnedEntry.player.name}
             avatarUrl={pinnedEntry.player.avatar_url}
+            frameKey={pinnedEntry.cosmetics?.frameKey}
+            auraKey={pinnedEntry.cosmetics?.auraKey}
             className="h-10 w-10 rounded-full border border-accent/40 bg-surface text-xs font-black"
           />
           <div className="min-w-0 flex-1">

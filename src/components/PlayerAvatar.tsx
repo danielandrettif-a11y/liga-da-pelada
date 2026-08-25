@@ -59,7 +59,7 @@ export function PlayerAvatar({
         onClick={handleClick}
         className={`group/avatar relative overflow-hidden flex items-center justify-center ${
           isInteractive ? "cursor-pointer active:scale-95 transition-transform" : ""
-        } ${frameEffect ? `${frameEffect} ` : ""}${auraEffect ? `${auraEffect} ` : ""}${className}`}
+        } ${className} ${frameEffect ? `${frameEffect} ` : ""}${auraEffect ? `${auraEffect} ` : ""}`}
         aria-label={`Foto de ${name}`}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}

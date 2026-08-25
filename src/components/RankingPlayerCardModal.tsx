@@ -264,7 +264,14 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
 
               <div className="absolute -right-5 bottom-0 h-52 w-56">
                 <div className="absolute inset-x-5 bottom-1 h-10 rounded-full bg-black/35 blur-xl" />
-                <PlayerAvatar name={entry.player.name} avatarUrl={entry.player.avatar_url} className="relative h-full w-full bg-transparent text-6xl font-black" imageClassName="object-cover object-top" />
+                <PlayerAvatar
+                  name={entry.player.name}
+                  avatarUrl={entry.player.avatar_url}
+                  frameKey={entry.cosmetics?.frameKey}
+                  auraKey={entry.cosmetics?.auraKey}
+                  className="relative h-full w-full bg-transparent text-6xl font-black"
+                  imageClassName="object-cover object-top"
+                />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16" style={{ background: `linear-gradient(transparent, ${theme.base})` }} />
               </div>
 
@@ -273,7 +280,13 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
 
             <div className="relative z-10 -mt-1 border-y border-current/30 bg-white/10 px-2 py-3 text-center backdrop-blur-sm">
               <h2 className="truncate font-athletic text-2xl font-black uppercase tracking-wide">{displayName}</h2>
-              {entry.player.nickname && <p className="mt-0.5 truncate text-[10px] font-bold italic opacity-75">“{entry.player.nickname}”</p>}
+              {entry.cosmetics?.titleName ? (
+                <p className="mt-0.5 truncate text-[10px] font-black uppercase tracking-wider opacity-90">
+                  ✨ {entry.cosmetics.titleName}
+                </p>
+              ) : entry.player.nickname ? (
+                <p className="mt-0.5 truncate text-[10px] font-bold italic opacity-75">“{entry.player.nickname}”</p>
+              ) : null}
             </div>
 
             <div className="relative z-10 mt-4 grid grid-cols-3 gap-x-2 gap-y-3 font-athletic">

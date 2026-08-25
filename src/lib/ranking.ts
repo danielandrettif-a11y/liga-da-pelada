@@ -37,6 +37,13 @@ export type RankingEntry = {
   seasonPosition: number;
   positionChange: number | null;
   fitness?: { distanceKm: number; averageSpeedKmh: number; entries: number } | null;
+  cosmetics?: {
+    frameKey: string | null;
+    auraKey: string | null;
+    titleName: string | null;
+    bannerAssetKey: string | null;
+    nameplateKey: string | null;
+  } | null;
 };
 
 export type RankingExperienceData = {

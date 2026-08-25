@@ -52,20 +52,20 @@ export function rarityClass(rarity: CosmeticRarity) {
 export function cosmeticFrameClass(assetKey?: string | null): string {
   if (!assetKey) return "";
   const key = assetKey.toLowerCase();
-  if (key.includes("neon")) return "ring-[2.5px] ring-[#ccff00] shadow-[0_0_16px_rgba(204,255,0,0.6)]";
-  if (key.includes("capitao") || key.includes("faixa")) return "ring-[2.5px] ring-amber-400 shadow-[0_0_14px_rgba(251,191,36,0.6)]";
-  if (key.includes("rede")) return "ring-[2.5px] ring-sky-300 ring-offset-1 ring-offset-black/60 shadow-[0_0_12px_rgba(125,211,252,0.5)]";
-  if (key.includes("alambrado")) return "ring-[2px] ring-zinc-400 ring-dashed shadow-[0_0_8px_rgba(255,255,255,0.25)]";
-  return "ring-[2px] ring-accent/60 shadow-[0_0_10px_rgba(204,255,0,0.3)]";
+  if (key.includes("neon")) return "!ring-[3.5px] !ring-[#ccff00] shadow-[0_0_20px_rgba(204,255,0,0.85)]";
+  if (key.includes("capitao") || key.includes("faixa")) return "!ring-[3.5px] !ring-amber-400 shadow-[0_0_18px_rgba(251,191,36,0.85)]";
+  if (key.includes("rede")) return "!ring-[3.5px] !ring-sky-300 ring-offset-2 ring-offset-black shadow-[0_0_16px_rgba(125,211,252,0.75)]";
+  if (key.includes("alambrado")) return "!ring-[3px] !ring-zinc-300 ring-dashed shadow-[0_0_12px_rgba(255,255,255,0.5)]";
+  return "!ring-[3px] !ring-accent/90 shadow-[0_0_14px_rgba(204,255,0,0.5)]";
 }
 
 export function cosmeticAuraClass(assetKey?: string | null): string {
   if (!assetKey) return "";
   const key = assetKey.toLowerCase();
-  if (key.includes("fumaca")) return "shadow-[0_0_24px_rgba(16,185,129,0.65)] animate-pulse";
-  if (key.includes("flash") || key.includes("refletor")) return "shadow-[0_0_26px_rgba(255,255,255,0.7)]";
-  if (key.includes("energia")) return "shadow-[0_0_20px_rgba(204,255,0,0.65)]";
-  return "shadow-[0_0_14px_rgba(204,255,0,0.4)]";
+  if (key.includes("fumaca")) return "shadow-[0_0_30px_rgba(16,185,129,0.9)] animate-pulse";
+  if (key.includes("flash") || key.includes("refletor")) return "shadow-[0_0_30px_rgba(255,255,255,0.9)]";
+  if (key.includes("energia")) return "shadow-[0_0_25px_rgba(204,255,0,0.85)]";
+  return "shadow-[0_0_20px_rgba(204,255,0,0.6)]";
 }
 
 export function cosmeticNameplateClass(assetKey?: string | null): string {

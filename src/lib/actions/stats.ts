@@ -8,6 +8,7 @@ import { buildAwardSeasonsByPlayer, countAwards } from "../awards";
 import type { EventType, SeasonStatus } from "../types";
 import type { Player } from "../types";
 import type { RankingEntry, RankingExperienceData } from "../ranking";
+import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
 
 type RankingStatsRow = {
   player_id: string;
@@ -651,6 +652,8 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     return awardSeasonsByPlayer.get(playerId) || [];
   }
 
+  const cosmeticsByPlayer = await getAllPlayersEquippedCosmeticsMap();
+
   const general = generalBase.map((entry, index): RankingEntry => {
     const previousPosition = previousPositions.get(entry.player.id);
     return {
@@ -660,6 +663,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       seasonPosition: index + 1,
       positionChange: previousPosition ? previousPosition - (index + 1) : null,
       fitness: getFitness(entry.player.id),
+      cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
     };
   });
   const generalByPlayer = new Map(general.map((entry) => [entry.player.id, entry]));
@@ -671,6 +675,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     seasonPosition: seasonPositions.get(entry.player.id) || general.length + 1,
     positionChange: generalByPlayer.get(entry.player.id)?.positionChange ?? null,
     fitness: getFitness(entry.player.id),
+    cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
   }));
 
   return {
