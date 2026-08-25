@@ -50,7 +50,7 @@ type MatchTimerProps = {
   onToggle: () => void;
   onReset: () => void;
   onAddExtraTime: (seconds: number) => void;
-  onThreshold: (threshold: "thirty_seconds" | "finished") => void;
+  onThreshold: (threshold: "thirty_seconds" | "finished") => Promise<boolean>;
 };
 
 const MatchTimer = memo(function MatchTimer({
@@ -68,6 +68,7 @@ const MatchTimer = memo(function MatchTimer({
   );
   const isRunning = !!timerState.startedAt;
   const notifiedThresholds = useRef({ thirtySeconds: false, finished: false });
+  const notifyingThresholds = useRef({ thirtySeconds: false, finished: false });
 
   useEffect(() => {
     const updateTimer = () => {
@@ -89,15 +90,23 @@ const MatchTimer = memo(function MatchTimer({
     }
     if (!isRunning) return;
 
-    if (secondsLeft > 0 && !notifiedThresholds.current.thirtySeconds) {
-      notifiedThresholds.current.thirtySeconds = true;
+    // Pode haver atraso do navegador (especialmente em segundo plano). Neste
+    // caso, ainda dispara o aviso de 30s quando o próximo tick já caiu em 00:00.
+    if (!notifiedThresholds.current.thirtySeconds && !notifyingThresholds.current.thirtySeconds) {
+      notifyingThresholds.current.thirtySeconds = true;
       if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.([80, 60, 80]);
-      onThreshold("thirty_seconds");
+      void onThreshold("thirty_seconds").then((handled) => {
+        if (handled) notifiedThresholds.current.thirtySeconds = true;
+        notifyingThresholds.current.thirtySeconds = false;
+      });
     }
-    if (secondsLeft === 0 && !notifiedThresholds.current.finished) {
-      notifiedThresholds.current.finished = true;
+    if (secondsLeft === 0 && !notifiedThresholds.current.finished && !notifyingThresholds.current.finished) {
+      notifyingThresholds.current.finished = true;
       if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.([180, 90, 180, 90, 260]);
-      onThreshold("finished");
+      void onThreshold("finished").then((handled) => {
+        if (handled) notifiedThresholds.current.finished = true;
+        notifyingThresholds.current.finished = false;
+      });
     }
   }, [isRunning, onThreshold, secondsLeft]);
 
@@ -428,10 +437,13 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
     setTimerSaving(false);
   }, [canManage, timerSaving, match.id]);
 
-  const notifyTimerThreshold = useCallback((threshold: "thirty_seconds" | "finished") => {
-    void notifyMatchTimerThreshold(match.id, threshold).then((result) => {
-      if (!result.success) setError(result.error || "Não foi possível enviar o aviso do cronômetro.");
-    });
+  const notifyTimerThreshold = useCallback(async (threshold: "thirty_seconds" | "finished") => {
+    const result = await notifyMatchTimerThreshold(match.id, threshold);
+    if (!result.success) {
+      setError(result.error || "Não foi possível enviar o aviso do cronômetro.");
+      return false;
+    }
+    return true;
   }, [match.id]);
 
   // Modal de Gol

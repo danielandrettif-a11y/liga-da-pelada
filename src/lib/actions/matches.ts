@@ -741,8 +741,10 @@ export async function notifyMatchTimerThreshold(
     const elapsed = (match.timer_accumulated_seconds || 0)
       + Math.max(0, Math.floor((Date.now() - new Date(match.timer_started_at).getTime()) / 1000));
     const secondsLeft = Math.max(0, Number(match.duration_seconds || 420) - elapsed);
+    // Caso o navegador fique em segundo plano, ele pode acordar diretamente
+    // em 00:00. Ainda entregamos o aviso de 30s em vez de perdê-lo.
     const shouldSend = threshold === "thirty_seconds"
-      ? secondsLeft > 0 && secondsLeft <= 30
+      ? secondsLeft <= 30
       : secondsLeft === 0;
     if (!shouldSend) return { success: true, skipped: true };
 
@@ -770,13 +772,19 @@ export async function notifyMatchTimerThreshold(
     if (error) throw new Error(error.message);
     if (!claimed) return { success: true, skipped: true };
 
-    after(async () => {
-      try {
-        await sendMatchTimerNotifications(client, claimed, threshold);
-      } catch (notificationError) {
-        console.error("Erro ao notificar alerta do cronometro:", notificationError);
-      }
-    });
+    // Diferente do fim manual da partida, estes gatilhos vêm do timer do
+    // navegador. Esperamos o envio terminar para não marcar o alerta como
+    // entregue caso a execução em segundo plano seja interrompida.
+    try {
+      await sendMatchTimerNotifications(client, claimed, threshold);
+    } catch (notificationError) {
+      await client
+        .from("matches")
+        .update({ [alertColumn]: null })
+        .eq("id", matchId)
+        .eq(alertColumn, now);
+      throw notificationError;
+    }
 
     return { success: true, sent: true };
   } catch (err: any) {
