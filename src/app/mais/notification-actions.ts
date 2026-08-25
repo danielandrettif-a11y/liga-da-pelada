@@ -14,7 +14,7 @@ export type SerializedPushSubscription = {
 };
 
 export async function getPushPublicKey() {
-  const { publicKey, configured } = getWebPushConfiguration();
+  const { publicKey, configured, error: configurationError } = getWebPushConfiguration();
   const backgroundAlertsConfigured = Boolean(
     process.env.QSTASH_TOKEN
     && process.env.MATCH_TIMER_WEBHOOK_SECRET
@@ -26,7 +26,7 @@ export async function getPushPublicKey() {
       success: false,
       publicKey: "",
       backgroundAlertsConfigured,
-      error: "As chaves VAPID do servidor ainda não estão completas.",
+      error: configurationError || "As chaves VAPID do servidor ainda não estão completas.",
     };
   }
 
@@ -34,9 +34,10 @@ export async function getPushPublicKey() {
 }
 
 export async function getPushSystemStatus() {
-  const { configured } = getWebPushConfiguration();
+  const { configured, error } = getWebPushConfiguration();
   return {
     pushConfigured: configured,
+    pushConfigurationError: error,
     backgroundAlertsConfigured: Boolean(
       process.env.QSTASH_TOKEN
       && process.env.MATCH_TIMER_WEBHOOK_SECRET
@@ -104,7 +105,7 @@ export async function sendPushTest() {
   try {
     const delivery = await sendPushTestNotification(account.client, account.user.id);
     if (delivery.disabled) {
-      return { success: false, error: "As chaves VAPID do servidor ainda não estão completas." };
+      return { success: false, error: getWebPushConfiguration().error || "As chaves VAPID do servidor ainda não estão completas." };
     }
     if (delivery.sent === 0) {
       return { success: false, error: delivery.failed > 0

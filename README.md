@@ -43,6 +43,7 @@ Configure as variáveis de produção abaixo (nunca no navegador):
 ```text
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:seu-email@exemplo.com
 SUPABASE_SERVICE_ROLE_KEY=
 QSTASH_TOKEN=
 MATCH_TIMER_WEBHOOK_SECRET=

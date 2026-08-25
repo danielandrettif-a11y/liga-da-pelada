@@ -1,4 +1,5 @@
 import webpush, { type PushSubscription, type WebPushError } from "web-push";
+import { createECDH } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { SITE_URL } from "@/lib/siteUrl";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -35,10 +36,35 @@ type PushDeliveryResult = {
 export function getWebPushConfiguration() {
   const publicKey = process.env.VAPID_PUBLIC_KEY || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
+  const subject = process.env.VAPID_SUBJECT?.trim() || SITE_URL;
+  const subjectIsValid = /^(mailto:[^\s@]+@[^\s@]+|https:\/\/[^\s]+)$/i.test(subject);
+  let keyPairMatches = false;
+
+  if (publicKey && privateKey) {
+    try {
+      const key = createECDH("prime256v1");
+      key.setPrivateKey(Buffer.from(privateKey, "base64url"));
+      const derivedPublicKey = key.getPublicKey(undefined, "uncompressed").toString("base64url");
+      keyPairMatches = derivedPublicKey === publicKey.replace(/=+$/, "");
+    } catch {
+      keyPairMatches = false;
+    }
+  }
+
+  const error = !publicKey || !privateKey
+    ? "Preencha VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no servidor."
+    : !keyPairMatches
+      ? "As chaves VAPID não formam um par válido. Gere as duas novamente e substitua ambas no Coolify."
+      : !subjectIsValid
+        ? "VAPID_SUBJECT deve ser um e-mail no formato mailto:voce@exemplo.com ou uma URL HTTPS."
+        : null;
+
   return {
     publicKey,
     privateKey,
-    configured: Boolean(publicKey && privateKey),
+    subject,
+    configured: error === null,
+    error,
   };
 }
 
@@ -101,7 +127,7 @@ async function sendPushNotificationsToUsers(
   fallbackUrl: string,
   useServiceClient = true,
 ) {
-  const { publicKey, privateKey, configured } = getWebPushConfiguration();
+  const { publicKey, privateKey, subject, configured } = getWebPushConfiguration();
   if (!configured || !publicKey || !privateKey) {
     console.warn("Notificação push ignorada: chaves VAPID não configuradas.");
     return { sent: 0, failed: 0, disabled: true };
@@ -145,7 +171,7 @@ async function sendPushNotificationsToUsers(
         TTL: 60 * 60,
         urgency: "high",
         vapidDetails: {
-          subject: SITE_URL,
+          subject,
           publicKey,
           privateKey,
         },
