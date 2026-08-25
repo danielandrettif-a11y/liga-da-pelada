@@ -1,4 +1,6 @@
 export type FantasySettings = {
+  /** Rodada 2 em diante ativa o sistema de vagas, rodízio e mercado 65/35. */
+  roleScoringActive?: boolean;
   currencyName: string;
   initialBudget: number;
   initialPlayerPrice: number;
@@ -34,6 +36,7 @@ export type FantasySettings = {
 };
 
 export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
+  roleScoringActive: true,
   currencyName: "C$",
   initialBudget: 55,
   initialPlayerPrice: 10,

@@ -18,6 +18,16 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
   const prices = new Map(["a", "b", "c", "d", "e", "f"].map((id) => [id, 10]));
 
   describe("Validação de Escalação e Orçamento (V1 + V2)", () => {
+    it("mantém o cálculo anterior quando a rodada ainda não ativou as regras de posição", () => {
+      const legacySettings = { ...DEFAULT_FANTASY_SETTINGS, roleScoringActive: false, goalkeeperLossPoints: 0, teamGoalConcededPoints: -1 };
+      expect(
+        calculateFantasyPlayerPoints(
+          { goals: 0, assists: 0, wins: 0, losses: 0, goalkeeperGames: 1, goalsConceded: 1, teamGoalsConceded: 1 },
+          legacySettings,
+        ),
+      ).toBe(2);
+    });
+
     it("valida rascunhos, cinco jogadores, capitão e orçamento", () => {
       expect(
         validateFantasyDraft({ playerIds: ["a", "b", "c", "d"], captainPlayerId: "a", prices, budget: 55 })

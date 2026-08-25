@@ -58,6 +58,7 @@ export function calculateFantasyPositionPackageBonus(
   },
   settings: FantasySettings,
 ): number {
+  if (settings.roleScoringActive === false) return 0;
   if (input.slotRole === "GOL") {
     // GOL é uma escolha do cartoleiro. O bônus exige atuação real no gol;
     // cada jogo sem sofrer gol rende +4, sem limite por rodada.

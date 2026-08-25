@@ -111,6 +111,7 @@ export async function getFantasyDashboard() {
 
   const settings: FantasySettings = settingsRow
     ? {
+        roleScoringActive: true,
         currencyName: settingsRow.currency_name,
         initialBudget: Number(settingsRow.initial_budget),
         initialPlayerPrice: Number(settingsRow.initial_player_price),
@@ -228,6 +229,7 @@ export async function getFantasyDashboard() {
   const scoringSettings: FantasySettings = scoringSnapshot
     ? {
         ...settings,
+        roleScoringActive: scoringSnapshot.role_scoring_active !== false,
         goalPoints: Number(scoringSnapshot.goal_points ?? settings.goalPoints),
         attackerGoalPoints: Number(scoringSnapshot.attacker_goal_points ?? settings.attackerGoalPoints),
         assistPoints: Number(scoringSnapshot.assist_points ?? settings.assistPoints),
@@ -1394,7 +1396,7 @@ export async function getFantasyPlayerDetail(playerId: string) {
 async function getLiveRoundProjections(client: any, fantasySeasonId: string, leagueId: string) {
   const { data: activeRound } = await client
     .from("fantasy_rounds")
-    .select("id, round_id, market_status, round:round_id(status)")
+    .select("id, round_id, market_status, settings_snapshot, round:round_id(status)")
     .eq("fantasy_season_id", fantasySeasonId)
     .eq("market_status", "in_progress")
     .maybeSingle();
@@ -1416,6 +1418,7 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
   ]);
   const settings: FantasySettings = {
     ...DEFAULT_FANTASY_SETTINGS,
+    roleScoringActive: activeRound.settings_snapshot?.role_scoring_active !== false,
     goalPoints: Number(settingsRow?.goal_points ?? DEFAULT_FANTASY_SETTINGS.goalPoints),
     attackerGoalPoints: Number(settingsRow?.attacker_goal_points ?? DEFAULT_FANTASY_SETTINGS.attackerGoalPoints),
     assistPoints: Number(settingsRow?.assist_points ?? DEFAULT_FANTASY_SETTINGS.assistPoints),

@@ -76,6 +76,17 @@ export function calculateFantasyPlayerPoints(
   >,
   settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
 ) {
+  if (settings.roleScoringActive === false) {
+    return (
+      stats.goals * (stats.playerProfile === "offensive" ? settings.attackerGoalPoints : settings.goalPoints) +
+      stats.assists * settings.assistPoints +
+      stats.wins * settings.winPoints +
+      (stats.losses || 0) * ((stats.goalkeeperGames || 0) > 0 ? settings.goalkeeperLossPoints : settings.lossPoints) +
+      (stats.goalkeeperGames || 0) * settings.goalkeeperAppearancePoints +
+      (stats.teamGoalsConceded ?? stats.goalsConceded ?? 0) * settings.teamGoalConcededPoints +
+      (stats.ownGoals || 0) * settings.ownGoalPoints
+    );
+  }
   return (
     stats.goals * settings.goalPoints +
     stats.assists * settings.assistPoints +
