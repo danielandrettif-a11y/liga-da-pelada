@@ -34,9 +34,13 @@ type PushDeliveryResult = {
 };
 
 export function getWebPushConfiguration() {
-  const publicKey = process.env.VAPID_PUBLIC_KEY || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-  const subject = process.env.VAPID_SUBJECT?.trim() || SITE_URL;
+  const normalizeEnvironmentValue = (value: string | undefined) => value
+    ?.trim()
+    .replace(/^['"]|['"]$/g, "") || undefined;
+  const publicKey = normalizeEnvironmentValue(process.env.VAPID_PUBLIC_KEY)
+    || normalizeEnvironmentValue(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+  const privateKey = normalizeEnvironmentValue(process.env.VAPID_PRIVATE_KEY);
+  const subject = normalizeEnvironmentValue(process.env.VAPID_SUBJECT) || SITE_URL;
   const subjectIsValid = /^(mailto:[^\s@]+@[^\s@]+|https:\/\/[^\s]+)$/i.test(subject);
   let keyPairMatches = false;
 
