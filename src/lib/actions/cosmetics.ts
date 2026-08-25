@@ -85,5 +85,51 @@ export async function equipCosmetic(slot: CosmeticSlot, cosmeticId: string | nul
   if (!fantasySeason) return { success: false, error: "Passe indisponível." };
   const { error } = await client.rpc("equip_fantasy_cosmetic", { p_fantasy_season_id: fantasySeason.id, p_slot: slot, p_cosmetic_id: cosmeticId });
   if (error) return { success: false, error: error.message };
-  revalidatePath("/meu-perfil"); return { success: true };
+  revalidatePath("/meu-perfil");
+  revalidatePath("/jogadores");
+  revalidatePath("/");
+  revalidatePath("/ranking");
+  return { success: true };
+}
+
+export type EquippedCosmeticsSummary = {
+  frameKey: string | null;
+  auraKey: string | null;
+  titleName: string | null;
+  bannerAssetKey: string | null;
+  nameplateKey: string | null;
+};
+
+export async function getMyEquippedCosmetics(): Promise<EquippedCosmeticsSummary | null> {
+  const account = await getCurrentAccount();
+  if (!account.user) return null;
+  const league = await getActiveLeague();
+  const season = await getActiveSeason(league.id);
+  if (!season) return null;
+  const client: any = account.client;
+  const { data: fantasySeason } = await client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle();
+  if (!fantasySeason) return null;
+
+  const { data: loadout } = await client
+    .from("fantasy_user_cosmetic_loadouts")
+    .select(`
+      frame:frame_cosmetic_id(asset_key),
+      aura:aura_cosmetic_id(asset_key),
+      title:title_cosmetic_id(name),
+      banner:banner_cosmetic_id(asset_key),
+      nameplate:nameplate_cosmetic_id(asset_key)
+    `)
+    .eq("user_id", account.user.id)
+    .eq("fantasy_season_id", fantasySeason.id)
+    .maybeSingle();
+
+  if (!loadout) return null;
+
+  return {
+    frameKey: loadout.frame?.asset_key || null,
+    auraKey: loadout.aura?.asset_key || null,
+    titleName: loadout.title?.name || null,
+    bannerAssetKey: loadout.banner?.asset_key || null,
+    nameplateKey: loadout.nameplate?.asset_key || null,
+  };
 }

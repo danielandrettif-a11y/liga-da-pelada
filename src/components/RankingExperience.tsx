@@ -351,6 +351,22 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
         </button>
       </div>
 
+      {view === "season" && (
+        <div className="flex items-start gap-3 rounded-2xl border border-accent/30 bg-accent/[0.08] p-3.5 shadow-sm">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-accent text-background font-black text-xs shadow-[0_0_10px_rgba(204,255,0,0.4)]">
+            !
+          </div>
+          <div className="min-w-0 flex-1 text-xs">
+            <p className="font-black uppercase tracking-wider text-accent text-[11px]">
+              Regra Top 6 Melhores Partidas
+            </p>
+            <p className="mt-0.5 text-foreground/90 leading-relaxed text-[11px]">
+              Os pontos da Geral somam as <strong className="text-accent">6 melhores atuações</strong> de cada jogador no ano. Faltas ou dias ruins não prejudicam sua classificação. Toque em qualquer atleta para ver as partidas e a nota de corte!
+            </p>
+          </div>
+        </div>
+      )}
+
       {view === "latest" && data.latestRound && (
         <div className="flex items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 py-2.5 text-xs text-muted">
           <CalendarDays className="h-4 w-4 text-accent" />

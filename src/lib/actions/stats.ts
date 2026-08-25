@@ -60,36 +60,84 @@ function sortRankingEntries<T extends Pick<RankingEntry, "points" | "wins" | "go
   });
 }
 
-function aggregateRankingRows(rows: RankingStatsRow[]) {
-  const map = new Map<string, Omit<RankingEntry, "awards" | "awardSeasons" | "seasonPosition" | "positionChange">>();
-
+function aggregateRankingRows(
+  rows: RankingStatsRow[],
+  roundsMap?: Map<string, { id: string; number: number; date: string }>,
+  maxBestRounds: number = 6,
+) {
+  const playerRowsMap = new Map<string, RankingStatsRow[]>();
   for (const row of rows) {
-    const current = map.get(row.player_id) || {
-      player: row.player,
-      games: 0,
-      wins: 0,
-      draws: 0,
-      losses: 0,
-      goals: 0,
-      assists: 0,
-      points: 0,
-      winRate: 0,
-    };
-
-    current.games += row.games;
-    current.wins += row.wins;
-    current.draws += row.draws;
-    current.losses += row.losses;
-    current.goals += row.goals;
-    current.assists += row.assists;
-    current.points += row.points;
-    current.winRate = current.games === 0
-      ? 0
-      : Math.round(((current.wins * 3 + current.draws) / (current.games * 3)) * 100);
-    map.set(row.player_id, current);
+    const list = playerRowsMap.get(row.player_id) || [];
+    list.push(row);
+    playerRowsMap.set(row.player_id, list);
   }
 
-  return sortRankingEntries(Array.from(map.values()));
+  const entries: Omit<RankingEntry, "awards" | "awardSeasons" | "seasonPosition" | "positionChange">[] = [];
+
+  for (const [, playerRows] of playerRowsMap.entries()) {
+    if (!playerRows.length) continue;
+    const first = playerRows[0];
+
+    const sortedRows = [...playerRows].sort((a, b) => b.points - a.points);
+
+    let totalRawPoints = 0;
+    let games = 0;
+    let wins = 0;
+    let draws = 0;
+    let losses = 0;
+    let goals = 0;
+    let assists = 0;
+
+    const bestRounds = sortedRows.map((r, idx) => {
+      totalRawPoints += r.points;
+      games += r.games;
+      wins += r.wins;
+      draws += r.draws;
+      losses += r.losses;
+      goals += r.goals;
+      assists += r.assists;
+
+      const roundInfo = roundsMap?.get(r.round_id);
+      return {
+        roundId: r.round_id,
+        roundNumber: roundInfo?.number ?? 0,
+        date: roundInfo?.date ?? "",
+        points: r.points,
+        goals: r.goals,
+        assists: r.assists,
+        wins: r.wins,
+        games: r.games,
+        countedInTop6: idx < maxBestRounds,
+      };
+    });
+
+    const top6Points = bestRounds
+      .filter((r) => r.countedInTop6)
+      .reduce((sum, r) => sum + r.points, 0);
+
+    const minPointsToEnterTop6 = bestRounds.length >= maxBestRounds
+      ? bestRounds[maxBestRounds - 1].points
+      : null;
+
+    const winRate = games === 0 ? 0 : Math.round(((wins * 3 + draws) / (games * 3)) * 100);
+
+    entries.push({
+      player: first.player,
+      games,
+      wins,
+      draws,
+      losses,
+      goals,
+      assists,
+      points: top6Points,
+      totalRawPoints,
+      bestRounds,
+      minPointsToEnterTop6,
+      winRate,
+    });
+  }
+
+  return sortRankingEntries(entries);
 }
 
 export async function calculateRoundStats(roundId: string) {
@@ -559,9 +607,10 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   const currentRoundIds = new Set(currentRounds.map((round) => round.id));
   const currentStats = stats.filter((row) => currentRoundIds.has(row.round_id) && isSelectableAthlete(row.player));
   const latestRound = currentRounds[0];
-  const generalBase = aggregateRankingRows(currentStats);
-  const previousBase = aggregateRankingRows(currentStats.filter((row) => row.round_id !== latestRound.id));
-  const latestBase = aggregateRankingRows(currentStats.filter((row) => row.round_id === latestRound.id));
+  const roundsMap = new Map((rounds || []).map((round) => [round.id, { id: round.id, number: round.number, date: round.date }]));
+  const generalBase = aggregateRankingRows(currentStats, roundsMap, 6);
+  const previousBase = aggregateRankingRows(currentStats.filter((row) => row.round_id !== latestRound.id), roundsMap, 6);
+  const latestBase = aggregateRankingRows(currentStats.filter((row) => row.round_id === latestRound.id), roundsMap, 6);
   const previousPositions = new Map(previousBase.map((entry, index) => [entry.player.id, index + 1]));
   const seasonPositions = new Map(generalBase.map((entry, index) => [entry.player.id, index + 1]));
   const awardSeasonsByPlayer = buildAwardSeasonsByPlayer(

@@ -198,16 +198,6 @@ export default async function RodadaDetalhePage({
           allPlayers={allSelectablePlayers}
         />
       )}
-
-      {round.status === "finished" && (
-        <BestGoalkeeperPicker
-          roundId={round.id}
-          participants={participants}
-          selectedPlayerId={round.best_goalkeeper_player_id || null}
-          canManage={account.isAdmin}
-          points={goalkeeperPoints}
-        />
-      )}
     </div>
   );
 

@@ -1,6 +1,7 @@
 import webpush, { type PushSubscription, type WebPushError } from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { SITE_URL } from "@/lib/siteUrl";
+import { createServiceClient } from "@/lib/supabase/service";
 
 type MatchForPush = {
   id: string;
@@ -55,7 +56,9 @@ async function sendMatchNotifications(
     return { sent: 0, failed: 0, disabled: true };
   }
 
-  const { data: roundPlayers, error: playersError } = await client
+  const queryClient = createServiceClient() || client;
+
+  const { data: roundPlayers, error: playersError } = await queryClient
     .from("round_players")
     .select("player_id")
     .eq("round_id", match.round_id);
@@ -64,14 +67,14 @@ async function sendMatchNotifications(
   const playerIds = [...new Set((roundPlayers || []).map((item) => item.player_id))];
   if (playerIds.length === 0) return { sent: 0, failed: 0 };
 
-  const { data: profiles, error: profilesError } = await client
+  const { data: profiles, error: profilesError } = await queryClient
     .from("account_profiles")
     .select("user_id")
     .in("player_id", playerIds);
 
   if (profilesError) throw profilesError;
   const userIds = [...new Set((profiles || []).map((profile) => profile.user_id))];
-  return sendPushNotificationsToUsers(client, userIds, notification, `/partidas/${match.id}`);
+  return sendPushNotificationsToUsers(queryClient, userIds, notification, `/partidas/${match.id}`);
 }
 
 async function sendPushNotificationsToUsers(
@@ -87,7 +90,9 @@ async function sendPushNotificationsToUsers(
   }
   if (userIds.length === 0) return { sent: 0, failed: 0 };
 
-  const { data: subscriptions, error: subscriptionsError } = await client
+  const queryClient = createServiceClient() || client;
+
+  const { data: subscriptions, error: subscriptionsError } = await queryClient
     .from("push_subscriptions")
     .select("endpoint, p256dh, auth")
     .in("user_id", userIds);

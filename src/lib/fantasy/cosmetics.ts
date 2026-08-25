@@ -48,3 +48,32 @@ export function cosmeticImage(assetKey?: string | null) {
 export function rarityClass(rarity: CosmeticRarity) {
   return ({ common: "border-white/20 text-white/80", rare: "border-sky-300/50 text-sky-200", epic: "border-fuchsia-300/55 text-fuchsia-200", legendary: "border-amber-300/70 text-amber-200" })[rarity];
 }
+
+export function cosmeticFrameClass(assetKey?: string | null): string {
+  if (!assetKey) return "";
+  const key = assetKey.toLowerCase();
+  if (key.includes("neon")) return "ring-[2.5px] ring-[#ccff00] shadow-[0_0_16px_rgba(204,255,0,0.6)]";
+  if (key.includes("capitao") || key.includes("faixa")) return "ring-[2.5px] ring-amber-400 shadow-[0_0_14px_rgba(251,191,36,0.6)]";
+  if (key.includes("rede")) return "ring-[2.5px] ring-sky-300 ring-offset-1 ring-offset-black/60 shadow-[0_0_12px_rgba(125,211,252,0.5)]";
+  if (key.includes("alambrado")) return "ring-[2px] ring-zinc-400 ring-dashed shadow-[0_0_8px_rgba(255,255,255,0.25)]";
+  return "ring-[2px] ring-accent/60 shadow-[0_0_10px_rgba(204,255,0,0.3)]";
+}
+
+export function cosmeticAuraClass(assetKey?: string | null): string {
+  if (!assetKey) return "";
+  const key = assetKey.toLowerCase();
+  if (key.includes("fumaca")) return "shadow-[0_0_24px_rgba(16,185,129,0.65)] animate-pulse";
+  if (key.includes("flash") || key.includes("refletor")) return "shadow-[0_0_26px_rgba(255,255,255,0.7)]";
+  if (key.includes("energia")) return "shadow-[0_0_20px_rgba(204,255,0,0.65)]";
+  return "shadow-[0_0_14px_rgba(204,255,0,0.4)]";
+}
+
+export function cosmeticNameplateClass(assetKey?: string | null): string {
+  if (!assetKey) return "border-white/10 bg-black/40 text-foreground";
+  const key = assetKey.toLowerCase();
+  if (key.includes("placar")) return "border-emerald-400/40 bg-black/80 text-emerald-300 font-mono";
+  if (key.includes("faixa")) return "border-amber-400/50 bg-amber-950/70 text-amber-200";
+  if (key.includes("retro")) return "border-orange-400/40 bg-orange-950/60 text-orange-200";
+  if (key.includes("prancheta")) return "border-lime-400/40 bg-lime-950/60 text-lime-200";
+  return "border-accent/30 bg-black/50 text-accent";
+}

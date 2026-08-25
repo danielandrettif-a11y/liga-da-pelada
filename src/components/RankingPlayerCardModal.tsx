@@ -303,7 +303,84 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
           </div>
         </div>
 
-        <div className="mx-auto mt-5 grid w-[88%] gap-2">
+        {entry.bestRounds && entry.bestRounds.length > 0 && (
+          <div className="mx-auto mt-4 w-[92%] overflow-hidden rounded-2xl border border-border bg-[#07150d]/95 p-4 shadow-xl backdrop-blur-md">
+            <div className="flex items-center justify-between border-b border-border/70 pb-2.5">
+              <div className="flex items-center gap-1.5">
+                <Trophy className="h-4 w-4 text-accent" />
+                <span className="font-athletic text-xs font-black uppercase tracking-wider text-foreground">
+                  Suas 6 Melhores Partidas
+                </span>
+              </div>
+              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-black text-accent">
+                {entry.bestRounds.filter((r) => r.countedInTop6).length}/6 no ranking
+              </span>
+            </div>
+
+            {/* Lista de Partidas */}
+            <div className="mt-3 divide-y divide-border/40 max-h-48 overflow-y-auto">
+              {entry.bestRounds.map((r, idx) => (
+                <div
+                  key={r.roundId}
+                  className={`flex items-center justify-between py-2 px-1 text-xs transition-colors ${
+                    r.countedInTop6 ? "text-foreground" : "text-muted opacity-60"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
+                        r.countedInTop6
+                          ? "bg-accent text-background font-bold"
+                          : "bg-surface text-muted"
+                      }`}
+                    >
+                      {idx + 1}
+                    </span>
+                    <div className="truncate">
+                      <p className="font-bold truncate text-[11px]">
+                        Rodada {String(r.roundNumber).padStart(2, "0")}
+                      </p>
+                      <p className="text-[9px] text-muted">
+                        {r.goals}G · {r.assists}A · {r.wins}V
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span
+                      className={`font-athletic text-base font-black ${
+                        r.countedInTop6 ? "text-accent" : "text-muted"
+                      }`}
+                    >
+                      {r.points} pts
+                    </span>
+                    {r.countedInTop6 && (
+                      <span className="block text-[8px] font-bold text-accent/80 uppercase">
+                        Somando
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Nota de Corte */}
+            <div className="mt-3 rounded-xl border border-accent/25 bg-accent/10 p-2.5 text-center text-[11px] font-bold text-foreground">
+              {entry.bestRounds.length >= 6 ? (
+                <span>
+                  🎯 <strong className="text-accent">Nota de corte:</strong> Precisa fazer{" "}
+                  <strong className="text-accent">&gt; {entry.minPointsToEnterTop6} pts</strong> na próxima rodada para subir no ranking.
+                </span>
+              ) : (
+                <span>
+                  🎯 <strong className="text-accent">Vagas livres:</strong> {entry.bestRounds.length}/6 jogos. Qualquer pontuação na próxima rodada entrará somando!
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="mx-auto mt-4 grid w-[88%] gap-2">
           <button type="button" onClick={shareCard} disabled={sharing} className="flex items-center justify-center gap-2 rounded-xl border border-accent/40 bg-accent/10 py-3.5 text-sm font-black uppercase tracking-wide text-accent disabled:opacity-50"><Share2 className="h-4 w-4" />{sharing ? "Gerando Stories..." : "Compartilhar carta"}</button>
           <Link href={`/jogadores/${entry.player.id}`} className="flex items-center justify-center rounded-xl bg-accent py-3.5 text-sm font-black uppercase tracking-wide text-background shadow-lg shadow-accent/15">Abrir perfil completo</Link>
           {shareError && <p className="rounded-lg bg-danger/10 p-2 text-center text-[10px] font-bold text-danger">{shareError}</p>}

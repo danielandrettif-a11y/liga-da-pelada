@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { getInitials } from "@/lib/utils";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { X, ZoomIn } from "@/components/icons";
+import { cosmeticAuraClass, cosmeticFrameClass } from "@/lib/fantasy/cosmetics";
 
 type PlayerAvatarProps = {
   name: string;
@@ -12,6 +13,9 @@ type PlayerAvatarProps = {
   className?: string;
   imageClassName?: string;
   clickable?: boolean;
+  frameKey?: string | null;
+  auraKey?: string | null;
+  frameClass?: string;
 };
 
 export function PlayerAvatar({
@@ -20,6 +24,9 @@ export function PlayerAvatar({
   className = "",
   imageClassName = "",
   clickable = true,
+  frameKey,
+  auraKey,
+  frameClass,
 }: PlayerAvatarProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -36,6 +43,8 @@ export function PlayerAvatar({
 
   const hasImage = Boolean(avatarUrl && !imageFailed);
   const isInteractive = clickable && hasImage;
+  const frameEffect = frameClass || cosmeticFrameClass(frameKey);
+  const auraEffect = cosmeticAuraClass(auraKey);
 
   function handleClick(e: React.MouseEvent) {
     if (!isInteractive) return;
@@ -50,7 +59,7 @@ export function PlayerAvatar({
         onClick={handleClick}
         className={`group/avatar relative overflow-hidden flex items-center justify-center ${
           isInteractive ? "cursor-pointer active:scale-95 transition-transform" : ""
-        } ${className}`}
+        } ${frameEffect ? `${frameEffect} ` : ""}${auraEffect ? `${auraEffect} ` : ""}${className}`}
         aria-label={`Foto de ${name}`}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}

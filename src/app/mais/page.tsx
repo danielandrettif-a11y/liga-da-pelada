@@ -72,12 +72,6 @@ const ADMIN_SECTIONS = [
         label: "PIX de recebimento",
         description: "Cadastrar chaves para encerrar a rodada",
       },
-      {
-        href: "/admin/cartola/pacotes",
-        icon: ClipboardList,
-        label: "Enviar pacote",
-        description: "Presentear uma pessoa com cartas do Cartola",
-      },
     ],
   },
   {

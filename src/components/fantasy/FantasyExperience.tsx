@@ -175,7 +175,40 @@ export function FantasyExperience({
   });
 
   const [selected, setSelected] = useState<string[]>(() => {
-    // 1. Tentar restaurar o layout exato de vagas salvo pelo usuário
+    const slots = Array(playersPerTeam).fill("");
+    if (!initialIds.length) return slots;
+
+    // 1. Tentar restaurar o layout direto do banco de dados (slot_index salvo)
+    const dbPlayers = (lineup?.fantasy_lineup_players || []).filter((item: any) => Boolean(item?.player_id));
+    const hasDbSlots = dbPlayers.some((item: any) => typeof item.slot_index === "number" && item.slot_index >= 0 && item.slot_index < playersPerTeam);
+
+    if (hasDbSlots) {
+      const placed = new Set<string>();
+      for (const item of dbPlayers) {
+        if (
+          typeof item.slot_index === "number" &&
+          item.slot_index >= 0 &&
+          item.slot_index < playersPerTeam &&
+          !slots[item.slot_index]
+        ) {
+          slots[item.slot_index] = item.player_id;
+          placed.add(item.player_id);
+        }
+      }
+      // Se sobrou algum jogador sem slot_index válido, preencher nos primeiros vazios
+      for (const item of dbPlayers) {
+        if (!placed.has(item.player_id)) {
+          const emptyIdx = slots.indexOf("");
+          if (emptyIdx !== -1) {
+            slots[emptyIdx] = item.player_id;
+            placed.add(item.player_id);
+          }
+        }
+      }
+      return slots;
+    }
+
+    // 2. Tentar restaurar o layout exato de vagas salvo no cache do navegador
     if (typeof window !== "undefined") {
       try {
         const cached = localStorage.getItem(storageKey);
@@ -194,15 +227,10 @@ export function FantasyExperience({
       } catch {}
     }
 
-    // 2. Se não houver layout em cache, organizar inteligentemente cada jogador no seu setor correto
-    const slots = Array(playersPerTeam).fill("");
-    if (!initialIds.length) return slots;
-
+    // 3. Fallback inteligente por perfil (apenas na 1ª vez sem cache/banco)
     const playerMap = new Map(market.map((p) => [p.id, p]));
     const remainingIds = [...initialIds];
 
-    // O time de 6 tem uma vaga tática de GOL. No time de 5, o rodízio vale
-    // pelo que aconteceu em campo e as cinco vagas são DEF/MEI/ATA.
     if (playersPerTeam === 6) {
       const gkSlot = 5;
       const gkIdx = remainingIds.findIndex((id) => (playerMap.get(id)?.goalkeeperGames || 0) > 0);
@@ -248,7 +276,7 @@ export function FantasyExperience({
     // Defensores
     const defSlots = [3, 4];
     for (const s of defSlots) {
-      if (slots[s] === "") {
+      if (s < playersPerTeam && slots[s] === "") {
         const defIdx = remainingIds.findIndex((id) => playerMap.get(id)?.profile === "defensive");
         if (defIdx >= 0) {
           slots[s] = remainingIds[defIdx];
@@ -266,6 +294,21 @@ export function FantasyExperience({
 
     return slots;
   });
+
+  // Sincronizar array de vagas quando a configuração da liga mudar (5 vs 6)
+  useEffect(() => {
+    setSelected((current) => {
+      if (current.length === playersPerTeam) return current;
+      if (current.length > playersPerTeam) {
+        return current.slice(0, playersPerTeam);
+      }
+      const next = [...current];
+      while (next.length < playersPerTeam) {
+        next.push("");
+      }
+      return next;
+    });
+  }, [playersPerTeam]);
 
   // Salvar posições das vagas no cache local sempre que alterar
   useEffect(() => {
@@ -621,11 +664,12 @@ export function FantasyExperience({
   }
 
   function save() {
-    const validPlayerIds = selected.filter(Boolean);
+    const normalizedSelected = selected.slice(0, playersPerTeam);
+    const validPlayerIds = normalizedSelected.filter(Boolean);
     const slotRoles = getFantasySlotRoles(playersPerTeam, formation);
-    const slotAssignments = selected.flatMap((playerId, slotIndex) =>
+    const slotAssignments = normalizedSelected.flatMap((playerId, slotIndex) =>
       playerId
-        ? [{ playerId, slotIndex, slotRole: slotRoles[slotIndex] }]
+        ? [{ playerId, slotIndex, slotRole: slotRoles[slotIndex] || "MEI" }]
         : [],
     );
     startTransition(async () => {

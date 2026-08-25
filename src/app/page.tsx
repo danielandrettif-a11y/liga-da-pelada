@@ -15,7 +15,6 @@ import Link from "next/link";
 import { getDashboardData } from "@/lib/actions/dashboard";
 import { getLatestFinishedSeason } from "@/lib/actions/seasons";
 import { PreviousSeasonBanner } from "@/components/PreviousSeasonBanner";
-import { GreetingBanner } from "@/components/GreetingBanner";
 import { LiveMatchBanner, type HomeLiveMatch } from "@/components/LiveMatchBanner";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PreSeasonBanner } from "@/components/PreSeasonBanner";
@@ -134,8 +133,7 @@ export default async function HomePage() {
   
   if (!data) {
     return (
-      <div className="space-y-8">
-        <GreetingBanner name={accountName} inbox={inbox} />
+      <div className="space-y-6">
         {!account.user && <JoinSelectionButton />}
         {hasIncompleteProfile && <IncompleteProfileBanner />}
         <div className="flex flex-col items-center justify-center p-8 text-center animate-fade-in">
@@ -162,9 +160,7 @@ export default async function HomePage() {
     : null;
 
   return (
-    <div className="space-y-6">
-      <GreetingBanner name={accountName} inbox={inbox} />
-
+    <div className="space-y-5">
       {!account.user && <JoinSelectionButton />}
       {hasIncompleteProfile && <IncompleteProfileBanner />}
 

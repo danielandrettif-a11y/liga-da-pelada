@@ -7,6 +7,18 @@ export type RankingAwards = {
   bestGoalkeeper: number;
 };
 
+export type RankingBestRound = {
+  roundId: string;
+  roundNumber: number;
+  date: string;
+  points: number;
+  goals: number;
+  assists: number;
+  wins: number;
+  games: number;
+  countedInTop6: boolean;
+};
+
 export type RankingEntry = {
   player: Player;
   games: number;
@@ -16,6 +28,9 @@ export type RankingEntry = {
   goals: number;
   assists: number;
   points: number;
+  totalRawPoints?: number;
+  bestRounds?: RankingBestRound[];
+  minPointsToEnterTop6?: number | null;
   winRate: number;
   awards: RankingAwards;
   awardSeasons: PlayerAwardSeason[];
