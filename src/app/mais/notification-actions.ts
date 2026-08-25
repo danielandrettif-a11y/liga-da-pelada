@@ -18,7 +18,7 @@ export async function getPushPublicKey() {
   const backgroundAlertsConfigured = Boolean(
     process.env.QSTASH_TOKEN
     && process.env.MATCH_TIMER_WEBHOOK_SECRET
-    && process.env.SUPABASE_SERVICE_ROLE_KEY,
+    && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY),
   );
 
   if (!publicKey || !configured) {
@@ -40,7 +40,7 @@ export async function getPushSystemStatus() {
     backgroundAlertsConfigured: Boolean(
       process.env.QSTASH_TOKEN
       && process.env.MATCH_TIMER_WEBHOOK_SECRET
-      && process.env.SUPABASE_SERVICE_ROLE_KEY,
+      && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY),
     ),
   };
 }

@@ -9,7 +9,10 @@ type TimerScheduleInput = {
   startedAt: string;
 };
 
-const QSTASH_PUBLISH_URL = "https://qstash.upstash.io/v2/publish";
+function getQStashPublishUrl() {
+  const baseUrl = (process.env.QSTASH_URL || "https://qstash.upstash.io").replace(/\/$/, "");
+  return `${baseUrl}/v2/publish`;
+}
 
 function getSchedulerConfiguration() {
   const token = process.env.QSTASH_TOKEN;
@@ -41,7 +44,7 @@ async function scheduleTimerAlert(
 ) {
   const destination = `${SITE_URL}/api/internal/match-timer-alert`;
   const runAt = Math.ceil((Date.now() + secondsUntil(input, threshold) * 1000) / 1000);
-  const response = await fetch(`${QSTASH_PUBLISH_URL}/${encodeURIComponent(destination)}`, {
+  const response = await fetch(`${getQStashPublishUrl()}/${encodeURIComponent(destination)}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
