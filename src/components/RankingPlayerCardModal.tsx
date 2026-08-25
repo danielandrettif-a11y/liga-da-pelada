@@ -234,7 +234,6 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   const clipPath = "polygon(10% 0, 90% 0, 100% 7%, 97% 88%, 50% 100%, 3% 88%, 0 7%)";
 
   return (
-  return (
     <div
       className="mobile-dialog-backdrop bg-black/90 backdrop-blur-md overflow-y-auto px-4 py-8 sm:py-12"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
