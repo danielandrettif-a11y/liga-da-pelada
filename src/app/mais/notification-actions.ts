@@ -108,7 +108,7 @@ export async function sendPushTest() {
     }
     if (delivery.sent === 0) {
       return { success: false, error: delivery.failed > 0
-        ? "O celular recusou a notificação. Ative a permissão do app nas configurações."
+        ? `O provedor recusou a notificação${delivery.failureReasons?.[0] ? `: ${delivery.failureReasons[0]}` : "."}`
         : "Este aparelho ainda não possui uma assinatura de notificação ativa." };
     }
     return { success: true };

@@ -25,6 +25,13 @@ type PushNotification = {
   url?: string;
 };
 
+type PushDeliveryResult = {
+  sent: number;
+  failed: number;
+  disabled?: boolean;
+  failureReasons?: string[];
+};
+
 export function getWebPushConfiguration() {
   const publicKey = process.env.VAPID_PUBLIC_KEY || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -43,6 +50,16 @@ function teamName(team: MatchForPush["team_a"], fallback: string) {
 function isExpiredSubscription(error: unknown) {
   const statusCode = (error as WebPushError | undefined)?.statusCode;
   return statusCode === 404 || statusCode === 410;
+}
+
+function getPushFailureReason(error: unknown) {
+  const pushError = error as (WebPushError & { body?: unknown }) | undefined;
+  const status = typeof pushError?.statusCode === "number"
+    ? `HTTP ${pushError.statusCode}`
+    : "erro do provedor push";
+  const body = typeof pushError?.body === "string" ? pushError.body.trim() : "";
+  const message = error instanceof Error ? error.message.trim() : "";
+  return [status, body || message].filter(Boolean).join(" — ").slice(0, 320);
 }
 
 async function sendMatchNotifications(
@@ -115,6 +132,7 @@ async function sendPushNotificationsToUsers(
   const expiredEndpoints: string[] = [];
   let sent = 0;
   let failed = 0;
+  const failureReasons: string[] = [];
 
   await Promise.all((subscriptions as StoredSubscription[]).map(async (stored) => {
     const subscription: PushSubscription = {
@@ -136,7 +154,10 @@ async function sendPushNotificationsToUsers(
     } catch (error) {
       failed += 1;
       if (isExpiredSubscription(error)) expiredEndpoints.push(stored.endpoint);
-      else console.error("Erro ao enviar Web Push:", error);
+      else {
+        failureReasons.push(getPushFailureReason(error));
+        console.error("Erro ao enviar Web Push:", error);
+      }
     }
   }));
 
@@ -144,7 +165,7 @@ async function sendPushNotificationsToUsers(
     await queryClient.from("push_subscriptions").delete().in("endpoint", expiredEndpoints);
   }
 
-  return { sent, failed };
+  return { sent, failed, failureReasons } satisfies PushDeliveryResult;
 }
 
 export async function sendPushTestNotification(client: SupabaseClient, userId: string) {
