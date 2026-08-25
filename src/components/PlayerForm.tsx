@@ -264,7 +264,7 @@ export function PlayerForm({ player, mode = "admin" }: { player?: Player; mode?:
         </div>
       )}
 
-      {mode === "admin" && (memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2">
+      {(memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2">
         <legend className="text-xs font-bold text-muted uppercase tracking-wider">
           Perfil de jogo
         </legend>
@@ -288,6 +288,11 @@ export function PlayerForm({ player, mode = "admin" }: { player?: Player; mode?:
             </label>
           ))}
         </div>
+        {mode === "self" && (
+          <p className="text-[10px] leading-4 text-muted">
+            Esta é sua tag oficial no Cartola. Ela libera os bônus quando você for escalado na vaga correspondente. GOL não é tag de perfil: qualquer atleta pode ser escolhido para a vaga de goleiro.
+          </p>
+        )}
       </fieldset>}
 
       <div className="pt-4 flex flex-col gap-3">
