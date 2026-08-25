@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Crown } from "@/components/icons";
 import type { SeasonPassDashboard } from "@/lib/actions/fantasy";
 import { SeasonPassPitch } from "./SeasonPassPitch";
 import { SeasonPassRules } from "./SeasonPassRules";
@@ -19,20 +18,8 @@ export function SeasonPassExperience({ pass }: { pass: SeasonPassDashboard }) {
   const progress = pass.progress;
 
   return (
-    <div className="space-y-5">
-      <SeasonPassRules mode={pass.mode} />
-      <section className="relative overflow-hidden rounded-[2rem] border border-[#a65cff]/45 bg-gradient-to-br from-[#321064] via-[#160c2c] to-[#07170e] p-6 shadow-[0_0_35px_rgba(142,65,255,0.18)]">
-        <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-[#a04dff]/20 blur-3xl" />
-        <Crown className="relative h-10 w-10 text-[#d2a2ff]" />
-        <p className="relative mt-4 font-athletic text-xs font-black uppercase italic tracking-[0.22em] text-[#bd82ff]">Passe BQ · V1</p>
-        <h2 className="relative mt-1 font-athletic text-3xl font-black uppercase italic leading-none text-white">Casa {progress} de 40</h2>
-        <p className="relative mt-3 max-w-sm text-sm leading-6 text-white/65">
-          {pass.mode === "community"
-            ? "Sua trilha avança ao montar escalações válidas nas rodadas Ranked."
-            : "Jogue, escale e some gols e assistências nas rodadas Ranked para avançar na trilha."}
-        </p>
-        <p className="relative mt-5 text-[10px] font-black uppercase tracking-[0.16em] text-[#d7adff]">Da torcida ao centroavante · 40 casas</p>
-      </section>
+    <div className="space-y-4">
+      <SeasonPassPitch progress={progress} playerName={pass.playerName} playerAvatarUrl={pass.playerAvatarUrl} />
 
       {!pass.authenticated ? (
         <section className="rounded-2xl border border-border bg-surface p-5 text-center">
@@ -43,8 +30,17 @@ export function SeasonPassExperience({ pass }: { pass: SeasonPassDashboard }) {
         <section className="rounded-2xl border border-warning/25 bg-warning/10 p-5 text-center"><p className="text-sm font-black text-foreground">Passe aguardando ativação</p><p className="mt-1 text-xs text-muted">Execute a migration 060 no Supabase para liberar sua progressão.</p></section>
       ) : (
         <>
-          <section className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Metric label="Peladas" value={pass.participations} /><Metric label="Semanas ativas" value={pass.activeWeeks} /><Metric label="Escalações" value={pass.validLineups} /><Metric label="G+A p/ ciclo" value={`${pass.goalsAssistsRemainder}/5`} /></section>
-          <SeasonPassPitch progress={progress} playerName={pass.playerName} playerAvatarUrl={pass.playerAvatarUrl} />
+          <section className="rounded-3xl border border-[#a65cff]/30 bg-[#110b20]/70 p-3.5">
+            <div className="flex items-start justify-between gap-3 px-1">
+              <div>
+                <p className="font-athletic text-[10px] font-black uppercase italic tracking-[0.18em] text-[#d7adff]">Resumo da temporada</p>
+                <p className="mt-1 text-xs leading-5 text-muted">{pass.mode === "community" ? "Escale nas rodadas Ranked para avançar." : "Jogue, escale e some G+A para avançar."}</p>
+              </div>
+              <span className="shrink-0 rounded-xl border border-[#a65cff]/35 bg-[#a04dff]/15 px-2.5 py-1.5 font-athletic text-sm font-black text-[#e0b9ff]">{progress}/40</span>
+            </div>
+            <div className="mt-3 grid grid-cols-4 gap-1.5"><Metric label="Peladas" value={pass.participations} /><Metric label="Semanas" value={pass.activeWeeks} /><Metric label="Escalações" value={pass.validLineups} /><Metric label="G+A" value={`${pass.goalsAssistsRemainder}/5`} /></div>
+          </section>
+          <SeasonPassRules mode={pass.mode} />
           <section className="rounded-3xl border border-border bg-surface p-4 text-xs leading-5 text-muted"><p className="font-athletic text-xs font-black uppercase italic tracking-[0.16em] text-accent">Regra justa de semana ativa</p><p className="mt-2">Se você não conseguiu ir, uma escalação válida ainda garante o avanço completo da semana. Só gols e assistências continuam exclusivos de quem entrou em campo.</p></section>
           {pass.events.length > 0 && <section className="rounded-3xl border border-border bg-surface p-4"><p className="font-athletic text-xs font-black uppercase italic tracking-[0.16em] text-accent">Últimos avanços</p><div className="mt-3 divide-y divide-border/70">{pass.events.map((event) => <div key={event.id} className="flex items-center justify-between gap-3 py-3"><div><p className="text-xs font-black text-foreground">{eventLabels[event.eventType]}</p><p className="mt-0.5 text-[10px] text-muted">{event.roundNumber ? `Rodada ${String(event.roundNumber).padStart(2, "0")}` : "Temporada BQ"}</p></div><span className="font-athletic text-lg font-black text-[#d7adff]">+{event.houses}</span></div>)}</div></section>}
         </>
@@ -54,5 +50,5 @@ export function SeasonPassExperience({ pass }: { pass: SeasonPassDashboard }) {
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {
-  return <div className="rounded-2xl border border-border bg-surface p-3 text-center"><span className="block font-athletic text-xl font-black text-accent">{value}</span><span className="mt-1 block text-[8px] font-black uppercase tracking-wider text-muted">{label}</span></div>;
+  return <div className="min-w-0 rounded-xl border border-white/10 bg-black/15 px-1.5 py-2 text-center"><span className="block truncate font-athletic text-base font-black text-accent">{value}</span><span className="mt-0.5 block truncate text-[7px] font-black uppercase tracking-wide text-muted">{label}</span></div>;
 }

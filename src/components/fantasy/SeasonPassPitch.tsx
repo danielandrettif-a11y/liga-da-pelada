@@ -347,34 +347,34 @@ export function SeasonPassPitch({
   const isUnlockedReward = (s: SeasonStage) => s.reward && progress >= s.reward.house;
 
   return (
-    <section className="overflow-hidden rounded-[2.5rem] border border-accent/40 bg-[#051109] p-3 sm:p-4 shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-fade-in">
+    <section className="overflow-hidden rounded-[2rem] border border-accent/40 bg-[#051109] p-1.5 sm:p-3 shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-fade-in">
       {/* Header com Progresso Geral */}
-      <div className="flex items-center justify-between gap-3 px-2 pb-3.5">
+      <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5 pt-1.5 sm:pb-3.5">
         <div>
           <span className="font-athletic text-[10px] font-black uppercase italic tracking-[0.2em] text-accent">
             Tabuleiro Oficial da Temporada
           </span>
-          <h2 className="font-athletic text-xl font-black uppercase italic text-white leading-tight">
+          <h2 className="font-athletic text-lg font-black uppercase italic text-white leading-tight sm:text-xl">
             {progress === 0 ? "A Jornada Vai Começar" : `${playerName || "Jogador"} · ${currentStage.name}`}
           </h2>
         </div>
-        <div className="flex items-center gap-1.5 rounded-2xl border border-accent/40 bg-accent/15 px-3.5 py-2 text-center shadow-lg shadow-accent/20">
+        <div className="flex items-center gap-1.5 rounded-2xl border border-accent/40 bg-accent/15 px-3 py-1.5 text-center shadow-lg shadow-accent/20 sm:px-3.5 sm:py-2">
           <div>
-            <span className="block font-athletic text-2xl font-black text-accent leading-none">{progress}</span>
+            <span className="block font-athletic text-xl font-black text-accent leading-none sm:text-2xl">{progress}</span>
             <span className="block text-[8px] font-black uppercase tracking-wider text-accent/80">de 40 casas</span>
           </div>
         </div>
       </div>
 
       {/* TABULEIRO GRÁFICO OFICIAL COM SOBREPOSIÇÃO INTERATIVA */}
-      <div className="relative w-full overflow-hidden rounded-[2rem] border-2 border-accent/30 bg-black shadow-[inset_0_0_40px_rgba(0,0,0,0.9)]">
+      <div className="relative w-full overflow-hidden rounded-[1.65rem] border-2 border-accent/30 bg-black shadow-[inset_0_0_40px_rgba(0,0,0,0.9)] sm:rounded-[2rem]">
         {/* Imagem de Fundo Oficial */}
         <Image
           src="/images/season-pass-board.jpg"
           alt="Tabuleiro Oficial do Passe de Temporada"
           width={683}
           height={1024}
-          sizes="(max-width: 32rem) calc(100vw - 2rem), 30rem"
+          sizes="(max-width: 32rem) calc(100vw - 1rem), 34rem"
           className="w-full h-auto block select-none pointer-events-none"
           loading="eager"
         />
@@ -461,7 +461,7 @@ export function SeasonPassPitch({
       </div>
 
       {/* CARD DETALHADO DA CASA SELECIONADA */}
-      <div className="mt-3.5 rounded-3xl border border-accent/30 bg-gradient-to-r from-[#0c2416] via-[#07170e] to-surface p-4 text-foreground shadow-xl">
+      <div className="mt-2.5 rounded-[1.4rem] border border-accent/30 bg-gradient-to-r from-[#0c2416] via-[#07170e] to-surface p-3.5 text-foreground shadow-xl sm:mt-3.5 sm:rounded-3xl sm:p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div

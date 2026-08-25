@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayersStatsGrid, type PlayerStats } from "./PlayersStatsGrid";
@@ -74,6 +74,7 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
   const [view, setView] = useState<RosterView>(initialView);
   const [filter, setFilter] = useState<RosterFilter>("all");
   const [statsMode, setStatsMode] = useState<StatsMode>("ranked");
+  const passPanelRef = useRef<HTMLElement>(null);
   const unreadIds = new Set(unreadPlayerIds);
   const showPlayers = filter === "all" || filter === "players";
   const showWags = filter === "all" || filter === "wags";
@@ -82,6 +83,16 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
   const visibleGuests = activeGuests[statsMode];
 
   useEffect(() => setView(initialView), [initialView]);
+
+  useEffect(() => {
+    if (view !== "pass") return;
+
+    const frame = window.requestAnimationFrame(() => {
+      passPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [view]);
 
   return (
     <div className="space-y-7">
@@ -146,7 +157,7 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
       )}
       </>}
 
-      {view === "pass" && <section className="scroll-mt-36 space-y-3"><SectionDivider title="Passe de Temporada" subtitle="Sua trilha de evolução na temporada" /><div>{seasonPass}</div></section>}
+      {view === "pass" && <section ref={passPanelRef} className="scroll-mt-36">{seasonPass}</section>}
     </div>
   );
 }
