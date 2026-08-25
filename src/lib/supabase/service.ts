@@ -11,8 +11,11 @@ export function createServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   // Supabase now calls the replacement for service_role `SUPABASE_SECRET_KEY`.
   // Accept both names so Coolify can use the value shown in its dashboard.
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    || process.env.SUPABASE_SECRET_KEY;
+  // Prefer the current `sb_secret_...` key. A legacy environment can still
+  // contain a publishable value under SERVICE_ROLE_KEY; using it first would
+  // make the client subject to RLS and break background notifications.
+  const serviceRoleKey = process.env.SUPABASE_SECRET_KEY
+    || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) return null;
 
   return createClient(url, serviceRoleKey, {

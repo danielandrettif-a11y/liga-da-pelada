@@ -82,6 +82,7 @@ async function sendPushNotificationsToUsers(
   userIds: string[],
   notification: PushNotification,
   fallbackUrl: string,
+  useServiceClient = true,
 ) {
   const { publicKey, privateKey, configured } = getWebPushConfiguration();
   if (!configured || !publicKey || !privateKey) {
@@ -90,7 +91,9 @@ async function sendPushNotificationsToUsers(
   }
   if (userIds.length === 0) return { sent: 0, failed: 0 };
 
-  const queryClient = createServiceClient() || client;
+  // The test only needs the caller's own subscription. Keeping its authenticated
+  // client avoids making the test depend on the background service key.
+  const queryClient = useServiceClient ? (createServiceClient() || client) : client;
 
   const { data: subscriptions, error: subscriptionsError } = await queryClient
     .from("push_subscriptions")
@@ -138,7 +141,7 @@ async function sendPushNotificationsToUsers(
   }));
 
   if (expiredEndpoints.length > 0) {
-    await client.from("push_subscriptions").delete().in("endpoint", expiredEndpoints);
+    await queryClient.from("push_subscriptions").delete().in("endpoint", expiredEndpoints);
   }
 
   return { sent, failed };
@@ -150,7 +153,7 @@ export async function sendPushTestNotification(client: SupabaseClient, userId: s
     body: "Este é um teste. Os avisos de 30 segundos e fim de jogo chegarão mesmo com o celular bloqueado.",
     tag: `push-test-${userId}`,
     url: "/mais",
-  }, "/mais");
+  }, "/mais", false);
 }
 
 export async function sendMatchFinishedNotifications(
