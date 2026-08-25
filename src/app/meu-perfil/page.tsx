@@ -7,7 +7,7 @@ import { getPlayer } from "@/lib/actions/players";
 import { FitnessPanel } from "@/components/FitnessPanel";
 import { getMyFitnessRounds, getPlayerFitnessSummaries } from "@/lib/actions/fitness";
 import { getMyFantasySummary } from "@/lib/actions/fantasy";
-import { getMyCosmeticsDashboard } from "@/lib/actions/cosmetics";
+import { getMyCosmeticsDashboard, getMyEquippedCosmetics } from "@/lib/actions/cosmetics";
 import { CosmeticsCollection } from "@/components/fantasy/CosmeticsExperience";
 
 export const revalidate = 0;
@@ -35,6 +35,7 @@ export default async function MeuPerfilPage() {
   }
 
   const player = await getPlayer(account.profile.player_id);
+  if (!player) redirect("/");
   const [fitnessRounds, fitnessSummaries, fantasySummary, cosmetics, myEquipped] = await Promise.all([
     getMyFitnessRounds(player.id),
     getPlayerFitnessSummaries(player.id),
