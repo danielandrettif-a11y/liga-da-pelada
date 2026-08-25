@@ -1057,6 +1057,12 @@ export async function saveFantasyLineup(input: {
           .eq("round_id", input.roundId)
           .maybeSingle()
       : { data: null };
+    const dbSlots = input.slotAssignments.map((slot) => ({
+      player_id: slot.playerId,
+      slot_index: slot.slotIndex,
+      slot_role: slot.slotRole,
+    }));
+
     if (testSession && input.roundId) {
       const { error } = await account.client.rpc("save_fantasy_test_lineup", {
         p_round_id: input.roundId,
@@ -1064,8 +1070,8 @@ export async function saveFantasyLineup(input: {
         p_captain_player_id: input.captainId,
         p_top_scorer_player_id: input.scorerId,
         p_top_assist_player_id: input.assistId,
-          p_challenge_player_id: input.challengeId,
-          p_lineup_slots: input.slotAssignments,
+        p_challenge_player_id: input.challengeId,
+        p_lineup_slots: dbSlots,
       });
       if (error) return { success: false, error: error.message };
     } else {
@@ -1075,8 +1081,8 @@ export async function saveFantasyLineup(input: {
         p_captain_player_id: input.captainId,
         p_top_scorer_player_id: input.scorerId,
         p_top_assist_player_id: input.assistId,
-          p_challenge_player_id: input.challengeId,
-          p_lineup_slots: input.slotAssignments,
+        p_challenge_player_id: input.challengeId,
+        p_lineup_slots: dbSlots,
       });
       if (lineupError) return { success: false, error: lineupError.message };
     }
