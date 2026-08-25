@@ -234,54 +234,96 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   const clipPath = "polygon(10% 0, 90% 0, 100% 7%, 97% 88%, 50% 100%, 3% 88%, 0 7%)";
 
   return (
-    <div className="mobile-dialog-backdrop bg-black/90 backdrop-blur-md" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label={`Carta de ${displayName}`} className="relative w-full max-w-[350px] py-12">
-        <button type="button" onClick={onClose} aria-label="Fechar carta" className="absolute right-1 top-1 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/65 text-white shadow-lg backdrop-blur hover:bg-black/90">
-          <X className="h-5 w-5" />
+  return (
+    <div
+      className="mobile-dialog-backdrop bg-black/90 backdrop-blur-md overflow-y-auto px-4 py-8 sm:py-12"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Carta de ${displayName}`}
+        className="relative w-full max-w-[350px] mx-auto my-auto"
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar carta"
+          className="absolute -top-3 -right-2 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-white/25 bg-black/85 text-white shadow-xl backdrop-blur hover:scale-105 active:scale-95 transition-transform"
+        >
+          <X className="h-4 w-4" />
         </button>
 
-        <div className="relative p-[3px]" style={{ clipPath, background: `linear-gradient(145deg, ${theme.edge}, ${theme.deep} 48%, ${theme.light})`, filter: `drop-shadow(0 26px 36px ${theme.glow})` }}>
-          <div className="relative overflow-hidden px-6 pb-12 pt-6" style={{ clipPath, color: theme.ink, background: `linear-gradient(155deg, ${theme.light} 0%, ${theme.base} 42%, ${theme.deep} 115%)` }}>
-            <div className="pointer-events-none absolute inset-0 opacity-40" style={{ backgroundImage: "repeating-linear-gradient(120deg, transparent 0 22px, rgba(255,255,255,.2) 23px 24px), radial-gradient(circle at 72% 14%, rgba(255,255,255,.85), transparent 28%)" }} />
+        {/* CARTA DE FUTEBOL ESTILO ULTIMATE TEAM */}
+        <div
+          className="relative p-[3px] transition-transform"
+          style={{
+            clipPath,
+            background: `linear-gradient(145deg, ${theme.edge}, ${theme.deep} 48%, ${theme.light})`,
+            filter: `drop-shadow(0 20px 30px ${theme.glow})`,
+          }}
+        >
+          <div
+            className="relative overflow-hidden px-5 pb-10 pt-5"
+            style={{
+              clipPath,
+              color: theme.ink,
+              background: `linear-gradient(155deg, ${theme.light} 0%, ${theme.base} 42%, ${theme.deep} 115%)`,
+            }}
+          >
+            <div
+              className="pointer-events-none absolute inset-0 opacity-40"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(120deg, transparent 0 22px, rgba(255,255,255,.2) 23px 24px), radial-gradient(circle at 72% 14%, rgba(255,255,255,.85), transparent 28%)",
+              }}
+            />
             <div className="pointer-events-none absolute -left-16 top-32 h-32 w-[140%] -rotate-12 border-y border-white/25 bg-white/10" />
-            <div className="pointer-events-none absolute inset-3 border border-current/20" style={{ clipPath }} />
+            <div className="pointer-events-none absolute inset-2.5 border border-current/20" style={{ clipPath }} />
 
-            <header className="relative z-10 flex items-center justify-between text-[9px] font-black uppercase tracking-[0.22em]">
-              <span>PBQ · Temporada</span>
-              <span className="rounded-full border border-current/25 bg-white/15 px-2.5 py-1">Carta {theme.label}</span>
+            {/* Cabeçalho */}
+            <header className="relative z-10 flex items-center justify-between text-[9px] font-black uppercase tracking-[0.22em] opacity-90">
+              <span className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
+                PBQ · Temporada
+              </span>
+              <span className="rounded-full border border-current/25 bg-white/20 px-2.5 py-0.5 shadow-sm">
+                Carta {theme.label}
+              </span>
             </header>
 
-            <div className="relative z-10 mt-2 h-52">
-              <div className="absolute left-0 top-5 z-20 flex w-20 flex-col items-center font-athletic">
-                <span className="player-card-rating text-6xl">{entry.points}</span>
-                <span className="-mt-1 text-xs font-black tracking-[0.25em]">PTS</span>
-                <div className="my-2 h-px w-12 bg-current opacity-30" />
-                <span className="text-center text-xl font-black leading-5">{profile}</span>
-                <div className="mt-3 flex h-10 w-10 items-center justify-center rounded-full border border-current/25 bg-white/15 shadow-inner">
-                  <Trophy className="h-6 w-6" fill="currentColor" />
+            {/* Miolo: Pontuação & Foto em Medalhão */}
+            <div className="relative z-10 mt-2 flex items-center justify-between h-44">
+              <div className="flex flex-col items-start font-athletic z-20 pl-1">
+                <span className="player-card-rating text-5xl font-black leading-none drop-shadow-sm">{entry.points}</span>
+                <span className="text-[10px] font-black tracking-[0.2em] opacity-80">PTS</span>
+                <div className="my-1.5 h-px w-10 bg-current opacity-30" />
+                <span className="text-xs font-black uppercase leading-tight max-w-[90px]">{profile}</span>
+                <div className="mt-2 inline-flex items-center gap-1 rounded-md border border-current/25 bg-white/20 px-2 py-0.5 text-xs font-black shadow-inner">
+                  {position}º
                 </div>
               </div>
 
-              <div className="absolute -right-5 bottom-0 h-52 w-56">
-                <div className="absolute inset-x-5 bottom-1 h-10 rounded-full bg-black/35 blur-xl" />
-                <PlayerAvatar
-                  name={entry.player.name}
-                  avatarUrl={entry.player.avatar_url}
-                  frameKey={entry.cosmetics?.frameKey}
-                  auraKey={entry.cosmetics?.auraKey}
-                  className="relative h-full w-full bg-transparent text-6xl font-black"
-                  imageClassName="object-cover object-top"
-                />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16" style={{ background: `linear-gradient(transparent, ${theme.base})` }} />
+              <div className="relative flex-1 flex justify-end pr-1">
+                <div className="relative h-36 w-36 rounded-full overflow-hidden border-[3px] border-current/35 bg-black/20 shadow-[0_10px_25px_rgba(0,0,0,0.45)] flex items-center justify-center">
+                  <PlayerAvatar
+                    name={entry.player.name}
+                    avatarUrl={entry.player.avatar_url}
+                    frameKey={entry.cosmetics?.frameKey}
+                    auraKey={entry.cosmetics?.auraKey}
+                    clickable={false}
+                    className="h-full w-full object-cover"
+                    imageClassName="object-cover object-top scale-105"
+                  />
+                </div>
               </div>
-
-              <div className="absolute bottom-1 left-0 z-20 flex h-7 w-7 items-center justify-center rounded-md border border-current/25 bg-white/15 font-athletic text-sm font-black">{position}º</div>
             </div>
 
-            <div className="relative z-10 -mt-1 border-y border-current/30 bg-white/10 px-2 py-3 text-center backdrop-blur-sm">
-              <h2 className="truncate font-athletic text-2xl font-black uppercase tracking-wide">{displayName}</h2>
+            {/* Nome & Título */}
+            <div className="relative z-10 mt-1 rounded-xl border border-current/25 bg-white/15 px-3 py-2 text-center backdrop-blur-xs shadow-sm">
+              <h2 className="truncate font-athletic text-xl font-black uppercase tracking-wide">{displayName}</h2>
               {entry.cosmetics?.titleName ? (
-                <p className="mt-0.5 truncate text-[10px] font-black uppercase tracking-wider opacity-90">
+                <p className="mt-0.5 truncate text-[9px] font-black uppercase tracking-wider opacity-90 text-current">
                   ✨ {entry.cosmetics.titleName}
                 </p>
               ) : entry.player.nickname ? (
@@ -289,28 +331,43 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
               ) : null}
             </div>
 
-            <div className="relative z-10 mt-4 grid grid-cols-3 gap-x-2 gap-y-3 font-athletic">
+            {/* Grid 3x2 de Estatísticas */}
+            <div className="relative z-10 mt-3 grid grid-cols-3 gap-1.5 font-athletic">
               {[
                 [entry.goals, "GOL"], [entry.assists, "AST"], [entry.wins, "VIT"],
                 [entry.games, "JOG"], [entry.losses, "DER"], [`${entry.winRate}%`, "APR"],
               ].map(([value, label]) => (
-                <div key={label} className="rounded-lg border border-current/15 bg-white/10 px-1 py-2 text-center shadow-inner">
-                  <p className="player-card-number text-2xl">{value}</p>
-                  <p className="mt-1 text-[9px] font-black tracking-[0.18em] opacity-70">{label}</p>
+                <div key={label} className="rounded-lg border border-current/15 bg-white/15 px-1 py-1.5 text-center shadow-inner">
+                  <p className="player-card-number text-xl leading-none">{value}</p>
+                  <p className="mt-0.5 text-[8px] font-black tracking-[0.14em] opacity-75">{label}</p>
                 </div>
               ))}
             </div>
 
             {awardBadges.length > 0 && (
-              <div className="relative z-10 mt-4 flex flex-wrap justify-center gap-1.5">
-                {awardBadges.map(({ label, value, Icon }) => <span key={label} className="inline-flex items-center gap-1 rounded-full border border-current/20 bg-white/15 px-2 py-1 text-[8px] font-black uppercase"><Icon className="h-3 w-3" />{label} {value}x</span>)}
+              <div className="relative z-10 mt-3 flex flex-wrap justify-center gap-1.5">
+                {awardBadges.map(({ label, value, Icon }) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center gap-1 rounded-full border border-current/20 bg-white/15 px-2 py-0.5 text-[8px] font-black uppercase"
+                  >
+                    <Icon className="h-3 w-3" />
+                    {label} {value}x
+                  </span>
+                ))}
               </div>
             )}
 
             {entry.fitness && (
-              <div className="relative z-10 mt-4 grid grid-cols-2 gap-2 border-t border-current/25 pt-3 text-center">
-                <div><p className="font-athletic text-lg font-black">{entry.fitness.distanceKm} km</p><p className="text-[8px] font-black uppercase opacity-65">Distância Ranked</p></div>
-                <div><p className="font-athletic text-lg font-black">{entry.fitness.averageSpeedKmh} km/h</p><p className="text-[8px] font-black uppercase opacity-65">Velocidade média</p></div>
+              <div className="relative z-10 mt-3 grid grid-cols-2 gap-2 border-t border-current/25 pt-2.5 text-center">
+                <div>
+                  <p className="font-athletic text-base font-black">{entry.fitness.distanceKm} km</p>
+                  <p className="text-[8px] font-black uppercase opacity-65">Distância Ranked</p>
+                </div>
+                <div>
+                  <p className="font-athletic text-base font-black">{entry.fitness.averageSpeedKmh} km/h</p>
+                  <p className="text-[8px] font-black uppercase opacity-65">Velocidade média</p>
+                </div>
               </div>
             )}
           </div>
