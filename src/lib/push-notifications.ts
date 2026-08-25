@@ -37,28 +37,31 @@ export function getWebPushConfiguration() {
   const normalizeEnvironmentValue = (value: string | undefined) => value
     ?.trim()
     .replace(/^['"]|['"]$/g, "") || undefined;
-  const publicKey = normalizeEnvironmentValue(process.env.VAPID_PUBLIC_KEY)
+  const configuredPublicKey = normalizeEnvironmentValue(process.env.VAPID_PUBLIC_KEY)
     || normalizeEnvironmentValue(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
   const privateKey = normalizeEnvironmentValue(process.env.VAPID_PRIVATE_KEY);
   const subject = normalizeEnvironmentValue(process.env.VAPID_SUBJECT) || SITE_URL;
   const subjectIsValid = /^(mailto:[^\s@]+@[^\s@]+|https:\/\/[^\s]+)$/i.test(subject);
-  let keyPairMatches = false;
+  let derivedPublicKey: string | undefined;
 
-  if (publicKey && privateKey) {
+  if (privateKey) {
     try {
       const key = createECDH("prime256v1");
       key.setPrivateKey(Buffer.from(privateKey, "base64url"));
-      const derivedPublicKey = key.getPublicKey(undefined, "uncompressed").toString("base64url");
-      keyPairMatches = derivedPublicKey === publicKey.replace(/=+$/, "");
+      derivedPublicKey = key.getPublicKey(undefined, "uncompressed").toString("base64url");
     } catch {
-      keyPairMatches = false;
+      derivedPublicKey = undefined;
     }
   }
+  // The public half is mathematically derived from the private VAPID key.
+  // Using the derived value prevents a stale NEXT_PUBLIC_* value from ever
+  // creating a subscription that the server cannot authenticate afterwards.
+  const publicKey = derivedPublicKey || configuredPublicKey;
 
-  const error = !publicKey || !privateKey
-    ? "Preencha VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no servidor."
-    : !keyPairMatches
-      ? "As chaves VAPID não formam um par válido. Gere as duas novamente e substitua ambas no Coolify."
+  const error = !privateKey
+    ? "Preencha VAPID_PRIVATE_KEY no servidor."
+    : !derivedPublicKey
+      ? "VAPID_PRIVATE_KEY não é uma chave VAPID válida. Gere uma nova no terminal e substitua esse valor no Coolify."
       : !subjectIsValid
         ? "VAPID_SUBJECT deve ser um e-mail no formato mailto:voce@exemplo.com ou uma URL HTTPS."
         : null;
