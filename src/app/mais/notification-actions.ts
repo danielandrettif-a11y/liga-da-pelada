@@ -114,6 +114,13 @@ export async function sendPushTest() {
     return { success: true };
   } catch (error) {
     console.error("Erro ao enviar teste de push:", error);
-    return { success: false, error: "Não foi possível entregar o teste agora." };
+    // O teste é também o diagnóstico inicial de produção. Antes ele ocultava
+    // a mensagem do Supabase e deixava impossível distinguir chave, tabela ou
+    // assinatura. A mensagem é segura para exibição e o erro completo segue
+    // disponível nos logs do Coolify.
+    const detail = error instanceof Error && error.message.trim()
+      ? error.message.trim()
+      : "erro desconhecido no servidor";
+    return { success: false, error: `Falha no teste: ${detail}` };
   }
 }
