@@ -43,18 +43,18 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 3 }, DEFAULT_FANTASY_SETTINGS)).toBe(
         -6
       );
-      expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, goalkeeperGames: 2, goalsConceded: 9, teamGoalsConceded: 3 }, DEFAULT_FANTASY_SETTINGS)).toBe(3);
-      expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, teamGoalsConceded: 2 }, DEFAULT_FANTASY_SETTINGS)).toBe(-2);
-      expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 2, goalkeeperGames: 1 }, DEFAULT_FANTASY_SETTINGS)).toBe(3);
+      expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, goalkeeperGames: 2, goalsConceded: 2 }, DEFAULT_FANTASY_SETTINGS)).toBe(4);
+      expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, teamGoalsConceded: 2 }, DEFAULT_FANTASY_SETTINGS)).toBe(0);
+      expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 2, goalkeeperGames: 1 }, DEFAULT_FANTASY_SETTINGS)).toBe(-1);
     });
 
-    it("dá gol turbinado apenas ao ATA e desconta gol contra", () => {
+    it("mantém o gol básico igual para todas as posições e desconta gol contra", () => {
       expect(
         calculateFantasyPlayerPoints(
           { goals: 1, ownGoals: 1, wins: 0, assists: 0, playerProfile: "offensive" },
           DEFAULT_FANTASY_SETTINGS,
         ),
-      ).toBe(3);
+      ).toBe(2);
       expect(
         calculateFantasyPlayerPoints(
           { goals: 1, ownGoals: 1, wins: 0, assists: 0, playerProfile: "midfield" },

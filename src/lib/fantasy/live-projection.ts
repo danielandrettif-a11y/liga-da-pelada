@@ -1,5 +1,9 @@
 import { calculateFantasyPlayerPoints } from "./engine";
 import type { FantasySettings } from "./config";
+import {
+  calculateFantasyPositionPackageBonus,
+  type FantasySlotRole,
+} from "./lineup-positions";
 
 export type FantasyLiveEvent = { playerId: string; assistPlayerId?: string | null; teamId: string; isOwnGoal?: boolean };
 export type FantasyLiveMatchPlayer = {
@@ -32,6 +36,9 @@ export type FantasyLivePlayerStats = {
   games: number;
   goalkeeperGames: number;
   goalsConceded: number;
+  cleanSheets: number;
+  defensiveCleanGames: number;
+  defensiveOneGoalGames: number;
   teamGoalsConceded: number;
   basePoints: number;
 };
@@ -40,6 +47,11 @@ export type FantasyLiveLineupInput = {
   id: string;
   userId: string;
   playerIds: string[];
+  slots?: Array<{
+    playerId: string;
+    slotRole: FantasySlotRole;
+    playerProfile?: FantasyLivePlayerStats["playerProfile"];
+  }>;
   captainPlayerId?: string | null;
   topScorerPlayerId?: string | null;
   topAssistPlayerId?: string | null;
@@ -52,6 +64,7 @@ export type FantasyLiveLineupProjection = {
   lineupId: string;
   userId: string;
   playerPoints: number;
+  positionBonus: number;
   captainBonus: number;
   predictionPoints: number;
   cardPoints: number;
@@ -83,6 +96,9 @@ export function projectFantasyLiveStats(
       games: 0,
       goalkeeperGames: 0,
       goalsConceded: 0,
+      cleanSheets: 0,
+      defensiveCleanGames: 0,
+      defensiveOneGoalGames: 0,
       teamGoalsConceded: 0,
     };
     stats.set(playerId, next);
@@ -94,12 +110,17 @@ export function projectFantasyLiveStats(
     const isFinished = match.status === "finished";
     const isDraw = match.scoreA === match.scoreB;
     const winner = isDraw ? null : match.scoreA > match.scoreB ? match.teamAId : match.teamBId;
+    const goalkeeperIds = new Set(match.goalkeepers.map((goalkeeper) => goalkeeper.playerId));
 
     for (const participant of match.players) {
       if (!participant.resultEligible) continue;
       const current = ensure(participant.playerId, participant.playerProfile);
       const conceded = participant.teamId === match.teamAId ? match.scoreB : match.scoreA;
       current.teamGoalsConceded += conceded;
+      if (participant.playerProfile === "defensive" && !goalkeeperIds.has(participant.playerId) && isFinished) {
+        if (conceded === 0) current.defensiveCleanGames += 1;
+        else if (conceded === 1) current.defensiveOneGoalGames += 1;
+      }
       if (isFinished) {
         current.games += 1;
         if (!isDraw && winner === participant.teamId) current.wins += 1;
@@ -113,6 +134,7 @@ export function projectFantasyLiveStats(
       current.goalsConceded += conceded;
       // A aparição é mostrada ao vivo, mas pode ser retirada caso a partida seja desfeita.
       current.goalkeeperGames += 1;
+      if (conceded === 0) current.cleanSheets += 1;
     }
 
     for (const event of match.events) {
@@ -145,11 +167,37 @@ export function projectFantasyLiveLineups(
   const topAssists = Math.max(0, ...[...playerStats.values()].map((item) => item.assists));
 
   return lineups.map((lineup) => {
-    const playerPoints = lineup.playerIds.reduce(
-      (sum, playerId) => sum + (playerStats.get(playerId)?.basePoints || 0),
-      0,
-    );
-    const captainBase = lineup.captainPlayerId ? playerStats.get(lineup.captainPlayerId)?.basePoints || 0 : 0;
+    const slotByPlayer = new Map((lineup.slots || []).map((slot) => [slot.playerId, slot]));
+    const pointsByPlayer = new Map<string, number>();
+    let positionBonus = 0;
+
+    for (const playerId of lineup.playerIds) {
+      const stats = playerStats.get(playerId);
+      const slot = slotByPlayer.get(playerId);
+      const bonus = stats && slot
+        ? calculateFantasyPositionPackageBonus(
+            {
+              slotRole: slot.slotRole,
+              playerProfile: slot.playerProfile ?? stats.playerProfile,
+              goals: stats.goals,
+              assists: stats.assists,
+              games: stats.games,
+              losses: stats.losses,
+              goalkeeperGames: stats.goalkeeperGames,
+              goalsConceded: stats.goalsConceded,
+              cleanSheets: stats.cleanSheets,
+              defensiveCleanGames: stats.defensiveCleanGames,
+              defensiveOneGoalGames: stats.defensiveOneGoalGames,
+            },
+            settings,
+          )
+        : 0;
+      positionBonus += bonus;
+      pointsByPlayer.set(playerId, (stats?.basePoints || 0) + bonus);
+    }
+
+    const playerPoints = [...pointsByPlayer.values()].reduce((sum, points) => sum + points, 0);
+    const captainBase = lineup.captainPlayerId ? pointsByPlayer.get(lineup.captainPlayerId) || 0 : 0;
     const captainBonus = captainBase * Math.max(0, settings.captainMultiplier - 1);
     const scorerHit = Boolean(
       lineup.topScorerPlayerId && topGoals > 0 && playerStats.get(lineup.topScorerPlayerId)?.goals === topGoals,
@@ -165,6 +213,7 @@ export function projectFantasyLiveLineups(
       lineupId: lineup.id,
       userId: lineup.userId,
       playerPoints,
+      positionBonus,
       captainBonus,
       predictionPoints,
       cardPoints,

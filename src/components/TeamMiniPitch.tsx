@@ -99,11 +99,6 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick }: 
                     {goalkeeperOrder}
                   </span>
                 )}
-                {player.is_goalkeeper && (
-                  <span className="absolute -bottom-1.5 -left-2 rounded border border-accent/30 bg-background/90 px-1 text-[7px] font-black leading-none text-accent">
-                    GOL
-                  </span>
-                )}
               </div>
               <span className={`mt-0.5 line-clamp-2 w-full rounded bg-black/75 px-0.5 py-0.5 text-center font-black leading-[1.05] text-white shadow-sm ${isCrowded ? "text-[6px]" : "text-[8px]"}`}>
                 {player.name}

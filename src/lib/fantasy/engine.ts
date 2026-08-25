@@ -12,6 +12,8 @@ export type FantasyPerformance = {
   playerProfile?: "offensive" | "midfield" | "defensive" | null;
   goalkeeperGames?: number;
   goalsConceded?: number;
+  defensiveCleanGames?: number;
+  defensiveOneGoalGames?: number;
   teamGoalsConceded?: number;
   recentPoints: number[];
   seasonPoints: number[];
@@ -66,6 +68,8 @@ export function calculateFantasyPlayerPoints(
     | "losses"
     | "goalkeeperGames"
     | "goalsConceded"
+    | "defensiveCleanGames"
+    | "defensiveOneGoalGames"
     | "teamGoalsConceded"
     | "ownGoals"
     | "playerProfile"
@@ -73,14 +77,13 @@ export function calculateFantasyPlayerPoints(
   settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
 ) {
   return (
-    stats.goals * (stats.playerProfile === "offensive" ? settings.attackerGoalPoints : settings.goalPoints) +
+    stats.goals * settings.goalPoints +
     stats.assists * settings.assistPoints +
     stats.wins * settings.winPoints +
-    (stats.losses || 0) * ((stats.goalkeeperGames || 0) > 0 ? settings.goalkeeperLossPoints : settings.lossPoints) +
+    (stats.losses || 0) * settings.lossPoints +
     (stats.goalkeeperGames || 0) * settings.goalkeeperAppearancePoints +
-    // A penalidade defensiva é compartilhada entre quem entrou em campo.
-    // Para rodadas antigas, o fallback preserva o dado histórico do goleiro.
-    (stats.teamGoalsConceded ?? stats.goalsConceded ?? 0) * settings.teamGoalConcededPoints +
+    (stats.goalsConceded || 0) * settings.goalConcededPoints +
+    (stats.playerProfile === "defensive" ? (stats.defensiveCleanGames || 0) * 2 + (stats.defensiveOneGoalGames || 0) : 0) +
     (stats.ownGoals || 0) * settings.ownGoalPoints
   );
 }
@@ -133,9 +136,9 @@ export function percentiles(values: Array<{ playerId: string; value: number }>):
 }
 
 /**
- * Balanceamento V2: o preço depende exclusivamente dos pontos-base da rodada.
- * A posição percentual usa o meio do grupo empatado (midrank), garantindo que
- * pontuações iguais sempre recebam a mesma faixa e a mesma variação.
+ * O preço depende exclusivamente dos scouts-base. Para que uma boa rodada de
+ * DEF tenha o mesmo espaço de valorização de MEI e ATA, a classificação mistura
+ * 65% do percentil entre atletas da mesma função e 35% do percentil geral.
  */
 export function calculateFantasyPrices(
   players: FantasyPerformance[],
@@ -155,15 +158,39 @@ export function calculateFantasyPrices(
     }));
   }
 
-  const ranked = participants
-    .map((player) => ({ player, roundPoints: calculateFantasyPlayerPoints(player, settings) }))
-    .sort((a, b) => b.roundPoints - a.roundPoints || a.player.playerId.localeCompare(b.player.playerId));
+  const withPoints = participants.map((player) => ({ player, roundPoints: calculateFantasyPlayerPoints(player, settings) }));
+  const percentileByPoints = (items: typeof withPoints) => {
+    const sorted = [...items].sort((a, b) => b.roundPoints - a.roundPoints || a.player.playerId.localeCompare(b.player.playerId));
+    const result = new Map<string, number>();
+    for (let start = 0; start < sorted.length;) {
+      let end = start;
+      while (end + 1 < sorted.length && sorted[end + 1].roundPoints === sorted[start].roundPoints) end += 1;
+      const percentile = sorted.length === 1 ? 0.5 : ((start + end) / 2) / (sorted.length - 1);
+      for (let index = start; index <= end; index += 1) result.set(sorted[index].player.playerId, percentile);
+      start = end + 1;
+    }
+    return result;
+  };
+  const overallPercentiles = percentileByPoints(withPoints);
+  const positionPercentiles = new Map<string, number>();
+  for (const profile of ["defensive", "midfield", "offensive"] as const) {
+    const group = withPoints.filter(({ player }) => player.playerProfile === profile);
+    const groupPercentiles = group.length >= 3 ? percentileByPoints(group) : overallPercentiles;
+    for (const { player } of group) positionPercentiles.set(player.playerId, groupPercentiles.get(player.playerId) ?? 0.5);
+  }
+  const ranked = withPoints
+    .map((item) => ({
+      ...item,
+      marketPercentile: 0.65 * (positionPercentiles.get(item.player.playerId) ?? overallPercentiles.get(item.player.playerId) ?? 0.5) +
+        0.35 * (overallPercentiles.get(item.player.playerId) ?? 0.5),
+    }))
+    .sort((a, b) => a.marketPercentile - b.marketPercentile || a.player.playerId.localeCompare(b.player.playerId));
   const allTied = ranked[0]?.roundPoints === ranked[ranked.length - 1]?.roundPoints;
   const groups: Array<{ start: number; end: number; percentile: number; marketBand: FantasyTrend }> = [];
 
   for (let start = 0; start < ranked.length;) {
     let end = start;
-    while (end + 1 < ranked.length && ranked[end + 1].roundPoints === ranked[start].roundPoints) end += 1;
+    while (end + 1 < ranked.length && ranked[end + 1].marketPercentile === ranked[start].marketPercentile) end += 1;
     const percentile = ranked.length === 1 ? 0.5 : ((start + end) / 2) / (ranked.length - 1);
     groups.push({
       start,

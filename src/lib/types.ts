@@ -384,6 +384,8 @@ export type PlayerRoundStats = {
   goalkeeper_games: number;
   clean_sheets: number;
   goals_conceded: number;
+  defensive_clean_games: number;
+  defensive_one_goal_games: number;
   own_goals: number;
   points: number;
 };

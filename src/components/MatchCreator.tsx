@@ -566,8 +566,8 @@ export function MatchCreator({ round }: { round: any }) {
                   )}
                   {!bqGoalkeeperSuggestionByTeam[team.id] && <option value="">Quem começa no gol?</option>}
                   {(eligibleGoalkeepersByTeam[team.id] || [])
-                    .sort((a: any, b: any) => a.goalkeeperOrder - b.goalkeeperOrder || Number(b.isGoalkeeper) - Number(a.isGoalkeeper) || a.name.localeCompare(b.name, "pt-BR"))
-                    .map((player: any) => <option key={player.id} value={player.id}>{player.name}{player.isGoalkeeper ? " · GOL" : ""}{Number.isFinite(player.goalkeeperOrder) ? ` · fila ${player.goalkeeperOrder}` : ""}</option>)}
+                    .sort((a: any, b: any) => a.goalkeeperOrder - b.goalkeeperOrder || a.name.localeCompare(b.name, "pt-BR"))
+                    .map((player: any) => <option key={player.id} value={player.id}>{player.name}{Number.isFinite(player.goalkeeperOrder) ? ` · fila ${player.goalkeeperOrder}` : ""}</option>)}
                 </select>
                 {bqGoalkeeperSuggestionByTeam[team.id] && (
                   <span className="mt-1.5 block text-[9px] font-semibold leading-relaxed text-muted">

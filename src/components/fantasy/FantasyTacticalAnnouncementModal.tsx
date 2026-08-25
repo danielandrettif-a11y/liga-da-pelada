@@ -8,14 +8,14 @@ export function FantasyTacticalAnnouncementModal() {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    const seen = localStorage.getItem("fantasy_tactical_v3_r2_seen");
+    const seen = localStorage.getItem("fantasy_tactical_v4_role_scoring_seen");
     if (!seen) {
       setIsOpen(true);
     }
   }, []);
 
   const handleClose = () => {
-    localStorage.setItem("fantasy_tactical_v3_r2_seen", "true");
+    localStorage.setItem("fantasy_tactical_v4_role_scoring_seen", "true");
     setIsOpen(false);
   };
 
@@ -45,7 +45,7 @@ export function FantasyTacticalAnnouncementModal() {
           </span>
           <div>
             <span className="rounded bg-accent/20 px-2 py-0.5 font-athletic text-[9px] font-black uppercase tracking-wider text-accent">
-              A partir da Rodada 02
+              Guia atualizado
             </span>
             <h2 className="font-athletic text-lg font-black uppercase italic tracking-tight text-white mt-0.5">
               Revolução Tática no Cartola!
@@ -54,7 +54,7 @@ export function FantasyTacticalAnnouncementModal() {
         </div>
 
         <p className="text-xs text-muted leading-relaxed mb-4">
-          O Cartola evoluiu para uma <strong>formação tática real (1-2-1-2)</strong> com bônus de pontuação exclusivos para cada posição da pelada.
+          Escale <strong>1 GOL, 2 DEF</strong> e complete com <strong>2 MEI/ALA + 1 ATA</strong> ou <strong>1 MEI/ALA + 2 ATA</strong>. O que acontece em campo dá pontos-base; a vaga certa ativa o bônus.
         </p>
 
         {/* Grid de Novidades */}
@@ -70,7 +70,7 @@ export function FantasyTacticalAnnouncementModal() {
                 <span className="font-black text-accent text-[10px]">+4,0 / +2,0 pts</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                <strong>Clean Sheet Regressivo:</strong> Ganha <strong>+4,0 pts</strong> se a zaga não tomar gol e <strong>+2,0 pts</strong> se tomar só 1 gol. Zaga consistente garante pontuação alta!
+                <strong>Proteção dividida:</strong> o DEF ganha <strong>+2,0 pts base</strong> sem sofrer gol e mais <strong>+2,0 pts</strong> se foi escalado na vaga DEF. Com 1 gol sofrido, é +1 base +1 de bônus.
               </p>
             </div>
           </div>
@@ -86,7 +86,7 @@ export function FantasyTacticalAnnouncementModal() {
                 <span className="font-black text-accent text-[10px]">+4,0 pts / assist + bônus</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Assistência valorizada a <strong>+4,0 pts</strong> e ganha <strong>+3,0 pts extras</strong> de Maestro da Rodada se der 2 ou mais assistências!
+                Assistência vale <strong>+3,0 pts base</strong>; na vaga MEI recebe +1 e chega a <strong>+4,0 pts</strong>. Com 2+ assistências, ainda há <strong>+3,0 pts</strong> de Maestro.
               </p>
             </div>
           </div>
@@ -102,7 +102,7 @@ export function FantasyTacticalAnnouncementModal() {
                 <span className="font-black text-accent text-[10px]">5,0 pts / gol + bônus</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Gol vale <strong>5,0 pts</strong> e ganha <strong>+3,0 pts extras</strong> de Artilheiro se fizer 2 ou mais gols na rodada!
+                Gol vale <strong>5,0 pts base</strong>. Na vaga ATA, 2+ gols rendem <strong>+3,0 pts</strong> de Artilheiro da Rodada.
               </p>
             </div>
           </div>
@@ -118,7 +118,7 @@ export function FantasyTacticalAnnouncementModal() {
                 <span className="font-black text-accent text-[10px]">+3,0 pres / +4,0 SG</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Qualquer atleta na vaga de GOL ganha <strong>+3,0 pts</strong> por partida agarrada, <strong>+4,0 pts</strong> sem sofrer gol e <strong>imunidade total de derrota</strong> na trave!
+                Qualquer atleta pode ser a sua aposta. Quem <strong>realmente atuar no gol</strong> ganha +3 base e -1 por gol sofrido. Se você o escalou em GOL e ele não sofreu gol, ganha <strong>+4,0 pts por clean sheet</strong>.
               </p>
             </div>
           </div>

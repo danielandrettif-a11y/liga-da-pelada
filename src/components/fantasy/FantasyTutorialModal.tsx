@@ -54,7 +54,7 @@ export function FantasyTutorialModal({
       tag: "Passo 3 de 5 · Bônus de Posição",
       title: "Esquemas & Bônus de Posição",
       description:
-        "Escale cada atleta na sua função correta para ativar o selo ⚡ BÔNUS:\n\n• 🛡️ DEF: Clean Sheet Regressivo (+4 pts se 0 gol / +2 pts se 1 gol).\n• 🪄 MEI: Assistências a 4.0 pts (+3 pts extras se der 2+ assistências na rodada).\n• 🎯 ATA: Gols a 5.0 pts (+3 pts extras se fizer 2+ gols na rodada).\n• 🧤 GOL: +3 pts por jogo agarrado no rodízio + 4 pts sem sofrer gol + Imunidade a derrotas!",
+        "Com 6 atletas, escolha 1 GOL, 2 DEF e complete com 2 MEI/ALA + 1 ATA ou 1 MEI/ALA + 2 ATA.\n\n• 🛡️ DEF: +2 base por proteção e +2 extra na vaga DEF em jogo sem sofrer gol (+4 total).\n• 🪄 MEI: assistência vale +3 base; na vaga MEI vira +4 e 2+ assistências dão +3 de Maestro.\n• 🎯 ATA: gol vale +5; 2+ gols na vaga ATA dão +3 de Artilheiro.\n• 🧤 GOL: qualquer atleta pode ocupar a vaga, mas o +4 de clean sheet só vem por jogo em que ele realmente atuou no gol sem sofrer gol.",
     },
     {
       icon: <Target className="h-8 w-8 text-warning" />,

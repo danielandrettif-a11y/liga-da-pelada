@@ -264,7 +264,7 @@ export function PlayerForm({ player, mode = "admin" }: { player?: Player; mode?:
         </div>
       )}
 
-      {(memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2">
+      {mode === "admin" && (memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2">
         <legend className="text-xs font-bold text-muted uppercase tracking-wider">
           Perfil de jogo
         </legend>
@@ -288,19 +288,6 @@ export function PlayerForm({ player, mode = "admin" }: { player?: Player; mode?:
             </label>
           ))}
         </div>
-        <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-xl border border-accent/25 bg-accent/5 px-4 py-3 has-[:checked]:border-accent has-[:checked]:bg-accent/10">
-          <input
-            type="checkbox"
-            name="is_goalkeeper"
-            value="true"
-            defaultChecked={player?.is_goalkeeper ?? false}
-            className="h-4 w-4 accent-[var(--accent)]"
-          />
-          <span>
-            <span className="block text-sm font-bold text-foreground">TambÃ©m jogo no gol</span>
-            <span className="block text-[11px] leading-4 text-muted">Adiciona GOL como especialidade complementar. A posiÃ§Ã£o de linha acima continua sendo Ãºnica.</span>
-          </span>
-        </label>
       </fieldset>}
 
       <div className="pt-4 flex flex-col gap-3">

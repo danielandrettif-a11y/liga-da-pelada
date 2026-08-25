@@ -61,4 +61,54 @@ describe("live fantasy projection", () => {
     );
     expect(lineup.predictionPoints).toBe(DEFAULT_FANTASY_SETTINGS.topScorerPredictionPoints + DEFAULT_FANTASY_SETTINGS.topAssistPredictionPoints);
   });
+
+  it("concede o Artilheiro somente ao ATA correto com dois ou mais gols", () => {
+    const stats = projectFantasyLiveStats([
+      {
+        ...baseMatch,
+        status: "live",
+        scoreA: 2,
+        events: [
+          { playerId: "scorer", teamId: "a" },
+          { playerId: "scorer", teamId: "a" },
+        ],
+        players: baseMatch.players.map((player) =>
+          player.playerId === "scorer" ? { ...player, playerProfile: "offensive" as const } : player,
+        ),
+      },
+    ], DEFAULT_FANTASY_SETTINGS);
+
+    const [correct, misplaced] = projectFantasyLiveLineups([
+      {
+        id: "correct",
+        userId: "correct",
+        playerIds: ["scorer"],
+        slots: [{ playerId: "scorer", slotRole: "ATA", playerProfile: "offensive" }],
+      },
+      {
+        id: "misplaced",
+        userId: "misplaced",
+        playerIds: ["scorer"],
+        slots: [{ playerId: "scorer", slotRole: "MEI", playerProfile: "offensive" }],
+      },
+    ], stats, DEFAULT_FANTASY_SETTINGS);
+
+    expect(correct.positionBonus).toBe(3);
+    expect(correct.playerPoints).toBe(13);
+    expect(misplaced.positionBonus).toBe(0);
+    expect(misplaced.playerPoints).toBe(10);
+  });
+
+  it("aplica o pacote de GOL a qualquer atleta nessa vaga e dá +4 de clean sheet", () => {
+    const stats = projectFantasyLiveStats([{ ...baseMatch, status: "finished" }], DEFAULT_FANTASY_SETTINGS);
+    const [goalkeeperSlot, fieldSlot] = projectFantasyLiveLineups([
+      { id: "gol", userId: "gol", playerIds: ["keeper"], slots: [{ playerId: "keeper", slotRole: "GOL" }] },
+      { id: "mei", userId: "mei", playerIds: ["keeper"], slots: [{ playerId: "keeper", slotRole: "MEI", playerProfile: "midfield" }] },
+    ], stats, DEFAULT_FANTASY_SETTINGS);
+
+    expect(goalkeeperSlot.positionBonus).toBe(4);
+    // Fora da vaga GOL, ele recebe apenas o eventual pacote da posição MEI.
+    expect(fieldSlot.positionBonus).toBe(1);
+    expect(goalkeeperSlot.playerPoints).toBe(fieldSlot.playerPoints + 3);
+  });
 });

@@ -22,6 +22,7 @@ import {
   projectFantasyLiveStats,
   type FantasyLiveLineupProjection,
 } from "@/lib/fantasy/live-projection";
+import type { FantasyLineupSlot } from "@/lib/fantasy/lineup-positions";
 
 export type FantasyMarketPlayer = {
   id: string;
@@ -116,7 +117,7 @@ export async function getFantasyDashboard() {
         minPlayerPrice: Number(settingsRow.min_player_price),
         maxPlayerPrice: Number(settingsRow.max_player_price),
         goalPoints: Number(settingsRow.goal_points),
-        attackerGoalPoints: Number(settingsRow.attacker_goal_points ?? 6),
+        attackerGoalPoints: Number(settingsRow.attacker_goal_points ?? 5),
         assistPoints: Number(settingsRow.assist_points),
         winPoints: Number(settingsRow.win_points),
         lossPoints: Number(settingsRow.loss_points ?? -1),
@@ -308,7 +309,7 @@ export async function getFantasyDashboard() {
     ? account.client
         .from("fantasy_lineups")
         .select(
-          "id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id)"
+          "id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked)"
         )
         .eq("fantasy_round_id", activeOfficialRound.id)
     : Promise.resolve({ data: [] as any[] });
@@ -348,7 +349,7 @@ export async function getFantasyDashboard() {
     officialRoundIds.length
       ? account.client
           .from("player_round_stats")
-          .select("round_id, player_id, goals, assists, wins, losses, own_goals, games, goalkeeper_games, goals_conceded, team_goals_conceded")
+          .select("round_id, player_id, goals, assists, wins, losses, own_goals, games, goalkeeper_games, goals_conceded, clean_sheets, defensive_clean_games, defensive_one_goal_games, team_goals_conceded")
           .in("round_id", officialRoundIds)
       : Promise.resolve({ data: [] as any[] }),
     displayRoundId
@@ -422,9 +423,9 @@ export async function getFantasyDashboard() {
   const priceByPlayer = new Map((priceRows || []).map((row: any) => [row.player_id, row]));
   const statsByPlayer = new Map<
     string,
-    { goals: number; assists: number; ownGoals: number; wins: number; losses: number; games: number; goalkeeperGames: number; goalsConceded: number; teamGoalsConceded: number }
+    { goals: number; assists: number; ownGoals: number; wins: number; losses: number; games: number; goalkeeperGames: number; goalsConceded: number; cleanSheets: number; defensiveCleanGames: number; defensiveOneGoalGames: number; teamGoalsConceded: number }
   >();
-  const currentStats = new Map<string, { goals: number; assists: number; ownGoals: number; wins: number; losses: number; goalkeeperGames: number; goalsConceded: number; teamGoalsConceded: number }>();
+  const currentStats = new Map<string, { goals: number; assists: number; ownGoals: number; wins: number; losses: number; goalkeeperGames: number; goalsConceded: number; cleanSheets: number; defensiveCleanGames: number; defensiveOneGoalGames: number; teamGoalsConceded: number }>();
 
   for (const row of statRows || []) {
     const current = statsByPlayer.get(row.player_id) || {
@@ -436,6 +437,9 @@ export async function getFantasyDashboard() {
       games: 0,
       goalkeeperGames: 0,
       goalsConceded: 0,
+      cleanSheets: 0,
+      defensiveCleanGames: 0,
+      defensiveOneGoalGames: 0,
       teamGoalsConceded: 0,
     };
     current.goals += Number(row.goals || 0);
@@ -446,6 +450,9 @@ export async function getFantasyDashboard() {
     current.games += Number(row.games || 0);
     current.goalkeeperGames += Number(row.goalkeeper_games || 0);
     current.goalsConceded += Number(row.goals_conceded || 0);
+    current.cleanSheets += Number(row.clean_sheets || 0);
+    current.defensiveCleanGames += Number(row.defensive_clean_games || 0);
+    current.defensiveOneGoalGames += Number(row.defensive_one_goal_games || 0);
     current.teamGoalsConceded += Number(row.team_goals_conceded || 0);
     statsByPlayer.set(row.player_id, current);
 
@@ -458,6 +465,9 @@ export async function getFantasyDashboard() {
         losses: Number(row.losses || 0),
         goalkeeperGames: Number(row.goalkeeper_games || 0),
         goalsConceded: Number(row.goals_conceded || 0),
+        cleanSheets: Number(row.clean_sheets || 0),
+        defensiveCleanGames: Number(row.defensive_clean_games || 0),
+        defensiveOneGoalGames: Number(row.defensive_one_goal_games || 0),
         teamGoalsConceded: Number(row.team_goals_conceded || 0),
       });
     }
@@ -470,12 +480,12 @@ export async function getFantasyDashboard() {
       current.ownGoals = 0;
     }
     for (const event of liveEvents) {
-      const scorer = currentStats.get(event.player_id) || { goals: 0, assists: 0, ownGoals: 0, wins: 0, losses: 0, goalkeeperGames: 0, goalsConceded: 0, teamGoalsConceded: 0 };
+      const scorer = currentStats.get(event.player_id) || { goals: 0, assists: 0, ownGoals: 0, wins: 0, losses: 0, goalkeeperGames: 0, goalsConceded: 0, cleanSheets: 0, defensiveCleanGames: 0, defensiveOneGoalGames: 0, teamGoalsConceded: 0 };
       if (event.is_own_goal) scorer.ownGoals += 1;
       else scorer.goals += 1;
       currentStats.set(event.player_id, scorer);
       if (event.assist_player_id && !event.is_own_goal) {
-        const assister = currentStats.get(event.assist_player_id) || { goals: 0, assists: 0, ownGoals: 0, wins: 0, losses: 0, goalkeeperGames: 0, goalsConceded: 0, teamGoalsConceded: 0 };
+        const assister = currentStats.get(event.assist_player_id) || { goals: 0, assists: 0, ownGoals: 0, wins: 0, losses: 0, goalkeeperGames: 0, goalsConceded: 0, cleanSheets: 0, defensiveCleanGames: 0, defensiveOneGoalGames: 0, teamGoalsConceded: 0 };
         assister.assists += 1;
         currentStats.set(event.assist_player_id, assister);
       }
@@ -489,6 +499,9 @@ export async function getFantasyDashboard() {
       current.ownGoals = Number(official?.own_goals || 0);
       current.goalkeeperGames = Number(official?.goalkeeper_games || 0);
       current.goalsConceded = Number(official?.goals_conceded || 0);
+      current.cleanSheets = Number(official?.clean_sheets || 0);
+      current.defensiveCleanGames = Number(official?.defensive_clean_games || 0);
+      current.defensiveOneGoalGames = Number(official?.defensive_one_goal_games || 0);
       current.teamGoalsConceded = Number(official?.team_goals_conceded || 0);
     }
   }
@@ -531,6 +544,9 @@ export async function getFantasyDashboard() {
         losses: item.losses,
         goalkeeperGames: item.goalkeeperGames,
         goalsConceded: item.goalsConceded,
+        cleanSheets: item.cleanSheets,
+        defensiveCleanGames: item.defensiveCleanGames,
+        defensiveOneGoalGames: item.defensiveOneGoalGames,
         teamGoalsConceded: item.teamGoalsConceded,
       });
     }
@@ -605,6 +621,9 @@ export async function getFantasyDashboard() {
         games: 0,
         goalkeeperGames: 0,
         goalsConceded: 0,
+        cleanSheets: 0,
+        defensiveCleanGames: 0,
+        defensiveOneGoalGames: 0,
         teamGoalsConceded: 0,
       };
       const price = isTest
@@ -625,6 +644,8 @@ export async function getFantasyDashboard() {
               losses: currentStats.get(player.id)?.losses || 0,
               goalkeeperGames: currentStats.get(player.id)?.goalkeeperGames || 0,
               goalsConceded: currentStats.get(player.id)?.goalsConceded || 0,
+              defensiveCleanGames: currentStats.get(player.id)?.defensiveCleanGames || 0,
+              defensiveOneGoalGames: currentStats.get(player.id)?.defensiveOneGoalGames || 0,
               teamGoalsConceded: currentStats.get(player.id)?.teamGoalsConceded || 0,
               playerProfile: player.player_profile,
             },
@@ -908,6 +929,13 @@ export async function getFantasyDashboard() {
             id: item.id,
             userId: item.user_id,
             playerIds: (item.fantasy_lineup_players || []).map((player: any) => player.player_id),
+            slots: (item.fantasy_lineup_players || [])
+              .filter((player: any) => player.slot_role)
+              .map((player: any) => ({
+                playerId: player.player_id,
+                slotRole: player.slot_role,
+                playerProfile: player.player_profile_locked,
+              })),
             captainPlayerId: item.captain_player_id,
             topScorerPlayerId: item.top_scorer_player_id,
             topAssistPlayerId: item.top_assist_player_id,
@@ -979,6 +1007,7 @@ export async function saveFantasyLineup(input: {
   fantasySeasonId: string;
   roundId: string | null;
   playerIds: string[];
+  slotAssignments: FantasyLineupSlot[];
   captainId: string | null;
   scorerId: string | null;
   assistId: string | null;
@@ -994,6 +1023,20 @@ export async function saveFantasyLineup(input: {
         success: false,
         error: `A escalação enviada é inválida. Aceita no máximo ${maxPlayers} jogadores.`,
       };
+    }
+    const slotAssignmentsAreValid =
+      input.slotAssignments.length === input.playerIds.length &&
+      new Set(input.slotAssignments.map((slot) => slot.playerId)).size === input.playerIds.length &&
+      new Set(input.slotAssignments.map((slot) => slot.slotIndex)).size === input.playerIds.length &&
+      input.slotAssignments.every(
+        (slot) =>
+          input.playerIds.includes(slot.playerId) &&
+          Number.isInteger(slot.slotIndex) &&
+          slot.slotIndex >= 0 &&
+          ["GOL", "DEF", "MEI", "ATA"].includes(slot.slotRole),
+      );
+    if (!slotAssignmentsAreValid) {
+      return { success: false, error: "As posições da escalação são inválidas. Ajuste o time e tente novamente." };
     }
     if (!input.roundId) {
       const { error } = await account.client.rpc("save_fantasy_portfolio", {
@@ -1019,7 +1062,8 @@ export async function saveFantasyLineup(input: {
         p_captain_player_id: input.captainId,
         p_top_scorer_player_id: input.scorerId,
         p_top_assist_player_id: input.assistId,
-        p_challenge_player_id: input.challengeId,
+          p_challenge_player_id: input.challengeId,
+          p_lineup_slots: input.slotAssignments,
       });
       if (error) return { success: false, error: error.message };
     } else {
@@ -1029,7 +1073,8 @@ export async function saveFantasyLineup(input: {
         p_captain_player_id: input.captainId,
         p_top_scorer_player_id: input.scorerId,
         p_top_assist_player_id: input.assistId,
-        p_challenge_player_id: input.challengeId,
+          p_challenge_player_id: input.challengeId,
+          p_lineup_slots: input.slotAssignments,
       });
       if (lineupError) return { success: false, error: lineupError.message };
     }
@@ -1363,7 +1408,7 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
       .eq("round_id", activeRound.round_id),
     client
       .from("fantasy_lineups")
-      .select("id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id)")
+      .select("id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked)")
       .eq("fantasy_round_id", activeRound.id)
       .neq("status", "missed"),
     client.from("leagues").select("players_per_team").eq("id", leagueId).maybeSingle(),
@@ -1408,6 +1453,13 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
         id: lineup.id,
         userId: lineup.user_id,
         playerIds: (lineup.fantasy_lineup_players || []).map((player: any) => player.player_id),
+        slots: (lineup.fantasy_lineup_players || [])
+          .filter((player: any) => player.slot_role)
+          .map((player: any) => ({
+            playerId: player.player_id,
+            slotRole: player.slot_role,
+            playerProfile: player.player_profile_locked,
+          })),
         captainPlayerId: lineup.captain_player_id,
         topScorerPlayerId: lineup.top_scorer_player_id,
         topAssistPlayerId: lineup.top_assist_player_id,
@@ -1719,14 +1771,14 @@ export async function getFantasyRoundLineupOverview(
 export async function updateFantasySettings(values: Partial<FantasySettings>) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
-  const { attackerGoalPoints, ownGoalPoints, lossPoints, goalkeeperLossPoints, goalkeeperAppearancePoints, goalConcededPoints, teamGoalConcededPoints, ...otherValues } = values;
+  const { attackerGoalPoints: _legacyAttackerGoalPoints, ownGoalPoints, lossPoints, goalkeeperLossPoints, goalkeeperAppearancePoints, goalConcededPoints, teamGoalConcededPoints, ...otherValues } = values;
   const { error } = await account.client.rpc("update_fantasy_settings", {
     p_settings: otherValues,
   });
   if (error) return { success: false, error: error.message };
-  if (attackerGoalPoints !== undefined || ownGoalPoints !== undefined) {
+  if (values.goalPoints !== undefined || ownGoalPoints !== undefined) {
     const { error: positionError } = await account.client.rpc("update_fantasy_attack_and_own_goal_points", {
-      p_attacker_goal_points: attackerGoalPoints ?? DEFAULT_FANTASY_SETTINGS.attackerGoalPoints,
+      p_attacker_goal_points: values.goalPoints ?? DEFAULT_FANTASY_SETTINGS.goalPoints,
       p_own_goal_points: ownGoalPoints ?? DEFAULT_FANTASY_SETTINGS.ownGoalPoints,
     });
     if (positionError) return { success: false, error: positionError.message };
@@ -2111,7 +2163,7 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
   const { data: stats } = playerIds.length
     ? await account.client
       .from("player_round_stats")
-      .select("player_id, games, goals, assists, wins, draws, losses, goalkeeper_games, goals_conceded, team_goals_conceded")
+      .select("player_id, games, goals, assists, wins, draws, losses, own_goals, goalkeeper_games, clean_sheets, goals_conceded, defensive_clean_games, defensive_one_goal_games, team_goals_conceded")
       .eq("round_id", roundId)
       .in("player_id", playerIds)
     : { data: [] };

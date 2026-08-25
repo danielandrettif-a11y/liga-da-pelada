@@ -138,6 +138,12 @@ export async function calculateRoundStats(roundId: string) {
 
     if (error || !round) throw new Error("Erro ao buscar rodada para estatísticas");
     const countsForRanking = round.round_type !== "friendly";
+    const roundPlayerIds = (round.round_players || []).map((item: any) => item.player_id);
+    const { data: roundPlayerProfiles, error: profileError } = roundPlayerIds.length
+      ? await client.from("players").select("id, player_profile").in("id", roundPlayerIds)
+      : { data: [], error: null };
+    if (profileError) throw new Error(`Erro ao buscar posições dos atletas: ${profileError.message}`);
+    const profileByPlayerId = new Map((roundPlayerProfiles || []).map((player: any) => [player.id, player.player_profile]));
 
     const points = { ...DEFAULT_SCORING_POINTS };
     const { data: configuredRules, error: rulesError } = await client
@@ -186,6 +192,8 @@ export async function calculateRoundStats(roundId: string) {
           goalkeeper_games: 0,
           clean_sheets: 0,
           goals_conceded: 0,
+          defensive_clean_games: 0,
+          defensive_one_goal_games: 0,
           own_goals: 0,
           team_goals_conceded: 0,
           points: 0,
@@ -198,6 +206,7 @@ export async function calculateRoundStats(roundId: string) {
       const isDraw = match.score_a === match.score_b;
       const winnerId = isDraw ? null : (match.score_a > match.score_b ? match.team_a_id : match.team_b_id);
 
+      const goalkeeperIds = new Set((match.match_goalkeepers || []).map((goalkeeper: any) => goalkeeper.player_id));
       // Resultado vale somente para participantes marcados como elegiveis.
       const processTeamMatch = (teamId: string, result: 'win' | 'draw' | 'loss') => {
         const teamGoalsConceded = teamId === match.team_a_id ? match.score_b : match.score_a;
@@ -209,6 +218,17 @@ export async function calculateRoundStats(roundId: string) {
           if (!s) continue;
           s.games += 1;
           s.team_goals_conceded += teamGoalsConceded;
+          // O defensor pontua pela proteção quando atuou na linha. Quem foi
+          // escalado no gol naquele jogo usa exclusivamente os scouts de gol.
+          if (profileByPlayerId.get(participant.player_id) === "defensive" && !goalkeeperIds.has(participant.player_id)) {
+            if (teamGoalsConceded === 0) {
+              s.defensive_clean_games += 1;
+              if (countsForRanking) s.points += 2;
+            } else if (teamGoalsConceded === 1) {
+              s.defensive_one_goal_games += 1;
+              if (countsForRanking) s.points += 1;
+            }
+          }
           if (result === 'win') { s.wins += 1; if (countsForRanking) s.points += points.win; }
           if (result === 'draw') { s.draws += 1; if (countsForRanking) s.points += points.draw; }
           if (result === 'loss') { s.losses += 1; if (countsForRanking) s.points += points.loss; }

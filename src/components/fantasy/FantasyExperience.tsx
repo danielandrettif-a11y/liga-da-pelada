@@ -37,6 +37,7 @@ import {
 } from "@/lib/actions/fantasy";
 import { supabase } from "@/lib/supabase";
 import { useDialogViewport } from "@/lib/useDialogViewport";
+import { getFantasySlotRoles, isCorrectFantasySlot } from "@/lib/fantasy/lineup-positions";
 import { FantasyRadarCarousel } from "./FantasyRadarCarousel";
 import { FantasyPackClaimBanner } from "./cards/FantasyPackClaimBanner";
 import { FantasyActiveCardSlot } from "./cards/FantasyActiveCardSlot";
@@ -117,12 +118,14 @@ function lineupSignature({
   scorer,
   assist,
   challenge,
+  slotRoles,
 }: {
   ids: Array<string | null | undefined>;
   captain: string | null | undefined;
   scorer: string | null | undefined;
   assist: string | null | undefined;
   challenge: string | null | undefined;
+  slotRoles?: string[];
 }) {
   return JSON.stringify({
     // A ordem visual do campo pode mudar com drag-and-drop, mas não é uma alteração da escalação.
@@ -131,6 +134,7 @@ function lineupSignature({
     scorer: scorer || null,
     assist: assist || null,
     challenge: challenge || null,
+    slotRoles: slotRoles || null,
   });
 }
 
@@ -197,21 +201,23 @@ export function FantasyExperience({
     const playerMap = new Map(market.map((p) => [p.id, p]));
     const remainingIds = [...initialIds];
 
-    // Goleiro
-    const gkSlot = playersPerTeam === 6 ? 5 : 4;
-    const gkIdx = remainingIds.findIndex((id) => {
-      const p = playerMap.get(id);
-      return Boolean(p && (p.isGoalkeeper || (p.goalkeeperGames || 0) > 0));
-    });
-    if (gkIdx >= 0) {
-      slots[gkSlot] = remainingIds[gkIdx];
-      remainingIds.splice(gkIdx, 1);
-    } else if (remainingIds.length === playersPerTeam) {
-      slots[gkSlot] = remainingIds.pop()!;
+    // O time de 6 tem uma vaga tática de GOL. No time de 5, o rodízio vale
+    // pelo que aconteceu em campo e as cinco vagas são DEF/MEI/ATA.
+    if (playersPerTeam === 6) {
+      const gkSlot = 5;
+      const gkIdx = remainingIds.findIndex((id) => (playerMap.get(id)?.goalkeeperGames || 0) > 0);
+      if (gkIdx >= 0) {
+        slots[gkSlot] = remainingIds[gkIdx];
+        remainingIds.splice(gkIdx, 1);
+      } else if (remainingIds.length === playersPerTeam) {
+        slots[gkSlot] = remainingIds.pop()!;
+      }
     }
 
     // Atacantes
-    const ataSlots = playersPerTeam === 6 ? (formation === "2-1-2" ? [0, 1] : [0]) : (formation === "2-2-1" ? [0, 1] : [0]);
+    const ataSlots = playersPerTeam === 6
+      ? (formation === "2-1-2" ? [0, 1] : [0])
+      : (formation === "2-1-2" ? [0, 1] : [0]);
     for (const s of ataSlots) {
       if (slots[s] === "") {
         const ataIdx = remainingIds.findIndex((id) => playerMap.get(id)?.profile === "offensive");
@@ -223,7 +229,9 @@ export function FantasyExperience({
     }
 
     // Meias
-    const meiSlots = playersPerTeam === 6 ? (formation === "2-1-2" ? [2] : [1, 2]) : (formation === "2-2-1" ? [2, 3] : [1, 2]);
+    const meiSlots = playersPerTeam === 6
+      ? (formation === "2-1-2" ? [2] : [1, 2])
+      : (formation === "2-1-2" ? [2] : [1, 2]);
     for (const s of meiSlots) {
       if (slots[s] === "") {
         const meiIdx = remainingIds.findIndex((id) => {
@@ -238,7 +246,7 @@ export function FantasyExperience({
     }
 
     // Defensores
-    const defSlots = playersPerTeam === 6 ? [3, 4] : (formation === "2-1-2" ? [3] : []);
+    const defSlots = [3, 4];
     for (const s of defSlots) {
       if (slots[s] === "") {
         const defIdx = remainingIds.findIndex((id) => playerMap.get(id)?.profile === "defensive");
@@ -320,6 +328,7 @@ export function FantasyExperience({
       scorer: lineup?.top_scorer_player_id,
       assist: lineup?.top_assist_player_id,
       challenge: lineup?.challenge_player_id,
+      slotRoles: getFantasySlotRoles(playersPerTeam, formation),
     })
   );
   const [pending, startTransition] = useTransition();
@@ -351,7 +360,7 @@ export function FantasyExperience({
   const remaining = effectiveBudget - cost;
 
 
-  // Filtro de posição inicial / ativo no mercado (GOL, DEF, MEI, ATA ou ALL)
+  // GOL não é tag: o filtro mostra o histórico real de atuações no rodízio.
   const [positionFilter, setPositionFilter] = useState<"ALL" | "GOL" | "DEF" | "MEI" | "ATA">("ALL");
 
   // Drag and drop / reposicionamento de atletas no campo
@@ -379,11 +388,10 @@ export function FantasyExperience({
         // Prioridade por posição: jogadores da posição selecionada vêm primeiro
         if (positionFilter !== "ALL") {
           if (positionFilter === "GOL") {
-            // Nível 1: Quem tem tag de goleiro oficial OU tag de bom no gol
-            // Nível 2: Quem tem jogos no gol (ordenado por melhor aproveitamento / menor média de gols sofridos)
+            // Nível 1: quem tem melhor histórico no gol; nível 2: quem já atuou.
             // Nível 3: O resto dos atletas
             const getGkTier = (p: FantasyMarketPlayer) => {
-              if (p.isGoalkeeper || p.isGoodGoalkeeper) return 1;
+              if (p.isGoodGoalkeeper) return 1;
               if ((p.goalkeeperGames || 0) > 0) return 2;
               return 3;
             };
@@ -479,6 +487,7 @@ export function FantasyExperience({
     scorer: scorerId,
     assist: assistId,
     challenge: challengeId,
+    slotRoles: getFantasySlotRoles(playersPerTeam, formation),
   });
   const hasUnsavedChanges = open && savedSignature !== currentSignature;
   const complete = validSelectedCount === playersPerTeam && Boolean(captainId) && remaining >= 0;
@@ -613,12 +622,19 @@ export function FantasyExperience({
 
   function save() {
     const validPlayerIds = selected.filter(Boolean);
+    const slotRoles = getFantasySlotRoles(playersPerTeam, formation);
+    const slotAssignments = selected.flatMap((playerId, slotIndex) =>
+      playerId
+        ? [{ playerId, slotIndex, slotRole: slotRoles[slotIndex] }]
+        : [],
+    );
     startTransition(async () => {
       try {
         const result = await saveFantasyLineup({
           fantasySeasonId,
           roundId: betweenRounds ? null : round?.id || null,
-          playerIds: validPlayerIds,
+            playerIds: validPlayerIds,
+            slotAssignments,
           captainId,
           scorerId,
           assistId,
@@ -663,14 +679,9 @@ export function FantasyExperience({
     const isBeingDragged = draggedSlot === slot;
     const isDragOver = dragOverSlot === slot;
 
-    // Bônus de posição ativo quando o atleta está escalado na sua função natural (ou no gol)
+    // O mesmo critério persistido no servidor decide o selo e o pacote de pontos.
     const isCorrectPosition = Boolean(
-      player && (
-        targetPos === "GOL" ||
-        (targetPos === "DEF" && player.profile === "defensive") ||
-        (targetPos === "MEI" && (player.profile === "midfield" || !player.profile)) ||
-        (targetPos === "ATA" && player.profile === "offensive")
-      )
+      player && targetPos !== "ALL" && isCorrectFantasySlot(targetPos, player.profile),
     );
 
     return (
@@ -968,29 +979,6 @@ export function FantasyExperience({
         )}
       </header>
 
-      {/* Desafio da rodada: sempre visível, mesmo antes de o usuário escolher o atleta. */}
-      {!betweenRounds && round && (
-        <section className="overflow-hidden rounded-2xl border border-warning/35 bg-gradient-to-br from-warning/15 via-surface to-[#161205] shadow-[0_10px_30px_rgba(0,0,0,.18)]">
-          <div className="flex items-center gap-3 px-4 py-3.5">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-warning/30 bg-warning/15 text-warning">
-              <Target className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[9px] font-black uppercase tracking-[.18em] text-warning">Desafio desta rodada</p>
-              <p className="mt-0.5 text-sm font-black text-foreground">
-                {challengeType ? CHALLENGE_LABELS[challengeType] : "Aguardando sorteio do desafio"}
-              </p>
-              <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
-                {challengeType
-                  ? "Escolha seu jogador no bloco de palpites para concorrer ao bônus extra."
-                  : "O desafio será definido antes de o mercado fechar."}
-              </p>
-            </div>
-            <span className="rounded-lg bg-warning/15 px-2 py-1 text-[9px] font-black uppercase text-warning">Extra</span>
-          </div>
-        </section>
-      )}
-
       {/* Resumo da Última Rodada */}
       {lastRound && !isTest && (
         <section className="overflow-hidden rounded-2xl border border-accent/25 bg-gradient-to-br from-[#0b2415] via-surface to-[#10190d] shadow-[0_12px_30px_rgba(0,0,0,.2)]">
@@ -1155,7 +1143,7 @@ export function FantasyExperience({
                   {betweenRounds ? "Meu elenco" : "Meu time"}
                 </h2>
                 <p className="text-[10px] text-muted">
-                  {open ? "Toque na coroa para escolher o capitão (2x)" : "Escalação somente para consulta"}
+                  {open ? "Toque na coroa para escolher o capitão (1,5x)" : "Escalação somente para consulta"}
                 </p>
                 <p
                   className={`mt-1 text-[9px] font-black uppercase ${
@@ -1224,7 +1212,7 @@ export function FantasyExperience({
                         : "text-muted hover:text-white"
                     }`}
                   >
-                    2-1-2 ({playersPerTeam === 6 ? "2 ATA" : "1 ATA"})
+                    2-1-2 (2 ATA)
                   </button>
                   <button
                     type="button"
@@ -1235,7 +1223,7 @@ export function FantasyExperience({
                         : "text-muted hover:text-white"
                     }`}
                   >
-                    2-2-1 ({playersPerTeam === 6 ? "2 MEI" : "2 ATA"})
+                    2-2-1 (2 MEI)
                   </button>
                 </div>
               </div>
@@ -1367,38 +1355,6 @@ export function FantasyExperience({
               ) : (
                 formation === "2-2-1" ? (
                   <div className="relative z-10 flex min-h-[448px] flex-col justify-between py-2">
-                    {/* 1. Ataque (2 vagas) */}
-                    <div>
-                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                        Ataque
-                      </span>
-                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[0, 1].map((slot) => renderSlot(slot, "Atacante / ATA", "ATA"))}
-                      </div>
-                    </div>
-
-                    {/* 2. Meio-Campo & Alas (2 vagas) */}
-                    <div>
-                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                        Meio-Campo & Alas
-                      </span>
-                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[2, 3].map((slot) => renderSlot(slot, "Meia / ALA", "MEI"))}
-                      </div>
-                    </div>
-
-                    {/* 3. Goleiro & Defesa (1 vaga) */}
-                    <div>
-                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                        Goleiro & Defesa
-                      </span>
-                      <div className="flex justify-center">
-                        {renderSlot(4, "Goleiro/Defesa", "GOL")}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="relative z-10 flex min-h-[448px] flex-col justify-between py-2">
                     {/* 1. Centroavante (1 vaga) */}
                     <div>
                       <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
@@ -1419,13 +1375,45 @@ export function FantasyExperience({
                       </div>
                     </div>
 
-                    {/* 3. Defesa & Goleiro (2 vagas) */}
+                    {/* 3. Linha Defensiva (2 vagas) */}
                     <div>
                       <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                        Defesa & Goleiro
+                        Linha Defensiva
                       </span>
                       <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[3, 4].map((slot) => renderSlot(slot, "Defensor / Goleiro", "DEF"))}
+                        {[3, 4].map((slot) => renderSlot(slot, "Defensor / DEF", "DEF"))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative z-10 flex min-h-[448px] flex-col justify-between py-2">
+                    {/* 1. Ataque (2 vagas) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Ataque
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                        {[0, 1].map((slot) => renderSlot(slot, "Atacante / ATA", "ATA"))}
+                      </div>
+                    </div>
+
+                    {/* 2. Meio-Campo & Alas (1 vaga) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Meio-Campo & Alas
+                      </span>
+                      <div className="flex justify-center">
+                        {renderSlot(2, "Meia / ALA", "MEI")}
+                      </div>
+                    </div>
+
+                    {/* 3. Linha Defensiva (2 vagas) */}
+                    <div>
+                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
+                        Linha Defensiva
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
+                        {[3, 4].map((slot) => renderSlot(slot, "Defensor / DEF", "DEF"))}
                       </div>
                     </div>
                   </div>
@@ -1665,7 +1653,7 @@ export function FantasyExperience({
               <span className="text-[8px] font-bold text-muted shrink-0 mr-0.5">Posição:</span>
               {[
                 { id: "ALL", label: "Todas" },
-                { id: "GOL", label: "🧤 Goleiros (GOL)" },
+                { id: "GOL", label: "🧤 Rodízio no gol" },
                 { id: "DEF", label: "🛡️ Zaga (DEF)" },
                 { id: "MEI", label: "🎯 Meio (MEI/ALA)" },
                 { id: "ATA", label: "⚡ Ataque (ATA)" },
@@ -1690,7 +1678,7 @@ export function FantasyExperience({
               <div className="flex items-center justify-between gap-2 rounded-xl border border-accent/30 bg-accent/10 px-3 py-1.5 text-[10px] text-accent">
                 <span className="font-bold">
                   {positionFilter === "GOL" ? (
-                    <>✨ <strong>Goleiros e Paredões (Bom no Gol)</strong> no topo, seguidos por melhor aproveitamento</>
+                    <>✨ <strong>Atletas com melhor histórico no gol</strong> no topo</>
                   ) : (
                     <>✨ Atletas de <strong>{
                       positionFilter === "DEF" ? "Defesa (DEF)" :
