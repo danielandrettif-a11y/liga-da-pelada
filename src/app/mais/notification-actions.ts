@@ -118,9 +118,20 @@ export async function sendPushTest() {
     // a mensagem do Supabase e deixava impossível distinguir chave, tabela ou
     // assinatura. A mensagem é segura para exibição e o erro completo segue
     // disponível nos logs do Coolify.
-    const detail = error instanceof Error && error.message.trim()
-      ? error.message.trim()
-      : "erro desconhecido no servidor";
+    const errorRecord = error && typeof error === "object"
+      ? error as { message?: unknown; code?: unknown; details?: unknown; hint?: unknown }
+      : null;
+    const message = error instanceof Error
+      ? error.message
+      : typeof errorRecord?.message === "string"
+        ? errorRecord.message
+        : "";
+    const context = [
+      typeof errorRecord?.code === "string" ? `código ${errorRecord.code}` : "",
+      typeof errorRecord?.details === "string" ? errorRecord.details : "",
+      typeof errorRecord?.hint === "string" ? errorRecord.hint : "",
+    ].filter(Boolean).join(" · ");
+    const detail = message.trim() || context || "erro desconhecido no servidor";
     return { success: false, error: `Falha no teste: ${detail}` };
   }
 }
