@@ -236,6 +236,20 @@ export async function createMatch(input: CreateMatchInput) {
       throw new Error(`Erro ao salvar os goleiros: ${goalkeeperError.message}`);
     }
 
+    // A partida já nasce com o cronômetro iniciado. Portanto, o agendamento
+    // precisa ser criado aqui também; esperar o botão "Iniciar" faria o jogo
+    // contar no app, mas deixaria o celular bloqueado sem os dois alertas.
+    const scheduling = await scheduleMatchTimerAlerts({
+      matchId: data.id,
+      durationSeconds,
+      accumulatedSeconds: 0,
+      startedAt: kickoffAt,
+    });
+    if (!scheduling.scheduled) {
+      await client.from("matches").update({ timer_started_at: null }).eq("id", data.id);
+      throw new Error("O agendador da tela bloqueada não está configurado no servidor.");
+    }
+
     if (round.status === "draft") {
       await client.from("rounds").update({ status: "active" }).eq("id", input.round_id);
     }
