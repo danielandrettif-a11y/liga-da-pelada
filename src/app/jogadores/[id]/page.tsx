@@ -1,6 +1,6 @@
-import { getPlayer, getPlayerAwardSeasons, getPlayerGoalsByClub, getPlayerRoundHistory } from "@/lib/actions/players";
+import { getPlayer, getPlayerAwardSeasons, getPlayerGoalsByClub, getPlayerPlaytime, getPlayerRoundHistory } from "@/lib/actions/players";
 import { getPlayerFitnessSummaries } from "@/lib/actions/fitness";
-import { aggregatePlayerStats, calculateWinRate, formatDateShort } from "@/lib/utils";
+import { aggregatePlayerStats, calculateWinRate, formatDateShort, formatDuration } from "@/lib/utils";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerProfileBadge } from "@/components/PlayerProfileBadge";
 import { PlayerAwards } from "@/components/PlayerAwards";
@@ -43,7 +43,7 @@ function aggregateGoalkeeperStats(rows: HistoryRow[]) {
 
 export default async function JogadorPerfilPage({ params }: PageProps<"/jogadores/[id]">) {
   const { id } = await params;
-  const [player, officialHistory, friendlyHistory, awardSeasons, fitness, clubGoals, fantasySummary, cosmetics] = await Promise.all([
+  const [player, officialHistory, friendlyHistory, awardSeasons, fitness, clubGoals, fantasySummary, cosmetics, playtime] = await Promise.all([
     getPlayer(id),
     getPlayerRoundHistory(id, "official"),
     getPlayerRoundHistory(id, "friendly"),
@@ -52,6 +52,7 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
     getPlayerGoalsByClub(id),
     getFantasyPlayerSummary(id),
     getPlayerEquippedCosmetics(id),
+    getPlayerPlaytime(id),
   ]);
   if (!player) notFound();
   const isPlayable = player.is_selectable && (player.member_category === "player" || player.member_category === "guest");
@@ -96,6 +97,8 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
 
       {!isPlayable ? <div className="glass-card p-6 text-center"><p className="text-sm font-black text-foreground">Parte da comunidade da Pelada</p><p className="mt-1 text-xs text-muted">O histórico esportivo está preservado, mas fica oculto enquanto este perfil não for um jogador selecionável.</p></div> : <>
         {([['Ranked', official], ['Amistosos', friendly]] as const).map(([label, stats]) => <section key={label}><h3 className="mb-3 px-1 text-xs font-black uppercase tracking-wider text-muted">{label}</h3><div className="grid grid-cols-4 gap-2">{([['Peladas', stats.rounds || 0], ['Jogos', stats.games], ['Gols', stats.goals], ['Assists', stats.assists], ['Vitórias', stats.wins], ['Empates', stats.draws], ['Derrotas', stats.losses], ['Aprov.', `${calculateWinRate(stats.wins, stats.draws, stats.games)}%`]] as const).map(([key, value]) => <div key={key} className="glass-card p-3 text-center"><p className="text-lg font-black text-foreground">{value}</p><p className="text-[8px] font-bold uppercase text-muted">{key}</p></div>)}</div></section>)}
+
+        <section><div className="mb-3 px-1"><h3 className="text-xs font-black uppercase tracking-wider text-muted">Tempo em quadra</h3><p className="mt-1 text-[10px] text-muted/70">Soma do tempo em que você esteve escalado nas partidas.</p></div><div className="grid grid-cols-3 gap-2"><div className="glass-card p-3 text-center"><p className="text-xl font-black text-accent">{formatDuration(playtime.totalSeconds)}</p><p className="text-[8px] font-bold uppercase text-muted">Total</p></div><div className="glass-card p-3 text-center"><p className="text-xl font-black text-foreground">{formatDuration(playtime.officialSeconds)}</p><p className="text-[8px] font-bold uppercase text-muted">Ranked</p></div><div className="glass-card p-3 text-center"><p className="text-xl font-black text-foreground">{formatDuration(playtime.friendlySeconds)}</p><p className="text-[8px] font-bold uppercase text-muted">Amistosos</p></div></div></section>
 
         {(officialGoalkeeper.games > 0 || friendlyGoalkeeper.games > 0) && <section><div className="mb-3 px-1"><h3 className="text-xs font-black uppercase tracking-wider text-muted">Histórico no gol</h3><p className="mt-1 text-[10px] text-muted/70">Atuações registradas como goleiro efetivo da partida.</p></div><div className="grid gap-3 sm:grid-cols-2">{([['Ranked', officialGoalkeeper], ['Amistosos', friendlyGoalkeeper]] as const).map(([label, stats]) => <div key={label} className="glass-card p-4"><p className="text-[9px] font-black uppercase text-accent">{label}</p><div className="mt-3 grid grid-cols-3 gap-2 text-center">{([['Jogos no gol', stats.games], ['Sem sofrer', stats.cleanSheets], ['Gols sofridos', stats.conceded]] as const).map(([key, value]) => <div key={key}><p className="stat-number text-xl text-foreground">{value}</p><p className="mt-1 text-[8px] font-bold uppercase leading-tight text-muted">{key}</p></div>)}</div></div>)}</div></section>}
 

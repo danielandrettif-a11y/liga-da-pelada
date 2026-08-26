@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, UserRound } from "@/components/icons";
 import { PlayerForm } from "@/components/PlayerForm";
 import { getCurrentAccount } from "@/lib/auth";
-import { getPlayer } from "@/lib/actions/players";
+import { getPlayer, getPlayerPlaytime } from "@/lib/actions/players";
+import { formatDuration } from "@/lib/utils";
 import { FitnessPanel } from "@/components/FitnessPanel";
 import { getMyFitnessRounds, getPlayerFitnessSummaries } from "@/lib/actions/fitness";
 import { getMyFantasySummary } from "@/lib/actions/fantasy";
@@ -36,12 +37,13 @@ export default async function MeuPerfilPage() {
 
   const player = await getPlayer(account.profile.player_id);
   if (!player) redirect("/");
-  const [fitnessRounds, fitnessSummaries, fantasySummary, cosmetics, myEquipped] = await Promise.all([
+  const [fitnessRounds, fitnessSummaries, fantasySummary, cosmetics, myEquipped, playtime] = await Promise.all([
     getMyFitnessRounds(player.id),
     getPlayerFitnessSummaries(player.id),
     getMyFantasySummary(),
     getMyCosmeticsDashboard(),
     getMyEquippedCosmetics(),
+    getPlayerPlaytime(player.id),
   ]);
 
   return (
@@ -65,7 +67,12 @@ export default async function MeuPerfilPage() {
         bannerAssetKey={myEquipped?.bannerAssetKey}
         backgroundAssetKey={myEquipped?.backgroundAssetKey}
       />
-      <CosmeticsCollection cosmetics={cosmetics} />
+      <CosmeticsCollection cosmetics={cosmetics} playerName={player.name} avatarUrl={player.avatar_url} />
+      <section className="glass-card p-4">
+        <p className="text-[10px] font-black uppercase tracking-wider text-muted">Tempo em quadra</p>
+        <p className="mt-1 text-2xl font-black text-accent">{formatDuration(playtime.totalSeconds)}</p>
+        <p className="mt-1 text-[10px] text-muted">Tempo total jogado em partidas registradas.</p>
+      </section>
       {fantasySummary && <Link href="/cartola/ranking" className="glass-card flex items-center justify-between p-4"><div><p className="text-[10px] font-black uppercase text-muted">Meu Cartola</p><p className="mt-1 text-sm font-black text-foreground">#{fantasySummary.position} na temporada</p><p className="text-[10px] text-muted">Patrimônio C$ {Number(fantasySummary.current_budget).toFixed(2)}</p></div><strong className="text-2xl text-accent">{Number(fantasySummary.total_points).toFixed(1)}</strong></Link>}
       <FitnessPanel rounds={fitnessRounds} visible={player.show_fitness_stats} summaries={fitnessSummaries} />
     </div>

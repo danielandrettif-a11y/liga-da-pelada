@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, CalendarDays, Plus } from "@/components/icons";
 import { getRound } from "@/lib/actions/rounds";
-import { formatDateShort } from "@/lib/utils";
+import { formatDateShort, formatDuration, formatTimeRange, getMatchElapsedSeconds } from "@/lib/utils";
 import { FinishRoundButton } from "@/components/FinishRoundButton";
 import { getCurrentAccount } from "@/lib/auth";
 import { TeamMiniPitch } from "@/components/TeamMiniPitch";
@@ -53,6 +53,7 @@ export default async function RodadaDetalhePage({
     .map((entry: any) => entry.players)
     .filter(Boolean)
     .sort((a: any, b: any) => a.name.localeCompare(b.name, "pt-BR"));
+  const roundElapsedSeconds = (round.matches || []).reduce((total: number, match: any) => total + getMatchElapsedSeconds(match), 0);
   const overview = (
     <div className="space-y-6">
       {/* Top bar */}
@@ -73,6 +74,7 @@ export default async function RodadaDetalhePage({
               {formatDateShort(round.date)}{round.start_time ? ` · ${round.start_time.slice(0, 5)}` : ""}
             </p>
             {round.round_type === "friendly" && <p className="mt-1 text-[9px] font-black uppercase text-warning">Estatísticas fora do Ranked</p>}
+            {roundElapsedSeconds > 0 && <p className="mt-1 text-[10px] font-bold text-accent">Tempo total da rodada: {formatDuration(roundElapsedSeconds)}</p>}
           </div>
         </div>
       </div>
@@ -158,6 +160,7 @@ export default async function RodadaDetalhePage({
                         {isFinished ? "Finalizada" : isLive ? "Ao vivo" : "Aguardando"}
                       </span>
                     </div>
+                    {formatTimeRange(match.started_at, match.finished_at) && <p className="mb-3 text-[10px] font-bold text-muted">⏱ {formatTimeRange(match.started_at, match.finished_at)} · {formatDuration(getMatchElapsedSeconds(match))}</p>}
 
                     <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
                       <div className="flex min-w-0 items-center justify-end gap-2 text-right">

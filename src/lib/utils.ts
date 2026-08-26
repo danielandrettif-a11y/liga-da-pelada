@@ -39,6 +39,38 @@ export function formatDateShort(dateStr: string): string {
   });
 }
 
+/** Tempo efetivamente transcorrido no cronômetro de uma partida. */
+export function getMatchElapsedSeconds(match: {
+  started_at?: string | null;
+  finished_at?: string | null;
+  timer_started_at?: string | null;
+  timer_accumulated_seconds?: number | null;
+}): number {
+  const accumulated = Math.max(0, Number(match.timer_accumulated_seconds || 0));
+  if (match.timer_started_at) {
+    return accumulated + Math.max(0, Math.floor((Date.now() - new Date(match.timer_started_at).getTime()) / 1000));
+  }
+  if (accumulated > 0) return accumulated;
+  if (match.started_at && match.finished_at) {
+    return Math.max(0, Math.floor((new Date(match.finished_at).getTime() - new Date(match.started_at).getTime()) / 1000));
+  }
+  return 0;
+}
+
+export function formatDuration(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) return hours + "h " + String(minutes).padStart(2, "0") + "min";
+  return minutes + " min";
+}
+
+export function formatTimeRange(startedAt?: string | null, finishedAt?: string | null): string | null {
+  if (!startedAt) return null;
+  const format = (value: string) => new Date(value).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return format(startedAt) + (finishedAt ? " – " + format(finishedAt) : " – em andamento");
+}
+
 /**
  * Calcula o aproveitamento (win rate) em porcentagem.
  * Considera vitórias e empates (empate = 1/3 de vitória).

@@ -574,12 +574,21 @@ export async function finishMatch(matchId: string) {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
 
+    const currentState = await getMatchState(client, matchId);
+    const elapsedAtFinish = Math.max(
+      0,
+      Number(currentState.timer_accumulated_seconds || 0)
+        + (currentState.timer_started_at
+          ? Math.floor((Date.now() - new Date(currentState.timer_started_at).getTime()) / 1000)
+          : 0),
+    );
     const { data: match, error } = await client
       .from("matches")
       .update({
         status: "finished",
         finished_at: new Date().toISOString(),
         timer_started_at: null,
+        timer_accumulated_seconds: elapsedAtFinish,
       })
       .eq("id", matchId)
       .neq("status", "finished")
@@ -608,6 +617,13 @@ export async function finishMatch(matchId: string) {
       if (!recoveryStats.success) throw new Error(recoveryStats.error || "Erro ao recalcular estatisticas.");
       return { success: true, alreadyFinished: true, roundId: existingMatch.round_id };
     }
+
+    const { error: lineupTimeError } = await client
+      .from("match_players")
+      .update({ left_elapsed_seconds: elapsedAtFinish })
+      .eq("match_id", matchId)
+      .eq("is_active", true);
+    if (lineupTimeError) throw new Error(lineupTimeError.message);
 
     revalidatePath(`/partidas/${matchId}`);
     revalidatePath(`/rodadas/${match.round_id}`);

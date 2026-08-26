@@ -7,6 +7,7 @@ import type { Player, CreatePlayerInput, MemberCategory, PlayerProfile, RoundTyp
 import { getActiveSeason, getActiveSeasonRoundIds } from "./seasons";
 import { getAdminClient, getCurrentAccount } from "../auth";
 import { TEAM_PRESETS } from "../teamPresets";
+import { getMatchElapsedSeconds } from "../utils";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -237,6 +238,33 @@ export async function getPlayerRoundHistory(playerId: string, roundType: RoundTy
   }
 
   return data;
+}
+
+export async function getPlayerPlaytime(playerId: string) {
+  const { data, error } = await supabase
+    .from("match_players")
+    .select("entered_elapsed_seconds, left_elapsed_seconds, matches!inner(started_at, finished_at, timer_started_at, timer_accumulated_seconds, rounds!inner(round_type))")
+    .eq("player_id", playerId);
+
+  if (error) {
+    console.error("Erro ao buscar tempo de jogo do jogador:", error);
+    return { totalSeconds: 0, officialSeconds: 0, friendlySeconds: 0 };
+  }
+
+  const totals = { totalSeconds: 0, officialSeconds: 0, friendlySeconds: 0 };
+  for (const row of (data || []) as any[]) {
+    const match = Array.isArray(row.matches) ? row.matches[0] : row.matches;
+    if (!match || !match.started_at) continue;
+    const elapsed = getMatchElapsedSeconds(match);
+    const entered = Math.max(0, Number(row.entered_elapsed_seconds || 0));
+    const left = row.left_elapsed_seconds == null ? elapsed : Math.max(entered, Number(row.left_elapsed_seconds));
+    const played = Math.max(0, left - entered);
+    const rounds = Array.isArray(match.rounds) ? match.rounds[0] : match.rounds;
+    if (rounds?.round_type === "friendly") totals.friendlySeconds += played;
+    else totals.officialSeconds += played;
+    totals.totalSeconds += played;
+  }
+  return totals;
 }
 
 export type PlayerClubGoals = {
