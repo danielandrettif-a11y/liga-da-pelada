@@ -13,7 +13,7 @@ export type FantasyPackDTO = {
   roundNumber?: number;
   source?: string;
   cardTier?: "bronze" | "gold" | null;
-  status: "available" | "opened" | "claimed";
+  status: "available" | "opened" | "claimed" | "dismissed";
   openedAt: string | null;
   chosenCardId: string | null;
   createdAt: string;
@@ -103,13 +103,13 @@ export async function getMyPacks(): Promise<{
     }),
   }));
 
-  const availablePacks = formatted.filter((p) => p.status !== "claimed");
+  const availablePacks = formatted.filter((p) => p.status === "available" || p.status === "opened");
   const claimedCount = formatted.filter((p) => p.status === "claimed").length;
 
   return {
     availablePacks,
     claimedCount,
-    totalPacks: formatted.length,
+    totalPacks: formatted.filter((p) => p.status !== "dismissed").length,
   };
 }
 

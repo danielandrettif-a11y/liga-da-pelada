@@ -5,7 +5,7 @@ import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayersStatsGrid, type PlayerStats } from "./PlayersStatsGrid";
 import { RosterUnreadLink } from "./RosterUnreadLink";
-import { markRosterActivitySeenThrough } from "@/lib/actions/registrations";
+import { markRosterActivitySeen } from "@/lib/actions/registrations";
 import { Crown } from "@/components/icons";
 
 type RosterFilter = "all" | "players" | "wags" | "supporters";
@@ -97,7 +97,9 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
     if (view !== "roster" || !unreadSeenThrough || visibleUnreadPlayerIds.length === 0) return;
 
     let cancelled = false;
-    void markRosterActivitySeenThrough(unreadSeenThrough).then((result) => {
+    // O RPC grava o horario do proprio banco. Isso evita o badge reaparecer por
+    // diferencas de relogio ou por um evento com o mesmo timestamp do cursor.
+    void markRosterActivitySeen().then((result) => {
       if (cancelled || !result.success) return;
       setVisibleUnreadPlayerIds([]);
       window.dispatchEvent(new CustomEvent("roster-unread-cleared"));

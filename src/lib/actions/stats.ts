@@ -599,7 +599,12 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
 
   const stats = rawStats as unknown as RankingStatsRow[];
   const currentRoundIds = new Set(currentRounds.map((round) => round.id));
-  const currentStats = stats.filter((row) => currentRoundIds.has(row.round_id) && isSelectableAthlete(row.player));
+  // Convidados continuam com histórico e scouts nas partidas, mas o ranking
+  // competitivo só começa quando o perfil é oficial. A união de perfis move os
+  // scouts antigos para o perfil oficial e o recálculo passa a incluí-los.
+  const currentStats = stats.filter(
+    (row) => currentRoundIds.has(row.round_id) && row.player?.is_selectable && row.player.member_category === "player",
+  );
   const latestRound = currentRounds[0];
   const roundsMap = new Map((rounds || []).map((round) => [round.id, { id: round.id, number: round.number, date: round.date }]));
   const generalBase = aggregateRankingRows(currentStats, roundsMap, 6);

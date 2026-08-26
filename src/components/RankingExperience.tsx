@@ -352,19 +352,19 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
       </div>
 
       {view === "season" && (
-        <div className="flex items-start gap-3 rounded-2xl border border-accent/30 bg-accent/[0.08] p-3.5 shadow-sm">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-accent text-background font-black text-xs shadow-[0_0_10px_rgba(204,255,0,0.4)]">
-            !
-          </div>
-          <div className="min-w-0 flex-1 text-xs">
-            <p className="font-black uppercase tracking-wider text-accent text-[11px]">
-              Regra Top 6 Melhores Partidas
-            </p>
-            <p className="mt-0.5 text-foreground/90 leading-relaxed text-[11px]">
-              Os pontos da Geral somam as <strong className="text-accent">6 melhores atuações</strong> de cada jogador no ano. Faltas ou dias ruins não prejudicam sua classificação. Toque em qualquer atleta para ver as partidas e a nota de corte!
-            </p>
-          </div>
-        </div>
+        <details className="group rounded-2xl border border-accent/30 bg-accent/[0.08] shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center gap-3 p-3.5 marker:hidden">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-accent text-background font-black text-xs shadow-[0_0_10px_rgba(204,255,0,0.4)]">!</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[11px] font-black uppercase tracking-wider text-accent">Ranking pelas 6 melhores partidas</span>
+              <span className="block truncate text-[10px] text-muted group-open:hidden">Toque para entender a regra</span>
+            </span>
+            <span className="text-sm font-black text-accent transition-transform group-open:rotate-45">+</span>
+          </summary>
+          <p className="border-t border-accent/15 px-4 pb-4 pt-3 text-[11px] leading-relaxed text-foreground/90">
+            Os pontos da Geral somam as <strong className="text-accent">6 melhores atuações</strong> de cada jogador no ano. Faltas ou dias ruins não prejudicam sua classificação. Toque em qualquer atleta para ver as partidas e a nota de corte.
+          </p>
+        </details>
       )}
 
       {view === "latest" && data.latestRound && (

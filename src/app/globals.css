@@ -541,3 +541,27 @@ textarea {
 .card-face-front {
   transform: rotateY(180deg);
 }
+
+@keyframes cosmetic-shimmer {
+  0% { transform: translateX(-140%) skewX(-18deg); opacity: 0; }
+  20% { opacity: .45; }
+  55%, 100% { transform: translateX(230%) skewX(-18deg); opacity: 0; }
+}
+
+.cosmetic-card-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: -25% auto -25% 0;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.38), transparent);
+  animation: cosmetic-shimmer 4.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cosmetic-card-shimmer::after,
+  .animate-pack-levitate,
+  .animate-card-float-1,
+  .animate-card-float-2 {
+    animation: none !important;
+  }
+}

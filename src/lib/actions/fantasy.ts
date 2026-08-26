@@ -43,6 +43,7 @@ export type FantasyMarketPlayer = {
   goalkeeperGames: number;
   goalsConceded: number;
   teamGoalsConceded: number;
+  isInCurrentRound: boolean;
   variation: number;
   priceChange: number;
   roundPoints: number;
@@ -694,6 +695,7 @@ export async function getFantasyDashboard() {
         isGoalkeeper: Boolean(player.is_goalkeeper),
         isGoodGoalkeeper,
         goalkeeperConcededAverage,
+        isInCurrentRound: Boolean(fantasyRound && participantIds.includes(player.id)),
         price,
         totalPoints,
         roundsPlayed,
@@ -944,6 +946,7 @@ export async function getFantasyDashboard() {
           })),
         liveStats,
         scoringSettings,
+        new Set(market.map((player) => player.id)),
       )
     : [];
   const liveProjection: FantasyLiveProjection = {
@@ -1420,7 +1423,7 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
       .eq("fantasy_round_id", activeRound.id)
       .neq("status", "missed"),
     client.from("leagues").select("players_per_team").eq("id", leagueId).maybeSingle(),
-    client.from("players").select("id, player_profile"),
+    client.from("players").select("id, player_profile, member_category, is_selectable"),
   ]);
   const settings: FantasySettings = {
     ...DEFAULT_FANTASY_SETTINGS,
@@ -1440,6 +1443,11 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
     topAssistPredictionPoints: Number(settingsRow?.top_assist_prediction_points ?? DEFAULT_FANTASY_SETTINGS.topAssistPredictionPoints),
   };
   const playerProfileById = new Map((playerRows || []).map((player: any) => [player.id, player.player_profile]));
+  const eligiblePredictionPlayerIds = new Set<string>(
+    (playerRows || [])
+      .filter((player: any) => player.member_category === "player" && player.is_selectable)
+      .map((player: any) => String(player.id)),
+  );
   const stats = projectFantasyLiveStats(
     (matches || []).map((match: any) => ({
       id: match.id,
@@ -1475,6 +1483,7 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
       })),
     stats,
     settings,
+    eligiblePredictionPlayerIds,
   );
   return { roundId: activeRound.round_id, byUserId: new Map(projections.map((item) => [item.userId, item])) };
 }

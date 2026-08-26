@@ -62,18 +62,18 @@ export function cosmeticFrameClass(assetKey?: string | null): string {
 export function cosmeticAuraClass(assetKey?: string | null): string {
   if (!assetKey) return "";
   const key = assetKey.toLowerCase();
-  if (key.includes("fumaca")) return "shadow-[0_0_30px_rgba(16,185,129,0.9)] animate-pulse";
-  if (key.includes("flash") || key.includes("refletor")) return "shadow-[0_0_30px_rgba(255,255,255,0.9)]";
-  if (key.includes("energia")) return "shadow-[0_0_25px_rgba(204,255,0,0.85)]";
+  if (key.includes("fumaca")) return "shadow-[0_0_12px_4px_rgba(16,185,129,.72),0_0_34px_rgba(16,185,129,.72)] animate-pulse motion-reduce:animate-none";
+  if (key.includes("flash") || key.includes("refletor")) return "shadow-[0_0_10px_3px_rgba(255,255,255,.72),0_0_32px_rgba(255,255,255,.72)]";
+  if (key.includes("energia")) return "shadow-[0_0_10px_3px_rgba(204,255,0,.68),0_0_30px_rgba(204,255,0,.72)]";
   return "shadow-[0_0_20px_rgba(204,255,0,0.6)]";
 }
 
 export function cosmeticNameplateClass(assetKey?: string | null): string {
   if (!assetKey) return "border-white/10 bg-black/40 text-foreground";
   const key = assetKey.toLowerCase();
-  if (key.includes("placar")) return "border-emerald-400/40 bg-black/80 text-emerald-300 font-mono";
-  if (key.includes("faixa")) return "border-amber-400/50 bg-amber-950/70 text-amber-200";
-  if (key.includes("retro")) return "border-orange-400/40 bg-orange-950/60 text-orange-200";
-  if (key.includes("prancheta")) return "border-lime-400/40 bg-lime-950/60 text-lime-200";
+  if (key.includes("placar")) return "border-emerald-400/50 bg-black/85 text-emerald-300 font-mono shadow-[inset_0_0_16px_rgba(52,211,153,.16),0_0_16px_rgba(52,211,153,.2)]";
+  if (key.includes("faixa")) return "border-amber-400/60 bg-[linear-gradient(135deg,#3b1708,#8a3d0d,#3b1708)] text-amber-100 shadow-[0_5px_18px_rgba(245,158,11,.25)]";
+  if (key.includes("retro")) return "border-orange-300/55 bg-[repeating-linear-gradient(135deg,#431407_0_7px,#70280e_7px_14px)] text-orange-100 shadow-[0_5px_16px_rgba(249,115,22,.24)]";
+  if (key.includes("prancheta")) return "border-lime-300/50 bg-[linear-gradient(90deg,#172a16_0_49%,rgba(163,230,53,.18)_50%,#172a16_51%)] text-lime-100 shadow-[inset_0_0_18px_rgba(163,230,53,.12)]";
   return "border-accent/30 bg-black/50 text-accent";
 }

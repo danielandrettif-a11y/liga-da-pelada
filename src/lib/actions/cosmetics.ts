@@ -12,10 +12,11 @@ export type CosmeticPassReward = {
 };
 export type CosmeticsDashboard = {
   available: boolean; seasonId: string | null; cosmetics: CosmeticItem[]; rewards: CosmeticPassReward[];
+  previewCatalog: CosmeticItem[];
   equipped: Partial<Record<CosmeticSlot, string | null>>; canPreviewAll: boolean;
 };
 
-const empty: CosmeticsDashboard = { available: false, seasonId: null, cosmetics: [], rewards: [], equipped: {}, canPreviewAll: false };
+const empty: CosmeticsDashboard = { available: false, seasonId: null, cosmetics: [], previewCatalog: [], rewards: [], equipped: {}, canPreviewAll: false };
 const mapCosmetic = (row: any): CosmeticItem => ({ id: row.id, slug: row.slug, slot: row.slot, rarity: row.rarity, name: row.name, description: row.description, assetKey: row.asset_key });
 
 export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
@@ -27,18 +28,20 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
   const client: any = account.client;
   const { data: fantasySeason } = await client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle();
   if (!fantasySeason) return empty;
-  const [ownedResult, rewardResult, choiceResult, loadoutResult] = await Promise.all([
+  const [ownedResult, catalogResult, rewardResult, choiceResult, loadoutResult] = await Promise.all([
     client.from("fantasy_user_cosmetics").select("cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id),
+    client.from("fantasy_cosmetics").select("*").order("created_at"),
     client.from("fantasy_season_pass_rewards").select("id, house, reward_type, card_tier, options:fantasy_season_pass_reward_options(cosmetic:fantasy_cosmetics(*))").eq("fantasy_season_id", fantasySeason.id).order("house"),
     client.from("fantasy_user_cosmetic_reward_choices").select("reward_id, cosmetic_id").eq("user_id", account.user.id),
     client.from("fantasy_user_cosmetic_loadouts").select("*").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).maybeSingle(),
   ]);
-  if (ownedResult.error || rewardResult.error) return empty;
+  if (ownedResult.error || rewardResult.error || catalogResult.error) return empty;
   const choices = new Map((choiceResult.data || []).map((row: any) => [row.reward_id, row.cosmetic_id]));
   const loadout = loadoutResult.data || {};
   return {
     available: true, seasonId: fantasySeason.id, canPreviewAll: account.isAdmin,
     cosmetics: (ownedResult.data || []).map((row: any) => row.cosmetic).filter(Boolean).map(mapCosmetic),
+    previewCatalog: account.isAdmin ? (catalogResult.data || []).map(mapCosmetic) : [],
     rewards: (rewardResult.data || []).map((row: any) => ({
       id: row.id, house: Number(row.house), rewardType: row.reward_type, cardTier: row.card_tier,
       selectedCosmeticId: choices.get(row.id) || null,
@@ -51,18 +54,27 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
   };
 }
 
-export async function grantAllCosmeticsPreview() {
+export async function cleanupMyLegacyCosmeticsPreview() {
   const account = await getCurrentAccount();
   if (!account.user || !account.isAdmin) return { success: false, error: "A prévia é exclusiva para administradores." };
-  const league = await getActiveLeague(); const season = await getActiveSeason(league.id);
-  if (!season) return { success: false, error: "Temporada não encontrada." };
   const client: any = account.client;
-  const { data: fantasySeason } = await client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle();
-  if (!fantasySeason) return { success: false, error: "Passe indisponível." };
-  const { data, error } = await client.rpc("grant_fantasy_cosmetics_preview", { p_fantasy_season_id: fantasySeason.id });
+  const { data, error } = await client.rpc("cleanup_my_cosmetics_preview");
   if (error) return { success: false, error: error.message };
   revalidatePath("/meu-perfil");
-  return { success: true, granted: Number(data || 0) };
+  revalidatePath("/jogadores");
+  revalidatePath("/ranking");
+  return { success: true, removed: Number(data || 0) };
+}
+
+export async function dismissMyUnopenedBronzePassPack() {
+  const account = await getCurrentAccount();
+  if (!account.user || !account.isAdmin) return { success: false, error: "A limpeza é exclusiva para administradores." };
+  const client: any = account.client;
+  const { data, error } = await client.rpc("dismiss_my_unopened_bronze_pass_pack");
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/cartola");
+  revalidatePath("/meu-perfil");
+  return { success: true, dismissed: Number(data || 0) };
 }
 
 export async function claimPassCosmetic(rewardId: string, cosmeticId: string) {

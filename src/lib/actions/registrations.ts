@@ -124,6 +124,7 @@ export async function markRosterActivitySeen() {
   const { error } = await account.client.rpc("mark_roster_activity_seen");
   if (error) return { success: false, error: error.message };
   revalidatePath("/", "layout");
+  revalidatePath("/jogadores");
   return { success: true };
 }
 

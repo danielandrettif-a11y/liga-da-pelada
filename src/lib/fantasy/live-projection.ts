@@ -162,9 +162,13 @@ export function projectFantasyLiveLineups(
   lineups: FantasyLiveLineupInput[],
   playerStats: Map<string, FantasyLivePlayerStats>,
   settings: FantasySettings,
+  eligiblePredictionPlayerIds?: ReadonlySet<string>,
 ): FantasyLiveLineupProjection[] {
-  const topGoals = Math.max(0, ...[...playerStats.values()].map((item) => item.goals));
-  const topAssists = Math.max(0, ...[...playerStats.values()].map((item) => item.assists));
+  const eligibleStats = [...playerStats.values()].filter(
+    (item) => !eligiblePredictionPlayerIds || eligiblePredictionPlayerIds.has(item.playerId),
+  );
+  const topGoals = Math.max(0, ...eligibleStats.map((item) => item.goals));
+  const topAssists = Math.max(0, ...eligibleStats.map((item) => item.assists));
 
   return lineups.map((lineup) => {
     const slotByPlayer = new Map((lineup.slots || []).map((slot) => [slot.playerId, slot]));
@@ -200,10 +204,14 @@ export function projectFantasyLiveLineups(
     const captainBase = lineup.captainPlayerId ? pointsByPlayer.get(lineup.captainPlayerId) || 0 : 0;
     const captainBonus = captainBase * Math.max(0, settings.captainMultiplier - 1);
     const scorerHit = Boolean(
-      lineup.topScorerPlayerId && topGoals > 0 && playerStats.get(lineup.topScorerPlayerId)?.goals === topGoals,
+      lineup.topScorerPlayerId &&
+      (!eligiblePredictionPlayerIds || eligiblePredictionPlayerIds.has(lineup.topScorerPlayerId)) &&
+      topGoals > 0 && playerStats.get(lineup.topScorerPlayerId)?.goals === topGoals,
     );
     const assistHit = Boolean(
-      lineup.topAssistPlayerId && topAssists > 0 && playerStats.get(lineup.topAssistPlayerId)?.assists === topAssists,
+      lineup.topAssistPlayerId &&
+      (!eligiblePredictionPlayerIds || eligiblePredictionPlayerIds.has(lineup.topAssistPlayerId)) &&
+      topAssists > 0 && playerStats.get(lineup.topAssistPlayerId)?.assists === topAssists,
     );
     const predictionPoints =
       (scorerHit ? lineup.topScorerReward ?? settings.topScorerPredictionPoints : 0) +

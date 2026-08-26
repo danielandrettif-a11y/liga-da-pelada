@@ -62,6 +62,28 @@ describe("live fantasy projection", () => {
     expect(lineup.predictionPoints).toBe(DEFAULT_FANTASY_SETTINGS.topScorerPredictionPoints + DEFAULT_FANTASY_SETTINGS.topAssistPredictionPoints);
   });
 
+  it("ignora convidados ao definir os líderes dos palpites", () => {
+    const stats = projectFantasyLiveStats([{
+      ...baseMatch,
+      status: "live",
+      scoreA: 3,
+      players: [...baseMatch.players, { playerId: "guest", teamId: "a", resultEligible: true }],
+      events: [
+        { playerId: "guest", teamId: "a" },
+        { playerId: "guest", teamId: "a" },
+        { playerId: "scorer", teamId: "a" },
+      ],
+    }], DEFAULT_FANTASY_SETTINGS);
+    const eligible = new Set(["scorer", "keeper", "loser"]);
+    const [officialPick, guestPick] = projectFantasyLiveLineups([
+      { id: "official", userId: "official", playerIds: ["scorer"], topScorerPlayerId: "scorer" },
+      { id: "guest", userId: "guest", playerIds: ["scorer"], topScorerPlayerId: "guest" },
+    ], stats, DEFAULT_FANTASY_SETTINGS, eligible);
+
+    expect(officialPick.predictionPoints).toBe(DEFAULT_FANTASY_SETTINGS.topScorerPredictionPoints);
+    expect(guestPick.predictionPoints).toBe(0);
+  });
+
   it("concede o Artilheiro somente ao ATA correto com dois ou mais gols", () => {
     const stats = projectFantasyLiveStats([
       {

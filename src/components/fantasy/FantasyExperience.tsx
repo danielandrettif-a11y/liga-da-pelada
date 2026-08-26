@@ -304,6 +304,7 @@ export function FantasyExperience({
   const [sort, setSort] = useState("points");
   const [activeTab, setActiveTab] = useState<"team" | "market">("team");
   const [filterTag, setFilterTag] = useState<string>("ALL");
+  const [calledUpOnly, setCalledUpOnly] = useState(false);
   const [message, setMessage] = useState("");
   const [showTutorial, setShowTutorial] = useState(false);
   const [showScoringModal, setShowScoringModal] = useState(false);
@@ -385,6 +386,7 @@ export function FantasyExperience({
       .filter((player) => {
         const matchesQuery = player.name.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR"));
         if (!matchesQuery) return false;
+        if (calledUpOnly && !player.isInCurrentRound) return false;
 
         if (filterTag === "ALL") return true;
         if (filterTag === "TREND_UP") return player.trend === "UP";
@@ -461,7 +463,7 @@ export function FantasyExperience({
         if (sort === "popularity") return b.popularityPercent - a.popularityPercent;
         return b.totalPoints - a.totalPoints;
       });
-  }, [market, query, sort, filterTag, positionFilter]);
+  }, [market, query, sort, filterTag, positionFilter, calledUpOnly]);
 
   const scheduledAt =
     round?.date && round.start_time ? new Date(`${round.date}T${round.start_time}`).getTime() : null;
@@ -1710,6 +1712,20 @@ export function FantasyExperience({
 
             {/* Chips de Filtros Rápidos */}
             <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 text-[9px] font-black uppercase tracking-wider">
+              {market.some((player) => player.isInCurrentRound) && (
+                <button
+                  type="button"
+                  aria-pressed={calledUpOnly}
+                  onClick={() => setCalledUpOnly((current) => !current)}
+                  className={`shrink-0 rounded-xl border px-2.5 py-1.5 transition-colors ${
+                    calledUpOnly
+                      ? "border-accent bg-accent text-background shadow-sm"
+                      : "border-accent/35 bg-accent/10 text-accent hover:bg-accent/20"
+                  }`}
+                >
+                  ✅ Somente convocados
+                </button>
+              )}
               {[
                 { id: "ALL", label: "Todos os Status" },
                 { id: "TREND_UP", label: "🔥 Em Alta" },
