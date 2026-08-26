@@ -16,6 +16,7 @@ import { RoundAdminPlayerTools } from "@/components/RoundAdminPlayerTools";
 import { getPlayers } from "@/lib/actions/players";
 import { RoundInstagramStoryGenerator } from "@/components/RoundInstagramStoryGenerator";
 import { RoundTeamShuffleCard } from "@/components/RoundTeamShuffleCard";
+import { getPaymentRecipients } from "@/lib/actions/payments";
 
 export const revalidate = 0;
 
