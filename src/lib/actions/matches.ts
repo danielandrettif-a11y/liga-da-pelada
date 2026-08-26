@@ -46,7 +46,7 @@ export async function createMatch(input: CreateMatchInput) {
     const [{ data: round, error: roundError }, { data: teams, error: teamsError }, { data: roundPlayers, error: roundPlayersError }] = await Promise.all([
       client.from("rounds").select("id, status, formation_mode, league:league_id (match_duration)").eq("id", input.round_id).single(),
       client.from("teams").select("id, position, team_players (player_id)").eq("round_id", input.round_id),
-      client.from("round_players").select("player_id, availability_status, attendance_status").eq("round_id", input.round_id),
+      client.from("round_players").select("player_id, availability_status, attendance_status, attendance_order").eq("round_id", input.round_id),
     ]);
 
     if (roundError || !round) throw new Error("Rodada nao encontrada.");
@@ -59,7 +59,11 @@ export async function createMatch(input: CreateMatchInput) {
 
     const availability = new Map(roundPlayers.map((entry: any) => [entry.player_id, entry.availability_status]));
     const attendance = new Map(roundPlayers.map((entry: any) => [entry.player_id, entry.attendance_status]));
-    const usesAttendance = round.formation_mode !== "manual";
+    // `formation_mode` distingue apenas manual/automático. A ordem de
+    // chegada é identificada pelos registros efetivamente ordenados; assim,
+    // sorteios aleatório/equilibrado não bloqueiam o terceiro time.
+    const usesAttendance = round.formation_mode !== "manual"
+      && roundPlayers.some((entry: any) => entry.attendance_order != null);
     const { data: previousMatches, error: previousMatchesError } = await client
       .from("matches")
       .select("team_a_id, team_b_id, status, match_order, created_at")

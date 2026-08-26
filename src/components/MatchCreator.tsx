@@ -37,7 +37,11 @@ export function MatchCreator({ round }: { round: any }) {
   const attendance = useMemo(() => new Map(
     (round?.round_players || []).map((entry: any) => [entry.player_id, entry.attendance_status || "pending"]),
   ), [round?.round_players]);
-  const usesAttendance = round?.formation_mode !== "manual";
+  // Apenas uma rodada que realmente registrou uma ordem de chegada deve
+  // exigir os dois times titulares no primeiro jogo. Sorteios aleatório e
+  // equilibrado deixam os três times disponíveis desde o início.
+  const usesAttendance = round?.formation_mode !== "manual"
+    && (round?.round_players || []).some((entry: any) => entry.attendance_order != null);
   const previousMatch = useMemo(() => [...(round?.matches || [])].sort((a: any, b: any) =>
     (b.match_order || 0) - (a.match_order || 0) || String(b.created_at).localeCompare(String(a.created_at)),
   )[0], [round?.matches]);
