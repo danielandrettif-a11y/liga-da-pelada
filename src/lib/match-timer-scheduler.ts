@@ -1,5 +1,6 @@
 import { SITE_URL } from "@/lib/siteUrl";
 
+
 type TimerAlert = "thirty_seconds" | "finished";
 
 type TimerScheduleInput = {
@@ -58,7 +59,7 @@ async function scheduleTimerAlert(
 ) {
   const destination = `${SITE_URL}/api/internal/match-timer-alert`;
   const runAt = Math.ceil((Date.now() + secondsUntil(input, threshold) * 1000) / 1000);
-  const response = await fetch(`${getQStashPublishUrl()}/${encodeURIComponent(destination)}`, {
+  const response = await fetch(`${getQStashPublishUrl()}/${destination}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -89,7 +90,7 @@ export async function schedulePushTestAlert(userId: string) {
   }
 
   const destination = `${SITE_URL}/api/internal/push-test-alert`;
-  const response = await fetch(`${getQStashPublishUrl()}/${encodeURIComponent(destination)}`, {
+  const response = await fetch(`${getQStashPublishUrl()}/${destination}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
