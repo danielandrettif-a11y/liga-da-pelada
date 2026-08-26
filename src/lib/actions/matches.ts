@@ -633,26 +633,25 @@ export async function updateMatchTimer(matchId: string, action: "start" | "pause
 
     if (action === "start") {
       const startedAt = new Date().toISOString();
+
+      // O agendamento precisa terminar dentro desta requisição. Em servidores
+      // próprios, uma tarefa deixada para depois da resposta pode ser encerrada
+      // antes de chegar ao QStash, justamente quando o celular é bloqueado.
+      const scheduling = await scheduleMatchTimerAlerts({
+        matchId,
+        durationSeconds: Number(match.duration_seconds || 420),
+        accumulatedSeconds: Number(match.timer_accumulated_seconds || 0),
+        startedAt,
+      });
+      if (!scheduling.scheduled) {
+        throw new Error("O agendador da tela bloqueada não está configurado no servidor.");
+      }
+
       const { error } = await client
         .from("matches")
         .update({ timer_started_at: startedAt })
         .eq("id", matchId);
       if (error) throw new Error(error.message);
-
-      // O PWA pode ser suspenso ao bloquear o celular. Estes jobs continuam
-      // vivos no servidor e chamam o webhook nos dois marcos do cronômetro.
-      after(async () => {
-        try {
-          await scheduleMatchTimerAlerts({
-            matchId,
-            durationSeconds: Number(match.duration_seconds || 420),
-            accumulatedSeconds: Number(match.timer_accumulated_seconds || 0),
-            startedAt,
-          });
-        } catch (schedulerError) {
-          console.error("Erro ao agendar alertas do cronômetro:", schedulerError);
-        }
-      });
     } else if (action === "pause") {
       if (match.timer_started_at) {
         const elapsed = Math.floor((new Date().getTime() - new Date(match.timer_started_at).getTime()) / 1000);
@@ -726,6 +725,18 @@ export async function addMatchExtraTime(matchId: string, extraSeconds: number) {
     const currentDuration = Number(match.duration_seconds || 420);
     const newDuration = Math.max(60, currentDuration + extraSeconds);
 
+    if (match.timer_started_at) {
+      const scheduling = await scheduleMatchTimerAlerts({
+        matchId,
+        durationSeconds: newDuration,
+        accumulatedSeconds: Number(match.timer_accumulated_seconds || 0),
+        startedAt: match.timer_started_at,
+      });
+      if (!scheduling.scheduled) {
+        throw new Error("O agendador da tela bloqueada não está configurado no servidor.");
+      }
+    }
+
     const { error } = await client
       .from("matches")
       .update({
@@ -736,22 +747,6 @@ export async function addMatchExtraTime(matchId: string, extraSeconds: number) {
       .eq("id", matchId);
 
     if (error) throw new Error(error.message);
-
-    if (match.timer_started_at) {
-      after(async () => {
-        try {
-          await scheduleMatchTimerAlerts({
-            matchId,
-            durationSeconds: newDuration,
-            accumulatedSeconds: Number(match.timer_accumulated_seconds || 0),
-            startedAt: match.timer_started_at,
-          });
-        } catch (schedulerError) {
-          console.error("Erro ao reagendar alertas do cronômetro:", schedulerError);
-        }
-      });
-    }
-
     revalidatePath(`/partidas/${matchId}`);
     return { success: true, newDuration };
   } catch (err: any) {

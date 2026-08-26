@@ -9,14 +9,28 @@ type TimerScheduleInput = {
   startedAt: string;
 };
 
+function readEnvironmentValue(name: string) {
+  const rawValue = process.env[name]?.trim();
+  if (!rawValue) return undefined;
+
+  const withoutName = rawValue.startsWith(`${name}=`)
+    ? rawValue.slice(name.length + 1).trim()
+    : rawValue;
+  const hasMatchingQuotes = (
+    (withoutName.startsWith('"') && withoutName.endsWith('"'))
+    || (withoutName.startsWith("'") && withoutName.endsWith("'"))
+  );
+  return hasMatchingQuotes ? withoutName.slice(1, -1).trim() : withoutName;
+}
+
 function getQStashPublishUrl() {
-  const baseUrl = (process.env.QSTASH_URL || "https://qstash.upstash.io").replace(/\/$/, "");
+  const baseUrl = (readEnvironmentValue("QSTASH_URL") || "https://qstash.upstash.io").replace(/\/$/, "");
   return `${baseUrl}/v2/publish`;
 }
 
 function getSchedulerConfiguration() {
-  const token = process.env.QSTASH_TOKEN;
-  const webhookSecret = process.env.MATCH_TIMER_WEBHOOK_SECRET;
+  const token = readEnvironmentValue("QSTASH_TOKEN");
+  const webhookSecret = readEnvironmentValue("MATCH_TIMER_WEBHOOK_SECRET");
   return {
     token,
     webhookSecret,
@@ -60,7 +74,11 @@ async function scheduleTimerAlert(
   });
 
   if (!response.ok) {
-    throw new Error(`Não foi possível agendar o alerta ${threshold} (${response.status}).`);
+    const responseDetails = (await response.text()).trim().slice(0, 300);
+    throw new Error(
+      `QStash recusou o alerta ${threshold}: HTTP ${response.status}`
+      + (responseDetails ? ` — ${responseDetails}` : "."),
+    );
   }
 }
 
