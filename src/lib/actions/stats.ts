@@ -330,13 +330,6 @@ export async function calculateRoundStats(roundId: string) {
       }
     }
 
-    const bestGoalkeeper = round.best_goalkeeper_player_id
-      ? statsMap[round.best_goalkeeper_player_id]
-      : null;
-    if (bestGoalkeeper && !voidedPlayerIds.has(round.best_goalkeeper_player_id)) {
-      if (countsForRanking) bestGoalkeeper.points += points.best_goalkeeper;
-    }
-
     // 4. Salvar tudo (Upsert)
     const statsArray = Object.values(statsMap);
     if (statsArray.length > 0) {
@@ -488,7 +481,7 @@ export async function getRoundStatistics(roundId: string): Promise<RoundStatisti
   const [{ data: round, error: roundError }, { data: rows, error: statsError }] = await Promise.all([
     supabase
       .from("rounds")
-      .select("id, status, round_type, best_goalkeeper_player_id")
+      .select("id, status, round_type")
       .eq("id", roundId)
       .maybeSingle(),
     supabase
@@ -518,7 +511,7 @@ export async function getRoundStatistics(roundId: string): Promise<RoundStatisti
       assists: Number(raw.assists || 0),
       points: Number(raw.points || 0),
       winRate: games > 0 ? Math.round(((wins * 3 + draws) / (games * 3)) * 100) : 0,
-      isBestGoalkeeper: player.id === round.best_goalkeeper_player_id,
+      isBestGoalkeeper: false,
     } satisfies RoundStatisticEntry];
   }).sort((a, b) => b.goals - a.goals || b.assists - a.assists || b.points - a.points || a.player.name.localeCompare(b.player.name, "pt-BR"));
 
@@ -536,7 +529,7 @@ export async function getRoundStatistics(roundId: string): Promise<RoundStatisti
       scorers: leaders("goals"),
       assisters: leaders("assists"),
       topPoints: round.round_type === "friendly" ? [] : leaders("points"),
-      goalkeepers: entries.filter((entry) => entry.isBestGoalkeeper),
+      goalkeepers: [],
     },
   };
 }

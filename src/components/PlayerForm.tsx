@@ -8,6 +8,7 @@ import type { MemberCategory, Player } from "@/lib/types";
 import { AvatarCropModal } from "./AvatarCropModal";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PLAYER_PROFILE_OPTIONS } from "@/lib/playerProfiles";
+import { cosmeticImage, cosmeticNameplateClass, cosmeticVisual } from "@/lib/fantasy/cosmetics";
 
 const MAX_SOURCE_SIZE = 20 * 1024 * 1024;
 
@@ -16,11 +17,19 @@ export function PlayerForm({
   mode = "admin",
   frameKey,
   auraKey,
+  titleName,
+  nameplateKey,
+  bannerAssetKey,
+  backgroundAssetKey,
 }: {
   player?: Player;
   mode?: "admin" | "self";
   frameKey?: string | null;
   auraKey?: string | null;
+  titleName?: string | null;
+  nameplateKey?: string | null;
+  bannerAssetKey?: string | null;
+  backgroundAssetKey?: string | null;
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -157,7 +166,15 @@ export function PlayerForm({
         </div>
       )}
 
-      <div className="flex flex-col items-center gap-3 pb-2">
+      <div
+        className={`relative -mx-5 -mt-5 mb-2 overflow-hidden border-b border-border px-5 pt-6 ${cosmeticVisual(bannerAssetKey || backgroundAssetKey)}`}
+        style={(cosmeticImage(bannerAssetKey) || cosmeticImage(backgroundAssetKey)) ? {
+          backgroundImage: `linear-gradient(rgba(2, 14, 8, .78), rgba(2, 14, 8, .92)), url(${cosmeticImage(bannerAssetKey) || cosmeticImage(backgroundAssetKey)})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        } : undefined}
+      >
+      <div className="relative flex flex-col items-center gap-3 pb-5">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
@@ -210,6 +227,12 @@ export function PlayerForm({
           )}
         </div>
         <p className="text-[10px] text-muted text-center">Escolha uma imagem e ajuste o enquadramento antes de salvar</p>
+        {titleName && (
+          <span className={`rounded-md border px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${cosmeticNameplateClass(nameplateKey)}`}>
+            ✨ {titleName}
+          </span>
+        )}
+      </div>
       </div>
 
       <div className="space-y-1.5">

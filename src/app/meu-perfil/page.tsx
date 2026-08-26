@@ -60,6 +60,10 @@ export default async function MeuPerfilPage() {
         mode="self"
         frameKey={myEquipped?.frameKey}
         auraKey={myEquipped?.auraKey}
+        titleName={myEquipped?.titleName}
+        nameplateKey={myEquipped?.nameplateKey}
+        bannerAssetKey={myEquipped?.bannerAssetKey}
+        backgroundAssetKey={myEquipped?.backgroundAssetKey}
       />
       <CosmeticsCollection cosmetics={cosmetics} />
       {fantasySummary && <Link href="/cartola/ranking" className="glass-card flex items-center justify-between p-4"><div><p className="text-[10px] font-black uppercase text-muted">Meu Cartola</p><p className="mt-1 text-sm font-black text-foreground">#{fantasySummary.position} na temporada</p><p className="text-[10px] text-muted">Patrimônio C$ {Number(fantasySummary.current_budget).toFixed(2)}</p></div><strong className="text-2xl text-accent">{Number(fantasySummary.total_points).toFixed(1)}</strong></Link>}

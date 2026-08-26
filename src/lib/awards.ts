@@ -76,14 +76,8 @@ export function buildAwardSeasonsByPlayer(rounds: AwardRound[], stats: AwardStat
       }
     }
 
-    if (round.bestGoalkeeperPlayerId) {
-      ensureSeason(round.bestGoalkeeperPlayerId, round).awards.push({
-        type: "bestGoalkeeper",
-        roundId: round.id,
-        roundNumber: round.number,
-        roundDate: round.date,
-      });
-    }
+    // O prêmio manual de melhor goleiro foi aposentado. A contribuição no gol
+    // é medida pelos scouts de cada partida, sem troféu subjetivo no final.
   }
 
   const roundsBySeason = new Map<string, AwardRound[]>();

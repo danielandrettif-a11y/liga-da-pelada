@@ -45,11 +45,6 @@ export const SCORING_RULE_FIELDS: Array<{
     description: "Pontos por derrota; pode ser um valor negativo.",
   },
   {
-    eventType: "best_goalkeeper",
-    label: "Melhor goleiro",
-    description: "Prêmio escolhido pelo ADM ao final da rodada.",
-  },
-  {
     eventType: "goalkeeper_appearance",
     label: "Atuação como goleiro",
     description: "Bônus por iniciar uma partida como goleiro.",

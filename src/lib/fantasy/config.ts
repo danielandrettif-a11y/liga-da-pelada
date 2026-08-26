@@ -74,6 +74,11 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
 
 export const FANTASY_RECENT_ROUND_WEIGHTS = [0.40, 0.25, 0.15, 0.12, 0.08] as const;
 
+/** O orçamento inicial acompanha a quantidade de vagas, mantendo C$ 11 por atleta. */
+export function getFantasyInitialBudget(playersPerTeam: number) {
+  return Math.max(1, Math.floor(playersPerTeam || 5)) * 11;
+}
+
 export function formatFantasyMoney(value: number, currencyName = "C$") {
   return `${currencyName} ${new Intl.NumberFormat("pt-BR", {
     minimumFractionDigits: 2,

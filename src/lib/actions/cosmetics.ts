@@ -84,11 +84,16 @@ export async function equipCosmetic(slot: CosmeticSlot, cosmeticId: string | nul
   const { data: fantasySeason } = await client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle();
   if (!fantasySeason) return { success: false, error: "Passe indisponível." };
   const { error } = await client.rpc("equip_fantasy_cosmetic", { p_fantasy_season_id: fantasySeason.id, p_slot: slot, p_cosmetic_id: cosmeticId });
+  // Não mascarar uma falha do banco como se o item tivesse sido equipado.
+  // Antes deste retorno a interface mostrava sucesso mesmo com RLS/migration ausente.
+  if (error) return { success: false, error: error.message };
   revalidatePath("/meu-perfil");
   revalidatePath("/jogadores");
   revalidatePath("/jogadores/[id]", "page");
   revalidatePath("/", "layout");
   revalidatePath("/ranking");
+  revalidatePath("/elenco");
+  revalidatePath("/cartola");
   return { success: true };
 }
 
@@ -98,6 +103,7 @@ export type EquippedCosmeticsSummary = {
   titleName: string | null;
   bannerAssetKey: string | null;
   nameplateKey: string | null;
+  backgroundAssetKey: string | null;
 };
 
 export async function getMyEquippedCosmetics(): Promise<EquippedCosmeticsSummary | null> {
@@ -117,7 +123,8 @@ export async function getMyEquippedCosmetics(): Promise<EquippedCosmeticsSummary
       aura:aura_cosmetic_id(asset_key),
       title:title_cosmetic_id(name),
       banner:banner_cosmetic_id(asset_key),
-      nameplate:nameplate_cosmetic_id(asset_key)
+      nameplate:nameplate_cosmetic_id(asset_key),
+      background:background_cosmetic_id(asset_key)
     `)
     .eq("user_id", account.user.id)
     .eq("fantasy_season_id", fantasySeason.id)
@@ -131,6 +138,7 @@ export async function getMyEquippedCosmetics(): Promise<EquippedCosmeticsSummary
     titleName: loadout.title?.name || null,
     bannerAssetKey: loadout.banner?.asset_key || null,
     nameplateKey: loadout.nameplate?.asset_key || null,
+    backgroundAssetKey: loadout.background?.asset_key || null,
   };
 }
 
@@ -165,7 +173,8 @@ export async function getPlayerEquippedCosmetics(playerId: string): Promise<Equi
       aura:aura_cosmetic_id(asset_key),
       title:title_cosmetic_id(name),
       banner:banner_cosmetic_id(asset_key),
-      nameplate:nameplate_cosmetic_id(asset_key)
+      nameplate:nameplate_cosmetic_id(asset_key),
+      background:background_cosmetic_id(asset_key)
     `)
     .eq("user_id", profile.user_id)
     .eq("fantasy_season_id", fantasySeason.id)
@@ -179,6 +188,7 @@ export async function getPlayerEquippedCosmetics(playerId: string): Promise<Equi
     titleName: loadout.title?.name || null,
     bannerAssetKey: loadout.banner?.asset_key || null,
     nameplateKey: loadout.nameplate?.asset_key || null,
+    backgroundAssetKey: loadout.background?.asset_key || null,
   };
 }
 
@@ -206,7 +216,8 @@ export async function getAllPlayersEquippedCosmeticsMap(): Promise<Map<string, E
       aura:aura_cosmetic_id(asset_key),
       title:title_cosmetic_id(name),
       banner:banner_cosmetic_id(asset_key),
-      nameplate:nameplate_cosmetic_id(asset_key)
+      nameplate:nameplate_cosmetic_id(asset_key),
+      background:background_cosmetic_id(asset_key)
     `).eq("fantasy_season_id", fantasySeason.id),
   ]);
 
@@ -222,6 +233,7 @@ export async function getAllPlayersEquippedCosmeticsMap(): Promise<Map<string, E
         titleName: (loadout.title as any)?.name || null,
         bannerAssetKey: (loadout.banner as any)?.asset_key || null,
         nameplateKey: (loadout.nameplate as any)?.asset_key || null,
+        backgroundAssetKey: (loadout.background as any)?.asset_key || null,
       });
     }
   }

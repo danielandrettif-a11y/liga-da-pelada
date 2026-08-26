@@ -16,5 +16,5 @@ const seasons = buildAwardSeasonsByPlayer(
 ).get("p1")!;
 
 assert.deepEqual(seasons.map((season: { seasonNumber: number }) => season.seasonNumber), [2, 1]);
-assert.deepEqual(countAwards(seasons, "active"), { topScorer: 1, topAssister: 1, bestGoalkeeper: 1 });
+assert.deepEqual(countAwards(seasons, "active"), { topScorer: 1, topAssister: 1, bestGoalkeeper: 0 });
 assert.equal(seasons[1].awards[0].roundId, "old");

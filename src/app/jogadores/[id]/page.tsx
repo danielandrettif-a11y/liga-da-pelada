@@ -11,7 +11,7 @@ import { TeamCrest } from "@/components/TeamCrest";
 import { FantasyPlayerCard } from "@/components/fantasy/FantasyPlayerCard";
 import { getFantasyPlayerSummary } from "@/lib/actions/fantasy";
 import { getPlayerEquippedCosmetics } from "@/lib/actions/cosmetics";
-import { cosmeticVisual } from "@/lib/fantasy/cosmetics";
+import { cosmeticImage, cosmeticNameplateClass, cosmeticVisual } from "@/lib/fantasy/cosmetics";
 
 export const revalidate = 0;
 
@@ -68,7 +68,7 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3"><Link href="/jogadores" className="flex h-10 w-10 items-center justify-center rounded-full bg-surface"><ArrowLeft className="h-5 w-5 text-muted" /></Link><h1 className="text-sm font-bold uppercase tracking-wider text-foreground">Perfil</h1></div>
-      <div className={`glass-card relative overflow-hidden flex flex-col items-center p-6 text-center ${cardGradient}`}>
+      <div className={`glass-card relative overflow-hidden flex flex-col items-center p-6 text-center ${cardGradient}`} style={cosmeticImage(cosmetics?.bannerAssetKey) ? { backgroundImage: `linear-gradient(rgba(3, 14, 8, .74), rgba(3, 14, 8, .92)), url(${cosmeticImage(cosmetics?.bannerAssetKey)})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
         {cosmetics?.bannerAssetKey && (
           <div className="pointer-events-none absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent via-transparent to-transparent" />
         )}
@@ -83,7 +83,7 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
         </div>
         <h2 className="text-2xl font-bold text-foreground">{player.name}</h2>
         {cosmetics?.titleName ? (
-          <p className="mt-1 inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/15 px-3 py-0.5 text-xs font-black text-accent uppercase tracking-wide shadow-sm">
+          <p className={`mt-1 inline-flex items-center gap-1 rounded-full border px-3 py-0.5 text-xs font-black uppercase tracking-wide shadow-sm ${cosmeticNameplateClass(cosmetics.nameplateKey)}`}>
             ✨ {cosmetics.titleName}
           </p>
         ) : player.nickname ? (

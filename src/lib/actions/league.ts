@@ -123,6 +123,7 @@ export async function updateLeagueConfig(
     revalidatePath("/admin/prelistas");
     revalidatePath("/convocacao");
     revalidatePath("/mais");
+    revalidatePath("/cartola");
     return { success: true };
   } catch (err: any) {
     console.error("Erro ao atualizar liga:", err);

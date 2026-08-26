@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentAccount } from "@/lib/auth";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
-import { DEFAULT_FANTASY_SETTINGS, type FantasySettings } from "@/lib/fantasy/config";
+import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget, type FantasySettings } from "@/lib/fantasy/config";
 import {
   calculateCostBenefit,
   calculateFantasyForm,
@@ -954,11 +954,11 @@ export async function getFantasyDashboard() {
   };
 
   const playersPerTeam = league.players_per_team || 5;
-  const dynamicInitialBudget = playersPerTeam * 11.00;
+  const dynamicInitialBudget = getFantasyInitialBudget(playersPerTeam);
   const storedBudget = Number(fantasyAccount?.current_budget ?? dynamicInitialBudget);
   const adjustedBudget = isTest
     ? dynamicInitialBudget
-    : storedBudget + (playersPerTeam - 5) * 11.00;
+    : Math.max(storedBudget, dynamicInitialBudget);
 
   return {
     authenticated: true as const,
@@ -1040,11 +1040,17 @@ export async function saveFantasyLineup(input: {
     if (!slotAssignmentsAreValid) {
       return { success: false, error: "As posições da escalação são inválidas. Ajuste o time e tente novamente." };
     }
+    const dbSlots = input.slotAssignments.map((slot) => ({
+      player_id: slot.playerId,
+      slot_index: slot.slotIndex,
+      slot_role: slot.slotRole,
+    }));
     if (!input.roundId) {
       const { error } = await account.client.rpc("save_fantasy_portfolio", {
         p_fantasy_season_id: input.fantasySeasonId,
         p_player_ids: input.playerIds,
         p_captain_player_id: input.captainId,
+        p_lineup_slots: dbSlots,
       });
       if (error) return { success: false, error: error.message };
       revalidatePath("/cartola");
@@ -1057,12 +1063,6 @@ export async function saveFantasyLineup(input: {
           .eq("round_id", input.roundId)
           .maybeSingle()
       : { data: null };
-    const dbSlots = input.slotAssignments.map((slot) => ({
-      player_id: slot.playerId,
-      slot_index: slot.slotIndex,
-      slot_role: slot.slotRole,
-    }));
-
     if (testSession && input.roundId) {
       const { error } = await account.client.rpc("save_fantasy_test_lineup", {
         p_round_id: input.roundId,

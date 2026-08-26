@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_FANTASY_SETTINGS } from "./config";
+import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget } from "./config";
 import {
   calculateCostBenefit,
   calculateFantasyForm,
@@ -56,6 +56,13 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, goalkeeperGames: 2, goalsConceded: 2 }, DEFAULT_FANTASY_SETTINGS)).toBe(4);
       expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, teamGoalsConceded: 2 }, DEFAULT_FANTASY_SETTINGS)).toBe(0);
       expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 2, goalkeeperGames: 1 }, DEFAULT_FANTASY_SETTINGS)).toBe(-1);
+    });
+
+    it("mantém o patrimônio proporcional nas modalidades de 5 e 6 atletas", () => {
+      expect(getFantasyInitialBudget(5)).toBe(55);
+      expect(getFantasyInitialBudget(6)).toBe(66);
+      expect(validateFantasyDraft({ playerIds: ["a", "b", "c", "d", "e", "f"], captainPlayerId: "a", prices, budget: 66, maxPlayers: 6 })).toMatchObject({ valid: true, complete: true, cost: 60 });
+      expect(validateFantasyDraft({ playerIds: ["a", "b", "c", "d", "e", "f"], captainPlayerId: "a", prices, budget: 59, maxPlayers: 6 }).valid).toBe(false);
     });
 
     it("mantém o gol básico igual para todas as posições e desconta gol contra", () => {

@@ -4,9 +4,7 @@ import { ArrowLeft, CalendarDays, Plus } from "@/components/icons";
 import { getRound } from "@/lib/actions/rounds";
 import { formatDateShort } from "@/lib/utils";
 import { FinishRoundButton } from "@/components/FinishRoundButton";
-import { BestGoalkeeperPicker } from "@/components/BestGoalkeeperPicker";
 import { getCurrentAccount } from "@/lib/auth";
-import { getGoalkeeperScoringPoints } from "@/lib/actions/scoring";
 import { TeamMiniPitch } from "@/components/TeamMiniPitch";
 import { RoundAvailabilityManager } from "@/components/RoundAvailabilityManager";
 import { TeamCrest } from "@/components/TeamCrest";
@@ -32,12 +30,9 @@ export default async function RodadaDetalhePage({
   const allSelectablePlayersPromise = accountPromise.then((acc) => acc.isAdmin ? getPlayers(true) : []);
   const paymentRecipientsPromise = accountPromise.then((acc) => acc.isAdmin ? getPaymentRecipients() : []);
 
-  const [round, account, goalkeeperPoints, roundStatistics, allSelectablePlayers, paymentRecipients] = await Promise.all([
+  const [round, account, roundStatistics, allSelectablePlayers, paymentRecipients] = await Promise.all([
     roundPromise,
     accountPromise,
-    roundPromise.then((currentRound) => currentRound?.status === "finished"
-      ? getGoalkeeperScoringPoints(currentRound.league_id)
-      : 0),
     roundPromise.then((currentRound) => currentRound?.status === "finished"
       ? getRoundStatistics(currentRound.id)
       : null),
