@@ -6,7 +6,7 @@ import { createMatch } from "@/lib/actions/matches";
 import { Swords, ArrowLeft, ChevronRight, ChevronDown, AlertTriangle, Check, ArrowLeftRight, Crown, Users } from "@/components/icons";
 import Link from "next/link";
 import { TeamCrest } from "./TeamCrest";
-import { markRoundTeamArrived, setRoundTeamCaptain, shuffleRoundTeams, swapRoundTeamPlayers } from "@/lib/actions/rounds";
+import { markRoundTeamArrived, setRoundTeamCaptain, swapRoundTeamPlayers } from "@/lib/actions/rounds";
 
 export function MatchCreator({ round }: { round: any }) {
   const router = useRouter();
@@ -19,7 +19,6 @@ export function MatchCreator({ round }: { round: any }) {
   const [swapPlayerBId, setSwapPlayerBId] = useState("");
   const [swapPanelOpen, setSwapPanelOpen] = useState(false);
   const [swapFeedback, setSwapFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const [shuffleFeedback, setShuffleFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [managementLoading, setManagementLoading] = useState(false);
   const [captainByTeam, setCaptainByTeam] = useState<Record<string, string>>(() => Object.fromEntries(
     (round?.teams || []).map((team: any) => [team.id, team.captain_player_id || ""]),
@@ -230,24 +229,6 @@ export function MatchCreator({ round }: { round: any }) {
     setManagementLoading(false);
   }
 
-  async function handleShuffleTeams() {
-    if (window.prompt("Digite MISTURAR para sortear todos os times para os próximos jogos. Partidas já encerradas não serão alteradas.") !== "MISTURAR") return;
-    setManagementLoading(true);
-    setError("");
-    setShuffleFeedback(null);
-    const result = await shuffleRoundTeams(round.id);
-    if (!result.success) {
-      setShuffleFeedback({ type: "error", message: result.error || "Não foi possível misturar os times." });
-    } else {
-      setTeamAId("");
-      setTeamBId("");
-      setGoalkeeperByTeam({});
-      setShuffleFeedback({ type: "success", message: "Times misturados. Os próximos jogos já usam a nova formação e uma nova ordem de goleiro." });
-      router.refresh();
-    }
-    setManagementLoading(false);
-  }
-
   function selectSwapPlayer(playerId: string, teamId: string) {
     setSwapFeedback(null);
     if (swapPlayerAId === playerId) {
@@ -298,21 +279,6 @@ export function MatchCreator({ round }: { round: any }) {
           </p>
         </div>
       </div>
-
-      <section className="overflow-hidden rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/10 via-surface to-surface shadow-[0_12px_30px_rgba(0,0,0,.16)]">
-        <div className="flex items-start gap-3 p-4">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-background"><ArrowLeftRight className="h-5 w-5" /></span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-black uppercase tracking-[.16em] text-accent">Intervalo da rodada</p>
-            <h2 className="mt-1 text-sm font-black text-foreground">Misturar todos os times</h2>
-            <p className="mt-1 text-[10px] leading-relaxed text-muted">Sorteia uma nova divisão equilibrada para os próximos jogos. Resultados, vitórias e pontos das partidas encerradas ficam preservados.</p>
-            <button type="button" disabled={managementLoading} onClick={handleShuffleTeams} className="mt-3 w-full rounded-xl bg-accent px-4 py-3 text-xs font-black text-background transition-transform active:scale-[.98] disabled:opacity-40">
-              {managementLoading ? "Misturando..." : "Sortear nova formação"}
-            </button>
-            {shuffleFeedback && <p role="status" className={`mt-3 rounded-xl p-2.5 text-center text-[10px] font-bold ${shuffleFeedback.type === "success" ? "bg-success/10 text-success" : "bg-danger/10 text-danger"}`}>{shuffleFeedback.message}</p>}
-          </div>
-        </div>
-      </section>
 
       <section className="glass-card overflow-hidden">
         <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3">

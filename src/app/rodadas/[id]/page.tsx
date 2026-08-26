@@ -15,7 +15,7 @@ import { RoundHistoryTabs } from "@/components/RoundHistoryTabs";
 import { RoundAdminPlayerTools } from "@/components/RoundAdminPlayerTools";
 import { getPlayers } from "@/lib/actions/players";
 import { RoundInstagramStoryGenerator } from "@/components/RoundInstagramStoryGenerator";
-import { getPaymentRecipients } from "@/lib/actions/payments";
+import { RoundTeamShuffleCard } from "@/components/RoundTeamShuffleCard";
 
 export const revalidate = 0;
 
@@ -89,8 +89,8 @@ export default async function RodadaDetalhePage({
       )}
 
       {/* Teams Grid */}
-      <section>
-        <h2 className="text-xs font-bold text-muted uppercase tracking-wider mb-3 px-1">
+      <section className="space-y-4">
+        <h2 className="text-xs font-bold text-muted uppercase tracking-wider px-1">
           Times Formados
         </h2>
         <div className="-mx-2 grid grid-cols-3 gap-1.5">
@@ -103,6 +103,11 @@ export default async function RodadaDetalhePage({
             </div>
           )}
         </div>
+
+        <RoundTeamShuffleCard
+          roundId={round.id}
+          canManage={account.isAdmin && round.status !== "finished" && round.teams.length >= 2}
+        />
       </section>
 
       <RoundAvailabilityManager
