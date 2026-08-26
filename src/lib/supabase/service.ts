@@ -9,13 +9,12 @@ export function createServiceClient() {
   // `SUPABASE_URL` is the server-side name shown by the current Supabase
   // dashboard. Keep the public variant for existing deployments.
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  // Supabase now calls the replacement for service_role `SUPABASE_SECRET_KEY`.
-  // Accept both names so Coolify can use the value shown in its dashboard.
-  // Prefer the current `sb_secret_...` key. A legacy environment can still
-  // contain a publishable value under SERVICE_ROLE_KEY; using it first would
-  // make the client subject to RLS and break background notifications.
-  const serviceRoleKey = process.env.SUPABASE_SECRET_KEY
-    || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Aceitamos a chave nova (`sb_secret_...`) e a chave legacy (`service_role`).
+  // Quando ambas existirem, a variável explicitamente destinada ao webhook
+  // precisa vencer: assim uma chave antiga em SUPABASE_SECRET_KEY não rebaixa
+  // o job para as políticas RLS.
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    || process.env.SUPABASE_SECRET_KEY;
   if (!url || !serviceRoleKey) return null;
 
   return createClient(url, serviceRoleKey, {
