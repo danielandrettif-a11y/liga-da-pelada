@@ -301,6 +301,27 @@ export async function swapRoundTeamPlayers(roundId: string, playerAId: string, p
   }
 }
 
+/**
+ * Refaz a distribuição de todos os atletas entre os times da rodada.
+ * Partidas já encerradas preservam a escalação em match_players; somente os
+ * próximos jogos usarão a nova composição.
+ */
+export async function shuffleRoundTeams(roundId: string) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem misturar os times." };
+    if (!roundId) return { success: false, error: "Rodada inválida." };
+
+    const { error } = await client.rpc("shuffle_round_teams", { p_round_id: roundId });
+    if (error) throw new Error(error.message);
+
+    refreshRoundManagement(roundId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Não foi possível misturar os times." };
+  }
+}
+
 export async function setRoundTeamCaptain(roundId: string, teamId: string, playerId: string | null) {
   try {
     const client = await getAdminClient();
