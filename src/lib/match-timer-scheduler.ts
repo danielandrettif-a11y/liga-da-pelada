@@ -82,6 +82,39 @@ async function scheduleTimerAlert(
   }
 }
 
+export async function schedulePushTestAlert(userId: string) {
+  const { token, webhookSecret, enabled } = getSchedulerConfiguration();
+  if (!enabled || !token || !webhookSecret) {
+    throw new Error("O agendador da tela bloqueada não está configurado no servidor.");
+  }
+
+  const destination = `${SITE_URL}/api/internal/push-test-alert`;
+  const response = await fetch(`${getQStashPublishUrl()}/${encodeURIComponent(destination)}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "Upstash-Delay": "10s",
+      "Upstash-Retries": "3",
+      "Upstash-Retry-Delay": "1000",
+      "Upstash-Forward-Authorization": `Bearer ${webhookSecret}`,
+      "Upstash-Label": `push-test-${userId}`,
+      "Upstash-Redact-Fields": "body,header[Authorization]",
+    },
+    body: JSON.stringify({ userId }),
+  });
+
+  if (!response.ok) {
+    const responseDetails = (await response.text()).trim().slice(0, 300);
+    throw new Error(
+      `QStash recusou o teste: HTTP ${response.status}`
+      + (responseDetails ? ` — ${responseDetails}` : "."),
+    );
+  }
+
+  return { scheduled: true };
+}
+
 /**
  * Agenda os dois alertas em um serviço que continua rodando quando o PWA está
  * fechado ou com a tela bloqueada. Os jobs podem se repetir após pausar ou

@@ -1,7 +1,8 @@
 "use server";
 
 import { getCurrentAccount } from "@/lib/auth";
-import { getWebPushConfiguration, sendPushTestNotification } from "@/lib/push-notifications";
+import { schedulePushTestAlert } from "@/lib/match-timer-scheduler";
+import { getWebPushConfiguration } from "@/lib/push-notifications";
 
 export type SerializedPushSubscription = {
   endpoint: string;
@@ -103,16 +104,8 @@ export async function sendPushTest() {
   if (!account.user) return { success: false, error: "Entre na sua conta para testar as notificações." };
 
   try {
-    const delivery = await sendPushTestNotification(account.client, account.user.id);
-    if (delivery.disabled) {
-      return { success: false, error: getWebPushConfiguration().error || "As chaves VAPID do servidor ainda não estão completas." };
-    }
-    if (delivery.sent === 0) {
-      return { success: false, error: delivery.failed > 0
-        ? `O provedor recusou a notificação${delivery.failureReasons?.[0] ? `: ${delivery.failureReasons[0]}` : "."}`
-        : "Este aparelho ainda não possui uma assinatura de notificação ativa." };
-    }
-    return { success: true };
+    await schedulePushTestAlert(account.user.id);
+    return { success: true, scheduled: true };
   } catch (error) {
     console.error("Erro ao enviar teste de push:", error);
     // O teste é também o diagnóstico inicial de produção. Antes ele ocultava

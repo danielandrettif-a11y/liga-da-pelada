@@ -183,7 +183,7 @@ export function PushNotificationSettings() {
     setMessage("");
     const result = await sendPushTest();
     setMessage(result.success
-      ? "Teste enviado. Bloqueie a tela por um instante: a notificação deve aparecer nela."
+      ? "Teste agendado para 10 segundos. Bloqueie a tela agora."
       : result.error || "Não foi possível enviar o teste.");
     setIsBusy(false);
   }

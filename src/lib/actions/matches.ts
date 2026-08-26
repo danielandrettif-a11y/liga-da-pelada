@@ -772,7 +772,9 @@ export async function dispatchMatchTimerThreshold(
 ) {
   try {
     const match = await getMatchState(client, matchId);
-    if (match.status !== "live" || !match.timer_started_at) return { success: true, skipped: true };
+    if (match.status !== "live" || !match.timer_started_at) {
+      return { success: true, skipped: true, reason: "inactive" as const };
+    }
 
     const elapsed = (match.timer_accumulated_seconds || 0)
       + Math.max(0, Math.floor((Date.now() - new Date(match.timer_started_at).getTime()) / 1000));
@@ -782,7 +784,14 @@ export async function dispatchMatchTimerThreshold(
     const shouldSend = threshold === "thirty_seconds"
       ? secondsLeft <= 30
       : secondsLeft === 0;
-    if (!shouldSend) return { success: true, skipped: true };
+    if (!shouldSend) {
+      return {
+        success: true,
+        skipped: true,
+        reason: "too_early" as const,
+        secondsLeft,
+      };
+    }
 
     const now = new Date().toISOString();
     const updates = threshold === "thirty_seconds"
