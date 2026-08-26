@@ -251,22 +251,6 @@ export function PlayerForm({
         />
       </div>
 
-      <div className="space-y-1.5">
-        <label htmlFor="nickname" className="text-xs font-bold text-muted uppercase tracking-wider">
-          Apelido <span className="text-[10px] text-muted/50 normal-case">(Opcional)</span>
-        </label>
-        <input
-          id="nickname"
-          name="nickname"
-          type="text"
-          defaultValue={player?.nickname || ""}
-          placeholder="Ex: Pontinha insinuante"
-          maxLength={60}
-          className="w-full bg-surface-hover border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-accent transition-colors"
-        />
-        <p className="text-[10px] text-muted">Aparece como subnome somente no perfil e na carta do jogador.</p>
-      </div>
-
       {mode === "admin" && (
         <div className="space-y-1.5">
           <label htmlFor="profile_bio" className="text-xs font-bold uppercase tracking-wider text-muted">

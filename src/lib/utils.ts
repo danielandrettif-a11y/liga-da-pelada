@@ -67,7 +67,7 @@ export function formatDuration(totalSeconds: number): string {
 
 export function formatTimeRange(startedAt?: string | null, finishedAt?: string | null): string | null {
   if (!startedAt) return null;
-  const format = (value: string) => new Date(value).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const format = (value: string) => new Date(value).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
   return format(startedAt) + (finishedAt ? " – " + format(finishedAt) : " – em andamento");
 }
 

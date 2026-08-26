@@ -1,0 +1,41 @@
+"use client";
+
+import Image from "next/image";
+import { useMemo, useState } from "react";
+import { CheckCircle2, Sparkles } from "@/components/icons";
+import type { CosmeticPassReward } from "@/lib/actions/cosmetics";
+import { COSMETIC_SLOT_LABELS } from "@/lib/fantasy/cosmetics";
+
+type Zone = "stands" | "bench" | "field";
+type Stage = { house: number; name: string; shortLabel: string; zone: Zone; x: number; y: number };
+const rawStages: Array<[number, string, string, Zone, number, number]> = [
+  [1,"Arquibancada · Entrada","1","stands",13.5,11.2],[2,"Arquibancada","2","stands",28.1,11.2],[3,"Arquibancada","3","stands",42.7,11.2],[4,"Arquibancada","4","stands",57.3,11.2],[5,"Arquibancada","5","stands",71.9,11.2],[6,"Arquibancada","6","stands",86.5,11.2],[7,"Arquibancada","7","stands",13.5,21],[8,"Arquibancada","8","stands",28.1,21],[9,"Arquibancada","9","stands",42.7,21],[10,"Arquibancada","10","stands",57.3,21],[11,"Arquibancada","11","stands",71.9,21],[12,"Arquibancada","12","stands",86.5,21],
+  [13,"Banco de Reservas","13","bench",8.8,39.5],[14,"Banco de Reservas","14","bench",19.5,39.5],[15,"Banco de Reservas","15","bench",8.8,47.8],[16,"Banco de Reservas","16","bench",19.5,47.8],[17,"Banco de Reservas","17","bench",8.8,56.1],[18,"Banco de Reservas","18","bench",19.5,56.1],[19,"Banco de Reservas","19","bench",8.8,64.4],[20,"Banco de Reservas","20","bench",19.5,64.4],[21,"Banco de Reservas","21","bench",8.8,72.7],[22,"Banco de Reservas","22","bench",19.5,72.7],[23,"Banco de Reservas","23","bench",8.8,81],[24,"Banco de Reservas","24","bench",19.5,81],
+  [25,"Goleiro Titular","GOL","field",63.5,33.8],[26,"Lateral Direito","LD","field",36.8,43.8],[27,"Zagueiro Direito","ZAG","field",54.5,43.8],[28,"Zagueiro Esquerdo","ZAG","field",72.3,43.8],[29,"Lateral Esquerdo","LE","field",90,43.8],[30,"Volante de Contenção","VOL","field",58,56.8],[31,"Volante de Contenção","VOL","field",68,56.8],[32,"Meia Central","MC","field",43,67.2],[33,"Meia Central","MC","field",56,67.2],[34,"Meia Ofensivo","MEI","field",77,67.2],[35,"Ponta Direita","PD","field",34,79.8],[36,"Ponta Direita","PD","field",46,79.8],[37,"Centroavante","CA","field",63.5,79.8],[38,"Ponta Esquerda","PE","field",80,79.8],[39,"Ponta Esquerda","PE","field",91,79.8],[40,"Lenda do Futebol BQ","LENDA","field",63.5,91.2],
+];
+const STAGES: Stage[] = rawStages.map(([house, name, shortLabel, zone, x, y]) => ({ house, name, shortLabel, zone, x, y }));
+
+function rewardIcon(reward: CosmeticPassReward, secret: boolean) {
+  if (secret) return "🔒";
+  if (reward.rewardType === "card_pack") return "🎴";
+  return ({ banner: "🖼️", frame: "⭕", title: "🏷️", aura: "✨", nameplate: "📛", background: "🌆" } as const)[reward.options[0]?.slot || "title"];
+}
+
+export function SeasonPassBoard({ progress, playerName, playerAvatarUrl, rewards, onOpenReward }: { progress: number; playerName: string | null; playerAvatarUrl: string | null; rewards: CosmeticPassReward[]; onOpenReward: (reward: CosmeticPassReward) => void }) {
+  const rewardsByHouse = useMemo(() => new Map(rewards.map((reward) => [reward.house, reward])), [rewards]);
+  const currentHouse = Math.max(1, Math.min(40, progress || 1));
+  const [selectedHouse, setSelectedHouse] = useState(currentHouse);
+  const stage = STAGES.find((item) => item.house === selectedHouse) || STAGES[0];
+  const selectedReward = rewardsByHouse.get(selectedHouse);
+  const secret = selectedReward?.house === 40 && progress < 40;
+  return <section className="overflow-hidden rounded-[2rem] border border-accent/40 bg-[#051109] p-1.5 shadow-[0_0_50px_rgba(0,0,0,.8)] sm:p-3">
+    <header className="flex items-center justify-between gap-3 px-2.5 pb-2.5 pt-1.5"><div><p className="font-athletic text-[10px] font-black uppercase italic tracking-[.2em] text-accent">Tabuleiro oficial da temporada</p><h2 className="font-athletic text-lg font-black uppercase italic leading-tight text-white">{progress ? `${playerName || "Jogador"} · casa ${currentHouse}` : "A jornada vai começar"}</h2></div><span className="rounded-2xl border border-accent/40 bg-accent/15 px-3 py-1.5 text-center font-athletic text-xl font-black text-accent">{progress}<small className="ml-1 text-[8px] uppercase">/40</small></span></header>
+    <div className="relative overflow-hidden rounded-[1.65rem] border-2 border-accent/30 bg-black"><Image src="/images/season-pass-board.jpg" alt="Tabuleiro oficial do Passe de Temporada" width={683} height={1024} sizes="(max-width: 32rem) calc(100vw - 1rem), 34rem" className="pointer-events-none block h-auto w-full select-none" loading="eager" /><div className="absolute inset-0">{STAGES.map((item) => { const reward = rewardsByHouse.get(item.house); const isCurrent = item.house === currentHouse; const completed = progress >= item.house; const isSelected = item.house === selectedHouse; const isSecret = reward?.house === 40 && progress < 40; return <button key={item.house} type="button" onClick={() => { setSelectedHouse(item.house); if (reward) onOpenReward(reward); }} className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full active:scale-90 ${item.zone === "stands" ? "w-[9%] aspect-square" : item.zone === "bench" ? "w-[8.5%] aspect-square" : item.house === 40 ? "w-[15%] aspect-square" : "w-[11.5%] aspect-square"}`} style={{ left: `${item.x}%`, top: `${item.y}%` }} aria-label={`Casa ${item.house}${reward ? ", recompensa" : ""}`}>
+      {isCurrent && <span className="absolute inset-0 z-30 flex items-center justify-center overflow-hidden rounded-full border-2 border-accent bg-background p-0.5 text-[8px] font-black text-background shadow-[0_0_20px_rgba(204,255,0,.9)]">{playerAvatarUrl ? <img src={playerAvatarUrl} alt={playerName || "Jogador"} className="h-full w-full rounded-full object-cover" /> : "VOCÊ"}</span>}
+      {completed && !isCurrent && <span className="absolute inset-[13%] z-20 flex items-center justify-center rounded-full border border-emerald-400 bg-emerald-950/85 text-emerald-400"><CheckCircle2 className="h-[70%] w-[70%]" /></span>}
+      {reward && <span className={`absolute -right-2.5 -top-2.5 z-40 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] shadow-lg ${completed ? "border-white bg-emerald-500" : "border-yellow-400 bg-black/90 text-yellow-300 animate-bounce motion-reduce:animate-none"}`}>{rewardIcon(reward, Boolean(isSecret))}</span>}
+      {isSelected && !isCurrent && <span className="pointer-events-none absolute inset-0 z-10 rounded-full bg-white/10 ring-4 ring-white/60" />}
+    </button>; })}</div></div>
+    <div className="mt-2.5 rounded-[1.4rem] border border-accent/30 bg-gradient-to-r from-[#0c2416] via-[#07170e] to-surface p-3.5"><div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-wider text-muted">{stage.zone === "stands" ? "Arquibancada" : stage.zone === "bench" ? "Banco de reservas" : "Time titular"} · casa {stage.house}</p><h3 className="font-athletic text-base font-black uppercase italic text-white">{stage.name}</h3></div><span className={`rounded-full px-2 py-1 text-[8px] font-black uppercase ${progress >= stage.house ? "bg-emerald-500/20 text-emerald-300" : "bg-white/10 text-muted"}`}>{progress >= stage.house ? "Concluída" : "Bloqueada"}</span></div>{selectedReward ? <button type="button" onClick={() => onOpenReward(selectedReward)} className="mt-3 flex w-full items-center justify-between rounded-2xl border border-yellow-400/35 bg-yellow-950/25 p-3 text-left"><span><strong className="block text-xs text-yellow-300">{secret ? "Recompensa secreta" : selectedReward.rewardType === "card_pack" ? `Pacote ${selectedReward.cardTier === "gold" ? "Ouro" : "Bronze"}` : `Escolha cosmética · ${COSMETIC_SLOT_LABELS[selectedReward.options[0]?.slot || "title"]}`}</strong><span className="mt-0.5 block text-[10px] text-muted">{secret ? "Alcance a casa 40 para descobrir." : progress >= selectedReward.house ? "Toque para ver e resgatar." : "Veja os itens bloqueados e como avançar."}</span></span><Sparkles className="h-5 w-5 text-yellow-300" /></button> : <p className="mt-3 text-[11px] text-muted">{progress >= stage.house ? "Etapa concluída. Continue para o próximo marco." : "Jogue, escale no Cartola e some gols e assistências para avançar."}</p>}</div>
+  </section>;
+}

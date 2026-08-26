@@ -87,8 +87,6 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
           <p className={`mt-1 inline-flex items-center gap-1 rounded-full border px-3 py-0.5 text-xs font-black uppercase tracking-wide shadow-sm ${cosmeticNameplateClass(cosmetics.nameplateKey)}`}>
             ✨ {cosmetics.titleName}
           </p>
-        ) : player.nickname ? (
-          <p className="mt-1 text-sm font-semibold italic text-muted">“{player.nickname}”</p>
         ) : null}
         <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2"><span className="rounded-full border border-border px-2.5 py-1 text-[9px] font-black uppercase text-muted">{categoryLabel}</span>{isPlayable && <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />}</div>
         {player.profile_bio && <p className="mt-5 max-w-xl text-sm leading-6 text-muted">{player.profile_bio}</p>}

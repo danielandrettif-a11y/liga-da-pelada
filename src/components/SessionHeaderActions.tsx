@@ -4,7 +4,7 @@ import { getMyInboxNotifications } from "@/lib/actions/inbox";
 import { getMyEquippedCosmetics } from "@/lib/actions/cosmetics";
 import { InboxBell } from "./InboxBell";
 import { ShareAppButton } from "./ShareAppButton";
-import { PlayerAvatar } from "./PlayerAvatar";
+import { ProfileQuickMenu } from "./ProfileQuickMenu";
 import { UserRound } from "@/components/icons";
 
 export async function SessionHeaderActions() {
@@ -30,21 +30,7 @@ export async function SessionHeaderActions() {
       <InboxBell notifications={inbox} />
       <ShareAppButton className="shadow-sm" />
       {account.user ? (
-        <Link
-          href="/meu-perfil"
-          className="relative block rounded-full transition-transform active:scale-95"
-          aria-label="Abrir meu perfil"
-          title={name || "Meu Perfil"}
-        >
-          <PlayerAvatar
-            name={name || "Perfil"}
-            avatarUrl={avatarUrl}
-            clickable={false}
-            frameKey={cosmetics?.frameKey}
-            auraKey={cosmetics?.auraKey}
-            className="h-10 w-10 rounded-full border border-accent/30 bg-surface/90 text-xs font-black text-accent"
-          />
-        </Link>
+        account.profile?.player_id ? <ProfileQuickMenu playerId={account.profile.player_id} name={name || "Perfil"} avatarUrl={avatarUrl} frameKey={cosmetics?.frameKey} auraKey={cosmetics?.auraKey} /> : <Link href="/meu-perfil" className="relative block rounded-full text-xs font-black text-accent">Perfil</Link>
       ) : (
         <Link
           href="/login"

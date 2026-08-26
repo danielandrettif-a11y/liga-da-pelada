@@ -72,6 +72,9 @@ function preloadInventoryModal() {
   void import("./cards/FantasyInventoryModal").then((mod) => mod.preloadFantasyInventory());
 }
 
+const MOBILE_DRAG_HOLD_MS = 320;
+const MOBILE_DRAG_CANCEL_DISTANCE_PX = 12;
+
 type Props = {
   round: {
     id: string;
@@ -104,6 +107,7 @@ type Props = {
   inventoryCount?: number;
   liveProjection?: FantasyLiveProjection;
   playersPerTeam?: number;
+  initialPackId?: string;
 };
 
 const positionLabel: Record<string, string> = {
@@ -158,6 +162,7 @@ export function FantasyExperience({
   inventoryCount = 0,
   liveProjection,
   playersPerTeam = 5,
+  initialPackId,
 }: Props) {
   const router = useRouter();
   const initialIds = (lineup?.fantasy_lineup_players || []).map((item: any) => item.player_id as string);
@@ -379,6 +384,24 @@ export function FantasyExperience({
   const [draggedSlot, setDraggedSlot] = useState<number | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
   const [touchDragPosition, setTouchDragPosition] = useState<{ x: number; y: number } | null>(null);
+  const touchHoldRef = useRef<{
+    slot: number;
+    startX: number;
+    startY: number;
+    timerId: number;
+  } | null>(null);
+  const activeTouchDragRef = useRef<number | null>(null);
+  const suppressPlayerClickUntilRef = useRef(0);
+
+  // React registra touchmove como passivo em alguns navegadores. Depois que a
+  // pressão longa arma o arrasto, este listener nativo impede a página de rolar
+  // até o atleta ser solto. Antes disso, a rolagem continua totalmente livre.
+  useEffect(() => {
+    if (draggedSlot === null || activeTouchDragRef.current === null) return;
+    const preventPageScroll = (event: TouchEvent) => event.preventDefault();
+    document.addEventListener("touchmove", preventPageScroll, { passive: false });
+    return () => document.removeEventListener("touchmove", preventPageScroll);
+  }, [draggedSlot]);
 
   // Filtros e ordenação no mercado
   const filtered = useMemo(() => {
@@ -481,6 +504,7 @@ export function FantasyExperience({
   useEffect(() => {
     return () => {
       if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+      if (touchHoldRef.current) window.clearTimeout(touchHoldRef.current.timerId);
     };
   }, []);
   const selectedChallengePlayer = market.find((player) => player.id === challengeId) || null;
@@ -684,6 +708,21 @@ export function FantasyExperience({
     });
   }
 
+  function clearPendingTouchDrag() {
+    if (touchHoldRef.current) {
+      window.clearTimeout(touchHoldRef.current.timerId);
+      touchHoldRef.current = null;
+    }
+  }
+
+  function finishTouchDrag() {
+    clearPendingTouchDrag();
+    activeTouchDragRef.current = null;
+    setDraggedSlot(null);
+    setDragOverSlot(null);
+    setTouchDragPosition(null);
+  }
+
   function renderSlot(
     slot: number,
     roleLabel: string,
@@ -739,15 +778,36 @@ export function FantasyExperience({
           if (target.closest("[data-no-drag]")) return;
           if (!open || !player) return;
           const touch = e.touches[0];
-          setDraggedSlot(slot);
-          setTouchDragPosition({ x: touch.clientX, y: touch.clientY });
-          if (typeof navigator !== "undefined" && navigator.vibrate) {
-            navigator.vibrate(20);
-          }
+          clearPendingTouchDrag();
+          touchHoldRef.current = {
+            slot,
+            startX: touch.clientX,
+            startY: touch.clientY,
+            timerId: window.setTimeout(() => {
+              const pending = touchHoldRef.current;
+              if (!pending || pending.slot !== slot) return;
+              touchHoldRef.current = null;
+              activeTouchDragRef.current = slot;
+              suppressPlayerClickUntilRef.current = Date.now() + 900;
+              setDraggedSlot(slot);
+              setDragOverSlot(slot);
+              setTouchDragPosition({ x: pending.startX, y: pending.startY });
+              if (typeof navigator !== "undefined" && navigator.vibrate) {
+                navigator.vibrate(25);
+              }
+            }, MOBILE_DRAG_HOLD_MS),
+          };
         }}
         onTouchMove={(e) => {
-          if (draggedSlot === null) return;
           const touch = e.touches[0];
+          const pending = touchHoldRef.current;
+          if (activeTouchDragRef.current === null) {
+            if (pending) {
+              const distance = Math.hypot(touch.clientX - pending.startX, touch.clientY - pending.startY);
+              if (distance > MOBILE_DRAG_CANCEL_DISTANCE_PX) clearPendingTouchDrag();
+            }
+            return;
+          }
           setTouchDragPosition({ x: touch.clientX, y: touch.clientY });
           const element = document.elementFromPoint(touch.clientX, touch.clientY);
           const slotEl = element?.closest("[data-slot-index]");
@@ -761,23 +821,25 @@ export function FantasyExperience({
             }
           }
         }}
-        onTouchEnd={() => {
-          if (draggedSlot !== null && dragOverSlot !== null && draggedSlot !== dragOverSlot) {
-            swapSlots(draggedSlot, dragOverSlot);
+        onTouchEnd={(e) => {
+          const sourceSlot = activeTouchDragRef.current;
+          clearPendingTouchDrag();
+          const touch = e.changedTouches[0];
+          const element = touch ? document.elementFromPoint(touch.clientX, touch.clientY) : null;
+          const slotEl = element?.closest("[data-slot-index]");
+          const targetSlotIndex = Number(slotEl?.getAttribute("data-slot-index"));
+          if (sourceSlot !== null && !isNaN(targetSlotIndex) && sourceSlot !== targetSlotIndex) {
+            swapSlots(sourceSlot, targetSlotIndex);
             if (typeof navigator !== "undefined" && navigator.vibrate) {
               navigator.vibrate([20, 30, 20]);
             }
           }
-          setDraggedSlot(null);
-          setDragOverSlot(null);
-          setTouchDragPosition(null);
+          finishTouchDrag();
         }}
         onTouchCancel={() => {
-          setDraggedSlot(null);
-          setDragOverSlot(null);
-          setTouchDragPosition(null);
+          finishTouchDrag();
         }}
-        style={{ touchAction: open && Boolean(player) ? "none" : "auto" }}
+        style={{ touchAction: open && Boolean(player) ? "pan-y" : "auto" }}
         className={`relative mx-auto flex w-full max-w-32 flex-col items-center transition-all duration-200 select-none ${
           open && Boolean(player) ? "cursor-grab active:cursor-grabbing" : ""
         } ${
@@ -799,21 +861,9 @@ export function FantasyExperience({
                 e.stopPropagation();
                 setCaptainId((prev) => (prev === player.id ? null : player.id));
               }}
-              onTouchStart={(e) => {
-                e.stopPropagation();
-              }}
-              onTouchEnd={(e) => {
-                e.stopPropagation();
-                if (open) {
-                  setCaptainId((prev) => (prev === player.id ? null : player.id));
-                  if (typeof navigator !== "undefined" && navigator.vibrate) {
-                    navigator.vibrate(15);
-                  }
-                }
-              }}
               className={`absolute -right-1 -top-1.5 z-30 flex h-7 w-7 items-center justify-center rounded-full border shadow-md transition-transform active:scale-90 touch-manipulation ${
                 captainId === player.id
-                  ? "border-accent bg-accent text-background scale-110 shadow-[0_0_12px_rgba(204,255,0,0.6)]"
+                  ? "border-amber-200 bg-gradient-to-br from-amber-300 to-amber-500 text-amber-950 scale-110 shadow-[0_0_14px_rgba(251,191,36,.8)]"
                   : "border-white/20 bg-background text-muted hover:text-white"
               }`}
               aria-label={captainId === player.id ? `Remover capitão de ${player.name}` : `Escolher ${player.name} como capitão`}
@@ -824,7 +874,13 @@ export function FantasyExperience({
 
             <button
               type="button"
-              onClick={() => setSelectedDrawerPlayer(player)}
+              onClick={(event) => {
+                if (Date.now() < suppressPlayerClickUntilRef.current) {
+                  event.preventDefault();
+                  return;
+                }
+                setSelectedDrawerPlayer(player);
+              }}
               className="flex flex-col items-center group"
             >
               <div className="relative">
@@ -834,7 +890,7 @@ export function FantasyExperience({
                   clickable={false}
                   className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-all group-active:scale-95 ${
                     captainId === player.id
-                      ? "border-accent ring-2 ring-accent/60 shadow-[0_0_15px_rgba(204,255,0,0.6)]"
+                      ? "border-amber-300 ring-2 ring-amber-300/70 shadow-[0_0_16px_rgba(251,191,36,.7)]"
                       : isCorrectPosition
                       ? "border-accent ring-2 ring-accent/60 shadow-[0_0_10px_rgba(204,255,0,0.4)]"
                       : "border-white/25 opacity-90"
@@ -914,6 +970,7 @@ export function FantasyExperience({
       {availablePacks && availablePacks.length > 0 && (
         <FantasyPackClaimBanner
           packs={availablePacks}
+          initialPackId={initialPackId}
           onPackClaimed={() => requestRefresh(0)}
         />
       )}
@@ -1252,7 +1309,7 @@ export function FantasyExperience({
                 </button>
                 {open && validSelectedCount > 1 && (
                   <p className="text-[9px] font-semibold text-emerald-200/70">
-                    🖐️ Arraste os atletas pelo campo
+                    🖐️ No celular, segure e arraste para mover
                   </p>
                 )}
               </div>

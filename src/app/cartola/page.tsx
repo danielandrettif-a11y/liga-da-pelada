@@ -3,7 +3,8 @@ import { ClipboardList, LogIn, Trophy } from "@/components/icons";
 import { FantasyExperience } from "@/components/fantasy/FantasyExperience";
 import { getFantasyDashboard } from "@/lib/actions/fantasy";
 
-export default async function CartolaPage() {
+export default async function CartolaPage({ searchParams }: PageProps<"/cartola">) {
+  const { pack } = await searchParams;
   const data = await getFantasyDashboard();
   if (!data.authenticated) return <Empty title="Entre para jogar o Cartola" description="Monte seu time, faça palpites e dispute com seus amigos." login />;
   if (!data.available) return <Empty title="Atualização do Cartola pendente" description="Execute as migrations do Cartola até a 039 para liberar a V1 desta temporada." />;
@@ -29,6 +30,7 @@ export default async function CartolaPage() {
       availablePacksCount={data.availablePacksCount}
       inventoryCount={data.inventoryCount}
       liveProjection={data.liveProjection}
+      initialPackId={typeof pack === "string" ? pack : undefined}
       />
     </div>
   );

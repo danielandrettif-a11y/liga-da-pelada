@@ -325,8 +325,6 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
                 <p className="mt-0.5 truncate text-[9px] font-black uppercase tracking-wider opacity-90 text-current">
                   ✨ {entry.cosmetics.titleName}
                 </p>
-              ) : entry.player.nickname ? (
-                <p className="mt-0.5 truncate text-[10px] font-bold italic opacity-75">“{entry.player.nickname}”</p>
               ) : null}
             </div>
 

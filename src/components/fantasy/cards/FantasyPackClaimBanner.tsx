@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Package, Sparkles } from "@/components/icons";
 import type { FantasyPackDTO } from "@/lib/actions/fantasy-cards";
@@ -13,10 +14,20 @@ const FantasyPackOpeningModal = dynamic(
 type Props = {
   packs: FantasyPackDTO[];
   onPackClaimed?: () => void;
+  initialPackId?: string;
 };
 
-export function FantasyPackClaimBanner({ packs, onPackClaimed }: Props) {
+export function FantasyPackClaimBanner({ packs, onPackClaimed, initialPackId }: Props) {
+  const router = useRouter();
   const [selectedPack, setSelectedPack] = useState<FantasyPackDTO | null>(null);
+  useEffect(() => {
+    if (!initialPackId || selectedPack) return;
+    const requested = packs.find((pack) => pack.id === initialPackId);
+    if (requested) {
+      setSelectedPack(requested);
+      router.replace("/cartola", { scroll: false });
+    }
+  }, [initialPackId, packs, router, selectedPack]);
 
   if (!packs || packs.length === 0) return null;
 

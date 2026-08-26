@@ -5,7 +5,7 @@ import { getCurrentAccount } from "@/lib/auth";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
 
-export type InboxNotification = { id: string; title: string; body: string; href: string; state: "active" | "resolved"; read_at: string | null; created_at: string; updated_at: string };
+export type InboxNotification = { id: string; title: string; body: string; href: string; notification_type?: string; state: "active" | "resolved"; read_at: string | null; created_at: string; updated_at: string };
 
 export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
   const account = await getCurrentAccount();
@@ -154,6 +154,21 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
       });
     }
 
+    // Recompensas do Passe: uma notificação por escolha pendente e por pacote entregue.
+    if (fantasySeason) {
+      const [{ data: pass }, { data: rewards }, { data: choices }, { data: passPacks }] = await Promise.all([
+        account.client.from("fantasy_season_passes").select("progress").eq("fantasy_season_id", fantasySeason.id).eq("user_id", account.user.id).maybeSingle(),
+        account.client.from("fantasy_season_pass_rewards").select("id, house, reward_type, card_tier").eq("fantasy_season_id", fantasySeason.id),
+        account.client.from("fantasy_user_cosmetic_reward_choices").select("reward_id").eq("user_id", account.user.id),
+        account.client.from("fantasy_round_packs").select("id, status, fantasy_season_pass_reward_id, card_tier").eq("user_id", account.user.id).eq("source", "season_pass").in("status", ["available", "opened"]),
+      ]);
+      const chosen = new Set((choices || []).map((choice: any) => choice.reward_id));
+      for (const reward of rewards || []) {
+        if (reward.reward_type === "cosmetic_choice" && Number(reward.house) <= Number(pass?.progress || 0) && !chosen.has(reward.id)) desired.push({ type: "fantasy_pass_cosmetic_reward", key: `pass:reward:${reward.id}`, title: "✨ Recompensa do Passe liberada", body: `A casa ${reward.house} abriu uma escolha cosmética para o seu perfil.`, href: `/jogadores?tab=passe&reward=${reward.id}` });
+      }
+      for (const pack of passPacks || []) desired.push({ type: "fantasy_pass_pack", key: `pass:pack:${pack.id}`, title: "🎴 Pacote do Passe disponível", body: `Seu pacote ${pack.card_tier === "gold" ? "Ouro" : "Bronze"} está pronto para abrir no Cartola.`, href: `/cartola?pack=${pack.id}` });
+    }
+
     const keys = new Set(desired.map((item) => item.key));
 
     // Buscar notificações existentes para nunca reabrir notificações já lidas/dispensadas pelo usuário
@@ -214,7 +229,7 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
 
     const { data } = await account.client
       .from("user_inbox_notifications")
-      .select("id, title, body, href, state, read_at, created_at, updated_at")
+      .select("id, title, body, href, notification_type, state, read_at, created_at, updated_at")
       .eq("user_id", account.user.id)
       .order("updated_at", { ascending: false })
       .limit(30);

@@ -8,7 +8,6 @@ export async function signup(formData: FormData) {
   const password = String(formData.get("password") || "");
   const passwordConfirmation = String(formData.get("password_confirmation") || "");
   const name = String(formData.get("name") || "").trim();
-  const nickname = String(formData.get("nickname") || "").trim();
   const playerProfile = String(formData.get("player_profile") || "midfield");
   const requestedNext = String(formData.get("next") || "");
   const returnTo = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "";
@@ -17,7 +16,7 @@ export async function signup(formData: FormData) {
   if (password.length < 8) return { success: false, error: "A senha precisa ter pelo menos 8 caracteres." };
   if (password !== passwordConfirmation) return { success: false, error: "As senhas não conferem." };
   if (!name) return { success: false, error: "Informe o seu nome." };
-  if (name.length > 120 || nickname.length > 60) return { success: false, error: "Nome ou apelido muito longo." };
+  if (name.length > 120) return { success: false, error: "Nome muito longo." };
   if (!["offensive", "midfield", "defensive"].includes(playerProfile)) {
     return { success: false, error: "Escolha um estilo de jogo válido." };
   }
@@ -30,7 +29,6 @@ export async function signup(formData: FormData) {
       emailRedirectTo: `${AUTH_CALLBACK_URL}${returnTo ? `?next=${encodeURIComponent(returnTo)}` : ""}`,
       data: {
         name,
-        nickname,
         player_profile: playerProfile,
       },
     },
