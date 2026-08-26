@@ -323,6 +323,7 @@ export type Match = {
   duration_seconds: number;
   timer_thirty_seconds_alerted_at?: string | null;
   timer_finished_alerted_at?: string | null;
+  timer_one_minute_alerted_at?: string | null;
   created_at: string;
 };
 

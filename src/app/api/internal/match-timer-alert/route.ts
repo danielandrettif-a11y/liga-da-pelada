@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   if (
     typeof body.matchId !== "string"
     || !/^[0-9a-f-]{36}$/i.test(body.matchId)
-    || (body.threshold !== "thirty_seconds" && body.threshold !== "finished")
+    || (body.threshold !== "one_minute" && body.threshold !== "thirty_seconds" && body.threshold !== "finished")
   ) {
     return Response.json({ error: "Alerta inválido." }, { status: 400 });
   }

@@ -50,7 +50,7 @@ type MatchTimerProps = {
   onToggle: () => void;
   onReset: () => void;
   onAddExtraTime: (seconds: number) => void;
-  onThreshold: (threshold: "thirty_seconds" | "finished") => Promise<boolean>;
+  onThreshold: (threshold: "one_minute" | "thirty_seconds" | "finished") => Promise<boolean>;
 };
 
 const MatchTimer = memo(function MatchTimer({
@@ -67,8 +67,8 @@ const MatchTimer = memo(function MatchTimer({
     Math.max(0, initialSeconds - getMatchTimerElapsedSeconds(timerState))
   );
   const isRunning = !!timerState.startedAt;
-  const notifiedThresholds = useRef({ thirtySeconds: false, finished: false });
-  const notifyingThresholds = useRef({ thirtySeconds: false, finished: false });
+  const notifiedThresholds = useRef({ oneMinute: false, thirtySeconds: false, finished: false });
+  const notifyingThresholds = useRef({ oneMinute: false, thirtySeconds: false, finished: false });
 
   useEffect(() => {
     const updateTimer = () => {
@@ -84,14 +84,21 @@ const MatchTimer = memo(function MatchTimer({
   }, [timerState, initialSeconds]);
 
   useEffect(() => {
-    if (secondsLeft > 30) {
-      notifiedThresholds.current = { thirtySeconds: false, finished: false };
+    if (secondsLeft > 60) {
+      notifiedThresholds.current = { oneMinute: false, thirtySeconds: false, finished: false };
       return;
     }
     if (!isRunning) return;
 
-    // Pode haver atraso do navegador (especialmente em segundo plano). Neste
-    // caso, ainda dispara o aviso de 30s quando o próximo tick já caiu em 00:00.
+    // O aviso de um minuto é local quando a tela está aberta; o QStash cobre
+    // o mesmo marco quando o PWA está suspenso ou com o celular bloqueado.
+    if (!notifiedThresholds.current.oneMinute && !notifyingThresholds.current.oneMinute) {
+      notifyingThresholds.current.oneMinute = true;
+      void onThreshold("one_minute").then((handled) => {
+        if (handled) notifiedThresholds.current.oneMinute = true;
+        notifyingThresholds.current.oneMinute = false;
+      });
+    }
     if (!notifiedThresholds.current.thirtySeconds && !notifyingThresholds.current.thirtySeconds) {
       notifyingThresholds.current.thirtySeconds = true;
       if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.([80, 60, 80]);
@@ -437,7 +444,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
     setTimerSaving(false);
   }, [canManage, timerSaving, match.id]);
 
-  const notifyTimerThreshold = useCallback(async (threshold: "thirty_seconds" | "finished") => {
+  const notifyTimerThreshold = useCallback(async (threshold: "one_minute" | "thirty_seconds" | "finished") => {
     const result = await notifyMatchTimerThreshold(match.id, threshold);
     if (!result.success) {
       setError(result.error || "Não foi possível enviar o aviso do cronômetro.");

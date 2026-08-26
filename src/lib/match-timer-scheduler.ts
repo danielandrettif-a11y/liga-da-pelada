@@ -1,7 +1,7 @@
 import { SITE_URL } from "@/lib/siteUrl";
 
 
-type TimerAlert = "thirty_seconds" | "finished";
+type TimerAlert = "one_minute" | "thirty_seconds" | "finished";
 
 type TimerScheduleInput = {
   matchId: string;
@@ -45,10 +45,13 @@ function secondsUntil(input: TimerScheduleInput, threshold: TimerAlert) {
     Math.floor((Date.now() - new Date(input.startedAt).getTime()) / 1000),
   );
   const elapsedAtStart = Math.max(0, input.accumulatedSeconds + elapsedSinceStart);
-  const targetElapsed = threshold === "thirty_seconds"
-    ? Math.max(0, input.durationSeconds - 30)
-    : input.durationSeconds;
-  return Math.max(0, targetElapsed - elapsedAtStart);
+  const targetElapsed = threshold === "one_minute"
+    ? Math.max(0, input.durationSeconds - 60)
+    : threshold === "thirty_seconds"
+      ? Math.max(0, input.durationSeconds - 30)
+      : input.durationSeconds;
+  // Antecipamos o job para compensar a latência normal do provedor push.
+  return Math.max(0, targetElapsed - elapsedAtStart - 4);
 }
 
 async function scheduleTimerAlert(
@@ -130,6 +133,7 @@ export async function scheduleMatchTimerAlerts(input: TimerScheduleInput) {
   }
 
   await Promise.all([
+    scheduleTimerAlert(input, "one_minute", token, webhookSecret),
     scheduleTimerAlert(input, "thirty_seconds", token, webhookSecret),
     scheduleTimerAlert(input, "finished", token, webhookSecret),
   ]);

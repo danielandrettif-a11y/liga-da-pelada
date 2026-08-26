@@ -19,7 +19,7 @@ async function getMatchState(
 ) {
   const { data, error } = await client
     .from("matches")
-    .select("id, round_id, team_a_id, team_b_id, score_a, score_b, status, timer_started_at, timer_accumulated_seconds, eligibility_elapsed_offset_seconds, duration_seconds, timer_thirty_seconds_alerted_at, timer_finished_alerted_at")
+      .select("id, round_id, team_a_id, team_b_id, score_a, score_b, status, timer_started_at, timer_accumulated_seconds, eligibility_elapsed_offset_seconds, duration_seconds, timer_one_minute_alerted_at, timer_thirty_seconds_alerted_at, timer_finished_alerted_at")
     .eq("id", matchId)
     .single();
 
@@ -713,6 +713,7 @@ export async function resetMatchTimer(matchId: string) {
         timer_accumulated_seconds: 0,
         timer_started_at: null,
         eligibility_elapsed_offset_seconds: eligibilityOffset,
+        timer_one_minute_alerted_at: null,
         timer_thirty_seconds_alerted_at: null,
         timer_finished_alerted_at: null,
       })
@@ -755,6 +756,7 @@ export async function addMatchExtraTime(matchId: string, extraSeconds: number) {
       .from("matches")
       .update({
         duration_seconds: newDuration,
+        timer_one_minute_alerted_at: null,
         timer_thirty_seconds_alerted_at: null,
         timer_finished_alerted_at: null,
       })
@@ -771,7 +773,7 @@ export async function addMatchExtraTime(matchId: string, extraSeconds: number) {
 
 export async function notifyMatchTimerThreshold(
   matchId: string,
-  threshold: "thirty_seconds" | "finished",
+  threshold: "one_minute" | "thirty_seconds" | "finished",
 ) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: ADMIN_ERROR };
@@ -782,7 +784,7 @@ export async function notifyMatchTimerThreshold(
 export async function dispatchMatchTimerThreshold(
   client: SupabaseClient,
   matchId: string,
-  threshold: "thirty_seconds" | "finished",
+  threshold: "one_minute" | "thirty_seconds" | "finished",
 ) {
   try {
     const match = await getMatchState(client, matchId);
@@ -795,9 +797,11 @@ export async function dispatchMatchTimerThreshold(
     const secondsLeft = Math.max(0, Number(match.duration_seconds || 420) - elapsed);
     // Caso o navegador fique em segundo plano, ele pode acordar diretamente
     // em 00:00. Ainda entregamos o aviso de 30s em vez de perdê-lo.
-    const shouldSend = threshold === "thirty_seconds"
-      ? secondsLeft <= 30
-      : secondsLeft === 0;
+    const shouldSend = threshold === "one_minute"
+      ? secondsLeft <= 60 + 4
+      : threshold === "thirty_seconds"
+        ? secondsLeft <= 30 + 4
+        : secondsLeft <= 4;
     if (!shouldSend) {
       return {
         success: true,
@@ -808,12 +812,16 @@ export async function dispatchMatchTimerThreshold(
     }
 
     const now = new Date().toISOString();
-    const updates = threshold === "thirty_seconds"
-      ? { timer_thirty_seconds_alerted_at: now }
-      : { timer_finished_alerted_at: now };
-    const alertColumn = threshold === "thirty_seconds"
-      ? "timer_thirty_seconds_alerted_at"
-      : "timer_finished_alerted_at";
+    const updates = threshold === "one_minute"
+      ? { timer_one_minute_alerted_at: now }
+      : threshold === "thirty_seconds"
+        ? { timer_thirty_seconds_alerted_at: now }
+        : { timer_finished_alerted_at: now };
+    const alertColumn = threshold === "one_minute"
+      ? "timer_one_minute_alerted_at"
+      : threshold === "thirty_seconds"
+        ? "timer_thirty_seconds_alerted_at"
+        : "timer_finished_alerted_at";
     const { data: claimed, error } = await client
       .from("matches")
       .update(updates)

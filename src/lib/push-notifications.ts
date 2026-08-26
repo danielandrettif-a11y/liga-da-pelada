@@ -226,13 +226,13 @@ export async function sendMatchFinishedNotifications(
 export async function sendMatchTimerNotifications(
   client: SupabaseClient,
   match: MatchForPush,
-  threshold: "thirty_seconds" | "finished",
+  threshold: "one_minute" | "thirty_seconds" | "finished",
 ) {
   const leftTeam = teamName(match.team_a, "Time A");
   const rightTeam = teamName(match.team_b, "Time B");
   const isFinal = threshold === "finished";
   return sendMatchNotifications(client, match, {
-    title: isFinal ? "Fim de jogo!!" : "30 segundos restantes!",
+    title: isFinal ? "Fim de jogo!!" : threshold === "one_minute" ? "1 minuto restante!" : "30 segundos restantes!",
     body: isFinal
       ? `${leftTeam} ${match.score_a} × ${match.score_b} ${rightTeam}`
       : `${leftTeam} ${match.score_a} × ${match.score_b} ${rightTeam} · prepare o apito final.`,
