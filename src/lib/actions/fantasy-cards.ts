@@ -113,6 +113,17 @@ export async function getMyPacks(): Promise<{
   };
 }
 
+export async function restoreMyPassPacks(fantasySeasonId: string) {
+  const account = await getCurrentAccount();
+  if (!account.user || !account.isAdmin) return { success: false, error: "A reativação é exclusiva para administradores." };
+  if (!fantasySeasonId) return { success: false, error: "Passe da temporada não encontrado." };
+  const { data, error } = await account.client.rpc("restore_my_pass_card_packs", { p_fantasy_season_id: fantasySeasonId });
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/cartola");
+  revalidatePath("/mais");
+  return { success: true, restored: Number(data || 0) };
+}
+
 /**
  * Abre um pacote pela primeira vez ou retorna as ofertas já existentes (Idempotente).
  */

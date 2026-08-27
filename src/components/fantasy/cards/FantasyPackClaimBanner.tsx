@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Package, Sparkles } from "@/components/icons";
-import type { FantasyPackDTO } from "@/lib/actions/fantasy-cards";
+import { restoreMyPassPacks, type FantasyPackDTO } from "@/lib/actions/fantasy-cards";
 
 const FantasyPackOpeningModal = dynamic(
   () => import("./FantasyPackOpeningModal").then((mod) => mod.FantasyPackOpeningModal),
@@ -15,11 +15,15 @@ type Props = {
   packs: FantasyPackDTO[];
   onPackClaimed?: () => void;
   initialPackId?: string;
+  fantasySeasonId?: string;
+  isAdmin?: boolean;
 };
 
-export function FantasyPackClaimBanner({ packs, onPackClaimed, initialPackId }: Props) {
+export function FantasyPackClaimBanner({ packs, onPackClaimed, initialPackId, fantasySeasonId, isAdmin = false }: Props) {
   const router = useRouter();
   const [selectedPack, setSelectedPack] = useState<FantasyPackDTO | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   useEffect(() => {
     if (!initialPackId || selectedPack) return;
     const requested = packs.find((pack) => pack.id === initialPackId);
@@ -29,7 +33,10 @@ export function FantasyPackClaimBanner({ packs, onPackClaimed, initialPackId }: 
     }
   }, [initialPackId, packs, router, selectedPack]);
 
-  if (!packs || packs.length === 0) return null;
+  if (!packs || packs.length === 0) {
+    if (!isAdmin || !fantasySeasonId) return null;
+    return <section className="rounded-3xl border border-amber-400/30 bg-amber-500/10 p-4"><p className="text-xs font-black uppercase text-amber-200">Pacote do Passe não encontrado</p><p className="mt-1 text-[11px] leading-4 text-muted">Se o pacote foi fechado durante um teste, reative-o para abrir e escolher sua carta.</p><button type="button" disabled={restoring} onClick={async () => { if (!window.confirm("Reativar os pacotes do Passe já liberados nesta conta?")) return; setRestoring(true); setRestoreMessage(null); const result = await restoreMyPassPacks(fantasySeasonId); setRestoring(false); if (result.success) { setRestoreMessage(result.restored ? "Pacote reativado. Atualizando o Cartola…" : "Nenhum pacote liberado encontrado nesta temporada."); router.refresh(); } else setRestoreMessage(result.error || "Não foi possível reativar o pacote."); }} className="mt-3 rounded-xl bg-amber-400 px-3 py-2 text-[10px] font-black uppercase text-[#05130b] disabled:opacity-50">{restoring ? "Reativando…" : "Reativar pacote do Passe"}</button>{restoreMessage && <p className="mt-2 text-[10px] font-bold text-amber-100">{restoreMessage}</p>}</section>;
+  }
 
   const currentPack = packs[0];
 
