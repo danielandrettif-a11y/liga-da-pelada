@@ -688,6 +688,61 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   };
 }
 
+export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: RankingEntry; position: number } | null> {
+  const data = await getRankingExperienceData();
+  const index = data.general.findIndex((item) => item.player.id === playerId);
+  if (index >= 0) {
+    return {
+      entry: data.general[index],
+      position: index + 1,
+    };
+  }
+
+  const { data: player } = await supabase.from("players").select("*").eq("id", playerId).maybeSingle();
+  if (!player) return null;
+
+  const { data: cosmeticsData } = await supabase
+    .from("player_equipped_cosmetics")
+    .select("slot, cosmetic:cosmetic_id(name, asset_key, slot)")
+    .eq("player_id", playerId);
+
+  const cosmeticsMap = new Map((cosmeticsData || []).map((item: any) => [item.slot, item.cosmetic]));
+  const frame = cosmeticsMap.get("frame");
+  const aura = cosmeticsMap.get("aura");
+  const title = cosmeticsMap.get("title");
+  const banner = cosmeticsMap.get("banner");
+  const nameplate = cosmeticsMap.get("nameplate");
+
+  const entry: RankingEntry = {
+    player: player as unknown as Player,
+    games: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    goals: 0,
+    assists: 0,
+    points: 0,
+    winRate: 0,
+    awards: { topScorer: 0, topAssister: 0, bestGoalkeeper: 0 },
+    awardSeasons: [],
+    seasonPosition: data.general.length + 1,
+    positionChange: null,
+    fitness: null,
+    cosmetics: {
+      frameKey: frame?.asset_key || null,
+      auraKey: aura?.asset_key || null,
+      titleName: title?.name || null,
+      bannerAssetKey: banner?.asset_key || null,
+      nameplateKey: nameplate?.asset_key || null,
+    },
+  };
+
+  return {
+    entry,
+    position: data.general.length + 1,
+  };
+}
+
 export type FriendlyStatsEntry = {
   player: Player;
   rounds: number;
