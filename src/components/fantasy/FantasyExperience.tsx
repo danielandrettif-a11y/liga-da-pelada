@@ -105,7 +105,6 @@ type Props = {
   availablePacks?: FantasyPackDTO[];
   availablePacksCount?: number;
   inventoryCount?: number;
-  isAdmin?: boolean;
   liveProjection?: FantasyLiveProjection;
   playersPerTeam?: number;
   initialPackId?: string;
@@ -161,7 +160,6 @@ export function FantasyExperience({
   availablePacks = [],
   availablePacksCount = 0,
   inventoryCount = 0,
-  isAdmin = false,
   liveProjection,
   playersPerTeam = 5,
   initialPackId,
@@ -969,11 +967,9 @@ export function FantasyExperience({
       )}
 
       {/* V3: BANNER DE PACOTES DISPONÍVEIS */}
-      {(!availablePacks || availablePacks.length > 0 || isAdmin) && (
+      {availablePacks && availablePacks.length > 0 && (
         <FantasyPackClaimBanner
           packs={availablePacks}
-          fantasySeasonId={fantasySeasonId}
-          isAdmin={isAdmin}
           initialPackId={initialPackId}
           onPackClaimed={() => requestRefresh(0)}
         />
