@@ -152,7 +152,7 @@ function CosmeticFrameOverlay({ assetKey }: { assetKey?: string | null }) {
   if (!assetKey) return null;
   const key = assetKey.toLowerCase();
   const image = cosmeticFrameImage(assetKey);
-  if (image) return <span aria-hidden="true" className="pointer-events-none absolute -inset-[5px] z-10 rounded-[inherit] bg-cover bg-center mix-blend-screen opacity-95" style={{ backgroundImage: `url(${image})` }} />;
+  if (image) return <span aria-hidden="true" className="pointer-events-none absolute -inset-[5px] z-10 rounded-[inherit] bg-cover bg-center" style={{ backgroundImage: `url(${image})` }} />;
   if (key.includes("alambrado") || key.includes("rede")) {
     const stroke = key.includes("rede") ? "rgba(186,230,253,.78)" : "rgba(228,228,231,.68)";
     return (
