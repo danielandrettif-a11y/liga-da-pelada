@@ -138,22 +138,6 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
       });
     }
 
-    // 3. Faltam os palpites da rodada
-    if (activeRound && count >= 1 && (!topScorerId || !topAssistId)) {
-      const missingBoth = !topScorerId && !topAssistId;
-      desired.push({
-        type: "fantasy_predictions_missing",
-        key: `cartola:predictions:missing:${activeRound.id}`,
-        title: "🎯 Palpites da Rodada Pendentes",
-        body: missingBoth
-          ? "Envie seus palpites de Artilheiro e Garçom da rodada (+3.0 pts extras em cada)."
-          : !topScorerId
-          ? "Falta enviar seu palpite de Artilheiro da rodada (+3.0 pts extras)."
-          : "Falta enviar seu palpite de Garçom da rodada (+3.0 pts extras).",
-        href: "/cartola",
-      });
-    }
-
     // Recompensas do Passe: uma notificação por escolha pendente e por pacote entregue.
     if (fantasySeason) {
       const [{ data: pass }, { data: rewards }, { data: choices }, { data: passPacks }] = await Promise.all([
