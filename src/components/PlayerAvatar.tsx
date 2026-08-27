@@ -57,9 +57,9 @@ export function PlayerAvatar({
     <>
       <div
         onClick={handleClick}
-        className={`group/avatar relative overflow-hidden flex items-center justify-center ${
+        className={`group/avatar relative flex items-center justify-center shrink-0 ${
           isInteractive ? "cursor-pointer active:scale-95 transition-transform" : ""
-        } ${className} ${frameEffect ? `${frameEffect} ` : ""}${auraEffect ? `${auraEffect} ` : ""}`}
+        } ${className} ${auraEffect ? `${auraEffect} ` : ""}`}
         aria-label={`Foto de ${name}`}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
@@ -71,25 +71,29 @@ export function PlayerAvatar({
           }
         }}
       >
-        {hasImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={avatarUrl!}
-            alt={`Foto de ${name}`}
-            className={`h-full w-full object-cover ${imageClassName}`}
-            onError={() => setImageFailed(true)}
-          />
-        ) : (
-          <span aria-hidden="true">{getInitials(name)}</span>
-        )}
+        {/* Foto com overflow-hidden para recorte circular */}
+        <div className={`relative h-full w-full overflow-hidden rounded-[inherit] flex items-center justify-center ${frameEffect ? `${frameEffect} ` : ""}`}>
+          {hasImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl!}
+              alt={`Foto de ${name}`}
+              className={`h-full w-full object-cover ${imageClassName}`}
+              onError={() => setImageFailed(true)}
+            />
+          ) : (
+            <span aria-hidden="true">{getInitials(name)}</span>
+          )}
 
+          {isInteractive && (
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35 opacity-0 transition-opacity group-hover/avatar:opacity-100">
+              <ZoomIn className="h-3.5 w-3.5 text-accent drop-shadow" />
+            </span>
+          )}
+        </div>
+
+        {/* Moldura sobreposta fora do overflow-hidden */}
         <CosmeticFrameOverlay assetKey={frameKey} />
-
-        {isInteractive && (
-          <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35 opacity-0 transition-opacity group-hover/avatar:opacity-100">
-            <ZoomIn className="h-3.5 w-3.5 text-accent drop-shadow" />
-          </span>
-        )}
       </div>
 
       {isOpen &&
@@ -148,11 +152,11 @@ function CosmeticFrameOverlay({ assetKey }: { assetKey?: string | null }) {
   if (!assetKey) return null;
   const key = assetKey.toLowerCase();
   const image = cosmeticFrameImage(assetKey);
-  if (image) return <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] bg-cover bg-center mix-blend-screen opacity-95" style={{ backgroundImage: `url(${image})` }} />;
+  if (image) return <span aria-hidden="true" className="pointer-events-none absolute -inset-[5px] z-10 rounded-[inherit] bg-cover bg-center mix-blend-screen opacity-95" style={{ backgroundImage: `url(${image})` }} />;
   if (key.includes("alambrado") || key.includes("rede")) {
     const stroke = key.includes("rede") ? "rgba(186,230,253,.78)" : "rgba(228,228,231,.68)";
     return (
-      <svg aria-hidden="true" className="pointer-events-none absolute inset-0 z-10 h-full w-full rounded-[inherit]" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <svg aria-hidden="true" className="pointer-events-none absolute -inset-[4px] z-10 h-[calc(100%+8px)] w-[calc(100%+8px)] rounded-[inherit]" viewBox="0 0 100 100" preserveAspectRatio="none">
         <defs><pattern id={`mesh-${key}`} width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M 0 0 L 0 14 M 7 0 L 7 14" stroke={stroke} strokeWidth="1.25" /></pattern></defs>
         <rect x="1.5" y="1.5" width="97" height="97" rx="48" fill="none" stroke={stroke} strokeWidth="3" />
         <rect x="1.5" y="1.5" width="97" height="97" rx="48" fill={`url(#mesh-${key})`} opacity=".24" />
@@ -160,10 +164,10 @@ function CosmeticFrameOverlay({ assetKey }: { assetKey?: string | null }) {
     );
   }
   if (key.includes("capitao") || key.includes("faixa")) {
-    return <span aria-hidden="true" className="pointer-events-none absolute inset-x-[-8%] bottom-[10%] z-10 -rotate-12 border-y border-amber-200/80 bg-gradient-to-r from-amber-950 via-amber-400 to-amber-950 py-[5%] opacity-90 shadow-lg" />;
+    return <span aria-hidden="true" className="pointer-events-none absolute inset-x-[-10%] bottom-[8%] z-10 -rotate-12 border-y border-amber-200/80 bg-gradient-to-r from-amber-950 via-amber-400 to-amber-950 py-[6%] opacity-90 shadow-lg" />;
   }
   if (key.includes("neon")) {
-    return <span aria-hidden="true" className="pointer-events-none absolute inset-[2px] z-10 rounded-[inherit] border-2 border-[#dcff65] shadow-[inset_0_0_12px_rgba(204,255,0,.65)]" />;
+    return <span aria-hidden="true" className="pointer-events-none absolute -inset-[3px] z-10 rounded-[inherit] border-2 border-[#dcff65] shadow-[inset_0_0_10px_rgba(204,255,0,.65),0_0_14px_rgba(204,255,0,.85)]" />;
   }
   return null;
 }

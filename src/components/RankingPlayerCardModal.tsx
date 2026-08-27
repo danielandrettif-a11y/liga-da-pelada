@@ -304,14 +304,14 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
               </div>
 
               <div className="relative flex-1 flex justify-end pr-1">
-                <div className="relative h-36 w-36 rounded-full overflow-hidden border-[3px] border-current/35 bg-black/20 shadow-[0_10px_25px_rgba(0,0,0,0.45)] flex items-center justify-center">
+                <div className="relative h-36 w-36 rounded-full border-[3px] border-current/35 bg-black/20 shadow-[0_10px_25px_rgba(0,0,0,0.45)] flex items-center justify-center">
                   <PlayerAvatar
                     name={entry.player.name}
                     avatarUrl={entry.player.avatar_url}
                     frameKey={entry.cosmetics?.frameKey}
                     auraKey={entry.cosmetics?.auraKey}
                     clickable={false}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full"
                     imageClassName="object-cover object-top scale-105"
                   />
                 </div>

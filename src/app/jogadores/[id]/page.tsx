@@ -11,7 +11,7 @@ import { TeamCrest } from "@/components/TeamCrest";
 import { FantasyPlayerCard } from "@/components/fantasy/FantasyPlayerCard";
 import { getFantasyPlayerSummary } from "@/lib/actions/fantasy";
 import { getPlayerEquippedCosmetics } from "@/lib/actions/cosmetics";
-import { cosmeticImage, cosmeticNameplateClass, cosmeticVisual } from "@/lib/fantasy/cosmetics";
+import { cosmeticBackgroundPosition, cosmeticImage, cosmeticNameplateClass, cosmeticVisual } from "@/lib/fantasy/cosmetics";
 
 export const revalidate = 0;
 
@@ -70,7 +70,7 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
     ? {
         backgroundImage: `linear-gradient(rgba(2, 14, 8, .80), rgba(2, 14, 8, .92)), url(${profileBackgroundImage})`,
         backgroundSize: "cover",
-        backgroundPosition: "center",
+        backgroundPosition: cosmeticBackgroundPosition("background", cosmetics?.backgroundAssetKey),
       }
     : undefined;
 
@@ -79,7 +79,7 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
       {profileBackgroundImage && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,transparent_0%,rgba(2,14,8,.38)_48%,rgba(2,14,8,.78)_100%)]" />}
       <div className="relative z-10 space-y-6">
       <div className="flex items-center gap-3"><Link href="/jogadores" className="flex h-10 w-10 items-center justify-center rounded-full bg-surface"><ArrowLeft className="h-5 w-5 text-muted" /></Link><h1 className="text-sm font-bold uppercase tracking-wider text-foreground">Perfil</h1></div>
-      <div className={`glass-card relative overflow-hidden flex flex-col items-center p-6 text-center ${cardGradient}`} style={cosmeticImage(cosmetics?.bannerAssetKey) ? { backgroundImage: `linear-gradient(rgba(3, 14, 8, .74), rgba(3, 14, 8, .92)), url(${cosmeticImage(cosmetics?.bannerAssetKey)})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
+      <div className={`glass-card relative overflow-hidden flex flex-col items-center p-6 text-center ${cardGradient}`} style={cosmeticImage(cosmetics?.bannerAssetKey) ? { backgroundImage: `linear-gradient(rgba(3, 14, 8, .74), rgba(3, 14, 8, .92)), url(${cosmeticImage(cosmetics?.bannerAssetKey)})`, backgroundSize: "cover", backgroundPosition: cosmeticBackgroundPosition("banner", cosmetics?.bannerAssetKey) } : undefined}>
         {cosmetics?.bannerAssetKey && (
           <div className="pointer-events-none absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent via-transparent to-transparent" />
         )}

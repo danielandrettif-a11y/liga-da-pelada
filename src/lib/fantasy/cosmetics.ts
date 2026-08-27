@@ -69,6 +69,22 @@ export function cosmeticImage(assetKey?: string | null) {
   return null;
 }
 
+export function cosmeticBackgroundPosition(slot?: CosmeticSlot | null, assetKey?: string | null): string {
+  const key = (assetKey || "").toLowerCase();
+  if (slot === "background" || key.includes("background")) {
+    if (key.includes("vestiario")) return "center 30%";
+    if (key.includes("por-do-sol")) return "center 15%";
+    return "center top";
+  }
+  if (slot === "banner" || key.includes("covers") || key.includes("banner")) {
+    if (key.includes("bar-campo")) return "center 35%";
+    if (key.includes("chuva-campo")) return "center 25%";
+    if (key.includes("vestiario-pos-jogo")) return "center 30%";
+    return "center 20%";
+  }
+  return "center 20%";
+}
+
 export function rarityClass(rarity: CosmeticRarity) {
   return ({ common: "border-white/20 text-white/80", rare: "border-sky-300/50 text-sky-200", epic: "border-fuchsia-300/55 text-fuchsia-200", legendary: "border-amber-300/70 text-amber-200" })[rarity];
 }
