@@ -58,6 +58,7 @@ export function CosmeticsCollection({ cosmetics, playerName = "Jogador", avatarU
   const [selectedSlot, setSelectedSlot] = useState<CosmeticSlot | "all">("all");
   const [message, setMessage] = useState("");
   const [previewMode, setPreviewMode] = useState(false);
+  const [profilePreview, setProfilePreview] = useState(false);
   const [previewLoadout, setPreviewLoadout] = useState<Partial<Record<CosmeticSlot, string | null>>>(() => ({ ...cosmetics.equipped }));
 
   if (!cosmetics.available) return <section className="glass-card p-5 text-center"><p className="font-black text-foreground">Coleção em preparação</p><p className="mt-1 text-xs text-muted">Aplique as migrations de cosméticos para ativar o Passe.</p></section>;
@@ -88,7 +89,10 @@ export function CosmeticsCollection({ cosmetics, playerName = "Jogador", avatarU
         <div className="relative p-5">
           <div className="absolute inset-0 opacity-25 [background-image:radial-gradient(circle_at_20%_10%,#ccff00_0,transparent_28%),linear-gradient(120deg,transparent_0_45%,rgba(255,255,255,.08)_46%_47%,transparent_48%)]" />
           <div className="relative flex items-start gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-accent text-background shadow-[0_0_24px_rgba(204,255,0,.35)]"><Crown className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="font-athletic text-xs font-black uppercase italic tracking-[.16em] text-accent">Minha coleção</p><h2 className="mt-1 text-lg font-black text-foreground">Personalizar perfil</h2><p className="mt-1 text-xs leading-5 text-muted">Equipe itens conquistados ou experimente combinações sem alterar seu perfil público.</p></div></div>
-          {cosmetics.canPreviewAll && <button type="button" onClick={togglePreview} className={`relative mt-4 w-full rounded-xl border px-3 py-2.5 text-[10px] font-black uppercase transition-colors ${previewMode ? "border-amber-300/50 bg-amber-300/15 text-amber-200" : "border-accent/40 bg-accent/10 text-accent"}`}>{previewMode ? "Sair do provador sem salvar" : "Abrir provador com todos os itens"}</button>}
+          <div className="relative mt-4 grid gap-2 sm:grid-cols-2">
+            {cosmetics.canPreviewAll && <button type="button" onClick={togglePreview} className={`w-full rounded-xl border px-3 py-2.5 text-[10px] font-black uppercase transition-colors ${previewMode ? "border-amber-300/50 bg-amber-300/15 text-amber-200" : "border-accent/40 bg-accent/10 text-accent"}`}>{previewMode ? "Sair do provador sem salvar" : "Abrir provador com todos os itens"}</button>}
+            <button type="button" onClick={() => setProfilePreview((current) => !current)} className={`w-full rounded-xl border px-3 py-2.5 text-[10px] font-black uppercase transition-colors ${profilePreview ? "border-accent/60 bg-accent text-background" : "border-white/20 bg-black/20 text-white"}`}>{profilePreview ? "Voltar à prévia rápida" : "Ver perfil completo"}</button>
+          </div>
         </div>
       </div>
 
@@ -99,6 +103,7 @@ export function CosmeticsCollection({ cosmetics, playerName = "Jogador", avatarU
           <PlayerAvatar name={playerName} avatarUrl={avatarUrl} clickable={false} frameKey={frame?.assetKey} auraKey={aura?.assetKey} className="h-20 w-20 rounded-full bg-black/55 text-lg font-black text-white" />
           <div className={`mt-4 rounded-xl border px-4 py-2 backdrop-blur-sm ${cosmeticNameplateClass(nameplate?.assetKey)}`}><p className="font-athletic text-lg font-black uppercase italic tracking-wide">{playerName}</p>{title && <p className="mt-0.5 text-[9px] font-black uppercase tracking-[.16em]">✦ {title.name}</p>}</div>
         </div>
+        {profilePreview && <div className="relative border-t border-white/10 bg-[#031109]/75 p-4 backdrop-blur-sm"><p className="text-center text-[9px] font-black uppercase tracking-[.18em] text-accent">Prévia do perfil completo</p><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{[["PONTOS", "29"], ["JOGOS", "9"], ["GOLS", "3"], ["ASSISTS", "4"]].map(([label, value]) => <div key={label} className="rounded-xl border border-accent/15 bg-black/20 p-2 text-center"><p className="text-[8px] font-black text-muted">{label}</p><p className="mt-1 text-sm font-black text-white">{value}</p></div>)}</div><div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-[9px] font-black uppercase tracking-wider text-muted">Identidade do jogador</p><p className="mt-1 text-xs font-black text-white">{playerName}</p><p className="mt-0.5 text-[10px] text-accent">{title ? `✦ ${title.name}` : "Sem título equipado"}</p><p className="mt-2 text-[10px] leading-4 text-muted">Esta visualização mostra como sua foto, moldura, aura, título e nameplate aparecem no perfil público.</p></div></div>}
       </div>
 
       {previewMode && <p className="rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-center text-[10px] font-bold text-amber-100">Nada neste provador é salvo no inventário ou exibido para outros usuários.</p>}
