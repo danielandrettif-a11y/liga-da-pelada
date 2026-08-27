@@ -78,6 +78,19 @@ export async function dismissMyUnopenedBronzePassPack() {
   return { success: true, dismissed: Number(data || 0) };
 }
 
+export async function resetMyTestPassRewardClaims(fantasySeasonId: string) {
+  const account = await getCurrentAccount();
+  if (!account.user || !account.isAdmin) return { success: false, error: "A limpeza é exclusiva para administradores." };
+  if (!fantasySeasonId) return { success: false, error: "Temporada do Passe não encontrada." };
+  const client: any = account.client;
+  const { data, error } = await client.rpc("reset_my_test_pass_cosmetic_claims", { p_fantasy_season_id: fantasySeasonId });
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/meu-perfil");
+  revalidatePath("/jogadores");
+  revalidatePath("/passe");
+  return { success: true, removed: Number(data || 0) };
+}
+
 export async function claimPassCosmetic(rewardId: string, cosmeticId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre para resgatar sua recompensa." };
