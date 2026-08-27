@@ -68,7 +68,7 @@ export default async function PrelistasPage() {
               };
           return (
             <article key={prelist.id} className={`relative overflow-hidden rounded-2xl border ${theme.card} animate-fade-in stagger-${Math.min(index + 1, 5)}`}>
-              <Link href={`/admin/rodada?round=${prelist.id}&mount=1`} className="block p-4 pr-14">
+              <Link href={`/admin/rodada?round=${prelist.id}&mount=1`} className="block p-4 pb-3">
                 <div className="flex items-center gap-3">
                   <div className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl border ${theme.tile}`}>
                     <span className={`text-[8px] font-black uppercase ${theme.text}`}>{isFriendly ? "AM." : "ROD."}</span>
@@ -89,7 +89,8 @@ export default async function PrelistasPage() {
                   </div>
                 </div>
               </Link>
-              <div className="absolute right-3 top-3">
+              <div className="flex items-center justify-between gap-3 border-t border-white/5 px-4 py-2.5">
+                <Link href={`/admin/rodada?round=${prelist.id}&mount=1`} className={`min-w-0 flex-1 truncate text-[10px] font-black uppercase ${theme.action}`}>Editar e montar times</Link>
                 <DeleteRoundButton redirectTo="/admin/prelistas" round={{
                   id: prelist.id,
                   number: prelist.number,

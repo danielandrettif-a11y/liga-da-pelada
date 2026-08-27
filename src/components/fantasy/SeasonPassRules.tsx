@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Crown, X } from "@/components/icons";
+import { useDialogViewport } from "@/lib/useDialogViewport";
 
 type Props = {
   mode: "athlete" | "community";
@@ -12,8 +13,9 @@ const STORAGE_KEY = "bq_season_pass_rules_seen_v2";
 
 export function SeasonPassRules({ mode }: Props) {
   const [mounted, setMounted] = useState(false);
-  const [expanded, setExpanded] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+
+  useDialogViewport(showTutorial);
 
   useEffect(() => {
     setMounted(true);
@@ -22,6 +24,15 @@ export function SeasonPassRules({ mode }: Props) {
       window.localStorage.setItem(STORAGE_KEY, "1");
     }
   }, []);
+
+  useEffect(() => {
+    if (!showTutorial) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowTutorial(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [showTutorial]);
 
   const athleteRules = [
     "Entrou em campo: +2 casas.",
@@ -43,9 +54,9 @@ export function SeasonPassRules({ mode }: Props) {
       <section className="overflow-hidden rounded-2xl border border-[#a65cff]/35 bg-[#160c2c]/70">
         <button
           type="button"
-          onClick={() => setExpanded((current) => !current)}
+          onClick={() => setShowTutorial(true)}
           className="flex w-full items-center justify-between gap-3 p-4 text-left"
-          aria-expanded={expanded}
+          aria-haspopup="dialog"
         >
           <span className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#a04dff]/20 text-[#d7adff]">
@@ -56,21 +67,20 @@ export function SeasonPassRules({ mode }: Props) {
               <span className="mt-0.5 block text-[10px] text-muted">Toque para ver as regras da trilha</span>
             </span>
           </span>
-          <span className="text-lg font-black text-[#d7adff]">{expanded ? "−" : "+"}</span>
+          <span className="text-lg font-black text-[#d7adff]">+</span>
         </button>
-        {expanded && <RulesContent mode={mode} rules={rules} compact />}
       </section>
 
       {mounted && showTutorial && createPortal(
         <div
-          className="mobile-dialog-backdrop z-[100002] bg-black/85 p-4 backdrop-blur-md"
+          className="mobile-dialog-backdrop z-[100002] flex items-center justify-center bg-black/85 p-3 backdrop-blur-md sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Como funciona o Passe BQ"
           onClick={() => setShowTutorial(false)}
         >
           <section
-            className="relative my-auto w-full max-w-md overflow-hidden rounded-[2rem] border border-[#a65cff]/45 bg-[#0b1510] shadow-[0_0_60px_rgba(0,0,0,0.9)]"
+            className="relative flex max-h-[min(88dvh,760px)] w-full max-w-md flex-col overflow-hidden rounded-[2rem] border border-[#a65cff]/45 bg-[#0b1510] shadow-[0_0_60px_rgba(0,0,0,0.9)]"
             onClick={(event) => event.stopPropagation()}
           >
             <button
@@ -81,14 +91,16 @@ export function SeasonPassRules({ mode }: Props) {
             >
               <X className="h-5 w-5" />
             </button>
-            <div className="bg-gradient-to-br from-[#4b1b8d] via-[#251047] to-[#0b1510] p-6 pr-16">
-              <Crown className="h-10 w-10 text-[#e0b9ff]" />
-              <p className="mt-4 font-athletic text-[10px] font-black uppercase italic tracking-[0.2em] text-[#d7adff]">Bem-vindo ao Passe BQ</p>
-              <h2 className="mt-1 font-athletic text-3xl font-black uppercase italic text-white">Sua trilha da temporada</h2>
-              <p className="mt-3 text-sm leading-6 text-white/70">Complete 40 casas jogando, escalando ou acompanhando a Pelada pelo Cartola.</p>
+            <div className="mobile-dialog-scroll overflow-y-auto overscroll-contain">
+              <div className="bg-gradient-to-br from-[#4b1b8d] via-[#251047] to-[#0b1510] p-6 pr-16">
+                <Crown className="h-10 w-10 text-[#e0b9ff]" />
+                <p className="mt-4 font-athletic text-[10px] font-black uppercase italic tracking-[0.2em] text-[#d7adff]">Bem-vindo ao Passe BQ</p>
+                <h2 className="mt-1 font-athletic text-3xl font-black uppercase italic text-white">Sua trilha da temporada</h2>
+                <p className="mt-3 text-sm leading-6 text-white/70">Complete 40 casas jogando, escalando ou acompanhando a Pelada pelo Cartola.</p>
+              </div>
+              <RulesContent mode={mode} rules={rules} />
             </div>
-            <RulesContent mode={mode} rules={rules} />
-            <div className="p-5 pt-0">
+            <div className="border-t border-white/10 bg-[#0b1510] p-4">
               <button type="button" onClick={() => setShowTutorial(false)} className="w-full rounded-2xl bg-accent py-3 text-xs font-black uppercase text-background">Entendi, vamos jogar</button>
             </div>
           </section>
@@ -99,9 +111,9 @@ export function SeasonPassRules({ mode }: Props) {
   );
 }
 
-function RulesContent({ mode, rules, compact = false }: { mode: Props["mode"]; rules: string[]; compact?: boolean }) {
+function RulesContent({ mode, rules }: { mode: Props["mode"]; rules: string[] }) {
   return (
-    <div className={compact ? "border-t border-white/10 px-4 pb-4 pt-3" : "p-5"}>
+    <div className="p-5">
       <p className="text-[10px] font-black uppercase tracking-wider text-accent">{mode === "athlete" ? "Atleta" : "Comunidade"}</p>
       <ul className="mt-2.5 space-y-2 text-xs leading-5 text-muted">
         {rules.map((rule) => <li key={rule} className="flex gap-2"><span className="mt-1 text-[#d7adff]">◆</span><span>{rule}</span></li>)}

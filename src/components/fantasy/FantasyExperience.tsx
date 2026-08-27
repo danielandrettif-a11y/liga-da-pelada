@@ -75,6 +75,37 @@ function preloadInventoryModal() {
 const MOBILE_DRAG_HOLD_MS = 320;
 const MOBILE_DRAG_CANCEL_DISTANCE_PX = 12;
 
+function lineupPlayersFromSource(lineup: any) {
+  return (
+    lineup?.fantasy_lineup_players?.length
+      ? lineup.fantasy_lineup_players
+      : lineup?.fantasy_portfolio_players || []
+  ).filter((item: any) => Boolean(item?.player_id));
+}
+
+function lineupFormationFromSlots(
+  players: any[],
+  playersPerTeam: number,
+): "2-1-2" | "2-2-1" | null {
+  const roles = Array(playersPerTeam).fill("");
+  for (const item of players) {
+    if (
+      typeof item.slot_index === "number" &&
+      item.slot_index >= 0 &&
+      item.slot_index < playersPerTeam &&
+      typeof item.slot_role === "string"
+    ) {
+      roles[item.slot_index] = item.slot_role;
+    }
+  }
+  if (!roles.some(Boolean)) return null;
+  for (const candidate of ["2-1-2", "2-2-1"] as const) {
+    const expected = getFantasySlotRoles(playersPerTeam, candidate);
+    if (roles.every((role, index) => !role || role === expected[index])) return candidate;
+  }
+  return null;
+}
+
 type Props = {
   round: {
     id: string;
@@ -165,11 +196,15 @@ export function FantasyExperience({
   initialPackId,
 }: Props) {
   const router = useRouter();
-  const initialIds = (lineup?.fantasy_lineup_players || []).map((item: any) => item.player_id as string);
-  const storageKey = `fantasy_slots_${fantasySeasonId}_${round?.id || "portfolio"}`;
+  const persistedPlayers = lineupPlayersFromSource(lineup);
+  const initialIds = persistedPlayers.map((item: any) => item.player_id as string);
+  const draftStorageKey = `fantasy_draft_slots_${fantasySeasonId}_${round?.id || "portfolio"}`;
+  const legacyStorageKey = `fantasy_slots_${fantasySeasonId}_${round?.id || "portfolio"}`;
 
   // Esquema tático selecionado (ex: 2-1-2 ou 2-2-1)
   const [formation, setFormation] = useState<"2-1-2" | "2-2-1">(() => {
+    const persistedFormation = lineupFormationFromSlots(persistedPlayers, playersPerTeam);
+    if (persistedFormation) return persistedFormation;
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem(`fantasy_formation_${fantasySeasonId}`);
@@ -181,14 +216,10 @@ export function FantasyExperience({
 
   const [selected, setSelected] = useState<string[]>(() => {
     const slots = Array(playersPerTeam).fill("");
-    if (!initialIds.length) return slots;
+    const dbPlayers = persistedPlayers;
 
-    // 1. Tentar restaurar o layout direto do banco de dados (slot_index salvo)
-    const dbPlayers = (
-      lineup?.fantasy_lineup_players ||
-      lineup?.fantasy_portfolio_players ||
-      []
-    ).filter((item: any) => Boolean(item?.player_id));
+    // Uma escalação salva sempre vem do banco. O cache nunca pode reposicionar
+    // um atleta persistido em outro slot.
     const hasDbSlots = dbPlayers.some(
       (item: any) =>
         typeof item.slot_index === "number" &&
@@ -222,49 +253,35 @@ export function FantasyExperience({
       return slots;
     }
 
-    // 2. Tentar restaurar o layout exato de vagas salvo no cache do navegador (mesmo que incompleto)
+    if (initialIds.length) {
+      for (let i = 0; i < Math.min(initialIds.length, playersPerTeam); i++) {
+        slots[i] = initialIds[i];
+      }
+      return slots;
+    }
+
+    // O cache serve apenas para um rascunho que ainda não existe no banco e é
+    // isolado por temporada e rodada.
     if (typeof window !== "undefined") {
       try {
-        const cached = localStorage.getItem(storageKey);
+        const cached = localStorage.getItem(draftStorageKey);
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed)) {
-            const cachedSlots = Array(playersPerTeam).fill("");
+            const knownIds = new Set(market.map((player) => player.id));
             const placed = new Set<string>();
-
-            // Colocar cada jogador exatamente na mesma vaga que ele estava no cache
             for (let i = 0; i < Math.min(parsed.length, playersPerTeam); i++) {
               const id = parsed[i];
-              if (id && initialIds.includes(id)) {
-                cachedSlots[i] = id;
+              if (typeof id === "string" && knownIds.has(id) && !placed.has(id)) {
+                slots[i] = id;
                 placed.add(id);
               }
             }
-
-            // Alocar eventuais atletas de initialIds que não constavam no cache nas vagas vazias
-            for (const id of initialIds) {
-              if (!placed.has(id)) {
-                const emptyIdx = cachedSlots.indexOf("");
-                if (emptyIdx !== -1) {
-                  cachedSlots[emptyIdx] = id;
-                  placed.add(id);
-                }
-              }
-            }
-
-            if (placed.size === initialIds.length) {
-              return cachedSlots;
-            }
+            return slots;
           }
         }
       } catch {}
     }
-
-    // 3. Fallback estável: preenche sequencialmente sem reordenar/embaralhar
-    for (let i = 0; i < Math.min(initialIds.length, playersPerTeam); i++) {
-      slots[i] = initialIds[i];
-    }
-
     return slots;
   });
 
@@ -283,15 +300,6 @@ export function FantasyExperience({
     });
   }, [playersPerTeam]);
 
-  // Salvar posições das vagas no cache local sempre que alterar
-  useEffect(() => {
-    try {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(storageKey, JSON.stringify(selected));
-      }
-    } catch {}
-  }, [selected, storageKey]);
-
   // Salvar esquema tático no cache local
   useEffect(() => {
     try {
@@ -309,7 +317,8 @@ export function FantasyExperience({
   const [sort, setSort] = useState("points");
   const [activeTab, setActiveTab] = useState<"team" | "market">("team");
   const [filterTag, setFilterTag] = useState<string>("ALL");
-  const [calledUpOnly, setCalledUpOnly] = useState(false);
+  const hasCurrentCallup = market.some((player) => player.isInCurrentRound);
+  const [calledUpOnly, setCalledUpOnly] = useState(() => hasCurrentCallup);
   const [message, setMessage] = useState("");
   const [showTutorial, setShowTutorial] = useState(false);
   const [showScoringModal, setShowScoringModal] = useState(false);
@@ -409,7 +418,7 @@ export function FantasyExperience({
       .filter((player) => {
         const matchesQuery = player.name.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR"));
         if (!matchesQuery) return false;
-        if (calledUpOnly && !player.isInCurrentRound) return false;
+        if (calledUpOnly && !player.isInCurrentRound && !selected.includes(player.id)) return false;
 
         if (filterTag === "ALL") return true;
         if (filterTag === "TREND_UP") return player.trend === "UP";
@@ -486,7 +495,7 @@ export function FantasyExperience({
         if (sort === "popularity") return b.popularityPercent - a.popularityPercent;
         return b.totalPoints - a.totalPoints;
       });
-  }, [market, query, sort, filterTag, positionFilter, calledUpOnly]);
+  }, [market, query, sort, filterTag, positionFilter, calledUpOnly, selected]);
 
   const scheduledAt =
     round?.date && round.start_time ? new Date(`${round.date}T${round.start_time}`).getTime() : null;
@@ -527,6 +536,17 @@ export function FantasyExperience({
     slotRoles: getFantasySlotRoles(playersPerTeam, formation),
   });
   const hasUnsavedChanges = open && savedSignature !== currentSignature;
+  const serverStateKey = JSON.stringify({
+    id: lineup?.id || null,
+    updatedAt: lineup?.updated_at || null,
+    players: persistedPlayers.map((item: any) => ({
+      id: item.player_id,
+      index: item.slot_index,
+      role: item.slot_role,
+    })),
+    captain: lineup?.captain_player_id || null,
+  });
+  const appliedServerStateRef = useRef(serverStateKey);
   const complete = validSelectedCount === playersPerTeam && Boolean(captainId) && remaining >= 0;
   const isSaved = Boolean(savedSignature && savedSignature === currentSignature);
   const saveState = !open
@@ -538,6 +558,56 @@ export function FantasyExperience({
     : complete
     ? "Pronta para salvar"
     : "Escalação incompleta";
+
+  // O navegador guarda apenas alterações ainda não salvas. Assim que o estado
+  // coincide com o banco, o rascunho e o cache legado desaparecem.
+  useEffect(() => {
+    try {
+      localStorage.removeItem(legacyStorageKey);
+      if (hasUnsavedChanges) {
+        localStorage.setItem(draftStorageKey, JSON.stringify(selected));
+      } else {
+        localStorage.removeItem(draftStorageKey);
+      }
+    } catch {}
+  }, [draftStorageKey, hasUnsavedChanges, legacyStorageKey, selected]);
+
+  // Atualizações vindas do servidor só entram quando não existe um rascunho
+  // local pendente. Isso evita tanto sobrescrever uma edição em andamento quanto
+  // manter uma escalação velha depois de uma atualização real do banco.
+  useEffect(() => {
+    if (appliedServerStateRef.current === serverStateKey || hasUnsavedChanges) return;
+    const slots = Array(playersPerTeam).fill("");
+    const placed = new Set<string>();
+    for (const item of persistedPlayers) {
+      if (typeof item.slot_index === "number" && item.slot_index >= 0 && item.slot_index < playersPerTeam && !slots[item.slot_index]) {
+        slots[item.slot_index] = item.player_id;
+        placed.add(item.player_id);
+      }
+    }
+    for (const item of persistedPlayers) {
+      if (!placed.has(item.player_id)) {
+        const empty = slots.indexOf("");
+        if (empty !== -1) slots[empty] = item.player_id;
+      }
+    }
+    const serverFormation = lineupFormationFromSlots(persistedPlayers, playersPerTeam) || formation;
+    setSelected(slots);
+    setFormation(serverFormation);
+    setCaptainId(lineup?.captain_player_id || null);
+    setScorerId(lineup?.top_scorer_player_id || null);
+    setAssistId(lineup?.top_assist_player_id || null);
+    setChallengeId(lineup?.challenge_player_id || null);
+    setSavedSignature(lineupSignature({
+      ids: slots,
+      captain: lineup?.captain_player_id,
+      scorer: lineup?.top_scorer_player_id,
+      assist: lineup?.top_assist_player_id,
+      challenge: lineup?.challenge_player_id,
+      slotRoles: getFantasySlotRoles(playersPerTeam, serverFormation),
+    }));
+    appliedServerStateRef.current = serverStateKey;
+  }, [formation, hasUnsavedChanges, lineup, persistedPlayers, playersPerTeam, serverStateKey]);
 
   useEffect(() => {
     if (status !== "in_progress" || !round) return;
@@ -630,6 +700,7 @@ export function FantasyExperience({
     if (player.price > remaining) return setMessage("Patrimônio insuficiente para comprar este jogador.");
 
     // Inserir no slot de destino clicado ou no primeiro slot vazio:
+    const shouldReturnToField = targetSlot !== null;
     setSelected((current) => {
       const next = [...current];
       while (next.length < playersPerTeam) {
@@ -650,10 +721,10 @@ export function FantasyExperience({
 
     setTargetSlot(null);
     setMessage("");
-    if (currentCount + 1 === playersPerTeam) {
+    if (shouldReturnToField || currentCount + 1 === playersPerTeam) {
       setTimeout(() => {
         setActiveTab("team");
-      }, 250);
+      }, 160);
     }
   }
 
@@ -687,7 +758,13 @@ export function FantasyExperience({
               : "Rascunho salvo. Complete antes do primeiro jogo."
             : result.error || "Não foi possível salvar."
         );
-        if (result.success) setSavedSignature(currentSignature);
+        if (result.success) {
+          setSavedSignature(currentSignature);
+          try {
+            localStorage.removeItem(draftStorageKey);
+            localStorage.removeItem(legacyStorageKey);
+          } catch {}
+        }
       } catch {
         setMessage("A conexão falhou ao salvar. Sua tela foi mantida; tente novamente.");
       }
@@ -928,6 +1005,7 @@ export function FantasyExperience({
               setTargetSlot(slot);
               setPositionFilter(targetPos);
               setFilterTag("ALL");
+              if (hasCurrentCallup) setCalledUpOnly(true);
               setActiveTab("market");
             }}
             className="mx-auto flex h-18 w-24 flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300/40 bg-black/25 text-center shadow-inner transition hover:border-accent hover:bg-black/40 active:scale-95 group"
@@ -1661,22 +1739,36 @@ export function FantasyExperience({
               </div>
             )}
 
-            {/* Chips de Filtros Rápidos */}
-            <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 text-[9px] font-black uppercase tracking-wider">
-              {market.some((player) => player.isInCurrentRound) && (
+            {hasCurrentCallup && (
+              <div
+                className="grid grid-cols-2 rounded-xl border border-accent/25 bg-black/25 p-1 text-[10px] font-black uppercase tracking-wider"
+                aria-label="Origem dos atletas do mercado"
+              >
                 <button
                   type="button"
                   aria-pressed={calledUpOnly}
-                  onClick={() => setCalledUpOnly((current) => !current)}
-                  className={`shrink-0 rounded-xl border px-2.5 py-1.5 transition-colors ${
-                    calledUpOnly
-                      ? "border-accent bg-accent text-background shadow-sm"
-                      : "border-accent/35 bg-accent/10 text-accent hover:bg-accent/20"
+                  onClick={() => setCalledUpOnly(true)}
+                  className={`rounded-lg px-3 py-2 transition-colors ${
+                    calledUpOnly ? "bg-accent text-background shadow-sm" : "text-muted hover:text-foreground"
                   }`}
                 >
-                  ✅ Somente convocados
+                  ✅ Convocados
                 </button>
-              )}
+                <button
+                  type="button"
+                  aria-pressed={!calledUpOnly}
+                  onClick={() => setCalledUpOnly(false)}
+                  className={`rounded-lg px-3 py-2 transition-colors ${
+                    !calledUpOnly ? "bg-accent text-background shadow-sm" : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  Todos
+                </button>
+              </div>
+            )}
+
+            {/* Chips de Filtros Rápidos */}
+            <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 text-[9px] font-black uppercase tracking-wider">
               {[
                 { id: "ALL", label: "Todos os Status" },
                 { id: "TREND_UP", label: "🔥 Em Alta" },
