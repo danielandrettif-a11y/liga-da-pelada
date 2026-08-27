@@ -29,7 +29,10 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
   const { data: fantasySeason } = await client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle();
   if (!fantasySeason) return empty;
   const [ownedResult, catalogResult, rewardResult, choiceResult, loadoutResult] = await Promise.all([
-    client.from("fantasy_user_cosmetics").select("cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id),
+    // Keep the provenance so older/test claims can still be matched to the
+    // reward even if the choice row was removed or was created by an older
+    // version of the claim function.
+    client.from("fantasy_user_cosmetics").select("cosmetic_id, source_reward_id, cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id),
     client.from("fantasy_cosmetics").select("*").order("created_at"),
     client.from("fantasy_season_pass_rewards").select("id, house, reward_type, card_tier, bonus:bonus_cosmetic_id(*), options:fantasy_season_pass_reward_options(cosmetic:fantasy_cosmetics(*))").eq("fantasy_season_id", fantasySeason.id).order("house"),
     client.from("fantasy_user_cosmetic_reward_choices").select("reward_id, cosmetic_id").eq("user_id", account.user.id),
@@ -37,6 +40,13 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
   ]);
   if (ownedResult.error || rewardResult.error || catalogResult.error) return empty;
   const choices = new Map((choiceResult.data || []).map((row: any) => [row.reward_id, row.cosmetic_id]));
+  const ownedByReward = new Map<string, Set<string>>();
+  for (const row of ownedResult.data || []) {
+    if (!row.source_reward_id || !row.cosmetic_id) continue;
+    const cosmetics = ownedByReward.get(row.source_reward_id) || new Set<string>();
+    cosmetics.add(row.cosmetic_id);
+    ownedByReward.set(row.source_reward_id, cosmetics);
+  }
   const loadout = loadoutResult.data || {};
   return {
     available: true, seasonId: fantasySeason.id, canPreviewAll: account.isAdmin,
@@ -44,7 +54,12 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
     previewCatalog: account.isAdmin ? (catalogResult.data || []).map(mapCosmetic) : [],
     rewards: (rewardResult.data || []).map((row: any) => ({
       id: row.id, house: Number(row.house), rewardType: row.reward_type, cardTier: row.card_tier,
-      selectedCosmeticId: choices.get(row.id) || null,
+      // The choice table is authoritative. The provenance fallback keeps the
+      // UI honest for claims made before the idempotent choice migration: if
+      // one of this reward's options is already owned, show it as selected.
+      selectedCosmeticId: choices.get(row.id) || ((row.options || [])
+        .map((option: any) => option.cosmetic?.id)
+        .find((id: string | undefined) => id && ownedByReward.get(row.id)?.has(id)) || null),
       bonusCosmetic: row.bonus ? mapCosmetic(row.bonus) : null,
       options: (row.options || []).map((option: any) => option.cosmetic).filter(Boolean).map(mapCosmetic),
     })),
