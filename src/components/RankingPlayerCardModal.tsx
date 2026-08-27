@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Medal, Share2, Sparkles, Target, Trophy, X } from "@/components/icons";
 import type { RankingEntry } from "@/lib/ranking";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { getInitials } from "@/lib/utils";
+import { useDialogViewport } from "@/lib/useDialogViewport";
 
 type Props = {
   entry: RankingEntry;
@@ -185,6 +187,13 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
 }
 
 export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
+  const [mounted, setMounted] = useState(false);
+  useDialogViewport(true);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const theme = cardTheme(position);
   const displayName = entry.player.name;
   const profile = `${PROFILE_LABELS[entry.player.player_profile || "midfield"]}${entry.player.is_goalkeeper ? " / GOL" : ""}`;
@@ -233,9 +242,11 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
 
   const clipPath = "polygon(10% 0, 90% 0, 100% 7%, 97% 88%, 50% 100%, 3% 88%, 0 7%)";
 
-  return (
+  if (!mounted || typeof document === "undefined") return null;
+
+  return createPortal(
     <div
-      className="mobile-dialog-backdrop bg-black/90 backdrop-blur-md overflow-y-auto px-4 py-8 sm:py-12"
+      className="mobile-dialog-backdrop z-[99999] bg-black/90 backdrop-blur-md animate-fade-in overflow-y-auto px-4 py-8 sm:py-12"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
@@ -453,6 +464,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
           {shareError && <p className="rounded-lg bg-danger/10 p-2 text-center text-[10px] font-bold text-danger">{shareError}</p>}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

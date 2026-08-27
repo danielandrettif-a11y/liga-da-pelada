@@ -152,11 +152,19 @@ function CosmeticFrameOverlay({ assetKey }: { assetKey?: string | null }) {
   if (!assetKey) return null;
   const key = assetKey.toLowerCase();
   const image = cosmeticFrameImage(assetKey);
-  if (image) return <span aria-hidden="true" className="pointer-events-none absolute -inset-[5px] z-10 rounded-[inherit] bg-cover bg-center" style={{ backgroundImage: `url(${image})` }} />;
+  if (image) {
+    return (
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -inset-[22%] z-10 bg-contain bg-center bg-no-repeat"
+        style={{ backgroundImage: `url(${image})` }}
+      />
+    );
+  }
   if (key.includes("alambrado") || key.includes("rede")) {
     const stroke = key.includes("rede") ? "rgba(186,230,253,.78)" : "rgba(228,228,231,.68)";
     return (
-      <svg aria-hidden="true" className="pointer-events-none absolute -inset-[4px] z-10 h-[calc(100%+8px)] w-[calc(100%+8px)] rounded-[inherit]" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <svg aria-hidden="true" className="pointer-events-none absolute -inset-[8%] z-10 h-[116%] w-[116%] rounded-[inherit]" viewBox="0 0 100 100" preserveAspectRatio="none">
         <defs><pattern id={`mesh-${key}`} width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M 0 0 L 0 14 M 7 0 L 7 14" stroke={stroke} strokeWidth="1.25" /></pattern></defs>
         <rect x="1.5" y="1.5" width="97" height="97" rx="48" fill="none" stroke={stroke} strokeWidth="3" />
         <rect x="1.5" y="1.5" width="97" height="97" rx="48" fill={`url(#mesh-${key})`} opacity=".24" />
@@ -164,10 +172,10 @@ function CosmeticFrameOverlay({ assetKey }: { assetKey?: string | null }) {
     );
   }
   if (key.includes("capitao") || key.includes("faixa")) {
-    return <span aria-hidden="true" className="pointer-events-none absolute inset-x-[-10%] bottom-[8%] z-10 -rotate-12 border-y border-amber-200/80 bg-gradient-to-r from-amber-950 via-amber-400 to-amber-950 py-[6%] opacity-90 shadow-lg" />;
+    return <span aria-hidden="true" className="pointer-events-none absolute inset-x-[-12%] bottom-[6%] z-10 -rotate-12 border-y border-amber-200/80 bg-gradient-to-r from-amber-950 via-amber-400 to-amber-950 py-[6%] opacity-90 shadow-lg" />;
   }
   if (key.includes("neon")) {
-    return <span aria-hidden="true" className="pointer-events-none absolute -inset-[3px] z-10 rounded-[inherit] border-2 border-[#dcff65] shadow-[inset_0_0_10px_rgba(204,255,0,.65),0_0_14px_rgba(204,255,0,.85)]" />;
+    return <span aria-hidden="true" className="pointer-events-none absolute -inset-[6%] z-10 rounded-[inherit] border-2 border-[#dcff65] shadow-[inset_0_0_10px_rgba(204,255,0,.65),0_0_14px_rgba(204,255,0,.85)]" />;
   }
   return null;
 }

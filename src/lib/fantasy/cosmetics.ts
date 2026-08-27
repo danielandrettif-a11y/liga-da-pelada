@@ -91,6 +91,7 @@ export function rarityClass(rarity: CosmeticRarity) {
 
 export function cosmeticFrameClass(assetKey?: string | null): string {
   if (!assetKey) return "";
+  if (cosmeticFrameImage(assetKey)) return "";
   const key = assetKey.toLowerCase();
   if (key.includes("neon")) return "!ring-[3.5px] !ring-[#ccff00] shadow-[0_0_20px_rgba(204,255,0,0.85)]";
   if (key.includes("capitao") || key.includes("faixa")) return "!ring-[3.5px] !ring-amber-400 shadow-[0_0_18px_rgba(251,191,36,0.85)]";
@@ -98,7 +99,6 @@ export function cosmeticFrameClass(assetKey?: string | null): string {
   if (key.includes("linha-lateral")) return "!ring-[3.5px] !ring-lime-200 ring-offset-2 ring-offset-emerald-950 shadow-[0_0_16px_rgba(190,242,100,.72)]";
   if (key.includes("grama-raiz")) return "!ring-[3px] !ring-emerald-300 ring-dashed shadow-[0_0_14px_rgba(52,211,153,.64)]";
   if (key.includes("alambrado")) return "!ring-[3px] !ring-zinc-300 ring-dashed shadow-[0_0_12px_rgba(255,255,255,0.5)]";
-  if (key.includes("prancheta") || key.includes("placar") || key.includes("arquibancada") || key.includes("vestiario") || key.includes("apito") || key.includes("luvas") || key.includes("colete") || key.includes("area-tecnica") || key.includes("escanteio")) return "!ring-[2px] !ring-amber-300/80 shadow-[0_0_16px_rgba(251,191,36,.48)]";
   return "!ring-[3px] !ring-accent/90 shadow-[0_0_14px_rgba(204,255,0,0.5)]";
 }
 
