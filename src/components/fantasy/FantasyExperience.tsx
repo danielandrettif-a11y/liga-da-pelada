@@ -1315,26 +1315,21 @@ export function FantasyExperience({
               </div>
             </div>
 
-            {/* CAMPO DE FUTEBOL REALISTA */}
-            <div className="relative min-h-[480px] w-full max-w-full overflow-hidden rounded-[2.5rem] border-2 border-emerald-400/35 bg-[#083b1f] p-3 sm:p-4 shadow-[0_20px_50px_rgba(0,0,0,0.7),inset_0_0_50px_rgba(0,0,0,0.6)]">
+            {/* Campo de Bairro: metade defensiva, da linha central ao gol. */}
+            <div
+              className="relative min-h-[480px] w-full max-w-full overflow-hidden rounded-[2.5rem] border-2 border-emerald-400/35 bg-[#083b1f] p-3 sm:p-4 shadow-[0_20px_50px_rgba(0,0,0,0.7),inset_0_0_50px_rgba(0,0,0,0.6)]"
+              style={{
+                backgroundImage: "linear-gradient(rgba(2, 16, 7, .20), rgba(2, 16, 7, .42)), url('/images/cartola/campo-de-bairro-metade.png')",
+                backgroundPosition: "center center",
+                backgroundSize: "cover",
+              }}
+            >
               <div
-                className="pointer-events-none absolute inset-0 opacity-40"
+                className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_12%,rgba(255,255,255,.08),transparent_34%),linear-gradient(90deg,rgba(1,10,4,.18),transparent_18%,transparent_82%,rgba(1,10,4,.18))]"
                 style={{
-                  backgroundImage:
-                    "repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 55px, transparent 55px, transparent 110px), radial-gradient(circle at 50% 30%, rgba(204,255,0,0.12), transparent 70%)",
+                  mixBlendMode: "soft-light",
                 }}
               />
-
-              <div className="pointer-events-none absolute inset-3 sm:inset-4 rounded-[2rem] border-2 border-white/40">
-                <div className="absolute inset-x-0 top-0 h-0.5 border-t-2 border-white/50" />
-                <div className="absolute -top-0.5 left-1/2 h-16 w-32 -translate-x-1/2 rounded-b-full border-b-2 border-x-2 border-white/40" />
-                <div className="absolute top-0 left-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70 shadow-sm" />
-                <div className="absolute bottom-28 left-1/2 h-12 w-28 -translate-x-1/2 rounded-t-full border-t-2 border-x-2 border-white/40" />
-                <div className="absolute bottom-0 left-1/2 h-28 w-64 -translate-x-1/2 border-t-2 border-x-2 border-white/45 bg-white/[0.015]" />
-                <div className="absolute bottom-18 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-white/80 shadow-sm" />
-                <div className="absolute bottom-0 left-1/2 h-12 w-32 -translate-x-1/2 border-t-2 border-x-2 border-white/45 bg-white/[0.02]" />
-                <div className="absolute -bottom-1 left-1/2 h-2 w-20 -translate-x-1/2 border-t-2 border-x-2 border-white/60 bg-white/10 rounded-t-xs" />
-              </div>
 
               {/* RENDERIZAÇÃO ADAPTÁVEL DO CAMPO (5 vs 6 JOGADORES) */}
               {playersPerTeam === 6 ? (
