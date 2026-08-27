@@ -8,7 +8,7 @@ import type { CosmeticItem, CosmeticSlot } from "@/lib/fantasy/cosmetics";
 
 export type CosmeticPassReward = {
   id: string; house: number; rewardType: "cosmetic_choice" | "card_pack"; cardTier: "bronze" | "gold" | null;
-  selectedCosmeticId: string | null; options: CosmeticItem[];
+  selectedCosmeticId: string | null; options: CosmeticItem[]; bonusCosmetic: CosmeticItem | null;
 };
 export type CosmeticsDashboard = {
   available: boolean; seasonId: string | null; cosmetics: CosmeticItem[]; rewards: CosmeticPassReward[];
@@ -31,7 +31,7 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
   const [ownedResult, catalogResult, rewardResult, choiceResult, loadoutResult] = await Promise.all([
     client.from("fantasy_user_cosmetics").select("cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id),
     client.from("fantasy_cosmetics").select("*").order("created_at"),
-    client.from("fantasy_season_pass_rewards").select("id, house, reward_type, card_tier, options:fantasy_season_pass_reward_options(cosmetic:fantasy_cosmetics(*))").eq("fantasy_season_id", fantasySeason.id).order("house"),
+    client.from("fantasy_season_pass_rewards").select("id, house, reward_type, card_tier, bonus:bonus_cosmetic_id(*), options:fantasy_season_pass_reward_options(cosmetic:fantasy_cosmetics(*))").eq("fantasy_season_id", fantasySeason.id).order("house"),
     client.from("fantasy_user_cosmetic_reward_choices").select("reward_id, cosmetic_id").eq("user_id", account.user.id),
     client.from("fantasy_user_cosmetic_loadouts").select("*").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).maybeSingle(),
   ]);
@@ -45,6 +45,7 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
     rewards: (rewardResult.data || []).map((row: any) => ({
       id: row.id, house: Number(row.house), rewardType: row.reward_type, cardTier: row.card_tier,
       selectedCosmeticId: choices.get(row.id) || null,
+      bonusCosmetic: row.bonus ? mapCosmetic(row.bonus) : null,
       options: (row.options || []).map((option: any) => option.cosmetic).filter(Boolean).map(mapCosmetic),
     })),
     equipped: {

@@ -65,9 +65,19 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
   const cardGradient = cosmetics?.bannerAssetKey
     ? `bg-gradient-to-b ${cosmeticVisual(cosmetics.bannerAssetKey)}/30`
     : "";
+  const profileBackgroundImage = cosmeticImage(cosmetics?.backgroundAssetKey);
+  const profileBackgroundStyle = profileBackgroundImage
+    ? {
+        backgroundImage: `linear-gradient(rgba(2, 14, 8, .80), rgba(2, 14, 8, .92)), url(${profileBackgroundImage})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
+    : undefined;
 
   return (
-    <div className="space-y-6">
+    <div className={`relative -mx-4 -mt-4 min-h-[calc(100dvh-3.5rem)] px-4 pb-4 pt-4 ${profileBackgroundImage ? "bg-[#06100a]" : ""}`} style={profileBackgroundStyle}>
+      {profileBackgroundImage && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,transparent_0%,rgba(2,14,8,.38)_48%,rgba(2,14,8,.78)_100%)]" />}
+      <div className="relative z-10 space-y-6">
       <div className="flex items-center gap-3"><Link href="/jogadores" className="flex h-10 w-10 items-center justify-center rounded-full bg-surface"><ArrowLeft className="h-5 w-5 text-muted" /></Link><h1 className="text-sm font-bold uppercase tracking-wider text-foreground">Perfil</h1></div>
       <div className={`glass-card relative overflow-hidden flex flex-col items-center p-6 text-center ${cardGradient}`} style={cosmeticImage(cosmetics?.bannerAssetKey) ? { backgroundImage: `linear-gradient(rgba(3, 14, 8, .74), rgba(3, 14, 8, .92)), url(${cosmeticImage(cosmetics?.bannerAssetKey)})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
         {cosmetics?.bannerAssetKey && (
@@ -143,6 +153,7 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
         <section><h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">Histórico Ranked</h3><History rows={officialHistory} /></section>
         <section><h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">Histórico de Amistosos</h3><History rows={friendlyHistory} friendly /></section>
       </>}
+      </div>
     </div>
   );
 }
