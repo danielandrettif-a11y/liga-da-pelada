@@ -1123,6 +1123,14 @@ export function FantasyExperience({
         )}
       </header>
 
+      {/* Radar compacto da página inicial do Cartola. */}
+      {radar && (
+        <FantasyRadarCarousel
+          radar={radar}
+          onSelectPlayer={(player) => setSelectedDrawerPlayer(player)}
+        />
+      )}
+
       {/* Resumo da Última Rodada */}
       {lastRound && !isTest && (
         <section className="overflow-hidden rounded-2xl border border-accent/25 bg-gradient-to-br from-[#0b2415] via-surface to-[#10190d] shadow-[0_12px_30px_rgba(0,0,0,.2)]">
@@ -1621,14 +1629,6 @@ export function FantasyExperience({
         {/* ABA: MERCADO DE JOGADORES */}
         {activeTab === "market" && (
           <aside className="space-y-4 w-full animate-fade-in">
-            {/* Radar abre a experiência do Mercado e recebe swipe/autoplay. */}
-            {radar && (
-              <FantasyRadarCarousel
-                radar={radar}
-                onSelectPlayer={(player) => setSelectedDrawerPlayer(player)}
-              />
-            )}
-
             {/* Barra de Resumo de Orçamento e Acesso Rápido ao Time */}
             <div className="flex items-center justify-between gap-3 rounded-2xl border border-accent/30 bg-gradient-to-r from-accent/15 via-[#06180e] to-surface p-3.5 shadow-md">
               <div className="min-w-0">
