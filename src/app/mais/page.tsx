@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FinishSeasonCard } from "@/components/FinishSeasonCard";
-import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
+import { getCurrentAccount, getCurrentAccountIdentity } from "@/lib/auth";
 import { logout } from "@/app/login/actions";
 import { InstallAppEntry } from "@/components/InstallAppPrompt";
 import { PushNotificationSettings } from "@/components/PushNotificationSettings";
@@ -101,21 +101,14 @@ const ADMIN_SECTIONS = [
 
 export default async function MaisPage() {
   const account = await getCurrentAccount();
-  const playerAvatarPromise = account.profile?.player_id
-    ? account.client
-        .from("players")
-        .select("avatar_url")
-        .eq("id", account.profile.player_id)
-        .maybeSingle()
-        .then(({ data }) => data?.avatar_url)
-    : Promise.resolve(undefined);
-  const [accountName, activeCallup, leagueConfig, playerAvatarUrl, stadiums] = await Promise.all([
-    getAccountDisplayName(account),
+  const [identity, activeCallup, leagueConfig, stadiums] = await Promise.all([
+    getCurrentAccountIdentity(),
     account.isAdmin ? getActiveCallup() : Promise.resolve(null),
     account.isAdmin ? getLeagueConfig() : Promise.resolve(null),
-    playerAvatarPromise,
     account.isAdmin ? getStadiums() : Promise.resolve([]),
   ]);
+  const accountName = identity.displayName;
+  const playerAvatarUrl = identity.avatarUrl;
 
   return (
     <div className="space-y-6">

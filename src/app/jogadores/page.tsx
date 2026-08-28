@@ -9,12 +9,15 @@ export const revalidate = 0;
 
 export default async function JogadoresPage({ searchParams }: PageProps<"/jogadores">) {
   const { tab, reward } = await searchParams;
-  const [rankedRoster, friendlyRoster, unreadRoster, seasonPass, cosmetics] = await Promise.all([
+  const shouldLoadPass = tab === "passe" || typeof reward === "string";
+  const passDataRequest = shouldLoadPass
+    ? Promise.all([getSeasonPassDashboard(), getMyCosmeticsDashboard()]).then(([pass, cosmetics]) => ({ pass, cosmetics }))
+    : Promise.resolve(null);
+  const [rankedRoster, friendlyRoster, unreadRoster, passData] = await Promise.all([
     getRosterGroups("official"),
     getRosterGroups("friendly"),
     getUnreadRosterPlayers(),
-    getSeasonPassDashboard(),
-    getMyCosmeticsDashboard(),
+    passDataRequest,
   ]);
 
   return (
@@ -31,10 +34,10 @@ export default async function JogadoresPage({ searchParams }: PageProps<"/jogado
         supporters={rankedRoster.supporters}
         unreadPlayerIds={unreadRoster.playerIds}
         unreadSeenThrough={unreadRoster.seenThrough}
-        initialView={tab === "passe" ? "pass" : "roster"}
-        seasonPassProgress={seasonPass.progress}
-        seasonPassMaxProgress={seasonPass.maxProgress}
-        seasonPass={<SeasonPassExperience pass={seasonPass} cosmetics={cosmetics} rewardId={typeof reward === "string" ? reward : undefined} />}
+        initialView={shouldLoadPass ? "pass" : "roster"}
+        seasonPassProgress={passData?.pass.progress}
+        seasonPassMaxProgress={passData?.pass.maxProgress}
+        seasonPass={passData ? <SeasonPassExperience pass={passData.pass} cosmetics={passData.cosmetics} rewardId={typeof reward === "string" ? reward : undefined} /> : undefined}
       />
     </div>
   );

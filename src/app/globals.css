@@ -97,6 +97,7 @@ textarea {
 .mobile-dialog-panel {
   width: 100%;
   min-height: 0;
+  margin-block: auto;
   max-height: calc(100dvh - max(2rem, env(safe-area-inset-top)) - max(2rem, env(safe-area-inset-bottom)));
   overflow: hidden;
 }
@@ -108,6 +109,11 @@ textarea {
   overscroll-behavior: contain;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
+}
+
+/* A confirmacao nunca fica escondida pelo indicador de gesto do celular. */
+.mobile-dialog-footer {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 
 @media (min-width: 640px) {

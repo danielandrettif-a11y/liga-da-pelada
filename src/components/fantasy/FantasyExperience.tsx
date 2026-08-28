@@ -1392,7 +1392,7 @@ export function FantasyExperience({
             <div
               className="relative min-h-[480px] w-full max-w-full overflow-hidden rounded-[2.5rem] border-2 border-emerald-400/35 bg-[#083b1f] p-3 sm:p-4 shadow-[0_20px_50px_rgba(0,0,0,0.7),inset_0_0_50px_rgba(0,0,0,0.6)]"
               style={{
-                backgroundImage: "linear-gradient(rgba(2, 16, 7, .20), rgba(2, 16, 7, .42)), url('/images/cartola/campo-de-bairro-metade.png')",
+                backgroundImage: "linear-gradient(rgba(2, 16, 7, .20), rgba(2, 16, 7, .42)), url('/images/cartola/campo-de-bairro-metade.webp')",
                 backgroundPosition: "center center",
                 backgroundSize: "cover",
               }}
@@ -1621,6 +1621,14 @@ export function FantasyExperience({
         {/* ABA: MERCADO DE JOGADORES */}
         {activeTab === "market" && (
           <aside className="space-y-4 w-full animate-fade-in">
+            {/* Radar abre a experiência do Mercado e recebe swipe/autoplay. */}
+            {radar && (
+              <FantasyRadarCarousel
+                radar={radar}
+                onSelectPlayer={(player) => setSelectedDrawerPlayer(player)}
+              />
+            )}
+
             {/* Barra de Resumo de Orçamento e Acesso Rápido ao Time */}
             <div className="flex items-center justify-between gap-3 rounded-2xl border border-accent/30 bg-gradient-to-r from-accent/15 via-[#06180e] to-surface p-3.5 shadow-md">
               <div className="min-w-0">
@@ -1645,14 +1653,6 @@ export function FantasyExperience({
                 Ver Time ({selected.length}/{playersPerTeam}) →
               </button>
             </div>
-
-            {/* RADAR CARTOLA V2 (Carrossel Dinâmico de Mercado Vivo) */}
-            {radar && (
-              <FantasyRadarCarousel
-                radar={radar}
-                onSelectPlayer={(player) => setSelectedDrawerPlayer(player)}
-              />
-            )}
 
             {/* Cabeçalho Responsivo do Mercado */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">

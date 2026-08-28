@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { getCurrentAccount, getAccountDisplayName } from "@/lib/auth";
-import { getMyInboxNotifications } from "@/lib/actions/inbox";
+import { getCurrentAccount, getCurrentAccountIdentity } from "@/lib/auth";
+import { getMyInboxPreview } from "@/lib/actions/inbox";
 import { getMyEquippedCosmetics } from "@/lib/actions/cosmetics";
 import { InboxBell } from "./InboxBell";
 import { ShareAppButton } from "./ShareAppButton";
@@ -9,28 +9,18 @@ import { UserRound } from "@/components/icons";
 
 export async function SessionHeaderActions() {
   const account = await getCurrentAccount();
-  const [name, inbox, cosmetics] = await Promise.all([
-    getAccountDisplayName(account),
-    account.user ? getMyInboxNotifications() : Promise.resolve([]),
+  const [identity, inbox, cosmetics] = await Promise.all([
+    getCurrentAccountIdentity(),
+    account.user ? getMyInboxPreview() : Promise.resolve([]),
     account.user ? getMyEquippedCosmetics() : Promise.resolve(null),
   ]);
-
-  let avatarUrl: string | null = null;
-  if (account.profile?.player_id) {
-    const { data: player } = await account.client
-      .from("players")
-      .select("avatar_url")
-      .eq("id", account.profile.player_id)
-      .maybeSingle();
-    avatarUrl = player?.avatar_url || null;
-  }
 
   return (
     <div className="flex items-center gap-2 shrink-0">
       <InboxBell notifications={inbox} />
       <ShareAppButton className="shadow-sm" />
       {account.user ? (
-        account.profile?.player_id ? <ProfileQuickMenu playerId={account.profile.player_id} name={name || "Perfil"} avatarUrl={avatarUrl} frameKey={cosmetics?.frameKey} auraKey={cosmetics?.auraKey} /> : <Link href="/meu-perfil" className="relative block rounded-full text-xs font-black text-accent">Perfil</Link>
+        account.profile?.player_id ? <ProfileQuickMenu playerId={account.profile.player_id} name={identity.displayName || "Perfil"} avatarUrl={identity.avatarUrl} frameKey={cosmetics?.frameKey} auraKey={cosmetics?.auraKey} /> : <Link href="/meu-perfil" className="relative block rounded-full text-xs font-black text-accent">Perfil</Link>
       ) : (
         <Link
           href="/login"

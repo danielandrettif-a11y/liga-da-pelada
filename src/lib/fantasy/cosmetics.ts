@@ -44,28 +44,28 @@ export function cosmeticVisual(assetKey?: string | null) {
 
 export function cosmeticImage(assetKey?: string | null) {
   const key = assetKey || "";
-  if (key.includes("alambrado-noturno")) return "/images/cosmetics/backgrounds/alambrado-noturno.png";
-  if (key.includes("vestiario-concreto")) return "/images/cosmetics/backgrounds/vestiario-concreto.png";
-  if (key.includes("garoa-refletores")) return "/images/cosmetics/backgrounds/garoa-refletores.png";
-  if (key.includes("gramado-bairro")) return "/images/cosmetics/backgrounds/gramado-bairro.png";
-  if (key.includes("arquibancada-vazia")) return "/images/cosmetics/backgrounds/arquibancada-vazia.png";
-  if (key.includes("por-do-sol-quadra")) return "/images/cosmetics/backgrounds/por-do-sol-quadra.png";
-  if (key.includes("campo-domingo")) return "/images/cosmetics/covers/campo-domingo.png";
-  if (key.includes("arquibancada-concreto")) return "/images/cosmetics/covers/arquibancada-concreto.png";
-  if (key.includes("vestiario-pos-jogo")) return "/images/cosmetics/covers/vestiario-pos-jogo.png";
-  if (key.includes("tunel-quadra")) return "/images/cosmetics/covers/tunel-quadra.png";
-  if (key.includes("chuva-campo")) return "/images/cosmetics/covers/chuva-campo.png";
-  if (key.includes("bar-campo")) return "/images/cosmetics/covers/bar-campo.png";
-  if (key.includes("banner-lenda-varzea")) return "/images/cosmetics/covers/lenda-varzea.png";
-  if (key.includes("banner-rei-estadio")) return "/images/cosmetics/covers/rei-estadio.png";
-  if (key.includes("campo-noite")) return "/images/cosmetics/campo-a-noite.png";
-  if (key.includes("arquibancada")) return "/images/cosmetics/arquibancada-neon.png";
-  if (key.includes("tunel")) return "/images/cosmetics/tunel-estadio.png";
-  if (key.includes("torcida")) return "/images/cosmetics/torcida-bq.png";
-  if (key.includes("vestiario")) return "/images/cosmetics/vestiario.png";
-  if (key.includes("chuva")) return "/images/cosmetics/chuva-estadio.png";
-  if (key.includes("lenda")) return "/images/cosmetics/lenda-varzea.png";
-  if (key.includes("rei")) return "/images/cosmetics/rei-estadio.png";
+  if (key.includes("alambrado-noturno")) return "/images/cosmetics/backgrounds/alambrado-noturno.webp";
+  if (key.includes("vestiario-concreto")) return "/images/cosmetics/backgrounds/vestiario-concreto.webp";
+  if (key.includes("garoa-refletores")) return "/images/cosmetics/backgrounds/garoa-refletores.webp";
+  if (key.includes("gramado-bairro")) return "/images/cosmetics/backgrounds/gramado-bairro.webp";
+  if (key.includes("arquibancada-vazia")) return "/images/cosmetics/backgrounds/arquibancada-vazia.webp";
+  if (key.includes("por-do-sol-quadra")) return "/images/cosmetics/backgrounds/por-do-sol-quadra.webp";
+  if (key.includes("campo-domingo")) return "/images/cosmetics/covers/campo-domingo.webp";
+  if (key.includes("arquibancada-concreto")) return "/images/cosmetics/covers/arquibancada-concreto.webp";
+  if (key.includes("vestiario-pos-jogo")) return "/images/cosmetics/covers/vestiario-pos-jogo.webp";
+  if (key.includes("tunel-quadra")) return "/images/cosmetics/covers/tunel-quadra.webp";
+  if (key.includes("chuva-campo")) return "/images/cosmetics/covers/chuva-campo.webp";
+  if (key.includes("bar-campo")) return "/images/cosmetics/covers/bar-campo.webp";
+  if (key.includes("banner-lenda-varzea")) return "/images/cosmetics/covers/lenda-varzea.webp";
+  if (key.includes("banner-rei-estadio")) return "/images/cosmetics/covers/rei-estadio.webp";
+  if (key.includes("campo-noite")) return "/images/cosmetics/campo-a-noite.webp";
+  if (key.includes("arquibancada")) return "/images/cosmetics/arquibancada-neon.webp";
+  if (key.includes("tunel")) return "/images/cosmetics/tunel-estadio.webp";
+  if (key.includes("torcida")) return "/images/cosmetics/torcida-bq.webp";
+  if (key.includes("vestiario")) return "/images/cosmetics/vestiario.webp";
+  if (key.includes("chuva")) return "/images/cosmetics/chuva-estadio.webp";
+  if (key.includes("lenda")) return "/images/cosmetics/lenda-varzea.webp";
+  if (key.includes("rei")) return "/images/cosmetics/rei-estadio.webp";
   return null;
 }
 
@@ -105,7 +105,7 @@ export function cosmeticFrameClass(assetKey?: string | null): string {
 export function cosmeticFrameImage(assetKey?: string | null) {
   const key = assetKey || "";
   const frame = ["prancheta-tecnico", "placar-estadio", "arquibancada", "vestiario", "apito-arbitro", "luvas-goleiro", "colete-treino", "area-tecnica", "escanteio"].find((name) => key.includes(name));
-  return frame ? `/images/cosmetics/frames/${frame}.png` : null;
+  return frame ? `/images/cosmetics/frames/${frame}.webp` : null;
 }
 
 export function cosmeticAuraClass(assetKey?: string | null): string {

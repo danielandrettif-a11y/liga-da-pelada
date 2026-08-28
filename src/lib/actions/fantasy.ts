@@ -74,6 +74,27 @@ export type FantasyRadarHighlight = {
   badge?: string;
 };
 
+export type FantasyRadarTopList = {
+  title: string;
+  subtitle: string;
+  players: FantasyRadarHighlight[];
+};
+
+export type FantasyRadarComparison = {
+  leader: FantasyRadarHighlight;
+  challenger: FantasyRadarHighlight;
+  metric: string;
+  copy: string;
+};
+
+export type FantasyRadarWithdrawal = {
+  id: string;
+  playerId: string | null;
+  playerName: string;
+  occurredAt: string;
+  player: FantasyMarketPlayer | null;
+};
+
 export type FantasyRadarData = {
   mostSelected: FantasyRadarHighlight | null;
   mostCaptained: FantasyRadarHighlight | null;
@@ -85,6 +106,13 @@ export type FantasyRadarData = {
   mostSold: FantasyRadarHighlight | null;
   favoriteScorer: FantasyRadarHighlight | null;
   favoriteAssist: FantasyRadarHighlight | null;
+  topLists: {
+    mostSelected: FantasyRadarTopList | null;
+    favoriteScorers: FantasyRadarTopList | null;
+    goalkeepers: FantasyRadarTopList | null;
+  };
+  comparison: FantasyRadarComparison | null;
+  latestWithdrawal: FantasyRadarWithdrawal | null;
   totalLineups: number;
   hasMinSample: boolean;
 };
@@ -104,11 +132,29 @@ export async function getFantasyDashboard() {
   const season = await getActiveSeason(league.id);
   if (!season) return { authenticated: true as const, available: false as const };
 
-  const { data: settingsRow } = await account.client
-    .from("fantasy_settings")
-    .select("*")
-    .eq("league_id", league.id)
-    .maybeSingle();
+  // Estas leituras dependem apenas de liga/temporada. Iniciá-las juntas
+  // remove um round-trip inteiro antes de montar o dashboard do Cartola.
+  const [{ data: settingsRow }, { data: testSession }, { data: fantasySeason }] = await Promise.all([
+    account.client
+      .from("fantasy_settings")
+      .select("*")
+      .eq("league_id", league.id)
+      .maybeSingle(),
+    account.client
+      .from("fantasy_test_sessions")
+      .select(
+        "*, round:round_id(id, number, date, start_time, status, round_type, teams(id, name, color), matches(id, status))"
+      )
+      .eq("league_id", league.id)
+      .eq("season_id", season.id)
+      .in("status", ["open", "in_progress"])
+      .maybeSingle(),
+    account.client
+      .from("fantasy_seasons")
+      .select("id, initial_budget, initial_player_price")
+      .eq("season_id", season.id)
+      .maybeSingle(),
+  ]);
 
   const settings: FantasySettings = settingsRow
     ? {
@@ -151,23 +197,6 @@ export async function getFantasyDashboard() {
         minSampleForRadar: Number(settingsRow.min_sample_for_radar ?? 3),
       }
     : DEFAULT_FANTASY_SETTINGS;
-
-  const [{ data: testSession }, { data: fantasySeason }] = await Promise.all([
-    account.client
-      .from("fantasy_test_sessions")
-      .select(
-        "*, round:round_id(id, number, date, start_time, status, round_type, teams(id, name, color), matches(id, status))"
-      )
-      .eq("league_id", league.id)
-      .eq("season_id", season.id)
-      .in("status", ["open", "in_progress"])
-      .maybeSingle(),
-    account.client
-      .from("fantasy_seasons")
-      .select("id, initial_budget, initial_player_price")
-      .eq("season_id", season.id)
-      .maybeSingle(),
-  ]);
 
   if (
     !fantasySeason ||
@@ -252,26 +281,27 @@ export async function getFantasyDashboard() {
   const officialRoundIds = officialFantasyRounds.map((item: any) => item.round?.id).filter(Boolean);
   const matchIds = (displayRound?.matches || []).map((match: any) => match.id);
 
-  // V3: Carregar pacotes, inventário e carta ativa do usuário
-  let availablePacks: any[] = [];
-  let availablePacksCount = 0;
-  let inventoryCount = 0;
-  let activeCard: any = null;
-
-  try {
-    const { getMyPacks, getMyInventoryCount, getActiveCardForRound } = await import("./fantasy-cards");
-    const [packsRes, inventoryCountResult, activeCardRes] = await Promise.all([
-      getMyPacks(),
-      getMyInventoryCount(),
-      displayRoundId ? getActiveCardForRound(displayRoundId) : Promise.resolve(null),
-    ]);
-    availablePacks = packsRes.availablePacks;
-    availablePacksCount = packsRes.availablePacks.length;
-    inventoryCount = inventoryCountResult;
-    activeCard = activeCardRes;
-  } catch (err) {
-    console.error("Erro ao carregar dados V3 das cartas:", err);
-  }
+  // Cartas não bloqueiam mais o início das consultas de mercado/escalação.
+  // O resultado continua sendo aguardado antes do retorno final da página.
+  const cardDashboardRequest = (async () => {
+    try {
+      const { getMyPacks, getMyInventoryCount, getActiveCardForRound } = await import("./fantasy-cards");
+      const [packsRes, inventoryCount, activeCard] = await Promise.all([
+        getMyPacks(),
+        getMyInventoryCount(),
+        displayRoundId ? getActiveCardForRound(displayRoundId) : Promise.resolve(null),
+      ]);
+      return {
+        availablePacks: packsRes.availablePacks,
+        availablePacksCount: packsRes.availablePacks.length,
+        inventoryCount,
+        activeCard,
+      };
+    } catch (err) {
+      console.error("Erro ao carregar dados V3 das cartas:", err);
+      return { availablePacks: [] as any[], availablePacksCount: 0, inventoryCount: 0, activeCard: null as any };
+    }
+  })();
 
   const lineupRequest = isTest
     ? account.client
@@ -347,6 +377,7 @@ export async function getFantasyDashboard() {
     { data: previousRoundLineups },
     { data: rawPortfolio },
     { data: liveMatches },
+    cardDashboard,
   ] = await Promise.all([
     account.client.from("fantasy_player_prices").select("*").eq("fantasy_season_id", fantasySeason.id),
     officialRoundIds.length
@@ -392,7 +423,10 @@ export async function getFantasyDashboard() {
     previousRoundLineupsRequest,
     portfolioRequest,
     liveMatchesRequest,
+    cardDashboardRequest,
   ]);
+
+  const { availablePacks, availablePacksCount, inventoryCount, activeCard } = cardDashboard;
 
   const lineup =
     isTest && rawLineup
@@ -806,6 +840,101 @@ export async function getFantasyDashboard() {
     (a, b) => b[1] - a[1]
   )[0]?.[0];
 
+  const scorerCandidates = [...market]
+    .filter((player) => (popularityAgg.scorerPredictionCounts.get(player.id) || 0) > 0 || player.games > 0)
+    .sort((a, b) => {
+      const predictionDiff =
+        (popularityAgg.scorerPredictionCounts.get(b.id) || 0) -
+        (popularityAgg.scorerPredictionCounts.get(a.id) || 0);
+      if (predictionDiff !== 0) return predictionDiff;
+      return b.goals / Math.max(1, b.games) - a.goals / Math.max(1, a.games);
+    });
+  const goalkeeperCandidates = [...market]
+    .filter((player) => (player.isGoalkeeper || player.goalkeeperGames > 0) && player.goalkeeperGames > 0)
+    .sort(
+      (a, b) =>
+        (a.goalkeeperConcededAverage ?? Number.POSITIVE_INFINITY) -
+          (b.goalkeeperConcededAverage ?? Number.POSITIVE_INFINITY) ||
+        b.goalkeeperGames - a.goalkeeperGames ||
+        b.totalPoints - a.totalPoints,
+    );
+  const makeTopList = (
+    title: string,
+    subtitle: string,
+    players: FantasyMarketPlayer[],
+    getValue: (player: FantasyMarketPlayer) => string,
+    getExtra: (player: FantasyMarketPlayer) => string,
+  ): FantasyRadarTopList | null => {
+    const topPlayers = players.slice(0, 3).map((player) => ({
+      player,
+      value: getValue(player),
+      extra: getExtra(player),
+    }));
+    return topPlayers.length >= 2 ? { title, subtitle, players: topPlayers } : null;
+  };
+
+  const topLists = {
+    mostSelected: makeTopList(
+      "Top 3 mais escalados",
+      "A turma está apostando nestes nomes.",
+      sortedByPopularity.filter((player) => player.popularityPercent > 0),
+      (player) => `${player.popularityPercent}%`,
+      () => "das escalações",
+    ),
+    favoriteScorers: makeTopList(
+      "Top 3 favoritos a gol",
+      "Palpite real; a corneta é por nossa conta.",
+      scorerCandidates,
+      (player) => {
+        const predictions = popularityAgg.scorerPredictionCounts.get(player.id) || 0;
+        return predictions > 0
+          ? `${Math.round((predictions / Math.max(1, popularityAgg.totalLineups)) * 100)}%`
+          : `${(player.goals / Math.max(1, player.games)).toFixed(2)} G/J`;
+      },
+      (player) =>
+        (popularityAgg.scorerPredictionCounts.get(player.id) || 0) > 0
+          ? "dos palpites de gol"
+          : `${player.goals} gol(s) em ${player.games} jogo(s)`,
+    ),
+    goalkeepers: makeTopList(
+      "Top 3 paredões",
+      "Quem fecha o gol sem pedir VAR.",
+      goalkeeperCandidates,
+      (player) => `${(player.goalkeeperConcededAverage ?? 0).toFixed(2)} G/J`,
+      (player) => `${player.goalkeeperGames} jogo(s) no gol`,
+    ),
+  };
+
+  const formLeader = sortedByForm[0];
+  const formChallenger = sortedByForm[1];
+  const formLeaderScore = formLeader?.recentPointsList.slice(0, 3).reduce((sum, value) => sum + value, 0) || 0;
+  const formChallengerScore = formChallenger?.recentPointsList.slice(0, 3).reduce((sum, value) => sum + value, 0) || 0;
+  const comparison: FantasyRadarComparison | null = formLeader && formChallenger
+    ? {
+        leader: { player: formLeader, value: `${formLeaderScore.toFixed(1)} pts`, extra: "nas últimas rodadas" },
+        challenger: { player: formChallenger, value: `${formChallengerScore.toFixed(1)} pts`, extra: "nas últimas rodadas" },
+        metric: "Forma recente",
+        copy: `${formLeader.name} leva ${Math.max(0, formLeaderScore - formChallengerScore).toFixed(1)} ponto(s) de vantagem. Hoje a bola parece reconhecer o crachá dele.`,
+      }
+    : null;
+
+  const { data: withdrawalRows } = await (account.client as any)
+    .from("callup_withdrawals")
+    .select("id, player_id, player_name, occurred_at")
+    .eq("league_id", league.id)
+    .order("occurred_at", { ascending: false })
+    .limit(1);
+  const withdrawalRow = withdrawalRows?.[0];
+  const latestWithdrawal: FantasyRadarWithdrawal | null = withdrawalRow
+    ? {
+        id: withdrawalRow.id,
+        playerId: withdrawalRow.player_id,
+        playerName: withdrawalRow.player_name,
+        occurredAt: withdrawalRow.occurred_at,
+        player: market.find((player) => player.id === withdrawalRow.player_id) || null,
+      }
+    : null;
+
   const radarData: FantasyRadarData = {
     totalLineups: popularityAgg.totalLineups,
     hasMinSample: popularityAgg.hasMinSample,
@@ -899,6 +1028,9 @@ export async function getFantasyDashboard() {
           badge: "Favorito a Garçom",
         }
       : null,
+    topLists,
+    comparison,
+    latestWithdrawal,
   };
 
   const topRoundPlayer = [...market].sort(
@@ -2073,23 +2205,24 @@ export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
   ]);
   if (seasonError || !fantasySeason) return empty;
 
-  const { data: pass, error: passError } = await account.client
-    .from("fantasy_season_passes")
-    .select("progress, progression_mode, participations, active_weeks, valid_lineups, goals_assists_remainder")
-    .eq("fantasy_season_id", fantasySeason.id)
-    .eq("user_id", account.user.id)
-    .maybeSingle();
+  const [{ data: pass, error: passError }, { data: rows, error: eventsError }] = await Promise.all([
+    account.client
+      .from("fantasy_season_passes")
+      .select("progress, progression_mode, participations, active_weeks, valid_lineups, goals_assists_remainder")
+      .eq("fantasy_season_id", fantasySeason.id)
+      .eq("user_id", account.user.id)
+      .maybeSingle(),
+    account.client
+      .from("fantasy_season_pass_events")
+      .select("id, event_type, houses, source_round_id, created_at, rounds:source_round_id(number, date)")
+      .eq("fantasy_season_id", fantasySeason.id)
+      .eq("user_id", account.user.id)
+      .order("created_at", { ascending: false })
+      .limit(8),
+  ]);
 
   // Enquanto a migration 060 nao estiver aplicada, o restante do app segue utilizavel.
   if (passError) return empty;
-
-  const { data: rows, error: eventsError } = await account.client
-    .from("fantasy_season_pass_events")
-    .select("id, event_type, houses, source_round_id, created_at, rounds:source_round_id(number, date)")
-    .eq("fantasy_season_id", fantasySeason.id)
-    .eq("user_id", account.user.id)
-    .order("created_at", { ascending: false })
-    .limit(8);
   if (eventsError) return empty;
 
   const mode = pass?.progression_mode === "community" || player?.member_category === "wag" || player?.member_category === "supporter"

@@ -222,74 +222,26 @@ export async function inviteGuestToCallup({
     return { success: false, error: "Informe o nome do seu amigo (pelo menos 2 letras)." };
   }
 
-  const adminClient = await getAdminClient();
-  const client = adminClient || account.client;
-
-  // 1. Buscar a convocação
-  const { data: callup, error: callupError } = await client
-    .from("callups")
-    .select("id, league_id, capacity, status")
-    .eq("id", callupId)
-    .single();
-
-  if (callupError || !callup) {
-    return { success: false, error: "Convocação não encontrada." };
-  }
-
-  if (callup.status !== "open") {
-    return { success: false, error: "A convocação já foi fechada." };
-  }
-
-  // 2. Criar o perfil de convidado
-  const { data: createdPlayer, error: playerError } = await client
-    .from("players")
-    .insert({
-      name: cleanName,
-      member_category: "guest",
-      is_selectable: true,
-      is_goalkeeper: isGoalkeeper,
-      player_profile: playerProfile,
-      registration_source: "site_signup",
-      created_by_user_id: account.user.id,
-    })
-    .select("id, name")
-    .single();
-
-  if (playerError || !createdPlayer) {
-    return { success: false, error: playerError?.message || "Não foi possível criar o perfil do convidado." };
-  }
-
-  const { error: membershipError } = await client
-    .from("league_members")
-    .insert({
-      league_id: callup.league_id,
-      player_id: createdPlayer.id,
-      role: "player",
-      is_active: true,
-    });
-
-  if (membershipError) {
-    await client.from("players").delete().eq("id", createdPlayer.id).eq("created_by_user_id", account.user.id);
-    return { success: false, error: membershipError.message };
-  }
-
-  // 3. A posição é reservada transacionalmente no banco para evitar duas
-  // inscrições ocuparem a mesma vaga quando acontecem ao mesmo tempo.
-  const { data: createdEntry, error: entryError } = await account.client.rpc("add_player_to_callup", {
-    p_callup_id: callupId,
-    p_player_id: createdPlayer.id,
-    p_admin_only: false,
-  });
+  // A criação do convidado, seu vínculo com a liga e a reserva na fila
+  // acontecem em uma única transação no banco. Assim não há convidado órfão
+  // nem duas pessoas ocupando a última vaga ao mesmo tempo.
+  const { data: createdEntry, error: entryError } = await (account.client as any).rpc(
+    "create_callup_guest",
+    {
+      p_callup_id: callupId,
+      p_name: cleanName,
+      p_player_profile: playerProfile,
+      p_is_goalkeeper: isGoalkeeper,
+    },
+  );
 
   if (entryError) {
-    // Evita deixar um perfil órfão se a convocação fechar no mesmo instante.
-    await client.from("players").delete().eq("id", createdPlayer.id).eq("created_by_user_id", account.user.id);
     return { success: false, error: entryError.message };
   }
 
   refreshCallups();
   const entry = Array.isArray(createdEntry) ? createdEntry[0] : createdEntry;
-  return { success: true, isConfirmed: entry?.status === "confirmed", playerId: createdPlayer.id };
+  return { success: true, isConfirmed: entry?.status === "confirmed", playerId: entry?.player_id };
 }
 
 /**

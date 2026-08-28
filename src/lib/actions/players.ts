@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cache } from "react";
 import { supabase } from "../supabase";
 import { buildAwardSeasonsByPlayer } from "../awards";
 import type { Player, CreatePlayerInput, MemberCategory, PlayerProfile, RoundType, SeasonStatus } from "../types";
@@ -59,6 +60,26 @@ export async function getPlayers(selectableOnly = false) {
   return data as Player[];
 }
 
+/** Atletas que pertencem à liga da convocação e podem ocupar uma vaga. */
+export async function getSelectableLeaguePlayers(leagueId: string) {
+  const { data, error } = await supabase
+    .from("league_members")
+    .select("players(*)")
+    .eq("league_id", leagueId)
+    .eq("is_active", true)
+    .order("joined_at");
+
+  if (error) {
+    console.error("Erro ao buscar elenco elegível da liga:", error);
+    return [] as Player[];
+  }
+
+  return (data || [])
+    .map((member: any) => member.players)
+    .filter((player: any) => player?.is_selectable && ["player", "guest"].includes(player.member_category))
+    .sort((a: Player, b: Player) => a.name.localeCompare(b.name, "pt-BR"));
+}
+
 export async function getPlayer(id: string) {
   const { data, error } = await supabase
     .from("players")
@@ -86,19 +107,19 @@ export async function getPlayer(id: string) {
   return data as Player;
 }
 
+const getPlayersForStatsCached = cache(async (selectableOnly: boolean) => {
+  const query = supabase.from("players").select("*").order("name");
+  return selectableOnly
+    ? query.eq("is_selectable", true).in("member_category", ["player", "guest"])
+    : query;
+});
+
 export async function getPlayersWithStats(roundType: RoundType = "official", selectableOnly = false) {
   const season = await getActiveSeason();
 
   // 1. Tentar buscar jogadores e stats agregados via View SQL
   if (season) {
-    const playersQuery = selectableOnly
-      ? supabase
-          .from("players")
-          .select("*")
-          .eq("is_selectable", true)
-          .in("member_category", ["player", "guest"])
-          .order("name")
-      : supabase.from("players").select("*").order("name");
+    const playersQuery = getPlayersForStatsCached(selectableOnly);
 
     const statsQuery = supabase
       .from("player_season_stats")
@@ -145,9 +166,7 @@ export async function getPlayersWithStats(roundType: RoundType = "official", sel
 
   // Fallback seguro se a view ainda não estiver criada no banco
   const [playersResult, roundIds] = await Promise.all([
-    selectableOnly
-      ? supabase.from("players").select("*").eq("is_selectable", true).in("member_category", ["player", "guest"])
-      : supabase.from("players").select("*"),
+    getPlayersForStatsCached(selectableOnly),
     getActiveSeasonRoundIds(season?.league_id, roundType),
   ]);
   const { data: players, error: playersError } = playersResult;

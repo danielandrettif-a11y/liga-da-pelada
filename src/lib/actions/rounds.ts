@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cache } from "react";
 import { supabase } from "../supabase";
 import { getActiveSeason } from "./seasons";
 import { createClient as createServerClient } from "../supabase/server";
@@ -16,7 +17,7 @@ import {
 import { drawGoalkeeperOrder } from "../goalkeeperOrder";
 import { TEAM_CREST_URLS } from "../teamPresets";
 
-export async function getActiveLeague() {
+const getActiveLeagueCached = cache(async () => {
   const { data, error } = await supabase
     .from("leagues")
     .select("id, players_per_team, teams_per_round, match_duration, stadium_name, stadium_map_url, event_duration_minutes, preseason_enabled")
@@ -37,6 +38,10 @@ export async function getActiveLeague() {
   }
 
   return data;
+});
+
+export async function getActiveLeague() {
+  return getActiveLeagueCached();
 }
 
 export async function getRounds() {

@@ -98,7 +98,7 @@ export function CallupBoard({
         : waitlist.findIndex((e) => e.id === myEntry.id) + 1)
     : null;
 
-  const availableToAdmin = selectablePlayers.filter(
+  const availablePlayers = selectablePlayers.filter(
     (player) => !callup.entries.some((entry) => entry.player_id === player.id)
   );
 
@@ -515,17 +515,17 @@ export function CallupBoard({
               )}
 
               {/* Qualquer conta logada pode incluir alguém do elenco jogável. */}
-              {isAuthenticated && availableToAdmin.length > 0 && (
+            {isAuthenticated && availablePlayers.length > 0 && (
                 <div className="pt-3 border-t border-accent/15 flex gap-2">
                   <select
-                    id="admin-callup-player"
+                    id="callup-player"
                     defaultValue=""
                     className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-xs text-foreground"
                   >
                     <option value="" disabled>
                       Adicionar alguém do elenco...
                     </option>
-                    {availableToAdmin.map((player) => (
+                    {availablePlayers.map((player) => (
                       <option key={player.id} value={player.id}>
                         {player.name}
                         {player.member_category === "guest" ? " (convidado)" : ""}
@@ -534,7 +534,7 @@ export function CallupBoard({
                   </select>
                   <button
                     onClick={() => {
-                      const select = document.getElementById("admin-callup-player") as HTMLSelectElement;
+                      const select = document.getElementById("callup-player") as HTMLSelectElement;
                       if (select?.value) run("add", () => addRosterPlayerToCallup(callup.id, select.value));
                     }}
                     disabled={!!loading}

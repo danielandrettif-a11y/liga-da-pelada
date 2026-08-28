@@ -1,12 +1,40 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cache } from "react";
 import { getCurrentAccount } from "@/lib/auth";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
 import { buildAwardSeasonsByPlayer } from "../awards";
 
 export type InboxNotification = { id: string; title: string; body: string; href: string; notification_type?: string; state: "active" | "resolved"; read_at: string | null; created_at: string; updated_at: string };
+
+// O sino faz parte do layout global. Ele precisa apenas das pendências já
+// materializadas, não de recalcular Cartola, Passe e prêmios em toda página.
+// O fluxo completo continua em getMyInboxNotifications, usado pela central.
+const getMyInboxPreviewCached = cache(async (): Promise<InboxNotification[]> => {
+  const account = await getCurrentAccount();
+  if (!account.user) return [];
+
+  const { data, error } = await account.client
+    .from("user_inbox_notifications")
+    .select("id, title, body, href, notification_type, state, read_at, created_at, updated_at")
+    .eq("user_id", account.user.id)
+    .eq("state", "active")
+    .is("read_at", null)
+    .order("updated_at", { ascending: false })
+    .limit(10);
+
+  if (error) {
+    console.error("Erro ao carregar prévia do inbox:", error);
+    return [];
+  }
+  return (data || []) as InboxNotification[];
+});
+
+export async function getMyInboxPreview(): Promise<InboxNotification[]> {
+  return getMyInboxPreviewCached();
+}
 
 export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
   const account = await getCurrentAccount();

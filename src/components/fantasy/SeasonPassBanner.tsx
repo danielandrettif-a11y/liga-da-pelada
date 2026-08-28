@@ -19,7 +19,7 @@ export function SeasonPassBanner({ pass, compact = false }: Props) {
     >
       <span
         className="pointer-events-none absolute inset-0 bg-cover bg-[center_right_42%] opacity-90 transition-transform duration-700 group-hover:scale-[1.035]"
-        style={{ backgroundImage: "url('/images/season-pass-journey-banner.png')" }}
+        style={{ backgroundImage: "url('/images/season-pass-journey-banner.webp')" }}
       />
       <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,#170b2b_0%,#210d42_36%,rgba(31,13,63,.82)_53%,rgba(21,10,44,.08)_100%)]" />
       <span className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#10061e]/90 to-transparent" />

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { CallupBoard } from "@/components/CallupBoard";
 import { CalendarPlus } from "@/components/icons";
 import { getActiveCallup } from "@/lib/actions/callups";
-import { getPlayers } from "@/lib/actions/players";
+import { getSelectableLeaguePlayers } from "@/lib/actions/players";
 import { getCurrentAccount } from "@/lib/auth";
 import { getLeagueConfig } from "@/lib/actions/league";
 
@@ -72,7 +72,9 @@ export default async function ConvocacaoPage() {
     );
   }
 
-  const selectablePlayers = account.isAdmin ? await getPlayers(true) : [];
+  // A convocação é colaborativa: qualquer pessoa logada pode escolher um
+  // atleta elegível do elenco. A RPC ainda valida a liga, a abertura e a vaga.
+  const selectablePlayers = account.user ? await getSelectableLeaguePlayers(callup.league_id) : [];
   const stadiumName = callup.stadium_name || leagueConfig?.stadium_name || null;
   const stadiumMapUrl = callup.stadium_map_url || leagueConfig?.stadium_map_url || null;
 

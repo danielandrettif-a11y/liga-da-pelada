@@ -638,10 +638,13 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   );
   const rankingAccount = await getCurrentAccount();
   const fitnessClient = rankingAccount.user ? rankingAccount.client : supabase;
-  const { data: fitnessRows } = await fitnessClient
-    .from("player_round_fitness")
-    .select("player_id, distance_km, average_speed_kmh")
-    .in("round_id", currentRounds.map((round) => round.id));
+  const [{ data: fitnessRows }, cosmeticsByPlayer] = await Promise.all([
+    fitnessClient
+      .from("player_round_fitness")
+      .select("player_id, distance_km, average_speed_kmh")
+      .in("round_id", currentRounds.map((round) => round.id)),
+    getAllPlayersEquippedCosmeticsMap(),
+  ]);
   const fitnessByPlayer = new Map<string, { distanceKm: number; speedTotal: number; entries: number }>();
   for (const row of fitnessRows || []) {
     const current = fitnessByPlayer.get(row.player_id) || { distanceKm: 0, speedTotal: 0, entries: 0 };
@@ -658,8 +661,6 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   function getAwardSeasons(playerId: string) {
     return awardSeasonsByPlayer.get(playerId) || [];
   }
-
-  const cosmeticsByPlayer = await getAllPlayersEquippedCosmeticsMap();
 
   const general = generalBase.map((entry, index): RankingEntry => {
     const previousPosition = previousPositions.get(entry.player.id);

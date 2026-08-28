@@ -22,10 +22,9 @@ import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
 import { NextRoundBanner } from "@/components/NextRoundBanner";
 import { OpenCallupBanner } from "@/components/OpenCallupBanner";
 import { HomeLastRoundSummary } from "@/components/HomeLastRoundSummary";
-import { getAccountDisplayName, getCurrentAccount } from "@/lib/auth";
+import { getCurrentAccount, getCurrentAccountIdentity } from "@/lib/auth";
 import { getSeasonPassDashboard } from "@/lib/actions/fantasy";
 import { SeasonPassBanner } from "@/components/fantasy/SeasonPassBanner";
-import { getMyInboxNotifications } from "@/lib/actions/inbox";
 
 export const dynamic = "force-dynamic";
 
@@ -101,25 +100,12 @@ function IncompleteProfileBanner() {
 
 export default async function HomePage() {
   const accountPromise = getCurrentAccount();
-  const playerAvatarPromise = accountPromise.then(async (account) => {
-    if (!account.profile?.player_id) return undefined;
-
-    const { data: player } = await account.client
-      .from("players")
-      .select("avatar_url")
-      .eq("id", account.profile.player_id)
-      .maybeSingle();
-
-    return player ? player.avatar_url : undefined;
-  });
-  const [{ data }, previousSeason, account, accountName, playerAvatarUrl, seasonPass, inbox] = await Promise.all([
+  const [{ data }, previousSeason, account, identity, seasonPass] = await Promise.all([
     getDashboardData(),
     getLatestFinishedSeason(),
     accountPromise,
-    accountPromise.then(getAccountDisplayName),
-    playerAvatarPromise,
+    getCurrentAccountIdentity(),
     getSeasonPassDashboard(),
-    getMyInboxNotifications(),
   ]);
   const inheritedGoogleAvatars = [
     account.user?.user_metadata?.avatar_url,
@@ -128,7 +114,7 @@ export default async function HomePage() {
   const hasIncompleteProfile = Boolean(
     account.user
       && account.profile?.player_id
-      && (playerAvatarUrl === null || inheritedGoogleAvatars.includes(playerAvatarUrl)),
+      && (identity.avatarUrl === null || inheritedGoogleAvatars.includes(identity.avatarUrl)),
   );
   
   if (!data) {

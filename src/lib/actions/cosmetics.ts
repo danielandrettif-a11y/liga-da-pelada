@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cache } from "react";
 import { getCurrentAccount } from "@/lib/auth";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
@@ -147,7 +148,7 @@ export type EquippedCosmeticsSummary = {
   backgroundAssetKey: string | null;
 };
 
-export async function getMyEquippedCosmetics(): Promise<EquippedCosmeticsSummary | null> {
+const getMyEquippedCosmeticsCached = cache(async (): Promise<EquippedCosmeticsSummary | null> => {
   const account = await getCurrentAccount();
   if (!account.user) return null;
   const league = await getActiveLeague();
@@ -181,6 +182,10 @@ export async function getMyEquippedCosmetics(): Promise<EquippedCosmeticsSummary
     nameplateKey: loadout.nameplate?.asset_key || null,
     backgroundAssetKey: loadout.background?.asset_key || null,
   };
+});
+
+export async function getMyEquippedCosmetics(): Promise<EquippedCosmeticsSummary | null> {
+  return getMyEquippedCosmeticsCached();
 }
 
 export async function getPlayerEquippedCosmetics(playerId: string): Promise<EquippedCosmeticsSummary | null> {

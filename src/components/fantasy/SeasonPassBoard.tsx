@@ -31,6 +31,7 @@ export function SeasonPassBoard({ progress, playerName, playerAvatarUrl, rewards
       <div className="pointer-events-none absolute left-[43%] top-[28.6%] z-10"><span className="rounded-md border border-accent/30 bg-black/65 px-2 py-0.5 text-[6px] font-black uppercase tracking-[.16em] text-accent">Campo · titulares</span></div>
       <div className="absolute inset-0">{STAGES.map((item) => {
         const reward = rewardsByHouse.get(item.house);
+        const fieldReward = Boolean(reward && item.zone === "field");
         const isCurrent = item.house === currentHouse;
         const completed = progress >= item.house;
         const isSelected = item.house === selectedHouse;
@@ -56,15 +57,16 @@ export function SeasonPassBoard({ progress, playerName, playerAvatarUrl, rewards
               ? <img src={playerAvatarUrl} alt={playerName || "Jogador"} className="h-[72%] w-[72%] rounded-[24%] border border-accent object-cover" />
               : isCurrent
                 ? <span className="text-[6px] text-accent">VOCÊ</span>
-                : reward
+                : item.zone === "field"
+                  ? <span className="text-[clamp(5px,1.5vw,8px)] text-white/80">{item.shortLabel}</span>
+                  : reward
                   ? <span className="rounded border border-yellow-300/60 bg-yellow-400/15 px-1 py-0.5 text-[clamp(4px,1.35vw,7px)] font-black uppercase tracking-wide text-yellow-100">{isSecret ? "Segredo" : "Prêmio"}</span>
                   : completed
                     ? <CheckCircle2 className="h-[45%] w-[45%] text-emerald-300" />
-                    : item.zone === "field"
-                      ? <span className="text-[clamp(5px,1.5vw,8px)] text-white/80">{item.shortLabel}</span>
-                      : null}
+                    : null}
           </span>
-          {reward && isCurrent && <span className="absolute bottom-0 inset-x-0 bg-yellow-400/20 py-px text-[clamp(4px,1.2vw,6px)] font-black uppercase tracking-wide text-yellow-100">Prêmio</span>}
+          {fieldReward && <span aria-hidden="true" className="absolute -right-1 -top-1 z-30 flex h-[28%] w-[28%] min-h-2 min-w-2 items-center justify-center rounded-full border border-yellow-200/90 bg-yellow-400 text-[clamp(4px,1vw,7px)] text-black shadow-[0_0_8px_rgba(250,204,21,.9)]"><Sparkles className="h-[68%] w-[68%]" /></span>}
+          {reward && isCurrent && item.zone !== "field" && <span className="absolute bottom-0 inset-x-0 bg-yellow-400/20 py-px text-[clamp(4px,1.2vw,6px)] font-black uppercase tracking-wide text-yellow-100">Prêmio</span>}
         </button>;
       })}</div>
     </div>
