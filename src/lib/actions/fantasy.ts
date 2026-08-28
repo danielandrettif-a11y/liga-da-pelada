@@ -875,14 +875,14 @@ export async function getFantasyDashboard() {
 
   const topLists = {
     mostSelected: makeTopList(
-      "Top 3 mais escalados",
+      "Mais escalados",
       "A turma está apostando nestes nomes.",
       sortedByPopularity.filter((player) => player.popularityPercent > 0),
       (player) => `${player.popularityPercent}%`,
       () => "das escalações",
     ),
     favoriteScorers: makeTopList(
-      "Top 3 favoritos a gol",
+      "Favoritos a gol",
       "Palpite real; a corneta é por nossa conta.",
       scorerCandidates,
       (player) => {
@@ -897,7 +897,7 @@ export async function getFantasyDashboard() {
           : `${player.goals} gol(s) em ${player.games} jogo(s)`,
     ),
     goalkeepers: makeTopList(
-      "Top 3 paredões",
+      "Paredões",
       "Quem fecha o gol sem pedir VAR.",
       goalkeeperCandidates,
       (player) => `${(player.goalkeeperConcededAverage ?? 0).toFixed(2)} G/J`,

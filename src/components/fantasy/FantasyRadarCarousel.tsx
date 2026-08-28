@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "@/components/icons";
+import { useEffect, useRef } from "react";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import type {
   FantasyMarketPlayer,
@@ -66,7 +65,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
   const interactingRef = useRef(false);
   const lastFrameRef = useRef<number | null>(null);
   const initializedRef = useRef(false);
-  const [expandedStoryId, setExpandedStoryId] = useState<string | null>(null);
+  const resumeTimerRef = useRef<number | null>(null);
 
   const stories: Story[] = [
     radar.latestWithdrawal
@@ -106,47 +105,68 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
     radar.comparison ? { id: "comparison", kind: "comparison", tone: "warning" } : null,
   ].filter(Boolean) as Story[];
 
+  const storySignature = stories.map((story) => story.id).join("|");
+
   useEffect(() => {
     const track = trackRef.current;
     if (!track || stories.length < 2) return;
 
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let frameId = 0;
+
+    const sectionWidth = () => track.scrollWidth / 3;
     const prepareLoop = () => {
-      if (!initializedRef.current && track.scrollWidth > 0) {
-        track.scrollLeft = track.scrollWidth / 3;
+      const width = sectionWidth();
+      if (!initializedRef.current && width > 0) {
+        track.scrollLeft = width;
         initializedRef.current = true;
       }
     };
     prepareLoop();
 
-    let frameId = 0;
     const move = (timestamp: number) => {
       const previous = lastFrameRef.current ?? timestamp;
       const elapsed = Math.min(timestamp - previous, 40);
       lastFrameRef.current = timestamp;
 
-      if (!interactingRef.current && !expandedStoryId) {
-        const sectionWidth = track.scrollWidth / 3;
-        if (sectionWidth > 0) {
-          track.scrollLeft += elapsed * 0.022;
-          if (track.scrollLeft >= sectionWidth * 2) track.scrollLeft -= sectionWidth;
-          if (track.scrollLeft <= 0) track.scrollLeft += sectionWidth;
+      if (!prefersReducedMotion && !interactingRef.current) {
+        const width = sectionWidth();
+        if (width > 0 && track.scrollWidth > track.clientWidth) {
+          // Velocidade intencionalmente perceptível, mas sem competir com o gesto manual.
+          track.scrollLeft += elapsed * 0.04;
+          if (track.scrollLeft >= width * 2) track.scrollLeft -= width;
+          if (track.scrollLeft <= 0) track.scrollLeft += width;
         }
       }
       frameId = window.requestAnimationFrame(move);
     };
 
+    const observer = new ResizeObserver(prepareLoop);
+    observer.observe(track);
     frameId = window.requestAnimationFrame(move);
     return () => {
       window.cancelAnimationFrame(frameId);
+      observer.disconnect();
+      if (resumeTimerRef.current !== null) window.clearTimeout(resumeTimerRef.current);
       lastFrameRef.current = null;
+      initializedRef.current = false;
     };
-  }, [expandedStoryId, stories.length]);
+  }, [storySignature, stories.length]);
 
   if (stories.length === 0) return null;
 
   const repeatedStories = [...stories, ...stories, ...stories];
+  const beginInteraction = () => {
+    if (resumeTimerRef.current !== null) window.clearTimeout(resumeTimerRef.current);
+    interactingRef.current = true;
+  };
   const releaseInteraction = () => {
-    interactingRef.current = false;
+    if (resumeTimerRef.current !== null) window.clearTimeout(resumeTimerRef.current);
+    // Aguarda o fim da inércia do gesto antes de retomar o radar automaticamente.
+    resumeTimerRef.current = window.setTimeout(() => {
+      interactingRef.current = false;
+      resumeTimerRef.current = null;
+    }, 900);
     lastFrameRef.current = null;
   };
 
@@ -160,22 +180,19 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
             <p className="truncate text-[8px] font-bold text-muted">Notícias, tendências e resenha do mercado</p>
           </div>
         </div>
-        <span className="shrink-0 text-[8px] font-bold text-muted">Segure e arraste</span>
+        <span className="shrink-0 text-[8px] font-bold text-muted">Passa sozinho · arraste</span>
       </div>
 
       <div
         ref={trackRef}
         className="no-scrollbar flex touch-pan-x select-none gap-2 overflow-x-auto px-3"
-        onPointerDown={() => {
-          interactingRef.current = true;
-        }}
+        onPointerDown={beginInteraction}
         onPointerUp={releaseInteraction}
         onPointerCancel={releaseInteraction}
         onPointerLeave={releaseInteraction}
         onTouchEnd={releaseInteraction}
       >
         {repeatedStories.map((story, repeatedIndex) => {
-          const expanded = expandedStoryId === story.id;
           return (
             <article
               key={`${repeatedIndex}-${story.id}`}
@@ -183,27 +200,23 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
             >
               {story.kind === "list" ? (
                 <>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between gap-2 text-left"
-                    onClick={() => setExpandedStoryId(expanded ? null : story.id)}
-                    aria-expanded={expanded}
-                  >
+                  <div className="flex w-full items-center justify-between gap-2 text-left">
                     <span className="min-w-0">
-                      <span className="block truncate text-[8px] font-black uppercase tracking-[.14em] text-accent">Top 3 do Radar</span>
+                      <span className="block truncate text-[8px] font-black uppercase tracking-[.14em] text-accent">
+                        {story.list.players.length === 1 ? "Destaque do Radar" : `Top ${story.list.players.length} do Radar`}
+                      </span>
                       <strong className="block truncate text-[11px] text-foreground">{story.list.title}</strong>
                     </span>
-                    <span className="flex shrink-0 items-center gap-1 rounded-lg bg-white/[.06] px-2 py-1 text-[8px] font-black text-muted">
-                      {expanded ? "Recolher" : "Abrir"}
-                      <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                    <span className="shrink-0 rounded-lg bg-white/[.06] px-2 py-1 text-[8px] font-black text-muted">
+                      {story.list.players.length} nomes
                     </span>
-                  </button>
-                  <div className={`mt-1 divide-y divide-white/[.06] ${expanded ? "" : "max-h-9 overflow-hidden"}`}>
-                    {story.list.players.slice(0, expanded ? 3 : 1).map((highlight, index) => (
+                  </div>
+                  <div className="mt-1 divide-y divide-white/[.06]">
+                    {story.list.players.slice(0, 3).map((highlight, index) => (
                       <CompactPlayer key={highlight.player.id} highlight={highlight} rank={index + 1} onSelectPlayer={onSelectPlayer} />
                     ))}
                   </div>
-                  {expanded ? <p className="mt-1 px-1 text-[8px] font-bold text-muted">{story.list.subtitle}</p> : null}
+                  <p className="mt-1 px-1 text-[8px] font-bold text-muted">{story.list.subtitle}</p>
                 </>
               ) : null}
 
