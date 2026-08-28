@@ -108,8 +108,16 @@ export type FantasyRadarData = {
   favoriteAssist: FantasyRadarHighlight | null;
   topLists: {
     mostSelected: FantasyRadarTopList | null;
+    mostCaptained: FantasyRadarTopList | null;
     favoriteScorers: FantasyRadarTopList | null;
+    favoriteAssists: FantasyRadarTopList | null;
     goalkeepers: FantasyRadarTopList | null;
+    topValuation: FantasyRadarTopList | null;
+    topDepreciation: FantasyRadarTopList | null;
+    bestCostBenefit: FantasyRadarTopList | null;
+    bestForm: FantasyRadarTopList | null;
+    mostBought: FantasyRadarTopList | null;
+    mostSold: FantasyRadarTopList | null;
   };
   comparison: FantasyRadarComparison | null;
   latestWithdrawal: FantasyRadarWithdrawal | null;
@@ -849,6 +857,15 @@ export async function getFantasyDashboard() {
       if (predictionDiff !== 0) return predictionDiff;
       return b.goals / Math.max(1, b.games) - a.goals / Math.max(1, a.games);
     });
+  const assistCandidates = [...market]
+    .filter((player) => (popularityAgg.assistPredictionCounts.get(player.id) || 0) > 0 || player.games > 0)
+    .sort((a, b) => {
+      const predictionDiff =
+        (popularityAgg.assistPredictionCounts.get(b.id) || 0) -
+        (popularityAgg.assistPredictionCounts.get(a.id) || 0);
+      if (predictionDiff !== 0) return predictionDiff;
+      return b.assists / Math.max(1, b.games) - a.assists / Math.max(1, a.games);
+    });
   const goalkeeperCandidates = [...market]
     .filter((player) => (player.isGoalkeeper || player.goalkeeperGames > 0) && player.goalkeeperGames > 0)
     .sort(
@@ -881,6 +898,13 @@ export async function getFantasyDashboard() {
       (player) => `${player.popularityPercent}%`,
       () => "das escalações",
     ),
+    mostCaptained: makeTopList(
+      "Capitães da rodada",
+      "As braçadeiras mais confiadas pelos cartoleiros.",
+      sortedByCaptain.filter((player) => player.captainPercent > 0),
+      (player) => `${player.captainPercent}%`,
+      () => "das braçadeiras",
+    ),
     favoriteScorers: makeTopList(
       "Favoritos a gol",
       "Palpite real; a corneta é por nossa conta.",
@@ -896,12 +920,69 @@ export async function getFantasyDashboard() {
           ? "dos palpites de gol"
           : `${player.goals} gol(s) em ${player.games} jogo(s)`,
     ),
+    favoriteAssists: makeTopList(
+      "Favoritos a assistência",
+      "Os garçons mais cotados para servir a rodada.",
+      assistCandidates,
+      (player) => {
+        const predictions = popularityAgg.assistPredictionCounts.get(player.id) || 0;
+        return predictions > 0
+          ? `${Math.round((predictions / Math.max(1, popularityAgg.totalLineups)) * 100)}%`
+          : `${(player.assists / Math.max(1, player.games)).toFixed(2)} A/J`;
+      },
+      (player) =>
+        (popularityAgg.assistPredictionCounts.get(player.id) || 0) > 0
+          ? "dos palpites de assistência"
+          : `${player.assists} assistência(s) em ${player.games} jogo(s)`,
+    ),
     goalkeepers: makeTopList(
       "Paredões",
       "Quem fecha o gol sem pedir VAR.",
       goalkeeperCandidates,
       (player) => `${(player.goalkeeperConcededAverage ?? 0).toFixed(2)} G/J`,
       (player) => `${player.goalkeeperGames} jogo(s) no gol`,
+    ),
+    topValuation: makeTopList(
+      "Maiores valorizações",
+      "Quem mais colocou cartoleta no bolso.",
+      sortedByValuation,
+      (player) => `+C$ ${player.priceChange.toFixed(2)}`,
+      (player) => `+${(player.variation * 100).toFixed(1)}% de valorização`,
+    ),
+    topDepreciation: makeTopList(
+      "Maiores desvalorizações",
+      "Os preços que mais sentiram a rodada.",
+      sortedByDepreciation,
+      (player) => `-C$ ${Math.abs(player.priceChange).toFixed(2)}`,
+      (player) => `${(player.variation * 100).toFixed(1)}% de variação`,
+    ),
+    bestCostBenefit: makeTopList(
+      "Melhores custo-benefício",
+      "Muito ponto sem estourar o orçamento.",
+      sortedByCostBenefit,
+      (player) => `${player.costBenefitScore.toFixed(1)}/10`,
+      (player) => player.costBenefitFormatted,
+    ),
+    bestForm: makeTopList(
+      "Melhores em forma",
+      "Quem chega mais quente pelas rodadas recentes.",
+      sortedByForm,
+      (player) => `${player.recentPointsList.slice(0, 3).reduce((sum, value) => sum + value, 0).toFixed(1)} pts`,
+      () => "nas últimas rodadas",
+    ),
+    mostBought: makeTopList(
+      "Mais comprados",
+      "Os nomes que mais ganharam novos donos.",
+      sortedByBought,
+      (player) => `+${player.buyersDelta}`,
+      () => "novos compradores",
+    ),
+    mostSold: makeTopList(
+      "Mais vendidos",
+      "A debandada do mercado nesta rodada.",
+      sortedBySold,
+      (player) => `${Math.abs(player.buyersDelta)}`,
+      () => "vendas na rodada",
     ),
   };
 

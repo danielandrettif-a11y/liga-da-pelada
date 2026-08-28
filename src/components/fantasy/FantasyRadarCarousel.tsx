@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import type {
   FantasyMarketPlayer,
@@ -17,8 +18,6 @@ type Props = {
 type Tone = "accent" | "warning" | "success" | "danger";
 type Story =
   | { id: string; kind: "list"; list: FantasyRadarTopList; tone: Tone }
-  | { id: string; kind: "highlight"; eyebrow: string; title: string; highlight: FantasyRadarHighlight; tone: Tone }
-  | { id: string; kind: "comparison"; tone: Tone }
   | { id: string; kind: "withdrawal"; tone: Tone };
 
 const toneClasses: Record<Tone, string> = {
@@ -61,6 +60,8 @@ function CompactPlayer({
 }
 
 export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [expandedStoryId, setExpandedStoryId] = useState<string | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const interactingRef = useRef(false);
   const lastFrameRef = useRef<number | null>(null);
@@ -74,40 +75,42 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
     radar.topLists.mostSelected
       ? { id: "top-selected", kind: "list", list: radar.topLists.mostSelected, tone: "accent" }
       : null,
+    radar.topLists.mostCaptained
+      ? { id: "top-captains", kind: "list", list: radar.topLists.mostCaptained, tone: "warning" }
+      : null,
     radar.topLists.favoriteScorers
       ? { id: "top-scorers", kind: "list", list: radar.topLists.favoriteScorers, tone: "warning" }
+      : null,
+    radar.topLists.favoriteAssists
+      ? { id: "top-assists", kind: "list", list: radar.topLists.favoriteAssists, tone: "accent" }
       : null,
     radar.topLists.goalkeepers
       ? { id: "top-goalkeepers", kind: "list", list: radar.topLists.goalkeepers, tone: "success" }
       : null,
-    radar.mostCaptained
-      ? {
-          id: "captains",
-          kind: "highlight",
-          eyebrow: "Capitão da massa",
-          title: "Braçadeira mais confiada",
-          highlight: radar.mostCaptained,
-          tone: "warning",
-        }
+    radar.topLists.topValuation
+      ? { id: "top-valuation", kind: "list", list: radar.topLists.topValuation, tone: "success" }
       : null,
-    radar.bestForm
-      ? { id: "form", kind: "highlight", eyebrow: "Em alta", title: "Melhor forma recente", highlight: radar.bestForm, tone: "success" }
+    radar.topLists.topDepreciation
+      ? { id: "top-depreciation", kind: "list", list: radar.topLists.topDepreciation, tone: "danger" }
       : null,
-    radar.topValuation
-      ? { id: "valuation", kind: "highlight", eyebrow: "Valorização", title: "Quem está rendendo caixa", highlight: radar.topValuation, tone: "accent" }
+    radar.topLists.bestCostBenefit
+      ? { id: "top-cost-benefit", kind: "list", list: radar.topLists.bestCostBenefit, tone: "accent" }
       : null,
-    radar.mostBought
-      ? { id: "bought", kind: "highlight", eyebrow: "Mercado agitado", title: "Mais comprado", highlight: radar.mostBought, tone: "success" }
+    radar.topLists.bestForm
+      ? { id: "top-form", kind: "list", list: radar.topLists.bestForm, tone: "success" }
       : null,
-    radar.mostSold
-      ? { id: "sold", kind: "highlight", eyebrow: "Mercado agitado", title: "Mais vendido", highlight: radar.mostSold, tone: "danger" }
+    radar.topLists.mostBought
+      ? { id: "top-bought", kind: "list", list: radar.topLists.mostBought, tone: "success" }
       : null,
-    radar.comparison ? { id: "comparison", kind: "comparison", tone: "warning" } : null,
+    radar.topLists.mostSold
+      ? { id: "top-sold", kind: "list", list: radar.topLists.mostSold, tone: "danger" }
+      : null,
   ].filter(Boolean) as Story[];
 
   const storySignature = stories.map((story) => story.id).join("|");
 
   useEffect(() => {
+    if (!isExpanded) return;
     const track = trackRef.current;
     if (!track || stories.length < 2) return;
 
@@ -129,7 +132,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
       const elapsed = Math.min(timestamp - previous, 40);
       lastFrameRef.current = timestamp;
 
-      if (!prefersReducedMotion && !interactingRef.current) {
+      if (!prefersReducedMotion && !interactingRef.current && !expandedStoryId) {
         const width = sectionWidth();
         if (width > 0 && track.scrollWidth > track.clientWidth) {
           // Velocidade intencionalmente perceptível, mas sem competir com o gesto manual.
@@ -151,7 +154,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
       lastFrameRef.current = null;
       initializedRef.current = false;
     };
-  }, [storySignature, stories.length]);
+  }, [expandedStoryId, isExpanded, storySignature, stories.length]);
 
   if (stories.length === 0) return null;
 
@@ -169,10 +172,20 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
     }, 900);
     lastFrameRef.current = null;
   };
+  const toggleRadar = () => {
+    if (isExpanded) setExpandedStoryId(null);
+    setIsExpanded((current) => !current);
+  };
 
   return (
     <section aria-label="Radar Cartola" className="overflow-hidden rounded-2xl border border-accent/20 bg-black/20 py-2.5 shadow-[0_8px_24px_rgba(0,0,0,.2)]">
-      <div className="mb-2 flex items-center justify-between gap-3 px-3">
+      <button
+        type="button"
+        onClick={toggleRadar}
+        aria-expanded={isExpanded}
+        aria-controls="radar-cartola-noticias"
+        className={`flex w-full items-center justify-between gap-3 px-3 text-left ${isExpanded ? "mb-2" : ""}`}
+      >
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-[11px]">📡</span>
           <div className="min-w-0">
@@ -180,10 +193,14 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
             <p className="truncate text-[8px] font-bold text-muted">Notícias, tendências e resenha do mercado</p>
           </div>
         </div>
-        <span className="shrink-0 text-[8px] font-bold text-muted">Passa sozinho · arraste</span>
-      </div>
+        <span className="flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[.04] px-2 py-1 text-[8px] font-black uppercase text-muted">
+          {isExpanded ? "Recolher" : "Expandir"}
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+        </span>
+      </button>
 
-      <div
+      {isExpanded ? <div
+        id="radar-cartola-noticias"
         ref={trackRef}
         className="no-scrollbar flex touch-pan-x select-none gap-2 overflow-x-auto px-3"
         onPointerDown={beginInteraction}
@@ -193,6 +210,8 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
         onTouchEnd={releaseInteraction}
       >
         {repeatedStories.map((story, repeatedIndex) => {
+          const isStoryExpanded = story.kind === "list" && expandedStoryId === story.id;
+          const storyContentId = `radar-story-${repeatedIndex}-${story.id}`;
           return (
             <article
               key={`${repeatedIndex}-${story.id}`}
@@ -200,45 +219,34 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
             >
               {story.kind === "list" ? (
                 <>
-                  <div className="flex w-full items-center justify-between gap-2 text-left">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedStoryId((current) => current === story.id ? null : story.id)}
+                    aria-expanded={isStoryExpanded}
+                    aria-controls={storyContentId}
+                    className="flex w-full items-center justify-between gap-2 rounded-lg text-left active:bg-white/[.04]"
+                  >
                     <span className="min-w-0">
                       <span className="block truncate text-[8px] font-black uppercase tracking-[.14em] text-accent">
-                        {story.list.players.length === 1 ? "Destaque do Radar" : `Top ${story.list.players.length} do Radar`}
+                        Top {story.list.players.length} do Radar
                       </span>
                       <strong className="block truncate text-[11px] text-foreground">{story.list.title}</strong>
                     </span>
-                    <span className="shrink-0 rounded-lg bg-white/[.06] px-2 py-1 text-[8px] font-black text-muted">
-                      {story.list.players.length} nomes
+                    <span className="flex shrink-0 items-center gap-1 rounded-lg bg-white/[.06] px-2 py-1 text-[8px] font-black uppercase text-muted">
+                      {isStoryExpanded ? "Recolher" : `Ver Top ${story.list.players.length}`}
+                      <ChevronDown className={`h-3 w-3 transition-transform ${isStoryExpanded ? "rotate-180" : ""}`} />
                     </span>
-                  </div>
-                  <div className="mt-1 divide-y divide-white/[.06]">
-                    {story.list.players.slice(0, 3).map((highlight, index) => (
-                      <CompactPlayer key={highlight.player.id} highlight={highlight} rank={index + 1} onSelectPlayer={onSelectPlayer} />
-                    ))}
-                  </div>
-                  <p className="mt-1 px-1 text-[8px] font-bold text-muted">{story.list.subtitle}</p>
-                </>
-              ) : null}
-
-              {story.kind === "highlight" ? (
-                <>
-                  <p className="truncate text-[8px] font-black uppercase tracking-[.14em] text-accent">{story.eyebrow}</p>
-                  <div className="flex items-center justify-between gap-2">
-                    <strong className="truncate text-[11px] text-foreground">{story.title}</strong>
-                    <span className="shrink-0 text-[8px] font-bold text-muted">Dados reais</span>
-                  </div>
-                  <CompactPlayer highlight={story.highlight} onSelectPlayer={onSelectPlayer} />
-                </>
-              ) : null}
-
-              {story.kind === "comparison" && radar.comparison ? (
-                <>
-                  <p className="text-[8px] font-black uppercase tracking-[.14em] text-warning">Duelo · {radar.comparison.metric}</p>
-                  <p className="truncate text-[11px] font-black text-foreground">{radar.comparison.leader.player.name} × {radar.comparison.challenger.player.name}</p>
-                  <div className="mt-1 grid grid-cols-2 gap-1 text-[9px] font-black text-muted">
-                    <button type="button" onClick={() => onSelectPlayer?.(radar.comparison!.leader.player)} className="truncate rounded-lg bg-black/20 px-2 py-1 text-left">{radar.comparison.leader.value}</button>
-                    <button type="button" onClick={() => onSelectPlayer?.(radar.comparison!.challenger.player)} className="truncate rounded-lg bg-black/20 px-2 py-1 text-left">{radar.comparison.challenger.value}</button>
-                  </div>
+                  </button>
+                  {isStoryExpanded ? (
+                    <div id={storyContentId}>
+                      <div className="mt-1 divide-y divide-white/[.06]">
+                        {story.list.players.slice(0, 3).map((highlight, index) => (
+                          <CompactPlayer key={highlight.player.id} highlight={highlight} rank={index + 1} onSelectPlayer={onSelectPlayer} />
+                        ))}
+                      </div>
+                      <p className="mt-1 px-1 text-[8px] font-bold text-muted">{story.list.subtitle}</p>
+                    </div>
+                  ) : null}
                 </>
               ) : null}
 
@@ -259,7 +267,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
             </article>
           );
         })}
-      </div>
+      </div> : null}
     </section>
   );
 }
