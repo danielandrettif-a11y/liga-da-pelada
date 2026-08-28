@@ -237,13 +237,24 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
                       <ChevronDown className={`h-3 w-3 transition-transform ${isStoryExpanded ? "rotate-180" : ""}`} />
                     </span>
                   </button>
+                  <div className="mt-1 border-t border-white/[.06] pt-1">
+                    <CompactPlayer
+                      highlight={story.list.players[0]}
+                      rank={1}
+                      onSelectPlayer={onSelectPlayer}
+                    />
+                  </div>
                   {isStoryExpanded ? (
                     <div id={storyContentId}>
-                      <div className="mt-1 divide-y divide-white/[.06]">
-                        {story.list.players.slice(0, 3).map((highlight, index) => (
-                          <CompactPlayer key={highlight.player.id} highlight={highlight} rank={index + 1} onSelectPlayer={onSelectPlayer} />
-                        ))}
-                      </div>
+                      {story.list.players.length > 1 ? (
+                        <div className="mt-1 divide-y divide-white/[.06]">
+                          {story.list.players.slice(1, 3).map((highlight, index) => (
+                            <CompactPlayer key={highlight.player.id} highlight={highlight} rank={index + 2} onSelectPlayer={onSelectPlayer} />
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-1 px-1 text-[8px] font-bold text-muted">Ainda não há dados suficientes para o 2º e 3º lugar.</p>
+                      )}
                       <p className="mt-1 px-1 text-[8px] font-bold text-muted">{story.list.subtitle}</p>
                     </div>
                   ) : null}

@@ -887,7 +887,9 @@ export async function getFantasyDashboard() {
       value: getValue(player),
       extra: getExtra(player),
     }));
-    return topPlayers.length >= 2 ? { title, subtitle, players: topPlayers } : null;
+    // Mesmo com uma amostra pequena, o líder ainda é útil no cartão recolhido.
+    // O componente informa com clareza quando ainda não há 2º e 3º lugar.
+    return topPlayers.length >= 1 ? { title, subtitle, players: topPlayers } : null;
   };
 
   const topLists = {
