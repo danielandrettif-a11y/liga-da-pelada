@@ -571,6 +571,10 @@ export function calculateMarketPopularity(params: {
     }
   }
 
+  const totalCaptainChoices = [...captainCounts.values()].reduce((sum, count) => sum + count, 0);
+  const totalScorerPredictions = [...scorerPredictionCounts.values()].reduce((sum, count) => sum + count, 0);
+  const totalAssistPredictions = [...assistPredictionCounts.values()].reduce((sum, count) => sum + count, 0);
+
   // Comparações de compra e venda (delta entre rodadas)
   const previousSelectionCounts = new Map<string, number>();
   const hasPreviousHistory = previousLineups.length > 0;
@@ -594,7 +598,7 @@ export function calculateMarketPopularity(params: {
     const count = selectionCounts.get(playerId) || 0;
     const percent = totalLineups > 0 ? Math.round((count / totalLineups) * 100) : 0;
     const captainCount = captainCounts.get(playerId) || 0;
-    const captainPercent = totalLineups > 0 ? Math.round((captainCount / totalLineups) * 100) : 0;
+    const captainPercent = totalCaptainChoices > 0 ? Math.round((captainCount / totalCaptainChoices) * 100) : 0;
     const delta = hasPreviousHistory ? buyersDelta.get(playerId) || 0 : 0;
 
     return {
@@ -615,8 +619,11 @@ export function calculateMarketPopularity(params: {
     getPopularity,
     selectionCounts,
     captainCounts,
+    totalCaptainChoices,
     buyersDelta,
     scorerPredictionCounts,
+    totalScorerPredictions,
     assistPredictionCounts,
+    totalAssistPredictions,
   };
 }

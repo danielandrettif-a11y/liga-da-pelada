@@ -60,7 +60,6 @@ function CompactPlayer({
 }
 
 export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [expandedStoryId, setExpandedStoryId] = useState<string | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const interactingRef = useRef(false);
@@ -110,7 +109,6 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
   const storySignature = stories.map((story) => story.id).join("|");
 
   useEffect(() => {
-    if (!isExpanded) return;
     const track = trackRef.current;
     if (!track || stories.length < 2) return;
 
@@ -154,7 +152,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
       lastFrameRef.current = null;
       initializedRef.current = false;
     };
-  }, [expandedStoryId, isExpanded, storySignature, stories.length]);
+  }, [expandedStoryId, storySignature, stories.length]);
 
   if (stories.length === 0) return null;
 
@@ -172,20 +170,9 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
     }, 900);
     lastFrameRef.current = null;
   };
-  const toggleRadar = () => {
-    if (isExpanded) setExpandedStoryId(null);
-    setIsExpanded((current) => !current);
-  };
-
   return (
     <section aria-label="Radar Cartola" className="overflow-hidden rounded-2xl border border-accent/20 bg-black/20 py-2.5 shadow-[0_8px_24px_rgba(0,0,0,.2)]">
-      <button
-        type="button"
-        onClick={toggleRadar}
-        aria-expanded={isExpanded}
-        aria-controls="radar-cartola-noticias"
-        className={`flex w-full items-center justify-between gap-3 px-3 text-left ${isExpanded ? "mb-2" : ""}`}
-      >
+      <div className="mb-2 flex w-full items-center justify-between gap-3 px-3">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-[11px]">📡</span>
           <div className="min-w-0">
@@ -193,13 +180,10 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
             <p className="truncate text-[8px] font-bold text-muted">Notícias, tendências e resenha do mercado</p>
           </div>
         </div>
-        <span className="flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[.04] px-2 py-1 text-[8px] font-black uppercase text-muted">
-          {isExpanded ? "Recolher" : "Expandir"}
-          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-        </span>
-      </button>
+        <span className="shrink-0 text-[8px] font-bold text-muted">Arraste para navegar</span>
+      </div>
 
-      {isExpanded ? <div
+      <div
         id="radar-cartola-noticias"
         ref={trackRef}
         className="no-scrollbar flex touch-pan-x select-none gap-2 overflow-x-auto px-3"
@@ -278,7 +262,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
             </article>
           );
         })}
-      </div> : null}
+      </div>
     </section>
   );
 }

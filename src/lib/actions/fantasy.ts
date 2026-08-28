@@ -423,7 +423,7 @@ export async function getFantasyDashboard() {
     latestFinishedRound
       ? account.client
           .from("fantasy_lineups")
-          .select("status, captain_player_id, fantasy_lineup_players(player_id)")
+          .select("user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id)")
           .eq("fantasy_round_id", latestFinishedRound.id)
           .eq("status", "scored")
       : Promise.resolve({ data: [] as any[] }),
@@ -605,11 +605,14 @@ export async function getFantasyDashboard() {
   const recentPointsByPlayer = new Map<string, number[]>();
 
   for (const row of priceHistory || []) {
-    if (!lastVariation.has(row.player_id)) {
+    const belongsToLatestFinishedRound = latestFinishedRound
+      ? row.fantasy_round_id === latestFinishedRound.id
+      : true;
+    if (belongsToLatestFinishedRound && !lastVariation.has(row.player_id)) {
       lastVariation.set(row.player_id, Number(row.variation_rate || 0));
       lastPriceChange.set(
         row.player_id,
-        Number(row.price_after || 0) - Number(row.price_before || 0)
+        Number(row.price_change ?? Number(row.price_after || 0) - Number(row.price_before || 0))
       );
     }
     if (latestFinishedRound && row.fantasy_round_id === latestFinishedRound.id) {
@@ -630,15 +633,23 @@ export async function getFantasyDashboard() {
   }
 
   // Calcular Popularidade de Mercado usando o motor V2
+  const latestLineupByUser = new Map(
+    (latestRoundLineups || []).map((lineup: any) => [lineup.user_id, lineup] as const),
+  );
   const currentLineupsFormatted = (
     activeOfficialRound ? activeRoundLineups : latestRoundLineups
-  )?.map((l: any) => ({
-    userId: l.user_id,
-    playerIds: (l.fantasy_lineup_players || []).map((p: any) => p.player_id),
-    captainPlayerId: l.captain_player_id,
-    topScorerPlayerId: l.top_scorer_player_id,
-    topAssistPlayerId: l.top_assist_player_id,
-  })) || [];
+  )?.map((l: any) => {
+    const latestSavedLineup = latestLineupByUser.get(l.user_id) as any;
+    return {
+      userId: l.user_id,
+      playerIds: (l.fantasy_lineup_players || []).map((p: any) => p.player_id),
+      // Quando a nova rodada ainda herdou apenas os jogadores do portfólio,
+      // preservamos as escolhas da última escalação até o usuário alterá-las.
+      captainPlayerId: l.captain_player_id || latestSavedLineup?.captain_player_id || null,
+      topScorerPlayerId: l.top_scorer_player_id || latestSavedLineup?.top_scorer_player_id || null,
+      topAssistPlayerId: l.top_assist_player_id || latestSavedLineup?.top_assist_player_id || null,
+    };
+  }) || [];
 
   const previousLineupsFormatted = (
     activeOfficialRound ? latestRoundLineups : previousRoundLineups
@@ -841,6 +852,17 @@ export async function getFantasyDashboard() {
     .filter((p) => p.buyersDelta < 0)
     .sort((a, b) => a.buyersDelta - b.buyersDelta);
 
+  const marketById = new Map(market.map((player) => [player.id, player] as const));
+  const rankPlayersByCount = (counts: Map<string, number>) =>
+    [...counts.entries()]
+      .filter(([, count]) => count > 0)
+      .sort((a, b) => b[1] - a[1] || (marketById.get(a[0])?.name || "").localeCompare(marketById.get(b[0])?.name || "", "pt-BR"))
+      .map(([playerId]) => marketById.get(playerId))
+      .filter((player): player is FantasyMarketPlayer => Boolean(player));
+
+  const selectedCandidates = rankPlayersByCount(popularityAgg.selectionCounts);
+  const captainCandidates = rankPlayersByCount(popularityAgg.captainCounts);
+
   const topScorerId = [...popularityAgg.scorerPredictionCounts.entries()].sort(
     (a, b) => b[1] - a[1]
   )[0]?.[0];
@@ -896,14 +918,14 @@ export async function getFantasyDashboard() {
     mostSelected: makeTopList(
       "Mais escalados",
       "A turma está apostando nestes nomes.",
-      sortedByPopularity.filter((player) => player.popularityPercent > 0),
+      selectedCandidates,
       (player) => `${player.popularityPercent}%`,
       () => "das escalações",
     ),
     mostCaptained: makeTopList(
       "Capitães da rodada",
       "As braçadeiras mais confiadas pelos cartoleiros.",
-      sortedByCaptain.filter((player) => player.captainPercent > 0),
+      captainCandidates,
       (player) => `${player.captainPercent}%`,
       () => "das braçadeiras",
     ),
@@ -914,7 +936,7 @@ export async function getFantasyDashboard() {
       (player) => {
         const predictions = popularityAgg.scorerPredictionCounts.get(player.id) || 0;
         return predictions > 0
-          ? `${Math.round((predictions / Math.max(1, popularityAgg.totalLineups)) * 100)}%`
+          ? `${Math.round((predictions / Math.max(1, popularityAgg.totalScorerPredictions)) * 100)}%`
           : `${(player.goals / Math.max(1, player.games)).toFixed(2)} G/J`;
       },
       (player) =>
@@ -929,7 +951,7 @@ export async function getFantasyDashboard() {
       (player) => {
         const predictions = popularityAgg.assistPredictionCounts.get(player.id) || 0;
         return predictions > 0
-          ? `${Math.round((predictions / Math.max(1, popularityAgg.totalLineups)) * 100)}%`
+          ? `${Math.round((predictions / Math.max(1, popularityAgg.totalAssistPredictions)) * 100)}%`
           : `${(player.assists / Math.max(1, player.games)).toFixed(2)} A/J`;
       },
       (player) =>
@@ -1092,7 +1114,7 @@ export async function getFantasyDashboard() {
           player: market.find((p) => p.id === topScorerId)!,
           value: `${Math.round(
             ((popularityAgg.scorerPredictionCounts.get(topScorerId) || 0) /
-              Math.max(1, popularityAgg.totalLineups)) *
+              Math.max(1, popularityAgg.totalScorerPredictions)) *
               100
           )}%`,
           extra: "dos palpites de gol",
@@ -1104,7 +1126,7 @@ export async function getFantasyDashboard() {
           player: market.find((p) => p.id === topAssistId)!,
           value: `${Math.round(
             ((popularityAgg.assistPredictionCounts.get(topAssistId) || 0) /
-              Math.max(1, popularityAgg.totalLineups)) *
+              Math.max(1, popularityAgg.totalAssistPredictions)) *
               100
           )}%`,
           extra: "dos palpites de garçom",

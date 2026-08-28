@@ -330,6 +330,25 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       // Daniel capitão em 3 de 10 -> 30%
       expect(danielPop.captainCount).toBe(3);
       expect(danielPop.captainPercent).toBe(30);
+
+      expect(pop.getPopularity("p2")).toMatchObject({ captainCount: 3, captainPercent: 30 });
+      expect(pop.getPopularity("leo")).toMatchObject({ captainCount: 2, captainPercent: 20 });
+      expect(pop.getPopularity("p3")).toMatchObject({ captainCount: 1, captainPercent: 10 });
+      expect(pop.captainCounts.size).toBe(5);
+    });
+
+    it("calcula capitães sobre o total de escolhas válidas", () => {
+      const pop = calculateMarketPopularity({
+        currentLineups: [
+          { userId: "u1", playerIds: ["p1"], captainPlayerId: "p1" },
+          { userId: "u2", playerIds: ["p2"] },
+          { userId: "u3", playerIds: ["p3"] },
+        ],
+      });
+
+      expect(pop.totalLineups).toBe(3);
+      expect(pop.totalCaptainChoices).toBe(1);
+      expect(pop.getPopularity("p1").captainPercent).toBe(100);
     });
 
     it("calcula delta de Mais Comprado (+4) e Mais Vendido (-5)", () => {
