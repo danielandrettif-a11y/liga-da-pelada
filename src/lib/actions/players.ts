@@ -340,7 +340,7 @@ export async function getPlayerAwardSeasons(playerId: string) {
 
   const { data: stats, error: statsError } = await supabase
     .from("player_round_stats")
-    .select("round_id, player_id, goals, assists, games")
+    .select("round_id, player_id, goals, assists, games, defensive_clean_games, defensive_one_goal_games, team_goals_conceded, player:player_id(player_profile, member_category, is_selectable)")
     .in("round_id", rounds.map((round) => round.id));
 
   if (statsError) {
@@ -362,7 +362,10 @@ export async function getPlayerAwardSeasons(playerId: string) {
         bestGoalkeeperPlayerId: round.best_goalkeeper_player_id,
       }] : [];
     }),
-    stats || [],
+    (stats || []).map((stat: any) => ({
+      ...stat,
+      player: Array.isArray(stat.player) ? stat.player[0] || null : stat.player,
+    })),
   );
 
   return awardSeasons.get(playerId) || [];

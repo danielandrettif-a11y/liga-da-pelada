@@ -5,10 +5,13 @@ import { useEffect } from "react";
 let activeLocks = 0;
 let originalOverflow: string | null = null;
 let originalHtmlOverflow: string | null = null;
-let originalBodyPosition: string | null = null;
-let originalBodyTop: string | null = null;
-let originalBodyWidth: string | null = null;
 let lockedScrollY = 0;
+
+function preventBackgroundTouch(event: TouchEvent) {
+  const target = event.target instanceof Element ? event.target : null;
+  if (target?.closest(".mobile-dialog-scroll")) return;
+  event.preventDefault();
+}
 
 /**
  * Gerenciador singleton de bloqueio de rolagem para modais e drawers no iOS/Android/Desktop.
@@ -24,15 +27,11 @@ export function useDialogViewport(open: boolean) {
       lockedScrollY = window.scrollY;
       originalOverflow = body.style.overflow;
       originalHtmlOverflow = html.style.overflow;
-      originalBodyPosition = body.style.position;
-      originalBodyTop = body.style.top;
-      originalBodyWidth = body.style.width;
       body.style.overflow = "hidden";
       html.style.overflow = "hidden";
-      // O overflow sozinho não bloqueia a página de forma confiável no Safari.
-      body.style.position = "fixed";
-      body.style.top = `-${lockedScrollY}px`;
-      body.style.width = "100%";
+      // Evita mover o body com position:fixed. No Safari/PWA isso deslocava
+      // portais abertos após o scroll e deixava uma camada invisível sobre o app.
+      document.addEventListener("touchmove", preventBackgroundTouch, { passive: false });
     }
     activeLocks++;
 
@@ -41,15 +40,10 @@ export function useDialogViewport(open: boolean) {
       if (activeLocks === 0) {
         body.style.overflow = originalOverflow ?? "";
         html.style.overflow = originalHtmlOverflow ?? "";
-        body.style.position = originalBodyPosition ?? "";
-        body.style.top = originalBodyTop ?? "";
-        body.style.width = originalBodyWidth ?? "";
+        document.removeEventListener("touchmove", preventBackgroundTouch);
         window.scrollTo(0, lockedScrollY);
         originalOverflow = null;
         originalHtmlOverflow = null;
-        originalBodyPosition = null;
-        originalBodyTop = null;
-        originalBodyWidth = null;
         lockedScrollY = 0;
       }
     };

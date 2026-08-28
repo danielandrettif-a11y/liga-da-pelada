@@ -5,6 +5,7 @@ export type RankingAwards = {
   topScorer: number;
   topAssister: number;
   bestGoalkeeper: number;
+  bestDefender: number;
 };
 
 export type RankingBestRound = {

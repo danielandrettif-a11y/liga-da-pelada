@@ -20,6 +20,9 @@ type RankingStatsRow = {
   goals: number;
   assists: number;
   points: number;
+  defensive_clean_games: number;
+  defensive_one_goal_games: number;
+  team_goals_conceded: number;
   player: Player;
 };
 
@@ -588,6 +591,9 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       goals,
       assists,
       points,
+      defensive_clean_games,
+      defensive_one_goal_games,
+      team_goals_conceded,
       player:player_id (*)
     `)
     .in("round_id", (rounds || []).map((round) => round.id));
@@ -597,7 +603,10 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     return { ...emptyData, seasonLabel };
   }
 
-  const stats = rawStats as unknown as RankingStatsRow[];
+  const stats = (rawStats as any[]).map((row) => ({
+    ...row,
+    player: Array.isArray(row.player) ? row.player[0] || null : row.player,
+  })) as RankingStatsRow[];
   const currentRoundIds = new Set(currentRounds.map((round) => round.id));
   // Convidados continuam com histórico e scouts nas partidas, mas o ranking
   // competitivo só começa quando o perfil é oficial. A união de perfis move os
@@ -723,7 +732,7 @@ export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: 
     assists: 0,
     points: 0,
     winRate: 0,
-    awards: { topScorer: 0, topAssister: 0, bestGoalkeeper: 0 },
+    awards: { topScorer: 0, topAssister: 0, bestGoalkeeper: 0, bestDefender: 0 },
     awardSeasons: [],
     seasonPosition: data.general.length + 1,
     positionChange: null,

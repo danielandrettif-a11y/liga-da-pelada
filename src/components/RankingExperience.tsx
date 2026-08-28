@@ -50,7 +50,7 @@ const FILTER_LABELS: Record<RankingFilter, string> = {
 };
 
 function awardsTotal(entry: RankingEntry) {
-  return entry.awards.topScorer + entry.awards.topAssister + entry.awards.bestGoalkeeper;
+  return entry.awards.topScorer + entry.awards.topAssister + entry.awards.bestGoalkeeper + entry.awards.bestDefender;
 }
 
 function metricValue(entry: RankingEntry, filter: RankingFilter) {
@@ -494,6 +494,7 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                     {entry.awards.topScorer > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Artilheiro da rodada {entry.awards.topScorer}x</span>}
                     {entry.awards.topAssister > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Garçom da rodada {entry.awards.topAssister}x</span>}
                     {entry.awards.bestGoalkeeper > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Goleiro {entry.awards.bestGoalkeeper}x</span>}
+                    {entry.awards.bestDefender > 0 && <span className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black text-amber-300">Xerife da rodada {entry.awards.bestDefender}x</span>}
                     {awardsTotal(entry) === 0 && <span className="text-[9px] text-muted">V: {entry.wins} · G: {entry.goals} · A: {entry.assists}</span>}
                   </div>
                   {above && (

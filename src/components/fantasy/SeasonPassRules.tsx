@@ -91,7 +91,7 @@ export function SeasonPassRules({ mode }: Props) {
             >
               <X className="h-5 w-5" />
             </button>
-            <div className="mobile-dialog-scroll overflow-y-auto overscroll-contain">
+            <div className="mobile-dialog-scroll flex-1 overflow-y-auto overscroll-contain">
               <div className="bg-gradient-to-br from-[#4b1b8d] via-[#251047] to-[#0b1510] p-6 pr-16">
                 <Crown className="h-10 w-10 text-[#e0b9ff]" />
                 <p className="mt-4 font-athletic text-[10px] font-black uppercase italic tracking-[0.2em] text-[#d7adff]">Bem-vindo ao Passe BQ</p>

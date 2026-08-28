@@ -11,6 +11,7 @@ const AWARDS: Array<{
   { type: "topScorer", label: "Artilheiro da rodada", Icon: Target },
   { type: "topAssister", label: "Garçom da rodada", Icon: Sparkles },
   { type: "bestGoalkeeper", label: "Melhor goleiro", Icon: Medal },
+  { type: "bestDefender", label: "Xerife da rodada", Icon: Medal },
   { type: "seasonTopScorer", label: "Artilheiro da temporada", Icon: Target },
   { type: "seasonTopAssister", label: "Garçom da temporada", Icon: Sparkles },
 ];

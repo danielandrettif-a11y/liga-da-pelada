@@ -1,6 +1,6 @@
 import type { SeasonStatus } from "./types";
 
-export type PlayerAwardType = "topScorer" | "topAssister" | "bestGoalkeeper" | "seasonTopScorer" | "seasonTopAssister";
+export type PlayerAwardType = "topScorer" | "topAssister" | "bestGoalkeeper" | "bestDefender" | "seasonTopScorer" | "seasonTopAssister";
 
 export type PlayerAward = {
   type: PlayerAwardType;
@@ -32,7 +32,31 @@ export type AwardStat = {
   goals: number;
   assists: number;
   games?: number;
+  defensive_clean_games?: number;
+  defensive_one_goal_games?: number;
+  team_goals_conceded?: number;
+  player?: {
+    player_profile?: string | null;
+    member_category?: string | null;
+    is_selectable?: boolean | null;
+  } | null;
 };
+
+function isOfficialAwardAthlete(stat: AwardStat) {
+  if (!stat.player) return true;
+  return stat.player.is_selectable !== false && stat.player.member_category === "player";
+}
+
+function defensiveProtectionAverage(stat: AwardStat) {
+  const games = Number(stat.games || 0);
+  if (games <= 0) return -1;
+  return (Number(stat.defensive_clean_games || 0) * 2 + Number(stat.defensive_one_goal_games || 0)) / games;
+}
+
+function goalsConcededAverage(stat: AwardStat) {
+  const games = Number(stat.games || 0);
+  return games > 0 ? Number(stat.team_goals_conceded || 0) / games : Number.POSITIVE_INFINITY;
+}
 
 export function buildAwardSeasonsByPlayer(rounds: AwardRound[], stats: AwardStat[]) {
   const roundsById = new Map(rounds.map((round) => [round.id, round]));
@@ -54,7 +78,7 @@ export function buildAwardSeasonsByPlayer(rounds: AwardRound[], stats: AwardStat
 
   for (const stat of stats) {
     const round = roundsById.get(stat.round_id);
-    if (!round) continue;
+    if (!round || !isOfficialAwardAthlete(stat)) continue;
     ensureSeason(stat.player_id, round);
     const roundStats = statsByRound.get(stat.round_id) || [];
     roundStats.push(stat);
@@ -76,8 +100,24 @@ export function buildAwardSeasonsByPlayer(rounds: AwardRound[], stats: AwardStat
       }
     }
 
-    // O prêmio manual de melhor goleiro foi aposentado. A contribuição no gol
-    // é medida pelos scouts de cada partida, sem troféu subjetivo no final.
+    // Xerife da Rodada: melhor média de proteção entre DEF. Em caso de empate,
+    // vence quem sofreu menos gols por jogo, depois quem atuou em mais partidas.
+    const bestDefender = roundStats
+      .filter((stat) => stat.player?.player_profile === "defensive" && Number(stat.games || 0) > 0)
+      .sort((a, b) =>
+        defensiveProtectionAverage(b) - defensiveProtectionAverage(a)
+        || goalsConcededAverage(a) - goalsConcededAverage(b)
+        || Number(b.games || 0) - Number(a.games || 0)
+        || a.player_id.localeCompare(b.player_id)
+      )[0];
+    if (bestDefender) {
+      ensureSeason(bestDefender.player_id, round).awards.push({
+        type: "bestDefender",
+        roundId: round.id,
+        roundNumber: round.number,
+        roundDate: round.date,
+      });
+    }
   }
 
   const roundsBySeason = new Map<string, AwardRound[]>();
@@ -86,7 +126,7 @@ export function buildAwardSeasonsByPlayer(rounds: AwardRound[], stats: AwardStat
     const ids = new Set(seasonRounds.map((round) => round.id));
     const aggregate = new Map<string, { goals: number; assists: number; games: number }>();
     for (const stat of stats) {
-      if (!ids.has(stat.round_id)) continue;
+      if (!ids.has(stat.round_id) || !isOfficialAwardAthlete(stat)) continue;
       const current = aggregate.get(stat.player_id) || { goals: 0, assists: 0, games: 0 };
       current.goals += stat.goals;
       current.assists += stat.assists;
@@ -121,11 +161,11 @@ export function buildAwardSeasonsByPlayer(rounds: AwardRound[], stats: AwardStat
 }
 
 export function countAwards(seasons: PlayerAwardSeason[], status?: SeasonStatus) {
-  const counts = { topScorer: 0, topAssister: 0, bestGoalkeeper: 0 };
+  const counts = { topScorer: 0, topAssister: 0, bestGoalkeeper: 0, bestDefender: 0 };
   for (const season of seasons) {
     if (status && season.seasonStatus !== status) continue;
     for (const award of season.awards) {
-      if (award.type === "topScorer" || award.type === "topAssister" || award.type === "bestGoalkeeper") counts[award.type] += 1;
+      if (award.type === "topScorer" || award.type === "topAssister" || award.type === "bestGoalkeeper" || award.type === "bestDefender") counts[award.type] += 1;
     }
   }
   return counts;

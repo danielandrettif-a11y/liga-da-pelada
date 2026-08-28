@@ -15,12 +15,6 @@ const rawStages: Array<[number, string, string, Zone, number, number]> = [
 ];
 const STAGES: Stage[] = rawStages.map(([house, name, shortLabel, zone, x, y]) => ({ house, name, shortLabel, zone, x, y }));
 
-function rewardIcon(reward: CosmeticPassReward, secret: boolean) {
-  if (secret) return "🔒";
-  if (reward.rewardType === "card_pack") return "🎴";
-  return ({ banner: "🖼️", frame: "⭕", title: "🏷️", aura: "✨", nameplate: "📛", background: "🌆" } as const)[reward.options[0]?.slot || "title"];
-}
-
 export function SeasonPassBoard({ progress, playerName, playerAvatarUrl, rewards, onOpenReward }: { progress: number; playerName: string | null; playerAvatarUrl: string | null; rewards: CosmeticPassReward[]; onOpenReward: (reward: CosmeticPassReward) => void }) {
   const rewardsByHouse = useMemo(() => new Map(rewards.map((reward) => [reward.house, reward])), [rewards]);
   const currentHouse = Math.max(1, Math.min(40, progress || 1));
@@ -63,14 +57,14 @@ export function SeasonPassBoard({ progress, playerName, playerAvatarUrl, rewards
               : isCurrent
                 ? <span className="text-[6px] text-accent">VOCÊ</span>
                 : reward
-                  ? rewardIcon(reward, Boolean(isSecret))
+                  ? <span className="rounded border border-yellow-300/60 bg-yellow-400/15 px-1 py-0.5 text-[clamp(4px,1.35vw,7px)] font-black uppercase tracking-wide text-yellow-100">{isSecret ? "Segredo" : "Prêmio"}</span>
                   : completed
                     ? <CheckCircle2 className="h-[45%] w-[45%] text-emerald-300" />
                     : item.zone === "field"
                       ? <span className="text-[clamp(5px,1.5vw,8px)] text-white/80">{item.shortLabel}</span>
                       : null}
           </span>
-          {reward && <span className="absolute bottom-0 inset-x-0 bg-yellow-400/15 py-px text-[clamp(4px,1.2vw,6px)] font-black uppercase tracking-wide text-yellow-200">Prêmio</span>}
+          {reward && isCurrent && <span className="absolute bottom-0 inset-x-0 bg-yellow-400/20 py-px text-[clamp(4px,1.2vw,6px)] font-black uppercase tracking-wide text-yellow-100">Prêmio</span>}
         </button>;
       })}</div>
     </div>

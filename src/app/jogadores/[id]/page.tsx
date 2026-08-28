@@ -103,6 +103,8 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
         {isPlayable && <div className="mt-6 inline-flex items-center gap-4 rounded-2xl border border-border bg-surface/50 px-6 py-3"><div><p className="text-[9px] font-bold uppercase text-muted">Pontos</p><p className="stat-number text-2xl text-accent">{official.points}</p></div><div className="h-8 w-px bg-border" /><div><p className="text-[9px] font-bold uppercase text-muted">Aprov.</p><p className="stat-number text-xl text-foreground">{calculateWinRate(official.wins, official.draws, official.games)}%</p></div></div>}
       </div>
 
+      {isPlayable && <section className="rounded-2xl border border-amber-300/25 bg-gradient-to-br from-amber-300/10 via-surface/85 to-surface/70 p-4 shadow-[0_0_24px_rgba(251,191,36,.06)]"><div className="mb-3 flex items-center gap-2"><Trophy className="h-4 w-4 text-amber-300" /><div><h3 className="text-xs font-black uppercase tracking-wider text-foreground">Prêmios individuais</h3><p className="mt-0.5 text-[10px] text-muted">Artilheiro, Garçom, Xerife e títulos da temporada Ranked.</p></div></div><PlayerAwards seasons={awardSeasons} /></section>}
+
       {!isPlayable ? <div className="glass-card p-6 text-center"><p className="text-sm font-black text-foreground">Parte da comunidade da Pelada</p><p className="mt-1 text-xs text-muted">O histórico esportivo está preservado, mas fica oculto enquanto este perfil não for um jogador selecionável.</p></div> : <>
         {([['Ranked', official], ['Amistosos', friendly]] as const).map(([label, stats]) => <section key={label}><h3 className="mb-3 px-1 text-xs font-black uppercase tracking-wider text-muted">{label}</h3><div className="grid grid-cols-4 gap-2">{([['Peladas', stats.rounds || 0], ['Jogos', stats.games], ['Gols', stats.goals], ['Assists', stats.assists], ['Vitórias', stats.wins], ['Empates', stats.draws], ['Derrotas', stats.losses], ['Aprov.', `${calculateWinRate(stats.wins, stats.draws, stats.games)}%`]] as const).map(([key, value]) => <div key={key} className="glass-card p-3 text-center"><p className="text-lg font-black text-foreground">{value}</p><p className="text-[8px] font-bold uppercase text-muted">{key}</p></div>)}</div></section>)}
 
@@ -149,7 +151,6 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
         </section>
 
         <FantasyPlayerCard summary={fantasySummary} />
-        <section><div className="mb-3 px-1"><h3 className="text-xs font-bold uppercase tracking-wider text-muted">Prêmios oficiais</h3><p className="mt-1 text-[10px] text-muted/70">Rodadas e títulos da temporada Ranked.</p></div><PlayerAwards seasons={awardSeasons} /></section>
         <section><h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">Histórico Ranked</h3><History rows={officialHistory} /></section>
         <section><h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">Histórico de Amistosos</h3><History rows={friendlyHistory} friendly /></section>
       </>}

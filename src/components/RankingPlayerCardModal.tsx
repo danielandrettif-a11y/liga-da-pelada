@@ -163,11 +163,12 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
     entry.awards.topScorer ? `ARTILHEIRO ${entry.awards.topScorer}x` : "",
     entry.awards.topAssister ? `GARÇOM ${entry.awards.topAssister}x` : "",
     entry.awards.bestGoalkeeper ? `GOLEIRO ${entry.awards.bestGoalkeeper}x` : "",
+    entry.awards.bestDefender ? `XERIFE ${entry.awards.bestDefender}x` : "",
   ].filter(Boolean).join("  •  ");
   if (awards) {
     context.fillStyle = theme.ink;
     context.font = "900 21px Arial";
-    context.fillText(awards, 540, 1422);
+    context.fillText(awards, 540, 1422, 780);
   }
   context.fillStyle = "rgba(255,255,255,.15)";
   roundedRect(context, 145, 1480, 790, 105, 24);
@@ -201,6 +202,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
     { label: "Artilheiro", value: entry.awards.topScorer, Icon: Target },
     { label: "Garçom", value: entry.awards.topAssister, Icon: Sparkles },
     { label: "Goleiro", value: entry.awards.bestGoalkeeper, Icon: Medal },
+    { label: "Xerife", value: entry.awards.bestDefender, Icon: Medal },
   ].filter((award) => award.value > 0);
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState("");
@@ -233,10 +235,8 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => event.key === "Escape" && onClose();
     document.addEventListener("keydown", onKeyDown);
-    document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = "";
     };
   }, [onClose]);
 
@@ -339,6 +339,17 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
               ) : null}
             </div>
 
+            {awardBadges.length > 0 && (
+              <div className="relative z-10 mt-2 flex flex-wrap justify-center gap-1.5 rounded-xl border border-current/15 bg-white/10 p-2">
+                {awardBadges.map(({ label, value, Icon }) => (
+                  <span key={label} className="inline-flex items-center gap-1 rounded-full border border-current/20 bg-white/15 px-2 py-0.5 text-[8px] font-black uppercase">
+                    <Icon className="h-3 w-3" />
+                    {label} {value}x
+                  </span>
+                ))}
+              </div>
+            )}
+
             {/* Grid 3x2 de Estatísticas */}
             <div className="relative z-10 mt-3 grid grid-cols-3 gap-1.5 font-athletic">
               {[
@@ -351,20 +362,6 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
                 </div>
               ))}
             </div>
-
-            {awardBadges.length > 0 && (
-              <div className="relative z-10 mt-3 flex flex-wrap justify-center gap-1.5">
-                {awardBadges.map(({ label, value, Icon }) => (
-                  <span
-                    key={label}
-                    className="inline-flex items-center gap-1 rounded-full border border-current/20 bg-white/15 px-2 py-0.5 text-[8px] font-black uppercase"
-                  >
-                    <Icon className="h-3 w-3" />
-                    {label} {value}x
-                  </span>
-                ))}
-              </div>
-            )}
 
             {entry.fitness && (
               <div className="relative z-10 mt-3 grid grid-cols-2 gap-2 border-t border-current/25 pt-2.5 text-center">

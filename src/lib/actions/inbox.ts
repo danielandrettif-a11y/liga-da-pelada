@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentAccount } from "@/lib/auth";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
+import { buildAwardSeasonsByPlayer } from "../awards";
 
 export type InboxNotification = { id: string; title: string; body: string; href: string; notification_type?: string; state: "active" | "resolved"; read_at: string | null; created_at: string; updated_at: string };
 
@@ -151,6 +152,55 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
         if (reward.reward_type === "cosmetic_choice" && Number(reward.house) <= Number(pass?.progress || 0) && !chosen.has(reward.id)) desired.push({ type: "fantasy_pass_cosmetic_reward", key: `pass:reward:${reward.id}`, title: "✨ Recompensa do Passe liberada", body: `A casa ${reward.house} abriu uma escolha cosmética para o seu perfil.`, href: `/jogadores?tab=passe&reward=${reward.id}` });
       }
       for (const pack of passPacks || []) desired.push({ type: "fantasy_pass_pack", key: `pass:pack:${pack.id}`, title: "🎴 Pacote do Passe disponível", body: `Seu pacote ${pack.card_tier === "gold" ? "Ouro" : "Bronze"} está pronto para abrir no Cartola.`, href: `/cartola?pack=${pack.id}` });
+    }
+
+    // Prêmios individuais da Ranked: o inbox registra uma mensagem permanente
+    // por prêmio e rodada. A chave única evita duplicar ao recarregar a página.
+    if (account.profile?.player_id) {
+      const { data: awardRounds } = await account.client
+        .from("rounds")
+        .select("id, number, date, season_id, best_goalkeeper_player_id")
+        .eq("season_id", season.id)
+        .eq("round_type", "official")
+        .eq("status", "finished")
+        .order("number", { ascending: false });
+      if (awardRounds?.length) {
+        const { data: awardStats } = await account.client
+          .from("player_round_stats")
+          .select("round_id, player_id, goals, assists, games, defensive_clean_games, defensive_one_goal_games, team_goals_conceded, player:player_id(player_profile, member_category, is_selectable)")
+          .in("round_id", awardRounds.map((round) => round.id));
+        const playerAwards = buildAwardSeasonsByPlayer(
+          awardRounds.map((round) => ({
+            id: round.id,
+            number: round.number,
+            date: round.date,
+            seasonId: season.id,
+            seasonNumber: season.number,
+            seasonStatus: season.status,
+            bestGoalkeeperPlayerId: round.best_goalkeeper_player_id,
+          })),
+          (awardStats || []).map((stat: any) => ({
+            ...stat,
+            player: Array.isArray(stat.player) ? stat.player[0] || null : stat.player,
+          })),
+        ).get(account.profile.player_id)?.flatMap((item) => item.awards) || [];
+        const awardCopy = {
+          topScorer: { title: "⚽ Você foi o Artilheiro da Rodada", body: "Você terminou a rodada como o maior goleador da Ranked." },
+          topAssister: { title: "🎯 Você foi o Garçom da Rodada", body: "Você terminou a rodada com o maior número de assistências." },
+          bestDefender: { title: "🛡️ Você foi o Xerife da Rodada", body: "Você teve a melhor média defensiva entre os atletas DEF." },
+        } as const;
+        for (const award of playerAwards) {
+          if (!(award.type in awardCopy)) continue;
+          const copy = awardCopy[award.type as keyof typeof awardCopy];
+          desired.push({
+            type: `player_award_${award.type}`,
+            key: `award:${award.type}:${award.roundId}:${account.profile.player_id}`,
+            title: copy.title,
+            body: `${copy.body} Rodada ${String(award.roundNumber).padStart(2, "0")}.`,
+            href: `/rodadas/${award.roundId}`,
+          });
+        }
+      }
     }
 
     const keys = new Set(desired.map((item) => item.key));

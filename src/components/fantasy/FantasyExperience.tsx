@@ -699,29 +699,24 @@ export function FantasyExperience({
     if (currentCount >= playersPerTeam) return setMessage(`Sua escalação já tem ${playersPerTeam} jogadores.`);
     if (player.price > remaining) return setMessage("Patrimônio insuficiente para comprar este jogador.");
 
-    // Inserir no slot de destino clicado ou no primeiro slot vazio:
-    const shouldReturnToField = targetSlot !== null;
-    setSelected((current) => {
-      const next = [...current];
-      while (next.length < playersPerTeam) {
-        next.push("");
-      }
-      if (targetSlot !== null && targetSlot >= 0 && targetSlot < playersPerTeam) {
-        next[targetSlot] = player.id;
-      } else {
-        const firstEmpty = next.findIndex((id) => !id);
-        if (firstEmpty !== -1) {
-          next[firstEmpty] = player.id;
-        } else {
-          next[0] = player.id;
-        }
-      }
-      return next.slice(0, playersPerTeam);
-    });
-
-    setTargetSlot(null);
+    // Ao entrar pelo campo, permanece no mercado até completar todas as vagas
+    // daquela posição. Ex.: o primeiro DEF mantém o segundo slot DEF como alvo.
+    const slotRoles = getFantasySlotRoles(playersPerTeam, formation);
+    const next = [...selected];
+    while (next.length < playersPerTeam) next.push("");
+    const insertionSlot = targetSlot !== null && targetSlot >= 0 && targetSlot < playersPerTeam
+      ? targetSlot
+      : next.findIndex((id) => !id);
+    if (insertionSlot < 0) return setMessage(`Sua escalação já tem ${playersPerTeam} jogadores.`);
+    next[insertionSlot] = player.id;
+    const insertedRole = slotRoles[insertionSlot];
+    const nextSlotForRole = targetSlot !== null
+      ? slotRoles.findIndex((role, index) => role === insertedRole && !next[index])
+      : -1;
+    setSelected(next.slice(0, playersPerTeam));
+    setTargetSlot(nextSlotForRole >= 0 ? nextSlotForRole : null);
     setMessage("");
-    if (shouldReturnToField || currentCount + 1 === playersPerTeam) {
+    if ((targetSlot !== null && nextSlotForRole < 0) || currentCount + 1 === playersPerTeam) {
       setTimeout(() => {
         setActiveTab("team");
       }, 160);
