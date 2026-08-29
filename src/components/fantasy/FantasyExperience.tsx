@@ -1993,6 +1993,8 @@ export function FantasyExperience({
           onClose={() => setSelectedDrawerPlayer(null)}
           isBought={Boolean(selectedDrawerPlayer && selected.includes(selectedDrawerPlayer.id))}
           isMarketOpen={open}
+          isRoundLive={status === "in_progress"}
+          liveRevision={liveProjection?.calculatedAt}
           onToggleBuy={(p) => togglePlayer(p)}
         />
       )}

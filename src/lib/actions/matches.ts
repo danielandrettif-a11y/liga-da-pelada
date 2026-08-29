@@ -193,6 +193,17 @@ export async function createMatch(input: CreateMatchInput) {
 
     if (error) throw new Error(error.message);
 
+    // O trigger do banco é a primeira proteção. A chamada explícita é
+    // idempotente e cobre instalações onde o trigger tenha ficado ausente ou
+    // desatualizado, evitando partida ao vivo com o Cartola ainda aberto.
+    const { error: fantasyLockError } = await client.rpc("lock_fantasy_market", {
+      p_round_id: input.round_id,
+    });
+    if (fantasyLockError) {
+      await client.from("matches").delete().eq("id", data.id);
+      throw new Error(`Não foi possível fechar o Cartola antes da partida: ${fantasyLockError.message}`);
+    }
+
     const lineupRows: Array<Record<string, unknown>> = [];
     for (const team of selectedTeams as any[]) {
       for (const teamPlayer of team.team_players || []) {

@@ -296,7 +296,7 @@ export async function getFantasyDashboard() {
       `${a.round?.date || ""}-${String(a.round?.number || 0).padStart(4, "0")}`
     );
 
-  const activeOfficialRound =
+  const selectedActiveOfficialRound =
     officialFantasyRounds
       .filter(
         (item: any) =>
@@ -308,6 +308,13 @@ export async function getFantasyDashboard() {
           return a.market_status === "in_progress" ? -1 : 1;
         return byRoundDateDesc(a, b);
       })[0] || null;
+  const activeOfficialRound = selectedActiveOfficialRound &&
+    selectedActiveOfficialRound.market_status === "open" &&
+    (selectedActiveOfficialRound.round?.matches || []).some((match: any) =>
+      match.status === "live" || match.status === "finished"
+    )
+      ? { ...selectedActiveOfficialRound, market_status: "in_progress" }
+      : selectedActiveOfficialRound;
 
   const finishedOfficialRounds = officialFantasyRounds
     .filter((item: any) => item.market_status === "finished")
@@ -403,9 +410,14 @@ export async function getFantasyDashboard() {
         .maybeSingle()
     : Promise.resolve({ data: null as any });
 
+  // O cliente de serviço permanece somente no servidor. Ele também recupera
+  // as escalações quando uma partida começou mas o status do mercado ficou
+  // indevidamente como `open` no banco.
+  const liveReadClient = createServiceClient() || account.client;
+
   // Buscar escalações da rodada ativa para popularidade em tempo real
   const activeRoundLineupsRequest = activeOfficialRound
-    ? account.client
+    ? liveReadClient
         .from("fantasy_lineups")
         .select(
           "id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked)"
@@ -423,9 +435,6 @@ export async function getFantasyDashboard() {
 
   // A prévia é pública para quem já está no Cartola, mas precisa continuar
   // funcionando caso uma regra de RLS da escalação/rodada seja atualizada.
-  // O cliente de serviço nunca sai do servidor e aqui é usado somente para
-  // ler partidas, participantes, goleiros e gols já públicos.
-  const liveReadClient = createServiceClient() || account.client;
   const liveMatchesRequest = loadFantasyMatchSnapshots(liveReadClient, displayRoundId);
 
   const [
@@ -1652,6 +1661,110 @@ export async function getFantasyPlayerDetail(playerId: string) {
   const gkGames = stats.goalkeeperGames || 0;
   const gkConceded = stats.goalsConceded || 0;
 
+  // A ficha do atleta também mostra os scouts que ainda não foram
+  // consolidados. A consulta usa a mesma fonte da prévia ao vivo para que o
+  // detalhe acompanhe a pontuação exibida no mercado.
+  const liveReadClient = createServiceClient() || account.client;
+  const [{ data: liveRoundRows }, { data: liveSettingsRow }] = await Promise.all([
+    liveReadClient
+      .from("fantasy_rounds")
+      .select("id, round_id, market_status, settings_snapshot, round:round_id(number, status, ignore_goalkeeper_stats)")
+      .eq("fantasy_season_id", fs.id)
+      .eq("market_status", "in_progress"),
+    liveReadClient
+      .from("fantasy_settings")
+      .select("*")
+      .eq("league_id", league.id)
+      .maybeSingle(),
+  ]);
+  const liveRound = (liveRoundRows || []).find((item: any) => {
+    const round = Array.isArray(item.round) ? item.round[0] : item.round;
+    return round?.status !== "finished";
+  }) || null;
+  const liveRoundInfo = Array.isArray(liveRound?.round) ? liveRound.round[0] : liveRound?.round;
+  let liveRoundSummary: any = null;
+
+  if (liveRound?.round_id) {
+    const snapshot = liveRound.settings_snapshot || {};
+    const liveSettings: FantasySettings = {
+      ...DEFAULT_FANTASY_SETTINGS,
+      roleScoringActive: snapshot.role_scoring_active !== false,
+      goalPoints: Number(snapshot.goal_points ?? liveSettingsRow?.goal_points ?? DEFAULT_FANTASY_SETTINGS.goalPoints),
+      attackerGoalPoints: Number(snapshot.attacker_goal_points ?? liveSettingsRow?.attacker_goal_points ?? DEFAULT_FANTASY_SETTINGS.attackerGoalPoints),
+      assistPoints: Number(snapshot.assist_points ?? liveSettingsRow?.assist_points ?? DEFAULT_FANTASY_SETTINGS.assistPoints),
+      winPoints: Number(snapshot.win_points ?? liveSettingsRow?.win_points ?? DEFAULT_FANTASY_SETTINGS.winPoints),
+      lossPoints: Number(snapshot.loss_points ?? liveSettingsRow?.loss_points ?? DEFAULT_FANTASY_SETTINGS.lossPoints),
+      goalkeeperLossPoints: Number(snapshot.goalkeeper_loss_points ?? liveSettingsRow?.goalkeeper_loss_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperLossPoints),
+      goalkeeperAppearancePoints: Number(snapshot.goalkeeper_appearance_points ?? liveSettingsRow?.goalkeeper_appearance_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperAppearancePoints),
+      goalConcededPoints: Number(snapshot.goal_conceded_points ?? liveSettingsRow?.goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.goalConcededPoints),
+      teamGoalConcededPoints: Number(snapshot.team_goal_conceded_points ?? liveSettingsRow?.team_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.teamGoalConcededPoints),
+      ownGoalPoints: Number(snapshot.own_goal_points ?? liveSettingsRow?.own_goal_points ?? DEFAULT_FANTASY_SETTINGS.ownGoalPoints),
+      captainMultiplier: Number(snapshot.captain_multiplier ?? liveSettingsRow?.captain_multiplier ?? DEFAULT_FANTASY_SETTINGS.captainMultiplier),
+    };
+    const liveMatches = await loadFantasyMatchSnapshots(liveReadClient, liveRound.round_id);
+    const playerProfile = playerRow.player_profile as "offensive" | "midfield" | "defensive" | null;
+    const liveStats = projectFantasyLiveStats(
+      liveMatches.map((match: any) => ({
+        id: match.id,
+        status: match.status,
+        teamAId: match.team_a_id,
+        teamBId: match.team_b_id,
+        scoreA: Number(match.score_a || 0),
+        scoreB: Number(match.score_b || 0),
+        players: (match.match_players || []).map((item: any) => ({
+          playerId: item.player_id,
+          teamId: item.team_id,
+          resultEligible: Boolean(item.result_eligible),
+          playerProfile: item.player_id === playerId ? playerProfile : null,
+        })),
+        goalkeepers: (match.match_goalkeepers || []).map((item: any) => ({
+          playerId: item.player_id,
+          teamId: item.team_id,
+        })),
+        events: (match.match_events || []).map((item: any) => ({
+          playerId: item.player_id,
+          assistPlayerId: item.assist_player_id,
+          teamId: item.team_id,
+          isOwnGoal: Boolean(item.is_own_goal),
+        })),
+      })),
+      liveSettings,
+      { ignoreGoalkeeperStats: Boolean(liveRoundInfo?.ignore_goalkeeper_stats) },
+    );
+    const current = liveStats.get(playerId) || {
+      goals: 0, assists: 0, ownGoals: 0, wins: 0, losses: 0,
+      goalkeeperGames: 0, goalsConceded: 0, defensiveCleanGames: 0,
+      defensiveOneGoalGames: 0, teamGoalsConceded: 0, basePoints: 0,
+    };
+    const goalValue = liveSettings.roleScoringActive === false && playerProfile === "offensive"
+      ? liveSettings.attackerGoalPoints
+      : liveSettings.goalPoints;
+    const defensiveBonus = liveSettings.roleScoringActive === false
+      ? 0
+      : (playerProfile === "defensive"
+        ? current.defensiveCleanGames * 2 + current.defensiveOneGoalGames
+        : 0);
+    const concededValue = liveSettings.roleScoringActive === false
+      ? current.teamGoalsConceded * liveSettings.teamGoalConcededPoints
+      : current.goalsConceded * liveSettings.goalConcededPoints;
+    const breakdown = [
+      { label: "Gols", count: current.goals, points: current.goals * goalValue },
+      { label: "Assistências", count: current.assists, points: current.assists * liveSettings.assistPoints },
+      { label: "Vitórias", count: current.wins, points: current.wins * liveSettings.winPoints },
+      { label: "Derrotas", count: current.losses, points: current.losses * liveSettings.lossPoints },
+      { label: "Jogos como goleiro", count: current.goalkeeperGames, points: current.goalkeeperGames * liveSettings.goalkeeperAppearancePoints },
+      { label: "Gols sofridos como goleiro", count: liveSettings.roleScoringActive === false ? current.teamGoalsConceded : current.goalsConceded, points: concededValue },
+      { label: "Bônus defensivo", count: current.defensiveCleanGames + current.defensiveOneGoalGames, points: defensiveBonus },
+      { label: "Gols contra", count: current.ownGoals, points: current.ownGoals * liveSettings.ownGoalPoints },
+    ].filter((item) => item.count > 0);
+    liveRoundSummary = {
+      roundNumber: liveRoundInfo?.number || null,
+      stats: current,
+      basePoints: current.basePoints,
+      breakdown,
+    };
+  }
+
   const { allTags, compactTags } = getFantasyPlayerTags({
     price,
     totalPoints,
@@ -1692,6 +1805,7 @@ export async function getFantasyPlayerDetail(playerId: string) {
     allTags,
     compactTags,
     history,
+    liveRound: liveRoundSummary,
   };
 }
 
@@ -1993,9 +2107,14 @@ export async function getFantasyRoundLineupOverview(
     };
   }
 
-  const { data: fantasyRounds } = await account.client
+  // Antes do fechamento só expomos nome e estado salvo/pendente, nunca os
+  // atletas escolhidos. A leitura de serviço evita que a RLS transforme a
+  // lista coletiva em "somente eu".
+  const overviewReadClient = createServiceClient() || account.client;
+
+  const { data: fantasyRounds } = await overviewReadClient
     .from("fantasy_rounds")
-    .select("id, market_status, round_id, round:round_id(id, number, date, status, round_type)")
+    .select("id, market_status, round_id, round:round_id(id, number, date, status, round_type, matches(id, status, started_at))")
     .eq("fantasy_season_id", fs.id);
 
   const officialFantasyRounds = (fantasyRounds || []).filter(
@@ -2032,8 +2151,12 @@ export async function getFantasyRoundLineupOverview(
     };
   }
 
+  const hasStartedMatch = (targetFantasyRound.round?.matches || []).some((match: any) =>
+    match.started_at || match.status === "live" || match.status === "finished"
+  );
   const isRoundOpen =
     targetFantasyRound.market_status === "open" &&
+    !hasStartedMatch &&
     targetFantasyRound.round?.status !== "finished";
 
   const ranking = await getFantasyRanking("round", targetFantasyRound.round?.id);
@@ -2054,12 +2177,12 @@ export async function getFantasyRoundLineupOverview(
 
   const [{ data: fantasyAccounts }, { data: allProfiles }, { data: lineups }] =
     await Promise.all([
-      account.client.from("fantasy_accounts").select("user_id").eq("fantasy_season_id", fs.id),
-      account.client
+      overviewReadClient.from("fantasy_accounts").select("user_id").eq("fantasy_season_id", fs.id),
+      overviewReadClient
         .from("account_profiles")
         .select("user_id, players(name, avatar_url)")
         .not("player_id", "is", null),
-      account.client
+      overviewReadClient
         .from("fantasy_lineups")
         .select("id, user_id, status, updated_at, created_at")
         .eq("fantasy_round_id", targetFantasyRound.id),
@@ -2521,13 +2644,19 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
 
   const { data: fantasyRound } = await account.client
     .from("fantasy_rounds")
-    .select("id, round_id, market_status, settings_snapshot, rounds(number, date, status)")
+    .select("id, round_id, market_status, settings_snapshot, rounds(number, date, status, matches(id, status, started_at))")
     .eq("fantasy_season_id", fantasySeason.id)
     .eq("round_id", roundId)
     .maybeSingle();
   if (!fantasyRound) return null;
 
-  const { data: storedLineup } = await account.client
+  const roundInfo = Array.isArray(fantasyRound.rounds) ? fantasyRound.rounds[0] || null : fantasyRound.rounds;
+  const hasStartedMatch = (roundInfo?.matches || []).some((match: any) =>
+    match.started_at || match.status === "live" || match.status === "finished"
+  );
+  const lineupReadClient = hasStartedMatch ? (createServiceClient() || account.client) : account.client;
+
+  const { data: storedLineup } = await lineupReadClient
     .from("fantasy_lineups")
     .select("*, fantasy_lineup_players(*, players(name, avatar_url))")
     .eq("fantasy_round_id", fantasyRound.id)
@@ -2535,7 +2664,7 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
     .maybeSingle();
   if (!storedLineup) return null;
 
-  const live = fantasyRound.market_status === "in_progress"
+  const live = fantasyRound.market_status === "in_progress" || hasStartedMatch
     ? await getLiveRoundProjections(account.client, fantasySeason.id, league.id)
     : null;
   const projection = live?.roundId === roundId ? live.byUserId.get(userId) || null : null;
@@ -2579,7 +2708,7 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
   return {
     history: history || { player: profile?.players || null },
     lineup,
-    round: Array.isArray(fantasyRound.rounds) ? fantasyRound.rounds[0] || null : fantasyRound.rounds,
+    round: roundInfo,
     isLive: Boolean(projection),
     settingsSnapshot: fantasyRound.settings_snapshot || {},
     statsByPlayer: Object.fromEntries((stats || []).map((stat: any) => [stat.player_id, stat])),

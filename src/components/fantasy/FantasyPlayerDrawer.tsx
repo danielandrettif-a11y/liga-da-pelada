@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Crown,
+  ChevronDown,
   Sparkles,
   TrendingDown,
   TrendingUp,
@@ -23,6 +24,8 @@ type Props = {
   onToggleBuy?: (player: FantasyMarketPlayer) => void;
   isBought?: boolean;
   isMarketOpen?: boolean;
+  isRoundLive?: boolean;
+  liveRevision?: string;
 };
 
 export function FantasyPlayerDrawer({
@@ -33,10 +36,13 @@ export function FantasyPlayerDrawer({
   onToggleBuy,
   isBought = false,
   isMarketOpen = true,
+  isRoundLive = false,
+  liveRevision,
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [detailData, setDetailData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [liveStatsOpen, setLiveStatsOpen] = useState(false);
 
   useDialogViewport(isOpen);
 
@@ -54,7 +60,11 @@ export function FantasyPlayerDrawer({
     } else {
       setDetailData(null);
     }
-  }, [isOpen, player?.id]);
+  }, [isOpen, liveRevision, player?.id]);
+
+  useEffect(() => {
+    setLiveStatsOpen(false);
+  }, [player?.id]);
 
   if (!mounted || !isOpen || !player || typeof document === "undefined") return null;
 
@@ -79,6 +89,7 @@ export function FantasyPlayerDrawer({
     .join(" ");
 
   const recentPoints = detailData?.recentPointsList || player.recentPointsList || [];
+  const liveRound = detailData?.liveRound;
 
   return createPortal(
     <div
@@ -144,6 +155,51 @@ export function FantasyPlayerDrawer({
             </div>
           </div>
         </div>
+
+        {isRoundLive && (
+          <section className="mt-3 overflow-hidden rounded-2xl border border-accent/30 bg-accent/[0.06]">
+            <button
+              type="button"
+              onClick={() => setLiveStatsOpen((current) => !current)}
+              aria-expanded={liveStatsOpen}
+              className="flex w-full items-center justify-between gap-3 p-3 text-left"
+            >
+              <span>
+                <span className="block text-[9px] font-black uppercase tracking-wider text-accent">Rodada ao vivo</span>
+                <span className="mt-0.5 block text-xs font-bold text-foreground">Scouts desta rodada</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <strong className="text-sm font-black text-accent">{Number(liveRound?.basePoints ?? player.roundPoints ?? 0).toFixed(1)} pts</strong>
+                <ChevronDown className={`h-4 w-4 text-accent transition-transform ${liveStatsOpen ? "rotate-180" : ""}`} />
+              </span>
+            </button>
+            {liveStatsOpen && (
+              <div className="border-t border-accent/20 px-3 pb-3 pt-2.5">
+                {loading && !liveRound ? (
+                  <p className="text-xs font-medium text-muted">Buscando os scouts ao vivo…</p>
+                ) : liveRound?.breakdown?.length ? (
+                  <div className="space-y-2">
+                    {liveRound.breakdown.map((item: { label: string; count: number; points: number }) => (
+                      <div key={item.label} className="flex items-center justify-between gap-3 text-xs">
+                        <span className="font-bold text-muted">{item.label} · {item.count}</span>
+                        <strong className={item.points < 0 ? "text-danger" : "text-accent"}>
+                          {item.points > 0 ? "+" : ""}{item.points.toFixed(1)} pts
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs font-medium text-muted">Ainda não há scout registrado para este atleta nesta rodada.</p>
+                )}
+                <div className="mt-3 flex items-center justify-between border-t border-accent/15 pt-2.5 text-xs">
+                  <span className="font-black text-foreground">Pontos-base ao vivo</span>
+                  <strong className="text-sm font-black text-accent">+{Number(liveRound?.basePoints ?? player.roundPoints ?? 0).toFixed(1)} pts</strong>
+                </div>
+                <p className="mt-2 text-[9px] font-medium leading-3 text-muted">Atualiza junto com a rodada. Bônus de capitão aparece somente no total da sua escalação.</p>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Grade de Destaques de Preço e Desempenho */}
         <div className="mt-4 grid grid-cols-3 gap-2">
