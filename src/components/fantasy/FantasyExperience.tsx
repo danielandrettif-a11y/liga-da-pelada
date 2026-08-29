@@ -438,7 +438,10 @@ export function FantasyExperience({
       .filter((player) => {
         const matchesQuery = player.name.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR"));
         if (!matchesQuery) return false;
-        if (calledUpOnly && !player.isInCurrentRound && !selected.includes(player.id)) return false;
+        // "Convocados" é um filtro estrito da round_players da rodada. Atletas
+        // já escalados continuam no campo e podem ser removidos por lá, mas não
+        // vazam para a lista do mercado quando não fazem parte da convocação.
+        if (calledUpOnly && !player.isInCurrentRound) return false;
 
         if (filterTag === "ALL") return true;
         if (filterTag === "TREND_UP") return player.trend === "UP";
@@ -515,7 +518,7 @@ export function FantasyExperience({
         if (sort === "popularity") return b.popularityPercent - a.popularityPercent;
         return b.totalPoints - a.totalPoints;
       });
-  }, [market, query, sort, filterTag, positionFilter, calledUpOnly, selected]);
+  }, [market, query, sort, filterTag, positionFilter, calledUpOnly]);
 
   const scheduledAt =
     round?.date && round.start_time ? new Date(`${round.date}T${round.start_time}`).getTime() : null;
@@ -824,6 +827,7 @@ export function FantasyExperience({
     const livePlayerProjection = player ? livePlayerProjectionById.get(player.id) : null;
     const isBeingDragged = draggedSlot === slot;
     const isDragOver = dragOverSlot === slot;
+    const isOutsideCallup = Boolean(player && hasCurrentCallup && !player.isInCurrentRound);
 
     // O mesmo critério persistido no servidor decide o selo e o pacote de pontos.
     const isCorrectPosition = Boolean(
@@ -982,7 +986,9 @@ export function FantasyExperience({
                   avatarUrl={player.avatarUrl}
                   clickable={false}
                   className={`h-14 w-14 rounded-full border-2 bg-background text-sm font-black shadow-lg transition-all group-active:scale-95 ${
-                    captainId === player.id
+                    isOutsideCallup
+                      ? "border-danger ring-2 ring-danger/80 shadow-[0_0_16px_rgba(239,68,68,.75)]"
+                    : captainId === player.id
                       ? "border-amber-300 ring-2 ring-amber-300/70 shadow-[0_0_16px_rgba(251,191,36,.7)]"
                       : isCorrectPosition
                       ? "border-accent ring-2 ring-accent/60 shadow-[0_0_10px_rgba(204,255,0,0.4)]"

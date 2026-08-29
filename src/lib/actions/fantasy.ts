@@ -1905,12 +1905,15 @@ async function getLiveRoundProjections(
     let query = readClient
       .from("fantasy_rounds")
       .select("id, round_id, market_status, settings_snapshot, round:round_id(status, ignore_goalkeeper_stats, date, number)")
-      .eq("fantasy_season_id", fantasySeasonId)
-      // A classificação da rodada começa assim que alguém salva a escalação.
-      // Antes da primeira partida ela é uma prévia de 0 pontos; depois, os
-      // mesmos atletas recebem os scouts ao vivo sem desaparecer da lista.
-      .in("market_status", ["open", "in_progress"]);
-    if (targetRoundId) query = query.eq("round_id", targetRoundId);
+      .eq("fantasy_season_id", fantasySeasonId);
+    if (targetRoundId) {
+      // Uma página histórica pode precisar reconstruir uma rodada já encerrada
+      // quando a consolidação deixou uma escalação antiga zerada.
+      query = query.eq("round_id", targetRoundId);
+    } else {
+      // Sem alvo explícito, somente a rodada corrente entra no ranking geral.
+      query = query.in("market_status", ["open", "in_progress"]);
+    }
     return query;
   };
   let { data: activeRoundRows, error: activeRoundError } = await readActiveRounds(liveReadClient);
@@ -1926,22 +1929,24 @@ async function getLiveRoundProjections(
     console.error("Não foi possível localizar a rodada da prévia do Cartola:", activeRoundError.message);
     return null;
   }
+  const linkedRound = (item: any) => Array.isArray(item?.round) ? item.round[0] || null : item?.round || null;
   const activeRound = (activeRoundRows || [])
-    .filter((item: any) => item.round?.status !== "finished")
+    .filter((item: any) => Boolean(targetRoundId) || linkedRound(item)?.status !== "finished")
     .sort((a: any, b: any) => {
       if (a.market_status !== b.market_status) return a.market_status === "in_progress" ? -1 : 1;
-      return `${b.round?.date || ""}-${String(b.round?.number || 0).padStart(4, "0")}`.localeCompare(
-        `${a.round?.date || ""}-${String(a.round?.number || 0).padStart(4, "0")}`,
+      return `${linkedRound(b)?.date || ""}-${String(linkedRound(b)?.number || 0).padStart(4, "0")}`.localeCompare(
+        `${linkedRound(a)?.date || ""}-${String(linkedRound(a)?.number || 0).padStart(4, "0")}`,
       );
     })[0] || null;
   if (!activeRound?.round_id) return null;
+  const activeRoundInfo = linkedRound(activeRound);
 
   const [{ data: settingsRow }, matches, { data: lineups }, { data: playerRows }] = await Promise.all([
     liveReadClient.from("fantasy_settings").select("*").eq("league_id", leagueId).maybeSingle(),
     loadFantasyMatchSnapshots(liveReadClient, activeRound.round_id),
     liveReadClient
       .from("fantasy_lineups")
-      .select("id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked)")
+      .select("id, user_id, status, score_breakdown, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked)")
       .eq("fantasy_round_id", activeRound.id),
     liveReadClient.from("players").select("id, player_profile, member_category, is_selectable"),
   ]);
@@ -1985,7 +1990,7 @@ async function getLiveRoundProjections(
       events: (match.match_events || []).map((item: any) => ({ playerId: item.player_id, assistPlayerId: item.assist_player_id, teamId: item.team_id, isOwnGoal: Boolean(item.is_own_goal) })),
     })),
     settings,
-    { ignoreGoalkeeperStats: Boolean((activeRound.round as any)?.ignore_goalkeeper_stats) },
+    { ignoreGoalkeeperStats: Boolean(activeRoundInfo?.ignore_goalkeeper_stats) },
   );
   const projections = projectFantasyLiveLineups(
       (lineups || [])
@@ -2008,12 +2013,17 @@ async function getLiveRoundProjections(
         captainPlayerId: lineup.captain_player_id,
         topScorerPlayerId: lineup.top_scorer_player_id,
         topAssistPlayerId: lineup.top_assist_player_id,
+        cardBonus: Number(lineup.score_breakdown?.cardBonus || 0),
       })),
     stats,
     settings,
     eligiblePredictionPlayerIds,
   );
-  return { roundId: activeRound.round_id, byUserId: new Map(projections.map((item) => [item.userId, item])) };
+  return {
+    roundId: activeRound.round_id,
+    isLive: activeRound.market_status !== "finished" && activeRoundInfo?.status !== "finished",
+    byUserId: new Map(projections.map((item) => [item.userId, item])),
+  };
 }
 
 export async function getFantasyRanking(
@@ -2109,7 +2119,7 @@ export async function getFantasyRanking(
           total_points: projection?.totalPoints ?? Number(lineup.total_points || 0),
           current_budget: lineup.budget_after ?? lineup.budget_before ?? 0,
           rounds_played: 1,
-          is_live: true,
+          is_live: live!.isLive,
         });
       }
       for (const projection of live!.byUserId.values()) {
@@ -2121,7 +2131,7 @@ export async function getFantasyRanking(
             total_points: projection.totalPoints,
             current_budget: 0,
             rounds_played: 1,
-            is_live: true,
+            is_live: live!.isLive,
           });
         }
       }
@@ -2863,7 +2873,7 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
     history: history || { player: profile?.players || null },
     lineup,
     round: roundInfo,
-    isLive: Boolean(projection),
+    isLive: Boolean(projection && live?.isLive),
     settingsSnapshot: fantasyRound.settings_snapshot || {},
     statsByPlayer: Object.fromEntries((stats || []).map((stat: any) => [stat.player_id, stat])),
     predictionPlayers: Object.fromEntries((predictionPlayers || []).map((player: any) => [player.id, player])),
