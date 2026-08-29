@@ -102,14 +102,15 @@ export function FantasyPlayerDrawer({
 
   return createPortal(
     <div
-      className="mobile-dialog-backdrop z-[99999] bg-black/90 backdrop-blur-md animate-fade-in"
+      className="mobile-dialog-backdrop z-[99999] bg-black/90 backdrop-blur-md animate-fade-in overflow-y-auto p-3 sm:p-6"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={`Perfil Cartola de ${player.name}`}
     >
       <div
-        className="relative flex w-full max-w-lg max-h-[88vh] flex-col overflow-y-auto rounded-3xl border border-accent/40 bg-[#06160d] p-5 sm:p-6 shadow-[0_0_60px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto touch-auto overscroll-contain"
+        className="mobile-dialog-scroll relative flex w-full max-w-lg max-h-[85dvh] sm:max-h-[85vh] flex-col overflow-y-auto rounded-3xl border border-accent/40 bg-[#06160d] p-5 sm:p-6 shadow-[0_0_60px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto touch-pan-y overscroll-contain"
+        style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Botão Fechar */}
