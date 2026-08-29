@@ -209,7 +209,7 @@ export function FantasyRankingList({
   if (ranking.length === 0) {
     return (
       <p className="glass-card p-6 text-center text-sm text-muted">
-        O ranking aparecerá após as primeiras escalações e partidas finalizadas.
+        O ranking aparecerá assim que alguém salvar a escalação para a rodada.
       </p>
     );
   }

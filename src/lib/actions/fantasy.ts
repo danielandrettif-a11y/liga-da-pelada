@@ -133,6 +133,62 @@ export type FantasyDashboardInsights = {
   topDepreciationPlayer: FantasyMarketPlayer | null;
 };
 
+async function loadFantasyMatchSnapshots(client: any, roundId: string | null) {
+  if (!roundId) return [] as any[];
+
+  const { data: matches, error: matchesError } = await client
+    .from("matches")
+    .select("id, status, team_a_id, team_b_id, score_a, score_b")
+    .eq("round_id", roundId);
+  if (matchesError) {
+    console.error("Erro ao buscar partidas para a prévia do Cartola:", matchesError);
+    return [] as any[];
+  }
+
+  const matchIds = (matches || []).map((match: any) => match.id);
+  if (matchIds.length === 0) return [] as any[];
+
+  const [eventsResult, playersResult, goalkeepersResult] = await Promise.all([
+    client
+      .from("match_events")
+      .select("match_id, event_type, player_id, assist_player_id, team_id, is_own_goal")
+      .in("match_id", matchIds)
+      .eq("event_type", "goal"),
+    client
+      .from("match_players")
+      .select("match_id, player_id, team_id, result_eligible")
+      .in("match_id", matchIds),
+    client
+      .from("match_goalkeepers")
+      .select("match_id, player_id, team_id")
+      .in("match_id", matchIds),
+  ]);
+
+  if (eventsResult.error) console.error("Erro ao buscar gols para a prévia do Cartola:", eventsResult.error);
+  if (playersResult.error) console.error("Erro ao buscar participantes para a prévia do Cartola:", playersResult.error);
+  if (goalkeepersResult.error) console.error("Erro ao buscar goleiros para a prévia do Cartola:", goalkeepersResult.error);
+
+  const groupByMatch = (rows: any[] | null) => {
+    const grouped = new Map<string, any[]>();
+    for (const row of rows || []) {
+      const current = grouped.get(row.match_id) || [];
+      current.push(row);
+      grouped.set(row.match_id, current);
+    }
+    return grouped;
+  };
+  const eventsByMatch = groupByMatch(eventsResult.data);
+  const playersByMatch = groupByMatch(playersResult.data);
+  const goalkeepersByMatch = groupByMatch(goalkeepersResult.data);
+
+  return (matches || []).map((match: any) => ({
+    ...match,
+    match_events: eventsByMatch.get(match.id) || [],
+    match_players: playersByMatch.get(match.id) || [],
+    match_goalkeepers: goalkeepersByMatch.get(match.id) || [],
+  }));
+}
+
 export async function getFantasyDashboard() {
   const account = await getCurrentAccount();
   if (!account.user) return { authenticated: false as const };
@@ -364,12 +420,7 @@ export async function getFantasyDashboard() {
         .eq("fantasy_round_id", previousFinishedRound.id)
     : Promise.resolve({ data: [] as any[] });
 
-  const liveMatchesRequest = displayRoundId
-    ? account.client
-        .from("matches")
-        .select("id, status, team_a_id, team_b_id, score_a, score_b, match_events(player_id, assist_player_id, team_id, is_own_goal), match_players(player_id, team_id, result_eligible), match_goalkeepers(player_id, team_id)")
-        .eq("round_id", displayRoundId)
-    : Promise.resolve({ data: [] as any[] });
+  const liveMatchesRequest = loadFantasyMatchSnapshots(account.client, displayRoundId);
 
   const [
     { data: priceRows },
@@ -385,7 +436,7 @@ export async function getFantasyDashboard() {
     { data: activeRoundLineups },
     { data: previousRoundLineups },
     { data: rawPortfolio },
-    { data: liveMatches },
+    liveMatches,
     cardDashboard,
   ] = await Promise.all([
     account.client.from("fantasy_player_prices").select("*").eq("fantasy_season_id", fantasySeason.id),
@@ -1140,9 +1191,28 @@ export async function getFantasyDashboard() {
     topDepreciationPlayer: sortedByDepreciation[0] || null,
   };
 
+  const projectionLineups = (activeRoundLineups || []).filter(
+    (item: any) => item.user_id !== account.user!.id || (item.fantasy_lineup_players || []).length > 0,
+  );
+  if (
+    fantasyRound?.market_status === "in_progress" &&
+    effectiveLineup?.fantasy_lineup_players?.length &&
+    !projectionLineups.some((item: any) => item.user_id === account.user!.id)
+  ) {
+    projectionLineups.push({
+      id: effectiveLineup.id || `preview-${account.user.id}`,
+      user_id: account.user.id,
+      status: effectiveLineup.status || "preview",
+      captain_player_id: effectiveLineup.captain_player_id,
+      top_scorer_player_id: effectiveLineup.top_scorer_player_id,
+      top_assist_player_id: effectiveLineup.top_assist_player_id,
+      fantasy_lineup_players: effectiveLineup.fantasy_lineup_players,
+    });
+  }
+
   const projectedLineups = fantasyRound?.market_status === "in_progress"
     ? projectFantasyLiveLineups(
-        (activeRoundLineups || [])
+        projectionLineups
           .filter((item: any) => item.status !== "missed")
           .map((item: any) => ({
             id: item.id,
@@ -1618,22 +1688,26 @@ export async function getFantasyPlayerDetail(playerId: string) {
 }
 
 async function getLiveRoundProjections(client: any, fantasySeasonId: string, leagueId: string) {
-  const { data: activeRound } = await client
+  const { data: activeRoundRows } = await client
     .from("fantasy_rounds")
     .select("id, round_id, market_status, settings_snapshot, round:round_id(status, ignore_goalkeeper_stats)")
     .eq("fantasy_season_id", fantasySeasonId)
-    .eq("market_status", "in_progress")
-    .order("locked_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    // A classificação da rodada começa assim que alguém salva a escalação.
+    // Antes da primeira partida ela é uma prévia de 0 pontos; depois, os
+    // mesmos atletas recebem os scouts ao vivo sem desaparecer da lista.
+    .in("market_status", ["open", "in_progress"])
+    .order("locked_at", { ascending: false, nullsFirst: false });
+  const activeRound = (activeRoundRows || [])
+    .filter((item: any) => item.round?.status !== "finished")
+    .sort((a: any, b: any) => {
+      if (a.market_status !== b.market_status) return a.market_status === "in_progress" ? -1 : 1;
+      return 0;
+    })[0] || null;
   if (!activeRound?.round_id) return null;
 
-  const [{ data: settingsRow }, { data: matches }, { data: lineups }, { data: playerRows }] = await Promise.all([
+  const [{ data: settingsRow }, matches, { data: lineups }, { data: playerRows }] = await Promise.all([
     client.from("fantasy_settings").select("*").eq("league_id", leagueId).maybeSingle(),
-    client
-      .from("matches")
-      .select("id, status, team_a_id, team_b_id, score_a, score_b, match_events(player_id, assist_player_id, team_id, is_own_goal), match_players(player_id, team_id, result_eligible), match_goalkeepers(player_id, team_id)")
-      .eq("round_id", activeRound.round_id),
+    loadFantasyMatchSnapshots(client, activeRound.round_id),
     client
       .from("fantasy_lineups")
       .select("id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked)")

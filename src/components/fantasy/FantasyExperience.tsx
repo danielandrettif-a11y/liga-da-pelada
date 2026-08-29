@@ -1129,7 +1129,7 @@ export function FantasyExperience({
       )}
 
       {/* Resumo da Última Rodada */}
-      {lastRound && !isTest && (
+      {lastRound && !isTest && betweenRounds && (
         <section className="overflow-hidden rounded-2xl border border-accent/25 bg-gradient-to-br from-[#0b2415] via-surface to-[#10190d] shadow-[0_12px_30px_rgba(0,0,0,.2)]">
           <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3.5">
             <div className="flex min-w-0 items-center gap-3">

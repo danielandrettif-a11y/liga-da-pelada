@@ -480,6 +480,60 @@ export async function substituteMatchPlayer(input: SubstituteMatchPlayerInput) {
   }
 }
 
+/**
+ * Remove uma partida criada por engano antes do encerramento da rodada.
+ * Os relacionamentos da partida usam cascade no banco; depois recalculamos os
+ * scouts da rodada e, quando existir, a rodada correspondente do Cartola.
+ */
+export async function deleteMatch(matchId: string) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: ADMIN_ERROR };
+    if (!matchId) return { success: false, error: "Partida inválida para exclusão." };
+
+    const { data: match, error: matchError } = await client
+      .from("matches")
+      .select("id, round_id, status, round:round_id(status)")
+      .eq("id", matchId)
+      .maybeSingle();
+
+    if (matchError) throw new Error(matchError.message);
+    if (!match) return { success: false, error: "Partida não encontrada." };
+    if (match.status === "live") return { success: false, error: "Encerre a partida antes de apagá-la." };
+    if ((match as any).round?.status === "finished") {
+      return { success: false, error: "A rodada já foi encerrada. Use a correção da rodada para preservar o histórico." };
+    }
+
+    const { error: deleteError } = await client.from("matches").delete().eq("id", matchId);
+    if (deleteError) throw new Error(deleteError.message);
+
+    const roundId = match.round_id;
+    const warnings: string[] = [];
+    const statsResult = await calculateRoundStats(roundId);
+    if (!statsResult.success) warnings.push(statsResult.error || "Não foi possível recalcular as estatísticas.");
+
+    const { data: fantasyRound, error: fantasyRoundError } = await client
+      .from("fantasy_rounds")
+      .select("id")
+      .eq("round_id", roundId)
+      .maybeSingle();
+    if (fantasyRoundError) warnings.push("A partida foi apagada, mas não foi possível localizar a rodada do Cartola.");
+    if (fantasyRound) {
+      const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: roundId });
+      if (fantasyError) warnings.push(`A partida foi apagada, mas o Cartola precisa ser reprocessado: ${fantasyError.message}`);
+    }
+
+    revalidatePath(`/rodadas/${roundId}`);
+    revalidatePath(`/rodadas/${roundId}/nova-partida`);
+    revalidatePath("/ranking");
+    revalidatePath("/cartola", "layout");
+    return { success: true, warning: warnings.join(" ") || undefined };
+  } catch (err: any) {
+    console.error("Erro ao apagar partida:", err);
+    return { success: false, error: err.message || "Não foi possível apagar a partida." };
+  }
+}
+
 export async function undoLastMatchSubstitution(substitutionId: string, matchId: string) {
   try {
     const client = await getAdminClient();

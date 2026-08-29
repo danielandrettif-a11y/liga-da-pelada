@@ -17,6 +17,8 @@ import { getPlayers } from "@/lib/actions/players";
 import { RoundInstagramStoryGenerator } from "@/components/RoundInstagramStoryGenerator";
 import { RoundTeamShuffleCard } from "@/components/RoundTeamShuffleCard";
 import { getPaymentRecipients } from "@/lib/actions/payments";
+import { DeleteMatchButton } from "@/components/DeleteMatchButton";
+import { RoundLiveStats } from "@/components/RoundLiveStats";
 
 export const revalidate = 0;
 
@@ -91,6 +93,8 @@ export default async function RodadaDetalhePage({
         </Link>
       )}
 
+      <RoundLiveStats matches={round.matches || []} players={participants} />
+
       {/* Teams Grid */}
       <section className="space-y-4">
         <h2 className="text-xs font-bold text-muted uppercase tracking-wider px-1">
@@ -158,20 +162,23 @@ export default async function RodadaDetalhePage({
                   {isFinished && (index === 0 || round.matches[index - 1]?.status !== "finished") && (
                     <p className="px-1 pt-2 text-[10px] font-black uppercase tracking-wider text-muted">Histórico de partidas</p>
                   )}
-                <Link href={`/partidas/${match.id}`} className="block">
-                  <div className={`glass-card glass-card-hover overflow-hidden p-4 animate-fade-in stagger-${Math.min(index + 1, 5)} ${isLive ? "border-accent/40 shadow-[0_0_24px_rgba(190,255,0,0.06)]" : ""}`}>
+                <div className={`glass-card glass-card-hover overflow-hidden p-4 animate-fade-in stagger-${Math.min(index + 1, 5)} ${isLive ? "border-accent/40 shadow-[0_0_24px_rgba(190,255,0,0.06)]" : ""}`}>
                     <div className="mb-3 flex items-center justify-between border-b border-border pb-2.5">
                       <span className="text-[10px] font-black uppercase tracking-wider text-muted">
                         Partida {String(index + 1).padStart(2, "0")}
                       </span>
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${isFinished ? "bg-muted/15 text-muted" : isLive ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>
-                        {isLive && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
-                        {isFinished ? "Finalizada" : isLive ? "Ao vivo" : "Aguardando"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${isFinished ? "bg-muted/15 text-muted" : isLive ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>
+                          {isLive && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
+                          {isFinished ? "Finalizada" : isLive ? "Ao vivo" : "Aguardando"}
+                        </span>
+                        {account.isAdmin && round.status !== "finished" && !isLive && <DeleteMatchButton matchId={match.id} matchNumber={index + 1} />}
+                      </div>
                     </div>
-                    {formatTimeRange(match.started_at, match.finished_at) && <p className="mb-3 text-[10px] font-bold text-muted">⏱ {formatTimeRange(match.started_at, match.finished_at)} · {formatDuration(getMatchElapsedSeconds(match))}</p>}
+                    <Link href={`/partidas/${match.id}`} className="block">
+                      {formatTimeRange(match.started_at, match.finished_at) && <p className="mb-3 text-[10px] font-bold text-muted">⏱ {formatTimeRange(match.started_at, match.finished_at)} · {formatDuration(getMatchElapsedSeconds(match))}</p>}
 
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
                       <div className="flex min-w-0 items-center justify-end gap-2 text-right">
                         <span className="truncate text-sm font-bold text-foreground">{teamA?.name}</span>
                         <TeamCrest name={teamA?.name || "Time A"} crestUrl={teamA?.crest_url} color={teamA?.color} className="h-6 w-6" />
@@ -187,9 +194,9 @@ export default async function RodadaDetalhePage({
                         <TeamCrest name={teamB?.name || "Time B"} crestUrl={teamB?.crest_url} color={teamB?.color} className="h-6 w-6" />
                         <span className="truncate text-sm font-bold text-foreground">{teamB?.name}</span>
                       </div>
-                    </div>
+                      </div>
+                    </Link>
                   </div>
-                </Link>
                 </div>
               );
             })
