@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Medal, Share2, Sparkles, Target, Trophy, X } from "@/components/icons";
+import { ChevronDown, Medal, Share2, Sparkles, Target, Trophy, X } from "@/components/icons";
 import type { RankingEntry } from "@/lib/ranking";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { getInitials } from "@/lib/utils";
@@ -189,6 +189,7 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
 
 export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   const [mounted, setMounted] = useState(false);
+  const [showBestRounds, setShowBestRounds] = useState(false);
   useDialogViewport(true);
 
   useEffect(() => {
@@ -246,27 +247,30 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
 
   return createPortal(
     <div
-      className="mobile-dialog-backdrop z-[99999] bg-black/90 backdrop-blur-md animate-fade-in overflow-y-auto px-4 py-8 sm:py-12"
+      className="mobile-dialog-backdrop z-[99999] fixed inset-0 bg-black/90 backdrop-blur-md animate-fade-in flex items-center justify-center p-3 sm:p-6"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={`Carta de ${displayName}`}
-        className="relative w-full max-w-[350px] mx-auto my-auto"
+        className="relative w-full max-w-[360px] max-h-[92dvh] overflow-y-auto overscroll-contain rounded-3xl p-1.5 pb-6 flex flex-col items-center my-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent]"
       >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Fechar carta"
-          className="absolute -top-3 -right-2 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-white/25 bg-black/85 text-white shadow-xl backdrop-blur hover:scale-105 active:scale-95 transition-transform"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        {/* Botão de Fechar fixado no topo */}
+        <div className="sticky top-0 z-50 flex w-full justify-end pointer-events-none mb-[-2.25rem] pr-1 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar carta"
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-black/85 text-white shadow-xl backdrop-blur-md hover:scale-105 active:scale-95 transition-transform"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
         {/* CARTA DE FUTEBOL ESTILO ULTIMATE TEAM */}
         <div
-          className="relative p-[3px] transition-transform"
+          className="relative w-full p-[3px] transition-transform"
           style={{
             clipPath,
             background: `linear-gradient(145deg, ${theme.edge}, ${theme.deep} 48%, ${theme.light})`,
@@ -274,7 +278,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
           }}
         >
           <div
-            className="relative overflow-hidden px-5 pb-10 pt-5"
+            className="relative overflow-hidden px-4 sm:px-5 pb-10 pt-5"
             style={{
               clipPath,
               color: theme.ink,
@@ -292,7 +296,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
             <div className="pointer-events-none absolute inset-2.5 border border-current/20" style={{ clipPath }} />
 
             {/* Cabeçalho */}
-            <header className="relative z-10 flex items-center justify-between text-[9px] font-black uppercase tracking-[0.22em] opacity-90">
+            <header className="relative z-10 flex items-center justify-between text-[9px] font-black uppercase tracking-[0.22em] opacity-90 pr-7">
               <span className="flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
                 PBQ · Temporada
@@ -302,8 +306,8 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
               </span>
             </header>
 
-            {/* Miolo: Pontuação & Foto em Medalhão */}
-            <div className="relative z-10 mt-2 flex items-center justify-between h-44">
+            {/* Miolo: Pontuação & Foto em Medalhão Circular com Recorte Perfeito */}
+            <div className="relative z-10 mt-2 flex items-center justify-between h-40 sm:h-44">
               <div className="flex flex-col items-start font-athletic z-20 pl-1">
                 <span className="player-card-rating text-5xl font-black leading-none drop-shadow-sm">{entry.points}</span>
                 <span className="text-[10px] font-black tracking-[0.2em] opacity-80">PTS</span>
@@ -315,15 +319,15 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
               </div>
 
               <div className="relative flex-1 flex justify-end pr-1">
-                <div className="relative h-36 w-36 rounded-full border-[3px] border-current/35 bg-black/20 shadow-[0_10px_25px_rgba(0,0,0,0.45)] flex items-center justify-center">
+                <div className="relative h-32 w-32 sm:h-36 sm:w-36 rounded-full border-[3px] border-current/35 bg-black/20 shadow-[0_10px_25px_rgba(0,0,0,0.45)] flex items-center justify-center overflow-hidden">
                   <PlayerAvatar
                     name={entry.player.name}
                     avatarUrl={entry.player.avatar_url}
                     frameKey={entry.cosmetics?.frameKey}
                     auraKey={entry.cosmetics?.auraKey}
                     clickable={false}
-                    className="h-full w-full"
-                    imageClassName="object-cover object-top scale-105"
+                    className="h-full w-full rounded-full overflow-hidden"
+                    imageClassName="h-full w-full object-cover object-top"
                   />
                 </div>
               </div>
@@ -378,87 +382,131 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
           </div>
         </div>
 
+        {/* 6 MELHORES PARTIDAS - SANFONA / ACCORDION */}
         {entry.bestRounds && entry.bestRounds.length > 0 && (
-          <div className="mx-auto mt-4 w-[92%] overflow-hidden rounded-2xl border border-border bg-[#07150d]/95 p-4 shadow-xl backdrop-blur-md">
-            <div className="flex items-center justify-between border-b border-border/70 pb-2.5">
-              <div className="flex items-center gap-1.5">
-                <Trophy className="h-4 w-4 text-accent" />
-                <span className="font-athletic text-xs font-black uppercase tracking-wider text-foreground">
-                  Suas 6 Melhores Partidas
-                </span>
-              </div>
-              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-black text-accent">
-                {entry.bestRounds.filter((r) => r.countedInTop6).length}/6 no ranking
-              </span>
-            </div>
-
-            {/* Lista de Partidas */}
-            <div className="mt-3 divide-y divide-border/40 max-h-48 overflow-y-auto">
-              {entry.bestRounds.map((r, idx) => (
-                <div
-                  key={r.roundId}
-                  className={`flex items-center justify-between py-2 px-1 text-xs transition-colors ${
-                    r.countedInTop6 ? "text-foreground" : "text-muted opacity-60"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
-                        r.countedInTop6
-                          ? "bg-accent text-background font-bold"
-                          : "bg-surface text-muted"
-                      }`}
-                    >
-                      {idx + 1}
-                    </span>
-                    <div className="truncate">
-                      <p className="font-bold truncate text-[11px]">
-                        Rodada {String(r.roundNumber).padStart(2, "0")}
-                      </p>
-                      <p className="text-[9px] text-muted">
-                        {r.goals}G · {r.assists}A · {r.wins}V
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <span
-                      className={`font-athletic text-base font-black ${
-                        r.countedInTop6 ? "text-accent" : "text-muted"
-                      }`}
-                    >
-                      {r.points} pts
-                    </span>
-                    {r.countedInTop6 && (
-                      <span className="block text-[8px] font-bold text-accent/80 uppercase">
-                        Somando
-                      </span>
-                    )}
-                  </div>
+          <div className="mx-auto mt-3.5 w-[94%] overflow-hidden rounded-2xl border border-border/80 bg-[#07150d]/95 shadow-xl backdrop-blur-md transition-all">
+            <button
+              type="button"
+              onClick={() => setShowBestRounds((prev) => !prev)}
+              className="flex w-full items-center justify-between p-3.5 text-left transition-colors hover:bg-white/[0.03] active:bg-white/[0.06]"
+              aria-expanded={showBestRounds}
+            >
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent">
+                  <Trophy className="h-4 w-4" />
                 </div>
-              ))}
-            </div>
+                <div>
+                  <span className="block font-athletic text-xs font-black uppercase tracking-wider text-foreground">
+                    6 Melhores Partidas
+                  </span>
+                  <span className="text-[10px] text-muted">
+                    {showBestRounds ? "Toque para recolher" : "Toque para ver histórico"}
+                  </span>
+                </div>
+              </div>
 
-            {/* Nota de Corte */}
-            <div className="mt-3 rounded-xl border border-accent/25 bg-accent/10 p-2.5 text-center text-[11px] font-bold text-foreground">
-              {entry.bestRounds.length >= 6 ? (
-                <span>
-                  🎯 <strong className="text-accent">Nota de corte:</strong> Precisa fazer{" "}
-                  <strong className="text-accent">&gt; {entry.minPointsToEnterTop6} pts</strong> na próxima rodada para subir no ranking.
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-black text-accent">
+                  {entry.bestRounds.filter((r) => r.countedInTop6).length}/6 no ranking
                 </span>
-              ) : (
-                <span>
-                  🎯 <strong className="text-accent">Vagas livres:</strong> {entry.bestRounds.length}/6 jogos. Qualquer pontuação na próxima rodada entrará somando!
-                </span>
-              )}
-            </div>
+                <ChevronDown
+                  className={`h-4 w-4 text-muted transition-transform duration-200 ${
+                    showBestRounds ? "rotate-180 text-accent" : ""
+                  }`}
+                />
+              </div>
+            </button>
+
+            {/* Conteúdo Expansível */}
+            {showBestRounds && (
+              <div className="border-t border-border/60 p-3 pt-2 animate-fade-in">
+                {/* Lista de Partidas com scroll dedicado */}
+                <div className="divide-y divide-border/40 max-h-52 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]">
+                  {entry.bestRounds.map((r, idx) => (
+                    <div
+                      key={r.roundId}
+                      className={`flex items-center justify-between py-2 px-1 text-xs transition-colors ${
+                        r.countedInTop6 ? "text-foreground" : "text-muted opacity-60"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
+                            r.countedInTop6
+                              ? "bg-accent text-background font-bold"
+                              : "bg-surface text-muted"
+                          }`}
+                        >
+                          {idx + 1}
+                        </span>
+                        <div className="truncate">
+                          <p className="font-bold truncate text-[11px]">
+                            Rodada {String(r.roundNumber).padStart(2, "0")}
+                          </p>
+                          <p className="text-[9px] text-muted">
+                            {r.goals}G · {r.assists}A · {r.wins}V
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span
+                          className={`font-athletic text-base font-black ${
+                            r.countedInTop6 ? "text-accent" : "text-muted"
+                          }`}
+                        >
+                          {r.points} pts
+                        </span>
+                        {r.countedInTop6 && (
+                          <span className="block text-[8px] font-bold text-accent/80 uppercase">
+                            Somando
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Nota de Corte */}
+                <div className="mt-3 rounded-xl border border-accent/25 bg-accent/10 p-2.5 text-center text-[11px] font-bold text-foreground">
+                  {entry.bestRounds.length >= 6 ? (
+                    <span>
+                      🎯 <strong className="text-accent">Nota de corte:</strong> Precisa fazer{" "}
+                      <strong className="text-accent">&gt; {entry.minPointsToEnterTop6} pts</strong> na próxima rodada para subir no ranking.
+                    </span>
+                  ) : (
+                    <span>
+                      🎯 <strong className="text-accent">Vagas livres:</strong> {entry.bestRounds.length}/6 jogos. Qualquer pontuação na próxima rodada entrará somando!
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        <div className="mx-auto mt-4 grid w-[88%] gap-2">
-          <button type="button" onClick={shareCard} disabled={sharing} className="flex items-center justify-center gap-2 rounded-xl border border-accent/40 bg-accent/10 py-3.5 text-sm font-black uppercase tracking-wide text-accent disabled:opacity-50"><Share2 className="h-4 w-4" />{sharing ? "Gerando Stories..." : "Compartilhar carta"}</button>
-          <Link href={`/jogadores/${entry.player.id}`} className="flex items-center justify-center rounded-xl bg-accent py-3.5 text-sm font-black uppercase tracking-wide text-background shadow-lg shadow-accent/15">Abrir perfil completo</Link>
-          {shareError && <p className="rounded-lg bg-danger/10 p-2 text-center text-[10px] font-bold text-danger">{shareError}</p>}
+        {/* Botões de Ação */}
+        <div className="mx-auto mt-4 grid w-[90%] gap-2">
+          <button
+            type="button"
+            onClick={shareCard}
+            disabled={sharing}
+            className="flex items-center justify-center gap-2 rounded-xl border border-accent/40 bg-accent/10 py-3.5 text-sm font-black uppercase tracking-wide text-accent hover:bg-accent/15 active:scale-[0.99] transition-all disabled:opacity-50"
+          >
+            <Share2 className="h-4 w-4" />
+            {sharing ? "Gerando Stories..." : "Compartilhar carta"}
+          </button>
+          <Link
+            href={`/jogadores/${entry.player.id}`}
+            className="flex items-center justify-center rounded-xl bg-accent py-3.5 text-sm font-black uppercase tracking-wide text-background shadow-lg shadow-accent/15 hover:brightness-110 active:scale-[0.99] transition-all"
+          >
+            Abrir perfil completo
+          </Link>
+          {shareError && (
+            <p className="rounded-lg bg-danger/10 p-2 text-center text-[10px] font-bold text-danger">
+              {shareError}
+            </p>
+          )}
         </div>
       </div>
     </div>,

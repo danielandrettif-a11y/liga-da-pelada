@@ -65,43 +65,91 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
   const cardGradient = cosmetics?.bannerAssetKey
     ? `bg-gradient-to-b ${cosmeticVisual(cosmetics.bannerAssetKey)}/30`
     : "";
+  const bannerImage = cosmeticImage(cosmetics?.bannerAssetKey);
   const profileBackgroundImage = cosmeticImage(cosmetics?.backgroundAssetKey);
-  const profileBackgroundStyle = profileBackgroundImage
-    ? {
-        backgroundImage: `linear-gradient(rgba(2, 14, 8, .58), rgba(2, 14, 8, .82)), url(${profileBackgroundImage})`,
-        backgroundSize: "cover",
-        backgroundPosition: cosmeticBackgroundPosition("background", cosmetics?.backgroundAssetKey),
-      }
-    : undefined;
 
   return (
-    <div className={`relative -mx-4 -mt-4 min-h-[calc(100dvh-3.5rem)] px-4 pb-4 pt-4 ${profileBackgroundImage ? "bg-[#06100a]" : ""}`} style={profileBackgroundStyle}>
-      {profileBackgroundImage && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,transparent_0%,rgba(2,14,8,.18)_48%,rgba(2,14,8,.62)_100%)]" />}
-      <div className="relative z-10 space-y-6">
-      <div className="flex items-center gap-3"><Link href="/jogadores" className="flex h-10 w-10 items-center justify-center rounded-full bg-surface"><ArrowLeft className="h-5 w-5 text-muted" /></Link><h1 className="text-sm font-bold uppercase tracking-wider text-foreground">Perfil</h1></div>
-      <div className={`glass-card relative overflow-hidden flex flex-col items-center p-6 text-center ${cardGradient}`} style={cosmeticImage(cosmetics?.bannerAssetKey) ? { backgroundImage: `linear-gradient(rgba(3, 14, 8, .52), rgba(3, 14, 8, .82)), url(${cosmeticImage(cosmetics?.bannerAssetKey)})`, backgroundSize: "cover", backgroundPosition: cosmeticBackgroundPosition("banner", cosmetics?.bannerAssetKey) } : undefined}>
-        {cosmetics?.bannerAssetKey && (
-          <div className="pointer-events-none absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent via-transparent to-transparent" />
-        )}
-        <div className="relative mb-4">
-          <PlayerAvatar
-            name={player.name}
-            avatarUrl={player.avatar_url}
-            frameKey={cosmetics?.frameKey}
-            auraKey={cosmetics?.auraKey}
-            className="h-24 w-24 rounded-full bg-surface text-2xl font-bold text-muted ring-2 ring-border"
-          />
+    <div className="relative -mx-4 -mt-4 min-h-[calc(100dvh-3.5rem)] px-4 pb-4 pt-4">
+      {/* Fundo Cosmético Imersivo Fixado na Viewport (não estica com o scroll da página, 100% nítido no celular e PC) */}
+      {profileBackgroundImage && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-0 bg-[#06100a]"
+          style={{
+            backgroundImage: `linear-gradient(to bottom, rgba(2, 14, 8, 0.48) 0%, rgba(2, 14, 8, 0.78) 45%, rgba(2, 14, 8, 0.96) 100%), url(${profileBackgroundImage})`,
+            backgroundSize: "cover",
+            backgroundPosition: cosmeticBackgroundPosition("background", cosmetics?.backgroundAssetKey),
+            backgroundRepeat: "no-repeat",
+          }}
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,transparent_0%,rgba(2,14,8,.22)_48%,rgba(2,14,8,.65)_100%)]" />
         </div>
-        <h2 className="text-2xl font-bold text-foreground">{player.name}</h2>
-        {cosmetics?.titleName ? (
-          <p className={`mt-1 inline-flex items-center gap-1 rounded-full border px-3 py-0.5 text-xs font-black uppercase tracking-wide shadow-sm ${cosmeticNameplateClass(cosmetics.nameplateKey)}`}>
-            ✨ {cosmetics.titleName}
-          </p>
-        ) : null}
-        <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2"><span className="rounded-full border border-border px-2.5 py-1 text-[9px] font-black uppercase text-muted">{categoryLabel}</span>{isPlayable && <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />}</div>
-        {player.profile_bio && <p className="mt-5 max-w-xl text-sm leading-6 text-muted">{player.profile_bio}</p>}
-        {isPlayable && <div className="mt-6 inline-flex items-center gap-4 rounded-2xl border border-border bg-surface/50 px-6 py-3"><div><p className="text-[9px] font-bold uppercase text-muted">Pontos</p><p className="stat-number text-2xl text-accent">{official.points}</p></div><div className="h-8 w-px bg-border" /><div><p className="text-[9px] font-bold uppercase text-muted">Aprov.</p><p className="stat-number text-xl text-foreground">{calculateWinRate(official.wins, official.draws, official.games)}%</p></div></div>}
-      </div>
+      )}
+
+      <div className="relative z-10 space-y-6">
+        <div className="flex items-center gap-3">
+          <Link href="/jogadores" className="flex h-10 w-10 items-center justify-center rounded-full bg-surface shadow-sm hover:bg-surface-hover transition-colors">
+            <ArrowLeft className="h-5 w-5 text-muted" />
+          </Link>
+          <h1 className="text-sm font-bold uppercase tracking-wider text-foreground">Perfil</h1>
+        </div>
+
+        {/* Card do Perfil com Capa e Visual Otimizados */}
+        <div className={`glass-card relative overflow-hidden flex flex-col items-center p-6 text-center shadow-xl ${cardGradient}`}>
+          {/* Imagem da Capa com enquadramento perfeito */}
+          {bannerImage && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-0 opacity-90"
+              style={{
+                backgroundImage: `linear-gradient(180deg, rgba(3, 14, 8, 0.35) 0%, rgba(3, 14, 8, 0.72) 55%, rgba(3, 14, 8, 0.94) 100%), url(${bannerImage})`,
+                backgroundSize: "cover",
+                backgroundPosition: cosmeticBackgroundPosition("banner", cosmetics?.bannerAssetKey),
+                backgroundRepeat: "no-repeat",
+              }}
+            />
+          )}
+          {cosmetics?.bannerAssetKey && (
+            <div className="pointer-events-none absolute inset-0 z-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent via-transparent to-transparent" />
+          )}
+
+          {/* Conteúdo em z-10 para manter nitidez e legibilidade máxima */}
+          <div className="relative z-10 flex flex-col items-center w-full">
+            <div className="relative mb-4">
+              <PlayerAvatar
+                name={player.name}
+                avatarUrl={player.avatar_url}
+                frameKey={cosmetics?.frameKey}
+                auraKey={cosmetics?.auraKey}
+                className="h-24 w-24 rounded-full bg-surface text-2xl font-bold text-muted ring-2 ring-border shadow-lg"
+              />
+            </div>
+            <h2 className="text-2xl font-bold text-foreground drop-shadow-sm">{player.name}</h2>
+            {cosmetics?.titleName ? (
+              <p className={`mt-1 inline-flex items-center gap-1 rounded-full border px-3 py-0.5 text-xs font-black uppercase tracking-wide shadow-sm ${cosmeticNameplateClass(cosmetics.nameplateKey)}`}>
+                ✨ {cosmetics.titleName}
+              </p>
+            ) : null}
+            <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2">
+              <span className="rounded-full border border-border bg-surface/50 backdrop-blur-xs px-2.5 py-1 text-[9px] font-black uppercase text-muted">{categoryLabel}</span>
+              {isPlayable && <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />}
+            </div>
+            {player.profile_bio && <p className="mt-5 max-w-xl text-sm leading-6 text-muted">{player.profile_bio}</p>}
+            {isPlayable && (
+              <div className="mt-6 inline-flex items-center gap-4 rounded-2xl border border-border bg-surface/60 backdrop-blur-sm px-6 py-3 shadow-sm">
+                <div>
+                  <p className="text-[9px] font-bold uppercase text-muted">Pontos</p>
+                  <p className="stat-number text-2xl text-accent">{official.points}</p>
+                </div>
+                <div className="h-8 w-px bg-border" />
+                <div>
+                  <p className="text-[9px] font-bold uppercase text-muted">Aprov.</p>
+                  <p className="stat-number text-xl text-foreground">{calculateWinRate(official.wins, official.draws, official.games)}%</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
       {isPlayable && <section className="rounded-2xl border border-amber-300/25 bg-gradient-to-br from-amber-300/10 via-surface/85 to-surface/70 p-4 shadow-[0_0_24px_rgba(251,191,36,.06)]"><div className="mb-3 flex items-center gap-2"><Trophy className="h-4 w-4 text-amber-300" /><div><h3 className="text-xs font-black uppercase tracking-wider text-foreground">Prêmios individuais</h3><p className="mt-0.5 text-[10px] text-muted">Artilheiro, Garçom, Xerife e títulos da temporada Ranked.</p></div></div><PlayerAwards seasons={awardSeasons} /></section>}
 
