@@ -153,11 +153,17 @@ function CosmeticFrameOverlay({ assetKey }: { assetKey?: string | null }) {
   const key = assetKey.toLowerCase();
   const image = cosmeticFrameImage(assetKey);
   if (image) {
+    // As imagens de moldura têm fundo preto sólido (não transparente).
+    // mix-blend-mode: lighten faz o preto desaparecer (valor 0 = neutro no lighten),
+    // deixando apenas os pixels decorativos da moldura visíveis sobre a foto do jogador.
     return (
       <span
         aria-hidden="true"
         className="pointer-events-none absolute -inset-[22%] z-10 bg-contain bg-center bg-no-repeat"
-        style={{ backgroundImage: `url(${image})` }}
+        style={{
+          backgroundImage: `url(${image})`,
+          mixBlendMode: "lighten",
+        }}
       />
     );
   }
