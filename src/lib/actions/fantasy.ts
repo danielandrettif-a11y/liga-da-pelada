@@ -1891,25 +1891,33 @@ export async function getFantasyPlayerDetail(playerId: string) {
   };
 }
 
-async function getLiveRoundProjections(client: any, fantasySeasonId: string, leagueId: string) {
+async function getLiveRoundProjections(
+  client: any,
+  fantasySeasonId: string,
+  leagueId: string,
+  targetRoundId?: string,
+) {
   // Mantém o ranking e a ficha individual na mesma fonte confiável da prévia
   // principal. O fallback preserva o funcionamento em ambientes de teste sem
   // chave de serviço configurada.
   const liveReadClient = createServiceClient() || client;
-  const { data: activeRoundRows } = await liveReadClient
+  let activeRoundQuery = liveReadClient
     .from("fantasy_rounds")
-    .select("id, round_id, market_status, settings_snapshot, round:round_id(status, ignore_goalkeeper_stats)")
+    .select("id, round_id, market_status, settings_snapshot, round:round_id(status, ignore_goalkeeper_stats, date, number)")
     .eq("fantasy_season_id", fantasySeasonId)
     // A classificação da rodada começa assim que alguém salva a escalação.
     // Antes da primeira partida ela é uma prévia de 0 pontos; depois, os
     // mesmos atletas recebem os scouts ao vivo sem desaparecer da lista.
-    .in("market_status", ["open", "in_progress"])
-    .order("locked_at", { ascending: false, nullsFirst: false });
+    .in("market_status", ["open", "in_progress"]);
+  if (targetRoundId) activeRoundQuery = activeRoundQuery.eq("round_id", targetRoundId);
+  const { data: activeRoundRows } = await activeRoundQuery;
   const activeRound = (activeRoundRows || [])
     .filter((item: any) => item.round?.status !== "finished")
     .sort((a: any, b: any) => {
       if (a.market_status !== b.market_status) return a.market_status === "in_progress" ? -1 : 1;
-      return 0;
+      return `${b.round?.date || ""}-${String(b.round?.number || 0).padStart(4, "0")}`.localeCompare(
+        `${a.round?.date || ""}-${String(a.round?.number || 0).padStart(4, "0")}`,
+      );
     })[0] || null;
   if (!activeRound?.round_id) return null;
 
@@ -2013,7 +2021,12 @@ export async function getFantasyRanking(
   // esconder escalações de terceiros do cliente comum, então a leitura
   // agregada precisa acontecer no servidor.
   const rankingReadClient = createServiceClient() || account.client;
-  const live = await getLiveRoundProjections(account.client, fs.id, league.id);
+  // Para o ranking geral basta a rodada ativa. No escopo de rodada a leitura
+  // é feita depois de resolver o alvo, evitando projetar pontos de outra
+  // rodada que esteja aberta ao mesmo tempo.
+  let live = scope === "general"
+    ? await getLiveRoundProjections(account.client, fs.id, league.id)
+    : null;
 
   let entries: any[] = [];
   if (scope === "round") {
@@ -2050,6 +2063,12 @@ export async function getFantasyRanking(
       fantasyRoundId = latest?.id || null;
       resolvedRoundId = latest?.round_id || null;
     }
+    live = await getLiveRoundProjections(
+      account.client,
+      fs.id,
+      league.id,
+      resolvedRoundId || undefined,
+    );
     let persistedLineups: any[] = [];
     if (fantasyRoundId) {
       const { data } = await rankingReadClient
@@ -2235,11 +2254,16 @@ export async function getFantasyRoundLineupOverview(
     (fr: any) => fr.round?.round_type === "official"
   );
 
-  const sortedRounds = [...officialFantasyRounds].sort((a: any, b: any) =>
-    `${b.round?.date || ""}-${String(b.round?.number || 0).padStart(4, "0")}`.localeCompare(
+  const sortedRounds = [...officialFantasyRounds].sort((a: any, b: any) => {
+    // Uma rodada que já começou sempre é o alvo padrão, mesmo que já exista
+    // outra rodada futura aberta no calendário.
+    if (a.market_status !== b.market_status) {
+      return a.market_status === "in_progress" ? -1 : b.market_status === "in_progress" ? 1 : 0;
+    }
+    return `${b.round?.date || ""}-${String(b.round?.number || 0).padStart(4, "0")}`.localeCompare(
       `${a.round?.date || ""}-${String(a.round?.number || 0).padStart(4, "0")}`
-    )
-  );
+    );
+  });
 
   let targetFantasyRound: any = null;
   if (roundId) {
@@ -2780,7 +2804,7 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
   if (!storedLineup) return null;
 
   const live = fantasyRound.market_status === "in_progress" || hasStartedMatch
-    ? await getLiveRoundProjections(account.client, fantasySeason.id, league.id)
+    ? await getLiveRoundProjections(account.client, fantasySeason.id, league.id, roundId)
     : null;
   const projection = live?.roundId === roundId ? live.byUserId.get(userId) || null : null;
   const livePointsByPlayer = new Map(
