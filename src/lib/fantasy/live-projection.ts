@@ -63,6 +63,13 @@ export type FantasyLiveLineupInput = {
 export type FantasyLiveLineupProjection = {
   lineupId: string;
   userId: string;
+  players: Array<{
+    playerId: string;
+    basePoints: number;
+    positionBonus: number;
+    captainBonus: number;
+    totalPoints: number;
+  }>;
   playerPoints: number;
   positionBonus: number;
   captainBonus: number;
@@ -80,6 +87,7 @@ export type FantasyLiveLineupProjection = {
 export function projectFantasyLiveStats(
   matches: FantasyLiveMatch[],
   settings: FantasySettings,
+  options: { ignoreGoalkeeperStats?: boolean } = {},
 ): Map<string, FantasyLivePlayerStats> {
   const stats = new Map<string, Omit<FantasyLivePlayerStats, "basePoints">>();
   const ensure = (playerId: string, playerProfile?: FantasyLivePlayerStats["playerProfile"]) => {
@@ -128,13 +136,15 @@ export function projectFantasyLiveStats(
       }
     }
 
-    for (const goalkeeper of match.goalkeepers) {
-      const current = ensure(goalkeeper.playerId);
-      const conceded = goalkeeper.teamId === match.teamAId ? match.scoreB : match.scoreA;
-      current.goalsConceded += conceded;
-      // A aparição é mostrada ao vivo, mas pode ser retirada caso a partida seja desfeita.
-      current.goalkeeperGames += 1;
-      if (conceded === 0) current.cleanSheets += 1;
+    if (!options.ignoreGoalkeeperStats) {
+      for (const goalkeeper of match.goalkeepers) {
+        const current = ensure(goalkeeper.playerId);
+        const conceded = goalkeeper.teamId === match.teamAId ? match.scoreB : match.scoreA;
+        current.goalsConceded += conceded;
+        // A aparição é mostrada ao vivo, mas pode ser retirada caso a partida seja desfeita.
+        current.goalkeeperGames += 1;
+        if (conceded === 0) current.cleanSheets += 1;
+      }
     }
 
     for (const event of match.events) {
@@ -203,6 +213,21 @@ export function projectFantasyLiveLineups(
     const playerPoints = [...pointsByPlayer.values()].reduce((sum, points) => sum + points, 0);
     const captainBase = lineup.captainPlayerId ? pointsByPlayer.get(lineup.captainPlayerId) || 0 : 0;
     const captainBonus = captainBase * Math.max(0, settings.captainMultiplier - 1);
+    const players = lineup.playerIds.map((playerId) => {
+      const basePoints = playerStats.get(playerId)?.basePoints || 0;
+      const totalWithoutCaptain = pointsByPlayer.get(playerId) || 0;
+      const positionBonus = totalWithoutCaptain - basePoints;
+      const playerCaptainBonus = playerId === lineup.captainPlayerId
+        ? totalWithoutCaptain * Math.max(0, settings.captainMultiplier - 1)
+        : 0;
+      return {
+        playerId,
+        basePoints,
+        positionBonus,
+        captainBonus: playerCaptainBonus,
+        totalPoints: totalWithoutCaptain + playerCaptainBonus,
+      };
+    });
     const scorerHit = Boolean(
       lineup.topScorerPlayerId &&
       (!eligiblePredictionPlayerIds || eligiblePredictionPlayerIds.has(lineup.topScorerPlayerId)) &&
@@ -220,6 +245,7 @@ export function projectFantasyLiveLineups(
     return {
       lineupId: lineup.id,
       userId: lineup.userId,
+      players,
       playerPoints,
       positionBonus,
       captainBonus,

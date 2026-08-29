@@ -149,7 +149,16 @@ export default async function RodadaDetalhePage({
               const isLive = match.status === "live";
               
               return (
-                <Link key={match.id} href={`/partidas/${match.id}`} className="block">
+                <div key={match.id} className="space-y-2">
+                  {isLive && (index === 0 || round.matches[index - 1]?.status !== "live") && (
+                    <div className="flex items-center gap-2 px-1 text-[10px] font-black uppercase tracking-wider text-accent">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-accent" /> Partida ao vivo
+                    </div>
+                  )}
+                  {isFinished && (index === 0 || round.matches[index - 1]?.status !== "finished") && (
+                    <p className="px-1 pt-2 text-[10px] font-black uppercase tracking-wider text-muted">Histórico de partidas</p>
+                  )}
+                <Link href={`/partidas/${match.id}`} className="block">
                   <div className={`glass-card glass-card-hover overflow-hidden p-4 animate-fade-in stagger-${Math.min(index + 1, 5)} ${isLive ? "border-accent/40 shadow-[0_0_24px_rgba(190,255,0,0.06)]" : ""}`}>
                     <div className="mb-3 flex items-center justify-between border-b border-border pb-2.5">
                       <span className="text-[10px] font-black uppercase tracking-wider text-muted">
@@ -181,6 +190,7 @@ export default async function RodadaDetalhePage({
                     </div>
                   </div>
                 </Link>
+                </div>
               );
             })
           )}

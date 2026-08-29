@@ -3,6 +3,11 @@
 import { getCurrentAccount } from "@/lib/auth";
 import { schedulePushTestAlert } from "@/lib/match-timer-scheduler";
 import { getWebPushConfiguration } from "@/lib/push-notifications";
+import { getActiveLeague } from "@/lib/actions/rounds";
+import { createServiceClient } from "@/lib/supabase/service";
+import { sendCartolaReminderTest } from "@/lib/cartola-reminders";
+import { scheduleCartolaRoundReminders } from "@/lib/cartola-reminder-scheduler";
+import { revalidatePath } from "next/cache";
 
 export type SerializedPushSubscription = {
   endpoint: string;
@@ -128,4 +133,102 @@ export async function sendPushTest() {
     const detail = message.trim() || context || "erro desconhecido no servidor";
     return { success: false, error: `Falha no teste: ${detail}` };
   }
+}
+
+export type NotificationPreferences = {
+  matchPushEnabled: boolean;
+  cartolaPushEnabled: boolean;
+  cartolaEmailEnabled: boolean;
+  collectiveEnabled: boolean;
+  emailTestedAt: string | null;
+  emailConfigured: boolean;
+};
+
+export async function getNotificationPreferences(): Promise<NotificationPreferences | null> {
+  const account = await getCurrentAccount();
+  if (!account.user) return null;
+  const league = await getActiveLeague();
+  const [{ data: preference }, { data: leagueSettings }] = await Promise.all([
+    account.client.from("user_notification_preferences").select("match_push_enabled, cartola_push_enabled, cartola_email_enabled").eq("user_id", account.user.id).maybeSingle(),
+    account.client.from("leagues").select("cartola_reminders_enabled, cartola_email_tested_at").eq("id", league.id).maybeSingle(),
+  ]);
+  return {
+    matchPushEnabled: preference?.match_push_enabled !== false,
+    cartolaPushEnabled: preference?.cartola_push_enabled !== false,
+    cartolaEmailEnabled: preference?.cartola_email_enabled !== false,
+    collectiveEnabled: leagueSettings?.cartola_reminders_enabled === true,
+    emailTestedAt: leagueSettings?.cartola_email_tested_at || null,
+    emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL && process.env.EMAIL_UNSUBSCRIBE_SECRET),
+  };
+}
+
+export async function updateNotificationPreferences(input: {
+  matchPushEnabled: boolean;
+  cartolaPushEnabled: boolean;
+  cartolaEmailEnabled: boolean;
+}) {
+  const account = await getCurrentAccount();
+  if (!account.user) return { success: false, error: "Entre na sua conta para alterar as notificações." };
+  const { error } = await account.client.from("user_notification_preferences").upsert({
+    user_id: account.user.id,
+    match_push_enabled: input.matchPushEnabled,
+    cartola_push_enabled: input.cartolaPushEnabled,
+    cartola_email_enabled: input.cartolaEmailEnabled,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "user_id" });
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/mais/notificacoes");
+  return { success: true };
+}
+
+export async function sendCartolaEmailTest() {
+  const account = await getCurrentAccount();
+  if (!account.user?.email || !account.isAdmin) return { success: false, error: "Somente um ADM com e-mail pode executar o teste." };
+  try {
+    const league = await getActiveLeague();
+    await sendCartolaReminderTest({
+      userId: account.user.id,
+      email: account.user.email,
+      name: String(account.user.user_metadata?.name || account.user.email.split("@")[0]).split(" ")[0],
+    });
+    const service = createServiceClient();
+    if (!service) throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurada.");
+    const testedAt = new Date().toISOString();
+    const { error } = await service.from("leagues").update({ cartola_email_tested_at: testedAt }).eq("id", league.id);
+    if (error) throw error;
+    revalidatePath("/mais/notificacoes");
+    return { success: true, testedAt };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível enviar o teste." };
+  }
+}
+
+export async function setCartolaRemindersEnabled(enabled: boolean) {
+  const account = await getCurrentAccount();
+  if (!account.isAdmin) return { success: false, error: "Somente administradores podem alterar o envio geral." };
+  const league = await getActiveLeague();
+  const service = createServiceClient();
+  if (!service) return { success: false, error: "SUPABASE_SERVICE_ROLE_KEY não configurada." };
+  const { data: config, error: configError } = await service.from("leagues").select("cartola_email_tested_at").eq("id", league.id).single();
+  if (configError) return { success: false, error: configError.message };
+  if (enabled && !config.cartola_email_tested_at) return { success: false, error: "Envie e confirme primeiro o teste no seu e-mail." };
+  const { error } = await service.from("leagues").update({ cartola_reminders_enabled: enabled }).eq("id", league.id);
+  if (error) return { success: false, error: error.message };
+
+  if (enabled) {
+    const { data: active } = await service
+      .from("fantasy_rounds")
+      .select("round:round_id(id, date, start_time, status, round_type), fantasy_season:fantasy_season_id!inner(league_id)")
+      .eq("fantasy_season.league_id", league.id)
+      .eq("market_status", "open")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const round = Array.isArray(active?.round) ? active?.round[0] : active?.round;
+    if (round?.id && round.round_type === "official" && round.status !== "finished") {
+      await scheduleCartolaRoundReminders({ roundId: round.id, date: round.date, startTime: round.start_time || "08:00", includeOpening: false });
+    }
+  }
+  revalidatePath("/mais/notificacoes");
+  return { success: true };
 }

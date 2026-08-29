@@ -3,7 +3,6 @@ import { FinishSeasonCard } from "@/components/FinishSeasonCard";
 import { getCurrentAccount, getCurrentAccountIdentity } from "@/lib/auth";
 import { logout } from "@/app/login/actions";
 import { InstallAppEntry } from "@/components/InstallAppPrompt";
-import { PushNotificationSettings } from "@/components/PushNotificationSettings";
 import { CallupAdminCard } from "@/components/CallupAdminCard";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { getActiveCallup } from "@/lib/actions/callups";
@@ -23,6 +22,7 @@ import {
   ClipboardList,
   ShieldCheck,
   Stadium,
+  Bell,
 } from "@/components/icons";
 import { getStadiums } from "@/lib/actions/stadiums";
 
@@ -132,15 +132,23 @@ export default async function MaisPage() {
         </div>
       )}
 
-      {account.user && account.profile?.player_id && (
+      {account.user && (
         <div>
           <h2 className="text-xs font-bold text-muted uppercase tracking-wider mb-2 px-1">Minha conta</h2>
           <div className="glass-card overflow-hidden">
-            <Link href="/meu-perfil" className="flex items-center gap-3 px-4 py-3.5 hover:bg-surface-hover">
+            {account.profile?.player_id && <Link href="/meu-perfil" className="flex items-center gap-3 px-4 py-3.5 hover:bg-surface-hover">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface"><UserRound className="h-5 w-5 text-accent" /></div>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-foreground">Meu Perfil</p>
                 <p className="text-xs text-muted">Foto, nome e estilo de jogo</p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted" />
+            </Link>}
+            <Link href="/mais/notificacoes" className={`flex items-center gap-3 px-4 py-3.5 hover:bg-surface-hover ${account.profile?.player_id ? "border-t border-border" : ""}`}>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface"><Bell className="h-5 w-5 text-accent" /></div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">Notificações</p>
+                <p className="text-xs text-muted">Partidas, Cartola e lembretes por e-mail</p>
               </div>
               <ChevronRight className="h-4 w-4 text-muted" />
             </Link>
@@ -151,8 +159,6 @@ export default async function MaisPage() {
       {account.user && (
         <InstallAppEntry userId={account.user.id} />
       )}
-
-      {account.user && <PushNotificationSettings />}
 
       {account.isAdmin && (
         <CallupAdminCard

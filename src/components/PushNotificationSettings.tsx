@@ -148,7 +148,7 @@ export function PushNotificationSettings() {
       }
 
       setState("active");
-      setMessage("Você receberá o alerta de 30 segundos e o fim das partidas da rodada em que estiver inscrito.");
+      setMessage("Você receberá alertas de 1 minuto, 30 segundos e fim das partidas da rodada em que estiver inscrito.");
     } catch (error) {
       setState("inactive");
       setMessage(error instanceof Error ? error.message : "Não foi possível ativar as notificações.");
@@ -197,13 +197,13 @@ export function PushNotificationSettings() {
       ? "Permissão bloqueada. Libere nas configurações do celular."
       : isActive
         ? backgroundAlertsReady
-          ? "Alertas de 30 segundos, fim de jogo e resultados das rodadas em que você estiver inscrito."
+          ? "Alertas de 1 minuto, 30 segundos, fim de jogo e resultados das rodadas em que você estiver inscrito."
           : "Notificações ativadas neste aparelho. O agendador de tela bloqueada ainda precisa ser configurado pelo administrador."
-        : "Receba os avisos de 30 segundos e fim das partidas da sua rodada.";
+        : "Receba os avisos de 1 minuto, 30 segundos e fim das partidas da sua rodada.";
 
   return (
     <section>
-      <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-muted">Notificações</h2>
+      <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-muted">Permissão deste aparelho</h2>
       <div className="glass-card overflow-hidden">
         <div className="flex items-center gap-3 p-4">
           <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isActive ? "bg-accent text-background" : "bg-accent/10 text-accent"}`}>

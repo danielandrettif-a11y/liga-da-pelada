@@ -124,10 +124,14 @@ async function sendMatchNotifications(
 
   if (profilesError) throw profilesError;
   const userIds = [...new Set((profiles || []).map((profile) => profile.user_id))];
-  return sendPushNotificationsToUsers(queryClient, userIds, notification, `/partidas/${match.id}`);
+  const { data: preferences } = userIds.length
+    ? await queryClient.from("user_notification_preferences").select("user_id, match_push_enabled").in("user_id", userIds)
+    : { data: [] as Array<{ user_id: string; match_push_enabled: boolean }> };
+  const disabled = new Set((preferences || []).filter((item) => item.match_push_enabled === false).map((item) => item.user_id));
+  return sendPushNotificationsToUsers(queryClient, userIds.filter((userId) => !disabled.has(userId)), notification, `/partidas/${match.id}`);
 }
 
-async function sendPushNotificationsToUsers(
+export async function sendPushNotificationsToUsers(
   client: SupabaseClient,
   userIds: string[],
   notification: PushNotification,
@@ -204,10 +208,10 @@ async function sendPushNotificationsToUsers(
 export async function sendPushTestNotification(client: SupabaseClient, userId: string) {
   return sendPushNotificationsToUsers(client, [userId], {
     title: "Notificações ativadas!",
-    body: "Este é um teste. Os avisos de 30 segundos e fim de jogo chegarão mesmo com o celular bloqueado.",
+    body: "Este é um teste. Os avisos de 1 minuto, 30 segundos e fim de jogo chegarão mesmo com o celular bloqueado.",
     tag: `push-test-${userId}`,
-    url: "/mais",
-  }, "/mais", false);
+    url: "/mais/notificacoes",
+  }, "/mais/notificacoes", false);
 }
 
 export async function sendMatchFinishedNotifications(

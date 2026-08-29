@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getAdminClient, getCurrentAccount } from "../auth";
 import { supabase } from "../supabase";
 import type { Callup, CallupEntry, Player, RoundType } from "../types";
+import { scheduleCartolaRoundReminders } from "../cartola-reminder-scheduler";
 import { getActiveLeague } from "./rounds";
 import {
   DEFAULT_PLAYERS_PER_TEAM,
@@ -345,6 +346,14 @@ export async function createCallupPrelist(callupId: string) {
   });
 
   if (error) return { success: false, error: error.message };
+
+  if (callup.round_type !== "friendly") {
+    try {
+      await scheduleCartolaRoundReminders({ roundId: String(roundId), date: callup.date, startTime: callup.start_time || "08:00", includeOpening: true });
+    } catch (scheduleError) {
+      console.error("Pré-lista criada, mas os lembretes do Cartola não foram agendados:", scheduleError);
+    }
+  }
 
   refreshCallups();
   revalidatePath("/cartola");

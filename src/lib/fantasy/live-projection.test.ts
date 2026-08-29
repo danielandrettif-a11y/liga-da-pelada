@@ -32,6 +32,22 @@ describe("live fantasy projection", () => {
     expect(projected.get("loser")?.losses).toBe(1);
   });
 
+  it("zera apenas os scouts de goleiro quando a rodada possui correção administrativa", () => {
+    const projected = projectFantasyLiveStats(
+      [{ ...baseMatch, status: "finished" }],
+      DEFAULT_FANTASY_SETTINGS,
+      { ignoreGoalkeeperStats: true },
+    );
+
+    expect(projected.get("keeper")).toMatchObject({
+      assists: 1,
+      wins: 1,
+      goalkeeperGames: 0,
+      goalsConceded: 0,
+      cleanSheets: 0,
+    });
+  });
+
   it("atualiza a projeção quando o evento deixa de existir", () => {
     const withGoal = projectFantasyLiveStats([{ ...baseMatch, status: "live" }], DEFAULT_FANTASY_SETTINGS);
     const withoutGoal = projectFantasyLiveStats([{ ...baseMatch, status: "live", scoreA: 0, events: [] }], DEFAULT_FANTASY_SETTINGS);
@@ -60,6 +76,9 @@ describe("live fantasy projection", () => {
       stats.get("scorer")!.basePoints * (DEFAULT_FANTASY_SETTINGS.captainMultiplier - 1)
     );
     expect(lineup.predictionPoints).toBe(DEFAULT_FANTASY_SETTINGS.topScorerPredictionPoints + DEFAULT_FANTASY_SETTINGS.topAssistPredictionPoints);
+    expect(lineup.players.find((player) => player.playerId === "scorer")?.totalPoints).toBe(
+      stats.get("scorer")!.basePoints + lineup.captainBonus,
+    );
   });
 
   it("ignora convidados ao definir os líderes dos palpites", () => {

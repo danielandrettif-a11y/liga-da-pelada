@@ -16,6 +16,7 @@ import {
 } from "../constants";
 import { drawGoalkeeperOrder } from "../goalkeeperOrder";
 import { TEAM_CREST_URLS } from "../teamPresets";
+import { scheduleCartolaRoundReminders } from "../cartola-reminder-scheduler";
 
 const getActiveLeagueCached = cache(async () => {
   const { data, error } = await supabase
@@ -128,6 +129,16 @@ export async function getRound(id: string) {
   }
 
   if (data.teams) data.teams.sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
+  if (data.matches) {
+    const statusOrder: Record<string, number> = { live: 0, pending: 1, finished: 2 };
+    data.matches.sort((a: any, b: any) => {
+      const statusDifference = (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
+      if (statusDifference !== 0) return statusDifference;
+      const aTimestamp = new Date(a.finished_at || a.started_at || a.created_at || 0).getTime();
+      const bTimestamp = new Date(b.finished_at || b.started_at || b.created_at || 0).getTime();
+      return bTimestamp - aTimestamp;
+    });
+  }
   return data;
 }
 
@@ -444,6 +455,14 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
     if (error) {
       if (error.code === "23505") throw new Error("Houve um conflito na numeracao. Atualize a pagina e tente novamente.");
       throw new Error(error.message);
+    }
+
+    if (effectiveRoundType === "official") {
+      try {
+        await scheduleCartolaRoundReminders({ roundId: String(roundId), date: effectiveDate, startTime: input.startTime, includeOpening: !input.roundId });
+      } catch (scheduleError) {
+        console.error("Pré-lista salva, mas os lembretes do Cartola não foram agendados:", scheduleError);
+      }
     }
 
     revalidatePath("/admin/rodada");

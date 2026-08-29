@@ -1099,11 +1099,8 @@ export function FantasyExperience({
             />
           </div>
           {status === "in_progress" && (
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-accent/20 bg-accent/10 px-3 py-2 text-[10px] font-bold text-accent">
+            <div className="mt-3 flex items-center gap-3 rounded-xl border border-accent/20 bg-accent/10 px-3 py-2 text-[10px] font-bold text-accent">
               <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" /> Prévia ao vivo</span>
-              <button type="button" onClick={refreshLivePoints} disabled={isRefreshing} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-black hover:bg-accent/15 disabled:opacity-50">
-                <RotateCcw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} /> Atualizar pontos
-              </button>
             </div>
           )}
         </div>
@@ -1334,10 +1331,15 @@ export function FantasyExperience({
                   <p className="text-[8px] font-black uppercase tracking-[.16em] text-muted">Sua rodada · prévia</p>
                   <p className="mt-1 text-2xl font-black text-accent">{(liveProjection?.currentUser?.totalPoints || 0).toFixed(1)} pts</p>
                 </div>
-                <div className="grid grid-cols-2 gap-x-2 gap-y-1 self-end text-right text-[9px] font-bold text-muted">
+                <div className="flex flex-col items-end justify-between gap-2">
+                  <button type="button" onClick={refreshLivePoints} disabled={isRefreshing} className="flex items-center gap-1 rounded-lg border border-accent/25 bg-accent/10 px-2 py-1 text-[9px] font-black text-accent hover:bg-accent/20 disabled:opacity-50">
+                    <RotateCcw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} /> Atualizar pontuação
+                  </button>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-right text-[9px] font-bold text-muted">
                   <span>Jogadores</span><strong className="text-foreground">{(liveProjection?.currentUser?.playerPoints || 0).toFixed(1)}</strong>
                   <span>Capitão</span><strong className="text-foreground">+{(liveProjection?.currentUser?.captainBonus || 0).toFixed(1)}</strong>
                   <span>Palpites/cartas</span><strong className="text-foreground">+{((liveProjection?.currentUser?.predictionPoints || 0) + (liveProjection?.currentUser?.cardPoints || 0)).toFixed(1)}</strong>
+                  </div>
                 </div>
                 <p className="col-span-2 border-t border-accent/15 pt-2 text-[9px] font-bold text-muted">Temporada se terminasse agora: <span className="text-foreground">{(account.totalPoints + (liveProjection?.currentUser?.totalPoints || 0)).toFixed(1)} pts</span></p>
               </div>

@@ -19,6 +19,7 @@ export type FantasyRankingEntry = {
     avatar_url: string | null;
   } | null;
   user_id?: string;
+  round_id?: string | null;
   is_live?: boolean;
 };
 
@@ -222,7 +223,15 @@ export function FantasyRankingList({
         </div>
       )}
       {ranking.map((item) => (
-        <Link key={item.id} href={item.user_id ? `/cartola/ranking/${item.user_id}` : "/cartola/ranking"} className="glass-card flex items-center gap-3 p-4 transition-colors hover:bg-surface-hover">
+        <Link
+          key={item.id}
+          href={item.user_id
+            ? scope === "round" && item.round_id
+              ? `/cartola/ranking/${item.user_id}/${item.round_id}`
+              : `/cartola/ranking/${item.user_id}`
+            : "/cartola/ranking"}
+          className="glass-card flex items-center gap-3 p-4 transition-colors hover:bg-surface-hover"
+        >
           <span
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black ${
               item.position <= 3 ? "bg-accent text-background" : "bg-surface text-muted"

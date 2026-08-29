@@ -156,6 +156,7 @@ export async function calculateRoundStats(roundId: string) {
         id,
         league_id,
         round_type,
+        ignore_goalkeeper_stats,
         best_goalkeeper_player_id,
         matches (
           id,
@@ -190,6 +191,7 @@ export async function calculateRoundStats(roundId: string) {
 
     if (error || !round) throw new Error("Erro ao buscar rodada para estatísticas");
     const countsForRanking = round.round_type !== "friendly";
+    const ignoreGoalkeeperStats = Boolean(round.ignore_goalkeeper_stats);
     const roundPlayerIds = (round.round_players || []).map((item: any) => item.player_id);
     const { data: roundPlayerProfiles, error: profileError } = roundPlayerIds.length
       ? await client.from("players").select("id, player_profile").in("id", roundPlayerIds)
@@ -290,17 +292,19 @@ export async function calculateRoundStats(roundId: string) {
       processTeamMatch(match.team_a_id, isDraw ? 'draw' : (winnerId === match.team_a_id ? 'win' : 'loss'));
       processTeamMatch(match.team_b_id, isDraw ? 'draw' : (winnerId === match.team_b_id ? 'win' : 'loss'));
 
-      for (const goalkeeper of match.match_goalkeepers || []) {
-        if (voidedPlayerIds.has(goalkeeper.player_id)) continue;
-        const s = statsMap[goalkeeper.player_id];
-        if (!s) continue;
-        const conceded = goalkeeper.team_id === match.team_a_id ? match.score_b : match.score_a;
-        s.goalkeeper_games += 1;
-        s.goals_conceded += conceded;
-        if (conceded === 0) s.clean_sheets += 1;
-        if (countsForRanking) {
-          s.points += points.goalkeeper_appearance;
-          s.points += conceded * points.goal_conceded;
+      if (!ignoreGoalkeeperStats) {
+        for (const goalkeeper of match.match_goalkeepers || []) {
+          if (voidedPlayerIds.has(goalkeeper.player_id)) continue;
+          const s = statsMap[goalkeeper.player_id];
+          if (!s) continue;
+          const conceded = goalkeeper.team_id === match.team_a_id ? match.score_b : match.score_a;
+          s.goalkeeper_games += 1;
+          s.goals_conceded += conceded;
+          if (conceded === 0) s.clean_sheets += 1;
+          if (countsForRanking) {
+            s.points += points.goalkeeper_appearance;
+            s.points += conceded * points.goal_conceded;
+          }
         }
       }
 
