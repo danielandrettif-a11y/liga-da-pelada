@@ -9,6 +9,9 @@ import { RosterUnreadLink } from "./RosterUnreadLink";
 import { markRosterActivitySeen } from "@/lib/actions/registrations";
 import { Crown } from "@/components/icons";
 
+import type { EquippedCosmeticsSummary } from "@/lib/actions/cosmetics";
+import { cosmeticBackgroundPosition, cosmeticImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
+
 type RosterFilter = "all" | "players" | "wags" | "supporters";
 type RosterView = "roster" | "pass";
 type StatsMode = "ranked" | "friendly";
@@ -18,6 +21,7 @@ type Props = {
   activeGuests: Record<StatsMode, PlayerStats[]>;
   wags: PlayerStats[];
   supporters: PlayerStats[];
+  playerCosmetics?: Record<string, EquippedCosmeticsSummary>;
   unreadPlayerIds?: string[];
   unreadSeenThrough?: string | null;
   initialView?: RosterView;
@@ -54,28 +58,42 @@ function SectionDivider({ title, subtitle, count, tone = "accent" }: { title: st
   );
 }
 
-function CommunityGrid({ players, label, unreadPlayerIds }: { players: Player[]; label: "WAG" | "Torcida"; unreadPlayerIds: Set<string> }) {
+function CommunityGrid({ players, label, unreadPlayerIds, playerCosmetics }: { players: Player[]; label: "WAG" | "Torcida"; unreadPlayerIds: Set<string>; playerCosmetics?: Record<string, EquippedCosmeticsSummary> }) {
   if (players.length === 0) {
     return <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted">Nenhum perfil nesta categoria.</div>;
   }
 
   return (
     <div className="grid min-w-0 grid-cols-2 gap-3">
-      {players.map((player) => (
-        <RosterUnreadLink key={player.id} href={`/jogadores/${player.id}`} unread={unreadPlayerIds.has(player.id)} className="glass-card glass-card-hover min-w-0 overflow-hidden p-3.5 text-center">
-          <div className="relative mx-auto w-fit">
-            <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-20 w-20 rounded-full border-2 border-accent/25 bg-surface text-lg font-black text-muted ring-4 ring-background" />
-            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-accent/25 bg-background px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-accent">{label}</span>
-          </div>
-          <p className="mt-3 truncate text-sm font-black text-foreground">{player.name}</p>
-          {player.nickname && <p className="mt-0.5 truncate text-[10px] italic text-muted">“{player.nickname}”</p>}
-        </RosterUnreadLink>
-      ))}
+      {players.map((player) => {
+        const cosmetic = playerCosmetics?.[player.id];
+        const bannerImg = cosmeticImage(cosmetic?.bannerAssetKey);
+        const cardGradient = cosmetic?.bannerAssetKey ? `bg-gradient-to-b ${cosmeticVisual(cosmetic.bannerAssetKey)}/30` : "";
+
+        return (
+          <RosterUnreadLink key={player.id} href={`/jogadores/${player.id}`} unread={unreadPlayerIds.has(player.id)} className="block h-full min-w-0">
+            <div
+              className={`glass-card glass-card-hover relative min-w-0 overflow-hidden p-3.5 text-center h-full ${cardGradient}`}
+              style={bannerImg ? { backgroundImage: `linear-gradient(180deg, rgba(3, 14, 8, 0.40) 0%, rgba(3, 14, 8, 0.85) 55%, rgba(3, 14, 8, 0.96) 100%), url(${bannerImg})`, backgroundSize: "cover", backgroundPosition: cosmeticBackgroundPosition("banner", cosmetic?.bannerAssetKey), backgroundRepeat: "no-repeat" } : undefined}
+            >
+              {cosmetic?.bannerAssetKey && <div className="pointer-events-none absolute inset-0 opacity-15 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent via-transparent to-transparent" />}
+              <div className="relative z-10">
+                <div className="relative mx-auto w-fit">
+                  <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} frameKey={cosmetic?.frameKey} auraKey={cosmetic?.auraKey} className="h-20 w-20 rounded-full border-2 border-accent/25 bg-surface text-lg font-black text-muted ring-4 ring-background" />
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-accent/25 bg-background px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-accent">{label}</span>
+                </div>
+                <p className="mt-3 truncate text-sm font-black text-foreground">{player.name}</p>
+                {player.nickname && <p className="mt-0.5 truncate text-[10px] italic text-muted">“{player.nickname}”</p>}
+              </div>
+            </div>
+          </RosterUnreadLink>
+        );
+      })}
     </div>
   );
 }
 
-export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters, unreadPlayerIds = [], unreadSeenThrough = null, initialView = "roster", seasonPass, seasonPassProgress, seasonPassMaxProgress = 40 }: Props) {
+export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters, playerCosmetics, unreadPlayerIds = [], unreadSeenThrough = null, initialView = "roster", seasonPass, seasonPassProgress, seasonPassMaxProgress = 40 }: Props) {
   const router = useRouter();
   const [view, setView] = useState<RosterView>(initialView);
   const [passPending, startPassTransition] = useTransition();
@@ -175,28 +193,28 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
       {showPlayers && (
         <section className="scroll-mt-36 space-y-4">
           <SectionDivider title="Jogadores oficiais" subtitle={statsMode === "ranked" ? "Atletas que disputam o Ranked" : "Desempenho separado nos amistosos"} count={visibleOfficialPlayers.length} />
-          <PlayersStatsGrid players={visibleOfficialPlayers} unreadPlayerIds={unreadIds} />
+          <PlayersStatsGrid players={visibleOfficialPlayers} unreadPlayerIds={unreadIds} playerCosmetics={playerCosmetics} />
         </section>
       )}
 
       {showPlayers && visibleGuests.length > 0 && (
         <section className="scroll-mt-36 space-y-4">
           <SectionDivider title="Convidados" subtitle="Participações temporárias com histórico preservado" count={visibleGuests.length} tone="warning" />
-          <PlayersStatsGrid players={visibleGuests} unreadPlayerIds={unreadIds} />
+          <PlayersStatsGrid players={visibleGuests} unreadPlayerIds={unreadIds} playerCosmetics={playerCosmetics} />
         </section>
       )}
 
       {showWags && (
         <section className="scroll-mt-36 space-y-4">
           <SectionDivider title="WAGs" subtitle="A comissão que acompanha a resenha" count={wags.length} tone="warning" />
-          <CommunityGrid players={wags} label="WAG" unreadPlayerIds={unreadIds} />
+          <CommunityGrid players={wags} label="WAG" unreadPlayerIds={unreadIds} playerCosmetics={playerCosmetics} />
         </section>
       )}
 
       {showSupporters && (
         <section className="scroll-mt-36 space-y-4">
           <SectionDivider title="Torcida" subtitle="Quem empurra a pelada do lado de fora" count={supporters.length} tone="muted" />
-          <CommunityGrid players={supporters} label="Torcida" unreadPlayerIds={unreadIds} />
+          <CommunityGrid players={supporters} label="Torcida" unreadPlayerIds={unreadIds} playerCosmetics={playerCosmetics} />
         </section>
       )}
       </>}

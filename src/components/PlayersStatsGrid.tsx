@@ -7,6 +7,8 @@ import { calculateWinRate, getDisplayName } from "@/lib/utils";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
 import { RosterUnreadLink } from "./RosterUnreadLink";
+import type { EquippedCosmeticsSummary } from "@/lib/actions/cosmetics";
+import { cosmeticBackgroundPosition, cosmeticImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
 
 export type PlayerStats = Player & {
   rounds: number;
@@ -36,7 +38,15 @@ function alphabeticalCompare(a: PlayerStats, b: PlayerStats) {
   return getDisplayName(a.name).localeCompare(getDisplayName(b.name), "pt-BR");
 }
 
-export function PlayersStatsGrid({ players, unreadPlayerIds = new Set<string>() }: { players: PlayerStats[]; unreadPlayerIds?: Set<string> }) {
+export function PlayersStatsGrid({
+  players,
+  unreadPlayerIds = new Set<string>(),
+  playerCosmetics,
+}: {
+  players: PlayerStats[];
+  unreadPlayerIds?: Set<string>;
+  playerCosmetics?: Record<string, EquippedCosmeticsSummary>;
+}) {
   const [sortBy, setSortBy] = useState<SortOption>("alphabetical");
   const sortedPlayers = useMemo(() => [...players].sort((a, b) => {
     if (sortBy === "alphabetical") return alphabeticalCompare(a, b);
@@ -61,36 +71,76 @@ export function PlayersStatsGrid({ players, unreadPlayerIds = new Set<string>() 
       </div>
 
       <div className="grid min-w-0 grid-cols-2 gap-3">
-        {sortedPlayers.map((player, index) => (
-          <RosterUnreadLink key={player.id} href={`/jogadores/${player.id}`} unread={unreadPlayerIds.has(player.id)} className="block h-full min-w-0">
-            <div className={`player-stat-card h-full min-w-0 rounded-2xl p-3.5 animate-fade-in stagger-${Math.min(index + 1, 5)}`}>
-              <div className="mb-3 flex items-center gap-3">
-                <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-11 w-11 flex-shrink-0 rounded-full border border-accent/25 bg-surface-hover text-sm font-bold text-muted ring-2 ring-background shadow-[0_0_16px_rgba(204,255,0,.08)]" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-foreground">{getDisplayName(player.name)}</p>
-                  <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />
+        {sortedPlayers.map((player, index) => {
+          const cosmetic = playerCosmetics?.[player.id];
+          const bannerImg = cosmeticImage(cosmetic?.bannerAssetKey);
+          const cardGradient = cosmetic?.bannerAssetKey
+            ? `bg-gradient-to-b ${cosmeticVisual(cosmetic.bannerAssetKey)}/30`
+            : "";
+
+          return (
+            <RosterUnreadLink key={player.id} href={`/jogadores/${player.id}`} unread={unreadPlayerIds.has(player.id)} className="block h-full min-w-0">
+              <div
+                className={`player-stat-card relative overflow-hidden h-full min-w-0 rounded-2xl p-3.5 animate-fade-in stagger-${Math.min(index + 1, 5)} ${cardGradient} ${bannerImg ? "border-accent/30 shadow-lg" : ""}`}
+                style={
+                  bannerImg
+                    ? {
+                        backgroundImage: `linear-gradient(180deg, rgba(3, 14, 8, 0.40) 0%, rgba(3, 14, 8, 0.85) 55%, rgba(3, 14, 8, 0.96) 100%), url(${bannerImg})`,
+                        backgroundSize: "cover",
+                        backgroundPosition: cosmeticBackgroundPosition("banner", cosmetic?.bannerAssetKey),
+                        backgroundRepeat: "no-repeat",
+                      }
+                    : undefined
+                }
+              >
+                {cosmetic?.bannerAssetKey && (
+                  <div className="pointer-events-none absolute inset-0 opacity-15 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent via-transparent to-transparent" />
+                )}
+
+                <div className="relative z-10 flex flex-col h-full justify-between">
+                  <div>
+                    <div className="mb-3 flex items-center gap-3">
+                      <PlayerAvatar
+                        name={player.name}
+                        avatarUrl={player.avatar_url}
+                        frameKey={cosmetic?.frameKey}
+                        auraKey={cosmetic?.auraKey}
+                        className="h-11 w-11 flex-shrink-0 rounded-full border border-accent/25 bg-surface-hover text-sm font-bold text-muted ring-2 ring-background shadow-[0_0_16px_rgba(204,255,0,.08)]"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-foreground drop-shadow-sm">{getDisplayName(player.name)}</p>
+                        <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />
+                      </div>
+                    </div>
+
+                    <div className="mb-3 grid grid-cols-2 gap-2">
+                      <div className="rounded-lg border border-white/5 bg-black/35 backdrop-blur-xs px-2 py-2 text-center shadow-inner">
+                        <p className="player-card-number text-xl text-foreground">{player.rounds}</p>
+                        <p className="mt-1 text-[8px] font-black uppercase tracking-wider text-muted">Peladas</p>
+                      </div>
+                      <div className="rounded-lg border border-white/5 bg-black/35 backdrop-blur-xs px-2 py-2 text-center shadow-inner">
+                        <p className="player-card-number text-xl text-foreground">{player.games}</p>
+                        <p className="mt-1 text-[8px] font-black uppercase tracking-wider text-muted">Jogos</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                      <div><p className="text-[9px] font-bold uppercase tracking-wide text-muted">Gols</p><p className="player-card-number mt-0.5 text-base text-foreground">{player.goals}</p></div>
+                      <div><p className="text-[9px] font-bold uppercase tracking-wide text-muted">Assists</p><p className="player-card-number mt-0.5 text-base text-foreground">{player.assists}</p></div>
+                      <div><p className="text-[9px] font-bold uppercase tracking-wide text-muted">Vitórias</p><p className="player-card-number mt-0.5 text-base text-foreground">{player.wins}</p></div>
+                      <div><p className="text-[9px] font-bold uppercase tracking-wide text-muted">Aprov.</p><p className="player-card-number mt-0.5 text-base text-foreground">{calculateWinRate(player.wins, player.draws, player.games)}%</p></div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between border-t border-border/80 pt-3">
+                    <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted">Pontos</span>
+                    <span className="player-card-points text-2xl drop-shadow-sm">{player.points}</span>
+                  </div>
                 </div>
               </div>
-
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                <div className="rounded-lg border border-white/5 bg-black/15 px-2 py-2 text-center shadow-inner"><p className="player-card-number text-xl text-foreground">{player.rounds}</p><p className="mt-1 text-[8px] font-black uppercase tracking-wider text-muted">Peladas</p></div>
-                <div className="rounded-lg border border-white/5 bg-black/15 px-2 py-2 text-center shadow-inner"><p className="player-card-number text-xl text-foreground">{player.games}</p><p className="mt-1 text-[8px] font-black uppercase tracking-wider text-muted">Jogos</p></div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                <div><p className="text-[9px] font-bold uppercase tracking-wide text-muted">Gols</p><p className="player-card-number mt-0.5 text-base text-foreground">{player.goals}</p></div>
-                <div><p className="text-[9px] font-bold uppercase tracking-wide text-muted">Assists</p><p className="player-card-number mt-0.5 text-base text-foreground">{player.assists}</p></div>
-                <div><p className="text-[9px] font-bold uppercase tracking-wide text-muted">Vitórias</p><p className="player-card-number mt-0.5 text-base text-foreground">{player.wins}</p></div>
-                <div><p className="text-[9px] font-bold uppercase tracking-wide text-muted">Aprov.</p><p className="player-card-number mt-0.5 text-base text-foreground">{calculateWinRate(player.wins, player.draws, player.games)}%</p></div>
-              </div>
-
-              <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted">Pontos</span>
-                <span className="player-card-points text-2xl">{player.points}</span>
-              </div>
-            </div>
-          </RosterUnreadLink>
-        ))}
+            </RosterUnreadLink>
+          );
+        })}
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import { RosterDirectory } from "@/components/RosterDirectory";
 import { getRosterGroups } from "@/lib/actions/players";
 import { getUnreadRosterPlayers } from "@/lib/actions/registrations";
 import { getSeasonPassDashboard } from "@/lib/actions/fantasy";
-import { getMyCosmeticsDashboard } from "@/lib/actions/cosmetics";
+import { getAllPlayersEquippedCosmeticsMap, getMyCosmeticsDashboard, type EquippedCosmeticsSummary } from "@/lib/actions/cosmetics";
 import { SeasonPassExperience } from "@/components/fantasy/SeasonPassExperience";
 
 export const revalidate = 0;
@@ -13,12 +13,15 @@ export default async function JogadoresPage({ searchParams }: PageProps<"/jogado
   const passDataRequest = shouldLoadPass
     ? Promise.all([getSeasonPassDashboard(), getMyCosmeticsDashboard()]).then(([pass, cosmetics]) => ({ pass, cosmetics }))
     : Promise.resolve(null);
-  const [rankedRoster, friendlyRoster, unreadRoster, passData] = await Promise.all([
+  const [rankedRoster, friendlyRoster, unreadRoster, passData, cosmeticsMap] = await Promise.all([
     getRosterGroups("official"),
     getRosterGroups("friendly"),
     getUnreadRosterPlayers(),
     passDataRequest,
+    getAllPlayersEquippedCosmeticsMap(),
   ]);
+
+  const playerCosmetics: Record<string, EquippedCosmeticsSummary> = Object.fromEntries(cosmeticsMap.entries());
 
   return (
     <div className="min-w-0 space-y-5">
@@ -32,6 +35,7 @@ export default async function JogadoresPage({ searchParams }: PageProps<"/jogado
         activeGuests={{ ranked: rankedRoster.activeGuests, friendly: friendlyRoster.activeGuests }}
         wags={rankedRoster.wags}
         supporters={rankedRoster.supporters}
+        playerCosmetics={playerCosmetics}
         unreadPlayerIds={unreadRoster.playerIds}
         unreadSeenThrough={unreadRoster.seenThrough}
         initialView={shouldLoadPass ? "pass" : "roster"}
