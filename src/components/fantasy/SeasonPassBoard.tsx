@@ -24,8 +24,8 @@ const STAGES: Stage[] = [
     [7, 13.5, 21], [8, 28.1, 21], [9, 42.7, 21], [10, 57.3, 21], [11, 71.9, 21], [12, 86.5, 21],
   ].map(([house, x, y]) => ({ id: `stands-${house}`, houses: [house], name: "Arquibancada", shortLabel: String(house), zone: "stands" as const, x, y })),
   ...[
-    [13, 8.8, 39.5], [14, 19.5, 39.5], [15, 8.8, 47.8], [16, 19.5, 47.8], [17, 8.8, 56.1], [18, 19.5, 56.1],
-    [19, 8.8, 64.4], [20, 19.5, 64.4], [21, 8.8, 72.7], [22, 19.5, 72.7], [23, 8.8, 81], [24, 19.5, 81],
+    [13, 8.8, 39.5], [14, 20, 39.5], [15, 8.8, 47.8], [16, 20, 47.8], [17, 8.8, 55.8], [18, 20, 55.8],
+    [19, 8.8, 63.7], [20, 20, 63.7], [21, 8.8, 71.6], [22, 20, 71.6], [23, 8.8, 79.5], [24, 20, 79.5],
   ].map(([house, x, y]) => ({ id: `bench-${house}`, houses: [house], name: "Banco de reservas", shortLabel: String(house), zone: "bench" as const, x, y })),
   // Os quadrados do campo devem ocupar os círculos desenhados na arte, sem
   // criar uma segunda formação visual por cima do 4-3-3 original.
@@ -123,16 +123,25 @@ export function SeasonPassBoard({
             const isCompleted = progress >= item.houses[item.houses.length - 1];
             const isSelected = item.id === selectedStage.id;
             const isLegend = item.houses.includes(40);
-            const size = item.zone === "stands" ? "w-[10.2%]" : item.zone === "bench" ? "w-[9.8%]" : isLegend ? "w-[13.5%]" : "w-[10.5%]";
+            const shape = item.zone === "stands"
+              ? "aspect-[0.87] w-[11.4%] rounded-[12%]"
+              : item.zone === "bench"
+                ? "aspect-[0.96] w-[10.4%] rounded-[10%]"
+                : `${isLegend ? "w-[13.5%]" : "w-[10.5%]"} aspect-square rounded-[24%]`;
+            const surface = isCompleted
+              ? "border-emerald-300/55 bg-[#08311f]"
+              : item.zone === "stands"
+                ? "border-white/25 bg-[#030806]"
+                : item.zone === "bench"
+                  ? "border-white/25 bg-[#06100b]"
+                  : "border-white/25 bg-[#07130b]";
 
             return (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => openStage(item)}
-                className={`absolute z-20 aspect-square touch-pan-y -translate-x-1/2 -translate-y-1/2 rounded-[24%] border bg-black/78 shadow-[0_2px_6px_rgba(0,0,0,.55)] transition active:scale-95 ${size} ${
-                  isCompleted ? "border-emerald-300/55 bg-emerald-950/75" : "border-white/25"
-                } ${isCurrent ? "ring-2 ring-accent shadow-[0_0_13px_rgba(204,255,0,.65)]" : ""} ${isSelected && !isCurrent ? "ring-1 ring-white/65" : ""}`}
+                className={`absolute z-20 touch-pan-y -translate-x-1/2 -translate-y-1/2 border shadow-[0_2px_6px_rgba(0,0,0,.7)] transition active:scale-95 ${shape} ${surface} ${isCurrent ? "ring-2 ring-accent shadow-[0_0_13px_rgba(204,255,0,.65)]" : ""} ${isSelected && !isCurrent ? "ring-1 ring-white/65" : ""}`}
                 style={{ left: `${item.x}%`, top: `${item.y}%` }}
                 aria-label={`${item.name}, ${item.houses.length > 1 ? "casas" : "casa"} ${houseLabel(item.houses)}, ${rewardCount} recompensa${rewardCount === 1 ? "" : "s"}`}
               >

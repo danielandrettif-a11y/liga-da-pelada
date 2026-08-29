@@ -627,3 +627,23 @@ export function calculateMarketPopularity(params: {
     totalAssistPredictions,
   };
 }
+
+/**
+ * Índice relativo para estimar potencial ofensivo na próxima rodada.
+ * A estatística principal (gol/jogo ou assistência/jogo) pesa 70% e a
+ * pontuação média geral pesa 30%. O resultado é um índice, não probabilidade.
+ */
+export function calculateFantasyPredictionIndex(input: {
+  primaryPerGame: number;
+  averagePoints: number;
+  maxPrimaryPerGame: number;
+  maxAveragePoints: number;
+}) {
+  const primaryScore = input.maxPrimaryPerGame > 0
+    ? Math.min(1, Math.max(0, input.primaryPerGame / input.maxPrimaryPerGame))
+    : 0;
+  const pointsScore = input.maxAveragePoints > 0
+    ? Math.min(1, Math.max(0, input.averagePoints / input.maxAveragePoints))
+    : 0;
+  return Math.round((primaryScore * 0.7 + pointsScore * 0.3) * 100);
+}

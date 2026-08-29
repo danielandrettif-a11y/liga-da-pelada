@@ -60,7 +60,7 @@ function CompactPlayer({
 }
 
 export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
-  const [expandedStoryId, setExpandedStoryId] = useState<string | null>(null);
+  const [listsExpanded, setListsExpanded] = useState(false);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const interactingRef = useRef(false);
   const lastFrameRef = useRef<number | null>(null);
@@ -130,7 +130,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
       const elapsed = Math.min(timestamp - previous, 40);
       lastFrameRef.current = timestamp;
 
-      if (!prefersReducedMotion && !interactingRef.current && !expandedStoryId) {
+      if (!prefersReducedMotion && !interactingRef.current && !listsExpanded) {
         const width = sectionWidth();
         if (width > 0 && track.scrollWidth > track.clientWidth) {
           // Velocidade intencionalmente perceptível, mas sem competir com o gesto manual.
@@ -152,7 +152,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
       lastFrameRef.current = null;
       initializedRef.current = false;
     };
-  }, [expandedStoryId, storySignature, stories.length]);
+  }, [listsExpanded, storySignature, stories.length]);
 
   if (stories.length === 0) return null;
 
@@ -194,7 +194,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
         onTouchEnd={releaseInteraction}
       >
         {repeatedStories.map((story, repeatedIndex) => {
-          const isStoryExpanded = story.kind === "list" && expandedStoryId === story.id;
+          const isStoryExpanded = story.kind === "list" && listsExpanded;
           const storyContentId = `radar-story-${repeatedIndex}-${story.id}`;
           return (
             <article
@@ -205,7 +205,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
                 <>
                   <button
                     type="button"
-                    onClick={() => setExpandedStoryId((current) => current === story.id ? null : story.id)}
+                    onClick={() => setListsExpanded((current) => !current)}
                     aria-expanded={isStoryExpanded}
                     aria-controls={storyContentId}
                     className="flex w-full items-center justify-between gap-2 rounded-lg text-left active:bg-white/[.04]"
@@ -217,7 +217,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
                       <strong className="block truncate text-[11px] text-foreground">{story.list.title}</strong>
                     </span>
                     <span className="flex shrink-0 items-center gap-1 rounded-lg bg-white/[.06] px-2 py-1 text-[8px] font-black uppercase text-muted">
-                      {isStoryExpanded ? "Recolher" : `Ver Top ${story.list.players.length}`}
+                      {isStoryExpanded ? "Recolher todos" : "Ver todos"}
                       <ChevronDown className={`h-3 w-3 transition-transform ${isStoryExpanded ? "rotate-180" : ""}`} />
                     </span>
                   </button>

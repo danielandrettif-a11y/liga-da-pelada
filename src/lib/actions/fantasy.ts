@@ -8,6 +8,7 @@ import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget, type FantasySettings
 import {
   calculateCostBenefit,
   calculateFantasyForm,
+  calculateFantasyPredictionIndex,
   calculateFantasyPlayerPoints,
   calculateFantasyTrend,
   calculateMarketPopularity,
@@ -863,31 +864,31 @@ export async function getFantasyDashboard() {
   const selectedCandidates = rankPlayersByCount(popularityAgg.selectionCounts);
   const captainCandidates = rankPlayersByCount(popularityAgg.captainCounts);
 
-  const topScorerId = [...popularityAgg.scorerPredictionCounts.entries()].sort(
-    (a, b) => b[1] - a[1]
-  )[0]?.[0];
-  const topAssistId = [...popularityAgg.assistPredictionCounts.entries()].sort(
-    (a, b) => b[1] - a[1]
-  )[0]?.[0];
-
-  const scorerCandidates = [...market]
-    .filter((player) => (popularityAgg.scorerPredictionCounts.get(player.id) || 0) > 0 || player.games > 0)
-    .sort((a, b) => {
-      const predictionDiff =
-        (popularityAgg.scorerPredictionCounts.get(b.id) || 0) -
-        (popularityAgg.scorerPredictionCounts.get(a.id) || 0);
-      if (predictionDiff !== 0) return predictionDiff;
-      return b.goals / Math.max(1, b.games) - a.goals / Math.max(1, a.games);
-    });
-  const assistCandidates = [...market]
-    .filter((player) => (popularityAgg.assistPredictionCounts.get(player.id) || 0) > 0 || player.games > 0)
-    .sort((a, b) => {
-      const predictionDiff =
-        (popularityAgg.assistPredictionCounts.get(b.id) || 0) -
-        (popularityAgg.assistPredictionCounts.get(a.id) || 0);
-      if (predictionDiff !== 0) return predictionDiff;
-      return b.assists / Math.max(1, b.games) - a.assists / Math.max(1, a.games);
-    });
+  const predictionCandidates = market.filter((player) => player.games > 0 || player.roundsPlayed > 0);
+  const goalsPerGame = (player: FantasyMarketPlayer) => player.goals / Math.max(1, player.games);
+  const assistsPerGame = (player: FantasyMarketPlayer) => player.assists / Math.max(1, player.games);
+  const averageFantasyPoints = (player: FantasyMarketPlayer) => player.totalPoints / Math.max(1, player.roundsPlayed);
+  const maxGoalAverage = Math.max(0, ...predictionCandidates.map(goalsPerGame));
+  const maxAssistAverage = Math.max(0, ...predictionCandidates.map(assistsPerGame));
+  const maxPointsAverage = Math.max(0, ...predictionCandidates.map(averageFantasyPoints));
+  const goalPotential = (player: FantasyMarketPlayer) => calculateFantasyPredictionIndex({
+    primaryPerGame: goalsPerGame(player),
+    averagePoints: averageFantasyPoints(player),
+    maxPrimaryPerGame: maxGoalAverage,
+    maxAveragePoints: maxPointsAverage,
+  });
+  const assistPotential = (player: FantasyMarketPlayer) => calculateFantasyPredictionIndex({
+    primaryPerGame: assistsPerGame(player),
+    averagePoints: averageFantasyPoints(player),
+    maxPrimaryPerGame: maxAssistAverage,
+    maxAveragePoints: maxPointsAverage,
+  });
+  const scorerCandidates = [...predictionCandidates].sort(
+    (a, b) => goalPotential(b) - goalPotential(a) || b.totalPoints - a.totalPoints,
+  );
+  const assistCandidates = [...predictionCandidates].sort(
+    (a, b) => assistPotential(b) - assistPotential(a) || b.totalPoints - a.totalPoints,
+  );
   const goalkeeperCandidates = [...market]
     .filter((player) => (player.isGoalkeeper || player.goalkeeperGames > 0) && player.goalkeeperGames > 0)
     .sort(
@@ -930,34 +931,18 @@ export async function getFantasyDashboard() {
       () => "das braçadeiras",
     ),
     favoriteScorers: makeTopList(
-      "Favoritos a gol",
-      "Palpite real; a corneta é por nossa conta.",
+      "Potencial de gol",
+      "Índice estimado: 70% média de gols e 30% pontuação média geral.",
       scorerCandidates,
-      (player) => {
-        const predictions = popularityAgg.scorerPredictionCounts.get(player.id) || 0;
-        return predictions > 0
-          ? `${Math.round((predictions / Math.max(1, popularityAgg.totalScorerPredictions)) * 100)}%`
-          : `${(player.goals / Math.max(1, player.games)).toFixed(2)} G/J`;
-      },
-      (player) =>
-        (popularityAgg.scorerPredictionCounts.get(player.id) || 0) > 0
-          ? "dos palpites de gol"
-          : `${player.goals} gol(s) em ${player.games} jogo(s)`,
+      (player) => `${goalPotential(player)}/100`,
+      (player) => `${goalsPerGame(player).toFixed(2)} gol/j · ${averageFantasyPoints(player).toFixed(1)} pts/j`,
     ),
     favoriteAssists: makeTopList(
-      "Favoritos a assistência",
-      "Os garçons mais cotados para servir a rodada.",
+      "Potencial de assistência",
+      "Índice estimado: 70% média de assistências e 30% pontuação média geral.",
       assistCandidates,
-      (player) => {
-        const predictions = popularityAgg.assistPredictionCounts.get(player.id) || 0;
-        return predictions > 0
-          ? `${Math.round((predictions / Math.max(1, popularityAgg.totalAssistPredictions)) * 100)}%`
-          : `${(player.assists / Math.max(1, player.games)).toFixed(2)} A/J`;
-      },
-      (player) =>
-        (popularityAgg.assistPredictionCounts.get(player.id) || 0) > 0
-          ? "dos palpites de assistência"
-          : `${player.assists} assistência(s) em ${player.games} jogo(s)`,
+      (player) => `${assistPotential(player)}/100`,
+      (player) => `${assistsPerGame(player).toFixed(2)} ast/j · ${averageFantasyPoints(player).toFixed(1)} pts/j`,
     ),
     goalkeepers: makeTopList(
       "Paredões",
@@ -1109,28 +1094,20 @@ export async function getFantasyDashboard() {
           badge: "Mais Vendido",
         }
       : null,
-    favoriteScorer: topScorerId
+    favoriteScorer: scorerCandidates[0]
       ? {
-          player: market.find((p) => p.id === topScorerId)!,
-          value: `${Math.round(
-            ((popularityAgg.scorerPredictionCounts.get(topScorerId) || 0) /
-              Math.max(1, popularityAgg.totalScorerPredictions)) *
-              100
-          )}%`,
-          extra: "dos palpites de gol",
-          badge: "Favorito a Artilheiro",
+          player: scorerCandidates[0],
+          value: `${goalPotential(scorerCandidates[0])}/100`,
+          extra: `${goalsPerGame(scorerCandidates[0]).toFixed(2)} gol/j`,
+          badge: "Potencial de Gol",
         }
       : null,
-    favoriteAssist: topAssistId
+    favoriteAssist: assistCandidates[0]
       ? {
-          player: market.find((p) => p.id === topAssistId)!,
-          value: `${Math.round(
-            ((popularityAgg.assistPredictionCounts.get(topAssistId) || 0) /
-              Math.max(1, popularityAgg.totalAssistPredictions)) *
-              100
-          )}%`,
-          extra: "dos palpites de garçom",
-          badge: "Favorito a Garçom",
+          player: assistCandidates[0],
+          value: `${assistPotential(assistCandidates[0])}/100`,
+          extra: `${assistsPerGame(assistCandidates[0]).toFixed(2)} ast/j`,
+          badge: "Potencial de Assistência",
         }
       : null,
     topLists,

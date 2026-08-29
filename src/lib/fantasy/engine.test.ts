@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget } from "./config";
 import {
   calculateCostBenefit,
+  calculateFantasyPredictionIndex,
   calculateFantasyForm,
   calculateFantasyPlayerPoints,
   calculateFantasyPrices,
@@ -306,6 +307,12 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
   });
 
   describe("Popularidade, Capitães, Mais Comprado/Vendido e Radar", () => {
+    it("combina a média ofensiva com a pontuação geral no índice preditivo", () => {
+      expect(calculateFantasyPredictionIndex({ primaryPerGame: 0.5, averagePoints: 10, maxPrimaryPerGame: 0.5, maxAveragePoints: 10 })).toBe(100);
+      expect(calculateFantasyPredictionIndex({ primaryPerGame: 0, averagePoints: 10, maxPrimaryPerGame: 0.5, maxAveragePoints: 10 })).toBe(30);
+      expect(calculateFantasyPredictionIndex({ primaryPerGame: 0.25, averagePoints: 5, maxPrimaryPerGame: 0.5, maxAveragePoints: 10 })).toBe(50);
+    });
+
     it("calcula % escalado e % capitão com precisão", () => {
       const currentLineups = [
         { userId: "u1", playerIds: ["daniel", "leo", "p3", "p4", "p5"], captainPlayerId: "daniel" },
