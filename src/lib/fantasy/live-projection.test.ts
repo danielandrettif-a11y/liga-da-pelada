@@ -140,6 +140,37 @@ describe("live fantasy projection", () => {
     expect(misplaced.playerPoints).toBe(10);
   });
 
+  it("mantém pontos-base, bônus da posição e capitão em parcelas que fecham o total", () => {
+    const stats = projectFantasyLiveStats([
+      {
+        ...baseMatch,
+        status: "live",
+        players: [
+          { playerId: "maker", teamId: "a", resultEligible: true, playerProfile: "midfield" as const },
+        ],
+        goalkeepers: [],
+        events: [{ playerId: "scorer", assistPlayerId: "maker", teamId: "a" }],
+      },
+    ], DEFAULT_FANTASY_SETTINGS);
+    const [lineup] = projectFantasyLiveLineups([
+      {
+        id: "lineup",
+        userId: "user",
+        playerIds: ["maker"],
+        slots: [{ playerId: "maker", slotRole: "MEI", playerProfile: "midfield" }],
+        captainPlayerId: "maker",
+      },
+    ], stats, DEFAULT_FANTASY_SETTINGS);
+
+    expect(lineup.players[0]).toMatchObject({
+      basePoints: 3,
+      positionBonus: 1,
+      captainBonus: 2,
+      totalPoints: 6,
+    });
+    expect(lineup).toMatchObject({ playerPoints: 4, positionBonus: 1, captainBonus: 2, totalPoints: 6 });
+  });
+
   it("aplica o pacote de GOL a qualquer atleta nessa vaga e dá +4 de clean sheet", () => {
     const stats = projectFantasyLiveStats([{ ...baseMatch, status: "finished" }], DEFAULT_FANTASY_SETTINGS);
     const [goalkeeperSlot, fieldSlot] = projectFantasyLiveLineups([

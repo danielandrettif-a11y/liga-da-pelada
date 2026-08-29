@@ -23,6 +23,7 @@ import {
   projectFantasyLiveLineups,
   projectFantasyLiveStats,
   type FantasyLiveLineupProjection,
+  type FantasyLivePlayerStats,
 } from "@/lib/fantasy/live-projection";
 import type { FantasyLineupSlot } from "@/lib/fantasy/lineup-positions";
 
@@ -347,6 +348,18 @@ export async function getFantasyDashboard() {
           scoringSnapshot.team_goal_conceded_points ?? settings.teamGoalConcededPoints,
         ),
         ownGoalPoints: Number(scoringSnapshot.own_goal_points ?? settings.ownGoalPoints),
+        captainMultiplier: Number(
+          scoringSnapshot.captain_multiplier ?? settings.captainMultiplier,
+        ),
+        topScorerPredictionPoints: Number(
+          scoringSnapshot.top_scorer_prediction_points ?? settings.topScorerPredictionPoints,
+        ),
+        topAssistPredictionPoints: Number(
+          scoringSnapshot.top_assist_prediction_points ?? settings.topAssistPredictionPoints,
+        ),
+        topTeamPredictionPoints: Number(
+          scoringSnapshot.top_team_prediction_points ?? settings.topTeamPredictionPoints,
+        ),
       }
     : settings;
   const displayRound = fantasyRound?.round || latestFinishedRound?.round || null;
@@ -1259,6 +1272,7 @@ export async function getFantasyDashboard() {
     isLive: fantasyRound?.market_status === "in_progress",
     calculatedAt: new Date().toISOString(),
     playerPoints: [...liveStats.values()].map((item) => ({ playerId: item.playerId, points: item.basePoints })),
+    playerStats: [...liveStats.values()],
     currentUser: projectedLineups.find((item) => item.userId === account.user!.id) || null,
   };
 
@@ -1854,22 +1868,26 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
       .eq("fantasy_round_id", activeRound.id),
     liveReadClient.from("players").select("id, player_profile, member_category, is_selectable"),
   ]);
+  // A prévia precisa usar as regras congeladas quando a rodada foi aberta.
+  // As configurações da liga podem mudar depois, mas não podem alterar uma
+  // rodada que já está valendo — nem deixar ranking e tela do time divergirem.
+  const snapshot = activeRound.settings_snapshot || {};
   const settings: FantasySettings = {
     ...DEFAULT_FANTASY_SETTINGS,
-    roleScoringActive: activeRound.settings_snapshot?.role_scoring_active !== false,
-    goalPoints: Number(settingsRow?.goal_points ?? DEFAULT_FANTASY_SETTINGS.goalPoints),
-    attackerGoalPoints: Number(settingsRow?.attacker_goal_points ?? DEFAULT_FANTASY_SETTINGS.attackerGoalPoints),
-    assistPoints: Number(settingsRow?.assist_points ?? DEFAULT_FANTASY_SETTINGS.assistPoints),
-    winPoints: Number(settingsRow?.win_points ?? DEFAULT_FANTASY_SETTINGS.winPoints),
-    lossPoints: Number(settingsRow?.loss_points ?? DEFAULT_FANTASY_SETTINGS.lossPoints),
-    goalkeeperLossPoints: Number(settingsRow?.goalkeeper_loss_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperLossPoints),
-    goalkeeperAppearancePoints: Number(settingsRow?.goalkeeper_appearance_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperAppearancePoints),
-    goalConcededPoints: Number(settingsRow?.goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.goalConcededPoints),
-    teamGoalConcededPoints: Number(settingsRow?.team_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.teamGoalConcededPoints),
-    ownGoalPoints: Number(settingsRow?.own_goal_points ?? DEFAULT_FANTASY_SETTINGS.ownGoalPoints),
-    captainMultiplier: Number(settingsRow?.captain_multiplier ?? DEFAULT_FANTASY_SETTINGS.captainMultiplier),
-    topScorerPredictionPoints: Number(settingsRow?.top_scorer_prediction_points ?? DEFAULT_FANTASY_SETTINGS.topScorerPredictionPoints),
-    topAssistPredictionPoints: Number(settingsRow?.top_assist_prediction_points ?? DEFAULT_FANTASY_SETTINGS.topAssistPredictionPoints),
+    roleScoringActive: snapshot.role_scoring_active !== false,
+    goalPoints: Number(snapshot.goal_points ?? settingsRow?.goal_points ?? DEFAULT_FANTASY_SETTINGS.goalPoints),
+    attackerGoalPoints: Number(snapshot.attacker_goal_points ?? settingsRow?.attacker_goal_points ?? DEFAULT_FANTASY_SETTINGS.attackerGoalPoints),
+    assistPoints: Number(snapshot.assist_points ?? settingsRow?.assist_points ?? DEFAULT_FANTASY_SETTINGS.assistPoints),
+    winPoints: Number(snapshot.win_points ?? settingsRow?.win_points ?? DEFAULT_FANTASY_SETTINGS.winPoints),
+    lossPoints: Number(snapshot.loss_points ?? settingsRow?.loss_points ?? DEFAULT_FANTASY_SETTINGS.lossPoints),
+    goalkeeperLossPoints: Number(snapshot.goalkeeper_loss_points ?? settingsRow?.goalkeeper_loss_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperLossPoints),
+    goalkeeperAppearancePoints: Number(snapshot.goalkeeper_appearance_points ?? settingsRow?.goalkeeper_appearance_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperAppearancePoints),
+    goalConcededPoints: Number(snapshot.goal_conceded_points ?? settingsRow?.goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.goalConcededPoints),
+    teamGoalConcededPoints: Number(snapshot.team_goal_conceded_points ?? settingsRow?.team_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.teamGoalConcededPoints),
+    ownGoalPoints: Number(snapshot.own_goal_points ?? settingsRow?.own_goal_points ?? DEFAULT_FANTASY_SETTINGS.ownGoalPoints),
+    captainMultiplier: Number(snapshot.captain_multiplier ?? settingsRow?.captain_multiplier ?? DEFAULT_FANTASY_SETTINGS.captainMultiplier),
+    topScorerPredictionPoints: Number(snapshot.top_scorer_prediction_points ?? settingsRow?.top_scorer_prediction_points ?? DEFAULT_FANTASY_SETTINGS.topScorerPredictionPoints),
+    topAssistPredictionPoints: Number(snapshot.top_assist_prediction_points ?? settingsRow?.top_assist_prediction_points ?? DEFAULT_FANTASY_SETTINGS.topAssistPredictionPoints),
   };
   const playerProfileById = new Map((playerRows || []).map((player: any) => [player.id, player.player_profile]));
   const eligiblePredictionPlayerIds = new Set<string>(
@@ -1960,11 +1978,16 @@ export async function getFantasyRanking(
         .from("fantasy_rounds")
         .select("id, round_id, market_status, round:round_id(date, number, status)")
         .eq("fantasy_season_id", fs.id);
-      const ordered = (data || []).sort((a: any, b: any) =>
-          `${b.round?.date}-${b.round?.number}`.localeCompare(
-            `${a.round?.date}-${a.round?.number}`
-          )
+      const ordered = [...(data || [])].sort((a: any, b: any) => {
+        // Uma rodada em jogo sempre vence uma rodada futura ainda aberta.
+        // Sem isso o ranking consultava a próxima rodada vazia.
+        if (a.market_status !== b.market_status) {
+          return a.market_status === "in_progress" ? -1 : b.market_status === "in_progress" ? 1 : 0;
+        }
+        return `${b.round?.date}-${b.round?.number}`.localeCompare(
+          `${a.round?.date}-${a.round?.number}`,
         );
+      });
       // A aba de rodada sempre prioriza a rodada que está aberta ou em jogo,
       // mesmo se já houver uma rodada futura criada no calendário.
       const latest = ordered.find((item: any) =>
@@ -2029,11 +2052,30 @@ export async function getFantasyRanking(
       .select("*")
       .eq("fantasy_season_id", fs.id)
       .order("total_points", { ascending: false });
-    entries = (data || []).map((item: any) => ({
+    const byUserId = new Map<string, any>();
+    for (const item of data || []) {
+      byUserId.set(item.user_id, {
       ...item,
       total_points: Number(item.total_points || 0) + (live?.byUserId.get(item.user_id)?.totalPoints || 0),
       is_live: Boolean(live?.byUserId.has(item.user_id)),
-    }));
+      });
+    }
+    // Uma conta pode ter sido criada a partir da escalação e ainda não ter o
+    // agregado histórico preenchido. A prévia ao vivo continua sendo válida e
+    // deve colocá-la no ranking geral imediatamente.
+    for (const projection of live?.byUserId.values() || []) {
+      if (!byUserId.has(projection.userId)) {
+        byUserId.set(projection.userId, {
+          id: projection.lineupId,
+          user_id: projection.userId,
+          total_points: projection.totalPoints,
+          current_budget: 0,
+          rounds_played: 0,
+          is_live: true,
+        });
+      }
+    }
+    entries = [...byUserId.values()];
   }
 
   entries.sort((a: any, b: any) => Number(b.total_points) - Number(a.total_points));
@@ -2506,6 +2548,7 @@ export type FantasyLiveProjection = {
   isLive: boolean;
   calculatedAt: string;
   playerPoints: Array<{ playerId: string; points: number }>;
+  playerStats: FantasyLivePlayerStats[];
   currentUser: FantasyLiveLineupProjection | null;
 };
 

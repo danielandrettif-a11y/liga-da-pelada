@@ -63,8 +63,10 @@ export function FantasyPlayerDrawer({
   }, [isOpen, liveRevision, player?.id]);
 
   useEffect(() => {
-    setLiveStatsOpen(false);
-  }, [player?.id]);
+    // A aba ao vivo abre pronta quando a rodada está em andamento. Assim o
+    // usuário vê os pontos e seus motivos sem precisar procurar um acordeão.
+    setLiveStatsOpen(isRoundLive);
+  }, [isRoundLive, player?.id]);
 
   if (!mounted || !isOpen || !player || typeof document === "undefined") return null;
 
@@ -130,6 +132,11 @@ export function FantasyPlayerDrawer({
             <p className="mt-0.5 text-xs text-muted">
               {player.goals} gols · {player.assists} assistências · {player.wins} vitórias
             </p>
+            {isRoundLive && (
+              <p className="mt-1 inline-flex rounded-full border border-accent/35 bg-accent/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-accent">
+                Ao vivo · {Number(liveRound?.basePoints ?? player.roundPoints ?? 0).toFixed(1)} pts
+              </p>
+            )}
             {/* Tags Completas */}
             <div className="mt-2 flex flex-wrap gap-1">
               {player.allTags.map((tag) => (
@@ -166,7 +173,7 @@ export function FantasyPlayerDrawer({
             >
               <span>
                 <span className="block text-[9px] font-black uppercase tracking-wider text-accent">Rodada ao vivo</span>
-                <span className="mt-0.5 block text-xs font-bold text-foreground">Scouts desta rodada</span>
+                <span className="mt-0.5 block text-xs font-bold text-foreground">Estatísticas ao vivo</span>
               </span>
               <span className="flex items-center gap-2">
                 <strong className="text-sm font-black text-accent">{Number(liveRound?.basePoints ?? player.roundPoints ?? 0).toFixed(1)} pts</strong>

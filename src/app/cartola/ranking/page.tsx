@@ -3,6 +3,11 @@ import { Trophy } from "@/components/icons";
 import { FantasyRankingList } from "@/components/fantasy/FantasyRankingList";
 import { getFantasyRanking, getFantasyRoundLineupOverview } from "@/lib/actions/fantasy";
 
+// A classificação muda a cada scout da rodada e depende da sessão atual.
+// Nunca reutilize a resposta vazia de outro acesso/navegação.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function FantasyRankingPage({ searchParams }: { searchParams: Promise<{ scope?: string }> }) {
   const { scope: requestedScope } = await searchParams;
   const scope = requestedScope === "general" ? "general" : "round";

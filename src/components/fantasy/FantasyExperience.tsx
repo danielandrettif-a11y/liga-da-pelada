@@ -376,6 +376,26 @@ export function FantasyExperience({
 
   const validSelectedPlayers = selectedPlayers.filter(Boolean) as FantasyMarketPlayer[];
   const validSelectedCount = validSelectedPlayers.length;
+  const livePlayerProjectionById = useMemo(
+    () => new Map(
+      (liveProjection?.currentUser?.players || []).map((item) => [item.playerId, item] as const),
+    ),
+    [liveProjection?.currentUser?.players],
+  );
+  const liveBasePlayerPoints = useMemo(
+    () => (liveProjection?.currentUser?.players || []).reduce(
+      (total, item) => total + item.basePoints,
+      0,
+    ),
+    [liveProjection?.currentUser?.players],
+  );
+  const livePositionBonus = useMemo(
+    () => (liveProjection?.currentUser?.players || []).reduce(
+      (total, item) => total + item.positionBonus,
+      0,
+    ),
+    [liveProjection?.currentUser?.players],
+  );
 
   const cost = validSelectedPlayers.reduce((sum, player) => {
     const isDiscounted = discountedPlayerId === player.id;
@@ -801,6 +821,7 @@ export function FantasyExperience({
     targetPos: "ALL" | "GOL" | "DEF" | "MEI" | "ATA" = "ALL"
   ) {
     const player = selectedPlayers[slot];
+    const livePlayerProjection = player ? livePlayerProjectionById.get(player.id) : null;
     const isBeingDragged = draggedSlot === slot;
     const isDragOver = dragOverSlot === slot;
 
@@ -981,7 +1002,9 @@ export function FantasyExperience({
                 {player.name}
               </span>
               <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
-                {status === "in_progress"
+                {status === "in_progress" && livePlayerProjection
+                  ? `${livePlayerProjection.totalPoints.toFixed(1)} pts`
+                  : status === "in_progress"
                   ? `${(
                       player.roundPoints *
                       (captainId === player.id ? settings.captainMultiplier : 1)
@@ -1336,7 +1359,8 @@ export function FantasyExperience({
                     <RotateCcw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} /> Atualizar pontuação
                   </button>
                   <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-right text-[9px] font-bold text-muted">
-                  <span>Jogadores</span><strong className="text-foreground">{(liveProjection?.currentUser?.playerPoints || 0).toFixed(1)}</strong>
+                  <span>Pontos-base</span><strong className="text-foreground">{liveBasePlayerPoints.toFixed(1)}</strong>
+                  <span>Bônus de posição</span><strong className="text-foreground">+{livePositionBonus.toFixed(1)}</strong>
                   <span>Capitão</span><strong className="text-foreground">+{(liveProjection?.currentUser?.captainBonus || 0).toFixed(1)}</strong>
                   <span>Palpites/cartas</span><strong className="text-foreground">+{((liveProjection?.currentUser?.predictionPoints || 0) + (liveProjection?.currentUser?.cardPoints || 0)).toFixed(1)}</strong>
                   </div>
@@ -1576,6 +1600,8 @@ export function FantasyExperience({
                 roundId={round.id}
                 activeCard={activeCard}
                 isMarketOpen={open}
+                isRoundLive={liveProjection?.isLive || status === "in_progress"}
+                liveStats={liveProjection?.playerStats || []}
                 marketPlayers={market}
                 lineupPlayers={validSelectedPlayers}
                 captainPlayerId={captainId}
@@ -1993,7 +2019,7 @@ export function FantasyExperience({
           onClose={() => setSelectedDrawerPlayer(null)}
           isBought={Boolean(selectedDrawerPlayer && selected.includes(selectedDrawerPlayer.id))}
           isMarketOpen={open}
-          isRoundLive={status === "in_progress"}
+          isRoundLive={Boolean(liveProjection?.isLive || status === "in_progress")}
           liveRevision={liveProjection?.calculatedAt}
           onToggleBuy={(p) => togglePlayer(p)}
         />
