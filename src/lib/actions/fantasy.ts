@@ -1776,20 +1776,74 @@ export async function getFantasyPlayerDetail(playerId: string) {
       ? current.teamGoalsConceded * liveSettings.teamGoalConcededPoints
       : current.goalsConceded * liveSettings.goalConcededPoints;
     const breakdown = [
-      { label: "Gols", count: current.goals, points: current.goals * goalValue },
-      { label: "Assistências", count: current.assists, points: current.assists * liveSettings.assistPoints },
-      { label: "Vitórias", count: current.wins, points: current.wins * liveSettings.winPoints },
-      { label: "Derrotas", count: current.losses, points: current.losses * liveSettings.lossPoints },
-      { label: "Jogos como goleiro", count: current.goalkeeperGames, points: current.goalkeeperGames * liveSettings.goalkeeperAppearancePoints },
-      { label: "Gols sofridos como goleiro", count: liveSettings.roleScoringActive === false ? current.teamGoalsConceded : current.goalsConceded, points: concededValue },
-      { label: "Bônus defensivo", count: current.defensiveCleanGames + current.defensiveOneGoalGames, points: defensiveBonus },
-      { label: "Gols contra", count: current.ownGoals, points: current.ownGoals * liveSettings.ownGoalPoints },
+      { key: "goals", label: "Gols", count: current.goals, unitPoints: goalValue, points: current.goals * goalValue, icon: "⚽" },
+      { key: "assists", label: "Assistências", count: current.assists, unitPoints: liveSettings.assistPoints, points: current.assists * liveSettings.assistPoints, icon: "👟" },
+      { key: "wins", label: "Vitórias", count: current.wins, unitPoints: liveSettings.winPoints, points: current.wins * liveSettings.winPoints, icon: "🏆" },
+      { key: "losses", label: "Derrotas", count: current.losses, unitPoints: liveSettings.lossPoints, points: current.losses * liveSettings.lossPoints, icon: "❌" },
+      { key: "goalkeeper_games", label: "Jogos no Gol (Rodízio)", count: current.goalkeeperGames, unitPoints: liveSettings.goalkeeperAppearancePoints, points: current.goalkeeperGames * liveSettings.goalkeeperAppearancePoints, icon: "🧤" },
+      { key: "goals_conceded", label: "Gols Sofridos no Gol", count: liveSettings.roleScoringActive === false ? current.teamGoalsConceded : current.goalsConceded, unitPoints: liveSettings.goalConcededPoints, points: concededValue, icon: "🛡️" },
+      { key: "defensive_bonus", label: "Bônus Defensivo (SG)", count: current.defensiveCleanGames + current.defensiveOneGoalGames, unitPoints: 2, points: defensiveBonus, icon: "🔒" },
+      { key: "own_goals", label: "Gols Contra", count: current.ownGoals, unitPoints: liveSettings.ownGoalPoints, points: current.ownGoals * liveSettings.ownGoalPoints, icon: "⚠️" },
     ].filter((item) => item.count > 0);
+
+    const matchesBreakdown = (liveMatches || [])
+      .filter((match: any) => {
+        const inPlayers = (match.match_players || []).some((p: any) => p.player_id === playerId);
+        const inGk = (match.match_goalkeepers || []).some((g: any) => g.player_id === playerId);
+        return inPlayers || inGk;
+      })
+      .map((match: any, index: number) => {
+        const isFinished = match.status === "finished";
+        const playerInMatch = (match.match_players || []).find((p: any) => p.player_id === playerId);
+        const isGk = (match.match_goalkeepers || []).some((g: any) => g.player_id === playerId);
+        const teamId = playerInMatch?.team_id || (match.match_goalkeepers || []).find((g: any) => g.player_id === playerId)?.team_id;
+        const myTeam = teamId === match.team_a_id ? "A" : teamId === match.team_b_id ? "B" : null;
+        const myScore = myTeam === "A" ? Number(match.score_a || 0) : Number(match.score_b || 0);
+        const oppScore = myTeam === "A" ? Number(match.score_b || 0) : Number(match.score_a || 0);
+        const isDraw = myScore === oppScore;
+        const isWin = isFinished && !isDraw && myScore > oppScore;
+        const isLoss = isFinished && !isDraw && myScore < oppScore;
+        const matchGoals = (match.match_events || []).filter((e: any) => e.player_id === playerId && !e.is_own_goal).length;
+        const matchAssists = (match.match_events || []).filter((e: any) => e.assist_player_id === playerId).length;
+        const matchOwnGoals = (match.match_events || []).filter((e: any) => e.player_id === playerId && e.is_own_goal).length;
+        
+        return {
+          matchId: match.id,
+          matchIndex: index + 1,
+          status: match.status,
+          scoreFormatted: `${match.score_a ?? 0} x ${match.score_b ?? 0}`,
+          myScore,
+          oppScore,
+          result: isFinished ? (isWin ? "win" : isLoss ? "loss" : "draw") : "live",
+          goals: matchGoals,
+          assists: matchAssists,
+          ownGoals: matchOwnGoals,
+          isGoalkeeper: isGk,
+          goalsConcededInMatch: isGk ? oppScore : 0,
+        };
+      });
+
+    const rulesList = [
+      { label: "Gol marcado", unitPoints: goalValue, icon: "⚽", description: playerProfile === "offensive" ? "Pontuação padrão para atacante" : "Pontuação por gol marcado" },
+      { label: "Assistência", unitPoints: liveSettings.assistPoints, icon: "👟", description: "Passe direto para gol" },
+      { label: "Vitória na partida", unitPoints: liveSettings.winPoints, icon: "🏆", description: "Time vence a partida (ao encerrar)" },
+      { label: "Derrota na partida", unitPoints: liveSettings.lossPoints, icon: "❌", description: "Time perde a partida (ao encerrar)" },
+      { label: "Jogar no gol (rodízio)", unitPoints: liveSettings.goalkeeperAppearancePoints, icon: "🧤", description: "Bônus por atuar na posição de goleiro" },
+      { label: "Gol sofrido no gol", unitPoints: liveSettings.goalConcededPoints, icon: "🛡️", description: "Penalidade por cada gol sofrido no gol" },
+      { label: "Gol contra", unitPoints: liveSettings.ownGoalPoints, icon: "⚠️", description: "Penalidade por marcar gol contra" },
+      ...(playerProfile === "defensive" ? [
+        { label: "SG Defensivo (0 gols)", unitPoints: 2, icon: "🔒", description: "Bônus de zagueiro por partida sem sofrer gols" },
+        { label: "SG Defensivo (1 gol)", unitPoints: 1, icon: "🛡️", description: "Bônus de zagueiro por partida com no máximo 1 gol sofrido" },
+      ] : []),
+    ];
+
     liveRoundSummary = {
       roundNumber: liveRoundInfo?.number || null,
       stats: current,
       basePoints: current.basePoints,
       breakdown,
+      matchesBreakdown,
+      rulesList,
     };
   }
 
