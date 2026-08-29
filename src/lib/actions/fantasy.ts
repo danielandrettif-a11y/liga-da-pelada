@@ -1900,17 +1900,32 @@ async function getLiveRoundProjections(
   // Mantém o ranking e a ficha individual na mesma fonte confiável da prévia
   // principal. O fallback preserva o funcionamento em ambientes de teste sem
   // chave de serviço configurada.
-  const liveReadClient = createServiceClient() || client;
-  let activeRoundQuery = liveReadClient
-    .from("fantasy_rounds")
-    .select("id, round_id, market_status, settings_snapshot, round:round_id(status, ignore_goalkeeper_stats, date, number)")
-    .eq("fantasy_season_id", fantasySeasonId)
-    // A classificação da rodada começa assim que alguém salva a escalação.
-    // Antes da primeira partida ela é uma prévia de 0 pontos; depois, os
-    // mesmos atletas recebem os scouts ao vivo sem desaparecer da lista.
-    .in("market_status", ["open", "in_progress"]);
-  if (targetRoundId) activeRoundQuery = activeRoundQuery.eq("round_id", targetRoundId);
-  const { data: activeRoundRows } = await activeRoundQuery;
+  let liveReadClient = createServiceClient() || client;
+  const readActiveRounds = (readClient: any) => {
+    let query = readClient
+      .from("fantasy_rounds")
+      .select("id, round_id, market_status, settings_snapshot, round:round_id(status, ignore_goalkeeper_stats, date, number)")
+      .eq("fantasy_season_id", fantasySeasonId)
+      // A classificação da rodada começa assim que alguém salva a escalação.
+      // Antes da primeira partida ela é uma prévia de 0 pontos; depois, os
+      // mesmos atletas recebem os scouts ao vivo sem desaparecer da lista.
+      .in("market_status", ["open", "in_progress"]);
+    if (targetRoundId) query = query.eq("round_id", targetRoundId);
+    return query;
+  };
+  let { data: activeRoundRows, error: activeRoundError } = await readActiveRounds(liveReadClient);
+  // Uma chave de serviço incompleta não pode esconder a prévia de todos os
+  // outros usuários. As políticas autenticadas já permitem ler essa rodada
+  // após o fechamento, então repetimos a leitura com a sessão atual.
+  if (activeRoundError && liveReadClient !== client) {
+    console.error("Leitura de serviço da prévia do Cartola falhou; usando sessão autenticada:", activeRoundError.message);
+    liveReadClient = client;
+    ({ data: activeRoundRows, error: activeRoundError } = await readActiveRounds(liveReadClient));
+  }
+  if (activeRoundError) {
+    console.error("Não foi possível localizar a rodada da prévia do Cartola:", activeRoundError.message);
+    return null;
+  }
   const activeRound = (activeRoundRows || [])
     .filter((item: any) => item.round?.status !== "finished")
     .sort((a: any, b: any) => {
