@@ -43,7 +43,7 @@ function PackageOption({ item, bonus, number, selected, hasChosen, locked, disab
 
 function FramePreview({ item, compact = false }: { item: CosmeticItem | null; compact?: boolean }) {
   const image = cosmeticFrameImage(item?.assetKey);
-  return <span className={`${compact ? "h-14 w-14" : "h-20 w-20"} relative shrink-0 rounded-full border-2 border-amber-200/70 bg-gradient-to-br from-[#163b23] to-[#020805] shadow-[0_0_18px_rgba(251,191,36,.4)]`}><span className="absolute inset-[17%] rounded-full border border-white/25 bg-black/35" />{image && <span className="absolute inset-0 rounded-full bg-cover bg-center mix-blend-screen" style={{ backgroundImage: `url(${image})` }} />}</span>;
+  return <span className={`${compact ? "h-14 w-14" : "h-20 w-20"} relative shrink-0 rounded-full border-2 border-amber-200/70 bg-gradient-to-br from-[#163b23] to-[#020805] shadow-[0_0_18px_rgba(251,191,36,.4)]`}><span className="absolute inset-[17%] rounded-full border border-white/25 bg-black/35" />{image && <span className="absolute -inset-[18%] bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${image})`, filter: "brightness(1.12) contrast(1.18) saturate(1.2) drop-shadow(0 2px 2px rgba(0,0,0,.75))" }} />}</span>;
 }
 
 function NameplatePreview({ item }: { item: CosmeticItem }) {

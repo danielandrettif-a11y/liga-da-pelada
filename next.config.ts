@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
     // Deixar o Next gerar WebP/AVIF evita baixar a arte original em cada miniatura.
     formats: ["image/avif", "image/webp"],
     imageSizes: [48, 64, 96, 128, 180, 240, 320, 430],
+    qualities: [75, 90],
     minimumCacheTTL: 60 * 60 * 24 * 30,
   },
   experimental: {

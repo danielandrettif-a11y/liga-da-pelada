@@ -6,12 +6,13 @@ import { PlayerProfileBadge } from "@/components/PlayerProfileBadge";
 import { PlayerAwards } from "@/components/PlayerAwards";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeft, ChevronRight, Football, Target, TrendingUp, Trophy } from "@/components/icons";
 import { TeamCrest } from "@/components/TeamCrest";
 import { FantasyPlayerCard } from "@/components/fantasy/FantasyPlayerCard";
 import { getFantasyPlayerSummary } from "@/lib/actions/fantasy";
 import { getPlayerEquippedCosmetics } from "@/lib/actions/cosmetics";
-import { cosmeticBackgroundPosition, cosmeticImage, cosmeticNameplateClass, cosmeticVisual } from "@/lib/fantasy/cosmetics";
+import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticNameplateClass, cosmeticVisual } from "@/lib/fantasy/cosmetics";
 
 export const revalidate = 0;
 
@@ -65,8 +66,8 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
   const cardGradient = cosmetics?.bannerAssetKey
     ? `bg-gradient-to-b ${cosmeticVisual(cosmetics.bannerAssetKey)}/30`
     : "";
-  const bannerImage = cosmeticImage(cosmetics?.bannerAssetKey);
-  const profileBackgroundImage = cosmeticImage(cosmetics?.backgroundAssetKey);
+  const bannerImage = cosmeticHighResolutionImage(cosmetics?.bannerAssetKey);
+  const profileBackgroundImage = cosmeticHighResolutionImage(cosmetics?.backgroundAssetKey);
 
   return (
     <div className="relative -mx-4 -mt-4 min-h-[calc(100dvh-3.5rem)] px-4 pb-4 pt-4">
@@ -74,14 +75,18 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
       {profileBackgroundImage && (
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-0 z-0 bg-[#06100a]"
-          style={{
-            backgroundImage: `linear-gradient(to bottom, rgba(2, 14, 8, 0.48) 0%, rgba(2, 14, 8, 0.78) 45%, rgba(2, 14, 8, 0.96) 100%), url(${profileBackgroundImage})`,
-            backgroundSize: "cover",
-            backgroundPosition: cosmeticBackgroundPosition("background", cosmetics?.backgroundAssetKey),
-            backgroundRepeat: "no-repeat",
-          }}
+          className="pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[#06100a]"
         >
+          <Image
+            src={profileBackgroundImage}
+            alt=""
+            fill
+            quality={90}
+            sizes="100vw"
+            className="object-cover"
+            style={{ objectPosition: cosmeticBackgroundPosition("background", cosmetics?.backgroundAssetKey) }}
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(2,14,8,.48)_0%,rgba(2,14,8,.78)_45%,rgba(2,14,8,.96)_100%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,transparent_0%,rgba(2,14,8,.22)_48%,rgba(2,14,8,.65)_100%)]" />
         </div>
       )}
@@ -98,16 +103,18 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
         <div className={`glass-card relative overflow-hidden flex flex-col items-center p-6 text-center shadow-xl ${cardGradient}`}>
           {/* Imagem da Capa com enquadramento perfeito */}
           {bannerImage && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 z-0 opacity-90"
-              style={{
-                backgroundImage: `linear-gradient(180deg, rgba(3, 14, 8, 0.35) 0%, rgba(3, 14, 8, 0.72) 55%, rgba(3, 14, 8, 0.94) 100%), url(${bannerImage})`,
-                backgroundSize: "cover",
-                backgroundPosition: cosmeticBackgroundPosition("banner", cosmetics?.bannerAssetKey),
-                backgroundRepeat: "no-repeat",
-              }}
-            />
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+              <Image
+                src={bannerImage}
+                alt=""
+                fill
+                quality={90}
+                sizes="(max-width: 768px) 100vw, 720px"
+                className="object-cover"
+                style={{ objectPosition: cosmeticBackgroundPosition("banner", cosmetics?.bannerAssetKey) }}
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,14,8,.3)_0%,rgba(3,14,8,.7)_55%,rgba(3,14,8,.94)_100%)]" />
+            </div>
           )}
           {cosmetics?.bannerAssetKey && (
             <div className="pointer-events-none absolute inset-0 z-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent via-transparent to-transparent" />

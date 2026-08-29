@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayersStatsGrid, type PlayerStats } from "./PlayersStatsGrid";
@@ -10,7 +11,7 @@ import { markRosterActivitySeen } from "@/lib/actions/registrations";
 import { Crown } from "@/components/icons";
 
 import type { EquippedCosmeticsSummary } from "@/lib/actions/cosmetics";
-import { cosmeticBackgroundPosition, cosmeticImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
+import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
 
 type RosterFilter = "all" | "players" | "wags" | "supporters";
 type RosterView = "roster" | "pass";
@@ -67,15 +68,15 @@ function CommunityGrid({ players, label, unreadPlayerIds, playerCosmetics }: { p
     <div className="grid min-w-0 grid-cols-2 gap-3">
       {players.map((player) => {
         const cosmetic = playerCosmetics?.[player.id];
-        const bannerImg = cosmeticImage(cosmetic?.bannerAssetKey);
+        const bannerImg = cosmeticHighResolutionImage(cosmetic?.bannerAssetKey);
         const cardGradient = cosmetic?.bannerAssetKey ? `bg-gradient-to-b ${cosmeticVisual(cosmetic.bannerAssetKey)}/30` : "";
 
         return (
           <RosterUnreadLink key={player.id} href={`/jogadores/${player.id}`} unread={unreadPlayerIds.has(player.id)} className="block h-full min-w-0">
             <div
               className={`glass-card glass-card-hover relative min-w-0 overflow-hidden p-3.5 text-center h-full ${cardGradient}`}
-              style={bannerImg ? { backgroundImage: `linear-gradient(180deg, rgba(3, 14, 8, 0.40) 0%, rgba(3, 14, 8, 0.85) 55%, rgba(3, 14, 8, 0.96) 100%), url(${bannerImg})`, backgroundSize: "cover", backgroundPosition: cosmeticBackgroundPosition("banner", cosmetic?.bannerAssetKey), backgroundRepeat: "no-repeat" } : undefined}
             >
+              {bannerImg && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-28 overflow-hidden"><Image src={bannerImg} alt="" fill quality={90} sizes="(max-width: 768px) 50vw, 360px" className="object-cover" style={{ objectPosition: cosmeticBackgroundPosition("banner", cosmetic?.bannerAssetKey) }} /><div className="absolute inset-0 bg-gradient-to-b from-black/5 via-[#06150d]/30 to-[#06150d]" /></div>}
               {cosmetic?.bannerAssetKey && <div className="pointer-events-none absolute inset-0 opacity-15 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent via-transparent to-transparent" />}
               <div className="relative z-10">
                 <div className="relative mx-auto w-fit">

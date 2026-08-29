@@ -69,6 +69,17 @@ export function cosmeticImage(assetKey?: string | null) {
   return null;
 }
 
+/**
+ * Retorna a arte-fonte sem a compressao agressiva usada nas miniaturas.
+ * Telas de perfil e cards maiores entregam esta fonte ao next/image, que gera
+ * uma variante responsiva adequada ao DPR do celular sem carregar o PNG
+ * original inteiro no navegador.
+ */
+export function cosmeticHighResolutionImage(assetKey?: string | null) {
+  const image = cosmeticImage(assetKey);
+  return image?.endsWith(".webp") ? image.replace(/\.webp$/, ".png") : image;
+}
+
 export function cosmeticBackgroundPosition(slot?: CosmeticSlot | null, assetKey?: string | null): string {
   const key = (assetKey || "").toLowerCase();
   if (slot === "background" || key.includes("background")) {
@@ -105,7 +116,10 @@ export function cosmeticFrameClass(assetKey?: string | null): string {
 export function cosmeticFrameImage(assetKey?: string | null) {
   const key = assetKey || "";
   const frame = ["prancheta-tecnico", "placar-estadio", "arquibancada", "vestiario", "apito-arbitro", "luvas-goleiro", "colete-treino", "area-tecnica", "escanteio"].find((name) => key.includes(name));
-  return frame ? `/images/cosmetics/frames/${frame}.webp` : null;
+  // Os WebPs antigos destas molduras perderam o alpha e criam um quadrado
+  // preto/pixelado ao redor do avatar. Os PNGs sao leves, nitidos e preservam
+  // a transparencia real em qualquer fundo.
+  return frame ? `/images/cosmetics/frames/${frame}.png` : null;
 }
 
 export function cosmeticAuraClass(assetKey?: string | null): string {

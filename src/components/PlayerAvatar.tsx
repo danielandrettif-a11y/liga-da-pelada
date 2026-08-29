@@ -156,9 +156,10 @@ function CosmeticFrameOverlay({ assetKey }: { assetKey?: string | null }) {
     return (
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute -inset-[22%] z-10 bg-contain bg-center bg-no-repeat drop-shadow-md"
+        className="pointer-events-none absolute -inset-[28%] z-10 bg-contain bg-center bg-no-repeat"
         style={{
           backgroundImage: `url(${image})`,
+          filter: "brightness(1.12) contrast(1.18) saturate(1.2) drop-shadow(0 2px 3px rgba(0,0,0,.82)) drop-shadow(0 0 4px rgba(218,181,76,.34))",
         }}
       />
     );
