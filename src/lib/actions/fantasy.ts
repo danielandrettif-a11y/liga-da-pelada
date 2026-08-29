@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentAccount } from "@/lib/auth";
+import { createServiceClient } from "@/lib/supabase/service";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
 import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget, type FantasySettings } from "@/lib/fantasy/config";
@@ -420,7 +421,12 @@ export async function getFantasyDashboard() {
         .eq("fantasy_round_id", previousFinishedRound.id)
     : Promise.resolve({ data: [] as any[] });
 
-  const liveMatchesRequest = loadFantasyMatchSnapshots(account.client, displayRoundId);
+  // A prévia é pública para quem já está no Cartola, mas precisa continuar
+  // funcionando caso uma regra de RLS da escalação/rodada seja atualizada.
+  // O cliente de serviço nunca sai do servidor e aqui é usado somente para
+  // ler partidas, participantes, goleiros e gols já públicos.
+  const liveReadClient = createServiceClient() || account.client;
+  const liveMatchesRequest = loadFantasyMatchSnapshots(liveReadClient, displayRoundId);
 
   const [
     { data: priceRows },
@@ -1191,13 +1197,15 @@ export async function getFantasyDashboard() {
     topDepreciationPlayer: sortedByDepreciation[0] || null,
   };
 
+  // A leitura individual acima é a fonte da escalação exibida na tela. Ela
+  // tem prioridade sobre a listagem geral: em bancos com dados antigos a
+  // relação aninhada da listagem podia chegar vazia e zerar só o dono dela.
   const projectionLineups = (activeRoundLineups || []).filter(
-    (item: any) => item.user_id !== account.user!.id || (item.fantasy_lineup_players || []).length > 0,
+    (item: any) => item.user_id !== account.user!.id,
   );
   if (
     fantasyRound?.market_status === "in_progress" &&
-    effectiveLineup?.fantasy_lineup_players?.length &&
-    !projectionLineups.some((item: any) => item.user_id === account.user!.id)
+    effectiveLineup?.fantasy_lineup_players?.length
   ) {
     projectionLineups.push({
       id: effectiveLineup.id || `preview-${account.user.id}`,
@@ -1688,7 +1696,11 @@ export async function getFantasyPlayerDetail(playerId: string) {
 }
 
 async function getLiveRoundProjections(client: any, fantasySeasonId: string, leagueId: string) {
-  const { data: activeRoundRows } = await client
+  // Mantém o ranking e a ficha individual na mesma fonte confiável da prévia
+  // principal. O fallback preserva o funcionamento em ambientes de teste sem
+  // chave de serviço configurada.
+  const liveReadClient = createServiceClient() || client;
+  const { data: activeRoundRows } = await liveReadClient
     .from("fantasy_rounds")
     .select("id, round_id, market_status, settings_snapshot, round:round_id(status, ignore_goalkeeper_stats)")
     .eq("fantasy_season_id", fantasySeasonId)
@@ -1706,14 +1718,14 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
   if (!activeRound?.round_id) return null;
 
   const [{ data: settingsRow }, matches, { data: lineups }, { data: playerRows }] = await Promise.all([
-    client.from("fantasy_settings").select("*").eq("league_id", leagueId).maybeSingle(),
-    loadFantasyMatchSnapshots(client, activeRound.round_id),
-    client
+    liveReadClient.from("fantasy_settings").select("*").eq("league_id", leagueId).maybeSingle(),
+    loadFantasyMatchSnapshots(liveReadClient, activeRound.round_id),
+    liveReadClient
       .from("fantasy_lineups")
       .select("id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked)")
       .eq("fantasy_round_id", activeRound.id)
       .neq("status", "missed"),
-    client.from("players").select("id, player_profile, member_category, is_selectable"),
+    liveReadClient.from("players").select("id, player_profile, member_category, is_selectable"),
   ]);
   const settings: FantasySettings = {
     ...DEFAULT_FANTASY_SETTINGS,
@@ -1815,33 +1827,64 @@ export async function getFantasyRanking(
     } else {
       const { data } = await account.client
         .from("fantasy_rounds")
-        .select("id, round_id, round:round_id(date, number)")
+        .select("id, round_id, market_status, round:round_id(date, number, status)")
         .eq("fantasy_season_id", fs.id);
-      const latest = (data || []).sort((a: any, b: any) =>
+      const ordered = (data || []).sort((a: any, b: any) =>
           `${b.round?.date}-${b.round?.number}`.localeCompare(
             `${a.round?.date}-${a.round?.number}`
           )
-        )[0];
+        );
+      // A aba de rodada sempre prioriza a rodada que está aberta ou em jogo,
+      // mesmo se já houver uma rodada futura criada no calendário.
+      const latest = ordered.find((item: any) =>
+        item.round?.status !== "finished" && ["open", "in_progress"].includes(item.market_status)
+      ) || ordered[0];
       fantasyRoundId = latest?.id || null;
       resolvedRoundId = latest?.round_id || null;
     }
-    if (live && (!roundId || roundId === live.roundId)) {
-      entries = [...live.byUserId.values()].map((item) => ({
-        id: item.lineupId,
-        user_id: item.userId,
-        round_id: live.roundId,
-        total_points: item.totalPoints,
-        current_budget: 0,
-        rounds_played: 1,
-        is_live: true,
-      }));
-    } else if (fantasyRoundId) {
+    let persistedLineups: any[] = [];
+    if (fantasyRoundId) {
       const { data } = await account.client
         .from("fantasy_lineups")
         .select("id, user_id, total_points, budget_after, budget_before, status")
         .eq("fantasy_round_id", fantasyRoundId)
-        .in("status", ["locked", "scored"]);
-      entries = (data || []).map((item: any) => ({
+        .neq("status", "missed");
+      persistedLineups = data || [];
+    }
+
+    const isTargetLive = Boolean(live && (!roundId || roundId === live.roundId));
+    if (isTargetLive) {
+      // A projeção calcula os pontos lance a lance. Os registros persistidos
+      // são um fallback para não deixar a tabela vazia caso uma escalação
+      // antiga esteja sem filhos, ou uma leitura chegue antes do realtime.
+      const byUserId = new Map<string, any>();
+      for (const lineup of persistedLineups) {
+        const projection = live!.byUserId.get(lineup.user_id);
+        byUserId.set(lineup.user_id, {
+          ...lineup,
+          round_id: live!.roundId,
+          total_points: projection?.totalPoints ?? Number(lineup.total_points || 0),
+          current_budget: lineup.budget_after ?? lineup.budget_before ?? 0,
+          rounds_played: 1,
+          is_live: true,
+        });
+      }
+      for (const projection of live!.byUserId.values()) {
+        if (!byUserId.has(projection.userId)) {
+          byUserId.set(projection.userId, {
+            id: projection.lineupId,
+            user_id: projection.userId,
+            round_id: live!.roundId,
+            total_points: projection.totalPoints,
+            current_budget: 0,
+            rounds_played: 1,
+            is_live: true,
+          });
+        }
+      }
+      entries = [...byUserId.values()];
+    } else {
+      entries = persistedLineups.map((item: any) => ({
         ...item,
         round_id: resolvedRoundId,
         current_budget: item.budget_after ?? item.budget_before,

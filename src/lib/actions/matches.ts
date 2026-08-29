@@ -423,6 +423,9 @@ export async function registerGoal(input: RegisterGoalInput) {
     if (result?.round_id) {
       revalidatePath(`/rodadas/${result.round_id}`);
     }
+    // A prévia do Cartola usa estes eventos diretamente. Invalidar a rota
+    // garante que a atualização manual e o realtime recebam o novo gol.
+    revalidatePath("/cartola");
 
     return {
       success: true,
@@ -582,6 +585,7 @@ export async function deleteEvent(eventId: string, matchId: string, teamId?: str
     if (result?.round_id) {
       revalidatePath(`/rodadas/${result.round_id}`);
     }
+    revalidatePath("/cartola");
 
     return {
       success: true,
@@ -682,6 +686,7 @@ export async function finishMatch(matchId: string) {
     revalidatePath(`/partidas/${matchId}`);
     revalidatePath(`/rodadas/${match.round_id}`);
     revalidatePath("/ranking");
+    revalidatePath("/cartola");
 
     const { error: participantsFinishError } = await client
       .from("match_players")

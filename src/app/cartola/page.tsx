@@ -3,6 +3,10 @@ import { ClipboardList, LogIn, Trophy } from "@/components/icons";
 import { FantasyExperience } from "@/components/fantasy/FantasyExperience";
 import { getFantasyDashboard } from "@/lib/actions/fantasy";
 
+// Pontuação ao vivo não pode reutilizar uma resposta de navegação anterior.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function CartolaPage({ searchParams }: PageProps<"/cartola">) {
   const { pack } = await searchParams;
   const data = await getFantasyDashboard();
