@@ -1230,7 +1230,11 @@ export async function getFantasyDashboard() {
   const projectedLineups = fantasyRound?.market_status === "in_progress"
     ? projectFantasyLiveLineups(
         projectionLineups
-          .filter((item: any) => item.status !== "missed")
+          // Bancos que fecharam uma escalação de 6 atletas com a função antiga
+          // podem ter gravado `missed` por engano. A existência dos jogadores
+          // salvos é a fonte segura para a prévia; escalações realmente vazias
+          // continuam fora da projeção.
+          .filter((item: any) => (item.fantasy_lineup_players || []).length > 0)
           .map((item: any) => ({
             id: item.id,
             userId: item.user_id,
@@ -1462,8 +1466,15 @@ export async function getRevealedLineups(roundId?: string) {
     };
   }
 
-  // Buscar todas as escalações com jogadores travados e snapshots
-  const { data: rawLineups } = await account.client
+  // Depois do fechamento a revelação é coletiva. O cliente de serviço evita
+  // que uma política de RLS reduza silenciosamente a consulta à escalação do
+  // usuário atual.
+  const revealedReadClient = createServiceClient() || account.client;
+
+  // Buscar todas as escalações com jogadores travados e snapshots. Também
+  // aceitamos o estado legado `missed` quando há atletas salvos: a função de
+  // fechamento antiga considerava apenas times de 5 e marcou times de 6 assim.
+  const { data: rawLineupRows } = await revealedReadClient
     .from("fantasy_lineups")
     .select(
       `
@@ -1475,12 +1486,15 @@ export async function getRevealedLineups(roundId?: string) {
       )
     `
     )
-    .eq("fantasy_round_id", targetFantasyRound.id)
-    .in("status", ["locked", "scored"]);
+    .eq("fantasy_round_id", targetFantasyRound.id);
+
+  const rawLineups = (rawLineupRows || []).filter(
+    (lineup: any) => (lineup.fantasy_lineup_players || []).length > 0,
+  );
 
   const userIds = (rawLineups || []).map((l: any) => l.user_id);
   const { data: profiles } = userIds.length
-    ? await account.client
+    ? await revealedReadClient
         .from("account_profiles")
         .select("user_id, players(name, avatar_url)")
         .in("user_id", userIds)
@@ -1493,13 +1507,13 @@ export async function getRevealedLineups(roundId?: string) {
     [l.top_scorer_player_id, l.top_assist_player_id, l.challenge_player_id].filter(Boolean)
   );
   const { data: predictedPlayers } = allPredictIds.length
-    ? await account.client.from("players").select("id, name, avatar_url").in("id", allPredictIds)
+    ? await revealedReadClient.from("players").select("id, name, avatar_url").in("id", allPredictIds)
     : { data: [] as any[] };
 
   const predictedMap = new Map((predictedPlayers || []).map((p: any) => [p.id, p]));
 
   const { data: activations } = userIds.length
-    ? await account.client
+    ? await revealedReadClient
         .from("fantasy_card_activations")
         .select("user_id, status, result_bonus, result_details, cards(name, slug, rarity)")
         .eq("round_id", targetFantasyRound.round.id)
@@ -1837,8 +1851,7 @@ async function getLiveRoundProjections(client: any, fantasySeasonId: string, lea
     liveReadClient
       .from("fantasy_lineups")
       .select("id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked)")
-      .eq("fantasy_round_id", activeRound.id)
-      .neq("status", "missed"),
+      .eq("fantasy_round_id", activeRound.id),
     liveReadClient.from("players").select("id, player_profile, member_category, is_selectable"),
   ]);
   const settings: FantasySettings = {
@@ -1924,6 +1937,10 @@ export async function getFantasyRanking(
     .maybeSingle();
   if (!fs) return [];
 
+  // A classificação é coletiva. Em produção, as políticas de RLS podem
+  // esconder escalações de terceiros do cliente comum, então a leitura
+  // agregada precisa acontecer no servidor.
+  const rankingReadClient = createServiceClient() || account.client;
   const live = await getLiveRoundProjections(account.client, fs.id, league.id);
 
   let entries: any[] = [];
@@ -1931,7 +1948,7 @@ export async function getFantasyRanking(
     let fantasyRoundId: string | null = null;
     let resolvedRoundId: string | null = roundId || null;
     if (roundId) {
-      const { data } = await account.client
+      const { data } = await rankingReadClient
         .from("fantasy_rounds")
         .select("id")
         .eq("fantasy_season_id", fs.id)
@@ -1939,7 +1956,7 @@ export async function getFantasyRanking(
         .maybeSingle();
       fantasyRoundId = data?.id || null;
     } else {
-      const { data } = await account.client
+      const { data } = await rankingReadClient
         .from("fantasy_rounds")
         .select("id, round_id, market_status, round:round_id(date, number, status)")
         .eq("fantasy_season_id", fs.id);
@@ -1958,12 +1975,13 @@ export async function getFantasyRanking(
     }
     let persistedLineups: any[] = [];
     if (fantasyRoundId) {
-      const { data } = await account.client
+      const { data } = await rankingReadClient
         .from("fantasy_lineups")
-        .select("id, user_id, total_points, budget_after, budget_before, status")
-        .eq("fantasy_round_id", fantasyRoundId)
-        .neq("status", "missed");
-      persistedLineups = data || [];
+        .select("id, user_id, total_points, budget_after, budget_before, status, fantasy_lineup_players(player_id)")
+        .eq("fantasy_round_id", fantasyRoundId);
+      persistedLineups = (data || []).filter(
+        (lineup: any) => (lineup.fantasy_lineup_players || []).length > 0,
+      );
     }
 
     const isTargetLive = Boolean(live && (!roundId || roundId === live.roundId));
@@ -2006,7 +2024,7 @@ export async function getFantasyRanking(
       }));
     }
   } else {
-    const { data } = await account.client
+    const { data } = await rankingReadClient
       .from("fantasy_accounts")
       .select("*")
       .eq("fantasy_season_id", fs.id)
@@ -2021,7 +2039,7 @@ export async function getFantasyRanking(
   entries.sort((a: any, b: any) => Number(b.total_points) - Number(a.total_points));
   const userIds = entries.map((item: any) => item.user_id);
   const { data: profiles } = userIds.length
-    ? await account.client
+    ? await rankingReadClient
         .from("account_profiles")
         .select("user_id, players(name, avatar_url)")
         .in("user_id", userIds)
