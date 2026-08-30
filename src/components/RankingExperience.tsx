@@ -425,7 +425,7 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                       {position === 1 ? <Crown className="h-4 w-4" fill="currentColor" /> : <Medal className="h-4 w-4" fill="currentColor" />}
                     </span>
                     {view === "season" && entry.positionChange !== null && (
-                      <span className={`absolute -right-3 top-0 inline-flex min-w-6 items-center justify-center rounded-full border border-background bg-surface px-1 py-0.5 text-[8px] font-black ${entry.positionChange > 0 ? "text-success" : entry.positionChange < 0 ? "text-danger" : "text-muted"}`}>
+                      <span className={`pointer-events-none absolute -right-3 top-0 z-30 inline-flex min-w-6 items-center justify-center rounded-full border border-background bg-surface px-1 py-0.5 text-[8px] font-black ${entry.positionChange > 0 ? "text-success" : entry.positionChange < 0 ? "text-danger" : "text-muted"}`}>
                         {entry.positionChange > 0 ? <ArrowUp className="h-2.5 w-2.5" /> : entry.positionChange < 0 ? <ArrowDown className="h-2.5 w-2.5" /> : "—"}
                         {entry.positionChange !== 0 ? Math.abs(entry.positionChange) : ""}
                       </span>

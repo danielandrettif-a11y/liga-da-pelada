@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { getInitials } from "@/lib/utils";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { X, ZoomIn } from "@/components/icons";
-import { cosmeticAuraClass, cosmeticFrameClass, cosmeticFrameImage } from "@/lib/fantasy/cosmetics";
+import { cosmeticAuraClass, cosmeticAuraVariant, cosmeticFrameClass, cosmeticFrameImage } from "@/lib/fantasy/cosmetics";
 
 type PlayerAvatarProps = {
   name: string;
@@ -60,6 +60,7 @@ export function PlayerAvatar({
         className={`group/avatar relative flex items-center justify-center shrink-0 ${
           isInteractive ? "cursor-pointer active:scale-95 transition-transform" : ""
         } ${className} ${auraEffect ? `${auraEffect} ` : ""}`}
+        style={auraEffect ? { overflow: "visible" } : undefined}
         aria-label={`Foto de ${name}`}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
@@ -71,8 +72,10 @@ export function PlayerAvatar({
           }
         }}
       >
+        <CosmeticAuraOverlay assetKey={auraKey} />
+
         {/* Foto com overflow-hidden para recorte circular */}
-        <div className={`relative h-full w-full overflow-hidden rounded-[inherit] flex items-center justify-center ${frameEffect ? `${frameEffect} ` : ""}`}>
+        <div className={`relative z-10 flex h-full w-full items-center justify-center overflow-hidden rounded-[inherit] ${frameEffect ? `${frameEffect} ` : ""}`}>
           {hasImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -156,7 +159,7 @@ function CosmeticFrameOverlay({ assetKey }: { assetKey?: string | null }) {
     return (
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute -inset-[28%] z-10 bg-contain bg-center bg-no-repeat"
+        className="pointer-events-none absolute -inset-[28%] z-20 bg-contain bg-center bg-no-repeat"
         style={{
           backgroundImage: `url(${image})`,
           filter: "brightness(1.12) contrast(1.18) saturate(1.2) drop-shadow(0 2px 3px rgba(0,0,0,.82)) drop-shadow(0 0 4px rgba(218,181,76,.34))",
@@ -167,7 +170,7 @@ function CosmeticFrameOverlay({ assetKey }: { assetKey?: string | null }) {
   if (key.includes("alambrado") || key.includes("rede")) {
     const stroke = key.includes("rede") ? "rgba(186,230,253,.78)" : "rgba(228,228,231,.68)";
     return (
-      <svg aria-hidden="true" className="pointer-events-none absolute -inset-[8%] z-10 h-[116%] w-[116%] rounded-[inherit]" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <svg aria-hidden="true" className="pointer-events-none absolute -inset-[8%] z-20 h-[116%] w-[116%] rounded-[inherit]" viewBox="0 0 100 100" preserveAspectRatio="none">
         <defs><pattern id={`mesh-${key}`} width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M 0 0 L 0 14 M 7 0 L 7 14" stroke={stroke} strokeWidth="1.25" /></pattern></defs>
         <rect x="1.5" y="1.5" width="97" height="97" rx="48" fill="none" stroke={stroke} strokeWidth="3" />
         <rect x="1.5" y="1.5" width="97" height="97" rx="48" fill={`url(#mesh-${key})`} opacity=".24" />
@@ -175,10 +178,21 @@ function CosmeticFrameOverlay({ assetKey }: { assetKey?: string | null }) {
     );
   }
   if (key.includes("capitao") || key.includes("faixa")) {
-    return <span aria-hidden="true" className="pointer-events-none absolute inset-x-[-12%] bottom-[6%] z-10 -rotate-12 border-y border-amber-200/80 bg-gradient-to-r from-amber-950 via-amber-400 to-amber-950 py-[6%] opacity-90 shadow-lg" />;
+    return <span aria-hidden="true" className="pointer-events-none absolute inset-x-[-12%] bottom-[6%] z-20 -rotate-12 border-y border-amber-200/80 bg-gradient-to-r from-amber-950 via-amber-400 to-amber-950 py-[6%] opacity-90 shadow-lg" />;
   }
   if (key.includes("neon")) {
-    return <span aria-hidden="true" className="pointer-events-none absolute -inset-[6%] z-10 rounded-[inherit] border-2 border-[#dcff65] shadow-[inset_0_0_10px_rgba(204,255,0,.65),0_0_14px_rgba(204,255,0,.85)]" />;
+    return <span aria-hidden="true" className="pointer-events-none absolute -inset-[6%] z-20 rounded-[inherit] border-2 border-[#dcff65] shadow-[inset_0_0_10px_rgba(204,255,0,.65),0_0_14px_rgba(204,255,0,.85)]" />;
   }
   return null;
+}
+
+function CosmeticAuraOverlay({ assetKey }: { assetKey?: string | null }) {
+  const variant = cosmeticAuraVariant(assetKey);
+  if (!variant) return null;
+
+  return (
+    <span aria-hidden="true" className={`cosmetic-aura cosmetic-aura--${variant}`}>
+      <span className="cosmetic-aura__detail" />
+    </span>
+  );
 }

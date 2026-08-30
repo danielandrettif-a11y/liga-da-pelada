@@ -147,17 +147,26 @@ export function cosmeticFrameImage(assetKey?: string | null) {
 }
 
 export function cosmeticAuraClass(assetKey?: string | null): string {
-  if (!assetKey) return "";
+  const variant = cosmeticAuraVariant(assetKey);
+  return variant ? `cosmetic-aura-host cosmetic-aura-host--${variant}` : "";
+}
+
+export type CosmeticAuraVariant = "smoke" | "spotlight" | "rain" | "flare" | "glory" | "energy";
+
+/**
+ * Mantem as chaves ja salvas no banco, mas converte cada uma em um efeito
+ * leve e animado. A arte da aura e feita em CSS para continuar nitida em
+ * avatares pequenos e nao disputar espaco com as molduras ilustradas.
+ */
+export function cosmeticAuraVariant(assetKey?: string | null): CosmeticAuraVariant | null {
+  if (!assetKey) return null;
   const key = assetKey.toLowerCase();
-  if (key.includes("fumaca-torcida")) return "shadow-[0_0_13px_5px_rgba(22,163,74,.72),0_0_38px_rgba(74,222,128,.68)] animate-pulse motion-reduce:animate-none";
-  if (key.includes("chuva-jogo")) return "shadow-[0_0_11px_3px_rgba(125,211,252,.75),0_0_30px_rgba(59,130,246,.58)]";
-  if (key.includes("sinalizador-verde")) return "shadow-[0_0_15px_6px_rgba(74,222,128,.88),0_0_44px_rgba(22,163,74,.75)] animate-pulse motion-reduce:animate-none";
-  if (key.includes("noite-decisao")) return "shadow-[0_0_13px_4px_rgba(251,191,36,.82),0_0_40px_rgba(180,83,9,.68)] animate-pulse motion-reduce:animate-none";
-  if (key.includes("refletores-acesos")) return "shadow-[0_0_11px_3px_rgba(255,255,255,.82),0_0_34px_rgba(163,230,53,.62)]";
-  if (key.includes("fumaca")) return "shadow-[0_0_12px_4px_rgba(16,185,129,.72),0_0_34px_rgba(16,185,129,.72)] animate-pulse motion-reduce:animate-none";
-  if (key.includes("flash") || key.includes("refletor")) return "shadow-[0_0_10px_3px_rgba(255,255,255,.72),0_0_32px_rgba(255,255,255,.72)]";
-  if (key.includes("luz-de-quadra")) return "shadow-[0_0_9px_3px_rgba(253,224,71,.7),0_0_28px_rgba(250,204,21,.62)] animate-pulse motion-reduce:animate-none";
-  return "shadow-[0_0_20px_rgba(204,255,0,0.6)]";
+  if (key.includes("fumaca-torcida") || key.includes("fumaca-churras") || key.includes("fumaca")) return "smoke";
+  if (key.includes("refletores-acesos") || key.includes("holofote") || key.includes("flash") || key.includes("refletor")) return "spotlight";
+  if (key.includes("chuva-jogo")) return "rain";
+  if (key.includes("sinalizador-verde")) return "flare";
+  if (key.includes("noite-decisao") || key.includes("gloria-decisao") || key.includes("luz-de-quadra")) return "glory";
+  return "energy";
 }
 
 export function cosmeticNameplateClass(assetKey?: string | null): string {
