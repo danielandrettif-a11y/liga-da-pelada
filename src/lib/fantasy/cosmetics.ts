@@ -63,12 +63,14 @@ export function cosmeticImage(assetKey?: string | null) {
   // Títulos usam uma prévia tipográfica própria. Nunca reaproveitar fotos
   // genéricas de capas ou fundos apenas porque a chave contém "rei", etc.
   if (key.startsWith("title-")) return null;
-  if (key.includes("alambrado-noturno")) return "/images/cosmetics/backgrounds/alambrado-noturno.webp";
-  if (key.includes("vestiario-concreto")) return "/images/cosmetics/backgrounds/vestiario-concreto.webp";
-  if (key.includes("garoa-refletores")) return "/images/cosmetics/backgrounds/garoa-refletores.webp";
-  if (key.includes("gramado-bairro")) return "/images/cosmetics/backgrounds/gramado-bairro.webp";
-  if (key.includes("arquibancada-vazia")) return "/images/cosmetics/backgrounds/arquibancada-vazia.webp";
-  if (key.includes("por-do-sol-quadra")) return "/images/cosmetics/backgrounds/por-do-sol-quadra.webp";
+  // Os fundos reformulados usam URLs versionadas para invalidar o cache de
+  // imagens do Next/CDN sem alterar os asset_keys já gravados no banco.
+  if (key.includes("alambrado-noturno")) return "/images/cosmetics/backgrounds/manha-campinho-2026.webp";
+  if (key.includes("vestiario-concreto")) return "/images/cosmetics/backgrounds/vestiario-resenha-2026.webp";
+  if (key.includes("garoa-refletores")) return "/images/cosmetics/backgrounds/depois-chuva-2026.webp";
+  if (key.includes("gramado-bairro")) return "/images/cosmetics/backgrounds/domingo-sol-2026.webp";
+  if (key.includes("arquibancada-vazia")) return "/images/cosmetics/backgrounds/torcida-chegando-2026.webp";
+  if (key.includes("por-do-sol-quadra")) return "/images/cosmetics/backgrounds/luzes-pelada-2026.webp";
   if (key.includes("campo-domingo")) return "/images/cosmetics/covers/campo-domingo-v2.webp";
   if (key.includes("arquibancada-concreto")) return "/images/cosmetics/covers/arquibancada-concreto-v2.webp";
   if (key.includes("vestiario-pos-jogo")) return "/images/cosmetics/covers/vestiario-pos-jogo-v2.webp";
