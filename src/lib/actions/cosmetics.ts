@@ -5,19 +5,44 @@ import { cache } from "react";
 import { getCurrentAccount } from "@/lib/auth";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
-import type { CosmeticItem, CosmeticSlot } from "@/lib/fantasy/cosmetics";
+import { isLegacyFrameAsset, type CosmeticItem, type CosmeticSlot } from "@/lib/fantasy/cosmetics";
 
 export type CosmeticPassReward = {
   id: string; house: number; rewardType: "cosmetic_choice" | "card_pack"; cardTier: "bronze" | "gold" | null;
   selectedCosmeticId: string | null; options: CosmeticItem[]; bonusCosmetic: CosmeticItem | null;
 };
+
+export type SeasonPassShopItem = {
+  id: string;
+  pricePoints: number;
+  cosmetic: CosmeticItem;
+  sourceHouse: number;
+};
+
+export type SeasonPassShop = {
+  totalProgressPoints: number;
+  bonusPoints: number;
+  extraPointsEarned: number;
+  spentPoints: number;
+  balancePoints: number;
+  isUnlocked: boolean;
+  hasStarted: boolean;
+  purchasedItems: number;
+  items: SeasonPassShopItem[];
+};
+
 export type CosmeticsDashboard = {
   available: boolean; seasonId: string | null; cosmetics: CosmeticItem[]; rewards: CosmeticPassReward[];
   previewCatalog: CosmeticItem[];
   equipped: Partial<Record<CosmeticSlot, string | null>>; canPreviewAll: boolean;
+  shop: SeasonPassShop;
 };
 
-const empty: CosmeticsDashboard = { available: false, seasonId: null, cosmetics: [], previewCatalog: [], rewards: [], equipped: {}, canPreviewAll: false };
+const emptyShop: SeasonPassShop = {
+  totalProgressPoints: 0, bonusPoints: 0, extraPointsEarned: 0, spentPoints: 0, balancePoints: 0,
+  isUnlocked: false, hasStarted: false, purchasedItems: 0, items: [],
+};
+const empty: CosmeticsDashboard = { available: false, seasonId: null, cosmetics: [], previewCatalog: [], rewards: [], equipped: {}, canPreviewAll: false, shop: emptyShop };
 const mapCosmetic = (row: any): CosmeticItem => ({ id: row.id, slug: row.slug, slot: row.slot, rarity: row.rarity, name: row.name, description: row.description, assetKey: row.asset_key });
 
 export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
@@ -29,7 +54,7 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
   const client: any = account.client;
   const { data: fantasySeason } = await client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle();
   if (!fantasySeason) return empty;
-  const [ownedResult, catalogResult, rewardResult, choiceResult, loadoutResult] = await Promise.all([
+  const [ownedResult, catalogResult, rewardResult, choiceResult, loadoutResult, passResult, shopResult] = await Promise.all([
     // Keep the provenance so older/test claims can still be matched to the
     // reward even if the choice row was removed or was created by an older
     // version of the claim function.
@@ -38,8 +63,10 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
     client.from("fantasy_season_pass_rewards").select("id, house, reward_type, card_tier, bonus:bonus_cosmetic_id(*), options:fantasy_season_pass_reward_options(cosmetic:fantasy_cosmetics(*))").eq("fantasy_season_id", fantasySeason.id).order("house"),
     client.from("fantasy_user_cosmetic_reward_choices").select("reward_id, cosmetic_id").eq("user_id", account.user.id),
     client.from("fantasy_user_cosmetic_loadouts").select("*").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).maybeSingle(),
+    client.from("fantasy_season_passes").select("progress, total_progress_points, shop_bonus_points").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).maybeSingle(),
+    client.from("fantasy_season_pass_shop_items").select("id, price_points, purchased_at, source_reward_id, cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).order("listed_at"),
   ]);
-  if (ownedResult.error || rewardResult.error || catalogResult.error) return empty;
+  if (ownedResult.error || rewardResult.error || catalogResult.error || passResult.error || shopResult.error) return empty;
   const choices = new Map((choiceResult.data || []).map((row: any) => [row.reward_id, row.cosmetic_id]));
   const ownedByReward = new Map<string, Set<string>>();
   for (const row of ownedResult.data || []) {
@@ -49,10 +76,28 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
     ownedByReward.set(row.source_reward_id, cosmetics);
   }
   const loadout = loadoutResult.data || {};
+  const rewardHouseById = new Map((rewardResult.data || []).map((row: any) => [row.id, Number(row.house || 0)]));
+  const totalProgressPoints = Number(passResult.data?.total_progress_points || passResult.data?.progress || 0);
+  const bonusPoints = Number(passResult.data?.shop_bonus_points || 0);
+  const extraPointsEarned = Math.max(0, totalProgressPoints - 40) + bonusPoints;
+  const shopRows = shopResult.data || [];
+  const spentPoints = shopRows
+    .filter((row: any) => Boolean(row.purchased_at))
+    .reduce((total: number, row: any) => total + Number(row.price_points || 0), 0);
+  const shopItems = shopRows
+    .filter((row: any) => !row.purchased_at && row.cosmetic)
+    .map((row: any) => ({
+      id: row.id,
+      pricePoints: Number(row.price_points || 0),
+      cosmetic: mapCosmetic(row.cosmetic),
+      sourceHouse: rewardHouseById.get(row.source_reward_id) || 0,
+    }));
   return {
     available: true, seasonId: fantasySeason.id, canPreviewAll: account.isAdmin,
     cosmetics: (ownedResult.data || []).map((row: any) => row.cosmetic).filter(Boolean).map(mapCosmetic),
-    previewCatalog: account.isAdmin ? (catalogResult.data || []).map(mapCosmetic) : [],
+    previewCatalog: account.isAdmin
+      ? (catalogResult.data || []).map(mapCosmetic).filter((item: CosmeticItem) => !isLegacyFrameAsset(item.slot === "frame" ? item.assetKey : null))
+      : [],
     rewards: (rewardResult.data || []).map((row: any) => ({
       id: row.id, house: Number(row.house), rewardType: row.reward_type, cardTier: row.card_tier,
       // The choice table is authoritative. The provenance fallback keeps the
@@ -67,6 +112,17 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
     equipped: {
       banner: loadout.banner_cosmetic_id || null, frame: loadout.frame_cosmetic_id || null, title: loadout.title_cosmetic_id || null,
       aura: loadout.aura_cosmetic_id || null, nameplate: loadout.nameplate_cosmetic_id || null, background: loadout.background_cosmetic_id || null,
+    },
+    shop: {
+      totalProgressPoints,
+      bonusPoints,
+      extraPointsEarned,
+      spentPoints,
+      balancePoints: Math.max(0, extraPointsEarned - spentPoints),
+      isUnlocked: Number(passResult.data?.progress || 0) >= 40,
+      hasStarted: shopRows.length > 0,
+      purchasedItems: shopRows.filter((row: any) => Boolean(row.purchased_at)).length,
+      items: shopItems,
     },
   };
 }
@@ -114,6 +170,18 @@ export async function claimPassCosmetic(rewardId: string, cosmeticId: string) {
   const { error } = await client.rpc("claim_fantasy_pass_cosmetic", { p_reward_id: rewardId, p_cosmetic_id: cosmeticId });
   if (error) return { success: false, error: error.message };
   revalidatePath("/jogadores"); revalidatePath("/meu-perfil");
+  return { success: true };
+}
+
+export async function purchaseSeasonPassShopItem(shopItemId: string) {
+  const account = await getCurrentAccount();
+  if (!account.user) return { success: false, error: "Entre para comprar um item da loja." };
+  if (!shopItemId) return { success: false, error: "Item da loja inválido." };
+  const { error } = await account.client.rpc("purchase_fantasy_pass_shop_item", { p_shop_item_id: shopItemId });
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/jogadores");
+  revalidatePath("/meu-perfil");
+  revalidatePath("/ranking");
   return { success: true };
 }
 

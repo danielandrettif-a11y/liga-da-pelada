@@ -34,20 +34,13 @@ export function SeasonPassRules({ mode }: Props) {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [showTutorial]);
 
-  const athleteRules = [
-    "Entrou em campo: +2 casas.",
-    "Escalação válida com 5 atletas: +1 casa.",
-    "Jogou e escalou: +1 casa extra — total de +4 na semana.",
-    "Não foi à pelada, mas escalou: +3 casas extras — também totaliza +4.",
-    "A cada 5 gols + assistências seus em campo: +1 casa.",
-    "Na 9ª semana ativa (jogou ou escalou): +4 casas.",
+  const rules = [
+    "Toda escalação válida com 5 atletas avança +4 casas para qualquer perfil.",
+    "Participar da pelada não avança casas: o avanço principal é igual para todos pelo Cartola.",
+    "Jogadores oficiais recebem +1 ponto de loja a cada 5 participações em campo.",
+    "WAGs e Torcida recebem +1 ponto de loja a cada 5 escalações válidas no Cartola.",
+    "Após a casa 40, cada nova escalação válida também vira +4 pontos extras para a loja.",
   ];
-  const communityRules = [
-    "Escalação válida em uma rodada Ranked: +4 casas.",
-    "Na 9ª escalação válida: +4 casas extras.",
-    "WAGs e Torcida avançam pelo Cartola, sem precisar entrar em campo.",
-  ];
-  const rules = mode === "community" ? communityRules : athleteRules;
 
   return (
     <>
@@ -96,7 +89,7 @@ export function SeasonPassRules({ mode }: Props) {
                 <Crown className="h-10 w-10 text-[#e0b9ff]" />
                 <p className="mt-4 font-athletic text-[10px] font-black uppercase italic tracking-[0.2em] text-[#d7adff]">Bem-vindo ao Passe BQ</p>
                 <h2 className="mt-1 font-athletic text-3xl font-black uppercase italic text-white">Sua trilha da temporada</h2>
-                <p className="mt-3 text-sm leading-6 text-white/70">Complete 40 casas jogando, escalando ou acompanhando a Pelada pelo Cartola.</p>
+              <p className="mt-3 text-sm leading-6 text-white/70">Complete 40 casas pelo Cartola. A regra é a mesma para atletas, WAGs e Torcida.</p>
               </div>
               <RulesContent mode={mode} rules={rules} />
             </div>
@@ -114,7 +107,7 @@ export function SeasonPassRules({ mode }: Props) {
 function RulesContent({ mode, rules }: { mode: Props["mode"]; rules: string[] }) {
   return (
     <div className="p-5">
-      <p className="text-[10px] font-black uppercase tracking-wider text-accent">{mode === "athlete" ? "Atleta" : "Comunidade"}</p>
+      <p className="text-[10px] font-black uppercase tracking-wider text-accent">Avanço igual para todos</p>
       <ul className="mt-2.5 space-y-2 text-xs leading-5 text-muted">
         {rules.map((rule) => <li key={rule} className="flex gap-2"><span className="mt-1 text-[#d7adff]">◆</span><span>{rule}</span></li>)}
       </ul>

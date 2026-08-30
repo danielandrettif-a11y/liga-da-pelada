@@ -2657,7 +2657,7 @@ export type FantasyLiveProjection = {
 
 export type SeasonPassEvent = {
   id: string;
-  eventType: "participation" | "valid_lineup" | "full_round" | "remote_full_round" | "goals_assists_cycle" | "participation_streak" | "active_week_streak" | "lineup_streak";
+  eventType: "valid_lineup";
   houses: number;
   roundId: string | null;
   roundNumber: number | null;
@@ -2675,6 +2675,7 @@ export type SeasonPassDashboard = {
   activeWeeks: number;
   validLineups: number;
   goalsAssistsRemainder: number;
+  shopBonusPoints: number;
   nextMilestone: number | null;
   playerName: string | null;
   playerAvatarUrl: string | null;
@@ -2686,7 +2687,7 @@ export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
   const account = await getCurrentAccount();
   const empty: SeasonPassDashboard = {
     authenticated: Boolean(account.user), available: false, progress: 0, maxProgress: 40,
-    mode: "athlete", participations: 0, activeWeeks: 0, validLineups: 0, goalsAssistsRemainder: 0,
+    mode: "athlete", participations: 0, activeWeeks: 0, validLineups: 0, goalsAssistsRemainder: 0, shopBonusPoints: 0,
     nextMilestone: 1, playerName: null, playerAvatarUrl: null, events: [],
   };
   if (!account.user || !account.profile?.player_id) return empty;
@@ -2704,7 +2705,7 @@ export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
   const [{ data: pass, error: passError }, { data: rows, error: eventsError }] = await Promise.all([
     account.client
       .from("fantasy_season_passes")
-      .select("progress, progression_mode, participations, active_weeks, valid_lineups, goals_assists_remainder")
+      .select("progress, progression_mode, participations, active_weeks, valid_lineups, goals_assists_remainder, shop_bonus_points")
       .eq("fantasy_season_id", fantasySeason.id)
       .eq("user_id", account.user.id)
       .maybeSingle(),
@@ -2737,6 +2738,7 @@ export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
     activeWeeks: Number(pass?.active_weeks || 0),
     validLineups: Number(pass?.valid_lineups || 0),
     goalsAssistsRemainder: Number(pass?.goals_assists_remainder || 0),
+    shopBonusPoints: Number(pass?.shop_bonus_points || 0),
     nextMilestone: milestones.find((milestone) => milestone > progress) ?? null,
     playerName: player?.name || null,
     playerAvatarUrl: player?.avatar_url || null,

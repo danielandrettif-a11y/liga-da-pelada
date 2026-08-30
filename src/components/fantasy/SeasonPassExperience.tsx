@@ -3,16 +3,10 @@ import type { SeasonPassDashboard } from "@/lib/actions/fantasy";
 import { SeasonPassRules } from "./SeasonPassRules";
 import type { CosmeticsDashboard } from "@/lib/actions/cosmetics";
 import { SeasonPassRewards } from "./SeasonPassRewards";
+import { SeasonPassShop } from "./SeasonPassShop";
 
 const eventLabels = {
-  participation: "Participação em rodada",
   valid_lineup: "Escalação válida",
-  full_round: "Jogou e escalou",
-  remote_full_round: "Escalou sem presença",
-  goals_assists_cycle: "Ciclo de gols e assistências",
-  participation_streak: "9 participações na temporada",
-  active_week_streak: "9 semanas ativas na temporada",
-  lineup_streak: "9 escalações na temporada",
 } as const;
 
 export function SeasonPassExperience({ pass, cosmetics, rewardId }: { pass: SeasonPassDashboard; cosmetics?: CosmeticsDashboard; rewardId?: string }) {
@@ -39,9 +33,10 @@ export function SeasonPassExperience({ pass, cosmetics, rewardId }: { pass: Seas
               </div>
               <span className="shrink-0 rounded-xl border border-[#a65cff]/35 bg-[#a04dff]/15 px-2.5 py-1.5 font-athletic text-sm font-black text-[#e0b9ff]">{progress}/40</span>
             </div>
-            <div className="mt-3 grid grid-cols-4 gap-1.5"><Metric label="Peladas" value={pass.participations} /><Metric label="Semanas" value={pass.activeWeeks} /><Metric label="Escalações" value={pass.validLineups} /><Metric label="G+A" value={`${pass.goalsAssistsRemainder}/5`} /></div>
+            <div className="mt-3 grid grid-cols-4 gap-1.5"><Metric label="Casas" value={`${progress}/40`} /><Metric label="Escalações" value={pass.validLineups} /><Metric label={pass.mode === "athlete" ? "Peladas" : "Cartola"} value={pass.mode === "athlete" ? pass.participations : pass.validLineups} /><Metric label="Bônus loja" value={`${pass.mode === "athlete" ? pass.participations % 5 : pass.validLineups % 5}/5`} /></div>
           </section>
           <SeasonPassRules mode={pass.mode} />
+          {cosmetics ? <SeasonPassShop shop={cosmetics.shop} /> : null}
           <section className="rounded-3xl border border-border bg-surface p-4 text-xs leading-5 text-muted"><p className="font-athletic text-xs font-black uppercase italic tracking-[0.16em] text-accent">Regra justa de semana ativa</p><p className="mt-2">Se você não conseguiu ir, uma escalação válida ainda garante o avanço completo da semana. Só gols e assistências continuam exclusivos de quem entrou em campo.</p></section>
           {pass.events.length > 0 && <section className="rounded-3xl border border-border bg-surface p-4"><p className="font-athletic text-xs font-black uppercase italic tracking-[0.16em] text-accent">Últimos avanços</p><div className="mt-3 divide-y divide-border/70">{pass.events.map((event) => <div key={event.id} className="flex items-center justify-between gap-3 py-3"><div><p className="text-xs font-black text-foreground">{eventLabels[event.eventType]}</p><p className="mt-0.5 text-[10px] text-muted">{event.roundNumber ? `Rodada ${String(event.roundNumber).padStart(2, "0")}` : "Temporada BQ"}</p></div><span className="font-athletic text-lg font-black text-[#d7adff]">+{event.houses}</span></div>)}</div></section>}
         </>

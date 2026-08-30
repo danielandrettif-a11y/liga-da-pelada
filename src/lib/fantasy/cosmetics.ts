@@ -11,6 +11,22 @@ export type CosmeticItem = {
   assetKey: string;
 };
 
+const LEGACY_FRAME_ASSET_KEYS = new Set([
+  "frame-alambrado",
+  "frame-rede",
+  "frame-neon",
+  "frame-capitao",
+  "frame-linha-lateral",
+  "frame-grama-raiz",
+]);
+
+/** Molduras antigas continuam validas para quem ja as conquistou, mas nao
+ * devem aparecer no catalogo do provador administrativo nem ser oferecidas
+ * como novas recompensas do Passe. */
+export function isLegacyFrameAsset(assetKey?: string | null) {
+  return LEGACY_FRAME_ASSET_KEYS.has((assetKey || "").toLowerCase());
+}
+
 export const COSMETIC_SLOT_LABELS: Record<CosmeticSlot, string> = {
   banner: "Capa", frame: "Moldura", title: "Título", aura: "Aura", nameplate: "Nameplate", background: "Fundo",
 };
@@ -114,7 +130,14 @@ export function cosmeticFrameClass(assetKey?: string | null): string {
 }
 
 export function cosmeticFrameImage(assetKey?: string | null) {
-  const key = assetKey || "";
+  const key = (assetKey || "").toLowerCase();
+  const upgradedFrame = ([
+    ["apito-arbitro", "apito-arbitro-v2.webp"],
+    ["vestiario", "vestiario-v2.webp"],
+    ["luvas-goleiro", "luvas-goleiro-v2.webp"],
+    ["area-tecnica", "area-tecnica-v2.webp"],
+  ] as const).find(([name]) => key.includes(name));
+  if (upgradedFrame) return `/images/cosmetics/frames/${upgradedFrame[1]}`;
   const frame = ["prancheta-tecnico", "placar-estadio", "arquibancada", "vestiario", "apito-arbitro", "luvas-goleiro", "colete-treino", "area-tecnica", "escanteio"].find((name) => key.includes(name));
   // Os WebPs antigos destas molduras perderam o alpha e criam um quadrado
   // preto/pixelado ao redor do avatar. Os PNGs sao leves, nitidos e preservam
