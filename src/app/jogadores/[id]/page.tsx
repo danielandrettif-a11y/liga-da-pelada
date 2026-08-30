@@ -141,9 +141,9 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
 
         {/* Card do Perfil com Capa e Visual Otimizados */}
         <div className={`glass-card relative overflow-hidden flex flex-col items-center p-6 text-center shadow-xl ${cardGradient}`}>
-          {/* Uma unica camada cobre todo o card em qualquer tamanho de tela. */}
+          {/* As capas sao artes panoramicas (1600x450) e ocupam somente a faixa superior. */}
           {bannerImage && (
-            <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 z-0 aspect-[32/9] overflow-hidden">
               <Image
                 src={bannerImage}
                 alt=""
@@ -153,7 +153,7 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
                 className="object-cover"
                 style={{ objectPosition: cosmeticBackgroundPosition("banner", cosmetics?.bannerAssetKey) }}
               />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,14,8,.12)_0%,rgba(3,14,8,.34)_42%,rgba(3,14,8,.82)_100%)] sm:bg-[linear-gradient(180deg,rgba(3,14,8,.12)_0%,rgba(3,14,8,.4)_58%,rgba(3,14,8,.76)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,14,8,.08)_0%,rgba(3,14,8,.12)_55%,rgba(3,14,8,.78)_100%)]" />
             </div>
           )}
           {cosmetics?.bannerAssetKey && (
