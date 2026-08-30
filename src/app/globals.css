@@ -654,9 +654,10 @@ textarea {
 }
 
 @keyframes aura-rain-fall {
-  from { background-position: 0 -18px; opacity: 0.35; }
-  50% { opacity: 0.68; }
-  to { background-position: -8px 24px; opacity: 0.35; }
+  0% { opacity: 0; transform: translate3d(4%, -20%, 0); }
+  16% { opacity: 0.78; }
+  72% { opacity: 0.58; }
+  100% { opacity: 0; transform: translate3d(-6%, 28%, 0); }
 }
 
 @keyframes aura-slow-orbit {
@@ -732,23 +733,36 @@ textarea {
 }
 
 .cosmetic-aura--rain::before {
-  inset: 15%;
-  background: repeating-linear-gradient(108deg, transparent 0 8px, rgba(224, 242, 254, 0.78) 9px, rgba(125, 211, 252, 0.4) 10px, transparent 12px 17px);
-  filter: drop-shadow(0 2px 1px rgba(14, 165, 233, 0.45));
-  animation: aura-rain-fall 1.35s linear infinite;
+  inset: 11%;
+  border-radius: 0;
+  background:
+    linear-gradient(166deg, transparent 0 16%, rgba(240,249,255,.84) 20% 68%, transparent 72%) 12% 18% / 2px 14px no-repeat,
+    linear-gradient(166deg, transparent 0 15%, rgba(186,230,253,.74) 20% 66%, transparent 72%) 31% 4% / 2px 10px no-repeat,
+    linear-gradient(166deg, transparent 0 18%, rgba(224,242,254,.78) 22% 67%, transparent 73%) 48% 32% / 2px 16px no-repeat,
+    linear-gradient(166deg, transparent 0 14%, rgba(125,211,252,.7) 20% 64%, transparent 70%) 67% 12% / 2px 11px no-repeat,
+    linear-gradient(166deg, transparent 0 17%, rgba(240,249,255,.8) 22% 68%, transparent 74%) 84% 38% / 2px 15px no-repeat,
+    linear-gradient(166deg, transparent 0 16%, rgba(186,230,253,.66) 21% 64%, transparent 71%) 22% 67% / 2px 9px no-repeat,
+    linear-gradient(166deg, transparent 0 18%, rgba(224,242,254,.74) 23% 66%, transparent 72%) 58% 78% / 2px 13px no-repeat,
+    linear-gradient(166deg, transparent 0 16%, rgba(125,211,252,.62) 21% 64%, transparent 70%) 91% 71% / 2px 10px no-repeat;
+  filter: drop-shadow(0 2px 1px rgba(14, 165, 233, 0.38));
+  animation: aura-rain-fall 1.55s ease-in infinite;
 }
 
 .cosmetic-aura--rain::after {
-  inset: 72% 13% 8%;
-  border-bottom: 3px solid rgba(186, 230, 253, 0.72);
-  box-shadow: 0 5px 10px rgba(56, 189, 248, 0.35);
-  animation: aura-soft-breathe 2.2s ease-in-out infinite;
+  inset: 67% 13% 9%;
+  background:
+    radial-gradient(ellipse at 23% 72%, transparent 0 24%, rgba(186,230,253,.55) 28% 34%, transparent 38%),
+    radial-gradient(ellipse at 73% 48%, transparent 0 25%, rgba(125,211,252,.44) 29% 34%, transparent 39%);
+  animation: aura-droplet-pulse 2.2s ease-in-out infinite;
 }
 
 .cosmetic-aura--rain .cosmetic-aura__detail {
-  inset: 13%;
-  border: 1px solid rgba(186, 230, 253, 0.22);
-  animation: aura-soft-breathe 3.4s ease-in-out infinite reverse;
+  inset: 10%;
+  background:
+    radial-gradient(circle at 18% 42%, rgba(224,242,254,.62) 0 1.1%, transparent 2.4%),
+    radial-gradient(circle at 79% 23%, rgba(186,230,253,.52) 0 1%, transparent 2.2%),
+    radial-gradient(circle at 65% 82%, rgba(125,211,252,.5) 0 1.2%, transparent 2.6%);
+  animation: aura-droplet-pulse 2.4s ease-in-out infinite reverse;
 }
 
 .cosmetic-aura--radar::before {
@@ -856,20 +870,26 @@ textarea {
 }
 
 .cosmetic-aura-inside--rain::before {
-  inset: -25%;
+  inset: -12%;
   border-radius: 0;
-  background: repeating-linear-gradient(108deg, transparent 0 6px, rgba(240, 249, 255, 0.88) 7px, rgba(125, 211, 252, 0.48) 8px, transparent 10px 15px);
-  filter: drop-shadow(0 2px 1px rgba(2, 132, 199, 0.55));
-  animation: aura-rain-fall 1.1s linear infinite;
+  background:
+    linear-gradient(166deg, transparent 0 15%, rgba(240,249,255,.88) 20% 68%, transparent 73%) 14% 8% / 2px 13px no-repeat,
+    linear-gradient(166deg, transparent 0 17%, rgba(186,230,253,.78) 22% 65%, transparent 71%) 38% 36% / 2px 9px no-repeat,
+    linear-gradient(166deg, transparent 0 15%, rgba(224,242,254,.84) 20% 68%, transparent 74%) 62% 3% / 2px 15px no-repeat,
+    linear-gradient(166deg, transparent 0 18%, rgba(125,211,252,.72) 23% 65%, transparent 72%) 84% 47% / 2px 10px no-repeat,
+    linear-gradient(166deg, transparent 0 16%, rgba(240,249,255,.82) 21% 67%, transparent 73%) 27% 78% / 2px 12px no-repeat,
+    linear-gradient(166deg, transparent 0 16%, rgba(186,230,253,.68) 21% 64%, transparent 70%) 72% 84% / 2px 8px no-repeat;
+  filter: drop-shadow(0 2px 1px rgba(2, 132, 199, 0.42));
+  animation: aura-rain-fall 1.4s ease-in infinite;
 }
 
 .cosmetic-aura-inside--rain::after {
   inset: 10%;
   background:
-    radial-gradient(ellipse at 24% 78%, rgba(224, 242, 254, 0.72) 0 2%, transparent 5%),
-    radial-gradient(ellipse at 72% 60%, rgba(186, 230, 253, 0.58) 0 1.6%, transparent 4%),
-    radial-gradient(ellipse at 48% 28%, rgba(224, 242, 254, 0.5) 0 1.4%, transparent 4%);
-  animation: aura-droplet-pulse 1.7s ease-in-out infinite;
+    radial-gradient(ellipse at 24% 78%, rgba(224, 242, 254, 0.64) 0 1.6%, transparent 4.5%),
+    radial-gradient(ellipse at 72% 60%, rgba(186, 230, 253, 0.5) 0 1.3%, transparent 3.8%),
+    radial-gradient(ellipse at 48% 28%, rgba(224, 242, 254, 0.44) 0 1.1%, transparent 3.5%);
+  animation: aura-droplet-pulse 2s ease-in-out infinite;
 }
 
 .cosmetic-aura-inside--radar::before {
