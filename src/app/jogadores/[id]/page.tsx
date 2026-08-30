@@ -120,19 +120,28 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
 
         {/* Card do Perfil com Capa e Visual Otimizados */}
         <div className={`glass-card relative overflow-hidden flex flex-col items-center p-6 text-center shadow-xl ${cardGradient}`}>
-          {/* Imagem da Capa com enquadramento perfeito */}
+          {/* No celular, preserva a arte completa e usa a própria capa como preenchimento ambiente. */}
           {bannerImage && (
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
               <Image
                 src={bannerImage}
                 alt=""
                 fill
-                quality={90}
-                sizes="(max-width: 768px) 100vw, 720px"
-                className="object-cover"
+                quality={75}
+                sizes="100vw"
+                className="scale-110 object-cover opacity-55 blur-xl sm:hidden"
                 style={{ objectPosition: cosmeticBackgroundPosition("banner", cosmetics?.bannerAssetKey) }}
               />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,14,8,.12)_0%,rgba(3,14,8,.4)_58%,rgba(3,14,8,.76)_100%)]" />
+              <Image
+                src={bannerImage}
+                alt=""
+                fill
+                quality={90}
+                sizes="(max-width: 768px) 100vw, 720px"
+                className="object-contain sm:object-cover"
+                style={{ objectPosition: cosmeticBackgroundPosition("banner", cosmetics?.bannerAssetKey) }}
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,14,8,.04)_0%,rgba(3,14,8,.18)_38%,rgba(3,14,8,.7)_72%,rgba(3,14,8,.86)_100%)] sm:bg-[linear-gradient(180deg,rgba(3,14,8,.12)_0%,rgba(3,14,8,.4)_58%,rgba(3,14,8,.76)_100%)]" />
             </div>
           )}
           {cosmetics?.bannerAssetKey && (
