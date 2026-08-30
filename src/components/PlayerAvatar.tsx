@@ -45,6 +45,7 @@ export function PlayerAvatar({
   const isInteractive = clickable && hasImage;
   const frameEffect = frameClass || cosmeticFrameClass(frameKey);
   const auraEffect = cosmeticAuraClass(auraKey);
+  const auraVariant = cosmeticAuraVariant(auraKey);
 
   function handleClick(e: React.MouseEvent) {
     if (!isInteractive) return;
@@ -72,20 +73,26 @@ export function PlayerAvatar({
           }
         }}
       >
-        <CosmeticAuraOverlay assetKey={auraKey} />
+        <CosmeticAuraOverlay variant={auraVariant} />
 
         {/* Foto com overflow-hidden para recorte circular */}
-        <div className={`relative z-10 flex h-full w-full items-center justify-center overflow-hidden rounded-[inherit] ${frameEffect ? `${frameEffect} ` : ""}`}>
+        <div className={`player-avatar__photo relative z-10 flex h-full w-full items-center justify-center overflow-hidden rounded-[inherit] ${frameEffect ? `${frameEffect} ` : ""}`}>
           {hasImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={avatarUrl!}
               alt={`Foto de ${name}`}
-              className={`h-full w-full object-cover ${imageClassName}`}
+              className={`player-avatar__image h-full w-full object-cover ${imageClassName}`}
               onError={() => setImageFailed(true)}
             />
           ) : (
             <span aria-hidden="true">{getInitials(name)}</span>
+          )}
+
+          {auraVariant && (
+            <span aria-hidden="true" className={`cosmetic-aura-inside cosmetic-aura-inside--${auraVariant}`}>
+              <span className="cosmetic-aura-inside__detail" />
+            </span>
           )}
 
           {isInteractive && (
@@ -186,8 +193,7 @@ function CosmeticFrameOverlay({ assetKey }: { assetKey?: string | null }) {
   return null;
 }
 
-function CosmeticAuraOverlay({ assetKey }: { assetKey?: string | null }) {
-  const variant = cosmeticAuraVariant(assetKey);
+function CosmeticAuraOverlay({ variant }: { variant: ReturnType<typeof cosmeticAuraVariant> }) {
   if (!variant) return null;
 
   return (

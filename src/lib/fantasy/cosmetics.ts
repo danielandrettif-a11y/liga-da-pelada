@@ -151,7 +151,7 @@ export function cosmeticAuraClass(assetKey?: string | null): string {
   return variant ? `cosmetic-aura-host cosmetic-aura-host--${variant}` : "";
 }
 
-export type CosmeticAuraVariant = "smoke" | "spotlight" | "rain" | "flare" | "glory" | "energy";
+export type CosmeticAuraVariant = "smoke" | "spotlight" | "rain" | "radar" | "glory" | "energy";
 
 /**
  * Mantem as chaves ja salvas no banco, mas converte cada uma em um efeito
@@ -164,7 +164,7 @@ export function cosmeticAuraVariant(assetKey?: string | null): CosmeticAuraVaria
   if (key.includes("fumaca-torcida") || key.includes("fumaca-churras") || key.includes("fumaca")) return "smoke";
   if (key.includes("refletores-acesos") || key.includes("holofote") || key.includes("flash") || key.includes("refletor")) return "spotlight";
   if (key.includes("chuva-jogo")) return "rain";
-  if (key.includes("sinalizador-verde")) return "flare";
+  if (key.includes("sinalizador-verde") || key.includes("radar-olheiro")) return "radar";
   if (key.includes("noite-decisao") || key.includes("gloria-decisao") || key.includes("luz-de-quadra")) return "glory";
   return "energy";
 }
