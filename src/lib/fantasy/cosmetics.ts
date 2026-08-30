@@ -66,14 +66,14 @@ export function cosmeticImage(assetKey?: string | null) {
   if (key.includes("gramado-bairro")) return "/images/cosmetics/backgrounds/gramado-bairro.webp";
   if (key.includes("arquibancada-vazia")) return "/images/cosmetics/backgrounds/arquibancada-vazia.webp";
   if (key.includes("por-do-sol-quadra")) return "/images/cosmetics/backgrounds/por-do-sol-quadra.webp";
-  if (key.includes("campo-domingo")) return "/images/cosmetics/covers/campo-domingo.webp";
-  if (key.includes("arquibancada-concreto")) return "/images/cosmetics/covers/arquibancada-concreto.webp";
-  if (key.includes("vestiario-pos-jogo")) return "/images/cosmetics/covers/vestiario-pos-jogo.webp";
-  if (key.includes("tunel-quadra")) return "/images/cosmetics/covers/tunel-quadra.webp";
-  if (key.includes("chuva-campo")) return "/images/cosmetics/covers/chuva-campo.webp";
-  if (key.includes("bar-campo")) return "/images/cosmetics/covers/bar-campo.webp";
-  if (key.includes("banner-lenda-varzea")) return "/images/cosmetics/covers/lenda-varzea.webp";
-  if (key.includes("banner-rei-estadio")) return "/images/cosmetics/covers/rei-estadio.webp";
+  if (key.includes("campo-domingo")) return "/images/cosmetics/covers/campo-domingo-v2.webp";
+  if (key.includes("arquibancada-concreto")) return "/images/cosmetics/covers/arquibancada-concreto-v2.webp";
+  if (key.includes("vestiario-pos-jogo")) return "/images/cosmetics/covers/vestiario-pos-jogo-v2.webp";
+  if (key.includes("tunel-quadra")) return "/images/cosmetics/covers/tunel-quadra-v2.webp";
+  if (key.includes("chuva-campo")) return "/images/cosmetics/covers/chuva-campo-v2.webp";
+  if (key.includes("bar-campo")) return "/images/cosmetics/covers/bar-campo-v2.webp";
+  if (key.includes("banner-lenda-varzea")) return "/images/cosmetics/covers/lenda-varzea-v2.webp";
+  if (key.includes("banner-rei-estadio")) return "/images/cosmetics/covers/rei-estadio-v2.webp";
   if (key.includes("campo-noite")) return "/images/cosmetics/campo-a-noite.webp";
   if (key.includes("arquibancada")) return "/images/cosmetics/arquibancada-neon.webp";
   if (key.includes("tunel")) return "/images/cosmetics/tunel-estadio.webp";
@@ -93,6 +93,7 @@ export function cosmeticImage(assetKey?: string | null) {
  */
 export function cosmeticHighResolutionImage(assetKey?: string | null) {
   const image = cosmeticImage(assetKey);
+  if (image?.endsWith("-v2.webp")) return image;
   return image?.endsWith(".webp") ? image.replace(/\.webp$/, ".png") : image;
 }
 

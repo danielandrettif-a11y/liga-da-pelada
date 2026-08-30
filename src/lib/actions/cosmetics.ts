@@ -66,7 +66,9 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
     client.from("fantasy_season_passes").select("progress, total_progress_points, shop_bonus_points").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).maybeSingle(),
     client.from("fantasy_season_pass_shop_items").select("id, price_points, purchased_at, source_reward_id, cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).order("listed_at"),
   ]);
-  if (ownedResult.error || rewardResult.error || catalogResult.error || passResult.error || shopResult.error) return empty;
+  // Loja e saldo são complementos. Se uma migration de permissão ainda não
+  // chegou ao banco, a coleção e as recompensas do Passe continuam visíveis.
+  if (ownedResult.error || rewardResult.error || catalogResult.error) return empty;
   const choices = new Map((choiceResult.data || []).map((row: any) => [row.reward_id, row.cosmetic_id]));
   const ownedByReward = new Map<string, Set<string>>();
   for (const row of ownedResult.data || []) {
@@ -77,10 +79,11 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
   }
   const loadout = loadoutResult.data || {};
   const rewardHouseById = new Map((rewardResult.data || []).map((row: any) => [row.id, Number(row.house || 0)]));
-  const totalProgressPoints = Number(passResult.data?.total_progress_points || passResult.data?.progress || 0);
-  const bonusPoints = Number(passResult.data?.shop_bonus_points || 0);
+  const passRow = passResult.error ? null : passResult.data;
+  const totalProgressPoints = Number(passRow?.total_progress_points || passRow?.progress || 0);
+  const bonusPoints = Number(passRow?.shop_bonus_points || 0);
   const extraPointsEarned = Math.max(0, totalProgressPoints - 40) + bonusPoints;
-  const shopRows = shopResult.data || [];
+  const shopRows = shopResult.error ? [] : (shopResult.data || []);
   const spentPoints = shopRows
     .filter((row: any) => Boolean(row.purchased_at))
     .reduce((total: number, row: any) => total + Number(row.price_points || 0), 0);
@@ -119,7 +122,7 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
       extraPointsEarned,
       spentPoints,
       balancePoints: Math.max(0, extraPointsEarned - spentPoints),
-      isUnlocked: Number(passResult.data?.progress || 0) >= 40,
+      isUnlocked: Number(passRow?.progress || 0) >= 40,
       hasStarted: shopRows.length > 0,
       purchasedItems: shopRows.filter((row: any) => Boolean(row.purchased_at)).length,
       items: shopItems,

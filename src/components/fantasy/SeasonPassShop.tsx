@@ -71,7 +71,7 @@ function ShopItem({ item, unlocked, balance, pending, onBuy }: { item: SeasonPas
 
   return <article className={`overflow-hidden rounded-2xl border bg-[#0b1b11] ${rarityClass(item.cosmetic.rarity)}`}>
     <div className={`relative h-20 overflow-hidden bg-gradient-to-br ${cosmeticVisual(item.cosmetic.assetKey)}`}>
-      {image ? <div className="absolute inset-0 opacity-80" style={{ backgroundImage: `linear-gradient(rgba(3,14,8,.22),rgba(3,14,8,.74)),url(${image})`, backgroundSize: "cover", backgroundPosition: "center" }} /> : null}
+      {image ? <div className={`absolute inset-0 ${item.cosmetic.slot === "banner" ? "opacity-100" : "opacity-80"}`} style={{ backgroundImage: `${item.cosmetic.slot === "banner" ? "linear-gradient(rgba(3,14,8,.01),rgba(3,14,8,.2))" : "linear-gradient(rgba(3,14,8,.22),rgba(3,14,8,.74))"},url(${image})`, backgroundSize: "cover", backgroundPosition: "center" }} /> : null}
       <span className="absolute left-2 top-2 rounded-full border border-white/15 bg-black/60 px-2 py-1 text-[7px] font-black uppercase text-white">Casa {item.sourceHouse || "Passe"}</span>
       <span className="absolute right-2 top-2 rounded-full bg-[#a04dff]/85 px-2 py-1 text-[8px] font-black text-white">{item.pricePoints} pts</span>
     </div>

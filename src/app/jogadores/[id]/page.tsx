@@ -113,7 +113,7 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
                 className="object-cover"
                 style={{ objectPosition: cosmeticBackgroundPosition("banner", cosmetics?.bannerAssetKey) }}
               />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,14,8,.3)_0%,rgba(3,14,8,.7)_55%,rgba(3,14,8,.94)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,14,8,.12)_0%,rgba(3,14,8,.4)_58%,rgba(3,14,8,.76)_100%)]" />
             </div>
           )}
           {cosmetics?.bannerAssetKey && (
