@@ -179,7 +179,7 @@ export function PlayerForm({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={loading}
-          className="relative rounded-full group disabled:opacity-50"
+          className={`relative rounded-full group disabled:opacity-50 ${frameKey ? "mb-5" : ""}`}
           aria-label={previewUrl ? "Trocar foto do jogador" : "Adicionar foto do jogador"}
         >
           <PlayerAvatar
@@ -189,7 +189,7 @@ export function PlayerForm({
             auraKey={auraKey}
             className="w-28 h-28 rounded-full bg-surface-hover border-2 border-border text-2xl font-bold text-muted ring-4 ring-background"
           />
-          <span className="absolute bottom-0 right-0 w-9 h-9 rounded-full bg-accent text-background flex items-center justify-center border-4 border-background group-hover:bg-accent-light transition-colors">
+          <span className="absolute bottom-0 right-0 z-20 w-9 h-9 rounded-full bg-accent text-background flex items-center justify-center border-4 border-background group-hover:bg-accent-light transition-colors">
             <Camera className="w-4 h-4" />
           </span>
         </button>

@@ -35,7 +35,7 @@ export function SeasonPassRules({ mode }: Props) {
   }, [showTutorial]);
 
   const rules = [
-    "Toda escalação válida com 5 atletas avança +4 casas para qualquer perfil.",
+    "Toda escalação completa, com a quantidade de atletas configurada na liga, avança +4 casas para qualquer perfil.",
     "Participar da pelada não avança casas: o avanço principal é igual para todos pelo Cartola.",
     "Jogadores oficiais recebem +1 ponto de loja a cada 5 participações em campo.",
     "WAGs e Torcida recebem +1 ponto de loja a cada 5 escalações válidas no Cartola.",

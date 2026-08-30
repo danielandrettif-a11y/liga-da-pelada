@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Lock, Sparkles } from "@/components/icons";
+import { CheckCircle2, ChevronDown, Lock, ShoppingCart, Sparkles } from "@/components/icons";
 import { purchaseSeasonPassShopItem, type SeasonPassShop, type SeasonPassShopItem } from "@/lib/actions/cosmetics";
 import { COSMETIC_SLOT_LABELS, cosmeticFrameImage, cosmeticImage, cosmeticVisual, rarityClass } from "@/lib/fantasy/cosmetics";
 
@@ -26,24 +26,32 @@ export function SeasonPassShop({ shop }: { shop: SeasonPassShop }) {
       : shop.items.length === 0
         ? "Você já resgatou todos os itens que ficaram disponíveis para esta temporada."
         : "Use os pontos conquistados depois da casa 40 para completar sua coleção.";
+  // A action já devolve apenas ofertas ainda não compradas.
+  const availableItems = shop.items;
+  const teaser = !shop.hasStarted
+    ? "A loja aparece aqui quando você escolher seu primeiro prêmio."
+    : !shop.isUnlocked
+      ? `Você já tem ${availableItems.length} ${availableItems.length === 1 ? "item reservado" : "itens reservados"}. Libere na casa 40.`
+      : availableItems.length
+        ? `${availableItems.length} ${availableItems.length === 1 ? "item disponível" : "itens disponíveis"} para completar sua coleção.`
+        : "Sua coleção extra está completa.";
 
-  return <section className="overflow-hidden rounded-3xl border border-[#d7adff]/35 bg-[radial-gradient(circle_at_10%_0%,rgba(164,77,255,.22),transparent_38%),#100b1b]">
-    <header className="flex items-start justify-between gap-3 border-b border-white/10 p-4 sm:p-5">
-      <div className="flex min-w-0 gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#d7adff]/40 bg-[#a04dff]/15 text-[#e4c3ff]"><Sparkles className="h-5 w-5" /></span>
-        <div>
-          <p className="font-athletic text-[10px] font-black uppercase italic tracking-[.16em] text-[#d7adff]">Trilha extra</p>
-          <h2 className="mt-0.5 text-base font-black text-white">Loja do Passe</h2>
-          <p className="mt-1 text-[11px] leading-4 text-muted">{status}</p>
-        </div>
-      </div>
-      <div className="shrink-0 rounded-2xl border border-[#d7adff]/35 bg-black/25 px-3 py-2 text-right">
-        <span className="block font-athletic text-lg font-black text-[#e4c3ff]">{shop.balancePoints}</span>
-        <span className="block text-[8px] font-black uppercase tracking-wide text-[#d7adff]">pts livres</span>
-      </div>
-    </header>
+  return <details className="group overflow-hidden rounded-3xl border border-[#d7adff]/45 bg-[radial-gradient(circle_at_7%_0%,rgba(164,77,255,.3),transparent_48%),linear-gradient(135deg,#160d25,#100b1b)] shadow-[0_0_24px_rgba(164,77,255,.16)] open:shadow-[0_0_28px_rgba(164,77,255,.28)]">
+    <summary className="flex cursor-pointer list-none items-center gap-3 p-3.5 outline-none transition-colors hover:bg-white/[.025] sm:p-4 [&::-webkit-details-marker]:hidden">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#d7adff]/55 bg-[#a04dff]/20 text-[#efd9ff] shadow-[0_0_18px_rgba(164,77,255,.22)]"><ShoppingCart className="h-5 w-5" /></span>
+      <span className="min-w-0 flex-1">
+        <span className="font-athletic block text-[9px] font-black uppercase italic tracking-[.16em] text-[#e2bcff]">Trilha extra</span>
+        <span className="mt-0.5 block text-sm font-black text-white">Loja do Passe</span>
+        <span className="mt-0.5 block truncate text-[10px] leading-4 text-[#cbb7d8]">{teaser}</span>
+      </span>
+      <span className="flex shrink-0 items-center gap-1.5">
+        <span className="rounded-xl border border-[#d7adff]/45 bg-black/25 px-2 py-1.5 text-center"><span className="block font-athletic text-base font-black leading-none text-[#f0dcff]">{shop.balancePoints}</span><span className="mt-1 block text-[6px] font-black uppercase tracking-wide text-[#d7adff]">pts livres</span></span>
+        <ChevronDown className="h-4 w-4 text-[#e4c3ff] transition-transform duration-200 group-open:rotate-180" />
+      </span>
+    </summary>
 
-    <div className="p-3 sm:p-4">
+    <div className="border-t border-white/10 p-3 sm:p-4">
+      <p className="mb-3 text-[11px] leading-4 text-muted">{status}</p>
       <div className="mb-3 grid grid-cols-3 gap-2">
         <ShopMetric label="Ganhos" value={shop.extraPointsEarned} />
         <ShopMetric label="Ciclo 5/5" value={shop.bonusPoints} />
@@ -57,7 +65,7 @@ export function SeasonPassShop({ shop }: { shop: SeasonPassShop }) {
         <p className="mt-1 text-[11px] leading-4 text-muted">{shop.hasStarted ? "Continue avançando para ganhar saldo quando surgirem novos itens." : "Ao escolher um pacote, a opção não escolhida fica guardada aqui para você comprar mais tarde."}</p>
       </div>}
     </div>
-  </section>;
+  </details>;
 }
 
 function ShopMetric({ label, value }: { label: string; value: number }) {

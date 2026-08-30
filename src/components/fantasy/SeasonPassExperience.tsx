@@ -29,7 +29,7 @@ export function SeasonPassExperience({ pass, cosmetics, rewardId }: { pass: Seas
             <div className="flex items-start justify-between gap-3 px-1">
               <div>
                 <p className="font-athletic text-[10px] font-black uppercase italic tracking-[0.18em] text-[#d7adff]">Resumo da temporada</p>
-                <p className="mt-1 text-xs leading-5 text-muted">{pass.mode === "community" ? "Escale nas rodadas Ranked para avançar." : "Jogue, escale e some G+A para avançar."}</p>
+                <p className="mt-1 text-xs leading-5 text-muted">Faça uma escalação válida no Cartola para avançar +4 casas.</p>
               </div>
               <span className="shrink-0 rounded-xl border border-[#a65cff]/35 bg-[#a04dff]/15 px-2.5 py-1.5 font-athletic text-sm font-black text-[#e0b9ff]">{progress}/40</span>
             </div>

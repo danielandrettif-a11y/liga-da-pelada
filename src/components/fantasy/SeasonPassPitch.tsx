@@ -541,8 +541,8 @@ export function SeasonPassPitch({
             {isCompleted(selectedStage)
               ? "Você já passou por esta etapa da jornada. Continue jogando para alcançar as próximas casas premiadas!"
               : isCurrent(selectedStage)
-              ? "Você está exatamente nesta casa! Escale seu time ou entre em campo na próxima rodada para avançar."
-              : "Continue jogando peladas e participando do Cartola para avançar até esta casa."}
+              ? "Você está exatamente nesta casa! Faça uma escalação válida na próxima rodada para avançar."
+              : "Continue escalando no Cartola para avançar até esta casa."}
           </p>
         )}
       </div>
