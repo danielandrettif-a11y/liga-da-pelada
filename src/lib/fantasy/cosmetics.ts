@@ -33,12 +33,12 @@ export const COSMETIC_SLOT_LABELS: Record<CosmeticSlot, string> = {
 
 export function cosmeticVisual(assetKey?: string | null) {
   const key = assetKey || "";
-  if (key.includes("alambrado-noturno")) return "from-[#020806] via-[#0a2516] to-[#486e38]";
-  if (key.includes("vestiario-concreto")) return "from-[#151714] via-[#403e36] to-[#8f856c]";
-  if (key.includes("garoa-refletores")) return "from-[#06121a] via-[#17465a] to-[#7ca7b4]";
-  if (key.includes("gramado-bairro")) return "from-[#07160a] via-[#246337] to-[#90b94e]";
-  if (key.includes("arquibancada-vazia")) return "from-[#07120c] via-[#214631] to-[#6f8f4c]";
-  if (key.includes("por-do-sol-quadra")) return "from-[#2d170d] via-[#9e4d23] to-[#e7ae4c]";
+  if (key.includes("alambrado-noturno")) return "from-[#9fe6ef] via-[#75bf72] to-[#d8f071]";
+  if (key.includes("vestiario-concreto")) return "from-[#f5dd9d] via-[#9ed39f] to-[#57a98a]";
+  if (key.includes("garoa-refletores")) return "from-[#88dce7] via-[#48b9a5] to-[#bfe56f]";
+  if (key.includes("gramado-bairro")) return "from-[#65c8ed] via-[#67b94c] to-[#e9e55e]";
+  if (key.includes("arquibancada-vazia")) return "from-[#55d1c0] via-[#a2db63] to-[#f4d760]";
+  if (key.includes("por-do-sol-quadra")) return "from-[#f1a36f] via-[#655fb4] to-[#32bea8]";
   if (key.includes("lenda")) return "from-[#4b3108] via-[#b98a20] to-[#e7c85f]";
   if (key.includes("rei")) return "from-[#031b18] via-[#0b6a51] to-[#bcff00]";
   if (key.includes("chuva")) return "from-[#071520] via-[#1d4151] to-[#6fa2ba]";
@@ -103,9 +103,7 @@ export function cosmeticHighResolutionImage(assetKey?: string | null) {
 export function cosmeticBackgroundPosition(slot?: CosmeticSlot | null, assetKey?: string | null): string {
   const key = (assetKey || "").toLowerCase();
   if (slot === "background" || key.includes("background")) {
-    if (key.includes("vestiario")) return "center 30%";
-    if (key.includes("por-do-sol")) return "center 15%";
-    return "center top";
+    return "center center";
   }
   if (slot === "banner" || key.includes("covers") || key.includes("banner")) {
     if (key.includes("bar-campo")) return "center 35%";

@@ -169,7 +169,7 @@ export function PlayerForm({
       <div
         className={`relative -mx-5 -mt-5 mb-2 overflow-hidden border-b border-border px-5 pt-6 ${cosmeticVisual(bannerAssetKey || backgroundAssetKey)}`}
         style={(cosmeticImage(bannerAssetKey) || cosmeticImage(backgroundAssetKey)) ? {
-          backgroundImage: `${bannerAssetKey ? "linear-gradient(rgba(2, 14, 8, .24), rgba(2, 14, 8, .56))" : "linear-gradient(rgba(2, 14, 8, .68), rgba(2, 14, 8, .86))"}, url(${cosmeticImage(bannerAssetKey) || cosmeticImage(backgroundAssetKey)})`,
+          backgroundImage: `${bannerAssetKey ? "linear-gradient(rgba(2, 14, 8, .24), rgba(2, 14, 8, .56))" : "linear-gradient(rgba(2, 14, 8, .18), rgba(2, 14, 8, .48))"}, url(${cosmeticImage(bannerAssetKey) || cosmeticImage(backgroundAssetKey)})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         } : undefined}

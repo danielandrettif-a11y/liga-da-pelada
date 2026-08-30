@@ -86,7 +86,7 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
             className="object-cover"
             style={{ objectPosition: cosmeticBackgroundPosition("background", cosmetics?.backgroundAssetKey) }}
           />
-          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(2,14,8,.48)_0%,rgba(2,14,8,.78)_45%,rgba(2,14,8,.96)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(2,14,8,.16)_0%,rgba(2,14,8,.48)_45%,rgba(2,14,8,.9)_100%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,transparent_0%,rgba(2,14,8,.22)_48%,rgba(2,14,8,.65)_100%)]" />
         </div>
       )}
