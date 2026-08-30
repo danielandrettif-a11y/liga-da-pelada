@@ -6,6 +6,7 @@ import { CheckCircle2, ChevronDown, Lock, ShoppingCart, Sparkles } from "@/compo
 import { purchaseSeasonPassShopItem, type SeasonPassShop, type SeasonPassShopItem } from "@/lib/actions/cosmetics";
 import { COSMETIC_SLOT_LABELS, cosmeticFrameImage, cosmeticImage, cosmeticVisual, rarityClass } from "@/lib/fantasy/cosmetics";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { CosmeticTitlePreview } from "@/components/fantasy/CosmeticTitlePreview";
 
 export function SeasonPassShop({ shop }: { shop: SeasonPassShop }) {
   const router = useRouter();
@@ -76,12 +77,14 @@ function ShopMetric({ label, value }: { label: string; value: number }) {
 function ShopItem({ item, unlocked, balance, pending, onBuy }: { item: SeasonPassShopItem; unlocked: boolean; balance: number; pending: boolean; onBuy: () => void }) {
   const image = cosmeticImage(item.cosmetic.assetKey) || cosmeticFrameImage(item.cosmetic.assetKey);
   const avatarCosmetic = item.cosmetic.slot === "frame" || item.cosmetic.slot === "aura";
+  const isTitle = item.cosmetic.slot === "title";
   const affordable = balance >= item.pricePoints;
   const disabled = !unlocked || !affordable || pending;
 
   return <article className={`overflow-hidden rounded-2xl border bg-[#0b1b11] ${rarityClass(item.cosmetic.rarity)}`}>
     <div className={`relative h-20 overflow-hidden bg-gradient-to-br ${cosmeticVisual(item.cosmetic.assetKey)}`}>
       {image ? <div className={`absolute inset-0 ${item.cosmetic.slot === "banner" ? "opacity-100" : "opacity-80"}`} style={{ backgroundImage: `${item.cosmetic.slot === "banner" ? "linear-gradient(rgba(3,14,8,.01),rgba(3,14,8,.2))" : "linear-gradient(rgba(3,14,8,.22),rgba(3,14,8,.74))"},url(${image})`, backgroundSize: "cover", backgroundPosition: "center" }} /> : null}
+      {isTitle ? <CosmeticTitlePreview item={item.cosmetic} compact className="absolute inset-0" /> : null}
       {avatarCosmetic ? <div className="absolute inset-0 flex items-center justify-center"><PlayerAvatar name="BQ" clickable={false} frameKey={item.cosmetic.slot === "frame" ? item.cosmetic.assetKey : null} auraKey={item.cosmetic.slot === "aura" ? item.cosmetic.assetKey : null} className="h-12 w-12 rounded-full bg-[#102819] text-[8px] font-black text-white" /></div> : null}
       <span className="absolute left-2 top-2 rounded-full border border-white/15 bg-black/60 px-2 py-1 text-[7px] font-black uppercase text-white">Casa {item.sourceHouse || "Passe"}</span>
       <span className="absolute right-2 top-2 rounded-full bg-[#a04dff]/85 px-2 py-1 text-[8px] font-black text-white">{item.pricePoints} pts</span>

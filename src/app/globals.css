@@ -567,6 +567,149 @@ textarea {
 }
 
 /* ============================================
+   Prévia tipográfica dos títulos
+   ============================================ */
+
+@keyframes title-preview-shine {
+  0%, 62% { opacity: 0; transform: translateX(-170%) skewX(-18deg); }
+  75% { opacity: 0.5; }
+  100% { opacity: 0; transform: translateX(220%) skewX(-18deg); }
+}
+
+.cosmetic-title-preview {
+  --title-accent: #ccff00;
+  --title-soft: rgba(204, 255, 0, 0.2);
+  position: relative;
+  display: flex;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 0.6rem;
+  color: #fff;
+  background:
+    radial-gradient(circle at 50% 18%, var(--title-soft), transparent 38%),
+    linear-gradient(145deg, #041109, #092317 58%, #020805);
+}
+
+.cosmetic-title-preview::before {
+  content: "";
+  position: absolute;
+  inset: -30% auto -30% -28%;
+  z-index: 1;
+  width: 24%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent);
+  opacity: 0;
+  animation: title-preview-shine 5.2s ease-in-out infinite;
+}
+
+.cosmetic-title-preview__pattern {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.42;
+  background:
+    linear-gradient(90deg, transparent 49.5%, var(--title-soft) 50%, transparent 50.5%),
+    linear-gradient(0deg, transparent 49.5%, var(--title-soft) 50%, transparent 50.5%),
+    repeating-radial-gradient(circle at center, transparent 0 18px, var(--title-soft) 19px 20px, transparent 21px 36px);
+  -webkit-mask: linear-gradient(180deg, rgba(0,0,0,.75), transparent 92%);
+  mask: linear-gradient(180deg, rgba(0,0,0,.75), transparent 92%);
+}
+
+.cosmetic-title-preview__content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  filter: drop-shadow(0 3px 5px rgba(0,0,0,.65));
+}
+
+.cosmetic-title-preview__symbol {
+  display: inline-flex;
+  min-width: 2.2rem;
+  height: 2.2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--title-accent) 70%, white);
+  border-radius: 999px;
+  padding-inline: 0.48rem;
+  color: var(--title-accent);
+  background: rgba(1, 9, 5, 0.72);
+  box-shadow: inset 0 0 10px var(--title-soft), 0 0 14px var(--title-soft);
+  font-family: var(--font-athletic);
+  font-size: 1.15rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.cosmetic-title-preview__player {
+  margin-top: 0.35rem;
+  color: rgba(255,255,255,.68);
+  font-size: 0.42rem;
+  font-weight: 900;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+}
+
+.cosmetic-title-preview__name {
+  max-width: 100%;
+  margin-top: 0.12rem;
+  color: #fff;
+  font-family: var(--font-athletic);
+  font-size: clamp(0.68rem, 3vw, 0.92rem);
+  font-style: italic;
+  font-weight: 950;
+  letter-spacing: 0.035em;
+  line-height: 1.03;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.cosmetic-title-preview__kicker {
+  margin-top: 0.22rem;
+  color: var(--title-accent);
+  font-size: 0.4rem;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.cosmetic-title-preview--compact {
+  padding: 0.3rem 2.6rem;
+}
+
+.cosmetic-title-preview--compact .cosmetic-title-preview__symbol {
+  min-width: 1.55rem;
+  height: 1.55rem;
+  font-size: 0.8rem;
+}
+
+.cosmetic-title-preview--compact .cosmetic-title-preview__player,
+.cosmetic-title-preview--compact .cosmetic-title-preview__kicker {
+  display: none;
+}
+
+.cosmetic-title-preview--compact .cosmetic-title-preview__name {
+  margin-top: 0.2rem;
+  font-size: 0.58rem;
+}
+
+.cosmetic-title-preview--gold { --title-accent: #fde047; --title-soft: rgba(250, 204, 21, 0.28); background: radial-gradient(circle at 50% 18%, rgba(253,224,71,.3), transparent 38%), linear-gradient(145deg, #251804, #70520a 58%, #0b0902); }
+.cosmetic-title-preview--green { --title-accent: #ccff00; --title-soft: rgba(163, 230, 53, 0.26); background: radial-gradient(circle at 50% 18%, rgba(204,255,0,.24), transparent 38%), linear-gradient(145deg, #031109, #155e34 58%, #020805); }
+.cosmetic-title-preview--blue { --title-accent: #7dd3fc; --title-soft: rgba(56, 189, 248, 0.25); background: radial-gradient(circle at 50% 18%, rgba(125,211,252,.25), transparent 38%), linear-gradient(145deg, #03111a, #164e63 58%, #02070b); }
+.cosmetic-title-preview--purple { --title-accent: #d8b4fe; --title-soft: rgba(168, 85, 247, 0.25); background: radial-gradient(circle at 50% 18%, rgba(216,180,254,.25), transparent 38%), linear-gradient(145deg, #150722, #581c87 58%, #08030d); }
+.cosmetic-title-preview--orange { --title-accent: #fdba74; --title-soft: rgba(249, 115, 22, 0.26); background: radial-gradient(circle at 50% 18%, rgba(253,186,116,.25), transparent 38%), linear-gradient(145deg, #200c03, #7c2d12 58%, #0b0402); }
+.cosmetic-title-preview--red { --title-accent: #fca5a5; --title-soft: rgba(239, 68, 68, 0.25); background: radial-gradient(circle at 50% 18%, rgba(252,165,165,.24), transparent 38%), linear-gradient(145deg, #200404, #7f1d1d 58%, #0b0202); }
+.cosmetic-title-preview--pink { --title-accent: #f9a8d4; --title-soft: rgba(236, 72, 153, 0.25); background: radial-gradient(circle at 50% 18%, rgba(249,168,212,.25), transparent 38%), linear-gradient(145deg, #210516, #831843 58%, #0b0207); }
+.cosmetic-title-preview--silver { --title-accent: #e2e8f0; --title-soft: rgba(148, 163, 184, 0.25); background: radial-gradient(circle at 50% 18%, rgba(226,232,240,.22), transparent 38%), linear-gradient(145deg, #0f1720, #334155 58%, #05080c); }
+
+/* ============================================
    Auras cosméticas — leves, móveis e compatíveis com molduras
    ============================================ */
 
@@ -941,6 +1084,7 @@ textarea {
 
 @media (prefers-reduced-motion: reduce) {
   .cosmetic-card-shimmer::after,
+  .cosmetic-title-preview::before,
   .cosmetic-aura::before,
   .cosmetic-aura::after,
   .cosmetic-aura__detail,

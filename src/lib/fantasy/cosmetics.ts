@@ -60,6 +60,9 @@ export function cosmeticVisual(assetKey?: string | null) {
 
 export function cosmeticImage(assetKey?: string | null) {
   const key = assetKey || "";
+  // Títulos usam uma prévia tipográfica própria. Nunca reaproveitar fotos
+  // genéricas de capas ou fundos apenas porque a chave contém "rei", etc.
+  if (key.startsWith("title-")) return null;
   if (key.includes("alambrado-noturno")) return "/images/cosmetics/backgrounds/alambrado-noturno.webp";
   if (key.includes("vestiario-concreto")) return "/images/cosmetics/backgrounds/vestiario-concreto.webp";
   if (key.includes("garoa-refletores")) return "/images/cosmetics/backgrounds/garoa-refletores.webp";
