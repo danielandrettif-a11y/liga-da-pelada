@@ -105,7 +105,12 @@ export function cosmeticHighResolutionImage(assetKey?: string | null) {
 /** Arte vertical usada apenas no fundo do perfil em telas de celular. */
 export function cosmeticMobileBackgroundImage(assetKey?: string | null) {
   const key = assetKey || "";
+  if (key.includes("alambrado-noturno")) return "/images/cosmetics/backgrounds/manha-campinho-mobile-2026.webp";
   if (key.includes("vestiario-concreto")) return "/images/cosmetics/backgrounds/vestiario-resenha-mobile-2026.png";
+  if (key.includes("garoa-refletores")) return "/images/cosmetics/backgrounds/depois-chuva-mobile-2026.webp";
+  if (key.includes("gramado-bairro")) return "/images/cosmetics/backgrounds/domingo-sol-mobile-2026.webp";
+  if (key.includes("arquibancada-vazia")) return "/images/cosmetics/backgrounds/torcida-chegando-mobile-2026.webp";
+  if (key.includes("por-do-sol-quadra")) return "/images/cosmetics/backgrounds/luzes-pelada-mobile-2026.webp";
   return null;
 }
 
