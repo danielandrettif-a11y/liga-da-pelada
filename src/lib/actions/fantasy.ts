@@ -2674,7 +2674,7 @@ export type SeasonPassDashboard = {
   participations: number;
   activeWeeks: number;
   validLineups: number;
-  goalsAssistsRemainder: number;
+  shopCycleRemainder: number;
   shopBonusPoints: number;
   nextMilestone: number | null;
   playerName: string | null;
@@ -2687,7 +2687,7 @@ export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
   const account = await getCurrentAccount();
   const empty: SeasonPassDashboard = {
     authenticated: Boolean(account.user), available: false, progress: 0, maxProgress: 40,
-    mode: "athlete", participations: 0, activeWeeks: 0, validLineups: 0, goalsAssistsRemainder: 0, shopBonusPoints: 0,
+    mode: "athlete", participations: 0, activeWeeks: 0, validLineups: 0, shopCycleRemainder: 0, shopBonusPoints: 0,
     nextMilestone: 1, playerName: null, playerAvatarUrl: null, events: [],
   };
   if (!account.user || !account.profile?.player_id) return empty;
@@ -2737,7 +2737,7 @@ export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
     participations: Number(pass?.participations || 0),
     activeWeeks: Number(pass?.active_weeks || 0),
     validLineups: Number(pass?.valid_lineups || 0),
-    goalsAssistsRemainder: Number(pass?.goals_assists_remainder || 0),
+    shopCycleRemainder: Number(pass?.goals_assists_remainder || 0),
     shopBonusPoints: Number(pass?.shop_bonus_points || 0),
     nextMilestone: milestones.find((milestone) => milestone > progress) ?? null,
     playerName: player?.name || null,

@@ -54,7 +54,7 @@ export function SeasonPassShop({ shop }: { shop: SeasonPassShop }) {
       <p className="mb-3 text-[11px] leading-4 text-muted">{status}</p>
       <div className="mb-3 grid grid-cols-3 gap-2">
         <ShopMetric label="Ganhos" value={shop.extraPointsEarned} />
-        <ShopMetric label="Ciclo 5/5" value={shop.bonusPoints} />
+        <ShopMetric label="Bônus ganhos" value={shop.bonusPoints} />
         <ShopMetric label="Usados" value={shop.spentPoints} />
       </div>
 

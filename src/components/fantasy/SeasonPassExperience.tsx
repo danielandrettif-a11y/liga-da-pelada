@@ -11,6 +11,9 @@ const eventLabels = {
 
 export function SeasonPassExperience({ pass, cosmetics, rewardId }: { pass: SeasonPassDashboard; cosmetics?: CosmeticsDashboard; rewardId?: string }) {
   const progress = pass.progress;
+  const shopMetric = pass.mode === "athlete"
+    ? { label: "Bônus loja", value: `${pass.shopCycleRemainder}/5` }
+    : { label: "Pontos loja", value: `+${pass.shopBonusPoints}` };
 
   return (
     <div className="space-y-4">
@@ -33,7 +36,7 @@ export function SeasonPassExperience({ pass, cosmetics, rewardId }: { pass: Seas
               </div>
               <span className="shrink-0 rounded-xl border border-[#a65cff]/35 bg-[#a04dff]/15 px-2.5 py-1.5 font-athletic text-sm font-black text-[#e0b9ff]">{progress}/40</span>
             </div>
-            <div className="mt-3 grid grid-cols-4 gap-1.5"><Metric label="Casas" value={`${progress}/40`} /><Metric label="Escalações" value={pass.validLineups} /><Metric label={pass.mode === "athlete" ? "Peladas" : "Cartola"} value={pass.mode === "athlete" ? pass.participations : pass.validLineups} /><Metric label="Bônus loja" value={`${pass.mode === "athlete" ? pass.participations % 5 : pass.validLineups % 5}/5`} /></div>
+            <div className="mt-3 grid grid-cols-4 gap-1.5"><Metric label="Casas" value={`${progress}/40`} /><Metric label="Escalações" value={pass.validLineups} /><Metric label={pass.mode === "athlete" ? "Participações" : "Cartola"} value={pass.mode === "athlete" ? pass.participations : pass.validLineups} /><Metric label={shopMetric.label} value={shopMetric.value} /></div>
           </section>
           <SeasonPassRules mode={pass.mode} />
           {cosmetics ? <SeasonPassShop shop={cosmetics.shop} /> : null}
