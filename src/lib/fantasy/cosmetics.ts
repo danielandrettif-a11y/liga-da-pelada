@@ -102,6 +102,21 @@ export function cosmeticHighResolutionImage(assetKey?: string | null) {
   return image?.endsWith(".webp") ? image.replace(/\.webp$/, ".png") : image;
 }
 
+/** Arte quadrada criada para preencher o card de perfil sem comprimir ou
+ * recortar as capas panoramicas usadas nas miniaturas e no catalogo. */
+export function cosmeticProfileCoverImage(assetKey?: string | null) {
+  const key = assetKey || "";
+  if (key.includes("campo-domingo")) return "/images/cosmetics/covers/campo-domingo-profile-square-v1.webp";
+  if (key.includes("arquibancada-concreto")) return "/images/cosmetics/covers/arquibancada-concreto-profile-square-v1.webp";
+  if (key.includes("vestiario-pos-jogo")) return "/images/cosmetics/covers/vestiario-pos-jogo-profile-square-v1.webp";
+  if (key.includes("tunel-quadra")) return "/images/cosmetics/covers/tunel-quadra-profile-square-v1.webp";
+  if (key.includes("chuva-campo")) return "/images/cosmetics/covers/chuva-campo-profile-square-v1.webp";
+  if (key.includes("bar-campo")) return "/images/cosmetics/covers/bar-campo-profile-square-v1.webp";
+  if (key.includes("banner-lenda-varzea")) return "/images/cosmetics/covers/lenda-varzea-profile-square-v1.webp";
+  if (key.includes("banner-rei-estadio")) return "/images/cosmetics/covers/rei-estadio-profile-square-v1.webp";
+  return cosmeticHighResolutionImage(assetKey);
+}
+
 /** Arte vertical usada apenas no fundo do perfil em telas de celular. */
 export function cosmeticMobileBackgroundImage(assetKey?: string | null) {
   const key = assetKey || "";

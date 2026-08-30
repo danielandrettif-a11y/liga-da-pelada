@@ -12,7 +12,7 @@ import { TeamCrest } from "@/components/TeamCrest";
 import { FantasyPlayerCard } from "@/components/fantasy/FantasyPlayerCard";
 import { getFantasyPlayerSummary } from "@/lib/actions/fantasy";
 import { getAdminCosmeticsPreview, getPlayerEquippedCosmetics, type CosmeticPreviewLoadout } from "@/lib/actions/cosmetics";
-import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticMobileBackgroundImage, cosmeticNameplateClass, cosmeticVisual } from "@/lib/fantasy/cosmetics";
+import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticMobileBackgroundImage, cosmeticNameplateClass, cosmeticProfileCoverImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
 import { OfficialProfilePreviewNotice } from "@/components/fantasy/OfficialProfilePreviewNotice";
 
 export const revalidate = 0;
@@ -84,7 +84,7 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
   const cardGradient = cosmetics?.bannerAssetKey
     ? `bg-gradient-to-b ${cosmeticVisual(cosmetics.bannerAssetKey)}/30`
     : "";
-  const bannerImage = cosmeticHighResolutionImage(cosmetics?.bannerAssetKey);
+  const bannerImage = cosmeticProfileCoverImage(cosmetics?.bannerAssetKey);
   const profileBackgroundImage = cosmeticHighResolutionImage(cosmetics?.backgroundAssetKey);
   const mobileProfileBackgroundImage = cosmeticMobileBackgroundImage(cosmetics?.backgroundAssetKey);
 
@@ -141,7 +141,7 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
 
         {/* Card do Perfil com Capa e Visual Otimizados */}
         <div className={`glass-card relative overflow-hidden flex flex-col items-center p-6 text-center shadow-xl ${cardGradient}`}>
-          {/* A arte inteira preenche o card sem o recorte lateral provocado por object-cover. */}
+          {/* Cada capa possui uma versao quadrada propria para o card de perfil. */}
           {bannerImage && (
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
               <Image
@@ -150,7 +150,7 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
                 fill
                 quality={90}
                 sizes="(max-width: 768px) 100vw, 720px"
-                className="object-fill"
+                className="object-cover"
                 style={{ objectPosition: cosmeticBackgroundPosition("banner", cosmetics?.bannerAssetKey) }}
               />
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,14,8,.08)_0%,rgba(3,14,8,.24)_48%,rgba(3,14,8,.78)_100%)]" />
