@@ -219,6 +219,51 @@ export type EquippedCosmeticsSummary = {
   backgroundAssetKey: string | null;
 };
 
+export type CosmeticPreviewLoadout = Partial<Record<CosmeticSlot, string | null>>;
+
+/**
+ * Resolve a combinação temporária enviada pelo provador para a página pública
+ * do próprio administrador. Os IDs da URL nunca são aceitos cegamente: cada
+ * item precisa existir no catálogo e pertencer exatamente ao slot solicitado.
+ */
+export async function getAdminCosmeticsPreview(playerId: string, requested: CosmeticPreviewLoadout): Promise<EquippedCosmeticsSummary | null> {
+  const account = await getCurrentAccount();
+  if (!account.isAdmin || !account.profile?.player_id || account.profile.player_id !== playerId) return null;
+
+  const selections = (Object.entries(requested) as Array<[CosmeticSlot, string | null | undefined]>)
+    .filter(([, cosmeticId]) => Boolean(cosmeticId));
+  if (!selections.length) return null;
+
+  const { data, error } = await account.client
+    .from("fantasy_cosmetics")
+    .select("id, slot, asset_key, name")
+    .in("id", selections.map(([, cosmeticId]) => cosmeticId as string));
+  if (error) return null;
+
+  const itemsById = new Map((data || []).map((item: any) => [item.id, item]));
+  const preview: EquippedCosmeticsSummary = {
+    frameKey: null,
+    auraKey: null,
+    titleName: null,
+    bannerAssetKey: null,
+    nameplateKey: null,
+    backgroundAssetKey: null,
+  };
+
+  for (const [slot, cosmeticId] of selections) {
+    const item = itemsById.get(cosmeticId);
+    if (!item || item.slot !== slot) continue;
+    if (slot === "frame") preview.frameKey = item.asset_key;
+    if (slot === "aura") preview.auraKey = item.asset_key;
+    if (slot === "title") preview.titleName = item.name;
+    if (slot === "banner") preview.bannerAssetKey = item.asset_key;
+    if (slot === "nameplate") preview.nameplateKey = item.asset_key;
+    if (slot === "background") preview.backgroundAssetKey = item.asset_key;
+  }
+
+  return preview;
+}
+
 const getMyEquippedCosmeticsCached = cache(async (): Promise<EquippedCosmeticsSummary | null> => {
   const account = await getCurrentAccount();
   if (!account.user) return null;

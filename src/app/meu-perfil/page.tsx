@@ -67,7 +67,7 @@ export default async function MeuPerfilPage() {
         bannerAssetKey={myEquipped?.bannerAssetKey}
         backgroundAssetKey={myEquipped?.backgroundAssetKey}
       />
-      <CosmeticsCollection cosmetics={cosmetics} playerName={player.name} avatarUrl={player.avatar_url} />
+      <CosmeticsCollection cosmetics={cosmetics} playerId={player.id} playerName={player.name} avatarUrl={player.avatar_url} />
       <section className="glass-card p-4">
         <p className="text-[10px] font-black uppercase tracking-wider text-muted">Tempo em quadra</p>
         <p className="mt-1 text-2xl font-black text-accent">{formatDuration(playtime.totalSeconds)}</p>

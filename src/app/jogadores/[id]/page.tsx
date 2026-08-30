@@ -11,8 +11,9 @@ import { ArrowLeft, ChevronRight, Football, Target, TrendingUp, Trophy } from "@
 import { TeamCrest } from "@/components/TeamCrest";
 import { FantasyPlayerCard } from "@/components/fantasy/FantasyPlayerCard";
 import { getFantasyPlayerSummary } from "@/lib/actions/fantasy";
-import { getPlayerEquippedCosmetics } from "@/lib/actions/cosmetics";
+import { getAdminCosmeticsPreview, getPlayerEquippedCosmetics, type CosmeticPreviewLoadout } from "@/lib/actions/cosmetics";
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticNameplateClass, cosmeticVisual } from "@/lib/fantasy/cosmetics";
+import { OfficialProfilePreviewNotice } from "@/components/fantasy/OfficialProfilePreviewNotice";
 
 export const revalidate = 0;
 
@@ -42,9 +43,23 @@ function aggregateGoalkeeperStats(rows: HistoryRow[]) {
   }), { games: 0, cleanSheets: 0, conceded: 0 });
 }
 
-export default async function JogadorPerfilPage({ params }: PageProps<"/jogadores/[id]">) {
+function readPreviewValue(value: string | string[] | undefined) {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+export default async function JogadorPerfilPage({ params, searchParams }: PageProps<"/jogadores/[id]">) {
   const { id } = await params;
-  const [player, officialHistory, friendlyHistory, awardSeasons, fitness, clubGoals, fantasySummary, cosmetics, playtime] = await Promise.all([
+  const query = await searchParams;
+  const isPreviewRequested = readPreviewValue(query.preview) === "admin";
+  const previewLoadout: CosmeticPreviewLoadout = isPreviewRequested ? {
+    banner: readPreviewValue(query.banner),
+    frame: readPreviewValue(query.frame),
+    title: readPreviewValue(query.title),
+    aura: readPreviewValue(query.aura),
+    nameplate: readPreviewValue(query.nameplate),
+    background: readPreviewValue(query.background),
+  } : {};
+  const [player, officialHistory, friendlyHistory, awardSeasons, fitness, clubGoals, fantasySummary, equippedCosmetics, previewCosmetics, playtime] = await Promise.all([
     getPlayer(id),
     getPlayerRoundHistory(id, "official"),
     getPlayerRoundHistory(id, "friendly"),
@@ -53,9 +68,12 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
     getPlayerGoalsByClub(id),
     getFantasyPlayerSummary(id),
     getPlayerEquippedCosmetics(id),
+    isPreviewRequested ? getAdminCosmeticsPreview(id, previewLoadout) : Promise.resolve(null),
     getPlayerPlaytime(id),
   ]);
   if (!player) notFound();
+  const cosmetics = previewCosmetics || equippedCosmetics;
+  const isAdministrativePreview = Boolean(previewCosmetics);
   const isPlayable = player.is_selectable && (player.member_category === "player" || player.member_category === "guest");
   const official = aggregatePlayerStats(officialHistory);
   const friendly = aggregatePlayerStats(friendlyHistory);
@@ -92,6 +110,7 @@ export default async function JogadorPerfilPage({ params }: PageProps<"/jogadore
       )}
 
       <div className="relative z-10 space-y-6">
+        {isAdministrativePreview && <OfficialProfilePreviewNotice playerId={player.id} />}
         <div className="flex items-center gap-3">
           <Link href="/jogadores" className="flex h-10 w-10 items-center justify-center rounded-full bg-surface shadow-sm hover:bg-surface-hover transition-colors">
             <ArrowLeft className="h-5 w-5 text-muted" />
