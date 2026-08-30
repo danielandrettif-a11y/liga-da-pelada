@@ -601,7 +601,8 @@ textarea {
 .cosmetic-aura {
   position: absolute;
   inset: -34%;
-  z-index: 0;
+  /* A aura e o acabamento final: passa sobre foto e moldura. */
+  z-index: 30;
   border-radius: 9999px;
   pointer-events: none;
   transform: translateZ(0);
