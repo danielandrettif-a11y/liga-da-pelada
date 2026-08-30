@@ -102,6 +102,13 @@ export function cosmeticHighResolutionImage(assetKey?: string | null) {
   return image?.endsWith(".webp") ? image.replace(/\.webp$/, ".png") : image;
 }
 
+/** Arte vertical usada apenas no fundo do perfil em telas de celular. */
+export function cosmeticMobileBackgroundImage(assetKey?: string | null) {
+  const key = assetKey || "";
+  if (key.includes("vestiario-concreto")) return "/images/cosmetics/backgrounds/vestiario-resenha-mobile-2026.png";
+  return null;
+}
+
 export function cosmeticBackgroundPosition(slot?: CosmeticSlot | null, assetKey?: string | null): string {
   const key = (assetKey || "").toLowerCase();
   if (slot === "background" || key.includes("background")) {

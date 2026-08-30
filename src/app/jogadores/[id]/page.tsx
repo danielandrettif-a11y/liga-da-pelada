@@ -12,7 +12,7 @@ import { TeamCrest } from "@/components/TeamCrest";
 import { FantasyPlayerCard } from "@/components/fantasy/FantasyPlayerCard";
 import { getFantasyPlayerSummary } from "@/lib/actions/fantasy";
 import { getAdminCosmeticsPreview, getPlayerEquippedCosmetics, type CosmeticPreviewLoadout } from "@/lib/actions/cosmetics";
-import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticNameplateClass, cosmeticVisual } from "@/lib/fantasy/cosmetics";
+import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticMobileBackgroundImage, cosmeticNameplateClass, cosmeticVisual } from "@/lib/fantasy/cosmetics";
 import { OfficialProfilePreviewNotice } from "@/components/fantasy/OfficialProfilePreviewNotice";
 
 export const revalidate = 0;
@@ -86,6 +86,7 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
     : "";
   const bannerImage = cosmeticHighResolutionImage(cosmetics?.bannerAssetKey);
   const profileBackgroundImage = cosmeticHighResolutionImage(cosmetics?.backgroundAssetKey);
+  const mobileProfileBackgroundImage = cosmeticMobileBackgroundImage(cosmetics?.backgroundAssetKey);
 
   return (
     <div className="relative -mx-4 -mt-4 min-h-[calc(100dvh-3.5rem)] px-4 pb-4 pt-4">
@@ -95,22 +96,33 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
           aria-hidden="true"
           className="pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[#06100a]"
         >
-          <Image
-            src={profileBackgroundImage}
-            alt=""
-            fill
-            quality={75}
-            sizes="100vw"
-            className="scale-110 object-cover opacity-55 blur-xl sm:hidden"
-            style={{ objectPosition: cosmeticBackgroundPosition("background", cosmetics?.backgroundAssetKey) }}
-          />
+          {mobileProfileBackgroundImage ? (
+            <Image
+              src={mobileProfileBackgroundImage}
+              alt=""
+              fill
+              quality={90}
+              sizes="100vw"
+              className="object-cover sm:hidden"
+            />
+          ) : (
+            <Image
+              src={profileBackgroundImage}
+              alt=""
+              fill
+              quality={75}
+              sizes="100vw"
+              className="scale-110 object-cover opacity-55 blur-xl sm:hidden"
+              style={{ objectPosition: cosmeticBackgroundPosition("background", cosmetics?.backgroundAssetKey) }}
+            />
+          )}
           <Image
             src={profileBackgroundImage}
             alt=""
             fill
             quality={90}
             sizes="100vw"
-            className="object-contain sm:object-cover"
+            className={mobileProfileBackgroundImage ? "hidden object-cover sm:block" : "object-contain sm:object-cover"}
             style={{ objectPosition: cosmeticBackgroundPosition("background", cosmetics?.backgroundAssetKey) }}
           />
           <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(2,14,8,.08)_0%,rgba(2,14,8,.28)_48%,rgba(2,14,8,.82)_100%)] sm:bg-[linear-gradient(to_bottom,rgba(2,14,8,.16)_0%,rgba(2,14,8,.48)_45%,rgba(2,14,8,.9)_100%)]" />
