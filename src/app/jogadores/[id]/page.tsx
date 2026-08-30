@@ -89,7 +89,7 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
 
   return (
     <div className="relative -mx-4 -mt-4 min-h-[calc(100dvh-3.5rem)] px-4 pb-4 pt-4">
-      {/* Fundo Cosmético Imersivo Fixado na Viewport (não estica com o scroll da página, 100% nítido no celular e PC) */}
+      {/* Fundo fixo: arte completa no celular e enquadramento panorâmico no desktop. */}
       {profileBackgroundImage && (
         <div
           aria-hidden="true"
@@ -99,13 +99,22 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
             src={profileBackgroundImage}
             alt=""
             fill
-            quality={90}
+            quality={75}
             sizes="100vw"
-            className="object-cover"
+            className="scale-110 object-cover opacity-55 blur-xl sm:hidden"
             style={{ objectPosition: cosmeticBackgroundPosition("background", cosmetics?.backgroundAssetKey) }}
           />
-          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(2,14,8,.16)_0%,rgba(2,14,8,.48)_45%,rgba(2,14,8,.9)_100%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,transparent_0%,rgba(2,14,8,.22)_48%,rgba(2,14,8,.65)_100%)]" />
+          <Image
+            src={profileBackgroundImage}
+            alt=""
+            fill
+            quality={90}
+            sizes="100vw"
+            className="object-contain sm:object-cover"
+            style={{ objectPosition: cosmeticBackgroundPosition("background", cosmetics?.backgroundAssetKey) }}
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(2,14,8,.08)_0%,rgba(2,14,8,.28)_48%,rgba(2,14,8,.82)_100%)] sm:bg-[linear-gradient(to_bottom,rgba(2,14,8,.16)_0%,rgba(2,14,8,.48)_45%,rgba(2,14,8,.9)_100%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,transparent_0%,rgba(2,14,8,.12)_48%,rgba(2,14,8,.48)_100%)] sm:bg-[radial-gradient(ellipse_at_50%_0%,transparent_0%,rgba(2,14,8,.22)_48%,rgba(2,14,8,.65)_100%)]" />
         </div>
       )}
 
