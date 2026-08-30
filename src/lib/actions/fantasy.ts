@@ -1315,7 +1315,7 @@ export async function getFantasyDashboard() {
           number: latestFinishedRound.round?.number,
           date: latestFinishedRound.round?.date,
           playerPoints: Number(latestLineup?.player_points || 0),
-          predictionPoints: Number(latestLineup?.prediction_points || 0),
+          cardPoints: Number(latestLineup?.score_breakdown?.cardBonus || 0),
           totalPoints: Number(latestLineup?.total_points || 0),
         }
       : null,

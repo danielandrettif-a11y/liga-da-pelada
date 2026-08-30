@@ -128,7 +128,7 @@ type Props = {
     number: number;
     date: string;
     playerPoints: number;
-    predictionPoints: number;
+    cardPoints: number;
     totalPoints: number;
   } | null;
   challengeType?: FantasyChallengeType | null;
@@ -1182,8 +1182,8 @@ export function FantasyExperience({
               <p className="mt-1 text-lg font-black text-foreground">{lastRound.playerPoints.toFixed(1)} <span className="text-[10px] text-muted">pts</span></p>
             </div>
             <div className="rounded-xl border border-warning/20 bg-warning/10 p-3">
-              <p className="text-[9px] font-black uppercase tracking-[.12em] text-warning">Palpites e extras</p>
-              <p className="mt-1 text-lg font-black text-warning">+{lastRound.predictionPoints.toFixed(1)} <span className="text-[10px] text-warning/70">pts</span></p>
+              <p className="text-[9px] font-black uppercase tracking-[.12em] text-warning">Bônus da carta</p>
+              <p className="mt-1 text-lg font-black text-warning">{lastRound.cardPoints > 0 ? "+" : ""}{lastRound.cardPoints.toFixed(1)} <span className="text-[10px] text-warning/70">pts</span></p>
             </div>
           </div>
         </section>
