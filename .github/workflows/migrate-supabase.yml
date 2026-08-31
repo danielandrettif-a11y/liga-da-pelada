@@ -118,6 +118,9 @@ jobs:
           set -euo pipefail
 
           supabase db dump --db-url "$OLD_DB_URL" --file "$MIGRATION_DIR/roles.sql" --role-only
+          # O pg_dump pode trazer essa configuracao do projeto antigo, mas ela
+          # nao pode ser alterada por uma conexao administrada do Supabase.
+          sed -i '/^SET log_min_messages =/d' "$MIGRATION_DIR/roles.sql"
           supabase db dump --db-url "$OLD_DB_URL" --file "$MIGRATION_DIR/schema.sql"
           supabase db dump \
             --db-url "$OLD_DB_URL" \
