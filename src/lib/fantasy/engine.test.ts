@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget } from "./config";
 import {
   calculateCostBenefit,
+  calculateExpectedFantasyPoints,
   calculateFantasyPredictionIndex,
   calculateFantasyForm,
   calculateFantasyPlayerPoints,
@@ -272,6 +273,12 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       expect(cb.formattedRatio).toBe("1,20 pts/C$");
     });
 
+    it("projeta pontos esperados combinando forma recente e média sustentável", () => {
+      expect(calculateExpectedFantasyPoints({ seasonAverage: 10, recentPoints: [16, 14, 12] })).toBe(12.8);
+      expect(calculateExpectedFantasyPoints({ seasonAverage: 10, recentPoints: [] })).toBe(10);
+      expect(calculateExpectedFantasyPoints({ seasonAverage: 0, recentPoints: [8, 12] })).toBe(10);
+    });
+
     it("gera tags prioritárias com limite de 2 tags para o card compacto", () => {
       const { allTags, compactTags } = getFantasyPlayerTags({
         price: 9.50,
@@ -391,6 +398,35 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       expect(daniel.buyersDelta).toBe(4);
       // João: 3 - 8 = -5
       expect(joao.buyersDelta).toBe(-5);
+    });
+
+    it("normaliza compras e vendas pela quantidade de escalações salvas", () => {
+      const previousLineups = Array.from({ length: 10 }, (_, index) => ({
+        userId: `old-${index}`,
+        playerIds: index < 8 ? ["daniel"] : ["joao"],
+      }));
+      const currentLineups = [
+        { userId: "new-1", playerIds: ["daniel"] },
+        { userId: "new-2", playerIds: ["joao"] },
+        { userId: "new-3", playerIds: ["joao"] },
+        { userId: "new-4", playerIds: ["joao"] },
+      ];
+
+      const pop = calculateMarketPopularity({ currentLineups, previousLineups, minSample: 3 });
+      expect(pop.getPopularity("daniel")).toMatchObject({
+        count: 1,
+        percent: 25,
+        previousCount: 8,
+        previousPercent: 80,
+        marketShareDelta: -55,
+      });
+      expect(pop.getPopularity("joao")).toMatchObject({
+        count: 3,
+        percent: 75,
+        previousPercent: 20,
+        marketShareDelta: 55,
+      });
+      expect(pop.hasComparableSample).toBe(true);
     });
 
     it("primeira rodada sem histórico não quebra e indica ausência de histórico anterior", () => {

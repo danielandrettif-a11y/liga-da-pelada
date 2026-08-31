@@ -168,12 +168,7 @@ export default async function HomePage() {
             return <OpenCallupBanner key={callup.id} callup={callup} userEntry={userEntry} />;
           });
 
-          const upcomingRound = preseasonEnabled ? nextFriendly : nextRound;
-          const upcomingType = preseasonEnabled ? "friendly" : "official";
-          const isRoundCoveredByCallup = Boolean(upcomingRound && activeCallups.some((callup: any) =>
-            callup.roundId === upcomingRound.id || (callup.date === upcomingRound.date && callup.roundType === upcomingType),
-          ));
-          const roundSlide = isRoundCoveredByCallup ? null : preseasonEnabled ? (
+          const roundSlide = preseasonEnabled ? (
             <PreSeasonBanner key="friendly" isAdmin={account.isAdmin} friendly={nextFriendly} />
           ) : (
             <NextRoundBanner
@@ -185,7 +180,16 @@ export default async function HomePage() {
             />
           );
 
-          const slides = [...callupSlides, roundSlide].filter(Boolean);
+          const hasOpenVacancy = activeCallups.some(
+            (callup: any) => callup.confirmed < callup.capacity,
+          );
+          // A agenda e a convocação são informações complementares. Mesmo
+          // quando apontam para a mesma rodada, mantemos os dois banners. A
+          // convocação assume a primeira posição somente enquanto há vaga.
+          const slides = (hasOpenVacancy
+            ? [...callupSlides, roundSlide]
+            : [roundSlide, ...callupSlides]
+          ).filter(Boolean);
 
           if (slides.length > 1) {
             return <HomeHeroCarousel>{slides}</HomeHeroCarousel>;

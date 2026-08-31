@@ -21,6 +21,10 @@ export type FantasyRankingEntry = {
   user_id?: string;
   round_id?: string | null;
   is_live?: boolean;
+  cosmetics?: {
+    frameKey: string | null;
+    auraKey: string | null;
+  } | null;
 };
 
 export function FantasyRankingList({
@@ -128,6 +132,8 @@ export function FantasyRankingList({
                   <PlayerAvatar
                     name={item.playerName}
                     avatarUrl={item.avatarUrl}
+                    frameKey={item.cosmetics?.frameKey}
+                    auraKey={item.cosmetics?.auraKey}
                     className="h-10 w-10 shrink-0 rounded-full bg-surface text-xs font-black text-accent"
                   />
                   <div className="min-w-0 flex-1">
@@ -180,6 +186,8 @@ export function FantasyRankingList({
                   <PlayerAvatar
                     name={item.playerName}
                     avatarUrl={item.avatarUrl}
+                    frameKey={item.cosmetics?.frameKey}
+                    auraKey={item.cosmetics?.auraKey}
                     className="h-10 w-10 shrink-0 rounded-full bg-surface text-xs font-black text-muted"
                   />
                   <div className="min-w-0 flex-1">
@@ -242,6 +250,8 @@ export function FantasyRankingList({
           <PlayerAvatar
             name={item.player?.name || "Cartoleiro"}
             avatarUrl={item.player?.avatar_url}
+            frameKey={item.cosmetics?.frameKey}
+            auraKey={item.cosmetics?.auraKey}
             className="h-10 w-10 shrink-0 rounded-full bg-surface text-xs font-black text-accent"
           />
           <div className="min-w-0 flex-1">

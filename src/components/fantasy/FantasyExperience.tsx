@@ -672,6 +672,28 @@ export function FantasyExperience({
     };
   }, [requestRefresh, round?.id]);
 
+  // Durante o mercado aberto, o Radar acompanha novas escalações completas.
+  // Realtime entrega a mudança imediatamente quando disponível; a atualização
+  // periódica cobre ambientes em que essas tabelas não estão na publicação.
+  useEffect(() => {
+    if (status !== "open" || !round || isTest) return;
+    const refreshRadarIfVisible = () => {
+      if (document.visibilityState === "visible") requestRefresh(250);
+    };
+    const channel = supabase
+      .channel(`fantasy-radar-lineups-${round.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "fantasy_lineups" }, refreshRadarIfVisible)
+      .on("postgres_changes", { event: "*", schema: "public", table: "fantasy_lineup_players" }, refreshRadarIfVisible)
+      .subscribe();
+    const interval = window.setInterval(refreshRadarIfVisible, 15_000);
+    document.addEventListener("visibilitychange", refreshRadarIfVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshRadarIfVisible);
+      supabase.removeChannel(channel);
+    };
+  }, [isTest, requestRefresh, round, status]);
+
   useEffect(() => {
     if (!hasUnsavedChanges) return;
     const message = validSelectedCount === playersPerTeam && !captainId
@@ -782,6 +804,7 @@ export function FantasyExperience({
             localStorage.removeItem(draftStorageKey);
             localStorage.removeItem(legacyStorageKey);
           } catch {}
+          requestRefresh(0);
         }
       } catch {
         setMessage("A conexão falhou ao salvar. Sua tela foi mantida; tente novamente.");

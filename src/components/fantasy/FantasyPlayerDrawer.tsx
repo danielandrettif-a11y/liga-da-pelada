@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -12,6 +13,7 @@ import {
 } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { formatFantasyMoney, type FantasySettings } from "@/lib/fantasy/config";
+import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
 import type { FantasyMarketPlayer } from "@/lib/actions/fantasy";
 import { getFantasyPlayerDetail } from "@/lib/actions/fantasy";
 import { useDialogViewport } from "@/lib/useDialogViewport";
@@ -99,6 +101,9 @@ export function FantasyPlayerDrawer({
   const breakdownList = liveRound?.breakdown || [];
   const matchesList = liveRound?.matchesBreakdown || [];
   const rulesList = liveRound?.rulesList || [];
+  const bannerAssetKey = detailData?.cosmetics?.bannerAssetKey || null;
+  const bannerImage = cosmeticHighResolutionImage(bannerAssetKey);
+  const frameKey = detailData?.cosmetics?.frameKey || null;
 
   return createPortal(
     <div
@@ -113,6 +118,25 @@ export function FantasyPlayerDrawer({
         style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
         onClick={(e) => e.stopPropagation()}
       >
+        {bannerImage && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-[190px] overflow-hidden rounded-t-3xl"
+          >
+            <Image
+              src={bannerImage}
+              alt=""
+              fill
+              priority={false}
+              quality={90}
+              sizes="(max-width: 640px) calc(100vw - 24px), 512px"
+              className="object-cover"
+              style={{ objectPosition: cosmeticBackgroundPosition("banner", bannerAssetKey) }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-[#06160d]/55 to-[#06160d]" />
+          </div>
+        )}
+
         {/* Botão Fechar */}
         <button
           onClick={onClose}
@@ -123,11 +147,12 @@ export function FantasyPlayerDrawer({
         </button>
 
         {/* Header do Jogador */}
-        <div className="flex items-center gap-3.5 border-b border-white/10 pb-4">
+        <div className="relative z-[1] flex min-h-[124px] items-center gap-3.5 border-b border-white/10 pb-4">
           <PlayerAvatar
             name={player.name}
             avatarUrl={player.avatarUrl}
             clickable={false}
+            frameKey={frameKey}
             className="h-16 w-16 shrink-0 rounded-2xl border-2 border-accent bg-background text-base font-black text-accent shadow-md"
           />
           <div className="min-w-0 flex-1">

@@ -219,7 +219,7 @@ export function FantasyRevealedLineupsModal({
                         {p.points.toFixed(1)} pts
                       </span>
                       <span className="mt-0.5 text-[8px] text-muted">
-                        Base {p.basePoints.toFixed(1)}{p.captainBonus ? ` +${p.captainBonus.toFixed(1)} cap.` : ""}
+                        Base {(p.basePoints - (p.positionBonus || 0)).toFixed(1)} · posição {(p.positionBonus || 0).toFixed(1)}{p.captainBonus ? ` · capitão ${p.captainBonus.toFixed(1)}` : ""}
                       </span>
                     </div>
                   ))}

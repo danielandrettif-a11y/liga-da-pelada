@@ -8,6 +8,7 @@ import { getActiveSeason } from "./seasons";
 import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget, type FantasySettings } from "@/lib/fantasy/config";
 import {
   calculateCostBenefit,
+  calculateExpectedFantasyPoints,
   calculateFantasyForm,
   calculateFantasyPredictionIndex,
   calculateFantasyPlayerPoints,
@@ -62,7 +63,12 @@ export type FantasyMarketPlayer = {
   costBenefitScore: number;
   costBenefitRatio: number;
   costBenefitFormatted: string;
+  expectedPoints: number;
   popularityPercent: number;
+  selectionCount: number;
+  previousSelectionCount: number;
+  previousPopularityPercent: number;
+  marketShareDelta: number;
   captainPercent: number;
   buyersDelta: number;
   hasPreviousHistory: boolean;
@@ -198,6 +204,7 @@ export async function getFantasyDashboard() {
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
   if (!season) return { authenticated: true as const, available: false as const };
+  const playersPerTeam = league.players_per_team || 5;
 
   // Estas leituras dependem apenas de liga/temporada. Iniciá-las juntas
   // remove um round-trip inteiro antes de montar o dashboard do Cartola.
@@ -444,6 +451,7 @@ export async function getFantasyDashboard() {
         .from("fantasy_lineups")
         .select("user_id, fantasy_lineup_players(player_id)")
         .eq("fantasy_round_id", previousFinishedRound.id)
+        .eq("status", "scored")
     : Promise.resolve({ data: [] as any[] });
 
   // A prévia é pública para quem já está no Cartola, mas precisa continuar
@@ -719,7 +727,8 @@ export async function getFantasyDashboard() {
   );
   const currentLineupsFormatted = (
     activeOfficialRound ? activeRoundLineups : latestRoundLineups
-  )?.map((l: any) => {
+  )?.filter((l: any) => (l.fantasy_lineup_players || []).length === playersPerTeam)
+    .map((l: any) => {
     const latestSavedLineup = latestLineupByUser.get(l.user_id) as any;
     return {
       userId: l.user_id,
@@ -795,7 +804,11 @@ export async function getFantasyDashboard() {
       const trendData = calculateFantasyTrend(playerRecentVars);
       const formData = calculateFantasyForm(playerRecentPoints);
       const avgPoints = roundsPlayed > 0 ? totalPoints / roundsPlayed : 0;
-      const costBenefit = calculateCostBenefit(avgPoints, price);
+      const expectedPoints = calculateExpectedFantasyPoints({
+        seasonAverage: avgPoints,
+        recentPoints: playerRecentPoints,
+      });
+      const costBenefit = calculateCostBenefit(expectedPoints, price);
       const popularity = popularityAgg.getPopularity(player.id);
 
       const gkGames = stats.goalkeeperGames || 0;
@@ -848,7 +861,12 @@ export async function getFantasyDashboard() {
         costBenefitScore: costBenefit.score,
         costBenefitRatio: costBenefit.ratio,
         costBenefitFormatted: costBenefit.formattedRatio,
+        expectedPoints,
         popularityPercent: popularity.percent,
+        selectionCount: popularity.count,
+        previousSelectionCount: popularity.previousCount,
+        previousPopularityPercent: popularity.previousPercent,
+        marketShareDelta: popularity.marketShareDelta,
         captainPercent: popularity.captainPercent,
         buyersDelta: popularity.buyersDelta,
         hasPreviousHistory: popularity.hasHistory,
@@ -917,8 +935,8 @@ export async function getFantasyDashboard() {
     .filter((p) => p.priceChange < 0)
     .sort((a, b) => a.priceChange - b.priceChange);
   const sortedByCostBenefit = [...market]
-    .filter((p) => p.roundsPlayed >= 1)
-    .sort((a, b) => b.costBenefitScore - a.costBenefitScore || b.totalPoints - a.totalPoints);
+    .filter((p) => p.roundsPlayed >= 1 && p.expectedPoints > 0)
+    .sort((a, b) => b.costBenefitRatio - a.costBenefitRatio || b.expectedPoints - a.expectedPoints);
   const sortedByForm = [...market]
     .filter((p) => p.recentPointsList.length >= 1)
     .sort((a, b) => {
@@ -927,11 +945,11 @@ export async function getFantasyDashboard() {
       return sumB - sumA;
     });
   const sortedByBought = [...market]
-    .filter((p) => p.buyersDelta > 0)
-    .sort((a, b) => b.buyersDelta - a.buyersDelta);
+    .filter((p) => popularityAgg.hasComparableSample && p.marketShareDelta > 0)
+    .sort((a, b) => b.marketShareDelta - a.marketShareDelta || b.selectionCount - a.selectionCount);
   const sortedBySold = [...market]
-    .filter((p) => p.buyersDelta < 0)
-    .sort((a, b) => a.buyersDelta - b.buyersDelta);
+    .filter((p) => popularityAgg.hasComparableSample && p.marketShareDelta < 0)
+    .sort((a, b) => a.marketShareDelta - b.marketShareDelta || a.selectionCount - b.selectionCount);
 
   const marketById = new Map(market.map((player) => [player.id, player] as const));
   const rankPlayersByCount = (counts: Map<string, number>) =>
@@ -1047,10 +1065,10 @@ export async function getFantasyDashboard() {
     ),
     bestCostBenefit: makeTopList(
       "Melhores custo-benefício",
-      "Muito ponto sem estourar o orçamento.",
+      "Projeção de forma recente + média da temporada dividida pelo preço atual.",
       sortedByCostBenefit,
-      (player) => `${player.costBenefitScore.toFixed(1)}/10`,
-      (player) => player.costBenefitFormatted,
+      (player) => `${player.expectedPoints.toFixed(1)} pts`,
+      (player) => `C$ ${player.price.toFixed(2)} · ${player.costBenefitFormatted}`,
     ),
     bestForm: makeTopList(
       "Melhores em forma",
@@ -1061,17 +1079,17 @@ export async function getFantasyDashboard() {
     ),
     mostBought: makeTopList(
       "Mais comprados",
-      "Os nomes que mais ganharam novos donos.",
+      `Quem mais ganhou espaço: rodada anterior × ${popularityAgg.totalLineups} escalações completas atuais.`,
       sortedByBought,
-      (player) => `+${player.buyersDelta}`,
-      () => "novos compradores",
+      (player) => `+${player.marketShareDelta.toFixed(1)} p.p.`,
+      (player) => `${player.selectionCount}/${popularityAgg.totalLineups} agora · ${player.previousPopularityPercent}% antes`,
     ),
     mostSold: makeTopList(
       "Mais vendidos",
-      "A debandada do mercado nesta rodada.",
+      `Quem mais perdeu espaço: rodada anterior × ${popularityAgg.totalLineups} escalações completas atuais.`,
       sortedBySold,
-      (player) => `${Math.abs(player.buyersDelta)}`,
-      () => "vendas na rodada",
+      (player) => `${player.marketShareDelta.toFixed(1)} p.p.`,
+      (player) => `${player.selectionCount}/${popularityAgg.totalLineups} agora · ${player.previousPopularityPercent}% antes`,
     ),
   };
 
@@ -1145,8 +1163,8 @@ export async function getFantasyDashboard() {
     bestCostBenefit: sortedByCostBenefit[0]
       ? {
           player: sortedByCostBenefit[0],
-          value: `${sortedByCostBenefit[0].costBenefitScore.toFixed(1)}/10`,
-          extra: sortedByCostBenefit[0].costBenefitFormatted,
+          value: `${sortedByCostBenefit[0].expectedPoints.toFixed(1)} pts`,
+          extra: `C$ ${sortedByCostBenefit[0].price.toFixed(2)} · ${sortedByCostBenefit[0].costBenefitFormatted}`,
           badge: "Melhor Custo-Benefício",
         }
       : null,
@@ -1161,16 +1179,16 @@ export async function getFantasyDashboard() {
     mostBought: sortedByBought[0]
       ? {
           player: sortedByBought[0],
-          value: `+${sortedByBought[0].buyersDelta}`,
-          extra: "novos compradores",
+          value: `+${sortedByBought[0].marketShareDelta.toFixed(1)} p.p.`,
+          extra: `${sortedByBought[0].selectionCount}/${popularityAgg.totalLineups} agora · ${sortedByBought[0].previousPopularityPercent}% antes`,
           badge: "Mais Comprado",
         }
       : null,
     mostSold: sortedBySold[0]
       ? {
           player: sortedBySold[0],
-          value: `${sortedBySold[0].buyersDelta}`,
-          extra: "vendas na rodada",
+          value: `${sortedBySold[0].marketShareDelta.toFixed(1)} p.p.`,
+          extra: `${sortedBySold[0].selectionCount}/${popularityAgg.totalLineups} agora · ${sortedBySold[0].previousPopularityPercent}% antes`,
           badge: "Mais Vendido",
         }
       : null,
@@ -1276,7 +1294,6 @@ export async function getFantasyDashboard() {
     currentUser: projectedLineups.find((item) => item.userId === account.user!.id) || null,
   };
 
-  const playersPerTeam = league.players_per_team || 5;
   const dynamicInitialBudget = getFantasyInitialBudget(playersPerTeam);
   const storedBudget = Number(fantasyAccount?.current_budget ?? dynamicInitialBudget);
   const adjustedBudget = isTest
@@ -1495,7 +1512,7 @@ export async function getRevealedLineups(roundId?: string) {
       id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, challenge_player_id,
       player_points, prediction_points, total_points, round_position,
       fantasy_lineup_players (
-        id, player_id, price_locked, price_after, base_points, captain_bonus, total_points,
+        id, player_id, price_locked, price_after, base_points, position_bonus, captain_bonus, total_points,
         player_name_locked, avatar_url_locked
       )
     `
@@ -1575,6 +1592,7 @@ export async function getRevealedLineups(roundId?: string) {
         priceLocked: Number(lp.price_locked || 0),
         priceAfter: lp.price_after != null ? Number(lp.price_after) : null,
         basePoints: Number(lp.base_points || 0),
+        positionBonus: Number(lp.position_bonus || 0),
         captainBonus: Number(lp.captain_bonus || 0),
         points: Number(lp.total_points || 0),
       })),
@@ -1612,6 +1630,7 @@ export async function getFantasyPlayerDetail(playerId: string) {
     { data: priceRow },
     { data: historyRows },
     { data: statRows },
+    { data: cosmeticProfileRow },
   ] = await Promise.all([
     account.client
       .from("players")
@@ -1636,6 +1655,11 @@ export async function getFantasyPlayerDetail(playerId: string) {
       .from("player_round_stats")
       .select("goals, assists, wins, losses, games, goalkeeper_games, goals_conceded")
       .eq("player_id", playerId),
+    account.client
+      .from("account_profiles")
+      .select("user_id")
+      .eq("player_id", playerId)
+      .maybeSingle(),
   ]);
 
   if (!playerRow) return null;
@@ -1684,7 +1708,8 @@ export async function getFantasyPlayerDetail(playerId: string) {
 
   const trendData = calculateFantasyTrend(recentVariations);
   const formData = calculateFantasyForm(recentPointsList);
-  const costBenefit = calculateCostBenefit(avgPoints, price);
+  const expectedPoints = calculateExpectedFantasyPoints({ seasonAverage: avgPoints, recentPoints: recentPointsList });
+  const costBenefit = calculateCostBenefit(expectedPoints, price);
 
   const gkGames = stats.goalkeeperGames || 0;
   const gkConceded = stats.goalsConceded || 0;
@@ -1693,7 +1718,15 @@ export async function getFantasyPlayerDetail(playerId: string) {
   // consolidados. A consulta usa a mesma fonte da prévia ao vivo para que o
   // detalhe acompanhe a pontuação exibida no mercado.
   const liveReadClient = createServiceClient() || account.client;
-  const [{ data: liveRoundRows }, { data: liveSettingsRow }] = await Promise.all([
+  const cosmeticLoadoutPromise = cosmeticProfileRow?.user_id
+    ? account.client
+      .from("fantasy_user_cosmetic_loadouts")
+      .select("banner:banner_cosmetic_id(asset_key), frame:frame_cosmetic_id(asset_key)")
+      .eq("user_id", cosmeticProfileRow.user_id)
+      .eq("fantasy_season_id", fs.id)
+      .maybeSingle()
+    : Promise.resolve({ data: null });
+  const [{ data: liveRoundRows }, { data: liveSettingsRow }, { data: cosmeticLoadout }] = await Promise.all([
     liveReadClient
       .from("fantasy_rounds")
       .select("id, round_id, market_status, settings_snapshot, round:round_id(number, status, ignore_goalkeeper_stats)")
@@ -1704,6 +1737,7 @@ export async function getFantasyPlayerDetail(playerId: string) {
       .select("*")
       .eq("league_id", league.id)
       .maybeSingle(),
+    cosmeticLoadoutPromise,
   ]);
   const liveRound = (liveRoundRows || []).find((item: any) => {
     const round = Array.isArray(item.round) ? item.round[0] : item.round;
@@ -1883,11 +1917,16 @@ export async function getFantasyPlayerDetail(playerId: string) {
     costBenefitScore: costBenefit.score,
     costBenefitRatio: costBenefit.ratio,
     costBenefitFormatted: costBenefit.formattedRatio,
+    expectedPoints,
     recentPointsList,
     allTags,
     compactTags,
     history,
     liveRound: liveRoundSummary,
+    cosmetics: {
+      bannerAssetKey: (cosmeticLoadout as any)?.banner?.asset_key || null,
+      frameKey: (cosmeticLoadout as any)?.frame?.asset_key || null,
+    },
   };
 }
 
@@ -2215,14 +2254,27 @@ export async function getFantasyRanking(
 
   entries.sort((a: any, b: any) => Number(b.total_points) - Number(a.total_points));
   const userIds = entries.map((item: any) => item.user_id);
-  const { data: profiles } = userIds.length
-    ? await rankingReadClient
-        .from("account_profiles")
-        .select("user_id, players(name, avatar_url)")
-        .in("user_id", userIds)
-    : { data: [] as any[] };
+  const [{ data: profiles }, { data: cosmeticLoadouts }] = userIds.length
+    ? await Promise.all([
+        rankingReadClient
+          .from("account_profiles")
+          .select("user_id, players(name, avatar_url)")
+          .in("user_id", userIds),
+        rankingReadClient
+          .from("fantasy_user_cosmetic_loadouts")
+          .select("user_id, frame:frame_cosmetic_id(asset_key), aura:aura_cosmetic_id(asset_key)")
+          .eq("fantasy_season_id", fs.id)
+          .in("user_id", userIds),
+      ])
+    : [{ data: [] as any[] }, { data: [] as any[] }];
   const profileByUser = new Map(
     (profiles || []).map((item: any) => [item.user_id, item.players])
+  );
+  const cosmeticsByUser = new Map(
+    (cosmeticLoadouts || []).map((item: any) => [item.user_id, {
+      frameKey: item.frame?.asset_key || null,
+      auraKey: item.aura?.asset_key || null,
+    }]),
   );
   let previousPoints: number | null = null;
   let previousPosition = 0;
@@ -2231,7 +2283,12 @@ export async function getFantasyRanking(
     const position = previousPoints === points ? previousPosition : index + 1;
     previousPoints = points;
     previousPosition = position;
-    return { ...item, position, player: profileByUser.get(item.user_id) || null };
+    return {
+      ...item,
+      position,
+      player: profileByUser.get(item.user_id) || null,
+      cosmetics: cosmeticsByUser.get(item.user_id) || null,
+    };
   });
 }
 
@@ -2243,6 +2300,10 @@ export type FantasyLineupStatusEntry = {
   savedAt: string | null;
   points?: number | null;
   isCurrentUser: boolean;
+  cosmetics?: {
+    frameKey: string | null;
+    auraKey: string | null;
+  } | null;
 };
 
 export type FantasyRoundLineupOverview = {
@@ -2375,7 +2436,7 @@ export async function getFantasyRoundLineupOverview(
     };
   }
 
-  const [{ data: fantasyAccounts }, { data: allProfiles }, { data: lineups }] =
+  const [{ data: fantasyAccounts }, { data: allProfiles }, { data: lineups }, { data: openRoundLoadouts }] =
     await Promise.all([
       overviewReadClient.from("fantasy_accounts").select("user_id").eq("fantasy_season_id", fs.id),
       overviewReadClient
@@ -2386,11 +2447,21 @@ export async function getFantasyRoundLineupOverview(
         .from("fantasy_lineups")
         .select("id, user_id, status, updated_at, created_at")
         .eq("fantasy_round_id", targetFantasyRound.id),
+      overviewReadClient
+        .from("fantasy_user_cosmetic_loadouts")
+        .select("user_id, frame:frame_cosmetic_id(asset_key), aura:aura_cosmetic_id(asset_key)")
+        .eq("fantasy_season_id", fs.id),
     ]);
 
   const lineupByUser = new Map((lineups || []).map((l: any) => [l.user_id, l]));
   const profileByUser = new Map(
     (allProfiles || []).map((p: any) => [p.user_id, p.players])
+  );
+  const cosmeticsByUser = new Map(
+    (openRoundLoadouts || []).map((item: any) => [item.user_id, {
+      frameKey: item.frame?.asset_key || null,
+      auraKey: item.aura?.asset_key || null,
+    }]),
   );
 
   const allUserIds = new Set<string>([
@@ -2417,6 +2488,7 @@ export async function getFantasyRoundLineupOverview(
         hasSaved: true,
         savedAt: lineup.updated_at || lineup.created_at || null,
         isCurrentUser,
+        cosmetics: cosmeticsByUser.get(userId) || null,
       });
     } else {
       pending.push({
@@ -2426,6 +2498,7 @@ export async function getFantasyRoundLineupOverview(
         hasSaved: false,
         savedAt: null,
         isCurrentUser,
+        cosmetics: cosmeticsByUser.get(userId) || null,
       });
     }
   }
@@ -2536,6 +2609,20 @@ export async function reprocessFantasyRoundWithCurrentRules(roundId: string) {
   return {
     success: true,
     affectedRounds: Number(result?.affected_finished_rounds || 1),
+  };
+}
+
+export async function repairLegacySavedFantasyLineups() {
+  const account = await getCurrentAccount();
+  if (!account.isAdmin) return { success: false, error: "Sem permissão." };
+  const { data, error } = await account.client.rpc("repair_legacy_saved_fantasy_lineups");
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/cartola/ranking");
+  revalidatePath("/admin/cartola");
+  return {
+    success: true,
+    repaired: Number(data?.repaired || 0),
+    lineups: Array.isArray(data?.lineups) ? data.lineups : [],
   };
 }
 
@@ -2867,7 +2954,10 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
     .maybeSingle();
   if (!storedLineup) return null;
 
-  const live = fantasyRound.market_status === "in_progress" || hasStartedMatch
+  // Rodada finalizada deve mostrar o resultado oficial persistido. Recalcular
+  // um histórico como projeção ao vivo pode usar scouts corrigidos depois do
+  // fechamento e fazer o detalhe divergir do ranking geral.
+  const live = fantasyRound.market_status === "in_progress"
     ? await getLiveRoundProjections(account.client, fantasySeason.id, league.id, roundId)
     : null;
   const projection = live?.roundId === roundId ? live.byUserId.get(userId) || null : null;

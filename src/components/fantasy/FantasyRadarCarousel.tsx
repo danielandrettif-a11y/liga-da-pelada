@@ -177,7 +177,11 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-[11px]">📡</span>
           <div className="min-w-0">
             <h2 className="truncate text-[10px] font-black uppercase tracking-[.14em] text-foreground">Radar Cartola</h2>
-            <p className="truncate text-[8px] font-bold text-muted">Notícias, tendências e resenha do mercado</p>
+            <p className="truncate text-[8px] font-bold text-muted">
+              {radar.totalLineups > 0
+                ? `Atualizado com ${radar.totalLineups} escalação${radar.totalLineups === 1 ? "" : "ões"} completa${radar.totalLineups === 1 ? "" : "s"}`
+                : "Notícias, tendências e resenha do mercado"}
+            </p>
           </div>
         </div>
         <span className="shrink-0 text-[8px] font-bold text-muted">Arraste para navegar</span>

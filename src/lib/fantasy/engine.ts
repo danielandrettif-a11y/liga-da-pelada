@@ -364,6 +364,29 @@ export function calculateCostBenefit(
 }
 
 /**
+ * Projeção conservadora para a próxima rodada. A forma mais recente ganha
+ * peso conforme há amostra (50%, 60% ou 70%), sem apagar a média sustentável
+ * da temporada. É o valor esperado usado para comparar preços diferentes.
+ */
+export function calculateExpectedFantasyPoints(input: {
+  seasonAverage: number;
+  recentPoints: number[];
+}) {
+  const seasonAverage = Math.max(0, Number(input.seasonAverage) || 0);
+  const recent = input.recentPoints
+    .slice(0, 3)
+    .map((value) => Math.max(0, Number(value) || 0));
+  if (!recent.length) return Math.round(seasonAverage * 10) / 10;
+
+  const recentAverage = average(recent);
+  if (seasonAverage <= 0) return Math.round(recentAverage * 10) / 10;
+
+  const recentWeight = Math.min(0.7, 0.4 + recent.length * 0.1);
+  const expected = recentAverage * recentWeight + seasonAverage * (1 - recentWeight);
+  return Math.round(expected * 10) / 10;
+}
+
+/**
  * Sistema de Tags Automáticas com Prioridade:
  * Retorna lista de tags qualificadas, ordenadas por relevância.
  * Apenas no máximo 2 tags são exibidas no card compacto para preservar clareza visual mobile.
@@ -406,7 +429,8 @@ export function getFantasyPlayerTags(params: {
   const avgPoints = roundsPlayed > 0 ? totalPoints / roundsPlayed : 0;
   const trend = calculateFantasyTrend(recentVariations);
   const form = calculateFantasyForm(recentPoints);
-  const costBenefit = calculateCostBenefit(avgPoints, price);
+  const expectedPoints = calculateExpectedFantasyPoints({ seasonAverage: avgPoints, recentPoints });
+  const costBenefit = calculateCostBenefit(expectedPoints, price);
 
   const tags: FantasyTagItem[] = [];
 
@@ -575,9 +599,12 @@ export function calculateMarketPopularity(params: {
   const totalScorerPredictions = [...scorerPredictionCounts.values()].reduce((sum, count) => sum + count, 0);
   const totalAssistPredictions = [...assistPredictionCounts.values()].reduce((sum, count) => sum + count, 0);
 
-  // Comparações de compra e venda (delta entre rodadas)
+  // Comparações de compra e venda entre rodadas. Quantidades brutas não são
+  // comparáveis quando só parte dos cartoleiros salvou a rodada atual, então o
+  // Radar usa ganho/perda de participação em pontos percentuais.
   const previousSelectionCounts = new Map<string, number>();
   const hasPreviousHistory = previousLineups.length > 0;
+  const previousTotalLineups = previousLineups.length;
   if (hasPreviousHistory) {
     for (const prev of previousLineups) {
       for (const pid of prev.playerIds) {
@@ -587,11 +614,15 @@ export function calculateMarketPopularity(params: {
   }
 
   const buyersDelta = new Map<string, number>();
+  const marketShareDelta = new Map<string, number>();
   const allKnownPlayerIds = new Set([...selectionCounts.keys(), ...previousSelectionCounts.keys()]);
   for (const pid of allKnownPlayerIds) {
     const cur = selectionCounts.get(pid) || 0;
     const prev = previousSelectionCounts.get(pid) || 0;
     buyersDelta.set(pid, cur - prev);
+    const currentShare = totalLineups > 0 ? (cur / totalLineups) * 100 : 0;
+    const previousShare = previousTotalLineups > 0 ? (prev / previousTotalLineups) * 100 : 0;
+    marketShareDelta.set(pid, Math.round((currentShare - previousShare) * 10) / 10);
   }
 
   function getPopularity(playerId: string) {
@@ -600,13 +631,20 @@ export function calculateMarketPopularity(params: {
     const captainCount = captainCounts.get(playerId) || 0;
     const captainPercent = totalCaptainChoices > 0 ? Math.round((captainCount / totalCaptainChoices) * 100) : 0;
     const delta = hasPreviousHistory ? buyersDelta.get(playerId) || 0 : 0;
+    const previousCount = previousSelectionCounts.get(playerId) || 0;
+    const previousPercent = previousTotalLineups > 0
+      ? Math.round((previousCount / previousTotalLineups) * 100)
+      : 0;
 
     return {
       count,
       percent,
+      previousCount,
+      previousPercent,
       captainCount,
       captainPercent,
       buyersDelta: delta,
+      marketShareDelta: hasPreviousHistory ? marketShareDelta.get(playerId) || 0 : 0,
       hasHistory: hasPreviousHistory,
       hasMinSample,
     };
@@ -614,13 +652,16 @@ export function calculateMarketPopularity(params: {
 
   return {
     totalLineups,
+    previousTotalLineups,
     hasMinSample,
+    hasComparableSample: hasMinSample && previousTotalLineups >= minSample,
     hasPreviousHistory,
     getPopularity,
     selectionCounts,
     captainCounts,
     totalCaptainChoices,
     buyersDelta,
+    marketShareDelta,
     scorerPredictionCounts,
     totalScorerPredictions,
     assistPredictionCounts,
