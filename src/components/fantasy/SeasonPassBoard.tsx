@@ -57,12 +57,14 @@ export function SeasonPassBoard({
   playerName,
   playerAvatarUrl,
   rewards,
+  locallyClaimedRewardIds,
   onOpenReward,
 }: {
   progress: number;
   playerName: string | null;
   playerAvatarUrl: string | null;
   rewards: CosmeticPassReward[];
+  locallyClaimedRewardIds: string[];
   onOpenReward: (reward: CosmeticPassReward) => void;
 }) {
   const rewardsByHouse = useMemo(() => {
@@ -188,7 +190,7 @@ export function SeasonPassBoard({
               <button
                 key={reward.id}
                 type="button"
-                onClick={() => onOpenReward(reward)}
+                onClick={() => selectedRewards.length > 1 ? setRewardPickerStageId(selectedStage.id) : onOpenReward(reward)}
                 className="flex w-full items-center justify-between gap-3 rounded-xl border border-yellow-400/20 bg-yellow-950/15 px-3 py-2 text-left active:bg-yellow-950/30"
               >
                 <span className="min-w-0">
@@ -206,11 +208,10 @@ export function SeasonPassBoard({
       <HouseRewardsDialog
         stage={rewardPickerStage}
         rewards={rewardPickerRewards}
+        progress={progress}
+        locallyClaimedRewardIds={locallyClaimedRewardIds}
         onClose={() => setRewardPickerStageId(null)}
-        onOpenReward={(reward) => {
-          setRewardPickerStageId(null);
-          onOpenReward(reward);
-        }}
+        onOpenReward={onOpenReward}
       />
     </section>
   );
@@ -219,16 +220,33 @@ export function SeasonPassBoard({
 function HouseRewardsDialog({
   stage,
   rewards,
+  progress,
+  locallyClaimedRewardIds,
   onClose,
   onOpenReward,
 }: {
   stage: Stage | null;
   rewards: CosmeticPassReward[];
+  progress: number;
+  locallyClaimedRewardIds: string[];
   onClose: () => void;
   onOpenReward: (reward: CosmeticPassReward) => void;
 }) {
   useDialogViewport(Boolean(stage));
   if (!stage) return null;
+
+  const isClaimed = (reward: CosmeticPassReward) => reward.rewardType === "card_pack"
+    ? progress >= reward.house
+    : Boolean(reward.selectedCosmeticId || locallyClaimedRewardIds.includes(reward.id));
+  const claimedCount = rewards.filter(isClaimed).length;
+  const pendingCount = rewards.length - claimedCount;
+  const unlocked = rewards.some((reward) => progress >= reward.house);
+  const heading = !unlocked ? "Prêmios desta casa" : pendingCount === 0 ? "Escolhas concluídas" : claimedCount > 0 ? "Continue escolhendo" : "Escolha seus prêmios";
+  const statusText = !unlocked
+    ? `${rewards.length} categorias serão liberadas nesta casa.`
+    : pendingCount === 0
+      ? "Todas as categorias desta casa já foram escolhidas."
+      : `Falta escolher ${pendingCount} ${pendingCount === 1 ? "categoria" : "categorias"}.`;
 
   return (
     <div className="mobile-dialog-backdrop z-[100] bg-black/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`Prêmios da casa ${houseLabel(stage.houses)}`} onClick={onClose}>
@@ -236,21 +254,34 @@ function HouseRewardsDialog({
         <header className="flex items-start justify-between gap-3">
           <div>
             <p className="font-athletic text-[10px] font-black uppercase tracking-[.16em] text-yellow-300">Casa {houseLabel(stage.houses)} · Passe BQ</p>
-            <h2 className="mt-1 text-lg font-black text-white">Escolha o prêmio para ver</h2>
-            <p className="mt-1 text-xs leading-5 text-muted">Esta casa entrega {rewards.length} prêmios. Toque em um para abrir os detalhes.</p>
+            <h2 className="mt-1 text-lg font-black text-white">{heading}</h2>
+            <p className="mt-1 text-xs leading-5 text-muted">Esta casa entrega {rewards.length} categorias. Abra cada uma para comparar os itens.</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-xl p-2 text-muted hover:bg-white/10 hover:text-white" aria-label="Fechar"><X className="h-5 w-5" /></button>
         </header>
+        <div className={`mt-4 flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-xs font-bold ${pendingCount === 0 && unlocked ? "border-emerald-300/30 bg-emerald-500/10 text-emerald-200" : "border-accent/25 bg-accent/10 text-accent"}`}>
+          {pendingCount === 0 && unlocked ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <Sparkles className="h-4 w-4 shrink-0" />}
+          {statusText}
+        </div>
         <div className="mt-4 space-y-2">
-          {rewards.map((reward, index) => (
-            <button key={reward.id} type="button" onClick={() => onOpenReward(reward)} className="flex w-full items-center justify-between gap-3 rounded-2xl border border-yellow-300/25 bg-yellow-950/20 px-3 py-3 text-left transition-colors hover:bg-yellow-950/35 active:scale-[.99]">
-              <span className="min-w-0">
-                <span className="block text-[8px] font-black uppercase tracking-[.12em] text-yellow-200/65">Prêmio {index + 1}</span>
-                <strong className="block truncate text-xs text-yellow-100">{reward.house === 40 ? "Recompensa lendária" : rewardLabel(reward)}</strong>
-              </span>
-              <Sparkles className="h-4 w-4 shrink-0 text-yellow-300" />
-            </button>
-          ))}
+          {rewards.map((reward, index) => {
+            const claimed = isClaimed(reward);
+            const statusLabel = reward.rewardType === "card_pack"
+              ? claimed ? "Recebido" : "Ver"
+              : claimed ? "Escolhido" : unlocked ? "Escolher" : "Ver";
+            return (
+              <button key={reward.id} type="button" onClick={() => onOpenReward(reward)} className="flex w-full items-center justify-between gap-3 rounded-2xl border border-yellow-300/25 bg-yellow-950/20 px-3 py-3 text-left transition-colors hover:bg-yellow-950/35 active:scale-[.99]">
+                <span className="min-w-0">
+                  <span className="block text-[8px] font-black uppercase tracking-[.12em] text-yellow-200/65">Categoria {index + 1}</span>
+                  <strong className="block truncate text-xs text-yellow-100">{reward.house === 40 ? "Recompensa lendária" : rewardLabel(reward)}</strong>
+                </span>
+                <span className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[8px] font-black uppercase ${claimed ? "bg-emerald-500/15 text-emerald-300" : "bg-yellow-300/10 text-yellow-200"}`}>
+                  {claimed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {statusLabel}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>
     </div>

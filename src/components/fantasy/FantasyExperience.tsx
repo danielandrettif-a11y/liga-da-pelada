@@ -1859,29 +1859,25 @@ export function FantasyExperience({
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      {/* Botão de Perfil / Drawer */}
+                      {/* Área única para abrir a ficha do atleta */}
                       <button
                         type="button"
                         onClick={() => setSelectedDrawerPlayer(player)}
-                        className="shrink-0 relative group"
+                        className="group flex min-w-0 flex-1 items-center gap-3 text-left"
                         title="Ver perfil completo do Cartola"
                       >
-                        <PlayerAvatar
-                          name={player.name}
-                          avatarUrl={player.avatarUrl}
-                          clickable={false}
-                          className="h-12 w-12 rounded-full border border-border bg-background text-xs font-black text-accent group-hover:border-accent transition-colors"
-                        />
-                        <span className="absolute -bottom-1 -right-1 text-[10px]">
-                          {player.trendIcon}
+                        <span className="relative shrink-0">
+                          <PlayerAvatar
+                            name={player.name}
+                            avatarUrl={player.avatarUrl}
+                            clickable={false}
+                            className="h-12 w-12 rounded-full border border-border bg-background text-xs font-black text-accent group-hover:border-accent transition-colors"
+                          />
+                          <span className="absolute -bottom-1 -right-1 text-[10px]">{player.trendIcon}</span>
                         </span>
-                      </button>
 
-                      {/* Dados Centrais */}
-                      <div
-                        className="min-w-0 flex-1 cursor-pointer"
-                        onClick={() => setSelectedDrawerPlayer(player)}
-                      >
+                        {/* Dados Centrais */}
+                        <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <p className="truncate text-xs font-black text-foreground hover:text-accent transition-colors">
                             {player.name}
@@ -1963,7 +1959,8 @@ export function FantasyExperience({
                             </span>
                           )}
                         </div>
-                      </div>
+                        </div>
+                      </button>
 
                       {/* Pontos & Ação */}
                       <div className="text-right shrink-0">
@@ -1999,13 +1996,7 @@ export function FantasyExperience({
                             ? `Saldo após venda: ${formatFantasyMoney(simulatedRemaining, settings.currencyName)}`
                             : `Saldo após compra: ${formatFantasyMoney(simulatedRemaining, settings.currencyName)}`}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDrawerPlayer(player)}
-                          className="text-accent font-bold hover:underline shrink-0"
-                        >
-                          Gráfico & histórico →
-                        </button>
+                        <span className="shrink-0 font-bold text-accent">Toque no atleta para ver a ficha</span>
                       </div>
                     )}
                   </div>

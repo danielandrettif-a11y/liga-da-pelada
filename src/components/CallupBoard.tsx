@@ -172,7 +172,7 @@ export function CallupBoard({
       ? `\n📍 *Localização:*\n🗺️ ${stadiumMapUrl}`
       : "";
 
-    const text = `⚽ *CONVOCAÇÃO ABERTA*\n${window.location.origin}/convocacao\n\n🏆 *${type}*\n📅 *Data:* ${dateFormatted}\n⏰ *Horário:* ${startTime}${venueText}\n\n👉 Toque no link acima para confirmar sua presença e ver a lista!`;
+    const text = `⚽ *CONVOCAÇÃO ABERTA*\n${window.location.origin}/convocacao?callup=${callup.id}\n\n🏆 *${type}*\n📅 *Data:* ${dateFormatted}\n⏰ *Horário:* ${startTime}${venueText}\n\n👉 Toque no link acima para confirmar sua presença e ver a lista!`;
 
     await navigator.clipboard.writeText(text);
     setLoading("copied");
@@ -222,7 +222,7 @@ export function CallupBoard({
                 durationMinutes: 120,
                 location: stadiumName || undefined,
                 mapUrl: stadiumMapUrl || undefined,
-                appUrl: "/convocacao",
+                appUrl: `/convocacao?callup=${callup.id}`,
               }}
               variant="glass"
             />

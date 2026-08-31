@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { createRoundWithTeams, saveRoundPrelist, type TeamInput } from "@/lib/actions/rounds";
+import { adminAddCallupPlayer, adminRemoveCallupPlayer } from "@/lib/actions/callups";
 import type { Player, RoundType, Stadium, TeamFormationMode } from "@/lib/types";
 import { drawTeamsByAttendance, drawTeamsDirect } from "@/lib/round-draw";
 import {
@@ -31,6 +32,7 @@ import { TEAM_PRESETS } from "@/lib/teamPresets";
 import { supabase } from "@/lib/supabase";
 import { DeleteRoundButton } from "./DeleteRoundButton";
 import { useDialogViewport } from "@/lib/useDialogViewport";
+import { isPlayerVisibleInPrelistTab } from "@/lib/callup-ui";
 
 type DrawPlayer = Player & {
   points?: number;
@@ -79,7 +81,7 @@ export function RoundCreator({
   prelistRoundId = null,
   initialTime = "08:00",
   initialStadiumId = null,
-  availableCallup = null,
+  availableCallups = [],
   mountTeams = false,
   prelistNumber = null,
   playersPerTeam = 5,
@@ -95,7 +97,7 @@ export function RoundCreator({
   prelistRoundId?: string | null;
   initialTime?: string;
   initialStadiumId?: string | null;
-  availableCallup?: { id: string; date: string; roundType: RoundType; playerIds: string[] } | null;
+  availableCallups?: Array<{ id: string; date: string; startTime: string; roundType: RoundType; playerIds: string[]; entryIds: string[] }>;
   mountTeams?: boolean;
   prelistNumber?: number | null;
   playersPerTeam?: number;
@@ -115,6 +117,8 @@ export function RoundCreator({
   
   // Step 2: Seleção
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set(initialPlayerIds));
+  const [playerListTab, setPlayerListTab] = useState<"available" | "selected">("available");
+  const [changingPlayerId, setChangingPlayerId] = useState<string | null>(null);
   
   // Step 3: Times
   const teamCount = Math.min(MAX_TEAMS_PER_ROUND, Math.max(MIN_TEAMS_PER_ROUND, Math.trunc(teamsPerRound)));
@@ -133,6 +137,7 @@ export function RoundCreator({
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const teamCapacity = Math.min(MAX_PLAYERS_PER_TEAM, Math.max(1, Math.trunc(playersPerTeam)));
   const roundCapacity = teamCapacity * teamCount;
 
@@ -143,22 +148,29 @@ export function RoundCreator({
   }
 
   const selectedPlayers = allPlayers.filter(p => selectedPlayerIds.has(p.id));
-  const visiblePlayers = useMemo(() => {
+  const filteredPlayers = useMemo(() => {
     const query = playerSearch.trim().toLocaleLowerCase("pt-BR");
     if (!query) return allPlayers;
     return allPlayers.filter((player) => `${player.name} ${player.nickname || ""}`.toLocaleLowerCase("pt-BR").includes(query));
   }, [allPlayers, playerSearch]);
+  const selectedSourceCallup = availableCallups.find((item) => item.id === sourceCallupId) || null;
+  const sourceEntryIds = new Set(selectedSourceCallup?.entryIds || []);
+  const synchronizedPlayerKey = (selectedSourceCallup?.playerIds || initialPlayerIds).join("|");
+  const visiblePlayers = filteredPlayers.filter((player) =>
+    isPlayerVisibleInPrelistTab(player.id, selectedPlayerIds, sourceEntryIds, playerListTab),
+  );
+  const availablePlayersCount = allPlayers.filter((player) => !selectedPlayerIds.has(player.id) && !sourceEntryIds.has(player.id)).length;
 
   useEffect(() => {
     if (!sourceCallupId) return;
-    const synchronizedIds = new Set(initialPlayerIds);
+    const synchronizedIds = new Set(synchronizedPlayerKey ? synchronizedPlayerKey.split("|") : []);
     setSelectedPlayerIds(synchronizedIds);
     setTeams((current) => current.map((team) => ({
       ...team,
       players: team.players.filter((player) => synchronizedIds.has(player.id)),
     })));
     setAttendanceOrder((current) => current.filter((playerId) => synchronizedIds.has(playerId)));
-  }, [initialPlayerIds, sourceCallupId]);
+  }, [sourceCallupId, synchronizedPlayerKey]);
 
   useEffect(() => {
     if (step !== 2 && !(sourceCallupId && step === 3)) return;
@@ -227,19 +239,90 @@ export function RoundCreator({
     if (!next.has(id)) setAttendanceOrder((current) => current.filter((playerId) => playerId !== id));
   }
 
+  async function addPlayerToPrelist(playerId: string) {
+    if (selectedPlayerIds.size >= roundCapacity) {
+      setError(`A rodada aceita no máximo ${roundCapacity} jogadores: ${teamCapacity} por time.`);
+      return;
+    }
+    if (!sourceCallupId) {
+      togglePlayerSelection(playerId);
+      return;
+    }
+
+    const previous = new Set(selectedPlayerIds);
+    setSelectedPlayerIds((current) => new Set(current).add(playerId));
+    setChangingPlayerId(playerId);
+    setError("");
+    setNotice("");
+    const result = await adminAddCallupPlayer(sourceCallupId, playerId);
+    if (!result.success) {
+      setSelectedPlayerIds(previous);
+      setError(result.error || "Não foi possível adicionar o jogador à convocação.");
+    } else if (result.status === "waitlist") {
+      setSelectedPlayerIds(previous);
+      setNotice("As vagas da pré-lista estão completas; o jogador foi adicionado à fila da convocação.");
+    } else {
+      router.refresh();
+    }
+    setChangingPlayerId(null);
+  }
+
+  async function removePlayerFromPrelist(playerId: string) {
+    if (!sourceCallupId) {
+      togglePlayerSelection(playerId);
+      return;
+    }
+
+    const player = allPlayers.find((item) => item.id === playerId);
+    const accepted = window.confirm(
+      `Remover ${player?.name || "este jogador"} da pré-lista e da convocação? Se houver alguém na fila, essa pessoa poderá subir automaticamente.`,
+    );
+    if (!accepted) return;
+
+    const previous = new Set(selectedPlayerIds);
+    const previousTeams = teams;
+    const previousAttendance = attendanceOrder;
+    setSelectedPlayerIds((current) => {
+      const next = new Set(current);
+      next.delete(playerId);
+      return next;
+    });
+    setTeams((current) => current.map((team) => ({
+      ...team,
+      players: team.players.filter((item) => item.id !== playerId),
+    })));
+    setAttendanceOrder((current) => current.filter((id) => id !== playerId));
+    setChangingPlayerId(playerId);
+    setError("");
+    setNotice("");
+    const result = await adminRemoveCallupPlayer(sourceCallupId, playerId);
+    if (!result.success) {
+      setSelectedPlayerIds(previous);
+      setTeams(previousTeams);
+      setAttendanceOrder(previousAttendance);
+      setError(result.error || "Não foi possível remover o jogador da convocação.");
+    } else {
+      router.refresh();
+    }
+    setChangingPlayerId(null);
+  }
+
   function chooseManualSource() {
     if (currentPrelistId) return;
     setSourceCallupId(null);
     setSelectedPlayerIds(new Set());
   }
 
-  function chooseCallupSource() {
-    if (!availableCallup || currentPrelistId) return;
-    setSourceCallupId(availableCallup.id);
-    setDate(availableCallup.date);
-    setSelectedRoundType(availableCallup.roundType);
-    setSelectedPlayerIds(new Set(availableCallup.playerIds));
-    setTeams(createDefaultTeams(teamCount, teamPresetOffsets[availableCallup.roundType] || 0));
+  function chooseCallupSource(callupId = availableCallups[0]?.id) {
+    if (!callupId || currentPrelistId) return;
+    const selectedCallup = availableCallups.find((item) => item.id === callupId);
+    if (!selectedCallup) return;
+    setSourceCallupId(selectedCallup.id);
+    setDate(selectedCallup.date);
+    setStartTime(selectedCallup.startTime);
+    setSelectedRoundType(selectedCallup.roundType);
+    setSelectedPlayerIds(new Set(selectedCallup.playerIds));
+    setTeams(createDefaultTeams(teamCount, teamPresetOffsets[selectedCallup.roundType] || 0));
   }
 
   async function persistPrelist(destination: "list" | "teams") {
@@ -500,17 +583,36 @@ export function RoundCreator({
           {error}
         </div>
       )}
+      {notice && (
+        <div className="rounded-lg border border-warning/25 bg-warning/10 p-3 text-xs font-semibold text-warning">
+          {notice}
+        </div>
+      )}
 
       {/* STEP 1: Data */}
       {step === 1 && (
         <div className="glass-card min-w-0 overflow-hidden p-5 space-y-4 animate-fade-in">
-          {availableCallup && (
+          {availableCallups.length > 0 && (
             <fieldset className="space-y-2">
               <legend className="text-xs font-black uppercase tracking-wider text-muted">Origem da lista</legend>
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={chooseManualSource} className={`rounded-xl border px-3 py-3 text-xs font-black ${!sourceCallupId ? "border-accent bg-accent text-background" : "border-border bg-background text-muted"}`}>Selecao manual</button>
-                <button type="button" onClick={chooseCallupSource} className={`rounded-xl border px-3 py-3 text-xs font-black ${sourceCallupId ? "border-accent bg-accent text-background" : "border-border bg-background text-muted"}`}>Puxar convocacao</button>
+                <button type="button" onClick={() => chooseCallupSource()} className={`rounded-xl border px-3 py-3 text-xs font-black ${sourceCallupId ? "border-accent bg-accent text-background" : "border-border bg-background text-muted"}`}>Puxar convocação</button>
               </div>
+              {sourceCallupId && availableCallups.length > 1 && (
+                <select
+                  value={sourceCallupId}
+                  onChange={(event) => chooseCallupSource(event.target.value)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs font-bold text-foreground"
+                  aria-label="Escolher convocação de origem"
+                >
+                  {availableCallups.map((item, index) => (
+                    <option key={item.id} value={item.id}>
+                      {item.roundType === "friendly" ? "Amistoso" : "Ranked"} {index + 1} · {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(new Date(`${item.date}T12:00:00`))}
+                    </option>
+                  ))}
+                </select>
+              )}
             </fieldset>
           )}
           <fieldset className="space-y-2">
@@ -583,7 +685,7 @@ export function RoundCreator({
             <div className="rounded-2xl border border-warning/30 bg-warning/5 p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-warning">Pre-lista</p><p className="text-xs text-muted">Participantes salvos. Edite e salve novamente quando precisar.</p></div>
-                <div className="flex items-center gap-2"><span className="rounded-full bg-warning/15 px-2.5 py-1 text-[9px] font-black text-warning">RASCUNHO</span>{prelistNumber && <DeleteRoundButton redirectTo="/rodadas" round={{ id: currentPrelistId, number: prelistNumber, round_type: selectedRoundType, date, playersCount: selectedPlayerIds.size, matchesCount: 0 }} />}</div>
+                <div className="flex items-center gap-2"><span className="rounded-full bg-warning/15 px-2.5 py-1 text-[9px] font-black text-warning">RASCUNHO</span>{prelistNumber && <DeleteRoundButton redirectTo="/admin/prelistas" round={{ id: currentPrelistId, number: prelistNumber, round_type: selectedRoundType, date, playersCount: selectedPlayerIds.size, matchesCount: 0 }} />}</div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <input type="date" value={date} disabled={Boolean(sourceCallupId)} onChange={(event) => setDate(event.target.value)} className="min-w-0 rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground disabled:opacity-60" />
@@ -612,6 +714,23 @@ export function RoundCreator({
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-1 rounded-2xl border border-border bg-black/35 p-1">
+            <button
+              type="button"
+              onClick={() => { setPlayerListTab("available"); setPlayerSearch(""); }}
+              className={`rounded-xl py-2.5 text-xs font-black transition-colors ${playerListTab === "available" ? "bg-accent text-background" : "text-muted hover:text-foreground"}`}
+            >
+              Disponíveis ({availablePlayersCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => { setPlayerListTab("selected"); setPlayerSearch(""); }}
+              className={`rounded-xl py-2.5 text-xs font-black transition-colors ${playerListTab === "selected" ? "bg-accent text-background" : "text-muted hover:text-foreground"}`}
+            >
+              Selecionados ({selectedPlayerIds.size})
+            </button>
+          </div>
+
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
@@ -625,21 +744,23 @@ export function RoundCreator({
 
           {sourceCallupId && (
             <div className="rounded-xl border border-accent/25 bg-accent/[0.06] px-3 py-2.5 text-[10px] font-semibold leading-4 text-muted">
-              Lista sincronizada com a Convocação. Para adicionar ou remover alguém, altere a convocação; esta tela será atualizada automaticamente.
+              Lista sincronizada com a Convocação. Alterações feitas aqui também atualizam a convocação; ao remover um confirmado, alguém da fila pode subir automaticamente.
             </div>
           )}
 
           <div className="glass-card overflow-hidden">
             {visiblePlayers.map((player, idx) => {
-              const isSelected = selectedPlayerIds.has(player.id);
+              const isSelected = playerListTab === "selected";
               return (
-                <div
+                <button
+                  type="button"
                   key={player.id}
-                  onClick={() => { if (!sourceCallupId) togglePlayerSelection(player.id); }}
+                  onClick={() => isSelected ? void removePlayerFromPrelist(player.id) : void addPlayerToPrelist(player.id)}
+                  disabled={Boolean(changingPlayerId)}
                   className={`
-                    flex items-center justify-between p-3 transition-colors ${sourceCallupId ? "cursor-default" : "cursor-pointer"}
+                    flex w-full items-center justify-between p-3 text-left transition-colors disabled:opacity-60
                     ${idx < visiblePlayers.length - 1 ? "border-b border-border" : ""}
-                    ${isSelected ? "bg-accent/5 hover:bg-accent/10" : "hover:bg-surface-hover"}
+                    ${isSelected ? "bg-accent/5 hover:bg-danger/10" : "hover:bg-surface-hover"}
                   `}
                 >
                   <div className="flex items-center gap-3">
@@ -662,10 +783,33 @@ export function RoundCreator({
                       </div>
                     </div>
                   </div>
-                  {isSelected && <CheckCircle2 className="w-5 h-5 text-accent" />}
-                </div>
+                  {changingPlayerId === player.id ? (
+                    <RotateCcw className="h-5 w-5 animate-spin text-accent" />
+                  ) : isSelected ? (
+                    <span className="flex items-center gap-1 rounded-lg border border-danger/25 bg-danger/10 px-2 py-1 text-[9px] font-black uppercase text-danger">
+                      Remover <X className="h-3 w-3" />
+                    </span>
+                  ) : (
+                    <ChevronRight className="h-5 w-5 text-muted" />
+                  )}
+                </button>
               );
             })}
+            {visiblePlayers.length === 0 && (
+              <div className="p-7 text-center">
+                <CheckCircle2 className="mx-auto h-7 w-7 text-accent/60" />
+                <p className="mt-2 text-sm font-black text-foreground">
+                  {playerSearch
+                    ? "Nenhum jogador encontrado"
+                    : playerListTab === "available"
+                      ? "Todos os jogadores disponíveis já foram selecionados"
+                      : "Nenhum jogador selecionado"}
+                </p>
+                <p className="mt-1 text-[10px] text-muted">
+                  {playerListTab === "available" ? "Abra a aba Selecionados para revisar a pré-lista." : "Escolha jogadores na aba Disponíveis."}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3">

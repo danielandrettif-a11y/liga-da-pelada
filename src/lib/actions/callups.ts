@@ -17,6 +17,24 @@ import {
 export type CallupEntryWithPlayer = CallupEntry & { player: Player };
 export type CallupWithEntries = Callup & { entries: CallupEntryWithPlayer[] };
 
+function normalizeCallup(data: any): CallupWithEntries | null {
+  const linkedRound = data?.round;
+  if (linkedRound) {
+    const isRoundStarted = linkedRound.status === "in_progress" || linkedRound.status === "finished";
+    const hasStartedMatches = (linkedRound.matches || []).some(
+      (match: any) => match.status === "in_progress" || match.status === "live" || match.status === "finished",
+    );
+    if (isRoundStarted || hasStartedMatches) return null;
+  }
+
+  const rawEntries = (data?.callup_entries || []) as CallupEntryWithPlayer[];
+  const entries = [...rawEntries].sort((a, b) => {
+    if (a.status !== b.status) return a.status === "confirmed" ? -1 : 1;
+    return a.position - b.position;
+  });
+  return { ...(data as Callup), entries };
+}
+
 function refreshCallups() {
   revalidatePath("/", "layout");
   revalidatePath("/convocacao");
@@ -25,7 +43,7 @@ function refreshCallups() {
   revalidatePath("/admin/prelistas");
 }
 
-export async function getActiveCallup(): Promise<CallupWithEntries | null> {
+export async function getActiveCallups(): Promise<CallupWithEntries[]> {
   const { data, error } = await supabase
     .from("callups")
     .select(`
@@ -43,33 +61,25 @@ export async function getActiveCallup(): Promise<CallupWithEntries | null> {
     `)
     .eq("league.is_active", true)
     .in("status", ["open", "locked"])
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("date", { ascending: true })
+    .order("start_time", { ascending: true })
+    .order("created_at", { ascending: true });
 
-  if (error || !data) {
+  if (error) {
     if (error) console.error("Erro ao buscar convocacao:", error);
-    return null;
+    return [];
   }
 
-  // Se a rodada vinculada ja iniciou ou finalizou, a convocacao nao deve mais aparecer
-  const linkedRound = (data as any).round;
-  if (linkedRound) {
-    const isRoundStarted = linkedRound.status === "in_progress" || linkedRound.status === "finished";
-    const hasStartedMatches = (linkedRound.matches || []).some(
-      (m: any) => m.status === "in_progress" || m.status === "finished"
-    );
-    if (isRoundStarted || hasStartedMatches) {
-      return null;
-    }
-  }
+  return (data || []).map(normalizeCallup).filter((callup): callup is CallupWithEntries => Boolean(callup));
+}
 
-  const rawEntries = (data.callup_entries || []) as unknown as CallupEntryWithPlayer[];
-  const entries = [...rawEntries].sort((a, b) => {
-    if (a.status !== b.status) return a.status === "confirmed" ? -1 : 1;
-    return a.position - b.position;
-  });
-  return { ...(data as unknown as Callup), entries };
+export async function getActiveCallup(): Promise<CallupWithEntries | null> {
+  return (await getActiveCallups())[0] || null;
+}
+
+export async function getActiveCallupById(callupId: string): Promise<CallupWithEntries | null> {
+  const callups = await getActiveCallups();
+  return callups.find((callup) => callup.id === callupId) || null;
 }
 
 export async function openCallup(formData: FormData) {
@@ -130,8 +140,7 @@ export async function openCallup(formData: FormData) {
     .select("id")
     .single();
   if (error) {
-    const message = error.code === "23505" ? "Ja existe uma convocacao aberta nesta liga." : error.message;
-    return { success: false, error: message };
+    return { success: false, error: error.message };
   }
   refreshCallups();
   return { success: true, id: data.id };
@@ -158,13 +167,13 @@ export async function leaveActiveCallup(callupId: string) {
 export async function adminAddCallupPlayer(callupId: string, playerId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem alterar a lista." };
-  const { error } = await client.rpc("admin_add_callup_player", {
+  const { data, error } = await client.rpc("admin_add_callup_player", {
     p_callup_id: callupId,
     p_player_id: playerId,
   });
   if (error) return { success: false, error: error.message };
   refreshCallups();
-  return { success: true };
+  return { success: true, status: data?.status as "confirmed" | "waitlist" | undefined };
 }
 
 /**

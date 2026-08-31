@@ -84,14 +84,13 @@ export async function getDashboardData() {
       .eq("id", season.league_id)
       .single();
 
-    const activeCallupPromise = supabase
+    const activeCallupsPromise = supabase
       .from("callups")
       .select("id, date, start_time, stadium_name, stadium_map_url, round_type, capacity, waitlist_capacity, callup_entries(player_id, status, position), round:round_id(id, status, matches(status))")
       .eq("league_id", season.league_id)
-      .eq("status", "open")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .in("status", ["open", "locked"])
+      .order("date", { ascending: true })
+      .order("start_time", { ascending: true });
 
     // 3. Ranking e Destaques
     const [
@@ -100,7 +99,7 @@ export async function getDashboardData() {
       { data: lastRoundData },
       { data: liveMatchData },
       { data: leagueData },
-      { data: activeCallupData },
+      { data: activeCallupsData },
       ranking,
     ] = await Promise.all([
       nextRoundPromise,
@@ -108,22 +107,39 @@ export async function getDashboardData() {
       lastRoundPromise,
       liveMatchPromise,
       leaguePromise,
-      activeCallupPromise,
+      activeCallupsPromise,
       getRanking(),
     ]);
 
-    // Se a rodada ligada a convocacao ja iniciou ou finalizou, ocultar convocacao
-    let isCallupHidden = false;
-    if (activeCallupData?.round) {
-      const linkedRound: any = activeCallupData.round;
+    // Convocacoes ligadas a rodadas iniciadas/finalizadas deixam de ser destaque.
+    const visibleCallups = (activeCallupsData || []).filter((callup: any) => {
+      if (!callup.round) return true;
+      const linkedRound: any = callup.round;
       const isRoundStarted = linkedRound.status === "in_progress" || linkedRound.status === "finished";
       const hasStartedMatches = (linkedRound.matches || []).some(
-        (m: any) => m.status === "in_progress" || m.status === "finished"
+        (m: any) => m.status === "in_progress" || m.status === "live" || m.status === "finished"
       );
-      if (isRoundStarted || hasStartedMatches) {
-        isCallupHidden = true;
-      }
-    }
+      return !isRoundStarted && !hasStartedMatches;
+    });
+
+    const mappedCallups = visibleCallups.map((callup: any) => ({
+      id: callup.id,
+      roundId: callup.round?.id || null,
+      date: callup.date,
+      startTime: callup.start_time || "08:00",
+      stadiumName: callup.stadium_name || leagueData?.stadium_name || null,
+      stadiumMapUrl: callup.stadium_map_url || leagueData?.stadium_map_url || null,
+      roundType: callup.round_type,
+      capacity: callup.capacity,
+      waitlistCapacity: callup.waitlist_capacity,
+      confirmed: (callup.callup_entries || []).filter((entry: any) => entry.status === "confirmed").length,
+      waiting: (callup.callup_entries || []).filter((entry: any) => entry.status === "waitlist").length,
+      entries: (callup.callup_entries || []).map((entry: any) => ({
+        playerId: entry.player_id,
+        status: entry.status as "confirmed" | "waitlist",
+        position: entry.position,
+      })),
+    }));
     
     let topScorer = null;
     let topAssists = null;
@@ -154,14 +170,17 @@ export async function getDashboardData() {
       };
     }
 
-    const callupConfirmedCount = (activeCallupData?.callup_entries || []).filter(
-      (entry: any) => entry.status === "confirmed"
-    ).length;
+    const matchingOfficialCallup = mappedCallups.find((callup) =>
+      callup.roundType === "official" && (callup.roundId === nextRoundData?.id || callup.date === nextRoundData?.date),
+    );
+    const matchingFriendlyCallup = mappedCallups.find((callup) =>
+      callup.roundType === "friendly" && (callup.roundId === nextFriendlyData?.id || callup.date === nextFriendlyData?.date),
+    );
     const roundPlayersCount = nextRoundData?.round_players?.[0]?.count || 0;
-    const effectiveConfirmed = roundPlayersCount > 0 ? roundPlayersCount : (activeCallupData && !isCallupHidden ? callupConfirmedCount : 0);
+    const effectiveConfirmed = roundPlayersCount > 0 ? roundPlayersCount : (matchingOfficialCallup?.confirmed || 0);
 
     const friendlyPlayersCount = nextFriendlyData?.round_players?.[0]?.count || 0;
-    const effectiveFriendlyConfirmed = friendlyPlayersCount > 0 ? friendlyPlayersCount : (activeCallupData && !isCallupHidden && activeCallupData.round_type === "friendly" ? callupConfirmedCount : 0);
+    const effectiveFriendlyConfirmed = friendlyPlayersCount > 0 ? friendlyPlayersCount : (matchingFriendlyCallup?.confirmed || 0);
 
     return {
       success: true,
@@ -182,23 +201,8 @@ export async function getDashboardData() {
         },
         eventDurationMinutes: leagueData?.event_duration_minutes || 120,
         preseasonEnabled: leagueData?.preseason_enabled === true,
-        activeCallup: activeCallupData && !isCallupHidden ? {
-          id: activeCallupData.id,
-          date: activeCallupData.date,
-          startTime: activeCallupData.start_time || "08:00",
-          stadiumName: activeCallupData.stadium_name || leagueData?.stadium_name || null,
-          stadiumMapUrl: activeCallupData.stadium_map_url || leagueData?.stadium_map_url || null,
-          roundType: activeCallupData.round_type,
-          capacity: activeCallupData.capacity,
-          waitlistCapacity: activeCallupData.waitlist_capacity,
-          confirmed: (activeCallupData.callup_entries || []).filter((entry: any) => entry.status === "confirmed").length,
-          waiting: (activeCallupData.callup_entries || []).filter((entry: any) => entry.status === "waitlist").length,
-          entries: (activeCallupData.callup_entries || []).map((entry: any) => ({
-            playerId: entry.player_id,
-            status: entry.status as "confirmed" | "waitlist",
-            position: entry.position,
-          })),
-        } : null,
+        activeCallup: mappedCallups[0] || null,
+        activeCallups: mappedCallups,
         lastRound: processedLastRound,
         rankingPreview: ranking.slice(0, 5),
         highlights: {

@@ -181,7 +181,7 @@ export function cosmeticAuraClass(assetKey?: string | null): string {
   return variant ? `cosmetic-aura-host cosmetic-aura-host--${variant}` : "";
 }
 
-export type CosmeticAuraVariant = "smoke" | "spotlight" | "rain" | "radar" | "glory" | "energy";
+export type CosmeticAuraVariant = "smoke" | "spotlight" | "rain" | "radar" | "glory" | "review" | "energy";
 
 /**
  * Mantem as chaves ja salvas no banco, mas converte cada uma em um efeito
@@ -196,6 +196,7 @@ export function cosmeticAuraVariant(assetKey?: string | null): CosmeticAuraVaria
   if (key.includes("chuva-jogo")) return "rain";
   if (key.includes("sinalizador-verde") || key.includes("radar-olheiro")) return "radar";
   if (key.includes("noite-decisao") || key.includes("gloria-decisao") || key.includes("luz-de-quadra")) return "glory";
+  if (key.includes("var-da-varzea") || key.includes("var-revisao")) return "review";
   return "energy";
 }
 
@@ -207,5 +208,6 @@ export function cosmeticNameplateClass(assetKey?: string | null): string {
   if (key.includes("faixa-torcida")) return "border-amber-400/60 bg-[repeating-linear-gradient(135deg,#214b26_0_9px,#08250f_9px_18px)] text-amber-100 shadow-[0_5px_18px_rgba(34,197,94,.22)]";
   if (key.includes("prancheta-tatica")) return "border-lime-300/50 bg-[linear-gradient(90deg,#172a16_0_49%,rgba(163,230,53,.18)_50%,#172a16_51%)] text-lime-100 shadow-[inset_0_0_18px_rgba(163,230,53,.12)]";
   if (key.includes("sumula-juiz")) return "border-[#f6df9a]/70 bg-[repeating-linear-gradient(0deg,#dfcf9d_0_2px,#eee0b6_2px_7px)] text-[#382613] shadow-[0_5px_18px_rgba(245,158,11,.25)]";
+  if (key.includes("placa-substituicao")) return "border-white/60 bg-[linear-gradient(90deg,#3f0808_0_48%,#070707_48%_52%,#07351a_52%_100%)] font-mono text-white shadow-[inset_0_0_14px_rgba(255,255,255,.12),-4px_0_14px_rgba(248,113,113,.3),4px_0_14px_rgba(74,222,128,.3)]";
   return "border-accent/30 bg-black/50 text-accent";
 }

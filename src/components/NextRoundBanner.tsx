@@ -1,8 +1,6 @@
 import Link from "next/link";
 import {
   CalendarDays,
-  ChevronRight,
-  ClipboardList,
   Clock,
   Football,
   MapPin,
@@ -25,29 +23,16 @@ export function NextRoundBanner({
   isAdmin = false,
   venue,
   eventDurationMinutes = 120,
-  activeCallup = null,
 }: {
   round: NextRound | null;
   isAdmin?: boolean;
   venue?: { name?: string | null; mapUrl?: string | null } | null;
   eventDurationMinutes?: number;
-  activeCallup?: { id?: string; confirmed?: number; capacity?: number } | null;
 }) {
   const isPrelist = round?.preparation_stage === "prelist";
-  const hasOpenCallup = Boolean(activeCallup);
-  const confirmedCount = (activeCallup && activeCallup.confirmed != null)
-    ? activeCallup.confirmed
-    : (round?.confirmedPlayers || 0);
+  const confirmedCount = round?.confirmedPlayers || 0;
 
-  const href = round
-    ? isAdmin && isPrelist
-      ? `/admin/rodada?round=${round.id}&mount=1`
-      : isAdmin
-      ? `/rodadas/${round.id}`
-      : hasOpenCallup
-      ? "/convocacao"
-      : "/rodadas"
-    : "/rodadas";
+  const href = "/rodadas";
 
   const formattedDate = round
     ? new Date(`${round.date}T00:00:00`).toLocaleDateString("pt-BR", {
@@ -64,13 +49,7 @@ export function NextRoundBanner({
       <Link
         href={href}
         className="absolute inset-0 z-10"
-        aria-label={
-          round
-            ? isAdmin && isPrelist
-              ? "Retomar pré-lista"
-              : "Abrir rodada oficial"
-            : "Abrir histórico de rodadas"
-        }
+        aria-label="Abrir agenda da pelada"
       />
 
       {/* Imagem de Fundo com Troféu e Estádio */}
@@ -98,14 +77,9 @@ export function NextRoundBanner({
             </span>
           </div>
 
-          <Link
-            href="/ranking"
-            className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-400/40 bg-gradient-to-br from-amber-500/25 to-black/40 text-amber-300 hover:text-amber-200 hover:scale-105 hover:border-amber-400 transition-all shadow-[0_0_20px_rgba(245,158,11,0.25)] backdrop-blur-md"
-            title="Ver Ranking da Liga"
-            aria-label="Ver Ranking da Liga"
-          >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-400/40 bg-gradient-to-br from-amber-500/25 to-black/40 text-amber-300 shadow-[0_0_20px_rgba(245,158,11,0.25)] backdrop-blur-md">
             <Trophy className="h-6 w-6" />
-          </Link>
+          </span>
         </div>
 
         {/* Informações Centrais: Título Boleiro e Convocados */}
@@ -153,12 +127,11 @@ export function NextRoundBanner({
             )}
 
             {round && (
-              hasOpenCallup || confirmedCount > 0 ? (
+              confirmedCount > 0 ? (
                 <span className="inline-flex items-center gap-1.5 rounded-xl border border-accent/30 bg-accent/15 px-2.5 py-1 text-[11px] font-black text-accent backdrop-blur-md">
                   <Users className="h-3.5 w-3.5" />
                   <span>
                     {confirmedCount} {confirmedCount === 1 ? "convocado" : "convocados"}
-                    {hasOpenCallup && confirmedCount === 0 ? " · Lista aberta" : ""}
                   </span>
                 </span>
               ) : (
@@ -178,35 +151,10 @@ export function NextRoundBanner({
           </div>
         </div>
 
-        {/* Rodapé: Ações Rápidas */}
-        <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-30 flex items-end justify-between gap-2 border-t border-white/10 pt-3.5">
-          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-            <Link
-              href="/rodadas"
-              className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-[10px] font-black uppercase text-foreground hover:bg-white/10 hover:border-white/30 transition-all backdrop-blur-sm"
-              title="Histórico de partidas"
-            >
-              <Clock className="h-3.5 w-3.5 text-amber-400" />
-              <span>Partidas</span>
-            </Link>
-
-            <Link
-              href="/admin/prelistas"
-              className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-[10px] font-black uppercase text-foreground hover:bg-white/10 hover:border-white/30 transition-all backdrop-blur-sm"
-              title="Pré-listas salvas"
-            >
-              <ClipboardList className="h-3.5 w-3.5 text-accent" />
-              <span>Pré-listas</span>
-            </Link>
-          </div>
-
-          <Link
-            href={href}
-            className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-accent to-emerald-400 px-4 py-2.5 text-[11px] font-black uppercase tracking-wider text-background shadow-[0_0_25px_rgba(204,255,0,0.35)] hover:brightness-110 active:scale-95 transition-all ml-auto"
-          >
-            <span>{isAdmin && isPrelist ? "Montar Times" : "Ver Rodada"}</span>
-            <ChevronRight className="h-4 w-4" />
-          </Link>
+        <div className="absolute inset-x-0 bottom-0 z-30 border-t border-white/10 pt-3.5 text-right">
+          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-accent">
+            Toque para ver a agenda da pelada
+          </span>
         </div>
       </div>
     </article>

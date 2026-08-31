@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarPlus, ChevronRight, Football, Sparkles, Trophy } from "@/components/icons";
+import { Football, Sparkles, Trophy } from "@/components/icons";
 
 type FriendlyRound = {
   id: string;
@@ -10,7 +10,7 @@ type FriendlyRound = {
 };
 
 export function PreSeasonBanner({ isAdmin, friendly }: { isAdmin: boolean; friendly: FriendlyRound | null }) {
-  const href = friendly ? `/rodadas/${friendly.id}` : isAdmin ? "/admin/rodada?type=friendly" : null;
+  const href = "/rodadas";
   const content = (
     <div className="group relative isolate flex h-full min-h-[350px] sm:min-h-[360px] flex-col justify-between overflow-hidden rounded-[28px] border border-accent/35 bg-[#07150d] p-5 shadow-[0_22px_60px_rgba(0,0,0,.38),0_0_28px_rgba(204,255,0,.08)] sm:p-6">
       <div className="pointer-events-none absolute inset-0 opacity-40" style={{ backgroundImage: "linear-gradient(rgba(204,255,0,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(204,255,0,.07) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
@@ -44,15 +44,13 @@ export function PreSeasonBanner({ isAdmin, friendly }: { isAdmin: boolean; frien
               <p className="truncate text-[9px] text-muted">{friendly ? `${friendly.confirmedPlayers || 0} participantes · ${friendly.status === "active" ? "em andamento" : "em preparação"}` : isAdmin ? "Monte os times e abra a pré-temporada" : "Aguardando o ADM chamar o jogo"}</p>
             </div>
           </div>
-          {href && (
-            <span className="flex shrink-0 items-center gap-1 rounded-xl bg-accent px-3 py-2.5 text-[10px] font-black uppercase text-background shadow-[0_0_24px_rgba(204,255,0,.2)]">
-              {friendly ? "Acessar" : <><CalendarPlus className="h-4 w-4" /> Iniciar</>}<ChevronRight className="h-3.5 w-3.5" />
-            </span>
-          )}
+          <span className="max-w-[116px] text-right text-[9px] font-black uppercase leading-4 tracking-wide text-accent">
+            Toque para ver a agenda
+          </span>
         </div>
       </div>
     </div>
   );
 
-  return href ? <Link href={href} className="block" aria-label={friendly ? "Abrir amistoso da pré-temporada" : "Iniciar amistoso da pré-temporada"}>{content}</Link> : content;
+  return <Link href={href} className="block" aria-label="Abrir agenda da pelada">{content}</Link>;
 }

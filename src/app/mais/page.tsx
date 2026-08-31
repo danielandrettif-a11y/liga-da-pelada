@@ -5,7 +5,7 @@ import { logout } from "@/app/login/actions";
 import { InstallAppEntry } from "@/components/InstallAppPrompt";
 import { CallupAdminCard } from "@/components/CallupAdminCard";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
-import { getActiveCallup } from "@/lib/actions/callups";
+import { getActiveCallups } from "@/lib/actions/callups";
 import { getLeagueConfig } from "@/lib/actions/league";
 import { PreSeasonToggle } from "@/components/PreSeasonToggle";
 import {
@@ -101,9 +101,9 @@ const ADMIN_SECTIONS = [
 
 export default async function MaisPage() {
   const account = await getCurrentAccount();
-  const [identity, activeCallup, leagueConfig, stadiums] = await Promise.all([
+  const [identity, activeCallups, leagueConfig, stadiums] = await Promise.all([
     getCurrentAccountIdentity(),
-    account.isAdmin ? getActiveCallup() : Promise.resolve(null),
+    account.isAdmin ? getActiveCallups() : Promise.resolve([]),
     account.isAdmin ? getLeagueConfig() : Promise.resolve(null),
     account.isAdmin ? getStadiums() : Promise.resolve([]),
   ]);
@@ -147,7 +147,7 @@ export default async function MaisPage() {
             <Link href="/mais/notificacoes" className={`flex items-center gap-3 px-4 py-3.5 hover:bg-surface-hover ${account.profile?.player_id ? "border-t border-border" : ""}`}>
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface"><Bell className="h-5 w-5 text-accent" /></div>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-foreground">Notificações</p>
+                <p className="text-sm font-semibold text-foreground">Preferências de notificações</p>
                 <p className="text-xs text-muted">Partidas, Cartola e lembretes por e-mail</p>
               </div>
               <ChevronRight className="h-4 w-4 text-muted" />
@@ -162,7 +162,7 @@ export default async function MaisPage() {
 
       {account.isAdmin && (
         <CallupAdminCard
-          callup={activeCallup}
+          callups={activeCallups}
           stadiums={stadiums}
           playersPerTeam={leagueConfig?.players_per_team || 5}
           teamsPerRound={leagueConfig?.teams_per_round || 3}

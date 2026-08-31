@@ -737,6 +737,10 @@ textarea {
   box-shadow: 0 0 17px rgba(253, 224, 71, 0.45), 0 0 34px rgba(245, 158, 11, 0.22);
 }
 
+.cosmetic-aura-host--review {
+  box-shadow: -6px 0 18px rgba(34, 211, 238, 0.4), 6px 0 18px rgba(248, 113, 113, 0.4), 0 0 34px rgba(255, 255, 255, 0.14);
+}
+
 .cosmetic-aura-host--energy {
   box-shadow: 0 0 13px rgba(204, 255, 0, 0.2);
 }
@@ -825,6 +829,17 @@ textarea {
 @keyframes aura-droplet-pulse {
   0%, 100% { opacity: 0.25; transform: scale(0.9); }
   50% { opacity: 0.72; transform: scale(1.05); }
+}
+
+@keyframes aura-review-scan {
+  0% { opacity: 0; transform: translateY(-145%); }
+  12%, 62% { opacity: 0.78; }
+  82%, 100% { opacity: 0; transform: translateY(560%); }
+}
+
+@keyframes aura-review-flicker {
+  0%, 44%, 52%, 100% { opacity: 0.48; }
+  46%, 49% { opacity: 0.9; }
 }
 
 .cosmetic-aura--smoke::before {
@@ -958,6 +973,34 @@ textarea {
   animation: aura-light-sway 3.6s ease-in-out infinite;
 }
 
+.cosmetic-aura--review::before {
+  inset: 5%;
+  background:
+    repeating-conic-gradient(from 0deg, rgba(34, 211, 238, 0.78) 0 1.4deg, transparent 2deg 29deg),
+    repeating-conic-gradient(from 15deg, rgba(248, 113, 113, 0.72) 0 1.4deg, transparent 2deg 29deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 67%, #000 69% 73%, transparent 76%);
+  mask: radial-gradient(circle, transparent 0 67%, #000 69% 73%, transparent 76%);
+  animation: aura-slow-orbit 18s linear infinite reverse;
+}
+
+.cosmetic-aura--review::after {
+  inset: 10%;
+  border: 1px dashed rgba(255, 255, 255, 0.68);
+  background:
+    linear-gradient(90deg, transparent 43%, rgba(248, 113, 113, 0.82) 43.5% 45%, transparent 45.5% 55%, rgba(34, 211, 238, 0.82) 55.5% 57%, transparent 57.5%);
+  box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.12), -3px 0 10px rgba(34, 211, 238, 0.22), 3px 0 10px rgba(248, 113, 113, 0.22);
+  animation: aura-review-flicker 3.4s steps(1, end) infinite;
+}
+
+.cosmetic-aura--review .cosmetic-aura__detail {
+  inset: 5%;
+  background:
+    radial-gradient(circle at 14% 22%, #cffafe 0 1.6%, rgba(34, 211, 238, 0.5) 2.4%, transparent 5.8%),
+    radial-gradient(circle at 86% 72%, #fee2e2 0 1.6%, rgba(248, 113, 113, 0.5) 2.4%, transparent 5.8%),
+    linear-gradient(90deg, transparent 0 8%, rgba(34, 211, 238, 0.66) 8% 18%, transparent 18% 82%, rgba(248, 113, 113, 0.66) 82% 92%, transparent 92%) center / 100% 1px no-repeat;
+  animation: aura-soft-breathe 2.8s ease-in-out infinite;
+}
+
 .cosmetic-aura--energy::before {
   inset: 15%;
   border: 1px solid rgba(204, 255, 0, 0.44);
@@ -1074,6 +1117,37 @@ textarea {
     radial-gradient(circle at 76% 66%, rgba(254,240,138,.78) 0 1.2%, transparent 3.2%),
     linear-gradient(180deg, rgba(251, 191, 36, 0.08), rgba(120, 53, 15, 0.12));
   animation: aura-droplet-pulse 2.1s ease-in-out infinite;
+}
+
+.cosmetic-aura-inside--review {
+  background: linear-gradient(90deg, rgba(8, 145, 178, 0.1), transparent 42% 58%, rgba(220, 38, 38, 0.1));
+  mix-blend-mode: screen;
+}
+
+.cosmetic-aura-inside--review::before {
+  inset: 8% -12% auto;
+  height: 15%;
+  border-radius: 0;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.72), rgba(34, 211, 238, 0.22), transparent);
+  filter: blur(0.5px);
+  box-shadow: 0 2px 5px rgba(248, 113, 113, 0.2);
+  animation: aura-review-scan 3.4s ease-in-out infinite;
+}
+
+.cosmetic-aura-inside--review::after {
+  background:
+    linear-gradient(90deg, transparent 43%, rgba(248, 113, 113, 0.78) 44% 45%, transparent 46% 54%, rgba(34, 211, 238, 0.78) 55% 56%, transparent 57%),
+    repeating-linear-gradient(0deg, transparent 0 9px, rgba(255, 255, 255, 0.08) 10px, transparent 11px);
+  animation: aura-review-flicker 3.4s steps(1, end) infinite;
+}
+
+.cosmetic-aura-inside--review .cosmetic-aura-inside__detail {
+  inset: 8%;
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+  background:
+    radial-gradient(circle at 16% 18%, #cffafe 0 1.4%, transparent 3.5%),
+    radial-gradient(circle at 84% 78%, #fee2e2 0 1.4%, transparent 3.5%);
+  animation: aura-soft-breathe 2.8s ease-in-out infinite reverse;
 }
 
 .cosmetic-aura-inside--energy::before {

@@ -11,6 +11,7 @@ export default async function PrelistasPage() {
   const account = await getCurrentAccount();
   if (!account.isAdmin) redirect("/mais");
   const prelists = await getAdminRoundPrelists();
+  if (prelists.length === 0) redirect("/admin/rodada?new=1");
 
   return (
     <div className="space-y-6">
@@ -90,7 +91,7 @@ export default async function PrelistasPage() {
                 </div>
               </Link>
               <div className="flex items-center justify-between gap-3 border-t border-white/5 px-4 py-2.5">
-                <Link href={`/admin/rodada?round=${prelist.id}&mount=1`} className={`min-w-0 flex-1 truncate text-[10px] font-black uppercase ${theme.action}`}>Editar e montar times</Link>
+                <span className={`min-w-0 flex-1 truncate text-[10px] font-black uppercase ${theme.action}`}>Toque no card para editar e montar</span>
                 <DeleteRoundButton redirectTo="/admin/prelistas" round={{
                   id: prelist.id,
                   number: prelist.number,

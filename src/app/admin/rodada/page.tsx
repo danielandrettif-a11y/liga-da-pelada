@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "@/components/icons";
 import { getPlayersWithStats } from "@/lib/actions/players";
 import { RoundCreator } from "@/components/RoundCreator";
-import { getActiveCallup } from "@/lib/actions/callups";
+import { getActiveCallups } from "@/lib/actions/callups";
 import { getLeagueConfig } from "@/lib/actions/league";
 import { getAdminRoundPrelist, getNextTeamPresetOffset } from "@/lib/actions/rounds";
 import { getStadiums } from "@/lib/actions/stadiums";
@@ -13,34 +13,42 @@ export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin
   const params = await searchParams;
   const requestedType = params.type === "friendly" ? "friendly" : "official";
   const requestedRoundId = typeof params.round === "string" ? params.round : null;
-  const [players, activeCallup, leagueConfig, officialPresetOffset, friendlyPresetOffset, prelist, stadiums] = await Promise.all([
+  const [players, activeCallups, leagueConfig, officialPresetOffset, friendlyPresetOffset, prelist, stadiums] = await Promise.all([
     getPlayersWithStats("official", true),
-    getActiveCallup(),
+    getActiveCallups(),
     getLeagueConfig(),
     getNextTeamPresetOffset("official"),
     getNextTeamPresetOffset("friendly"),
     requestedRoundId ? getAdminRoundPrelist(requestedRoundId) : Promise.resolve(null),
     getStadiums(),
   ]);
-  const requestedCallup = typeof params.callup === "string" && activeCallup?.id === params.callup ? activeCallup : null;
-  const linkedCallup = prelist?.callupId && activeCallup?.id === prelist.callupId ? activeCallup : null;
+  const requestedCallup = typeof params.callup === "string"
+    ? activeCallups.find((item) => item.id === params.callup) || null
+    : null;
+  const linkedCallup = prelist?.callupId
+    ? activeCallups.find((item) => item.id === prelist.callupId) || null
+    : null;
   const callup = linkedCallup || requestedCallup;
   const prelistIds = prelist?.round_players?.map((entry: any) => entry.player_id) || [];
-  const confirmedIds = prelistIds.length
-    ? prelistIds
-    : callup?.entries.filter((entry) => entry.status === "confirmed").map((entry) => entry.player_id) || [];
-  const availableCallup = activeCallup?.status === "open" && (!activeCallup.round_id || activeCallup.round_id === prelist?.id) ? {
-    id: activeCallup.id,
-    date: activeCallup.date,
-    roundType: activeCallup.round_type,
-    playerIds: activeCallup.entries.filter((entry) => entry.status === "confirmed").map((entry) => entry.player_id),
-  } : null;
+  const confirmedIds = callup
+    ? callup.entries.filter((entry) => entry.status === "confirmed").map((entry) => entry.player_id)
+    : prelistIds;
+  const availableCallups = activeCallups
+    .filter((item) => item.status === "open" && (!item.round_id || item.round_id === prelist?.id))
+    .map((item) => ({
+      id: item.id,
+      date: item.date,
+      startTime: item.start_time?.slice(0, 5) || "08:00",
+      roundType: item.round_type,
+      playerIds: item.entries.filter((entry) => entry.status === "confirmed").map((entry) => entry.player_id),
+      entryIds: item.entries.map((entry) => entry.player_id),
+    }));
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Link
-          href="/admin/prelistas"
+          href={prelist ? "/admin/prelistas" : "/rodadas"}
           className="w-10 h-10 rounded-full bg-surface hover:bg-surface-hover flex items-center justify-center transition-colors"
         >
           <ArrowLeft className="w-5 h-5 text-muted" />
@@ -63,7 +71,7 @@ export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin
         roundType={prelist?.round_type || callup?.round_type || requestedType}
         callupId={callup?.id || null}
         prelistRoundId={prelist?.id || null}
-        availableCallup={availableCallup}
+        availableCallups={availableCallups}
         mountTeams={params.mount === "1"}
         prelistNumber={prelist?.number || null}
         playersPerTeam={leagueConfig?.players_per_team || 5}

@@ -74,7 +74,7 @@ export function InboxCard({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="text-xs font-black uppercase tracking-tight text-foreground">
-                Notificações
+                Avisos
               </h2>
               {unreadCount > 0 && (
                 <span className="rounded-full bg-accent/20 px-2 py-0.5 font-athletic text-[8px] font-black uppercase text-accent">

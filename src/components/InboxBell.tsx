@@ -51,7 +51,7 @@ export function InboxBell({
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-surface/80 text-foreground transition-all hover:border-accent/40 hover:bg-surface active:scale-95 shadow-sm"
-        aria-label="Abrir notificações"
+        aria-label="Abrir avisos"
         aria-expanded={isOpen}
       >
         <Bell className="h-5 w-5 text-muted hover:text-foreground transition-colors" />
@@ -72,7 +72,7 @@ export function InboxBell({
             onClick={() => setIsOpen(false)}
             role="dialog"
             aria-modal="true"
-            aria-label="Central de Notificações"
+            aria-label="Central de avisos"
           >
             <div
               className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-accent/30 bg-[#07150d] p-0 shadow-[0_20px_60px_rgba(0,0,0,0.95)] animate-fade-in-up"
@@ -82,7 +82,7 @@ export function InboxBell({
               <div className="flex items-center justify-between border-b border-border/80 px-4 py-3.5 bg-black/40">
                 <div className="flex items-center gap-2">
                   <span className="font-athletic text-sm font-black uppercase tracking-wider text-foreground">
-                    Notificações
+                    Avisos
                   </span>
                   {unreadCount > 0 && (
                     <span className="rounded-full bg-danger/20 px-2 py-0.5 text-[9px] font-black uppercase text-danger border border-danger/30">

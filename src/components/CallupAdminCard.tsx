@@ -8,21 +8,24 @@ import { closeCallup, openCallup, updateCallup, type CallupWithEntries } from "@
 import type { Stadium } from "@/lib/types";
 
 export function CallupAdminCard({
-  callup,
+  callups,
   stadiums = [],
   playersPerTeam = 5,
   teamsPerRound = 3,
 }: {
-  callup: CallupWithEntries | null;
+  callups: CallupWithEntries[];
   stadiums?: Stadium[];
   playersPerTeam?: number;
   teamsPerRound?: number;
 }) {
   const router = useRouter();
+  const [selectedCallupId, setSelectedCallupId] = useState(callups[0]?.id || "");
+  const [showCreate, setShowCreate] = useState(callups.length === 0);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const callup = callups.find((item) => item.id === selectedCallupId) || callups[0] || null;
   const confirmed = callup?.entries.filter((entry) => entry.status === "confirmed").length || 0;
   const capacity = callup?.capacity || playersPerTeam * teamsPerRound;
   const waitlistCapacity = callup?.waitlist_capacity ?? 3;
@@ -32,7 +35,10 @@ export function CallupAdminCard({
     setError("");
     const result = await openCallup(formData);
     if (!result.success) setError(result.error || "Erro ao abrir convocação.");
-    else router.refresh();
+    else {
+      setShowCreate(false);
+      router.refresh();
+    }
     setLoading(false);
   }
 
@@ -72,7 +78,7 @@ export function CallupAdminCard({
     const venueText = callup.stadium_name ? `\n📍 Local: ${callup.stadium_name}` : "";
     const mapText = callup.stadium_map_url ? `\n🗺️ Como chegar: ${callup.stadium_map_url}` : "";
 
-    const text = `⚽ Convocação aberta para ${type}!\n📅 Data: ${dateFormatted}\n⏰ Horário: ${time}${venueText}${mapText}\n\n👉 Confirme sua presença: ${window.location.origin}/convocacao`;
+    const text = `⚽ Convocação aberta para ${type}!\n📅 Data: ${dateFormatted}\n⏰ Horário: ${time}${venueText}${mapText}\n\n👉 Confirme sua presença: ${window.location.origin}/convocacao?callup=${callup.id}`;
 
     await navigator.clipboard.writeText(text);
     setCopied(true);
@@ -83,19 +89,22 @@ export function CallupAdminCard({
     <section>
       <div className="mb-2 flex items-center justify-between px-1">
         <h2 className="text-xs font-bold uppercase tracking-wider text-muted">Convocação</h2>
-        {callup && !editing && (
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="flex items-center gap-1 text-[10px] font-black uppercase text-accent hover:underline"
-          >
-            <PencilLine className="h-3 w-3" /> Editar dados
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {callup && !editing && !showCreate && (
+            <button type="button" onClick={() => setEditing(true)} className="flex items-center gap-1 text-[10px] font-black uppercase text-muted hover:text-accent">
+              <PencilLine className="h-3 w-3" /> Editar
+            </button>
+          )}
+          {!showCreate && (
+            <button type="button" onClick={() => { setEditing(false); setShowCreate(true); }} className="flex items-center gap-1 text-[10px] font-black uppercase text-accent hover:underline">
+              <CalendarPlus className="h-3 w-3" /> Nova
+            </button>
+          )}
+        </div>
       </div>
       <div className="glass-card min-w-0 overflow-hidden p-4">
         {error && <div className="mb-3 rounded-lg bg-danger/10 p-3 text-xs font-bold text-danger">{error}</div>}
-        {!callup ? (
+        {showCreate || !callup ? (
           <form action={create} className="min-w-0 space-y-3 overflow-hidden">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10">
@@ -167,6 +176,11 @@ export function CallupAdminCard({
             >
               {loading ? "Abrindo..." : "Abrir convocação"}
             </button>
+            {callups.length > 0 && (
+              <button type="button" onClick={() => setShowCreate(false)} className="w-full rounded-xl border border-border py-2.5 text-xs font-bold text-muted">
+                Cancelar
+              </button>
+            )}
           </form>
         ) : editing ? (
           <form action={handleEdit} className="min-w-0 space-y-3 overflow-hidden animate-fade-in">
@@ -260,7 +274,21 @@ export function CallupAdminCard({
           </form>
         ) : (
           <div className="space-y-3">
-            <Link href="/convocacao" className="flex items-center gap-3">
+            {callups.length > 1 && (
+              <select
+                value={callup?.id || ""}
+                onChange={(event) => { setSelectedCallupId(event.target.value); setEditing(false); setError(""); }}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs font-bold text-foreground"
+                aria-label="Selecionar convocação"
+              >
+                {callups.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.round_type === "friendly" ? "Amistoso" : "Ranked"} · {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(new Date(`${item.date}T12:00:00`))}
+                  </option>
+                ))}
+              </select>
+            )}
+            <Link href={`/convocacao?callup=${callup?.id}`} className="flex items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/10">
                 <CheckCircle2 className="h-5 w-5 text-accent" />
               </div>

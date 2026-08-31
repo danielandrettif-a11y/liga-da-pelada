@@ -138,12 +138,9 @@ export default async function HomePage() {
     );
   }
 
-  const { nextRound, nextFriendly, preseasonEnabled, activeCallup, liveMatch, matchDuration, venue, eventDurationMinutes, lastRound, rankingPreview, highlights } = data;
+  const { nextRound, nextFriendly, preseasonEnabled, activeCallups = [], liveMatch, matchDuration, venue, eventDurationMinutes, lastRound, rankingPreview, highlights } = data;
 
   const currentPlayerId = account.profile?.player_id || null;
-  const userEntry = activeCallup && currentPlayerId
-    ? (activeCallup.entries || []).find((entry: any) => entry.playerId === currentPlayerId) || null
-    : null;
 
   return (
     <div className="space-y-5">
@@ -159,18 +156,24 @@ export default async function HomePage() {
       <section className="space-y-3">
         <div className="px-1">
           <h2 className="font-athletic text-sm font-black uppercase italic tracking-wider text-foreground">
-            {activeCallup && (nextRound || nextFriendly) ? "Em destaque" : activeCallup ? "Convocação" : "Próxima Rodada"}
+            {activeCallups.length > 0 ? "Agenda da Pelada" : "Próxima Rodada"}
           </h2>
         </div>
 
         {(() => {
-          const isConfirmed = userEntry?.status === "confirmed";
+          const callupSlides = activeCallups.map((callup: any) => {
+            const userEntry = currentPlayerId
+              ? (callup.entries || []).find((entry: any) => entry.playerId === currentPlayerId) || null
+              : null;
+            return <OpenCallupBanner key={callup.id} callup={callup} userEntry={userEntry} />;
+          });
 
-          const callupSlide = activeCallup ? (
-            <OpenCallupBanner key="callup" callup={activeCallup} userEntry={userEntry} />
-          ) : null;
-
-          const roundSlide = preseasonEnabled ? (
+          const upcomingRound = preseasonEnabled ? nextFriendly : nextRound;
+          const upcomingType = preseasonEnabled ? "friendly" : "official";
+          const isRoundCoveredByCallup = Boolean(upcomingRound && activeCallups.some((callup: any) =>
+            callup.roundId === upcomingRound.id || (callup.date === upcomingRound.date && callup.roundType === upcomingType),
+          ));
+          const roundSlide = isRoundCoveredByCallup ? null : preseasonEnabled ? (
             <PreSeasonBanner key="friendly" isAdmin={account.isAdmin} friendly={nextFriendly} />
           ) : (
             <NextRoundBanner
@@ -179,15 +182,10 @@ export default async function HomePage() {
               isAdmin={account.isAdmin}
               venue={venue}
               eventDurationMinutes={eventDurationMinutes}
-              activeCallup={activeCallup}
             />
           );
 
-          // Se já confirmou presença: Banner Azul (Rodada) fica na frente
-          // Se ainda não aceitou/confirmou: Banner de Convocação fica na frente
-          const slides = isConfirmed
-            ? [roundSlide, callupSlide].filter(Boolean)
-            : [callupSlide, roundSlide].filter(Boolean);
+          const slides = [...callupSlides, roundSlide].filter(Boolean);
 
           if (slides.length > 1) {
             return <HomeHeroCarousel>{slides}</HomeHeroCarousel>;
