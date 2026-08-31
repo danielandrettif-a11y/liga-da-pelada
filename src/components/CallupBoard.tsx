@@ -45,6 +45,7 @@ import { PlayerProfileBadge } from "./PlayerProfileBadge";
 import { RoundCalendarButton } from "./RoundCalendarButton";
 import { CallupTacticalAlertModal } from "./CallupTacticalAlertModal";
 import { useDialogViewport } from "@/lib/useDialogViewport";
+import type { EquippedCosmeticsSummary } from "@/lib/actions/cosmetics";
 
 type Props = {
   callup: CallupWithEntries;
@@ -57,6 +58,7 @@ type Props = {
   stadiumMapUrl?: string | null;
   stadiums?: Stadium[];
   fantasyHighlights?: FantasyQuickHighlight | null;
+  playerCosmetics?: Record<string, EquippedCosmeticsSummary>;
 };
 
 export function CallupBoard({
@@ -70,6 +72,7 @@ export function CallupBoard({
   stadiumMapUrl,
   stadiums = [],
   fantasyHighlights,
+  playerCosmetics = {},
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState("");
@@ -613,6 +616,8 @@ export function CallupBoard({
                     <PlayerAvatar
                       name={entry.player.name}
                       avatarUrl={entry.player.avatar_url}
+                      frameKey={playerCosmetics[entry.player_id]?.frameKey}
+                      auraKey={playerCosmetics[entry.player_id]?.auraKey}
                       className="h-9 w-9 shrink-0 rounded-full bg-surface text-xs font-black text-muted"
                     />
 
@@ -698,6 +703,8 @@ export function CallupBoard({
                       <PlayerAvatar
                         name={entry.player.name}
                         avatarUrl={entry.player.avatar_url}
+                        frameKey={playerCosmetics[entry.player_id]?.frameKey}
+                        auraKey={playerCosmetics[entry.player_id]?.auraKey}
                         className="h-9 w-9 shrink-0 rounded-full bg-surface text-xs font-black text-muted"
                       />
 

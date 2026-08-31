@@ -6,7 +6,9 @@ import { createMatch } from "@/lib/actions/matches";
 import { Swords, ArrowLeft, ChevronRight, ChevronDown, AlertTriangle, Check, ArrowLeftRight, Crown, Users } from "@/components/icons";
 import Link from "next/link";
 import { TeamCrest } from "./TeamCrest";
-import { markRoundTeamArrived, setRoundTeamCaptain, swapRoundTeamPlayers } from "@/lib/actions/rounds";
+import { markRoundTeamArrived, setRoundTeamCaptain, setRoundTeamVestColor, swapRoundTeamPlayers } from "@/lib/actions/rounds";
+import { VEST_COLORS } from "@/lib/vest-colors";
+import { pickFairSubstitute } from "@/lib/substitution-draw";
 
 export function MatchCreator({ round }: { round: any }) {
   const router = useRouter();
@@ -25,6 +27,10 @@ export function MatchCreator({ round }: { round: any }) {
   ));
   const [goalkeeperByTeam, setGoalkeeperByTeam] = useState<Record<string, string>>({});
   const [goalkeeperModeByTeam, setGoalkeeperModeByTeam] = useState<Record<string, "bq" | "manual">>({});
+  const [colorByTeam, setColorByTeam] = useState<Record<string, string>>(() => Object.fromEntries(
+    (round?.teams || []).map((team: any) => [team.id, team.color || "#22c55e"]),
+  ));
+  const [substitutionNotice, setSubstitutionNotice] = useState<Array<{ absent: string; replacement: string }> | null>(null);
 
   const teams = useMemo(() => round?.teams || [], [round?.teams]);
   const playerTeamById = useMemo(() => new Map(
@@ -40,8 +46,8 @@ export function MatchCreator({ round }: { round: any }) {
   // Apenas uma rodada que realmente registrou uma ordem de chegada deve
   // exigir os dois times titulares no primeiro jogo. Sorteios aleatório e
   // equilibrado deixam os três times disponíveis desde o início.
-  const usesAttendance = round?.formation_mode !== "manual"
-    && (round?.round_players || []).some((entry: any) => entry.attendance_order != null);
+  const tracksAttendance = round?.formation_mode !== "manual";
+  const usesArrivalOrder = round?.arrival_order_enabled === true;
   const previousMatch = useMemo(() => [...(round?.matches || [])].sort((a: any, b: any) =>
     (b.match_order || 0) - (a.match_order || 0) || String(b.created_at).localeCompare(String(a.created_at)),
   )[0], [round?.matches]);
@@ -49,7 +55,7 @@ export function MatchCreator({ round }: { round: any }) {
   const selectedTeams = teams.filter((team: any) => selectedTeamIds.includes(team.id));
   const injuredPlayers = selectedTeams.flatMap((team: any) =>
     (team.team_players || [])
-      .filter((entry: any) => availability.get(entry.player_id) === "injured" || (usesAttendance && attendance.get(entry.player_id) !== "present"))
+      .filter((entry: any) => availability.get(entry.player_id) === "injured" || (tracksAttendance && attendance.get(entry.player_id) !== "present"))
       .map((entry: any) => ({ team, player: entry.players, playerId: entry.player_id, reason: availability.get(entry.player_id) === "injured" ? "Machucado" : "Ainda nao chegou" })),
   );
   const outgoingTeamIds = previousMatch
@@ -58,12 +64,23 @@ export function MatchCreator({ round }: { round: any }) {
   const waitingPlayers = teams
     .filter((team: any) => outgoingTeamIds.includes(team.id))
     .flatMap((team: any) => (team.team_players || [])
-      .filter((entry: any) => availability.get(entry.player_id) === "available" && (!usesAttendance || attendance.get(entry.player_id) === "present"))
+      .filter((entry: any) => availability.get(entry.player_id) === "available" && (!tracksAttendance || attendance.get(entry.player_id) === "present"))
       .map((entry: any) => ({ team, player: entry.players, playerId: entry.player_id })))
     .filter((entry: any) => entry.player);
+  const previousLoanCount = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const match of round?.matches || []) {
+      for (const player of match.match_players || []) {
+        if (player.original_team_id && player.team_id !== player.original_team_id) {
+          counts.set(player.player_id, (counts.get(player.player_id) || 0) + 1);
+        }
+      }
+    }
+    return counts;
+  }, [round?.matches]);
   const eligibleGoalkeepersByTeam = useMemo(() => Object.fromEntries(teams.map((team: any) => {
     const players = (team.team_players || [])
-      .filter((entry: any) => availability.get(entry.player_id) !== "injured" && (!usesAttendance || attendance.get(entry.player_id) === "present"))
+      .filter((entry: any) => availability.get(entry.player_id) !== "injured" && (!tracksAttendance || attendance.get(entry.player_id) === "present"))
       .map((entry: any) => ({
         id: entry.player_id,
         name: entry.players?.name || "Jogador",
@@ -79,17 +96,17 @@ export function MatchCreator({ round }: { round: any }) {
           id: replacementId,
           name: replacement.player.name,
           isGoalkeeper: Boolean(replacement.player.is_goalkeeper),
-          goalkeeperOrder: Number.MAX_SAFE_INTEGER,
+          goalkeeperOrder: Number((team.team_players || []).find((item: any) => item.player_id === absentId)?.goalkeeper_order || Number.MAX_SAFE_INTEGER),
         });
       }
     }
     return [team.id, players];
-  })), [teams, availability, attendance, usesAttendance, replacementByAbsent, playerTeamById, waitingPlayers]);
+  })), [teams, availability, attendance, tracksAttendance, replacementByAbsent, playerTeamById, waitingPlayers]);
 
   const bqGoalkeeperSuggestionByTeam = useMemo(() => Object.fromEntries(teams.map((team: any) => {
     const rotation = [...(team.team_players || [])]
       .map((entry: any) => ({
-        id: entry.player_id,
+        id: replacementByAbsent[entry.player_id] || entry.player_id,
         order: Number(entry.goalkeeper_order || Number.MAX_SAFE_INTEGER),
       }))
       .sort((a, b) => a.order - b.order);
@@ -115,11 +132,39 @@ export function MatchCreator({ round }: { round: any }) {
     }
 
     return [team.id, null] as const;
-  })), [teams, eligibleGoalkeepersByTeam, round?.matches]);
+  })), [teams, eligibleGoalkeepersByTeam, round?.matches, replacementByAbsent]);
 
   useEffect(() => {
     setReplacementByAbsent({});
+    setSubstitutionNotice(null);
   }, [teamAId, teamBId]);
+
+  const missingSubstitutionKey = injuredPlayers
+    .filter((entry: any) => !replacementByAbsent[entry.playerId])
+    .map((entry: any) => entry.playerId)
+    .sort()
+    .join("|");
+  const waitingPlayerKey = waitingPlayers.map((entry: any) => entry.playerId).sort().join("|");
+
+  useEffect(() => {
+    if (selectedTeamIds.length !== 2 || !missingSubstitutionKey || !waitingPlayerKey) return;
+    const usedNow = new Set(Object.values(replacementByAbsent).filter(Boolean));
+    const next = { ...replacementByAbsent };
+    const notice: Array<{ absent: string; replacement: string }> = [];
+    for (const entry of injuredPlayers.filter((item: any) => !next[item.playerId])) {
+      const picked = pickFairSubstitute<{ playerId: string; player: any; team: any }>(waitingPlayers, previousLoanCount, usedNow);
+      if (!picked) continue;
+      next[entry.playerId] = picked.playerId;
+      usedNow.add(picked.playerId);
+      notice.push({ absent: entry.player?.name || "Jogador", replacement: picked.player?.name || "Jogador" });
+    }
+    if (notice.length) {
+      setReplacementByAbsent(next);
+      setSubstitutionNotice(notice);
+    }
+  // A chave muda apenas quando os participantes da escolha mudam.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missingSubstitutionKey, waitingPlayerKey, selectedTeamIds.length]);
 
   useEffect(() => {
     setGoalkeeperByTeam((current) => {
@@ -266,8 +311,39 @@ export function MatchCreator({ round }: { round: any }) {
     setManagementLoading(false);
   }
 
+  async function handleVestColorChange(teamId: string, color: string) {
+    const previous = colorByTeam[teamId];
+    setColorByTeam((current) => ({ ...current, [teamId]: color }));
+    setManagementLoading(true);
+    setError("");
+    const result = await setRoundTeamVestColor(round.id, teamId, color);
+    if (!result.success) {
+      setColorByTeam((current) => ({ ...current, [teamId]: previous }));
+      setError(result.error || "Nao foi possivel definir a cor do colete.");
+    } else router.refresh();
+    setManagementLoading(false);
+  }
+
   return (
     <div className="space-y-6">
+      {substitutionNotice && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Sorteio de substituição">
+          <div className="w-full max-w-sm rounded-3xl border border-warning/35 bg-[#07150d] p-5 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-warning/15 text-warning"><ArrowLeftRight className="h-5 w-5" /></span>
+              <div><h2 className="text-base font-black text-foreground">Substituição sorteada</h2><p className="text-[10px] font-semibold text-muted">Quem foi menos sorteado teve prioridade.</p></div>
+            </div>
+            <div className="mt-4 space-y-2">
+              {substitutionNotice.map((item) => (
+                <div key={`${item.absent}-${item.replacement}`} className="rounded-xl border border-border bg-surface p-3 text-xs font-bold text-foreground">
+                  <span className="text-danger">{item.absent}</span><span className="px-2 text-muted">→</span><span className="text-accent">{item.replacement}</span>
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={() => setSubstitutionNotice(null)} className="mt-4 w-full rounded-xl bg-accent py-3 text-xs font-black uppercase text-background">Continuar</button>
+          </div>
+        </div>
+      )}
       {/* Top bar */}
       <div className="flex items-center gap-3">
         <Link
@@ -287,24 +363,33 @@ export function MatchCreator({ round }: { round: any }) {
       <section className="glass-card overflow-hidden">
         <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent"><Crown className="h-4.5 w-4.5" /></span>
-          <div><h2 className="text-sm font-black text-foreground">Capitães de referência</h2><p className="text-[10px] text-muted">O nome aparece nos cartões para facilitar quem joga contra quem.</p></div>
+          <div><h2 className="text-sm font-black text-foreground">Identidade dos times</h2><p className="text-[10px] text-muted">Escolha o colete e o capitão de referência no mesmo lugar.</p></div>
         </div>
         <div className="divide-y divide-border">
           {teams.map((team: any) => (
-            <label key={team.id} className="flex min-w-0 items-center gap-3 px-4 py-3">
-              <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-9 w-9 shrink-0" />
+            <div key={team.id} className="grid min-w-0 grid-cols-[auto_1fr] gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[auto_1fr_auto_auto] sm:items-center">
+              <TeamCrest name={team.name} crestUrl={team.crest_url} color={colorByTeam[team.id] || team.color} className="h-9 w-9 shrink-0 row-span-2 sm:row-span-1" />
               <span className="min-w-0 flex-1 truncate text-xs font-black text-foreground">{team.name}</span>
+              <label className="col-start-2 flex min-w-0 items-center gap-2 sm:col-start-auto">
+                <span className="text-[9px] font-black uppercase text-muted">Colete</span>
+                <select value={colorByTeam[team.id] || team.color} onChange={(event) => handleVestColorChange(team.id, event.target.value)} disabled={managementLoading} className="min-w-0 flex-1 rounded-xl border border-border bg-background px-2.5 py-2 text-[10px] font-bold text-foreground disabled:opacity-50 sm:w-28">
+                  {VEST_COLORS.map((item) => <option key={item.color} value={item.color}>{item.label}</option>)}
+                </select>
+              </label>
+              <label className="col-start-2 flex min-w-0 items-center gap-2 sm:col-start-auto">
+                <span className="text-[9px] font-black uppercase text-muted">Capitão</span>
               <select
                 value={captainByTeam[team.id] || ""}
                 onChange={(event) => handleCaptainChange(team.id, event.target.value)}
                 disabled={managementLoading}
                 aria-label={`Capitão do ${team.name}`}
-                className="min-w-0 max-w-[48%] rounded-xl border border-border bg-background px-2.5 py-2 text-[10px] font-bold text-foreground disabled:opacity-50"
+                className="min-w-0 flex-1 rounded-xl border border-border bg-background px-2.5 py-2 text-[10px] font-bold text-foreground disabled:opacity-50 sm:w-32"
               >
                 <option value="">Sem capitão</option>
                 {(team.team_players || []).map((entry: any) => <option key={entry.player_id} value={entry.player_id}>{entry.players?.name}</option>)}
               </select>
-            </label>
+              </label>
+            </div>
           ))}
         </div>
       </section>
@@ -325,8 +410,8 @@ export function MatchCreator({ round }: { round: any }) {
           <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
             {teams.map((t: any) => {
               const isSelected = teamAId === t.id;
-              const isDisabled = teamBId === t.id || (!previousMatch && usesAttendance && !firstMatchAllowedIds.has(t.id));
-              const vestColor = t.color || "#CCFF00";
+              const isDisabled = teamBId === t.id || (!previousMatch && usesArrivalOrder && !firstMatchAllowedIds.has(t.id));
+              const vestColor = colorByTeam[t.id] || t.color || "#CCFF00";
 
               return (
                 <button
@@ -341,11 +426,11 @@ export function MatchCreator({ round }: { round: any }) {
                     p-3 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-200
                     ${isSelected ? "scale-[1.03] ring-1 ring-white/20" : "hover:border-white/30 hover:bg-surface-hover"}
                     ${teamBId === t.id ? "opacity-40 cursor-not-allowed" : ""}
-                    ${!previousMatch && usesAttendance && !firstMatchAllowedIds.has(t.id) ? "opacity-35 cursor-not-allowed" : ""}
+                    ${!previousMatch && usesArrivalOrder && !firstMatchAllowedIds.has(t.id) ? "opacity-35 cursor-not-allowed" : ""}
                   `}
                   disabled={isDisabled}
                 >
-                  <TeamCrest name={t.name} crestUrl={t.crest_url} color={t.color} className="h-11 w-11" />
+                  <TeamCrest name={t.name} crestUrl={t.crest_url} color={vestColor} className="h-11 w-11" />
                   <span className="text-xs font-black truncate w-full text-center text-foreground">{t.name}</span>
                   <span
                     className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-black uppercase"
@@ -380,8 +465,8 @@ export function MatchCreator({ round }: { round: any }) {
           <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
             {teams.map((t: any) => {
               const isSelected = teamBId === t.id;
-              const isDisabled = teamAId === t.id || (!previousMatch && usesAttendance && !firstMatchAllowedIds.has(t.id));
-              const vestColor = t.color || "#CCFF00";
+              const isDisabled = teamAId === t.id || (!previousMatch && usesArrivalOrder && !firstMatchAllowedIds.has(t.id));
+              const vestColor = colorByTeam[t.id] || t.color || "#CCFF00";
 
               return (
                 <button
@@ -396,11 +481,11 @@ export function MatchCreator({ round }: { round: any }) {
                     p-3 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-200
                     ${isSelected ? "scale-[1.03] ring-1 ring-white/20" : "hover:border-white/30 hover:bg-surface-hover"}
                     ${teamAId === t.id ? "opacity-40 cursor-not-allowed" : ""}
-                    ${!previousMatch && usesAttendance && !firstMatchAllowedIds.has(t.id) ? "opacity-35 cursor-not-allowed" : ""}
+                    ${!previousMatch && usesArrivalOrder && !firstMatchAllowedIds.has(t.id) ? "opacity-35 cursor-not-allowed" : ""}
                   `}
                   disabled={isDisabled}
                 >
-                  <TeamCrest name={t.name} crestUrl={t.crest_url} color={t.color} className="h-11 w-11" />
+                  <TeamCrest name={t.name} crestUrl={t.crest_url} color={vestColor} className="h-11 w-11" />
                   <span className="text-xs font-black truncate w-full text-center text-foreground">{t.name}</span>
                   <span
                     className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-black uppercase"
@@ -492,7 +577,7 @@ export function MatchCreator({ round }: { round: any }) {
 
           {injuredPlayers.length > 0 && (
             <div className="space-y-4 p-4">
-              {usesAttendance && [...new Set(injuredPlayers.filter((entry: any) => entry.reason === "Ainda nao chegou").map((entry: any) => entry.team.id))].map((teamId: any) => {
+              {tracksAttendance && [...new Set(injuredPlayers.filter((entry: any) => entry.reason === "Ainda nao chegou").map((entry: any) => entry.team.id))].map((teamId: any) => {
                 const team = teams.find((item: any) => item.id === teamId);
                 return <div key={teamId} className="rounded-xl border border-warning/25 bg-warning/5 p-3"><div className="flex items-center gap-2"><Users className="h-4 w-4 text-warning" /><p className="flex-1 text-xs font-bold text-foreground">Todo mundo do {team?.name} chegou?</p><button type="button" disabled={managementLoading} onClick={() => markTeamArrived(teamId)} className="rounded-lg bg-accent px-3 py-2 text-[9px] font-black uppercase text-background">Sim, todos</button></div><p className="mt-2 text-[10px] text-muted">Se nao, escolha abaixo quem sera emprestado pelo time que acabou de sair.</p></div>;
               })}

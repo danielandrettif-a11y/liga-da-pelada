@@ -3,6 +3,7 @@
 import { supabase } from "../supabase";
 import { getRanking } from "./stats";
 import { getActiveSeason } from "./seasons";
+import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
 
 export async function getDashboardData() {
   try {
@@ -101,6 +102,7 @@ export async function getDashboardData() {
       { data: leagueData },
       { data: activeCallupsData },
       ranking,
+      cosmeticsByPlayer,
     ] = await Promise.all([
       nextRoundPromise,
       nextFriendlyPromise,
@@ -109,7 +111,13 @@ export async function getDashboardData() {
       leaguePromise,
       activeCallupsPromise,
       getRanking(),
+      getAllPlayersEquippedCosmeticsMap(),
     ]);
+
+    const rankingWithCosmetics = ranking.map((entry) => ({
+      ...entry,
+      cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
+    }));
 
     // Convocacoes ligadas a rodadas iniciadas/finalizadas deixam de ser destaque.
     const visibleCallups = (activeCallupsData || []).filter((callup: any) => {
@@ -145,11 +153,11 @@ export async function getDashboardData() {
     let topAssists = null;
     let topWins = null;
 
-    if (ranking && ranking.length > 0) {
+    if (rankingWithCosmetics.length > 0) {
       // Cria cópias para ordenar independentemente sem mutar a array original
-      topScorer = [...ranking].sort((a, b) => b.goals - a.goals)[0];
-      topAssists = [...ranking].sort((a, b) => b.assists - a.assists)[0];
-      topWins = [...ranking].sort((a, b) => b.wins - a.wins)[0];
+      topScorer = [...rankingWithCosmetics].sort((a, b) => b.goals - a.goals)[0];
+      topAssists = [...rankingWithCosmetics].sort((a, b) => b.assists - a.assists)[0];
+      topWins = [...rankingWithCosmetics].sort((a, b) => b.wins - a.wins)[0];
     }
 
     // Processamento da Última Rodada (mapear os times nas partidas)
@@ -204,7 +212,7 @@ export async function getDashboardData() {
         activeCallup: mappedCallups[0] || null,
         activeCallups: mappedCallups,
         lastRound: processedLastRound,
-        rankingPreview: ranking.slice(0, 5),
+        rankingPreview: rankingWithCosmetics.slice(0, 5),
         highlights: {
           topScorer: topScorer && topScorer.goals > 0 ? topScorer : null,
           topAssists: topAssists && topAssists.assists > 0 ? topAssists : null,

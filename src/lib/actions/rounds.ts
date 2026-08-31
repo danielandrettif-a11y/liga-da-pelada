@@ -7,6 +7,7 @@ import { getActiveSeason } from "./seasons";
 import { createClient as createServerClient } from "../supabase/server";
 import { getAdminClient, getCurrentAccount } from "../auth";
 import type { RoundType, TeamFormationMode } from "../types";
+import { VEST_COLORS } from "../vest-colors";
 import {
   DEFAULT_PLAYERS_PER_TEAM,
   MAX_PLAYERS_PER_TEAM,
@@ -112,6 +113,11 @@ export async function getRound(id: string) {
       matches (
         *,
         match_events (*),
+        match_players (
+          player_id,
+          team_id,
+          original_team_id
+        ),
         match_goalkeepers (
           team_id,
           player_id,
@@ -287,6 +293,22 @@ export async function setRoundPlayerAttendance(roundId: string, playerId: string
   }
 }
 
+export async function setRoundAttendanceBulk(roundId: string, presentPlayerIds: string[]) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem alterar a presenca." };
+    const { error } = await client.rpc("set_round_attendance_bulk", {
+      p_round_id: roundId,
+      p_present_player_ids: [...new Set(presentPlayerIds)],
+    });
+    if (error) throw new Error(error.message);
+    refreshRoundManagement(roundId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 export async function markRoundTeamArrived(roundId: string, teamId: string) {
   try {
     const client = await getAdminClient();
@@ -347,6 +369,20 @@ export async function setRoundTeamCaptain(roundId: string, teamId: string, playe
       p_team_id: teamId,
       p_player_id: playerId,
     });
+    if (error) throw new Error(error.message);
+    refreshRoundManagement(roundId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function setRoundTeamVestColor(roundId: string, teamId: string, color: string) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem definir os coletes." };
+    if (!VEST_COLORS.some((item) => item.color === color)) return { success: false, error: "Cor de colete inválida." };
+    const { error } = await client.from("teams").update({ color }).eq("id", teamId).eq("round_id", roundId);
     if (error) throw new Error(error.message);
     refreshRoundManagement(roundId);
     return { success: true };
@@ -691,20 +727,13 @@ export async function createRoundWithTeams(
     }
     }
 
-    const { error: clearAttendanceError } = await client.from("round_players").update({
-      attendance_status: "pending",
-      attendance_order: null,
-      attendance_marked_at: null,
-    }).eq("round_id", round.id);
-    if (clearAttendanceError) throw new Error(`Erro ao preparar presencas: ${clearAttendanceError.message}`);
-    for (const [attendanceIndex, playerId] of attendanceOrder.entries()) {
-      const { error: attendanceError } = await client.from("round_players").update({
-        attendance_status: "present",
-        attendance_order: attendanceIndex + 1,
-        attendance_marked_at: new Date().toISOString(),
-      }).eq("round_id", round.id).eq("player_id", playerId);
-      if (attendanceError) throw new Error(`Erro ao registrar presenca: ${attendanceError.message}`);
-    }
+    const arrivalOrderEnabled = attendanceOrder.length > 0;
+    const initialPresentPlayerIds = arrivalOrderEnabled ? attendanceOrder : allPlayerIds;
+    const { error: attendanceError } = await client.rpc("set_round_attendance_bulk", {
+      p_round_id: round.id,
+      p_present_player_ids: initialPresentPlayerIds,
+    });
+    if (attendanceError) throw new Error(`Erro ao preparar presencas: ${attendanceError.message}`);
 
     // 5. Inserir times e team_players
     for (const [teamIndex, team] of normalizedTeams.entries()) {
@@ -739,7 +768,7 @@ export async function createRoundWithTeams(
 
     const { error: readyError } = await client
       .from("rounds")
-      .update({ preparation_stage: "teams_ready", formation_mode: formationMode })
+      .update({ preparation_stage: "teams_ready", formation_mode: formationMode, arrival_order_enabled: arrivalOrderEnabled })
       .eq("id", round.id);
     if (readyError) throw new Error(`Erro ao concluir a rodada: ${readyError.message}`);
 

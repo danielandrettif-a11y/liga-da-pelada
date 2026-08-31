@@ -279,6 +279,8 @@ export default async function HomePage() {
                   <PlayerAvatar
                     name={name}
                     avatarUrl={stats.player?.avatar_url}
+                    frameKey={stats.cosmetics?.frameKey}
+                    auraKey={stats.cosmetics?.auraKey}
                     className="h-9 w-9 flex-shrink-0 rounded-full border border-border bg-surface-hover text-xs font-bold text-muted"
                   />
 

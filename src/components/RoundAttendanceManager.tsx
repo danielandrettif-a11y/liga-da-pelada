@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, Loader2, Users } from "@/components/icons";
 import { PlayerAvatar } from "./PlayerAvatar";
-import { setRoundPlayerAttendance } from "@/lib/actions/rounds";
+import { setRoundAttendanceBulk, setRoundPlayerAttendance } from "@/lib/actions/rounds";
 
 type AttendanceEntry = {
   player_id: string;
@@ -21,30 +21,64 @@ export function RoundAttendanceManager({ roundId, entries, canManage }: {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [localEntries, setLocalEntries] = useState(entries);
 
-  const ordered = useMemo(() => [...entries].filter((entry) => entry.players).sort((a, b) => {
+  useEffect(() => setLocalEntries(entries), [entries]);
+
+  const ordered = useMemo(() => [...localEntries].filter((entry) => entry.players).sort((a, b) => {
     if (a.attendance_status !== b.attendance_status) return a.attendance_status === "present" ? -1 : 1;
     if (a.attendance_status === "present") return (a.attendance_order || 0) - (b.attendance_order || 0);
     return (a.players?.name || "").localeCompare(b.players?.name || "", "pt-BR");
-  }), [entries]);
+  }), [localEntries]);
 
-  const presentCount = entries.filter((entry) => entry.attendance_status === "present").length;
+  const presentCount = localEntries.filter((entry) => entry.attendance_status === "present").length;
+
+  function withNormalizedOrders(items: AttendanceEntry[]) {
+    const orderByPlayer = new Map(
+      items
+        .filter((item) => item.attendance_status === "present")
+        .sort((a, b) => (a.attendance_order ?? Number.MAX_SAFE_INTEGER) - (b.attendance_order ?? Number.MAX_SAFE_INTEGER)
+          || (a.players?.name || "").localeCompare(b.players?.name || "", "pt-BR"))
+        .map((item, index) => [item.player_id, index + 1]),
+    );
+    return items.map((item) => item.attendance_status === "present"
+      ? { ...item, attendance_order: orderByPlayer.get(item.player_id) || null }
+      : { ...item, attendance_order: null });
+  }
 
   async function toggle(entry: AttendanceEntry) {
+    const previous = localEntries;
+    const willBePresent = entry.attendance_status !== "present";
+    setLocalEntries((current) => withNormalizedOrders(current.map((item) => item.player_id === entry.player_id
+      ? { ...item, attendance_status: willBePresent ? "present" : "pending" }
+      : item)));
     setPendingId(entry.player_id);
     setMessage("");
-    const result = await setRoundPlayerAttendance(roundId, entry.player_id, entry.attendance_status !== "present");
-    if (!result.success) setMessage(result.error || "Não foi possível atualizar a presença.");
+    const result = await setRoundPlayerAttendance(roundId, entry.player_id, willBePresent);
+    if (!result.success) {
+      setLocalEntries(previous);
+      setMessage(result.error || "Não foi possível atualizar a presença.");
+    }
     setPendingId(null);
   }
 
   async function markAll(status: boolean) {
+    const previous = localEntries;
+    const next = withNormalizedOrders(localEntries.map((entry) => ({
+      ...entry,
+      attendance_status: status ? "present" as const : "pending" as const,
+    })));
+    setLocalEntries(next);
     setBulkLoading(true);
     setMessage("");
-    for (const entry of entries) {
-      if ((entry.attendance_status === "present") !== status) {
-        await setRoundPlayerAttendance(roundId, entry.player_id, status);
-      }
+    const presentPlayerIds = next
+      .filter((entry) => entry.attendance_status === "present")
+      .sort((a, b) => (a.attendance_order || 0) - (b.attendance_order || 0))
+      .map((entry) => entry.player_id);
+    const result = await setRoundAttendanceBulk(roundId, presentPlayerIds);
+    if (!result.success) {
+      setLocalEntries(previous);
+      setMessage(result.error || "Não foi possível atualizar as presenças.");
     }
     setBulkLoading(false);
   }
@@ -79,7 +113,7 @@ export function RoundAttendanceManager({ roundId, entries, canManage }: {
             </span>
             {canManage && (
               <div className="flex gap-2">
-                {presentCount < entries.length ? (
+                {presentCount < localEntries.length ? (
                   <button
                     type="button"
                     disabled={bulkLoading || pendingId !== null}

@@ -2145,18 +2145,55 @@ export async function getFantasyRanking(
       }));
     }
   } else {
-    const { data } = await rankingReadClient
-      .from("fantasy_accounts")
-      .select("*")
-      .eq("fantasy_season_id", fs.id)
-      .order("total_points", { ascending: false });
+    const [{ data: accounts }, { data: seasonRounds }] = await Promise.all([
+      rankingReadClient
+        .from("fantasy_accounts")
+        .select("*")
+        .eq("fantasy_season_id", fs.id),
+      rankingReadClient
+        .from("fantasy_rounds")
+        .select("id")
+        .eq("fantasy_season_id", fs.id),
+    ]);
+    const fantasyRoundIds = (seasonRounds || []).map((item: any) => item.id);
+    const { data: scoredLineups } = fantasyRoundIds.length
+      ? await rankingReadClient
+          .from("fantasy_lineups")
+          .select("user_id, total_points")
+          .in("fantasy_round_id", fantasyRoundIds)
+          .eq("status", "scored")
+      : { data: [] as any[] };
+    const historicalByUser = new Map<string, { totalPoints: number; roundsPlayed: number; bestRound: number }>();
+    for (const lineup of scoredLineups || []) {
+      const current = historicalByUser.get(lineup.user_id) || { totalPoints: 0, roundsPlayed: 0, bestRound: 0 };
+      const roundPoints = Number(lineup.total_points || 0);
+      current.totalPoints += roundPoints;
+      current.roundsPlayed += 1;
+      current.bestRound = Math.max(current.bestRound, roundPoints);
+      historicalByUser.set(lineup.user_id, current);
+    }
     const byUserId = new Map<string, any>();
-    for (const item of data || []) {
+    for (const item of accounts || []) {
+      const historical = historicalByUser.get(item.user_id) || { totalPoints: 0, roundsPlayed: 0, bestRound: 0 };
       byUserId.set(item.user_id, {
-      ...item,
-      total_points: Number(item.total_points || 0) + (live?.byUserId.get(item.user_id)?.totalPoints || 0),
-      is_live: Boolean(live?.byUserId.has(item.user_id)),
+        ...item,
+        total_points: historical.totalPoints + (live?.byUserId.get(item.user_id)?.totalPoints || 0),
+        rounds_played: historical.roundsPlayed,
+        best_round_points: historical.bestRound,
+        is_live: Boolean(live?.byUserId.has(item.user_id)),
       });
+    }
+    for (const [userId, historical] of historicalByUser) {
+      if (!byUserId.has(userId)) {
+        byUserId.set(userId, {
+          user_id: userId,
+          total_points: historical.totalPoints + (live?.byUserId.get(userId)?.totalPoints || 0),
+          rounds_played: historical.roundsPlayed,
+          best_round_points: historical.bestRound,
+          current_budget: 0,
+          is_live: Boolean(live?.byUserId.has(userId)),
+        });
+      }
     }
     // Uma conta pode ter sido criada a partir da escalação e ainda não ter o
     // agregado histórico preenchido. A prévia ao vivo continua sendo válida e

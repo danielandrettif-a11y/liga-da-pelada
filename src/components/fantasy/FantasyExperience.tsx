@@ -1225,6 +1225,7 @@ export function FantasyExperience({
         <Link
           className="group flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-border bg-surface/80 px-1.5 py-3 text-center transition-colors hover:border-accent/40 hover:bg-surface-hover"
           href="/cartola/ranking"
+          prefetch={true}
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent group-hover:bg-accent group-hover:text-background"><Trophy className="h-4.5 w-4.5" /></span>
           <span className="truncate text-[10px] font-black text-foreground">Ranking</span>
@@ -1232,6 +1233,7 @@ export function FantasyExperience({
         <Link
           className="group flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-border bg-surface/80 px-1.5 py-3 text-center transition-colors hover:border-accent/40 hover:bg-surface-hover"
           href="/cartola/historico"
+          prefetch={true}
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent group-hover:bg-accent group-hover:text-background"><History className="h-4.5 w-4.5" /></span>
           <span className="truncate text-[10px] font-black text-foreground">Histórico</span>

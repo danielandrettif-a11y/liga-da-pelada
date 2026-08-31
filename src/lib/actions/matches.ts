@@ -44,7 +44,7 @@ export async function createMatch(input: CreateMatchInput) {
     if (replacements.length > 30) return { success: false, error: "Quantidade de substitutos invalida." };
 
     const [{ data: round, error: roundError }, { data: teams, error: teamsError }, { data: roundPlayers, error: roundPlayersError }] = await Promise.all([
-      client.from("rounds").select("id, status, formation_mode, league:league_id (match_duration)").eq("id", input.round_id).single(),
+      client.from("rounds").select("id, status, formation_mode, arrival_order_enabled, league:league_id (match_duration)").eq("id", input.round_id).single(),
       client.from("teams").select("id, position, team_players (player_id)").eq("round_id", input.round_id),
       client.from("round_players").select("player_id, availability_status, attendance_status, attendance_order").eq("round_id", input.round_id),
     ]);
@@ -59,11 +59,10 @@ export async function createMatch(input: CreateMatchInput) {
 
     const availability = new Map(roundPlayers.map((entry: any) => [entry.player_id, entry.availability_status]));
     const attendance = new Map(roundPlayers.map((entry: any) => [entry.player_id, entry.attendance_status]));
-    // `formation_mode` distingue apenas manual/automático. A ordem de
-    // chegada é identificada pelos registros efetivamente ordenados; assim,
-    // sorteios aleatório/equilibrado não bloqueiam o terceiro time.
-    const usesAttendance = round.formation_mode !== "manual"
-      && roundPlayers.some((entry: any) => entry.attendance_order != null);
+    // Presença controla os desfalques. O bloqueio dos dois primeiros times é
+    // uma regra separada e exclusiva do sorteio por ordem de chegada.
+    const tracksAttendance = round.formation_mode !== "manual";
+    const usesArrivalOrder = round.arrival_order_enabled === true;
     const { data: previousMatches, error: previousMatchesError } = await client
       .from("matches")
       .select("team_a_id, team_b_id, status, match_order, created_at")
@@ -73,7 +72,7 @@ export async function createMatch(input: CreateMatchInput) {
       .limit(1);
     if (previousMatchesError) throw new Error(previousMatchesError.message);
     const previousMatch = previousMatches?.[0];
-    if (!previousMatch && usesAttendance) {
+    if (!previousMatch && usesArrivalOrder) {
       const firstTeamIds = teams.filter((team: any) => team.position <= 2).map((team: any) => team.id);
       if (firstTeamIds.length !== 2 || firstTeamIds.some((id: string) => !selectedTeamIds.includes(id))) {
         return { success: false, error: "A primeira partida precisa ser disputada pelos dois times titulares." };
@@ -89,7 +88,7 @@ export async function createMatch(input: CreateMatchInput) {
       unavailableByTeam.set(team.id, new Set(
         (team.team_players || [])
           .map((entry: any) => entry.player_id)
-          .filter((playerId: string) => availability.get(playerId) === "injured" || (usesAttendance && attendance.get(playerId) !== "present")),
+          .filter((playerId: string) => availability.get(playerId) === "injured" || (tracksAttendance && attendance.get(playerId) !== "present")),
       ));
     }
 
@@ -114,7 +113,7 @@ export async function createMatch(input: CreateMatchInput) {
         return { success: false, error: "O substituto precisa vir do time que acabou de sair." };
       }
       if (availability.get(replacement.replacement_player_id) !== "available"
-        || (usesAttendance && attendance.get(replacement.replacement_player_id) !== "present")) {
+        || (tracksAttendance && attendance.get(replacement.replacement_player_id) !== "present")) {
         return { success: false, error: "O substituto escolhido nao esta disponivel." };
       }
       usedAbsentPlayers.add(replacement.absent_player_id);
@@ -141,7 +140,7 @@ export async function createMatch(input: CreateMatchInput) {
     const effectiveTeamByPlayer = new Map<string, string>();
     for (const team of selectedTeams as any[]) {
       for (const teamPlayer of team.team_players || []) {
-        if (availability.get(teamPlayer.player_id) !== "injured" && (!usesAttendance || attendance.get(teamPlayer.player_id) === "present")) {
+        if (availability.get(teamPlayer.player_id) !== "injured" && (!tracksAttendance || attendance.get(teamPlayer.player_id) === "present")) {
           proposedPlayerIds.add(teamPlayer.player_id);
           effectiveTeamByPlayer.set(teamPlayer.player_id, team.id);
         }
@@ -207,7 +206,7 @@ export async function createMatch(input: CreateMatchInput) {
     const lineupRows: Array<Record<string, unknown>> = [];
     for (const team of selectedTeams as any[]) {
       for (const teamPlayer of team.team_players || []) {
-        if (availability.get(teamPlayer.player_id) !== "injured" && (!usesAttendance || attendance.get(teamPlayer.player_id) === "present")) {
+        if (availability.get(teamPlayer.player_id) !== "injured" && (!tracksAttendance || attendance.get(teamPlayer.player_id) === "present")) {
           lineupRows.push({
             match_id: data.id,
             player_id: teamPlayer.player_id,

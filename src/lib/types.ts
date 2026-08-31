@@ -147,6 +147,7 @@ export type Round = {
   status: RoundStatus;
   round_type: RoundType;
   formation_mode: TeamFormationMode;
+  arrival_order_enabled: boolean;
   preparation_stage: RoundPreparationStage;
   stadium_id?: string | null;
   stadium_name?: string | null;
@@ -552,7 +553,7 @@ export type Database = {
       };
       rounds: {
         Row: Round;
-        Insert: Omit<Round, 'id' | 'created_at' | 'status' | 'formation_mode' | 'preparation_stage' | 'payment_pix' | 'payment_total' | 'best_goalkeeper_player_id'> & { id?: string; created_at?: string; status?: RoundStatus; formation_mode?: TeamFormationMode; preparation_stage?: RoundPreparationStage; payment_pix?: string | null; payment_total?: number | null; best_goalkeeper_player_id?: string | null };
+        Insert: Omit<Round, 'id' | 'created_at' | 'status' | 'formation_mode' | 'arrival_order_enabled' | 'preparation_stage' | 'payment_pix' | 'payment_total' | 'best_goalkeeper_player_id'> & { id?: string; created_at?: string; status?: RoundStatus; formation_mode?: TeamFormationMode; arrival_order_enabled?: boolean; preparation_stage?: RoundPreparationStage; payment_pix?: string | null; payment_total?: number | null; best_goalkeeper_player_id?: string | null };
         Update: Partial<Omit<Round, 'id'>>;
       };
       callups: {
@@ -686,6 +687,10 @@ export type Database = {
       set_round_player_attendance: {
         Args: { p_round_id: string; p_player_id: string; p_present: boolean };
         Returns: boolean;
+      };
+      set_round_attendance_bulk: {
+        Args: { p_round_id: string; p_present_player_ids: string[] };
+        Returns: number;
       };
       mark_round_team_arrived: {
         Args: { p_round_id: string; p_team_id: string };

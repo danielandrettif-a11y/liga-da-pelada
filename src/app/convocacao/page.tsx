@@ -10,6 +10,7 @@ import { getLeagueConfig } from "@/lib/actions/league";
 import { getFantasyQuickHighlights } from "@/lib/actions/fantasy";
 import { getStadiums } from "@/lib/actions/stadiums";
 import { labelCallupTabs } from "@/lib/callup-ui";
+import { getAllPlayersEquippedCosmeticsMap } from "@/lib/actions/cosmetics";
 
 export const revalidate = 0;
 
@@ -60,12 +61,13 @@ export default async function ConvocacaoPage({
   searchParams: Promise<{ callup?: string }>;
 }) {
   const params = await searchParams;
-  const [callups, account, leagueConfig, fantasyHighlights, stadiums] = await Promise.all([
+  const [callups, account, leagueConfig, fantasyHighlights, stadiums, cosmeticsMap] = await Promise.all([
     getActiveCallups(),
     getCurrentAccount(),
     getLeagueConfig(),
     getFantasyQuickHighlights(),
     getStadiums(),
+    getAllPlayersEquippedCosmeticsMap(),
   ]);
   if (callups.length === 0) {
     return (
@@ -120,6 +122,7 @@ export default async function ConvocacaoPage({
         stadiumMapUrl={stadiumMapUrl}
         stadiums={stadiums}
         fantasyHighlights={fantasyHighlights}
+        playerCosmetics={Object.fromEntries(cosmeticsMap)}
       />
     </div>
   );
