@@ -1,0 +1,232 @@
+name: Migrar banco Supabase
+
+run-name: Migracao manual do Supabase
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Digite MIGRAR para confirmar que o banco novo esta vazio
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migrate-supabase-database
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Copiar banco antigo para o novo
+    if: ${{ inputs.confirmation == 'MIGRAR' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      OLD_DB_URL: ${{ secrets.OLD_DB_URL }}
+      NEW_DB_URL: ${{ secrets.NEW_DB_URL }}
+
+    steps:
+      - name: Baixar o repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: latest
+
+      - name: Instalar cliente PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Validar conexoes e destino
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${OLD_DB_URL:-}" ]]; then
+            echo "O secret OLD_DB_URL nao foi configurado."
+            exit 1
+          fi
+
+          if [[ -z "${NEW_DB_URL:-}" ]]; then
+            echo "O secret NEW_DB_URL nao foi configurado."
+            exit 1
+          fi
+
+          if [[ "$OLD_DB_URL" == "$NEW_DB_URL" ]]; then
+            echo "A origem e o destino apontam para a mesma conexao."
+            exit 1
+          fi
+
+          psql "$OLD_DB_URL" --no-psqlrc --set ON_ERROR_STOP=1 --command "select 1" >/dev/null
+          psql "$NEW_DB_URL" --no-psqlrc --set ON_ERROR_STOP=1 --command "select 1" >/dev/null
+
+          target_public_tables="$(
+            psql "$NEW_DB_URL" \
+              --no-psqlrc \
+              --tuples-only \
+              --no-align \
+              --set ON_ERROR_STOP=1 \
+              --command "select count(*) from pg_catalog.pg_tables where schemaname = 'public' and tablename <> 'spatial_ref_sys'"
+          )"
+          target_public_tables="${target_public_tables//[[:space:]]/}"
+
+          if [[ "$target_public_tables" != "0" ]]; then
+            echo "O banco novo ja possui $target_public_tables tabela(s) em public. A migracao foi interrompida para evitar sobrescrita."
+            exit 1
+          fi
+
+          vault_table_exists="$(
+            psql "$OLD_DB_URL" \
+              --no-psqlrc \
+              --tuples-only \
+              --no-align \
+              --set ON_ERROR_STOP=1 \
+              --command "select count(*) from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname = 'vault' and c.relname = 'secrets'"
+          )"
+          vault_table_exists="${vault_table_exists//[[:space:]]/}"
+
+          if [[ "$vault_table_exists" != "0" ]]; then
+            vault_secrets="$(
+              psql "$OLD_DB_URL" \
+                --no-psqlrc \
+                --tuples-only \
+                --no-align \
+                --set ON_ERROR_STOP=1 \
+                --command "select count(*) from vault.secrets"
+            )"
+            vault_secrets="${vault_secrets//[[:space:]]/}"
+
+            if [[ "$vault_secrets" != "0" ]]; then
+              echo "O banco antigo usa Supabase Vault. Esta rotina segura para bancos sem Vault foi interrompida antes de alterar o destino."
+              exit 1
+            fi
+          fi
+
+          migration_dir="$RUNNER_TEMP/supabase-migration"
+          mkdir -p "$migration_dir"
+          echo "MIGRATION_DIR=$migration_dir" >> "$GITHUB_ENV"
+
+      - name: Gerar backup do banco antigo
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          supabase db dump --db-url "$OLD_DB_URL" --file "$MIGRATION_DIR/roles.sql" --role-only
+          supabase db dump --db-url "$OLD_DB_URL" --file "$MIGRATION_DIR/schema.sql"
+          supabase db dump \
+            --db-url "$OLD_DB_URL" \
+            --file "$MIGRATION_DIR/data.sql" \
+            --use-copy \
+            --data-only \
+            --exclude "storage.buckets_vectors" \
+            --exclude "storage.vector_indexes"
+
+      - name: Restaurar no banco novo
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          psql "$NEW_DB_URL" \
+            --no-psqlrc \
+            --single-transaction \
+            --variable ON_ERROR_STOP=1 \
+            --file "$MIGRATION_DIR/roles.sql" \
+            --file "$MIGRATION_DIR/schema.sql" \
+            --command "set session_replication_role = replica" \
+            --file "$MIGRATION_DIR/data.sql"
+
+      - name: Preservar historico de migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          has_history="$(
+            psql "$OLD_DB_URL" \
+              --no-psqlrc \
+              --tuples-only \
+              --no-align \
+              --set ON_ERROR_STOP=1 \
+              --command "select count(*) from pg_catalog.pg_namespace where nspname = 'supabase_migrations'"
+          )"
+          has_history="${has_history//[[:space:]]/}"
+
+          if [[ "$has_history" == "0" ]]; then
+            echo "O banco antigo nao possui o schema supabase_migrations."
+            exit 0
+          fi
+
+          supabase db dump \
+            --db-url "$OLD_DB_URL" \
+            --file "$MIGRATION_DIR/history_schema.sql" \
+            --schema supabase_migrations
+          supabase db dump \
+            --db-url "$OLD_DB_URL" \
+            --file "$MIGRATION_DIR/history_data.sql" \
+            --use-copy \
+            --data-only \
+            --schema supabase_migrations
+
+          psql "$NEW_DB_URL" \
+            --no-psqlrc \
+            --single-transaction \
+            --variable ON_ERROR_STOP=1 \
+            --file "$MIGRATION_DIR/history_schema.sql" \
+            --file "$MIGRATION_DIR/history_data.sql"
+
+      - name: Conferir tabelas e usuarios
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          old_public_tables="$(
+            psql "$OLD_DB_URL" --no-psqlrc --tuples-only --no-align --set ON_ERROR_STOP=1 \
+              --command "select count(*) from pg_catalog.pg_tables where schemaname = 'public' and tablename <> 'spatial_ref_sys'"
+          )"
+          new_public_tables="$(
+            psql "$NEW_DB_URL" --no-psqlrc --tuples-only --no-align --set ON_ERROR_STOP=1 \
+              --command "select count(*) from pg_catalog.pg_tables where schemaname = 'public' and tablename <> 'spatial_ref_sys'"
+          )"
+          old_auth_users="$(
+            psql "$OLD_DB_URL" --no-psqlrc --tuples-only --no-align --set ON_ERROR_STOP=1 \
+              --command "select count(*) from auth.users"
+          )"
+          new_auth_users="$(
+            psql "$NEW_DB_URL" --no-psqlrc --tuples-only --no-align --set ON_ERROR_STOP=1 \
+              --command "select count(*) from auth.users"
+          )"
+
+          old_public_tables="${old_public_tables//[[:space:]]/}"
+          new_public_tables="${new_public_tables//[[:space:]]/}"
+          old_auth_users="${old_auth_users//[[:space:]]/}"
+          new_auth_users="${new_auth_users//[[:space:]]/}"
+
+          {
+            echo "### Resultado da migracao"
+            echo ""
+            echo "| Verificacao | Antigo | Novo |"
+            echo "| --- | ---: | ---: |"
+            echo "| Tabelas public | $old_public_tables | $new_public_tables |"
+            echo "| Usuarios Auth | $old_auth_users | $new_auth_users |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$old_public_tables" != "$new_public_tables" ]]; then
+            echo "A quantidade de tabelas public nao confere."
+            exit 1
+          fi
+
+          if [[ "$old_auth_users" != "$new_auth_users" ]]; then
+            echo "A quantidade de usuarios Auth nao confere."
+            exit 1
+          fi
+
+      - name: Apagar arquivos temporarios
+        if: always()
+        shell: bash
+        run: |
+          rm -rf "$RUNNER_TEMP/supabase-migration"
