@@ -12,15 +12,17 @@ export function CallupAdminCard({
   stadiums = [],
   playersPerTeam = 5,
   teamsPerRound = 3,
+  initialShowCreate = false,
 }: {
   callups: CallupWithEntries[];
   stadiums?: Stadium[];
   playersPerTeam?: number;
   teamsPerRound?: number;
+  initialShowCreate?: boolean;
 }) {
   const router = useRouter();
   const [selectedCallupId, setSelectedCallupId] = useState(callups[0]?.id || "");
-  const [showCreate, setShowCreate] = useState(callups.length === 0);
+  const [showCreate, setShowCreate] = useState(initialShowCreate || callups.length === 0);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");

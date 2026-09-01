@@ -388,33 +388,46 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
             <button
               type="button"
               onClick={() => setShowBestRounds((prev) => !prev)}
-              className="flex w-full items-center justify-between p-3.5 text-left transition-colors hover:bg-white/[0.03] active:bg-white/[0.06]"
+              className="w-full p-3.5 text-left transition-colors hover:bg-white/[0.03] active:bg-white/[0.06]"
               aria-expanded={showBestRounds}
             >
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent">
-                  <Trophy className="h-4 w-4" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent">
+                    <Trophy className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <span className="block font-athletic text-xs font-black uppercase tracking-wider text-foreground">
+                      6 Melhores Partidas
+                    </span>
+                    <span className="text-[10px] text-muted">
+                      {showBestRounds ? "Toque para recolher" : "Toque para ver os scouts"}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <span className="block font-athletic text-xs font-black uppercase tracking-wider text-foreground">
-                    6 Melhores Partidas
+
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-black text-accent">
+                    {entry.bestRounds.filter((r) => r.countedInTop6).length}/6 no ranking
                   </span>
-                  <span className="text-[10px] text-muted">
-                    {showBestRounds ? "Toque para recolher" : "Toque para ver histórico"}
-                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 text-muted transition-transform duration-200 ${
+                      showBestRounds ? "rotate-180 text-accent" : ""
+                    }`}
+                  />
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-black text-accent">
-                  {entry.bestRounds.filter((r) => r.countedInTop6).length}/6 no ranking
-                </span>
-                <ChevronDown
-                  className={`h-4 w-4 text-muted transition-transform duration-200 ${
-                    showBestRounds ? "rotate-180 text-accent" : ""
-                  }`}
-                />
-              </div>
+              {!showBestRounds && (
+                <div className="mt-3 grid grid-cols-3 gap-1.5">
+                  {entry.bestRounds.filter((r) => r.countedInTop6).slice(0, 6).map((round) => (
+                    <span key={round.roundId} className="flex items-center justify-between rounded-lg border border-accent/15 bg-accent/[0.07] px-2 py-1.5">
+                      <span className="text-[8px] font-black uppercase text-muted">R{String(round.roundNumber).padStart(2, "0")}</span>
+                      <span className="font-athletic text-sm font-black text-accent">{round.points}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
             </button>
 
             {/* Conteúdo Expansível */}
@@ -422,7 +435,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
               <div className="border-t border-border/60 p-3 pt-2 animate-fade-in">
                 {/* Lista de Partidas com scroll dedicado */}
                 <div className="divide-y divide-border/40 max-h-52 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]">
-                  {entry.bestRounds.map((r, idx) => (
+                  {entry.bestRounds.filter((r) => r.countedInTop6).slice(0, 6).map((r, idx) => (
                     <div
                       key={r.roundId}
                       className={`flex items-center justify-between py-2 px-1 text-xs transition-colors ${

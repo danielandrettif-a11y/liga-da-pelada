@@ -1,9 +1,13 @@
-import { CalendarDays, Plus, ChevronRight, Users, Football } from "@/components/icons";
+import { CalendarDays, CalendarPlus, Plus, ChevronRight, Users, Football } from "@/components/icons";
 import Link from "next/link";
 import { getRounds } from "@/lib/actions/rounds";
 import { formatDateShort } from "@/lib/utils";
 import { getCurrentAccount } from "@/lib/auth";
 import { DeleteRoundButton } from "@/components/DeleteRoundButton";
+import { CallupAdminCard } from "@/components/CallupAdminCard";
+import { getActiveCallups } from "@/lib/actions/callups";
+import { getLeagueConfig } from "@/lib/actions/league";
+import { getStadiums } from "@/lib/actions/stadiums";
 
 export const revalidate = 0;
 
@@ -30,6 +34,9 @@ export default async function RodadasPage() {
     getRounds(),
     getCurrentAccount(),
   ]);
+  const [activeCallups, leagueConfig, stadiums] = account.isAdmin
+    ? await Promise.all([getActiveCallups(), getLeagueConfig(), getStadiums()])
+    : [[], null, []];
 
   return (
     <div className="space-y-5">
@@ -46,6 +53,30 @@ export default async function RodadasPage() {
           Nova pré-lista
         </Link>}
       </div>
+
+      {account.isAdmin && (
+        <details className="group overflow-hidden rounded-2xl border border-accent/30 bg-accent/[0.06]">
+          <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 [&::-webkit-details-marker]:hidden">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/15">
+              <CalendarPlus className="h-5 w-5 text-accent" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-black text-foreground">Abrir convocação</span>
+              <span className="block text-[10px] text-muted">Crie a chamada sem sair da tela de rodadas</span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-accent transition-transform group-open:rotate-90" />
+          </summary>
+          <div className="border-t border-accent/20 p-3">
+            <CallupAdminCard
+              callups={activeCallups}
+              stadiums={stadiums}
+              playersPerTeam={leagueConfig?.players_per_team || 5}
+              teamsPerRound={leagueConfig?.teams_per_round || 3}
+              initialShowCreate
+            />
+          </div>
+        </details>
+      )}
 
       {/* Rounds List */}
       <div className="space-y-3">

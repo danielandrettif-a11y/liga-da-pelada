@@ -44,6 +44,37 @@ export async function getGoalkeeperScoringPoints(leagueId: string) {
   return data?.points ?? DEFAULT_SCORING_POINTS.best_goalkeeper;
 }
 
+export async function getActiveScoringRules(): Promise<ScoringPoints> {
+  const rules = { ...DEFAULT_SCORING_POINTS };
+  const { data: league, error: leagueError } = await supabase
+    .from("leagues")
+    .select("id")
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle();
+
+  if (leagueError || !league) {
+    if (leagueError) console.error("Erro ao buscar liga para exibir a pontuação:", leagueError);
+    return rules;
+  }
+
+  const { data, error } = await supabase
+    .from("ranking_rules")
+    .select("event_type, points")
+    .eq("league_id", league.id);
+
+  if (error) {
+    console.error("Erro ao buscar regras públicas de pontuação:", error);
+    return rules;
+  }
+
+  for (const rule of data || []) {
+    if (rule.event_type in rules) rules[rule.event_type as EventType] = rule.points;
+  }
+
+  return rules;
+}
+
 export async function getScoringRules(): Promise<{
   success: boolean;
   rules: ScoringPoints;
