@@ -71,6 +71,18 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
     radar.latestWithdrawal
       ? { id: `withdrawal-${radar.latestWithdrawal.id}`, kind: "withdrawal", tone: "danger" }
       : null,
+    radar.topLists.previousRoundGoals
+      ? { id: "previous-round-goals", kind: "list", list: radar.topLists.previousRoundGoals, tone: "warning" }
+      : null,
+    radar.topLists.previousRoundAssists
+      ? { id: "previous-round-assists", kind: "list", list: radar.topLists.previousRoundAssists, tone: "accent" }
+      : null,
+    radar.topLists.previousRoundEfficiency
+      ? { id: "previous-round-efficiency", kind: "list", list: radar.topLists.previousRoundEfficiency, tone: "success" }
+      : null,
+    radar.topLists.previousRoundDefense
+      ? { id: "previous-round-defense", kind: "list", list: radar.topLists.previousRoundDefense, tone: "success" }
+      : null,
     radar.topLists.mostSelected
       ? { id: "top-selected", kind: "list", list: radar.topLists.mostSelected, tone: "accent" }
       : null,
@@ -216,7 +228,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-[8px] font-black uppercase tracking-[.14em] text-accent">
-                        Top {story.list.players.length} do Radar
+                        Top {story.list.players.length} · {story.list.contextLabel}
                       </span>
                       <strong className="block truncate text-[11px] text-foreground">{story.list.title}</strong>
                     </span>

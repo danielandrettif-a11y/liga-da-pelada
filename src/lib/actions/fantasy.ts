@@ -89,6 +89,7 @@ export type FantasyRadarTopList = {
   title: string;
   subtitle: string;
   players: FantasyRadarHighlight[];
+  contextLabel: "Rodada anterior" | "Próxima rodada" | "Rodada em andamento";
 };
 
 export type FantasyRadarComparison = {
@@ -129,6 +130,10 @@ export type FantasyRadarData = {
     bestForm: FantasyRadarTopList | null;
     mostBought: FantasyRadarTopList | null;
     mostSold: FantasyRadarTopList | null;
+    previousRoundGoals: FantasyRadarTopList | null;
+    previousRoundAssists: FantasyRadarTopList | null;
+    previousRoundEfficiency: FantasyRadarTopList | null;
+    previousRoundDefense: FantasyRadarTopList | null;
   };
   comparison: FantasyRadarComparison | null;
   latestWithdrawal: FantasyRadarWithdrawal | null;
@@ -1008,12 +1013,16 @@ export async function getFantasyDashboard() {
         b.goalkeeperGames - a.goalkeeperGames ||
         b.totalPoints - a.totalPoints,
     );
+  const marketContextLabel: FantasyRadarTopList["contextLabel"] = fantasyRound?.market_status === "in_progress"
+    ? "Rodada em andamento"
+    : "Próxima rodada";
   const makeTopList = (
     title: string,
     subtitle: string,
     players: FantasyMarketPlayer[],
     getValue: (player: FantasyMarketPlayer) => string,
     getExtra: (player: FantasyMarketPlayer) => string,
+    contextLabel: FantasyRadarTopList["contextLabel"] = marketContextLabel,
   ): FantasyRadarTopList | null => {
     const topPlayers = players.slice(0, 3).map((player) => ({
       player,
@@ -1022,8 +1031,70 @@ export async function getFantasyDashboard() {
     }));
     // Mesmo com uma amostra pequena, o líder ainda é útil no cartão recolhido.
     // O componente informa com clareza quando ainda não há 2º e 3º lugar.
-    return topPlayers.length >= 1 ? { title, subtitle, players: topPlayers } : null;
+    return topPlayers.length >= 1 ? { title, subtitle, players: topPlayers, contextLabel } : null;
   };
+
+  const latestFinishedRoundId = latestFinishedRound?.round?.id || null;
+  const latestRoundStatsByPlayer = new Map(
+    (statRows || [])
+      .filter((row: any) => row.round_id === latestFinishedRoundId)
+      .map((row: any) => [row.player_id, row] as const),
+  );
+  const latestRoundPlayers = market
+    .map((player) => ({ player, stats: latestRoundStatsByPlayer.get(player.id) }))
+    .filter((item): item is { player: FantasyMarketPlayer; stats: any } => Boolean(item.stats));
+  const makePreviousRoundTopList = (
+    title: string,
+    subtitle: string,
+    players: Array<{ player: FantasyMarketPlayer; stats: any }>,
+    getValue: (item: { player: FantasyMarketPlayer; stats: any }) => string,
+    getExtra: (item: { player: FantasyMarketPlayer; stats: any }) => string,
+  ): FantasyRadarTopList | null => {
+    if (!latestFinishedRoundId) return null;
+    const topPlayers = players.slice(0, 3).map((item) => ({
+      player: item.player,
+      value: getValue(item),
+      extra: getExtra(item),
+    }));
+    return topPlayers.length ? { title, subtitle, players: topPlayers, contextLabel: "Rodada anterior" } : null;
+  };
+
+  const previousRoundGoals = makePreviousRoundTopList(
+    "Artilheiros da rodada",
+    "Quem mais balançou a rede na rodada anterior.",
+    latestRoundPlayers
+      .filter((item) => Number(item.stats.goals || 0) > 0)
+      .sort((a, b) => Number(b.stats.goals || 0) - Number(a.stats.goals || 0)),
+    (item) => `${Number(item.stats.goals)} gol${Number(item.stats.goals) === 1 ? "" : "s"}`,
+    (item) => `${Number(item.stats.games || 0)} jogo${Number(item.stats.games || 0) === 1 ? "" : "s"} na rodada`,
+  );
+  const previousRoundAssists = makePreviousRoundTopList(
+    "Garçons da rodada",
+    "Quem mais serviu os companheiros na rodada anterior.",
+    latestRoundPlayers
+      .filter((item) => Number(item.stats.assists || 0) > 0)
+      .sort((a, b) => Number(b.stats.assists || 0) - Number(a.stats.assists || 0)),
+    (item) => `${Number(item.stats.assists)} assistência${Number(item.stats.assists) === 1 ? "" : "s"}`,
+    (item) => `${Number(item.stats.games || 0)} jogo${Number(item.stats.games || 0) === 1 ? "" : "s"} na rodada`,
+  );
+  const previousRoundEfficiency = makePreviousRoundTopList(
+    "Melhor aproveitamento",
+    "Percentual de vitórias dos atletas que entraram em campo na rodada anterior.",
+    latestRoundPlayers
+      .filter((item) => Number(item.stats.games || 0) > 0)
+      .sort((a, b) => Number(b.stats.wins || 0) / Number(b.stats.games || 1) - Number(a.stats.wins || 0) / Number(a.stats.games || 1)),
+    (item) => `${((Number(item.stats.wins || 0) / Number(item.stats.games || 1)) * 100).toFixed(0)}%`,
+    (item) => `${Number(item.stats.wins || 0)} vitória${Number(item.stats.wins || 0) === 1 ? "" : "s"} em ${Number(item.stats.games || 0)} jogo${Number(item.stats.games || 0) === 1 ? "" : "s"}`,
+  );
+  const previousRoundDefense = makePreviousRoundTopList(
+    "Melhor defesa",
+    "Menor média de gols sofridos por quem foi para o gol na rodada anterior.",
+    latestRoundPlayers
+      .filter((item) => Number(item.stats.goalkeeper_games || 0) > 0)
+      .sort((a, b) => Number(a.stats.goals_conceded || 0) / Number(a.stats.goalkeeper_games || 1) - Number(b.stats.goals_conceded || 0) / Number(b.stats.goalkeeper_games || 1)),
+    (item) => `${(Number(item.stats.goals_conceded || 0) / Number(item.stats.goalkeeper_games || 1)).toFixed(2)} G/J`,
+    (item) => `${Number(item.stats.goals_conceded || 0)} gol${Number(item.stats.goals_conceded || 0) === 1 ? "" : "s"} sofrido${Number(item.stats.goals_conceded || 0) === 1 ? "" : "s"}`,
+  );
 
   const topLists = {
     mostSelected: makeTopList(
@@ -1103,6 +1174,10 @@ export async function getFantasyDashboard() {
       (player) => `${player.marketShareDelta.toFixed(1)} p.p.`,
       (player) => `${player.selectionCount}/${popularityAgg.totalLineups} agora · ${player.previousPopularityPercent}% antes`,
     ),
+    previousRoundGoals,
+    previousRoundAssists,
+    previousRoundEfficiency,
+    previousRoundDefense,
   };
 
   const formLeader = sortedByForm[0];
