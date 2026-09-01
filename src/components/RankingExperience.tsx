@@ -433,6 +433,9 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                   </div>
                   <div className="mb-2 mt-4 w-full px-1 text-center">
                     <p className="truncate text-xs font-black text-foreground">{entry.player.name}</p>
+                    <p className="mt-1 truncate text-[8px] font-bold text-muted">
+                      {entry.wins}V · {entry.draws}E · {entry.losses}D · {entry.goals}G · {entry.assists}A
+                    </p>
                     <p className={`mt-0.5 text-xs font-black ${style.label}`}>{metricDisplay(entry, filter)} <span className="text-[8px] uppercase opacity-70">{FILTER_LABELS[filter]}</span></p>
                   </div>
                   <div className={`w-full rounded-t-2xl border-x border-t bg-gradient-to-b pt-3 ${height} ${style.base}`}>

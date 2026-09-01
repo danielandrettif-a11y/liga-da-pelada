@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Clock, RotateCcw } from "@/components/icons";
+import { CheckCircle2, Clock, Crown, Medal, RotateCcw } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import type { FantasyRoundLineupOverview } from "@/lib/actions/fantasy";
 import { cosmeticImage } from "@/lib/fantasy/cosmetics";
@@ -28,6 +28,34 @@ export type FantasyRankingEntry = {
     backgroundAssetKey: string | null;
   } | null;
 };
+
+function podiumStyle(position: number) {
+  if (position === 1) return {
+    ring: "border-[#f5cf52] shadow-[0_0_24px_rgba(245,207,82,.28)]",
+    base: "from-[#866714]/80 via-[#4f3c08]/70 to-[#211a05]/80 border-[#d5ad38]/50",
+    medal: "from-[#fff0a8] via-[#e0b83d] to-[#9d7217] text-[#3b2b07]",
+    label: "text-[#f5d45e]",
+  };
+  if (position === 2) return {
+    ring: "border-slate-300 shadow-[0_0_20px_rgba(203,213,225,.18)]",
+    base: "from-slate-400/40 via-slate-600/25 to-slate-900/40 border-slate-300/30",
+    medal: "from-white via-slate-300 to-slate-500 text-slate-800",
+    label: "text-slate-300",
+  };
+  return {
+    ring: "border-[#c47a43] shadow-[0_0_20px_rgba(196,122,67,.18)]",
+    base: "from-[#9b542a]/45 via-[#5b2c17]/35 to-[#271109]/60 border-[#b86d3b]/40",
+    medal: "from-[#efbc91] via-[#b96d39] to-[#713619] text-[#32160a]",
+    label: "text-[#d98a50]",
+  };
+}
+
+function rankingHref(item: FantasyRankingEntry, scope: "general" | "round") {
+  if (!item.user_id) return "/cartola/ranking";
+  return scope === "round" && item.round_id
+    ? `/cartola/ranking/${item.user_id}/${item.round_id}`
+    : `/cartola/ranking/${item.user_id}`;
+}
 
 export function FantasyRankingList({
   ranking,
@@ -228,22 +256,63 @@ export function FantasyRankingList({
     );
   }
 
+  const podium = ranking.slice(0, 3);
+  const showPodium = podium.length === 3;
+  const podiumOrder = showPodium ? [podium[1], podium[0], podium[2]] : podium;
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {ranking.some((item) => item.is_live) && (
         <div className="mb-2 flex items-center justify-between rounded-xl border border-accent/25 bg-accent/10 px-3 py-2 text-[10px] font-black text-accent">
           <span>● PRÉVIA AO VIVO</span>
           <button type="button" onClick={() => startRefresh(() => router.refresh())} disabled={refreshing} className="flex items-center gap-1 disabled:opacity-50"><RotateCcw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Atualizar</button>
         </div>
       )}
-      {ranking.map((item) => (
+      {showPodium && (
+        <section className="pt-7" aria-label="Pódio do Cartola">
+          <div className="flex items-end justify-center gap-2 sm:gap-4">
+            {podiumOrder.map((item, visualIndex) => {
+              const position = visualIndex === 0 ? 2 : visualIndex === 1 ? 1 : 3;
+              const style = podiumStyle(position);
+              const height = position === 1 ? "h-36" : position === 2 ? "h-28" : "h-24";
+              return (
+                <Link
+                  key={item.id}
+                  href={rankingHref(item, scope)}
+                  className="relative flex w-1/3 max-w-[112px] flex-col items-center rounded-t-2xl transition-transform hover:-translate-y-1 focus:outline-none animate-slide-in-bottom"
+                  aria-label={`Abrir perfil de ${item.player?.name || "Cartoleiro"}, ${position}º lugar`}
+                >
+                  {position === 1 && <Crown className="absolute -top-8 h-8 w-8 rotate-[-7deg] text-[#f5d45e] drop-shadow-lg" fill="currentColor" />}
+                  <div className="relative z-10">
+                    <PlayerAvatar
+                      name={item.player?.name || "Cartoleiro"}
+                      avatarUrl={item.player?.avatar_url}
+                      frameKey={item.cosmetics?.frameKey}
+                      auraKey={item.cosmetics?.auraKey}
+                      className={`h-16 w-16 rounded-full border-[3px] bg-background text-sm font-black text-muted ${style.ring}`}
+                    />
+                    <span className={`absolute -bottom-2 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-gradient-to-br ${style.medal} shadow-lg`}>
+                      {position === 1 ? <Crown className="h-4 w-4" fill="currentColor" /> : <Medal className="h-4 w-4" fill="currentColor" />}
+                    </span>
+                  </div>
+                  <div className="mb-2 mt-4 w-full px-1 text-center">
+                    <p className="truncate text-xs font-black text-foreground">{item.player?.name || "Cartoleiro"}</p>
+                    <p className={`mt-1 text-xs font-black ${style.label}`}>{Number(item.total_points).toFixed(1)} <span className="text-[8px] uppercase opacity-70">pts</span></p>
+                    <p className="mt-0.5 truncate text-[8px] font-bold text-muted">C$ {Number(item.current_budget).toFixed(2)}</p>
+                  </div>
+                  <div className={`w-full rounded-t-2xl border-x border-t bg-gradient-to-b pt-3 ${height} ${style.base}`}>
+                    <span className="font-athletic text-3xl font-black text-white/45">{position}</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+      {(showPodium ? ranking.slice(3) : ranking).map((item) => (
         <Link
           key={item.id}
-          href={item.user_id
-            ? scope === "round" && item.round_id
-              ? `/cartola/ranking/${item.user_id}/${item.round_id}`
-              : `/cartola/ranking/${item.user_id}`
-            : "/cartola/ranking"}
+          href={rankingHref(item, scope)}
           className="glass-card flex items-center gap-3 p-4 transition-colors hover:bg-surface-hover"
         >
           <span

@@ -1,6 +1,6 @@
 import { CalendarDays, CalendarPlus, Plus, ChevronRight, Users, Football } from "@/components/icons";
 import Link from "next/link";
-import { getRounds } from "@/lib/actions/rounds";
+import { getAdminRoundPrelists, getRounds } from "@/lib/actions/rounds";
 import { formatDateShort } from "@/lib/utils";
 import { getCurrentAccount } from "@/lib/auth";
 import { DeleteRoundButton } from "@/components/DeleteRoundButton";
@@ -34,9 +34,23 @@ export default async function RodadasPage() {
     getRounds(),
     getCurrentAccount(),
   ]);
-  const [activeCallups, leagueConfig, stadiums] = account.isAdmin
-    ? await Promise.all([getActiveCallups(), getLeagueConfig(), getStadiums()])
-    : [[], null, []];
+  const [activeCallups, leagueConfig, stadiums, adminPrelists] = account.isAdmin
+    ? await Promise.all([getActiveCallups(), getLeagueConfig(), getStadiums(), getAdminRoundPrelists()])
+    : [[], null, [], []];
+  const visiblePrelists = (adminPrelists || []).filter((prelist: any) => prelist.playersCount > 0);
+  const agendaItems = [
+    ...rounds.map((round: any) => ({ ...round, agendaKind: "round" as const })),
+    ...visiblePrelists.map((prelist: any) => ({
+      ...prelist,
+      agendaKind: "prelist" as const,
+      preparation_stage: "prelist",
+      matchesCount: 0,
+    })),
+  ].sort((a, b) =>
+    `${b.date || ""}-${b.start_time || ""}-${b.created_at || ""}`.localeCompare(
+      `${a.date || ""}-${a.start_time || ""}-${a.created_at || ""}`,
+    ),
+  );
 
   return (
     <div className="space-y-5">
@@ -46,6 +60,7 @@ export default async function RodadasPage() {
           <h1 className="text-xl font-bold text-foreground">Agenda e histórico</h1>
           <p className="text-xs text-muted mt-0.5">
             {rounds.length} rodadas registradas
+            {visiblePrelists.length > 0 ? ` · ${visiblePrelists.length} pré-lista${visiblePrelists.length === 1 ? "" : "s"} pronta${visiblePrelists.length === 1 ? "" : "s"}` : ""}
           </p>
         </div>
         {account.isAdmin && <Link href="/admin/rodada?new=1" className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-accent hover:bg-accent-light text-background text-xs font-bold transition-all active:scale-95">
@@ -80,21 +95,27 @@ export default async function RodadasPage() {
 
       {/* Rounds List */}
       <div className="space-y-3">
-        {rounds.map((round, index) => {
-          const statusStyle = round.preparation_stage === "prelist"
-            ? { label: "Pre-lista", bg: "bg-warning/15", text: "text-warning" }
+        {agendaItems.map((round, index) => {
+          const isPrelist = round.agendaKind === "prelist";
+          const statusStyle = isPrelist
+            ? { label: "Pré-lista", bg: "bg-warning/15", text: "text-warning" }
             : STATUS_STYLES[round.status as keyof typeof STATUS_STYLES] || STATUS_STYLES.draft;
+          const href = isPrelist
+            ? `/admin/rodada?round=${round.id}&mount=1`
+            : `/rodadas/${round.id}`;
 
           return (
             <div key={round.id} className="relative">
-            <Link href={`/rodadas/${round.id}`} className="block">
+            <Link href={href} className="block">
               <div
-                className={`glass-card glass-card-hover p-4 animate-fade-in stagger-${index + 1}`}
+                className={`${isPrelist
+                  ? "rounded-2xl border border-warning/45 bg-gradient-to-br from-warning/[0.14] via-surface to-background shadow-[0_10px_28px_rgba(0,0,0,.22)]"
+                  : "glass-card glass-card-hover"} p-4 animate-fade-in stagger-${Math.min(index + 1, 5)}`}
               >
                 <div className="flex items-center gap-4">
                   {/* Round number */}
-                  <div className="w-14 h-14 rounded-xl bg-surface flex flex-col items-center justify-center flex-shrink-0">
-                    <span className="text-[10px] text-muted font-semibold uppercase">
+                  <div className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center flex-shrink-0 ${isPrelist ? "border border-warning/30 bg-warning/10" : "bg-surface"}`}>
+                    <span className={`text-[10px] font-semibold uppercase ${isPrelist ? "text-warning" : "text-muted"}`}>
                       {round.round_type === "friendly" ? "AM." : "ROD."}
                     </span>
                     <span className="stat-number text-xl text-foreground">
@@ -134,6 +155,11 @@ export default async function RodadasPage() {
                         </span>
                       )}
                     </div>
+                    {isPrelist && (
+                      <p className="mt-2 flex items-center gap-1 text-[9px] font-black uppercase tracking-wide text-warning">
+                        Convocados salvos · montar times e iniciar <ChevronRight className="h-3 w-3" />
+                      </p>
+                    )}
                   </div>
 
                   {account.isAdmin ? <div className="mr-10" /> : <ChevronRight className="w-5 h-5 text-muted flex-shrink-0" />}
@@ -144,7 +170,7 @@ export default async function RodadasPage() {
             </div>
           );
         })}
-        {rounds.length === 0 && (
+        {agendaItems.length === 0 && (
           <div className="p-8 text-center text-muted text-sm glass-card">
             Nenhuma rodada criada ainda.
           </div>
