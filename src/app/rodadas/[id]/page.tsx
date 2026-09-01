@@ -14,7 +14,6 @@ import { getRoundStatistics } from "@/lib/actions/stats";
 import { RoundHistoryTabs } from "@/components/RoundHistoryTabs";
 import { RoundAdminPlayerTools } from "@/components/RoundAdminPlayerTools";
 import { getPlayers } from "@/lib/actions/players";
-import { RoundInstagramStoryGenerator } from "@/components/RoundInstagramStoryGenerator";
 import { RoundTeamShuffleCard } from "@/components/RoundTeamShuffleCard";
 import { getPaymentRecipients } from "@/lib/actions/payments";
 import { DeleteMatchButton } from "@/components/DeleteMatchButton";
@@ -205,10 +204,6 @@ export default async function RodadaDetalhePage({
       </section>
       
       <FinishRoundButton roundId={round.id} status={round.status} canManage={account.isAdmin} recipients={paymentRecipients} />
-
-      {round.status === "finished" && (
-        <RoundInstagramStoryGenerator round={round} statistics={roundStatistics} />
-      )}
 
       {account.isAdmin && (
         <RoundAdminPlayerTools
