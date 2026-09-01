@@ -65,6 +65,7 @@ export type FantasyLiveLineupProjection = {
   userId: string;
   players: Array<{
     playerId: string;
+    slotRole: FantasySlotRole | null;
     basePoints: number;
     positionBonus: number;
     captainBonus: number;
@@ -214,6 +215,7 @@ export function projectFantasyLiveLineups(
     const captainBase = lineup.captainPlayerId ? pointsByPlayer.get(lineup.captainPlayerId) || 0 : 0;
     const captainBonus = captainBase * Math.max(0, settings.captainMultiplier - 1);
     const players = lineup.playerIds.map((playerId) => {
+      const slot = slotByPlayer.get(playerId);
       const basePoints = playerStats.get(playerId)?.basePoints || 0;
       const totalWithoutCaptain = pointsByPlayer.get(playerId) || 0;
       const positionBonus = totalWithoutCaptain - basePoints;
@@ -222,6 +224,7 @@ export function projectFantasyLiveLineups(
         : 0;
       return {
         playerId,
+        slotRole: slot?.slotRole || null,
         basePoints,
         positionBonus,
         captainBonus: playerCaptainBonus,

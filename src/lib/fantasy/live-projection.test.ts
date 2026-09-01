@@ -163,6 +163,7 @@ describe("live fantasy projection", () => {
     ], stats, DEFAULT_FANTASY_SETTINGS);
 
     expect(lineup.players[0]).toMatchObject({
+      slotRole: "MEI",
       basePoints: 3,
       positionBonus: 1,
       captainBonus: 2,

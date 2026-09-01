@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Clock, Crown, RotateCcw } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
@@ -15,6 +15,11 @@ export type FantasyRankingEntry = {
   rounds_played: number | string;
   current_budget: number | string;
   total_points: number | string;
+  best_round_points?: number | string;
+  captain_bonus_points?: number | string;
+  def_points?: number | string;
+  mid_points?: number | string;
+  attack_points?: number | string;
   player: {
     name: string;
     avatar_url: string | null;
@@ -28,6 +33,40 @@ export type FantasyRankingEntry = {
     backgroundAssetKey: string | null;
   } | null;
 };
+
+type FantasyRankingFilter = "points" | "budget" | "captain" | "def" | "mid" | "attack" | "best";
+
+type FantasyRankingMetric = {
+  id: FantasyRankingFilter;
+  label: string;
+  title: string;
+  description: string;
+  valueLabel: string;
+  field: keyof Pick<
+    FantasyRankingEntry,
+    "total_points" | "current_budget" | "best_round_points" | "captain_bonus_points" | "def_points" | "mid_points" | "attack_points"
+  >;
+  currency?: boolean;
+};
+
+const FANTASY_RANKING_METRICS: FantasyRankingMetric[] = [
+  { id: "points", label: "Geral", title: "Pódio dos Cartoleiros", description: "Pontuação total da temporada", valueLabel: "pontos", field: "total_points" },
+  { id: "budget", label: "Cartoletas", title: "Reis das Cartoletas", description: "Maior patrimônio atual", valueLabel: "cartoletas", field: "current_budget", currency: true },
+  { id: "captain", label: "Capitão", title: "Mestres da Faixa", description: "Mais pontos extras com o capitão", valueLabel: "bônus capitão", field: "captain_bonus_points" },
+  { id: "def", label: "DEF", title: "Muralha do Cartola", description: "Mais pontos com atletas na DEF", valueLabel: "pontos DEF", field: "def_points" },
+  { id: "mid", label: "MEI", title: "Donos do Meio", description: "Mais pontos com atletas no MEI", valueLabel: "pontos MEI", field: "mid_points" },
+  { id: "attack", label: "ATA", title: "Ataque dos Sonhos", description: "Mais pontos com atletas no ATA", valueLabel: "pontos ATA", field: "attack_points" },
+  { id: "best", label: "Recorde", title: "Rodadas Históricas", description: "Melhor rodada individual de cada usuário", valueLabel: "melhor rodada", field: "best_round_points" },
+];
+
+function metricValue(item: FantasyRankingEntry, metric: FantasyRankingMetric) {
+  return Number(item[metric.field] || 0);
+}
+
+function formattedMetricValue(item: FantasyRankingEntry, metric: FantasyRankingMetric) {
+  const value = metricValue(item, metric);
+  return metric.currency ? `C$ ${value.toFixed(2)}` : value.toFixed(1);
+}
 
 function podiumStyle(position: number) {
   if (position === 1) return {
@@ -60,7 +99,7 @@ function rankingHref(item: FantasyRankingEntry, scope: "general" | "round") {
     : `/cartola/ranking/${item.user_id}`;
 }
 
-function FantasyPodium({ ranking, scope }: { ranking: FantasyRankingEntry[]; scope: "general" | "round" }) {
+function FantasyPodium({ ranking, scope, metric }: { ranking: FantasyRankingEntry[]; scope: "general" | "round"; metric: FantasyRankingMetric }) {
   const podium = ranking.slice(0, 3);
   if (podium.length < 3) return null;
   const podiumOrder = [podium[1], podium[0], podium[2]];
@@ -77,8 +116,8 @@ function FantasyPodium({ ranking, scope }: { ranking: FantasyRankingEntry[]; sco
             <Crown className="h-4 w-4" />
           </span>
           <div className="min-w-0">
-            <h2 className="truncate font-athletic text-sm font-black uppercase tracking-wider text-foreground">Pódio dos Cartoleiros</h2>
-            <p className="text-[9px] font-bold uppercase tracking-[.14em] text-accent/75">Fantasy · mercado da temporada</p>
+            <h2 className="truncate font-athletic text-sm font-black uppercase tracking-wider text-foreground">{metric.title}</h2>
+            <p className="truncate text-[9px] font-bold uppercase tracking-[.12em] text-accent/75">{metric.description}</p>
           </div>
         </div>
         <span className="shrink-0 rounded-full border border-accent/25 bg-black/30 px-2 py-1 text-[8px] font-black uppercase text-accent">Top 3</span>
@@ -114,9 +153,11 @@ function FantasyPodium({ ranking, scope }: { ranking: FantasyRankingEntry[]; sco
                   />
                 </div>
                 <p className="mt-2 line-clamp-2 min-h-8 w-full text-[10px] font-black leading-4 text-foreground sm:text-xs">{item.player?.name || "Cartoleiro"}</p>
-                <p className={`mt-0.5 font-athletic text-lg font-black leading-none ${style.label}`}>{Number(item.total_points).toFixed(1)}</p>
-                <p className="mt-0.5 text-[7px] font-black uppercase tracking-wider text-muted">pontos</p>
-                <span className="mt-2 max-w-full truncate rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[8px] font-black text-emerald-200">C$ {Number(item.current_budget).toFixed(2)}</span>
+                <p className={`mt-0.5 whitespace-nowrap font-athletic text-base font-black leading-none sm:text-lg ${style.label}`}>{formattedMetricValue(item, metric)}</p>
+                <p className="mt-0.5 line-clamp-1 text-[7px] font-black uppercase tracking-wider text-muted">{metric.valueLabel}</p>
+                <span className="mt-2 max-w-full truncate rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[8px] font-black text-emerald-200">
+                  {metric.id === "budget" ? `${Number(item.total_points).toFixed(1)} pts` : `C$ ${Number(item.current_budget).toFixed(2)}`}
+                </span>
               </div>
 
               <div className={`relative z-10 mt-2 rounded-xl border py-1.5 ${style.base}`}>
@@ -141,6 +182,7 @@ export function FantasyRankingList({
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"confirmed" | "pending">("confirmed");
+  const [rankingFilter, setRankingFilter] = useState<FantasyRankingFilter>("points");
   const [refreshing, startRefresh] = useTransition();
   const refreshTimer = useRef<number | null>(null);
   const refresh = useCallback((delay = 0) => {
@@ -166,6 +208,25 @@ export function FantasyRankingList({
       if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
     };
   }, [refresh, scope]);
+
+  const activeMetric = FANTASY_RANKING_METRICS.find((metric) => metric.id === rankingFilter) || FANTASY_RANKING_METRICS[0];
+  const displayedRanking = useMemo(() => {
+    if (scope !== "general") return ranking;
+    const sorted = [...ranking].sort((a, b) =>
+      metricValue(b, activeMetric) - metricValue(a, activeMetric)
+      || Number(b.total_points) - Number(a.total_points)
+      || (a.player?.name || "").localeCompare(b.player?.name || "", "pt-BR")
+    );
+    let previousValue: number | null = null;
+    let previousPosition = 0;
+    return sorted.map((item, index) => {
+      const value = metricValue(item, activeMetric);
+      const position = previousValue === value ? previousPosition : index + 1;
+      previousValue = value;
+      previousPosition = position;
+      return { ...item, position };
+    });
+  }, [activeMetric, ranking, scope]);
 
   // Se o escopo for rodada e a rodada estiver aberta para escalação
   if (scope === "round" && roundOverview?.isRoundOpen) {
@@ -321,7 +382,7 @@ export function FantasyRankingList({
   }
 
   // Visualização de Ranking tradicional (geral ou rodada concluída)
-  if (ranking.length === 0) {
+  if (displayedRanking.length === 0) {
     return (
       <p className="glass-card p-6 text-center text-sm text-muted">
         O ranking aparecerá assim que alguém salvar a escalação para a rodada.
@@ -329,7 +390,7 @@ export function FantasyRankingList({
     );
   }
 
-  const showPodium = ranking.length >= 3;
+  const showPodium = displayedRanking.length >= 3;
 
   return (
     <div className="space-y-3">
@@ -339,8 +400,36 @@ export function FantasyRankingList({
           <button type="button" onClick={() => startRefresh(() => router.refresh())} disabled={refreshing} className="flex items-center gap-1 disabled:opacity-50"><RotateCcw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Atualizar</button>
         </div>
       )}
-      {showPodium && <FantasyPodium ranking={ranking} scope={scope} />}
-      {(showPodium ? ranking.slice(3) : ranking).map((item) => {
+      {scope === "general" && (
+        <section className="overflow-hidden rounded-2xl border border-accent/20 bg-[#06150d]/90 p-2.5 shadow-[0_12px_30px_rgba(0,0,0,.18)]" aria-label="Filtros do ranking do Cartola">
+          <div className="flex items-center justify-between gap-3 px-1 pb-2">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[.16em] text-accent">Escolha o ranking</p>
+              <p className="text-[10px] text-muted">{activeMetric.description}</p>
+            </div>
+            <span className="shrink-0 rounded-full border border-accent/20 bg-accent/[.08] px-2 py-1 text-[8px] font-black uppercase text-accent">Temporada</span>
+          </div>
+          <div className="flex snap-x gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {FANTASY_RANKING_METRICS.map((metric) => (
+              <button
+                key={metric.id}
+                type="button"
+                onClick={() => setRankingFilter(metric.id)}
+                aria-pressed={rankingFilter === metric.id}
+                className={`shrink-0 snap-start rounded-xl border px-3 py-2 text-[10px] font-black transition-all duration-300 ease-out motion-reduce:transition-none ${
+                  rankingFilter === metric.id
+                    ? "border-accent bg-accent text-background shadow-[0_8px_20px_rgba(204,255,0,.15)]"
+                    : "border-white/10 bg-black/20 text-muted hover:border-accent/30 hover:text-foreground"
+                }`}
+              >
+                {metric.label}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      {showPodium && <FantasyPodium ranking={displayedRanking} scope={scope} metric={activeMetric} />}
+      {(showPodium ? displayedRanking.slice(3) : displayedRanking).map((item) => {
         const backgroundImage = cosmeticImage(item.cosmetics?.backgroundAssetKey);
         return (
             <Link
@@ -365,12 +454,14 @@ export function FantasyRankingList({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-black text-foreground">{item.player?.name || "Cartoleiro"}</p>
                   <p className="mt-0.5 truncate text-[10px] text-muted">
-                    {Number(item.rounds_played)} {Number(item.rounds_played) === 1 ? "rodada" : "rodadas"} · <span className="text-emerald-200">C$ {Number(item.current_budget).toFixed(2)}</span>
+                    {activeMetric.id === "points"
+                      ? <>{Number(item.rounds_played)} {Number(item.rounds_played) === 1 ? "rodada" : "rodadas"} · <span className="text-emerald-200">C$ {Number(item.current_budget).toFixed(2)}</span></>
+                      : <>{activeMetric.description} · <span className="text-emerald-200">{activeMetric.id === "budget" ? `${Number(item.total_points).toFixed(1)} pts` : `C$ ${Number(item.current_budget).toFixed(2)}`}</span></>}
                   </p>
                 </div>
                 <div className="shrink-0 rounded-xl border border-accent/15 bg-black/25 px-2.5 py-1.5 text-right">
-                  <strong className="stat-number text-lg text-accent">{Number(item.total_points).toFixed(1)}</strong>
-                  <p className="text-[7px] font-black uppercase tracking-wider text-muted">{item.is_live ? "prévia" : "pontos"}</p>
+                  <strong className="stat-number whitespace-nowrap text-base text-accent sm:text-lg">{formattedMetricValue(item, activeMetric)}</strong>
+                  <p className="text-[7px] font-black uppercase tracking-wider text-muted">{item.is_live && activeMetric.id !== "budget" ? "prévia" : activeMetric.valueLabel}</p>
                 </div>
               </div>
             </Link>

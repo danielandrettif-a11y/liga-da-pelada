@@ -2288,37 +2288,93 @@ export async function getFantasyRanking(
     const { data: scoredLineups } = fantasyRoundIds.length
       ? await rankingReadClient
           .from("fantasy_lineups")
-          .select("user_id, total_points")
+          .select("user_id, total_points, fantasy_lineup_players(total_points, captain_bonus, slot_role, player_profile_locked)")
           .in("fantasy_round_id", fantasyRoundIds)
           .eq("status", "scored")
       : { data: [] as any[] };
-    const historicalByUser = new Map<string, { totalPoints: number; roundsPlayed: number; bestRound: number }>();
+    type HistoricalFantasyMetrics = {
+      totalPoints: number;
+      roundsPlayed: number;
+      bestRound: number;
+      captainBonusPoints: number;
+      defPoints: number;
+      midPoints: number;
+      attackPoints: number;
+    };
+    const emptyHistoricalMetrics = (): HistoricalFantasyMetrics => ({
+      totalPoints: 0,
+      roundsPlayed: 0,
+      bestRound: 0,
+      captainBonusPoints: 0,
+      defPoints: 0,
+      midPoints: 0,
+      attackPoints: 0,
+    });
+    const historicalByUser = new Map<string, HistoricalFantasyMetrics>();
     for (const lineup of scoredLineups || []) {
-      const current = historicalByUser.get(lineup.user_id) || { totalPoints: 0, roundsPlayed: 0, bestRound: 0 };
+      const current = historicalByUser.get(lineup.user_id) || emptyHistoricalMetrics();
       const roundPoints = Number(lineup.total_points || 0);
       current.totalPoints += roundPoints;
       current.roundsPlayed += 1;
       current.bestRound = Math.max(current.bestRound, roundPoints);
+      for (const player of lineup.fantasy_lineup_players || []) {
+        current.captainBonusPoints += Number(player.captain_bonus || 0);
+        const role = player.slot_role || (
+          player.player_profile_locked === "defensive" ? "DEF"
+            : player.player_profile_locked === "midfield" ? "MEI"
+              : player.player_profile_locked === "offensive" ? "ATA"
+                : null
+        );
+        if (role === "DEF") current.defPoints += Number(player.total_points || 0);
+        if (role === "MEI") current.midPoints += Number(player.total_points || 0);
+        if (role === "ATA") current.attackPoints += Number(player.total_points || 0);
+      }
       historicalByUser.set(lineup.user_id, current);
     }
+    const liveMetrics = (userId: string) => {
+      const projection = live?.byUserId.get(userId);
+      const metrics = {
+        totalPoints: Number(projection?.totalPoints || 0),
+        captainBonusPoints: Number(projection?.captainBonus || 0),
+        defPoints: 0,
+        midPoints: 0,
+        attackPoints: 0,
+      };
+      for (const player of projection?.players || []) {
+        if (player.slotRole === "DEF") metrics.defPoints += Number(player.totalPoints || 0);
+        if (player.slotRole === "MEI") metrics.midPoints += Number(player.totalPoints || 0);
+        if (player.slotRole === "ATA") metrics.attackPoints += Number(player.totalPoints || 0);
+      }
+      return metrics;
+    };
     const byUserId = new Map<string, any>();
     for (const item of accounts || []) {
-      const historical = historicalByUser.get(item.user_id) || { totalPoints: 0, roundsPlayed: 0, bestRound: 0 };
+      const historical = historicalByUser.get(item.user_id) || emptyHistoricalMetrics();
+      const currentLive = liveMetrics(item.user_id);
       byUserId.set(item.user_id, {
         ...item,
-        total_points: historical.totalPoints + (live?.byUserId.get(item.user_id)?.totalPoints || 0),
+        total_points: historical.totalPoints + currentLive.totalPoints,
         rounds_played: historical.roundsPlayed,
-        best_round_points: historical.bestRound,
+        best_round_points: Math.max(historical.bestRound, currentLive.totalPoints),
+        captain_bonus_points: historical.captainBonusPoints + currentLive.captainBonusPoints,
+        def_points: historical.defPoints + currentLive.defPoints,
+        mid_points: historical.midPoints + currentLive.midPoints,
+        attack_points: historical.attackPoints + currentLive.attackPoints,
         is_live: Boolean(live?.byUserId.has(item.user_id)),
       });
     }
     for (const [userId, historical] of historicalByUser) {
       if (!byUserId.has(userId)) {
+        const currentLive = liveMetrics(userId);
         byUserId.set(userId, {
           user_id: userId,
-          total_points: historical.totalPoints + (live?.byUserId.get(userId)?.totalPoints || 0),
+          total_points: historical.totalPoints + currentLive.totalPoints,
           rounds_played: historical.roundsPlayed,
-          best_round_points: historical.bestRound,
+          best_round_points: Math.max(historical.bestRound, currentLive.totalPoints),
+          captain_bonus_points: historical.captainBonusPoints + currentLive.captainBonusPoints,
+          def_points: historical.defPoints + currentLive.defPoints,
+          mid_points: historical.midPoints + currentLive.midPoints,
+          attack_points: historical.attackPoints + currentLive.attackPoints,
           current_budget: 0,
           is_live: Boolean(live?.byUserId.has(userId)),
         });
@@ -2329,10 +2385,16 @@ export async function getFantasyRanking(
     // deve colocá-la no ranking geral imediatamente.
     for (const projection of live?.byUserId.values() || []) {
       if (!byUserId.has(projection.userId)) {
+        const currentLive = liveMetrics(projection.userId);
         byUserId.set(projection.userId, {
           id: projection.lineupId,
           user_id: projection.userId,
           total_points: projection.totalPoints,
+          best_round_points: projection.totalPoints,
+          captain_bonus_points: currentLive.captainBonusPoints,
+          def_points: currentLive.defPoints,
+          mid_points: currentLive.midPoints,
+          attack_points: currentLive.attackPoints,
           current_budget: 0,
           rounds_played: 0,
           is_live: true,
