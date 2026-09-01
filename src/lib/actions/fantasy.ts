@@ -694,7 +694,6 @@ export async function getFantasyDashboard() {
   // Agregações de Histórico de Preço e Pontuações Recentes
   const lastVariation = new Map<string, number>();
   const lastPriceChange = new Map<string, number>();
-  const latestRoundPerformance = new Map<string, number>();
   const recentVariationsByPlayer = new Map<string, number[]>();
   const recentPointsByPlayer = new Map<string, number[]>();
 
@@ -708,9 +707,6 @@ export async function getFantasyDashboard() {
         row.player_id,
         Number(row.price_change ?? Number(row.price_after || 0) - Number(row.price_before || 0))
       );
-    }
-    if (latestFinishedRound && row.fantasy_round_id === latestFinishedRound.id) {
-      latestRoundPerformance.set(row.player_id, Number(row.round_points || 0));
     }
     if (Number(row.games || 0) > 0) {
       const varList = recentVariationsByPlayer.get(row.player_id) || [];
@@ -784,24 +780,25 @@ export async function getFantasyDashboard() {
       const roundsPlayed = isTest ? 0 : Number(priceRow?.rounds_played || 0);
       const variation = isTest ? 0 : lastVariation.get(player.id) || 0;
       const priceChange = isTest ? 0 : lastPriceChange.get(player.id) || 0;
-      const roundPoints = betweenRounds
-        ? latestRoundPerformance.get(player.id) || 0
-        : calculateFantasyPlayerPoints(
-            {
-              goals: currentStats.get(player.id)?.goals || 0,
-              assists: currentStats.get(player.id)?.assists || 0,
-              ownGoals: currentStats.get(player.id)?.ownGoals || 0,
-              wins: currentStats.get(player.id)?.wins || 0,
-              losses: currentStats.get(player.id)?.losses || 0,
-              goalkeeperGames: currentStats.get(player.id)?.goalkeeperGames || 0,
-              goalsConceded: currentStats.get(player.id)?.goalsConceded || 0,
-              defensiveCleanGames: currentStats.get(player.id)?.defensiveCleanGames || 0,
-              defensiveOneGoalGames: currentStats.get(player.id)?.defensiveOneGoalGames || 0,
-              teamGoalsConceded: currentStats.get(player.id)?.teamGoalsConceded || 0,
-              playerProfile: player.player_profile,
-            },
-            scoringSettings,
-          );
+      // A pontuação da última rodada vem diretamente das estatísticas daquela
+      // rodada. O histórico de preços é só uma consequência da apuração e,
+      // em bases migradas, pode ter o campo round_points zerado.
+      const roundPoints = calculateFantasyPlayerPoints(
+        {
+          goals: currentStats.get(player.id)?.goals || 0,
+          assists: currentStats.get(player.id)?.assists || 0,
+          ownGoals: currentStats.get(player.id)?.ownGoals || 0,
+          wins: currentStats.get(player.id)?.wins || 0,
+          losses: currentStats.get(player.id)?.losses || 0,
+          goalkeeperGames: currentStats.get(player.id)?.goalkeeperGames || 0,
+          goalsConceded: currentStats.get(player.id)?.goalsConceded || 0,
+          defensiveCleanGames: currentStats.get(player.id)?.defensiveCleanGames || 0,
+          defensiveOneGoalGames: currentStats.get(player.id)?.defensiveOneGoalGames || 0,
+          teamGoalsConceded: currentStats.get(player.id)?.teamGoalsConceded || 0,
+          playerProfile: player.player_profile,
+        },
+        scoringSettings,
+      );
 
       const playerRecentPoints = recentPointsByPlayer.get(player.id) || [];
       const playerRecentVars = recentVariationsByPlayer.get(player.id) || [];

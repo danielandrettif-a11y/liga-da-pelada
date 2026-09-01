@@ -1875,6 +1875,7 @@ export function FantasyExperience({
                 const bought = selected.includes(player.id);
                 const simulatedRemaining = bought ? remaining + player.price : remaining - player.price;
                 const backgroundImage = cosmeticImage(player.cosmetics?.backgroundAssetKey);
+                const displayedPoints = sort === "lastRound" ? player.roundPoints : player.totalPoints;
 
                 return (
                   <div
@@ -2003,9 +2004,9 @@ export function FantasyExperience({
                       {/* Pontos & Ação */}
                       <div className="text-right shrink-0">
                         <p className="text-sm font-black text-foreground">
-                          {player.totalPoints.toFixed(1)}
+                          {displayedPoints.toFixed(1)}
                         </p>
-                        <p className="text-[8px] uppercase text-muted">pontos</p>
+                        <p className="text-[8px] uppercase text-muted">{sort === "lastRound" ? "últ. rodada" : "pontos"}</p>
 
                         {open && (
                           <button
