@@ -2318,6 +2318,7 @@ export type FantasyLineupStatusEntry = {
   cosmetics?: {
     frameKey: string | null;
     auraKey: string | null;
+    backgroundAssetKey: string | null;
   } | null;
 };
 
@@ -2464,7 +2465,7 @@ export async function getFantasyRoundLineupOverview(
         .eq("fantasy_round_id", targetFantasyRound.id),
       overviewReadClient
         .from("fantasy_user_cosmetic_loadouts")
-        .select("user_id, frame:frame_cosmetic_id(asset_key), aura:aura_cosmetic_id(asset_key)")
+        .select("user_id, frame:frame_cosmetic_id(asset_key), aura:aura_cosmetic_id(asset_key), background:background_cosmetic_id(asset_key)")
         .eq("fantasy_season_id", fs.id),
     ]);
 
@@ -2476,6 +2477,7 @@ export async function getFantasyRoundLineupOverview(
     (openRoundLoadouts || []).map((item: any) => [item.user_id, {
       frameKey: item.frame?.asset_key || null,
       auraKey: item.aura?.asset_key || null,
+      backgroundAssetKey: item.background?.asset_key || null,
     }]),
   );
 

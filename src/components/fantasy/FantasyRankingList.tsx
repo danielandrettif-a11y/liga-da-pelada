@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, Clock, RotateCcw } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import type { FantasyRoundLineupOverview } from "@/lib/actions/fantasy";
+import { cosmeticImage } from "@/lib/fantasy/cosmetics";
 import { supabase } from "@/lib/supabase";
 
 export type FantasyRankingEntry = {
@@ -24,6 +25,7 @@ export type FantasyRankingEntry = {
   cosmetics?: {
     frameKey: string | null;
     auraKey: string | null;
+    backgroundAssetKey: string | null;
   } | null;
 };
 
@@ -119,48 +121,52 @@ export function FantasyRankingList({
                 Nenhum cartoleiro salvou o time para esta rodada ainda. Seja o primeiro!
               </div>
             ) : (
-              confirmed.map((item, index) => (
-                <div
-                  key={item.userId}
-                  className={`glass-card flex items-center gap-3 p-3.5 ${
-                    item.isCurrentUser ? "border-accent/40 bg-accent/5" : ""
-                  }`}
-                >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-success/15 text-xs font-black text-success">
-                    {index + 1}
-                  </span>
-                  <PlayerAvatar
-                    name={item.playerName}
-                    avatarUrl={item.avatarUrl}
-                    frameKey={item.cosmetics?.frameKey}
-                    auraKey={item.cosmetics?.auraKey}
-                    className="h-10 w-10 shrink-0 rounded-full bg-surface text-xs font-black text-accent"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <p className="truncate text-sm font-black text-foreground">{item.playerName}</p>
-                      {item.isCurrentUser && (
-                        <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[8px] font-black uppercase text-accent">
-                          Você
-                        </span>
-                      )}
+              confirmed.map((item, index) => {
+                const backgroundImage = cosmeticImage(item.cosmetics?.backgroundAssetKey);
+                return (
+                  <div
+                    key={item.userId}
+                    className={`glass-card relative overflow-hidden ${item.isCurrentUser ? "border-accent/40 bg-accent/5" : ""}`}
+                  >
+                    {backgroundImage && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-65" style={{ backgroundImage: `linear-gradient(rgba(3, 15, 8, .24), rgba(3, 15, 8, .74)), url(${backgroundImage})` }} />}
+                    <div className="relative flex items-center gap-3 p-3.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-success/15 text-xs font-black text-success">
+                        {index + 1}
+                      </span>
+                      <PlayerAvatar
+                        name={item.playerName}
+                        avatarUrl={item.avatarUrl}
+                        frameKey={item.cosmetics?.frameKey}
+                        auraKey={item.cosmetics?.auraKey}
+                        className="h-10 w-10 shrink-0 rounded-full bg-surface text-xs font-black text-accent"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate text-sm font-black text-foreground">{item.playerName}</p>
+                          {item.isCurrentUser && (
+                            <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[8px] font-black uppercase text-accent">
+                              Você
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-muted">
+                          {item.savedAt
+                            ? `Escalação salva em ${new Intl.DateTimeFormat("pt-BR", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }).format(new Date(item.savedAt))}`
+                            : "Escalação confirmada"}
+                        </p>
+                      </div>
+                      <span className="flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[9px] font-black uppercase text-success">
+                        <CheckCircle2 className="h-3 w-3" /> Escalado
+                      </span>
                     </div>
-                    <p className="text-[10px] text-muted">
-                      {item.savedAt
-                        ? `Escalação salva em ${new Intl.DateTimeFormat("pt-BR", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }).format(new Date(item.savedAt))}`
-                        : "Escalação confirmada"}
-                    </p>
                   </div>
-                  <span className="flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[9px] font-black uppercase text-success">
-                    <CheckCircle2 className="h-3 w-3" /> Escalado
-                  </span>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         )}
