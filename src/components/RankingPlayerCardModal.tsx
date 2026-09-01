@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { ChevronDown, Medal, Share2, Sparkles, Target, Trophy, X } from "@/components/icons";
@@ -195,11 +195,24 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   const [mounted, setMounted] = useState(false);
   const [showBestRounds, setShowBestRounds] = useState(false);
   const [expandedRoundId, setExpandedRoundId] = useState<string | null>(null);
+  const dialogScrollRef = useRef<HTMLDivElement>(null);
+  const bestRoundsRef = useRef<HTMLDivElement>(null);
   useDialogViewport(true);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!showBestRounds) return;
+    const frame = window.requestAnimationFrame(() => {
+      const dialog = dialogScrollRef.current;
+      const rounds = bestRoundsRef.current;
+      if (!dialog || !rounds) return;
+      dialog.scrollTo({ top: Math.max(0, rounds.offsetTop - 8), behavior: "smooth" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [showBestRounds]);
 
   const theme = cardTheme(position);
   const displayName = entry.player.name;
@@ -256,10 +269,11 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
+        ref={dialogScrollRef}
         role="dialog"
         aria-modal="true"
         aria-label={`Carta de ${displayName}`}
-        className="mobile-dialog-scroll relative my-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[360px] flex-col items-center overflow-y-auto overscroll-contain rounded-3xl p-1.5 pb-6 touch-pan-y [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent]"
+        className="mobile-dialog-scroll relative my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-[360px] overflow-y-auto overscroll-contain rounded-3xl p-1.5 pb-6 touch-pan-y [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent]"
       >
         {/* Botão de Fechar fixado no topo */}
         <div className="sticky top-0 z-50 flex w-full justify-end pointer-events-none mb-[-2.25rem] pr-1 pt-1">
@@ -389,7 +403,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
 
         {/* 6 MELHORES PARTIDAS - SANFONA / ACCORDION */}
         {entry.bestRounds && entry.bestRounds.length > 0 && (
-          <div className="mx-auto mt-3.5 w-[94%] overflow-hidden rounded-2xl border border-border/80 bg-[#07150d]/95 shadow-xl backdrop-blur-md transition-all">
+          <div ref={bestRoundsRef} className="mx-auto mt-3.5 w-[94%] overflow-hidden rounded-2xl border border-border/80 bg-[#07150d]/95 shadow-xl backdrop-blur-md transition-all">
             <button
               type="button"
               onClick={() => setShowBestRounds((prev) => !prev)}
