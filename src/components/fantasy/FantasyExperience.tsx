@@ -27,6 +27,7 @@ import {
 } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { formatFantasyMoney, type FantasySettings } from "@/lib/fantasy/config";
+import { cosmeticImage } from "@/lib/fantasy/cosmetics";
 import { CHALLENGE_LABELS, fantasyChallengeOffer, type FantasyChallengeType } from "@/lib/fantasy/challenges";
 import {
   saveFantasyLineup,
@@ -1873,17 +1874,27 @@ export function FantasyExperience({
               {filtered.map((player) => {
                 const bought = selected.includes(player.id);
                 const simulatedRemaining = bought ? remaining + player.price : remaining - player.price;
+                const backgroundImage = cosmeticImage(player.cosmetics?.backgroundAssetKey);
 
                 return (
                   <div
                     key={player.id}
-                    className={`flex flex-col gap-2 rounded-2xl border p-3 text-left transition ${
+                    className={`relative flex flex-col gap-2 overflow-hidden rounded-2xl border p-3 text-left transition ${
                       bought
                         ? "border-accent/60 bg-accent/10 shadow-[0_0_15px_rgba(204,255,0,0.06)]"
                         : "border-border bg-surface hover:border-accent/30"
                     }`}
                   >
-                    <div className="flex items-center gap-3">
+                    {backgroundImage && (
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-70"
+                        style={{
+                          backgroundImage: `linear-gradient(rgba(3, 15, 8, .22), rgba(3, 15, 8, .72)), url(${backgroundImage})`,
+                        }}
+                      />
+                    )}
+                    <div className="relative flex items-center gap-3">
                       {/* Área única para abrir a ficha do atleta */}
                       <button
                         type="button"
@@ -1896,6 +1907,8 @@ export function FantasyExperience({
                             name={player.name}
                             avatarUrl={player.avatarUrl}
                             clickable={false}
+                            frameKey={player.cosmetics?.frameKey}
+                            auraKey={player.cosmetics?.auraKey}
                             className="h-12 w-12 rounded-full border border-border bg-background text-xs font-black text-accent group-hover:border-accent transition-colors"
                           />
                           <span className="absolute -bottom-1 -right-1 text-[10px]">{player.trendIcon}</span>
@@ -2015,7 +2028,7 @@ export function FantasyExperience({
 
                     {/* Informação de Saldo Simulado */}
                     {open && (
-                      <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-1 border-t border-white/5 pt-1.5 text-[9px] text-muted min-w-0">
+                      <div className="relative flex flex-wrap sm:flex-nowrap items-center justify-between gap-1 border-t border-white/5 pt-1.5 text-[9px] text-muted min-w-0">
                         <span className="truncate">
                           {bought
                             ? `Saldo após venda: ${formatFantasyMoney(simulatedRemaining, settings.currencyName)}`

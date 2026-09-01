@@ -20,6 +20,7 @@ import {
   type FantasyTrend,
 } from "@/lib/fantasy/engine";
 import type { FantasyChallengeType } from "@/lib/fantasy/challenges";
+import { getAllPlayersEquippedCosmeticsMap, type EquippedCosmeticsSummary } from "./cosmetics";
 import {
   projectFantasyLiveLineups,
   projectFantasyLiveStats,
@@ -74,6 +75,7 @@ export type FantasyMarketPlayer = {
   hasPreviousHistory: boolean;
   allTags: FantasyTagItem[];
   compactTags: FantasyTagItem[];
+  cosmetics: Pick<EquippedCosmeticsSummary, "frameKey" | "auraKey" | "backgroundAssetKey"> | null;
 };
 
 export type FantasyRadarHighlight = {
@@ -457,6 +459,7 @@ export async function getFantasyDashboard() {
   // A prévia é pública para quem já está no Cartola, mas precisa continuar
   // funcionando caso uma regra de RLS da escalação/rodada seja atualizada.
   const liveMatchesRequest = loadFantasyMatchSnapshots(liveReadClient, displayRoundId);
+  const playerCosmeticsRequest = getAllPlayersEquippedCosmeticsMap();
 
   const [
     { data: priceRows },
@@ -474,6 +477,7 @@ export async function getFantasyDashboard() {
     { data: rawPortfolio },
     liveMatches,
     cardDashboard,
+    playerCosmetics,
   ] = await Promise.all([
     account.client.from("fantasy_player_prices").select("*").eq("fantasy_season_id", fantasySeason.id),
     officialRoundIds.length
@@ -520,6 +524,7 @@ export async function getFantasyDashboard() {
     portfolioRequest,
     liveMatchesRequest,
     cardDashboardRequest,
+    playerCosmeticsRequest,
   ]);
 
   const { availablePacks, availablePacksCount, inventoryCount, activeCard } = cardDashboard;
@@ -810,6 +815,7 @@ export async function getFantasyDashboard() {
       });
       const costBenefit = calculateCostBenefit(expectedPoints, price);
       const popularity = popularityAgg.getPopularity(player.id);
+      const cosmetics = playerCosmetics.get(player.id);
 
       const gkGames = stats.goalkeeperGames || 0;
       const gkConceded = stats.goalsConceded || 0;
@@ -872,6 +878,13 @@ export async function getFantasyDashboard() {
         hasPreviousHistory: popularity.hasHistory,
         allTags,
         compactTags,
+        cosmetics: cosmetics
+          ? {
+              frameKey: cosmetics.frameKey,
+              auraKey: cosmetics.auraKey,
+              backgroundAssetKey: cosmetics.backgroundAssetKey,
+            }
+          : null,
       };
     })
     .sort((a, b) => b.totalPoints - a.totalPoints || a.name.localeCompare(b.name, "pt-BR"));
