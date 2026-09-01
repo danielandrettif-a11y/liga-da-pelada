@@ -1360,6 +1360,9 @@ export async function saveFantasyLineup(input: {
     if (!account.user) return { success: false, error: "Entre na sua conta para escalar." };
     const league = await getActiveLeague();
     const maxPlayers = league.players_per_team || 5;
+    if (input.roundId && (input.playerIds.length !== maxPlayers || !input.captainId)) {
+      return { success: false, error: `Para salvar a escalação, escolha exatamente ${maxPlayers} jogadores e um capitão.` };
+    }
     if (input.playerIds.length > maxPlayers || new Set(input.playerIds).size !== input.playerIds.length) {
       return {
         success: false,

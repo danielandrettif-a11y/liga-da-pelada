@@ -35,7 +35,7 @@ export function FantasyAdminSettings({ settings, rounds }: { settings: any; roun
     });
   }
   function repairLegacy() {
-    if (window.prompt("Isso recupera times completos antigos e refaz pontos, preços e patrimônios. Digite REPARAR para confirmar.") !== "REPARAR") return;
+    if (window.prompt("Isso recupera times completos antigos, inclusive os sem capitão, e refaz pontos, preços e patrimônios. Digite REPARAR para confirmar.") !== "REPARAR") return;
     startTransition(async () => {
       const result = await repairLegacySavedFantasyLineups();
       if (!result.success) {
