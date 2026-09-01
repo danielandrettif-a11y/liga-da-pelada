@@ -878,7 +878,9 @@ export async function getFantasyDashboard() {
 
   let effectiveLineup: any =
     lineup ||
-    (rawPortfolio
+    (betweenRounds && latestLineup
+      ? latestLineup
+      : rawPortfolio
       ? {
           ...rawPortfolio,
           captain_player_id: rawPortfolio.captain_player_id,
