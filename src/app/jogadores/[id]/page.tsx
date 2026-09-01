@@ -14,8 +14,7 @@ import { getFantasyPlayerSummary } from "@/lib/actions/fantasy";
 import { getAdminCosmeticsPreview, getPlayerEquippedCosmetics, type CosmeticPreviewLoadout } from "@/lib/actions/cosmetics";
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticMobileBackgroundImage, cosmeticNameplateClass, cosmeticProfileCoverImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
 import { OfficialProfilePreviewNotice } from "@/components/fantasy/OfficialProfilePreviewNotice";
-import { getActiveScoringRules } from "@/lib/actions/scoring";
-import type { ScoringPoints } from "@/lib/scoring";
+import { buildRankedPointBreakdown } from "@/lib/ranked-scoring";
 
 export const revalidate = 0;
 
@@ -25,27 +24,19 @@ function formatPointValue(value: number) {
   return value > 0 ? `+${value}` : String(value);
 }
 
-function rankedPointDescription(row: HistoryRow, rules: ScoringPoints) {
-  const parts: string[] = [];
-  let explainedPoints = 0;
-  const add = (count: number, singular: string, plural: string, pointsEach: number) => {
-    if (!count) return;
-    const subtotal = count * pointsEach;
-    explainedPoints += subtotal;
-    parts.push(`${count} ${count === 1 ? singular : plural} (${formatPointValue(subtotal)})`);
-  };
-
-  add(Number(row.goals || 0), "gol", "gols", rules.goal);
-  add(Number(row.assists || 0), "assistência", "assistências", rules.assist);
-  add(Number(row.wins || 0), "vitória", "vitórias", rules.win);
-  add(Number(row.draws || 0), "empate", "empates", rules.draw);
-  add(Number(row.losses || 0), "derrota", "derrotas", rules.loss);
-  add(Number(row.goalkeeper_games || 0), "jogo no gol", "jogos no gol", rules.goalkeeper_appearance);
-  add(Number(row.goals_conceded || 0), "gol sofrido", "gols sofridos", rules.goal_conceded);
-  add(Number(row.own_goals || 0), "gol contra", "gols contra", rules.own_goal);
-  add(Number(row.defensive_clean_games || 0), "jogo sem sofrer gol na linha", "jogos sem sofrer gol na linha", 2);
-  add(Number(row.defensive_one_goal_games || 0), "jogo sofrendo 1 gol na linha", "jogos sofrendo 1 gol na linha", 1);
-
+function rankedPointDescription(row: HistoryRow) {
+  const breakdown = buildRankedPointBreakdown({
+    goals: row.goals,
+    assists: row.assists,
+    wins: row.wins,
+    draws: row.draws,
+    losses: row.losses,
+    goalkeeperAppearances: row.goalkeeper_games,
+    goalkeeperGoalsConceded: row.goals_conceded,
+    ownGoals: row.own_goals,
+  });
+  const parts = breakdown.map((item) => `${item.count} ${item.label.toLocaleLowerCase("pt-BR")} (${formatPointValue(item.points)})`);
+  const explainedPoints = breakdown.reduce((sum, item) => sum + item.points, 0);
   const total = Number(row.points || 0);
   const adjustment = total - explainedPoints;
   if (adjustment !== 0) parts.push(`ajuste da rodada (${formatPointValue(adjustment)})`);
@@ -55,7 +46,7 @@ function rankedPointDescription(row: HistoryRow, rules: ScoringPoints) {
     : `Sem eventos pontuáveis = ${formatPointValue(total)} pts`;
 }
 
-function History({ rows, friendly = false, rules }: { rows: HistoryRow[]; friendly?: boolean; rules?: ScoringPoints }) {
+function History({ rows, friendly = false }: { rows: HistoryRow[]; friendly?: boolean }) {
   if (rows.length === 0) return <div className="glass-card p-6 text-center text-sm text-muted">Nenhuma participação registrada.</div>;
   return (
     <div className="glass-card overflow-hidden">
@@ -69,9 +60,9 @@ function History({ rows, friendly = false, rules }: { rows: HistoryRow[]; friend
               <span className="flex items-center gap-1 text-sm font-bold text-foreground"><Target className="h-3 w-3 text-muted" />{row.assists}</span>
               <span className={`text-sm font-bold ${row.wins > 0 ? "text-success" : row.draws > 0 ? "text-warning" : "text-danger"}`}>{row.wins > 0 ? "V" : row.draws > 0 ? "E" : "D"}</span>
             </div>
-            {!friendly && rules && <p className="mt-2 text-[10px] leading-4 text-muted">{rankedPointDescription(row, rules)}</p>}
+            {!friendly && <p className="mt-2 text-[10px] leading-4 text-muted">{rankedPointDescription(row)}</p>}
           </div>
-          {!friendly && <div className="text-right"><span className="stat-number text-lg text-accent">+{row.points}</span><p className="text-[9px] text-muted">PTS</p></div>}
+          {!friendly && <div className="text-right"><span className="stat-number text-lg text-accent">{formatPointValue(Number(row.points || 0))}</span><p className="text-[9px] text-muted">PTS</p></div>}
           <ChevronRight className="h-4 w-4 text-muted" />
         </Link>
       ))}
@@ -103,7 +94,7 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
     nameplate: readPreviewValue(query.nameplate),
     background: readPreviewValue(query.background),
   } : {};
-  const [player, officialHistory, friendlyHistory, awardSeasons, fitness, clubGoals, fantasySummary, equippedCosmetics, previewCosmetics, playtime, scoringRules] = await Promise.all([
+  const [player, officialHistory, friendlyHistory, awardSeasons, fitness, clubGoals, fantasySummary, equippedCosmetics, previewCosmetics, playtime] = await Promise.all([
     getPlayer(id),
     getPlayerRoundHistory(id, "official"),
     getPlayerRoundHistory(id, "friendly"),
@@ -114,7 +105,6 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
     getPlayerEquippedCosmetics(id),
     isPreviewRequested ? getAdminCosmeticsPreview(id, previewLoadout) : Promise.resolve(null),
     getPlayerPlaytime(id),
-    getActiveScoringRules(),
   ]);
   if (!player) notFound();
   const cosmetics = previewCosmetics || equippedCosmetics;
@@ -291,7 +281,7 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
         </section>
 
         <FantasyPlayerCard summary={fantasySummary} />
-        <section><h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">Histórico Ranked</h3><History rows={officialHistory} rules={scoringRules} /></section>
+        <section><h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">Histórico Ranked</h3><History rows={officialHistory} /></section>
         <section><h3 className="mb-3 px-1 text-xs font-bold uppercase tracking-wider text-muted">Histórico de Amistosos</h3><History rows={friendlyHistory} friendly /></section>
       </>}
       </div>

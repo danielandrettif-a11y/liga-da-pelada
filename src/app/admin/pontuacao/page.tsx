@@ -1,11 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft } from "@/components/icons";
 import { ScoringRulesForm } from "@/components/ScoringRulesForm";
-import { getScoringRules } from "@/lib/actions/scoring";
 
 export default async function PontuacaoPage() {
-  const result = await getScoringRules();
-
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -17,15 +14,12 @@ export default async function PontuacaoPage() {
           <ArrowLeft className="h-5 w-5 text-muted" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-foreground">Pontuação</h1>
-          <p className="mt-0.5 text-xs text-muted">Defina quanto vale cada resultado</p>
+          <h1 className="text-xl font-bold text-foreground">Pontuação Ranked</h1>
+          <p className="mt-0.5 text-xs text-muted">Como cada resultado e evento vale pontos</p>
         </div>
       </div>
 
-      <ScoringRulesForm
-        initialRules={result.rules}
-        initialError={result.success ? undefined : result.error}
-      />
+      <ScoringRulesForm />
     </div>
   );
 }
