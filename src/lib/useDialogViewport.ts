@@ -8,8 +8,13 @@ let originalHtmlOverflow: string | null = null;
 let lockedScrollY = 0;
 
 function preventBackgroundTouch(event: TouchEvent) {
-  const target = event.target instanceof Element ? event.target : null;
-  if (target?.closest(".mobile-dialog-scroll")) return;
+  // Em navegadores móveis, um gesto pode começar em um nó de texto ou SVG.
+  // O composedPath preserva o elemento rolável pai nesses casos e evita que o
+  // bloqueio do fundo cancele a rolagem interna do modal.
+  const isInsideScrollableDialog = event.composedPath().some((target) =>
+    target instanceof Element && Boolean(target.closest(".mobile-dialog-scroll")),
+  );
+  if (isInsideScrollableDialog) return;
   event.preventDefault();
 }
 

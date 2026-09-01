@@ -259,7 +259,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label={`Carta de ${displayName}`}
-        className="mobile-dialog-scroll relative w-full max-w-[360px] max-h-[92dvh] overflow-y-auto overscroll-contain rounded-3xl p-1.5 pb-6 flex flex-col items-center my-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent]"
+        className="mobile-dialog-scroll relative my-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[360px] flex-col items-center overflow-y-auto overscroll-contain rounded-3xl p-1.5 pb-6 touch-pan-y [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent]"
       >
         {/* Botão de Fechar fixado no topo */}
         <div className="sticky top-0 z-50 flex w-full justify-end pointer-events-none mb-[-2.25rem] pr-1 pt-1">
