@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Clock, Crown, Medal, RotateCcw } from "@/components/icons";
+import { CheckCircle2, Clock, Crown, RotateCcw } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import type { FantasyRoundLineupOverview } from "@/lib/actions/fantasy";
 import { cosmeticImage } from "@/lib/fantasy/cosmetics";
@@ -31,20 +31,23 @@ export type FantasyRankingEntry = {
 
 function podiumStyle(position: number) {
   if (position === 1) return {
-    ring: "border-[#f5cf52] shadow-[0_0_24px_rgba(245,207,82,.28)]",
-    base: "from-[#866714]/80 via-[#4f3c08]/70 to-[#211a05]/80 border-[#d5ad38]/50",
+    card: "border-amber-300/60 bg-gradient-to-b from-amber-300/20 via-[#15210d] to-[#06130b] shadow-[0_18px_38px_rgba(245,190,45,.14)]",
+    ring: "border-amber-200 bg-amber-300/20 shadow-[0_0_24px_rgba(245,207,82,.3)]",
+    base: "border-amber-300/35 bg-gradient-to-b from-amber-300/25 to-amber-950/35",
     medal: "from-[#fff0a8] via-[#e0b83d] to-[#9d7217] text-[#3b2b07]",
     label: "text-[#f5d45e]",
   };
   if (position === 2) return {
-    ring: "border-slate-300 shadow-[0_0_20px_rgba(203,213,225,.18)]",
-    base: "from-slate-400/40 via-slate-600/25 to-slate-900/40 border-slate-300/30",
+    card: "border-slate-300/45 bg-gradient-to-b from-slate-300/15 via-[#102019] to-[#06130b] shadow-[0_16px_32px_rgba(203,213,225,.08)]",
+    ring: "border-slate-200 bg-slate-300/15 shadow-[0_0_20px_rgba(203,213,225,.2)]",
+    base: "border-slate-300/25 bg-gradient-to-b from-slate-300/20 to-slate-900/35",
     medal: "from-white via-slate-300 to-slate-500 text-slate-800",
     label: "text-slate-300",
   };
   return {
-    ring: "border-[#c47a43] shadow-[0_0_20px_rgba(196,122,67,.18)]",
-    base: "from-[#9b542a]/45 via-[#5b2c17]/35 to-[#271109]/60 border-[#b86d3b]/40",
+    card: "border-orange-400/40 bg-gradient-to-b from-orange-400/15 via-[#151d13] to-[#06130b] shadow-[0_16px_32px_rgba(196,122,67,.08)]",
+    ring: "border-orange-300 bg-orange-400/15 shadow-[0_0_20px_rgba(196,122,67,.2)]",
+    base: "border-orange-400/25 bg-gradient-to-b from-orange-400/20 to-orange-950/35",
     medal: "from-[#efbc91] via-[#b96d39] to-[#713619] text-[#32160a]",
     label: "text-[#d98a50]",
   };
@@ -55,6 +58,76 @@ function rankingHref(item: FantasyRankingEntry, scope: "general" | "round") {
   return scope === "round" && item.round_id
     ? `/cartola/ranking/${item.user_id}/${item.round_id}`
     : `/cartola/ranking/${item.user_id}`;
+}
+
+function FantasyPodium({ ranking, scope }: { ranking: FantasyRankingEntry[]; scope: "general" | "round" }) {
+  const podium = ranking.slice(0, 3);
+  if (podium.length < 3) return null;
+  const podiumOrder = [podium[1], podium[0], podium[2]];
+
+  return (
+    <section
+      className="relative isolate overflow-hidden rounded-[1.75rem] border border-accent/30 bg-[radial-gradient(circle_at_50%_0%,rgba(204,255,0,.16),transparent_42%),linear-gradient(160deg,#071b10,#031008_72%)] px-2.5 pb-3 pt-4 shadow-[0_20px_45px_rgba(0,0,0,.28)]"
+      aria-label="Pódio do Cartola"
+    >
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(204,255,0,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(204,255,0,.08)_1px,transparent_1px)] [background-size:28px_28px] [mask-image:linear-gradient(to_bottom,black,transparent_85%)]" />
+      <div className="relative mb-8 flex items-center justify-between gap-2 px-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/12 text-accent">
+            <Crown className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="truncate font-athletic text-sm font-black uppercase tracking-wider text-foreground">Pódio dos Cartoleiros</h2>
+            <p className="text-[9px] font-bold uppercase tracking-[.14em] text-accent/75">Fantasy · mercado da temporada</p>
+          </div>
+        </div>
+        <span className="shrink-0 rounded-full border border-accent/25 bg-black/30 px-2 py-1 text-[8px] font-black uppercase text-accent">Top 3</span>
+      </div>
+
+      <div className="relative grid grid-cols-3 items-end gap-1.5 sm:gap-2.5">
+        {podiumOrder.map((item, visualIndex) => {
+          const position = visualIndex === 0 ? 2 : visualIndex === 1 ? 1 : 3;
+          const style = podiumStyle(position);
+          const avatarSize = position === 1 ? "h-[4.5rem] w-[4.5rem]" : "h-16 w-16";
+          const backgroundImage = cosmeticImage(item.cosmetics?.backgroundAssetKey);
+          return (
+            <Link
+              key={item.id}
+              href={rankingHref(item, scope)}
+              className={`group relative min-w-0 overflow-hidden rounded-[1.35rem] border px-1.5 pb-1.5 pt-5 text-center transition-transform duration-300 ease-out hover:-translate-y-1 active:scale-[.98] motion-reduce:transform-none motion-reduce:transition-none ${position === 1 ? "min-h-[224px]" : "min-h-[200px]"} ${style.card}`}
+              aria-label={`Abrir perfil de ${item.player?.name || "Cartoleiro"}, ${position}º lugar`}
+            >
+              {backgroundImage && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-25" style={{ backgroundImage: `linear-gradient(rgba(3,16,8,.18),rgba(3,16,8,.9)),url(${backgroundImage})` }} />}
+              <span className={`absolute left-1.5 top-1.5 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br text-[11px] font-black shadow-lg ${style.medal}`}>
+                {position}
+              </span>
+              {position === 1 && <Crown className="absolute left-1/2 top-1 z-20 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rotate-[-6deg] text-amber-300 drop-shadow-lg" fill="currentColor" />}
+
+              <div className="relative z-10 flex flex-col items-center">
+                <div className={`relative flex items-center justify-center rounded-full border-2 p-1 ${style.ring}`}>
+                  <PlayerAvatar
+                    name={item.player?.name || "Cartoleiro"}
+                    avatarUrl={item.player?.avatar_url}
+                    frameKey={item.cosmetics?.frameKey}
+                    auraKey={item.cosmetics?.auraKey}
+                    className={`${avatarSize} rounded-full bg-[#0c2517] text-xs font-black text-accent`}
+                  />
+                </div>
+                <p className="mt-2 line-clamp-2 min-h-8 w-full text-[10px] font-black leading-4 text-foreground sm:text-xs">{item.player?.name || "Cartoleiro"}</p>
+                <p className={`mt-0.5 font-athletic text-lg font-black leading-none ${style.label}`}>{Number(item.total_points).toFixed(1)}</p>
+                <p className="mt-0.5 text-[7px] font-black uppercase tracking-wider text-muted">pontos</p>
+                <span className="mt-2 max-w-full truncate rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[8px] font-black text-emerald-200">C$ {Number(item.current_budget).toFixed(2)}</span>
+              </div>
+
+              <div className={`relative z-10 mt-2 rounded-xl border py-1.5 ${style.base}`}>
+                <span className="font-athletic text-lg font-black text-white/70">{position}º</span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
 export function FantasyRankingList({
@@ -256,9 +329,7 @@ export function FantasyRankingList({
     );
   }
 
-  const podium = ranking.slice(0, 3);
-  const showPodium = podium.length === 3;
-  const podiumOrder = showPodium ? [podium[1], podium[0], podium[2]] : podium;
+  const showPodium = ranking.length >= 3;
 
   return (
     <div className="space-y-3">
@@ -268,80 +339,43 @@ export function FantasyRankingList({
           <button type="button" onClick={() => startRefresh(() => router.refresh())} disabled={refreshing} className="flex items-center gap-1 disabled:opacity-50"><RotateCcw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Atualizar</button>
         </div>
       )}
-      {showPodium && (
-        <section className="pt-7" aria-label="Pódio do Cartola">
-          <div className="flex items-end justify-center gap-2 sm:gap-4">
-            {podiumOrder.map((item, visualIndex) => {
-              const position = visualIndex === 0 ? 2 : visualIndex === 1 ? 1 : 3;
-              const style = podiumStyle(position);
-              const height = position === 1 ? "h-36" : position === 2 ? "h-28" : "h-24";
-              return (
-                <Link
-                  key={item.id}
-                  href={rankingHref(item, scope)}
-                  className="relative flex w-1/3 max-w-[112px] flex-col items-center rounded-t-2xl transition-transform hover:-translate-y-1 focus:outline-none animate-slide-in-bottom"
-                  aria-label={`Abrir perfil de ${item.player?.name || "Cartoleiro"}, ${position}º lugar`}
-                >
-                  {position === 1 && <Crown className="absolute -top-8 h-8 w-8 rotate-[-7deg] text-[#f5d45e] drop-shadow-lg" fill="currentColor" />}
-                  <div className="relative z-10">
-                    <PlayerAvatar
-                      name={item.player?.name || "Cartoleiro"}
-                      avatarUrl={item.player?.avatar_url}
-                      frameKey={item.cosmetics?.frameKey}
-                      auraKey={item.cosmetics?.auraKey}
-                      className={`h-16 w-16 rounded-full border-[3px] bg-background text-sm font-black text-muted ${style.ring}`}
-                    />
-                    <span className={`absolute -bottom-2 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-gradient-to-br ${style.medal} shadow-lg`}>
-                      {position === 1 ? <Crown className="h-4 w-4" fill="currentColor" /> : <Medal className="h-4 w-4" fill="currentColor" />}
-                    </span>
-                  </div>
-                  <div className="mb-2 mt-4 w-full px-1 text-center">
-                    <p className="truncate text-xs font-black text-foreground">{item.player?.name || "Cartoleiro"}</p>
-                    <p className={`mt-1 text-xs font-black ${style.label}`}>{Number(item.total_points).toFixed(1)} <span className="text-[8px] uppercase opacity-70">pts</span></p>
-                    <p className="mt-0.5 truncate text-[8px] font-bold text-muted">C$ {Number(item.current_budget).toFixed(2)}</p>
-                  </div>
-                  <div className={`w-full rounded-t-2xl border-x border-t bg-gradient-to-b pt-3 ${height} ${style.base}`}>
-                    <span className="font-athletic text-3xl font-black text-white/45">{position}</span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      )}
-      {(showPodium ? ranking.slice(3) : ranking).map((item) => (
-        <Link
-          key={item.id}
-          href={rankingHref(item, scope)}
-          className="glass-card flex items-center gap-3 p-4 transition-colors hover:bg-surface-hover"
-        >
-          <span
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black ${
-              item.position <= 3 ? "bg-accent text-background" : "bg-surface text-muted"
-            }`}
-          >
-            {item.position}
-          </span>
-          <PlayerAvatar
-            name={item.player?.name || "Cartoleiro"}
-            avatarUrl={item.player?.avatar_url}
-            frameKey={item.cosmetics?.frameKey}
-            auraKey={item.cosmetics?.auraKey}
-            className="h-10 w-10 shrink-0 rounded-full bg-surface text-xs font-black text-accent"
-          />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-black text-foreground">{item.player?.name || "Cartoleiro"}</p>
-            <p className="text-[10px] text-muted">
-              {Number(item.rounds_played)} {Number(item.rounds_played) === 1 ? "rodada" : "rodadas"} · patrimônio C${" "}
-              {Number(item.current_budget).toFixed(2)}
-            </p>
-          </div>
-          <div className="shrink-0 text-right">
-            <strong className="stat-number text-lg text-accent">{Number(item.total_points).toFixed(1)}</strong>
-            <p className="text-[8px] font-black uppercase text-muted">{item.is_live ? "prévia" : "pontos"}</p>
-          </div>
-        </Link>
-      ))}
+      {showPodium && <FantasyPodium ranking={ranking} scope={scope} />}
+      {(showPodium ? ranking.slice(3) : ranking).map((item) => {
+        const backgroundImage = cosmeticImage(item.cosmetics?.backgroundAssetKey);
+        return (
+            <Link
+              key={item.id}
+              href={rankingHref(item, scope)}
+              className="group relative block overflow-hidden rounded-2xl border border-emerald-400/20 bg-gradient-to-r from-[#092016] via-[#07170f] to-[#05110b] shadow-[0_10px_24px_rgba(0,0,0,.16)] transition-all duration-300 ease-out hover:border-accent/40 hover:brightness-110 active:scale-[.99] motion-reduce:transition-none"
+            >
+              {backgroundImage && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-30" style={{ backgroundImage: `linear-gradient(90deg,rgba(4,17,10,.5),rgba(4,17,10,.92)),url(${backgroundImage})` }} />}
+              <div className="relative flex items-center gap-3 p-3.5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-accent/20 bg-accent/[.08] font-athletic text-base font-black text-accent/80">
+                  {item.position}
+                </span>
+                <div className="shrink-0 rounded-full border border-accent/35 bg-accent/10 p-0.5 shadow-[0_0_16px_rgba(204,255,0,.08)]">
+                  <PlayerAvatar
+                    name={item.player?.name || "Cartoleiro"}
+                    avatarUrl={item.player?.avatar_url}
+                    frameKey={item.cosmetics?.frameKey}
+                    auraKey={item.cosmetics?.auraKey}
+                    className="h-11 w-11 rounded-full bg-[#102819] text-xs font-black text-accent"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-black text-foreground">{item.player?.name || "Cartoleiro"}</p>
+                  <p className="mt-0.5 truncate text-[10px] text-muted">
+                    {Number(item.rounds_played)} {Number(item.rounds_played) === 1 ? "rodada" : "rodadas"} · <span className="text-emerald-200">C$ {Number(item.current_budget).toFixed(2)}</span>
+                  </p>
+                </div>
+                <div className="shrink-0 rounded-xl border border-accent/15 bg-black/25 px-2.5 py-1.5 text-right">
+                  <strong className="stat-number text-lg text-accent">{Number(item.total_points).toFixed(1)}</strong>
+                  <p className="text-[7px] font-black uppercase tracking-wider text-muted">{item.is_live ? "prévia" : "pontos"}</p>
+                </div>
+              </div>
+            </Link>
+        );
+      })}
     </div>
   );
 }
