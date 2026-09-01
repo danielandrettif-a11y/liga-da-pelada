@@ -1,0 +1,96 @@
+name: Migrar arquivos do Supabase Storage
+
+run-name: Migracao manual dos arquivos do Storage
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Digite MIGRAR_STORAGE para copiar os arquivos para o projeto novo
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migrate-supabase-storage
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Copiar arquivos do Storage
+    if: ${{ inputs.confirmation == 'MIGRAR_STORAGE' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      OLD_SUPABASE_URL: ${{ secrets.OLD_SUPABASE_URL }}
+      OLD_SERVICE_ROLE_KEY: ${{ secrets.OLD_SERVICE_ROLE_KEY }}
+      NEW_SUPABASE_URL: ${{ secrets.NEW_SUPABASE_URL }}
+      NEW_SERVICE_ROLE_KEY: ${{ secrets.NEW_SERVICE_ROLE_KEY }}
+      NEW_DB_URL: ${{ secrets.NEW_DB_URL }}
+
+    steps:
+      - name: Baixar o repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci --ignore-scripts
+
+      - name: Copiar buckets e arquivos
+        run: node scripts/migrate-supabase-storage.mjs
+
+      - name: Instalar cliente PostgreSQL
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Atualizar URLs das imagens copiadas
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${NEW_DB_URL:-}" ]]; then
+            echo "O secret NEW_DB_URL nao foi configurado."
+            exit 1
+          fi
+
+          old_project_url="${OLD_SUPABASE_URL%/}"
+          new_project_url="${NEW_SUPABASE_URL%/}"
+
+          psql "$NEW_DB_URL" \
+            --no-psqlrc \
+            --single-transaction \
+            --variable ON_ERROR_STOP=1 \
+            --set old_project_url="$old_project_url" \
+            --set new_project_url="$new_project_url" <<'SQL'
+          UPDATE public.players
+          SET avatar_url = replace(avatar_url, :'old_project_url', :'new_project_url')
+          WHERE avatar_url LIKE :'old_project_url' || '/storage/v1/object/%';
+
+          UPDATE public.player_registration_events
+          SET avatar_url = replace(avatar_url, :'old_project_url', :'new_project_url')
+          WHERE avatar_url LIKE :'old_project_url' || '/storage/v1/object/%';
+
+          UPDATE public.fantasy_lineup_players
+          SET avatar_url_locked = replace(avatar_url_locked, :'old_project_url', :'new_project_url')
+          WHERE avatar_url_locked LIKE :'old_project_url' || '/storage/v1/object/%';
+
+          UPDATE public.fantasy_test_lineup_players
+          SET avatar_url_locked = replace(avatar_url_locked, :'old_project_url', :'new_project_url')
+          WHERE avatar_url_locked LIKE :'old_project_url' || '/storage/v1/object/%';
+
+          UPDATE auth.users
+          SET raw_user_meta_data = jsonb_set(
+            raw_user_meta_data,
+            '{avatar_url}',
+            to_jsonb(replace(raw_user_meta_data ->> 'avatar_url', :'old_project_url', :'new_project_url'))
+          )
+          WHERE raw_user_meta_data ->> 'avatar_url' LIKE :'old_project_url' || '/storage/v1/object/%';
+          SQL
