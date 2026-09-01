@@ -16,7 +16,14 @@ export type RankingBestRound = {
   goals: number;
   assists: number;
   wins: number;
+  draws: number;
+  losses: number;
   games: number;
+  pointBreakdown: Array<{
+    label: string;
+    count: number;
+    points: number;
+  }>;
   countedInTop6: boolean;
 };
 

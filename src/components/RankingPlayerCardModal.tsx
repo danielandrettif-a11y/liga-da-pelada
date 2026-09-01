@@ -28,6 +28,10 @@ function cardTheme(position: number) {
   return { base: "#123e28", light: "#4f8d67", deep: "#06150d", edge: "#bdfb68", ink: "#f7fff9", glow: "rgba(204,255,0,.2)", label: "ESPECIAL" };
 }
 
+function signedPoints(points: number) {
+  return points > 0 ? `+${points}` : String(points);
+}
+
 function roundedRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
   context.beginPath();
   context.roundRect(x, y, width, height, radius);
@@ -190,6 +194,7 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
 export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   const [mounted, setMounted] = useState(false);
   const [showBestRounds, setShowBestRounds] = useState(false);
+  const [expandedRoundId, setExpandedRoundId] = useState<string | null>(null);
   useDialogViewport(true);
 
   useEffect(() => {
@@ -433,49 +438,78 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
             {/* Conteúdo Expansível */}
             {showBestRounds && (
               <div className="border-t border-border/60 p-3 pt-2 animate-fade-in">
-                {/* Lista de Partidas com scroll dedicado */}
-                <div className="divide-y divide-border/40 max-h-52 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]">
+                <p className="px-1 pb-2 text-[9px] font-bold uppercase tracking-wide text-muted">
+                  Toque em uma rodada para ver como os pontos foram feitos
+                </p>
+                <div className="divide-y divide-border/40">
                   {entry.bestRounds.filter((r) => r.countedInTop6).slice(0, 6).map((r, idx) => (
                     <div
                       key={r.roundId}
-                      className={`flex items-center justify-between py-2 px-1 text-xs transition-colors ${
-                        r.countedInTop6 ? "text-foreground" : "text-muted opacity-60"
-                      }`}
+                      className="text-xs text-foreground"
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span
-                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
-                            r.countedInTop6
-                              ? "bg-accent text-background font-bold"
-                              : "bg-surface text-muted"
-                          }`}
-                        >
-                          {idx + 1}
-                        </span>
-                        <div className="truncate">
-                          <p className="font-bold truncate text-[11px]">
-                            Rodada {String(r.roundNumber).padStart(2, "0")}
-                          </p>
-                          <p className="text-[9px] text-muted">
-                            {r.goals}G · {r.assists}A · {r.wins}V
-                          </p>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedRoundId((current) => current === r.roundId ? null : r.roundId)}
+                        className="flex w-full items-center justify-between gap-2 px-1 py-3 text-left transition-colors hover:bg-white/[0.025]"
+                        aria-expanded={expandedRoundId === r.roundId}
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-black text-background">
+                            {idx + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-[11px] font-bold">
+                              Rodada {String(r.roundNumber).padStart(2, "0")}
+                            </p>
+                            <p className="text-[9px] text-muted">
+                              {r.games}J · {r.goals}G · {r.assists}A · {r.wins}V · {r.draws}E · {r.losses}D
+                            </p>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="text-right shrink-0">
-                        <span
-                          className={`font-athletic text-base font-black ${
-                            r.countedInTop6 ? "text-accent" : "text-muted"
-                          }`}
-                        >
-                          {r.points} pts
-                        </span>
-                        {r.countedInTop6 && (
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className="text-right">
+                            <span className="block font-athletic text-base font-black text-accent">{r.points} pts</span>
                           <span className="block text-[8px] font-bold text-accent/80 uppercase">
                             Somando
                           </span>
-                        )}
-                      </div>
+                          </span>
+                          <ChevronDown className={`h-3.5 w-3.5 text-muted transition-transform ${expandedRoundId === r.roundId ? "rotate-180 text-accent" : ""}`} />
+                        </div>
+                      </button>
+
+                      {expandedRoundId === r.roundId && (
+                        <div className="mb-3 rounded-xl border border-accent/20 bg-accent/[0.06] p-3 animate-fade-in">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <div>
+                              <p className="text-[10px] font-black uppercase text-foreground">Detalhamento da pontuação</p>
+                              <p className="mt-0.5 text-[9px] text-muted">
+                                {r.date ? new Intl.DateTimeFormat("pt-BR").format(new Date(`${r.date}T12:00:00`)) : `Rodada ${r.roundNumber}`}
+                              </p>
+                            </div>
+                            <span className="font-athletic text-lg font-black text-accent">{signedPoints(r.points)} pts</span>
+                          </div>
+
+                          {r.pointBreakdown.length > 0 ? (
+                            <div className="space-y-1.5">
+                              {r.pointBreakdown.map((item) => (
+                                <div key={item.label} className="flex items-center justify-between gap-3 rounded-lg bg-black/15 px-2.5 py-2">
+                                  <span className="text-[10px] text-foreground">{item.count}× {item.label}</span>
+                                  <span className={`text-[10px] font-black ${item.points < 0 ? "text-danger" : item.points > 0 ? "text-accent" : "text-muted"}`}>
+                                    {signedPoints(item.points)} pts
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="rounded-lg bg-black/15 px-2.5 py-2 text-[10px] text-muted">Nenhum evento pontuável registrado.</p>
+                          )}
+
+                          <Link href={`/rodadas/${r.roundId}`} className="mt-2.5 flex items-center justify-center rounded-lg border border-border py-2 text-[9px] font-black uppercase text-foreground hover:bg-white/[0.04]">
+                            Abrir rodada completa
+                          </Link>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

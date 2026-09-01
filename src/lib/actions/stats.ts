@@ -3,7 +3,7 @@
 import { supabase } from "../supabase";
 import { getActiveSeason, getActiveSeasonRoundIds } from "./seasons";
 import { getAdminClient, getCurrentAccount } from "../auth";
-import { DEFAULT_SCORING_POINTS } from "../scoring";
+import { DEFAULT_SCORING_POINTS, type ScoringPoints } from "../scoring";
 import { buildAwardSeasonsByPlayer, countAwards } from "../awards";
 import type { EventType, SeasonStatus } from "../types";
 import type { Player } from "../types";
@@ -20,6 +20,9 @@ type RankingStatsRow = {
   goals: number;
   assists: number;
   points: number;
+  goalkeeper_games: number;
+  goals_conceded: number;
+  own_goals: number;
   defensive_clean_games: number;
   defensive_one_goal_games: number;
   team_goals_conceded: number;
@@ -68,6 +71,7 @@ function aggregateRankingRows(
   rows: RankingStatsRow[],
   roundsMap?: Map<string, { id: string; number: number; date: string }>,
   maxBestRounds: number = 6,
+  scoringRules: ScoringPoints = DEFAULT_SCORING_POINTS,
 ) {
   const playerRowsMap = new Map<string, RankingStatsRow[]>();
   for (const row of rows) {
@@ -102,6 +106,22 @@ function aggregateRankingRows(
       assists += r.assists;
 
       const roundInfo = roundsMap?.get(r.round_id);
+      const pointBreakdown = [
+        { label: r.goals === 1 ? "Gol" : "Gols", count: r.goals, points: r.goals * scoringRules.goal },
+        { label: r.assists === 1 ? "Assistência" : "Assistências", count: r.assists, points: r.assists * scoringRules.assist },
+        { label: r.wins === 1 ? "Vitória" : "Vitórias", count: r.wins, points: r.wins * scoringRules.win },
+        { label: r.draws === 1 ? "Empate" : "Empates", count: r.draws, points: r.draws * scoringRules.draw },
+        { label: r.losses === 1 ? "Derrota" : "Derrotas", count: r.losses, points: r.losses * scoringRules.loss },
+        { label: r.goalkeeper_games === 1 ? "Jogo no gol" : "Jogos no gol", count: r.goalkeeper_games, points: r.goalkeeper_games * scoringRules.goalkeeper_appearance },
+        { label: r.goals_conceded === 1 ? "Gol sofrido" : "Gols sofridos", count: r.goals_conceded, points: r.goals_conceded * scoringRules.goal_conceded },
+        { label: r.own_goals === 1 ? "Gol contra" : "Gols contra", count: r.own_goals, points: r.own_goals * scoringRules.own_goal },
+        { label: "Defesa sem sofrer gol", count: r.defensive_clean_games, points: r.defensive_clean_games * 2 },
+        { label: "Defesa sofrendo 1 gol", count: r.defensive_one_goal_games, points: r.defensive_one_goal_games },
+      ].filter((item) => item.count > 0);
+      const explainedPoints = pointBreakdown.reduce((sum, item) => sum + item.points, 0);
+      if (explainedPoints !== r.points) {
+        pointBreakdown.push({ label: "Ajuste da rodada", count: 1, points: r.points - explainedPoints });
+      }
       return {
         roundId: r.round_id,
         roundNumber: roundInfo?.number ?? 0,
@@ -110,7 +130,10 @@ function aggregateRankingRows(
         goals: r.goals,
         assists: r.assists,
         wins: r.wins,
+        draws: r.draws,
+        losses: r.losses,
         games: r.games,
+        pointBreakdown,
         countedInTop6: idx < maxBestRounds,
       };
     });
@@ -595,6 +618,9 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       goals,
       assists,
       points,
+      goalkeeper_games,
+      goals_conceded,
+      own_goals,
       defensive_clean_games,
       defensive_one_goal_games,
       team_goals_conceded,
@@ -620,9 +646,18 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   );
   const latestRound = currentRounds[0];
   const roundsMap = new Map((rounds || []).map((round) => [round.id, { id: round.id, number: round.number, date: round.date }]));
-  const generalBase = aggregateRankingRows(currentStats, roundsMap, 6);
-  const previousBase = aggregateRankingRows(currentStats.filter((row) => row.round_id !== latestRound.id), roundsMap, 6);
-  const latestBase = aggregateRankingRows(currentStats.filter((row) => row.round_id === latestRound.id), roundsMap, 6);
+  const scoringRules = { ...DEFAULT_SCORING_POINTS };
+  const { data: configuredRules, error: configuredRulesError } = await supabase
+    .from("ranking_rules")
+    .select("event_type, points")
+    .eq("league_id", season.league_id);
+  if (configuredRulesError) console.error("Erro ao buscar regras para detalhar o ranking:", configuredRulesError);
+  for (const rule of configuredRules || []) {
+    if (rule.event_type in scoringRules) scoringRules[rule.event_type as EventType] = rule.points;
+  }
+  const generalBase = aggregateRankingRows(currentStats, roundsMap, 6, scoringRules);
+  const previousBase = aggregateRankingRows(currentStats.filter((row) => row.round_id !== latestRound.id), roundsMap, 6, scoringRules);
+  const latestBase = aggregateRankingRows(currentStats.filter((row) => row.round_id === latestRound.id), roundsMap, 6, scoringRules);
   const previousPositions = new Map(previousBase.map((entry, index) => [entry.player.id, index + 1]));
   const seasonPositions = new Map(generalBase.map((entry, index) => [entry.player.id, index + 1]));
   const awardSeasonsByPlayer = buildAwardSeasonsByPlayer(
