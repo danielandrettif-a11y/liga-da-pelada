@@ -498,8 +498,10 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                     {entry.awards.topAssister > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Garçom da rodada {entry.awards.topAssister}x</span>}
                     {entry.awards.bestGoalkeeper > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Goleiro {entry.awards.bestGoalkeeper}x</span>}
                     {entry.awards.bestDefender > 0 && <span className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black text-amber-300">Xerife da rodada {entry.awards.bestDefender}x</span>}
-                    {awardsTotal(entry) === 0 && <span className="text-[9px] text-muted">V: {entry.wins} · G: {entry.goals} · A: {entry.assists}</span>}
                   </div>
+                  <p className="mt-1 text-[9px] font-bold text-muted">
+                    {entry.wins}V · {entry.draws}E · {entry.losses}D · {entry.goals}G · {entry.assists}A
+                  </p>
                   {above && (
                     <p className="mt-1.5 text-[9px] font-semibold text-muted/80">
                       Faltam {gap} {FILTER_LABELS[filter]} para ultrapassar o {position - 1}º lugar
