@@ -407,11 +407,11 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                   key={entry.player.id}
                   type="button"
                   onClick={() => setSelected({ entry, position })}
-                  className={`relative flex w-1/3 max-w-[112px] flex-col items-center rounded-t-2xl transition-transform hover:-translate-y-1 focus:outline-none animate-slide-in-bottom stagger-${position}`}
+                  className={`relative isolate flex w-1/3 max-w-[112px] flex-col items-center rounded-t-2xl transition-transform hover:-translate-y-1 focus:outline-none animate-slide-in-bottom stagger-${position}`}
                   aria-label={`Abrir carta de ${entry.player.name}, ${position}º lugar`}
                 >
                   {position === 1 && (
-                    <Crown className="absolute -top-8 h-8 w-8 rotate-[-7deg] text-[#f5d45e] drop-shadow-lg" fill="currentColor" />
+                    <Crown className="absolute z-40 -top-8 h-8 w-8 rotate-[-7deg] text-[#f5d45e] drop-shadow-lg" fill="currentColor" />
                   )}
                   <div className="relative z-10">
                     <PlayerAvatar
@@ -421,11 +421,11 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                       auraKey={entry.cosmetics?.auraKey}
                       className={`h-16 w-16 rounded-full border-[3px] bg-background text-sm font-black text-muted ${style.ring}`}
                     />
-                    <span className={`absolute -bottom-2 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-gradient-to-br ${style.medal} shadow-lg`}>
+                    <span className={`pointer-events-none absolute -bottom-2 left-1/2 z-50 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-gradient-to-br ${style.medal} shadow-lg`}>
                       {position === 1 ? <Crown className="h-4 w-4" fill="currentColor" /> : <Medal className="h-4 w-4" fill="currentColor" />}
                     </span>
                     {view === "season" && entry.positionChange !== null && (
-                      <span className={`pointer-events-none absolute -right-3 top-0 z-30 inline-flex min-w-6 items-center justify-center rounded-full border border-background bg-surface px-1 py-0.5 text-[8px] font-black ${entry.positionChange > 0 ? "text-success" : entry.positionChange < 0 ? "text-danger" : "text-muted"}`}>
+                      <span className={`pointer-events-none absolute -right-3 top-0 z-[60] inline-flex min-w-6 items-center justify-center rounded-full border border-background bg-surface px-1 py-0.5 text-[8px] font-black ${entry.positionChange > 0 ? "text-success" : entry.positionChange < 0 ? "text-danger" : "text-muted"}`}>
                         {entry.positionChange > 0 ? <ArrowUp className="h-2.5 w-2.5" /> : entry.positionChange < 0 ? <ArrowDown className="h-2.5 w-2.5" /> : "—"}
                         {entry.positionChange !== 0 ? Math.abs(entry.positionChange) : ""}
                       </span>
