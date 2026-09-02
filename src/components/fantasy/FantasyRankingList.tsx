@@ -20,6 +20,10 @@ export type FantasyRankingEntry = {
   def_points?: number | string;
   mid_points?: number | string;
   attack_points?: number | string;
+  mid_selection_count?: number | string;
+  attack_selection_count?: number | string;
+  mid_average_points?: number | string;
+  attack_average_points?: number | string;
   player: {
     name: string;
     avatar_url: string | null;
@@ -34,7 +38,7 @@ export type FantasyRankingEntry = {
   } | null;
 };
 
-type FantasyRankingFilter = "points" | "budget" | "captain" | "def" | "mid" | "attack" | "best";
+type FantasyRankingFilter = "points" | "best" | "budget" | "captain" | "def" | "mid" | "attack";
 
 type FantasyRankingMetric = {
   id: FantasyRankingFilter;
@@ -44,19 +48,21 @@ type FantasyRankingMetric = {
   valueLabel: string;
   field: keyof Pick<
     FantasyRankingEntry,
-    "total_points" | "current_budget" | "best_round_points" | "captain_bonus_points" | "def_points" | "mid_points" | "attack_points"
+    "total_points" | "current_budget" | "best_round_points" | "captain_bonus_points" | "def_points" | "mid_points" | "attack_points" | "mid_average_points" | "attack_average_points"
   >;
   currency?: boolean;
+  sampleField?: keyof Pick<FantasyRankingEntry, "mid_selection_count" | "attack_selection_count">;
+  minimumSelections?: number;
 };
 
 const FANTASY_RANKING_METRICS: FantasyRankingMetric[] = [
   { id: "points", label: "Geral", title: "Pódio dos Cartoleiros", description: "Pontuação total da temporada", valueLabel: "pontos", field: "total_points" },
+  { id: "best", label: "Recorde", title: "Rodadas Históricas", description: "Melhor rodada individual de cada usuário", valueLabel: "melhor rodada", field: "best_round_points" },
   { id: "budget", label: "Cartoletas", title: "Reis das Cartoletas", description: "Maior patrimônio atual", valueLabel: "cartoletas", field: "current_budget", currency: true },
   { id: "captain", label: "Capitão", title: "Mestres da Faixa", description: "Mais pontos extras com o capitão", valueLabel: "bônus capitão", field: "captain_bonus_points" },
   { id: "def", label: "DEF", title: "Muralha do Cartola", description: "Mais pontos com atletas na DEF", valueLabel: "pontos DEF", field: "def_points" },
-  { id: "mid", label: "MEI", title: "Donos do Meio", description: "Mais pontos com atletas no MEI", valueLabel: "pontos MEI", field: "mid_points" },
-  { id: "attack", label: "ATA", title: "Ataque dos Sonhos", description: "Mais pontos com atletas no ATA", valueLabel: "pontos ATA", field: "attack_points" },
-  { id: "best", label: "Recorde", title: "Rodadas Históricas", description: "Melhor rodada individual de cada usuário", valueLabel: "melhor rodada", field: "best_round_points" },
+  { id: "mid", label: "MEI", title: "Eficiência no Meio", description: "Média por atleta escalado no MEI", valueLabel: "pts por MEI", field: "mid_average_points", sampleField: "mid_selection_count", minimumSelections: 3 },
+  { id: "attack", label: "ATA", title: "Eficiência no Ataque", description: "Média por atleta escalado no ATA", valueLabel: "pts por ATA", field: "attack_average_points", sampleField: "attack_selection_count", minimumSelections: 3 },
 ];
 
 function metricValue(item: FantasyRankingEntry, metric: FantasyRankingMetric) {
@@ -66,6 +72,14 @@ function metricValue(item: FantasyRankingEntry, metric: FantasyRankingMetric) {
 function formattedMetricValue(item: FantasyRankingEntry, metric: FantasyRankingMetric) {
   const value = metricValue(item, metric);
   return metric.currency ? `C$ ${value.toFixed(2)}` : value.toFixed(1);
+}
+
+function metricSupportingValue(item: FantasyRankingEntry, metric: FantasyRankingMetric) {
+  if (metric.sampleField) {
+    const selections = Number(item[metric.sampleField] || 0);
+    return `${selections} ${selections === 1 ? "escolha" : "escolhas"}`;
+  }
+  return metric.id === "budget" ? `${Number(item.total_points).toFixed(1)} pts` : `C$ ${Number(item.current_budget).toFixed(2)}`;
 }
 
 function podiumStyle(position: number) {
@@ -156,7 +170,7 @@ function FantasyPodium({ ranking, scope, metric }: { ranking: FantasyRankingEntr
                 <p className={`mt-0.5 whitespace-nowrap font-athletic text-base font-black leading-none sm:text-lg ${style.label}`}>{formattedMetricValue(item, metric)}</p>
                 <p className="mt-0.5 line-clamp-1 text-[7px] font-black uppercase tracking-wider text-muted">{metric.valueLabel}</p>
                 <span className="mt-2 max-w-full truncate rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[8px] font-black text-emerald-200">
-                  {metric.id === "budget" ? `${Number(item.total_points).toFixed(1)} pts` : `C$ ${Number(item.current_budget).toFixed(2)}`}
+                  {metricSupportingValue(item, metric)}
                 </span>
               </div>
 
@@ -212,7 +226,10 @@ export function FantasyRankingList({
   const activeMetric = FANTASY_RANKING_METRICS.find((metric) => metric.id === rankingFilter) || FANTASY_RANKING_METRICS[0];
   const displayedRanking = useMemo(() => {
     if (scope !== "general") return ranking;
-    const sorted = [...ranking].sort((a, b) =>
+    const eligibleRanking = activeMetric.minimumSelections && activeMetric.sampleField
+      ? ranking.filter((item) => Number(item[activeMetric.sampleField!] || 0) >= activeMetric.minimumSelections!)
+      : ranking;
+    const sorted = [...eligibleRanking].sort((a, b) =>
       metricValue(b, activeMetric) - metricValue(a, activeMetric)
       || Number(b.total_points) - Number(a.total_points)
       || (a.player?.name || "").localeCompare(b.player?.name || "", "pt-BR")
@@ -385,7 +402,9 @@ export function FantasyRankingList({
   if (displayedRanking.length === 0) {
     return (
       <p className="glass-card p-6 text-center text-sm text-muted">
-        O ranking aparecerá assim que alguém salvar a escalação para a rodada.
+        {activeMetric.minimumSelections
+          ? `O ranking de ${activeMetric.label} aparecerá quando alguém completar pelo menos ${activeMetric.minimumSelections} escolhas nessa posição.`
+          : "O ranking aparecerá assim que alguém salvar a escalação para a rodada."}
       </p>
     );
   }
@@ -405,7 +424,7 @@ export function FantasyRankingList({
           <div className="flex items-center justify-between gap-3 px-1 pb-2">
             <div>
               <p className="text-[9px] font-black uppercase tracking-[.16em] text-accent">Escolha o ranking</p>
-              <p className="text-[10px] text-muted">{activeMetric.description}</p>
+              <p className="text-[10px] text-muted">{activeMetric.description}{activeMetric.minimumSelections ? ` · mínimo ${activeMetric.minimumSelections} escolhas` : ""}</p>
             </div>
             <span className="shrink-0 rounded-full border border-accent/20 bg-accent/[.08] px-2 py-1 text-[8px] font-black uppercase text-accent">Temporada</span>
           </div>
@@ -456,7 +475,7 @@ export function FantasyRankingList({
                   <p className="mt-0.5 truncate text-[10px] text-muted">
                     {activeMetric.id === "points"
                       ? <>{Number(item.rounds_played)} {Number(item.rounds_played) === 1 ? "rodada" : "rodadas"} · <span className="text-emerald-200">C$ {Number(item.current_budget).toFixed(2)}</span></>
-                      : <>{activeMetric.description} · <span className="text-emerald-200">{activeMetric.id === "budget" ? `${Number(item.total_points).toFixed(1)} pts` : `C$ ${Number(item.current_budget).toFixed(2)}`}</span></>}
+                      : <>{activeMetric.description} · <span className="text-emerald-200">{metricSupportingValue(item, activeMetric)}</span></>}
                   </p>
                 </div>
                 <div className="shrink-0 rounded-xl border border-accent/15 bg-black/25 px-2.5 py-1.5 text-right">

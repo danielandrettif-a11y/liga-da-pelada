@@ -2299,7 +2299,9 @@ export async function getFantasyRanking(
       captainBonusPoints: number;
       defPoints: number;
       midPoints: number;
+      midSelections: number;
       attackPoints: number;
+      attackSelections: number;
     };
     const emptyHistoricalMetrics = (): HistoricalFantasyMetrics => ({
       totalPoints: 0,
@@ -2308,7 +2310,9 @@ export async function getFantasyRanking(
       captainBonusPoints: 0,
       defPoints: 0,
       midPoints: 0,
+      midSelections: 0,
       attackPoints: 0,
+      attackSelections: 0,
     });
     const historicalByUser = new Map<string, HistoricalFantasyMetrics>();
     for (const lineup of scoredLineups || []) {
@@ -2326,8 +2330,14 @@ export async function getFantasyRanking(
                 : null
         );
         if (role === "DEF") current.defPoints += Number(player.total_points || 0);
-        if (role === "MEI") current.midPoints += Number(player.total_points || 0);
-        if (role === "ATA") current.attackPoints += Number(player.total_points || 0);
+        if (role === "MEI") {
+          current.midPoints += Number(player.total_points || 0);
+          current.midSelections += 1;
+        }
+        if (role === "ATA") {
+          current.attackPoints += Number(player.total_points || 0);
+          current.attackSelections += 1;
+        }
       }
       historicalByUser.set(lineup.user_id, current);
     }
@@ -2338,12 +2348,20 @@ export async function getFantasyRanking(
         captainBonusPoints: Number(projection?.captainBonus || 0),
         defPoints: 0,
         midPoints: 0,
+        midSelections: 0,
         attackPoints: 0,
+        attackSelections: 0,
       };
       for (const player of projection?.players || []) {
         if (player.slotRole === "DEF") metrics.defPoints += Number(player.totalPoints || 0);
-        if (player.slotRole === "MEI") metrics.midPoints += Number(player.totalPoints || 0);
-        if (player.slotRole === "ATA") metrics.attackPoints += Number(player.totalPoints || 0);
+        if (player.slotRole === "MEI") {
+          metrics.midPoints += Number(player.totalPoints || 0);
+          metrics.midSelections += 1;
+        }
+        if (player.slotRole === "ATA") {
+          metrics.attackPoints += Number(player.totalPoints || 0);
+          metrics.attackSelections += 1;
+        }
       }
       return metrics;
     };
@@ -2359,7 +2377,11 @@ export async function getFantasyRanking(
         captain_bonus_points: historical.captainBonusPoints + currentLive.captainBonusPoints,
         def_points: historical.defPoints + currentLive.defPoints,
         mid_points: historical.midPoints + currentLive.midPoints,
+        mid_selection_count: historical.midSelections + currentLive.midSelections,
+        mid_average_points: (historical.midPoints + currentLive.midPoints) / Math.max(1, historical.midSelections + currentLive.midSelections),
         attack_points: historical.attackPoints + currentLive.attackPoints,
+        attack_selection_count: historical.attackSelections + currentLive.attackSelections,
+        attack_average_points: (historical.attackPoints + currentLive.attackPoints) / Math.max(1, historical.attackSelections + currentLive.attackSelections),
         is_live: Boolean(live?.byUserId.has(item.user_id)),
       });
     }
@@ -2374,7 +2396,11 @@ export async function getFantasyRanking(
           captain_bonus_points: historical.captainBonusPoints + currentLive.captainBonusPoints,
           def_points: historical.defPoints + currentLive.defPoints,
           mid_points: historical.midPoints + currentLive.midPoints,
+          mid_selection_count: historical.midSelections + currentLive.midSelections,
+          mid_average_points: (historical.midPoints + currentLive.midPoints) / Math.max(1, historical.midSelections + currentLive.midSelections),
           attack_points: historical.attackPoints + currentLive.attackPoints,
+          attack_selection_count: historical.attackSelections + currentLive.attackSelections,
+          attack_average_points: (historical.attackPoints + currentLive.attackPoints) / Math.max(1, historical.attackSelections + currentLive.attackSelections),
           current_budget: 0,
           is_live: Boolean(live?.byUserId.has(userId)),
         });
@@ -2394,7 +2420,11 @@ export async function getFantasyRanking(
           captain_bonus_points: currentLive.captainBonusPoints,
           def_points: currentLive.defPoints,
           mid_points: currentLive.midPoints,
+          mid_selection_count: currentLive.midSelections,
+          mid_average_points: currentLive.midPoints / Math.max(1, currentLive.midSelections),
           attack_points: currentLive.attackPoints,
+          attack_selection_count: currentLive.attackSelections,
+          attack_average_points: currentLive.attackPoints / Math.max(1, currentLive.attackSelections),
           current_budget: 0,
           rounds_played: 0,
           is_live: true,
