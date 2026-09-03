@@ -37,6 +37,7 @@ export async function getDashboardData() {
             assist_player_id,
             team_id,
             minute,
+            elapsed_seconds,
             player:player_id (id, name, avatar_url),
             assist_player:assist_player_id (id, name, avatar_url)
           )

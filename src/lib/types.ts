@@ -368,6 +368,7 @@ export type MatchEvent = {
   assist_player_id: string | null;
   team_id: string;
   minute: number | null;
+  elapsed_seconds: number | null;
   is_own_goal: boolean;
   created_at: string;
 };

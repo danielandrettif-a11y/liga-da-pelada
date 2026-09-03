@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ClipboardList, Football, Target, X } from "@/components/icons";
 import { TeamCrest } from "@/components/TeamCrest";
+import { formatGoalTime } from "@/lib/goal-time";
 
 const PREVIEW_MATCH_COUNT = 5;
 
@@ -15,6 +16,7 @@ type MatchEvent = {
   assist_player_id?: string | null;
   team_id: string;
   minute?: number | null;
+  elapsed_seconds?: number | null;
   player?: { id: string; name: string; avatar_url?: string | null } | null;
   assist_player?: { id: string; name: string; avatar_url?: string | null } | null;
 };
@@ -198,6 +200,7 @@ function MatchDetailsModal({
                 const teamName = isTeamA ? teamA.name : teamB.name;
                 const playerName = event.player?.name || "Gol";
                 const assistName = event.assist_player?.name || null;
+                const goalTime = formatGoalTime(event);
 
                 return (
                   <div
@@ -208,8 +211,8 @@ function MatchDetailsModal({
                       <div className="flex items-center gap-1.5">
                         <Football className="h-3.5 w-3.5 shrink-0 text-accent" />
                         <span className="truncate font-black text-foreground">{playerName}</span>
-                        {event.minute !== null && event.minute !== undefined && (
-                          <span className="text-[10px] text-muted">{event.minute}&apos;</span>
+                        {goalTime && (
+                          <span className="whitespace-nowrap text-[10px] text-muted">{goalTime}</span>
                         )}
                       </div>
                       {assistName && (

@@ -264,13 +264,13 @@ function formationMetrics(data, config) {
     const playerTotal = selections.reduce((sum, row) => sum + simulatedSelection(row, config).total, 0);
     const prediction = (number(lineup.top_scorer_points) + number(lineup.top_assist_points)) * config.predictionScale
       + number(lineup.challenge_points) + number(lineup.card_points);
-    const key = `${lineup.lineup_size}-${lineup.formation}`;
+    const key = `${lineup.lineup_size}|${lineup.formation}`;
     const bucket = groups.get(key) ?? [];
     bucket.push((playerTotal + prediction) / Math.max(1, number(lineup.lineup_size)));
     groups.set(key, bucket);
   }
   const summaries = [...groups.entries()].map(([key, values]) => {
-    const [size, formation] = key.split("-");
+    const [size, formation] = key.split("|");
     return { size: number(size), formation, samples: values.length, meanPerSlot: average(values) };
   });
   let maxGap = 0;
@@ -398,7 +398,13 @@ function recommendConfig(data, current) {
       dataDriven: false,
     };
   }
-  return { ...best, dataDriven: true };
+  return {
+    ...best,
+    dataDriven: true,
+    meetsTargets: best.evaluation.expectedGap <= 0.15
+      && best.evaluation.p90Gap <= 0.20
+      && best.evaluation.formation.maxGap < 0.05,
+  };
 }
 
 function standingsImpact(data, proposed) {
@@ -582,20 +588,29 @@ function buildReport(payload) {
   const proposedEvaluation = recommendation.evaluation ?? evaluateConfig(data, proposed, current);
   const impact = standingsImpact(data, proposed);
   const imbalances = imbalanceRanking(currentRoles, currentFormation, data);
-  const activeRounds = data.rounds.filter((round) => round.rules?.roleScoringActive).length;
-  const legacyRounds = data.rounds.length - activeRounds;
-  const confidence = Math.min(...ROLES.map((role) => currentRoles.metrics[role].samples || 0)) >= 30
-    ? "alta" : Math.min(...ROLES.map((role) => currentRoles.metrics[role].samples || 0)) >= 10 ? "média" : "baixa";
+  const scoredActiveRoundKeys = new Set(data.selections
+    .filter((selection) => selection.role_scoring_active)
+    .map(keyOfRound));
+  const scoredLegacyRoundKeys = new Set(data.selections
+    .filter((selection) => !selection.role_scoring_active)
+    .map(keyOfRound));
+  const activeRounds = scoredActiveRoundKeys.size;
+  const legacyRounds = scoredLegacyRoundKeys.size;
+  const minimumRoleSample = Math.min(...ROLES.map((role) => currentRoles.metrics[role].samples || 0));
+  const confidence = activeRounds < 2 ? "muito baixa"
+    : activeRounds >= 4 && minimumRoleSample >= 30 ? "alta"
+      : activeRounds >= 3 && minimumRoleSample >= 10 ? "média" : "baixa";
+  const recommendationMeetsTargets = Boolean(recommendation.meetsTargets);
 
   const lines = [];
   lines.push("# Auditoria de balanceamento do Cartola", "");
   lines.push(`Gerado em ${new Date().toLocaleString("pt-BR")}. A auditoria é somente leitura; nenhuma regra ou dado de produção foi alterado.`, "");
   lines.push("## Resumo executivo", "");
-  lines.push(`- Nota do sistema de pontuação: **${grade(scoring.overall)}/10**.`);
-  lines.push(`- Nota do projeto Cartola completo: **${grade(project.overall)}/10**.`);
-  lines.push(`- Confiança estatística: **${confidence}** (${activeRounds} rodada(s) com posições e ${legacyRounds} rodada(s) legada(s)).`);
+  lines.push(`- Nota provisória do sistema de pontuação: **${grade(scoring.overall)}/10**.`);
+  lines.push(`- Nota provisória do projeto Cartola completo: **${grade(project.overall)}/10**.`);
+  lines.push(`- Confiança estatística: **${confidence}** (${activeRounds} rodada(s) pontuada(s) com posições e ${legacyRounds} rodada(s) legada(s)).`);
   lines.push(`- Integridade da recomposição: **${percent(validation.successRate)}** de ${validation.checked} verificações; ${validation.failures} divergência(s).`);
-  lines.push(`- A proposta ${recommendation.dataDriven ? "foi escolhida por busca numérica no histórico" : "é preliminar por falta de amostra suficiente"} e não foi aplicada.`, "");
+  lines.push(`- O melhor cenário ${recommendation.dataDriven ? "foi escolhido por busca numérica no histórico" : "é preliminar por falta de amostra suficiente"}, ${recommendationMeetsTargets ? "atingiu as três metas" : "não atingiu todas as metas e não deve ser aplicado"}.`, "");
 
   lines.push("## Notas por posição", "");
   lines.push("| Posição | Nota | Amostra | Média/jogo | Mediana | P75 | P90 | Máximo | Zero | Negativo | Bônus no pacote | Confiança |");
@@ -646,13 +661,16 @@ function buildReport(payload) {
   });
   lines.push("");
 
-  lines.push("## Proposta numérica", "");
+  lines.push(`## ${recommendationMeetsTargets ? "Proposta numérica" : "Melhor cenário testado — não recomendado para aplicação"}`, "");
   lines.push("| Regra | Atual | Proposta |");
   lines.push("|---|---:|---:|");
   for (const row of recommendationRows(current, proposed)) lines.push(`| ${row[0]} | ${row[1]} | ${row[2]} |`);
   lines.push("");
   if (proposedEvaluation && Number.isFinite(proposedEvaluation.objective)) {
     lines.push(`A simulação proposta ficou com diferença de retorno esperado de **${percent(proposedEvaluation.expectedGap)}**, diferença de P90 de **${percent(proposedEvaluation.p90Gap)}** e vantagem entre formações de **${percent(proposedEvaluation.formation.maxGap)}**.`, "");
+  }
+  if (!recommendationMeetsTargets) {
+    lines.push("**Decisão:** não transformar estes valores em migration. A diferença média continua acima da meta e a amostra contém apenas uma rodada pontuada com posições.", "");
   }
   lines.push("Classificação das mudanças:", "");
   lines.push("- **Indispensável:** corrigir qualquer divergência de recomposição antes de mexer nos pesos; reduzir parâmetros que ultrapassem as metas de 15%/20%/5%.");
@@ -688,8 +706,37 @@ function buildReport(payload) {
   lines.push(`| Integridade/testes | 10% | ${grade(project.integrityScore)} | Recomposição + proteções existentes |`);
   lines.push(`| **Total** | **100%** | **${grade(project.overall)}** | |`, "");
 
+  if (validation.failures > 0) {
+    const groupedFormulaFailures = new Map();
+    const divergentSelections = new Set();
+    const divergentPlayers = new Set();
+    for (const failure of validation.formulaFailures) {
+      const key = `${failure.row.round_number}|${failure.component}`;
+      const current = groupedFormulaFailures.get(key) ?? { round: failure.row.round_number, component: failure.component, count: 0, maxDifference: 0 };
+      current.count += 1;
+      current.maxDifference = Math.max(current.maxDifference, Math.abs(failure.difference));
+      groupedFormulaFailures.set(key, current);
+      divergentSelections.add(`${failure.row.round_number}|${failure.row.lineup_key}|${failure.row.player_key}`);
+      divergentPlayers.add(`${failure.row.round_number}|${failure.row.player_key}`);
+    }
+    lines.push("## Divergências encontradas", "");
+    lines.push("As somas internas fecharam; as divergências abaixo aparecem ao recalcular os scouts com o snapshot da rodada.", "");
+    if (validation.formulaFailures.length > 0) {
+      lines.push(`Os ${validation.formulaFailures.length} apontamentos de fórmula estão concentrados em **${divergentSelections.size} escolha(s)** de **${divergentPlayers.size} atleta(s) anônimo(s)**. Isso indica um caso histórico localizado, não uma quebra generalizada da aritmética armazenada.`, "");
+    }
+    lines.push("| Rodada | Componente | Ocorrências | Maior diferença |");
+    lines.push("|---:|---|---:|---:|");
+    for (const failure of [...groupedFormulaFailures.values()].sort((a, b) => a.round - b.round || a.component.localeCompare(b.component))) {
+      lines.push(`| ${failure.round} | ${failure.component} | ${failure.count} | ${points(failure.maxDifference)} |`);
+    }
+    for (const failure of validation.lineupFailures) {
+      lines.push(`| ${failure.row.round_number} | escalação: ${failure.component} | 1 | ${points(Math.abs(failure.difference))} |`);
+    }
+    lines.push("");
+  }
+
   lines.push("## Limites e próximos passos", "");
-  lines.push("- Notas com confiança baixa não devem virar migration sem mais rodadas; o relatório sinaliza a amostra por posição.");
+  lines.push("- As notas são provisórias enquanto houver menos de duas rodadas pontuadas com o sistema de posições.");
   lines.push("- A busca testa alternativas próximas das regras atuais, não combinações arbitrárias que descaracterizem o jogo.");
   lines.push("- Antes de qualquer aplicação, revisar manualmente os cenários extremos e executar a suíte de testes de prévia/final.");
   lines.push("- Este arquivo é uma recomendação: não cria migration, não chama o Supabase e não altera produção.", "");

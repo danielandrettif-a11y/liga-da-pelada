@@ -38,6 +38,7 @@ import {
 } from "@/lib/match-rules";
 import { TeamCrest } from "./TeamCrest";
 import { useDialogViewport } from "@/lib/useDialogViewport";
+import { formatGoalTime } from "@/lib/goal-time";
 
 // ============================================
 // MatchTimer: Isolado com memo para evitar re-render global da tela a cada segundo
@@ -520,7 +521,8 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
 
     // Cálculo do minuto oficial
     const elapsedSecs = getMatchTimerElapsedSeconds(timerState);
-    const minute = Math.floor(getOfficialElapsedSeconds(elapsedSecs, eligibilityOffset) / 60);
+    const officialElapsedSeconds = getOfficialElapsedSeconds(elapsedSecs, eligibilityOffset);
+    const minute = Math.floor(officialElapsedSeconds / 60);
 
     // Dados do jogador para UI instantânea
     const scorerPool = request.isOwnGoal ? opposingActivePlayers : activePlayers;
@@ -536,6 +538,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       event_type: "goal",
       is_own_goal: request.isOwnGoal,
       minute,
+      elapsed_seconds: officialElapsedSeconds,
       created_at: new Date().toISOString(),
       player: scorerEntry?.player || { name: "Jogador" },
       assist_player: assistEntry?.player || null,
@@ -799,6 +802,8 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                 );
               }
 
+              const goalTime = formatGoalTime(ev);
+
               return (
                 <div
                   key={ev.id}
@@ -821,9 +826,9 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                       <p className="text-sm font-bold text-foreground">
                         {ev.is_own_goal && <span className="mr-1.5 text-danger">Gol contra ·</span>}
                         {ev.player?.name}
-                        {ev.minute !== null && ev.minute !== undefined && (
+                        {goalTime && (
                           <span className="ml-1.5 text-[10px] font-normal text-muted">
-                            ({ev.minute}&apos;)
+                            ({goalTime})
                           </span>
                         )}
                       </p>
