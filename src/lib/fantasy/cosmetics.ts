@@ -1,4 +1,4 @@
-export type CosmeticSlot = "banner" | "frame" | "title" | "aura" | "nameplate" | "background";
+export type CosmeticSlot = "banner" | "frame" | "title" | "aura" | "nameplate" | "background" | "showcase" | "pitch";
 export type CosmeticRarity = "common" | "rare" | "epic" | "legendary";
 
 export type CosmeticItem = {
@@ -28,11 +28,12 @@ export function isLegacyFrameAsset(assetKey?: string | null) {
 }
 
 export const COSMETIC_SLOT_LABELS: Record<CosmeticSlot, string> = {
-  banner: "Capa", frame: "Moldura", title: "Título", aura: "Aura", nameplate: "Nameplate", background: "Fundo",
+  banner: "Capa", frame: "Moldura", title: "Título", aura: "Aura", nameplate: "Nameplate", background: "Fundo", showcase: "Emblema", pitch: "Campo",
 };
 
 export function cosmeticVisual(assetKey?: string | null) {
   const key = assetKey || "";
+  if (key.includes("lenda-campinho")) return "from-[#020604] via-[#123b24] to-[#cda434]";
   if (key.includes("alambrado-noturno")) return "from-[#9fe6ef] via-[#75bf72] to-[#d8f071]";
   if (key.includes("vestiario-concreto")) return "from-[#f5dd9d] via-[#9ed39f] to-[#57a98a]";
   if (key.includes("garoa-refletores")) return "from-[#88dce7] via-[#48b9a5] to-[#bfe56f]";
@@ -63,6 +64,10 @@ export function cosmeticImage(assetKey?: string | null) {
   // Títulos usam uma prévia tipográfica própria. Nunca reaproveitar fotos
   // genéricas de capas ou fundos apenas porque a chave contém "rei", etc.
   if (key.startsWith("title-")) return null;
+  if (key.includes("showcase-lenda-campinho")) return "/images/cosmetics/house-40/emblema-lenda-campinho-v1.webp";
+  if (key.includes("pitch-lenda-campinho")) return "/images/cartola/campo-lenda-campinho-v1.webp";
+  if (key.includes("banner-lenda-campinho")) return "/images/cosmetics/house-40/capa-lenda-campinho-v1.webp";
+  if (key.includes("background-lenda-campinho")) return "/images/cosmetics/house-40/fundo-lenda-campinho-v1.webp";
   // Os fundos reformulados usam URLs versionadas para invalidar o cache de
   // imagens do Next/CDN sem alterar os asset_keys já gravados no banco.
   if (key.includes("alambrado-noturno")) return "/images/cosmetics/backgrounds/manha-campinho-2026.webp";
@@ -70,7 +75,7 @@ export function cosmeticImage(assetKey?: string | null) {
   if (key.includes("garoa-refletores")) return "/images/cosmetics/backgrounds/depois-chuva-2026.webp";
   if (key.includes("gramado-bairro")) return "/images/cosmetics/backgrounds/domingo-sol-2026.webp";
   if (key.includes("arquibancada-vazia")) return "/images/cosmetics/backgrounds/torcida-chegando-2026.webp";
-  if (key.includes("por-do-sol-quadra")) return "/images/cosmetics/backgrounds/luzes-pelada-2026.webp";
+  if (key.includes("por-do-sol-quadra")) return "/images/cosmetics/backgrounds/luzes-pelada-2026-v2.webp";
   if (key.includes("campo-domingo")) return "/images/cosmetics/covers/campo-domingo-v2.webp";
   if (key.includes("arquibancada-concreto")) return "/images/cosmetics/covers/arquibancada-concreto-v2.webp";
   if (key.includes("vestiario-pos-jogo")) return "/images/cosmetics/covers/vestiario-pos-jogo-v2.webp";
@@ -106,6 +111,7 @@ export function cosmeticHighResolutionImage(assetKey?: string | null) {
  * recortar as capas panoramicas usadas nas miniaturas e no catalogo. */
 export function cosmeticProfileCoverImage(assetKey?: string | null) {
   const key = assetKey || "";
+  if (key.includes("banner-lenda-campinho")) return "/images/cosmetics/house-40/capa-lenda-campinho-v1.webp";
   if (key.includes("campo-domingo")) return "/images/cosmetics/covers/campo-domingo-profile-square-v1.webp";
   if (key.includes("arquibancada-concreto")) return "/images/cosmetics/covers/arquibancada-concreto-profile-square-v1.webp";
   if (key.includes("vestiario-pos-jogo")) return "/images/cosmetics/covers/vestiario-pos-jogo-profile-square-v1.webp";
@@ -120,12 +126,13 @@ export function cosmeticProfileCoverImage(assetKey?: string | null) {
 /** Arte vertical usada apenas no fundo do perfil em telas de celular. */
 export function cosmeticMobileBackgroundImage(assetKey?: string | null) {
   const key = assetKey || "";
+  if (key.includes("background-lenda-campinho")) return "/images/cosmetics/house-40/fundo-lenda-campinho-mobile-v1.webp";
   if (key.includes("alambrado-noturno")) return "/images/cosmetics/backgrounds/manha-campinho-mobile-2026.webp";
   if (key.includes("vestiario-concreto")) return "/images/cosmetics/backgrounds/vestiario-resenha-mobile-2026.png";
   if (key.includes("garoa-refletores")) return "/images/cosmetics/backgrounds/depois-chuva-mobile-2026.webp";
   if (key.includes("gramado-bairro")) return "/images/cosmetics/backgrounds/domingo-sol-mobile-2026.webp";
   if (key.includes("arquibancada-vazia")) return "/images/cosmetics/backgrounds/torcida-chegando-mobile-2026.webp";
-  if (key.includes("por-do-sol-quadra")) return "/images/cosmetics/backgrounds/luzes-pelada-mobile-2026.webp";
+  if (key.includes("por-do-sol-quadra")) return "/images/cosmetics/backgrounds/luzes-pelada-mobile-2026-v2.webp";
   return null;
 }
 
@@ -162,6 +169,7 @@ export function cosmeticFrameClass(assetKey?: string | null): string {
 
 export function cosmeticFrameImage(assetKey?: string | null) {
   const key = (assetKey || "").toLowerCase();
+  if (key.includes("frame-lenda-campinho")) return "/images/cosmetics/house-40/moldura-lenda-campinho-v1.webp";
   const upgradedFrame = ([
     ["apito-arbitro", "apito-arbitro-v2.webp"],
     ["vestiario", "vestiario-v2.webp"],
@@ -195,7 +203,7 @@ export function cosmeticAuraVariant(assetKey?: string | null): CosmeticAuraVaria
   if (key.includes("refletores-acesos") || key.includes("holofote") || key.includes("flash") || key.includes("refletor")) return "spotlight";
   if (key.includes("chuva-jogo")) return "rain";
   if (key.includes("sinalizador-verde") || key.includes("radar-olheiro")) return "radar";
-  if (key.includes("noite-decisao") || key.includes("gloria-decisao") || key.includes("luz-de-quadra")) return "glory";
+  if (key.includes("noite-decisao") || key.includes("gloria-decisao") || key.includes("luz-de-quadra") || key.includes("lenda-campinho")) return "glory";
   if (key.includes("var-da-varzea") || key.includes("var-revisao")) return "review";
   return "energy";
 }
@@ -209,5 +217,7 @@ export function cosmeticNameplateClass(assetKey?: string | null): string {
   if (key.includes("prancheta-tatica")) return "border-lime-300/50 bg-[linear-gradient(90deg,#172a16_0_49%,rgba(163,230,53,.18)_50%,#172a16_51%)] text-lime-100 shadow-[inset_0_0_18px_rgba(163,230,53,.12)]";
   if (key.includes("sumula-juiz")) return "border-[#f6df9a]/70 bg-[repeating-linear-gradient(0deg,#dfcf9d_0_2px,#eee0b6_2px_7px)] text-[#382613] shadow-[0_5px_18px_rgba(245,158,11,.25)]";
   if (key.includes("placa-substituicao")) return "border-white/60 bg-[linear-gradient(90deg,#3f0808_0_48%,#070707_48%_52%,#07351a_52%_100%)] font-mono text-white shadow-[inset_0_0_14px_rgba(255,255,255,.12),-4px_0_14px_rgba(248,113,113,.3),4px_0_14px_rgba(74,222,128,.3)]";
+  if (key.includes("portao-campinho")) return "border-zinc-300/55 bg-[repeating-linear-gradient(90deg,#0a100c_0_5px,#263329_5px_7px)] text-lime-100 shadow-[inset_0_0_14px_rgba(255,255,255,.08),0_5px_16px_rgba(0,0,0,.45)]";
+  if (key.includes("lenda-campinho")) return "border-amber-300/70 bg-[linear-gradient(115deg,#151006,#5c4614_48%,#102619)] text-amber-100 shadow-[inset_0_0_18px_rgba(250,204,21,.18),0_0_18px_rgba(204,255,0,.2)]";
   return "border-accent/30 bg-black/50 text-accent";
 }

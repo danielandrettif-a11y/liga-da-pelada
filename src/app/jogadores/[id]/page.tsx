@@ -12,7 +12,7 @@ import { TeamCrest } from "@/components/TeamCrest";
 import { FantasyPlayerCard } from "@/components/fantasy/FantasyPlayerCard";
 import { getFantasyPlayerSummary } from "@/lib/actions/fantasy";
 import { getAdminCosmeticsPreview, getPlayerEquippedCosmetics, type CosmeticPreviewLoadout } from "@/lib/actions/cosmetics";
-import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticMobileBackgroundImage, cosmeticNameplateClass, cosmeticProfileCoverImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
+import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticImage, cosmeticMobileBackgroundImage, cosmeticNameplateClass, cosmeticProfileCoverImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
 import { OfficialProfilePreviewNotice } from "@/components/fantasy/OfficialProfilePreviewNotice";
 import { buildRankedPointBreakdown } from "@/lib/ranked-scoring";
 
@@ -93,6 +93,8 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
     aura: readPreviewValue(query.aura),
     nameplate: readPreviewValue(query.nameplate),
     background: readPreviewValue(query.background),
+    showcase: readPreviewValue(query.showcase),
+    pitch: readPreviewValue(query.pitch),
   } : {};
   const [player, officialHistory, friendlyHistory, awardSeasons, fitness, clubGoals, fantasySummary, equippedCosmetics, previewCosmetics, playtime] = await Promise.all([
     getPlayer(id),
@@ -122,6 +124,7 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
   const bannerImage = cosmeticProfileCoverImage(cosmetics?.bannerAssetKey);
   const profileBackgroundImage = cosmeticHighResolutionImage(cosmetics?.backgroundAssetKey);
   const mobileProfileBackgroundImage = cosmeticMobileBackgroundImage(cosmetics?.backgroundAssetKey);
+  const showcaseImage = cosmeticImage(cosmetics?.showcaseAssetKey);
 
   return (
     <div className="relative -mx-4 -mt-4 min-h-[calc(100dvh-3.5rem)] px-4 pb-4 pt-4">
@@ -197,6 +200,11 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
 
           {/* Conteúdo em z-10 para manter nitidez e legibilidade máxima */}
           <div className="relative z-10 flex flex-col items-center w-full">
+            {showcaseImage ? (
+              <div className="absolute right-0 top-0 flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-2xl border border-amber-300/35 bg-black/45 p-1 shadow-[0_0_20px_rgba(250,204,21,.2)] backdrop-blur-sm sm:h-20 sm:w-20">
+                <Image src={showcaseImage} alt="Emblema cosmético equipado" fill sizes="80px" className="object-contain p-1" />
+              </div>
+            ) : null}
             <div className="relative mb-4">
               <PlayerAvatar
                 name={player.name}

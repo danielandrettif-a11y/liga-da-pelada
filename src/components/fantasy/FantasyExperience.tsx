@@ -140,6 +140,7 @@ type Props = {
   liveProjection?: FantasyLiveProjection;
   playersPerTeam?: number;
   initialPackId?: string;
+  pitchAssetKey?: string | null;
 };
 
 const positionLabel: Record<string, string> = {
@@ -195,6 +196,7 @@ export function FantasyExperience({
   liveProjection,
   playersPerTeam = 5,
   initialPackId,
+  pitchAssetKey = null,
 }: Props) {
   const router = useRouter();
   const persistedPlayers = lineupPlayersFromSource(lineup);
@@ -1458,7 +1460,7 @@ export function FantasyExperience({
             <div
               className="relative min-h-[480px] w-full max-w-full overflow-hidden rounded-[2.5rem] border-2 border-emerald-400/35 bg-[#083b1f] p-3 sm:p-4 shadow-[0_20px_50px_rgba(0,0,0,0.7),inset_0_0_50px_rgba(0,0,0,0.6)]"
               style={{
-                backgroundImage: "linear-gradient(rgba(2, 16, 7, .20), rgba(2, 16, 7, .42)), url('/images/cartola/campo-de-bairro-metade.webp')",
+                backgroundImage: `linear-gradient(rgba(2, 16, 7, .20), rgba(2, 16, 7, .42)), url('${cosmeticImage(pitchAssetKey) || "/images/cartola/campo-de-bairro-metade.webp"}')`,
                 backgroundPosition: "center center",
                 backgroundSize: "cover",
               }}

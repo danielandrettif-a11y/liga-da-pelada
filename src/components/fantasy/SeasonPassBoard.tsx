@@ -150,6 +150,10 @@ export function SeasonPassBoard({
                 <span className="flex h-full w-full flex-col items-center justify-center leading-none">
                   {isCurrent && playerAvatarUrl ? (
                     <img src={playerAvatarUrl} alt={playerName || "Jogador"} className="h-[58%] w-[58%] rounded-full border border-accent object-cover" />
+                  ) : isLegend ? (
+                    <span className="relative h-[76%] w-[76%] drop-shadow-[0_0_7px_rgba(250,204,21,.7)]">
+                      <Image src="/images/cosmetics/house-40/emblema-lenda-campinho-v1.webp" alt="" fill sizes="64px" className="object-contain" />
+                    </span>
                   ) : item.zone === "field" ? (
                     <strong className={`text-[clamp(5px,1.55vw,8px)] ${isLegend ? "text-yellow-200" : "text-white/85"}`}>{item.shortLabel}</strong>
                   ) : isCompleted ? (

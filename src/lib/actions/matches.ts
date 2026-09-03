@@ -333,16 +333,7 @@ export async function getMatch(matchId: string) {
         original_team:original_team_id (id, name, color, crest_url)
       ),
       match_events (
-        id,
-        match_id,
-        event_type,
-        player_id,
-        assist_player_id,
-        team_id,
-        minute,
-        elapsed_seconds,
-        is_own_goal,
-        created_at,
+        *,
         player:player_id (id, name, nickname, avatar_url),
         assist_player:assist_player_id (id, name, nickname, avatar_url)
       ),

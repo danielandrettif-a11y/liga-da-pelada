@@ -45,6 +45,42 @@ const emptyShop: SeasonPassShop = {
 const empty: CosmeticsDashboard = { available: false, seasonId: null, cosmetics: [], previewCatalog: [], rewards: [], equipped: {}, canPreviewAll: false, shop: emptyShop };
 const mapCosmetic = (row: any): CosmeticItem => ({ id: row.id, slug: row.slug, slot: row.slot, rarity: row.rarity, name: row.name, description: row.description, assetKey: row.asset_key });
 
+const CURRENT_LOADOUT_RELATIONS = `
+  user_id,
+  frame:frame_cosmetic_id(asset_key),
+  aura:aura_cosmetic_id(asset_key),
+  title:title_cosmetic_id(name),
+  banner:banner_cosmetic_id(asset_key),
+  nameplate:nameplate_cosmetic_id(asset_key),
+  background:background_cosmetic_id(asset_key),
+  showcase:showcase_cosmetic_id(asset_key),
+  pitch:pitch_cosmetic_id(asset_key)
+`;
+
+const LEGACY_LOADOUT_RELATIONS = `
+  user_id,
+  frame:frame_cosmetic_id(asset_key),
+  aura:aura_cosmetic_id(asset_key),
+  title:title_cosmetic_id(name),
+  banner:banner_cosmetic_id(asset_key),
+  nameplate:nameplate_cosmetic_id(asset_key),
+  background:background_cosmetic_id(asset_key)
+`;
+
+async function loadCosmeticRelations(client: any, fantasySeasonId: string, userId?: string) {
+  const buildQuery = (selection: string) => {
+    let query = client.from("fantasy_user_cosmetic_loadouts").select(selection).eq("fantasy_season_id", fantasySeasonId);
+    if (userId) query = query.eq("user_id", userId);
+    return userId ? query.maybeSingle() : query;
+  };
+  const current = await buildQuery(CURRENT_LOADOUT_RELATIONS);
+  if (!current.error) return current.data;
+  // Permite publicar a interface antes da migration 128 sem esconder os
+  // cosmeticos que ja estavam equipados nos seis slots antigos.
+  const legacy = await buildQuery(LEGACY_LOADOUT_RELATIONS);
+  return legacy.data;
+}
+
 export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
   const account = await getCurrentAccount();
   if (!account.user) return empty;
@@ -60,7 +96,7 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
     // version of the claim function.
     client.from("fantasy_user_cosmetics").select("cosmetic_id, source_reward_id, cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id),
     client.from("fantasy_cosmetics").select("*").order("created_at"),
-    client.from("fantasy_season_pass_rewards").select("id, house, reward_type, card_tier, bonus:bonus_cosmetic_id(*), options:fantasy_season_pass_reward_options(cosmetic:fantasy_cosmetics(*))").eq("fantasy_season_id", fantasySeason.id).order("house"),
+    client.from("fantasy_season_pass_rewards").select("id, house, reward_key, reward_type, card_tier, bonus:bonus_cosmetic_id(*), options:fantasy_season_pass_reward_options(cosmetic:fantasy_cosmetics(*))").eq("fantasy_season_id", fantasySeason.id).order("house"),
     client.from("fantasy_user_cosmetic_reward_choices").select("reward_id, cosmetic_id").eq("user_id", account.user.id),
     client.from("fantasy_user_cosmetic_loadouts").select("*").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).maybeSingle(),
     client.from("fantasy_season_passes").select("progress, total_progress_points, shop_bonus_points").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).maybeSingle(),
@@ -101,7 +137,7 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
     previewCatalog: account.isAdmin
       ? (catalogResult.data || []).map(mapCosmetic).filter((item: CosmeticItem) => !isLegacyFrameAsset(item.slot === "frame" ? item.assetKey : null))
       : [],
-    rewards: (rewardResult.data || []).map((row: any) => ({
+    rewards: (rewardResult.data || []).filter((row: any) => row.reward_key !== "pass-shop-pitch-40").map((row: any) => ({
       id: row.id, house: Number(row.house), rewardType: row.reward_type, cardTier: row.card_tier,
       // The choice table is authoritative. The provenance fallback keeps the
       // UI honest for claims made before the idempotent choice migration: if
@@ -115,6 +151,7 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
     equipped: {
       banner: loadout.banner_cosmetic_id || null, frame: loadout.frame_cosmetic_id || null, title: loadout.title_cosmetic_id || null,
       aura: loadout.aura_cosmetic_id || null, nameplate: loadout.nameplate_cosmetic_id || null, background: loadout.background_cosmetic_id || null,
+      showcase: loadout.showcase_cosmetic_id || null, pitch: loadout.pitch_cosmetic_id || null,
     },
     shop: {
       totalProgressPoints,
@@ -217,6 +254,8 @@ export type EquippedCosmeticsSummary = {
   bannerAssetKey: string | null;
   nameplateKey: string | null;
   backgroundAssetKey: string | null;
+  showcaseAssetKey: string | null;
+  pitchAssetKey: string | null;
 };
 
 export type CosmeticPreviewLoadout = Partial<Record<CosmeticSlot, string | null>>;
@@ -248,6 +287,8 @@ export async function getAdminCosmeticsPreview(playerId: string, requested: Cosm
     bannerAssetKey: null,
     nameplateKey: null,
     backgroundAssetKey: null,
+    showcaseAssetKey: null,
+    pitchAssetKey: null,
   };
 
   for (const [slot, cosmeticId] of selections) {
@@ -259,6 +300,8 @@ export async function getAdminCosmeticsPreview(playerId: string, requested: Cosm
     if (slot === "banner") preview.bannerAssetKey = item.asset_key;
     if (slot === "nameplate") preview.nameplateKey = item.asset_key;
     if (slot === "background") preview.backgroundAssetKey = item.asset_key;
+    if (slot === "showcase") preview.showcaseAssetKey = item.asset_key;
+    if (slot === "pitch") preview.pitchAssetKey = item.asset_key;
   }
 
   return preview;
@@ -274,19 +317,7 @@ const getMyEquippedCosmeticsCached = cache(async (): Promise<EquippedCosmeticsSu
   const { data: fantasySeason } = await client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle();
   if (!fantasySeason) return null;
 
-  const { data: loadout } = await client
-    .from("fantasy_user_cosmetic_loadouts")
-    .select(`
-      frame:frame_cosmetic_id(asset_key),
-      aura:aura_cosmetic_id(asset_key),
-      title:title_cosmetic_id(name),
-      banner:banner_cosmetic_id(asset_key),
-      nameplate:nameplate_cosmetic_id(asset_key),
-      background:background_cosmetic_id(asset_key)
-    `)
-    .eq("user_id", account.user.id)
-    .eq("fantasy_season_id", fantasySeason.id)
-    .maybeSingle();
+  const loadout = await loadCosmeticRelations(client, fantasySeason.id, account.user.id);
 
   if (!loadout) return null;
 
@@ -297,6 +328,8 @@ const getMyEquippedCosmeticsCached = cache(async (): Promise<EquippedCosmeticsSu
     bannerAssetKey: loadout.banner?.asset_key || null,
     nameplateKey: loadout.nameplate?.asset_key || null,
     backgroundAssetKey: loadout.background?.asset_key || null,
+    showcaseAssetKey: loadout.showcase?.asset_key || null,
+    pitchAssetKey: loadout.pitch?.asset_key || null,
   };
 });
 
@@ -328,19 +361,7 @@ export async function getPlayerEquippedCosmetics(playerId: string): Promise<Equi
 
   if (!fantasySeason) return null;
 
-  const { data: loadout } = await client
-    .from("fantasy_user_cosmetic_loadouts")
-    .select(`
-      frame:frame_cosmetic_id(asset_key),
-      aura:aura_cosmetic_id(asset_key),
-      title:title_cosmetic_id(name),
-      banner:banner_cosmetic_id(asset_key),
-      nameplate:nameplate_cosmetic_id(asset_key),
-      background:background_cosmetic_id(asset_key)
-    `)
-    .eq("user_id", profile.user_id)
-    .eq("fantasy_season_id", fantasySeason.id)
-    .maybeSingle();
+  const loadout = await loadCosmeticRelations(client, fantasySeason.id, profile.user_id);
 
   if (!loadout) return null;
 
@@ -351,6 +372,8 @@ export async function getPlayerEquippedCosmetics(playerId: string): Promise<Equi
     bannerAssetKey: loadout.banner?.asset_key || null,
     nameplateKey: loadout.nameplate?.asset_key || null,
     backgroundAssetKey: loadout.background?.asset_key || null,
+    showcaseAssetKey: loadout.showcase?.asset_key || null,
+    pitchAssetKey: loadout.pitch?.asset_key || null,
   };
 }
 
@@ -370,17 +393,9 @@ export async function getAllPlayersEquippedCosmeticsMap(): Promise<Map<string, E
 
   if (!fantasySeason) return new Map();
 
-  const [{ data: profiles }, { data: loadouts }] = await Promise.all([
+  const [{ data: profiles }, loadouts] = await Promise.all([
     client.from("account_profiles").select("user_id, player_id").not("player_id", "is", null),
-    client.from("fantasy_user_cosmetic_loadouts").select(`
-      user_id,
-      frame:frame_cosmetic_id(asset_key),
-      aura:aura_cosmetic_id(asset_key),
-      title:title_cosmetic_id(name),
-      banner:banner_cosmetic_id(asset_key),
-      nameplate:nameplate_cosmetic_id(asset_key),
-      background:background_cosmetic_id(asset_key)
-    `).eq("fantasy_season_id", fantasySeason.id),
+    loadCosmeticRelations(client, fantasySeason.id),
   ]);
 
   const userToPlayer = new Map<string, string>((profiles || []).map((p: any) => [p.user_id, p.player_id]));
@@ -396,6 +411,8 @@ export async function getAllPlayersEquippedCosmeticsMap(): Promise<Map<string, E
         bannerAssetKey: (loadout.banner as any)?.asset_key || null,
         nameplateKey: (loadout.nameplate as any)?.asset_key || null,
         backgroundAssetKey: (loadout.background as any)?.asset_key || null,
+        showcaseAssetKey: (loadout.showcase as any)?.asset_key || null,
+        pitchAssetKey: (loadout.pitch as any)?.asset_key || null,
       });
     }
   }

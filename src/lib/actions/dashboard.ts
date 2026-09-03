@@ -30,14 +30,7 @@ export async function getDashboardData() {
         matches(
           *,
           match_events(
-            id,
-            match_id,
-            event_type,
-            player_id,
-            assist_player_id,
-            team_id,
-            minute,
-            elapsed_seconds,
+            *,
             player:player_id (id, name, avatar_url),
             assist_player:assist_player_id (id, name, avatar_url)
           )

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Crown, Sparkles } from "@/components/icons";
@@ -27,7 +28,7 @@ import {
   type CosmeticSlot,
 } from "@/lib/fantasy/cosmetics";
 
-const SLOTS: Array<CosmeticSlot | "all"> = ["all", "banner", "frame", "title", "aura", "nameplate", "background"];
+const SLOTS: Array<CosmeticSlot | "all"> = ["all", "banner", "frame", "title", "aura", "nameplate", "background", "showcase", "pitch"];
 
 export function PassCosmeticRewards({ cosmetics, progress }: { cosmetics: CosmeticsDashboard; progress: number }) {
   const router = useRouter();
@@ -86,6 +87,8 @@ export function CosmeticsCollection({ cosmetics, playerId, playerName = "Jogador
   const aura = bySlot.get("aura");
   const title = bySlot.get("title");
   const nameplate = bySlot.get("nameplate");
+  const showcase = bySlot.get("showcase");
+  const pitch = bySlot.get("pitch");
   const heroAsset = banner?.assetKey || background?.assetKey;
   const heroImage = cosmeticImage(heroAsset);
   const cartolaBannerImage = cosmeticHighResolutionImage(banner?.assetKey);
@@ -128,6 +131,7 @@ export function CosmeticsCollection({ cosmetics, playerId, playerName = "Jogador
       <div className={`relative overflow-hidden rounded-3xl border ${previewMode ? "border-amber-300/55" : "border-white/10"} bg-gradient-to-br ${cosmeticVisual(heroAsset)} shadow-2xl`} style={heroImage ? { backgroundImage: `${banner ? "linear-gradient(115deg,rgba(2,14,8,.5),rgba(2,14,8,.08))" : "linear-gradient(115deg,rgba(2,14,8,.22),rgba(2,14,8,.02))"}, url(${heroImage})`, backgroundSize: "cover", backgroundPosition: cosmeticBackgroundPosition(banner ? "banner" : "background", heroAsset) } : undefined}>
         <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_52%,rgba(0,0,0,.38))]" />
         <div className="relative flex min-h-48 flex-col items-center justify-center p-6 text-center">
+          {showcase && cosmeticImage(showcase.assetKey) ? <span className="absolute right-3 top-3 h-16 w-16 drop-shadow-[0_0_12px_rgba(250,204,21,.45)]"><Image src={cosmeticImage(showcase.assetKey) || ""} alt={`Emblema ${showcase.name}`} fill sizes="64px" className="object-contain" /></span> : null}
           <span className={`mb-4 rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-[.18em] ${previewMode ? "border-amber-300/40 bg-black/55 text-amber-200" : "border-accent/30 bg-black/45 text-accent"}`}>{previewMode ? "Provador temporário" : "Visual equipado"}</span>
           <PlayerAvatar name={playerName} avatarUrl={avatarUrl} clickable={false} frameKey={frame?.assetKey} auraKey={aura?.assetKey} className="h-20 w-20 rounded-full bg-black/55 text-lg font-black text-white" />
           <div className={`mt-4 rounded-xl border px-4 py-2 backdrop-blur-sm ${cosmeticNameplateClass(nameplate?.assetKey)}`}><p className="font-athletic text-lg font-black uppercase italic tracking-wide">{playerName}</p>{title && <p className="mt-0.5 text-[9px] font-black uppercase tracking-[.16em]">✦ {title.name}</p>}</div>
@@ -142,7 +146,7 @@ export function CosmeticsCollection({ cosmetics, playerId, playerName = "Jogador
             <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-1 text-[8px] font-black uppercase text-amber-100">Só ADM</span>
           </div>
           <div className="relative min-h-[170px] overflow-hidden rounded-2xl border border-accent/40 bg-[#06160d] p-5">
-            {cartolaBannerImage && <div aria-hidden="true" className="absolute inset-0" style={{ backgroundImage: `url(${cartolaBannerImage})`, backgroundSize: "cover", backgroundPosition: cosmeticBackgroundPosition("banner", banner?.assetKey) }} />}
+            {(cosmeticImage(pitch?.assetKey) || cartolaBannerImage) && <div aria-hidden="true" className="absolute inset-0" style={{ backgroundImage: `url(${cosmeticImage(pitch?.assetKey) || cartolaBannerImage})`, backgroundSize: "cover", backgroundPosition: cosmeticImage(pitch?.assetKey) ? "center" : cosmeticBackgroundPosition("banner", banner?.assetKey) }} />}
             <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-[#06160d]/55 to-[#06160d]" />
             <div className="relative flex items-center gap-3.5">
               <PlayerAvatar name={playerName} avatarUrl={avatarUrl} clickable={false} frameKey={frame?.assetKey} className="h-16 w-16 shrink-0 rounded-2xl border-2 border-accent bg-background text-base font-black text-accent shadow-md" />
