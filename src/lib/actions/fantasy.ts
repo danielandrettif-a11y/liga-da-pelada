@@ -1421,6 +1421,12 @@ export async function getFantasyDashboard() {
           playerPoints: Number(latestLineup?.player_points || 0),
           cardPoints: Number(latestLineup?.score_breakdown?.cardBonus || 0),
           totalPoints: Number(latestLineup?.total_points || 0),
+          playerScores: (latestLineup?.fantasy_lineup_players || []).map((player: any) => ({
+            playerId: player.player_id as string,
+            // Este total é o mesmo usado no histórico da rodada: base,
+            // bônus da posição e eventual bônus de capitão já apurados.
+            points: Number(player.total_points || 0),
+          })),
         }
       : null,
     // V3: Pacotes, Inventário e Carta Ativa

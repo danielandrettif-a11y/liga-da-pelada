@@ -39,6 +39,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { getFantasySlotRoles, isCorrectFantasySlot } from "@/lib/fantasy/lineup-positions";
+import { resolveFantasyPitchPoints } from "@/lib/fantasy/pitch-points";
 import { FantasyRadarCarousel } from "./FantasyRadarCarousel";
 import { FantasyPackClaimBanner } from "./cards/FantasyPackClaimBanner";
 import { FantasyActiveCardSlot } from "./cards/FantasyActiveCardSlot";
@@ -131,6 +132,7 @@ type Props = {
     playerPoints: number;
     cardPoints: number;
     totalPoints: number;
+    playerScores: Array<{ playerId: string; points: number }>;
   } | null;
   challengeType?: FantasyChallengeType | null;
   activeCard?: FantasyActiveCardDTO | null;
@@ -200,6 +202,10 @@ export function FantasyExperience({
 }: Props) {
   const router = useRouter();
   const persistedPlayers = lineupPlayersFromSource(lineup);
+  const lastRoundPointsByPlayerId = useMemo(
+    () => new Map((lastRound?.playerScores || []).map((item) => [item.playerId, item.points] as const)),
+    [lastRound?.playerScores],
+  );
   const initialIds = persistedPlayers.map((item: any) => item.player_id as string);
   const draftStorageKey = `fantasy_draft_slots_${fantasySeasonId}_${round?.id || "portfolio"}`;
   const legacyStorageKey = `fantasy_slots_${fantasySeasonId}_${round?.id || "portfolio"}`;
@@ -851,6 +857,16 @@ export function FantasyExperience({
   ) {
     const player = selectedPlayers[slot];
     const livePlayerProjection = player ? livePlayerProjectionById.get(player.id) : null;
+    const displayedPoints = player
+      ? resolveFantasyPitchPoints({
+          status,
+          marketRoundPoints: player.roundPoints,
+          lastRoundLineupPoints: lastRoundPointsByPlayerId.get(player.id),
+          liveLineupPoints: livePlayerProjection?.totalPoints,
+          isCaptain: captainId === player.id,
+          captainMultiplier: settings.captainMultiplier,
+        })
+      : 0;
     const isBeingDragged = draggedSlot === slot;
     const isDragOver = dragOverSlot === slot;
     const isOutsideCallup = Boolean(player && hasCurrentCallup && !player.isInCurrentRound);
@@ -1034,14 +1050,7 @@ export function FantasyExperience({
                 {player.name}
               </span>
               <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
-                {status === "in_progress" && livePlayerProjection
-                  ? `${livePlayerProjection.totalPoints.toFixed(1)} pts`
-                  : status === "in_progress"
-                  ? `${(
-                      player.roundPoints *
-                      (captainId === player.id ? settings.captainMultiplier : 1)
-                    ).toFixed(1)} pts`
-                  : `${player.roundPoints.toFixed(1)} pts`}
+                {displayedPoints.toFixed(1)} pts
               </span>
               <span className="text-[8px] font-bold text-white/70">
                 {formatFantasyMoney(player.price, settings.currencyName)}
