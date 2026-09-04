@@ -2,14 +2,18 @@
 
 import { useMemo, useState } from "react";
 import { ChevronDown } from "@/components/icons";
+import { TeamCrest } from "@/components/TeamCrest";
+import { getRoundTeamStats } from "@/lib/round-team-stats";
 
 type Player = { id: string; name: string; nickname?: string | null; avatar_url?: string | null };
 type MatchEvent = { player_id?: string | null; assist_player_id?: string | null; is_own_goal?: boolean | null };
+type Team = { id: string; name: string; color?: string | null; crest_url?: string | null };
+type Match = { status: "pending" | "live" | "finished"; team_a_id: string; team_b_id: string; score_a: number | null; score_b: number | null; match_events?: MatchEvent[] | null };
 
-export function RoundLiveStats({ matches, players }: { matches: Array<{ status: string; match_events?: MatchEvent[] | null }>; players: Player[] }) {
+export function RoundLiveStats({ matches, players, teams }: { matches: Match[]; players: Player[]; teams: Team[] }) {
   const hasLiveMatch = matches.some((match) => match.status === "live");
   const [expanded, setExpanded] = useState(hasLiveMatch);
-  const { entries, goals, assists } = useMemo(() => {
+  const { entries, goals, assists, teamStats } = useMemo(() => {
     const totals = new Map<string, { goals: number; assists: number }>();
     let goalTotal = 0;
     let assistTotal = 0;
@@ -33,12 +37,13 @@ export function RoundLiveStats({ matches, players }: { matches: Array<{ status: 
     return {
       goals: goalTotal,
       assists: assistTotal,
+      teamStats: getRoundTeamStats(teams, matches),
       entries: [...totals.entries()]
         .map(([playerId, totals]) => ({ player: playerById.get(playerId), ...totals }))
         .filter((entry) => entry.player)
         .sort((a, b) => b.goals - a.goals || b.assists - a.assists || a.player!.name.localeCompare(b.player!.name, "pt-BR")),
     };
-  }, [matches, players]);
+  }, [matches, players, teams]);
 
   return (
     <section className="overflow-hidden rounded-2xl border border-accent/25 bg-surface/80 shadow-[0_0_22px_rgba(190,255,0,0.04)]">
@@ -51,6 +56,20 @@ export function RoundLiveStats({ matches, players }: { matches: Array<{ status: 
         <ChevronDown className={`h-5 w-5 shrink-0 text-muted transition-transform ${expanded ? "rotate-180" : ""}`} />
       </button>
       {expanded && <div className="border-t border-border px-4 pb-4 pt-3">
+        {teamStats.length > 0 && <>
+          <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-muted">Desempenho dos times</p>
+          <div className="mb-4 space-y-1">
+            {teamStats.map((team) => <div key={team.id} className="flex items-center gap-2.5 rounded-xl bg-background/35 px-2.5 py-2">
+              <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-8 w-8" />
+              <span className="min-w-0 flex-1 truncate text-xs font-bold text-foreground">{team.name}</span>
+              <span className="text-right text-[10px] font-black text-accent"><strong className="block text-xs">{team.wins}</strong>Vitórias</span>
+              <span className="border-l border-border pl-2 text-right text-[10px] font-black text-info"><strong className="block text-xs">{team.goalsFor}</strong>Fez</span>
+              <span className="border-l border-border pl-2 text-right text-[10px] font-black text-danger"><strong className="block text-xs">{team.goalsAgainst}</strong>Tomou</span>
+            </div>)}
+          </div>
+          {hasLiveMatch && <p className="-mt-2 mb-4 text-[10px] font-bold text-muted">Gols atualizados ao vivo; vitórias entram ao encerrar a partida.</p>}
+        </>}
+
         {entries.length === 0 ? <p className="py-2 text-center text-xs text-muted">Ainda sem gols registrados nesta rodada.</p> : <>
           <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-muted">Gols e assistências por jogador</p>
           <div className="max-h-64 space-y-1 overflow-y-auto pr-1">

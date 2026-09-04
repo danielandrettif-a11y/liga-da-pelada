@@ -92,7 +92,7 @@ export default async function RodadaDetalhePage({
         </Link>
       )}
 
-      <RoundLiveStats matches={round.matches || []} players={participants} />
+      <RoundLiveStats matches={round.matches || []} players={participants} teams={round.teams || []} />
 
       {/* Teams Grid */}
       <section className="space-y-4">

@@ -96,11 +96,15 @@ export function FantasyPlayerDrawer({
     .join(" ");
 
   const recentPoints = detailData?.recentPointsList || player.recentPointsList || [];
-  const liveRound = detailData?.liveRound;
-  const livePoints = Number(liveRound?.basePoints ?? player.roundPoints ?? 0);
-  const breakdownList = liveRound?.breakdown || [];
-  const matchesList = liveRound?.matchesBreakdown || [];
-  const rulesList = liveRound?.rulesList || [];
+  const roundDetail = detailData?.roundDetail;
+  const latestSavedPoints = detailData
+    ? recentPoints[recentPoints.length - 1]
+    : player.recentPointsList?.[0];
+  const livePoints = Number(roundDetail?.basePoints ?? latestSavedPoints ?? player.roundPoints ?? 0);
+  const breakdownList = roundDetail?.breakdown || [];
+  const matchesList = roundDetail?.matchesBreakdown || [];
+  const rulesList = roundDetail?.rulesList || [];
+  const detailIsLive = roundDetail?.status === "live";
   const bannerAssetKey = detailData?.cosmetics?.bannerAssetKey || null;
   const bannerImage = cosmeticHighResolutionImage(bannerAssetKey);
   const frameKey = detailData?.cosmetics?.frameKey || null;
@@ -418,9 +422,11 @@ export function FantasyPlayerDrawer({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />
+                    <span className={`h-2 w-2 rounded-full bg-accent ${detailIsLive ? "animate-pulse" : ""}`} />
                     <span className="text-[10px] font-black uppercase tracking-wider text-accent">
-                      {liveRound?.roundNumber ? `Rodada ${liveRound.roundNumber} · Ao Vivo` : isRoundLive ? "Rodada Atual · Ao Vivo" : "Desempenho da Rodada"}
+                      {roundDetail?.roundNumber
+                        ? `Rodada ${roundDetail.roundNumber} · ${detailIsLive ? "Ao Vivo" : "Finalizada"}`
+                        : isRoundLive ? "Rodada Atual · Ao Vivo" : "Desempenho da Última Rodada"}
                     </span>
                   </div>
                   <h3 className="mt-1 text-sm font-black text-foreground">
@@ -437,7 +443,9 @@ export function FantasyPlayerDrawer({
                 </div>
               </div>
               <p className="mt-2 text-[10px] leading-relaxed text-muted border-t border-accent/15 pt-2">
-                Valores calculados em tempo real a partir dos scouts e eventos de jogo. O bônus de capitão e cartas especiais incidem no total da sua escalação.
+                {detailIsLive
+                  ? "Valores calculados em tempo real a partir dos scouts e eventos de jogo. O bônus de capitão e cartas especiais incidem no total da sua escalação."
+                  : "Pontuação-base oficial da última rodada válida, calculada com as regras que estavam vigentes naquela rodada. Bônus de posição, capitão e cartas aparecem no total da escalação."}
               </p>
             </div>
 
@@ -452,7 +460,7 @@ export function FantasyPlayerDrawer({
                 </span>
               </div>
 
-              {loading && !liveRound ? (
+              {loading && !roundDetail ? (
                 <div className="py-6 text-center text-xs text-muted">
                   Carregando scouts da rodada...
                 </div>
@@ -481,10 +489,12 @@ export function FantasyPlayerDrawer({
               ) : (
                 <div className="py-4 text-center">
                   <p className="text-xs font-semibold text-muted">
-                    Nenhum scout pontuado registrado para este atleta nesta rodada ainda.
+                    Nenhum scout pontuado encontrado para este atleta nesta rodada.
                   </p>
                   <p className="mt-1 text-[10px] text-muted/70">
-                    Gols, assistências, vitórias e participações aparecerão aqui assim que as partidas forem disputadas.
+                    {isRoundLive
+                      ? "Gols, assistências, vitórias e participações aparecerão aqui assim que as partidas forem disputadas."
+                      : "Este atleta não teve uma rodada válida com scouts disponíveis no histórico."}
                   </p>
                 </div>
               )}

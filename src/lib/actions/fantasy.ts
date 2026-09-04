@@ -1781,6 +1781,7 @@ export async function getFantasyPlayerDetail(playerId: string) {
 
   const history = (historyRows || []).map((h: any) => ({
     id: h.id,
+    fantasyRoundId: h.fantasy_round_id,
     roundNumber: h.fantasy_rounds?.round?.number || null,
     roundDate: h.fantasy_rounds?.round?.date || null,
     priceBefore: Number(h.price_before),
@@ -1799,6 +1800,7 @@ export async function getFantasyPlayerDetail(playerId: string) {
   }));
 
   const validRecentHistory = history.filter((h) => h.games > 0);
+  const latestValidHistory = validRecentHistory[validRecentHistory.length - 1] || null;
   const recentPointsList = validRecentHistory.slice(-5).map((h) => h.roundPoints);
   const recentVariations = validRecentHistory.slice(-5).map((h) => h.variationRate);
 
@@ -1839,11 +1841,20 @@ export async function getFantasyPlayerDetail(playerId: string) {
     const round = Array.isArray(item.round) ? item.round[0] : item.round;
     return round?.status !== "finished";
   }) || null;
-  const liveRoundInfo = Array.isArray(liveRound?.round) ? liveRound.round[0] : liveRound?.round;
-  let liveRoundSummary: any = null;
+  const { data: latestFinishedPlayerRound } = !liveRound && latestValidHistory?.fantasyRoundId
+    ? await liveReadClient
+      .from("fantasy_rounds")
+      .select("id, round_id, market_status, settings_snapshot, round:round_id(number, date, status, ignore_goalkeeper_stats)")
+      .eq("id", latestValidHistory.fantasyRoundId)
+      .maybeSingle()
+    : { data: null as any };
+  const scoringRound = liveRound || latestFinishedPlayerRound;
+  const scoringRoundInfo = Array.isArray(scoringRound?.round) ? scoringRound.round[0] : scoringRound?.round;
+  const scoringRoundIsLive = Boolean(liveRound);
+  let roundDetail: any = null;
 
-  if (liveRound?.round_id) {
-    const snapshot = liveRound.settings_snapshot || {};
+  if (scoringRound?.round_id) {
+    const snapshot = scoringRound.settings_snapshot || {};
     const liveSettings: FantasySettings = {
       ...DEFAULT_FANTASY_SETTINGS,
       roleScoringActive: snapshot.role_scoring_active !== false,
@@ -1859,7 +1870,7 @@ export async function getFantasyPlayerDetail(playerId: string) {
       ownGoalPoints: Number(snapshot.own_goal_points ?? liveSettingsRow?.own_goal_points ?? DEFAULT_FANTASY_SETTINGS.ownGoalPoints),
       captainMultiplier: Number(snapshot.captain_multiplier ?? liveSettingsRow?.captain_multiplier ?? DEFAULT_FANTASY_SETTINGS.captainMultiplier),
     };
-    const liveMatches = await loadFantasyMatchSnapshots(liveReadClient, liveRound.round_id);
+    const liveMatches = await loadFantasyMatchSnapshots(liveReadClient, scoringRound.round_id);
     const playerProfile = playerRow.player_profile as "offensive" | "midfield" | "defensive" | null;
     const liveStats = projectFantasyLiveStats(
       liveMatches.map((match: any) => ({
@@ -1887,7 +1898,7 @@ export async function getFantasyPlayerDetail(playerId: string) {
         })),
       })),
       liveSettings,
-      { ignoreGoalkeeperStats: Boolean(liveRoundInfo?.ignore_goalkeeper_stats) },
+      { ignoreGoalkeeperStats: Boolean(scoringRoundInfo?.ignore_goalkeeper_stats) },
     );
     const current = liveStats.get(playerId) || {
       goals: 0, assists: 0, ownGoals: 0, wins: 0, losses: 0,
@@ -1905,16 +1916,33 @@ export async function getFantasyPlayerDetail(playerId: string) {
     const concededValue = liveSettings.roleScoringActive === false
       ? current.teamGoalsConceded * liveSettings.teamGoalConcededPoints
       : current.goalsConceded * liveSettings.goalConcededPoints;
+    const concededUnitValue = liveSettings.roleScoringActive === false
+      ? liveSettings.teamGoalConcededPoints
+      : liveSettings.goalConcededPoints;
+    const authoritativeBasePoints = scoringRoundIsLive
+      ? current.basePoints
+      : Number(latestValidHistory?.roundPoints ?? current.basePoints);
     const breakdown = [
       { key: "goals", label: "Gols", count: current.goals, unitPoints: goalValue, points: current.goals * goalValue, icon: "⚽" },
       { key: "assists", label: "Assistências", count: current.assists, unitPoints: liveSettings.assistPoints, points: current.assists * liveSettings.assistPoints, icon: "👟" },
       { key: "wins", label: "Vitórias", count: current.wins, unitPoints: liveSettings.winPoints, points: current.wins * liveSettings.winPoints, icon: "🏆" },
       { key: "losses", label: "Derrotas", count: current.losses, unitPoints: liveSettings.lossPoints, points: current.losses * liveSettings.lossPoints, icon: "❌" },
       { key: "goalkeeper_games", label: "Jogos no Gol (Rodízio)", count: current.goalkeeperGames, unitPoints: liveSettings.goalkeeperAppearancePoints, points: current.goalkeeperGames * liveSettings.goalkeeperAppearancePoints, icon: "🧤" },
-      { key: "goals_conceded", label: "Gols Sofridos no Gol", count: liveSettings.roleScoringActive === false ? current.teamGoalsConceded : current.goalsConceded, unitPoints: liveSettings.goalConcededPoints, points: concededValue, icon: "🛡️" },
+      { key: "goals_conceded", label: "Gols Sofridos no Gol", count: liveSettings.roleScoringActive === false ? current.teamGoalsConceded : current.goalsConceded, unitPoints: concededUnitValue, points: concededValue, icon: "🛡️" },
       { key: "defensive_bonus", label: "Bônus Defensivo (SG)", count: current.defensiveCleanGames + current.defensiveOneGoalGames, unitPoints: 2, points: defensiveBonus, icon: "🔒" },
       { key: "own_goals", label: "Gols Contra", count: current.ownGoals, unitPoints: liveSettings.ownGoalPoints, points: current.ownGoals * liveSettings.ownGoalPoints, icon: "⚠️" },
     ].filter((item) => item.count > 0);
+    const historicalAdjustment = authoritativeBasePoints - current.basePoints;
+    if (!scoringRoundIsLive && Math.abs(historicalAdjustment) >= 0.005) {
+      breakdown.push({
+        key: "historical_adjustment",
+        label: "Ajuste da apuração histórica",
+        count: 1,
+        unitPoints: historicalAdjustment,
+        points: historicalAdjustment,
+        icon: "📌",
+      });
+    }
 
     const matchesBreakdown = (liveMatches || [])
       .filter((match: any) => {
@@ -1959,7 +1987,7 @@ export async function getFantasyPlayerDetail(playerId: string) {
       { label: "Vitória na partida", unitPoints: liveSettings.winPoints, icon: "🏆", description: "Time vence a partida (ao encerrar)" },
       { label: "Derrota na partida", unitPoints: liveSettings.lossPoints, icon: "❌", description: "Time perde a partida (ao encerrar)" },
       { label: "Jogar no gol (rodízio)", unitPoints: liveSettings.goalkeeperAppearancePoints, icon: "🧤", description: "Bônus por atuar na posição de goleiro" },
-      { label: "Gol sofrido no gol", unitPoints: liveSettings.goalConcededPoints, icon: "🛡️", description: "Penalidade por cada gol sofrido no gol" },
+      { label: "Gol sofrido no gol", unitPoints: concededUnitValue, icon: "🛡️", description: "Penalidade por cada gol sofrido no gol" },
       { label: "Gol contra", unitPoints: liveSettings.ownGoalPoints, icon: "⚠️", description: "Penalidade por marcar gol contra" },
       ...(playerProfile === "defensive" ? [
         { label: "SG Defensivo (0 gols)", unitPoints: 2, icon: "🔒", description: "Bônus de zagueiro por partida sem sofrer gols" },
@@ -1967,10 +1995,12 @@ export async function getFantasyPlayerDetail(playerId: string) {
       ] : []),
     ];
 
-    liveRoundSummary = {
-      roundNumber: liveRoundInfo?.number || null,
+    roundDetail = {
+      roundNumber: scoringRoundInfo?.number || null,
+      roundDate: scoringRoundInfo?.date || null,
+      status: scoringRoundIsLive ? "live" : "finished",
       stats: current,
-      basePoints: current.basePoints,
+      basePoints: authoritativeBasePoints,
       breakdown,
       matchesBreakdown,
       rulesList,
@@ -2018,7 +2048,7 @@ export async function getFantasyPlayerDetail(playerId: string) {
     allTags,
     compactTags,
     history,
-    liveRound: liveRoundSummary,
+    roundDetail,
     cosmetics: {
       bannerAssetKey: (cosmeticLoadout as any)?.banner?.asset_key || null,
       frameKey: (cosmeticLoadout as any)?.frame?.asset_key || null,
