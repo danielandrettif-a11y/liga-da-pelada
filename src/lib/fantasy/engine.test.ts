@@ -21,7 +21,7 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
 
   describe("Validação de Escalação e Orçamento (V1 + V2)", () => {
     it("mantém o cálculo anterior quando a rodada ainda não ativou as regras de posição", () => {
-      const legacySettings = { ...DEFAULT_FANTASY_SETTINGS, roleScoringActive: false, goalkeeperLossPoints: 0, teamGoalConcededPoints: -1 };
+      const legacySettings = { ...DEFAULT_FANTASY_SETTINGS, roleScoringActive: false, goalkeeperAppearancePoints: 3, goalkeeperLossPoints: 0, teamGoalConcededPoints: -1 };
       expect(
         calculateFantasyPlayerPoints(
           { goals: 0, assists: 0, wins: 0, losses: 0, goalkeeperGames: 1, goalsConceded: 1, teamGoalsConceded: 1 },
@@ -48,16 +48,16 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       ).toBe(false);
     });
 
-    it("calcula gol (+5), assistência (+3), vitória (+4), derrota de linha (-2) e goleiro", () => {
+    it("calcula gol (+4), assistência (+2.5), vitória (+3), derrota de linha (-2.5) e goleiro (BQ v5)", () => {
       expect(calculateFantasyPlayerPoints({ goals: 2, assists: 1, wins: 2, losses: 0 }, DEFAULT_FANTASY_SETTINGS)).toBe(
-        21
+        16.5
       );
       expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 3 }, DEFAULT_FANTASY_SETTINGS)).toBe(
-        -6
+        -7.5
       );
-      expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, goalkeeperGames: 2, goalsConceded: 2 }, DEFAULT_FANTASY_SETTINGS)).toBe(4);
+      expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, goalkeeperGames: 2, goalsConceded: 2 }, DEFAULT_FANTASY_SETTINGS)).toBe(2);
       expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, teamGoalsConceded: 2 }, DEFAULT_FANTASY_SETTINGS)).toBe(0);
-      expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 2, goalkeeperGames: 1 }, DEFAULT_FANTASY_SETTINGS)).toBe(-1);
+      expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 2, goalkeeperGames: 1 }, DEFAULT_FANTASY_SETTINGS)).toBe(-3);
     });
 
     it("mantém o patrimônio proporcional nas modalidades de 5 e 6 atletas", () => {
@@ -73,13 +73,13 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
           { goals: 1, ownGoals: 1, wins: 0, assists: 0, playerProfile: "offensive" },
           DEFAULT_FANTASY_SETTINGS,
         ),
-      ).toBe(2);
+      ).toBe(1);
       expect(
         calculateFantasyPlayerPoints(
           { goals: 1, ownGoals: 1, wins: 0, assists: 0, playerProfile: "midfield" },
           DEFAULT_FANTASY_SETTINGS,
         ),
-      ).toBe(2);
+      ).toBe(1);
     });
   });
 

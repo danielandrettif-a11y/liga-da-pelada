@@ -249,6 +249,7 @@ export async function getFantasyDashboard() {
         attackerGoalPoints: Number(settingsRow.attacker_goal_points ?? 5),
         assistPoints: Number(settingsRow.assist_points),
         winPoints: Number(settingsRow.win_points),
+        drawPoints: Number(settingsRow.draw_points ?? 1),
         lossPoints: Number(settingsRow.loss_points ?? -1),
         goalkeeperLossPoints: Number(settingsRow.goalkeeper_loss_points ?? settingsRow.loss_points ?? -1),
         goalkeeperAppearancePoints: Number(settingsRow.goalkeeper_appearance_points ?? 3),
@@ -1905,19 +1906,19 @@ export async function getFantasyPlayerDetail(playerId: string) {
       goalkeeperGames: 0, goalsConceded: 0, defensiveCleanGames: 0,
       defensiveOneGoalGames: 0, teamGoalsConceded: 0, basePoints: 0,
     };
-    const goalValue = liveSettings.roleScoringActive === false && playerProfile === "offensive"
+    const goalValue = (liveSettings.roleScoringActive === false && playerProfile === "offensive"
       ? liveSettings.attackerGoalPoints
-      : liveSettings.goalPoints;
+      : liveSettings.goalPoints) ?? liveSettings.goalPoints;
     const defensiveBonus = liveSettings.roleScoringActive === false
       ? 0
       : (playerProfile === "defensive"
         ? current.defensiveCleanGames * 2 + current.defensiveOneGoalGames
         : 0);
     const concededValue = liveSettings.roleScoringActive === false
-      ? current.teamGoalsConceded * liveSettings.teamGoalConcededPoints
+      ? current.teamGoalsConceded * (liveSettings.teamGoalConcededPoints ?? 0)
       : current.goalsConceded * liveSettings.goalConcededPoints;
     const concededUnitValue = liveSettings.roleScoringActive === false
-      ? liveSettings.teamGoalConcededPoints
+      ? (liveSettings.teamGoalConcededPoints ?? 0)
       : liveSettings.goalConcededPoints;
     const authoritativeBasePoints = scoringRoundIsLive
       ? current.basePoints

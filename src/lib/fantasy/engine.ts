@@ -4,7 +4,7 @@ export type FantasyPerformance = {
   playerId: string;
   games: number;
   wins: number;
-  draws: number;
+  draws?: number;
   losses?: number;
   goals: number;
   assists: number;
@@ -65,6 +65,7 @@ export function calculateFantasyPlayerPoints(
     | "goals"
     | "assists"
     | "wins"
+    | "draws"
     | "losses"
     | "goalkeeperGames"
     | "goalsConceded"
@@ -77,31 +78,36 @@ export function calculateFantasyPlayerPoints(
   settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
 ) {
   if (settings.roleScoringActive === false) {
+    const legacySettings = settings as unknown as Record<string, number | undefined>;
     return (
-      stats.goals * (stats.playerProfile === "offensive" ? settings.attackerGoalPoints : settings.goalPoints) +
+      stats.goals * (legacySettings.attackerGoalPoints ?? settings.goalPoints) +
       stats.assists * settings.assistPoints +
       stats.wins * settings.winPoints +
-      (stats.losses || 0) * ((stats.goalkeeperGames || 0) > 0 ? settings.goalkeeperLossPoints : settings.lossPoints) +
+      (stats.draws || 0) * (legacySettings.drawPoints ?? settings.drawPoints ?? 1) +
+      (stats.losses || 0) * ((stats.goalkeeperGames || 0) > 0 ? (legacySettings.goalkeeperLossPoints ?? settings.lossPoints) : settings.lossPoints) +
       (stats.goalkeeperGames || 0) * settings.goalkeeperAppearancePoints +
-      (stats.teamGoalsConceded ?? stats.goalsConceded ?? 0) * settings.teamGoalConcededPoints +
+      (stats.teamGoalsConceded ?? stats.goalsConceded ?? 0) * (legacySettings.teamGoalConcededPoints ?? 0) +
       (stats.ownGoals || 0) * settings.ownGoalPoints
     );
   }
-  return (
-    stats.goals * settings.goalPoints +
-    stats.assists * settings.assistPoints +
-    stats.wins * settings.winPoints +
-    (stats.losses || 0) * settings.lossPoints +
-    (stats.goalkeeperGames || 0) * settings.goalkeeperAppearancePoints +
-    (stats.goalsConceded || 0) * settings.goalConcededPoints +
-    (stats.playerProfile === "defensive" ? (stats.defensiveCleanGames || 0) * 2 + (stats.defensiveOneGoalGames || 0) : 0) +
-    (stats.ownGoals || 0) * settings.ownGoalPoints
-  );
+  // BQ v5: base uniforme para todas as posições. Bônus defensivos (clean
+  // sheet, proteção parcial e Muralha) são calculados exclusivamente pelo
+  // pacote de posição em lineup-positions.ts.
+  const goalsCents = Math.round(stats.goals * settings.goalPoints * 100);
+  const assistsCents = Math.round(stats.assists * settings.assistPoints * 100);
+  const winsCents = Math.round(stats.wins * settings.winPoints * 100);
+  const drawsCents = Math.round((stats.draws || 0) * (settings.drawPoints ?? 1) * 100);
+  const lossesCents = Math.round((stats.losses || 0) * settings.lossPoints * 100);
+  const goalkeeperCents = Math.round((stats.goalkeeperGames || 0) * settings.goalkeeperAppearancePoints * 100);
+  const goalsConcededCents = Math.round((stats.goalsConceded || 0) * settings.goalConcededPoints * 100);
+  const ownGoalsCents = Math.round((stats.ownGoals || 0) * settings.ownGoalPoints * 100);
+  return (goalsCents + assistsCents + winsCents + drawsCents + lossesCents + goalkeeperCents + goalsConcededCents + ownGoalsCents) / 100;
 }
 
 export function predictionIsCorrect<T>(choice: T | null | undefined, leaders: T[], leaderValue: number) {
   return leaderValue > 0 && choice != null && leaders.includes(choice);
 }
+
 
 export function validateFantasyDraft(input: {
   playerIds: string[];

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, Trash2 } from "@/components/icons";
 import { deletePlayer, savePlayer } from "@/lib/actions/players";
+import { setPlayerSpeedRating } from "@/lib/actions/speed-draw";
 import type { MemberCategory, Player } from "@/lib/types";
 import { AvatarCropModal } from "./AvatarCropModal";
 import { PlayerAvatar } from "./PlayerAvatar";
@@ -21,6 +22,7 @@ export function PlayerForm({
   nameplateKey,
   bannerAssetKey,
   backgroundAssetKey,
+  initialSpeedRating = null,
 }: {
   player?: Player;
   mode?: "admin" | "self";
@@ -30,6 +32,7 @@ export function PlayerForm({
   nameplateKey?: string | null;
   bannerAssetKey?: string | null;
   backgroundAssetKey?: string | null;
+  initialSpeedRating?: 1 | 2 | 3 | null;
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,6 +47,7 @@ export function PlayerForm({
   const [croppedFile, setCroppedFile] = useState<File | null>(null);
   const [cropSourceUrl, setCropSourceUrl] = useState("");
   const [memberCategory, setMemberCategory] = useState<MemberCategory>(player?.member_category || "player");
+  const [speedRating, setSpeedRating] = useState<1 | 2 | 3 | null>(initialSpeedRating);
 
   useEffect(() => {
     return () => {
@@ -121,6 +125,10 @@ export function PlayerForm({
     try {
       const result = await savePlayer(player?.id || null, formData);
       if (!result.success) throw new Error(result.error);
+
+      if (player?.id && mode === "admin") {
+        await setPlayerSpeedRating(player.id, speedRating);
+      }
 
       router.push(mode === "self" ? "/meu-perfil" : "/admin/jogadores");
       router.refresh();
@@ -280,6 +288,32 @@ export function PlayerForm({
           </select>
           <p className="text-[10px] text-muted">WAGs e torcedores aparecem no Elenco, mas nunca entram em convocações, sorteios ou partidas. Se já houver estatísticas, elas serão preservadas e ficarão ocultas.</p>
           {memberCategory === "guest" && <p className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-[11px] leading-4 text-muted">Convidados permanecem ativos no elenco e disponíveis para futuras rodadas.</p>}
+        </div>
+      )}
+
+      {mode === "admin" && (
+        <div className="space-y-1.5">
+          <label htmlFor="speed_rating" className="text-xs font-bold uppercase tracking-wider text-muted">
+            Velocidade (Admin Privado)
+          </label>
+          <select
+            id="speed_rating"
+            name="speed_rating"
+            value={speedRating === null ? "" : String(speedRating)}
+            onChange={(event) => {
+              const val = event.target.value === "" ? null : (Number(event.target.value) as 1 | 2 | 3);
+              setSpeedRating(val);
+            }}
+            className="w-full rounded-xl border border-border bg-surface-hover px-4 py-3 text-sm text-foreground outline-none focus:border-accent"
+          >
+            <option value="">Sem avaliação (calculado como 2★ em memória)</option>
+            <option value="1">1★ — Baixa velocidade</option>
+            <option value="2">2★ — Média velocidade</option>
+            <option value="3">3★ — Alta velocidade</option>
+          </select>
+          <p className="text-[10px] text-muted">
+            Visível apenas para administradores. Usado pelo algoritmo de Sorteio por Velocidade.
+          </p>
         </div>
       )}
 

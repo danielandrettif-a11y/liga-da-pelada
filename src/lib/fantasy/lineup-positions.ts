@@ -1,4 +1,5 @@
 import type { FantasySettings } from "./config";
+import { calculatePositionBonusValue, type PositionBreakdownInput } from "./position-breakdown";
 
 export type FantasySlotRole = "GOL" | "DEF" | "MEI" | "ATA";
 export type FantasyPlayerProfile = string | null | undefined;
@@ -42,6 +43,16 @@ export function isCorrectFantasySlot(
   return playerProfile === "offensive";
 }
 
+/**
+ * Calcula o bônus posicional BQ v5.
+ *
+ * DEF: +1.5 por clean sheet, +0.5 por partida com 1 gol, Muralha +3 (≥3 CS), teto 10.
+ * MEI: +1 por assistência, Maestro +3 (≥2 assistências).
+ * ATA: Artilheiro +3 (≥2 gols).
+ * GOL: +4 por clean sheet quando realmente atuou no gol.
+ *
+ * Delega para position-breakdown.ts para manter uma fonte única.
+ */
 export function calculateFantasyPositionPackageBonus(
   input: {
     slotRole: FantasySlotRole;
@@ -56,29 +67,21 @@ export function calculateFantasyPositionPackageBonus(
     defensiveCleanGames: number;
     defensiveOneGoalGames: number;
   },
-  settings: FantasySettings,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _settings: FantasySettings,
 ): number {
-  if (settings.roleScoringActive === false) return 0;
-  if (input.slotRole === "GOL") {
-    // GOL é uma escolha do cartoleiro. O bônus exige atuação real no gol;
-    // cada jogo sem sofrer gol rende +4, sem limite por rodada.
-    return input.goalkeeperGames > 0 ? input.cleanSheets * 4 : 0;
-  }
+  if (_settings.roleScoringActive === false) return 0;
 
-  if (!isCorrectFantasySlot(input.slotRole, input.playerProfile)) return 0;
+  const breakdownInput: PositionBreakdownInput = {
+    slotRole: input.slotRole,
+    playerProfile: input.playerProfile,
+    goals: input.goals,
+    assists: input.assists,
+    defensiveCleanGames: input.defensiveCleanGames,
+    defensiveOneGoalGames: input.defensiveOneGoalGames,
+    goalkeeperGames: input.goalkeeperGames,
+    cleanSheets: input.cleanSheets,
+  };
 
-  if (input.slotRole === "DEF") {
-    // O scout-base de DEF já dá a primeira metade; a vaga correta completa o total.
-    return input.defensiveCleanGames * 2 + input.defensiveOneGoalGames;
-  }
-
-  if (input.slotRole === "MEI") {
-    // A assistência básica já vale +3. O pacote completa para +4 e concede
-    // o Maestro da Rodada ao atingir duas ou mais assistências.
-    return input.assists * (4 - settings.assistPoints) + (input.assists >= 2 ? 3 : 0);
-  }
-
-  // O gol básico vale +5 para todos. O atacante recebe somente o prêmio de
-  // Artilheiro quando marca ao menos dois na rodada.
-  return input.goals >= 2 ? 3 : 0;
+  return calculatePositionBonusValue(breakdownInput);
 }

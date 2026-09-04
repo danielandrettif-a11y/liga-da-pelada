@@ -1,12 +1,14 @@
+import { BQ_SCORING_V5, calculateBQBasePoints, type BQBaseScoringSnapshot, type BQPlayerStats } from "./bq-scoring";
+
 export const RANKED_SCORING = {
-  win: 4,
-  goal: 3,
-  assist: 2,
-  draw: 1,
-  loss: -1,
-  ownGoal: -2,
-  goalkeeperAppearance: 3,
-  goalkeeperGoalConceded: -1,
+  win: BQ_SCORING_V5.win,
+  goal: BQ_SCORING_V5.goal,
+  assist: BQ_SCORING_V5.assist,
+  draw: BQ_SCORING_V5.draw,
+  loss: BQ_SCORING_V5.loss,
+  ownGoal: BQ_SCORING_V5.ownGoal,
+  goalkeeperAppearance: BQ_SCORING_V5.goalkeeperAppearance,
+  goalkeeperGoalConceded: BQ_SCORING_V5.goalkeeperGoalConceded,
 } as const;
 
 export type RankedScoringStats = {
@@ -30,18 +32,23 @@ function amount(value: number | null | undefined) {
   return Number(value || 0);
 }
 
-/** Fonte única da pontuação Ranked. Não recebe perfil, tag ou posição do Cartola. */
-export function calculateRankedPoints(stats: RankedScoringStats) {
-  return (
-    amount(stats.wins) * RANKED_SCORING.win
-    + amount(stats.goals) * RANKED_SCORING.goal
-    + amount(stats.assists) * RANKED_SCORING.assist
-    + amount(stats.draws) * RANKED_SCORING.draw
-    + amount(stats.losses) * RANKED_SCORING.loss
-    + amount(stats.ownGoals) * RANKED_SCORING.ownGoal
-    + amount(stats.goalkeeperAppearances) * RANKED_SCORING.goalkeeperAppearance
-    + amount(stats.goalkeeperGoalsConceded) * RANKED_SCORING.goalkeeperGoalConceded
-  );
+/**
+ * Fonte única da pontuação Ranked. Delega para calculateBQBasePoints para
+ * garantir paridade com o Cartola nos 8 scouts básicos.
+ */
+export function calculateRankedPoints(stats: RankedScoringStats, snapshot?: BQBaseScoringSnapshot) {
+  const scoring = snapshot ?? BQ_SCORING_V5;
+  const bqStats: BQPlayerStats = {
+    goals: amount(stats.goals),
+    assists: amount(stats.assists),
+    wins: amount(stats.wins),
+    draws: amount(stats.draws),
+    losses: amount(stats.losses),
+    ownGoals: amount(stats.ownGoals),
+    goalkeeperAppearances: amount(stats.goalkeeperAppearances),
+    goalkeeperGoalsConceded: amount(stats.goalkeeperGoalsConceded),
+  };
+  return calculateBQBasePoints(scoring, bqStats);
 }
 
 export function buildRankedPointBreakdown(stats: RankedScoringStats): RankedPointBreakdownItem[] {
@@ -58,7 +65,10 @@ export function buildRankedPointBreakdown(stats: RankedScoringStats): RankedPoin
 
   return entries.flatMap(([key, singular, plural, pointsEach]) => {
     const count = amount(stats[key]);
-    return count > 0 ? [{ label: count === 1 ? singular : plural, count, points: count * pointsEach }] : [];
+    if (count <= 0) return [];
+    // Calcula em centésimos para manter a precisão com decimais
+    const points = Math.round(count * pointsEach * 100) / 100;
+    return [{ label: count === 1 ? singular : plural, count, points }];
   });
 }
 

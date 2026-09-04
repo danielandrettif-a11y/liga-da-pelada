@@ -1,4 +1,5 @@
 import type { PlayerProfile, TeamFormationMode } from "./types";
+import { drawTeamsBySpeed, type SpeedDrawPlayer } from "./speed-draw";
 
 export type AttendanceDrawPlayer = {
   id: string;
@@ -62,12 +63,14 @@ export function drawTeamsDirect({
   playersPerTeam,
   mode,
   random = Math.random,
+  speedRatings,
 }: {
   players: AttendanceDrawPlayer[];
   teamCount: number;
   playersPerTeam: number;
   mode: Exclude<TeamFormationMode, "manual">;
   random?: () => number;
+  speedRatings?: Map<string, 1 | 2 | 3 | null>;
 }): string[][] {
   const capacity = teamCount * playersPerTeam;
   const available = players.slice(0, capacity);
@@ -84,6 +87,19 @@ export function drawTeamsDirect({
     return teams;
   }
 
+  if (mode === "speed") {
+    const speedPlayers: SpeedDrawPlayer[] = available.map((p) => ({
+      id: p.id,
+      speedRating: speedRatings?.get(p.id) ?? null,
+    }));
+    return drawTeamsBySpeed({
+      players: speedPlayers,
+      teamCount,
+      playersPerTeam,
+      random,
+    }).teams;
+  }
+
   return distributeBalanced(available, teamCount, random);
 }
 
@@ -94,6 +110,7 @@ export function drawTeamsByAttendance({
   playersPerTeam,
   mode,
   random = Math.random,
+  speedRatings,
 }: {
   players: AttendanceDrawPlayer[];
   attendanceOrder: string[];
@@ -101,6 +118,7 @@ export function drawTeamsByAttendance({
   playersPerTeam: number;
   mode: Exclude<TeamFormationMode, "manual">;
   random?: () => number;
+  speedRatings?: Map<string, 1 | 2 | 3 | null>;
 }): AttendanceDrawResult {
   const capacity = teamCount * playersPerTeam;
   const minimumPresent = playersPerTeam * 2;
@@ -120,6 +138,16 @@ export function drawTeamsByAttendance({
       shuffle(starterPlayers, random).forEach((player, index) => result[index % 2].push(player.id));
       return result;
     })()
+    : mode === "speed"
+    ? drawTeamsBySpeed({
+        players: starterPlayers.map((p) => ({
+          id: p.id,
+          speedRating: speedRatings?.get(p.id) ?? null,
+        })),
+        teamCount: 2,
+        playersPerTeam,
+        random,
+      }).teams
     : distributeBalanced(starterPlayers, 2, random);
 
   const starterSet = new Set(starterIds);

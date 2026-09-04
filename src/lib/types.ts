@@ -18,7 +18,14 @@ export type User = {
 export type PlayerProfile = 'offensive' | 'midfield' | 'defensive';
 export type MemberCategory = 'player' | 'guest' | 'wag' | 'supporter';
 export type RoundType = 'official' | 'friendly';
-export type TeamFormationMode = 'manual' | 'random' | 'balanced';
+export type TeamFormationMode = 'manual' | 'random' | 'balanced' | 'speed';
+
+export type PlayerAdminAttributes = {
+  player_id: string;
+  speed_rating: 1 | 2 | 3 | null;
+  updated_by?: string | null;
+  updated_at?: string;
+};
 export type CallupStatus = 'open' | 'locked' | 'converted' | 'closed';
 export type CallupEntryStatus = 'confirmed' | 'waitlist';
 export type RegistrationSource = 'legacy' | 'site_signup' | 'admin';

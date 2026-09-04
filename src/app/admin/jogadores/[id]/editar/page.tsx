@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "@/components/icons";
 import { PlayerForm } from "@/components/PlayerForm";
 import { getPlayer } from "@/lib/actions/players";
+import { getPlayerSpeedRatings } from "@/lib/actions/speed-draw";
 import { getRegisteredMergeCandidates } from "@/lib/actions/registrations";
 import { GuestProfileMerge } from "@/components/GuestProfileMerge";
 
@@ -19,6 +20,9 @@ export default async function EditarJogadorPage({
   if (!player) {
     notFound();
   }
+  const speedRatings = await getPlayerSpeedRatings();
+  const speedRating = speedRatings[player.id] ?? null;
+
   const mergeCandidates = player.is_selectable && (player.member_category === "player" || player.member_category === "guest")
     ? await getRegisteredMergeCandidates(player.id)
     : [];
@@ -40,7 +44,7 @@ export default async function EditarJogadorPage({
         </div>
       </div>
 
-      <PlayerForm player={player} />
+      <PlayerForm player={player} initialSpeedRating={speedRating} />
       {player.is_selectable && (player.member_category === "player" || player.member_category === "guest") && <GuestProfileMerge guest={player} candidates={mergeCandidates} />}
     </div>
   );

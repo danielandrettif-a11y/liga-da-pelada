@@ -32,6 +32,7 @@ export type FantasyLivePlayerStats = {
   ownGoals: number;
   playerProfile?: "offensive" | "midfield" | "defensive" | null;
   wins: number;
+  draws: number;
   losses: number;
   games: number;
   goalkeeperGames: number;
@@ -101,6 +102,7 @@ export function projectFantasyLiveStats(
       ownGoals: 0,
       playerProfile,
       wins: 0,
+      draws: 0,
       losses: 0,
       games: 0,
       goalkeeperGames: 0,
@@ -132,8 +134,9 @@ export function projectFantasyLiveStats(
       }
       if (isFinished) {
         current.games += 1;
-        if (!isDraw && winner === participant.teamId) current.wins += 1;
-        if (!isDraw && winner !== participant.teamId) current.losses += 1;
+        if (isDraw) current.draws += 1;
+        else if (winner === participant.teamId) current.wins += 1;
+        else current.losses += 1;
       }
     }
 
@@ -213,14 +216,14 @@ export function projectFantasyLiveLineups(
 
     const playerPoints = [...pointsByPlayer.values()].reduce((sum, points) => sum + points, 0);
     const captainBase = lineup.captainPlayerId ? pointsByPlayer.get(lineup.captainPlayerId) || 0 : 0;
-    const captainBonus = captainBase * Math.max(0, settings.captainMultiplier - 1);
+    const captainBonus = Math.round(captainBase * Math.max(0, settings.captainMultiplier - 1) * 100) / 100;
     const players = lineup.playerIds.map((playerId) => {
       const slot = slotByPlayer.get(playerId);
       const basePoints = playerStats.get(playerId)?.basePoints || 0;
       const totalWithoutCaptain = pointsByPlayer.get(playerId) || 0;
       const positionBonus = totalWithoutCaptain - basePoints;
       const playerCaptainBonus = playerId === lineup.captainPlayerId
-        ? totalWithoutCaptain * Math.max(0, settings.captainMultiplier - 1)
+        ? Math.round(totalWithoutCaptain * Math.max(0, settings.captainMultiplier - 1) * 100) / 100
         : 0;
       return {
         playerId,

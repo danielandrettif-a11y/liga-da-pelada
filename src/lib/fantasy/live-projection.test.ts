@@ -135,9 +135,9 @@ describe("live fantasy projection", () => {
     ], stats, DEFAULT_FANTASY_SETTINGS);
 
     expect(correct.positionBonus).toBe(3);
-    expect(correct.playerPoints).toBe(13);
+    expect(correct.playerPoints).toBe(11);
     expect(misplaced.positionBonus).toBe(0);
-    expect(misplaced.playerPoints).toBe(10);
+    expect(misplaced.playerPoints).toBe(8);
   });
 
   it("mantém pontos-base, bônus da posição e capitão em parcelas que fecham o total", () => {
@@ -164,12 +164,12 @@ describe("live fantasy projection", () => {
 
     expect(lineup.players[0]).toMatchObject({
       slotRole: "MEI",
-      basePoints: 3,
+      basePoints: 2.5,
       positionBonus: 1,
-      captainBonus: 2,
-      totalPoints: 6,
+      captainBonus: 1.75,
+      totalPoints: 5.25,
     });
-    expect(lineup).toMatchObject({ playerPoints: 4, positionBonus: 1, captainBonus: 2, totalPoints: 6 });
+    expect(lineup).toMatchObject({ playerPoints: 3.5, positionBonus: 1, captainBonus: 1.75, totalPoints: 5.25 });
   });
 
   it("aplica o pacote de GOL a qualquer atleta nessa vaga e dá +4 de clean sheet", () => {

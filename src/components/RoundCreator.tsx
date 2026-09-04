@@ -7,6 +7,7 @@ import { createRoundWithTeams, saveRoundPrelist, type TeamInput } from "@/lib/ac
 import { adminAddCallupPlayer, adminRemoveCallupPlayer } from "@/lib/actions/callups";
 import type { Player, RoundType, Stadium, TeamFormationMode } from "@/lib/types";
 import { drawTeamsByAttendance, drawTeamsDirect } from "@/lib/round-draw";
+import { getPlayerSpeedRatings } from "@/lib/actions/speed-draw";
 import {
   Users,
   Calendar,
@@ -376,17 +377,23 @@ export function RoundCreator({
     })));
   }
 
-  function executeDirectDraw(mode: Exclude<TeamFormationMode, "manual">) {
+  async function executeDirectDraw(mode: Exclude<TeamFormationMode, "manual">) {
     if (selectedPlayers.length === 0) {
       setError("Selecione os jogadores antes de sortear os times.");
       return;
     }
     try {
+      let speedMap: Map<string, 1 | 2 | 3 | null> | undefined;
+      if (mode === "speed") {
+        const ratings = await getPlayerSpeedRatings();
+        speedMap = new Map(Object.entries(ratings).map(([id, r]) => [id, r]));
+      }
       const result = drawTeamsDirect({
         players: selectedPlayers,
         teamCount,
         playersPerTeam: teamCapacity,
         mode,
+        speedRatings: speedMap,
       });
       const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
       setTeams((current) => current.map((team, index) => ({
@@ -436,13 +443,18 @@ export function RoundCreator({
     setAttendanceOrder([]);
   }
 
-  function confirmAttendanceDraw() {
+  async function confirmAttendanceDraw() {
     if (!pendingDrawMode) return;
     if (attendanceOrder.length === 0) {
-      executeDirectDraw(pendingDrawMode);
+      await executeDirectDraw(pendingDrawMode);
       return;
     }
     try {
+      let speedMap: Map<string, 1 | 2 | 3 | null> | undefined;
+      if (pendingDrawMode === "speed") {
+        const ratings = await getPlayerSpeedRatings();
+        speedMap = new Map(Object.entries(ratings).map(([id, r]) => [id, r]));
+      }
       const minimumPresent = Math.min(selectedPlayers.length, teamCapacity * 2);
       if (attendanceOrder.length < minimumPresent) {
         // Se marcou apenas alguns, completa com os outros selecionados
@@ -453,7 +465,7 @@ export function RoundCreator({
           attendanceOrder: fullOrder,
           teamCount,
           playersPerTeam: teamCapacity,
-          mode: pendingDrawMode,
+          mode: pendingDrawMode, speedRatings: speedMap,
         });
         const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
         setTeams((current) => current.map((team, index) => ({
@@ -466,7 +478,7 @@ export function RoundCreator({
           attendanceOrder,
           teamCount,
           playersPerTeam: teamCapacity,
-          mode: pendingDrawMode,
+          mode: pendingDrawMode, speedRatings: speedMap,
         });
         const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
         setTeams((current) => current.map((team, index) => ({
@@ -972,7 +984,7 @@ export function RoundCreator({
               <p className="text-[10px] font-black uppercase tracking-wider text-muted">Como montar os times?</p>
               <span className="text-[9px] font-bold text-accent">Sorteio com 1 toque</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               <button
                 type="button"
                 onClick={() => requestDraw("random")}
@@ -985,7 +997,14 @@ export function RoundCreator({
                 onClick={() => requestDraw("balanced")}
                 className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "balanced" ? "border-accent bg-accent/15 text-accent shadow-sm" : "border-border bg-surface text-foreground hover:border-accent/40"}`}
               >
-                ⚖️ Sorteio Equilibrado
+                ⚖️ Equilibrado
+              </button>
+              <button
+                type="button"
+                onClick={() => requestDraw("speed")}
+                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "speed" ? "border-accent bg-accent/15 text-accent shadow-sm" : "border-border bg-surface text-foreground hover:border-accent/40"}`}
+              >
+                🏎️ Por Velocidade
               </button>
               <button
                 type="button"
@@ -1009,6 +1028,8 @@ export function RoundCreator({
                 ? "Times sorteados aleatoriamente com sucesso!"
                 : formationMode === "balanced"
                 ? "Times equilibrados por pontuação e posições com sucesso!"
+                : formationMode === "speed"
+                ? "Times equilibrados por velocidade (★) com sucesso!"
                 : "Escolha um modo acima para montar os times."}
             </p>
           </div>
