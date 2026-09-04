@@ -6,12 +6,45 @@
 -- fantasy_settings, adiciona snapshot de regras por rodada e recalcula
 -- player_round_stats para a temporada ativa.
 
--- 1. Alterar tipos para NUMERIC(12,2)
+-- 1. Dropar temporariamente a view que depende de player_round_stats.points
+DROP VIEW IF EXISTS public.player_season_stats CASCADE;
+
+-- 2. Alterar tipos para NUMERIC(12,2)
 ALTER TABLE public.player_round_stats
   ALTER COLUMN points TYPE NUMERIC(12,2) USING points::NUMERIC(12,2);
 
 ALTER TABLE public.ranking_rules
   ALTER COLUMN points TYPE NUMERIC(12,2) USING points::NUMERIC(12,2);
+
+-- 3. Recriar a view player_season_stats com points::NUMERIC(12,2)
+CREATE OR REPLACE VIEW public.player_season_stats AS
+SELECT
+  prs.player_id, r.season_id, r.round_type,
+  p.name AS player_name, p.nickname AS player_nickname, p.avatar_url AS player_avatar_url,
+  p.player_profile, p.is_goalkeeper AS player_is_goalkeeper,
+  p.member_category AS player_member_category, p.is_selectable AS player_is_selectable,
+  COUNT(DISTINCT prs.round_id)::INTEGER AS rounds_count,
+  COALESCE(SUM(prs.games), 0)::INTEGER AS games,
+  COALESCE(SUM(prs.wins), 0)::INTEGER AS wins,
+  COALESCE(SUM(prs.draws), 0)::INTEGER AS draws,
+  COALESCE(SUM(prs.losses), 0)::INTEGER AS losses,
+  COALESCE(SUM(prs.goals), 0)::INTEGER AS goals,
+  COALESCE(SUM(prs.assists), 0)::INTEGER AS assists,
+  COALESCE(SUM(prs.points), 0)::NUMERIC(12,2) AS points,
+  CASE WHEN COALESCE(SUM(prs.games), 0) = 0 THEN 0
+    ELSE ROUND(((COALESCE(SUM(prs.wins), 0) * 3 + COALESCE(SUM(prs.draws), 0))::NUMERIC /
+      (COALESCE(SUM(prs.games), 0) * 3)::NUMERIC) * 100)::INTEGER END AS win_rate,
+  COALESCE(SUM(prs.goalkeeper_games), 0)::INTEGER AS goalkeeper_games,
+  COALESCE(SUM(prs.clean_sheets), 0)::INTEGER AS clean_sheets,
+  COALESCE(SUM(prs.goals_conceded), 0)::INTEGER AS goals_conceded
+FROM public.player_round_stats prs
+JOIN public.rounds r ON r.id = prs.round_id
+JOIN public.players p ON p.id = prs.player_id
+WHERE r.status = 'finished'
+GROUP BY prs.player_id, r.season_id, r.round_type, p.name, p.nickname, p.avatar_url,
+  p.player_profile, p.is_goalkeeper, p.member_category, p.is_selectable;
+
+GRANT SELECT ON public.player_season_stats TO authenticated, anon;
 
 -- 2. Snapshot de pontuação em rounds
 ALTER TABLE public.rounds
