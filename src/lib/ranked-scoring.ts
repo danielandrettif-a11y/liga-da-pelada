@@ -1,4 +1,4 @@
-import { BQ_SCORING_V5, calculateBQBasePoints, type BQBaseScoringSnapshot, type BQPlayerStats } from "./bq-scoring";
+import { BQ_SCORING_V5, buildBQBasePointBreakdown, calculateBQBasePoints, type BQBaseScoringSnapshot, type BQPlayerStats } from "./bq-scoring";
 
 export const RANKED_SCORING = {
   win: BQ_SCORING_V5.win,
@@ -51,25 +51,18 @@ export function calculateRankedPoints(stats: RankedScoringStats, snapshot?: BQBa
   return calculateBQBasePoints(scoring, bqStats);
 }
 
-export function buildRankedPointBreakdown(stats: RankedScoringStats): RankedPointBreakdownItem[] {
-  const entries: Array<[keyof RankedScoringStats, string, string, number]> = [
-    ["goals", "Gol", "Gols", RANKED_SCORING.goal],
-    ["assists", "Assistência", "Assistências", RANKED_SCORING.assist],
-    ["wins", "Vitória", "Vitórias", RANKED_SCORING.win],
-    ["draws", "Empate", "Empates", RANKED_SCORING.draw],
-    ["losses", "Derrota", "Derrotas", RANKED_SCORING.loss],
-    ["goalkeeperAppearances", "Jogo no gol", "Jogos no gol", RANKED_SCORING.goalkeeperAppearance],
-    ["goalkeeperGoalsConceded", "Gol sofrido", "Gols sofridos", RANKED_SCORING.goalkeeperGoalConceded],
-    ["ownGoals", "Gol contra", "Gols contra", RANKED_SCORING.ownGoal],
-  ];
-
-  return entries.flatMap(([key, singular, plural, pointsEach]) => {
-    const count = amount(stats[key]);
-    if (count <= 0) return [];
-    // Calcula em centésimos para manter a precisão com decimais
-    const points = Math.round(count * pointsEach * 100) / 100;
-    return [{ label: count === 1 ? singular : plural, count, points }];
-  });
+export function buildRankedPointBreakdown(
+  stats: RankedScoringStats,
+  snapshot: BQBaseScoringSnapshot = BQ_SCORING_V5,
+  options: { suppressGoalkeeperRewards?: boolean } = {},
+): RankedPointBreakdownItem[] {
+  const normalized: BQPlayerStats = {
+    goals: amount(stats.goals), assists: amount(stats.assists), wins: amount(stats.wins),
+    draws: amount(stats.draws), losses: amount(stats.losses), ownGoals: amount(stats.ownGoals),
+    goalkeeperAppearances: amount(stats.goalkeeperAppearances),
+    goalkeeperGoalsConceded: amount(stats.goalkeeperGoalsConceded),
+  };
+  return buildBQBasePointBreakdown(snapshot, normalized, options).map(({ label, count, points }) => ({ label, count, points }));
 }
 
 export const RANKED_SCORING_RULES = [

@@ -54,7 +54,7 @@ export function FantasyTutorialModal({
       tag: "Passo 3 de 5 · Bônus de Posição",
       title: "Esquemas & Bônus de Posição",
       description:
-        "Com 6 atletas, escolha 1 GOL, 2 DEF e complete com 2 MEI/ALA + 1 ATA ou 1 MEI/ALA + 2 ATA.\n\n• 🛡️ DEF: +2 base por proteção e +2 extra na vaga DEF em jogo sem sofrer gol (+4 total).\n• 🪄 MEI: assistência vale +3 base; na vaga MEI vira +4 e 2+ assistências dão +3 de Maestro.\n• 🎯 ATA: gol vale +5; 2+ gols na vaga ATA dão +3 de Artilheiro.\n• 🧤 GOL: qualquer atleta pode ocupar a vaga, mas o +4 de clean sheet só vem por jogo em que ele realmente atuou no gol sem sofrer gol.",
+        "Com 6 atletas, escolha 1 GOL, 2 DEF e complete com 2 MEI/ALA + 1 ATA ou 1 MEI/ALA + 2 ATA.\n\n• 🛡️ DEF: +1,5 por clean sheet de linha, +0,5 com exatamente 1 gol sofrido, Muralha +3 com 3+ clean sheets e teto +10.\n• 🪄 MEI: assistência vale +2,5 base; na vaga MEI recebe +1 e 2+ assistências dão +3 de Maestro.\n• 🎯 ATA: gol vale +4; 2+ gols na vaga ATA dão +3 de Artilheiro.\n• 🧤 GOL: atuação real vale +2 e gol sofrido -1; o +4 de clean sheet só vem quando ele realmente atuou no gol sem sofrer gol.",
     },
     {
       icon: <Target className="h-8 w-8 text-warning" />,

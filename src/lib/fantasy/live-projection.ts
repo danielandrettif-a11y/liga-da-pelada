@@ -89,7 +89,7 @@ export type FantasyLiveLineupProjection = {
 export function projectFantasyLiveStats(
   matches: FantasyLiveMatch[],
   settings: FantasySettings,
-  options: { ignoreGoalkeeperStats?: boolean } = {},
+  options: { suppressGoalkeeperRewards?: boolean } = {},
 ): Map<string, FantasyLivePlayerStats> {
   const stats = new Map<string, Omit<FantasyLivePlayerStats, "basePoints">>();
   const ensure = (playerId: string, playerProfile?: FantasyLivePlayerStats["playerProfile"]) => {
@@ -140,15 +140,14 @@ export function projectFantasyLiveStats(
       }
     }
 
-    if (!options.ignoreGoalkeeperStats) {
-      for (const goalkeeper of match.goalkeepers) {
-        const current = ensure(goalkeeper.playerId);
-        const conceded = goalkeeper.teamId === match.teamAId ? match.scoreB : match.scoreA;
-        current.goalsConceded += conceded;
-        // A aparição é mostrada ao vivo, mas pode ser retirada caso a partida seja desfeita.
-        current.goalkeeperGames += 1;
-        if (conceded === 0) current.cleanSheets += 1;
-      }
+    for (const goalkeeper of match.goalkeepers) {
+      const current = ensure(goalkeeper.playerId);
+      const conceded = goalkeeper.teamId === match.teamAId ? match.scoreB : match.scoreA;
+      current.goalsConceded += conceded;
+      // Os scouts brutos permanecem para auditoria mesmo quando a rodada suprime
+      // somente as recompensas positivas de goleiro.
+      current.goalkeeperGames += 1;
+      if (conceded === 0) current.cleanSheets += 1;
     }
 
     for (const event of match.events) {
@@ -166,7 +165,10 @@ export function projectFantasyLiveStats(
       playerId,
       {
         ...value,
-        basePoints: calculateFantasyPlayerPoints(value, settings),
+        basePoints: calculateFantasyPlayerPoints(value, {
+          ...settings,
+          goalkeeperAppearancePoints: options.suppressGoalkeeperRewards ? 0 : settings.goalkeeperAppearancePoints,
+        }),
       },
     ]),
   );
@@ -206,6 +208,7 @@ export function projectFantasyLiveLineups(
               cleanSheets: stats.cleanSheets,
               defensiveCleanGames: stats.defensiveCleanGames,
               defensiveOneGoalGames: stats.defensiveOneGoalGames,
+              suppressGoalkeeperRewards: settings.suppressGoalkeeperRewards,
             },
             settings,
           )

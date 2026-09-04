@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { BQ_SCORING_V5, calculateBQBasePoints, applyCaptainMultiplier, rankingRulesToSnapshot, snapshotToRankingRules } from "./bq-scoring";
+import { BQ_SCORING_V5, calculateBQBasePoints, applyCaptainMultiplier, buildBQBasePointBreakdown, rankingRulesToSnapshot, snapshotToRankingRules } from "./bq-scoring";
 import { calculateRankedPoints, RANKED_SCORING } from "./ranked-scoring";
 import { DEFAULT_FANTASY_SETTINGS } from "./fantasy/config";
 import { calculateFantasyPlayerPoints } from "./fantasy/engine";
+import { calculatePositionBreakdown } from "./fantasy/position-breakdown";
 
 describe("BQ Scoring v5 — Paridade Ranked/Cartola", () => {
   it("usa exatamente os mesmos 8 valores BQ para Ranked e Cartola", () => {
@@ -93,5 +94,30 @@ describe("BQ Scoring v5 — Paridade Ranked/Cartola", () => {
       goals: 2, assists: 1, wins: 3, draws: 1, losses: 2, ownGoals: 1,
       goalkeeperAppearances: 0, goalkeeperGoalsConceded: 0,
     })).toBe(12.5);
+  });
+
+  it("regressão Caio R03: derrota -2.5, goleiro normal e DEF limitado a 10", () => {
+    const base = calculateBQBasePoints(BQ_SCORING_V5, {
+      goals: 2, assists: 2, wins: 8, draws: 0, losses: 4, ownGoals: 0,
+      goalkeeperAppearances: 2, goalkeeperGoalsConceded: 0,
+    });
+    const defensive = calculatePositionBreakdown({
+      slotRole: "DEF", playerProfile: "defensive", goals: 2, assists: 2,
+      goalkeeperGames: 2, cleanSheets: 2, defensiveCleanGames: 8,
+      defensiveOneGoalGames: 0,
+    });
+    expect(base).toBe(31);
+    expect(defensive.appliedBonus).toBe(10);
+    expect(base + defensive.appliedBonus).toBe(41);
+  });
+
+  it("R02 zera só a recompensa de atuação e mantém a punição por gol sofrido", () => {
+    const rows = buildBQBasePointBreakdown(BQ_SCORING_V5, {
+      goals: 1, assists: 0, wins: 0, draws: 0, losses: 0, ownGoals: 0,
+      goalkeeperAppearances: 2, goalkeeperGoalsConceded: 3,
+    }, { suppressGoalkeeperRewards: true });
+    expect(rows.find((row) => row.key === "goalkeeperAppearances")?.points).toBe(0);
+    expect(rows.find((row) => row.key === "goalkeeperGoalsConceded")?.points).toBe(-3);
+    expect(rows.reduce((sum, row) => sum + row.points, 0)).toBe(1);
   });
 });

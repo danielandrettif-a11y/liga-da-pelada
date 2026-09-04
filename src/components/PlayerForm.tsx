@@ -127,7 +127,8 @@ export function PlayerForm({
       if (!result.success) throw new Error(result.error);
 
       if (player?.id && mode === "admin") {
-        await setPlayerSpeedRating(player.id, speedRating);
+        const speedResult = await setPlayerSpeedRating(player.id, speedRating);
+        if (!speedResult.success) throw new Error(speedResult.error || "Não foi possível salvar as estrelas de velocidade.");
       }
 
       router.push(mode === "self" ? "/meu-perfil" : "/admin/jogadores");

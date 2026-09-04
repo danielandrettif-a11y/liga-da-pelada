@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Stadium,
   Bell,
+  RotateCcw,
 } from "@/components/icons";
 import { getStadiums } from "@/lib/actions/stadiums";
 
@@ -88,6 +89,12 @@ const ADMIN_SECTIONS = [
         icon: ClipboardList,
         label: "Cartola",
         description: "Configurar Fantasy, preços e reprocessamentos",
+      },
+      {
+        href: "/admin/reprocessar",
+        icon: RotateCcw,
+        label: "Reprocessar temporada",
+        description: "Auditar e recalcular o Cartola da temporada ativa",
       },
       {
         href: "/admin/liga",

@@ -34,6 +34,14 @@ export type BQPlayerStats = {
   goalkeeperGoalsConceded: number;
 };
 
+export type BQBasePointBreakdownItem = {
+  key: keyof BQPlayerStats;
+  label: string;
+  count: number;
+  unitPoints: number;
+  points: number;
+};
+
 // ---------------------------------------------------------------------------
 // Valores padrão BQ v5
 // ---------------------------------------------------------------------------
@@ -85,6 +93,57 @@ export function calculateBQBasePoints(
     amount(stats.goalkeeperGoalsConceded) * cents(snapshot.goalkeeperGoalConceded);
 
   return totalCents / 100;
+}
+
+/** Converte snapshots legados (snake_case) e atuais para o formato canônico. */
+export function normalizeBQScoringSnapshot(
+  value: Record<string, unknown> | null | undefined,
+): BQBaseScoringSnapshot {
+  const source = value || {};
+  const numeric = (camel: string, snake: string, fallback: number) =>
+    Number(source[camel] ?? source[snake] ?? fallback);
+  return {
+    version: numeric("version", "scoring_version", BQ_SCORING_V5.version),
+    goal: numeric("goal", "goal_points", BQ_SCORING_V5.goal),
+    assist: numeric("assist", "assist_points", BQ_SCORING_V5.assist),
+    win: numeric("win", "win_points", BQ_SCORING_V5.win),
+    draw: numeric("draw", "draw_points", BQ_SCORING_V5.draw),
+    loss: numeric("loss", "loss_points", BQ_SCORING_V5.loss),
+    ownGoal: numeric("ownGoal", "own_goal_points", BQ_SCORING_V5.ownGoal),
+    goalkeeperAppearance: numeric(
+      "goalkeeperAppearance",
+      "goalkeeper_appearance_points",
+      BQ_SCORING_V5.goalkeeperAppearance,
+    ),
+    goalkeeperGoalConceded: numeric(
+      "goalkeeperGoalConceded",
+      "goal_conceded_points",
+      BQ_SCORING_V5.goalkeeperGoalConceded,
+    ),
+  };
+}
+
+/** Breakdown compartilhado por Ranked, Cartola ao vivo e histórico. */
+export function buildBQBasePointBreakdown(
+  snapshot: BQBaseScoringSnapshot,
+  stats: BQPlayerStats,
+  options: { suppressGoalkeeperRewards?: boolean } = {},
+): BQBasePointBreakdownItem[] {
+  const rows: Array<[keyof BQPlayerStats, string, number]> = [
+    ["goals", "Gols", snapshot.goal],
+    ["assists", "Assistências", snapshot.assist],
+    ["wins", "Vitórias", snapshot.win],
+    ["draws", "Empates", snapshot.draw],
+    ["losses", "Derrotas", snapshot.loss],
+    ["ownGoals", "Gols contra", snapshot.ownGoal],
+    ["goalkeeperAppearances", "Jogos como goleiro", options.suppressGoalkeeperRewards ? 0 : snapshot.goalkeeperAppearance],
+    ["goalkeeperGoalsConceded", "Gols sofridos como goleiro", snapshot.goalkeeperGoalConceded],
+  ];
+  return rows.flatMap(([key, label, unitPoints]) => {
+    const count = amount(stats[key]);
+    if (count === 0) return [];
+    return [{ key, label, count, unitPoints, points: Math.round(count * unitPoints * 100) / 100 }];
+  });
 }
 
 /**

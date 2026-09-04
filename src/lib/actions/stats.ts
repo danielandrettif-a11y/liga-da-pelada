@@ -9,6 +9,7 @@ import type { SeasonStatus } from "../types";
 import type { Player } from "../types";
 import type { RankingEntry, RankingExperienceData } from "../ranking";
 import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
+import { normalizeBQScoringSnapshot } from "../bq-scoring";
 
 type RankingStatsRow = {
   player_id: string;
@@ -176,7 +177,8 @@ export async function calculateRoundStats(roundId: string) {
         id,
         league_id,
         round_type,
-        ignore_goalkeeper_stats,
+        suppress_goalkeeper_rewards,
+        scoring_snapshot,
         best_goalkeeper_player_id,
         matches (
           id,
@@ -211,7 +213,8 @@ export async function calculateRoundStats(roundId: string) {
 
     if (error || !round) throw new Error("Erro ao buscar rodada para estatísticas");
     const countsForRanking = round.round_type !== "friendly";
-    const ignoreGoalkeeperStats = Boolean(round.ignore_goalkeeper_stats);
+    const suppressGoalkeeperRewards = Boolean(round.suppress_goalkeeper_rewards);
+    const scoringSnapshot = normalizeBQScoringSnapshot(round.scoring_snapshot as Record<string, unknown> | null);
     const roundPlayerIds = (round.round_players || []).map((item: any) => item.player_id);
     const { data: roundPlayerProfiles, error: profileError } = roundPlayerIds.length
       ? await client.from("players").select("id, player_profile").in("id", roundPlayerIds)
@@ -296,16 +299,14 @@ export async function calculateRoundStats(roundId: string) {
       processTeamMatch(match.team_a_id, isDraw ? 'draw' : (winnerId === match.team_a_id ? 'win' : 'loss'));
       processTeamMatch(match.team_b_id, isDraw ? 'draw' : (winnerId === match.team_b_id ? 'win' : 'loss'));
 
-      if (!ignoreGoalkeeperStats) {
-        for (const goalkeeper of match.match_goalkeepers || []) {
-          if (voidedPlayerIds.has(goalkeeper.player_id)) continue;
-          const s = statsMap[goalkeeper.player_id];
-          if (!s) continue;
-          const conceded = goalkeeper.team_id === match.team_a_id ? match.score_b : match.score_a;
-          s.goalkeeper_games += 1;
-          s.goals_conceded += conceded;
-          if (conceded === 0) s.clean_sheets += 1;
-        }
+      for (const goalkeeper of match.match_goalkeepers || []) {
+        if (voidedPlayerIds.has(goalkeeper.player_id)) continue;
+        const s = statsMap[goalkeeper.player_id];
+        if (!s) continue;
+        const conceded = goalkeeper.team_id === match.team_a_id ? match.score_b : match.score_a;
+        s.goalkeeper_games += 1;
+        s.goals_conceded += conceded;
+        if (conceded === 0) s.clean_sheets += 1;
       }
 
       // Processar eventos (gols e assistências)
@@ -344,9 +345,9 @@ export async function calculateRoundStats(roundId: string) {
         draws: stats.draws,
         losses: stats.losses,
         ownGoals: stats.own_goals,
-        goalkeeperAppearances: stats.goalkeeper_games,
+        goalkeeperAppearances: suppressGoalkeeperRewards ? 0 : stats.goalkeeper_games,
         goalkeeperGoalsConceded: stats.goals_conceded,
-      }) : 0,
+      }, scoringSnapshot) : 0,
     }));
     if (statsArray.length > 0) {
       const { error: upsertError } = await client

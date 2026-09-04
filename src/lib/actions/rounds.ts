@@ -552,7 +552,7 @@ export async function createRoundWithTeams(
     }
 
     const roundType: RoundType = options.roundType === "friendly" ? "friendly" : "official";
-    const formationMode: TeamFormationMode = options.formationMode === "random" || options.formationMode === "balanced"
+    const formationMode: TeamFormationMode = options.formationMode === "random" || options.formationMode === "balanced" || options.formationMode === "speed"
       ? options.formationMode
       : "manual";
     const rawPlayerIds = normalizedTeams.flatMap((team) => team.playerIds);

@@ -80,6 +80,7 @@ export type PositionBreakdownInput = {
   goalkeeperGames: number;
   /** Clean sheets como goleiro */
   cleanSheets: number;
+  suppressGoalkeeperRewards?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -105,7 +106,9 @@ export function calculatePositionBreakdown(input: PositionBreakdownInput): Posit
 
   // GOL — clean sheet quando realmente atuou no gol
   if (slotRole === "GOL") {
-    const cleanSheetBonus = input.goalkeeperGames > 0 ? input.cleanSheets * GOL_CLEAN_SHEET_BONUS : 0;
+    const cleanSheetBonus = !input.suppressGoalkeeperRewards && input.goalkeeperGames > 0
+      ? input.cleanSheets * GOL_CLEAN_SHEET_BONUS
+      : 0;
     return {
       position: "GOL",
       events: input.goalkeeperGames > 0 && input.cleanSheets > 0

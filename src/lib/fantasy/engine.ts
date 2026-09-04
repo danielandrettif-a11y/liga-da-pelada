@@ -85,7 +85,7 @@ export function calculateFantasyPlayerPoints(
       stats.wins * settings.winPoints +
       (stats.draws || 0) * (legacySettings.drawPoints ?? settings.drawPoints ?? 1) +
       (stats.losses || 0) * ((stats.goalkeeperGames || 0) > 0 ? (legacySettings.goalkeeperLossPoints ?? settings.lossPoints) : settings.lossPoints) +
-      (stats.goalkeeperGames || 0) * settings.goalkeeperAppearancePoints +
+      (stats.goalkeeperGames || 0) * (settings.suppressGoalkeeperRewards ? 0 : settings.goalkeeperAppearancePoints) +
       (stats.teamGoalsConceded ?? stats.goalsConceded ?? 0) * (legacySettings.teamGoalConcededPoints ?? 0) +
       (stats.ownGoals || 0) * settings.ownGoalPoints
     );
@@ -98,7 +98,7 @@ export function calculateFantasyPlayerPoints(
   const winsCents = Math.round(stats.wins * settings.winPoints * 100);
   const drawsCents = Math.round((stats.draws || 0) * (settings.drawPoints ?? 1) * 100);
   const lossesCents = Math.round((stats.losses || 0) * settings.lossPoints * 100);
-  const goalkeeperCents = Math.round((stats.goalkeeperGames || 0) * settings.goalkeeperAppearancePoints * 100);
+  const goalkeeperCents = Math.round((stats.goalkeeperGames || 0) * (settings.suppressGoalkeeperRewards ? 0 : settings.goalkeeperAppearancePoints) * 100);
   const goalsConcededCents = Math.round((stats.goalsConceded || 0) * settings.goalConcededPoints * 100);
   const ownGoalsCents = Math.round((stats.ownGoals || 0) * settings.ownGoalPoints * 100);
   return (goalsCents + assistsCents + winsCents + drawsCents + lossesCents + goalkeeperCents + goalsConcededCents + ownGoalsCents) / 100;

@@ -66,6 +66,7 @@ export function calculateFantasyPositionPackageBonus(
     cleanSheets: number;
     defensiveCleanGames: number;
     defensiveOneGoalGames: number;
+    suppressGoalkeeperRewards?: boolean;
   },
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _settings: FantasySettings,
@@ -81,6 +82,7 @@ export function calculateFantasyPositionPackageBonus(
     defensiveOneGoalGames: input.defensiveOneGoalGames,
     goalkeeperGames: input.goalkeeperGames,
     cleanSheets: input.cleanSheets,
+    suppressGoalkeeperRewards: input.suppressGoalkeeperRewards ?? _settings.suppressGoalkeeperRewards,
   };
 
   return calculatePositionBonusValue(breakdownInput);

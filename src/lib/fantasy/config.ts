@@ -3,6 +3,8 @@ import { BQ_SCORING_V5 } from "../bq-scoring";
 export type FantasySettings = {
   /** Rodada 2 em diante ativa o sistema de vagas, rodízio e mercado 65/35. */
   roleScoringActive?: boolean;
+  /** Exceção pontual por rodada: mantém scouts brutos e punição, mas zera recompensas de goleiro. */
+  suppressGoalkeeperRewards?: boolean;
   currencyName: string;
   initialBudget: number;
   initialPlayerPrice: number;
@@ -37,10 +39,12 @@ export type FantasySettings = {
   attackerGoalPoints?: number;
   goalkeeperLossPoints?: number;
   teamGoalConcededPoints?: number;
+  goalkeeperSlotCleanSheetPoints?: number;
 };
 
 export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   roleScoringActive: true,
+  suppressGoalkeeperRewards: false,
   currencyName: "C$",
   initialBudget: 55,
   initialPlayerPrice: 10,
@@ -76,6 +80,7 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   attackerGoalPoints: BQ_SCORING_V5.goal,
   goalkeeperLossPoints: BQ_SCORING_V5.loss,
   teamGoalConcededPoints: 0,
+  goalkeeperSlotCleanSheetPoints: 4,
 };
 
 export const FANTASY_RECENT_ROUND_WEIGHTS = [0.40, 0.25, 0.15, 0.12, 0.08] as const;

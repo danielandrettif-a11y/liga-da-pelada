@@ -7,7 +7,8 @@ import { createRoundWithTeams, saveRoundPrelist, type TeamInput } from "@/lib/ac
 import { adminAddCallupPlayer, adminRemoveCallupPlayer } from "@/lib/actions/callups";
 import type { Player, RoundType, Stadium, TeamFormationMode } from "@/lib/types";
 import { drawTeamsByAttendance, drawTeamsDirect } from "@/lib/round-draw";
-import { getPlayerSpeedRatings } from "@/lib/actions/speed-draw";
+import { drawTeamsBySpeedOnServer } from "@/lib/actions/speed-draw";
+import type { SpeedTeamSummary } from "@/lib/speed-draw";
 import {
   Users,
   Calendar,
@@ -119,6 +120,7 @@ export function RoundCreator({
   const [formationMode, setFormationMode] = useState<TeamFormationMode>("manual");
   const [attendanceOrder, setAttendanceOrder] = useState<string[]>([]);
   const [pendingDrawMode, setPendingDrawMode] = useState<Exclude<TeamFormationMode, "manual"> | null>(null);
+  const [speedSummary, setSpeedSummary] = useState<{ teams: SpeedTeamSummary[]; unratedCount: number } | null>(null);
   const [mounted, setMounted] = useState(false);
   useDialogViewport(Boolean(pendingDrawMode));
 
@@ -349,6 +351,7 @@ export function RoundCreator({
 
   function assignToTeam(player: DrawPlayer, teamId: string) {
     setFormationMode("manual");
+    setSpeedSummary(null);
     setAttendanceOrder([]);
     const targetTeam = teams.find((team) => team.id === teamId);
     const alreadyInTarget = targetTeam?.players.some((item) => item.id === player.id);
@@ -370,6 +373,7 @@ export function RoundCreator({
 
   function removeFromTeam(player: DrawPlayer) {
     setFormationMode("manual");
+    setSpeedSummary(null);
     setAttendanceOrder([]);
     setTeams(prev => prev.map(t => ({
       ...t,
@@ -383,23 +387,33 @@ export function RoundCreator({
       return;
     }
     try {
-      let speedMap: Map<string, 1 | 2 | 3 | null> | undefined;
       if (mode === "speed") {
-        const ratings = await getPlayerSpeedRatings();
-        speedMap = new Map(Object.entries(ratings).map(([id, r]) => [id, r]));
+        const serverResult = await drawTeamsBySpeedOnServer({
+          playerIds: selectedPlayers.map((player) => player.id),
+          teamCount,
+          playersPerTeam: teamCapacity,
+        });
+        if (!serverResult.success || !serverResult.teams) throw new Error(serverResult.error || "Não foi possível sortear por velocidade.");
+        const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
+        setTeams((current) => current.map((team, index) => ({
+          ...team,
+          players: (serverResult.teams?.[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
+        })));
+        setSpeedSummary({ teams: serverResult.teamSummaries || [], unratedCount: serverResult.unratedCount || 0 });
+      } else {
+        const result = drawTeamsDirect({
+          players: selectedPlayers,
+          teamCount,
+          playersPerTeam: teamCapacity,
+          mode,
+        });
+        const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
+        setTeams((current) => current.map((team, index) => ({
+          ...team,
+          players: (result[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
+        })));
+        setSpeedSummary(null);
       }
-      const result = drawTeamsDirect({
-        players: selectedPlayers,
-        teamCount,
-        playersPerTeam: teamCapacity,
-        mode,
-        speedRatings: speedMap,
-      });
-      const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
-      setTeams((current) => current.map((team, index) => ({
-        ...team,
-        players: (result[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
-      })));
       setFormationMode(mode);
       // Sorteio normal não usa a regra de bloquear o terceiro time pela
       // ordem de chegada. As presenças começam todas marcadas na rodada.
@@ -450,11 +464,27 @@ export function RoundCreator({
       return;
     }
     try {
-      let speedMap: Map<string, 1 | 2 | 3 | null> | undefined;
       if (pendingDrawMode === "speed") {
-        const ratings = await getPlayerSpeedRatings();
-        speedMap = new Map(Object.entries(ratings).map(([id, r]) => [id, r]));
+        const serverResult = await drawTeamsBySpeedOnServer({
+          playerIds: selectedPlayers.map((player) => player.id),
+          attendanceOrder,
+          teamCount,
+          playersPerTeam: teamCapacity,
+        });
+        if (!serverResult.success || !serverResult.teams) throw new Error(serverResult.error || "Não foi possível sortear por velocidade.");
+        const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
+        setTeams((current) => current.map((team, index) => ({
+          ...team,
+          players: (serverResult.teams?.[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
+        })));
+        setAttendanceOrder(serverResult.attendanceOrder || attendanceOrder);
+        setSpeedSummary({ teams: serverResult.teamSummaries || [], unratedCount: serverResult.unratedCount || 0 });
+        setFormationMode("speed");
+        setPendingDrawMode(null);
+        setError("");
+        return;
       }
+      setSpeedSummary(null);
       const minimumPresent = Math.min(selectedPlayers.length, teamCapacity * 2);
       if (attendanceOrder.length < minimumPresent) {
         // Se marcou apenas alguns, completa com os outros selecionados
@@ -465,7 +495,7 @@ export function RoundCreator({
           attendanceOrder: fullOrder,
           teamCount,
           playersPerTeam: teamCapacity,
-          mode: pendingDrawMode, speedRatings: speedMap,
+          mode: pendingDrawMode,
         });
         const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
         setTeams((current) => current.map((team, index) => ({
@@ -478,7 +508,7 @@ export function RoundCreator({
           attendanceOrder,
           teamCount,
           playersPerTeam: teamCapacity,
-          mode: pendingDrawMode, speedRatings: speedMap,
+          mode: pendingDrawMode,
         });
         const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
         setTeams((current) => current.map((team, index) => ({
@@ -490,8 +520,7 @@ export function RoundCreator({
       setPendingDrawMode(null);
       setError("");
     } catch (drawError) {
-      // Fallback para sorteio direto
-      executeDirectDraw(pendingDrawMode);
+      setError(drawError instanceof Error ? drawError.message : "Não foi possível sortear os times.");
     }
   }
 
@@ -1015,7 +1044,7 @@ export function RoundCreator({
               </button>
               <button
                 type="button"
-                onClick={() => { setFormationMode("manual"); setTeams((current) => current.map((team) => ({ ...team, players: [] }))); }}
+                onClick={() => { setFormationMode("manual"); setSpeedSummary(null); setTeams((current) => current.map((team) => ({ ...team, players: [] }))); }}
                 className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "manual" ? "border-accent bg-accent/15 text-accent" : "border-border bg-surface text-muted"}`}
               >
                 ✋ Manual
@@ -1032,6 +1061,23 @@ export function RoundCreator({
                 ? "Times equilibrados por velocidade (★) com sucesso!"
                 : "Escolha um modo acima para montar os times."}
             </p>
+            {formationMode === "speed" && speedSummary && (
+              <div className="mt-3 rounded-xl border border-accent/25 bg-accent/5 p-3">
+                <p className="text-[9px] font-black uppercase tracking-wider text-accent">Resumo privado do ADM</p>
+                <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                  {speedSummary.teams.map((summary, index) => (
+                    <p key={index} className="rounded-lg bg-background/60 px-2.5 py-2 text-[10px] font-bold text-muted">
+                      <span className="text-foreground">Time {index + 1}</span> · média {summary.average.toFixed(2)}★ · {summary.stars[3]}×3★ · {summary.stars[2]}×2★ · {summary.stars[1]}×1★
+                    </p>
+                  ))}
+                </div>
+                {speedSummary.unratedCount > 0 && (
+                  <p className="mt-2 text-[9px] font-bold text-warning">
+                    {speedSummary.unratedCount} jogador(es) sem avaliação foram considerados como 2★ somente neste cálculo.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {mounted && pendingDrawMode && typeof document !== "undefined" && createPortal(

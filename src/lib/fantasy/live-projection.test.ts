@@ -32,20 +32,47 @@ describe("live fantasy projection", () => {
     expect(projected.get("loser")?.losses).toBe(1);
   });
 
-  it("zera apenas os scouts de goleiro quando a rodada possui correção administrativa", () => {
+  it("Rodada 02 preserva scouts brutos e suprime somente recompensas positivas de goleiro", () => {
     const projected = projectFantasyLiveStats(
       [{ ...baseMatch, status: "finished" }],
       DEFAULT_FANTASY_SETTINGS,
-      { ignoreGoalkeeperStats: true },
+      { suppressGoalkeeperRewards: true },
     );
 
     expect(projected.get("keeper")).toMatchObject({
       assists: 1,
       wins: 1,
-      goalkeeperGames: 0,
+      goalkeeperGames: 1,
       goalsConceded: 0,
-      cleanSheets: 0,
+      cleanSheets: 1,
+      basePoints: 5.5,
     });
+  });
+
+  it("Rodada 03 mantém +2 por atuação no gol e -1 por gol sofrido", () => {
+    const projected = projectFantasyLiveStats([
+      { ...baseMatch, status: "finished", scoreA: 2, scoreB: 1 },
+    ], DEFAULT_FANTASY_SETTINGS);
+    expect(projected.get("keeper")).toMatchObject({
+      goalkeeperGames: 1,
+      goalsConceded: 1,
+      basePoints: 6.5,
+    });
+  });
+
+  it("Rodada 02 também zera o clean sheet da vaga GOL sem apagar o scout", () => {
+    const round2Settings = { ...DEFAULT_FANTASY_SETTINGS, suppressGoalkeeperRewards: true };
+    const stats = projectFantasyLiveStats(
+      [{ ...baseMatch, status: "finished" }],
+      round2Settings,
+      { suppressGoalkeeperRewards: true },
+    );
+    const [lineup] = projectFantasyLiveLineups([{
+      id: "r2", userId: "user", playerIds: ["keeper"],
+      slots: [{ playerId: "keeper", slotRole: "GOL", playerProfile: "midfield" }],
+    }], stats, round2Settings);
+    expect(stats.get("keeper")?.cleanSheets).toBe(1);
+    expect(lineup.positionBonus).toBe(0);
   });
 
   it("atualiza a projeção quando o evento deixa de existir", () => {

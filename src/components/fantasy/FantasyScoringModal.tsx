@@ -70,7 +70,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
           </div>
 
           <p className="mt-2 text-xs text-muted leading-relaxed">
-            Primeiro vêm os scouts do que aconteceu em campo; depois, o bônus da vaga que você escolheu. Cada partida termina no 2º gol, sem empate.
+            Primeiro vêm os oito scouts do que aconteceu em campo; depois, o bônus da vaga que você escolheu. O mesmo cálculo vale no ao vivo e no fechamento.
           </p>
 
           {/* Abas Internas */}
@@ -132,21 +132,21 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                     </span>
                   </div>
                   <span className="rounded bg-blue-500/20 px-2 py-0.5 text-[9px] font-black text-blue-300">
-                    Clean Sheet Regressivo
+                    Teto de +10
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-muted">
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🧱 0 gols sofridos: +2 base +2 na vaga DEF</span>
-                    <strong className="text-accent font-black">+4.0 pts</strong>
+                    <span>🧱 0 gols sofridos jogando na linha:</span>
+                    <strong className="text-accent font-black">+1.5 pts</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🛡️ 1 gol sofrido: +1 base +1 na vaga DEF</span>
-                    <strong className="text-blue-300 font-black">+2.0 pts</strong>
+                    <span>🛡️ Exatamente 1 gol sofrido na linha:</span>
+                    <strong className="text-blue-300 font-black">+0.5 pt</strong>
                   </div>
                   <div className="flex justify-between py-0.5">
-                    <span>❌ 2 gols sofridos (limite da partida):</span>
-                    <strong className="text-danger font-black">0.0 pts</strong>
+                    <span>🏰 Muralha com 3+ clean sheets:</span>
+                    <strong className="text-accent font-black">+3.0 pts uma vez</strong>
                   </div>
                 </div>
               </div>
@@ -168,8 +168,8 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                 </div>
                 <div className="space-y-1 text-xs text-muted">
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🎯 Assistência: +3 base +1 na vaga MEI</span>
-                    <strong className="text-accent font-black">+4.0 pts / assist</strong>
+                    <span>🎯 Assistência: +2.5 base +1 na vaga MEI</span>
+                    <strong className="text-accent font-black">+3.5 pts / assist</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
                     <span>🪄 Bônus Maestro (2+ assistências):</span>
@@ -301,6 +301,13 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
 
                   <div className="flex items-center justify-between p-3">
                     <span className="font-bold text-white flex items-center gap-1.5">
+                      🤝 Empate
+                    </span>
+                    <span className="font-black text-success">+{settings.drawPoints.toFixed(1)} pt</span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3">
+                    <span className="font-bold text-white flex items-center gap-1.5">
                       🥅 Gol sofrido como goleiro real
                     </span>
                     <span className="font-black text-danger">{settings.goalConcededPoints.toFixed(1)} pt / gol</span>
@@ -308,9 +315,9 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
 
                   <div className="flex items-center justify-between p-3">
                     <span className="font-bold text-white flex items-center gap-1.5">
-                      🧱 DEF jogando na linha
+                      🧱 DEF jogando na linha (bônus da vaga)
                     </span>
-                    <span className="font-black text-blue-300">+2 (SG) / +1 (1 gol sofrido)</span>
+                    <span className="font-black text-blue-300">+1.5 (SG) / +0.5 (1 sofrido), teto +10</span>
                   </div>
                 </div>
               </div>

@@ -154,6 +154,7 @@ export type Round = {
   status: RoundStatus;
   round_type: RoundType;
   formation_mode: TeamFormationMode;
+  suppress_goalkeeper_rewards?: boolean;
   arrival_order_enabled: boolean;
   preparation_stage: RoundPreparationStage;
   stadium_id?: string | null;

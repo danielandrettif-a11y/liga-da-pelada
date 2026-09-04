@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { drawTeamsBySpeed, type SpeedDrawPlayer } from "./speed-draw";
+import { drawTeamsBySpeed, summarizeSpeedTeams, type SpeedDrawPlayer } from "./speed-draw";
 
 // Gerador de seed determinístico para testes reproduzíveis
 function seededRandom(seed: number) {
@@ -111,5 +111,14 @@ describe("Sorteio por Velocidade", () => {
 
     expect(result.teams[0]).toHaveLength(2);
     expect(result.unratedCount).toBe(1);
+  });
+
+  it("resume os times efetivamente retornados sem refazer o sorteio", () => {
+    const summary = summarizeSpeedTeams(
+      [["fast", "middle"], ["slow", "unknown"]],
+      new Map([["fast", 3], ["middle", 2], ["slow", 1], ["unknown", null]]),
+    );
+    expect(summary[0]).toEqual({ stars: { 1: 0, 2: 1, 3: 1 }, average: 2.5 });
+    expect(summary[1]).toEqual({ stars: { 1: 1, 2: 1, 3: 0 }, average: 1.5 });
   });
 });

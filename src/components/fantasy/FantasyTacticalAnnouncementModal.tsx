@@ -67,10 +67,10 @@ export function FantasyTacticalAnnouncementModal() {
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-black text-blue-300">Zaga & Proteção (DEF)</span>
-                <span className="font-black text-accent text-[10px]">+4,0 / +2,0 pts</span>
+                <span className="font-black text-accent text-[10px]">+1,5 / +0,5 pts</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                <strong>Proteção dividida:</strong> o DEF ganha <strong>+2,0 pts base</strong> sem sofrer gol e mais <strong>+2,0 pts</strong> se foi escalado na vaga DEF. Com 1 gol sofrido, é +1 base +1 de bônus.
+                Na vaga DEF, jogar na linha sem sofrer gol vale <strong>+1,5</strong>; sofrer exatamente um vale <strong>+0,5</strong>. Três clean sheets ativam Muralha (+3 uma vez), sempre com teto de <strong>+10</strong>.
               </p>
             </div>
           </div>
@@ -83,10 +83,10 @@ export function FantasyTacticalAnnouncementModal() {
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-black text-warning">Armação & Passes (MEI/ALA)</span>
-                <span className="font-black text-accent text-[10px]">+4,0 pts / assist + bônus</span>
+                <span className="font-black text-accent text-[10px]">+3,5 pts / assist + bônus</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Assistência vale <strong>+3,0 pts base</strong>; na vaga MEI recebe +1 e chega a <strong>+4,0 pts</strong>. Com 2+ assistências, ainda há <strong>+3,0 pts</strong> de Maestro.
+                Assistência vale <strong>+2,5 pts base</strong>; na vaga MEI recebe +1 e chega a <strong>+3,5 pts</strong>. Com 2+ assistências, ainda há <strong>+3,0 pts</strong> de Maestro.
               </p>
             </div>
           </div>
@@ -99,10 +99,10 @@ export function FantasyTacticalAnnouncementModal() {
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-black text-danger">Finalização (ATA)</span>
-                <span className="font-black text-accent text-[10px]">5,0 pts / gol + bônus</span>
+                <span className="font-black text-accent text-[10px]">4,0 pts / gol + bônus</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Gol vale <strong>5,0 pts base</strong>. Na vaga ATA, 2+ gols rendem <strong>+3,0 pts</strong> de Artilheiro da Rodada.
+                Gol vale <strong>4,0 pts base</strong>. Na vaga ATA, 2+ gols rendem <strong>+3,0 pts</strong> de Artilheiro da Rodada.
               </p>
             </div>
           </div>
@@ -115,10 +115,10 @@ export function FantasyTacticalAnnouncementModal() {
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-black text-accent">Paredão no Rodízio (GOL)</span>
-                <span className="font-black text-accent text-[10px]">+3,0 pres / +4,0 SG</span>
+                <span className="font-black text-accent text-[10px]">+2,0 pres / +4,0 SG</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Qualquer atleta pode ser a sua aposta. Quem <strong>realmente atuar no gol</strong> ganha +3 base e -1 por gol sofrido. Se você o escalou em GOL e ele não sofreu gol, ganha <strong>+4,0 pts por clean sheet</strong>.
+                Qualquer atleta pode ser a sua aposta. Quem <strong>realmente atuar no gol</strong> ganha +2 base e -1 por gol sofrido. Se você o escalou em GOL e ele não sofreu gol, ganha <strong>+4,0 pts por clean sheet</strong>.
               </p>
             </div>
           </div>

@@ -58,6 +58,20 @@ function teamStarCounts(team: SpeedDrawPlayer[]): { 1: number; 2: number; 3: num
   return counts;
 }
 
+/** Gera o resumo do ADM para os times efetivamente sorteados. */
+export function summarizeSpeedTeams(
+  teams: string[][],
+  ratings: ReadonlyMap<string, SpeedRating | null>,
+): SpeedTeamSummary[] {
+  return teams.map((ids) => {
+    const players = ids.map((id) => ({ id, speedRating: ratings.get(id) ?? null }));
+    return {
+      stars: teamStarCounts(players),
+      average: Math.round(teamAverage(players) * 100) / 100,
+    };
+  });
+}
+
 function maxDiff(teams: SpeedDrawPlayer[][]): number {
   const averages = teams.map(teamAverage);
   return Math.max(...averages) - Math.min(...averages);
