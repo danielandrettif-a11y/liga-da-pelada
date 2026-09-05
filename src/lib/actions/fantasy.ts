@@ -445,6 +445,14 @@ export async function getFantasyDashboard() {
   // as escalações quando uma partida começou mas o status do mercado ficou
   // indevidamente como `open` no banco.
   const liveReadClient = createServiceClient() || account.client;
+  const latestCardActivationRequest = latestFinishedRound
+    ? liveReadClient
+      .from("fantasy_card_activations")
+      .select("result_bonus")
+      .eq("round_id", latestFinishedRound.round_id)
+      .eq("user_id", account.user.id)
+      .maybeSingle()
+    : Promise.resolve({ data: null as any });
 
   // Buscar escalações da rodada ativa para popularidade em tempo real
   const activeRoundLineupsRequest = activeOfficialRound
@@ -476,6 +484,7 @@ export async function getFantasyDashboard() {
     { data: roundParticipants },
     { data: rawLineup },
     { data: latestLineup },
+    { data: latestCardActivation },
     { data: fantasyAccount },
     { data: liveEvents },
     { data: selectablePlayers },
@@ -500,6 +509,7 @@ export async function getFantasyDashboard() {
       : Promise.resolve({ data: [] as any[] }),
     lineupRequest,
     latestLineupRequest,
+    latestCardActivationRequest,
     account.client
       .from("fantasy_accounts")
       .select("*")
@@ -1430,7 +1440,11 @@ export async function getFantasyDashboard() {
           number: latestFinishedRound.round?.number,
           date: latestFinishedRound.round?.date,
           playerPoints: Number(latestLineup?.player_points || 0),
-          cardPoints: Number(latestLineup?.score_breakdown?.cardBonus || 0),
+          cardPoints: Number(
+            latestCardActivation?.result_bonus
+            ?? latestLineup?.score_breakdown?.cardBonus
+            ?? 0,
+          ),
           totalPoints: Number(latestLineup?.total_points || 0),
           playerScores: (latestLineup?.fantasy_lineup_players || []).map((player: any) => ({
             playerId: player.player_id as string,
