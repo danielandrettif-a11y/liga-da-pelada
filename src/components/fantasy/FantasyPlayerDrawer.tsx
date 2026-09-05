@@ -108,6 +108,20 @@ export function FantasyPlayerDrawer({
   const bannerAssetKey = detailData?.cosmetics?.bannerAssetKey || null;
   const bannerImage = cosmeticHighResolutionImage(bannerAssetKey);
   const frameKey = detailData?.cosmetics?.frameKey || null;
+  const recentHistory = (detailData?.history || []).filter((item: any) => item.games > 0).slice(-5);
+
+  const openRoundSummary = async (fantasyRoundId: string) => {
+    setLoading(true);
+    try {
+      const result = await getFantasyPlayerDetail(player.id, fantasyRoundId);
+      if (result) setDetailData(result);
+      setActiveTab("scouts");
+    } catch {
+      // Mantém o perfil aberto com os dados já carregados quando a rede falhar.
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return createPortal(
     <div
@@ -377,9 +391,14 @@ export function FantasyPlayerDrawer({
                   Últimas Rodadas Válidas (Pontos)
                 </p>
                 <div className="mt-2 flex items-center gap-2">
-                  {recentPoints.map((pts: number, idx: number) => (
-                    <div
-                      key={idx}
+                  {recentPoints.map((pts: number, idx: number) => {
+                    const historyItem = recentHistory[idx];
+                    return <button
+                      type="button"
+                      key={historyItem?.fantasyRoundId || idx}
+                      disabled={!historyItem || loading}
+                      onClick={() => historyItem && openRoundSummary(historyItem.fantasyRoundId)}
+                      aria-label={historyItem ? `Abrir resumo da Rodada ${historyItem.roundNumber}` : undefined}
                       className={`flex-1 rounded-xl p-2 text-center border ${
                         pts >= 10
                           ? "border-success/40 bg-success/10 text-success"
@@ -388,10 +407,10 @@ export function FantasyPlayerDrawer({
                           : "border-danger/30 bg-danger/10 text-danger"
                       }`}
                     >
-                      <p className="text-[8px] font-bold text-muted">R-{recentPoints.length - idx}</p>
+                      <p className="text-[8px] font-bold text-muted">R-{historyItem?.roundNumber ?? recentPoints.length - idx}</p>
                       <p className="text-xs font-black">{pts.toFixed(1)}</p>
-                    </div>
-                  ))}
+                    </button>;
+                  })}
                 </div>
               </div>
             )}

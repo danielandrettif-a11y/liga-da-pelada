@@ -112,7 +112,10 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
         </div>
 
         {/* Conteúdo com Scroll */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+        <div
+          className="mobile-dialog-scroll flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 touch-pan-y overscroll-contain"
+          style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
+        >
           {/* ABA 1: BÔNUS POR POSIÇÃO */}
           {activeTab === "positions" && (
             <div className="space-y-3">

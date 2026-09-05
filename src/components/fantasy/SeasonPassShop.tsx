@@ -23,18 +23,14 @@ export function SeasonPassShop({ shop }: { shop: SeasonPassShop }) {
 
   const status = !shop.hasStarted
     ? "A loja é pessoal: ela começa a ser montada quando você escolher seu primeiro pacote do Passe."
-    : !shop.isUnlocked
-      ? "Conclua a casa 40 para liberar as compras. Depois disso, cada ponto novo entra na trilha extra."
-      : shop.items.length === 0
+    : shop.items.length === 0
         ? "Você já resgatou todos os itens que ficaram disponíveis para esta temporada."
-        : "Use os pontos conquistados depois da casa 40 para completar sua coleção.";
+        : "Use seus pontos extras para comprar as opções que não escolheu. O novo campo é liberado na casa 40.";
   // A action já devolve apenas ofertas ainda não compradas.
   const availableItems = shop.items;
   const teaser = !shop.hasStarted
     ? "A loja aparece aqui quando você escolher seu primeiro prêmio."
-    : !shop.isUnlocked
-      ? `Você já tem ${availableItems.length} ${availableItems.length === 1 ? "item reservado" : "itens reservados"}. Libere na casa 40.`
-      : availableItems.length
+    : availableItems.length
         ? `${availableItems.length} ${availableItems.length === 1 ? "item disponível" : "itens disponíveis"} para completar sua coleção.`
         : "Sua coleção extra está completa.";
 
@@ -61,7 +57,7 @@ export function SeasonPassShop({ shop }: { shop: SeasonPassShop }) {
       </div>
 
       {shop.items.length > 0 ? <div className="grid grid-cols-2 gap-2 sm:gap-3">
-        {shop.items.map((item) => <ShopItem key={item.id} item={item} unlocked={shop.isUnlocked} balance={shop.balancePoints} pending={pending} onBuy={() => buy(item)} />)}
+        {shop.items.map((item) => <ShopItem key={item.id} item={item} house40Reached={shop.isUnlocked} balance={shop.balancePoints} pending={pending} onBuy={() => buy(item)} />)}
       </div> : <div className="rounded-2xl border border-white/10 bg-black/15 px-4 py-5 text-center">
         <p className="text-xs font-black text-white">{shop.hasStarted ? "Coleção extra em dia" : "Sua loja ainda está vazia"}</p>
         <p className="mt-1 text-[11px] leading-4 text-muted">{shop.hasStarted ? "Continue avançando para ganhar saldo quando surgirem novos itens." : "Ao escolher um pacote, a opção não escolhida fica guardada aqui para você comprar mais tarde."}</p>
@@ -74,12 +70,13 @@ function ShopMetric({ label, value }: { label: string; value: number }) {
   return <div className="rounded-xl border border-white/10 bg-black/15 px-2 py-2 text-center"><strong className="block font-athletic text-sm text-white">{value}</strong><span className="block text-[7px] font-black uppercase tracking-wide text-muted">{label}</span></div>;
 }
 
-function ShopItem({ item, unlocked, balance, pending, onBuy }: { item: SeasonPassShopItem; unlocked: boolean; balance: number; pending: boolean; onBuy: () => void }) {
+function ShopItem({ item, house40Reached, balance, pending, onBuy }: { item: SeasonPassShopItem; house40Reached: boolean; balance: number; pending: boolean; onBuy: () => void }) {
   const image = cosmeticImage(item.cosmetic.assetKey) || cosmeticFrameImage(item.cosmetic.assetKey);
   const avatarCosmetic = item.cosmetic.slot === "frame" || item.cosmetic.slot === "aura";
   const isTitle = item.cosmetic.slot === "title";
   const affordable = balance >= item.pricePoints;
-  const disabled = !unlocked || !affordable || pending;
+  const locked = item.cosmetic.slot === "pitch" && !house40Reached;
+  const disabled = locked || !affordable || pending;
 
   return <article className={`overflow-hidden rounded-2xl border bg-[#0b1b11] ${rarityClass(item.cosmetic.rarity)}`}>
     <div className={`relative h-20 overflow-hidden bg-gradient-to-br ${cosmeticVisual(item.cosmetic.assetKey)}`}>
@@ -93,7 +90,7 @@ function ShopItem({ item, unlocked, balance, pending, onBuy }: { item: SeasonPas
       <p className="text-[8px] font-black uppercase tracking-wide text-muted">{COSMETIC_SLOT_LABELS[item.cosmetic.slot]} · {item.cosmetic.rarity}</p>
       <h3 className="mt-1 min-h-8 text-[11px] font-black leading-4 text-white">{item.cosmetic.name}</h3>
       <button type="button" disabled={disabled} onClick={onBuy} className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl border border-[#d7adff]/35 bg-[#a04dff]/15 px-2 py-2 text-[8px] font-black uppercase text-[#e9d2ff] transition-colors hover:bg-[#a04dff] hover:text-white disabled:cursor-not-allowed disabled:opacity-45">
-        {!unlocked ? <><Lock className="h-3 w-3" /> Casa 40</> : affordable ? <><Sparkles className="h-3 w-3" /> {pending ? "Comprando" : "Comprar"}</> : <><CheckCircle2 className="h-3 w-3" /> Faltam {item.pricePoints - balance}</>}
+        {locked ? <><Lock className="h-3 w-3" /> Casa 40</> : affordable ? <><Sparkles className="h-3 w-3" /> {pending ? "Comprando" : "Comprar"}</> : <><CheckCircle2 className="h-3 w-3" /> Faltam {item.pricePoints - balance}</>}
       </button>
     </div>
   </article>;

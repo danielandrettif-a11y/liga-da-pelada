@@ -7,6 +7,7 @@ import {
   finishMatch,
   deleteEvent,
   correctFinishedGoal,
+  correctFinishedGoalAssist,
   updateMatchTimer,
   resetMatchTimer,
   addMatchExtraTime,
@@ -26,6 +27,7 @@ import {
   Target,
   X,
   ArrowLeftRight,
+  PencilLine,
 } from "@/components/icons";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -462,6 +464,8 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
     isOwnGoal: boolean;
   }>({ open: false, teamId: "", scorerId: null, isOwnGoal: false });
   useDialogViewport(goalModal.open);
+  const [assistEdit, setAssistEdit] = useState<any | null>(null);
+  useDialogViewport(Boolean(assistEdit));
 
   // Jogadores ativos para o modal
   const activePlayers = useMemo(() => {
@@ -479,6 +483,13 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       (entry: any) => entry.team_id !== goalModal.teamId && entry.is_active,
     );
   }, [match.match_players, goalModal.teamId]);
+
+  const assistEditPlayers = useMemo(() => {
+    if (!assistEdit) return [];
+    return (match.match_players || []).filter(
+      (entry: any) => entry.team_id === assistEdit.team_id && entry.player_id !== assistEdit.player_id,
+    );
+  }, [assistEdit, match.match_players]);
 
   // Timeline unificada e ordenada
   const timelineItems = useMemo(() => {
@@ -637,6 +648,24 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       setLoading(false);
       deletingEventRef.current.delete(eventId);
     }
+  }
+
+  async function handleCorrectAssist(assistPlayerId: string | null) {
+    if (!assistEdit || loading) return;
+    const selected = assistEditPlayers.find((entry: any) => entry.player_id === assistPlayerId);
+    setLoading(true);
+    setError("");
+    const result = await correctFinishedGoalAssist(assistEdit.id, assistPlayerId);
+    if (!result.success) {
+      setError(result.error || "Não foi possível corrigir a assistência.");
+    } else {
+      setEvents((current) => current.map((event) => event.id === assistEdit.id
+        ? { ...event, assist_player_id: assistPlayerId, assist_player: selected?.player || null }
+        : event));
+      setAssistEdit(null);
+      router.refresh();
+    }
+    setLoading(false);
   }
 
   async function handleUndoSubstitution(substitutionId: string) {
@@ -841,7 +870,17 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                       )}
                     </div>
 
-                    {canManage && (
+                    {canManage && <div className="flex shrink-0 items-center gap-1">
+                      {isFinished && <button
+                        type="button"
+                        onClick={() => setAssistEdit(ev)}
+                        disabled={loading || ev.isOptimistic || ev.is_own_goal}
+                        title="Editar assistência"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                        aria-label="Editar assistência do gol"
+                      >
+                        <PencilLine className="h-4 w-4" />
+                      </button>}
                       <button
                         onClick={() => handleDeleteEvent(ev.id, ev.team_id)}
                         disabled={loading || ev.isOptimistic}
@@ -851,7 +890,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
-                    )}
+                    </div>}
                   </div>
                 </div>
               );
@@ -885,6 +924,24 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       )}
 
       {/* MODAL DE REGISTRO DE GOL */}
+      {assistEdit && canManage && (
+        <div className="mobile-dialog-backdrop bg-background/85 backdrop-blur-sm animate-fade-in">
+          <div className="glass-card flex max-h-[85dvh] w-full max-w-sm flex-col overflow-hidden animate-fade-in-up">
+            <div className="flex shrink-0 items-center justify-between border-b border-border bg-surface p-4">
+              <div><h3 className="font-bold text-foreground">Editar assistência</h3><p className="mt-0.5 text-[10px] text-muted">Gol de {assistEdit.player?.name}</p></div>
+              <button type="button" onClick={() => setAssistEdit(null)} className="text-muted hover:text-foreground" aria-label="Fechar edição"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="mobile-dialog-scroll min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4 pb-6 touch-pan-y" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
+              <button type="button" disabled={loading} onClick={() => handleCorrectAssist(null)} className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-left text-xs font-bold text-muted hover:border-accent/40 hover:text-foreground disabled:opacity-50">Sem assistência</button>
+              {assistEditPlayers.map((entry: any) => <button key={entry.player_id} type="button" disabled={loading} onClick={() => handleCorrectAssist(entry.player_id)} className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2 text-left hover:border-accent/40 disabled:opacity-50">
+                <PlayerAvatar name={entry.player?.name || "Jogador"} avatarUrl={entry.player?.avatar_url} clickable={false} className="h-9 w-9 rounded-full bg-background text-[10px] font-black text-accent" />
+                <span className="text-xs font-bold text-foreground">{entry.player?.name}</span>
+              </button>)}
+            </div>
+          </div>
+        </div>
+      )}
+
       {goalModal.open && canManage && (
         <div className="mobile-dialog-backdrop bg-background/85 backdrop-blur-sm animate-fade-in">
           <div className="glass-card flex max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-full max-w-sm flex-col overflow-hidden animate-fade-in-up sm:max-h-[85dvh]">

@@ -1717,7 +1717,7 @@ export async function getRevealedLineups(roundId?: string) {
   };
 }
 
-export async function getFantasyPlayerDetail(playerId: string) {
+export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: string) {
   const account = await getCurrentAccount();
   if (!account.user) return null;
 
@@ -1812,6 +1812,9 @@ export async function getFantasyPlayerDetail(playerId: string) {
 
   const validRecentHistory = history.filter((h) => h.games > 0);
   const latestValidHistory = validRecentHistory[validRecentHistory.length - 1] || null;
+  const selectedHistory = fantasyRoundId
+    ? validRecentHistory.find((item) => item.fantasyRoundId === fantasyRoundId) || null
+    : null;
   const recentPointsList = validRecentHistory.slice(-5).map((h) => h.roundPoints);
   const recentVariations = validRecentHistory.slice(-5).map((h) => h.variationRate);
 
@@ -1852,16 +1855,17 @@ export async function getFantasyPlayerDetail(playerId: string) {
     const round = Array.isArray(item.round) ? item.round[0] : item.round;
     return round?.status !== "finished";
   }) || null;
-  const { data: latestFinishedPlayerRound } = !liveRound && latestValidHistory?.fantasyRoundId
+  const historyRoundId = fantasyRoundId || (!liveRound ? latestValidHistory?.fantasyRoundId : null);
+  const { data: historyRound } = historyRoundId
     ? await liveReadClient
       .from("fantasy_rounds")
       .select("id, round_id, market_status, settings_snapshot, round:round_id(number, date, status, suppress_goalkeeper_rewards)")
-      .eq("id", latestValidHistory.fantasyRoundId)
+      .eq("id", historyRoundId)
       .maybeSingle()
     : { data: null as any };
-  const scoringRound = liveRound || latestFinishedPlayerRound;
+  const scoringRound = fantasyRoundId ? historyRound : (liveRound || historyRound);
   const scoringRoundInfo = Array.isArray(scoringRound?.round) ? scoringRound.round[0] : scoringRound?.round;
-  const scoringRoundIsLive = Boolean(liveRound);
+  const scoringRoundIsLive = !fantasyRoundId && Boolean(liveRound);
   let roundDetail: any = null;
 
   if (scoringRound?.round_id) {
@@ -1941,7 +1945,7 @@ export async function getFantasyPlayerDetail(playerId: string) {
       : liveSettings.goalConcededPoints;
     const authoritativeBasePoints = scoringRoundIsLive
       ? current.basePoints
-      : Number(latestValidHistory?.roundPoints ?? current.basePoints);
+      : Number((selectedHistory || latestValidHistory)?.roundPoints ?? current.basePoints);
     const breakdown = [
       { key: "goals", label: "Gols", count: current.goals, unitPoints: goalValue, points: current.goals * goalValue, icon: "⚽" },
       { key: "assists", label: "Assistências", count: current.assists, unitPoints: liveSettings.assistPoints, points: current.assists * liveSettings.assistPoints, icon: "👟" },
@@ -3155,6 +3159,15 @@ export async function getFantasyUserHistory(userId: string) {
       .order("created_at", { ascending: false }),
   ]);
   if (!profile || !fantasyAccount) return null;
+  const roundIds = (lineups || []).map((lineup: any) => lineup.fantasy_rounds?.round_id).filter(Boolean);
+  const { data: activations } = roundIds.length
+    ? await account.client
+      .from("fantasy_card_activations")
+      .select("round_id, status, result_bonus, result_details, cards(name, slug, rarity, description)")
+      .eq("user_id", userId)
+      .in("round_id", roundIds)
+    : { data: [] as any[] };
+  const activationByRound = new Map((activations || []).map((activation: any) => [activation.round_id, activation]));
   return {
     userId,
     player: profile.players,
@@ -3164,11 +3177,23 @@ export async function getFantasyUserHistory(userId: string) {
       roundsPlayed: Number(fantasyAccount.rounds_played || 0),
       bestRoundPoints: Number(fantasyAccount.best_round_points || 0),
     },
-    lineups: (lineups || []).map((lineup: any) => ({
-      ...lineup,
-      fantasyRound: lineup.fantasy_rounds,
-      round: lineup.fantasy_rounds?.rounds,
-    })),
+    lineups: (lineups || []).map((lineup: any) => {
+      const activation: any = activationByRound.get(lineup.fantasy_rounds?.round_id);
+      return {
+        ...lineup,
+        fantasyRound: lineup.fantasy_rounds,
+        round: lineup.fantasy_rounds?.rounds,
+        activeCard: activation?.cards ? {
+          name: activation.cards.name,
+          slug: activation.cards.slug,
+          rarity: activation.cards.rarity,
+          description: activation.cards.description,
+          status: activation.status,
+          bonus: Number(activation.result_bonus || 0),
+          details: activation.result_details || null,
+        } : null,
+      };
+    }),
   };
 }
 
@@ -3255,6 +3280,7 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
   const { data: predictionPlayers } = predictionIds.length
     ? await account.client.from("players").select("id, name, avatar_url").in("id", predictionIds)
     : { data: [] };
+  const historyLineup = history?.lineups?.find((item: any) => item.fantasyRound?.round_id === roundId);
   return {
     history: history || { player: profile?.players || null },
     lineup,
@@ -3274,6 +3300,7 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
         }))
       : Object.fromEntries((storedStats || []).map((stat: any) => [stat.player_id, stat])),
     predictionPlayers: Object.fromEntries((predictionPlayers || []).map((player: any) => [player.id, player])),
+    activeCard: historyLineup?.activeCard || null,
   };
 }
 
