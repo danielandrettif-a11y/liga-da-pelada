@@ -225,24 +225,12 @@ export function FantasyRevealedLineupsModal({
                   ))}
                 </div>
 
-                {/* Palpites e Desafio */}
-                {(lineup.topScorer || lineup.topAssist || lineup.challengePlayer) && (
+                {/* Desafio da rodada */}
+                {lineup.challengePlayer && (
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/5 pt-2 text-[9px] font-bold text-muted">
-                    {lineup.topScorer && (
-                      <span className="rounded-lg bg-black/30 px-2 py-1 flex items-center gap-1">
-                        ⚽ Gol: <strong className="text-foreground">{lineup.topScorer.name}</strong>
-                      </span>
-                    )}
-                    {lineup.topAssist && (
-                      <span className="rounded-lg bg-black/30 px-2 py-1 flex items-center gap-1">
-                        🍽️ Garçom: <strong className="text-foreground">{lineup.topAssist.name}</strong>
-                      </span>
-                    )}
-                    {lineup.challengePlayer && (
-                      <span className="rounded-lg bg-warning/10 text-warning px-2 py-1 flex items-center gap-1 border border-warning/20">
-                        <Target className="h-3 w-3 inline" /> Desafio: <strong>{lineup.challengePlayer.name}</strong>
-                      </span>
-                    )}
+                    <span className="rounded-lg bg-warning/10 text-warning px-2 py-1 flex items-center gap-1 border border-warning/20">
+                      <Target className="h-3 w-3 inline" /> Desafio: <strong>{lineup.challengePlayer.name}</strong>
+                    </span>
                   </div>
                 )}
                 {lineup.activeCard && (
@@ -251,9 +239,8 @@ export function FantasyRevealedLineupsModal({
                     <p className="mt-1 text-muted">Bônus da carta: <strong className="text-foreground">{lineup.activeCard.bonus >= 0 ? "+" : ""}{lineup.activeCard.bonus.toFixed(1)} pts</strong></p>
                   </div>
                 )}
-                <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-black/20 p-2 text-center text-[9px]">
+                <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-black/20 p-2 text-center text-[9px]">
                   <span><strong className="block text-foreground">{lineup.playerPoints.toFixed(1)}</strong>jogadores</span>
-                  <span><strong className="block text-foreground">{lineup.predictionPoints.toFixed(1)}</strong>palpites</span>
                   <span><strong className="block text-accent">{lineup.totalPoints.toFixed(1)}</strong>total</span>
                 </div>
                 </>}

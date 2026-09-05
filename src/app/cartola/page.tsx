@@ -11,7 +11,7 @@ export const revalidate = 0;
 export default async function CartolaPage({ searchParams }: PageProps<"/cartola">) {
   const { pack } = await searchParams;
   const [data, cosmetics] = await Promise.all([getFantasyDashboard(), getMyEquippedCosmetics()]);
-  if (!data.authenticated) return <Empty title="Entre para jogar o Cartola" description="Monte seu time, faça palpites e dispute com seus amigos." login />;
+  if (!data.authenticated) return <Empty title="Entre para jogar o Cartola" description="Monte seu time, use cartas e dispute com seus amigos." login />;
   if (!data.available) return <Empty title="Atualização do Cartola pendente" description="Execute as migrations do Cartola até a 039 para liberar a V1 desta temporada." />;
   return (
     <div>

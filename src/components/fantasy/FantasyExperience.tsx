@@ -1245,7 +1245,7 @@ export function FantasyExperience({
                 </span>
               </div>
               <p className="text-[10px] text-muted">
-                O mercado fechou! Toque para ver os {playersPerTeam} jogadores, capitão e palpites de todos os rivais.
+                O mercado fechou! Toque para ver os {playersPerTeam} jogadores, capitão e cartas de todos os rivais.
               </p>
             </div>
           </div>
@@ -1387,10 +1387,6 @@ export function FantasyExperience({
             {open && selected.length === playersPerTeam && !captainId && (
               <p className="rounded-xl border border-warning/35 bg-warning/10 px-3 py-2 text-[10px] font-bold text-warning">Falta escolher o capitão antes de concluir sua escalação.</p>
             )}
-            {open && (!scorerId || !assistId) && (
-              <p className="text-[10px] font-bold text-muted">Palpites são opcionais, mas rendem pontos: {!scorerId && "artilheiro"}{!scorerId && !assistId && " e "}{!assistId && "garçom"} ainda não foram escolhidos.</p>
-            )}
-
             {status === "in_progress" && (
               <div className="grid grid-cols-2 gap-2 rounded-2xl border border-accent/30 bg-gradient-to-r from-accent/15 to-surface p-3">
                 <div>
@@ -1405,7 +1401,7 @@ export function FantasyExperience({
                   <span>Pontos-base</span><strong className="text-foreground">{liveBasePlayerPoints.toFixed(1)}</strong>
                   <span>Bônus de posição</span><strong className="text-foreground">+{livePositionBonus.toFixed(1)}</strong>
                   <span>Capitão</span><strong className="text-foreground">+{(liveProjection?.currentUser?.captainBonus || 0).toFixed(1)}</strong>
-                  <span>Palpites/cartas</span><strong className="text-foreground">+{((liveProjection?.currentUser?.predictionPoints || 0) + (liveProjection?.currentUser?.cardPoints || 0)).toFixed(1)}</strong>
+                  <span>Carta</span><strong className="text-foreground">+{(liveProjection?.currentUser?.cardPoints || 0).toFixed(1)}</strong>
                   </div>
                 </div>
                 <p className="col-span-2 border-t border-accent/15 pt-2 text-[9px] font-bold text-muted">Temporada se terminasse agora: <span className="text-foreground">{(account.totalPoints + (liveProjection?.currentUser?.totalPoints || 0)).toFixed(1)} pts</span></p>
@@ -2103,7 +2099,7 @@ export function FantasyExperience({
       {/* MODAL DE ANÚNCIO DA REVOLUÇÃO TÁTICA (RODADA 02) */}
       <FantasyTacticalAnnouncementModal />
 
-      {/* POPUP BÁSICO DE AJUDA DOS PALPITES / DESAFIO */}
+      {/* POPUP BÁSICO DE AJUDA DO DESAFIO */}
       {mounted &&
         infoModal &&
         typeof document !== "undefined" &&
@@ -2218,57 +2214,4 @@ function MarketCountdown({ scheduledAt }: { scheduledAt: number }) {
   return remaining > 0
     ? <>Mercado fecha em {formatCountdown(remaining)}</>
     : <>Fechando mercado · Início da rodada iminente</>;
-}
-
-function Select({
-  label,
-  value,
-  disabled,
-  onChange,
-  options,
-  onInfoClick,
-}: {
-  label: string;
-  value: string;
-  disabled: boolean;
-  onChange: (value: string | null) => void;
-  options: { id: string; name: string }[];
-  onInfoClick?: () => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-black uppercase tracking-wider text-muted">{label}</span>
-        {onInfoClick && (
-          <button
-            type="button"
-            onClick={onInfoClick}
-            className="flex h-5 w-5 items-center justify-center rounded-full text-muted hover:bg-white/10 hover:text-accent transition-colors"
-            title="Mais informações"
-            aria-label={`Informações sobre ${label}`}
-          >
-            <HelpCircle className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
-      <div className="relative">
-        <select
-          disabled={disabled}
-          value={value}
-          onChange={(e) => onChange(e.target.value || null)}
-          className="h-11 w-full appearance-none rounded-xl border border-border bg-[#05100B] px-3.5 pr-8 text-xs font-bold text-foreground disabled:opacity-50 focus:border-accent outline-none transition-colors"
-        >
-          <option value="">Sem palpite</option>
-          {options.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name}
-            </option>
-          ))}
-        </select>
-        <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted text-[10px]">
-          ▼
-        </div>
-      </div>
-    </div>
-  );
 }

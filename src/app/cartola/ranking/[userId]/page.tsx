@@ -28,7 +28,7 @@ export default async function FantasyUserHistoryPage({ params }: { params: Promi
       {data.lineups.length ? data.lineups.map((lineup: any) => <Link key={lineup.id} href={`/cartola/ranking/${userId}/${lineup.fantasyRound.round_id}`} className="glass-card flex items-center justify-between gap-3 p-4 transition-colors hover:bg-surface-hover">
         <div className="min-w-0">
           <p className="text-[10px] font-black uppercase text-muted">Rodada {String(lineup.round?.number || 0).padStart(2, "0")}</p>
-          <p className="mt-1 text-xs text-muted">{lineup.round?.date} · jogadores {Number(lineup.player_points || 0).toFixed(1)} · palpites {Number(lineup.prediction_points || 0).toFixed(1)}</p>
+          <p className="mt-1 text-xs text-muted">{lineup.round?.date} · jogadores {Number(lineup.player_points || 0).toFixed(1)} pts</p>
           {lineup.activeCard && <p className="mt-1.5 text-[10px] font-black text-[#e2bcff]">🃏 {lineup.activeCard.name} · {lineup.activeCard.bonus > 0 ? "+" : ""}{lineup.activeCard.bonus.toFixed(1)} pts</p>}
         </div>
         <strong className="shrink-0 text-xl font-black text-accent">{Number(lineup.total_points || 0).toFixed(1)}</strong>

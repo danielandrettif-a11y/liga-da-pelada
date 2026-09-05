@@ -7,7 +7,6 @@ import {
   HelpCircle,
   Shield,
   Sparkles,
-  Target,
   Trophy,
   Users,
   X,
@@ -342,21 +341,6 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                 </div>
                 <p className="text-muted leading-relaxed">
                   O jogador escolhido como Capitão tem <strong>toda a sua pontuação da rodada multiplicada por 1.5x</strong>. Vale a pena apostar em zagueiros seguros, meias garçons ou atacantes goleadores!
-                </p>
-              </div>
-
-              {/* Palpites */}
-              <div className="rounded-2xl border border-accent/30 bg-accent/10 p-4 space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/20 text-accent">
-                    <Target className="h-4 w-4" />
-                  </span>
-                  <span className="font-athletic text-sm font-black uppercase text-accent">
-                    Palpites da Rodada
-                  </span>
-                </div>
-                <p className="text-muted leading-relaxed">
-                  Antes do mercado fechar, escolha quem será o <strong>Artilheiro</strong> e o <strong>Garçom</strong>. Cada acerto rende respectivamente <strong>+{settings.topScorerPredictionPoints.toFixed(1)}</strong> e <strong>+{settings.topAssistPredictionPoints.toFixed(1)} pts</strong>.
                 </p>
               </div>
 

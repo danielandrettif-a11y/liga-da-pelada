@@ -17,16 +17,6 @@ export default async function FantasyUserRoundHistoryPage({ params }: { params: 
       Number(second.slot_index ?? Number.MAX_SAFE_INTEGER),
   );
   const breakdown = (data.lineup.score_breakdown || {}) as Record<string, unknown>;
-  const snapshots = (data.lineup.predictions_snapshot || {}) as Record<string, any>;
-  const prediction = (kind: "topScorer" | "topAssist", pointsKey: "topScorer" | "topAssist") => {
-    const choice = snapshots[kind];
-    const playerId = kind === "topScorer" ? data.lineup.top_scorer_player_id : data.lineup.top_assist_player_id;
-    const current = playerId ? data.predictionPlayers[playerId] : null;
-    const points = Number(breakdown[pointsKey] || 0);
-    return { name: choice?.playerName || current?.name || null, points, hit: points > 0 };
-  };
-  const scorer = prediction("topScorer", "topScorer");
-  const assist = prediction("topAssist", "topAssist");
   const savedCardSlug = typeof breakdown.cardSlug === "string" ? breakdown.cardSlug : null;
   const savedCardName = savedCardSlug === "super_captain"
     ? "Super Capitão"
@@ -53,7 +43,6 @@ export default async function FantasyUserRoundHistoryPage({ params }: { params: 
         <strong className="shrink-0 text-lg font-black text-[#e2bcff]">{activeCard.bonus > 0 ? "+" : ""}{activeCard.bonus.toFixed(1)} pts</strong>
       </div>
     </section>}
-    <section className="grid grid-cols-2 gap-2"><PredictionCard label="Palpite artilheiro" value={scorer} /><PredictionCard label="Palpite garçom" value={assist} /></section>
   </div>;
 }
 
@@ -71,5 +60,3 @@ function MiniPitch({ players, userId, roundId, captainId }: { players: any[]; us
     : [players.slice(0, 2), players.slice(2, 4), players.slice(4, 5)];
   return <div className="relative min-h-[420px] overflow-hidden rounded-2xl border border-emerald-300/30 bg-[radial-gradient(circle_at_50%_40%,rgba(53,170,97,.22),transparent_50%),linear-gradient(160deg,#092a1b,#04130c)] p-3 shadow-inner"><div className="absolute inset-x-0 top-1/2 border-t border-white/25" /><div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/25" /><div className="absolute inset-x-5 top-3 bottom-3 border border-white/20" /><div className="relative z-10 flex min-h-[396px] flex-col justify-between py-2">{rows.map((row, index) => <div key={index} className={`flex ${row.length === 2 ? "justify-around" : "justify-center"}`}>{row.map((player: any) => { const playerName = player.player_name_locked || player.players?.name || "Jogador"; const captain = player.player_id === captainId; return <Link key={player.id} href={`/cartola/ranking/${userId}/${roundId}/${player.player_id}`} className="flex w-28 flex-col items-center text-center transition-transform active:scale-95"><div className={`relative rounded-full ${captain ? "ring-2 ring-accent" : ""}`}><PlayerAvatar name={playerName} avatarUrl={player.avatar_url_locked || player.players?.avatar_url} className="h-12 w-12 rounded-full border-2 border-emerald-200 bg-background text-xs font-black text-accent" />{captain && <span className="absolute -right-2 -top-1 rounded-full bg-accent px-1.5 py-0.5 text-[8px] font-black text-background">C</span>}</div><span className="mt-1 max-w-28 truncate rounded-md bg-black/80 px-1.5 py-0.5 text-[9px] font-black text-white">{playerName}</span><span className="mt-0.5 text-[10px] font-black text-accent">{Number(player.total_points || 0).toFixed(1)} pts</span></Link>; })}</div>)}</div></div>;
 }
-
-function PredictionCard({ label, value }: { label: string; value: { name: string | null; points: number; hit: boolean } }) { return <div className={`rounded-2xl border p-3 ${value.name ? value.hit ? "border-success/40 bg-success/10" : "border-danger/35 bg-danger/10" : "border-border bg-surface"}`}><p className="text-[8px] font-black uppercase tracking-wider text-muted">{label}</p>{value.name ? <><p className="mt-1 truncate text-sm font-black text-foreground">{value.name}</p><p className={`mt-1 text-[10px] font-black ${value.hit ? "text-success" : "text-danger"}`}>{value.hit ? `Acertou · +${value.points.toFixed(1)} pts` : "Não acertou · 0,0 pts"}</p></> : <p className="mt-1 text-xs font-bold text-muted">Não enviado</p>}</div>; }
