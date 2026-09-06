@@ -34,6 +34,10 @@ export type FantasySettings = {
   smoothingGames: number;
   maxPriceIncrease: number;
   maxPriceDecrease: number;
+  marketUpShare: number;
+  marketStableShare: number;
+  marketMinIncrease: number;
+  marketMinDecrease: number;
   minSampleForRadar?: number;
   // Campos legados preservados para compatibilidade com snapshots antigos
   attackerGoalPoints?: number;
@@ -73,8 +77,12 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   historicalWeight: 0.15,
   consistencyWeight: 0.10,
   smoothingGames: 5,
-  maxPriceIncrease: 0.18,
-  maxPriceDecrease: 0.08,
+  maxPriceIncrease: 0.25,
+  maxPriceDecrease: 0.10,
+  marketUpShare: 0.35,
+  marketStableShare: 0.30,
+  marketMinIncrease: 0.05,
+  marketMinDecrease: 0.02,
   minSampleForRadar: 3,
   // Campos legados — preservados para snapshots antigos
   attackerGoalPoints: BQ_SCORING_V5.goal,

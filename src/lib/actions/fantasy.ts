@@ -277,6 +277,10 @@ export async function getFantasyDashboard() {
         smoothingGames: Number(settingsRow.smoothing_games),
         maxPriceIncrease: Number(settingsRow.max_price_increase),
         maxPriceDecrease: Number(settingsRow.max_price_decrease),
+        marketUpShare: Number(settingsRow.market_up_share ?? DEFAULT_FANTASY_SETTINGS.marketUpShare),
+        marketStableShare: Number(settingsRow.market_stable_share ?? DEFAULT_FANTASY_SETTINGS.marketStableShare),
+        marketMinIncrease: Number(settingsRow.market_min_increase ?? DEFAULT_FANTASY_SETTINGS.marketMinIncrease),
+        marketMinDecrease: Number(settingsRow.market_min_decrease ?? DEFAULT_FANTASY_SETTINGS.marketMinDecrease),
         minSampleForRadar: Number(settingsRow.min_sample_for_radar ?? 3),
       }
     : DEFAULT_FANTASY_SETTINGS;
@@ -1631,9 +1635,9 @@ export async function getRevealedLineups(roundId?: string) {
     .select(
       `
       id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, challenge_player_id,
-      player_points, prediction_points, total_points, round_position,
+      player_points, prediction_points, total_points, round_position, score_breakdown,
       fantasy_lineup_players (
-        id, player_id, price_locked, price_after, base_points, position_bonus, captain_bonus, total_points,
+        id, player_id, slot_index, slot_role, player_profile_locked, price_locked, price_after, base_points, position_bonus, captain_bonus, total_points,
         player_name_locked, avatar_url_locked
       )
     `
@@ -1703,12 +1707,14 @@ export async function getRevealedLineups(roundId?: string) {
             status: activation.status,
             bonus: Number(activation.result_bonus || 0),
             details: activation.result_details || null,
+            fallbackBonus: Number(l.score_breakdown?.cardBonus || 0),
           }
         : null,
       players: (l.fantasy_lineup_players || []).map((lp: any) => ({
         playerId: lp.player_id,
         name: lp.player_name_locked || "Jogador",
         avatarUrl: lp.avatar_url_locked || null,
+        slotRole: lp.slot_role || null,
         isCaptain: lp.player_id === l.captain_player_id,
         priceLocked: Number(lp.price_locked || 0),
         priceAfter: lp.price_after != null ? Number(lp.price_after) : null,
@@ -2308,7 +2314,7 @@ export async function getFantasyRanking(
     if (fantasyRoundId) {
       const { data } = await rankingReadClient
         .from("fantasy_lineups")
-        .select("id, user_id, total_points, budget_after, budget_before, status, fantasy_lineup_players(player_id)")
+        .select("id, user_id, total_points, budget_after, budget_before, score_breakdown, status, fantasy_lineup_players(player_id)")
         .eq("fantasy_round_id", fantasyRoundId);
       persistedLineups = (data || []).filter(
         (lineup: any) => (lineup.fantasy_lineup_players || []).length > 0,
@@ -2553,6 +2559,7 @@ export async function getFantasyRanking(
     (roundCardActivations || []).map((activation: any) => {
       const card = Array.isArray(activation.card) ? activation.card[0] : activation.card;
       const details = activation.result_details || {};
+      const matchingLineup = entries.find((entry: any) => entry.user_id === activation.user_id);
       return [activation.user_id, {
         slug: card?.slug || null,
         name: card?.name || "Carta utilizada",
@@ -2561,6 +2568,8 @@ export async function getFantasyRanking(
         budgetRecovery: Number(details.budgetRecovery || 0),
         description: details.description || null,
         status: activation.status || "RESERVED",
+        details,
+        fallbackBonus: Number(matchingLineup?.score_breakdown?.cardBonus || 0),
       }];
     }),
   );
@@ -3180,19 +3189,20 @@ export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
 export async function getFantasyUserHistory(userId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return null;
+  const historyReadClient = createServiceClient() || account.client;
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
   if (!season) return null;
-  const { data: fantasySeason } = await account.client
+  const { data: fantasySeason } = await historyReadClient
     .from("fantasy_seasons")
     .select("id")
     .eq("season_id", season.id)
     .maybeSingle();
   if (!fantasySeason) return null;
   const [{ data: profile }, { data: fantasyAccount }, { data: lineups }] = await Promise.all([
-    account.client.from("account_profiles").select("user_id, players(name, avatar_url)").eq("user_id", userId).maybeSingle(),
-    account.client.from("fantasy_accounts").select("total_points, current_budget, rounds_played, best_round_points").eq("fantasy_season_id", fantasySeason.id).eq("user_id", userId).maybeSingle(),
-    account.client
+    historyReadClient.from("account_profiles").select("user_id, players(name, avatar_url)").eq("user_id", userId).maybeSingle(),
+    historyReadClient.from("fantasy_accounts").select("total_points, current_budget, rounds_played, best_round_points").eq("fantasy_season_id", fantasySeason.id).eq("user_id", userId).maybeSingle(),
+    historyReadClient
       .from("fantasy_lineups")
       .select("id, total_points, player_points, prediction_points, budget_after, captain_player_id, top_scorer_player_id, top_assist_player_id, score_breakdown, fantasy_rounds!inner(round_id, market_status, settings_snapshot, rounds!inner(number, date, status))")
       .eq("user_id", userId)
@@ -3203,7 +3213,7 @@ export async function getFantasyUserHistory(userId: string) {
   if (!profile || !fantasyAccount) return null;
   const roundIds = (lineups || []).map((lineup: any) => lineup.fantasy_rounds?.round_id).filter(Boolean);
   const { data: activations } = roundIds.length
-    ? await account.client
+    ? await historyReadClient
       .from("fantasy_card_activations")
       .select("round_id, status, result_bonus, result_details, cards(name, slug, rarity, description)")
       .eq("user_id", userId)
@@ -3323,6 +3333,15 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
     ? await account.client.from("players").select("id, name, avatar_url").in("id", predictionIds)
     : { data: [] };
   const historyLineup = history?.lineups?.find((item: any) => item.fantasyRound?.round_id === roundId);
+  const { data: directActivation } = await lineupReadClient
+    .from("fantasy_card_activations")
+    .select("status, result_bonus, result_details, cards(name, slug, rarity, description)")
+    .eq("round_id", roundId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  const directCard: any = Array.isArray((directActivation as any)?.cards)
+    ? (directActivation as any).cards[0]
+    : (directActivation as any)?.cards;
   return {
     history: history || { player: profile?.players || null },
     lineup,
@@ -3342,7 +3361,15 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
         }))
       : Object.fromEntries((storedStats || []).map((stat: any) => [stat.player_id, stat])),
     predictionPlayers: Object.fromEntries((predictionPlayers || []).map((player: any) => [player.id, player])),
-    activeCard: historyLineup?.activeCard || null,
+    activeCard: directCard ? {
+      name: directCard.name,
+      slug: directCard.slug,
+      rarity: directCard.rarity,
+      description: directCard.description,
+      status: directActivation?.status,
+      bonus: Number(directActivation?.result_bonus || 0),
+      details: directActivation?.result_details || null,
+    } : historyLineup?.activeCard || null,
   };
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cosmeticAuraClass, cosmeticAuraVariant, cosmeticFrameImage, cosmeticImage, cosmeticMobileBackgroundImage, cosmeticNameplateClass } from "./cosmetics";
+import { cosmeticAuraClass, cosmeticAuraVariant, cosmeticFrameImage, cosmeticImage, cosmeticMobileBackgroundImage, cosmeticNameplateClass, cosmeticNameplateImage } from "./cosmetics";
 
 describe("cosmetic aura variants", () => {
   it("maps VAR da Varzea to its animated review effect", () => {
@@ -10,11 +10,13 @@ describe("cosmetic aura variants", () => {
 });
 
 describe("cosmetic nameplate classes", () => {
-  it("maps Placa de Substituicao to the split red and green panel", () => {
+  it("maps Placa de Substituicao to the image artwork", () => {
     const className = cosmeticNameplateClass("nameplate-placa-substituicao");
 
     expect(className).toContain("cosmetic-nameplate");
     expect(className).toContain("cosmetic-nameplate--substitution");
+    expect(cosmeticNameplateImage("nameplate-placa-substituicao")).toBe("/images/cosmetics/nameplates/nameplate-placa-substituicao-v2.webp");
+    expect(cosmeticImage("nameplate-placa-substituicao")).toBe("/images/cosmetics/nameplates/nameplate-placa-substituicao-v2.webp");
   });
 });
 

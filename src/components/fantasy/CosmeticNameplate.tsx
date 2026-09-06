@@ -1,4 +1,4 @@
-import { cosmeticNameplateClass } from "@/lib/fantasy/cosmetics";
+import { cosmeticNameplateClass, cosmeticNameplateImage } from "@/lib/fantasy/cosmetics";
 
 type NameplateMeta = {
   kicker: string;
@@ -32,9 +32,13 @@ export function CosmeticNameplate({
   className?: string;
 }) {
   const meta = nameplateMeta(assetKey);
+  const artwork = cosmeticNameplateImage(assetKey);
 
   return (
-    <div className={`${cosmeticNameplateClass(assetKey)} ${compact ? "cosmetic-nameplate--compact" : ""} ${className}`}>
+    <div
+      className={`${cosmeticNameplateClass(assetKey)} ${artwork ? "cosmetic-nameplate--art" : ""} ${compact ? "cosmetic-nameplate--compact" : ""} ${className}`}
+      style={artwork ? { backgroundImage: `url(${artwork})` } : undefined}
+    >
       <div className="cosmetic-nameplate__header">
         <span>{meta.kicker}</span>
         <b aria-hidden="true">{meta.mark}</b>

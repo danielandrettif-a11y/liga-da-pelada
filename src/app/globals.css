@@ -713,7 +713,7 @@ textarea {
    Auras cosméticas — leves, móveis e compatíveis com molduras
    ============================================ */
 
-/* Nameplates 2026 — placas compactas com materiais e recortes próprios. */
+/* Nameplates 2026 — a arte vem dos WebPs; CSS posiciona somente o conteúdo. */
 .cosmetic-nameplate {
   position: relative;
   isolation: isolate;
@@ -729,6 +729,22 @@ textarea {
   padding: .55rem 1rem .6rem;
   text-align: left;
 }
+
+.cosmetic-nameplate--art {
+  display: flex;
+  min-height: 5.1rem;
+  flex-direction: column;
+  justify-content: center;
+  border-color: transparent;
+  background-color: transparent;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  box-shadow: none;
+  padding: .85rem 15% .82rem;
+}
+
+.cosmetic-nameplate--art::after { display: none; }
 
 .cosmetic-nameplate::after {
   content: "";
@@ -806,6 +822,11 @@ textarea {
   padding: .42rem .65rem .45rem;
 }
 
+.cosmetic-nameplate--art.cosmetic-nameplate--compact {
+  min-height: 3.8rem;
+  padding: .62rem 14% .58rem;
+}
+
 .cosmetic-nameplate--compact .cosmetic-nameplate__header { font-size: .4rem; }
 .cosmetic-nameplate--compact .cosmetic-nameplate__header b { font-size: .48rem; }
 .cosmetic-nameplate--compact .cosmetic-nameplate__player { margin-top: .28rem; font-size: .72rem; }
@@ -820,46 +841,29 @@ textarea {
 .cosmetic-nameplate--locker {
   border-color: rgba(253,230,138,.55);
   color: #fff2c7;
-  background:
-    linear-gradient(90deg,transparent 0 12%,rgba(255,255,255,.07) 12% 13%,transparent 13% 87%,rgba(0,0,0,.25) 87% 88%,transparent 88%),
-    repeating-linear-gradient(4deg,#3c2414 0 6px,#2a180e 6px 12px);
 }
 
 .cosmetic-nameplate--scoreboard {
   border-color: rgba(190,242,100,.65);
   color: #ccff00;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: radial-gradient(circle at 20% 20%,rgba(204,255,0,.13),transparent 32%),#020503;
   text-shadow: 0 0 8px rgba(204,255,0,.72);
-  box-shadow: inset 0 0 18px rgba(163,230,53,.19),0 0 16px rgba(163,230,53,.18);
 }
 
 .cosmetic-nameplate--supporters {
   border-color: rgba(250,204,21,.58);
   color: #fff3b0;
-  transform: rotate(-.35deg);
-  background:
-    linear-gradient(90deg,transparent 0 6%,rgba(250,204,21,.3) 6% 7%,transparent 7% 93%,rgba(250,204,21,.3) 93% 94%,transparent 94%),
-    repeating-linear-gradient(135deg,#22602e 0 10px,#0c3218 10px 20px);
 }
 
 .cosmetic-nameplate--tactics {
   border-color: rgba(190,242,100,.5);
   color: #ecfccb;
-  background:
-    radial-gradient(circle at 22% 50%,transparent 0 13px,rgba(204,255,0,.24) 14px 15px,transparent 16px),
-    linear-gradient(90deg,transparent 49.5%,rgba(204,255,0,.2) 50%,transparent 50.5%),
-    linear-gradient(#18351f,#0d2415);
 }
 
 .cosmetic-nameplate--matchsheet {
   border-color: rgba(92,64,35,.72);
   color: #352312;
   text-shadow: none;
-  background:
-    linear-gradient(90deg,rgba(185,28,28,.15) 0 2px,transparent 2px) 16px 0/100% 100%,
-    repeating-linear-gradient(0deg,#f3e5b5 0 7px,#d9c58d 7px 8px);
-  box-shadow: 0 7px 18px rgba(0,0,0,.3),inset 0 0 18px rgba(120,76,26,.14);
 }
 
 .cosmetic-nameplate--matchsheet::after { border-color: rgba(73,48,22,.2); }
@@ -868,23 +872,16 @@ textarea {
   border-color: rgba(255,255,255,.5);
   color: #fff;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  background:
-    linear-gradient(90deg,rgba(248,113,113,.16),transparent 38% 62%,rgba(74,222,128,.17)),
-    linear-gradient(90deg,#3d0808 0 47%,#050505 47% 53%,#07351a 53% 100%);
-  box-shadow: inset 0 0 14px rgba(255,255,255,.1),-4px 0 15px rgba(248,113,113,.25),4px 0 15px rgba(74,222,128,.25);
 }
 
 .cosmetic-nameplate--gate {
   border-color: rgba(212,212,216,.55);
   color: #ecfccb;
-  background: repeating-linear-gradient(90deg,#0a100c 0 5px,#263329 5px 7px);
 }
 
 .cosmetic-nameplate--legend {
   border-color: rgba(253,224,71,.76);
   color: #fff1a8;
-  background: radial-gradient(circle at 50% 0,rgba(204,255,0,.25),transparent 45%),linear-gradient(115deg,#151006,#684f14 48%,#102619);
-  box-shadow: inset 0 0 20px rgba(250,204,21,.2),0 0 20px rgba(204,255,0,.18);
 }
 
 .cosmetic-aura-host {

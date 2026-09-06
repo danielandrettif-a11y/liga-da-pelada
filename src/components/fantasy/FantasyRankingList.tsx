@@ -8,6 +8,7 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { CosmeticNameplate } from "@/components/fantasy/CosmeticNameplate";
 import type { FantasyRoundLineupOverview } from "@/lib/actions/fantasy";
 import { cosmeticImage } from "@/lib/fantasy/cosmetics";
+import { resolveFantasyCardBenefit } from "@/lib/fantasy/card-benefits";
 import { supabase } from "@/lib/supabase";
 
 export type FantasyRankingEntry = {
@@ -47,6 +48,8 @@ export type FantasyRankingEntry = {
     budgetRecovery: number;
     description: string | null;
     status: string;
+    details?: Record<string, unknown> | null;
+    fallbackBonus?: number;
   } | null;
 };
 
@@ -95,10 +98,14 @@ function metricSupportingValue(item: FantasyRankingEntry, metric: FantasyRanking
 }
 
 function cardBenefitLabel(card: NonNullable<FantasyRankingEntry["roundCard"]>) {
-  if (card.budgetRecovery > 0) return `+C$ ${card.budgetRecovery.toFixed(2)}`;
-  if (card.bonus > 0) return `+${card.bonus.toFixed(1)} pts`;
-  if (["RESERVED", "LOCKED"].includes(card.status)) return "Em disputa";
-  return "Sem bônus";
+  return resolveFantasyCardBenefit({
+    slug: card.slug,
+    status: card.status,
+    bonus: card.bonus,
+    details: card.details,
+    fallbackBonus: card.fallbackBonus,
+    fallbackDescription: card.description,
+  }).label;
 }
 
 function cardRarityClass(rarity?: string) {

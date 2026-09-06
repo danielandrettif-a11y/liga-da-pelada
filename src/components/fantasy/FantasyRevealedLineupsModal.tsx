@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Crown, Lock, Search, Target, Trophy, X } from "@/components/icons";
+import { Lock, Search, Target, Trophy, X } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { FantasyLineupMiniPitch } from "@/components/fantasy/FantasyLineupMiniPitch";
 import { getRevealedLineups } from "@/lib/actions/fantasy";
+import { resolveFantasyCardBenefit } from "@/lib/fantasy/card-benefits";
 
 type Props = {
   roundId?: string | null;
@@ -136,6 +138,13 @@ export function FantasyRevealedLineupsModal({
           ) : (
             filteredLineups.map((lineup) => {
               const expanded = expandedLineupId === lineup.lineupId;
+              const benefit = lineup.activeCard ? resolveFantasyCardBenefit({
+                slug: lineup.activeCard.slug,
+                status: lineup.activeCard.status,
+                bonus: lineup.activeCard.bonus,
+                details: lineup.activeCard.details,
+                fallbackBonus: lineup.activeCard.fallbackBonus,
+              }) : null;
               return <article
                 key={lineup.lineupId}
                 className={`rounded-2xl border p-4 transition-colors ${
@@ -187,42 +196,8 @@ export function FantasyRevealedLineupsModal({
                 </button>
 
                 {expanded && <>
-                {/* 5 Jogadores Escalados */}
-                <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2 border-t border-white/5 pt-3">
-                  {lineup.players.map((p: any) => (
-                    <div
-                      key={p.playerId}
-                      className={`relative flex flex-col items-center rounded-xl border p-2 text-center ${
-                        p.isCaptain
-                          ? "border-warning/60 bg-warning/10 ring-1 ring-warning/30"
-                          : "border-white/5 bg-black/20"
-                      }`}
-                    >
-                      {p.isCaptain && (
-                        <span
-                          className="absolute -top-1.5 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-warning text-background shadow"
-                          title="Capitão (2x Pontos)"
-                        >
-                          <Crown className="h-3 w-3" />
-                        </span>
-                      )}
-                      <PlayerAvatar
-                        name={p.name}
-                        avatarUrl={p.avatarUrl}
-                        clickable={false}
-                        className="h-9 w-9 rounded-full border border-white/20 bg-background text-[10px] font-black text-accent"
-                      />
-                      <span className="mt-1 truncate w-full text-[10px] font-black text-foreground">
-                        {p.name}
-                      </span>
-                      <span className="text-[9px] font-bold text-accent">
-                        {p.points.toFixed(1)} pts
-                      </span>
-                      <span className="mt-0.5 text-[8px] text-muted">
-                        Base {(p.basePoints - (p.positionBonus || 0)).toFixed(1)} · posição {(p.positionBonus || 0).toFixed(1)}{p.captainBonus ? ` · capitão ${p.captainBonus.toFixed(1)}` : ""}
-                      </span>
-                    </div>
-                  ))}
+                <div className="mt-3 border-t border-white/5 pt-3">
+                  <FantasyLineupMiniPitch players={lineup.players} captainId={lineup.captainId} />
                 </div>
 
                 {/* Desafio da rodada */}
@@ -233,12 +208,13 @@ export function FantasyRevealedLineupsModal({
                     </span>
                   </div>
                 )}
-                {lineup.activeCard && (
+                {lineup.activeCard ? (
                   <div className="mt-3 rounded-xl border border-[#a65cff]/35 bg-[#a65cff]/10 px-3 py-2 text-[10px]">
                     <p className="font-black text-[#d7adff]">🃏 Carta: {lineup.activeCard.name} <span className="text-muted">· {lineup.activeCard.status}</span></p>
-                    <p className="mt-1 text-muted">Bônus da carta: <strong className="text-foreground">{lineup.activeCard.bonus >= 0 ? "+" : ""}{lineup.activeCard.bonus.toFixed(1)} pts</strong></p>
+                    <p className="mt-1 text-muted">Benefício: <strong className={benefit?.applied ? "text-accent" : "text-foreground"}>{benefit?.label}</strong></p>
+                    {benefit?.description && <p className="mt-1 leading-4 text-muted">{benefit.description}</p>}
                   </div>
-                )}
+                ) : <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[10px] font-bold text-muted">🃏 Nenhuma carta usada nesta rodada.</div>}
                 <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-black/20 p-2 text-center text-[9px]">
                   <span><strong className="block text-foreground">{lineup.playerPoints.toFixed(1)}</strong>jogadores</span>
                   <span><strong className="block text-accent">{lineup.totalPoints.toFixed(1)}</strong>total</span>

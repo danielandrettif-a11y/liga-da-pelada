@@ -64,6 +64,8 @@ export function cosmeticImage(assetKey?: string | null) {
   // Títulos usam uma prévia tipográfica própria. Nunca reaproveitar fotos
   // genéricas de capas ou fundos apenas porque a chave contém "rei", etc.
   if (key.startsWith("title-")) return null;
+  const nameplate = cosmeticNameplateImage(key);
+  if (nameplate) return nameplate;
   if (key.includes("showcase-lenda-campinho")) return "/images/cosmetics/house-40/emblema-lenda-campinho-v1.webp";
   if (key.includes("pitch-lenda-campinho")) return "/images/cartola/campo-lenda-campinho-v1.webp";
   if (key.includes("banner-lenda-campinho")) return "/images/cosmetics/house-40/capa-lenda-campinho-v1.webp";
@@ -93,6 +95,24 @@ export function cosmeticImage(assetKey?: string | null) {
   if (key.includes("lenda")) return "/images/cosmetics/lenda-varzea.webp";
   if (key.includes("rei")) return "/images/cosmetics/rei-estadio.webp";
   return null;
+}
+
+/** Artes definitivas dos nameplates. A imagem contém somente a placa; nome e
+ * título continuam sendo renderizados pelo app para permanecerem nítidos. */
+export function cosmeticNameplateImage(assetKey?: string | null) {
+  const key = (assetKey || "").toLowerCase();
+  if (!key.includes("nameplate")) return null;
+  const asset = ([
+    ["ficha-vestiario", "nameplate-ficha-vestiario-v2.webp"],
+    ["placar-quadra", "nameplate-placar-quadra-v2.webp"],
+    ["faixa-torcida", "nameplate-faixa-torcida-v2.webp"],
+    ["prancheta-tatica", "nameplate-prancheta-tatica-v2.webp"],
+    ["sumula-juiz", "nameplate-sumula-juiz-v2.webp"],
+    ["placa-substituicao", "nameplate-placa-substituicao-v2.webp"],
+    ["portao-campinho", "nameplate-portao-campinho-v2.webp"],
+    ["lenda-campinho", "nameplate-lenda-campinho-v2.webp"],
+  ] as const).find(([fragment]) => key.includes(fragment));
+  return asset ? `/images/cosmetics/nameplates/${asset[1]}` : null;
 }
 
 /**
