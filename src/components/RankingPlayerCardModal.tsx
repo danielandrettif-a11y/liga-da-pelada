@@ -23,10 +23,10 @@ const PROFILE_LABELS = {
 };
 
 function cardTheme(position: number) {
-  if (position === 1) return { base: "#c99520", light: "#fff0a6", deep: "#6f4806", edge: "#fff5bd", ink: "#2d2106", glow: "rgba(255,199,47,.42)", label: "OURO" };
-  if (position === 2) return { base: "#a8b1bd", light: "#f8fbff", deep: "#515b68", edge: "#ffffff", ink: "#17202a", glow: "rgba(210,224,240,.35)", label: "PRATA" };
-  if (position === 3) return { base: "#a9612f", light: "#f0c09a", deep: "#512713", edge: "#f4c8a6", ink: "#2c150a", glow: "rgba(195,105,53,.38)", label: "BRONZE" };
-  return { base: "#123e28", light: "#4f8d67", deep: "#06150d", edge: "#bdfb68", ink: "#f7fff9", glow: "rgba(204,255,0,.2)", label: "ESPECIAL" };
+  if (position === 1) return { artwork: "/images/ranking-cards/ranking-card-gold-v1.webp", base: "#c99520", light: "#fff0a6", deep: "#6f4806", edge: "#ffe77a", ink: "#ffffff", glow: "rgba(255,199,47,.42)", label: "OURO" };
+  if (position === 2) return { artwork: "/images/ranking-cards/ranking-card-silver-v1.webp", base: "#a8b1bd", light: "#f8fbff", deep: "#515b68", edge: "#e8f1f8", ink: "#ffffff", glow: "rgba(210,224,240,.35)", label: "PRATA" };
+  if (position === 3) return { artwork: "/images/ranking-cards/ranking-card-bronze-v1.webp", base: "#a9612f", light: "#f0c09a", deep: "#512713", edge: "#efad77", ink: "#ffffff", glow: "rgba(195,105,53,.38)", label: "BRONZE" };
+  return { artwork: "/images/ranking-cards/ranking-card-neutral-v1.webp", base: "#123e28", light: "#4f8d67", deep: "#06150d", edge: "#ccff00", ink: "#ffffff", glow: "rgba(204,255,0,.2)", label: "RANKED" };
 }
 
 function signedPoints(points: number) {
@@ -57,6 +57,7 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
   if (!context) throw new Error("Canvas indisponível");
   const theme = cardTheme(position);
   const profile = `${PROFILE_LABELS[entry.player.player_profile || "midfield"]}${entry.player.is_goalkeeper ? " / GOL" : ""}`;
+  const cardArtwork = await loadShareImage(theme.artwork);
 
   const background = context.createLinearGradient(0, 0, 0, 1920);
   background.addColorStop(0, "#020b06");
@@ -76,28 +77,20 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
   context.fillText("CARTA DA TEMPORADA", 540, 158);
 
   const x = 95, y = 225, width = 890, height = 1450;
-  context.save();
-  roundedRect(context, x, y, width, height, 70);
-  context.clip();
-  const cardGradient = context.createLinearGradient(x, y, x + width, y + height);
-  cardGradient.addColorStop(0, theme.light);
-  cardGradient.addColorStop(0.48, theme.base);
-  cardGradient.addColorStop(1, theme.deep);
-  context.fillStyle = cardGradient;
-  context.fillRect(x, y, width, height);
-  context.fillStyle = "rgba(255,255,255,.12)";
-  for (let stripe = -800; stripe < 1200; stripe += 95) {
+  if (cardArtwork) {
+    context.drawImage(cardArtwork, x, y, width, height);
+  } else {
     context.save();
-    context.translate(x + stripe, y);
-    context.rotate(-0.22);
-    context.fillRect(0, 0, 20, 1700);
+    roundedRect(context, x, y, width, height, 70);
+    context.clip();
+    const cardGradient = context.createLinearGradient(x, y, x + width, y + height);
+    cardGradient.addColorStop(0, theme.light);
+    cardGradient.addColorStop(0.48, theme.base);
+    cardGradient.addColorStop(1, theme.deep);
+    context.fillStyle = cardGradient;
+    context.fillRect(x, y, width, height);
     context.restore();
   }
-  context.restore();
-  context.strokeStyle = theme.edge;
-  context.lineWidth = 9;
-  roundedRect(context, x, y, width, height, 70);
-  context.stroke();
 
   context.textAlign = "left";
   context.fillStyle = theme.ink;
@@ -136,14 +129,14 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
   context.arc(avatarX, avatarY, avatarRadius, 0, Math.PI * 2);
   context.stroke();
 
-  context.fillStyle = "rgba(255,255,255,.16)";
-  roundedRect(context, 145, 710, 790, 125, 24);
+  context.fillStyle = "rgba(0,0,0,.18)";
+  roundedRect(context, 145, 985, 790, 125, 24);
   context.fill();
   context.fillStyle = theme.ink;
   context.textAlign = "center";
   context.font = "900 56px Arial";
   const displayName = entry.player.name.toUpperCase();
-  context.fillText(displayName.length > 25 ? `${displayName.slice(0, 24)}…` : displayName, 540, 790);
+  context.fillText(displayName.length > 25 ? `${displayName.slice(0, 24)}…` : displayName, 540, 1050);
 
   const stats: Array<[string | number, string]> = [
     [entry.goals, "GOLS"], [entry.assists, "ASSIST."], [entry.wins, "VITÓRIAS"],
@@ -153,15 +146,15 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
     const col = index % 3;
     const row = Math.floor(index / 3);
     const boxX = 145 + col * 270;
-    const boxY = 900 + row * 225;
-    context.fillStyle = "rgba(255,255,255,.14)";
-    roundedRect(context, boxX, boxY, 245, 190, 24);
+    const boxY = 1210 + row * 145;
+    context.fillStyle = "rgba(0,0,0,.08)";
+    roundedRect(context, boxX, boxY, 245, 125, 20);
     context.fill();
     context.fillStyle = theme.ink;
     context.font = "900 65px Arial";
-    context.fillText(String(value), boxX + 122, boxY + 82);
+    context.fillText(String(value), boxX + 122, boxY + 58);
     context.font = "900 20px Arial";
-    context.fillText(label, boxX + 122, boxY + 132);
+    context.fillText(label, boxX + 122, boxY + 94);
   });
 
   const awards = [
@@ -173,14 +166,14 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
   if (awards) {
     context.fillStyle = theme.ink;
     context.font = "900 21px Arial";
-    context.fillText(awards, 540, 1422, 780);
+    context.fillText(awards, 540, 1145, 780);
   }
   context.fillStyle = "rgba(255,255,255,.15)";
-  roundedRect(context, 145, 1480, 790, 105, 24);
+  roundedRect(context, 145, 1515, 790, 70, 20);
   context.fill();
   context.fillStyle = theme.ink;
   context.font = "900 25px Arial";
-  context.fillText("FUTEBOL, RESENHA E BAIXA QUALIDADE", 540, 1545);
+  context.fillText("FUTEBOL, RESENHA E BAIXA QUALIDADE", 540, 1560);
 
   context.fillStyle = "#ffffff";
   context.font = "900 31px Arial";
@@ -260,8 +253,6 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
     };
   }, [onClose]);
 
-  const clipPath = "polygon(10% 0, 90% 0, 100% 7%, 97% 88%, 50% 100%, 3% 88%, 0 7%)";
-
   if (!mounted || typeof document === "undefined") return null;
 
   return createPortal(
@@ -288,119 +279,60 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
           </button>
         </div>
 
-        {/* CARTA DE FUTEBOL ESTILO ULTIMATE TEAM */}
-        <div
-          className="relative w-full p-[3px] transition-transform"
-          style={{
-            clipPath,
-            background: `linear-gradient(145deg, ${theme.edge}, ${theme.deep} 48%, ${theme.light})`,
-            filter: `drop-shadow(0 20px 30px ${theme.glow})`,
-          }}
-        >
-          <div
-            className="relative overflow-hidden px-4 sm:px-5 pb-10 pt-5"
-            style={{
-              clipPath,
-              color: theme.ink,
-              background: `linear-gradient(155deg, ${theme.light} 0%, ${theme.base} 42%, ${theme.deep} 115%)`,
-            }}
-          >
-            <div
-              className="pointer-events-none absolute inset-0 opacity-40"
-              style={{
-                backgroundImage:
-                  "repeating-linear-gradient(120deg, transparent 0 22px, rgba(255,255,255,.2) 23px 24px), radial-gradient(circle at 72% 14%, rgba(255,255,255,.85), transparent 28%)",
-              }}
-            />
-            <div className="pointer-events-none absolute -left-16 top-32 h-32 w-[140%] -rotate-12 border-y border-white/25 bg-white/10" />
-            <div className="pointer-events-none absolute inset-2.5 border border-current/20" style={{ clipPath }} />
+        <div className="relative aspect-[2/3] w-full text-white" style={{ filter: `drop-shadow(0 20px 30px ${theme.glow})` }}>
+          <img src={theme.artwork} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full object-fill" />
 
-            {/* Cabeçalho */}
-            <header className="relative z-10 flex items-center justify-between text-[9px] font-black uppercase tracking-[0.22em] opacity-90 pr-7">
-              <span className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
-                PBQ · Temporada
-              </span>
-              <span className="rounded-full border border-current/25 bg-white/20 px-2.5 py-0.5 shadow-sm">
-                Carta {theme.label}
-              </span>
-            </header>
+          <header className="absolute inset-x-[18%] top-[5.5%] z-10 flex h-[5%] items-center justify-center truncate text-[8px] font-black uppercase tracking-[.2em]" style={{ color: theme.edge }}>
+            PBQ • {theme.label}
+          </header>
 
-            {/* Miolo: Pontuação & Foto em Medalhão Circular com Recorte Perfeito */}
-            <div className="relative z-10 mt-2 flex items-center justify-between h-40 sm:h-44">
-              <div className="flex flex-col items-start font-athletic z-20 pl-1">
-                <span className="player-card-rating text-5xl font-black leading-none drop-shadow-sm">{entry.points}</span>
-                <span className="text-[10px] font-black tracking-[0.2em] opacity-80">PTS</span>
-                <div className="my-1.5 h-px w-10 bg-current opacity-30" />
-                <span className="text-xs font-black uppercase leading-tight max-w-[90px]">{profile}</span>
-                <div className="mt-2 inline-flex items-center gap-1 rounded-md border border-current/25 bg-white/20 px-2 py-0.5 text-xs font-black shadow-inner">
-                  {position}º
-                </div>
-              </div>
-
-              <div className="relative flex-1 flex justify-end pr-1">
-                <div className="relative h-32 w-32 sm:h-36 sm:w-36 rounded-full border-[3px] border-current/35 bg-black/20 shadow-[0_10px_25px_rgba(0,0,0,0.45)] flex items-center justify-center overflow-hidden">
-                  <PlayerAvatar
-                    name={entry.player.name}
-                    avatarUrl={entry.player.avatar_url}
-                    frameKey={entry.cosmetics?.frameKey}
-                    auraKey={entry.cosmetics?.auraKey}
-                    clickable={false}
-                    className="h-full w-full rounded-full overflow-hidden"
-                    imageClassName="h-full w-full object-cover object-top"
-                  />
-                </div>
+          <div className="absolute inset-x-[13%] top-[14%] z-10 flex h-[37%] items-center justify-between">
+            <div className="flex w-[34%] flex-col items-start pl-1 font-athletic drop-shadow-[0_2px_5px_rgba(0,0,0,.9)]">
+              <span className="player-card-rating text-[2.65rem] font-black leading-none" style={{ color: theme.edge }}>{entry.points}</span>
+              <span className="mt-0.5 text-[9px] font-black tracking-[.22em] text-white/75">PTS</span>
+              <span className="mt-2 border-t border-white/30 pt-2 text-[11px] font-black uppercase leading-tight text-white">{profile}</span>
+              <span className="mt-2 rounded-md border border-white/25 bg-black/35 px-2 py-0.5 text-xs font-black text-white">{position}º</span>
+            </div>
+            <div className="relative flex h-[78%] w-[60%] items-center justify-center">
+              <div className="relative aspect-square h-full max-h-44 overflow-hidden rounded-full border-[3px] bg-[#07150d] shadow-[0_10px_28px_rgba(0,0,0,.55)]" style={{ borderColor: theme.edge }}>
+                <PlayerAvatar name={entry.player.name} avatarUrl={entry.player.avatar_url} frameKey={entry.cosmetics?.frameKey} auraKey={entry.cosmetics?.auraKey} clickable={false} className="h-full w-full overflow-hidden rounded-full" imageClassName="h-full w-full object-cover object-top" />
               </div>
             </div>
+          </div>
 
-            {/* Nome & Título */}
+          <div className="absolute inset-x-[12%] top-[55%] z-10 flex h-[9%] items-center justify-center overflow-hidden px-2 text-center">
             {entry.cosmetics?.nameplateKey ? (
-              <CosmeticNameplate assetKey={entry.cosmetics.nameplateKey} playerName={displayName} titleName={entry.cosmetics.titleName} className="relative z-10 mt-1 w-full max-w-none" />
+              <CosmeticNameplate assetKey={entry.cosmetics.nameplateKey} playerName={displayName} titleName={entry.cosmetics.titleName} compact className="w-[125%] max-w-none scale-[.8]" />
             ) : (
-              <div className="relative z-10 mt-1 rounded-xl border border-current/25 bg-white/15 px-3 py-2 text-center backdrop-blur-xs shadow-sm">
-                <h2 className="truncate font-athletic text-xl font-black uppercase tracking-wide">{displayName}</h2>
-                {entry.cosmetics?.titleName ? <p className="mt-0.5 truncate text-[9px] font-black uppercase tracking-wider opacity-90 text-current">✨ {entry.cosmetics.titleName}</p> : null}
-              </div>
-            )}
-
-            {awardBadges.length > 0 && (
-              <div className="relative z-10 mt-2 flex flex-wrap justify-center gap-1.5 rounded-xl border border-current/15 bg-white/10 p-2">
-                {awardBadges.map(({ label, value, Icon }) => (
-                  <span key={label} className="inline-flex items-center gap-1 rounded-full border border-current/20 bg-white/15 px-2 py-0.5 text-[8px] font-black uppercase">
-                    <Icon className="h-3 w-3" />
-                    {label} {value}x
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Grid 3x2 de Estatísticas */}
-            <div className="relative z-10 mt-3 grid grid-cols-3 gap-1.5 font-athletic">
-              {[
-                [entry.goals, "GOL"], [entry.assists, "AST"], [entry.wins, "VIT"],
-                [entry.games, "JOG"], [entry.losses, "DER"], [`${entry.winRate}%`, "APR"],
-              ].map(([value, label]) => (
-                <div key={label} className="rounded-lg border border-current/15 bg-white/15 px-1 py-1.5 text-center shadow-inner">
-                  <p className="player-card-number text-xl leading-none">{value}</p>
-                  <p className="mt-0.5 text-[8px] font-black tracking-[0.14em] opacity-75">{label}</p>
-                </div>
-              ))}
-            </div>
-
-            {entry.fitness && (
-              <div className="relative z-10 mt-3 grid grid-cols-2 gap-2 border-t border-current/25 pt-2.5 text-center">
-                <div>
-                  <p className="font-athletic text-base font-black">{entry.fitness.distanceKm} km</p>
-                  <p className="text-[8px] font-black uppercase opacity-65">Distância Ranked</p>
-                </div>
-                <div>
-                  <p className="font-athletic text-base font-black">{entry.fitness.averageSpeedKmh} km/h</p>
-                  <p className="text-[8px] font-black uppercase opacity-65">Velocidade média</p>
-                </div>
+              <div className="min-w-0">
+                <h2 className="truncate font-athletic text-xl font-black uppercase tracking-wide text-white drop-shadow-[0_2px_4px_rgba(0,0,0,.9)]">{displayName}</h2>
+                {entry.cosmetics?.titleName && <p className="truncate text-[8px] font-black uppercase tracking-widest" style={{ color: theme.edge }}>✦ {entry.cosmetics.titleName}</p>}
               </div>
             )}
           </div>
+
+          <div className="absolute inset-x-[17%] top-[65.8%] z-10 grid h-[5.5%] grid-cols-2 gap-[9%] text-center">
+            {awardBadges.length > 0 ? awardBadges.slice(0, 2).map(({ label, value, Icon }) => (
+              <span key={label} className="flex min-w-0 items-center justify-center gap-1 truncate text-[7px] font-black uppercase text-white">
+                <Icon className="h-2.5 w-2.5 shrink-0" style={{ color: theme.edge }} /> {label} {value}x
+              </span>
+            )) : <span className="col-span-2 self-center text-[7px] font-black uppercase tracking-[.18em] text-white/55">Futebol • Resenha • PBQ</span>}
+          </div>
+
+          <div className="absolute inset-x-[15%] bottom-[8%] top-[73%] z-10 grid grid-cols-3 grid-rows-2 font-athletic">
+            {[[entry.goals, "GOL"], [entry.assists, "AST"], [entry.wins, "VIT"], [entry.games, "JOG"], [entry.losses, "DER"], [`${entry.winRate}%`, "APR"]].map(([value, label]) => (
+              <div key={label} className="flex flex-col items-center justify-center text-center">
+                <p className="player-card-number text-xl leading-none text-white drop-shadow-[0_2px_3px_rgba(0,0,0,.9)]">{value}</p>
+                <p className="mt-1 text-[7px] font-black tracking-[.14em] text-white/65">{label}</p>
+              </div>
+            ))}
+          </div>
         </div>
+
+        {entry.fitness && <div className="mx-auto -mt-1 grid w-[88%] grid-cols-2 gap-2 rounded-xl border border-white/10 bg-[#07150d]/95 p-2 text-center shadow-xl">
+          <div><p className="font-athletic text-sm font-black text-accent">{entry.fitness.distanceKm} km</p><p className="text-[7px] font-black uppercase text-muted">Distância Ranked</p></div>
+          <div><p className="font-athletic text-sm font-black text-accent">{entry.fitness.averageSpeedKmh} km/h</p><p className="text-[7px] font-black uppercase text-muted">Velocidade média</p></div>
+        </div>}
 
         {/* 6 MELHORES PARTIDAS - SANFONA / ACCORDION */}
         {entry.bestRounds && entry.bestRounds.length > 0 && (
