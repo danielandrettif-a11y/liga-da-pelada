@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_FANTASY_SETTINGS } from "./config";
-import { applyFantasyBudgetGuard, calculateFantasyPrices, roundMoney, validateFantasyDraft } from "./engine";
+import { calculateFantasyPrices, roundMoney, validateFantasyDraft } from "./engine";
 
 type SimulatedPlayer = {
   id: string;
@@ -214,11 +214,9 @@ describe("Cartola V2 — Simulação Econômica de Longo Prazo (15 Rodadas)", ()
           (sum, pid) => sum + (priceResults.find((r) => r.playerId === pid)?.nextPrice || 0),
           0
         );
-        user.budget = applyFantasyBudgetGuard(
-          roundMoney(cashRemaining + newTeamValue),
-          DEFAULT_FANTASY_SETTINGS.initialBudget,
-          DEFAULT_FANTASY_SETTINGS,
-        );
+        // O V10 deixa cada decisão aparecer integralmente no patrimônio:
+        // caixa restante + valor de venda do time, sem compressão artificial.
+        user.budget = roundMoney(cashRemaining + newTeamValue);
       }
 
       const avgP = players.reduce((sum, p) => sum + p.price, 0) / players.length;
@@ -248,9 +246,8 @@ describe("Cartola V2 — Simulação Econômica de Longo Prazo (15 Rodadas)", ()
     // descontrolada (teto médio de C$ 13,50 após 15 rodadas).
     expect(finalAveragePrice).toBeGreaterThanOrEqual(8.0);
     expect(finalAveragePrice).toBeLessThanOrEqual(13.5);
-    expect(finalAverageBudget).toBeLessThanOrEqual(
-      DEFAULT_FANTASY_SETTINGS.initialBudget * (DEFAULT_FANTASY_SETTINGS.budgetHardCapMultiplier || 1.4),
-    );
+    expect(Number.isFinite(finalAverageBudget)).toBe(true);
+    expect(finalAverageBudget).toBeGreaterThan(0);
 
     // 2. Os limites min/max foram rigorosamente respeitados
     expect(minFinalPrice).toBeGreaterThanOrEqual(DEFAULT_FANTASY_SETTINGS.minPlayerPrice);

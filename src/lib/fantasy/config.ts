@@ -38,15 +38,21 @@ export type FantasySettings = {
   marketStableShare: number;
   marketMinIncrease: number;
   marketMinDecrease: number;
-  /** Piso e teto da curva competitiva de preço do Mercado V8. */
+  /** Piso e teto de equilíbrio da curva de preço do Mercado V10. */
   competitivePriceFloor?: number;
   competitivePriceCeiling?: number;
-  /** Expoente da curva: acima de 1 concentra o preço alto nos destaques. */
+  /** Expoente que mantém o atleta mediano perto do preço inicial. */
   competitivePriceCurve?: number;
   /** Peso da rodada atual; o restante vem da média da temporada. */
   marketRoundWeight?: number;
+  /** Legado do Mercado V9; mantido para ler snapshots antigos. */
+  marketAttendanceWeight?: number;
   /** Parcela da distância até o preço-alvo percorrida a cada rodada. */
   marketRepriceStrength?: number;
+  /** Limites iniciais e passo de maturação da variação por rodada. */
+  marketInitialUpCap?: number;
+  marketInitialDownCap?: number;
+  marketCapStep?: number;
   /** Freio de inflação do patrimônio ao longo da temporada. */
   budgetSoftCapMultiplier?: number;
   budgetHardCapMultiplier?: number;
@@ -66,7 +72,7 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   initialBudget: 55,
   initialPlayerPrice: 10,
   minPlayerPrice: 5,
-  maxPlayerPrice: 25,
+  maxPlayerPrice: 20,
   // Scouts básicos BQ v5 — sincronizados com bq-scoring.ts
   goalPoints: BQ_SCORING_V5.goal,
   assistPoints: BQ_SCORING_V5.assist,
@@ -90,17 +96,21 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   historicalWeight: 0.15,
   consistencyWeight: 0.10,
   smoothingGames: 5,
-  maxPriceIncrease: 0.20,
+  maxPriceIncrease: 0.15,
   maxPriceDecrease: 0.12,
   marketUpShare: 0.35,
   marketStableShare: 0.30,
   marketMinIncrease: 0.05,
   marketMinDecrease: 0.02,
   competitivePriceFloor: 6,
-  competitivePriceCeiling: 20,
-  competitivePriceCurve: 1.15,
-  marketRoundWeight: 0.55,
-  marketRepriceStrength: 0.35,
+  competitivePriceCeiling: 18,
+  competitivePriceCurve: 1.9,
+  marketRoundWeight: 0.70,
+  marketAttendanceWeight: 0,
+  marketRepriceStrength: 0.26,
+  marketInitialUpCap: 0.08,
+  marketInitialDownCap: 0.06,
+  marketCapStep: 0.02,
   budgetSoftCapMultiplier: 1.20,
   budgetHardCapMultiplier: 1.40,
   budgetExcessRetention: 0.25,

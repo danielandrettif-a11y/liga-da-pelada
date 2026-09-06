@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget } from "./config";
 import {
-  applyFantasyBudgetGuard,
   calculateCostBenefit,
   calculateExpectedFantasyPoints,
+  calculateFantasyPriceCaps,
   calculateFantasyPredictionIndex,
   calculateFantasyForm,
   calculateFantasyPlayerPoints,
@@ -137,8 +137,8 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       expect(horriblePlayer.variationRate).toBeGreaterThanOrEqual(-DEFAULT_FANTASY_SETTINGS.maxPriceDecrease - 0.0001);
     });
 
-    // V2-T06 e V2-T07: Piso (C$ 5,00) e Teto (C$ 25,00)
-    it("V2-T06 e V2-T07: Preço nunca cai abaixo de C$ 5 nem ultrapassa C$ 25", () => {
+    // V2-T06 e V2-T07: Piso (C$ 5,00) e teto (C$ 20,00)
+    it("V2-T06 e V2-T07: Preço nunca cai abaixo de C$ 5 nem ultrapassa C$ 20", () => {
       const results = calculateFantasyPrices([
         { playerId: "top", games: 3, wins: 3, draws: 0, goals: 4, assists: 2, recentPoints: [20], seasonPoints: [20], currentPrice: 24.90 },
         { playerId: "bottom", games: 3, wins: 0, draws: 0, losses: 3, goals: 0, assists: 0, recentPoints: [-3], seasonPoints: [-3], currentPrice: 5.10 },
@@ -454,7 +454,7 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
     });
   });
 
-  describe("Mercado V8 — preço competitivo por rodada e temporada", () => {
+  describe("Mercado V10 — reação gradual e caminho de recuperação", () => {
     const marketWith = (count: number) => Array.from({ length: count }, (_, index) => ({
       playerId: `p-${index}`,
       games: 1,
@@ -468,20 +468,25 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       currentPrice: 10,
     }));
 
-    it("cria uma curva que impede comprar os seis melhores com o orçamento inicial", () => {
+    it("mantém o preço justo mediano perto de C$ 9,50 e separa a elite", () => {
       const targets = Array.from({ length: 25 }, (_, index) =>
-        calculateCompetitivePriceTarget(index / 24, DEFAULT_FANTASY_SETTINGS),
+        calculateCompetitivePriceTarget(1 - index / 24, DEFAULT_FANTASY_SETTINGS),
       );
       const sixMostExpensive = targets.slice(0, 6).reduce((sum, price) => sum + price, 0);
-      expect(sixMostExpensive).toBeGreaterThan(getFantasyInitialBudget(6) * 1.45);
-      expect(targets[0]).toBe(20);
+      expect(sixMostExpensive).toBeGreaterThan(getFantasyInitialBudget(6) * 1.35);
+      expect(targets[0]).toBe(18);
+      expect(targets[12]).toBeCloseTo(9.22, 2);
       expect(targets.at(-1)).toBe(6);
     });
 
-    it("desacelera a inflação do patrimônio sem apagar o ganho do usuário", () => {
-      expect(applyFantasyBudgetGuard(65, 66, DEFAULT_FANTASY_SETTINGS)).toBe(65);
-      expect(applyFantasyBudgetGuard(100, 66, DEFAULT_FANTASY_SETTINGS)).toBe(84.4);
-      expect(applyFantasyBudgetGuard(200, 66, DEFAULT_FANTASY_SETTINGS)).toBe(92.4);
+    it("amadurece os limites sem deixar ninguém ficar caríssimo nas três primeiras rodadas", () => {
+      expect(calculateFantasyPriceCaps(1, DEFAULT_FANTASY_SETTINGS)).toEqual({ up: 0.08, down: 0.06 });
+      expect(calculateFantasyPriceCaps(2, DEFAULT_FANTASY_SETTINGS)).toEqual({ up: 0.1, down: 0.08 });
+      expect(calculateFantasyPriceCaps(3, DEFAULT_FANTASY_SETTINGS)).toEqual({ up: 0.12, down: 0.1 });
+      expect(calculateFantasyPriceCaps(5, DEFAULT_FANTASY_SETTINGS)).toEqual({ up: 0.15, down: 0.12 });
+
+      const maximumAfterThree = roundMoney(10 * 1.08 * 1.10 * 1.12);
+      expect(maximumAfterThree).toBe(13.31);
     });
 
     it("combina momento e temporada, sem deixar uma rodada apagar o histórico", () => {
@@ -498,12 +503,54 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       expect(strongSeason.nextPrice).toBeLessThanOrEqual(hotRound.nextPrice);
     });
 
+    it("recompensa forte a virada de um atleta barato, sem prêmio artificial por presença", () => {
+      const result = calculateFantasyPrices([
+        {
+          playerId: "barato-em-recuperacao",
+          games: 1,
+          wins: 0,
+          draws: 0,
+          losses: 0,
+          goals: 8,
+          assists: 0,
+          recentPoints: [-4, 32],
+          seasonPoints: [-4, 32],
+          currentPrice: 7.5,
+        },
+        {
+          playerId: "caro-em-ma-fase",
+          games: 1,
+          wins: 0,
+          draws: 0,
+          losses: 0,
+          goals: 0,
+          assists: 0,
+          recentPoints: [30, 0],
+          seasonPoints: [30, 0],
+          currentPrice: 14,
+        },
+        ...marketWith(10).map((player, index) => ({
+          ...player,
+          playerId: `base-${index}`,
+          currentPrice: 10,
+          seasonPoints: [20 - index, 20 - index],
+        })),
+      ], DEFAULT_FANTASY_SETTINGS);
+
+      const cheap = result.find((item) => item.playerId === "barato-em-recuperacao")!;
+      const expensive = result.find((item) => item.playerId === "caro-em-ma-fase")!;
+      expect(cheap.variationRate).toBe(0.12);
+      expect(expensive.variationRate).toBe(-0.1);
+      expect(cheap.nextPrice).toBe(8.4);
+      expect(expensive.nextPrice).toBe(12.6);
+    });
+
     it("espalha o mercado e mantém a mudança de uma rodada dentro dos limites", () => {
       const result = calculateFantasyPrices(marketWith(15), DEFAULT_FANTASY_SETTINGS);
       const best = result.find((item) => item.playerId === "p-0")!;
       const worst = result.find((item) => item.playerId === "p-14")!;
-      expect(best.nextPrice).toBe(12);
-      expect(worst.nextPrice).toBe(8.8);
+      expect(best.nextPrice).toBe(11);
+      expect(worst.nextPrice).toBe(9.2);
       expect(best.variationRate).toBeLessThanOrEqual(DEFAULT_FANTASY_SETTINGS.maxPriceIncrease);
       expect(worst.variationRate).toBeGreaterThanOrEqual(-DEFAULT_FANTASY_SETTINGS.maxPriceDecrease);
     });
