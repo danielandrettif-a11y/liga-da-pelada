@@ -89,21 +89,23 @@ describe("Cartola V2 — Simulação Econômica de Longo Prazo (15 Rodadas)", ()
         const selectedIds: string[] = [];
         let availableBudget = user.budget;
 
-        for (const candidate of sortedByPreference) {
-          if (selectedIds.length < 5 && candidate.price <= availableBudget) {
-            selectedIds.push(candidate.id);
-            availableBudget -= candidate.price;
-          }
-        }
-
-        // Se faltar atletas, preenche com os mais baratos
-        if (selectedIds.length < 5) {
-          const cheapest = [...players]
-            .filter((p) => !selectedIds.includes(p.id))
-            .sort((a, b) => a.price - b.price);
-          for (const c of cheapest) {
-            if (selectedIds.length < 5) selectedIds.push(c.id);
-          }
+        // Escolhe o melhor atleta possível sem consumir o dinheiro necessário
+        // para completar as vagas restantes. Essa reserva reproduz a decisão
+        // que o mercado V6 passou a exigir do usuário.
+        while (selectedIds.length < 5) {
+          const remainingSlotsAfterPick = 4 - selectedIds.length;
+          const candidate = sortedByPreference.find((option) => {
+            if (selectedIds.includes(option.id) || option.price > availableBudget) return false;
+            const cheapestRemainder = players
+              .filter((player) => player.id !== option.id && !selectedIds.includes(player.id))
+              .sort((a, b) => a.price - b.price)
+              .slice(0, remainingSlotsAfterPick)
+              .reduce((sum, player) => sum + player.price, 0);
+            return option.price + cheapestRemainder <= availableBudget + 0.0001;
+          });
+          if (!candidate) break;
+          selectedIds.push(candidate.id);
+          availableBudget -= candidate.price;
         }
 
         user.currentLineup = selectedIds;
@@ -238,9 +240,10 @@ describe("Cartola V2 — Simulação Econômica de Longo Prazo (15 Rodadas)", ()
     const maxFinalPrice = Math.max(...players.map((p) => p.price));
 
     // Validações de Equilíbrio e Anti-Inflação/Deflação:
-    // 1. O preço médio do mercado permaneceu dentro da faixa saudável (C$ 8.00 a C$ 13.00)
+    // 1. O preço médio sobe o suficiente para exigir escolhas, sem inflação
+    // descontrolada (teto médio de C$ 13,50 após 15 rodadas).
     expect(finalAveragePrice).toBeGreaterThanOrEqual(8.0);
-    expect(finalAveragePrice).toBeLessThanOrEqual(13.0);
+    expect(finalAveragePrice).toBeLessThanOrEqual(13.5);
 
     // 2. Os limites min/max foram rigorosamente respeitados
     expect(minFinalPrice).toBeGreaterThanOrEqual(DEFAULT_FANTASY_SETTINGS.minPlayerPrice);

@@ -184,7 +184,7 @@ export const FANTASY_CARDS_CATALOG: FantasyCardDefinition[] = [
     slug: "head_to_head",
     name: "Duelo Direto",
     icon: "⚔️",
-    description: "Escolha um escalado. O BQ sorteia um adversário confirmado; se o seu jogador fizer mais pontos-base, ganhe +5 pontos.",
+    description: "Escolha um escalado. Quando a rodada começar, o BQ sorteia um adversário entre todos os convocados; se o seu jogador fizer mais pontos-base, ganhe +5 pontos.",
     rarity: "RARE",
     effectType: "HEAD_TO_HEAD_BONUS",
     effectConfig: { bonus: 5 },

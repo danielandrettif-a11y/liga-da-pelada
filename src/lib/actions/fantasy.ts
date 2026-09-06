@@ -2260,6 +2260,7 @@ export async function getFantasyRanking(
   let live = scope === "general"
     ? await getLiveRoundProjections(account.client, fs.id, league.id)
     : null;
+  let rankingRoundId: string | null = roundId || null;
 
   let entries: any[] = [];
   if (scope === "round") {
@@ -2296,6 +2297,7 @@ export async function getFantasyRanking(
       fantasyRoundId = latest?.id || null;
       resolvedRoundId = latest?.round_id || null;
     }
+    rankingRoundId = resolvedRoundId;
     live = await getLiveRoundProjections(
       account.client,
       fs.id,
@@ -2515,7 +2517,7 @@ export async function getFantasyRanking(
 
   entries.sort((a: any, b: any) => Number(b.total_points) - Number(a.total_points));
   const userIds = entries.map((item: any) => item.user_id);
-  const [{ data: profiles }, { data: cosmeticLoadouts }] = userIds.length
+  const [{ data: profiles }, { data: cosmeticLoadouts }, { data: roundCardActivations }] = userIds.length
     ? await Promise.all([
         rankingReadClient
           .from("account_profiles")
@@ -2526,8 +2528,15 @@ export async function getFantasyRanking(
           .select("user_id, frame:frame_cosmetic_id(asset_key), aura:aura_cosmetic_id(asset_key)")
           .eq("fantasy_season_id", fs.id)
           .in("user_id", userIds),
+        scope === "round" && rankingRoundId
+          ? rankingReadClient
+              .from("fantasy_card_activations")
+              .select("user_id, status, result_bonus, result_details, card:fantasy_cards(slug, name, rarity)")
+              .eq("round_id", rankingRoundId)
+              .in("user_id", userIds)
+          : Promise.resolve({ data: [] as any[] }),
       ])
-    : [{ data: [] as any[] }, { data: [] as any[] }];
+    : [{ data: [] as any[] }, { data: [] as any[] }, { data: [] as any[] }];
   const profileByUser = new Map(
     (profiles || []).map((item: any) => [item.user_id, item.players])
   );
@@ -2536,6 +2545,21 @@ export async function getFantasyRanking(
       frameKey: item.frame?.asset_key || null,
       auraKey: item.aura?.asset_key || null,
     }]),
+  );
+  const cardByUser = new Map(
+    (roundCardActivations || []).map((activation: any) => {
+      const card = Array.isArray(activation.card) ? activation.card[0] : activation.card;
+      const details = activation.result_details || {};
+      return [activation.user_id, {
+        slug: card?.slug || null,
+        name: card?.name || "Carta utilizada",
+        rarity: card?.rarity || "COMMON",
+        bonus: Number(activation.result_bonus || 0),
+        budgetRecovery: Number(details.budgetRecovery || 0),
+        description: details.description || null,
+        status: activation.status || "RESERVED",
+      }];
+    }),
   );
   let previousPoints: number | null = null;
   let previousPosition = 0;
@@ -2549,6 +2573,7 @@ export async function getFantasyRanking(
       position,
       player: profileByUser.get(item.user_id) || null,
       cosmetics: cosmeticsByUser.get(item.user_id) || null,
+      roundCard: cardByUser.get(item.user_id) || null,
     };
   });
 }

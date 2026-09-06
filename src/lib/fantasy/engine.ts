@@ -213,7 +213,7 @@ export function calculateFantasyPrices(
       start,
       end,
       percentile,
-      marketBand: allTied ? "STABLE" : percentile < 0.3 ? "UP" : percentile < 0.6 ? "STABLE" : "DOWN",
+      marketBand: allTied ? "STABLE" : percentile < 0.45 ? "UP" : percentile < 0.65 ? "STABLE" : "DOWN",
     });
     start = end + 1;
   }
@@ -231,11 +231,11 @@ export function calculateFantasyPrices(
       ? upRange.max === upRange.min
         ? settings.maxPriceIncrease
         : settings.maxPriceIncrease
-          - ((percentile - upRange.min) / (upRange.max - upRange.min)) * (settings.maxPriceIncrease - 0.03)
+          - ((percentile - upRange.min) / (upRange.max - upRange.min)) * (settings.maxPriceIncrease - 0.04)
       : marketBand === "DOWN"
         ? downRange.max === downRange.min
           ? -settings.maxPriceDecrease
-          : -(0.02 + ((percentile - downRange.min) / (downRange.max - downRange.min)) * (settings.maxPriceDecrease - 0.02))
+          : -(0.015 + ((percentile - downRange.min) / (downRange.max - downRange.min)) * (settings.maxPriceDecrease - 0.015))
         : 0;
 
     for (let index = start; index <= end; index += 1) {

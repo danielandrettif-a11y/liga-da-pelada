@@ -13,8 +13,8 @@ describe("cosmetic nameplate classes", () => {
   it("maps Placa de Substituicao to the split red and green panel", () => {
     const className = cosmeticNameplateClass("nameplate-placa-substituicao");
 
-    expect(className).toContain("linear-gradient(90deg");
-    expect(className).toContain("font-mono");
+    expect(className).toContain("cosmetic-nameplate");
+    expect(className).toContain("cosmetic-nameplate--substitution");
   });
 });
 

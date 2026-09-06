@@ -375,6 +375,12 @@ export function FantasyInventoryModal({
                 </div>
               )}
 
+              {selectedToUse.card.slug === "head_to_head" && (
+                <div className="rounded-2xl border border-sky-300/30 bg-sky-300/10 px-3.5 py-3 text-xs leading-relaxed text-sky-100">
+                  <strong>Adversário surpresa.</strong> Você escolhe seu atleta agora. O rival será sorteado entre todos os convocados somente quando a rodada começar.
+                </div>
+              )}
+
               {/* Seletor de Jogador Único */}
               {selectedToUse.card.requiresTarget === "SINGLE_PLAYER" && (() => {
                 const eligible = getEligiblePlayers(selectedToUse.card);
@@ -402,7 +408,9 @@ export function FantasyInventoryModal({
                           ? "Escolha o atleta do mercado antes de montar sua escalação:"
                           : isAllIn
                             ? "Escolha qualquer atleta do mercado:"
-                            : "Escolha o jogador alvo desta carta:"}
+                            : selectedToUse.card.slug === "head_to_head"
+                              ? "Escolha seu representante no duelo:"
+                              : "Escolha o jogador alvo desta carta:"}
                     </label>
                     <select
                       value={targetPlayerId}

@@ -73,8 +73,8 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   historicalWeight: 0.15,
   consistencyWeight: 0.10,
   smoothingGames: 5,
-  maxPriceIncrease: 0.12,
-  maxPriceDecrease: 0.10,
+  maxPriceIncrease: 0.18,
+  maxPriceDecrease: 0.08,
   minSampleForRadar: 3,
   // Campos legados — preservados para snapshots antigos
   attackerGoalPoints: BQ_SCORING_V5.goal,

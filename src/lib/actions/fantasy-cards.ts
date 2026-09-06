@@ -629,29 +629,11 @@ export async function activateCardForRound({
   }
 
 
-  // Duelo Direto: o usuário escolhe somente seu atleta. O adversário é
-  // sorteado no servidor entre os demais participantes da rodada.
-  let resolvedTargetPlayer2Id = targetPlayer2Id || null;
-  if (userCardObj?.slug === "head_to_head") {
-    const { data: roundPlayers, error: roundPlayersError } = await client
-      .from("round_players")
-      .select("player_id")
-      .eq("round_id", roundId);
-
-    if (roundPlayersError) {
-      return { success: false, error: "Não foi possível sortear o adversário do Duelo Direto." };
-    }
-
-    const candidates = Array.from(new Set(
-      (roundPlayers || [])
-        .map((entry: any) => entry.player_id as string)
-        .filter((playerId: string) => playerId && playerId !== targetPlayerId),
-    ));
-    if (candidates.length === 0) {
-      return { success: false, error: "Não há outro participante disponível para o Duelo Direto." };
-    }
-    resolvedTargetPlayer2Id = candidates[Math.floor(Math.random() * candidates.length)];
-  }
+  // No Duelo Direto, o adversário permanece secreto durante o mercado. O
+  // banco sorteia alguém da lista final de convocados no primeiro apito.
+  const resolvedTargetPlayer2Id = userCardObj?.slug === "head_to_head"
+    ? null
+    : targetPlayer2Id || null;
 
   // 4. Salvar snapshot do efeito e dos alvos
   const effectSnapshot = {

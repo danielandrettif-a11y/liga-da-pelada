@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Clock, Crown, RotateCcw } from "@/components/icons";
+import { Cards, CheckCircle2, ChevronRight, Clock, Crown, RotateCcw } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import type { FantasyRoundLineupOverview } from "@/lib/actions/fantasy";
 import { cosmeticImage } from "@/lib/fantasy/cosmetics";
@@ -35,6 +35,15 @@ export type FantasyRankingEntry = {
     frameKey: string | null;
     auraKey: string | null;
     backgroundAssetKey: string | null;
+  } | null;
+  roundCard?: {
+    slug: string | null;
+    name: string;
+    rarity: string;
+    bonus: number;
+    budgetRecovery: number;
+    description: string | null;
+    status: string;
   } | null;
 };
 
@@ -82,6 +91,20 @@ function metricSupportingValue(item: FantasyRankingEntry, metric: FantasyRanking
   return metric.id === "budget" ? `${Number(item.total_points).toFixed(1)} pts` : `C$ ${Number(item.current_budget).toFixed(2)}`;
 }
 
+function cardBenefitLabel(card: NonNullable<FantasyRankingEntry["roundCard"]>) {
+  if (card.budgetRecovery > 0) return `+C$ ${card.budgetRecovery.toFixed(2)}`;
+  if (card.bonus > 0) return `+${card.bonus.toFixed(1)} pts`;
+  if (["RESERVED", "LOCKED"].includes(card.status)) return "Em disputa";
+  return "Sem bônus";
+}
+
+function cardRarityClass(rarity?: string) {
+  if (rarity === "LEGENDARY") return "border-amber-300/35 bg-amber-300/10 text-amber-200";
+  if (rarity === "EPIC") return "border-fuchsia-300/30 bg-fuchsia-300/10 text-fuchsia-200";
+  if (rarity === "RARE") return "border-sky-300/30 bg-sky-300/10 text-sky-200";
+  return "border-white/15 bg-white/[.06] text-emerald-100";
+}
+
 function podiumStyle(position: number) {
   if (position === 1) return {
     card: "border-amber-300/60 bg-gradient-to-b from-amber-300/20 via-[#15210d] to-[#06130b] shadow-[0_18px_38px_rgba(245,190,45,.14)]",
@@ -120,10 +143,10 @@ function FantasyPodium({ ranking, scope, metric }: { ranking: FantasyRankingEntr
 
   return (
     <section
-      className="relative isolate overflow-hidden rounded-[1.75rem] border border-accent/30 bg-[radial-gradient(circle_at_50%_0%,rgba(204,255,0,.16),transparent_42%),linear-gradient(160deg,#071b10,#031008_72%)] px-2.5 pb-3 pt-4 shadow-[0_20px_45px_rgba(0,0,0,.28)]"
+      className="relative isolate overflow-hidden rounded-[1.75rem] border border-accent/30 bg-[radial-gradient(circle_at_50%_0%,rgba(204,255,0,.18),transparent_42%),linear-gradient(160deg,#071b10,#020a05_72%)] px-2.5 pb-3 pt-4 shadow-[0_20px_45px_rgba(0,0,0,.34)]"
       aria-label="Pódio do Cartola"
     >
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(204,255,0,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(204,255,0,.08)_1px,transparent_1px)] [background-size:28px_28px] [mask-image:linear-gradient(to_bottom,black,transparent_85%)]" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(204,255,0,.07)_1px,transparent_1px),linear-gradient(90deg,rgba(204,255,0,.07)_1px,transparent_1px)] [background-size:24px_24px] [mask-image:linear-gradient(to_bottom,black,transparent_85%)]" />
       <div className="relative mb-8 flex items-center justify-between gap-2 px-1">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/12 text-accent">
@@ -147,7 +170,7 @@ function FantasyPodium({ ranking, scope, metric }: { ranking: FantasyRankingEntr
             <Link
               key={item.id}
               href={rankingHref(item, scope)}
-              className={`group relative min-w-0 overflow-hidden rounded-[1.35rem] border px-1.5 pb-1.5 pt-5 text-center transition-transform duration-300 ease-out hover:-translate-y-1 active:scale-[.98] motion-reduce:transform-none motion-reduce:transition-none ${position === 1 ? "min-h-[224px]" : "min-h-[200px]"} ${style.card}`}
+              className={`group relative min-w-0 overflow-hidden rounded-[1.35rem] border px-1.5 pb-1.5 pt-5 text-center transition-transform duration-300 ease-out hover:-translate-y-1 active:scale-[.98] motion-reduce:transform-none motion-reduce:transition-none ${position === 1 ? "min-h-[248px]" : "min-h-[226px]"} ${style.card}`}
               aria-label={`Abrir perfil de ${item.player?.name || "Cartoleiro"}, ${position}º lugar`}
             >
               {backgroundImage && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-25" style={{ backgroundImage: `linear-gradient(rgba(3,16,8,.18),rgba(3,16,8,.9)),url(${backgroundImage})` }} />}
@@ -166,12 +189,21 @@ function FantasyPodium({ ranking, scope, metric }: { ranking: FantasyRankingEntr
                     className={`${avatarSize} rounded-full bg-[#0c2517] text-xs font-black text-accent`}
                   />
                 </div>
-                <p className="mt-2 line-clamp-2 min-h-8 w-full text-[10px] font-black leading-4 text-foreground sm:text-xs">{item.player?.name || "Cartoleiro"}</p>
+                <div className="mt-2 flex min-h-9 w-full items-center justify-center border-y border-white/10 bg-black/25 px-1 py-1">
+                  <p className="line-clamp-2 text-[10px] font-black uppercase leading-4 text-foreground sm:text-xs">{item.player?.name || "Cartoleiro"}</p>
+                </div>
                 <p className={`mt-0.5 whitespace-nowrap font-athletic text-base font-black leading-none sm:text-lg ${style.label}`}>{formattedMetricValue(item, metric)}</p>
                 <p className="mt-0.5 line-clamp-1 text-[7px] font-black uppercase tracking-wider text-muted">{metric.valueLabel}</p>
                 <span className="mt-2 max-w-full truncate rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[8px] font-black text-emerald-200">
                   {metricSupportingValue(item, metric)}
                 </span>
+                {item.roundCard && (
+                  <span className={`mt-1.5 flex max-w-full items-center gap-1 rounded-md border px-1.5 py-1 text-[7px] font-black uppercase ${cardRarityClass(item.roundCard.rarity)}`}>
+                    <Cards className="h-2.5 w-2.5 shrink-0" />
+                    <span className="truncate">{item.roundCard.name}</span>
+                    <b className="shrink-0">{cardBenefitLabel(item.roundCard)}</b>
+                  </span>
+                )}
               </div>
 
               <div className={`relative z-10 mt-2 rounded-xl border py-1.5 ${style.base}`}>
@@ -454,33 +486,58 @@ export function FantasyRankingList({
             <Link
               key={item.id}
               href={rankingHref(item, scope)}
-              className="group relative block overflow-hidden rounded-2xl border border-emerald-400/20 bg-gradient-to-r from-[#092016] via-[#07170f] to-[#05110b] shadow-[0_10px_24px_rgba(0,0,0,.16)] transition-all duration-300 ease-out hover:border-accent/40 hover:brightness-110 active:scale-[.99] motion-reduce:transition-none"
+              className="group relative block overflow-hidden rounded-[1.35rem] border border-emerald-300/20 bg-[radial-gradient(circle_at_88%_20%,rgba(204,255,0,.11),transparent_34%),linear-gradient(135deg,#0a2015,#041109_74%)] shadow-[0_14px_30px_rgba(0,0,0,.24)] transition-all duration-300 ease-out hover:border-accent/45 hover:brightness-110 active:scale-[.99] motion-reduce:transition-none"
             >
-              {backgroundImage && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-30" style={{ backgroundImage: `linear-gradient(90deg,rgba(4,17,10,.5),rgba(4,17,10,.92)),url(${backgroundImage})` }} />}
-              <div className="relative flex items-center gap-3 p-3.5">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-accent/20 bg-accent/[.08] font-athletic text-base font-black text-accent/80">
-                  {item.position}
-                </span>
-                <div className="shrink-0 rounded-full border border-accent/35 bg-accent/10 p-0.5 shadow-[0_0_16px_rgba(204,255,0,.08)]">
-                  <PlayerAvatar
-                    name={item.player?.name || "Cartoleiro"}
-                    avatarUrl={item.player?.avatar_url}
-                    frameKey={item.cosmetics?.frameKey}
-                    auraKey={item.cosmetics?.auraKey}
-                    className="h-11 w-11 rounded-full bg-[#102819] text-xs font-black text-accent"
-                  />
+              {backgroundImage && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-25" style={{ backgroundImage: `linear-gradient(90deg,rgba(4,17,10,.92),rgba(4,17,10,.56)),url(${backgroundImage})` }} />}
+              <span aria-hidden="true" className="absolute -left-2 -top-2 h-7 w-7 rotate-45 border-r border-emerald-300/25 bg-background" />
+              <span aria-hidden="true" className="absolute -bottom-2 -right-2 h-7 w-7 rotate-45 border-l border-emerald-300/25 bg-background" />
+              <div className="relative p-3.5">
+                <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2">
+                  <span className="text-[8px] font-black uppercase tracking-[.2em] text-accent/70">PBQ • Ranked</span>
+                  <span className="rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[8px] font-black uppercase text-emerald-100">Temporada</span>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-black text-foreground">{item.player?.name || "Cartoleiro"}</p>
-                  <p className="mt-0.5 truncate text-[10px] text-muted">
-                    {activeMetric.id === "points"
-                      ? <>{Number(item.rounds_played)} {Number(item.rounds_played) === 1 ? "rodada" : "rodadas"} · <span className="text-emerald-200">C$ {Number(item.current_budget).toFixed(2)}</span></>
-                      : <>{activeMetric.description} · <span className="text-emerald-200">{metricSupportingValue(item, activeMetric)}</span></>}
-                  </p>
+
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl border border-accent/25 bg-black/30 shadow-[inset_0_0_16px_rgba(204,255,0,.06)]">
+                    <strong className="font-athletic text-xl font-black leading-none text-accent">{item.position}º</strong>
+                    <span className="mt-0.5 text-[7px] font-black uppercase tracking-wider text-muted">posição</span>
+                  </div>
+                  <div className="shrink-0 rounded-full border-2 border-accent/50 bg-accent/10 p-0.5 shadow-[0_0_20px_rgba(204,255,0,.14)]">
+                    <PlayerAvatar
+                      name={item.player?.name || "Cartoleiro"}
+                      avatarUrl={item.player?.avatar_url}
+                      frameKey={item.cosmetics?.frameKey}
+                      auraKey={item.cosmetics?.auraKey}
+                      className="h-14 w-14 rounded-full bg-[#102819] text-xs font-black text-accent"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-athletic text-base font-black uppercase tracking-wide text-foreground">{item.player?.name || "Cartoleiro"}</p>
+                    <p className="mt-1 truncate text-[9px] font-bold uppercase tracking-wider text-muted">
+                      {activeMetric.id === "points"
+                        ? <>{Number(item.rounds_played)} {Number(item.rounds_played) === 1 ? "rodada" : "rodadas"} • C$ {Number(item.current_budget).toFixed(2)}</>
+                        : metricSupportingValue(item, activeMetric)}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <strong className="stat-number whitespace-nowrap text-xl text-accent">{formattedMetricValue(item, activeMetric)}</strong>
+                    <p className="text-[7px] font-black uppercase tracking-[.14em] text-muted">{item.is_live && activeMetric.id !== "budget" ? "prévia" : activeMetric.valueLabel}</p>
+                  </div>
                 </div>
-                <div className="shrink-0 rounded-xl border border-accent/15 bg-black/25 px-2.5 py-1.5 text-right">
-                  <strong className="stat-number whitespace-nowrap text-base text-accent sm:text-lg">{formattedMetricValue(item, activeMetric)}</strong>
-                  <p className="text-[7px] font-black uppercase tracking-wider text-muted">{item.is_live && activeMetric.id !== "budget" ? "prévia" : activeMetric.valueLabel}</p>
+
+                {item.roundCard && (
+                  <div className={`mt-3 flex items-center gap-2 rounded-xl border px-2.5 py-2 ${cardRarityClass(item.roundCard.rarity)}`}>
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-black/25"><Cards className="h-4 w-4" /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[8px] font-black uppercase tracking-[.14em] opacity-70">Carta da rodada</p>
+                      <p className="truncate text-[10px] font-black">{item.roundCard.name}</p>
+                    </div>
+                    <strong className="shrink-0 text-xs font-black">{cardBenefitLabel(item.roundCard)}</strong>
+                  </div>
+                )}
+
+                <div className="mt-2 flex items-center justify-end gap-1 text-[8px] font-black uppercase tracking-wider text-accent/75">
+                  Ver escalação <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
                 </div>
               </div>
             </Link>

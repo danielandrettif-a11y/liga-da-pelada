@@ -209,15 +209,16 @@ export function cosmeticAuraVariant(assetKey?: string | null): CosmeticAuraVaria
 }
 
 export function cosmeticNameplateClass(assetKey?: string | null): string {
-  if (!assetKey) return "border-white/10 bg-black/40 text-foreground";
+  const base = "cosmetic-nameplate";
+  if (!assetKey) return `${base} cosmetic-nameplate--default`;
   const key = assetKey.toLowerCase();
-  if (key.includes("ficha-vestiario")) return "border-amber-200/55 bg-[repeating-linear-gradient(0deg,#26160d_0_4px,#3e2616_4px_8px)] text-amber-100 shadow-[inset_0_0_12px_rgba(245,158,11,.16),0_5px_16px_rgba(0,0,0,.35)]";
-  if (key.includes("placar-quadra")) return "border-lime-300/55 bg-black text-lime-300 font-mono shadow-[inset_0_0_16px_rgba(163,230,53,.24),0_0_16px_rgba(163,230,53,.25)]";
-  if (key.includes("faixa-torcida")) return "border-amber-400/60 bg-[repeating-linear-gradient(135deg,#214b26_0_9px,#08250f_9px_18px)] text-amber-100 shadow-[0_5px_18px_rgba(34,197,94,.22)]";
-  if (key.includes("prancheta-tatica")) return "border-lime-300/50 bg-[linear-gradient(90deg,#172a16_0_49%,rgba(163,230,53,.18)_50%,#172a16_51%)] text-lime-100 shadow-[inset_0_0_18px_rgba(163,230,53,.12)]";
-  if (key.includes("sumula-juiz")) return "border-[#f6df9a]/70 bg-[repeating-linear-gradient(0deg,#dfcf9d_0_2px,#eee0b6_2px_7px)] text-[#382613] shadow-[0_5px_18px_rgba(245,158,11,.25)]";
-  if (key.includes("placa-substituicao")) return "border-white/60 bg-[linear-gradient(90deg,#3f0808_0_48%,#070707_48%_52%,#07351a_52%_100%)] font-mono text-white shadow-[inset_0_0_14px_rgba(255,255,255,.12),-4px_0_14px_rgba(248,113,113,.3),4px_0_14px_rgba(74,222,128,.3)]";
-  if (key.includes("portao-campinho")) return "border-zinc-300/55 bg-[repeating-linear-gradient(90deg,#0a100c_0_5px,#263329_5px_7px)] text-lime-100 shadow-[inset_0_0_14px_rgba(255,255,255,.08),0_5px_16px_rgba(0,0,0,.45)]";
-  if (key.includes("lenda-campinho")) return "border-amber-300/70 bg-[linear-gradient(115deg,#151006,#5c4614_48%,#102619)] text-amber-100 shadow-[inset_0_0_18px_rgba(250,204,21,.18),0_0_18px_rgba(204,255,0,.2)]";
-  return "border-accent/30 bg-black/50 text-accent";
+  if (key.includes("ficha-vestiario")) return `${base} cosmetic-nameplate--locker`;
+  if (key.includes("placar-quadra")) return `${base} cosmetic-nameplate--scoreboard`;
+  if (key.includes("faixa-torcida")) return `${base} cosmetic-nameplate--supporters`;
+  if (key.includes("prancheta-tatica")) return `${base} cosmetic-nameplate--tactics`;
+  if (key.includes("sumula-juiz")) return `${base} cosmetic-nameplate--matchsheet`;
+  if (key.includes("placa-substituicao")) return `${base} cosmetic-nameplate--substitution`;
+  if (key.includes("portao-campinho")) return `${base} cosmetic-nameplate--gate`;
+  if (key.includes("lenda-campinho")) return `${base} cosmetic-nameplate--legend`;
+  return `${base} cosmetic-nameplate--default`;
 }

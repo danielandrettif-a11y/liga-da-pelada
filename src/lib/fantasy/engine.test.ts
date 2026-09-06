@@ -452,7 +452,7 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
     });
   });
 
-  describe("Balanceamento V2 — distribuição 30/30/40", () => {
+  describe("Mercado V6 — valorização competitiva 45/20/35", () => {
     const marketWith = (count: number) => Array.from({ length: count }, (_, index) => ({
       playerId: `p-${index}`,
       games: 1,
@@ -467,9 +467,9 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
     }));
 
     it.each([
-      [10, 3, 3, 4],
-      [15, 5, 4, 6],
-      [18, 6, 5, 7],
+      [10, 5, 1, 4],
+      [15, 7, 3, 5],
+      [18, 8, 4, 6],
     ])("divide %i participantes em %i altas, %i estáveis e %i baixas", (count, up, stable, down) => {
       const result = calculateFantasyPrices(marketWith(count), DEFAULT_FANTASY_SETTINGS);
       expect(result.filter((item) => item.marketBand === "UP")).toHaveLength(up);
@@ -477,24 +477,24 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       expect(result.filter((item) => item.marketBand === "DOWN")).toHaveLength(down);
     });
 
-    it("aplica +12% ao melhor, -10% ao pior e ignora o histórico", () => {
+    it("aplica +18% ao melhor, -8% ao pior e ignora o histórico", () => {
       const input = marketWith(15);
       input[0].recentPoints = [-500];
       input[0].seasonPoints = [-500];
       input[14].recentPoints = [500];
       input[14].seasonPoints = [500];
       const result = calculateFantasyPrices(input, DEFAULT_FANTASY_SETTINGS);
-      expect(result.find((item) => item.playerId === "p-0")?.variationRate).toBeCloseTo(0.12, 6);
-      expect(result.find((item) => item.playerId === "p-14")?.variationRate).toBeCloseTo(-0.10, 6);
+      expect(result.find((item) => item.playerId === "p-0")?.variationRate).toBeCloseTo(0.18, 6);
+      expect(result.find((item) => item.playerId === "p-14")?.variationRate).toBeCloseTo(-0.08, 6);
     });
 
-    it("aplica exatamente +3% no fim da alta e -2% no início da baixa", () => {
+    it("aplica exatamente +4% no fim da alta e -1,5% no início da baixa", () => {
       const result = calculateFantasyPrices(marketWith(15), DEFAULT_FANTASY_SETTINGS);
-      expect(result.find((item) => item.playerId === "p-4")?.variationRate).toBeCloseTo(0.03, 6);
-      expect(result.find((item) => item.playerId === "p-9")?.variationRate).toBeCloseTo(-0.02, 6);
+      expect(result.find((item) => item.playerId === "p-6")?.variationRate).toBeCloseTo(0.04, 6);
+      expect(result.find((item) => item.playerId === "p-10")?.variationRate).toBeCloseTo(-0.015, 6);
     });
 
-    it("faz jogador positivo desvalorizar se ele estiver nos últimos 40%", () => {
+    it("faz jogador positivo desvalorizar se ele estiver nos últimos 35%", () => {
       const result = calculateFantasyPrices(marketWith(10), DEFAULT_FANTASY_SETTINGS);
       const bottom = result.find((item) => item.playerId === "p-9")!;
       expect(bottom.roundPoints).toBeGreaterThan(0);
