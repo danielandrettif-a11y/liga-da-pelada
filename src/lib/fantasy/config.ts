@@ -38,6 +38,19 @@ export type FantasySettings = {
   marketStableShare: number;
   marketMinIncrease: number;
   marketMinDecrease: number;
+  /** Piso e teto da curva competitiva de preço do Mercado V8. */
+  competitivePriceFloor?: number;
+  competitivePriceCeiling?: number;
+  /** Expoente da curva: acima de 1 concentra o preço alto nos destaques. */
+  competitivePriceCurve?: number;
+  /** Peso da rodada atual; o restante vem da média da temporada. */
+  marketRoundWeight?: number;
+  /** Parcela da distância até o preço-alvo percorrida a cada rodada. */
+  marketRepriceStrength?: number;
+  /** Freio de inflação do patrimônio ao longo da temporada. */
+  budgetSoftCapMultiplier?: number;
+  budgetHardCapMultiplier?: number;
+  budgetExcessRetention?: number;
   minSampleForRadar?: number;
   // Campos legados preservados para compatibilidade com snapshots antigos
   attackerGoalPoints?: number;
@@ -77,12 +90,20 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   historicalWeight: 0.15,
   consistencyWeight: 0.10,
   smoothingGames: 5,
-  maxPriceIncrease: 0.25,
-  maxPriceDecrease: 0.10,
+  maxPriceIncrease: 0.20,
+  maxPriceDecrease: 0.12,
   marketUpShare: 0.35,
   marketStableShare: 0.30,
   marketMinIncrease: 0.05,
   marketMinDecrease: 0.02,
+  competitivePriceFloor: 6,
+  competitivePriceCeiling: 20,
+  competitivePriceCurve: 1.15,
+  marketRoundWeight: 0.55,
+  marketRepriceStrength: 0.35,
+  budgetSoftCapMultiplier: 1.20,
+  budgetHardCapMultiplier: 1.40,
+  budgetExcessRetention: 0.25,
   minSampleForRadar: 3,
   // Campos legados — preservados para snapshots antigos
   attackerGoalPoints: BQ_SCORING_V5.goal,

@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget } from "./config";
 import {
+  applyFantasyBudgetGuard,
   calculateCostBenefit,
   calculateExpectedFantasyPoints,
   calculateFantasyPredictionIndex,
   calculateFantasyForm,
   calculateFantasyPlayerPoints,
   calculateFantasyPrices,
+  calculateCompetitivePriceTarget,
   calculateFantasyTrend,
   calculateMarketPopularity,
   getFantasyPlayerTags,
@@ -106,7 +108,7 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       ], DEFAULT_FANTASY_SETTINGS);
 
       const playerB = results.find((r) => r.playerId === "b")!;
-      expect(Math.abs(playerB.variationRate)).toBeLessThanOrEqual(0.06);
+      expect(Math.abs(playerB.variationRate)).toBeLessThanOrEqual(0.10);
     });
 
     // V2-T03: Jogador muito abaixo da média -> desvaloriza
@@ -452,7 +454,7 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
     });
   });
 
-  describe("Mercado V7 — valorização competitiva 35/30/35", () => {
+  describe("Mercado V8 — preço competitivo por rodada e temporada", () => {
     const marketWith = (count: number) => Array.from({ length: count }, (_, index) => ({
       playerId: `p-${index}`,
       games: 1,
@@ -466,32 +468,44 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       currentPrice: 10,
     }));
 
-    it.each([
-      [10, 4, 2, 4],
-      [15, 5, 5, 5],
-      [18, 6, 6, 6],
-    ])("divide %i participantes em %i altas, %i estáveis e %i baixas", (count, up, stable, down) => {
-      const result = calculateFantasyPrices(marketWith(count), DEFAULT_FANTASY_SETTINGS);
-      expect(result.filter((item) => item.marketBand === "UP")).toHaveLength(up);
-      expect(result.filter((item) => item.marketBand === "STABLE")).toHaveLength(stable);
-      expect(result.filter((item) => item.marketBand === "DOWN")).toHaveLength(down);
+    it("cria uma curva que impede comprar os seis melhores com o orçamento inicial", () => {
+      const targets = Array.from({ length: 25 }, (_, index) =>
+        calculateCompetitivePriceTarget(index / 24, DEFAULT_FANTASY_SETTINGS),
+      );
+      const sixMostExpensive = targets.slice(0, 6).reduce((sum, price) => sum + price, 0);
+      expect(sixMostExpensive).toBeGreaterThan(getFantasyInitialBudget(6) * 1.45);
+      expect(targets[0]).toBe(20);
+      expect(targets.at(-1)).toBe(6);
     });
 
-    it("aplica +25% ao melhor, -10% ao pior e ignora o histórico", () => {
+    it("desacelera a inflação do patrimônio sem apagar o ganho do usuário", () => {
+      expect(applyFantasyBudgetGuard(65, 66, DEFAULT_FANTASY_SETTINGS)).toBe(65);
+      expect(applyFantasyBudgetGuard(100, 66, DEFAULT_FANTASY_SETTINGS)).toBe(84.4);
+      expect(applyFantasyBudgetGuard(200, 66, DEFAULT_FANTASY_SETTINGS)).toBe(92.4);
+    });
+
+    it("combina momento e temporada, sem deixar uma rodada apagar o histórico", () => {
       const input = marketWith(15);
       input[0].recentPoints = [-500];
       input[0].seasonPoints = [-500];
       input[14].recentPoints = [500];
       input[14].seasonPoints = [500];
       const result = calculateFantasyPrices(input, DEFAULT_FANTASY_SETTINGS);
-      expect(result.find((item) => item.playerId === "p-0")?.variationRate).toBeCloseTo(0.25, 6);
-      expect(result.find((item) => item.playerId === "p-14")?.variationRate).toBeCloseTo(-0.10, 6);
+      const hotRound = result.find((item) => item.playerId === "p-0")!;
+      const strongSeason = result.find((item) => item.playerId === "p-14")!;
+      expect(hotRound.roundRank).toBeLessThan(strongSeason.roundRank!);
+      expect(hotRound.nextPrice).toBeGreaterThan(10);
+      expect(strongSeason.nextPrice).toBeLessThanOrEqual(hotRound.nextPrice);
     });
 
-    it("aplica exatamente +5% no fim da alta e -2% no início da baixa", () => {
+    it("espalha o mercado e mantém a mudança de uma rodada dentro dos limites", () => {
       const result = calculateFantasyPrices(marketWith(15), DEFAULT_FANTASY_SETTINGS);
-      expect(result.find((item) => item.playerId === "p-4")?.variationRate).toBeCloseTo(0.05, 6);
-      expect(result.find((item) => item.playerId === "p-10")?.variationRate).toBeCloseTo(-0.02, 6);
+      const best = result.find((item) => item.playerId === "p-0")!;
+      const worst = result.find((item) => item.playerId === "p-14")!;
+      expect(best.nextPrice).toBe(12);
+      expect(worst.nextPrice).toBe(8.8);
+      expect(best.variationRate).toBeLessThanOrEqual(DEFAULT_FANTASY_SETTINGS.maxPriceIncrease);
+      expect(worst.variationRate).toBeGreaterThanOrEqual(-DEFAULT_FANTASY_SETTINGS.maxPriceDecrease);
     });
 
     it("faz jogador positivo desvalorizar se ele estiver nos últimos 35%", () => {
@@ -503,7 +517,7 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
     });
 
     it("mantém todos estáveis quando todos empatam", () => {
-      const tied = marketWith(15).map((player) => ({ ...player, assists: 1 }));
+      const tied = marketWith(15).map((player) => ({ ...player, assists: 1, seasonPoints: [10] }));
       const result = calculateFantasyPrices(tied, DEFAULT_FANTASY_SETTINGS);
       expect(result.every((item) => item.marketBand === "STABLE" && item.variationRate === 0)).toBe(true);
     });
@@ -513,6 +527,9 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       tied[4].assists = 10;
       tied[5].assists = 10;
       tied[6].assists = 10;
+      tied[4].seasonPoints = [50];
+      tied[5].seasonPoints = [50];
+      tied[6].seasonPoints = [50];
       const result = calculateFantasyPrices(tied, DEFAULT_FANTASY_SETTINGS);
       const group = ["p-4", "p-5", "p-6"].map((id) => result.find((item) => item.playerId === id)!);
       expect(new Set(group.map((item) => item.marketBand)).size).toBe(1);
@@ -520,14 +537,14 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       expect(new Set(group.map((item) => item.variationRate)).size).toBe(1);
     });
 
-    it("exclui ausentes da divisão e respeita piso e teto", () => {
+    it("exclui ausentes da curva e respeita piso e teto", () => {
       const input = marketWith(10);
       input[0].currentPrice = 24.9;
       input[9].currentPrice = 5.1;
       input.push({ ...input[0], playerId: "absent", games: 0, currentPrice: 13.75 });
       const result = calculateFantasyPrices(input, DEFAULT_FANTASY_SETTINGS);
-      expect(result.find((item) => item.playerId === "p-0")?.nextPrice).toBe(25);
-      expect(result.find((item) => item.playerId === "p-9")?.nextPrice).toBe(5);
+      expect(result.find((item) => item.playerId === "p-0")?.nextPrice).toBeLessThanOrEqual(24.9);
+      expect(result.find((item) => item.playerId === "p-9")?.nextPrice).toBeGreaterThanOrEqual(DEFAULT_FANTASY_SETTINGS.minPlayerPrice);
       expect(result.find((item) => item.playerId === "absent")).toMatchObject({
         nextPrice: 13.75,
         variationRate: 0,

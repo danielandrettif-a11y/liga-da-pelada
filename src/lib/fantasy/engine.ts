@@ -152,10 +152,33 @@ export function percentiles(values: Array<{ playerId: string; value: number }>):
   return result;
 }
 
+export function calculateCompetitivePriceTarget(
+  marketPercentile: number,
+  settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
+) {
+  const floor = settings.competitivePriceFloor ?? 6;
+  const ceiling = settings.competitivePriceCeiling ?? 20;
+  const curve = settings.competitivePriceCurve ?? 1.15;
+  const percentile = Math.max(0, Math.min(1, marketPercentile));
+  return roundMoney(floor + (ceiling - floor) * Math.pow(1 - percentile, curve));
+}
+
+export function applyFantasyBudgetGuard(
+  rawBudget: number,
+  baseBudget: number,
+  settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
+) {
+  const softCap = baseBudget * (settings.budgetSoftCapMultiplier ?? 1.20);
+  const hardCap = baseBudget * (settings.budgetHardCapMultiplier ?? 1.40);
+  const retention = settings.budgetExcessRetention ?? 0.25;
+  if (rawBudget <= softCap) return roundMoney(rawBudget);
+  return roundMoney(Math.min(hardCap, softCap + (rawBudget - softCap) * retention));
+}
+
 /**
- * O preço depende exclusivamente dos scouts-base. Para que uma boa rodada de
- * DEF tenha o mesmo espaço de valorização de MEI e ATA, a classificação mistura
- * 65% do percentil entre atletas da mesma função e 35% do percentil geral.
+ * Mercado V8. A nota de mercado mistura 55% da rodada com 45% da temporada.
+ * Em cada janela, 65% da comparação acontece dentro da função e 35% no geral.
+ * O preço anda gradualmente em direção a uma curva competitiva de C$ 6 a C$ 20.
  */
 export function calculateFantasyPrices(
   players: FantasyPerformance[],
@@ -175,80 +198,83 @@ export function calculateFantasyPrices(
     }));
   }
 
-  const withPoints = participants.map((player) => ({ player, roundPoints: calculateFantasyPlayerPoints(player, settings) }));
-  const percentileByPoints = (items: typeof withPoints) => {
-    const sorted = [...items].sort((a, b) => b.roundPoints - a.roundPoints || a.player.playerId.localeCompare(b.player.playerId));
+  const withPoints = participants.map((player) => ({
+    player,
+    roundPoints: calculateFantasyPlayerPoints(player, settings),
+    seasonAverage: average(player.seasonPoints.length ? player.seasonPoints : [calculateFantasyPlayerPoints(player, settings)]),
+  }));
+  const percentileByValue = (items: typeof withPoints, value: "roundPoints" | "seasonAverage") => {
+    const sorted = [...items].sort((a, b) => b[value] - a[value] || a.player.playerId.localeCompare(b.player.playerId));
     const result = new Map<string, number>();
     for (let start = 0; start < sorted.length;) {
       let end = start;
-      while (end + 1 < sorted.length && sorted[end + 1].roundPoints === sorted[start].roundPoints) end += 1;
+      while (end + 1 < sorted.length && sorted[end + 1][value] === sorted[start][value]) end += 1;
       const percentile = sorted.length === 1 ? 0.5 : ((start + end) / 2) / (sorted.length - 1);
       for (let index = start; index <= end; index += 1) result.set(sorted[index].player.playerId, percentile);
       start = end + 1;
     }
     return result;
   };
-  const overallPercentiles = percentileByPoints(withPoints);
-  const positionPercentiles = new Map<string, number>();
+  const roundOverall = percentileByValue(withPoints, "roundPoints");
+  const seasonOverall = percentileByValue(withPoints, "seasonAverage");
+  const roundByPosition = new Map<string, number>();
+  const seasonByPosition = new Map<string, number>();
   for (const profile of ["defensive", "midfield", "offensive"] as const) {
     const group = withPoints.filter(({ player }) => player.playerProfile === profile);
-    const groupPercentiles = group.length >= 3 ? percentileByPoints(group) : overallPercentiles;
-    for (const { player } of group) positionPercentiles.set(player.playerId, groupPercentiles.get(player.playerId) ?? 0.5);
+    const roundGroup = group.length >= 3 ? percentileByValue(group, "roundPoints") : roundOverall;
+    const seasonGroup = group.length >= 3 ? percentileByValue(group, "seasonAverage") : seasonOverall;
+    for (const { player } of group) {
+      roundByPosition.set(player.playerId, roundGroup.get(player.playerId) ?? 0.5);
+      seasonByPosition.set(player.playerId, seasonGroup.get(player.playerId) ?? 0.5);
+    }
   }
+  const roundWeight = settings.marketRoundWeight ?? 0.55;
   const ranked = withPoints
     .map((item) => ({
       ...item,
-      marketPercentile: 0.65 * (positionPercentiles.get(item.player.playerId) ?? overallPercentiles.get(item.player.playerId) ?? 0.5) +
-        0.35 * (overallPercentiles.get(item.player.playerId) ?? 0.5),
+      roundMarketPercentile:
+        0.65 * (roundByPosition.get(item.player.playerId) ?? roundOverall.get(item.player.playerId) ?? 0.5) +
+        0.35 * (roundOverall.get(item.player.playerId) ?? 0.5),
+      seasonMarketPercentile:
+        0.65 * (seasonByPosition.get(item.player.playerId) ?? seasonOverall.get(item.player.playerId) ?? 0.5) +
+        0.35 * (seasonOverall.get(item.player.playerId) ?? 0.5),
+    }))
+    .map((item) => ({
+      ...item,
+      marketPercentile:
+        roundWeight * item.roundMarketPercentile + (1 - roundWeight) * item.seasonMarketPercentile,
     }))
     .sort((a, b) => a.marketPercentile - b.marketPercentile || a.player.playerId.localeCompare(b.player.playerId));
-  const allTied = ranked[0]?.roundPoints === ranked[ranked.length - 1]?.roundPoints;
-  const groups: Array<{ start: number; end: number; percentile: number; marketBand: FantasyTrend }> = [];
+  const allTied = ranked.every(
+    (item) => item.roundPoints === ranked[0]?.roundPoints && item.seasonAverage === ranked[0]?.seasonAverage,
+  );
+  const groups: Array<{ start: number; end: number; percentile: number }> = [];
 
   for (let start = 0; start < ranked.length;) {
     let end = start;
     while (end + 1 < ranked.length && ranked[end + 1].marketPercentile === ranked[start].marketPercentile) end += 1;
     const percentile = ranked.length === 1 ? 0.5 : ((start + end) / 2) / (ranked.length - 1);
-    groups.push({
-      start,
-      end,
-      percentile,
-      marketBand: allTied
-        ? "STABLE"
-        : percentile < settings.marketUpShare
-          ? "UP"
-          : percentile < settings.marketUpShare + settings.marketStableShare
-            ? "STABLE"
-            : "DOWN",
-    });
+    groups.push({ start, end, percentile });
     start = end + 1;
   }
 
-  const bandRange = (band: FantasyTrend) => {
-    const percentiles = groups.filter((group) => group.marketBand === band).map((group) => group.percentile);
-    return { min: Math.min(...percentiles), max: Math.max(...percentiles) };
-  };
-  const upRange = bandRange("UP");
-  const downRange = bandRange("DOWN");
   const byId = new Map<string, FantasyPriceResult>();
+  const strength = settings.marketRepriceStrength ?? 0.35;
 
-  for (const { start, end, percentile, marketBand } of groups) {
-    const variationRate = marketBand === "UP"
-      ? upRange.max === upRange.min
-        ? settings.maxPriceIncrease
-        : settings.maxPriceIncrease
-          - ((percentile - upRange.min) / (upRange.max - upRange.min)) * (settings.maxPriceIncrease - settings.marketMinIncrease)
-      : marketBand === "DOWN"
-        ? downRange.max === downRange.min
-          ? -settings.maxPriceDecrease
-          : -(settings.marketMinDecrease + ((percentile - downRange.min) / (downRange.max - downRange.min)) * (settings.maxPriceDecrease - settings.marketMinDecrease))
-        : 0;
-
+  for (const { start, end, percentile } of groups) {
     for (let index = start; index <= end; index += 1) {
       const { player, roundPoints } = ranked[index];
-      const nextPrice = roundMoney(
-        Math.max(settings.minPlayerPrice, Math.min(settings.maxPlayerPrice, player.currentPrice * (1 + variationRate)))
-      );
+      const priceTarget = calculateCompetitivePriceTarget(percentile, settings);
+      const desiredPrice = allTied
+        ? player.currentPrice
+        : player.currentPrice + (priceTarget - player.currentPrice) * strength;
+      const nextPrice = roundMoney(Math.max(
+        settings.minPlayerPrice,
+        player.currentPrice * (1 - settings.maxPriceDecrease),
+        Math.min(settings.maxPlayerPrice, player.currentPrice * (1 + settings.maxPriceIncrease), desiredPrice),
+      ));
+      const variationRate = roundMoney((nextPrice - player.currentPrice) / player.currentPrice * 10_000) / 10_000;
+      const marketBand: FantasyTrend = variationRate > 0.015 ? "UP" : variationRate < -0.015 ? "DOWN" : "STABLE";
       byId.set(player.playerId, {
         ...player,
         roundPoints,
