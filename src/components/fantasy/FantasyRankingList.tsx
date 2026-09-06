@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from "next/navigation";
 import { Cards, CheckCircle2, ChevronRight, Clock, Crown, RotateCcw } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { CosmeticNameplate } from "@/components/fantasy/CosmeticNameplate";
 import type { FantasyRoundLineupOverview } from "@/lib/actions/fantasy";
 import { cosmeticImage } from "@/lib/fantasy/cosmetics";
 import { supabase } from "@/lib/supabase";
@@ -35,6 +36,8 @@ export type FantasyRankingEntry = {
     frameKey: string | null;
     auraKey: string | null;
     backgroundAssetKey: string | null;
+    nameplateKey: string | null;
+    titleName: string | null;
   } | null;
   roundCard?: {
     slug: string | null;
@@ -103,6 +106,28 @@ function cardRarityClass(rarity?: string) {
   if (rarity === "EPIC") return "border-fuchsia-300/30 bg-fuchsia-300/10 text-fuchsia-200";
   if (rarity === "RARE") return "border-sky-300/30 bg-sky-300/10 text-sky-200";
   return "border-white/15 bg-white/[.06] text-emerald-100";
+}
+
+function RoundCardSummary({ card, compact = false }: { card?: FantasyRankingEntry["roundCard"]; compact?: boolean }) {
+  if (!card) {
+    return (
+      <div className={`${compact ? "mt-1.5 px-1.5 py-1 text-[7px]" : "mt-3 px-2.5 py-2 text-[9px]"} flex items-center gap-2 rounded-xl border border-white/10 bg-black/25 font-black uppercase text-muted`}>
+        <Cards className={`${compact ? "h-2.5 w-2.5" : "h-4 w-4"} shrink-0`} />
+        Sem carta nesta rodada
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${compact ? "mt-1.5 gap-1 px-1.5 py-1 text-[7px]" : "mt-3 gap-2 px-2.5 py-2"} flex items-center rounded-xl border ${cardRarityClass(card.rarity)}`}>
+      <span className={`${compact ? "h-5 w-5" : "h-7 w-7"} flex shrink-0 items-center justify-center rounded-lg bg-black/25`}><Cards className={`${compact ? "h-2.5 w-2.5" : "h-4 w-4"}`} /></span>
+      <div className="min-w-0 flex-1 text-left">
+        <p className={`${compact ? "text-[6px]" : "text-[8px]"} truncate font-black uppercase tracking-[.14em] opacity-70`}>Carta da rodada</p>
+        <p className={`${compact ? "text-[7px]" : "text-[10px]"} truncate font-black`}>{card.name}</p>
+      </div>
+      <strong className={`${compact ? "text-[7px]" : "text-xs"} shrink-0 font-black`}>{cardBenefitLabel(card)}</strong>
+    </div>
+  );
 }
 
 function podiumStyle(position: number) {
@@ -189,21 +214,19 @@ function FantasyPodium({ ranking, scope, metric }: { ranking: FantasyRankingEntr
                     className={`${avatarSize} rounded-full bg-[#0c2517] text-xs font-black text-accent`}
                   />
                 </div>
-                <div className="mt-2 flex min-h-9 w-full items-center justify-center border-y border-white/10 bg-black/25 px-1 py-1">
-                  <p className="line-clamp-2 text-[10px] font-black uppercase leading-4 text-foreground sm:text-xs">{item.player?.name || "Cartoleiro"}</p>
-                </div>
+                {item.cosmetics?.nameplateKey ? (
+                  <CosmeticNameplate assetKey={item.cosmetics.nameplateKey} playerName={item.player?.name || "Cartoleiro"} titleName={item.cosmetics.titleName} compact className="mt-2" />
+                ) : (
+                  <div className="mt-2 flex min-h-9 w-full items-center justify-center border-y border-white/10 bg-black/25 px-1 py-1">
+                    <p className="line-clamp-2 text-[10px] font-black uppercase leading-4 text-foreground sm:text-xs">{item.player?.name || "Cartoleiro"}</p>
+                  </div>
+                )}
                 <p className={`mt-0.5 whitespace-nowrap font-athletic text-base font-black leading-none sm:text-lg ${style.label}`}>{formattedMetricValue(item, metric)}</p>
                 <p className="mt-0.5 line-clamp-1 text-[7px] font-black uppercase tracking-wider text-muted">{metric.valueLabel}</p>
                 <span className="mt-2 max-w-full truncate rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[8px] font-black text-emerald-200">
                   {metricSupportingValue(item, metric)}
                 </span>
-                {item.roundCard && (
-                  <span className={`mt-1.5 flex max-w-full items-center gap-1 rounded-md border px-1.5 py-1 text-[7px] font-black uppercase ${cardRarityClass(item.roundCard.rarity)}`}>
-                    <Cards className="h-2.5 w-2.5 shrink-0" />
-                    <span className="truncate">{item.roundCard.name}</span>
-                    <b className="shrink-0">{cardBenefitLabel(item.roundCard)}</b>
-                  </span>
-                )}
+                {scope === "round" && <RoundCardSummary card={item.roundCard} compact />}
               </div>
 
               <div className={`relative z-10 mt-2 rounded-xl border py-1.5 ${style.base}`}>
@@ -512,7 +535,11 @@ export function FantasyRankingList({
                     />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-athletic text-base font-black uppercase tracking-wide text-foreground">{item.player?.name || "Cartoleiro"}</p>
+                    {item.cosmetics?.nameplateKey ? (
+                      <CosmeticNameplate assetKey={item.cosmetics.nameplateKey} playerName={item.player?.name || "Cartoleiro"} titleName={item.cosmetics.titleName} compact />
+                    ) : (
+                      <p className="truncate font-athletic text-base font-black uppercase tracking-wide text-foreground">{item.player?.name || "Cartoleiro"}</p>
+                    )}
                     <p className="mt-1 truncate text-[9px] font-bold uppercase tracking-wider text-muted">
                       {activeMetric.id === "points"
                         ? <>{Number(item.rounds_played)} {Number(item.rounds_played) === 1 ? "rodada" : "rodadas"} • C$ {Number(item.current_budget).toFixed(2)}</>
@@ -525,16 +552,7 @@ export function FantasyRankingList({
                   </div>
                 </div>
 
-                {item.roundCard && (
-                  <div className={`mt-3 flex items-center gap-2 rounded-xl border px-2.5 py-2 ${cardRarityClass(item.roundCard.rarity)}`}>
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-black/25"><Cards className="h-4 w-4" /></span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[8px] font-black uppercase tracking-[.14em] opacity-70">Carta da rodada</p>
-                      <p className="truncate text-[10px] font-black">{item.roundCard.name}</p>
-                    </div>
-                    <strong className="shrink-0 text-xs font-black">{cardBenefitLabel(item.roundCard)}</strong>
-                  </div>
-                )}
+                {scope === "round" && <RoundCardSummary card={item.roundCard} />}
 
                 <div className="mt-2 flex items-center justify-end gap-1 text-[8px] font-black uppercase tracking-wider text-accent/75">
                   Ver escalação <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />

@@ -9,7 +9,8 @@ import type { MemberCategory, Player } from "@/lib/types";
 import { AvatarCropModal } from "./AvatarCropModal";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PLAYER_PROFILE_OPTIONS } from "@/lib/playerProfiles";
-import { cosmeticImage, cosmeticNameplateClass, cosmeticVisual } from "@/lib/fantasy/cosmetics";
+import { cosmeticImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
+import { CosmeticNameplate } from "@/components/fantasy/CosmeticNameplate";
 
 const MAX_SOURCE_SIZE = 20 * 1024 * 1024;
 
@@ -236,10 +237,8 @@ export function PlayerForm({
           )}
         </div>
         <p className="text-[10px] text-muted text-center">Escolha uma imagem e ajuste o enquadramento antes de salvar</p>
-        {titleName && (
-          <span className={`rounded-md border px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${cosmeticNameplateClass(nameplateKey)}`}>
-            ✨ {titleName}
-          </span>
+        {(nameplateKey || titleName) && (
+          <CosmeticNameplate assetKey={nameplateKey} playerName={previewName} titleName={titleName} className="w-full max-w-[18rem]" />
         )}
       </div>
       </div>

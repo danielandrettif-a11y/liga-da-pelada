@@ -5,10 +5,11 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Sparkles, X } from "@/components/icons";
 import { claimPassCosmetic, type CosmeticPassReward } from "@/lib/actions/cosmetics";
-import { cosmeticImage, cosmeticNameplateClass, cosmeticVisual, COSMETIC_SLOT_LABELS, rarityClass, type CosmeticItem } from "@/lib/fantasy/cosmetics";
+import { cosmeticImage, cosmeticVisual, COSMETIC_SLOT_LABELS, rarityClass, type CosmeticItem } from "@/lib/fantasy/cosmetics";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { CosmeticTitlePreview } from "@/components/fantasy/CosmeticTitlePreview";
+import { CosmeticNameplate } from "@/components/fantasy/CosmeticNameplate";
 
 export function PassRewardPicker({ reward, progress, playerName, playerAvatarUrl, onBack, onClaimed, onClose }: { reward: CosmeticPassReward | null; progress: number; playerName?: string | null; playerAvatarUrl?: string | null; onBack?: () => void; onClaimed?: (rewardId: string) => void; onClose: () => void }) {
   const router = useRouter();
@@ -51,5 +52,5 @@ function FramePreview({ item, bonusFrame, playerName, playerAvatarUrl, compact =
 }
 
 function NameplatePreview({ item }: { item: CosmeticItem }) {
-  return <span className={`rounded-xl border px-4 py-2 font-athletic text-sm font-black uppercase italic tracking-wide ${cosmeticNameplateClass(item.assetKey)}`}>Jogador BQ</span>;
+  return <CosmeticNameplate assetKey={item.assetKey} playerName="Jogador BQ" className="mx-3 w-full" />;
 }

@@ -12,7 +12,8 @@ import { TeamCrest } from "@/components/TeamCrest";
 import { FantasyPlayerCard } from "@/components/fantasy/FantasyPlayerCard";
 import { getFantasyPlayerSummary } from "@/lib/actions/fantasy";
 import { getAdminCosmeticsPreview, getPlayerEquippedCosmetics, type CosmeticPreviewLoadout } from "@/lib/actions/cosmetics";
-import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticImage, cosmeticMobileBackgroundImage, cosmeticNameplateClass, cosmeticProfileCoverImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
+import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticImage, cosmeticMobileBackgroundImage, cosmeticProfileCoverImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
+import { CosmeticNameplate } from "@/components/fantasy/CosmeticNameplate";
 import { OfficialProfilePreviewNotice } from "@/components/fantasy/OfficialProfilePreviewNotice";
 import { buildRankedPointBreakdown } from "@/lib/ranked-scoring";
 
@@ -215,10 +216,13 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
               />
             </div>
             <h2 className="text-2xl font-bold text-foreground drop-shadow-sm">{player.name}</h2>
-            {cosmetics?.titleName ? (
-              <p className={`mt-1 inline-flex items-center gap-1 rounded-full border px-3 py-0.5 text-xs font-black uppercase tracking-wide shadow-sm ${cosmeticNameplateClass(cosmetics.nameplateKey)}`}>
-                ✨ {cosmetics.titleName}
-              </p>
+            {(cosmetics?.nameplateKey || cosmetics?.titleName) ? (
+              <CosmeticNameplate
+                assetKey={cosmetics.nameplateKey}
+                playerName={player.name}
+                titleName={cosmetics.titleName}
+                className="mx-auto mt-2 w-full max-w-[19rem]"
+              />
             ) : null}
             <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2">
               <span className="rounded-full border border-border bg-surface/50 backdrop-blur-xs px-2.5 py-1 text-[9px] font-black uppercase text-muted">{categoryLabel}</span>

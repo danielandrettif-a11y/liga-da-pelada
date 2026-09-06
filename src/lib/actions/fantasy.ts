@@ -2525,7 +2525,7 @@ export async function getFantasyRanking(
           .in("user_id", userIds),
         rankingReadClient
           .from("fantasy_user_cosmetic_loadouts")
-          .select("user_id, frame:frame_cosmetic_id(asset_key), aura:aura_cosmetic_id(asset_key)")
+          .select("user_id, frame:frame_cosmetic_id(asset_key), aura:aura_cosmetic_id(asset_key), nameplate:nameplate_cosmetic_id(asset_key), title:title_cosmetic_id(name), background:background_cosmetic_id(asset_key)")
           .eq("fantasy_season_id", fs.id)
           .in("user_id", userIds),
         scope === "round" && rankingRoundId
@@ -2544,6 +2544,9 @@ export async function getFantasyRanking(
     (cosmeticLoadouts || []).map((item: any) => [item.user_id, {
       frameKey: item.frame?.asset_key || null,
       auraKey: item.aura?.asset_key || null,
+      nameplateKey: item.nameplate?.asset_key || null,
+      titleName: item.title?.name || null,
+      backgroundAssetKey: item.background?.asset_key || null,
     }]),
   );
   const cardByUser = new Map(

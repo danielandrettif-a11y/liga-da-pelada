@@ -21,6 +21,7 @@ import type {
 } from "@/lib/ranking";
 import { formatDateShort, getInitials } from "@/lib/utils";
 import { PlayerAvatar } from "./PlayerAvatar";
+import { CosmeticNameplate } from "./fantasy/CosmeticNameplate";
 
 const RankingPlayerCardModal = dynamic(() =>
   import("./RankingPlayerCardModal").then((module) => module.RankingPlayerCardModal),
@@ -432,7 +433,11 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                     )}
                   </div>
                   <div className="mb-2 mt-4 w-full px-1 text-center">
-                    <p className="truncate text-xs font-black text-foreground">{entry.player.name}</p>
+                    {entry.cosmetics?.nameplateKey ? (
+                      <CosmeticNameplate assetKey={entry.cosmetics.nameplateKey} playerName={entry.player.name} titleName={entry.cosmetics.titleName} compact />
+                    ) : (
+                      <p className="truncate text-xs font-black text-foreground">{entry.player.name}</p>
+                    )}
                     <p className="mt-1 truncate text-[8px] font-bold text-muted">
                       {entry.wins}V · {entry.draws}E · {entry.losses}D · {entry.goals}G · {entry.assists}A
                     </p>
@@ -467,10 +472,15 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
               key={entry.player.id}
               type="button"
               onClick={() => setSelected({ entry, position })}
-              className="glass-card glass-card-hover w-full p-3 text-left animate-fade-in"
+              className="group relative w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#10251a] via-[#091a11] to-[#041009] p-3 text-left shadow-[0_12px_28px_rgba(0,0,0,.22)] transition-all hover:-translate-y-0.5 hover:border-accent/35 animate-fade-in"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 shrink-0 text-center font-athletic text-base font-black text-muted">{position}º</div>
+              <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/35 to-transparent" />
+              <span className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full border border-accent/10" />
+              <div className="relative flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-xl border border-white/10 bg-black/25">
+                  <span className="font-athletic text-base font-black leading-none text-foreground">{position}º</span>
+                  <span className="mt-0.5 text-[6px] font-black uppercase tracking-[.12em] text-muted">Rank</span>
+                </div>
                 <PlayerAvatar
                   name={entry.player.name}
                   avatarUrl={entry.player.avatar_url}
@@ -480,11 +490,13 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-black text-foreground">{displayName}</p>
-                    {entry.cosmetics?.titleName && (
-                      <span className="truncate rounded bg-accent/15 px-1.5 py-0.2 text-[8px] font-black uppercase text-accent border border-accent/25">
-                        {entry.cosmetics.titleName}
-                      </span>
+                    {entry.cosmetics?.nameplateKey ? (
+                      <CosmeticNameplate assetKey={entry.cosmetics.nameplateKey} playerName={displayName} titleName={entry.cosmetics.titleName} compact />
+                    ) : (
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-athletic text-sm font-black uppercase tracking-wide text-foreground">{displayName}</p>
+                        {entry.cosmetics?.titleName && <p className="truncate text-[8px] font-black uppercase tracking-wider text-accent">✦ {entry.cosmetics.titleName}</p>}
+                      </div>
                     )}
                     {view === "season" && entry.positionChange !== null && (
                       <span className={`inline-flex items-center text-[9px] font-black ${entry.positionChange > 0 ? "text-success" : entry.positionChange < 0 ? "text-danger" : "text-muted"}`}>
@@ -493,26 +505,27 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                       </span>
                     )}
                   </div>
-                  <div className="mt-1 flex flex-wrap gap-1">
+                  <div className="mt-1.5 flex flex-wrap gap-1">
                     {entry.awards.topScorer > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Artilheiro da rodada {entry.awards.topScorer}x</span>}
                     {entry.awards.topAssister > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Garçom da rodada {entry.awards.topAssister}x</span>}
                     {entry.awards.bestGoalkeeper > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Goleiro {entry.awards.bestGoalkeeper}x</span>}
                     {entry.awards.bestDefender > 0 && <span className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black text-amber-300">Xerife da rodada {entry.awards.bestDefender}x</span>}
                   </div>
-                  <p className="mt-1 text-[9px] font-bold text-muted">
-                    {entry.wins}V · {entry.draws}E · {entry.losses}D · {entry.goals}G · {entry.assists}A
-                  </p>
-                  {above && (
-                    <p className="mt-1.5 text-[9px] font-semibold text-muted/80">
-                      Faltam {gap} {FILTER_LABELS[filter]} para ultrapassar o {position - 1}º lugar
-                    </p>
-                  )}
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="stat-number text-xl text-foreground">{metricDisplay(entry, filter)}</p>
                   <p className="text-[8px] font-black uppercase tracking-wider text-muted">{FILTER_LABELS[filter]}</p>
                 </div>
               </div>
+              <div className="relative mt-3 grid grid-cols-5 gap-1 border-t border-white/10 pt-2.5">
+                {[[entry.wins, "VIT"], [entry.draws, "EMP"], [entry.losses, "DER"], [entry.goals, "GOL"], [entry.assists, "AST"]].map(([value, label]) => (
+                  <div key={label} className="rounded-lg border border-white/[.07] bg-black/20 px-1 py-1.5 text-center">
+                    <p className="font-athletic text-sm font-black leading-none text-foreground">{value}</p>
+                    <p className="mt-1 text-[6px] font-black uppercase tracking-[.12em] text-muted">{label}</p>
+                  </div>
+                ))}
+              </div>
+              {above && <p className="relative mt-2 text-center text-[8px] font-semibold uppercase tracking-wide text-muted/80">Faltam {gap} {FILTER_LABELS[filter]} para subir</p>}
             </button>
           );
         })}
@@ -533,7 +546,9 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
             className="h-10 w-10 rounded-full border border-accent/40 bg-surface text-xs font-black"
           />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-black text-foreground">Sua posição · {pinnedEntry.player.name}</p>
+            {pinnedEntry.cosmetics?.nameplateKey ? (
+              <CosmeticNameplate assetKey={pinnedEntry.cosmetics.nameplateKey} playerName={pinnedEntry.player.name} titleName={pinnedEntry.cosmetics.titleName} compact />
+            ) : <p className="truncate text-xs font-black text-foreground">Sua posição · {pinnedEntry.player.name}</p>}
             <p className="text-[9px] text-muted">Toque para abrir sua carta</p>
           </div>
           <span className="stat-number text-xl text-accent">{metricDisplay(pinnedEntry, filter)}</span>

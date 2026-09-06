@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ChevronDown, Medal, Share2, Sparkles, Target, Trophy, X } from "@/components/icons";
 import type { RankingEntry } from "@/lib/ranking";
 import { PlayerAvatar } from "./PlayerAvatar";
+import { CosmeticNameplate } from "./fantasy/CosmeticNameplate";
 import { getInitials } from "@/lib/utils";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 
@@ -353,14 +354,14 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
             </div>
 
             {/* Nome & Título */}
-            <div className="relative z-10 mt-1 rounded-xl border border-current/25 bg-white/15 px-3 py-2 text-center backdrop-blur-xs shadow-sm">
-              <h2 className="truncate font-athletic text-xl font-black uppercase tracking-wide">{displayName}</h2>
-              {entry.cosmetics?.titleName ? (
-                <p className="mt-0.5 truncate text-[9px] font-black uppercase tracking-wider opacity-90 text-current">
-                  ✨ {entry.cosmetics.titleName}
-                </p>
-              ) : null}
-            </div>
+            {entry.cosmetics?.nameplateKey ? (
+              <CosmeticNameplate assetKey={entry.cosmetics.nameplateKey} playerName={displayName} titleName={entry.cosmetics.titleName} className="relative z-10 mt-1 w-full max-w-none" />
+            ) : (
+              <div className="relative z-10 mt-1 rounded-xl border border-current/25 bg-white/15 px-3 py-2 text-center backdrop-blur-xs shadow-sm">
+                <h2 className="truncate font-athletic text-xl font-black uppercase tracking-wide">{displayName}</h2>
+                {entry.cosmetics?.titleName ? <p className="mt-0.5 truncate text-[9px] font-black uppercase tracking-wider opacity-90 text-current">✨ {entry.cosmetics.titleName}</p> : null}
+              </div>
+            )}
 
             {awardBadges.length > 0 && (
               <div className="relative z-10 mt-2 flex flex-wrap justify-center gap-1.5 rounded-xl border border-current/15 bg-white/10 p-2">
