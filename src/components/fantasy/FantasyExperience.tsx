@@ -1459,6 +1459,21 @@ export function FantasyExperience({
                   </p>
                 )}
               </div>
+
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-accent/25 bg-[linear-gradient(120deg,rgba(204,255,0,.16),rgba(7,28,15,.9)_48%,rgba(3,13,8,.94))] px-3.5 py-2.5 shadow-[inset_0_1px_rgba(255,255,255,.06),0_10px_22px_rgba(0,0,0,.18)]">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-accent/35 bg-accent/15 text-accent">
+                    <Shirt className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[8px] font-black uppercase tracking-[.18em] text-muted">Valor do time escalado</p>
+                    <p className="mt-0.5 font-athletic text-lg font-black leading-none text-accent">{formatFantasyMoney(cost, settings.currencyName)}</p>
+                  </div>
+                </div>
+                <span className="shrink-0 rounded-full border border-white/10 bg-black/25 px-2 py-1 text-[9px] font-black text-foreground">
+                  {validSelectedCount}/{playersPerTeam} no campo
+                </span>
+              </div>
             </div>
 
             {/* Campo de Bairro: metade defensiva, da linha central ao gol. */}
