@@ -832,6 +832,60 @@ textarea {
 .cosmetic-nameplate--compact .cosmetic-nameplate__player { margin-top: .28rem; font-size: .72rem; }
 .cosmetic-nameplate--compact .cosmetic-nameplate__title { font-size: .4rem; }
 
+/* Encaixe dedicado para a placa estreita das cartas do ranking. A arte
+   cosmética ocupa toda a faixa, mas o nome ganha duas linhas e não é ampliado
+   para fora da área útil da moldura. */
+.ranking-card-nameplate.cosmetic-nameplate {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  justify-content: center;
+  overflow: hidden;
+  padding: .25rem 14% .28rem;
+  border-radius: .45rem !important;
+  background-size: 100% 100%;
+}
+
+.ranking-card-nameplate .cosmetic-nameplate__header {
+  display: none;
+}
+
+.ranking-card-nameplate .cosmetic-nameplate__player {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 0;
+  font-size: clamp(.62rem, 3.1vw, .88rem);
+  letter-spacing: .035em;
+  line-height: .92;
+  text-align: center;
+  text-overflow: clip;
+  text-wrap: balance;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.ranking-card-nameplate .cosmetic-nameplate__title {
+  max-width: 100%;
+  margin-top: .16rem;
+  font-size: .34rem;
+  letter-spacing: .08em;
+  text-align: center;
+}
+
+.ranking-card-nameplate .cosmetic-nameplate__edge {
+  display: none;
+}
+
+.ranking-card-player-name {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
+  text-wrap: balance;
+}
+
 .cosmetic-nameplate--default {
   border-color: rgba(204,255,0,.34);
   color: #d9ff71;

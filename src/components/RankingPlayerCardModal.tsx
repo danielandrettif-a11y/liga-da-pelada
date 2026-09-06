@@ -29,6 +29,49 @@ function cardTheme(position: number) {
   return { artwork: "/images/ranking-cards/ranking-card-neutral-v1.webp", base: "#123e28", light: "#4f8d67", deep: "#06150d", edge: "#ccff00", ink: "#ffffff", glow: "rgba(204,255,0,.2)", label: "RANKED" };
 }
 
+function cardLayout(position: number) {
+  if (position === 1) return {
+    header: "inset-x-[29%] top-[9.2%] h-[4.3%]",
+    hero: "inset-x-[14.5%] top-[16%] h-[31.5%]",
+    score: "left-0 top-[6%] w-[38%]",
+    portrait: "right-[1%] top-[3%] w-[48%]",
+    image: "object-[center_18%]",
+    name: "inset-x-[13.5%] top-[49.3%] h-[8.2%]",
+    awards: "inset-x-[21%] top-[59.1%] h-[4.8%]",
+    stats: "inset-x-[18.5%] bottom-[9.5%] top-[65.7%]",
+  };
+  if (position === 2) return {
+    header: "inset-x-[28%] top-[11.6%] h-[4.2%]",
+    hero: "inset-x-[14%] top-[17%] h-[34%]",
+    score: "left-0 top-[5%] w-[38%]",
+    portrait: "right-[2%] top-[5%] w-[44%]",
+    image: "object-[center_22%]",
+    name: "inset-x-[10.5%] top-[55.2%] h-[8.3%]",
+    awards: "inset-x-[17%] top-[65.2%] h-[5.1%]",
+    stats: "inset-x-[15%] bottom-[8.7%] top-[72.8%]",
+  };
+  if (position === 3) return {
+    header: "inset-x-[30%] top-[8.1%] h-[4.1%]",
+    hero: "inset-x-[13.5%] top-[15%] h-[35%]",
+    score: "left-[1%] top-[6%] w-[38%]",
+    portrait: "right-[2%] top-[6%] w-[44%]",
+    image: "object-[center_18%]",
+    name: "inset-x-[10.5%] top-[51.8%] h-[8.5%]",
+    awards: "inset-x-[17%] top-[62.1%] h-[5.2%]",
+    stats: "inset-x-[16.5%] bottom-[12.4%] top-[69.5%]",
+  };
+  return {
+    header: "inset-x-[30%] top-[8%] h-[4%]",
+    hero: "inset-x-[14%] top-[15.5%] h-[35%]",
+    score: "left-0 top-[7%] w-[38%]",
+    portrait: "right-[3%] top-[6%] w-[43%]",
+    image: "object-[center_18%]",
+    name: "inset-x-[10.5%] top-[53.5%] h-[8.4%]",
+    awards: "inset-x-[17%] top-[63.7%] h-[5%]",
+    stats: "inset-x-[15%] bottom-[9.8%] top-[70%]",
+  };
+}
+
 function signedPoints(points: number) {
   return points > 0 ? `+${points}` : String(points);
 }
@@ -209,6 +252,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   }, [showBestRounds]);
 
   const theme = cardTheme(position);
+  const layout = cardLayout(position);
   const displayName = entry.player.name;
   const profile = `${PROFILE_LABELS[entry.player.player_profile || "midfield"]}${entry.player.is_goalkeeper ? " / GOL" : ""}`;
   const awardBadges = [
@@ -282,36 +326,44 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
         <div className="relative aspect-[2/3] w-full text-white" style={{ filter: `drop-shadow(0 20px 30px ${theme.glow})` }}>
           <img src={theme.artwork} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full object-fill" />
 
-          <header className="absolute inset-x-[18%] top-[5.5%] z-10 flex h-[5%] items-center justify-center truncate text-[8px] font-black uppercase tracking-[.2em]" style={{ color: theme.edge }}>
+          <header className={`absolute z-10 flex items-center justify-center truncate text-[8px] font-black uppercase tracking-[.16em] ${layout.header}`} style={{ color: theme.edge }}>
             PBQ • {theme.label}
           </header>
 
-          <div className="absolute inset-x-[13%] top-[14%] z-10 flex h-[37%] items-center justify-between">
-            <div className="flex w-[34%] flex-col items-start pl-1 font-athletic drop-shadow-[0_2px_5px_rgba(0,0,0,.9)]">
+          <div className={`absolute z-10 ${layout.hero}`}>
+            <div className={`absolute flex flex-col items-start pl-1 font-athletic drop-shadow-[0_2px_5px_rgba(0,0,0,.9)] ${layout.score}`}>
               <span className="player-card-rating text-[2.65rem] font-black leading-none" style={{ color: theme.edge }}>{entry.points}</span>
               <span className="mt-0.5 text-[9px] font-black tracking-[.22em] text-white/75">PTS</span>
               <span className="mt-2 border-t border-white/30 pt-2 text-[11px] font-black uppercase leading-tight text-white">{profile}</span>
               <span className="mt-2 rounded-md border border-white/25 bg-black/35 px-2 py-0.5 text-xs font-black text-white">{position}º</span>
             </div>
-            <div className="relative flex h-[78%] w-[60%] items-center justify-center">
-              <div className="relative aspect-square h-full max-h-44 overflow-hidden rounded-full border-[3px] bg-[#07150d] shadow-[0_10px_28px_rgba(0,0,0,.55)]" style={{ borderColor: theme.edge }}>
-                <PlayerAvatar name={entry.player.name} avatarUrl={entry.player.avatar_url} frameKey={entry.cosmetics?.frameKey} auraKey={entry.cosmetics?.auraKey} clickable={false} className="h-full w-full overflow-hidden rounded-full" imageClassName="h-full w-full object-cover object-top" />
-              </div>
+            <div className={`absolute aspect-square ${layout.portrait}`}>
+              <PlayerAvatar
+                name={entry.player.name}
+                avatarUrl={entry.player.avatar_url}
+                clickable={false}
+                className="h-full w-full overflow-hidden rounded-full border-[3px] bg-[#07150d] text-2xl font-black shadow-[0_10px_28px_rgba(0,0,0,.55)]"
+                imageClassName={`h-full w-full object-cover ${layout.image}`}
+                frameKey={null}
+                auraKey={null}
+                frameClass=""
+              />
+              <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full border border-white/30" style={{ boxShadow: `inset 0 0 0 2px ${theme.edge}, 0 0 16px ${theme.glow}` }} />
             </div>
           </div>
 
-          <div className="absolute inset-x-[12%] top-[55%] z-10 flex h-[9%] items-center justify-center overflow-hidden px-2 text-center">
+          <div className={`absolute z-10 flex items-center justify-center px-1 text-center ${layout.name}`}>
             {entry.cosmetics?.nameplateKey ? (
-              <CosmeticNameplate assetKey={entry.cosmetics.nameplateKey} playerName={displayName} titleName={entry.cosmetics.titleName} compact className="w-[125%] max-w-none scale-[.8]" />
+              <CosmeticNameplate assetKey={entry.cosmetics.nameplateKey} playerName={displayName} titleName={entry.cosmetics.titleName} compact className="ranking-card-nameplate h-full w-full max-w-none" />
             ) : (
-              <div className="min-w-0">
-                <h2 className="truncate font-athletic text-xl font-black uppercase tracking-wide text-white drop-shadow-[0_2px_4px_rgba(0,0,0,.9)]">{displayName}</h2>
-                {entry.cosmetics?.titleName && <p className="truncate text-[8px] font-black uppercase tracking-widest" style={{ color: theme.edge }}>✦ {entry.cosmetics.titleName}</p>}
+              <div className="flex h-full min-w-0 w-full flex-col items-center justify-center px-[7%]">
+                <h2 className={`ranking-card-player-name font-athletic font-black uppercase text-white drop-shadow-[0_2px_4px_rgba(0,0,0,.9)] ${displayName.length > 22 ? "text-sm leading-[.9] tracking-normal" : displayName.length > 15 ? "text-base leading-none tracking-tight" : "text-xl leading-none tracking-wide"}`}>{displayName}</h2>
+                {entry.cosmetics?.titleName && <p className="mt-0.5 max-w-full truncate text-[7px] font-black uppercase tracking-[.13em]" style={{ color: theme.edge }}>✦ {entry.cosmetics.titleName}</p>}
               </div>
             )}
           </div>
 
-          <div className="absolute inset-x-[17%] top-[65.8%] z-10 grid h-[5.5%] grid-cols-2 gap-[9%] text-center">
+          <div className={`absolute z-10 grid grid-cols-2 gap-[9%] text-center ${layout.awards}`}>
             {awardBadges.length > 0 ? awardBadges.slice(0, 2).map(({ label, value, Icon }) => (
               <span key={label} className="flex min-w-0 items-center justify-center gap-1 truncate text-[7px] font-black uppercase text-white">
                 <Icon className="h-2.5 w-2.5 shrink-0" style={{ color: theme.edge }} /> {label} {value}x
@@ -319,7 +371,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
             )) : <span className="col-span-2 self-center text-[7px] font-black uppercase tracking-[.18em] text-white/55">Futebol • Resenha • PBQ</span>}
           </div>
 
-          <div className="absolute inset-x-[15%] bottom-[8%] top-[73%] z-10 grid grid-cols-3 grid-rows-2 font-athletic">
+          <div className={`absolute z-10 grid grid-cols-3 grid-rows-2 font-athletic ${layout.stats}`}>
             {[[entry.goals, "GOL"], [entry.assists, "AST"], [entry.wins, "VIT"], [entry.games, "JOG"], [entry.losses, "DER"], [`${entry.winRate}%`, "APR"]].map(([value, label]) => (
               <div key={label} className="flex flex-col items-center justify-center text-center">
                 <p className="player-card-number text-xl leading-none text-white drop-shadow-[0_2px_3px_rgba(0,0,0,.9)]">{value}</p>
