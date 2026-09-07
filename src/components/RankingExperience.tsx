@@ -51,7 +51,7 @@ const FILTER_LABELS: Record<RankingFilter, string> = {
 };
 
 function awardsTotal(entry: RankingEntry) {
-  return entry.awards.topScorer + entry.awards.topAssister + entry.awards.bestGoalkeeper + entry.awards.bestDefender;
+  return entry.awards.roundMvp + entry.awards.topScorer + entry.awards.topAssister + entry.awards.kingOfWins;
 }
 
 function metricValue(entry: RankingEntry, filter: RankingFilter) {
@@ -506,10 +506,10 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                     )}
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-1">
+                    {entry.awards.roundMvp > 0 && <span className="rounded bg-warning/10 px-1.5 py-0.5 text-[8px] font-black text-warning">Craque da rodada {entry.awards.roundMvp}x</span>}
                     {entry.awards.topScorer > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Artilheiro da rodada {entry.awards.topScorer}x</span>}
                     {entry.awards.topAssister > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Garçom da rodada {entry.awards.topAssister}x</span>}
-                    {entry.awards.bestGoalkeeper > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Goleiro {entry.awards.bestGoalkeeper}x</span>}
-                    {entry.awards.bestDefender > 0 && <span className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black text-amber-300">Xerife da rodada {entry.awards.bestDefender}x</span>}
+                    {entry.awards.kingOfWins > 0 && <span className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black text-amber-300">Rei das vitórias {entry.awards.kingOfWins}x</span>}
                   </div>
                 </div>
                 <div className="shrink-0 text-right">

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ChevronRight, Shield } from "@/components/icons";
+import { ChevronRight, Shield, Sparkles } from "@/components/icons";
 import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
@@ -16,7 +16,31 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: "community", label: "Comunidade" },
 ];
 
-function PersonCard({ player, isAdmin }: { player: Player; isAdmin: boolean }) {
+function SpeedRatingBadge({ rating }: { rating: 1 | 2 | 3 | null }) {
+  const hasRating = rating !== null;
+  const stars = hasRating ? "★".repeat(rating) : "☆☆☆";
+  const label = hasRating
+    ? `Velocidade avaliada: ${rating} de 3 estrelas`
+    : "Velocidade ainda não avaliada";
+
+  return (
+    <span
+      title={label}
+      aria-label={label}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[8px] font-black uppercase tracking-wide ${
+        hasRating
+          ? "border-warning/40 bg-warning/10 text-warning"
+          : "border-dashed border-muted/45 bg-surface text-muted"
+      }`}
+    >
+      <Sparkles className="h-3 w-3" />
+      <span>{stars}</span>
+      {!hasRating && <span className="normal-case tracking-normal">avaliar</span>}
+    </span>
+  );
+}
+
+function PersonCard({ player, isAdmin, speedRating }: { player: Player; isAdmin: boolean; speedRating: 1 | 2 | 3 | null }) {
   const category = player.member_category === "player" ? "Jogador" : player.member_category === "guest" ? "Convidado" : player.member_category === "wag" ? "WAG" : "Torcida";
   return (
     <Link href={`/admin/jogadores/${player.id}/editar`} className="glass-card glass-card-hover flex min-w-0 items-center gap-3 p-3.5">
@@ -25,6 +49,7 @@ function PersonCard({ player, isAdmin }: { player: Player; isAdmin: boolean }) {
         <div className="flex flex-wrap items-center gap-1.5">
           <p className="max-w-full truncate text-sm font-black text-foreground">{player.name}</p>
           {isAdmin && <span className="inline-flex items-center gap-1 rounded-full border border-warning/35 bg-warning/10 px-2 py-0.5 text-[8px] font-black uppercase text-warning"><Shield className="h-3 w-3" /> ADM</span>}
+          <SpeedRatingBadge rating={speedRating} />
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
           <span className="rounded-full border border-border px-2 py-0.5 text-[8px] font-black uppercase text-muted">{category}</span>
@@ -36,7 +61,7 @@ function PersonCard({ player, isAdmin }: { player: Player; isAdmin: boolean }) {
   );
 }
 
-function Group({ title, subtitle, players, adminIds }: { title: string; subtitle: string; players: Player[]; adminIds: Set<string> }) {
+function Group({ title, subtitle, players, adminIds, speedRatings }: { title: string; subtitle: string; players: Player[]; adminIds: Set<string>; speedRatings: Record<string, 1 | 2 | 3 | null> }) {
   return (
     <section className="space-y-3">
       <div className="flex items-end justify-between gap-3 px-1">
@@ -44,14 +69,14 @@ function Group({ title, subtitle, players, adminIds }: { title: string; subtitle
         <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-[9px] font-black text-muted">{players.length}</span>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
-        {players.map((player) => <PersonCard key={player.id} player={player} isAdmin={adminIds.has(player.id)} />)}
+        {players.map((player) => <PersonCard key={player.id} player={player} isAdmin={adminIds.has(player.id)} speedRating={speedRatings[player.id] ?? null} />)}
         {players.length === 0 && <div className="col-span-full rounded-2xl border border-dashed border-border p-5 text-center text-xs text-muted">Nenhum perfil nesta categoria.</div>}
       </div>
     </section>
   );
 }
 
-export function AdminRosterDirectory({ players, adminPlayerIds }: { players: Player[]; adminPlayerIds: string[] }) {
+export function AdminRosterDirectory({ players, adminPlayerIds, speedRatings }: { players: Player[]; adminPlayerIds: string[]; speedRatings: Record<string, 1 | 2 | 3 | null> }) {
   const [filter, setFilter] = useState<Filter>("all");
   const adminIds = new Set(adminPlayerIds);
   const official = players.filter((player) => player.member_category === "player");
@@ -65,10 +90,10 @@ export function AdminRosterDirectory({ players, adminPlayerIds }: { players: Pla
         {FILTERS.map((item) => <button key={item.value} type="button" role="tab" aria-selected={filter === item.value} onClick={() => setFilter(item.value)} className={`min-w-0 rounded-xl px-1 py-2.5 text-[9px] font-black transition-colors ${filter === item.value ? "bg-accent text-background" : "text-muted hover:bg-surface"}`}><span className="block truncate">{item.label}</span></button>)}
       </div>
 
-      {(filter === "all" || filter === "players") && <Group title="Jogadores oficiais" subtitle="Atletas ativos no Ranked" players={official} adminIds={adminIds} />}
-      {(filter === "all" || filter === "guests") && <Group title="Convidados" subtitle="Perfis permanentes e disponíveis para convocação" players={guests} adminIds={adminIds} />}
-      {(filter === "all" || filter === "community") && <Group title="WAGs" subtitle="Comunidade fora das quatro linhas" players={wags} adminIds={adminIds} />}
-      {(filter === "all" || filter === "community") && <Group title="Torcida" subtitle="Quem acompanha a pelada" players={supporters} adminIds={adminIds} />}
+      {(filter === "all" || filter === "players") && <Group title="Jogadores oficiais" subtitle="Atletas ativos no Ranked" players={official} adminIds={adminIds} speedRatings={speedRatings} />}
+      {(filter === "all" || filter === "guests") && <Group title="Convidados" subtitle="Perfis permanentes e disponíveis para convocação" players={guests} adminIds={adminIds} speedRatings={speedRatings} />}
+      {(filter === "all" || filter === "community") && <Group title="WAGs" subtitle="Comunidade fora das quatro linhas" players={wags} adminIds={adminIds} speedRatings={speedRatings} />}
+      {(filter === "all" || filter === "community") && <Group title="Torcida" subtitle="Quem acompanha a pelada" players={supporters} adminIds={adminIds} speedRatings={speedRatings} />}
     </div>
   );
 }

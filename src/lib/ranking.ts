@@ -2,10 +2,10 @@ import type { Player } from "./types";
 import type { PlayerAwardSeason } from "./awards";
 
 export type RankingAwards = {
+  roundMvp: number;
   topScorer: number;
   topAssister: number;
-  bestGoalkeeper: number;
-  bestDefender: number;
+  kingOfWins: number;
 };
 
 export type RankingBestRound = {

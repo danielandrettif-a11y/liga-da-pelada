@@ -165,7 +165,10 @@ export default async function HomePage() {
             const userEntry = currentPlayerId
               ? (callup.entries || []).find((entry: any) => entry.playerId === currentPlayerId) || null
               : null;
-            return <OpenCallupBanner key={callup.id} callup={callup} userEntry={userEntry} />;
+            return {
+              userEntry,
+              slide: <OpenCallupBanner key={callup.id} callup={callup} userEntry={userEntry} />,
+            };
           });
 
           const roundSlide = preseasonEnabled ? (
@@ -180,15 +183,14 @@ export default async function HomePage() {
             />
           );
 
-          const hasOpenVacancy = activeCallups.some(
-            (callup: any) => callup.confirmed < callup.capacity,
+          const hasConfirmedPresence = callupSlides.some(
+            ({ userEntry }) => userEntry?.status === "confirmed",
           );
-          // A agenda e a convocação são informações complementares. Mesmo
-          // quando apontam para a mesma rodada, mantemos os dois banners. A
-          // convocação assume a primeira posição somente enquanto há vaga.
-          const slides = (hasOpenVacancy
-            ? [...callupSlides, roundSlide]
-            : [roundSlide, ...callupSlides]
+          // A convocação exige ação enquanto a presença ainda estiver pendente.
+          // Depois da confirmação, a temporada/rodada vira a informação principal.
+          const slides = (hasConfirmedPresence
+            ? [roundSlide, ...callupSlides.map(({ slide }) => slide)]
+            : [...callupSlides.map(({ slide }) => slide), roundSlide]
           ).filter(Boolean);
 
           if (slides.length > 1) {

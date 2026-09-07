@@ -750,7 +750,7 @@ export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: 
     assists: 0,
     points: 0,
     winRate: 0,
-    awards: { topScorer: 0, topAssister: 0, bestGoalkeeper: 0, bestDefender: 0 },
+    awards: { roundMvp: 0, topScorer: 0, topAssister: 0, kingOfWins: 0 },
     awardSeasons: [],
     seasonPosition: data.general.length + 1,
     positionChange: null,

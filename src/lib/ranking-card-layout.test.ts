@@ -64,7 +64,7 @@ describe("ranking card layout", () => {
       games: 23,
       losses: 6,
       winRate: 59,
-      awards: { topScorer: 0, topAssister: 1, bestGoalkeeper: 0, bestDefender: 2 },
+      awards: { roundMvp: 2, topScorer: 0, topAssister: 1, kingOfWins: 3 },
       cosmetics: { titleName: null },
     } as RankingEntry;
 
@@ -78,10 +78,10 @@ describe("ranking card layout", () => {
       title: null,
     });
     expect(content.awards.map(({ label, value }) => [label, value])).toEqual([
+      ["Craque", 2],
       ["Artilheiro", 0],
       ["Garçom", 1],
-      ["Goleiro", 0],
-      ["Xerife", 2],
+      ["Vitórias", 3],
     ]);
     expect(content.stats.map(({ label }) => label)).toEqual(["GOL", "AST", "VIT", "JOG", "DER", "APR"]);
   });

@@ -25,6 +25,17 @@ describe("premios da temporada", () => {
     expect(result.get("p2")?.[0].awards.some((award) => award.type === "seasonTopScorer")).toBe(true);
   });
 
+  it("premia Craque e Rei das Vitórias com os scouts da rodada", () => {
+    const result = buildAwardSeasonsByPlayer(rounds, [
+      { player_id: "p1", round_id: "r1", goals: 1, assists: 1, games: 2, points: 11, wins: 2 },
+      { player_id: "p2", round_id: "r1", goals: 0, assists: 0, games: 2, points: 9, wins: 2 },
+    ]);
+    expect(result.get("p1")?.[0].awards.some((award) => award.type === "roundMvp")).toBe(true);
+    expect(result.get("p1")?.[0].awards.some((award) => award.type === "kingOfWins")).toBe(true);
+    expect(result.get("p2")?.[0].awards.some((award) => award.type === "roundMvp")).toBe(false);
+    expect(result.get("p2")?.[0].awards.some((award) => award.type === "kingOfWins")).toBe(true);
+  });
+
   it("premia um unico Xerife pela melhor media defensiva da rodada", () => {
     const result = buildAwardSeasonsByPlayer(rounds, [
       { player_id: "def-1", round_id: "r1", goals: 0, assists: 0, games: 2, defensive_clean_games: 1, defensive_one_goal_games: 1, team_goals_conceded: 1, player: { player_profile: "defensive", member_category: "player", is_selectable: true } },

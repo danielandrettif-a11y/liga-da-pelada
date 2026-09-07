@@ -399,7 +399,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
 
           <div className="ranking-card-awards absolute z-10 grid grid-cols-2 grid-rows-2 text-center" style={rankingCardBoxStyle(layout.awards)}>
             {cardContent.awards.map(({ key, label, value }) => {
-              const Icon = key === "topScorer" ? Target : key === "topAssister" ? Sparkles : Medal;
+              const Icon = key === "roundMvp" ? Trophy : key === "topScorer" ? Target : key === "topAssister" ? Sparkles : Medal;
               return (
                 <span key={key} className="flex min-w-0 items-center justify-center gap-1 truncate px-1 text-[7px] font-black uppercase text-white">
                   <Icon className="h-2.5 w-2.5 shrink-0" style={{ color: theme.edge }} /> {label} {value}x

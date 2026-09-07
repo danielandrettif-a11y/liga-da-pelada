@@ -1,6 +1,6 @@
 import type { SeasonStatus } from "./types";
 
-export type PlayerAwardType = "topScorer" | "topAssister" | "bestGoalkeeper" | "bestDefender" | "seasonTopScorer" | "seasonTopAssister";
+export type PlayerAwardType = "roundMvp" | "topScorer" | "topAssister" | "kingOfWins" | "bestGoalkeeper" | "bestDefender" | "seasonTopScorer" | "seasonTopAssister";
 
 export type PlayerAward = {
   type: PlayerAwardType;
@@ -31,6 +31,8 @@ export type AwardStat = {
   round_id: string;
   goals: number;
   assists: number;
+  wins?: number;
+  points?: number;
   games?: number;
   defensive_clean_games?: number;
   defensive_one_goal_games?: number;
@@ -89,14 +91,22 @@ export function buildAwardSeasonsByPlayer(rounds: AwardRound[], stats: AwardStat
     const roundStats = statsByRound.get(round.id) || [];
     const mostGoals = Math.max(0, ...roundStats.map((stat) => stat.goals));
     const mostAssists = Math.max(0, ...roundStats.map((stat) => stat.assists));
+    const mostPoints = Math.max(0, ...roundStats.map((stat) => Number(stat.points || 0)));
+    const mostWins = Math.max(0, ...roundStats.map((stat) => Number(stat.wins || 0)));
 
     for (const stat of roundStats) {
       const season = ensureSeason(stat.player_id, round);
+      if (mostPoints > 0 && Number(stat.points || 0) === mostPoints) {
+        season.awards.push({ type: "roundMvp", roundId: round.id, roundNumber: round.number, roundDate: round.date });
+      }
       if (mostGoals > 0 && stat.goals === mostGoals) {
         season.awards.push({ type: "topScorer", roundId: round.id, roundNumber: round.number, roundDate: round.date });
       }
       if (mostAssists > 0 && stat.assists === mostAssists) {
         season.awards.push({ type: "topAssister", roundId: round.id, roundNumber: round.number, roundDate: round.date });
+      }
+      if (mostWins > 0 && Number(stat.wins || 0) === mostWins) {
+        season.awards.push({ type: "kingOfWins", roundId: round.id, roundNumber: round.number, roundDate: round.date });
       }
     }
 
@@ -161,11 +171,11 @@ export function buildAwardSeasonsByPlayer(rounds: AwardRound[], stats: AwardStat
 }
 
 export function countAwards(seasons: PlayerAwardSeason[], status?: SeasonStatus) {
-  const counts = { topScorer: 0, topAssister: 0, bestGoalkeeper: 0, bestDefender: 0 };
+  const counts = { roundMvp: 0, topScorer: 0, topAssister: 0, kingOfWins: 0 };
   for (const season of seasons) {
     if (status && season.seasonStatus !== status) continue;
     for (const award of season.awards) {
-      if (award.type === "topScorer" || award.type === "topAssister" || award.type === "bestGoalkeeper" || award.type === "bestDefender") counts[award.type] += 1;
+      if (award.type === "roundMvp" || award.type === "topScorer" || award.type === "topAssister" || award.type === "kingOfWins") counts[award.type] += 1;
     }
   }
   return counts;

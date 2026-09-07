@@ -32,7 +32,7 @@ export type RankingCardTheme = {
   label: string;
 };
 
-export type RankingCardAwardKey = "topScorer" | "topAssister" | "bestGoalkeeper" | "bestDefender";
+export type RankingCardAwardKey = "roundMvp" | "topScorer" | "topAssister" | "kingOfWins";
 
 export type RankingCardContent = {
   header: string;
@@ -136,10 +136,10 @@ export function buildRankingCardContent(entry: RankingEntry, position: number): 
     name: entry.player.name,
     title: entry.cosmetics?.titleName || null,
     awards: [
+      { key: "roundMvp", label: "Craque", value: entry.awards.roundMvp },
       { key: "topScorer", label: "Artilheiro", value: entry.awards.topScorer },
       { key: "topAssister", label: "Garçom", value: entry.awards.topAssister },
-      { key: "bestGoalkeeper", label: "Goleiro", value: entry.awards.bestGoalkeeper },
-      { key: "bestDefender", label: "Xerife", value: entry.awards.bestDefender },
+      { key: "kingOfWins", label: "Vitórias", value: entry.awards.kingOfWins },
     ],
     stats: [
       { value: String(entry.goals), label: "GOL" },

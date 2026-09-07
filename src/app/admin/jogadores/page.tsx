@@ -4,6 +4,7 @@ import { ArrowLeft, UserPlus } from "@/components/icons";
 import { AdminRosterDirectory } from "@/components/AdminRosterDirectory";
 import { RosterSeenMarker } from "@/components/RosterSeenMarker";
 import { getPlayers } from "@/lib/actions/players";
+import { getPlayerSpeedRatings } from "@/lib/actions/speed-draw";
 import { getCurrentAccount } from "@/lib/auth";
 
 export const revalidate = 0;
@@ -11,8 +12,9 @@ export const revalidate = 0;
 export default async function AdminJogadoresPage() {
   const account = await getCurrentAccount();
   if (!account.isAdmin) redirect("/");
-  const [players, { data: adminProfiles }] = await Promise.all([
+  const [players, speedRatings, { data: adminProfiles }] = await Promise.all([
     getPlayers(),
+    getPlayerSpeedRatings(),
     account.client.from("account_profiles").select("player_id").eq("role", "admin").not("player_id", "is", null),
   ]);
   const adminPlayerIds = (adminProfiles || []).map((profile) => profile.player_id).filter((id): id is string => Boolean(id));
@@ -25,7 +27,7 @@ export default async function AdminJogadoresPage() {
         <div className="min-w-0 flex-1"><h1 className="text-xl font-black text-foreground">Gerenciar Elenco</h1><p className="mt-0.5 text-xs text-muted">{players.length} pessoas cadastradas</p></div>
         <Link href="/admin/jogadores/novo" className="flex shrink-0 items-center gap-2 rounded-xl bg-accent px-3 py-2.5 text-xs font-black text-background"><UserPlus className="h-4 w-4" /><span className="hidden min-[390px]:inline">Nova pessoa</span></Link>
       </div>
-      <AdminRosterDirectory players={players} adminPlayerIds={adminPlayerIds} />
+      <AdminRosterDirectory players={players} adminPlayerIds={adminPlayerIds} speedRatings={speedRatings} />
     </div>
   );
 }
