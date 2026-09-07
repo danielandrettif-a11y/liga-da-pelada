@@ -37,6 +37,7 @@ export function CosmeticNameplate({
   return (
     <div
       className={`${cosmeticNameplateClass(assetKey)} ${artwork ? "cosmetic-nameplate--art" : ""} ${compact ? "cosmetic-nameplate--compact" : ""} ${className}`}
+      data-long-name={playerName.trim().length > 18 ? "true" : undefined}
       style={artwork ? { backgroundImage: `url(${artwork})` } : undefined}
     >
       <div className="cosmetic-nameplate__header">

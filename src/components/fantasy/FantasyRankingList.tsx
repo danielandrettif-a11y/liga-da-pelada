@@ -222,7 +222,7 @@ function FantasyPodium({ ranking, scope, metric }: { ranking: FantasyRankingEntr
                   />
                 </div>
                 {item.cosmetics?.nameplateKey ? (
-                  <CosmeticNameplate assetKey={item.cosmetics.nameplateKey} playerName={item.player?.name || "Cartoleiro"} titleName={item.cosmetics.titleName} compact className="mt-2" />
+                  <CosmeticNameplate assetKey={item.cosmetics.nameplateKey} playerName={item.player?.name || "Cartoleiro"} titleName={item.cosmetics.titleName} compact className="ranking-podium-nameplate mt-2" />
                 ) : (
                   <div className="mt-2 flex min-h-9 w-full items-center justify-center border-y border-white/10 bg-black/25 px-1 py-1">
                     <p className="line-clamp-2 text-[10px] font-black uppercase leading-4 text-foreground sm:text-xs">{item.player?.name || "Cartoleiro"}</p>
@@ -543,7 +543,7 @@ export function FantasyRankingList({
                   </div>
                   <div className="min-w-0 flex-1">
                     {item.cosmetics?.nameplateKey ? (
-                      <CosmeticNameplate assetKey={item.cosmetics.nameplateKey} playerName={item.player?.name || "Cartoleiro"} titleName={item.cosmetics.titleName} compact />
+                      <CosmeticNameplate assetKey={item.cosmetics.nameplateKey} playerName={item.player?.name || "Cartoleiro"} titleName={item.cosmetics.titleName} compact className="ranking-row-nameplate" />
                     ) : (
                       <p className="truncate font-athletic text-base font-black uppercase tracking-wide text-foreground">{item.player?.name || "Cartoleiro"}</p>
                     )}

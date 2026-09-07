@@ -434,7 +434,7 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                   </div>
                   <div className="mb-2 mt-4 w-full px-1 text-center">
                     {entry.cosmetics?.nameplateKey ? (
-                      <CosmeticNameplate assetKey={entry.cosmetics.nameplateKey} playerName={entry.player.name} titleName={entry.cosmetics.titleName} compact />
+                      <CosmeticNameplate assetKey={entry.cosmetics.nameplateKey} playerName={entry.player.name} titleName={entry.cosmetics.titleName} compact className="ranking-podium-nameplate" />
                     ) : (
                       <p className="truncate text-xs font-black text-foreground">{entry.player.name}</p>
                     )}
@@ -491,7 +491,7 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     {entry.cosmetics?.nameplateKey ? (
-                      <CosmeticNameplate assetKey={entry.cosmetics.nameplateKey} playerName={displayName} titleName={entry.cosmetics.titleName} compact />
+                      <CosmeticNameplate assetKey={entry.cosmetics.nameplateKey} playerName={displayName} titleName={entry.cosmetics.titleName} compact className="ranking-row-nameplate" />
                     ) : (
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-athletic text-sm font-black uppercase tracking-wide text-foreground">{displayName}</p>
@@ -547,7 +547,7 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
           />
           <div className="min-w-0 flex-1">
             {pinnedEntry.cosmetics?.nameplateKey ? (
-              <CosmeticNameplate assetKey={pinnedEntry.cosmetics.nameplateKey} playerName={pinnedEntry.player.name} titleName={pinnedEntry.cosmetics.titleName} compact />
+              <CosmeticNameplate assetKey={pinnedEntry.cosmetics.nameplateKey} playerName={pinnedEntry.player.name} titleName={pinnedEntry.cosmetics.titleName} compact className="ranking-row-nameplate" />
             ) : <p className="truncate text-xs font-black text-foreground">Sua posição · {pinnedEntry.player.name}</p>}
             <p className="text-[9px] text-muted">Toque para abrir sua carta</p>
           </div>

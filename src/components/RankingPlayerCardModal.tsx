@@ -7,6 +7,8 @@ import { ChevronDown, Medal, Share2, Sparkles, Target, Trophy, X } from "@/compo
 import type { RankingEntry } from "@/lib/ranking";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { CosmeticNameplate } from "./fantasy/CosmeticNameplate";
+import { cosmeticNameplateImage } from "@/lib/fantasy/cosmetics";
+import { getRankingCardLayout, rankingCardBoxPixels, rankingCardBoxStyle, type RankingCardPhotoShape } from "@/lib/ranking-card-layout";
 import { getInitials } from "@/lib/utils";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 
@@ -29,49 +31,6 @@ function cardTheme(position: number) {
   return { artwork: "/images/ranking-cards/ranking-card-neutral-v1.webp", base: "#123e28", light: "#4f8d67", deep: "#06150d", edge: "#ccff00", ink: "#ffffff", glow: "rgba(204,255,0,.2)", label: "RANKED" };
 }
 
-function cardLayout(position: number) {
-  if (position === 1) return {
-    header: "inset-x-[29%] top-[9.2%] h-[4.3%]",
-    hero: "inset-x-[14.5%] top-[16%] h-[31.5%]",
-    score: "left-0 top-[6%] w-[38%]",
-    portrait: "right-[1%] top-[3%] w-[48%]",
-    image: "object-[center_18%]",
-    name: "inset-x-[13.5%] top-[49.3%] h-[8.2%]",
-    awards: "inset-x-[21%] top-[59.1%] h-[4.8%]",
-    stats: "inset-x-[18.5%] bottom-[9.5%] top-[65.7%]",
-  };
-  if (position === 2) return {
-    header: "inset-x-[28%] top-[11.6%] h-[4.2%]",
-    hero: "inset-x-[14%] top-[17%] h-[34%]",
-    score: "left-0 top-[5%] w-[38%]",
-    portrait: "right-[2%] top-[5%] w-[44%]",
-    image: "object-[center_22%]",
-    name: "inset-x-[10.5%] top-[55.2%] h-[8.3%]",
-    awards: "inset-x-[17%] top-[65.2%] h-[5.1%]",
-    stats: "inset-x-[15%] bottom-[8.7%] top-[72.8%]",
-  };
-  if (position === 3) return {
-    header: "inset-x-[30%] top-[8.1%] h-[4.1%]",
-    hero: "inset-x-[13.5%] top-[15%] h-[35%]",
-    score: "left-[1%] top-[6%] w-[38%]",
-    portrait: "right-[2%] top-[6%] w-[44%]",
-    image: "object-[center_18%]",
-    name: "inset-x-[10.5%] top-[51.8%] h-[8.5%]",
-    awards: "inset-x-[17%] top-[62.1%] h-[5.2%]",
-    stats: "inset-x-[16.5%] bottom-[12.4%] top-[69.5%]",
-  };
-  return {
-    header: "inset-x-[30%] top-[8%] h-[4%]",
-    hero: "inset-x-[14%] top-[15.5%] h-[35%]",
-    score: "left-0 top-[7%] w-[38%]",
-    portrait: "right-[3%] top-[6%] w-[43%]",
-    image: "object-[center_18%]",
-    name: "inset-x-[10.5%] top-[53.5%] h-[8.4%]",
-    awards: "inset-x-[17%] top-[63.7%] h-[5%]",
-    stats: "inset-x-[15%] bottom-[9.8%] top-[70%]",
-  };
-}
-
 function signedPoints(points: number) {
   return points > 0 ? `+${points}` : String(points);
 }
@@ -92,6 +51,95 @@ async function loadShareImage(url: string | null) {
   });
 }
 
+type CanvasBox = { x: number; y: number; width: number; height: number };
+
+function tracePhotoShape(context: CanvasRenderingContext2D, shape: RankingCardPhotoShape, box: CanvasBox, inset = 0) {
+  const x = box.x + inset;
+  const y = box.y + inset;
+  const width = box.width - inset * 2;
+  const height = box.height - inset * 2;
+  context.beginPath();
+  if (shape === "circle") {
+    context.ellipse(x + width / 2, y + height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
+    context.closePath();
+    return;
+  }
+  const points = shape === "bronze-cutout"
+    ? [[.13, 0], [.87, 0], [1, .12], [1, .88], [.87, 1], [.13, 1], [0, .88], [0, .12]]
+    : shape === "silver-shield"
+      ? [[.09, 0], [.91, 0], [1, .1], [.94, .78], [.5, 1], [.06, .78], [0, .1]]
+      : [[.1, 0], [.9, 0], [1, .09], [.93, .81], [.5, 1], [.07, .81], [0, .09]];
+  points.forEach(([pointX, pointY], index) => {
+    const targetX = x + width * pointX;
+    const targetY = y + height * pointY;
+    if (index === 0) context.moveTo(targetX, targetY);
+    else context.lineTo(targetX, targetY);
+  });
+  context.closePath();
+}
+
+function drawCoverImage(context: CanvasRenderingContext2D, image: HTMLImageElement, box: CanvasBox, focusY: number) {
+  const scale = Math.max(box.width / image.width, box.height / image.height);
+  const drawWidth = image.width * scale;
+  const drawHeight = image.height * scale;
+  context.drawImage(
+    image,
+    box.x + (box.width - drawWidth) / 2,
+    box.y + (box.height - drawHeight) * focusY,
+    drawWidth,
+    drawHeight,
+  );
+}
+
+function wrapCanvasName(context: CanvasRenderingContext2D, name: string, maxWidth: number) {
+  const words = name.trim().toUpperCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return ["JOGADOR"];
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (current && context.measureText(candidate).width > maxWidth) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+function drawCanvasName(
+  context: CanvasRenderingContext2D,
+  name: string,
+  title: string | null | undefined,
+  box: CanvasBox,
+  color: string,
+) {
+  let fontSize = Math.min(54, box.height * .45);
+  let lines: string[] = [];
+  while (fontSize >= 22) {
+    context.font = `900 ${fontSize}px Arial`;
+    lines = wrapCanvasName(context, name, box.width * .72);
+    if (lines.length <= 2 && lines.every((line) => context.measureText(line).width <= box.width * .72)) break;
+    fontSize -= 2;
+  }
+  context.fillStyle = color;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  const showTitle = Boolean(title && lines.length === 1 && name.trim().length <= 18);
+  const lineHeight = fontSize * .9;
+  const contentHeight = lines.length * lineHeight + (showTitle ? 22 : 0);
+  const firstY = box.y + (box.height - contentHeight) / 2 + lineHeight / 2;
+  lines.slice(0, 2).forEach((line, index) => context.fillText(line, box.x + box.width / 2, firstY + index * lineHeight, box.width * .74));
+  if (showTitle) {
+    context.font = "900 16px Arial";
+    context.fillStyle = "rgba(255,255,255,.78)";
+    context.fillText(`✦ ${title!.toUpperCase()}`, box.x + box.width / 2, firstY + lineHeight + 8, box.width * .68);
+  }
+  context.textBaseline = "alphabetic";
+}
+
 async function createPlayerStory(entry: RankingEntry, position: number) {
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
@@ -99,8 +147,13 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Canvas indisponível");
   const theme = cardTheme(position);
+  const layout = getRankingCardLayout(position);
   const profile = `${PROFILE_LABELS[entry.player.player_profile || "midfield"]}${entry.player.is_goalkeeper ? " / GOL" : ""}`;
-  const cardArtwork = await loadShareImage(theme.artwork);
+  const [cardArtwork, avatar, nameplateArtwork] = await Promise.all([
+    loadShareImage(theme.artwork),
+    loadShareImage(entry.player.avatar_url),
+    loadShareImage(cosmeticNameplateImage(entry.cosmetics?.nameplateKey)),
+  ]);
 
   const background = context.createLinearGradient(0, 0, 0, 1920);
   background.addColorStop(0, "#020b06");
@@ -119,111 +172,112 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
   context.font = "800 24px Arial";
   context.fillText("CARTA DA TEMPORADA", 540, 158);
 
-  const x = 95, y = 225, width = 890, height = 1450;
+  const card = { x: 95, y: 215, width: 890, height: 1335 };
   if (cardArtwork) {
-    context.drawImage(cardArtwork, x, y, width, height);
+    context.drawImage(cardArtwork, card.x, card.y, card.width, card.height);
   } else {
     context.save();
-    roundedRect(context, x, y, width, height, 70);
+    roundedRect(context, card.x, card.y, card.width, card.height, 70);
     context.clip();
-    const cardGradient = context.createLinearGradient(x, y, x + width, y + height);
+    const cardGradient = context.createLinearGradient(card.x, card.y, card.x + card.width, card.y + card.height);
     cardGradient.addColorStop(0, theme.light);
     cardGradient.addColorStop(0.48, theme.base);
     cardGradient.addColorStop(1, theme.deep);
     context.fillStyle = cardGradient;
-    context.fillRect(x, y, width, height);
+    context.fillRect(card.x, card.y, card.width, card.height);
     context.restore();
   }
 
+  const headerBox = rankingCardBoxPixels(layout.header, card);
+  context.textAlign = "center";
+  context.fillStyle = theme.edge;
+  context.font = "900 20px Arial";
+  context.fillText(`PBQ • ${theme.label}`, headerBox.x + headerBox.width / 2, headerBox.y + headerBox.height * .68, headerBox.width);
+
+  const scoreBox = rankingCardBoxPixels(layout.score, card);
   context.textAlign = "left";
   context.fillStyle = theme.ink;
-  context.font = "900 118px Arial";
-  context.fillText(String(entry.points), 155, 420);
-  context.font = "900 30px Arial";
-  context.fillText("PTS", 170, 462);
-  context.font = "900 36px Arial";
-  context.fillText(profile, 150, 525);
-  context.font = "900 24px Arial";
-  context.fillText(`${position}º NO RANKING`, 150, 572);
+  context.font = `900 ${Math.min(105, scoreBox.width * .43)}px Arial`;
+  context.fillText(String(entry.points), scoreBox.x, scoreBox.y + scoreBox.height * .34, scoreBox.width);
+  context.font = "900 22px Arial";
+  context.fillText("PTS", scoreBox.x + 8, scoreBox.y + scoreBox.height * .44);
+  context.font = "900 27px Arial";
+  context.fillText(profile, scoreBox.x, scoreBox.y + scoreBox.height * .65, scoreBox.width);
+  context.font = "900 20px Arial";
+  context.fillText(`${position}º`, scoreBox.x, scoreBox.y + scoreBox.height * .8);
 
-  const avatar = await loadShareImage(entry.player.avatar_url);
-  const avatarX = 660, avatarY = 465, avatarRadius = 205;
+  const photoBox = rankingCardBoxPixels(layout.photo, card);
   context.save();
-  context.beginPath();
-  context.arc(avatarX, avatarY, avatarRadius, 0, Math.PI * 2);
+  tracePhotoShape(context, layout.photoShape, photoBox, 7);
   context.clip();
   if (avatar) {
-    const scale = Math.max((avatarRadius * 2) / avatar.width, (avatarRadius * 2) / avatar.height);
-    const drawWidth = avatar.width * scale;
-    const drawHeight = avatar.height * scale;
-    context.drawImage(avatar, avatarX - drawWidth / 2, avatarY - drawHeight / 2, drawWidth, drawHeight);
+    const focusY = layout.tier === "silver" ? .24 : .18;
+    drawCoverImage(context, avatar, photoBox, focusY);
   } else {
     context.fillStyle = "rgba(0,0,0,.28)";
-    context.fillRect(avatarX - avatarRadius, avatarY - avatarRadius, avatarRadius * 2, avatarRadius * 2);
+    context.fillRect(photoBox.x, photoBox.y, photoBox.width, photoBox.height);
     context.fillStyle = theme.ink;
     context.textAlign = "center";
-    context.font = "900 100px Arial";
-    context.fillText(getInitials(entry.player.name), avatarX, avatarY + 34);
+    context.font = `900 ${photoBox.width * .3}px Arial`;
+    context.fillText(getInitials(entry.player.name), photoBox.x + photoBox.width / 2, photoBox.y + photoBox.height * .58);
   }
   context.restore();
   context.strokeStyle = theme.edge;
-  context.lineWidth = 8;
-  context.beginPath();
-  context.arc(avatarX, avatarY, avatarRadius, 0, Math.PI * 2);
+  context.lineWidth = 7;
+  tracePhotoShape(context, layout.photoShape, photoBox, 3.5);
   context.stroke();
 
-  context.fillStyle = "rgba(0,0,0,.18)";
-  roundedRect(context, 145, 985, 790, 125, 24);
-  context.fill();
-  context.fillStyle = theme.ink;
-  context.textAlign = "center";
-  context.font = "900 56px Arial";
-  const displayName = entry.player.name.toUpperCase();
-  context.fillText(displayName.length > 25 ? `${displayName.slice(0, 24)}…` : displayName, 540, 1050);
-
-  const stats: Array<[string | number, string]> = [
-    [entry.goals, "GOLS"], [entry.assists, "ASSIST."], [entry.wins, "VITÓRIAS"],
-    [entry.games, "JOGOS"], [entry.losses, "DERROTAS"], [`${entry.winRate}%`, "APROV."],
-  ];
-  stats.forEach(([value, label], index) => {
-    const col = index % 3;
-    const row = Math.floor(index / 3);
-    const boxX = 145 + col * 270;
-    const boxY = 1210 + row * 145;
-    context.fillStyle = "rgba(0,0,0,.08)";
-    roundedRect(context, boxX, boxY, 245, 125, 20);
+  const nameBox = rankingCardBoxPixels(layout.name, card);
+  if (nameplateArtwork) context.drawImage(nameplateArtwork, nameBox.x, nameBox.y, nameBox.width, nameBox.height);
+  else {
+    context.fillStyle = "rgba(0,0,0,.18)";
+    roundedRect(context, nameBox.x, nameBox.y, nameBox.width, nameBox.height, 18);
     context.fill();
-    context.fillStyle = theme.ink;
-    context.font = "900 65px Arial";
-    context.fillText(String(value), boxX + 122, boxY + 58);
-    context.font = "900 20px Arial";
-    context.fillText(label, boxX + 122, boxY + 94);
-  });
+  }
+  drawCanvasName(context, entry.player.name, entry.cosmetics?.titleName, nameBox, theme.ink);
 
+  const awardsBox = rankingCardBoxPixels(layout.awards, card);
   const awards = [
     entry.awards.topScorer ? `ARTILHEIRO ${entry.awards.topScorer}x` : "",
     entry.awards.topAssister ? `GARÇOM ${entry.awards.topAssister}x` : "",
     entry.awards.bestGoalkeeper ? `GOLEIRO ${entry.awards.bestGoalkeeper}x` : "",
     entry.awards.bestDefender ? `XERIFE ${entry.awards.bestDefender}x` : "",
-  ].filter(Boolean).join("  •  ");
-  if (awards) {
-    context.fillStyle = theme.ink;
-    context.font = "900 21px Arial";
-    context.fillText(awards, 540, 1145, 780);
-  }
-  context.fillStyle = "rgba(255,255,255,.15)";
-  roundedRect(context, 145, 1515, 790, 70, 20);
-  context.fill();
+  ].filter(Boolean).slice(0, 2);
+  context.textAlign = "center";
   context.fillStyle = theme.ink;
-  context.font = "900 25px Arial";
-  context.fillText("FUTEBOL, RESENHA E BAIXA QUALIDADE", 540, 1560);
+  context.font = "900 17px Arial";
+  if (awards.length > 0) awards.forEach((award, index) => {
+    const cellWidth = awardsBox.width / awards.length;
+    context.fillText(award, awardsBox.x + cellWidth * (index + .5), awardsBox.y + awardsBox.height * .66, cellWidth * .9);
+  });
+  else context.fillText("FUTEBOL • RESENHA • PBQ", awardsBox.x + awardsBox.width / 2, awardsBox.y + awardsBox.height * .66, awardsBox.width);
+
+  const stats: Array<[string | number, string]> = [
+    [entry.goals, "GOL"], [entry.assists, "AST"], [entry.wins, "VIT"],
+    [entry.games, "JOG"], [entry.losses, "DER"], [`${entry.winRate}%`, "APR"],
+  ];
+  const statsBox = rankingCardBoxPixels(layout.stats, card);
+  stats.forEach(([value, label], index) => {
+    const col = index % 3;
+    const row = Math.floor(index / 3);
+    const cellWidth = statsBox.width / 3;
+    const cellHeight = statsBox.height / 2;
+    const centerX = statsBox.x + cellWidth * (col + .5);
+    const centerY = statsBox.y + cellHeight * (row + .5);
+    context.fillStyle = theme.ink;
+    context.font = `900 ${Math.min(48, cellHeight * .46)}px Arial`;
+    context.fillText(String(value), centerX, centerY - cellHeight * .02, cellWidth * .8);
+    context.fillStyle = "rgba(255,255,255,.68)";
+    context.font = `900 ${Math.min(15, cellHeight * .14)}px Arial`;
+    context.fillText(label, centerX, centerY + cellHeight * .28, cellWidth * .7);
+  });
 
   context.fillStyle = "#ffffff";
   context.font = "900 31px Arial";
-  context.fillText("COMPARTILHE SUA CARTA", 540, 1782);
+  context.fillText("COMPARTILHE SUA CARTA", 540, 1695);
   context.fillStyle = "#91a498";
   context.font = "700 22px Arial";
-  context.fillText("pelada-de-baixa-qualidade", 540, 1828);
+  context.fillText("pelada-de-baixa-qualidade", 540, 1740);
 
   return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Não foi possível gerar a imagem.")), "image/png", 0.95));
 }
@@ -252,7 +306,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   }, [showBestRounds]);
 
   const theme = cardTheme(position);
-  const layout = cardLayout(position);
+  const layout = getRankingCardLayout(position);
   const displayName = entry.player.name;
   const profile = `${PROFILE_LABELS[entry.player.player_profile || "midfield"]}${entry.player.is_goalkeeper ? " / GOL" : ""}`;
   const awardBadges = [
@@ -326,33 +380,34 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
         <div className="relative aspect-[2/3] w-full text-white" style={{ filter: `drop-shadow(0 20px 30px ${theme.glow})` }}>
           <img src={theme.artwork} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full object-fill" />
 
-          <header className={`absolute z-10 flex items-center justify-center truncate text-[8px] font-black uppercase tracking-[.16em] ${layout.header}`} style={{ color: theme.edge }}>
+          <header className="absolute z-10 flex items-center justify-center truncate text-[8px] font-black uppercase tracking-[.16em]" style={{ ...rankingCardBoxStyle(layout.header), color: theme.edge }}>
             PBQ • {theme.label}
           </header>
 
-          <div className={`absolute z-10 ${layout.hero}`}>
-            <div className={`absolute flex flex-col items-start pl-1 font-athletic drop-shadow-[0_2px_5px_rgba(0,0,0,.9)] ${layout.score}`}>
+          <div className="absolute z-10 flex flex-col items-start pl-1 font-athletic drop-shadow-[0_2px_5px_rgba(0,0,0,.9)]" style={rankingCardBoxStyle(layout.score)}>
               <span className="player-card-rating text-[2.65rem] font-black leading-none" style={{ color: theme.edge }}>{entry.points}</span>
               <span className="mt-0.5 text-[9px] font-black tracking-[.22em] text-white/75">PTS</span>
               <span className="mt-2 border-t border-white/30 pt-2 text-[11px] font-black uppercase leading-tight text-white">{profile}</span>
               <span className="mt-2 rounded-md border border-white/25 bg-black/35 px-2 py-0.5 text-xs font-black text-white">{position}º</span>
-            </div>
-            <div className={`absolute aspect-square ${layout.portrait}`}>
-              <PlayerAvatar
-                name={entry.player.name}
-                avatarUrl={entry.player.avatar_url}
-                clickable={false}
-                className="h-full w-full overflow-hidden rounded-full border-[3px] bg-[#07150d] text-2xl font-black shadow-[0_10px_28px_rgba(0,0,0,.55)]"
-                imageClassName={`h-full w-full object-cover ${layout.image}`}
-                frameKey={null}
-                auraKey={null}
-                frameClass=""
-              />
-              <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full border border-white/30" style={{ boxShadow: `inset 0 0 0 2px ${theme.edge}, 0 0 16px ${theme.glow}` }} />
-            </div>
           </div>
 
-          <div className={`absolute z-10 flex items-center justify-center px-1 text-center ${layout.name}`}>
+          <div
+            className={`ranking-card-photo ranking-card-photo--${layout.photoShape} absolute z-10`}
+            style={{ ...rankingCardBoxStyle(layout.photo), backgroundColor: theme.edge, filter: `drop-shadow(0 8px 12px ${theme.glow})` }}
+          >
+            <PlayerAvatar
+              name={entry.player.name}
+              avatarUrl={entry.player.avatar_url}
+              clickable={false}
+              className="ranking-card-photo__avatar h-full w-full bg-[#07150d] text-2xl font-black"
+              imageClassName="ranking-card-photo__image h-full w-full object-cover"
+              frameKey={null}
+              auraKey={null}
+              frameClass=""
+            />
+          </div>
+
+          <div className="absolute z-10 flex items-center justify-center px-1 text-center" style={rankingCardBoxStyle(layout.name)}>
             {entry.cosmetics?.nameplateKey ? (
               <CosmeticNameplate assetKey={entry.cosmetics.nameplateKey} playerName={displayName} titleName={entry.cosmetics.titleName} compact className="ranking-card-nameplate h-full w-full max-w-none" />
             ) : (
@@ -363,7 +418,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
             )}
           </div>
 
-          <div className={`absolute z-10 grid grid-cols-2 gap-[9%] text-center ${layout.awards}`}>
+          <div className="absolute z-10 grid grid-cols-2 gap-[9%] text-center" style={rankingCardBoxStyle(layout.awards)}>
             {awardBadges.length > 0 ? awardBadges.slice(0, 2).map(({ label, value, Icon }) => (
               <span key={label} className="flex min-w-0 items-center justify-center gap-1 truncate text-[7px] font-black uppercase text-white">
                 <Icon className="h-2.5 w-2.5 shrink-0" style={{ color: theme.edge }} /> {label} {value}x
@@ -371,11 +426,11 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
             )) : <span className="col-span-2 self-center text-[7px] font-black uppercase tracking-[.18em] text-white/55">Futebol • Resenha • PBQ</span>}
           </div>
 
-          <div className={`absolute z-10 grid grid-cols-3 grid-rows-2 font-athletic ${layout.stats}`}>
+          <div className={`ranking-card-stats ranking-card-stats--${layout.tier} absolute z-10 grid grid-cols-3 grid-rows-2 font-athletic`} style={rankingCardBoxStyle(layout.stats)}>
             {[[entry.goals, "GOL"], [entry.assists, "AST"], [entry.wins, "VIT"], [entry.games, "JOG"], [entry.losses, "DER"], [`${entry.winRate}%`, "APR"]].map(([value, label]) => (
               <div key={label} className="flex flex-col items-center justify-center text-center">
-                <p className="player-card-number text-xl leading-none text-white drop-shadow-[0_2px_3px_rgba(0,0,0,.9)]">{value}</p>
-                <p className="mt-1 text-[7px] font-black tracking-[.14em] text-white/65">{label}</p>
+                <p className="player-card-number text-[1.12rem] leading-none text-white drop-shadow-[0_2px_3px_rgba(0,0,0,.9)]">{value}</p>
+                <p className="mt-0.5 text-[6px] font-black tracking-[.12em] text-white/65">{label}</p>
               </div>
             ))}
           </div>
