@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { FantasyAdminSettings } from "@/components/fantasy/FantasyAdminSettings";
+import { FantasyMarketV11Panel } from "@/components/fantasy/FantasyMarketV11Panel";
 import { FantasyTestManager } from "@/components/fantasy/FantasyTestManager";
 import { getFantasyAdminData } from "@/lib/actions/fantasy";
 
@@ -22,6 +23,7 @@ export default async function FantasyAdminPage() {
       </Link>
 
       <FantasyTestManager testSession={data.testSession} friendlyRounds={data.friendlyRounds} />
+      <FantasyMarketV11Panel initialStatus={data.marketStatus} />
       <FantasyAdminSettings settings={data.settings} rounds={data.rounds} />
     </div>
   );

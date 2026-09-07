@@ -1,4 +1,5 @@
 import { DEFAULT_FANTASY_SETTINGS, type FantasySettings } from "./config";
+import { calculateMarketV11Price, percentileById, type MarketV11PriceResult } from "./market-v11";
 
 export type FantasyPerformance = {
   playerId: string;
@@ -28,6 +29,12 @@ export type FantasyPriceResult = FantasyPerformance & {
   roundPercentile: number | null;
   variationRate: number;
   nextPrice: number;
+  marketV11?: MarketV11PriceResult & {
+    priceQuality: number;
+    roundMarketQuality: number;
+    seasonMarketQuality: number;
+    marketQuality: number;
+  };
 };
 
 export type FantasyTrend = "UP" | "STABLE" | "DOWN";
@@ -276,6 +283,10 @@ export function calculateFantasyPrices(
 
   const byId = new Map<string, FantasyPriceResult>();
   const strength = settings.marketRepriceStrength ?? 0.26;
+  const useMarketV11 = (settings.marketVersion ?? 10) >= 11;
+  const priceQualities = percentileById(
+    ranked.map(({ player }) => ({ id: player.playerId, value: player.currentPrice })),
+  );
   const roundIndex = Math.max(1, ...participants.map((player) => player.seasonPoints.length + 1));
   const caps = calculateFantasyPriceCaps(roundIndex, settings);
 
@@ -283,17 +294,27 @@ export function calculateFantasyPrices(
     for (let index = start; index <= end; index += 1) {
       const { player, roundPoints } = ranked[index];
       const priceTarget = calculateCompetitivePriceTarget(quality, settings);
+      const v11 = calculateMarketV11Price({
+        currentPrice: player.currentPrice,
+        marketQuality: quality,
+        roundMarketQuality: ranked[index].roundMarketQuality,
+        priceQuality: priceQualities.get(player.playerId) ?? 0.5,
+      }, settings);
       const desiredPrice = allTied
         ? player.currentPrice
         : player.currentPrice + (priceTarget - player.currentPrice) * strength;
-      const nextPrice = roundMoney(Math.min(
-        settings.maxPlayerPrice,
-        Math.max(
-          settings.minPlayerPrice,
-          player.currentPrice * (1 - caps.down),
-          Math.min(player.currentPrice * (1 + caps.up), desiredPrice),
-        ),
-      ));
+      const nextPrice = allTied
+        ? player.currentPrice
+        : useMarketV11
+          ? v11.nextPrice
+          : roundMoney(Math.min(
+              settings.maxPlayerPrice,
+              Math.max(
+                settings.minPlayerPrice,
+                player.currentPrice * (1 - caps.down),
+                Math.min(player.currentPrice * (1 + caps.up), desiredPrice),
+              ),
+            ));
       const variationRate = roundMoney((nextPrice - player.currentPrice) / player.currentPrice * 10_000) / 10_000;
       const marketBand: FantasyTrend = variationRate > 0.015 ? "UP" : variationRate < -0.015 ? "DOWN" : "STABLE";
       byId.set(player.playerId, {
@@ -305,6 +326,13 @@ export function calculateFantasyPrices(
         roundPercentile: 1 - quality,
         variationRate,
         nextPrice,
+        marketV11: useMarketV11 ? {
+          ...v11,
+          priceQuality: priceQualities.get(player.playerId) ?? 0.5,
+          roundMarketQuality: ranked[index].roundMarketQuality,
+          seasonMarketQuality: ranked[index].seasonMarketQuality,
+          marketQuality: quality,
+        } : undefined,
       });
     }
   }

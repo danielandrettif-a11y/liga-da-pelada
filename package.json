@@ -8,7 +8,9 @@
     "start": "next start",
     "test": "vitest run",
     "audit:cartola": "node scripts/analyze-cartola-balance.mjs",
-    "audit:cartola:self-test": "node scripts/analyze-cartola-balance.mjs --self-test"
+    "audit:cartola:self-test": "node scripts/analyze-cartola-balance.mjs --self-test",
+    "audit:market:v11": "node scripts/analyze-market-v11.mjs",
+    "audit:market:v11:self-test": "node scripts/analyze-market-v11.mjs --self-test"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

@@ -26,6 +26,7 @@ export default async function CartolaPage({ searchParams }: PageProps<"/cartola"
       lineup={data.lineup}
       insights={data.insights}
       radar={data.radar}
+      marketHealth={data.marketHealth}
       account={data.account}
       isTest={data.fantasyRound.isTest}
       lastRound={data.lastRound}

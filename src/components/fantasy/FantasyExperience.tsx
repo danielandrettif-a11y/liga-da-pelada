@@ -35,6 +35,7 @@ import {
   type FantasyMarketPlayer,
   type FantasyRadarData,
   type FantasyLiveProjection,
+  type FantasyPublicMarketHealth,
 } from "@/lib/actions/fantasy";
 import { supabase } from "@/lib/supabase";
 import { useDialogViewport } from "@/lib/useDialogViewport";
@@ -124,6 +125,7 @@ type Props = {
   lineup: any;
   insights: FantasyDashboardInsights;
   radar?: FantasyRadarData;
+  marketHealth?: FantasyPublicMarketHealth | null;
   account: { totalPoints: number; roundsPlayed: number; bestRoundPoints: number };
   isTest?: boolean;
   lastRound?: {
@@ -187,6 +189,7 @@ export function FantasyExperience({
   lineup,
   insights,
   radar,
+  marketHealth = null,
   account,
   isTest = false,
   lastRound = null,
@@ -222,6 +225,11 @@ export function FantasyExperience({
     }
     return playersPerTeam === 6 ? "2-1-2" : "2-2-1";
   });
+  const recoveryPriceLimit = useMemo(() => {
+    const prices = market.map((player) => player.price).sort((a, b) => a - b);
+    if (!prices.length) return 0;
+    return prices[Math.floor((prices.length - 1) * (settings.marketCheapPercentile ?? 0.35))];
+  }, [market, settings.marketCheapPercentile]);
 
   const [selected, setSelected] = useState<string[]>(() => {
     const slots = Array(playersPerTeam).fill("");
@@ -1162,6 +1170,16 @@ export function FantasyExperience({
               accent={betweenRounds || remaining >= 0}
             />
           </div>
+          {marketHealth?.version === 11 && (
+            <div className={`mt-3 rounded-xl border px-3 py-2 text-[10px] ${
+              marketHealth.level === "COMPETITIVE" ? "border-warning/35 bg-warning/10 text-warning" :
+              marketHealth.level === "ACCESSIBLE" ? "border-sky-300/25 bg-sky-300/10 text-sky-100" :
+              "border-accent/25 bg-accent/10 text-accent"
+            }`}>
+              <p className="font-black uppercase tracking-[.16em]">Mercado {marketHealth.level === "COMPETITIVE" ? "competitivo" : marketHealth.level === "ACCESSIBLE" ? "acessível" : "equilibrado"}</p>
+              <p className="mt-0.5 text-[9px] leading-4 text-foreground/75">Preços são iguais para todos e se ajustam gradualmente à economia da liga.</p>
+            </div>
+          )}
           {status === "in_progress" && (
             <div className="mt-3 flex items-center gap-3 rounded-xl border border-accent/20 bg-accent/10 px-3 py-2 text-[10px] font-bold text-accent">
               <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" /> Prévia ao vivo</span>
@@ -1960,6 +1978,11 @@ export function FantasyExperience({
                           <span className="text-[8px] font-bold text-muted ml-auto">
                             {player.formIcon} {player.formLabel}
                           </span>
+                          {player.price <= recoveryPriceLimit && (
+                            <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[7px] font-black uppercase text-accent border border-accent/25">
+                              Aposta de recuperação
+                            </span>
+                          )}
                         </div>
 
                         {/* Tags Compactas */}

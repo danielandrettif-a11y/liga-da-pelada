@@ -1,6 +1,8 @@
 import { BQ_SCORING_V5 } from "../bq-scoring";
 
 export type FantasySettings = {
+  /** Versão do motor de mercado congelada no snapshot da rodada. */
+  marketVersion?: number;
   /** Rodada 2 em diante ativa o sistema de vagas, rodízio e mercado 65/35. */
   roleScoringActive?: boolean;
   /** Exceção pontual por rodada: mantém scouts brutos e punição, mas zera recompensas de goleiro. */
@@ -53,6 +55,20 @@ export type FantasySettings = {
   marketInitialUpCap?: number;
   marketInitialDownCap?: number;
   marketCapStep?: number;
+  /** Mercado V11: dificuldade global baseada na capacidade real de compra da liga. */
+  marketDifficultyMultiplier?: number;
+  marketDifficultyMin?: number;
+  marketDifficultyMax?: number;
+  marketDifficultyStep?: number;
+  marketTargetEliteAffordability?: number;
+  marketTargetMedianEliteRatio?: number;
+  marketRecoveryBonusStrength?: number;
+  marketExpensiveRiskStrength?: number;
+  marketBreakoutRepriceStrength?: number;
+  marketCheapPercentile?: number;
+  marketElitePercentile?: number;
+  marketBreakoutRoundPercentile?: number;
+  marketBadRoundPercentile?: number;
   /** Freio de inflação do patrimônio ao longo da temporada. */
   budgetSoftCapMultiplier?: number;
   budgetHardCapMultiplier?: number;
@@ -66,6 +82,7 @@ export type FantasySettings = {
 };
 
 export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
+  marketVersion: 11,
   roleScoringActive: true,
   suppressGoalkeeperRewards: false,
   currencyName: "C$",
@@ -111,6 +128,19 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   marketInitialUpCap: 0.08,
   marketInitialDownCap: 0.06,
   marketCapStep: 0.02,
+  marketDifficultyMultiplier: 1,
+  marketDifficultyMin: 0.94,
+  marketDifficultyMax: 1.18,
+  marketDifficultyStep: 0.03,
+  marketTargetEliteAffordability: 0.20,
+  marketTargetMedianEliteRatio: 0.86,
+  marketRecoveryBonusStrength: 2.40,
+  marketExpensiveRiskStrength: 1.20,
+  marketBreakoutRepriceStrength: 0.40,
+  marketCheapPercentile: 0.35,
+  marketElitePercentile: 0.80,
+  marketBreakoutRoundPercentile: 0.70,
+  marketBadRoundPercentile: 0.35,
   budgetSoftCapMultiplier: 1.20,
   budgetHardCapMultiplier: 1.40,
   budgetExcessRetention: 0.25,

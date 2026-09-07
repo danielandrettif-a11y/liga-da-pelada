@@ -6,6 +6,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
 import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget, type FantasySettings } from "@/lib/fantasy/config";
+import { type FantasyMarketHealth } from "@/lib/fantasy/market-v11";
 import {
   calculateCostBenefit,
   calculateExpectedFantasyPoints,
@@ -78,6 +79,8 @@ export type FantasyMarketPlayer = {
   compactTags: FantasyTagItem[];
   cosmetics: Pick<EquippedCosmeticsSummary, "frameKey" | "auraKey" | "backgroundAssetKey"> | null;
 };
+
+export type FantasyPublicMarketHealth = FantasyMarketHealth;
 
 export type FantasyRadarHighlight = {
   player: FantasyMarketPlayer;
@@ -290,6 +293,20 @@ export async function getFantasyDashboard() {
         marketInitialUpCap: Number(settingsRow.market_initial_up_cap ?? DEFAULT_FANTASY_SETTINGS.marketInitialUpCap),
         marketInitialDownCap: Number(settingsRow.market_initial_down_cap ?? DEFAULT_FANTASY_SETTINGS.marketInitialDownCap),
         marketCapStep: Number(settingsRow.market_cap_step ?? DEFAULT_FANTASY_SETTINGS.marketCapStep),
+        marketVersion: Number(settingsRow.market_version ?? 10),
+        marketDifficultyMultiplier: Number(settingsRow.market_difficulty_multiplier ?? DEFAULT_FANTASY_SETTINGS.marketDifficultyMultiplier),
+        marketDifficultyMin: Number(settingsRow.market_difficulty_min ?? DEFAULT_FANTASY_SETTINGS.marketDifficultyMin),
+        marketDifficultyMax: Number(settingsRow.market_difficulty_max ?? DEFAULT_FANTASY_SETTINGS.marketDifficultyMax),
+        marketDifficultyStep: Number(settingsRow.market_difficulty_step ?? DEFAULT_FANTASY_SETTINGS.marketDifficultyStep),
+        marketTargetEliteAffordability: Number(settingsRow.market_target_elite_affordability ?? DEFAULT_FANTASY_SETTINGS.marketTargetEliteAffordability),
+        marketTargetMedianEliteRatio: Number(settingsRow.market_target_median_elite_ratio ?? DEFAULT_FANTASY_SETTINGS.marketTargetMedianEliteRatio),
+        marketRecoveryBonusStrength: Number(settingsRow.market_recovery_bonus_strength ?? DEFAULT_FANTASY_SETTINGS.marketRecoveryBonusStrength),
+        marketExpensiveRiskStrength: Number(settingsRow.market_expensive_risk_strength ?? DEFAULT_FANTASY_SETTINGS.marketExpensiveRiskStrength),
+        marketBreakoutRepriceStrength: Number(settingsRow.market_breakout_reprice_strength ?? DEFAULT_FANTASY_SETTINGS.marketBreakoutRepriceStrength),
+        marketCheapPercentile: Number(settingsRow.market_cheap_percentile ?? DEFAULT_FANTASY_SETTINGS.marketCheapPercentile),
+        marketElitePercentile: Number(settingsRow.market_elite_percentile ?? DEFAULT_FANTASY_SETTINGS.marketElitePercentile),
+        marketBreakoutRoundPercentile: Number(settingsRow.market_breakout_round_percentile ?? DEFAULT_FANTASY_SETTINGS.marketBreakoutRoundPercentile),
+        marketBadRoundPercentile: Number(settingsRow.market_bad_round_percentile ?? DEFAULT_FANTASY_SETTINGS.marketBadRoundPercentile),
         budgetSoftCapMultiplier: Number(settingsRow.budget_soft_cap_multiplier ?? DEFAULT_FANTASY_SETTINGS.budgetSoftCapMultiplier),
         budgetHardCapMultiplier: Number(settingsRow.budget_hard_cap_multiplier ?? DEFAULT_FANTASY_SETTINGS.budgetHardCapMultiplier),
         budgetExcessRetention: Number(settingsRow.budget_excess_retention ?? DEFAULT_FANTASY_SETTINGS.budgetExcessRetention),
@@ -320,6 +337,25 @@ export async function getFantasyDashboard() {
       "*, round:round_id(id, number, date, start_time, status, round_type, preparation_stage, suppress_goalkeeper_rewards, teams(id, name, color), matches(id, status))"
     )
     .eq("fantasy_season_id", fantasySeason.id);
+  const { data: marketHealthRow, error: marketHealthError } = await account.client.rpc(
+    "get_fantasy_market_v11_public_health",
+    { p_fantasy_season_id: fantasySeason.id },
+  );
+  const marketHealth: FantasyPublicMarketHealth | null = marketHealthError || !marketHealthRow
+    ? null
+    : {
+        version: Number(marketHealthRow.version || 10),
+        level: marketHealthRow.level,
+        pressure: Number(marketHealthRow.pressure || 0),
+        difficultyMultiplier: Number(marketHealthRow.difficultyMultiplier || 1),
+        eliteAffordabilityRate: marketHealthRow.eliteAffordabilityRate === null ? null : Number(marketHealthRow.eliteAffordabilityRate),
+        competitiveAffordabilityRate: marketHealthRow.competitiveAffordabilityRate === null ? null : Number(marketHealthRow.competitiveAffordabilityRate),
+        economyAffordabilityRate: marketHealthRow.economyAffordabilityRate === null ? null : Number(marketHealthRow.economyAffordabilityRate),
+        economyLineupCost: marketHealthRow.economyLineupCost === null ? null : Number(marketHealthRow.economyLineupCost),
+        competitiveLineupCost: marketHealthRow.competitiveLineupCost === null ? null : Number(marketHealthRow.competitiveLineupCost),
+        eliteLineupCost: marketHealthRow.eliteLineupCost === null ? null : Number(marketHealthRow.eliteLineupCost),
+        medianEliteRatio: marketHealthRow.medianEliteRatio === null ? null : Number(marketHealthRow.medianEliteRatio),
+      };
 
   const officialFantasyRounds = (fantasyRoundRows || []).filter(
     (item: any) => item.round?.round_type === "official"
@@ -1445,6 +1481,7 @@ export async function getFantasyDashboard() {
     lineup: effectiveLineup,
     insights,
     radar: radarData,
+    marketHealth,
     budget: adjustedBudget,
     account: {
       totalPoints: Number(fantasyAccount?.total_points || 0),
@@ -2847,10 +2884,25 @@ export async function updateFantasySettings(values: Partial<FantasySettings>) {
     return { success: false, error: "Edite os oito scouts juntos na tela Pontuação BQ para manter Ranked e Cartola sincronizados." };
   }
   const { attackerGoalPoints: _legacyAttackerGoalPoints, ownGoalPoints, lossPoints, goalkeeperLossPoints, goalkeeperAppearancePoints, goalConcededPoints, teamGoalConcededPoints, ...otherValues } = values;
+  const v11Keys = [
+    "market_difficulty_min", "market_difficulty_max", "market_difficulty_step", "market_target_elite_affordability",
+    "market_target_median_elite_ratio", "market_recovery_bonus_strength", "market_expensive_risk_strength",
+    "market_breakout_reprice_strength", "market_cheap_percentile", "market_elite_percentile",
+    "market_breakout_round_percentile", "market_bad_round_percentile",
+  ] as const;
+  const v11Values = Object.fromEntries(
+    v11Keys.filter((key) => (values as any)[key] !== undefined).map((key) => [key, (values as any)[key]]),
+  );
   const { error } = await account.client.rpc("update_fantasy_settings", {
     p_settings: otherValues,
   });
   if (error) return { success: false, error: error.message };
+  if (Object.keys(v11Values).length) {
+    const { error: v11Error } = await account.client.rpc("update_fantasy_market_v11_settings", {
+      p_settings: v11Values,
+    });
+    if (v11Error) return { success: false, error: v11Error.message };
+  }
   if (values.goalPoints !== undefined || ownGoalPoints !== undefined) {
     const { error: positionError } = await account.client.rpc("update_fantasy_attack_and_own_goal_points", {
       p_attacker_goal_points: values.goalPoints ?? DEFAULT_FANTASY_SETTINGS.goalPoints,
@@ -2885,6 +2937,16 @@ export async function updateFantasySettings(values: Partial<FantasySettings>) {
   revalidatePath("/admin/cartola");
   revalidatePath("/cartola");
   return { success: true };
+}
+
+export async function previewFantasyMarketV11() {
+  const account = await getCurrentAccount();
+  if (!account.isAdmin) return { success: false as const, error: "Somente administradores." };
+  const { data, error } = await account.client.rpc("preview_fantasy_market_v11", {
+    p_fantasy_season_id: undefined,
+  });
+  if (error) return { success: false as const, error: error.message };
+  return { success: true as const, preview: data };
 }
 
 export async function reprocessFantasyRound(roundId: string) {
@@ -2951,6 +3013,9 @@ export async function getFantasyAdminData() {
   if (!account.isAdmin) return null;
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
+  const { data: fantasySeasonRow } = season
+    ? await account.client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle()
+    : { data: null as { id: string } | null };
   const { data: settings } = await account.client
     .from("fantasy_settings")
     .select("*")
@@ -2961,7 +3026,7 @@ export async function getFantasyAdminData() {
     .select("id, market_status, processed_at, rules_version, scoring_version, round:round_id(id, number, date, status, round_type)")
     .order("created_at", { ascending: false })
     .limit(20);
-  const [{ data: testSession }, { data: friendlyRounds }] = await Promise.all([
+  const [{ data: testSession }, { data: friendlyRounds }, marketStatusResult] = await Promise.all([
     account.client
       .from("fantasy_test_sessions")
       .select(
@@ -2981,6 +3046,9 @@ export async function getFantasyAdminData() {
           .order("date", { ascending: false })
           .limit(12)
       : Promise.resolve({ data: [] as any[] }),
+    fantasySeasonRow
+      ? account.client.rpc("get_fantasy_market_v11_status", { p_fantasy_season_id: fantasySeasonRow.id })
+      : Promise.resolve({ data: null, error: null } as any),
   ]);
   return {
     settings: settings || {
@@ -3036,6 +3104,7 @@ export async function getFantasyAdminData() {
     rounds: rounds || [],
     testSession: testSession || null,
     friendlyRounds: friendlyRounds || [],
+    marketStatus: marketStatusResult?.error ? null : marketStatusResult?.data || null,
   };
 }
 
