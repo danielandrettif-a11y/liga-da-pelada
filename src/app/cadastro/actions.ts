@@ -17,7 +17,7 @@ export async function signup(formData: FormData) {
   if (password !== passwordConfirmation) return { success: false, error: "As senhas não conferem." };
   if (!name) return { success: false, error: "Informe o seu nome." };
   if (name.length > 120) return { success: false, error: "Nome muito longo." };
-  if (!["offensive", "midfield", "defensive"].includes(playerProfile)) {
+  if (!["offensive", "wing", "midfield", "defensive"].includes(playerProfile)) {
     return { success: false, error: "Escolha um estilo de jogo válido." };
   }
 

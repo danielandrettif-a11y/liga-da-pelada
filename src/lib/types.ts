@@ -15,7 +15,7 @@ export type User = {
   created_at: string;
 };
 
-export type PlayerProfile = 'offensive' | 'midfield' | 'defensive';
+export type PlayerProfile = 'offensive' | 'wing' | 'midfield' | 'defensive';
 export type MemberCategory = 'player' | 'guest' | 'wag' | 'supporter';
 export type RoundType = 'official' | 'friendly';
 export type TeamFormationMode = 'manual' | 'random' | 'balanced' | 'speed';

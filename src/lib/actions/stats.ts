@@ -283,7 +283,7 @@ export async function calculateRoundStats(roundId: string) {
           s.team_goals_conceded += teamGoalsConceded;
           // Mantém os scouts defensivos brutos exclusivamente para o motor do
           // Cartola. Eles não entram no cálculo da Ranked.
-          if (profileByPlayerId.get(participant.player_id) === "defensive" && !goalkeeperIds.has(participant.player_id)) {
+          if (["defensive", "wing"].includes(String(profileByPlayerId.get(participant.player_id))) && !goalkeeperIds.has(participant.player_id)) {
             if (teamGoalsConceded === 0) {
               s.defensive_clean_games += 1;
             } else if (teamGoalsConceded === 1) {

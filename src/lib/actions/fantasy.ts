@@ -5,7 +5,7 @@ import { getCurrentAccount } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
-import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget, type FantasySettings } from "@/lib/fantasy/config";
+import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget, withFantasyPositionSnapshot, type FantasySettings } from "@/lib/fantasy/config";
 import { type FantasyMarketHealth } from "@/lib/fantasy/market-v11";
 import {
   calculateCostBenefit,
@@ -28,7 +28,7 @@ import {
   type FantasyLiveLineupProjection,
   type FantasyLivePlayerStats,
 } from "@/lib/fantasy/live-projection";
-import type { FantasyLineupSlot } from "@/lib/fantasy/lineup-positions";
+import { isValidFantasyFormationRoles, type FantasyLineupSlot } from "@/lib/fantasy/lineup-positions";
 import { calculatePositionBreakdown } from "@/lib/fantasy/position-breakdown";
 
 export type FantasyMarketPlayer = {
@@ -311,6 +311,27 @@ export async function getFantasyDashboard() {
         budgetHardCapMultiplier: Number(settingsRow.budget_hard_cap_multiplier ?? DEFAULT_FANTASY_SETTINGS.budgetHardCapMultiplier),
         budgetExcessRetention: Number(settingsRow.budget_excess_retention ?? DEFAULT_FANTASY_SETTINGS.budgetExcessRetention),
         minSampleForRadar: Number(settingsRow.min_sample_for_radar ?? 3),
+        defCleanSheetBonus: Number(settingsRow.def_clean_sheet_bonus ?? DEFAULT_FANTASY_SETTINGS.defCleanSheetBonus),
+        defOneGoalBonus: Number(settingsRow.def_one_goal_bonus ?? DEFAULT_FANTASY_SETTINGS.defOneGoalBonus),
+        defMuralhaThreshold: Number(settingsRow.def_muralha_threshold ?? DEFAULT_FANTASY_SETTINGS.defMuralhaThreshold),
+        defMuralhaBonus: Number(settingsRow.def_muralha_bonus ?? DEFAULT_FANTASY_SETTINGS.defMuralhaBonus),
+        defBonusCap: Number(settingsRow.def_bonus_cap ?? DEFAULT_FANTASY_SETTINGS.defBonusCap),
+        meiAssistBonus: Number(settingsRow.mei_assist_bonus ?? DEFAULT_FANTASY_SETTINGS.meiAssistBonus),
+        meiMaestroThreshold: Number(settingsRow.mei_maestro_threshold ?? DEFAULT_FANTASY_SETTINGS.meiMaestroThreshold),
+        meiMaestroBonus: Number(settingsRow.mei_maestro_bonus ?? DEFAULT_FANTASY_SETTINGS.meiMaestroBonus),
+        meiBonusCap: Number(settingsRow.mei_bonus_cap ?? DEFAULT_FANTASY_SETTINGS.meiBonusCap),
+        alaGoalBonus: Number(settingsRow.ala_goal_bonus ?? DEFAULT_FANTASY_SETTINGS.alaGoalBonus),
+        alaAssistBonus: Number(settingsRow.ala_assist_bonus ?? DEFAULT_FANTASY_SETTINGS.alaAssistBonus),
+        alaCleanSheetBonus: Number(settingsRow.ala_clean_sheet_bonus ?? DEFAULT_FANTASY_SETTINGS.alaCleanSheetBonus),
+        alaOneGoalBonus: Number(settingsRow.ala_one_goal_bonus ?? DEFAULT_FANTASY_SETTINGS.alaOneGoalBonus),
+        alaAttackThreshold: Number(settingsRow.ala_attack_threshold ?? DEFAULT_FANTASY_SETTINGS.alaAttackThreshold),
+        alaDefenseThreshold: Number(settingsRow.ala_defense_threshold ?? DEFAULT_FANTASY_SETTINGS.alaDefenseThreshold),
+        alaVaiEVoltaBonus: Number(settingsRow.ala_vai_e_volta_bonus ?? DEFAULT_FANTASY_SETTINGS.alaVaiEVoltaBonus),
+        alaBonusCap: Number(settingsRow.ala_bonus_cap ?? DEFAULT_FANTASY_SETTINGS.alaBonusCap),
+        ataGoalBonus: Number(settingsRow.ata_goal_bonus ?? DEFAULT_FANTASY_SETTINGS.ataGoalBonus),
+        ataArtilheiroThreshold: Number(settingsRow.ata_artilheiro_threshold ?? DEFAULT_FANTASY_SETTINGS.ataArtilheiroThreshold),
+        ataArtilheiroBonus: Number(settingsRow.ata_artilheiro_bonus ?? DEFAULT_FANTASY_SETTINGS.ataArtilheiroBonus),
+        ataBonusCap: Number(settingsRow.ata_bonus_cap ?? DEFAULT_FANTASY_SETTINGS.ataBonusCap),
       }
     : DEFAULT_FANTASY_SETTINGS;
 
@@ -399,7 +420,7 @@ export async function getFantasyDashboard() {
   const betweenRounds = !isTest && !activeOfficialRound;
   const scoringSnapshot = fantasyRound?.settings_snapshot || null;
   const scoringSettings: FantasySettings = scoringSnapshot
-    ? {
+    ? withFantasyPositionSnapshot({
         ...settings,
         roleScoringActive: scoringSnapshot.role_scoring_active !== false,
         suppressGoalkeeperRewards: Boolean(fantasyRound?.round?.suppress_goalkeeper_rewards),
@@ -430,7 +451,28 @@ export async function getFantasyDashboard() {
         topTeamPredictionPoints: Number(
           scoringSnapshot.top_team_prediction_points ?? settings.topTeamPredictionPoints,
         ),
-      }
+        defCleanSheetBonus: Number(scoringSnapshot.def_clean_sheet_bonus ?? settings.defCleanSheetBonus),
+        defOneGoalBonus: Number(scoringSnapshot.def_one_goal_bonus ?? settings.defOneGoalBonus),
+        defMuralhaThreshold: Number(scoringSnapshot.def_muralha_threshold ?? settings.defMuralhaThreshold),
+        defMuralhaBonus: Number(scoringSnapshot.def_muralha_bonus ?? settings.defMuralhaBonus),
+        defBonusCap: Number(scoringSnapshot.def_bonus_cap ?? settings.defBonusCap),
+        meiAssistBonus: Number(scoringSnapshot.mei_assist_bonus ?? settings.meiAssistBonus),
+        meiMaestroThreshold: Number(scoringSnapshot.mei_maestro_threshold ?? settings.meiMaestroThreshold),
+        meiMaestroBonus: Number(scoringSnapshot.mei_maestro_bonus ?? settings.meiMaestroBonus),
+        meiBonusCap: Number(scoringSnapshot.mei_bonus_cap ?? settings.meiBonusCap),
+        alaGoalBonus: Number(scoringSnapshot.ala_goal_bonus ?? settings.alaGoalBonus),
+        alaAssistBonus: Number(scoringSnapshot.ala_assist_bonus ?? settings.alaAssistBonus),
+        alaCleanSheetBonus: Number(scoringSnapshot.ala_clean_sheet_bonus ?? settings.alaCleanSheetBonus),
+        alaOneGoalBonus: Number(scoringSnapshot.ala_one_goal_bonus ?? settings.alaOneGoalBonus),
+        alaAttackThreshold: Number(scoringSnapshot.ala_attack_threshold ?? settings.alaAttackThreshold),
+        alaDefenseThreshold: Number(scoringSnapshot.ala_defense_threshold ?? settings.alaDefenseThreshold),
+        alaVaiEVoltaBonus: Number(scoringSnapshot.ala_vai_e_volta_bonus ?? settings.alaVaiEVoltaBonus),
+        alaBonusCap: Number(scoringSnapshot.ala_bonus_cap ?? settings.alaBonusCap),
+        ataGoalBonus: Number(scoringSnapshot.ata_goal_bonus ?? settings.ataGoalBonus),
+        ataArtilheiroThreshold: Number(scoringSnapshot.ata_artilheiro_threshold ?? settings.ataArtilheiroThreshold),
+        ataArtilheiroBonus: Number(scoringSnapshot.ata_artilheiro_bonus ?? settings.ataArtilheiroBonus),
+        ataBonusCap: Number(scoringSnapshot.ata_bonus_cap ?? settings.ataBonusCap),
+      }, scoringSnapshot)
     : settings;
   const displayRound = fantasyRound?.round || latestFinishedRound?.round || null;
   const displayRoundId = displayRound?.id || null;
@@ -1549,9 +1591,12 @@ export async function saveFantasyLineup(input: {
           input.playerIds.includes(slot.playerId) &&
           Number.isInteger(slot.slotIndex) &&
           slot.slotIndex >= 0 &&
-          ["GOL", "DEF", "MEI", "ATA"].includes(slot.slotRole),
+          ["GOL", "DEF", "MEI", "ALA", "ATA"].includes(slot.slotRole),
       );
-    if (!slotAssignmentsAreValid) {
+    const orderedRoles = [...input.slotAssignments]
+      .sort((a, b) => a.slotIndex - b.slotIndex)
+      .map((slot) => slot.slotRole);
+    if (!slotAssignmentsAreValid || (input.playerIds.length === maxPlayers && !isValidFantasyFormationRoles(maxPlayers, orderedRoles))) {
       return { success: false, error: "As posições da escalação são inválidas. Ajuste o time e tente novamente." };
     }
     const dbSlots = input.slotAssignments.map((slot) => ({
@@ -1939,7 +1984,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
 
   if (scoringRound?.round_id) {
     const snapshot = scoringRound.settings_snapshot || {};
-    const liveSettings: FantasySettings = {
+    const liveSettings: FantasySettings = withFantasyPositionSnapshot({
       ...DEFAULT_FANTASY_SETTINGS,
       roleScoringActive: snapshot.role_scoring_active !== false,
       suppressGoalkeeperRewards: Boolean(scoringRoundInfo?.suppress_goalkeeper_rewards),
@@ -1955,9 +2000,9 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       teamGoalConcededPoints: Number(snapshot.team_goal_conceded_points ?? liveSettingsRow?.team_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.teamGoalConcededPoints),
       ownGoalPoints: Number(snapshot.own_goal_points ?? liveSettingsRow?.own_goal_points ?? DEFAULT_FANTASY_SETTINGS.ownGoalPoints),
       captainMultiplier: Number(snapshot.captain_multiplier ?? liveSettingsRow?.captain_multiplier ?? DEFAULT_FANTASY_SETTINGS.captainMultiplier),
-    };
+    }, snapshot);
     const liveMatches = await loadFantasyMatchSnapshots(liveReadClient, scoringRound.round_id);
-    const playerProfile = playerRow.player_profile as "offensive" | "midfield" | "defensive" | null;
+    const playerProfile = playerRow.player_profile as "offensive" | "wing" | "midfield" | "defensive" | null;
     const liveStats = projectFantasyLiveStats(
       liveMatches.map((match: any) => ({
         id: match.id,
@@ -1994,8 +2039,15 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     const goalValue = (liveSettings.roleScoringActive === false && playerProfile === "offensive"
       ? liveSettings.attackerGoalPoints
       : liveSettings.goalPoints) ?? liveSettings.goalPoints;
-    const defensivePosition = calculatePositionBreakdown({
-      slotRole: "DEF",
+    const profileSlotRole = playerProfile === "defensive"
+      ? "DEF"
+      : playerProfile === "midfield"
+        ? "MEI"
+        : playerProfile === "wing"
+          ? "ALA"
+          : "ATA";
+    const positionBreakdown = calculatePositionBreakdown({
+      slotRole: profileSlotRole,
       playerProfile,
       goals: current.goals,
       assists: current.assists,
@@ -2004,8 +2056,9 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       goalkeeperGames: current.goalkeeperGames,
       cleanSheets: current.cleanSheets,
       suppressGoalkeeperRewards: liveSettings.suppressGoalkeeperRewards,
+      settings: liveSettings,
     });
-    const defensiveBonus = liveSettings.roleScoringActive === false ? 0 : defensivePosition.appliedBonus;
+    const positionBonus = liveSettings.roleScoringActive === false ? 0 : positionBreakdown.appliedBonus;
     const concededValue = liveSettings.roleScoringActive === false
       ? current.teamGoalsConceded * (liveSettings.teamGoalConcededPoints ?? 0)
       : current.goalsConceded * liveSettings.goalConcededPoints;
@@ -2023,7 +2076,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       { key: "losses", label: "Derrotas", count: current.losses, unitPoints: liveSettings.lossPoints, points: current.losses * liveSettings.lossPoints, icon: "❌" },
       { key: "goalkeeper_games", label: "Jogos no Gol (Rodízio)", count: current.goalkeeperGames, unitPoints: liveSettings.suppressGoalkeeperRewards ? 0 : liveSettings.goalkeeperAppearancePoints, points: current.goalkeeperGames * (liveSettings.suppressGoalkeeperRewards ? 0 : liveSettings.goalkeeperAppearancePoints), icon: "🧤" },
       { key: "goals_conceded", label: "Gols Sofridos no Gol", count: liveSettings.roleScoringActive === false ? current.teamGoalsConceded : current.goalsConceded, unitPoints: concededUnitValue, points: concededValue, icon: "🛡️" },
-      { key: "defensive_bonus", label: "Bônus DEF aplicado", count: current.defensiveCleanGames + current.defensiveOneGoalGames, unitPoints: 0, points: defensiveBonus, icon: "🔒" },
+      { key: "position_bonus", label: `Bônus ${profileSlotRole} aplicado`, count: Math.abs(positionBonus) > 0 ? 1 : 0, unitPoints: positionBonus, points: positionBonus, icon: "✨" },
       { key: "own_goals", label: "Gols Contra", count: current.ownGoals, unitPoints: liveSettings.ownGoalPoints, points: current.ownGoals * liveSettings.ownGoalPoints, icon: "⚠️" },
     ].filter((item) => item.count > 0);
     const historicalAdjustment = authoritativeBasePoints - current.basePoints;
@@ -2083,10 +2136,12 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       { label: "Jogar no gol (rodízio)", unitPoints: liveSettings.suppressGoalkeeperRewards ? 0 : liveSettings.goalkeeperAppearancePoints, icon: "🧤", description: liveSettings.suppressGoalkeeperRewards ? "Recompensa suprimida nesta rodada" : "Bônus por atuar na posição de goleiro" },
       { label: "Gol sofrido no gol", unitPoints: concededUnitValue, icon: "🛡️", description: "Penalidade por cada gol sofrido no gol" },
       { label: "Gol contra", unitPoints: liveSettings.ownGoalPoints, icon: "⚠️", description: "Penalidade por marcar gol contra" },
-      ...(playerProfile === "defensive" ? [
-        { label: "Clean sheet DEF", unitPoints: 1.5, icon: "🔒", description: "Bônus de linha por partida sem sofrer gols" },
-        { label: "Proteção parcial DEF", unitPoints: 0.5, icon: "🛡️", description: "Bônus de linha por partida sofrendo exatamente 1 gol" },
-      ] : []),
+      ...positionBreakdown.events.map((event) => ({
+        label: `${event.label} (${profileSlotRole})`,
+        unitPoints: event.count ? event.value / event.count : event.value,
+        icon: "✨",
+        description: "Bônus da posição oficial",
+      })),
     ];
 
     roundDetail = {
@@ -2096,7 +2151,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       stats: current,
       basePoints: authoritativeBasePoints,
       breakdown,
-      positionBreakdown: defensivePosition,
+      positionBreakdown,
       matchesBreakdown,
       rulesList,
     };
@@ -2436,6 +2491,8 @@ export async function getFantasyRanking(
       defPoints: number;
       midPoints: number;
       midSelections: number;
+      wingPoints: number;
+      wingSelections: number;
       attackPoints: number;
       attackSelections: number;
     };
@@ -2447,6 +2504,8 @@ export async function getFantasyRanking(
       defPoints: 0,
       midPoints: 0,
       midSelections: 0,
+      wingPoints: 0,
+      wingSelections: 0,
       attackPoints: 0,
       attackSelections: 0,
     });
@@ -2462,13 +2521,18 @@ export async function getFantasyRanking(
         const role = player.slot_role || (
           player.player_profile_locked === "defensive" ? "DEF"
             : player.player_profile_locked === "midfield" ? "MEI"
-              : player.player_profile_locked === "offensive" ? "ATA"
-                : null
+              : player.player_profile_locked === "wing" ? "ALA"
+                : player.player_profile_locked === "offensive" ? "ATA"
+                  : null
         );
         if (role === "DEF") current.defPoints += Number(player.total_points || 0);
         if (role === "MEI") {
           current.midPoints += Number(player.total_points || 0);
           current.midSelections += 1;
+        }
+        if (role === "ALA") {
+          current.wingPoints += Number(player.total_points || 0);
+          current.wingSelections += 1;
         }
         if (role === "ATA") {
           current.attackPoints += Number(player.total_points || 0);
@@ -2485,6 +2549,8 @@ export async function getFantasyRanking(
         defPoints: 0,
         midPoints: 0,
         midSelections: 0,
+        wingPoints: 0,
+        wingSelections: 0,
         attackPoints: 0,
         attackSelections: 0,
       };
@@ -2493,6 +2559,10 @@ export async function getFantasyRanking(
         if (player.slotRole === "MEI") {
           metrics.midPoints += Number(player.totalPoints || 0);
           metrics.midSelections += 1;
+        }
+        if (player.slotRole === "ALA") {
+          metrics.wingPoints += Number(player.totalPoints || 0);
+          metrics.wingSelections += 1;
         }
         if (player.slotRole === "ATA") {
           metrics.attackPoints += Number(player.totalPoints || 0);
@@ -2515,6 +2585,9 @@ export async function getFantasyRanking(
         mid_points: historical.midPoints + currentLive.midPoints,
         mid_selection_count: historical.midSelections + currentLive.midSelections,
         mid_average_points: (historical.midPoints + currentLive.midPoints) / Math.max(1, historical.midSelections + currentLive.midSelections),
+        wing_points: historical.wingPoints + currentLive.wingPoints,
+        wing_selection_count: historical.wingSelections + currentLive.wingSelections,
+        wing_average_points: (historical.wingPoints + currentLive.wingPoints) / Math.max(1, historical.wingSelections + currentLive.wingSelections),
         attack_points: historical.attackPoints + currentLive.attackPoints,
         attack_selection_count: historical.attackSelections + currentLive.attackSelections,
         attack_average_points: (historical.attackPoints + currentLive.attackPoints) / Math.max(1, historical.attackSelections + currentLive.attackSelections),
@@ -2534,6 +2607,9 @@ export async function getFantasyRanking(
           mid_points: historical.midPoints + currentLive.midPoints,
           mid_selection_count: historical.midSelections + currentLive.midSelections,
           mid_average_points: (historical.midPoints + currentLive.midPoints) / Math.max(1, historical.midSelections + currentLive.midSelections),
+          wing_points: historical.wingPoints + currentLive.wingPoints,
+          wing_selection_count: historical.wingSelections + currentLive.wingSelections,
+          wing_average_points: (historical.wingPoints + currentLive.wingPoints) / Math.max(1, historical.wingSelections + currentLive.wingSelections),
           attack_points: historical.attackPoints + currentLive.attackPoints,
           attack_selection_count: historical.attackSelections + currentLive.attackSelections,
           attack_average_points: (historical.attackPoints + currentLive.attackPoints) / Math.max(1, historical.attackSelections + currentLive.attackSelections),
@@ -2558,6 +2634,9 @@ export async function getFantasyRanking(
           mid_points: currentLive.midPoints,
           mid_selection_count: currentLive.midSelections,
           mid_average_points: currentLive.midPoints / Math.max(1, currentLive.midSelections),
+          wing_points: currentLive.wingPoints,
+          wing_selection_count: currentLive.wingSelections,
+          wing_average_points: currentLive.wingPoints / Math.max(1, currentLive.wingSelections),
           attack_points: currentLive.attackPoints,
           attack_selection_count: currentLive.attackSelections,
           attack_average_points: currentLive.attackPoints / Math.max(1, currentLive.attackSelections),

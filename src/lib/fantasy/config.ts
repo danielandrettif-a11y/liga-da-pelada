@@ -79,6 +79,27 @@ export type FantasySettings = {
   goalkeeperLossPoints?: number;
   teamGoalConcededPoints?: number;
   goalkeeperSlotCleanSheetPoints?: number;
+  defCleanSheetBonus?: number;
+  defOneGoalBonus?: number;
+  defMuralhaThreshold?: number;
+  defMuralhaBonus?: number;
+  defBonusCap?: number;
+  meiAssistBonus?: number;
+  meiMaestroThreshold?: number;
+  meiMaestroBonus?: number;
+  meiBonusCap?: number;
+  alaGoalBonus?: number;
+  alaAssistBonus?: number;
+  alaCleanSheetBonus?: number;
+  alaOneGoalBonus?: number;
+  alaAttackThreshold?: number;
+  alaDefenseThreshold?: number;
+  alaVaiEVoltaBonus?: number;
+  alaBonusCap?: number;
+  ataGoalBonus?: number;
+  ataArtilheiroThreshold?: number;
+  ataArtilheiroBonus?: number;
+  ataBonusCap?: number;
 };
 
 export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
@@ -150,9 +171,95 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   goalkeeperLossPoints: BQ_SCORING_V5.loss,
   teamGoalConcededPoints: 0,
   goalkeeperSlotCleanSheetPoints: 4,
+  defCleanSheetBonus: 1.25,
+  defOneGoalBonus: 0.5,
+  defMuralhaThreshold: 3,
+  defMuralhaBonus: 2.5,
+  defBonusCap: 8,
+  meiAssistBonus: 0.75,
+  meiMaestroThreshold: 2,
+  meiMaestroBonus: 2.5,
+  meiBonusCap: 6,
+  alaGoalBonus: 0.5,
+  alaAssistBonus: 0.5,
+  alaCleanSheetBonus: 0.5,
+  alaOneGoalBonus: 0.25,
+  alaAttackThreshold: 2,
+  alaDefenseThreshold: 2,
+  alaVaiEVoltaBonus: 2,
+  alaBonusCap: 6,
+  ataGoalBonus: 0.5,
+  ataArtilheiroThreshold: 2,
+  ataArtilheiroBonus: 2,
+  ataBonusCap: 4,
 };
 
 export const FANTASY_RECENT_ROUND_WEIGHTS = [0.40, 0.25, 0.15, 0.12, 0.08] as const;
+
+const POSITION_SNAPSHOT_KEYS = {
+  defCleanSheetBonus: "def_clean_sheet_bonus",
+  defOneGoalBonus: "def_one_goal_bonus",
+  defMuralhaThreshold: "def_muralha_threshold",
+  defMuralhaBonus: "def_muralha_bonus",
+  defBonusCap: "def_bonus_cap",
+  meiAssistBonus: "mei_assist_bonus",
+  meiMaestroThreshold: "mei_maestro_threshold",
+  meiMaestroBonus: "mei_maestro_bonus",
+  meiBonusCap: "mei_bonus_cap",
+  alaGoalBonus: "ala_goal_bonus",
+  alaAssistBonus: "ala_assist_bonus",
+  alaCleanSheetBonus: "ala_clean_sheet_bonus",
+  alaOneGoalBonus: "ala_one_goal_bonus",
+  alaAttackThreshold: "ala_attack_threshold",
+  alaDefenseThreshold: "ala_defense_threshold",
+  alaVaiEVoltaBonus: "ala_vai_e_volta_bonus",
+  alaBonusCap: "ala_bonus_cap",
+  ataGoalBonus: "ata_goal_bonus",
+  ataArtilheiroThreshold: "ata_artilheiro_threshold",
+  ataArtilheiroBonus: "ata_artilheiro_bonus",
+  ataBonusCap: "ata_bonus_cap",
+} as const satisfies Partial<Record<keyof FantasySettings, string>>;
+
+export function withFantasyPositionSnapshot(
+  base: FantasySettings,
+  snapshot?: Record<string, unknown> | null,
+): FantasySettings {
+  if (!snapshot) return base;
+  const version = Number(snapshot.scoring_version ?? snapshot.version ?? 5);
+  const result: FantasySettings = version < 6
+    ? {
+        ...base,
+        defCleanSheetBonus: 1.5,
+        defOneGoalBonus: 0.5,
+        defMuralhaThreshold: 3,
+        defMuralhaBonus: 3,
+        defBonusCap: 10,
+        meiAssistBonus: 1,
+        meiMaestroThreshold: 2,
+        meiMaestroBonus: 3,
+        meiBonusCap: Number.MAX_SAFE_INTEGER,
+        alaGoalBonus: 0,
+        alaAssistBonus: 0,
+        alaCleanSheetBonus: 0,
+        alaOneGoalBonus: 0,
+        alaVaiEVoltaBonus: 0,
+        alaBonusCap: 0,
+        ataGoalBonus: 0,
+        ataArtilheiroThreshold: 2,
+        ataArtilheiroBonus: 3,
+        ataBonusCap: Number.MAX_SAFE_INTEGER,
+      }
+    : { ...base };
+  for (const [camelKey, snakeKey] of Object.entries(POSITION_SNAPSHOT_KEYS)) {
+    const key = camelKey as keyof typeof POSITION_SNAPSHOT_KEYS;
+    const fallback = base[key];
+    const value = snapshot[snakeKey] ?? snapshot[key];
+    if (value !== undefined && value !== null && typeof fallback === "number") {
+      (result as unknown as Record<string, unknown>)[key] = Number(value);
+    }
+  }
+  return result;
+}
 
 /** O orçamento inicial acompanha a quantidade de vagas, mantendo C$ 11 por atleta. */
 export function getFantasyInitialBudget(playersPerTeam: number) {

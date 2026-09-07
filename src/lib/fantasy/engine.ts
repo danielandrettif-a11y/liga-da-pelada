@@ -10,7 +10,7 @@ export type FantasyPerformance = {
   goals: number;
   assists: number;
   ownGoals?: number;
-  playerProfile?: "offensive" | "midfield" | "defensive" | null;
+  playerProfile?: "offensive" | "wing" | "midfield" | "defensive" | null;
   goalkeeperGames?: number;
   goalsConceded?: number;
   defensiveCleanGames?: number;
@@ -246,7 +246,7 @@ export function calculateFantasyPrices(
   const seasonOverall = qualityByValue(withPoints, "seasonAverage");
   const roundByPosition = new Map<string, number>();
   const seasonByPosition = new Map<string, number>();
-  for (const profile of ["defensive", "midfield", "offensive"] as const) {
+  for (const profile of ["defensive", "midfield", "wing", "offensive"] as const) {
     const group = withPoints.filter(({ player }) => player.playerProfile === profile);
     const roundGroup = group.length >= 3 ? qualityByValue(group, "roundPoints") : roundOverall;
     const seasonGroup = group.length >= 3 ? qualityByValue(group, "seasonAverage") : seasonOverall;

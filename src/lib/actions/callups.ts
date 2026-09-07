@@ -219,7 +219,7 @@ export async function inviteGuestToCallup({
 }: {
   callupId: string;
   name: string;
-  playerProfile?: "offensive" | "midfield" | "defensive";
+  playerProfile?: "offensive" | "wing" | "midfield" | "defensive";
   isGoalkeeper?: boolean;
 }) {
   const account = await getCurrentAccount();

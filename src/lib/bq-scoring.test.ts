@@ -96,7 +96,7 @@ describe("BQ Scoring v5 — Paridade Ranked/Cartola", () => {
     })).toBe(12.5);
   });
 
-  it("regressão Caio R03: derrota -2.5, goleiro normal e DEF limitado a 10", () => {
+  it("regressão Caio R03: base histórica preservada e DEF v6 limitado a 8", () => {
     const base = calculateBQBasePoints(BQ_SCORING_V5, {
       goals: 2, assists: 2, wins: 8, draws: 0, losses: 4, ownGoals: 0,
       goalkeeperAppearances: 2, goalkeeperGoalsConceded: 0,
@@ -107,8 +107,8 @@ describe("BQ Scoring v5 — Paridade Ranked/Cartola", () => {
       defensiveOneGoalGames: 0,
     });
     expect(base).toBe(31);
-    expect(defensive.appliedBonus).toBe(10);
-    expect(base + defensive.appliedBonus).toBe(41);
+    expect(defensive.appliedBonus).toBe(8);
+    expect(base + defensive.appliedBonus).toBe(39);
   });
 
   it("R02 zera só a recompensa de atuação e mantém a punição por gol sofrido", () => {

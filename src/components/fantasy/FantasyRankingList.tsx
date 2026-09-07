@@ -21,10 +21,13 @@ export type FantasyRankingEntry = {
   captain_bonus_points?: number | string;
   def_points?: number | string;
   mid_points?: number | string;
+  wing_points?: number | string;
   attack_points?: number | string;
   mid_selection_count?: number | string;
+  wing_selection_count?: number | string;
   attack_selection_count?: number | string;
   mid_average_points?: number | string;
+  wing_average_points?: number | string;
   attack_average_points?: number | string;
   player: {
     name: string;
@@ -53,7 +56,7 @@ export type FantasyRankingEntry = {
   } | null;
 };
 
-type FantasyRankingFilter = "points" | "best" | "budget" | "captain" | "def" | "mid" | "attack";
+type FantasyRankingFilter = "points" | "best" | "budget" | "captain" | "def" | "mid" | "wing" | "attack";
 
 type FantasyRankingMetric = {
   id: FantasyRankingFilter;
@@ -63,10 +66,10 @@ type FantasyRankingMetric = {
   valueLabel: string;
   field: keyof Pick<
     FantasyRankingEntry,
-    "total_points" | "current_budget" | "best_round_points" | "captain_bonus_points" | "def_points" | "mid_points" | "attack_points" | "mid_average_points" | "attack_average_points"
+    "total_points" | "current_budget" | "best_round_points" | "captain_bonus_points" | "def_points" | "mid_points" | "wing_points" | "attack_points" | "mid_average_points" | "wing_average_points" | "attack_average_points"
   >;
   currency?: boolean;
-  sampleField?: keyof Pick<FantasyRankingEntry, "mid_selection_count" | "attack_selection_count">;
+  sampleField?: keyof Pick<FantasyRankingEntry, "mid_selection_count" | "wing_selection_count" | "attack_selection_count">;
   minimumSelections?: number;
 };
 
@@ -77,6 +80,7 @@ const FANTASY_RANKING_METRICS: FantasyRankingMetric[] = [
   { id: "captain", label: "Capitão", title: "Mestres da Faixa", description: "Mais pontos extras com o capitão", valueLabel: "bônus capitão", field: "captain_bonus_points" },
   { id: "def", label: "DEF", title: "Muralha do Cartola", description: "Mais pontos com atletas na DEF", valueLabel: "pontos DEF", field: "def_points" },
   { id: "mid", label: "MEI", title: "Eficiência no Meio", description: "Média por atleta escalado no MEI", valueLabel: "pts por MEI", field: "mid_average_points", sampleField: "mid_selection_count", minimumSelections: 3 },
+  { id: "wing", label: "ALA", title: "Reis do Vai e Volta", description: "Média por atleta escalado como ALA", valueLabel: "pts por ALA", field: "wing_average_points", sampleField: "wing_selection_count", minimumSelections: 3 },
   { id: "attack", label: "ATA", title: "Eficiência no Ataque", description: "Média por atleta escalado no ATA", valueLabel: "pts por ATA", field: "attack_average_points", sampleField: "attack_selection_count", minimumSelections: 3 },
 ];
 

@@ -479,7 +479,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   if (!["player", "guest", "wag", "supporter"].includes(requestedCategory)) {
     return { success: false, error: "Escolha uma categoria valida." };
   }
-  if (!["offensive", "midfield", "defensive"].includes(playerProfile)) {
+  if (!["offensive", "wing", "midfield", "defensive"].includes(playerProfile)) {
     return { success: false, error: "Escolha um perfil de jogo valido." };
   }
 
