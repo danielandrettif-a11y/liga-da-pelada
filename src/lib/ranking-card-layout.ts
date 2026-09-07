@@ -139,7 +139,7 @@ export function buildRankingCardContent(entry: RankingEntry, position: number): 
       { key: "roundMvp", label: "Craque", value: entry.awards.roundMvp },
       { key: "topScorer", label: "Artilheiro", value: entry.awards.topScorer },
       { key: "topAssister", label: "Garçom", value: entry.awards.topAssister },
-      { key: "kingOfWins", label: "Vitórias", value: entry.awards.kingOfWins },
+      { key: "kingOfWins", label: "Rei das Vitórias", value: entry.awards.kingOfWins },
     ],
     stats: [
       { value: String(entry.goals), label: "GOL" },

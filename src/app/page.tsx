@@ -11,6 +11,7 @@ import {
   type SportIconProps,
 } from "@/components/icons";
 import type { ComponentType } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { getDashboardData } from "@/lib/actions/dashboard";
 import { getLatestFinishedSeason } from "@/lib/actions/seasons";
@@ -25,6 +26,7 @@ import { HomeLastRoundSummary } from "@/components/HomeLastRoundSummary";
 import { getCurrentAccount, getCurrentAccountIdentity } from "@/lib/auth";
 import { getSeasonPassDashboard } from "@/lib/actions/fantasy";
 import { SeasonPassBanner } from "@/components/fantasy/SeasonPassBanner";
+import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
 
 export const dynamic = "force-dynamic";
 
@@ -268,17 +270,36 @@ export default async function HomePage() {
           {rankingPreview && rankingPreview.length > 0 ? (
             rankingPreview.map((stats: any, index: number) => {
               const name = stats.player?.name || "Desconhecido";
+              const bannerAssetKey = stats.cosmetics?.bannerAssetKey || null;
+              const bannerImage = cosmeticHighResolutionImage(bannerAssetKey);
               return (
                 <Link
                   href={`/jogadores/${stats.player.id}`}
                   key={stats.player.id}
                   className={`
-                    flex items-center gap-3 px-4 py-3.5 animate-fade-in
+                    group relative isolate flex min-h-[88px] items-center gap-3 overflow-hidden px-4 py-3.5 animate-fade-in
                     ${index < rankingPreview.length - 1 ? "border-b border-border" : ""}
                     stagger-${index + 1}
                     hover:bg-surface-hover transition-colors
                   `}
                 >
+                  {bannerImage && (
+                    <>
+                      <Image
+                        src={bannerImage}
+                        alt=""
+                        fill
+                        quality={80}
+                        sizes="(max-width: 640px) 100vw, 720px"
+                        className="pointer-events-none -z-20 object-cover opacity-70 transition-transform duration-500 group-hover:scale-[1.035]"
+                        style={{ objectPosition: cosmeticBackgroundPosition("banner", bannerAssetKey) }}
+                      />
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(4,18,10,.98)_0%,rgba(4,18,10,.94)_30%,rgba(4,18,10,.62)_64%,rgba(4,18,10,.78)_100%)]"
+                      />
+                    </>
+                  )}
                   <RankBadge rank={index + 1} />
                   
                   {/* Foto do jogador, com iniciais apenas como fallback */}

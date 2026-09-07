@@ -81,7 +81,7 @@ describe("ranking card layout", () => {
       ["Craque", 2],
       ["Artilheiro", 0],
       ["Garçom", 1],
-      ["Vitórias", 3],
+      ["Rei das Vitórias", 3],
     ]);
     expect(content.stats.map(({ label }) => label)).toEqual(["GOL", "AST", "VIT", "JOG", "DER", "APR"]);
   });
