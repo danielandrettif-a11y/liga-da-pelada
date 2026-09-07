@@ -1,29 +1,50 @@
 import { describe, expect, it } from "vitest";
-import { getRankingCardLayout, rankingCardBoxPixels } from "./ranking-card-layout";
+import type { RankingEntry } from "./ranking";
+import {
+  buildRankingCardContent,
+  getRankingCardLayout,
+  getRankingCardTheme,
+  getRankingCardTier,
+  rankingCardBoxPixels,
+} from "./ranking-card-layout";
 
 describe("ranking card layout", () => {
   it.each([
-    [1, "gold", "circle"],
-    [2, "silver", "silver-shield"],
-    [3, "bronze", "bronze-cutout"],
-    [4, "ranked", "ranked-shield"],
-    [18, "ranked", "ranked-shield"],
-  ] as const)("maps position %s to the expected visual", (position, tier, photoShape) => {
-    const layout = getRankingCardLayout(position);
-    expect(layout.tier).toBe(tier);
-    expect(layout.photoShape).toBe(photoShape);
+    [1, "gold", "OURO"],
+    [2, "silver", "PRATA"],
+    [3, "bronze", "BRONZE"],
+    [4, "ranked", "RANKED"],
+    [18, "ranked", "RANKED"],
+  ] as const)("maps position %s to the expected theme", (position, tier, label) => {
+    expect(getRankingCardTier(position)).toBe(tier);
+    expect(getRankingCardTheme(position)).toMatchObject({ tier, label });
+  });
+
+  it("uses the same geometry and photo shape for every tier", () => {
+    const layout = getRankingCardLayout();
+    expect(layout.photoShape).toBe("shield");
+    for (const position of [1, 2, 3, 4, 18]) {
+      expect(getRankingCardLayout()).toBe(layout);
+      expect(getRankingCardTheme(position).artwork).toContain("-v2.webp");
+    }
   });
 
   it("keeps every content box inside the card artwork", () => {
-    for (const position of [1, 2, 3, 4]) {
-      const layout = getRankingCardLayout(position);
-      for (const box of [layout.header, layout.score, layout.photo, layout.name, layout.awards, layout.stats]) {
-        expect(box.left).toBeGreaterThanOrEqual(0);
-        expect(box.top).toBeGreaterThanOrEqual(0);
-        expect(box.left + box.width).toBeLessThanOrEqual(100);
-        expect(box.top + box.height).toBeLessThanOrEqual(100);
-      }
+    const layout = getRankingCardLayout();
+    for (const box of [layout.header, layout.score, layout.photo, layout.name, layout.awards, layout.stats]) {
+      expect(box.left).toBeGreaterThanOrEqual(0);
+      expect(box.top).toBeGreaterThanOrEqual(0);
+      expect(box.left + box.width).toBeLessThanOrEqual(100);
+      expect(box.top + box.height).toBeLessThanOrEqual(100);
     }
+  });
+
+  it("keeps stacked content regions separated", () => {
+    const { score, photo, name, awards, stats } = getRankingCardLayout();
+    expect(score.left + score.width).toBeLessThan(photo.left);
+    expect(Math.max(score.top + score.height, photo.top + photo.height)).toBeLessThan(name.top);
+    expect(name.top + name.height).toBeLessThan(awards.top);
+    expect(awards.top + awards.height).toBeLessThan(stats.top);
   });
 
   it("converts normalized boxes without changing their proportions", () => {
@@ -33,11 +54,35 @@ describe("ranking card layout", () => {
     )).toEqual({ x: 180, y: 440, width: 240, height: 480 });
   });
 
-  it("keeps the gold portrait circular on a 2:3 card", () => {
-    const photo = rankingCardBoxPixels(
-      getRankingCardLayout(1).photo,
-      { x: 0, y: 0, width: 360, height: 540 },
-    );
-    expect(Math.abs(photo.width - photo.height)).toBeLessThan(1);
+  it("builds the same complete information set even when awards are zero", () => {
+    const entry = {
+      player: { name: "Jogador Teste", player_profile: "defensive", is_goalkeeper: false },
+      points: 53.5,
+      goals: 5,
+      assists: 4,
+      wins: 12,
+      games: 23,
+      losses: 6,
+      winRate: 59,
+      awards: { topScorer: 0, topAssister: 1, bestGoalkeeper: 0, bestDefender: 2 },
+      cosmetics: { titleName: null },
+    } as RankingEntry;
+
+    const content = buildRankingCardContent(entry, 7);
+    expect(content).toMatchObject({
+      header: "PBQ • RANKED",
+      points: "53.5",
+      profile: "DEF",
+      placement: "7º",
+      name: "Jogador Teste",
+      title: null,
+    });
+    expect(content.awards.map(({ label, value }) => [label, value])).toEqual([
+      ["Artilheiro", 0],
+      ["Garçom", 1],
+      ["Goleiro", 0],
+      ["Xerife", 2],
+    ]);
+    expect(content.stats.map(({ label }) => label)).toEqual(["GOL", "AST", "VIT", "JOG", "DER", "APR"]);
   });
 });

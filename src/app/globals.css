@@ -902,40 +902,20 @@ textarea {
   clip-path: inherit;
 }
 
-.ranking-card-photo--circle {
-  border-radius: 999px;
-  clip-path: circle(50% at 50% 50%);
-}
-
-.ranking-card-photo--silver-shield {
-  border-radius: 0;
-  clip-path: polygon(9% 0, 91% 0, 100% 10%, 94% 78%, 50% 100%, 6% 78%, 0 10%);
-}
-
-.ranking-card-photo--bronze-cutout {
-  border-radius: 0;
-  clip-path: polygon(13% 0, 87% 0, 100% 12%, 100% 88%, 87% 100%, 13% 100%, 0 88%, 0 12%);
-}
-
-.ranking-card-photo--ranked-shield {
+.ranking-card-photo--shield {
   border-radius: 0;
   clip-path: polygon(10% 0, 90% 0, 100% 9%, 93% 81%, 50% 100%, 7% 81%, 0 9%);
 }
 
-.ranking-card-photo--circle .ranking-card-photo__image { object-position: center 18%; }
-.ranking-card-photo--silver-shield .ranking-card-photo__image { object-position: center 24%; }
-.ranking-card-photo--bronze-cutout .ranking-card-photo__image { object-position: center 18%; }
-.ranking-card-photo--ranked-shield .ranking-card-photo__image { object-position: center 18%; }
+.ranking-card-photo--shield .ranking-card-photo__image { object-position: center 18%; }
+
+.ranking-card-awards > span {
+  min-width: 0;
+}
 
 .ranking-card-stats > div {
   min-width: 0;
   padding: .12rem .05rem;
-}
-
-.ranking-card-stats--silver > div,
-.ranking-card-stats--bronze > div,
-.ranking-card-stats--ranked > div {
-  transform: translateY(-1px);
 }
 
 /* O pódio tem só um terço da tela: preserva a arte e prioriza o nome. */
