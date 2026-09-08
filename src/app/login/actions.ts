@@ -31,6 +31,11 @@ export async function login(formData: FormData) {
     return { error: "Email ou senha incorretos." };
   }
 
+  const { error: profileRepairError } = await supabase.rpc("ensure_my_player_account");
+  if (profileRepairError) {
+    console.error("Erro ao concluir perfil após login:", profileRepairError);
+  }
+
   const { data: profile } = await supabase
     .from("account_profiles")
     .select("role")

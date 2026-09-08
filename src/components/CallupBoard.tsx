@@ -35,6 +35,7 @@ import {
   joinActiveCallup,
   leaveActiveCallup,
   removeCallupEntry,
+  repairMyPlayerAccount,
   updateCallup,
   type CallupWithEntries,
 } from "@/lib/actions/callups";
@@ -421,7 +422,16 @@ export function CallupBoard({
           </button>
         ) : (
           <div className="rounded-2xl border border-warning/25 bg-warning/10 p-3.5 text-center text-xs font-bold text-warning">
-            Sua conta ainda não está vinculada a um jogador selecionável. Você pode contratar amigos ou pedir ao ADM para vincular seu perfil.
+            <p>Seu cadastro de jogador ainda não foi concluído.</p>
+            <button
+              type="button"
+              onClick={() => run("repair-profile", repairMyPlayerAccount)}
+              disabled={!!loading}
+              className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-warning px-4 py-2 font-black text-background disabled:opacity-50"
+            >
+              {loading === "repair-profile" ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+              Concluir meu cadastro
+            </button>
           </div>
         )}
       </section>

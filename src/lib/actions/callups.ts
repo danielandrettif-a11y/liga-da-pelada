@@ -149,6 +149,8 @@ export async function openCallup(formData: FormData) {
 export async function joinActiveCallup(callupId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre na sua conta para participar." };
+  const { error: profileError } = await account.client.rpc("ensure_my_player_account");
+  if (profileError) return { success: false, error: profileError.message };
   const { error } = await account.client.rpc("join_callup", { p_callup_id: callupId });
   if (error) return { success: false, error: error.message };
   refreshCallups();
@@ -174,6 +176,15 @@ export async function adminAddCallupPlayer(callupId: string, playerId: string) {
   if (error) return { success: false, error: error.message };
   refreshCallups();
   return { success: true, status: data?.status as "confirmed" | "waitlist" | undefined };
+}
+
+export async function repairMyPlayerAccount() {
+  const account = await getCurrentAccount();
+  if (!account.user) return { success: false, error: "Entre na sua conta para concluir o cadastro." };
+  const { data, error } = await account.client.rpc("ensure_my_player_account");
+  if (error) return { success: false, error: error.message };
+  refreshCallups();
+  return { success: true, playerId: data?.player_id as string | undefined };
 }
 
 /**
