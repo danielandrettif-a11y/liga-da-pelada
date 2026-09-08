@@ -20,6 +20,8 @@ const AVATAR_EXTENSIONS: Record<string, string> = {
 
 function revalidatePlayerPaths(id?: string) {
   revalidatePath("/");
+  revalidatePath("/mais");
+  revalidatePath("/meu-perfil");
   revalidatePath("/jogadores");
   revalidatePath("/ranking");
   revalidatePath("/admin/jogadores");

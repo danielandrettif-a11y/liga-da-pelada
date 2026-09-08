@@ -12,6 +12,16 @@ export default async function PrelistasPage() {
   if (!account.isAdmin) redirect("/mais");
   const prelists = await getAdminRoundPrelists();
   if (prelists.length === 0) redirect("/admin/rodada?new=1");
+  const hasFriendlyPrelist = prelists.some((prelist: any) => prelist.round_type === "friendly");
+  const hasRankedPrelist = prelists.some((prelist: any) => prelist.round_type === "official");
+  const prelistCountTheme = hasFriendlyPrelist && hasRankedPrelist
+    ? "bg-sky-400/15 text-sky-300"
+    : hasFriendlyPrelist
+      ? "bg-warning/15 text-warning"
+      : "bg-accent/15 text-accent";
+  const prelistCountLabel = hasFriendlyPrelist && hasRankedPrelist
+    ? "Ranked + Amistoso"
+    : `${prelists.length} pré-lista${prelists.length === 1 ? "" : "s"}`;
 
   return (
     <div className="space-y-6">
@@ -45,7 +55,7 @@ export default async function PrelistasPage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h2 className="font-athletic text-sm font-black uppercase italic tracking-wider text-foreground">Pré-listas salvas</h2>
-          <span className="rounded-full bg-warning/15 px-2.5 py-1 text-[10px] font-black text-warning">{prelists.length}</span>
+          <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${prelistCountTheme}`}>{prelistCountLabel}</span>
         </div>
 
         {prelists.map((prelist: any, index: number) => {
