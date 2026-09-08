@@ -192,11 +192,11 @@ describe("live fantasy projection", () => {
     expect(lineup.players[0]).toMatchObject({
       slotRole: "MEI",
       basePoints: 2.5,
-      positionBonus: 0.75,
-      captainBonus: 1.63,
-      totalPoints: 4.88,
+      positionBonus: 1,
+      captainBonus: 1.75,
+      totalPoints: 5.25,
     });
-    expect(lineup).toMatchObject({ playerPoints: 3.25, positionBonus: 0.75, captainBonus: 1.63, totalPoints: 4.88 });
+    expect(lineup).toMatchObject({ playerPoints: 3.5, positionBonus: 1, captainBonus: 1.75, totalPoints: 5.25 });
   });
 
   it("aplica o pacote de GOL a qualquer atleta nessa vaga e dá +4 de clean sheet", () => {
@@ -208,7 +208,7 @@ describe("live fantasy projection", () => {
 
     expect(goalkeeperSlot.positionBonus).toBe(4);
     // Fora da vaga GOL, ele recebe apenas o eventual pacote da posição MEI.
-    expect(fieldSlot.positionBonus).toBe(0.75);
-    expect(goalkeeperSlot.playerPoints).toBe(fieldSlot.playerPoints + 3.25);
+    expect(fieldSlot.positionBonus).toBe(1);
+    expect(goalkeeperSlot.playerPoints).toBe(fieldSlot.playerPoints + 3);
   });
 });

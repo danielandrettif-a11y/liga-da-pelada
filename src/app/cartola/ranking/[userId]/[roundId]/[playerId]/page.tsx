@@ -5,7 +5,6 @@ import { getFantasyUserRoundHistory } from "@/lib/actions/fantasy";
 import { buildBQBasePointBreakdown, normalizeBQScoringSnapshot } from "@/lib/bq-scoring";
 import { calculatePositionBreakdown } from "@/lib/fantasy/position-breakdown";
 import type { FantasySlotRole } from "@/lib/fantasy/lineup-positions";
-import { DEFAULT_FANTASY_SETTINGS, withFantasyPositionSnapshot } from "@/lib/fantasy/config";
 
 const value = (source: Record<string, unknown>, key: string, fallback = 0) => Number(source[key] ?? fallback);
 
@@ -29,7 +28,7 @@ export default async function FantasyLineupPlayerDetailPage({ params }: { params
     goalkeeperAppearances: value(stat, "goalkeeper_games"),
     goalkeeperGoalsConceded: value(stat, "goals_conceded"),
   }, { suppressGoalkeeperRewards });
-  const slotRole = (["GOL", "DEF", "MEI", "ALA", "ATA"].includes(item.slot_role) ? item.slot_role : "ATA") as FantasySlotRole;
+  const slotRole = (["GOL", "DEF", "MEI", "ATA"].includes(item.slot_role) ? item.slot_role : "ATA") as FantasySlotRole;
   const position = calculatePositionBreakdown({
     slotRole,
     playerProfile: item.player_profile_locked,
@@ -40,7 +39,6 @@ export default async function FantasyLineupPlayerDetailPage({ params }: { params
     goalkeeperGames: value(stat, "goalkeeper_games"),
     cleanSheets: value(stat, "clean_sheets"),
     suppressGoalkeeperRewards,
-    settings: withFantasyPositionSnapshot(DEFAULT_FANTASY_SETTINGS, settings),
   });
   const captain = item.player_id === data.lineup.captain_player_id;
   return <div className="space-y-5"><header><Link href={`/cartola/ranking/${userId}/${roundId}`} className="text-xs font-bold text-accent">← Voltar à escalação</Link><div className="mt-4 flex items-center gap-3"><PlayerAvatar name={playerName} avatarUrl={item.avatar_url_locked || item.players?.avatar_url} className="h-14 w-14 rounded-full bg-surface text-base font-black text-accent" /><div><h1 className="text-xl font-black text-foreground">{playerName}</h1><p className="text-xs text-muted">Rodada {String(data.round?.number || 0).padStart(2, "0")} · composição dos pontos</p></div></div></header><section className="glass-card space-y-3 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-muted">O que aconteceu em campo</p>{entries.length ? entries.map((entry) => <Row key={entry.key} label={`${entry.label} · ${entry.count}${entry.unitPoints === 0 ? " (sem prêmio nesta rodada)" : ""}`} points={entry.points} />) : <p className="text-sm text-muted">Nenhuma ação pontuável registrada nesta rodada.</p>}<div className="border-t border-border pt-3"><Row label="Scouts básicos" points={Number(item.base_points || 0) - Number(item.position_bonus || 0)} strong /></div>{position.events.map((event) => <Row key={event.label} label={`${event.label} · ${event.count}`} points={event.value} />)}{position.specialBonus?.activated && <Row label={`Bônus ${position.specialBonus.name}`} points={position.specialBonus.value} />}{Number(item.position_bonus || 0) !== 0 && <Row label={`Bônus ${slotRole} aplicado${position.capReached ? ` (teto ${position.cap})` : ""}`} points={Number(item.position_bonus || 0)} strong />}{captain && <Row label="Bônus de capitão" points={Number(item.captain_bonus || 0)} /> }<div className="border-t border-border pt-3"><Row label="Total deste jogador" points={Number(item.total_points || 0)} strong /></div></section><p className="px-1 text-[11px] leading-5 text-muted">Cartas são bônus da escalação inteira, por isso aparecem no total da rodada — não são atribuídas a um jogador específico.</p></div>;

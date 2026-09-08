@@ -119,7 +119,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
           {activeTab === "positions" && (
             <div className="space-y-3">
               <div className="rounded-2xl border border-accent/30 bg-accent/10 p-3 text-xs text-emerald-100/90 leading-relaxed">
-                💡 <strong>Como escalar:</strong> escolha 1 GOL, 2 DEF e uma frente <strong>Equilibrada (MEI + ALA + ATA)</strong>, <strong>Clássica (2 MEI + ATA)</strong>, <strong>Pelas pontas (2 ALA + ATA)</strong> ou <strong>Ofensiva (MEI + 2 ATA)</strong>. DEF, MEI, ALA e ATA precisam coincidir com a posição oficial. A vaga GOL continua livre.
+                💡 <strong>Como escalar:</strong> escolha 1 GOL, 2 DEF e complete com <strong>2 MEI/ALA + 1 ATA</strong> ou <strong>1 MEI/ALA + 2 ATA</strong>. DEF, MEI e ATA precisam coincidir com a tag oficial. A vaga GOL é livre: você aposta em quem deve atuar melhor no rodízio do gol.
               </div>
 
               {/* 1. Defensores (DEF) */}
@@ -134,13 +134,13 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                     </span>
                   </div>
                   <span className="rounded bg-blue-500/20 px-2 py-0.5 text-[9px] font-black text-blue-300">
-                    Teto de +8
+                    Teto de +10
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-muted">
                   <div className="flex justify-between py-0.5 border-b border-white/5">
                     <span>🧱 0 gols sofridos jogando na linha:</span>
-                    <strong className="text-accent font-black">+1.25 pts</strong>
+                    <strong className="text-accent font-black">+1.5 pts</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
                     <span>🛡️ Exatamente 1 gol sofrido na linha:</span>
@@ -148,12 +148,12 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                   </div>
                   <div className="flex justify-between py-0.5">
                     <span>🏰 Muralha com 3+ clean sheets:</span>
-                    <strong className="text-accent font-black">+2.5 pts uma vez</strong>
+                    <strong className="text-accent font-black">+3.0 pts uma vez</strong>
                   </div>
                 </div>
               </div>
 
-              {/* 2. Meias (MEI) */}
+              {/* 2. Meias / Alas (MEI) */}
               <div className="rounded-2xl border border-warning/25 bg-yellow-950/20 p-3.5 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -161,21 +161,21 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                       MEI
                     </span>
                     <span className="font-athletic text-sm font-black uppercase text-yellow-200">
-                      Meio-Campo & Armação
+                      Meia, Ala & Armação
                     </span>
                   </div>
                   <span className="rounded bg-warning/20 px-2 py-0.5 text-[9px] font-black text-warning">
-                    Teto de +6
+                    Maestro da Rodada
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-muted">
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🎯 Assistência: +2.5 base +0.75 na vaga MEI</span>
-                    <strong className="text-accent font-black">+3.25 pts / assist</strong>
+                    <span>🎯 Assistência: +2.5 base +1 na vaga MEI</span>
+                    <strong className="text-accent font-black">+3.5 pts / assist</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
                     <span>🪄 Bônus Maestro (2+ assistências):</span>
-                    <strong className="text-warning font-black">+2.5 pts extras</strong>
+                    <strong className="text-warning font-black">+3.0 pts extras</strong>
                   </div>
                   <div className="flex justify-between py-0.5">
                     <span>⚽ Gol marcado (scout base):</span>
@@ -184,38 +184,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                 </div>
               </div>
 
-              {/* 3. Alas (ALA) */}
-              <div className="rounded-2xl border border-violet-500/25 bg-violet-950/20 p-3.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/20 text-violet-300 font-black text-xs">
-                      ALA
-                    </span>
-                    <span className="font-athletic text-sm font-black uppercase text-violet-200">
-                      Vai e Volta
-                    </span>
-                  </div>
-                  <span className="rounded bg-violet-500/20 px-2 py-0.5 text-[9px] font-black text-violet-300">
-                    Teto de +6
-                  </span>
-                </div>
-                <div className="space-y-1 text-xs text-muted">
-                  <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>⚡ Gol ou assistência:</span>
-                    <strong className="text-violet-300 font-black">+0.5 pt cada</strong>
-                  </div>
-                  <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🪽 Clean sheet / jogo com 1 gol:</span>
-                    <strong className="text-violet-300 font-black">+0.5 / +0.25 pt</strong>
-                  </div>
-                  <div className="flex justify-between py-0.5">
-                    <span>🔄 Vai e Volta (2 ações ofensivas + 2 defensivas):</span>
-                    <strong className="text-accent font-black">+2.0 pts</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4. Atacantes (ATA) */}
+              {/* 3. Atacantes (ATA) */}
               <div className="rounded-2xl border border-danger/25 bg-red-950/20 p-3.5 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -227,17 +196,17 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                     </span>
                   </div>
                   <span className="rounded bg-danger/20 px-2 py-0.5 text-[9px] font-black text-danger">
-                    Teto de +4
+                    Artilheiro da Rodada
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-muted">
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>⚽ Gol: +{settings.goalPoints.toFixed(1)} base +0.5 na vaga ATA</span>
-                    <strong className="text-accent font-black">+{(settings.goalPoints + 0.5).toFixed(1)} pts / gol</strong>
+                    <span>⚽ Gol marcado (scout base):</span>
+                    <strong className="text-accent font-black">+{settings.goalPoints.toFixed(1)} pts / gol</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
                     <span>🔥 Bônus Artilheiro (2+ gols):</span>
-                    <strong className="text-danger font-black">+2.0 pts extras</strong>
+                    <strong className="text-danger font-black">+3.0 pts extras</strong>
                   </div>
                   <div className="flex justify-between py-0.5">
                     <span>🎯 Assistência:</span>
@@ -246,7 +215,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                 </div>
               </div>
 
-              {/* 5. Goleiro no Rodízio (GOL) */}
+              {/* 4. Goleiro no Rodízio (GOL) */}
               <div className="rounded-2xl border border-emerald-500/25 bg-emerald-950/20 p-3.5 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -350,7 +319,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                     <span className="font-bold text-white flex items-center gap-1.5">
                       🧱 DEF jogando na linha (bônus da vaga)
                     </span>
-                    <span className="font-black text-blue-300">+1.25 (SG) / +0.5 (1 sofrido), teto +8</span>
+                    <span className="font-black text-blue-300">+1.5 (SG) / +0.5 (1 sofrido), teto +10</span>
                   </div>
                 </div>
               </div>

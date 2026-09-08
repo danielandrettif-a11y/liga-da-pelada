@@ -54,7 +54,7 @@ export function FantasyTutorialModal({
       tag: "Passo 3 de 5 · Bônus de Posição",
       title: "Esquemas & Bônus de Posição",
       description:
-        "Com 6 atletas, escolha 1 GOL, 2 DEF e uma frente Equilibrada (MEI + ALA + ATA), Clássica (2 MEI + ATA), Pelas pontas (2 ALA + ATA) ou Ofensiva (MEI + 2 ATA).\n\n• 🛡️ DEF: +1,25 por clean sheet, +0,5 com 1 gol sofrido, Muralha +2,5 e teto +8.\n• 🪄 MEI: +0,75 por assistência, Maestro +2,5 e teto +6.\n• 🪽 ALA: +0,5 por gol/assistência, +0,5 por clean sheet, +0,25 com 1 gol; Vai e Volta +2 e teto +6.\n• 🎯 ATA: +0,5 por gol, Artilheiro +2 e teto +4.\n• 🧤 GOL: atuação real vale +2 e gol sofrido -1; o +4 de clean sheet só vem quando ele realmente atuou no gol sem sofrer gol.",
+        "Com 6 atletas, escolha 1 GOL, 2 DEF e complete com 2 MEI/ALA + 1 ATA ou 1 MEI/ALA + 2 ATA.\n\n• 🛡️ DEF: +1,5 por clean sheet de linha, +0,5 com exatamente 1 gol sofrido, Muralha +3 com 3+ clean sheets e teto +10.\n• 🪄 MEI: assistência vale +2,5 base; na vaga MEI recebe +1 e 2+ assistências dão +3 de Maestro.\n• 🎯 ATA: gol vale +4; 2+ gols na vaga ATA dão +3 de Artilheiro.\n• 🧤 GOL: atuação real vale +2 e gol sofrido -1; o +4 de clean sheet só vem quando ele realmente atuou no gol sem sofrer gol.",
     },
     {
       icon: <Target className="h-8 w-8 text-warning" />,

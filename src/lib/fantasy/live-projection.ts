@@ -10,7 +10,7 @@ export type FantasyLiveMatchPlayer = {
   playerId: string;
   teamId: string;
   resultEligible: boolean;
-  playerProfile?: "offensive" | "wing" | "midfield" | "defensive" | null;
+  playerProfile?: "offensive" | "midfield" | "defensive" | null;
 };
 export type FantasyLiveGoalkeeper = { playerId: string; teamId: string };
 export type FantasyLiveMatch = {
@@ -30,7 +30,7 @@ export type FantasyLivePlayerStats = {
   goals: number;
   assists: number;
   ownGoals: number;
-  playerProfile?: "offensive" | "wing" | "midfield" | "defensive" | null;
+  playerProfile?: "offensive" | "midfield" | "defensive" | null;
   wins: number;
   draws: number;
   losses: number;
@@ -128,7 +128,7 @@ export function projectFantasyLiveStats(
       const current = ensure(participant.playerId, participant.playerProfile);
       const conceded = participant.teamId === match.teamAId ? match.scoreB : match.scoreA;
       current.teamGoalsConceded += conceded;
-      if ((participant.playerProfile === "defensive" || participant.playerProfile === "wing") && !goalkeeperIds.has(participant.playerId) && isFinished) {
+      if (participant.playerProfile === "defensive" && !goalkeeperIds.has(participant.playerId) && isFinished) {
         if (conceded === 0) current.defensiveCleanGames += 1;
         else if (conceded === 1) current.defensiveOneGoalGames += 1;
       }

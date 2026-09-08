@@ -1,11 +1,10 @@
 /**
- * Breakdown autoritativo da pontuação por posição — BQ v6.
+ * Breakdown autoritativo da pontuação por posição — BQ v5.
  *
  * Usado na prévia ao vivo, processamento final e histórico para garantir
  * uma representação única e consistente em todas as interfaces.
  */
 
-import type { FantasySettings } from "./config";
 import type { FantasySlotRole } from "./lineup-positions";
 
 // ---------------------------------------------------------------------------
@@ -37,17 +36,29 @@ export type PositionBonusBreakdown = {
 };
 
 // ---------------------------------------------------------------------------
-// Valores históricos usados apenas como fallback de snapshots incompletos
+// Constantes BQ v5
 // ---------------------------------------------------------------------------
 
+/** Teto do bônus posicional DEF por rodada. */
+const DEF_BONUS_CAP = 10;
+
+/** Clean sheet por partida para DEF (excluindo partidas como goleiro). */
+const DEF_CLEAN_SHEET_BONUS = 1.5;
+/** Partida com exatamente 1 gol sofrido para DEF. */
+const DEF_ONE_GOAL_BONUS = 0.5;
 /** Bônus Muralha: ≥3 clean sheets na rodada. */
 const DEF_MURALHA_THRESHOLD = 3;
+const DEF_MURALHA_BONUS = 3;
 
+/** Bônus por assistência para MEI (além dos +2.5 básicos). */
+const MEI_ASSIST_BONUS = 1;
 /** Maestro: ≥2 assistências na rodada. */
 const MEI_MAESTRO_THRESHOLD = 2;
+const MEI_MAESTRO_BONUS = 3;
 
 /** Artilheiro: ≥2 gols na rodada. */
 const ATA_ARTILHEIRO_THRESHOLD = 2;
+const ATA_ARTILHEIRO_BONUS = 3;
 
 /** GOL: clean sheet quando o atleta realmente atuou no gol. */
 const GOL_CLEAN_SHEET_BONUS = 4;
@@ -70,7 +81,6 @@ export type PositionBreakdownInput = {
   /** Clean sheets como goleiro */
   cleanSheets: number;
   suppressGoalkeeperRewards?: boolean;
-  settings?: FantasySettings;
 };
 
 // ---------------------------------------------------------------------------
@@ -85,7 +95,6 @@ function isCorrectSlot(slotRole: FantasySlotRole, playerProfile: string | null |
   if (slotRole === "GOL") return true;
   if (slotRole === "DEF") return playerProfile === "defensive";
   if (slotRole === "MEI") return playerProfile === "midfield";
-  if (slotRole === "ALA") return playerProfile === "wing";
   return playerProfile === "offensive";
 }
 
@@ -94,12 +103,11 @@ function isCorrectSlot(slotRole: FantasySlotRole, playerProfile: string | null |
  */
 export function calculatePositionBreakdown(input: PositionBreakdownInput): PositionBonusBreakdown {
   const { slotRole, playerProfile } = input;
-  const setting = (key: keyof FantasySettings, fallback: number) => Number(input.settings?.[key] ?? fallback);
 
   // GOL — clean sheet quando realmente atuou no gol
   if (slotRole === "GOL") {
     const cleanSheetBonus = !input.suppressGoalkeeperRewards && input.goalkeeperGames > 0
-      ? input.cleanSheets * setting("goalkeeperSlotCleanSheetPoints", GOL_CLEAN_SHEET_BONUS)
+      ? input.cleanSheets * GOL_CLEAN_SHEET_BONUS
       : 0;
     return {
       position: "GOL",
@@ -133,64 +141,59 @@ export function calculatePositionBreakdown(input: PositionBreakdownInput): Posit
     let gross = 0;
 
     if (input.defensiveCleanGames > 0) {
-      const value = Math.round(input.defensiveCleanGames * setting("defCleanSheetBonus", 1.25) * 100) / 100;
+      const value = Math.round(input.defensiveCleanGames * DEF_CLEAN_SHEET_BONUS * 100) / 100;
       events.push({ label: "Clean sheet", count: input.defensiveCleanGames, value });
       gross += value;
     }
     if (input.defensiveOneGoalGames > 0) {
-      const value = Math.round(input.defensiveOneGoalGames * setting("defOneGoalBonus", 0.5) * 100) / 100;
+      const value = Math.round(input.defensiveOneGoalGames * DEF_ONE_GOAL_BONUS * 100) / 100;
       events.push({ label: "Proteção parcial (1 gol)", count: input.defensiveOneGoalGames, value });
       gross += value;
     }
 
-    const muralhaThreshold = setting("defMuralhaThreshold", DEF_MURALHA_THRESHOLD);
-    const muralhaBonus = setting("defMuralhaBonus", 2.5);
-    const muralhaActivated = input.defensiveCleanGames >= muralhaThreshold;
+    const muralhaActivated = input.defensiveCleanGames >= DEF_MURALHA_THRESHOLD;
     const specialBonus: SpecialBonus = {
       name: "Muralha",
       activated: muralhaActivated,
-      value: muralhaActivated ? muralhaBonus : 0,
-      progress: muralhaActivated ? null : `${input.defensiveCleanGames}/${muralhaThreshold} clean sheets`,
+      value: muralhaActivated ? DEF_MURALHA_BONUS : 0,
+      progress: muralhaActivated ? null : `${input.defensiveCleanGames}/${DEF_MURALHA_THRESHOLD} clean sheets`,
     };
     if (muralhaActivated) {
-      gross += muralhaBonus;
+      gross += DEF_MURALHA_BONUS;
     }
 
-    const cap = setting("defBonusCap", 8);
-    const applied = Math.min(gross, cap);
+    const applied = Math.min(gross, DEF_BONUS_CAP);
     return {
       position: "DEF",
       events,
       specialBonus,
       grossBonus: Math.round(gross * 100) / 100,
-      cap,
+      cap: DEF_BONUS_CAP,
       appliedBonus: Math.round(applied * 100) / 100,
-      capReached: gross > cap,
+      capReached: gross > DEF_BONUS_CAP,
     };
   }
 
-  // MEI — bônus por assistência + Maestro, com teto
+  // MEI — +1 por assistência + Maestro
   if (slotRole === "MEI") {
     const events: PositionBonusEvent[] = [];
     let gross = 0;
 
     if (input.assists > 0) {
-      const value = input.assists * setting("meiAssistBonus", 0.75);
+      const value = input.assists * MEI_ASSIST_BONUS;
       events.push({ label: "Bônus assistência", count: input.assists, value });
       gross += value;
     }
 
-    const maestroThreshold = setting("meiMaestroThreshold", MEI_MAESTRO_THRESHOLD);
-    const maestroBonus = setting("meiMaestroBonus", 2.5);
-    const maestroActivated = input.assists >= maestroThreshold;
+    const maestroActivated = input.assists >= MEI_MAESTRO_THRESHOLD;
     const specialBonus: SpecialBonus = {
       name: "Maestro",
       activated: maestroActivated,
-      value: maestroActivated ? maestroBonus : 0,
-      progress: maestroActivated ? null : `${input.assists}/${maestroThreshold} assistências`,
+      value: maestroActivated ? MEI_MAESTRO_BONUS : 0,
+      progress: maestroActivated ? null : `${input.assists}/${MEI_MAESTRO_THRESHOLD} assistências`,
     };
     if (maestroActivated) {
-      gross += maestroBonus;
+      gross += MEI_MAESTRO_BONUS;
     }
 
     return {
@@ -198,69 +201,30 @@ export function calculatePositionBreakdown(input: PositionBreakdownInput): Posit
       events,
       specialBonus,
       grossBonus: gross,
-      cap: setting("meiBonusCap", 6),
-      appliedBonus: Math.min(gross, setting("meiBonusCap", 6)),
-      capReached: gross > setting("meiBonusCap", 6),
+      cap: null,
+      appliedBonus: gross,
+      capReached: false,
     };
   }
 
-  if (slotRole === "ALA") {
-    const events: PositionBonusEvent[] = [];
-    const goalValue = Math.round(input.goals * setting("alaGoalBonus", 0.5) * 100) / 100;
-    const assistValue = Math.round(input.assists * setting("alaAssistBonus", 0.5) * 100) / 100;
-    const cleanValue = Math.round(input.defensiveCleanGames * setting("alaCleanSheetBonus", 0.5) * 100) / 100;
-    const protectedValue = Math.round(input.defensiveOneGoalGames * setting("alaOneGoalBonus", 0.25) * 100) / 100;
-    if (input.goals > 0) events.push({ label: "Participação com gol", count: input.goals, value: goalValue });
-    if (input.assists > 0) events.push({ label: "Participação com assistência", count: input.assists, value: assistValue });
-    if (input.defensiveCleanGames > 0) events.push({ label: "Recomposição com clean sheet", count: input.defensiveCleanGames, value: cleanValue });
-    if (input.defensiveOneGoalGames > 0) events.push({ label: "Recomposição com 1 gol sofrido", count: input.defensiveOneGoalGames, value: protectedValue });
-    let gross = goalValue + assistValue + cleanValue + protectedValue;
-    const attackThreshold = setting("alaAttackThreshold", 2);
-    const defenseThreshold = setting("alaDefenseThreshold", 2);
-    const vaiEVoltaActivated = input.goals + input.assists >= attackThreshold
-      && input.defensiveCleanGames + input.defensiveOneGoalGames >= defenseThreshold;
-    const vaiEVoltaBonus = setting("alaVaiEVoltaBonus", 2);
-    const specialBonus: SpecialBonus = {
-      name: "Vai e Volta",
-      activated: vaiEVoltaActivated,
-      value: vaiEVoltaActivated ? vaiEVoltaBonus : 0,
-      progress: vaiEVoltaActivated ? null : `${Math.min(input.goals + input.assists, attackThreshold)}/${attackThreshold} ataque · ${Math.min(input.defensiveCleanGames + input.defensiveOneGoalGames, defenseThreshold)}/${defenseThreshold} proteção`,
-    };
-    if (vaiEVoltaActivated) gross += vaiEVoltaBonus;
-    const cap = setting("alaBonusCap", 6);
-    return {
-      position: "ALA",
-      events,
-      specialBonus,
-      grossBonus: Math.round(gross * 100) / 100,
-      cap,
-      appliedBonus: Math.round(Math.min(gross, cap) * 100) / 100,
-      capReached: gross > cap,
-    };
-  }
-
-  // ATA — bônus por gol + Artilheiro (gol básico +4 já está na base)
-  const artilheiroThreshold = setting("ataArtilheiroThreshold", ATA_ARTILHEIRO_THRESHOLD);
-  const artilheiroBonus = setting("ataArtilheiroBonus", 2);
-  const goalBonus = input.goals * setting("ataGoalBonus", 0.5);
-  const artilheiroActivated = input.goals >= artilheiroThreshold;
+  // ATA — somente Artilheiro (gol básico +4 já está na base)
+  const artilheiroActivated = input.goals >= ATA_ARTILHEIRO_THRESHOLD;
   const specialBonus: SpecialBonus = {
     name: "Artilheiro",
     activated: artilheiroActivated,
-    value: artilheiroActivated ? artilheiroBonus : 0,
-    progress: artilheiroActivated ? null : `${input.goals}/${artilheiroThreshold} gols`,
+    value: artilheiroActivated ? ATA_ARTILHEIRO_BONUS : 0,
+    progress: artilheiroActivated ? null : `${input.goals}/${ATA_ARTILHEIRO_THRESHOLD} gols`,
   };
-  const gross = goalBonus + (artilheiroActivated ? artilheiroBonus : 0);
-  const cap = setting("ataBonusCap", 4);
+  const gross = artilheiroActivated ? ATA_ARTILHEIRO_BONUS : 0;
 
   return {
     position: "ATA",
-    events: input.goals > 0 ? [{ label: "Bônus por gol", count: input.goals, value: goalBonus }] : [],
+    events: [],
     specialBonus,
     grossBonus: gross,
-    cap,
-    appliedBonus: Math.min(gross, cap),
-    capReached: gross > cap,
+    cap: null,
+    appliedBonus: gross,
+    capReached: false,
   };
 }
 

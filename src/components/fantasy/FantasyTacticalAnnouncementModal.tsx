@@ -8,14 +8,14 @@ export function FantasyTacticalAnnouncementModal() {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    const seen = localStorage.getItem("fantasy_tactical_v6_wing_seen");
+    const seen = localStorage.getItem("fantasy_tactical_v4_role_scoring_seen");
     if (!seen) {
       setIsOpen(true);
     }
   }, []);
 
   const handleClose = () => {
-    localStorage.setItem("fantasy_tactical_v6_wing_seen", "true");
+    localStorage.setItem("fantasy_tactical_v4_role_scoring_seen", "true");
     setIsOpen(false);
   };
 
@@ -54,7 +54,7 @@ export function FantasyTacticalAnnouncementModal() {
         </div>
 
         <p className="text-xs text-muted leading-relaxed mb-4">
-          A partir da Rodada 4, ALA é uma posição própria. Escale <strong>1 GOL, 2 DEF</strong> e escolha entre as formações Equilibrada, Clássica, Pelas pontas ou Ofensiva. A vaga certa ativa o bônus BQ v6.
+          Escale <strong>1 GOL, 2 DEF</strong> e complete com <strong>2 MEI/ALA + 1 ATA</strong> ou <strong>1 MEI/ALA + 2 ATA</strong>. O que acontece em campo dá pontos-base; a vaga certa ativa o bônus.
         </p>
 
         {/* Grid de Novidades */}
@@ -67,47 +67,31 @@ export function FantasyTacticalAnnouncementModal() {
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-black text-blue-300">Zaga & Proteção (DEF)</span>
-                <span className="font-black text-accent text-[10px]">+1,25 / +0,5 pts</span>
+                <span className="font-black text-accent text-[10px]">+1,5 / +0,5 pts</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Na vaga DEF, jogar na linha sem sofrer gol vale <strong>+1,25</strong>; sofrer exatamente um vale <strong>+0,5</strong>. Três clean sheets ativam Muralha (+2,5 uma vez), com teto de <strong>+8</strong>.
+                Na vaga DEF, jogar na linha sem sofrer gol vale <strong>+1,5</strong>; sofrer exatamente um vale <strong>+0,5</strong>. Três clean sheets ativam Muralha (+3 uma vez), sempre com teto de <strong>+10</strong>.
               </p>
             </div>
           </div>
 
-          {/* 2. Meio */}
+          {/* 2. Meio / Ala */}
           <div className="flex items-start gap-3 rounded-2xl border border-warning/20 bg-warning/10 p-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-warning/20 text-warning">
               <Target className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-black text-warning">Armação & Passes (MEI)</span>
-                <span className="font-black text-accent text-[10px]">+0,75 / assist</span>
+                <span className="font-black text-warning">Armação & Passes (MEI/ALA)</span>
+                <span className="font-black text-accent text-[10px]">+3,5 pts / assist + bônus</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Na vaga MEI, cada assistência recebe <strong>+0,75</strong>. Com 2+ assistências, há <strong>+2,5</strong> de Maestro, respeitando o teto de +6.
+                Assistência vale <strong>+2,5 pts base</strong>; na vaga MEI recebe +1 e chega a <strong>+3,5 pts</strong>. Com 2+ assistências, ainda há <strong>+3,0 pts</strong> de Maestro.
               </p>
             </div>
           </div>
 
-          {/* 3. Alas */}
-          <div className="flex items-start gap-3 rounded-2xl border border-violet-500/20 bg-violet-500/10 p-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-500/20 text-violet-300">
-              <Sparkles className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-black text-violet-300">Vai e Volta (ALA)</span>
-                <span className="font-black text-accent text-[10px]">Teto +6</span>
-              </div>
-              <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Gol, assistência e recomposição somam bônus. Duas ações ofensivas e duas defensivas ativam <strong>+2</strong> de Vai e Volta.
-              </p>
-            </div>
-          </div>
-
-          {/* 4. Atacantes */}
+          {/* 3. Atacantes */}
           <div className="flex items-start gap-3 rounded-2xl border border-danger/20 bg-danger/10 p-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-danger/20 text-danger">
               <Trophy className="h-4 w-4" />
@@ -115,15 +99,15 @@ export function FantasyTacticalAnnouncementModal() {
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-black text-danger">Finalização (ATA)</span>
-                <span className="font-black text-accent text-[10px]">+0,5 / gol</span>
+                <span className="font-black text-accent text-[10px]">4,0 pts / gol + bônus</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Além dos 4,0 pts base, cada gol na vaga ATA recebe <strong>+0,5</strong>. Com 2+ gols, Artilheiro dá <strong>+2</strong>, com teto de +4.
+                Gol vale <strong>4,0 pts base</strong>. Na vaga ATA, 2+ gols rendem <strong>+3,0 pts</strong> de Artilheiro da Rodada.
               </p>
             </div>
           </div>
 
-          {/* 5. Goleiros no Rodízio */}
+          {/* 4. Goleiros no Rodízio */}
           <div className="flex items-start gap-3 rounded-2xl border border-accent/20 bg-accent/10 p-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/20 text-accent">
               <Users className="h-4 w-4" />
@@ -143,7 +127,7 @@ export function FantasyTacticalAnnouncementModal() {
         {/* Chamada para o perfil */}
         <div className="rounded-2xl border border-accent/35 bg-gradient-to-r from-accent/15 via-[#0c2415] to-surface p-3 mb-4">
           <p className="text-[11px] font-bold text-foreground leading-snug">
-            ⚠️ <strong>Confira sua posição:</strong> antes do fechamento da Rodada 4, escolha entre DEF, MEI, ALA ou ATA. Depois disso, a posição fica travada na temporada; administradores podem corrigir exceções.
+            ⚠️ <strong>Atualize sua Posição no Perfil:</strong> Vá em <em>Meu Perfil</em> e garanta que sua tag (DEF, MEI/ALA ou ATA) está correta para pontuar com os bônus!
           </p>
         </div>
 

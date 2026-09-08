@@ -486,7 +486,6 @@ export function CallupBoard({
                       className="sm:col-span-3 rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-accent outline-none"
                     >
                       <option value="midfield">Meio-Campo</option>
-                      <option value="wing">Ala</option>
                       <option value="offensive">Ataque</option>
                       <option value="defensive">Defesa</option>
                     </select>

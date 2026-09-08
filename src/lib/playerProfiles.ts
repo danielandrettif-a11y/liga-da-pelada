@@ -14,15 +14,9 @@ export const PLAYER_PROFILE_OPTIONS: Array<{
   },
   {
     value: "midfield",
-    label: "Meio-Campo",
-    shortLabel: "MEI",
-    description: "Organiza o jogo e cria oportunidades com assistências.",
-  },
-  {
-    value: "wing",
-    label: "Ala",
-    shortLabel: "ALA",
-    description: "Ataca pelos lados e recompõe para proteger o time.",
+    label: "Meio / Ala",
+    shortLabel: "MEI/ALA",
+    description: "Ajuda na marcação e na criação das jogadas.",
   },
   {
     value: "defensive",
@@ -40,6 +34,5 @@ export function getPlayerProfile(profile?: PlayerProfile | null) {
 export const PLAYER_PROFILE_STYLES: Record<PlayerProfile, string> = {
   offensive: "bg-danger/10 text-danger border-danger/20",
   midfield: "bg-warning/10 text-warning border-warning/20",
-  wing: "bg-violet-500/10 text-violet-300 border-violet-500/20",
   defensive: "bg-blue-500/10 text-blue-400 border-blue-500/20",
 };

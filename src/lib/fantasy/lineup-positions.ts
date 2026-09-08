@@ -1,9 +1,7 @@
 import type { FantasySettings } from "./config";
 import { calculatePositionBonusValue, type PositionBreakdownInput } from "./position-breakdown";
 
-export type FantasySlotRole = "GOL" | "DEF" | "MEI" | "ALA" | "ATA";
-export type FantasyFormation = "balanced" | "classic" | "wide" | "offensive";
-export type LegacyFantasyFormation = "2-1-2" | "2-2-1";
+export type FantasySlotRole = "GOL" | "DEF" | "MEI" | "ATA";
 export type FantasyPlayerProfile = string | null | undefined;
 
 export type FantasyLineupSlot = {
@@ -14,47 +12,23 @@ export type FantasyLineupSlot = {
 
 export function getFantasySlotRoles(
   playersPerTeam: number,
-  formation: FantasyFormation | LegacyFantasyFormation,
+  formation: "2-1-2" | "2-2-1",
 ): FantasySlotRole[] {
-  const normalized = normalizeFantasyFormation(formation);
-  const fieldRoles: Record<FantasyFormation, FantasySlotRole[]> = {
-    balanced: ["ATA", "ALA", "MEI", "DEF", "DEF"],
-    classic: ["ATA", "MEI", "MEI", "DEF", "DEF"],
-    wide: ["ATA", "ALA", "ALA", "DEF", "DEF"],
-    offensive: ["ATA", "ATA", "MEI", "DEF", "DEF"],
-  };
+  if (playersPerTeam === 6) {
+    return formation === "2-1-2"
+      ? ["ATA", "ATA", "MEI", "DEF", "DEF", "GOL"]
+      : ["ATA", "MEI", "MEI", "DEF", "DEF", "GOL"];
+  }
 
-  if (playersPerTeam === 5) return [...fieldRoles[normalized]];
-  if (playersPerTeam === 6) return [...fieldRoles[normalized], "GOL"];
+  if (playersPerTeam === 5) {
+    return formation === "2-1-2"
+      ? ["ATA", "ATA", "MEI", "DEF", "DEF"]
+      : ["ATA", "MEI", "MEI", "DEF", "DEF"];
+  }
 
   return Array.from({ length: playersPerTeam }, (_, index) =>
     index === playersPerTeam - 1 ? "GOL" : "MEI",
   );
-}
-
-export function normalizeFantasyFormation(
-  formation: FantasyFormation | LegacyFantasyFormation,
-): FantasyFormation {
-  if (formation === "2-1-2") return "offensive";
-  if (formation === "2-2-1") return "classic";
-  return formation;
-}
-
-export function inferFantasyFormation(
-  playersPerTeam: number,
-  roles: Array<string | null | undefined>,
-): FantasyFormation | null {
-  for (const formation of ["balanced", "classic", "wide", "offensive"] as const) {
-    const expected = getFantasySlotRoles(playersPerTeam, formation);
-    if (roles.length === expected.length && roles.every((role, index) => !role || role === expected[index])) {
-      return formation;
-    }
-  }
-  return null;
-}
-
-export function isValidFantasyFormationRoles(playersPerTeam: number, roles: string[]): boolean {
-  return inferFantasyFormation(playersPerTeam, roles) !== null;
 }
 
 export function isCorrectFantasySlot(
@@ -66,17 +40,15 @@ export function isCorrectFantasySlot(
   if (slotRole === "GOL") return true;
   if (slotRole === "DEF") return playerProfile === "defensive";
   if (slotRole === "MEI") return playerProfile === "midfield";
-  if (slotRole === "ALA") return playerProfile === "wing";
   return playerProfile === "offensive";
 }
 
 /**
- * Calcula o bônus posicional BQ v6.
+ * Calcula o bônus posicional BQ v5.
  *
- * DEF: +1.25 por clean sheet, +0.5 por partida com 1 gol, Muralha +2.5 (≥3 CS), teto 8.
- * MEI: +0.75 por assistência, Maestro +2.5 (≥2 assistências), teto 6.
- * ALA: recompensa equilibrada por ataque e recomposição, Vai e Volta +2, teto 6.
- * ATA: +0.5 por gol, Artilheiro +2 (≥2 gols), teto 4.
+ * DEF: +1.5 por clean sheet, +0.5 por partida com 1 gol, Muralha +3 (≥3 CS), teto 10.
+ * MEI: +1 por assistência, Maestro +3 (≥2 assistências).
+ * ATA: Artilheiro +3 (≥2 gols).
  * GOL: +4 por clean sheet quando realmente atuou no gol.
  *
  * Delega para position-breakdown.ts para manter uma fonte única.
@@ -111,7 +83,6 @@ export function calculateFantasyPositionPackageBonus(
     goalkeeperGames: input.goalkeeperGames,
     cleanSheets: input.cleanSheets,
     suppressGoalkeeperRewards: input.suppressGoalkeeperRewards ?? _settings.suppressGoalkeeperRewards,
-    settings: _settings,
   };
 
   return calculatePositionBonusValue(breakdownInput);
