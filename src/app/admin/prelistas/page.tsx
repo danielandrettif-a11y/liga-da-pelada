@@ -70,6 +70,14 @@ export default async function PrelistasPage() {
                 badge: "bg-warning/15 text-warning",
                 action: "text-warning",
               }
+            : hasFriendlyPrelist
+              ? {
+                  card: "border-sky-400/35 bg-gradient-to-br from-sky-400/10 via-surface to-background",
+                  tile: "border-sky-400/30 bg-sky-400/10",
+                  text: "text-sky-300",
+                  badge: "bg-sky-400/15 text-sky-300",
+                  action: "text-sky-300",
+                }
             : {
                 card: "border-accent/35 bg-gradient-to-br from-accent/10 via-surface to-background",
                 tile: "border-accent/30 bg-accent/10",
