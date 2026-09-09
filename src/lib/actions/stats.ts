@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_cache } from "next/cache";
 import { supabase } from "../supabase";
 import { getActiveSeason, getActiveSeasonRoundIds } from "./seasons";
 import { getAdminClient, getCurrentAccount } from "../auth";
@@ -365,7 +366,7 @@ export async function calculateRoundStats(roundId: string) {
   }
 }
 
-export async function getRanking() {
+async function getRankingUncached() {
   const season = await getActiveSeason();
   if (!season) return [];
 
@@ -492,6 +493,15 @@ export async function getRanking() {
   });
 
   return ranking;
+}
+
+const getRankingCached = unstable_cache(getRankingUncached, ["official-ranking"], {
+  revalidate: 60,
+  tags: ["ranking"],
+});
+
+export async function getRanking() {
+  return getRankingCached();
 }
 
 export async function getRoundStatistics(roundId: string): Promise<RoundStatistics | null> {

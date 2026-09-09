@@ -10,8 +10,16 @@ export async function getDashboardData() {
     const season = await getActiveSeason();
     if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
 
+    const { data: readModelData, error: readModelError } = await supabase.rpc("get_home_read_model", {
+      p_season_id: season.id,
+      p_league_id: season.league_id,
+    });
+    const readModel = !readModelError && readModelData && typeof readModelData === "object"
+      ? readModelData as any
+      : null;
+
     // 1. Próxima Rodada (draft ou active)
-    const nextRoundPromise = supabase
+    const nextRoundPromise = readModel ? Promise.resolve({ data: readModel.nextRound }) : supabase
       .from("rounds")
       .select("*, round_players(count)")
       .in("status", ["draft", "active"])
@@ -23,7 +31,7 @@ export async function getDashboardData() {
       .single();
 
     // 2. Última Rodada (finished) com partidas e times
-    const lastRoundPromise = supabase
+    const lastRoundPromise = readModel ? Promise.resolve({ data: readModel.lastRound }) : supabase
       .from("rounds")
       .select(`
         *,
@@ -44,7 +52,7 @@ export async function getDashboardData() {
       .limit(1)
       .single();
 
-    const nextFriendlyPromise = supabase
+    const nextFriendlyPromise = readModel ? Promise.resolve({ data: readModel.nextFriendly }) : supabase
       .from("rounds")
       .select("*, round_players(count)")
       .in("status", ["draft", "active"])
@@ -54,7 +62,7 @@ export async function getDashboardData() {
       .limit(1)
       .maybeSingle();
 
-    const liveMatchPromise = supabase
+    const liveMatchPromise = readModel ? Promise.resolve({ data: readModel.liveMatch }) : supabase
       .from("matches")
       .select(`
         id,
@@ -73,13 +81,13 @@ export async function getDashboardData() {
       .limit(1)
       .maybeSingle();
 
-    const leaguePromise = supabase
+    const leaguePromise = readModel ? Promise.resolve({ data: readModel.league }) : supabase
       .from("leagues")
       .select("match_duration, preseason_enabled, stadium_name, stadium_map_url, event_duration_minutes")
       .eq("id", season.league_id)
       .single();
 
-    const activeCallupsPromise = supabase
+    const activeCallupsPromise = readModel ? Promise.resolve({ data: readModel.activeCallups }) : supabase
       .from("callups")
       .select("id, date, start_time, stadium_name, stadium_map_url, round_type, capacity, waitlist_capacity, callup_entries(player_id, status, position), round:round_id(id, status, matches(status))")
       .eq("league_id", season.league_id)
@@ -172,10 +180,10 @@ export async function getDashboardData() {
       };
     }
 
-    const matchingOfficialCallup = mappedCallups.find((callup) =>
+    const matchingOfficialCallup = mappedCallups.find((callup: any) =>
       callup.roundType === "official" && (callup.roundId === nextRoundData?.id || callup.date === nextRoundData?.date),
     );
-    const matchingFriendlyCallup = mappedCallups.find((callup) =>
+    const matchingFriendlyCallup = mappedCallups.find((callup: any) =>
       callup.roundType === "friendly" && (callup.roundId === nextFriendlyData?.id || callup.date === nextFriendlyData?.date),
     );
     const roundPlayersCount = nextRoundData?.round_players?.[0]?.count || 0;

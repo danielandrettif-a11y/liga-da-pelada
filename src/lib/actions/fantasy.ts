@@ -5,8 +5,14 @@ import { getCurrentAccount } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
-import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget, type FantasySettings } from "@/lib/fantasy/config";
+import {
+  DEFAULT_FANTASY_SETTINGS,
+  getFantasyInitialBudget,
+  normalizeFantasySettingsRow,
+  type FantasySettings,
+} from "@/lib/fantasy/config";
 import { type FantasyMarketHealth } from "@/lib/fantasy/market-v11";
+import { parseFantasyMarketReadModel } from "@/lib/fantasy/market-read-model";
 import {
   calculateCostBenefit,
   calculateExpectedFantasyPoints,
@@ -241,78 +247,7 @@ export async function getFantasyDashboard() {
       .maybeSingle(),
   ]);
 
-  const settings: FantasySettings = settingsRow
-    ? {
-        roleScoringActive: true,
-        currencyName: settingsRow.currency_name,
-        initialBudget: Number(settingsRow.initial_budget),
-        initialPlayerPrice: Number(settingsRow.initial_player_price),
-        minPlayerPrice: Number(settingsRow.min_player_price),
-        maxPlayerPrice: Number(settingsRow.max_player_price),
-        goalPoints: Number(settingsRow.goal_points),
-        attackerGoalPoints: Number(settingsRow.attacker_goal_points ?? 5),
-        assistPoints: Number(settingsRow.assist_points),
-        winPoints: Number(settingsRow.win_points),
-        drawPoints: Number(settingsRow.draw_points ?? 1),
-        lossPoints: Number(settingsRow.loss_points ?? -1),
-        goalkeeperLossPoints: Number(settingsRow.goalkeeper_loss_points ?? settingsRow.loss_points ?? -1),
-        goalkeeperAppearancePoints: Number(settingsRow.goalkeeper_appearance_points ?? 3),
-        goalConcededPoints: Number(settingsRow.goal_conceded_points ?? -1),
-        teamGoalConcededPoints: Number(settingsRow.team_goal_conceded_points ?? -1),
-        ownGoalPoints: Number(settingsRow.own_goal_points ?? -3),
-        captainMultiplier: Number(settingsRow.captain_multiplier),
-        topScorerPredictionPoints: Number(settingsRow.top_scorer_prediction_points),
-        topAssistPredictionPoints: Number(settingsRow.top_assist_prediction_points),
-        topTeamPredictionPoints: Number(settingsRow.top_team_prediction_points),
-        recentWeight: Number(settingsRow.recent_weight),
-        kingOfWinsPoints: Number(settingsRow.king_of_wins_points ?? 6),
-        mvpPredictionPoints: Number(settingsRow.mvp_prediction_points ?? 8),
-        betOfRoundPoints: Number(settingsRow.bet_of_round_points ?? 8),
-        betRequiredRanks: [1, 2, 3, 4].map((band) =>
-          Number(settingsRow[`bet_rank_band_${band}`] ?? 6 - band)
-        ) as [number, number, number, number],
-        scoreGoalRewards: [1, 2, 3, 4].map((band) =>
-          Number(settingsRow[`score_goal_reward_band_${band}`] ?? [7, 6, 4, 3][band - 1])
-        ) as [number, number, number, number],
-        winRateWeight: Number(settingsRow.win_rate_weight),
-        historicalWeight: Number(settingsRow.historical_weight),
-        consistencyWeight: Number(settingsRow.consistency_weight),
-        smoothingGames: Number(settingsRow.smoothing_games),
-        maxPriceIncrease: Number(settingsRow.max_price_increase),
-        maxPriceDecrease: Number(settingsRow.max_price_decrease),
-        marketUpShare: Number(settingsRow.market_up_share ?? DEFAULT_FANTASY_SETTINGS.marketUpShare),
-        marketStableShare: Number(settingsRow.market_stable_share ?? DEFAULT_FANTASY_SETTINGS.marketStableShare),
-        marketMinIncrease: Number(settingsRow.market_min_increase ?? DEFAULT_FANTASY_SETTINGS.marketMinIncrease),
-        marketMinDecrease: Number(settingsRow.market_min_decrease ?? DEFAULT_FANTASY_SETTINGS.marketMinDecrease),
-        competitivePriceFloor: Number(settingsRow.competitive_price_floor ?? DEFAULT_FANTASY_SETTINGS.competitivePriceFloor),
-        competitivePriceCeiling: Number(settingsRow.competitive_price_ceiling ?? DEFAULT_FANTASY_SETTINGS.competitivePriceCeiling),
-        competitivePriceCurve: Number(settingsRow.competitive_price_curve ?? DEFAULT_FANTASY_SETTINGS.competitivePriceCurve),
-        marketRoundWeight: Number(settingsRow.market_round_weight ?? DEFAULT_FANTASY_SETTINGS.marketRoundWeight),
-        marketAttendanceWeight: Number(settingsRow.market_attendance_weight ?? DEFAULT_FANTASY_SETTINGS.marketAttendanceWeight),
-        marketRepriceStrength: Number(settingsRow.market_reprice_strength ?? DEFAULT_FANTASY_SETTINGS.marketRepriceStrength),
-        marketInitialUpCap: Number(settingsRow.market_initial_up_cap ?? DEFAULT_FANTASY_SETTINGS.marketInitialUpCap),
-        marketInitialDownCap: Number(settingsRow.market_initial_down_cap ?? DEFAULT_FANTASY_SETTINGS.marketInitialDownCap),
-        marketCapStep: Number(settingsRow.market_cap_step ?? DEFAULT_FANTASY_SETTINGS.marketCapStep),
-        marketVersion: Number(settingsRow.market_version ?? 10),
-        marketDifficultyMultiplier: Number(settingsRow.market_difficulty_multiplier ?? DEFAULT_FANTASY_SETTINGS.marketDifficultyMultiplier),
-        marketDifficultyMin: Number(settingsRow.market_difficulty_min ?? DEFAULT_FANTASY_SETTINGS.marketDifficultyMin),
-        marketDifficultyMax: Number(settingsRow.market_difficulty_max ?? DEFAULT_FANTASY_SETTINGS.marketDifficultyMax),
-        marketDifficultyStep: Number(settingsRow.market_difficulty_step ?? DEFAULT_FANTASY_SETTINGS.marketDifficultyStep),
-        marketTargetEliteAffordability: Number(settingsRow.market_target_elite_affordability ?? DEFAULT_FANTASY_SETTINGS.marketTargetEliteAffordability),
-        marketTargetMedianEliteRatio: Number(settingsRow.market_target_median_elite_ratio ?? DEFAULT_FANTASY_SETTINGS.marketTargetMedianEliteRatio),
-        marketRecoveryBonusStrength: Number(settingsRow.market_recovery_bonus_strength ?? DEFAULT_FANTASY_SETTINGS.marketRecoveryBonusStrength),
-        marketExpensiveRiskStrength: Number(settingsRow.market_expensive_risk_strength ?? DEFAULT_FANTASY_SETTINGS.marketExpensiveRiskStrength),
-        marketBreakoutRepriceStrength: Number(settingsRow.market_breakout_reprice_strength ?? DEFAULT_FANTASY_SETTINGS.marketBreakoutRepriceStrength),
-        marketCheapPercentile: Number(settingsRow.market_cheap_percentile ?? DEFAULT_FANTASY_SETTINGS.marketCheapPercentile),
-        marketElitePercentile: Number(settingsRow.market_elite_percentile ?? DEFAULT_FANTASY_SETTINGS.marketElitePercentile),
-        marketBreakoutRoundPercentile: Number(settingsRow.market_breakout_round_percentile ?? DEFAULT_FANTASY_SETTINGS.marketBreakoutRoundPercentile),
-        marketBadRoundPercentile: Number(settingsRow.market_bad_round_percentile ?? DEFAULT_FANTASY_SETTINGS.marketBadRoundPercentile),
-        budgetSoftCapMultiplier: Number(settingsRow.budget_soft_cap_multiplier ?? DEFAULT_FANTASY_SETTINGS.budgetSoftCapMultiplier),
-        budgetHardCapMultiplier: Number(settingsRow.budget_hard_cap_multiplier ?? DEFAULT_FANTASY_SETTINGS.budgetHardCapMultiplier),
-        budgetExcessRetention: Number(settingsRow.budget_excess_retention ?? DEFAULT_FANTASY_SETTINGS.budgetExcessRetention),
-        minSampleForRadar: Number(settingsRow.min_sample_for_radar ?? 3),
-      }
-    : DEFAULT_FANTASY_SETTINGS;
+  const settings = normalizeFantasySettingsRow(settingsRow);
 
   if (
     !fantasySeason ||
@@ -331,16 +266,25 @@ export async function getFantasyDashboard() {
     };
   }
 
-  const { data: fantasyRoundRows } = await account.client
-    .from("fantasy_rounds")
-    .select(
-      "*, round:round_id(id, number, date, start_time, status, round_type, preparation_stage, suppress_goalkeeper_rewards, teams(id, name, color), matches(id, status))"
-    )
-    .eq("fantasy_season_id", fantasySeason.id);
-  const { data: marketHealthRow, error: marketHealthError } = await account.client.rpc(
-    "get_fantasy_market_v11_public_health",
-    { p_fantasy_season_id: fantasySeason.id },
-  );
+  const [
+    { data: fantasyRoundRows },
+    { data: marketHealthRow, error: marketHealthError },
+    { data: marketReadModelData, error: marketReadModelError },
+  ] = await Promise.all([
+    account.client
+      .from("fantasy_rounds")
+      .select(
+        "*, round:round_id(id, number, date, start_time, status, round_type, preparation_stage, suppress_goalkeeper_rewards, teams(id, name, color), matches(id, status))"
+      )
+      .eq("fantasy_season_id", fantasySeason.id),
+    account.client.rpc("get_fantasy_market_v11_public_health", {
+      p_fantasy_season_id: fantasySeason.id,
+    }),
+    account.client.rpc("get_fantasy_market_read_model", {
+      p_fantasy_season_id: fantasySeason.id,
+    }),
+  ]);
+  const marketReadModel = parseFantasyMarketReadModel(marketReadModelData, Boolean(marketReadModelError));
   const marketHealth: FantasyPublicMarketHealth | null = marketHealthError || !marketHealthRow
     ? null
     : {
@@ -549,8 +493,12 @@ export async function getFantasyDashboard() {
     cardDashboard,
     playerCosmetics,
   ] = await Promise.all([
-    account.client.from("fantasy_player_prices").select("*").eq("fantasy_season_id", fantasySeason.id),
-    officialRoundIds.length
+    marketReadModel
+      ? Promise.resolve({ data: marketReadModel.prices || [] })
+      : account.client.from("fantasy_player_prices").select("*").eq("fantasy_season_id", fantasySeason.id),
+    marketReadModel
+      ? Promise.resolve({ data: marketReadModel.stats || [] })
+      : officialRoundIds.length
       ? account.client
           .from("player_round_stats")
           .select("round_id, player_id, goals, assists, wins, draws, losses, own_goals, games, goalkeeper_games, goals_conceded, clean_sheets, defensive_clean_games, defensive_one_goal_games, team_goals_conceded")
@@ -571,18 +519,22 @@ export async function getFantasyDashboard() {
     matchIds.length
       ? account.client.from("match_events").select("player_id, assist_player_id, is_own_goal").in("match_id", matchIds)
       : Promise.resolve({ data: [] as any[] }),
-    account.client
-      .from("players")
-      .select("id, name, avatar_url, player_profile, member_category, is_selectable")
-      .eq("is_selectable", true)
-      .eq("member_category", "player"),
-    account.client
-      .from("fantasy_player_price_history")
-      .select(
-        "player_id, fantasy_round_id, price_before, price_after, price_change, variation_rate, market_band, round_rank, round_points, goals, assists, wins, games, created_at"
-      )
-      .eq("fantasy_season_id", fantasySeason.id)
-      .order("created_at", { ascending: false }),
+    marketReadModel
+      ? Promise.resolve({ data: marketReadModel.players || [] })
+      : account.client
+          .from("players")
+          .select("id, name, avatar_url, player_profile, member_category, is_selectable")
+          .eq("is_selectable", true)
+          .eq("member_category", "player"),
+    marketReadModel
+      ? Promise.resolve({ data: marketReadModel.history || [] })
+      : account.client
+          .from("fantasy_player_price_history")
+          .select(
+            "player_id, fantasy_round_id, price_before, price_after, price_change, variation_rate, market_band, round_rank, round_points, goals, assists, wins, games, created_at"
+          )
+          .eq("fantasy_season_id", fantasySeason.id)
+          .order("created_at", { ascending: false }),
     latestFinishedRound
       ? account.client
           .from("fantasy_lineups")

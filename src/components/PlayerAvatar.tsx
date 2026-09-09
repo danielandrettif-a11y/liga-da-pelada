@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import { getInitials } from "@/lib/utils";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { X, ZoomIn } from "@/components/icons";
@@ -16,6 +17,7 @@ type PlayerAvatarProps = {
   frameKey?: string | null;
   auraKey?: string | null;
   frameClass?: string;
+  sizes?: string;
 };
 
 export function PlayerAvatar({
@@ -27,6 +29,7 @@ export function PlayerAvatar({
   frameKey,
   auraKey,
   frameClass,
+  sizes = "(max-width: 640px) 80px, 96px",
 }: PlayerAvatarProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -46,6 +49,16 @@ export function PlayerAvatar({
   const frameEffect = frameClass || cosmeticFrameClass(frameKey);
   const auraEffect = cosmeticAuraClass(auraKey);
   const auraVariant = cosmeticAuraVariant(auraKey);
+  const canOptimize = Boolean(avatarUrl && (
+    avatarUrl.startsWith("/") || (() => {
+      try {
+        const configured = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        return Boolean(configured && new URL(avatarUrl).hostname === new URL(configured).hostname);
+      } catch {
+        return false;
+      }
+    })()
+  ));
 
   function handleClick(e: React.MouseEvent) {
     if (!isInteractive) return;
@@ -77,12 +90,23 @@ export function PlayerAvatar({
 
         {/* Foto com overflow-hidden para recorte circular */}
         <div className={`player-avatar__photo relative z-10 flex h-full w-full items-center justify-center overflow-hidden rounded-[inherit] ${frameEffect ? `${frameEffect} ` : ""}`}>
-          {hasImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
+          {hasImage && canOptimize ? (
+            <Image
+              src={avatarUrl!}
+              alt={`Foto de ${name}`}
+              fill
+              sizes={sizes}
+              quality={75}
+              className={`player-avatar__image object-cover ${imageClassName}`}
+              onError={() => setImageFailed(true)}
+            />
+          ) : hasImage ? (
             <img
               src={avatarUrl!}
               alt={`Foto de ${name}`}
               className={`player-avatar__image h-full w-full object-cover ${imageClassName}`}
+              loading="lazy"
+              decoding="async"
               onError={() => setImageFailed(true)}
             />
           ) : (
@@ -135,12 +159,11 @@ export function PlayerAvatar({
 
               {/* Imagem Ampliada */}
               <div className="relative mt-2 aspect-square w-64 max-w-full overflow-hidden rounded-2xl border-2 border-accent shadow-[0_0_30px_rgba(204,255,0,0.25)]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={avatarUrl!}
-                  alt={`Foto de ${name}`}
-                  className="h-full w-full object-cover"
-                />
+                {canOptimize ? (
+                  <Image src={avatarUrl!} alt={`Foto de ${name}`} fill sizes="256px" quality={90} className="object-cover" />
+                ) : (
+                  <img src={avatarUrl!} alt={`Foto de ${name}`} className="h-full w-full object-cover" decoding="async" />
+                )}
               </div>
 
               {/* Informações do Jogador */}

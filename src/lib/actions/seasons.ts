@@ -1,7 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { cache } from "react";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { supabase } from "../supabase";
 import { createClient as createServerClient } from "../supabase/server";
 import type { RoundType, Season, SeasonPlayerSummary, SeasonSummary } from "../types";
@@ -9,7 +8,7 @@ import { getAdminClient } from "../auth";
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerClient>>;
 
-const getActiveSeasonCached = cache(async (leagueId?: string) => {
+const getActiveSeasonCached = unstable_cache(async (leagueId?: string) => {
   let resolvedLeagueId = leagueId;
 
   if (!resolvedLeagueId) {
@@ -34,13 +33,13 @@ const getActiveSeasonCached = cache(async (leagueId?: string) => {
 
   if (error || !data) return null;
   return data as Season;
-});
+}, ["active-season"], { revalidate: 300, tags: ["season"] });
 
 export async function getActiveSeason(leagueId?: string) {
   return getActiveSeasonCached(leagueId);
 }
 
-const getActiveSeasonRoundIdsCached = cache(async (leagueId: string | undefined, roundType: RoundType) => {
+const getActiveSeasonRoundIdsCached = unstable_cache(async (leagueId: string | undefined, roundType: RoundType) => {
   const season = await getActiveSeason(leagueId);
   if (!season) return [];
 
@@ -52,13 +51,13 @@ const getActiveSeasonRoundIdsCached = cache(async (leagueId: string | undefined,
 
   if (error) return [];
   return data.map((round) => round.id as string);
-});
+}, ["active-season-round-ids"], { revalidate: 60, tags: ["rounds"] });
 
 export async function getActiveSeasonRoundIds(leagueId?: string, roundType: RoundType = "official") {
   return getActiveSeasonRoundIdsCached(leagueId, roundType);
 }
 
-export async function getLatestFinishedSeason() {
+const getLatestFinishedSeasonCached = unstable_cache(async () => {
   const { data: league } = await supabase
     .from("leagues")
     .select("id")
@@ -80,6 +79,10 @@ export async function getLatestFinishedSeason() {
 
   if (error || !data?.stats_snapshot) return null;
   return data.stats_snapshot as unknown as SeasonSummary;
+}, ["latest-finished-season"], { revalidate: 300, tags: ["season-history"] });
+
+export async function getLatestFinishedSeason() {
+  return getLatestFinishedSeasonCached();
 }
 
 async function buildSeasonSummary(
@@ -233,6 +236,10 @@ export async function finishSeason(confirmation: string) {
   revalidatePath("/rodadas");
   revalidatePath("/jogadores");
   revalidatePath("/mais");
+  revalidateTag("season", "max");
+  revalidateTag("season-history", "max");
+  revalidateTag("rounds", "max");
+  revalidateTag("ranking", "max");
 
   return {
     success: true,

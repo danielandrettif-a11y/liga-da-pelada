@@ -186,13 +186,13 @@ export default async function HomePage() {
           );
 
           const hasConfirmedPresence = callupSlides.some(
-            ({ userEntry }) => userEntry?.status === "confirmed",
+            ({ userEntry }: { userEntry: any }) => userEntry?.status === "confirmed",
           );
           // A convocação exige ação enquanto a presença ainda estiver pendente.
           // Depois da confirmação, a temporada/rodada vira a informação principal.
           const slides = (hasConfirmedPresence
-            ? [roundSlide, ...callupSlides.map(({ slide }) => slide)]
-            : [...callupSlides.map(({ slide }) => slide), roundSlide]
+            ? [roundSlide, ...callupSlides.map(({ slide }: { slide: React.ReactNode }) => slide)]
+            : [...callupSlides.map(({ slide }: { slide: React.ReactNode }) => slide), roundSlide]
           ).filter(Boolean);
 
           if (slides.length > 1) {

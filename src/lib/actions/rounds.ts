@@ -1,7 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { cache } from "react";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { supabase } from "../supabase";
 import { getActiveSeason } from "./seasons";
 import { createClient as createServerClient } from "../supabase/server";
@@ -19,7 +18,7 @@ import { drawGoalkeeperOrder } from "../goalkeeperOrder";
 import { TEAM_CREST_URLS } from "../teamPresets";
 import { scheduleCartolaRoundReminders } from "../cartola-reminder-scheduler";
 
-const getActiveLeagueCached = cache(async () => {
+const getActiveLeagueCached = unstable_cache(async () => {
   const { data, error } = await supabase
     .from("leagues")
     .select("id, players_per_team, teams_per_round, match_duration, stadium_name, stadium_map_url, event_duration_minutes, preseason_enabled")
@@ -40,16 +39,13 @@ const getActiveLeagueCached = cache(async () => {
   }
 
   return data;
-});
+}, ["active-league"], { revalidate: 300, tags: ["league"] });
 
 export async function getActiveLeague() {
   return getActiveLeagueCached();
 }
 
-export async function getRounds() {
-  const season = await getActiveSeason();
-  if (!season) return [];
-
+const getRoundsCached = unstable_cache(async (seasonId: string) => {
   const query = supabase
     .from("rounds")
     .select(`
@@ -68,7 +64,7 @@ export async function getRounds() {
       round_players (count),
       matches (count)
     `)
-    .eq("season_id", season.id)
+    .eq("season_id", seasonId)
     .eq("preparation_stage", "teams_ready");
 
   const { data, error } = await query
@@ -86,6 +82,12 @@ export async function getRounds() {
     playersCount: round.round_players?.[0]?.count || 0,
     matchesCount: round.matches?.[0]?.count || 0,
   }));
+}, ["round-history"], { revalidate: 60, tags: ["rounds"] });
+
+export async function getRounds() {
+  const season = await getActiveSeason();
+  if (!season) return [];
+  return getRoundsCached(season.id);
 }
 
 export async function getRound(id: string) {
@@ -792,6 +794,7 @@ export async function createRoundWithTeams(
     revalidatePath("/admin/prelistas");
     revalidatePath("/convocacao");
     revalidatePath("/", "layout");
+    revalidateTag("rounds", "max");
     return { success: true, roundId: round.id };
 
   } catch (err: any) {
@@ -900,6 +903,8 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     revalidatePath("/ranking");
     revalidatePath("/pagamentos");
     revalidatePath("/cartola", "layout");
+    revalidateTag("rounds", "max");
+    revalidateTag("ranking", "max");
     return { success: true };
   } catch (err: any) {
     console.error("Erro ao encerrar rodada:", err);

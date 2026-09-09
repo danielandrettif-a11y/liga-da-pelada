@@ -1,0 +1,41 @@
+name: Database types
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * 1"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  generate:
+    if: ${{ vars.ENABLE_DATABASE_TYPES == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Generate types from the remote schema
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: supabase gen types typescript --project-id "$SUPABASE_PROJECT_ID" --schema public > src/lib/database.generated.ts
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        if: ${{ vars.TYPES_APP_ID != '' }}
+        with:
+          app-id: ${{ vars.TYPES_APP_ID }}
+          private-key: ${{ secrets.TYPES_APP_PRIVATE_KEY }}
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ steps.app-token.outputs.token || github.token }}
+          commit-message: "chore(db): update generated Supabase types"
+          branch: codex/database-types
+          title: "chore(db): update generated Supabase types"
+          body: "Atualização automática dos tipos a partir do schema remoto do Supabase."

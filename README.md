@@ -16,6 +16,21 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Qualidade e desempenho
+
+```bash
+npm run typecheck
+npm test
+npm run build
+npm run audit:security
+```
+
+O workflow `Quality` executa essas verificações em cada push e pull request. Erros do servidor, erros não tratados no navegador e Core Web Vitals são emitidos como JSON nos logs. Configure `OBSERVABILITY_WEBHOOK_URL` para também encaminhá-los ao monitor escolhido.
+
+Os testes Playwright públicos rodam com `npm run test:e2e`. Os cenários administrativos exigem `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_ROUND_ID` e `E2E_MATCH_ID` de um projeto Supabase exclusivo para testes. A CI E2E é habilitada com `RUN_E2E=true`; o teste reversível de pontuação, que cria e remove um gol, exige também `E2E_ALLOW_MUTATIONS=true`.
+
+O workflow manual/semanal `Database types` atualiza `src/lib/database.generated.ts` em uma PR quando `ENABLE_DATABASE_TYPES=true`, `SUPABASE_PROJECT_ID` e `SUPABASE_ACCESS_TOKEN` estiverem configurados.
+
 ## Login com Google
 
 O aplicativo usa o Google como provedor OAuth do Supabase. Para habilitar o botão em cada ambiente:

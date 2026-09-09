@@ -154,6 +154,52 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
 
 export const FANTASY_RECENT_ROUND_WEIGHTS = [0.40, 0.25, 0.15, 0.12, 0.08] as const;
 
+const FANTASY_SETTING_COLUMNS = {
+  initialBudget: "initial_budget", initialPlayerPrice: "initial_player_price", minPlayerPrice: "min_player_price", maxPlayerPrice: "max_player_price",
+  goalPoints: "goal_points", attackerGoalPoints: "attacker_goal_points", assistPoints: "assist_points", winPoints: "win_points", drawPoints: "draw_points", lossPoints: "loss_points",
+  goalkeeperLossPoints: "goalkeeper_loss_points", goalkeeperAppearancePoints: "goalkeeper_appearance_points", goalConcededPoints: "goal_conceded_points", teamGoalConcededPoints: "team_goal_conceded_points", ownGoalPoints: "own_goal_points",
+  captainMultiplier: "captain_multiplier", topScorerPredictionPoints: "top_scorer_prediction_points", topAssistPredictionPoints: "top_assist_prediction_points", topTeamPredictionPoints: "top_team_prediction_points",
+  recentWeight: "recent_weight", kingOfWinsPoints: "king_of_wins_points", mvpPredictionPoints: "mvp_prediction_points", betOfRoundPoints: "bet_of_round_points",
+  winRateWeight: "win_rate_weight", historicalWeight: "historical_weight", consistencyWeight: "consistency_weight", smoothingGames: "smoothing_games", maxPriceIncrease: "max_price_increase", maxPriceDecrease: "max_price_decrease",
+  marketUpShare: "market_up_share", marketStableShare: "market_stable_share", marketMinIncrease: "market_min_increase", marketMinDecrease: "market_min_decrease",
+  competitivePriceFloor: "competitive_price_floor", competitivePriceCeiling: "competitive_price_ceiling", competitivePriceCurve: "competitive_price_curve", marketRoundWeight: "market_round_weight", marketAttendanceWeight: "market_attendance_weight", marketRepriceStrength: "market_reprice_strength",
+  marketInitialUpCap: "market_initial_up_cap", marketInitialDownCap: "market_initial_down_cap", marketCapStep: "market_cap_step", marketVersion: "market_version",
+  marketDifficultyMultiplier: "market_difficulty_multiplier", marketDifficultyMin: "market_difficulty_min", marketDifficultyMax: "market_difficulty_max", marketDifficultyStep: "market_difficulty_step",
+  marketTargetEliteAffordability: "market_target_elite_affordability", marketTargetMedianEliteRatio: "market_target_median_elite_ratio", marketRecoveryBonusStrength: "market_recovery_bonus_strength", marketExpensiveRiskStrength: "market_expensive_risk_strength", marketBreakoutRepriceStrength: "market_breakout_reprice_strength",
+  marketCheapPercentile: "market_cheap_percentile", marketElitePercentile: "market_elite_percentile", marketBreakoutRoundPercentile: "market_breakout_round_percentile", marketBadRoundPercentile: "market_bad_round_percentile",
+  budgetSoftCapMultiplier: "budget_soft_cap_multiplier", budgetHardCapMultiplier: "budget_hard_cap_multiplier", budgetExcessRetention: "budget_excess_retention", minSampleForRadar: "min_sample_for_radar",
+} as const;
+
+const LEGACY_FANTASY_SETTING_FALLBACKS: Partial<Record<keyof FantasySettings, number>> = {
+  attackerGoalPoints: 5,
+  drawPoints: 1,
+  lossPoints: -1,
+  goalkeeperAppearancePoints: 3,
+  goalConcededPoints: -1,
+  teamGoalConcededPoints: -1,
+  ownGoalPoints: -3,
+  marketVersion: 10,
+};
+
+/** Único adaptador entre a linha snake_case do banco e o motor do Cartola. */
+export function normalizeFantasySettingsRow(row: Record<string, unknown> | null): FantasySettings {
+  if (!row) return DEFAULT_FANTASY_SETTINGS;
+  const normalized: Record<string, unknown> = {
+    ...DEFAULT_FANTASY_SETTINGS,
+    roleScoringActive: true,
+    currencyName: row.currency_name || DEFAULT_FANTASY_SETTINGS.currencyName,
+  };
+  for (const [property, column] of Object.entries(FANTASY_SETTING_COLUMNS)) {
+    const key = property as keyof FantasySettings;
+    const fallback = LEGACY_FANTASY_SETTING_FALLBACKS[key] ?? DEFAULT_FANTASY_SETTINGS[key];
+    normalized[property] = Number(row[column] ?? fallback);
+  }
+  normalized.goalkeeperLossPoints = Number(row.goalkeeper_loss_points ?? row.loss_points ?? -1);
+  normalized.betRequiredRanks = [1, 2, 3, 4].map((band) => Number(row[`bet_rank_band_${band}`] ?? 6 - band));
+  normalized.scoreGoalRewards = [1, 2, 3, 4].map((band) => Number(row[`score_goal_reward_band_${band}`] ?? [7, 6, 4, 3][band - 1]));
+  return normalized as FantasySettings;
+}
+
 /** O orçamento inicial acompanha a quantidade de vagas, mantendo C$ 11 por atleta. */
 export function getFantasyInitialBudget(playersPerTeam: number) {
   return Math.max(1, Math.floor(playersPerTeam || 5)) * 11;

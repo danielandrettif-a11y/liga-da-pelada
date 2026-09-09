@@ -10,6 +10,7 @@ import { claimPackCard, openPack } from "@/lib/actions/fantasy-cards";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { PackVideoOpening } from "./PackVideoOpening";
 import { CardRevealStage } from "./CardRevealStage";
+import "./pack-opening.css";
 
 type Props = {
   pack: FantasyPackDTO;

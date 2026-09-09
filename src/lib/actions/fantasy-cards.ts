@@ -4,54 +4,11 @@ import { revalidatePath } from "next/cache";
 import { getCurrentAccount, getAdminClient } from "@/lib/auth";
 import { FANTASY_CARDS_CATALOG, getCardBySlug, type FantasyCardDefinition } from "@/lib/fantasy/cards/catalog";
 import { generatePackOffers } from "@/lib/fantasy/cards/pack-generator";
-import { MAX_SPECIAL_CARDS_PER_ROUND, type FantasyCardRarity } from "@/lib/fantasy/cards/config";
+import { MAX_SPECIAL_CARDS_PER_ROUND } from "@/lib/fantasy/cards/config";
 import { isFantasyPriceEligible } from "@/lib/fantasy/cards/eligibility";
+import type { FantasyActiveCardDTO, FantasyPackDTO, FantasyUserCardDTO } from "@/lib/fantasy/cards/dtos";
 
-export type FantasyPackDTO = {
-  id: string;
-  roundId: string | null;
-  roundNumber?: number;
-  source?: string;
-  cardTier?: "bronze" | "gold" | null;
-  status: "available" | "opened" | "claimed" | "dismissed";
-  openedAt: string | null;
-  chosenCardId: string | null;
-  createdAt: string;
-  offers: Array<{
-    slot: number;
-    card: FantasyCardDefinition;
-  }>;
-};
-
-export type FantasyUserCardDTO = {
-  id: string;
-  cardId: string;
-  slug: string;
-  name: string;
-  description: string;
-  rarity: FantasyCardRarity;
-  effectType: string;
-  effectConfig: Record<string, any>;
-  status: "OWNED" | "RESERVED" | "LOCKED" | "CONSUMED";
-  acquiredAt: string;
-  consumedAt: string | null;
-  icon: string;
-};
-
-export type FantasyActiveCardDTO = {
-  id: string;
-  roundId: string;
-  userCardId: string;
-  card: FantasyCardDefinition;
-  status: "RESERVED" | "LOCKED" | "RESOLVED";
-  targetPlayerId?: string | null;
-  targetPlayerName?: string | null;
-  targetPlayer2Id?: string | null;
-  targetPlayer2Name?: string | null;
-  targetPrediction?: "TOP_SCORER" | "TOP_ASSIST" | "CHALLENGE" | null;
-  resultBonus?: number;
-  resultDetails?: any;
-};
+export type { FantasyActiveCardDTO, FantasyPackDTO, FantasyUserCardDTO } from "@/lib/fantasy/cards/dtos";
 
 /**
  * Busca todos os pacotes do usuário logado (pendentes e concluídos).

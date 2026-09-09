@@ -635,7 +635,7 @@ export function CallupBoard({
                       <p className="truncate text-xs font-black text-foreground">
                         {entry.player.name}{" "}
                         {isMe && <span className="text-[10px] text-accent font-normal">(você)</span>}
-                        {entry.joined_by_name && <span className="text-[10px] text-accent font-normal">(adicionado por {entry.joined_by_name})</span>}
+                        {entry.joined_by_name && <span className="text-[10px] text-accent font-normal">(amigo de {entry.joined_by_name})</span>}
                       </p>
                       <div className="mt-0.5 flex items-center gap-1.5 text-[9px] text-muted">
                         <PlayerProfileBadge profile={entry.player.player_profile} isGoalkeeper={entry.player.is_goalkeeper} />
@@ -722,7 +722,7 @@ export function CallupBoard({
                         <p className="truncate text-xs font-black text-foreground">
                           {entry.player.name}{" "}
                           {isMe && <span className="text-[10px] text-warning font-normal">(você)</span>}
-                          {entry.joined_by_name && <span className="text-[10px] text-warning font-normal">(adicionado por {entry.joined_by_name})</span>}
+                          {entry.joined_by_name && <span className="text-[10px] text-warning font-normal">(amigo de {entry.joined_by_name})</span>}
                         </p>
                         <div className="mt-0.5 flex items-center gap-1.5 text-[9px] text-muted">
                           <PlayerProfileBadge profile={entry.player.player_profile} isGoalkeeper={entry.player.is_goalkeeper} />

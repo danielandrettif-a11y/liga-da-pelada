@@ -6,6 +6,7 @@ import { SessionBottomNav } from "@/components/SessionBottomNav";
 import { SessionInstallAppPrompt } from "@/components/SessionInstallAppPrompt";
 import { Header } from "@/components/Header";
 import { PwaRegistration } from "@/components/PwaRegistration";
+import { WebVitalsReporter } from "@/components/WebVitalsReporter";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -71,8 +72,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
   themeColor: "#0B0E14",
   colorScheme: "dark",
@@ -82,6 +81,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${oswald.variable} h-full antialiased`}>
       <body className="min-h-dvh flex flex-col font-sans">
+        <WebVitalsReporter />
         <PwaRegistration />
         <Header />
         <main className="min-w-0 flex-1 px-4 pt-4 pb-[calc(5.5rem+env(safe-area-inset-bottom)+1.5rem)] max-w-lg mx-auto w-full">

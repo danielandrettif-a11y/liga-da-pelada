@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { createRoundWithTeams, saveRoundPrelist, type TeamInput } from "@/lib/actions/rounds";
 import { adminAddCallupPlayer, adminRemoveCallupPlayer } from "@/lib/actions/callups";
-import type { Player, RoundType, Stadium, TeamFormationMode } from "@/lib/types";
+import type { RoundType, TeamFormationMode } from "@/lib/types";
 import { drawTeamsByAttendance, drawTeamsDirect } from "@/lib/round-draw";
 import { drawTeamsBySpeedOnServer } from "@/lib/actions/speed-draw";
 import type { SpeedTeamSummary } from "@/lib/speed-draw";
@@ -30,38 +30,12 @@ import {
   MAX_TEAMS_PER_ROUND,
   MIN_TEAMS_PER_ROUND,
 } from "@/lib/constants";
-import { TEAM_PRESETS } from "@/lib/teamPresets";
 import { supabase } from "@/lib/supabase";
 import { DeleteRoundButton } from "./DeleteRoundButton";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { isPlayerVisibleInPrelistTab } from "@/lib/callup-ui";
 import { VEST_COLORS } from "@/lib/vest-colors";
-
-type DrawPlayer = Player & {
-  points?: number;
-  rounds?: number;
-  games?: number;
-};
-
-type DrawTeam = {
-  id: string;
-  name: string;
-  color: string;
-  crestUrl: string | null;
-  players: DrawPlayer[];
-};
-
-function createDefaultTeams(count: number, offset = 0): DrawTeam[] {
-  const featuredTeams = TEAM_PRESETS.slice(0, 4);
-  const normalizedOffset = ((offset % featuredTeams.length) + featuredTeams.length) % featuredTeams.length;
-  const rotatedFeatured = [...featuredTeams.slice(normalizedOffset), ...featuredTeams.slice(0, normalizedOffset)];
-  const availableTeams = [...rotatedFeatured, ...TEAM_PRESETS.slice(4)];
-  return availableTeams.slice(0, count).map((team, index): DrawTeam => ({
-    id: `team${index + 1}`,
-    ...team,
-    players: [] as DrawPlayer[],
-  }));
-}
+import { createDefaultTeams, type DrawPlayer, type DrawTeam, type RoundCreatorProps } from "./round-creator-model";
 
 export function RoundCreator({
   allPlayers,
@@ -79,23 +53,7 @@ export function RoundCreator({
   playersPerTeam = 5,
   teamsPerRound = 3,
   teamPresetOffsets = {},
-}: {
-  allPlayers: DrawPlayer[];
-  stadiums?: Stadium[];
-  initialDate?: string;
-  initialPlayerIds?: string[];
-  roundType?: RoundType;
-  callupId?: string | null;
-  prelistRoundId?: string | null;
-  initialTime?: string;
-  initialStadiumId?: string | null;
-  availableCallups?: Array<{ id: string; date: string; startTime: string; roundType: RoundType; playerIds: string[]; entryIds: string[] }>;
-  mountTeams?: boolean;
-  prelistNumber?: number | null;
-  playersPerTeam?: number;
-  teamsPerRound?: number;
-  teamPresetOffsets?: Partial<Record<RoundType, number>>;
-}) {
+}: RoundCreatorProps) {
   const router = useRouter();
   const [refreshingPlayers, startPlayersRefresh] = useTransition();
   const [step, setStep] = useState<1 | 2 | 3>(prelistRoundId ? (mountTeams ? 3 : 2) : 1);
