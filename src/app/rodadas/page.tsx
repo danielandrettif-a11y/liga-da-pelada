@@ -38,7 +38,6 @@ export default async function RodadasPage() {
     ? await Promise.all([getActiveCallups(), getLeagueConfig(), getStadiums(), getAdminRoundPrelists()])
     : [[], null, [], []];
   const visiblePrelists = (adminPrelists || []).filter((prelist: any) => prelist.playersCount > 0);
-  const hasFriendlyPrelist = visiblePrelists.some((prelist: any) => prelist.round_type === "friendly");
   const agendaItems = [
     ...rounds.map((round: any) => ({ ...round, agendaKind: "round" as const })),
     ...visiblePrelists.map((prelist: any) => ({
@@ -98,7 +97,7 @@ export default async function RodadasPage() {
       <div className="space-y-3">
         {agendaItems.map((round, index) => {
           const isPrelist = round.agendaKind === "prelist";
-          const prelistTheme = round.round_type === "friendly"
+          const roundTypeTheme = round.round_type === "friendly"
             ? {
                 card: "border-warning/45 bg-gradient-to-br from-warning/[0.14] via-surface to-background",
                 tile: "border-warning/30 bg-warning/10",
@@ -111,9 +110,9 @@ export default async function RodadasPage() {
                 text: "text-sky-300",
                 badge: "bg-sky-400/15",
               };
-          const useDistinctPrelistTheme = isPrelist && hasFriendlyPrelist;
+          const useRoundTypeTheme = isPrelist || round.status === "finished";
           const statusStyle = isPrelist
-            ? { label: "Pré-lista", bg: useDistinctPrelistTheme ? prelistTheme.badge : "bg-warning/15", text: useDistinctPrelistTheme ? prelistTheme.text : "text-warning" }
+            ? { label: "Pré-lista", bg: roundTypeTheme.badge, text: roundTypeTheme.text }
             : STATUS_STYLES[round.status as keyof typeof STATUS_STYLES] || STATUS_STYLES.draft;
           const href = isPrelist
             ? `/admin/rodada?round=${round.id}&mount=1`
@@ -123,14 +122,14 @@ export default async function RodadasPage() {
             <div key={round.id} className="relative">
             <Link href={href} className="block">
               <div
-                className={`${isPrelist
-                  ? `rounded-2xl border ${useDistinctPrelistTheme ? prelistTheme.card : "border-warning/45 bg-gradient-to-br from-warning/[0.14] via-surface to-background"} shadow-[0_10px_28px_rgba(0,0,0,.22)]`
+                className={`${useRoundTypeTheme
+                  ? `rounded-2xl border ${roundTypeTheme.card} shadow-[0_10px_28px_rgba(0,0,0,.22)]`
                   : "glass-card glass-card-hover"} p-4 animate-fade-in stagger-${Math.min(index + 1, 5)}`}
               >
                 <div className="flex items-center gap-4">
                   {/* Round number */}
-                  <div className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center flex-shrink-0 ${isPrelist ? `border ${useDistinctPrelistTheme ? prelistTheme.tile : "border-warning/30 bg-warning/10"}` : "bg-surface"}`}>
-                    <span className={`text-[10px] font-semibold uppercase ${isPrelist ? (useDistinctPrelistTheme ? prelistTheme.text : "text-warning") : "text-muted"}`}>
+                  <div className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center flex-shrink-0 ${useRoundTypeTheme ? `border ${roundTypeTheme.tile}` : "bg-surface"}`}>
+                    <span className={`text-[10px] font-semibold uppercase ${useRoundTypeTheme ? roundTypeTheme.text : "text-muted"}`}>
                       {round.round_type === "friendly" ? "AM." : "ROD."}
                     </span>
                     <span className="stat-number text-xl text-foreground">
@@ -171,7 +170,7 @@ export default async function RodadasPage() {
                       )}
                     </div>
                     {isPrelist && (
-                      <p className={`mt-2 flex items-center gap-1 text-[9px] font-black uppercase tracking-wide ${useDistinctPrelistTheme ? prelistTheme.text : "text-warning"}`}>
+                      <p className={`mt-2 flex items-center gap-1 text-[9px] font-black uppercase tracking-wide ${roundTypeTheme.text}`}>
                         Convocados salvos · montar times e iniciar <ChevronRight className="h-3 w-3" />
                       </p>
                     )}
