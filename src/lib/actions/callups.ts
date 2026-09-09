@@ -14,7 +14,10 @@ import {
   TEAMS_PER_ROUND,
 } from "../constants";
 
-export type CallupEntryWithPlayer = CallupEntry & { player: Player };
+export type CallupEntryWithPlayer = CallupEntry & {
+  player: Player;
+  joined_by_name?: string | null;
+};
 export type CallupWithEntries = Callup & { entries: CallupEntryWithPlayer[] };
 
 function normalizeCallup(data: any): CallupWithEntries | null {
@@ -70,7 +73,32 @@ export async function getActiveCallups(): Promise<CallupWithEntries[]> {
     return [];
   }
 
-  return (data || []).map(normalizeCallup).filter((callup): callup is CallupWithEntries => Boolean(callup));
+  const callups = (data || []).map(normalizeCallup).filter((callup): callup is CallupWithEntries => Boolean(callup));
+  if (callups.length === 0) return callups;
+
+  const { data: joiners, error: joinersError } = await supabase.rpc("get_callup_entry_joiners", {
+    p_callup_ids: callups.map((callup) => callup.id),
+  });
+  if (joinersError) {
+    console.error("Erro ao buscar responsáveis pelas entradas da convocação:", joinersError);
+    return callups;
+  }
+
+  const joinerRows = (joiners || []) as Array<{ callup_entry_id: string; joined_by_name: string | null }>;
+  const joinerNameByEntryId = new Map<string, string | null>(
+    joinerRows.map((joiner) => [
+      joiner.callup_entry_id,
+      joiner.joined_by_name,
+    ]),
+  );
+
+  return callups.map((callup) => ({
+    ...callup,
+    entries: callup.entries.map((entry) => ({
+      ...entry,
+      joined_by_name: joinerNameByEntryId.get(entry.id) || null,
+    })),
+  }));
 }
 
 export async function getActiveCallup(): Promise<CallupWithEntries | null> {
