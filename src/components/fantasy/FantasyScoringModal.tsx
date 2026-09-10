@@ -119,7 +119,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
           {activeTab === "positions" && (
             <div className="space-y-3">
               <div className="rounded-2xl border border-accent/30 bg-accent/10 p-3 text-xs text-emerald-100/90 leading-relaxed">
-                💡 <strong>Como escalar:</strong> escolha 1 GOL, 2 DEF e complete com <strong>2 MEI/ALA + 1 ATA</strong> ou <strong>1 MEI/ALA + 2 ATA</strong>. DEF, MEI e ATA precisam coincidir com a tag oficial. A vaga GOL é livre: você aposta em quem deve atuar melhor no rodízio do gol.
+                💡 <strong>Como escalar:</strong> escolha 1 GOL, 2 DEF e complete com <strong>2 ALA/MEI + 1 ATA</strong> ou <strong>1 ALA/MEI + 2 ATA</strong>. DEF, ALA/MEI e ATA precisam coincidir com a tag oficial. A vaga GOL é livre: você aposta em quem deve atuar melhor no rodízio do gol.
               </div>
 
               {/* 1. Defensores (DEF) */}
@@ -170,7 +170,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                 </div>
                 <div className="space-y-1 text-xs text-muted">
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🎯 Assistência: +2.5 base +1 na vaga MEI</span>
+                    <span>🎯 Assistência: +2.5 base +1 na vaga ALA/MEI</span>
                     <strong className="text-accent font-black">+3.5 pts / assist</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">

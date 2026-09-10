@@ -36,7 +36,7 @@ const STAGES: Stage[] = [
   { id: "field-le", houses: [29], name: "Lateral esquerdo", shortLabel: "LE", zone: "field", x: 86.4, y: 43.6 },
   { id: "field-vol", houses: [30, 31], name: "Volante", shortLabel: "VOL", zone: "field", x: 61.5, y: 54.6 },
   { id: "field-mc", houses: [32, 33], name: "Meia central", shortLabel: "MC", zone: "field", x: 49, y: 67 },
-  { id: "field-mei", houses: [34], name: "Meia ofensivo", shortLabel: "MEI", zone: "field", x: 73.4, y: 67 },
+  { id: "field-mei", houses: [34], name: "Ala/Meio ofensivo", shortLabel: "ALA/MEI", zone: "field", x: 73.4, y: 67 },
   { id: "field-pd", houses: [35, 36], name: "Ponta direita", shortLabel: "PD", zone: "field", x: 39.3, y: 78.7 },
   { id: "field-ca", houses: [37], name: "Centroavante", shortLabel: "CA", zone: "field", x: 61.5, y: 78.7 },
   { id: "field-pe", houses: [38, 39], name: "Ponta esquerda", shortLabel: "PE", zone: "field", x: 83.8, y: 78.7 },

@@ -1,6 +1,6 @@
 # Auditoria de balanceamento do Cartola
 
-Esta auditoria foi desenhada para medir o sistema atual com dados reais sem alterar o banco. Ela entrega notas de 0 a 10 para GOL, DEF, MEI e ATA, uma nota do sistema de pontuação, uma nota do Cartola completo e uma proposta numérica simulada.
+Esta auditoria foi desenhada para medir o sistema atual com dados reais sem alterar o banco. Ela entrega notas de 0 a 10 para GOL, DEF, ALA/MEI e ATA, uma nota do sistema de pontuação, uma nota do Cartola completo e uma proposta numérica simulada.
 
 ## Estado da entrega
 
@@ -26,7 +26,7 @@ Esta auditoria foi desenhada para medir o sistema atual com dados reais sem alte
 | Palpite de garçom | até +6 |
 | GOL | +4 por clean sheet real, acumulável por jogo no gol |
 | DEF | base +2/+1 e vaga +2/+1 para clean/um gol sofrido |
-| MEI | assistência completa +4; Maestro +3 com duas ou mais |
+| ALA/MEI | assistência completa +4; Maestro +3 com duas ou mais |
 | ATA | Artilheiro +3 com dois ou mais gols |
 
 A Rodada 1 é tratada como legado. O sistema de vagas, posições e mercado por perfil entra da Rodada 2 em diante.
@@ -111,8 +111,7 @@ Riscos que a etapa estatística precisa quantificar:
 
 - DEF recebe proteção na base e novamente na vaga correta;
 - GOL pode acumular clean sheets quando há rodízio;
-- MEI combina assistência de 4 pontos com o degrau do Maestro;
+- ALA/MEI combina assistência de 4 pontos com o degrau do Maestro;
 - ATA depende de um evento mais raro para receber o bônus exclusivo;
 - capitão e dois palpites podem concentrar uma parcela alta do total;
 - as constantes de posição existem tanto em TypeScript quanto em SQL, aumentando o custo de manutenção e o risco de divergência futura.
-

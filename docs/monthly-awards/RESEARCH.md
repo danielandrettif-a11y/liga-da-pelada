@@ -1,7 +1,7 @@
 # Prêmios mensais — pesquisa
 
 ## Objetivo
-Exibir no perfil conquistas mensais para Melhor DEF, Melhor MEI, Melhor ATA e Melhor Técnico.
+Exibir no perfil conquistas mensais para Melhor Defensor, Melhor Ala/Meio, Melhor Atacante, Melhor Goleiro, Chuteira de Ouro, Garçom, Melhor Técnico e Melhor WAG.
 
 ## Fonte dos resultados
 - Atletas: soma de `player_round_stats.points` nas rodadas oficiais finalizadas do mês, separada pela tag congelada em cada rodada; mudanças futuras não reclassificam pontos antigos.

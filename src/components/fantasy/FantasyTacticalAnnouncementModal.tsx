@@ -54,7 +54,7 @@ export function FantasyTacticalAnnouncementModal() {
         </div>
 
         <p className="text-xs text-muted leading-relaxed mb-4">
-          Escale <strong>1 GOL, 2 DEF</strong> e complete com <strong>2 MEI/ALA + 1 ATA</strong> ou <strong>1 MEI/ALA + 2 ATA</strong>. O que acontece em campo dá pontos-base; a vaga certa ativa o bônus.
+          Escale <strong>1 GOL, 2 DEF</strong> e complete com <strong>2 ALA/MEI + 1 ATA</strong> ou <strong>1 ALA/MEI + 2 ATA</strong>. O que acontece em campo dá pontos-base; a vaga certa ativa o bônus.
         </p>
 
         {/* Grid de Novidades */}
@@ -75,18 +75,18 @@ export function FantasyTacticalAnnouncementModal() {
             </div>
           </div>
 
-          {/* 2. Meio / Ala */}
+          {/* 2. Ala / Meio */}
           <div className="flex items-start gap-3 rounded-2xl border border-warning/20 bg-warning/10 p-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-warning/20 text-warning">
               <Target className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-black text-warning">Armação & Passes (MEI/ALA)</span>
+                <span className="font-black text-warning">Armação & Passes (ALA/MEI)</span>
                 <span className="font-black text-accent text-[10px]">+3,5 pts / assist + bônus</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Assistência vale <strong>+2,5 pts base</strong>; na vaga MEI recebe +1 e chega a <strong>+3,5 pts</strong>. Com 2+ assistências, ainda há <strong>+3,0 pts</strong> de Maestro.
+                Assistência vale <strong>+2,5 pts base</strong>; na vaga ALA/MEI recebe +1 e chega a <strong>+3,5 pts</strong>. Com 2+ assistências, ainda há <strong>+3,0 pts</strong> de Maestro.
               </p>
             </div>
           </div>
@@ -127,7 +127,7 @@ export function FantasyTacticalAnnouncementModal() {
         {/* Chamada para o perfil */}
         <div className="rounded-2xl border border-accent/35 bg-gradient-to-r from-accent/15 via-[#0c2415] to-surface p-3 mb-4">
           <p className="text-[11px] font-bold text-foreground leading-snug">
-            ⚠️ <strong>Atualize sua Posição no Perfil:</strong> Vá em <em>Meu Perfil</em> e garanta que sua tag (DEF, MEI/ALA ou ATA) está correta para pontuar com os bônus!
+            ⚠️ <strong>Atualize sua Posição no Perfil:</strong> Vá em <em>Meu Perfil</em> e garanta que sua tag (DEF, ALA/MEI ou ATA) está correta para pontuar com os bônus!
           </p>
         </div>
 

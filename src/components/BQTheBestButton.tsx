@@ -21,6 +21,7 @@ const AWARD_ORDER: MonthlyAwardType[] = [
   "goldenBootMonth",
   "topAssistMonth",
   "bestManagerMonth",
+  "bestWagMonth",
 ];
 
 const AWARD_VISUALS: Record<MonthlyAwardType, { code: string; card: string; icon: string; eyebrow: string }> = {
@@ -31,7 +32,7 @@ const AWARD_VISUALS: Record<MonthlyAwardType, { code: string; card: string; icon
     eyebrow: "text-sky-300",
   },
   bestMidfielderMonth: {
-    code: "MEI",
+    code: "ALA/MEI",
     card: "border-violet-300/30 bg-gradient-to-r from-violet-400/15 via-[#151522] to-[#07130c]",
     icon: "border-violet-300/35 bg-violet-400/15 text-violet-300",
     eyebrow: "text-violet-300",
@@ -66,21 +67,35 @@ const AWARD_VISUALS: Record<MonthlyAwardType, { code: string; card: string; icon
     icon: "border-accent/40 bg-accent/15 text-accent",
     eyebrow: "text-accent",
   },
+  bestWagMonth: {
+    code: "WAG",
+    card: "border-fuchsia-300/30 bg-gradient-to-r from-fuchsia-400/15 via-[#241326] to-[#07130c]",
+    icon: "border-fuchsia-300/35 bg-fuchsia-400/15 text-fuchsia-200",
+    eyebrow: "text-fuchsia-200",
+  },
 };
 
 const AWARD_EXPLANATIONS: Record<MonthlyAwardType, string> = {
-  bestDefenderMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag DEF.",
-  bestMidfielderMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag MEI.",
-  bestAttackerMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag ATA.",
+  bestDefenderMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag Defensor.",
+  bestMidfielderMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag Ala/Meio.",
+  bestAttackerMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag Atacante.",
   bestGoalkeeperMonth: "Foi quem menos sofreu gols durante as partidas em que atuou no gol.",
   goldenBootMonth: "Foi o jogador que marcou mais gols nas rodadas oficiais do mês.",
   topAssistMonth: "Foi o jogador que distribuiu mais assistências nas rodadas oficiais do mês.",
   bestManagerMonth: "Conquistou a maior pontuação acumulada no Cartola durante o mês.",
+  bestWagMonth: "Prêmio honorário mensal concedido à Anna e à Duda, sem critério competitivo.",
+};
+
+type AwardEntry = {
+  type: MonthlyAwardType;
+  winner?: MonthlyAwardWinner;
 };
 
 function AwardIcon({ type, className }: { type: MonthlyAwardType; className?: string }) {
   const Icon = type === "bestManagerMonth"
     ? Trophy
+    : type === "bestWagMonth"
+      ? Crown
     : type === "bestGoalkeeperMonth"
       ? Shield
       : type === "goldenBootMonth"
@@ -115,7 +130,12 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
   }
 
   const monthLabel = formatAwardMonth(periodStart).replace(/ de \d{4}$/, "");
-  const orderedWinners = AWARD_ORDER.map((type) => winners.find((winner) => winner.type === type));
+  const awardEntries = AWARD_ORDER.flatMap((type): AwardEntry[] => {
+    const categoryWinners = winners.filter((winner) => winner.type === type);
+    return categoryWinners.length > 0
+      ? categoryWinners.map((winner) => ({ type, winner }))
+      : [{ type, winner: undefined }];
+  });
 
   return (
     <>
@@ -179,12 +199,12 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
                     <div className="mt-5 w-full rounded-2xl border border-white/10 bg-black/25 p-4">
                       <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/45">O que fez para ganhar</p>
                       <p className="mt-2 font-athletic text-3xl font-black italic text-amber-200">{formatAwardPerformance(selectedWinner)}</p>
-                      <p className="mt-1 text-[11px] font-semibold text-white/55">em {selectedWinner.roundsPlayed} rodada{selectedWinner.roundsPlayed === 1 ? "" : "s"} oficial{selectedWinner.roundsPlayed === 1 ? "" : "is"}</p>
+                      {selectedWinner.type !== "bestWagMonth" && <p className="mt-1 text-[11px] font-semibold text-white/55">em {selectedWinner.roundsPlayed} rodada{selectedWinner.roundsPlayed === 1 ? "" : "s"} oficial{selectedWinner.roundsPlayed === 1 ? "" : "is"}</p>}
                     </div>
 
                     <div className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[.04] p-4 text-left">
                       <p className="text-xs font-bold leading-5 text-white/80">{AWARD_EXPLANATIONS[selectedWinner.type]}</p>
-                      <p className="mt-2 border-t border-white/10 pt-2 text-[10px] leading-4 text-white/45">Em caso de empate: mais vitórias, depois mais empates.</p>
+                      {selectedWinner.type !== "bestWagMonth" && <p className="mt-2 border-t border-white/10 pt-2 text-[10px] leading-4 text-white/45">Em caso de empate: mais vitórias, depois mais empates.</p>}
                     </div>
                   </div>
                 </div>
@@ -196,16 +216,15 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
                     <p className="font-athletic text-xs font-black uppercase italic tracking-[0.15em] text-white">Seleção do mês</p>
                     <p className="mt-0.5 text-[10px] text-white/45">Toque em um vencedor para ver a conquista</p>
                   </div>
-                  <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-1 text-[8px] font-black uppercase text-amber-200">7 prêmios</span>
+                  <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-1 text-[8px] font-black uppercase text-amber-200">8 categorias</span>
                 </div>
 
                 <div className="grid gap-2.5">
-                  {orderedWinners.map((winner, index) => {
-                    const type = AWARD_ORDER[index];
+                  {awardEntries.map(({ winner, type }) => {
                     const visual = AWARD_VISUALS[type];
                     return winner ? (
                       <button
-                        key={type}
+                        key={`${type}-${winner.playerId}`}
                         type="button"
                         onClick={() => setSelectedWinner(winner)}
                         className={`group flex min-h-[82px] w-full items-center gap-3 rounded-2xl border p-3 text-left shadow-[0_10px_24px_rgba(0,0,0,.18)] transition-transform active:scale-[.98] ${visual.card}`}

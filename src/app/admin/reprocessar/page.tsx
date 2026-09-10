@@ -71,7 +71,7 @@ export default function ReprocessarPage() {
         </div>
         <p className="text-xs leading-relaxed text-muted">
           Esta ferramenta aplica as regras do <strong>BQ v5</strong> (scouts básicos unificados,
-          bônus posicionais DEF/MEI/ATA e novo modelo de mercado) retroativamente em todas as rodadas
+          bônus posicionais DEF/ALA-MEI/ATA e novo modelo de mercado) retroativamente em todas as rodadas
           da temporada ativa. Escalações, capitães e palpites são preservados.
         </p>
         <div className="pt-2">

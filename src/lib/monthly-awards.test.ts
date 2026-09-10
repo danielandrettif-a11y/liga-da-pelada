@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAwardMonth, formatAwardPerformance, parseMonthlyAwardWinners, parseMonthlyAwards, previousMonthStart } from "./monthly-awards";
+import { formatAwardMonth, formatAwardPerformance, MONTHLY_AWARD_LABELS, parseMonthlyAwardWinners, parseMonthlyAwards, previousMonthStart } from "./monthly-awards";
 
 describe("monthly awards", () => {
   it("normaliza somente categorias conhecidas", () => {
@@ -54,6 +54,7 @@ describe("monthly awards", () => {
     expect(formatAwardPerformance({ ...base, type: "bestGoalkeeperMonth", metricValue: 2 })).toBe("2 gols sofridos");
     expect(formatAwardPerformance({ ...base, type: "goldenBootMonth", metricValue: 7 })).toBe("7 gols");
     expect(formatAwardPerformance({ ...base, type: "topAssistMonth", metricValue: 1 })).toBe("1 assistência");
+    expect(formatAwardPerformance({ ...base, type: "bestWagMonth", metricValue: 0 })).toBe("Premiação especial do mês");
   });
 
   it("aceita as novas categorias retornadas pelo banco", () => {
@@ -65,5 +66,38 @@ describe("monthly awards", () => {
       metric_value: 9,
       is_final: true,
     }])[0]).toMatchObject({ type: "goldenBootMonth", metricValue: 9 });
+  });
+
+  it("aceita as duas vencedoras da categoria Melhor WAG", () => {
+    expect(parseMonthlyAwardWinners([
+      {
+        award_type: "bestWagMonth",
+        period_start: "2026-08-01",
+        points: 0,
+        rounds_played: 0,
+        metric_value: 0,
+        is_final: true,
+        player_id: "anna-id",
+        player_name: "Anna",
+        avatar_url: null,
+      },
+      {
+        award_type: "bestWagMonth",
+        period_start: "2026-08-01",
+        points: 0,
+        rounds_played: 0,
+        metric_value: 0,
+        is_final: true,
+        player_id: "duda-id",
+        player_name: "Duda",
+        avatar_url: null,
+      },
+    ])).toHaveLength(2);
+  });
+
+  it("exibe as posições dos prêmios por extenso", () => {
+    expect(MONTHLY_AWARD_LABELS.bestDefenderMonth).toBe("Melhor Defensor do mês");
+    expect(MONTHLY_AWARD_LABELS.bestMidfielderMonth).toBe("Melhor Ala/Meio do mês");
+    expect(MONTHLY_AWARD_LABELS.bestAttackerMonth).toBe("Melhor Atacante do mês");
   });
 });

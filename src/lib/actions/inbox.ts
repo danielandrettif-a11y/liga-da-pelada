@@ -94,7 +94,7 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
       type: "tactical_revolution_r2",
       key: `announcement:tactical_r2:${league.id}`,
       title: "⚡ Bônus de Posição Ativos no Cartola!",
-      body: "Pontuação atualizada: DEF soma proteção base + bônus na vaga; MEI e ATA ativam bônus na posição correta; GOL premia o clean sheet de quem você apostou no rodízio. Confira o Guia de Pontuação!",
+      body: "Pontuação atualizada: DEF soma proteção base + bônus na vaga; ALA/MEI e ATA ativam bônus na posição correta; GOL premia o clean sheet de quem você apostou no rodízio. Confira o Guia de Pontuação!",
       href: "/cartola",
     });
 

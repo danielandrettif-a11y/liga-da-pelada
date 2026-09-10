@@ -1451,7 +1451,7 @@ export function FantasyExperience({
                         Meio Avançado (Armador)
                       </span>
                       <div className="flex justify-center">
-                        {renderSlot(2, "Meia / ALA", "MEI")}
+                        {renderSlot(2, "Ala / Meio", "MEI")}
                       </div>
                     </div>
 
@@ -1493,7 +1493,7 @@ export function FantasyExperience({
                         Meio-Campo & Alas
                       </span>
                       <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[1, 2].map((slot) => renderSlot(slot, "Meia / ALA", "MEI"))}
+                        {[1, 2].map((slot) => renderSlot(slot, "Ala / Meio", "MEI"))}
                       </div>
                     </div>
 
@@ -1537,7 +1537,7 @@ export function FantasyExperience({
                         Meio-Campo & Alas
                       </span>
                       <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[1, 2].map((slot) => renderSlot(slot, "Meia / ALA", "MEI"))}
+                        {[1, 2].map((slot) => renderSlot(slot, "Ala / Meio", "MEI"))}
                       </div>
                     </div>
 
@@ -1569,7 +1569,7 @@ export function FantasyExperience({
                         Meio-Campo & Alas
                       </span>
                       <div className="flex justify-center">
-                        {renderSlot(2, "Meia / ALA", "MEI")}
+                        {renderSlot(2, "Ala / Meio", "MEI")}
                       </div>
                     </div>
 
@@ -1714,7 +1714,7 @@ export function FantasyExperience({
                 { id: "ALL", label: "Todas" },
                 { id: "GOL", label: "🧤 Rodízio no gol" },
                 { id: "DEF", label: "🛡️ Zaga (DEF)" },
-                { id: "MEI", label: "🎯 Meio (MEI/ALA)" },
+                { id: "MEI", label: "🎯 Ala/Meio (ALA/MEI)" },
                 { id: "ATA", label: "⚡ Ataque (ATA)" },
               ].map((chip) => (
                 <button
@@ -1741,7 +1741,7 @@ export function FantasyExperience({
                   ) : (
                     <>✨ Atletas de <strong>{
                       positionFilter === "DEF" ? "Defesa (DEF)" :
-                      positionFilter === "MEI" ? "Meio / Ala (MEI/ALA)" : "Ataque (ATA)"
+                      positionFilter === "MEI" ? "Ala / Meio (ALA/MEI)" : "Ataque (ATA)"
                     }</strong> no topo primeiro</>
                   )}
                 </span>
@@ -1893,7 +1893,7 @@ export function FantasyExperience({
                             </span>
                           ) : (
                             <span className="rounded bg-warning/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-warning border border-warning/30">
-                              MEI/ALA
+                              ALA/MEI
                             </span>
                           )}
                           <span className="text-[8px] font-bold text-muted ml-auto">

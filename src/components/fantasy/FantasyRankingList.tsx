@@ -76,7 +76,7 @@ const FANTASY_RANKING_METRICS: FantasyRankingMetric[] = [
   { id: "budget", label: "Cartoletas", title: "Reis das Cartoletas", description: "Maior patrimônio atual", valueLabel: "cartoletas", field: "current_budget", currency: true },
   { id: "captain", label: "Capitão", title: "Mestres da Faixa", description: "Mais pontos extras com o capitão", valueLabel: "bônus capitão", field: "captain_bonus_points" },
   { id: "def", label: "DEF", title: "Muralha do Cartola", description: "Mais pontos com atletas na DEF", valueLabel: "pontos DEF", field: "def_points" },
-  { id: "mid", label: "MEI", title: "Eficiência no Meio", description: "Média por atleta escalado no MEI", valueLabel: "pts por MEI", field: "mid_average_points", sampleField: "mid_selection_count", minimumSelections: 3 },
+  { id: "mid", label: "ALA/MEI", title: "Eficiência Ala/Meio", description: "Média por atleta escalado em ALA/MEI", valueLabel: "pts por ALA/MEI", field: "mid_average_points", sampleField: "mid_selection_count", minimumSelections: 3 },
   { id: "attack", label: "ATA", title: "Eficiência no Ataque", description: "Média por atleta escalado no ATA", valueLabel: "pts por ATA", field: "attack_average_points", sampleField: "attack_selection_count", minimumSelections: 3 },
 ];
 

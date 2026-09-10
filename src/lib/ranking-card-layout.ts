@@ -105,7 +105,7 @@ const CARD_THEMES: Record<RankingCardTier, RankingCardTheme> = {
 
 const PROFILE_LABELS = {
   offensive: "ATA",
-  midfield: "MEI/ALA",
+  midfield: "ALA/MEI",
   defensive: "DEF",
 } as const;
 
