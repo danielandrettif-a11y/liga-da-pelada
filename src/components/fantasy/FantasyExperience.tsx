@@ -988,6 +988,14 @@ export function FantasyExperience({
 
   return (
     <div className="w-full space-y-5">
+      {/* Radar independente no topo da experiência. */}
+      {radar && (
+        <FantasyRadarCarousel
+          radar={radar}
+          onSelectPlayer={(player) => setSelectedDrawerPlayer(player)}
+        />
+      )}
+
       {/* Banner de Modo Teste */}
       {isTest && (
         <div className="overflow-hidden rounded-2xl border border-warning/45 bg-warning/12 p-4 text-center shadow-[0_0_28px_rgba(245,158,11,.08)]">
@@ -1102,14 +1110,6 @@ export function FantasyExperience({
           </div>
         )}
 
-        {radar && (
-          <div className="relative border-t border-white/10 p-3">
-            <FantasyRadarCarousel
-              radar={radar}
-              onSelectPlayer={(player) => setSelectedDrawerPlayer(player)}
-            />
-          </div>
-        )}
       </header>
 
       {/* Resumo da Última Rodada */}
@@ -1415,9 +1415,19 @@ export function FantasyExperience({
               />
 
               {betweenRounds && (
-                <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 w-[145%] -translate-x-1/2 -translate-y-1/2 -rotate-[24deg] border-y-2 border-warning/70 bg-[#2a1805]/95 py-3 text-center shadow-[0_8px_28px_rgba(0,0,0,.55)] backdrop-blur-sm">
-                  <p className="font-athletic text-sm font-black uppercase italic tracking-[.18em] text-warning sm:text-base">Janela de transferências fechada</p>
-                  <p className="mt-0.5 text-[8px] font-black uppercase tracking-[.12em] text-warning/80">Aguarde a próxima Ranked</p>
+                <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 w-[132%] -translate-x-1/2 -translate-y-1/2 -rotate-[16deg] overflow-hidden border-y border-accent/80 bg-[linear-gradient(90deg,rgba(2,20,11,.97),rgba(10,70,36,.97)_25%,rgba(3,35,18,.98)_50%,rgba(10,70,36,.97)_75%,rgba(2,20,11,.97))] py-2.5 text-center shadow-[0_10px_32px_rgba(0,0,0,.65),0_0_20px_rgba(204,255,0,.12)]">
+                  <div className="absolute inset-x-0 top-1 h-px bg-white/25" />
+                  <div className="absolute inset-x-0 bottom-1 h-px bg-white/25" />
+                  <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
+                  <div className="absolute left-1/2 top-1/2 h-px w-full -translate-x-1/2 bg-white/[.07]" />
+                  <div className="relative flex items-center justify-center gap-3 px-10">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-accent/50 bg-black/30 text-lg shadow-[inset_0_0_10px_rgba(204,255,0,.12)]">⚽</span>
+                    <div>
+                      <p className="font-athletic text-base font-black uppercase italic leading-none tracking-[.16em] text-white sm:text-lg">Mercado fechado</p>
+                      <p className="mt-1 text-[8px] font-black uppercase tracking-[.18em] text-accent">Janela abre na próxima Ranked</p>
+                    </div>
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-accent/50 bg-black/30 text-lg shadow-[inset_0_0_10px_rgba(204,255,0,.12)]">⚽</span>
+                  </div>
                 </div>
               )}
 
