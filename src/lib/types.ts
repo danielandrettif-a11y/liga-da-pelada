@@ -154,6 +154,7 @@ export type Round = {
   status: RoundStatus;
   round_type: RoundType;
   formation_mode: TeamFormationMode;
+  target_players_per_team?: number | null;
   suppress_goalkeeper_rewards?: boolean;
   arrival_order_enabled: boolean;
   preparation_stage: RoundPreparationStage;
@@ -311,6 +312,7 @@ export type TeamPlayer = {
   team_id: string;
   player_id: string;
   goalkeeper_order: number | null;
+  loan_order?: number | null;
 };
 
 export type MatchStatus = 'pending' | 'live' | 'finished';

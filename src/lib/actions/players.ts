@@ -9,6 +9,7 @@ import { getActiveSeason, getActiveSeasonRoundIds } from "./seasons";
 import { getAdminClient, getCurrentAccount } from "../auth";
 import { TEAM_PRESETS } from "../teamPresets";
 import { getMatchElapsedSeconds } from "../utils";
+import { parseMonthlyAwards } from "../monthly-awards";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -390,6 +391,16 @@ export async function getPlayerAwardSeasons(playerId: string) {
   );
 
   return awardSeasons.get(playerId) || [];
+}
+
+export async function getPlayerMonthlyAwards(playerId: string) {
+  const { data, error } = await supabase.rpc("get_monthly_awards_for_player", { p_player_id: playerId });
+  if (error) {
+    // Compatibilidade durante o intervalo entre o deploy do app e a migration.
+    if (error.code !== "PGRST202" && error.code !== "42883") console.error("Erro ao buscar prêmios mensais:", error);
+    return [];
+  }
+  return parseMonthlyAwards(data);
 }
 
 export async function createPlayer(input: CreatePlayerInput) {

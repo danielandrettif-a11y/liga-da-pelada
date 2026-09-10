@@ -17,6 +17,7 @@ import {
 import { drawGoalkeeperOrder } from "../goalkeeperOrder";
 import { TEAM_CREST_URLS } from "../teamPresets";
 import { scheduleCartolaRoundReminders } from "../cartola-reminder-scheduler";
+import { validateUnderfilledTeamSizes } from "../underfilled-rounds";
 
 const getActiveLeagueCached = unstable_cache(async () => {
   const { data, error } = await supabase
@@ -120,13 +121,9 @@ export async function getRound(id: string) {
           team_id,
           original_team_id
         ),
-        match_goalkeepers (
-          team_id,
-          player_id,
-          selected_at
-        )
+        match_goalkeepers (*)
       ),
-      league:league_id (stadium_name, stadium_map_url, event_duration_minutes)
+      league:league_id (stadium_name, stadium_map_url, event_duration_minutes, players_per_team)
     `)
     .eq("id", id)
     .single();
@@ -526,7 +523,45 @@ export type CreateRoundOptions = {
   stadiumId?: string | null;
   stadiumName?: string | null;
   stadiumMapUrl?: string | null;
+  targetPlayersPerTeam?: number;
+  confirmUnderfilled?: boolean;
 };
+
+export async function setCallupMatchSize(callupId: string, targetPlayersPerTeam: 5 | 6) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem alterar a capacidade da convocação." };
+    if (!callupId || ![5, 6].includes(targetPlayersPerTeam)) return { success: false, error: "Formato de partida inválido." };
+
+    const league = await getActiveLeague();
+    const { data: config, error: configError } = await client
+      .from("leagues")
+      .select("players_per_team, teams_per_round")
+      .eq("id", league.id)
+      .single();
+    if (configError || config?.players_per_team !== 6 || config?.teams_per_round !== 3) {
+      return { success: false, error: "O ajuste 5x5/6x6 exige uma liga configurada com 3 times de 6." };
+    }
+
+    const { data: updatedCallup, error } = await client
+      .from("callups")
+      .update({ capacity: targetPlayersPerTeam * 3, updated_at: new Date().toISOString() })
+      .eq("id", callupId)
+      .eq("league_id", league.id)
+      .eq("status", "open")
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!updatedCallup) return { success: false, error: "Convocação aberta não encontrada." };
+
+    revalidatePath("/admin/rodada");
+    revalidatePath("/admin/prelistas");
+    revalidatePath("/convocacao");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Não foi possível ajustar a capacidade." };
+  }
+}
 
 export async function createRoundWithTeams(
   date: string,
@@ -580,7 +615,23 @@ export async function createRoundWithTeams(
     if (normalizedTeams.length !== teamsPerRound) {
       return { success: false, error: `Esta liga usa ${teamsPerRound} times por rodada.` };
     }
-    if (normalizedTeams.some((team) => team.playerIds.length > playersPerTeam)) {
+    const leagueCapacity = playersPerTeam * teamsPerRound;
+    const targetPlayersPerTeam = options.targetPlayersPerTeam === 5 ? 5 : playersPerTeam;
+    const isUnderfilledChoice = allPlayerIds.length < leagueCapacity;
+    if (isUnderfilledChoice || targetPlayersPerTeam === 5) {
+      if (!options.confirmUnderfilled) {
+        return { success: false, error: "Confirme a criação da rodada com menos jogadores." };
+      }
+      if (teamsPerRound !== 3 || playersPerTeam !== 6 || ![5, 6].includes(targetPlayersPerTeam)) {
+        return { success: false, error: "A rodada incompleta está disponível para a configuração de 3 times com 6 jogadores." };
+      }
+      const sizeError = validateUnderfilledTeamSizes(
+        normalizedTeams.map((team) => team.playerIds.length),
+        allPlayerIds.length,
+        targetPlayersPerTeam as 5 | 6,
+      );
+      if (sizeError) return { success: false, error: sizeError };
+    } else if (normalizedTeams.some((team) => team.playerIds.length > playersPerTeam)) {
       return { success: false, error: `Cada time pode ter no máximo ${playersPerTeam} jogadores.` };
     }
     const attendanceOrder = [...new Set(options.attendanceOrder || [])];
@@ -628,8 +679,8 @@ export async function createRoundWithTeams(
         .filter((entry) => entry.status === "confirmed")
         .map((entry) => entry.player_id)
         .sort();
-      if (callup.date !== date || callup.round_type !== roundType || confirmedIds.length !== callup.capacity || confirmedIds.join(",") !== [...allPlayerIds].sort().join(",")) {
-        return { success: false, error: `Use a data, o tipo e os ${callup.capacity} confirmados da convocacao.` };
+      if (callup.date !== date || callup.round_type !== roundType || confirmedIds.join(",") !== [...allPlayerIds].sort().join(",")) {
+        return { success: false, error: "Use a data, o tipo e todos os confirmados atuais da convocacao." };
       }
       if (options.prelistRoundId && callup.round_id !== options.prelistRoundId) {
         return { success: false, error: "A convocacao nao esta vinculada a esta pre-lista." };
@@ -673,12 +724,17 @@ export async function createRoundWithTeams(
       if ((existingRound.teams || []).length > 0) return { success: false, error: "Esta rodada ja possui times montados." };
       
       if (stadiumId || startTime) {
-        await client.from("rounds").update({
+        const { error: updateRoundError } = await client.from("rounds").update({
           start_time: startTime || existingRound.start_time,
           stadium_id: stadiumId || existingRound.stadium_id,
           stadium_name: stadiumName || existingRound.stadium_name,
           stadium_map_url: stadiumMapUrl || existingRound.stadium_map_url,
+          ...(isUnderfilledChoice ? { target_players_per_team: targetPlayersPerTeam } : {}),
         }).eq("id", existingRound.id);
+        if (updateRoundError) throw new Error(`Erro ao atualizar a pre-lista: ${updateRoundError.message}`);
+      } else if (isUnderfilledChoice) {
+        const { error: updateTargetError } = await client.from("rounds").update({ target_players_per_team: targetPlayersPerTeam }).eq("id", existingRound.id);
+        if (updateTargetError) throw new Error(`Erro ao salvar o formato da rodada: ${updateTargetError.message}`);
       }
       round = existingRound;
     } else {
@@ -710,6 +766,7 @@ export async function createRoundWithTeams(
         round_type: roundType,
         formation_mode: formationMode,
         preparation_stage: "teams_ready",
+        ...(isUnderfilledChoice ? { target_players_per_team: targetPlayersPerTeam } : {}),
       })
       .select()
       .single();
@@ -755,6 +812,7 @@ export async function createRoundWithTeams(
 
       if (team.playerIds.length > 0) {
         const goalkeeperOrder = drawGoalkeeperOrder(team.playerIds);
+        const loanOrder = new Map(drawGoalkeeperOrder(team.playerIds).map((entry) => [entry.playerId, entry.order]));
         const { error: tpError } = await client
           .from("team_players")
           .insert(
@@ -762,6 +820,7 @@ export async function createRoundWithTeams(
               team_id: teamData.id,
               player_id: playerId,
               goalkeeper_order: order,
+              ...(isUnderfilledChoice ? { loan_order: loanOrder.get(playerId) } : {}),
             }))
           );
         if (tpError) throw new Error(`Erro ao vincular jogadores ao time ${team.name}: ${tpError.message}`);
@@ -775,6 +834,14 @@ export async function createRoundWithTeams(
     if (readyError) throw new Error(`Erro ao concluir a rodada: ${readyError.message}`);
 
     if (options.callupId) {
+      if (targetPlayersPerTeam === 5) {
+        const { error: capacityError } = await client
+          .from("callups")
+          .update({ capacity: 15, updated_at: new Date().toISOString() })
+          .eq("id", options.callupId)
+          .eq("league_id", league.id);
+        if (capacityError) throw new Error(`Erro ao ajustar a capacidade da convocacao: ${capacityError.message}`);
+      }
       const { error: lockError } = await client
         .from("callups")
         .update({ status: "locked", updated_at: new Date().toISOString() })

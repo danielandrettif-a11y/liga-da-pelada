@@ -9,6 +9,7 @@ import { TeamCrest } from "./TeamCrest";
 import { markRoundTeamArrived, setRoundTeamCaptain, setRoundTeamVestColor, swapRoundTeamPlayers } from "@/lib/actions/rounds";
 import { VEST_COLORS } from "@/lib/vest-colors";
 import { pickFairSubstitute } from "@/lib/substitution-draw";
+import { buildStructuralLoans } from "@/lib/underfilled-rounds";
 
 export function MatchCreator({ round }: { round: any }) {
   const router = useRouter();
@@ -33,6 +34,8 @@ export function MatchCreator({ round }: { round: any }) {
   const [substitutionNotice, setSubstitutionNotice] = useState<Array<{ absent: string; replacement: string }> | null>(null);
 
   const teams = useMemo(() => round?.teams || [], [round?.teams]);
+  const leagueConfig = Array.isArray(round?.league) ? round.league[0] : round?.league;
+  const targetPlayersPerTeam = Number(round?.target_players_per_team || leagueConfig?.players_per_team || 6);
   const playerTeamById = useMemo(() => new Map(
     teams.flatMap((team: any) => (team.team_players || []).map((entry: any) => [entry.player_id, team.id] as const)),
   ), [teams]);
@@ -78,6 +81,29 @@ export function MatchCreator({ round }: { round: any }) {
     }
     return counts;
   }, [round?.matches]);
+  const structuralLoans = useMemo(() => buildStructuralLoans({
+    teams: teams.map((team: any) => ({
+      id: team.id,
+      position: Number(team.position || 0),
+      players: (team.team_players || []).map((entry: any, index: number) => ({
+        playerId: entry.player_id,
+        loanOrder: Number(entry.loan_order || entry.goalkeeper_order || index + 1),
+        eligible: availability.get(entry.player_id) === "available"
+          && (!tracksAttendance || attendance.get(entry.player_id) === "present"),
+      })),
+    })),
+    selectedTeamIds,
+    targetPlayersPerTeam,
+    previousLoanCount,
+    reservedPlayerIds: new Set(Object.values(replacementByAbsent).filter(Boolean)),
+  }), [teams, selectedTeamIds, targetPlayersPerTeam, previousLoanCount, replacementByAbsent, availability, attendance, tracksAttendance]);
+  const structuralShortage = selectedTeams.reduce(
+    (total: number, team: any) => total + Math.max(0, targetPlayersPerTeam - (team.team_players || []).length),
+    0,
+  );
+  const teamPlayerById = useMemo(() => new Map(
+    teams.flatMap((team: any) => (team.team_players || []).map((entry: any) => [entry.player_id, entry.players] as const)),
+  ), [teams]);
   const eligibleGoalkeepersByTeam = useMemo(() => Object.fromEntries(teams.map((team: any) => {
     const players = (team.team_players || [])
       .filter((entry: any) => availability.get(entry.player_id) !== "injured" && (!tracksAttendance || attendance.get(entry.player_id) === "present"))
@@ -100,8 +126,19 @@ export function MatchCreator({ round }: { round: any }) {
         });
       }
     }
+    for (const loan of structuralLoans.filter((item) => item.targetTeamId === team.id)) {
+      const player = teamPlayerById.get(loan.playerId) as any;
+      if (player && !players.some((entry: any) => entry.id === loan.playerId)) {
+        players.push({
+          id: loan.playerId,
+          name: player.name,
+          isGoalkeeper: Boolean(player.is_goalkeeper),
+          goalkeeperOrder: loan.rotationOrder,
+        });
+      }
+    }
     return [team.id, players];
-  })), [teams, availability, attendance, tracksAttendance, replacementByAbsent, playerTeamById, waitingPlayers]);
+  })), [teams, availability, attendance, tracksAttendance, replacementByAbsent, playerTeamById, waitingPlayers, structuralLoans, teamPlayerById]);
 
   const bqGoalkeeperSuggestionByTeam = useMemo(() => Object.fromEntries(teams.map((team: any) => {
     const rotation = [...(team.team_players || [])]
@@ -110,6 +147,10 @@ export function MatchCreator({ round }: { round: any }) {
         order: Number(entry.goalkeeper_order || Number.MAX_SAFE_INTEGER),
       }))
       .sort((a, b) => a.order - b.order);
+    for (const loan of structuralLoans.filter((item) => item.targetTeamId === team.id)) {
+      rotation.push({ id: loan.playerId, order: loan.rotationOrder });
+    }
+    rotation.sort((a, b) => a.order - b.order);
     const eligible = [...(eligibleGoalkeepersByTeam[team.id] || [])]
       .sort((a: any, b: any) => a.goalkeeperOrder - b.goalkeeperOrder || a.name.localeCompare(b.name, "pt-BR"));
     if (!rotation.length || !eligible.length) return [team.id, null] as const;
@@ -122,7 +163,9 @@ export function MatchCreator({ round }: { round: any }) {
       .find((item: any) => (item.match_goalkeepers || []).some((goalkeeper: any) => goalkeeper.team_id === team.id));
     const lastGoalkeeper = lastMatchWithGoalkeeper?.match_goalkeepers?.find((goalkeeper: any) => goalkeeper.team_id === team.id);
     const lastIndex = lastGoalkeeper
-      ? rotation.findIndex((entry: any) => entry.id === lastGoalkeeper.player_id)
+      ? rotation.findIndex((entry: any) => Number(lastGoalkeeper.rotation_order || 0) > 0
+        ? entry.order === Number(lastGoalkeeper.rotation_order)
+        : entry.id === lastGoalkeeper.player_id)
       : -1;
 
     for (let offset = 1; offset <= rotation.length; offset += 1) {
@@ -132,7 +175,7 @@ export function MatchCreator({ round }: { round: any }) {
     }
 
     return [team.id, null] as const;
-  })), [teams, eligibleGoalkeepersByTeam, round?.matches, replacementByAbsent]);
+  })), [teams, eligibleGoalkeepersByTeam, round?.matches, replacementByAbsent, structuralLoans]);
 
   useEffect(() => {
     setReplacementByAbsent({});
@@ -217,6 +260,10 @@ export function MatchCreator({ round }: { round: any }) {
     const uncoveredPlayers = injuredPlayers.filter((entry: any) => !replacementByAbsent[entry.playerId]);
     if (uncoveredPlayers.length > 0) {
       setError(`Escolha substitutos para as ${uncoveredPlayers.length} vaga(s) desfalcadas.`);
+      return;
+    }
+    if (structuralLoans.length !== structuralShortage) {
+      setError(`O time de fora não possui jogadores disponíveis suficientes para completar ${targetPlayersPerTeam}x${targetPlayersPerTeam}.`);
       return;
     }
 
@@ -617,6 +664,25 @@ export function MatchCreator({ round }: { round: any }) {
               )}
             </div>
           )}
+        </section>
+      )}
+
+      {selectedTeamIds.length === 2 && structuralShortage > 0 && (
+        <section className="overflow-hidden rounded-2xl border border-accent/30 bg-accent/5 animate-fade-in-up">
+          <div className="border-b border-accent/20 px-4 py-3">
+            <h2 className="text-sm font-black text-foreground">Empréstimos automáticos</h2>
+            <p className="mt-1 text-[10px] text-muted">Fila fixa para completar {targetPlayersPerTeam}x{targetPlayersPerTeam} sem repetir antes da vez.</p>
+          </div>
+          <div className="space-y-2 p-4">
+            {structuralLoans.map((loan) => {
+              const player = teamPlayerById.get(loan.playerId) as any;
+              const source = teams.find((team: any) => team.id === loan.originalTeamId);
+              const target = teams.find((team: any) => team.id === loan.targetTeamId);
+              const sourceEntry = source?.team_players?.find((entry: any) => entry.player_id === loan.playerId);
+              return <p key={`${loan.targetTeamId}-${loan.rotationOrder}`} className="rounded-xl bg-background/60 px-3 py-2.5 text-xs font-bold text-foreground"><span className="text-accent">E{sourceEntry?.loan_order || "—"}</span> · {player?.name || "Jogador"} · {source?.name} → {target?.name}</p>;
+            })}
+            {structuralLoans.length !== structuralShortage && <p className="rounded-xl bg-danger/10 p-3 text-xs font-semibold text-danger">Não há jogadores disponíveis suficientes no time de fora.</p>}
+          </div>
         </section>
       )}
 

@@ -40,6 +40,7 @@ export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin
       date: item.date,
       startTime: item.start_time?.slice(0, 5) || "08:00",
       roundType: item.round_type,
+      capacity: item.capacity,
       playerIds: item.entries.filter((entry) => entry.status === "confirmed").map((entry) => entry.player_id),
       entryIds: item.entries.map((entry) => entry.player_id),
     }));

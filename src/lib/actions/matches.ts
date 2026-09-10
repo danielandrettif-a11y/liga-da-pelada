@@ -10,6 +10,7 @@ import { calculateRoundStats } from "./stats";
 import { getAdminClient } from "../auth";
 import { sendMatchFinishedNotifications, sendMatchTimerNotifications } from "../push-notifications";
 import { scheduleMatchTimerAlerts } from "../match-timer-scheduler";
+import { buildStructuralLoans } from "../underfilled-rounds";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 
@@ -44,8 +45,8 @@ export async function createMatch(input: CreateMatchInput) {
     if (replacements.length > 30) return { success: false, error: "Quantidade de substitutos invalida." };
 
     const [{ data: round, error: roundError }, { data: teams, error: teamsError }, { data: roundPlayers, error: roundPlayersError }] = await Promise.all([
-      client.from("rounds").select("id, status, formation_mode, arrival_order_enabled, league:league_id (match_duration)").eq("id", input.round_id).single(),
-      client.from("teams").select("id, position, team_players (player_id)").eq("round_id", input.round_id),
+      client.from("rounds").select("*, league:league_id (match_duration, players_per_team)").eq("id", input.round_id).single(),
+      client.from("teams").select("id, position, team_players (*)").eq("round_id", input.round_id),
       client.from("round_players").select("player_id, availability_status, attendance_status, attendance_order").eq("round_id", input.round_id),
     ]);
 
@@ -65,11 +66,10 @@ export async function createMatch(input: CreateMatchInput) {
     const usesArrivalOrder = round.arrival_order_enabled === true;
     const { data: previousMatches, error: previousMatchesError } = await client
       .from("matches")
-      .select("team_a_id, team_b_id, status, match_order, created_at")
+      .select("team_a_id, team_b_id, status, match_order, created_at, match_players(player_id, team_id, original_team_id)")
       .eq("round_id", input.round_id)
       .order("match_order", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(1);
+      .order("created_at", { ascending: false });
     if (previousMatchesError) throw new Error(previousMatchesError.message);
     const previousMatch = previousMatches?.[0];
     if (!previousMatch && usesArrivalOrder) {
@@ -124,6 +124,43 @@ export async function createMatch(input: CreateMatchInput) {
       return { success: false, error: `Escolha substitutos para as ${missingReplacementCount} vaga(s) desfalcadas.` };
     }
 
+    const leagueConfig = Array.isArray(round.league) ? round.league[0] : round.league;
+    const targetPlayersPerTeam = Math.max(1, Number(round.target_players_per_team || (leagueConfig as any)?.players_per_team || 6));
+    if (selectedTeams.some((team: any) => (team.team_players || []).length > targetPlayersPerTeam)) {
+      return { success: false, error: `Um dos times possui mais de ${targetPlayersPerTeam} jogadores.` };
+    }
+    const previousLoanCount = new Map<string, number>();
+    for (const previous of previousMatches || []) {
+      for (const player of (previous as any).match_players || []) {
+        if (player.original_team_id && player.team_id !== player.original_team_id) {
+          previousLoanCount.set(player.player_id, (previousLoanCount.get(player.player_id) || 0) + 1);
+        }
+      }
+    }
+    const structuralLoans = buildStructuralLoans({
+      teams: (teams as any[]).map((team) => ({
+        id: team.id,
+        position: Number(team.position || 0),
+        players: (team.team_players || []).map((entry: any, index: number) => ({
+          playerId: entry.player_id,
+          loanOrder: Number(entry.loan_order || entry.goalkeeper_order || index + 1),
+          eligible: availability.get(entry.player_id) === "available"
+            && (!tracksAttendance || attendance.get(entry.player_id) === "present"),
+        })),
+      })),
+      selectedTeamIds,
+      targetPlayersPerTeam,
+      previousLoanCount,
+      reservedPlayerIds: usedReplacementPlayers,
+    });
+    const structuralShortage = (selectedTeams as any[]).reduce(
+      (total, team) => total + Math.max(0, targetPlayersPerTeam - (team.team_players || []).length),
+      0,
+    );
+    if (structuralLoans.length !== structuralShortage) {
+      return { success: false, error: `O time de fora nao possui jogadores disponiveis suficientes para completar ${targetPlayersPerTeam}x${targetPlayersPerTeam}.` };
+    }
+
     const { data: liveMatches, error: liveMatchesError } = await client
       .from("matches")
       .select("id, team_a_id, team_b_id")
@@ -149,6 +186,10 @@ export async function createMatch(input: CreateMatchInput) {
     for (const replacement of replacements) {
       effectiveTeamByPlayer.set(replacement.replacement_player_id, replacement.team_id);
     }
+    for (const loan of structuralLoans) {
+      proposedPlayerIds.add(loan.playerId);
+      effectiveTeamByPlayer.set(loan.playerId, loan.targetTeamId);
+    }
     if (effectiveTeamByPlayer.get(input.goalkeeper_a_id) !== input.team_a_id
       || effectiveTeamByPlayer.get(input.goalkeeper_b_id) !== input.team_b_id) {
       return { success: false, error: "O goleiro precisa estar escalado pelo time nesta partida." };
@@ -167,7 +208,6 @@ export async function createMatch(input: CreateMatchInput) {
       }
     }
 
-    const leagueConfig = Array.isArray(round.league) ? round.league[0] : round.league;
     const durationMinutes = Number((leagueConfig as any)?.match_duration || 7);
     const durationSeconds = Math.max(60, Math.round(durationMinutes * 60));
 
@@ -232,6 +272,18 @@ export async function createMatch(input: CreateMatchInput) {
         entered_elapsed_seconds: 0,
       });
     }
+    for (const loan of structuralLoans) {
+      lineupRows.push({
+        match_id: data.id,
+        player_id: loan.playerId,
+        team_id: loan.targetTeamId,
+        original_team_id: loan.originalTeamId,
+        is_starter: true,
+        is_active: true,
+        result_eligible: true,
+        entered_elapsed_seconds: 0,
+      });
+    }
 
     if (lineupRows.length > 0) {
       const { error: lineupError } = await client.from("match_players").insert(lineupRows);
@@ -241,9 +293,19 @@ export async function createMatch(input: CreateMatchInput) {
       }
     }
 
+    const goalkeeperRotationOrder = (teamId: string, playerId: string) => {
+      const structural = structuralLoans.find((loan) => loan.targetTeamId === teamId && loan.playerId === playerId);
+      if (structural) return structural.rotationOrder;
+      const absentReplacement = replacements.find((replacement) => replacement.team_id === teamId && replacement.replacement_player_id === playerId);
+      const sourcePlayerId = absentReplacement?.absent_player_id || playerId;
+      return Number((selectedTeams as any[])
+        .find((team) => team.id === teamId)?.team_players
+        ?.find((entry: any) => entry.player_id === sourcePlayerId)?.goalkeeper_order || 0) || null;
+    };
+    const supportsLogicalRotation = Object.prototype.hasOwnProperty.call(round, "target_players_per_team");
     const { error: goalkeeperError } = await client.from("match_goalkeepers").insert([
-      { match_id: data.id, team_id: input.team_a_id, player_id: input.goalkeeper_a_id },
-      { match_id: data.id, team_id: input.team_b_id, player_id: input.goalkeeper_b_id },
+      { match_id: data.id, team_id: input.team_a_id, player_id: input.goalkeeper_a_id, ...(supportsLogicalRotation ? { rotation_order: goalkeeperRotationOrder(input.team_a_id, input.goalkeeper_a_id) } : {}) },
+      { match_id: data.id, team_id: input.team_b_id, player_id: input.goalkeeper_b_id, ...(supportsLogicalRotation ? { rotation_order: goalkeeperRotationOrder(input.team_b_id, input.goalkeeper_b_id) } : {}) },
     ]);
     if (goalkeeperError) {
       await client.from("matches").delete().eq("id", data.id);

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { createRoundWithTeams, saveRoundPrelist, type TeamInput } from "@/lib/actions/rounds";
+import { createRoundWithTeams, saveRoundPrelist, setCallupMatchSize, type TeamInput } from "@/lib/actions/rounds";
 import { adminAddCallupPlayer, adminRemoveCallupPlayer } from "@/lib/actions/callups";
 import type { RoundType, TeamFormationMode } from "@/lib/types";
 import { drawTeamsByAttendance, drawTeamsDirect } from "@/lib/round-draw";
@@ -11,6 +11,7 @@ import { drawTeamsBySpeedOnServer } from "@/lib/actions/speed-draw";
 import type { SpeedTeamSummary } from "@/lib/speed-draw";
 import {
   Users,
+  AlertTriangle,
   Calendar,
   CheckCircle2,
   ChevronDown,
@@ -36,6 +37,7 @@ import { useDialogViewport } from "@/lib/useDialogViewport";
 import { isPlayerVisibleInPrelistTab } from "@/lib/callup-ui";
 import { VEST_COLORS } from "@/lib/vest-colors";
 import { createDefaultTeams, type DrawPlayer, type DrawTeam, type RoundCreatorProps } from "./round-creator-model";
+import { MIN_UNDERFILLED_PLAYERS, rebalanceTeamRosters, validateUnderfilledTeamSizes, type RoundTeamSizeMode } from "@/lib/underfilled-rounds";
 
 export function RoundCreator({
   allPlayers,
@@ -79,8 +81,9 @@ export function RoundCreator({
   const [attendanceOrder, setAttendanceOrder] = useState<string[]>([]);
   const [pendingDrawMode, setPendingDrawMode] = useState<Exclude<TeamFormationMode, "manual"> | null>(null);
   const [speedSummary, setSpeedSummary] = useState<{ teams: SpeedTeamSummary[]; unratedCount: number } | null>(null);
+  const [underfilledPrompt, setUnderfilledPrompt] = useState<"count" | "size" | null>(null);
   const [mounted, setMounted] = useState(false);
-  useDialogViewport(Boolean(pendingDrawMode));
+  useDialogViewport(Boolean(pendingDrawMode || underfilledPrompt));
 
   useEffect(() => {
     setMounted(true);
@@ -91,6 +94,7 @@ export function RoundCreator({
   const [notice, setNotice] = useState("");
   const teamCapacity = Math.min(MAX_PLAYERS_PER_TEAM, Math.max(1, Math.trunc(playersPerTeam)));
   const roundCapacity = teamCapacity * teamCount;
+  const minimumPlayersToMount = teamCount === 3 && teamCapacity === 6 ? MIN_UNDERFILLED_PLAYERS : 1;
 
   function selectRoundType(type: RoundType) {
     if (sourceCallupId) return;
@@ -105,6 +109,7 @@ export function RoundCreator({
     return allPlayers.filter((player) => `${player.name} ${player.nickname || ""}`.toLocaleLowerCase("pt-BR").includes(query));
   }, [allPlayers, playerSearch]);
   const selectedSourceCallup = availableCallups.find((item) => item.id === sourceCallupId) || null;
+  const selectionCapacity = selectedSourceCallup?.capacity || roundCapacity;
   const sourceEntryIds = new Set(selectedSourceCallup?.entryIds || []);
   const synchronizedPlayerKey = (selectedSourceCallup?.playerIds || initialPlayerIds).join("|");
   const visiblePlayers = filteredPlayers.filter((player) =>
@@ -179,8 +184,8 @@ export function RoundCreator({
       })));
     }
     else {
-      if (next.size >= roundCapacity) {
-        setError(`A rodada aceita no máximo ${roundCapacity} jogadores: ${teamCapacity} por time.`);
+      if (next.size >= selectionCapacity) {
+        setError(`A lista aceita no máximo ${selectionCapacity} jogadores.`);
         return;
       }
       next.add(id);
@@ -191,8 +196,8 @@ export function RoundCreator({
   }
 
   async function addPlayerToPrelist(playerId: string) {
-    if (selectedPlayerIds.size >= roundCapacity) {
-      setError(`A rodada aceita no máximo ${roundCapacity} jogadores: ${teamCapacity} por time.`);
+    if (selectedPlayerIds.size >= selectionCapacity) {
+      setError(`A lista aceita no máximo ${selectionCapacity} jogadores.`);
       return;
     }
     if (!sourceCallupId) {
@@ -511,14 +516,64 @@ export function RoundCreator({
       return;
     }
 
-    await handleCreateRound();
+    const teamSizes = teams.map((team) => team.players.length);
+    if (teamSizes.reduce((total, size) => total + size, 0) !== selectedPlayers.length) {
+      setError("Todos os jogadores selecionados precisam estar em um time.");
+      return;
+    }
+
+    if (teamCount === 3 && teamCapacity === 6 && selectedPlayers.length < roundCapacity) {
+      if (selectedPlayers.length < MIN_UNDERFILLED_PLAYERS) {
+        setError(`Selecione pelo menos ${MIN_UNDERFILLED_PLAYERS} jogadores para iniciar uma rodada incompleta.`);
+        return;
+      }
+      setError("");
+      setUnderfilledPrompt("count");
+      return;
+    }
+
+    await handleCreateRound(teamCapacity, false);
   }
 
-  async function handleCreateRound() {
+  async function confirmUnderfilledSize(targetPlayersPerTeam: RoundTeamSizeMode) {
+    if (sourceCallupId) {
+      const capacityResult = await setCallupMatchSize(sourceCallupId, targetPlayersPerTeam);
+      if (!capacityResult.success) {
+        setUnderfilledPrompt(null);
+        setError(capacityResult.error || "Não foi possível ajustar a capacidade da convocação.");
+        return;
+      }
+    }
+    const teamsToSave = formationMode === "manual"
+      ? teams
+      : (() => {
+          const rebalancedRosters = rebalanceTeamRosters(teams.map((team) => team.players));
+          return teams.map((team, index) => ({ ...team, players: rebalancedRosters[index] }));
+        })();
+    const validationError = validateUnderfilledTeamSizes(
+      teamsToSave.map((team) => team.players.length),
+      selectedPlayers.length,
+      targetPlayersPerTeam,
+    );
+    if (validationError) {
+      setUnderfilledPrompt(null);
+      setError(validationError);
+      if (targetPlayersPerTeam === 5 && selectedPlayers.length > 15) {
+        setStep(2);
+        router.refresh();
+      }
+      return;
+    }
+    setTeams(teamsToSave);
+    setUnderfilledPrompt(null);
+    await handleCreateRound(targetPlayersPerTeam, true, teamsToSave);
+  }
+
+  async function handleCreateRound(targetPlayersPerTeam: number, confirmUnderfilled: boolean, teamsToSave = teams) {
     setLoading(true);
     setError("");
 
-    const teamsInput: TeamInput[] = teams.map(t => ({
+    const teamsInput: TeamInput[] = teamsToSave.map(t => ({
       name: t.name.trim(),
       color: t.color,
       crestUrl: t.crestUrl,
@@ -534,6 +589,8 @@ export function RoundCreator({
       prelistRoundId: currentPrelistId,
       startTime,
       stadiumId: selectedStadiumId,
+      targetPlayersPerTeam,
+      confirmUnderfilled,
     });
     
     if (!res.success) {
@@ -579,6 +636,36 @@ export function RoundCreator({
         <div className="rounded-lg border border-warning/25 bg-warning/10 p-3 text-xs font-semibold text-warning">
           {notice}
         </div>
+      )}
+
+      {mounted && underfilledPrompt && typeof document !== "undefined" && createPortal(
+        <div className="mobile-dialog-backdrop z-[99999] items-end bg-black/85 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Confirmar rodada incompleta">
+          <div className="mobile-dialog-panel relative flex max-w-md flex-col rounded-t-[2rem] border-t border-warning/40 bg-[#07150d] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-20px_60px_rgba(0,0,0,.9)] sm:rounded-3xl sm:border">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning/15 text-warning"><AlertTriangle className="h-5 w-5" /></span>
+              <div>
+                <h2 className="text-base font-black text-foreground">Rodada incompleta</h2>
+                {underfilledPrompt === "count" ? (
+                  <p className="mt-1 text-xs leading-relaxed text-muted">Há {selectedPlayers.length} de {roundCapacity} jogadores. Tem certeza de que deseja continuar com menos pessoas?</p>
+                ) : (
+                  <p className="mt-1 text-xs leading-relaxed text-muted">Deseja manter partidas 6x6? O time que estiver fora emprestará jogadores automaticamente para completar as vagas.</p>
+                )}
+              </div>
+            </div>
+            <div className="mt-5 grid gap-2">
+              {underfilledPrompt === "count" ? (
+                <button type="button" onClick={() => setUnderfilledPrompt("size")} className="rounded-xl bg-warning px-4 py-3 text-xs font-black uppercase text-background">Sim, continuar</button>
+              ) : (
+                <>
+                  <button type="button" onClick={() => confirmUnderfilledSize(6)} className="rounded-xl bg-accent px-4 py-3 text-xs font-black uppercase text-background">Sim, manter 6x6</button>
+                  <button type="button" onClick={() => confirmUnderfilledSize(5)} className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-xs font-black uppercase text-warning">Não, usar 5x5</button>
+                </>
+              )}
+              <button type="button" onClick={() => setUnderfilledPrompt(null)} className="rounded-xl border border-border bg-surface px-4 py-3 text-xs font-bold text-muted">Cancelar</button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
 
       {/* STEP 1: Data */}
@@ -701,7 +788,7 @@ export function RoundCreator({
                 Atualizar
               </button>
               <span className="rounded-lg bg-surface-hover px-2 py-1 text-xs font-bold text-muted">
-                {selectedPlayerIds.size}/{roundCapacity}
+                {selectedPlayerIds.size}/{selectionCapacity}
               </span>
             </div>
           </div>
@@ -821,12 +908,12 @@ export function RoundCreator({
           </div>
           <button
             onClick={() => persistPrelist("teams")}
-            disabled={loading || selectedPlayerIds.size === 0 || Boolean(sourceCallupId && selectedPlayerIds.size !== roundCapacity)}
+            disabled={loading || selectedPlayerIds.size < minimumPlayersToMount}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3.5 font-bold text-background transition-all active:scale-[0.98] disabled:opacity-50"
           >
             Montar Times <ChevronRight className="w-4 h-4" />
           </button>
-          {sourceCallupId && selectedPlayerIds.size !== roundCapacity && <p className="text-center text-[10px] font-semibold text-warning">Complete as {roundCapacity} vagas da convocacao antes de montar os times.</p>}
+          {selectedPlayerIds.size < minimumPlayersToMount && <p className="text-center text-[10px] font-semibold text-warning">Selecione pelo menos {minimumPlayersToMount} jogadores para montar os times.</p>}
         </div>
       )}
 

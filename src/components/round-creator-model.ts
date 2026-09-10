@@ -14,7 +14,7 @@ export type RoundCreatorProps = {
   prelistRoundId?: string | null;
   initialTime?: string;
   initialStadiumId?: string | null;
-  availableCallups?: Array<{ id: string; date: string; startTime: string; roundType: RoundType; playerIds: string[]; entryIds: string[] }>;
+  availableCallups?: Array<{ id: string; date: string; startTime: string; roundType: RoundType; capacity: number; playerIds: string[]; entryIds: string[] }>;
   mountTeams?: boolean;
   prelistNumber?: number | null;
   playersPerTeam?: number;
