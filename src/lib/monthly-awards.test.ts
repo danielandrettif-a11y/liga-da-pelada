@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAwardMonth, parseMonthlyAwardWinners, parseMonthlyAwards, previousMonthStart } from "./monthly-awards";
+import { formatAwardMonth, formatAwardPerformance, parseMonthlyAwardWinners, parseMonthlyAwards, previousMonthStart } from "./monthly-awards";
 
 describe("monthly awards", () => {
   it("normaliza somente categorias conhecidas", () => {
@@ -47,5 +47,23 @@ describe("monthly awards", () => {
       playerName: "Daniel",
       avatarUrl: null,
     }]);
+  });
+
+  it("apresenta a métrica específica dos novos prêmios", () => {
+    const base = { periodStart: "2026-08-01", points: 15, roundsPlayed: 4, isFinal: true };
+    expect(formatAwardPerformance({ ...base, type: "bestGoalkeeperMonth", metricValue: 2 })).toBe("2 gols sofridos");
+    expect(formatAwardPerformance({ ...base, type: "goldenBootMonth", metricValue: 7 })).toBe("7 gols");
+    expect(formatAwardPerformance({ ...base, type: "topAssistMonth", metricValue: 1 })).toBe("1 assistência");
+  });
+
+  it("aceita as novas categorias retornadas pelo banco", () => {
+    expect(parseMonthlyAwards([{
+      award_type: "goldenBootMonth",
+      period_start: "2026-08-01",
+      points: 22,
+      rounds_played: 4,
+      metric_value: 9,
+      is_final: true,
+    }])[0]).toMatchObject({ type: "goldenBootMonth", metricValue: 9 });
   });
 });

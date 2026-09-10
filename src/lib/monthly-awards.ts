@@ -2,6 +2,9 @@ export type MonthlyAwardType =
   | "bestDefenderMonth"
   | "bestMidfielderMonth"
   | "bestAttackerMonth"
+  | "bestGoalkeeperMonth"
+  | "goldenBootMonth"
+  | "topAssistMonth"
   | "bestManagerMonth";
 
 export type MonthlyAward = {
@@ -10,6 +13,7 @@ export type MonthlyAward = {
   points: number;
   roundsPlayed: number;
   isFinal: boolean;
+  metricValue?: number;
 };
 
 export type MonthlyAwardWinner = MonthlyAward & {
@@ -22,6 +26,9 @@ export const MONTHLY_AWARD_LABELS: Record<MonthlyAwardType, string> = {
   bestDefenderMonth: "Melhor DEF do mês",
   bestMidfielderMonth: "Melhor MEI do mês",
   bestAttackerMonth: "Melhor ATA do mês",
+  bestGoalkeeperMonth: "Melhor Goleiro do mês",
+  goldenBootMonth: "Chuteira de Ouro",
+  topAssistMonth: "Garçom do mês",
   bestManagerMonth: "Melhor Técnico do mês",
 };
 
@@ -34,12 +41,14 @@ export function parseMonthlyAwards(rows: unknown): MonthlyAward[] {
     const row = value as Record<string, unknown>;
     const type = String(row.award_type || "");
     if (!MONTHLY_AWARD_TYPES.has(type) || typeof row.period_start !== "string") return [];
+    const metricValue = row.metric_value == null ? undefined : Number(row.metric_value);
     return [{
       type: type as MonthlyAwardType,
       periodStart: row.period_start,
       points: Number(row.points || 0),
       roundsPlayed: Number(row.rounds_played || 0),
       isFinal: row.is_final === true,
+      ...(metricValue === undefined ? {} : { metricValue }),
     }];
   });
 }
@@ -56,17 +65,33 @@ export function parseMonthlyAwardWinners(rows: unknown): MonthlyAwardWinner[] {
       || typeof row.player_id !== "string"
       || typeof row.player_name !== "string"
     ) return [];
+    const metricValue = row.metric_value == null ? undefined : Number(row.metric_value);
     return [{
       type: type as MonthlyAwardType,
       periodStart: row.period_start,
       points: Number(row.points || 0),
       roundsPlayed: Number(row.rounds_played || 0),
       isFinal: row.is_final === true,
+      ...(metricValue === undefined ? {} : { metricValue }),
       playerId: row.player_id,
       playerName: row.player_name,
       avatarUrl: typeof row.avatar_url === "string" ? row.avatar_url : null,
     }];
   });
+}
+
+export function formatAwardPerformance(award: MonthlyAward) {
+  const value = award.metricValue ?? award.points;
+  if (award.type === "bestGoalkeeperMonth") {
+    return `${value} ${value === 1 ? "gol sofrido" : "gols sofridos"}`;
+  }
+  if (award.type === "goldenBootMonth") {
+    return `${value} ${value === 1 ? "gol" : "gols"}`;
+  }
+  if (award.type === "topAssistMonth") {
+    return `${value} ${value === 1 ? "assistência" : "assistências"}`;
+  }
+  return `${award.points.toFixed(1)} pts`;
 }
 
 export function previousMonthStart(referenceDate = new Date()) {

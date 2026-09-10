@@ -401,6 +401,7 @@ export type PlayerRoundStats = {
   defensive_one_goal_games: number;
   own_goals: number;
   points: number;
+  player_profile_locked?: PlayerProfile | null;
 };
 
 // ============================================

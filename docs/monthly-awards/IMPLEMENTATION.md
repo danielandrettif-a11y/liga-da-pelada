@@ -16,3 +16,8 @@
 - Consultar os quatro vencedores do mês anterior em uma única RPC.
 - Exibir uma chamada clicável dentro do banner da agenda.
 - Abrir um modal com DEF, MEI, ATA e Técnico, incluindo foto e pontuação.
+
+## Fase 5: premiações expandidas e posição histórica
+- Congelar a posição do atleta em cada linha de estatística da rodada.
+- Somar DEF, MEI e ATA somente dentro da tag usada naquela rodada.
+- Adicionar Melhor Goleiro, Chuteira de Ouro e Garçom ao perfil e ao popup.

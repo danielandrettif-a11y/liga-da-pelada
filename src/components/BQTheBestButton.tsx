@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronRight, Crown, Medal, Trophy, X } from "@/components/icons";
+import { ChevronRight, Crown, Football, Medal, Shield, Target, Trophy, X } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import {
   formatAwardMonth,
+  formatAwardPerformance,
   MONTHLY_AWARD_LABELS,
   type MonthlyAwardType,
   type MonthlyAwardWinner,
@@ -16,6 +17,9 @@ const AWARD_ORDER: MonthlyAwardType[] = [
   "bestDefenderMonth",
   "bestMidfielderMonth",
   "bestAttackerMonth",
+  "bestGoalkeeperMonth",
+  "goldenBootMonth",
+  "topAssistMonth",
   "bestManagerMonth",
 ];
 
@@ -80,7 +84,15 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
             <div className="relative mt-4 grid gap-2.5">
               {orderedWinners.map((winner, index) => {
                 const type = AWARD_ORDER[index];
-                const Icon = type === "bestManagerMonth" ? Trophy : Medal;
+                const Icon = type === "bestManagerMonth"
+                  ? Trophy
+                  : type === "bestGoalkeeperMonth"
+                    ? Shield
+                    : type === "goldenBootMonth"
+                      ? Football
+                      : type === "topAssistMonth"
+                        ? Target
+                        : Medal;
                 return (
                   <article key={type} className="flex min-h-[72px] items-center gap-3 rounded-2xl border border-white/10 bg-gradient-to-r from-white/[.07] to-transparent p-3">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-300/15 text-amber-300"><Icon className="h-4 w-4" /></span>
@@ -90,7 +102,7 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
                         <div className="min-w-0 flex-1">
                           <p className="text-[9px] font-black uppercase tracking-wider text-amber-300">{MONTHLY_AWARD_LABELS[type]}</p>
                           <p className="truncate text-sm font-black text-white">{winner.playerName}</p>
-                          <p className="text-[9px] text-white/50">{winner.points.toFixed(1)} pts · {winner.roundsPlayed} rodada{winner.roundsPlayed === 1 ? "" : "s"}</p>
+                          <p className="text-[9px] text-white/50">{formatAwardPerformance(winner)} · {winner.roundsPlayed} rodada{winner.roundsPlayed === 1 ? "" : "s"}</p>
                         </div>
                       </>
                     ) : (
