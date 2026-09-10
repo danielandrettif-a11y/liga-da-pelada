@@ -12,6 +12,12 @@ export type MonthlyAward = {
   isFinal: boolean;
 };
 
+export type MonthlyAwardWinner = MonthlyAward & {
+  playerId: string;
+  playerName: string;
+  avatarUrl: string | null;
+};
+
 export const MONTHLY_AWARD_LABELS: Record<MonthlyAwardType, string> = {
   bestDefenderMonth: "Melhor DEF do mês",
   bestMidfielderMonth: "Melhor MEI do mês",
@@ -36,6 +42,44 @@ export function parseMonthlyAwards(rows: unknown): MonthlyAward[] {
       isFinal: row.is_final === true,
     }];
   });
+}
+
+export function parseMonthlyAwardWinners(rows: unknown): MonthlyAwardWinner[] {
+  if (!Array.isArray(rows)) return [];
+  return rows.flatMap((value) => {
+    if (!value || typeof value !== "object") return [];
+    const row = value as Record<string, unknown>;
+    const type = String(row.award_type || "");
+    if (
+      !MONTHLY_AWARD_TYPES.has(type)
+      || typeof row.period_start !== "string"
+      || typeof row.player_id !== "string"
+      || typeof row.player_name !== "string"
+    ) return [];
+    return [{
+      type: type as MonthlyAwardType,
+      periodStart: row.period_start,
+      points: Number(row.points || 0),
+      roundsPlayed: Number(row.rounds_played || 0),
+      isFinal: row.is_final === true,
+      playerId: row.player_id,
+      playerName: row.player_name,
+      avatarUrl: typeof row.avatar_url === "string" ? row.avatar_url : null,
+    }];
+  });
+}
+
+export function previousMonthStart(referenceDate = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "numeric",
+  }).formatToParts(referenceDate);
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  return new Date(Date.UTC(year, month - 2, 1))
+    .toISOString()
+    .slice(0, 10);
 }
 
 export function formatAwardMonth(periodStart: string) {

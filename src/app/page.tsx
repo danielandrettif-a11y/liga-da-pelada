@@ -27,6 +27,7 @@ import { getCurrentAccount, getCurrentAccountIdentity } from "@/lib/auth";
 import { getSeasonPassDashboard } from "@/lib/actions/fantasy";
 import { SeasonPassBanner } from "@/components/fantasy/SeasonPassBanner";
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
+import { getPreviousMonthAwardWinners } from "@/lib/actions/players";
 
 export const dynamic = "force-dynamic";
 
@@ -102,12 +103,13 @@ function IncompleteProfileBanner() {
 
 export default async function HomePage() {
   const accountPromise = getCurrentAccount();
-  const [{ data }, previousSeason, account, identity, seasonPass] = await Promise.all([
+  const [{ data }, previousSeason, account, identity, seasonPass, monthlyAwards] = await Promise.all([
     getDashboardData(),
     getLatestFinishedSeason(),
     accountPromise,
     getCurrentAccountIdentity(),
     getSeasonPassDashboard(),
+    getPreviousMonthAwardWinners(),
   ]);
   const inheritedGoogleAvatars = [
     account.user?.user_metadata?.avatar_url,
@@ -182,6 +184,8 @@ export default async function HomePage() {
               isAdmin={account.isAdmin}
               venue={venue}
               eventDurationMinutes={eventDurationMinutes}
+              awardsPeriodStart={monthlyAwards.periodStart}
+              awardWinners={monthlyAwards.winners}
             />
           );
 

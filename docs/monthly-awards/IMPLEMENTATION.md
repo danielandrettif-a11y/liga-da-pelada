@@ -11,3 +11,8 @@
 ## Fase 3: qualidade
 - Testar rótulos e normalização.
 - Executar typegen, TypeScript, testes e build.
+
+## Fase 4: BQ The Best na home
+- Consultar os quatro vencedores do mês anterior em uma única RPC.
+- Exibir uma chamada clicável dentro do banner da agenda.
+- Abrir um modal com DEF, MEI, ATA e Técnico, incluindo foto e pontuação.

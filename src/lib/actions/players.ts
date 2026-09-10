@@ -9,7 +9,7 @@ import { getActiveSeason, getActiveSeasonRoundIds } from "./seasons";
 import { getAdminClient, getCurrentAccount } from "../auth";
 import { TEAM_PRESETS } from "../teamPresets";
 import { getMatchElapsedSeconds } from "../utils";
-import { parseMonthlyAwards } from "../monthly-awards";
+import { parseMonthlyAwardWinners, parseMonthlyAwards, previousMonthStart } from "../monthly-awards";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -401,6 +401,20 @@ export async function getPlayerMonthlyAwards(playerId: string) {
     return [];
   }
   return parseMonthlyAwards(data);
+}
+
+export async function getPreviousMonthAwardWinners() {
+  const periodStart = previousMonthStart();
+  const { data, error } = await supabase.rpc("get_monthly_award_winners", {
+    p_period_start: periodStart,
+  });
+
+  if (error) {
+    console.error("Erro ao buscar os melhores do mês:", error);
+    return { periodStart, winners: [] };
+  }
+
+  return { periodStart, winners: parseMonthlyAwardWinners(data) };
 }
 
 export async function createPlayer(input: CreatePlayerInput) {

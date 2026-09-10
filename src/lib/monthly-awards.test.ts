@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAwardMonth, parseMonthlyAwards } from "./monthly-awards";
+import { formatAwardMonth, parseMonthlyAwardWinners, parseMonthlyAwards, previousMonthStart } from "./monthly-awards";
 
 describe("monthly awards", () => {
   it("normaliza somente categorias conhecidas", () => {
@@ -17,5 +17,35 @@ describe("monthly awards", () => {
 
   it("formata o mês sem deslocamento de fuso", () => {
     expect(formatAwardMonth("2026-09-01")).toBe("Setembro de 2026");
+  });
+
+  it("calcula o começo do mês anterior inclusive na virada do ano", () => {
+    expect(previousMonthStart(new Date("2026-01-15T12:00:00Z"))).toBe("2025-12-01");
+  });
+
+  it("respeita o mês local de São Paulo na virada em UTC", () => {
+    expect(previousMonthStart(new Date("2026-09-01T01:00:00Z"))).toBe("2026-07-01");
+  });
+
+  it("normaliza vencedores com a identidade do jogador", () => {
+    expect(parseMonthlyAwardWinners([{
+      award_type: "bestManagerMonth",
+      period_start: "2026-08-01",
+      points: "94.2",
+      rounds_played: 4,
+      is_final: true,
+      player_id: "player-1",
+      player_name: "Daniel",
+      avatar_url: null,
+    }])).toEqual([{
+      type: "bestManagerMonth",
+      periodStart: "2026-08-01",
+      points: 94.2,
+      roundsPlayed: 4,
+      isFinal: true,
+      playerId: "player-1",
+      playerName: "Daniel",
+      avatarUrl: null,
+    }]);
   });
 });

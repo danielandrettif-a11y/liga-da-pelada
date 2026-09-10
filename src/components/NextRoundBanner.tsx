@@ -7,6 +7,8 @@ import {
   Trophy,
   Users,
 } from "@/components/icons";
+import { BQTheBestButton } from "@/components/BQTheBestButton";
+import type { MonthlyAwardWinner } from "@/lib/monthly-awards";
 
 type NextRound = {
   id: string;
@@ -23,11 +25,15 @@ export function NextRoundBanner({
   isAdmin = false,
   venue,
   eventDurationMinutes = 120,
+  awardsPeriodStart,
+  awardWinners = [],
 }: {
   round: NextRound | null;
   isAdmin?: boolean;
   venue?: { name?: string | null; mapUrl?: string | null } | null;
   eventDurationMinutes?: number;
+  awardsPeriodStart: string;
+  awardWinners?: MonthlyAwardWinner[];
 }) {
   const isPrelist = round?.preparation_stage === "prelist";
   const confirmedCount = round?.confirmedPlayers || 0;
@@ -151,10 +157,11 @@ export function NextRoundBanner({
           </div>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 z-30 border-t border-white/10 pt-3.5 text-right">
-          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-accent">
-            Toque para ver a agenda da pelada
-          </span>
+        <div className="absolute inset-x-0 bottom-0 z-30 space-y-2.5">
+          <BQTheBestButton periodStart={awardsPeriodStart} winners={awardWinners} />
+          <div className="border-t border-white/10 pt-2 text-right">
+            <span className="text-[9px] font-black uppercase tracking-[0.14em] text-accent">Toque fora do prêmio para ver a agenda</span>
+          </div>
         </div>
       </div>
     </article>
