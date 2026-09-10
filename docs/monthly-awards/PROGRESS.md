@@ -1,6 +1,6 @@
 # Prêmios mensais — progresso
 
-## Status: premiações expandidas concluídas e aprovadas para envio
+## Status: galeria de conquistas concluída e aprovada para envio
 
 - [x] Regras e fontes de dados definidas.
 - [x] RPC mensal.
@@ -12,5 +12,8 @@
 - [x] Snapshot histórico da posição por rodada.
 - [x] Melhor Goleiro, Chuteira de Ouro e Garçom do mês.
 - [x] Goleiro por menos gols sofridos e desempates globais por vitórias e empates.
+- [x] Lista de vencedores redesenhada sem pontuação exposta.
+- [x] Ficha clicável com resultado e explicação do prêmio.
+- [x] Validação final da galeria.
 - [x] Validação final das regras expandidas.
 - [x] Aprovação para envio ao Git.

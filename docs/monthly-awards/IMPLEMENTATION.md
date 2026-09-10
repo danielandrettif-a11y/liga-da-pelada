@@ -21,3 +21,8 @@
 - Congelar a posição do atleta em cada linha de estatística da rodada.
 - Somar DEF, MEI e ATA somente dentro da tag usada naquela rodada.
 - Adicionar Melhor Goleiro, Chuteira de Ouro e Garçom ao perfil e ao popup.
+
+## Fase 6: galeria de conquistas
+- Remover números da lista principal e reforçar visualmente cada categoria.
+- Transformar cada vencedor em uma área clicável.
+- Mostrar resultado, participação, regra e desempates somente na ficha detalhada.
