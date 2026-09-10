@@ -43,4 +43,23 @@ describe("rodadas incompletas", () => {
     expect(loans.map((loan) => loan.playerId)).toEqual(["c0", "c1"]);
     expect(loans.map((loan) => loan.rotationOrder)).toEqual([6, 6]);
   });
+
+  it("aceita trocar o empréstimo sem retirar o recusado das rodadas futuras", () => {
+    const teams = [
+      { id: "a", position: 1, players: Array.from({ length: 5 }, (_, i) => ({ playerId: `a${i}`, loanOrder: i + 1, eligible: true })) },
+      { id: "b", position: 2, players: Array.from({ length: 5 }, (_, i) => ({ playerId: `b${i}`, loanOrder: i + 1, eligible: true })) },
+      { id: "c", position: 3, players: Array.from({ length: 5 }, (_, i) => ({ playerId: `c${i}`, loanOrder: i + 1, eligible: true })) },
+    ];
+    const changed = buildStructuralLoans({
+      teams,
+      selectedTeamIds: ["a", "b"],
+      targetPlayersPerTeam: 6,
+      previousLoanCount: new Map(),
+      reservedPlayerIds: new Set(["c0"]),
+      preferredPlayerBySlot: new Map([["a:6", "c2"]]),
+    });
+    expect(changed.map((loan) => loan.playerId)).toEqual(["c2", "c1"]);
+    const nextMatch = buildStructuralLoans({ teams, selectedTeamIds: ["a", "b"], targetPlayersPerTeam: 6, previousLoanCount: new Map() });
+    expect(nextMatch[0].playerId).toBe("c0");
+  });
 });

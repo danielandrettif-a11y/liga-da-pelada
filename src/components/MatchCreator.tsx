@@ -18,6 +18,8 @@ export function MatchCreator({ round }: { round: any }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [replacementByAbsent, setReplacementByAbsent] = useState<Record<string, string>>({});
+  const [structuralLoanOverrideBySlot, setStructuralLoanOverrideBySlot] = useState<Record<string, string>>({});
+  const [declinedStructuralPlayerIds, setDeclinedStructuralPlayerIds] = useState<string[]>([]);
   const [swapPlayerAId, setSwapPlayerAId] = useState("");
   const [swapPlayerBId, setSwapPlayerBId] = useState("");
   const [swapPanelOpen, setSwapPanelOpen] = useState(false);
@@ -95,8 +97,9 @@ export function MatchCreator({ round }: { round: any }) {
     selectedTeamIds,
     targetPlayersPerTeam,
     previousLoanCount,
-    reservedPlayerIds: new Set(Object.values(replacementByAbsent).filter(Boolean)),
-  }), [teams, selectedTeamIds, targetPlayersPerTeam, previousLoanCount, replacementByAbsent, availability, attendance, tracksAttendance]);
+    reservedPlayerIds: new Set([...Object.values(replacementByAbsent).filter(Boolean), ...declinedStructuralPlayerIds]),
+    preferredPlayerBySlot: new Map(Object.entries(structuralLoanOverrideBySlot)),
+  }), [teams, selectedTeamIds, targetPlayersPerTeam, previousLoanCount, replacementByAbsent, declinedStructuralPlayerIds, structuralLoanOverrideBySlot, availability, attendance, tracksAttendance]);
   const structuralShortage = selectedTeams.reduce(
     (total: number, team: any) => total + Math.max(0, targetPlayersPerTeam - (team.team_players || []).length),
     0,
@@ -179,6 +182,8 @@ export function MatchCreator({ round }: { round: any }) {
 
   useEffect(() => {
     setReplacementByAbsent({});
+    setStructuralLoanOverrideBySlot({});
+    setDeclinedStructuralPlayerIds([]);
     setSubstitutionNotice(null);
   }, [teamAId, teamBId]);
 
@@ -287,6 +292,12 @@ export function MatchCreator({ round }: { round: any }) {
           absent_player_id: entry.playerId,
           replacement_player_id: replacementByAbsent[entry.playerId],
         })),
+      structural_loan_overrides: structuralLoans.map((loan) => ({
+        target_team_id: loan.targetTeamId,
+        rotation_order: loan.rotationOrder,
+        player_id: loan.playerId,
+      })),
+      structural_loan_excluded_player_ids: declinedStructuralPlayerIds,
     });
 
     if (!res.success) {
@@ -679,7 +690,32 @@ export function MatchCreator({ round }: { round: any }) {
               const source = teams.find((team: any) => team.id === loan.originalTeamId);
               const target = teams.find((team: any) => team.id === loan.targetTeamId);
               const sourceEntry = source?.team_players?.find((entry: any) => entry.player_id === loan.playerId);
-              return <p key={`${loan.targetTeamId}-${loan.rotationOrder}`} className="rounded-xl bg-background/60 px-3 py-2.5 text-xs font-bold text-foreground"><span className="text-accent">E{sourceEntry?.loan_order || "—"}</span> · {player?.name || "Jogador"} · {source?.name} → {target?.name}</p>;
+              const slotKey = `${loan.targetTeamId}:${loan.rotationOrder}`;
+              const usedByAnotherSlot = new Set(structuralLoans.filter((item) => `${item.targetTeamId}:${item.rotationOrder}` !== slotKey).map((item) => item.playerId));
+              const replacementIds = new Set(Object.values(replacementByAbsent).filter(Boolean));
+              const candidates = (source?.team_players || []).filter((entry: any) =>
+                availability.get(entry.player_id) === "available"
+                && (!tracksAttendance || attendance.get(entry.player_id) === "present")
+                && !usedByAnotherSlot.has(entry.player_id)
+                && !replacementIds.has(entry.player_id)
+              );
+              return <div key={slotKey} className="rounded-xl bg-background/60 px-3 py-2.5 text-xs font-bold text-foreground">
+                <p><span className="text-accent">E{sourceEntry?.loan_order || "—"}</span> · {player?.name || "Jogador"} · {source?.name} → {target?.name}</p>
+                <label className="mt-2 block">
+                  <span className="mb-1 block text-[9px] font-black uppercase tracking-wider text-muted">Trocar se não quiser jogar</span>
+                  <select
+                    value={loan.playerId}
+                    onChange={(event) => {
+                      const nextPlayerId = event.target.value;
+                      setDeclinedStructuralPlayerIds((current) => [...new Set([...current.filter((id) => id !== nextPlayerId), loan.playerId])]);
+                      setStructuralLoanOverrideBySlot((current) => ({ ...current, [slotKey]: nextPlayerId }));
+                    }}
+                    className="w-full rounded-lg border border-border bg-surface px-2.5 py-2 text-xs font-bold text-foreground outline-none focus:border-accent"
+                  >
+                    {candidates.map((entry: any) => <option key={entry.player_id} value={entry.player_id}>{entry.players?.name || "Jogador"} · E{entry.loan_order || "—"}</option>)}
+                  </select>
+                </label>
+              </div>;
             })}
             {structuralLoans.length !== structuralShortage && <p className="rounded-xl bg-danger/10 p-3 text-xs font-semibold text-danger">Não há jogadores disponíveis suficientes no time de fora.</p>}
           </div>

@@ -278,8 +278,8 @@ export function FantasyExperience({
   const [pending, startTransition] = useTransition();
   const [isRefreshing, startRefreshTransition] = useTransition();
   const betweenRounds = status === "between_rounds";
-  const open = status === "open" || betweenRounds;
-  const isMarketClosed = !open && (status === "in_progress" || status === "finished");
+  const open = status === "open";
+  const isMarketClosed = !open && (betweenRounds || status === "in_progress" || status === "finished");
 
   // V3: Bônus de orçamento temporário da carta Crédito Extra
   const budgetBonus = activeCard?.card?.effectType === "BUDGET_BONUS" ? (activeCard.card.effectConfig?.bonus || 5) : 0;
@@ -1000,18 +1000,6 @@ export function FantasyExperience({
         </div>
       )}
 
-      {/* Banner de Mercado Permanente */}
-      {betweenRounds && (
-        <div className="overflow-hidden rounded-2xl border border-accent/35 bg-accent/10 p-4">
-          <p className="text-[10px] font-black uppercase tracking-[.22em] text-accent">
-            Mercado permanente V2
-          </p>
-          <p className="mt-1 text-xs font-bold leading-5 text-foreground">
-            Compre, venda e escolha seu capitão agora. Seu time será mantido para a próxima Ranked oficial.
-          </p>
-        </div>
-      )}
-
       {/* V3: BANNER DE PACOTES DISPONÍVEIS */}
       {availablePacks && availablePacks.length > 0 && (
         <FantasyPackClaimBanner
@@ -1031,7 +1019,7 @@ export function FantasyExperience({
               <h1 className="mt-1 font-athletic text-[2rem] font-black uppercase italic leading-none text-foreground">Cartola</h1>
               <p className="mt-2 max-w-[250px] text-xs leading-5 text-muted">
                 {betweenRounds
-                  ? "Prepare seu elenco com base em valorização, tendências e custo-benefício"
+                  ? "Acompanhe as tendências enquanto aguarda a abertura da próxima Ranked"
                   : `Ranked ${round?.number || ""} · escale ${playersPerTeam} craques`}
               </p>
             </div>
@@ -1050,7 +1038,7 @@ export function FantasyExperience({
               {isTest
                 ? `Teste · ${open ? "aberto" : status === "in_progress" ? "em jogo" : "finalizado"}`
                 : betweenRounds
-                ? "Compras abertas"
+                ? "Janela fechada"
                 : open
                 ? "Mercado aberto"
                 : status === "in_progress"
@@ -1101,15 +1089,28 @@ export function FantasyExperience({
             </div>
           </div>
         )}
-      </header>
 
-      {/* Radar compacto da página inicial do Cartola. */}
-      {radar && (
-        <FantasyRadarCarousel
-          radar={radar}
-          onSelectPlayer={(player) => setSelectedDrawerPlayer(player)}
-        />
-      )}
+        {betweenRounds && (
+          <div className="relative flex items-center gap-3 border-t border-warning/25 bg-warning/[.08] px-5 py-3.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-warning/15 text-warning">
+              <Lock className="h-4.5 w-4.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[8px] font-black uppercase tracking-[.2em] text-warning">Janela de transferências fechada</p>
+              <p className="mt-0.5 text-xs font-black text-foreground">As compras voltam quando uma nova Ranked for aberta.</p>
+            </div>
+          </div>
+        )}
+
+        {radar && (
+          <div className="relative border-t border-white/10 p-3">
+            <FantasyRadarCarousel
+              radar={radar}
+              onSelectPlayer={(player) => setSelectedDrawerPlayer(player)}
+            />
+          </div>
+        )}
+      </header>
 
       {/* Resumo da Última Rodada */}
       {lastRound && !isTest && betweenRounds && (
@@ -1157,14 +1158,16 @@ export function FantasyExperience({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-black uppercase text-foreground">
-                  Escalações reveladas
+                  {betweenRounds ? "Times da última Ranked" : "Escalações reveladas"}
                 </span>
                 <span className="rounded-full bg-success/20 text-success px-2 py-0.5 text-[8px] font-black uppercase">
-                  Ao Vivo
+                  {betweenRounds ? "Final" : "Ao Vivo"}
                 </span>
               </div>
               <p className="text-[10px] text-muted">
-                O mercado fechou! Toque para ver os {playersPerTeam} jogadores, capitão e cartas de todos os rivais.
+                {betweenRounds
+                  ? `Consulte os ${playersPerTeam} jogadores, capitão e cartas usados na rodada anterior.`
+                  : `O mercado fechou! Toque para ver os ${playersPerTeam} jogadores, capitão e cartas de todos os rivais.`}
               </p>
             </div>
           </div>
@@ -1410,6 +1413,13 @@ export function FantasyExperience({
                   mixBlendMode: "soft-light",
                 }}
               />
+
+              {betweenRounds && (
+                <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 w-[145%] -translate-x-1/2 -translate-y-1/2 -rotate-[24deg] border-y-2 border-warning/70 bg-[#2a1805]/95 py-3 text-center shadow-[0_8px_28px_rgba(0,0,0,.55)] backdrop-blur-sm">
+                  <p className="font-athletic text-sm font-black uppercase italic tracking-[.18em] text-warning sm:text-base">Janela de transferências fechada</p>
+                  <p className="mt-0.5 text-[8px] font-black uppercase tracking-[.12em] text-warning/80">Aguarde a próxima Ranked</p>
+                </div>
+              )}
 
               {/* RENDERIZAÇÃO ADAPTÁVEL DO CAMPO (5 vs 6 JOGADORES) */}
               {playersPerTeam === 6 ? (

@@ -501,6 +501,12 @@ export type CreateMatchInput = {
     absent_player_id: string;
     replacement_player_id: string;
   }>;
+  structural_loan_overrides?: Array<{
+    target_team_id: string;
+    rotation_order: number;
+    player_id: string;
+  }>;
+  structural_loan_excluded_player_ids?: string[];
 };
 
 export type SubstituteMatchPlayerInput = {

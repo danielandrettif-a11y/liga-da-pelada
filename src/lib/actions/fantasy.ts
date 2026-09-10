@@ -1483,6 +1483,9 @@ export async function saveFantasyLineup(input: {
     if (!account.user) return { success: false, error: "Entre na sua conta para escalar." };
     const league = await getActiveLeague();
     const maxPlayers = league.players_per_team || 5;
+    if (!input.roundId) {
+      return { success: false, error: "A janela de transferências está fechada. Aguarde a abertura da próxima Ranked." };
+    }
     if (input.roundId && (input.playerIds.length !== maxPlayers || !input.captainId)) {
       return { success: false, error: `Para salvar a escalação, escolha exatamente ${maxPlayers} jogadores e um capitão.` };
     }
@@ -1511,17 +1514,6 @@ export async function saveFantasyLineup(input: {
       slot_index: slot.slotIndex,
       slot_role: slot.slotRole,
     }));
-    if (!input.roundId) {
-      const { error } = await account.client.rpc("save_fantasy_portfolio", {
-        p_fantasy_season_id: input.fantasySeasonId,
-        p_player_ids: input.playerIds,
-        p_captain_player_id: input.captainId,
-        p_lineup_slots: dbSlots,
-      });
-      if (error) return { success: false, error: error.message };
-      revalidatePath("/cartola");
-      return { success: true };
-    }
     const { data: testSession } = input.roundId
       ? await account.client
           .from("fantasy_test_sessions")

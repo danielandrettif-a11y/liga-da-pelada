@@ -42,7 +42,12 @@ export async function createMatch(input: CreateMatchInput) {
 
     const selectedTeamIds = [input.team_a_id, input.team_b_id];
     const replacements = input.replacements || [];
+    const structuralLoanOverrides = input.structural_loan_overrides || [];
+    const structuralLoanExcludedPlayerIds = input.structural_loan_excluded_player_ids || [];
     if (replacements.length > 30) return { success: false, error: "Quantidade de substitutos invalida." };
+    if (structuralLoanOverrides.length > 12 || structuralLoanExcludedPlayerIds.length > 30) {
+      return { success: false, error: "Quantidade de trocas de empréstimo inválida." };
+    }
 
     const [{ data: round, error: roundError }, { data: teams, error: teamsError }, { data: roundPlayers, error: roundPlayersError }] = await Promise.all([
       client.from("rounds").select("*, league:league_id (match_duration, players_per_team)").eq("id", input.round_id).single(),
@@ -137,6 +142,22 @@ export async function createMatch(input: CreateMatchInput) {
         }
       }
     }
+    const preferredPlayerBySlot = new Map<string, string>();
+    for (const override of structuralLoanOverrides) {
+      if (!selectedTeamIds.includes(override.target_team_id) || !Number.isInteger(override.rotation_order) || override.rotation_order < 1) {
+        return { success: false, error: "A troca de empréstimo enviada é inválida." };
+      }
+      const slotKey = `${override.target_team_id}:${override.rotation_order}`;
+      if (preferredPlayerBySlot.has(slotKey)) return { success: false, error: "Uma vaga de empréstimo foi enviada duas vezes." };
+      preferredPlayerBySlot.set(slotKey, override.player_id);
+    }
+    const validLenderPlayerIds = new Set((teams as any[])
+      .filter((team) => !selectedTeamIds.includes(team.id))
+      .flatMap((team) => (team.team_players || []).map((entry: any) => entry.player_id)));
+    if (structuralLoanExcludedPlayerIds.some((playerId) => !validLenderPlayerIds.has(playerId))) {
+      return { success: false, error: "A lista de jogadores que recusaram o empréstimo é inválida." };
+    }
+    const reservedStructuralPlayers = new Set([...usedReplacementPlayers, ...structuralLoanExcludedPlayerIds]);
     const structuralLoans = buildStructuralLoans({
       teams: (teams as any[]).map((team) => ({
         id: team.id,
@@ -151,7 +172,8 @@ export async function createMatch(input: CreateMatchInput) {
       selectedTeamIds,
       targetPlayersPerTeam,
       previousLoanCount,
-      reservedPlayerIds: usedReplacementPlayers,
+      reservedPlayerIds: reservedStructuralPlayers,
+      preferredPlayerBySlot,
     });
     const structuralShortage = (selectedTeams as any[]).reduce(
       (total, team) => total + Math.max(0, targetPlayersPerTeam - (team.team_players || []).length),
@@ -159,6 +181,13 @@ export async function createMatch(input: CreateMatchInput) {
     );
     if (structuralLoans.length !== structuralShortage) {
       return { success: false, error: `O time de fora nao possui jogadores disponiveis suficientes para completar ${targetPlayersPerTeam}x${targetPlayersPerTeam}.` };
+    }
+    if (structuralLoanOverrides.some((override) => !structuralLoans.some((loan) =>
+      loan.targetTeamId === override.target_team_id
+      && loan.rotationOrder === override.rotation_order
+      && loan.playerId === override.player_id
+    ))) {
+      return { success: false, error: "O jogador escolhido não está disponível para este empréstimo." };
     }
 
     const { data: liveMatches, error: liveMatchesError } = await client

@@ -78,12 +78,14 @@ export function buildStructuralLoans({
   targetPlayersPerTeam,
   previousLoanCount,
   reservedPlayerIds = new Set(),
+  preferredPlayerBySlot = new Map(),
 }: {
   teams: StructuralLoanTeam[];
   selectedTeamIds: string[];
   targetPlayersPerTeam: number;
   previousLoanCount: ReadonlyMap<string, number>;
   reservedPlayerIds?: ReadonlySet<string>;
+  preferredPlayerBySlot?: ReadonlyMap<string, string>;
 }): StructuralLoan[] {
   const selected = teams
     .filter((team) => selectedTeamIds.includes(team.id))
@@ -98,8 +100,12 @@ export function buildStructuralLoans({
   for (const team of selected) {
     const missing = Math.max(0, targetPlayersPerTeam - team.players.length);
     for (let offset = 0; offset < missing; offset += 1) {
-      const candidate = orderLoanQueue(
-        lender.players.filter((player) => player.eligible),
+      const rotationOrder = team.players.length + offset + 1;
+      const slotKey = `${team.id}:${rotationOrder}`;
+      const availableCandidates = lender.players.filter((player) => player.eligible && !used.has(player.playerId));
+      const preferredPlayerId = preferredPlayerBySlot.get(slotKey);
+      const candidate = availableCandidates.find((player) => player.playerId === preferredPlayerId) || orderLoanQueue(
+        availableCandidates,
         previousLoanCount,
         used,
       )[0];
@@ -109,7 +115,7 @@ export function buildStructuralLoans({
         targetTeamId: team.id,
         originalTeamId: lender.id,
         playerId: candidate.playerId,
-        rotationOrder: team.players.length + offset + 1,
+        rotationOrder,
       });
     }
   }
