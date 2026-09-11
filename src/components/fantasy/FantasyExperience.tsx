@@ -1414,7 +1414,9 @@ export function FantasyExperience({
                 }}
               />
 
-              {betweenRounds && <div className="pointer-events-none absolute inset-0 z-20 bg-black/15 backdrop-blur-[1.5px]" />}
+              {betweenRounds && (
+                <div className="pointer-events-none absolute inset-0 z-20 bg-[#020b06]/40 backdrop-blur-[10px] backdrop-saturate-[.35]" />
+              )}
 
               {betweenRounds && (
                 <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 w-[132%] -translate-x-1/2 -translate-y-1/2 -rotate-[16deg] overflow-hidden border-y border-accent/80 bg-[linear-gradient(90deg,rgba(2,20,11,.97),rgba(10,70,36,.97)_25%,rgba(3,35,18,.98)_50%,rgba(10,70,36,.97)_75%,rgba(2,20,11,.97))] py-2.5 text-center shadow-[0_10px_32px_rgba(0,0,0,.65),0_0_20px_rgba(204,255,0,.12)]">
