@@ -15,7 +15,7 @@
 ## Fase 4: BQ The Best na home
 - Consultar os quatro vencedores do mês anterior em uma única RPC.
 - Exibir uma chamada clicável dentro do banner da agenda.
-- Abrir um modal com Defensor, Ala/Meio, Atacante, Goleiro, Chuteira de Ouro, Garçom, Técnico e WAG, incluindo foto e detalhes da conquista.
+- Abrir um modal com Defensor, Ala/Meio, Atacante, Goleiro, Chuteira de Ouro, Garçom e Técnico, incluindo foto e detalhes da conquista.
 
 ## Fase 5: premiações expandidas e posição histórica
 - Congelar a posição do atleta em cada linha de estatística da rodada.

@@ -5,8 +5,7 @@ export type MonthlyAwardType =
   | "bestGoalkeeperMonth"
   | "goldenBootMonth"
   | "topAssistMonth"
-  | "bestManagerMonth"
-  | "bestWagMonth";
+  | "bestManagerMonth";
 
 export type MonthlyAward = {
   type: MonthlyAwardType;
@@ -31,7 +30,6 @@ export const MONTHLY_AWARD_LABELS: Record<MonthlyAwardType, string> = {
   goldenBootMonth: "Chuteira de Ouro",
   topAssistMonth: "Garçom do mês",
   bestManagerMonth: "Melhor Técnico do mês",
-  bestWagMonth: "Melhor WAG do mês",
 };
 
 const MONTHLY_AWARD_TYPES = new Set(Object.keys(MONTHLY_AWARD_LABELS));
@@ -93,7 +91,6 @@ export function formatAwardPerformance(award: MonthlyAward) {
   if (award.type === "topAssistMonth") {
     return `${value} ${value === 1 ? "assistência" : "assistências"}`;
   }
-  if (award.type === "bestWagMonth") return "Premiação especial do mês";
   return `${award.points.toFixed(1)} pts`;
 }
 

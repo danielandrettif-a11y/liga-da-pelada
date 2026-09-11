@@ -21,7 +21,6 @@ const AWARD_ORDER: MonthlyAwardType[] = [
   "goldenBootMonth",
   "topAssistMonth",
   "bestManagerMonth",
-  "bestWagMonth",
 ];
 
 const AWARD_VISUALS: Record<MonthlyAwardType, { code: string; card: string; icon: string; eyebrow: string }> = {
@@ -67,12 +66,6 @@ const AWARD_VISUALS: Record<MonthlyAwardType, { code: string; card: string; icon
     icon: "border-accent/40 bg-accent/15 text-accent",
     eyebrow: "text-accent",
   },
-  bestWagMonth: {
-    code: "WAG",
-    card: "border-fuchsia-300/30 bg-gradient-to-r from-fuchsia-400/15 via-[#241326] to-[#07130c]",
-    icon: "border-fuchsia-300/35 bg-fuchsia-400/15 text-fuchsia-200",
-    eyebrow: "text-fuchsia-200",
-  },
 };
 
 const AWARD_EXPLANATIONS: Record<MonthlyAwardType, string> = {
@@ -83,7 +76,6 @@ const AWARD_EXPLANATIONS: Record<MonthlyAwardType, string> = {
   goldenBootMonth: "Foi o jogador que marcou mais gols nas rodadas oficiais do mês.",
   topAssistMonth: "Foi o jogador que distribuiu mais assistências nas rodadas oficiais do mês.",
   bestManagerMonth: "Conquistou a maior pontuação acumulada no Cartola durante o mês.",
-  bestWagMonth: "Prêmio honorário mensal concedido à Anna e à Duda, sem critério competitivo.",
 };
 
 type AwardEntry = {
@@ -94,8 +86,6 @@ type AwardEntry = {
 function AwardIcon({ type, className }: { type: MonthlyAwardType; className?: string }) {
   const Icon = type === "bestManagerMonth"
     ? Trophy
-    : type === "bestWagMonth"
-      ? Crown
     : type === "bestGoalkeeperMonth"
       ? Shield
       : type === "goldenBootMonth"
@@ -235,12 +225,12 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
                     <div className="mt-5 w-full rounded-2xl border border-white/10 bg-black/25 p-4">
                       <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/45">O que fez para ganhar</p>
                       <p className="mt-2 font-athletic text-3xl font-black italic text-amber-200">{formatAwardPerformance(selectedWinner)}</p>
-                      {selectedWinner.type !== "bestWagMonth" && <p className="mt-1 text-[11px] font-semibold text-white/55">em {selectedWinner.roundsPlayed} rodada{selectedWinner.roundsPlayed === 1 ? "" : "s"} oficial{selectedWinner.roundsPlayed === 1 ? "" : "is"}</p>}
+                      <p className="mt-1 text-[11px] font-semibold text-white/55">em {selectedWinner.roundsPlayed} rodada{selectedWinner.roundsPlayed === 1 ? "" : "s"} oficial{selectedWinner.roundsPlayed === 1 ? "" : "is"}</p>
                     </div>
 
                     <div className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[.04] p-4 text-left">
                       <p className="text-xs font-bold leading-5 text-white/80">{AWARD_EXPLANATIONS[selectedWinner.type]}</p>
-                      {selectedWinner.type !== "bestWagMonth" && <p className="mt-2 border-t border-white/10 pt-2 text-[10px] leading-4 text-white/45">Em caso de empate: mais vitórias, depois mais empates.</p>}
+                      <p className="mt-2 border-t border-white/10 pt-2 text-[10px] leading-4 text-white/45">Em caso de empate: mais vitórias, depois mais empates.</p>
                     </div>
                   </div>
                 </div>
@@ -252,7 +242,7 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
                     <p className="font-athletic text-xs font-black uppercase italic tracking-[0.15em] text-white">Seleção do mês</p>
                     <p className="mt-0.5 text-[10px] text-white/45">Toque em um vencedor para ver a conquista</p>
                   </div>
-                  <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-1 text-[8px] font-black uppercase text-amber-200">8 categorias</span>
+                  <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-1 text-[8px] font-black uppercase text-amber-200">7 categorias</span>
                 </div>
 
                 <button type="button" onClick={handleShareAwards} disabled={sharing} className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-fuchsia-300/45 bg-fuchsia-300/10 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-fuchsia-100 transition-colors hover:bg-fuchsia-300/20 disabled:opacity-60">

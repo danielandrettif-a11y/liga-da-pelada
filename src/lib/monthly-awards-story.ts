@@ -13,7 +13,6 @@ const AWARD_COLORS: Record<MonthlyAwardType, { accent: string; background: strin
   goldenBootMonth: { accent: "#ffe16d", background: "#4a3b08", code: "GOLS" },
   topAssistMonth: { accent: "#63edb4", background: "#0b4030", code: "ASSIST" },
   bestManagerMonth: { accent: "#d3ff31", background: "#34450c", code: "TÉC" },
-  bestWagMonth: { accent: "#ff9ee9", background: "#4a1744", code: "WAG" },
 };
 
 function roundedRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
