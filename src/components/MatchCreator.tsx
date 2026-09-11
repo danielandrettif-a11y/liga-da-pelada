@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createMatch } from "@/lib/actions/matches";
-import { Swords, ArrowLeft, ChevronRight, ChevronDown, AlertTriangle, Check, ArrowLeftRight, Crown, Users } from "@/components/icons";
+import { Swords, ArrowLeft, ChevronRight, AlertTriangle, Check, ArrowLeftRight, Crown, Users } from "@/components/icons";
 import Link from "next/link";
 import { TeamCrest } from "./TeamCrest";
-import { markRoundTeamArrived, setRoundTeamCaptain, setRoundTeamVestColor, swapRoundTeamPlayers } from "@/lib/actions/rounds";
+import { markRoundTeamArrived, setRoundTeamCaptain, setRoundTeamVestColor } from "@/lib/actions/rounds";
 import { VEST_COLORS } from "@/lib/vest-colors";
 import { pickFairSubstitute } from "@/lib/substitution-draw";
 import { buildStructuralLoans } from "@/lib/underfilled-rounds";
@@ -20,10 +20,6 @@ export function MatchCreator({ round }: { round: any }) {
   const [replacementByAbsent, setReplacementByAbsent] = useState<Record<string, string>>({});
   const [structuralLoanOverrideBySlot, setStructuralLoanOverrideBySlot] = useState<Record<string, string>>({});
   const [declinedStructuralPlayerIds, setDeclinedStructuralPlayerIds] = useState<string[]>([]);
-  const [swapPlayerAId, setSwapPlayerAId] = useState("");
-  const [swapPlayerBId, setSwapPlayerBId] = useState("");
-  const [swapPanelOpen, setSwapPanelOpen] = useState(false);
-  const [swapFeedback, setSwapFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [managementLoading, setManagementLoading] = useState(false);
   const [captainByTeam, setCaptainByTeam] = useState<Record<string, string>>(() => Object.fromEntries(
     (round?.teams || []).map((team: any) => [team.id, team.captain_player_id || ""]),
@@ -108,13 +104,16 @@ export function MatchCreator({ round }: { round: any }) {
     teams.flatMap((team: any) => (team.team_players || []).map((entry: any) => [entry.player_id, entry.players] as const)),
   ), [teams]);
   const eligibleGoalkeepersByTeam = useMemo(() => Object.fromEntries(teams.map((team: any) => {
+    const loanStartsGoalkeeperQueue = structuralLoans.some((loan) =>
+      loan.targetTeamId === team.id && loan.rotationOrder === 1,
+    );
     const players = (team.team_players || [])
       .filter((entry: any) => availability.get(entry.player_id) !== "injured" && (!tracksAttendance || attendance.get(entry.player_id) === "present"))
       .map((entry: any) => ({
         id: entry.player_id,
         name: entry.players?.name || "Jogador",
         isGoalkeeper: Boolean(entry.players?.is_goalkeeper),
-        goalkeeperOrder: Number(entry.goalkeeper_order || Number.MAX_SAFE_INTEGER),
+        goalkeeperOrder: Number(entry.goalkeeper_order || Number.MAX_SAFE_INTEGER) + (loanStartsGoalkeeperQueue ? 1 : 0),
       }));
     for (const [absentId, replacementId] of Object.entries(replacementByAbsent)) {
       const absentTeamId = playerTeamById.get(absentId);
@@ -125,7 +124,7 @@ export function MatchCreator({ round }: { round: any }) {
           id: replacementId,
           name: replacement.player.name,
           isGoalkeeper: Boolean(replacement.player.is_goalkeeper),
-          goalkeeperOrder: Number((team.team_players || []).find((item: any) => item.player_id === absentId)?.goalkeeper_order || Number.MAX_SAFE_INTEGER),
+          goalkeeperOrder: Number((team.team_players || []).find((item: any) => item.player_id === absentId)?.goalkeeper_order || Number.MAX_SAFE_INTEGER) + (loanStartsGoalkeeperQueue ? 1 : 0),
         });
       }
     }
@@ -144,10 +143,13 @@ export function MatchCreator({ round }: { round: any }) {
   })), [teams, availability, attendance, tracksAttendance, replacementByAbsent, playerTeamById, waitingPlayers, structuralLoans, teamPlayerById]);
 
   const bqGoalkeeperSuggestionByTeam = useMemo(() => Object.fromEntries(teams.map((team: any) => {
+    const loanStartsGoalkeeperQueue = structuralLoans.some((loan) =>
+      loan.targetTeamId === team.id && loan.rotationOrder === 1,
+    );
     const rotation = [...(team.team_players || [])]
       .map((entry: any) => ({
         id: replacementByAbsent[entry.player_id] || entry.player_id,
-        order: Number(entry.goalkeeper_order || Number.MAX_SAFE_INTEGER),
+        order: Number(entry.goalkeeper_order || Number.MAX_SAFE_INTEGER) + (loanStartsGoalkeeperQueue ? 1 : 0),
       }))
       .sort((a, b) => a.order - b.order);
     for (const loan of structuralLoans.filter((item) => item.targetTeamId === team.id)) {
@@ -316,42 +318,6 @@ export function MatchCreator({ round }: { round: any }) {
     if (!result.success) setError(result.error || "Nao foi possivel atualizar as chegadas.");
     else router.refresh();
     setManagementLoading(false);
-  }
-
-  async function handlePermanentSwap() {
-    if (!swapPlayerAId || !swapPlayerBId) return;
-    setManagementLoading(true);
-    setError("");
-    setSwapFeedback(null);
-    const result = await swapRoundTeamPlayers(round.id, swapPlayerAId, swapPlayerBId);
-    if (!result.success) {
-      setSwapFeedback({ type: "error", message: result.error || "Não foi possível realizar a troca." });
-    }
-    else {
-      setSwapPlayerAId("");
-      setSwapPlayerBId("");
-      setSwapFeedback({ type: "success", message: "Troca realizada. Os próximos jogos já usarão os novos times." });
-      router.refresh();
-    }
-    setManagementLoading(false);
-  }
-
-  function selectSwapPlayer(playerId: string, teamId: string) {
-    setSwapFeedback(null);
-    if (swapPlayerAId === playerId) {
-      setSwapPlayerAId("");
-      return;
-    }
-    if (swapPlayerBId === playerId) {
-      setSwapPlayerBId("");
-      return;
-    }
-    const firstTeamId = playerTeamById.get(swapPlayerAId);
-    const secondTeamId = playerTeamById.get(swapPlayerBId);
-    if (!swapPlayerAId || firstTeamId === teamId) setSwapPlayerAId(playerId);
-    else if (!swapPlayerBId || secondTeamId === teamId) setSwapPlayerBId(playerId);
-    else setSwapPlayerBId(playerId);
-    setError("");
   }
 
   async function handleCaptainChange(teamId: string, playerId: string) {
@@ -567,57 +533,6 @@ export function MatchCreator({ round }: { round: any }) {
         </div>
 
       </div>
-
-      <section className="glass-card overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setSwapPanelOpen((current) => !current)}
-          aria-expanded={swapPanelOpen}
-          aria-controls="permanent-swap-panel"
-          className={`flex w-full items-center gap-3 bg-surface px-4 py-3 text-left transition-colors hover:bg-surface-hover ${swapPanelOpen ? "border-b border-border" : ""}`}
-        >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-warning/10 text-warning"><ArrowLeftRight className="h-4.5 w-4.5" /></span>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-black text-foreground">Troca permanente</h2>
-            <p className="text-[10px] text-muted">{swapPanelOpen ? "Escolha um jogador de cada time." : "Toque para abrir e trocar dois jogadores de time."}</p>
-          </div>
-          <ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${swapPanelOpen ? "rotate-180" : ""}`} />
-        </button>
-        {swapPanelOpen && <div id="permanent-swap-panel" className="grid gap-3 p-4 sm:grid-cols-2">
-          {teams.map((team: any) => (
-            <div key={team.id} className="overflow-hidden rounded-xl border border-border bg-background/45">
-              <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
-                <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-7 w-7" />
-                <span className="min-w-0 flex-1 truncate text-xs font-black text-foreground">{team.name}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5 p-2">
-                {(team.team_players || []).map((entry: any) => {
-                  const position = swapPlayerAId === entry.player_id ? 1 : swapPlayerBId === entry.player_id ? 2 : 0;
-                  return (
-                    <button
-                      key={entry.player_id}
-                      type="button"
-                      onClick={() => selectSwapPlayer(entry.player_id, team.id)}
-                      className={`relative min-w-0 rounded-lg border px-2 py-2 text-left text-[10px] font-bold transition-colors ${position ? "border-warning bg-warning/10 text-warning" : "border-border bg-surface text-foreground"}`}
-                    >
-                      <span className="block truncate">{entry.players?.name}</span>
-                      {position > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-warning text-[8px] font-black text-background">{position}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-          {swapFeedback && (
-            <p role="status" className={`rounded-xl p-3 text-center text-[10px] font-bold sm:col-span-2 ${swapFeedback.type === "success" ? "bg-success/10 text-success" : "bg-danger/10 text-danger"}`}>
-              {swapFeedback.message}
-            </p>
-          )}
-          <button type="button" disabled={managementLoading || !swapPlayerAId || !swapPlayerBId} onClick={handlePermanentSwap} className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-xs font-black text-warning disabled:opacity-40 sm:col-span-2">
-            {managementLoading ? "Salvando..." : "Confirmar troca entre os times"}
-          </button>
-        </div>}
-      </section>
 
       {selectedTeamIds.length === 2 && (
         <section className="glass-card overflow-hidden animate-fade-in-up">

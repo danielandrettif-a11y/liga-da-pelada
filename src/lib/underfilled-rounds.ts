@@ -100,7 +100,11 @@ export function buildStructuralLoans({
   for (const team of selected) {
     const missing = Math.max(0, targetPlayersPerTeam - team.players.length);
     for (let offset = 0; offset < missing; offset += 1) {
-      const rotationOrder = team.players.length + offset + 1;
+      // Quando falta apenas uma pessoa, o empréstimo ocupa a primeira vaga
+      // lógica do rodízio do gol. Os titulares passam a ocupar as vagas 2–6
+      // na tela e ao registrar a partida. Isso faz o convidado estrear no gol
+      // sem quebrar a sequência nas partidas seguintes.
+      const rotationOrder = missing === 1 ? 1 : team.players.length + offset + 1;
       const slotKey = `${team.id}:${rotationOrder}`;
       const availableCandidates = lender.players.filter((player) => player.eligible && !used.has(player.playerId));
       const preferredPlayerId = preferredPlayerBySlot.get(slotKey);

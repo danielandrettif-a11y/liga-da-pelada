@@ -113,6 +113,7 @@ export default async function RodadaDetalhePage({
         <RoundTeamShuffleCard
           roundId={round.id}
           canManage={account.isAdmin && round.status !== "finished" && round.teams.length >= 2}
+          teams={round.teams || []}
         />
       </section>
 

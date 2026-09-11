@@ -29,7 +29,7 @@ describe("rodadas incompletas", () => {
     expect(orderLoanQueue(candidates, new Map([["p1", 1], ["p2", 1], ["p3", 1]]))[0].playerId).toBe("p1");
   });
 
-  it("completa 5x5 com dois nomes diferentes do time de fora", () => {
+  it("completa 5x5 e põe o único empréstimo no início da fila do gol", () => {
     const loans = buildStructuralLoans({
       teams: [
         { id: "a", position: 1, players: Array.from({ length: 5 }, (_, i) => ({ playerId: `a${i}`, loanOrder: i + 1, eligible: true })) },
@@ -41,7 +41,7 @@ describe("rodadas incompletas", () => {
       previousLoanCount: new Map(),
     });
     expect(loans.map((loan) => loan.playerId)).toEqual(["c0", "c1"]);
-    expect(loans.map((loan) => loan.rotationOrder)).toEqual([6, 6]);
+    expect(loans.map((loan) => loan.rotationOrder)).toEqual([1, 1]);
   });
 
   it("aceita trocar o empréstimo sem retirar o recusado das rodadas futuras", () => {
@@ -56,7 +56,7 @@ describe("rodadas incompletas", () => {
       targetPlayersPerTeam: 6,
       previousLoanCount: new Map(),
       reservedPlayerIds: new Set(["c0"]),
-      preferredPlayerBySlot: new Map([["a:6", "c2"]]),
+      preferredPlayerBySlot: new Map([["a:1", "c2"]]),
     });
     expect(changed.map((loan) => loan.playerId)).toEqual(["c2", "c1"]);
     const nextMatch = buildStructuralLoans({ teams, selectedTeamIds: ["a", "b"], targetPlayersPerTeam: 6, previousLoanCount: new Map() });

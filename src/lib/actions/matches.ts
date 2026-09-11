@@ -325,11 +325,15 @@ export async function createMatch(input: CreateMatchInput) {
     const goalkeeperRotationOrder = (teamId: string, playerId: string) => {
       const structural = structuralLoans.find((loan) => loan.targetTeamId === teamId && loan.playerId === playerId);
       if (structural) return structural.rotationOrder;
+      const loanStartsGoalkeeperQueue = structuralLoans.some((loan) =>
+        loan.targetTeamId === teamId && loan.rotationOrder === 1,
+      );
       const absentReplacement = replacements.find((replacement) => replacement.team_id === teamId && replacement.replacement_player_id === playerId);
       const sourcePlayerId = absentReplacement?.absent_player_id || playerId;
-      return Number((selectedTeams as any[])
+      const rotationOrder = Number((selectedTeams as any[])
         .find((team) => team.id === teamId)?.team_players
-        ?.find((entry: any) => entry.player_id === sourcePlayerId)?.goalkeeper_order || 0) || null;
+        ?.find((entry: any) => entry.player_id === sourcePlayerId)?.goalkeeper_order || 0);
+      return rotationOrder > 0 ? rotationOrder + (loanStartsGoalkeeperQueue ? 1 : 0) : null;
     };
     const supportsLogicalRotation = Object.prototype.hasOwnProperty.call(round, "target_players_per_team");
     const { error: goalkeeperError } = await client.from("match_goalkeepers").insert([
