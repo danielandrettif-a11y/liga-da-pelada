@@ -179,18 +179,18 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
           setSelectedWinner(null);
           setOpen(true);
         }}
-        className="pointer-events-auto relative z-30 flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-fuchsia-300/75 bg-[radial-gradient(circle_at_12%_0%,rgba(250,204,21,.42),transparent_34%),linear-gradient(110deg,#64134f_0%,#9d1d62_46%,#351027_100%)] px-3.5 py-3 text-left shadow-[0_0_0_1px_rgba(250,204,21,.22),0_14px_32px_rgba(112,18,83,.55),inset_0_1px_0_rgba(255,255,255,.2)] transition-transform active:scale-[.98]"
+        className="pointer-events-auto relative z-30 flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-yellow-300/65 bg-[radial-gradient(circle_at_10%_0%,rgba(250,204,21,.24),transparent_36%),linear-gradient(110deg,#16351f_0%,#0d4934_50%,#071d14_100%)] px-3.5 py-3 text-left shadow-[0_0_0_1px_rgba(204,255,0,.12),0_14px_32px_rgba(0,0,0,.38),inset_0_1px_0_rgba(255,255,255,.13)] transition-transform active:scale-[.98]"
         aria-haspopup="dialog"
       >
-        <span aria-hidden="true" className="absolute -right-8 top-1/2 h-24 w-24 -translate-y-1/2 rounded-full bg-fuchsia-200/20 blur-2xl" />
-        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-yellow-100/70 bg-gradient-to-br from-yellow-200 to-amber-500 text-[#381124] shadow-[0_0_22px_rgba(250,204,21,.55)]">
+        <span aria-hidden="true" className="absolute -right-8 top-1/2 h-24 w-24 -translate-y-1/2 rounded-full bg-accent/20 blur-2xl" />
+        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-yellow-100/70 bg-gradient-to-br from-yellow-200 to-amber-500 text-[#19301b] shadow-[0_0_22px_rgba(250,204,21,.45)]">
           <Crown className="h-5 w-5" />
         </span>
         <span className="relative min-w-0 flex-1">
           <span className="block font-athletic text-[13px] font-black uppercase italic tracking-[0.12em] text-yellow-100">BQ The Best</span>
           <span className="block truncate text-[10px] font-black uppercase tracking-wider text-white/90">Melhores de {monthLabel}</span>
         </span>
-        <span className="relative flex items-center gap-1 rounded-full bg-yellow-200 px-2.5 py-1 text-[9px] font-black uppercase text-[#4b1535] shadow-[0_0_18px_rgba(250,204,21,.36)]">Ver <ChevronRight className="h-3.5 w-3.5" /></span>
+        <span className="relative flex items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-[9px] font-black uppercase text-[#07160d] shadow-[0_0_18px_rgba(204,255,0,.30)]">Ver <ChevronRight className="h-3.5 w-3.5" /></span>
       </button>
 
       {mounted && open && typeof document !== "undefined" && createPortal(
