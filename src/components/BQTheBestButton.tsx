@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, ChevronRight, Crown, Football, Medal, Shield, Target, Trophy, X } from "@/components/icons";
+import { ArrowLeft, ChevronRight, Crown, Football, Medal, Share2, Shield, Target, Trophy, X } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import {
@@ -110,6 +110,8 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [selectedWinner, setSelectedWinner] = useState<MonthlyAwardWinner | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [shareMessage, setShareMessage] = useState("");
   useDialogViewport(open);
 
   useEffect(() => setMounted(true), []);
@@ -137,6 +139,38 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
       : [{ type, winner: undefined }];
   });
 
+  async function handleShareAwards() {
+    setSharing(true);
+    setShareMessage("");
+    try {
+      const { createMonthlyAwardsStory } = await import("@/lib/monthly-awards-story");
+      const blob = await createMonthlyAwardsStory(periodStart, awardEntries);
+      const file = new File([blob], `bq-the-best-${periodStart}.png`, { type: "image/png" });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          title: "BQ The Best",
+          text: `Confira os melhores de ${formatAwardMonth(periodStart)}!`,
+          files: [file],
+        });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = file.name;
+        anchor.click();
+        URL.revokeObjectURL(url);
+        setShareMessage("Imagem baixada para postar!");
+      }
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        console.error("Erro ao gerar imagem das premiações:", error);
+        setShareMessage("Não foi possível gerar a imagem. Tente novamente.");
+      }
+    } finally {
+      setSharing(false);
+    }
+  }
+
   return (
     <>
       <button
@@ -145,17 +179,18 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
           setSelectedWinner(null);
           setOpen(true);
         }}
-        className="pointer-events-auto relative z-30 flex w-full items-center gap-3 rounded-2xl border border-amber-300/45 bg-gradient-to-r from-[#291b05]/95 via-[#183216]/95 to-[#07160d]/95 px-3.5 py-3 text-left shadow-[0_12px_28px_rgba(0,0,0,.35),inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-md transition-transform active:scale-[.98]"
+        className="pointer-events-auto relative z-30 flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-fuchsia-300/75 bg-[radial-gradient(circle_at_12%_0%,rgba(250,204,21,.42),transparent_34%),linear-gradient(110deg,#64134f_0%,#9d1d62_46%,#351027_100%)] px-3.5 py-3 text-left shadow-[0_0_0_1px_rgba(250,204,21,.22),0_14px_32px_rgba(112,18,83,.55),inset_0_1px_0_rgba(255,255,255,.2)] transition-transform active:scale-[.98]"
         aria-haspopup="dialog"
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-300/40 bg-amber-300/15 text-amber-300 shadow-[0_0_18px_rgba(251,191,36,.18)]">
+        <span aria-hidden="true" className="absolute -right-8 top-1/2 h-24 w-24 -translate-y-1/2 rounded-full bg-fuchsia-200/20 blur-2xl" />
+        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-yellow-100/70 bg-gradient-to-br from-yellow-200 to-amber-500 text-[#381124] shadow-[0_0_22px_rgba(250,204,21,.55)]">
           <Crown className="h-5 w-5" />
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-athletic text-[13px] font-black uppercase italic tracking-[0.12em] text-amber-200">BQ The Best</span>
-          <span className="block truncate text-[10px] font-bold uppercase tracking-wider text-white/75">Melhores de {monthLabel}</span>
+        <span className="relative min-w-0 flex-1">
+          <span className="block font-athletic text-[13px] font-black uppercase italic tracking-[0.12em] text-yellow-100">BQ The Best</span>
+          <span className="block truncate text-[10px] font-black uppercase tracking-wider text-white/90">Melhores de {monthLabel}</span>
         </span>
-        <span className="flex items-center gap-1 text-[9px] font-black uppercase text-accent">Ver <ChevronRight className="h-3.5 w-3.5" /></span>
+        <span className="relative flex items-center gap-1 rounded-full bg-yellow-200 px-2.5 py-1 text-[9px] font-black uppercase text-[#4b1535] shadow-[0_0_18px_rgba(250,204,21,.36)]">Ver <ChevronRight className="h-3.5 w-3.5" /></span>
       </button>
 
       {mounted && open && typeof document !== "undefined" && createPortal(
@@ -166,9 +201,9 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
           aria-labelledby="bq-the-best-title"
           onMouseDown={(event) => event.target === event.currentTarget && closeModal()}
         >
-          <section className="mobile-dialog-panel mobile-dialog-scroll relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-[2rem] border border-amber-300/35 bg-[#06120b] p-5 shadow-[0_-16px_60px_rgba(0,0,0,.7)] sm:rounded-[2rem]">
+          <section className="mobile-dialog-panel relative flex max-h-[calc(100dvh-0.75rem)] w-full max-w-md flex-col overflow-hidden rounded-t-[2rem] border border-amber-300/35 bg-[#06120b] shadow-[0_-16px_60px_rgba(0,0,0,.7)] sm:max-h-[90dvh] sm:rounded-[2rem]">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-amber-300/15 to-transparent" />
-            <header className="relative flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+            <header className="relative flex shrink-0 items-start justify-between gap-4 border-b border-white/10 px-4 pb-3 pt-4 sm:px-5 sm:pb-4 sm:pt-5">
               <div className="flex min-w-0 gap-3">
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-200 to-amber-500 text-[#251500] shadow-[0_0_28px_rgba(251,191,36,.25)]"><Trophy className="h-7 w-7" /></span>
                 <div>
@@ -180,8 +215,9 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
               <button type="button" onClick={closeModal} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white" aria-label="Fechar premiações"><X className="h-4 w-4" /></button>
             </header>
 
-            {selectedWinner ? (
-              <div className="relative mt-5 animate-fade-in">
+            <div className="mobile-dialog-scroll relative flex-1 overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-5 sm:pb-5">
+              {selectedWinner ? (
+              <div className="relative animate-fade-in">
                 <button type="button" onClick={() => setSelectedWinner(null)} className="mb-4 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-white/60 transition-colors hover:text-white">
                   <ArrowLeft className="h-4 w-4" /> Voltar aos vencedores
                 </button>
@@ -210,7 +246,7 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
                 </div>
               </div>
             ) : (
-              <div className="relative mt-4">
+              <div className="relative">
                 <div className="mb-3 flex items-end justify-between gap-3 px-1">
                   <div>
                     <p className="font-athletic text-xs font-black uppercase italic tracking-[0.15em] text-white">Seleção do mês</p>
@@ -218,6 +254,11 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
                   </div>
                   <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-1 text-[8px] font-black uppercase text-amber-200">8 categorias</span>
                 </div>
+
+                <button type="button" onClick={handleShareAwards} disabled={sharing} className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-fuchsia-300/45 bg-fuchsia-300/10 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-fuchsia-100 transition-colors hover:bg-fuchsia-300/20 disabled:opacity-60">
+                  <Share2 className="h-4 w-4" /> {sharing ? "Gerando imagem..." : "Gerar imagem para postar"}
+                </button>
+                {shareMessage && <p className="mb-3 text-center text-[10px] font-bold text-accent">{shareMessage}</p>}
 
                 <div className="grid gap-2.5">
                   {awardEntries.map(({ winner, type }) => {
@@ -227,17 +268,17 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
                         key={`${type}-${winner.playerId}`}
                         type="button"
                         onClick={() => setSelectedWinner(winner)}
-                        className={`group flex min-h-[82px] w-full items-center gap-3 rounded-2xl border p-3 text-left shadow-[0_10px_24px_rgba(0,0,0,.18)] transition-transform active:scale-[.98] ${visual.card}`}
+                        className={`group flex min-h-[74px] w-full items-center gap-2.5 rounded-xl border p-2.5 text-left shadow-[0_10px_24px_rgba(0,0,0,.18)] transition-transform active:scale-[.98] sm:min-h-[82px] sm:gap-3 sm:rounded-2xl sm:p-3 ${visual.card}`}
                         aria-label={`Ver conquista de ${winner.playerName}: ${MONTHLY_AWARD_LABELS[type]}`}
                       >
-                        <span className={`relative flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-2xl border ${visual.icon}`}>
-                          <AwardIcon type={type} className="h-5 w-5" />
+                        <span className={`relative flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl border sm:h-12 sm:w-12 sm:rounded-2xl ${visual.icon}`}>
+                          <AwardIcon type={type} className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
                           <span className="mt-0.5 text-[7px] font-black tracking-wider">{visual.code}</span>
                         </span>
-                        <PlayerAvatar name={winner.playerName} avatarUrl={winner.avatarUrl} clickable={false} className="h-[52px] w-[52px] rounded-full border-2 border-amber-200/75 bg-surface shadow-[0_0_18px_rgba(251,191,36,.16)]" sizes="52px" />
+                        <PlayerAvatar name={winner.playerName} avatarUrl={winner.avatarUrl} clickable={false} className="h-11 w-11 rounded-full border-2 border-amber-200/75 bg-surface shadow-[0_0_18px_rgba(251,191,36,.16)] sm:h-[52px] sm:w-[52px]" sizes="52px" />
                         <span className="min-w-0 flex-1">
-                          <span className={`block text-[9px] font-black uppercase tracking-[0.12em] ${visual.eyebrow}`}>{MONTHLY_AWARD_LABELS[type]}</span>
-                          <span className="mt-0.5 block truncate text-base font-black text-white">{winner.playerName}</span>
+                          <span className={`block text-[8px] font-black uppercase tracking-[0.1em] sm:text-[9px] sm:tracking-[0.12em] ${visual.eyebrow}`}>{MONTHLY_AWARD_LABELS[type]}</span>
+                          <span className="mt-0.5 block truncate text-[15px] font-black text-white sm:text-base">{winner.playerName}</span>
                           <span className="mt-1 flex items-center gap-1 text-[8px] font-black uppercase tracking-wider text-white/45">Ver conquista <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" /></span>
                         </span>
                       </button>
@@ -253,7 +294,8 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
                   })}
                 </div>
               </div>
-            )}
+              )}
+            </div>
           </section>
         </div>,
         document.body,
