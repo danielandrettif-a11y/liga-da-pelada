@@ -265,15 +265,23 @@ export function FantasyExperience({
     }
   }, []);
 
+  // O elenco permanente preenche o campo como sugestão, mas não pode fazer
+  // uma rodada parecer salva. Só uma linha ligada à rodada (ou à sessão de
+  // teste) confirma a escalação e aparece no Radar.
+  const hasPersistedRoundLineup = Boolean(
+    lineup?.fantasy_round_id || (isTest && lineup?.test_session_id),
+  );
   const [savedSignature, setSavedSignature] = useState(() =>
-    lineupSignature({
-      ids: initialIds,
-      captain: lineup?.captain_player_id,
-      scorer: lineup?.top_scorer_player_id,
-      assist: lineup?.top_assist_player_id,
-      challenge: lineup?.challenge_player_id,
-      slotRoles: getFantasySlotRoles(playersPerTeam, formation),
-    })
+    hasPersistedRoundLineup
+      ? lineupSignature({
+          ids: initialIds,
+          captain: lineup?.captain_player_id,
+          scorer: lineup?.top_scorer_player_id,
+          assist: lineup?.top_assist_player_id,
+          challenge: lineup?.challenge_player_id,
+          slotRoles: getFantasySlotRoles(playersPerTeam, formation),
+        })
+      : "",
   );
   const [pending, startTransition] = useTransition();
   const [isRefreshing, startRefreshTransition] = useTransition();
