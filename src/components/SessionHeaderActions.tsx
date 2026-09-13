@@ -16,7 +16,7 @@ export async function SessionHeaderActions() {
   ]);
 
   return (
-    <div className="flex items-center gap-2 shrink-0">
+    <div className="flex shrink-0 items-center gap-3">
       <InboxBell notifications={inbox} />
       <ShareAppButton className="shadow-sm" />
       {account.user ? (

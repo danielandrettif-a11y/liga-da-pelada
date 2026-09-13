@@ -73,7 +73,7 @@ export function NextRoundBanner({
       <div className="pointer-events-none absolute -bottom-16 -left-16 h-60 w-60 rounded-full bg-accent/20 blur-3xl" />
 
       {/* Conteúdo do Banner */}
-      <div className="pointer-events-none absolute inset-5 z-20 flex flex-col gap-4 pb-28 sm:inset-6">
+      <div className="pointer-events-none absolute inset-5 z-20 flex flex-col gap-4 sm:inset-6">
         {/* Topo do Banner: Selo da Liga + Troféu Dourado */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -157,7 +157,10 @@ export function NextRoundBanner({
           </div>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 z-30 space-y-2.5">
+        {/* Mantém o prêmio no fluxo do banner. Em telas estreitas os chips podem
+            quebrar em mais de uma linha, então uma posição absoluta acabava
+            cobrindo o último ícone/convocado. */}
+        <div className="mt-auto space-y-2.5">
           <BQTheBestButton periodStart={awardsPeriodStart} winners={awardWinners} />
           <div className="border-t border-white/10 pt-2 text-right">
             <span className="text-[9px] font-black uppercase tracking-[0.14em] text-accent">Toque fora do prêmio para ver a agenda</span>

@@ -47,6 +47,8 @@ import { RoundCalendarButton } from "./RoundCalendarButton";
 import { CallupTacticalAlertModal } from "./CallupTacticalAlertModal";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import type { EquippedCosmeticsSummary } from "@/lib/actions/cosmetics";
+import Image from "next/image";
+import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
 
 type Props = {
   callup: CallupWithEntries;
@@ -599,6 +601,8 @@ export function CallupBoard({
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {confirmed.map((entry, index) => {
                 const isMe = entry.player_id === currentPlayerId;
+                const cosmetic = playerCosmetics[entry.player_id];
+                const bannerImage = cosmeticHighResolutionImage(cosmetic?.bannerAssetKey);
                 const isMyGuest = Boolean(
                   currentUserId &&
                     (entry.joined_by === currentUserId ||
@@ -609,14 +613,28 @@ export function CallupBoard({
                 return (
                   <div
                     key={entry.id}
-                    className={`relative flex items-center gap-3 rounded-2xl border p-2.5 transition-colors ${
+                    className={`relative flex items-center gap-3 overflow-hidden rounded-2xl border p-2.5 transition-colors ${
                       isMe
                         ? "border-accent/50 bg-accent/[0.08]"
                         : "border-border bg-surface/70 hover:bg-surface"
                     }`}
                   >
+                    {bannerImage && (
+                      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-55">
+                        <Image
+                          src={bannerImage}
+                          alt=""
+                          fill
+                          sizes="(max-width: 640px) 100vw, 50vw"
+                          quality={75}
+                          className="object-cover"
+                          style={{ objectPosition: cosmeticBackgroundPosition("banner", cosmetic?.bannerAssetKey) }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-r from-[#06150d]/85 via-[#06150d]/60 to-[#06150d]/88" />
+                      </div>
+                    )}
                     <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-xl font-athletic text-xs font-black ${
+                      className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl font-athletic text-xs font-black ${
                         isMe ? "bg-accent text-background" : "bg-surface text-muted border border-border"
                       }`}
                     >
@@ -628,10 +646,10 @@ export function CallupBoard({
                       avatarUrl={entry.player.avatar_url}
                       frameKey={playerCosmetics[entry.player_id]?.frameKey}
                       auraKey={playerCosmetics[entry.player_id]?.auraKey}
-                      className="h-9 w-9 shrink-0 rounded-full bg-surface text-xs font-black text-muted"
+                      className="relative z-10 h-9 w-9 shrink-0 rounded-full bg-surface text-xs font-black text-muted"
                     />
 
-                    <div className="min-w-0 flex-1 pr-6">
+                    <div className="relative z-10 min-w-0 flex-1 pr-6">
                       <p className="truncate text-xs font-black text-foreground">
                         {entry.player.name}{" "}
                         {isMe && <span className="text-[10px] text-accent font-normal">(você)</span>}
@@ -651,7 +669,7 @@ export function CallupBoard({
                       <button
                         onClick={() => run(`remove-${entry.id}`, () => removeCallupEntry(callup.id, entry.player_id))}
                         disabled={!!loading}
-                        className="absolute right-2 top-2.5 rounded-lg p-1 text-muted hover:bg-danger/10 hover:text-danger transition-colors"
+                        className="absolute right-2 top-2.5 z-10 rounded-lg p-1 text-muted hover:bg-danger/10 hover:text-danger transition-colors"
                         title={isMyGuest ? "Remover meu convidado" : `Remover ${entry.player.name}`}
                         aria-label={`Remover ${entry.player.name}`}
                       >
@@ -686,6 +704,8 @@ export function CallupBoard({
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {waitlist.map((entry, index) => {
                   const isMe = entry.player_id === currentPlayerId;
+                  const cosmetic = playerCosmetics[entry.player_id];
+                  const bannerImage = cosmeticHighResolutionImage(cosmetic?.bannerAssetKey);
                   const isMyGuest = Boolean(
                     currentUserId &&
                       (entry.joined_by === currentUserId ||
@@ -696,14 +716,28 @@ export function CallupBoard({
                   return (
                     <div
                       key={entry.id}
-                      className={`relative flex items-center gap-3 rounded-2xl border p-2.5 transition-colors ${
+                      className={`relative flex items-center gap-3 overflow-hidden rounded-2xl border p-2.5 transition-colors ${
                         isMe
                           ? "border-warning/50 bg-warning/[0.08]"
                           : "border-border bg-surface/70 hover:bg-surface"
                       }`}
                     >
+                      {bannerImage && (
+                        <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-55">
+                          <Image
+                            src={bannerImage}
+                            alt=""
+                            fill
+                            sizes="(max-width: 640px) 100vw, 50vw"
+                            quality={75}
+                            className="object-cover"
+                            style={{ objectPosition: cosmeticBackgroundPosition("banner", cosmetic?.bannerAssetKey) }}
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-r from-[#06150d]/85 via-[#06150d]/60 to-[#06150d]/88" />
+                        </div>
+                      )}
                       <span
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-xl font-athletic text-xs font-black ${
+                        className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl font-athletic text-xs font-black ${
                           isMe ? "bg-warning text-background" : "bg-surface text-muted border border-border"
                         }`}
                       >
@@ -715,10 +749,10 @@ export function CallupBoard({
                         avatarUrl={entry.player.avatar_url}
                         frameKey={playerCosmetics[entry.player_id]?.frameKey}
                         auraKey={playerCosmetics[entry.player_id]?.auraKey}
-                        className="h-9 w-9 shrink-0 rounded-full bg-surface text-xs font-black text-muted"
+                        className="relative z-10 h-9 w-9 shrink-0 rounded-full bg-surface text-xs font-black text-muted"
                       />
 
-                      <div className="min-w-0 flex-1 pr-6">
+                      <div className="relative z-10 min-w-0 flex-1 pr-6">
                         <p className="truncate text-xs font-black text-foreground">
                           {entry.player.name}{" "}
                           {isMe && <span className="text-[10px] text-warning font-normal">(você)</span>}
@@ -738,7 +772,7 @@ export function CallupBoard({
                         <button
                           onClick={() => run(`remove-${entry.id}`, () => removeCallupEntry(callup.id, entry.player_id))}
                           disabled={!!loading}
-                          className="absolute right-2 top-2.5 rounded-lg p-1 text-muted hover:bg-danger/10 hover:text-danger transition-colors"
+                          className="absolute right-2 top-2.5 z-10 rounded-lg p-1 text-muted hover:bg-danger/10 hover:text-danger transition-colors"
                           title={isMyGuest ? "Remover meu convidado da fila" : `Remover ${entry.player.name}`}
                           aria-label={`Remover ${entry.player.name}`}
                         >

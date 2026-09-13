@@ -81,7 +81,7 @@ function CommunityGrid({ players, label, unreadPlayerIds, playerCosmetics }: { p
               <div className="relative z-10">
                 <div className="relative mx-auto w-fit">
                   <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} frameKey={cosmetic?.frameKey} auraKey={cosmetic?.auraKey} className="h-20 w-20 rounded-full border-2 border-accent/25 bg-surface text-lg font-black text-muted ring-4 ring-background" />
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-accent/25 bg-background px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-accent">{label}</span>
+                  <span className="absolute -bottom-2 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full border border-accent/35 bg-background px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-accent shadow-[0_2px_8px_rgba(0,0,0,.6)]">{label}</span>
                 </div>
                 <p className="mt-3 truncate text-sm font-black text-foreground">{player.name}</p>
                 {player.nickname && <p className="mt-0.5 truncate text-[10px] italic text-muted">“{player.nickname}”</p>}

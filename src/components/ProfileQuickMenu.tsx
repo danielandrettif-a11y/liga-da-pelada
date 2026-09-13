@@ -71,7 +71,7 @@ export function ProfileQuickMenu({ playerId, name, avatarUrl, frameKey, auraKey 
 
   return (
     <>
-      <button type="button" onPointerDown={() => router.prefetch(profileHref)} onClick={openMenu} className="relative block rounded-full transition-transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-accent" aria-label="Abrir opções do perfil" title={name}>
+      <button type="button" onPointerDown={() => router.prefetch(profileHref)} onClick={openMenu} className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-accent" aria-label="Abrir opções do perfil" title={name}>
         <PlayerAvatar name={name} avatarUrl={avatarUrl} clickable={false} frameKey={frameKey} auraKey={auraKey} className="h-10 w-10 rounded-full border border-accent/30 bg-surface/90 text-xs font-black text-accent" />
       </button>
 
