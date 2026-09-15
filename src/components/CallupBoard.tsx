@@ -185,6 +185,29 @@ export function CallupBoard({
     setTimeout(() => setLoading(""), 1600);
   }
 
+  async function copyWhatsAppList() {
+    const date = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" })
+      .format(new Date(`${callup.date}T12:00:00`));
+    const numberedPlayers = Array.from({ length: 18 }, (_, index) =>
+      `${index + 1}. ${confirmed[index]?.player.name || ""}`,
+    );
+    const numberedWaitlist = Array.from({ length: callup.waitlist_capacity }, (_, index) =>
+      `${index + 1}. ${waitlist[index]?.player.name || ""}`,
+    );
+    const text = [
+      `⚽ *Pelada BQ – ${date} - ${startTime}*`,
+      "",
+      ...numberedPlayers,
+      "",
+      "*Lista de espera*",
+      ...numberedWaitlist,
+    ].join("\n");
+
+    await navigator.clipboard.writeText(text);
+    setLoading("copied-list");
+    setTimeout(() => setLoading(""), 1600);
+  }
+
   async function handlePrelist() {
     setLoading("prelist");
     setError("");
@@ -243,6 +266,14 @@ export function CallupBoard({
                 <PencilLine className="h-4 w-4" />
               </button>
             )}
+            <button
+              onClick={copyWhatsAppList}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent/40 bg-accent/15 text-accent hover:bg-accent/25 transition-colors shadow-sm"
+              title="Copiar lista para WhatsApp"
+              aria-label="Copiar lista para WhatsApp"
+            >
+              {loading === "copied-list" ? <CheckCircle2 className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}
+            </button>
             <button
               onClick={copyInvite}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent/40 bg-accent/15 text-accent hover:bg-accent/25 transition-colors shadow-sm"

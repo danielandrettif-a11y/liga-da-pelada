@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CheckCircle2, Copy, LockKeyhole, PencilLine, X } from "@/components/icons";
+import { Check, CheckCircle2, ClipboardList, Copy, LockKeyhole, PencilLine, X } from "@/components/icons";
 import { setPlayerPayment, updateRoundPaymentDetails, type PaymentPlayer, type PaymentRound } from "@/lib/actions/payments";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
@@ -28,6 +28,7 @@ export function PaymentChecklist({
   const [players, setPlayers] = useState(initialPlayers);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedPaymentList, setCopiedPaymentList] = useState(false);
   const [error, setError] = useState("");
   const [showCompletedList, setShowCompletedList] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState({ pix: round.payment_pix || "", total: Number(round.payment_total) || 0 });
@@ -57,6 +58,31 @@ export function PaymentChecklist({
     }
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function copyPaymentList() {
+    const date = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" })
+      .format(new Date(`${round.date}T12:00:00`));
+    const text = [
+      `⚽ *Pelada BQ – ${date}*`,
+      "",
+      ...players.map((player, index) => `${player.paid ? "✅" : "❌"} ${index + 1}. ${player.name}`),
+    ].join("\n");
+
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const input = document.createElement("textarea");
+      input.value = text;
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+    }
+    setCopiedPaymentList(true);
+    window.setTimeout(() => setCopiedPaymentList(false), 2000);
   }
 
   async function savePaymentDetails() {
@@ -151,11 +177,15 @@ export function PaymentChecklist({
         </div>
         <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-accent">PIX para pagamento</p>
         {round.payment_recipient_name && <p className="mt-1 text-xs font-bold text-foreground">Recebedor: {round.payment_recipient_name}</p>}
-        <div className="mt-2 flex items-center gap-3">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           <p className="min-w-0 flex-1 break-all text-sm font-bold text-foreground">{paymentDetails.pix}</p>
           <button onClick={copyPix} className="flex shrink-0 items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-black text-background">
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {copied ? "Copiado" : "Copiar"}
+            {copied ? "PIX copiado" : "Copiar PIX"}
+          </button>
+          <button onClick={copyPaymentList} className="flex shrink-0 items-center gap-1.5 rounded-xl border border-accent/35 bg-background/60 px-3 py-2 text-xs font-black text-accent hover:bg-accent/10">
+            {copiedPaymentList ? <Check className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}
+            {copiedPaymentList ? "Lista copiada" : "Copiar lista"}
           </button>
         </div>
       </div>
