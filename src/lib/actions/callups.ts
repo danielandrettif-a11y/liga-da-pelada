@@ -23,9 +23,15 @@ export type CallupWithEntries = Callup & { entries: CallupEntryWithPlayer[] };
 function normalizeCallup(data: any): CallupWithEntries | null {
   const linkedRound = data?.round;
   if (linkedRound) {
-    const isRoundStarted = linkedRound.status === "in_progress" || linkedRound.status === "finished";
+    // A pré-lista permanece em "draft". Ao iniciar a primeira partida a
+    // rodada muda para "active", então a convocação não deve mais aparecer.
+    const isRoundStarted = linkedRound.status !== "draft";
     const hasStartedMatches = (linkedRound.matches || []).some(
-      (match: any) => match.status === "in_progress" || match.status === "live" || match.status === "finished",
+      (match: any) =>
+        Boolean(match.started_at) ||
+        match.status === "in_progress" ||
+        match.status === "live" ||
+        match.status === "finished",
     );
     if (isRoundStarted || hasStartedMatches) return null;
   }
@@ -59,7 +65,7 @@ export async function getActiveCallups(): Promise<CallupWithEntries[]> {
       round:round_id (
         id,
         status,
-        matches (id, status)
+        matches (id, status, started_at)
       )
     `)
     .eq("league.is_active", true)

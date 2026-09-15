@@ -89,7 +89,7 @@ export async function getDashboardData() {
 
     const activeCallupsPromise = readModel ? Promise.resolve({ data: readModel.activeCallups }) : supabase
       .from("callups")
-      .select("id, date, start_time, stadium_name, stadium_map_url, round_type, capacity, waitlist_capacity, callup_entries(player_id, status, position), round:round_id(id, status, matches(status))")
+      .select("id, date, start_time, stadium_name, stadium_map_url, round_type, capacity, waitlist_capacity, callup_entries(player_id, status, position), round:round_id(id, status, matches(status, started_at))")
       .eq("league_id", season.league_id)
       .in("status", ["open", "locked"])
       .order("date", { ascending: true })
@@ -125,9 +125,13 @@ export async function getDashboardData() {
     const visibleCallups = (activeCallupsData || []).filter((callup: any) => {
       if (!callup.round) return true;
       const linkedRound: any = callup.round;
-      const isRoundStarted = linkedRound.status === "in_progress" || linkedRound.status === "finished";
+      const isRoundStarted = linkedRound.status !== "draft";
       const hasStartedMatches = (linkedRound.matches || []).some(
-        (m: any) => m.status === "in_progress" || m.status === "live" || m.status === "finished"
+        (m: any) =>
+          Boolean(m.started_at) ||
+          m.status === "in_progress" ||
+          m.status === "live" ||
+          m.status === "finished"
       );
       return !isRoundStarted && !hasStartedMatches;
     });
