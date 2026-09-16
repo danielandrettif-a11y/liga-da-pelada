@@ -85,6 +85,12 @@ const ADMIN_SECTIONS = [
         description: "Configurar regras de pontuação",
       },
       {
+        href: "/admin/overall",
+        icon: Sliders,
+        label: "OVR adaptativo",
+        description: "Calcular e auditar notas em modo sombra",
+      },
+      {
         href: "/admin/cartola",
         icon: ClipboardList,
         label: "Cartola",
