@@ -79,6 +79,15 @@ describe("motor adaptativo de OVR", () => {
       ATA: { defense: 0.10, goals: 0.60, assists: 0.25, result: 0.05 },
     },
   });
+  const balancedCharacteristicsFormula = parseOverallFormulaConfig({
+    ...roleReframeFormula,
+    // A participação da característica já reduz a confiança/target da posição
+    // e define a composição do OVR. Aplicá-la novamente no limite semanal
+    // cria uma vantagem artificial para especialistas de uma única função.
+    traitWeightedChange: false,
+    maxChangePerRound: 1.5,
+    performanceChangeBonus: 0.03,
+  });
 
   it("separa gols e assistências no OVR V10 sem transformar vitória em defesa", () => {
     const scorer = { id: "scorer", playerProfile: "offensive" as const, overallTraits: ["offensive" as const], overallSeedMode: "observed" as const };
@@ -92,6 +101,62 @@ describe("motor adaptativo de OVR", () => {
     const creatorResult = result.snapshots.find((item) => item.playerId === "creator")!;
     expect(scorerResult.positions.ATA.value).toBeGreaterThan(scorerResult.positions.DEF.value);
     expect(creatorResult.positions.ALA_MEI.value).toBeGreaterThan(creatorResult.positions.ATA.value);
+  });
+
+  it("não deixa uma única característica superar histórico melhor por dupla aceleração", () => {
+    const specialist: OverallPlayer = {
+      id: "specialist",
+      playerProfile: "offensive",
+      overallTraits: ["offensive"],
+      overallSeedMode: "observed",
+    };
+    const versatile: OverallPlayer = {
+      id: "versatile",
+      playerProfile: "offensive",
+      overallTraits: ["midfield", "offensive"],
+      overallSeedMode: "observed",
+    };
+    const inputs = [
+      round(1, [
+        appearance("specialist", { goals: 4, playerProfileLocked: "offensive" }),
+        appearance("versatile", { goals: 4, assists: 3, playerProfileLocked: "offensive" }),
+      ]),
+      round(2, [
+        appearance("specialist", { goals: 4, assists: 1, playerProfileLocked: "offensive" }),
+        appearance("versatile", { goals: 4, assists: 3, playerProfileLocked: "offensive" }),
+      ]),
+      round(3, [
+        appearance("versatile", { goals: 4, assists: 3, playerProfileLocked: "offensive" }),
+      ]),
+    ];
+
+    const previous = calculatePlayerOveralls([specialist, versatile], inputs, roleReframeFormula);
+    const balanced = calculatePlayerOveralls([specialist, versatile], inputs, balancedCharacteristicsFormula);
+    const previousSpecialist = previous.snapshots.find((item) => item.playerId === "specialist")!;
+    const previousVersatile = previous.snapshots.find((item) => item.playerId === "versatile")!;
+    const balancedSpecialist = balanced.snapshots.find((item) => item.playerId === "specialist")!;
+    const balancedVersatile = balanced.snapshots.find((item) => item.playerId === "versatile")!;
+
+    expect(previousSpecialist.overall).toBeGreaterThan(previousVersatile.overall);
+    expect(balancedVersatile.overall).toBeGreaterThan(balancedSpecialist.overall);
+    expect(balancedSpecialist.overall).toBeLessThan(previousSpecialist.overall);
+    expect(balancedVersatile.positions.ATA.value).toBeGreaterThan(previousVersatile.positions.ATA.value);
+  });
+
+  it("segura uma amostra de uma rodada sem esconder um bom desempenho", () => {
+    const newcomer: OverallPlayer = {
+      id: "newcomer",
+      playerProfile: "offensive",
+      overallTraits: ["offensive"],
+      overallSeedMode: "observed",
+    };
+    const snapshot = calculatePlayerOveralls([newcomer], [round(1, [
+      appearance("newcomer", { goals: 5, assists: 3, playerProfileLocked: "offensive" }),
+    ])], balancedCharacteristicsFormula).snapshots[0];
+
+    expect(snapshot.positions.ATA.value).toBeGreaterThan(70);
+    expect(snapshot.positions.ATA.value).toBeLessThanOrEqual(71.7);
+    expect(snapshot.isProvisional).toBe(true);
   });
 
   it("mantém todo jogador novo no OVR neutro, independente da tag operacional", () => {
