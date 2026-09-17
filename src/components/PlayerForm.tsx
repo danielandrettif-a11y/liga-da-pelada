@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, Trash2 } from "@/components/icons";
-import { deletePlayer, savePlayer } from "@/lib/actions/players";
+import { deletePlayer, savePlayer, swapPlayerAvatars } from "@/lib/actions/players";
 import { setPlayerSpeedRating } from "@/lib/actions/speed-draw";
 import type { MemberCategory, Player, PlayerProfile } from "@/lib/types";
 import { AvatarCropModal } from "./AvatarCropModal";
@@ -152,10 +152,43 @@ export function PlayerForm({
     }
   }
 
-  function handleUseAlternateAvatar() {
+  async function handleUseAlternateAvatar() {
     if (!alternatePreviewUrl) return;
-    setUseAlternateAsActive((current) => !current);
+
+    const hasPendingAvatarChange = Boolean(
+      croppedActiveAvatar
+      || croppedAlternateAvatar
+      || removeActiveAvatar
+      || removeAlternateAvatar,
+    );
+
+    // Se alguma foto ainda está só no navegador, ela precisa ser enviada junto
+    // ao formulário. Para duas fotos já salvas, a troca é instantânea.
+    if (hasPendingAvatarChange || !player?.id) {
+      setUseAlternateAsActive((current) => !current);
+      setError("");
+      return;
+    }
+
+    setLoading(true);
     setError("");
+    try {
+      const result = await swapPlayerAvatars(player.id);
+      if (!result.success) throw new Error(result.error);
+
+      setActivePreviewUrl(alternatePreviewUrl);
+      setAlternatePreviewUrl(activePreviewUrl);
+      previewObjectUrlRef.current = {
+        active: previewObjectUrlRef.current.alternate,
+        alternate: previewObjectUrlRef.current.active,
+      };
+      setUseAlternateAsActive(false);
+      router.refresh();
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Não foi possível trocar a foto.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -308,7 +341,7 @@ export function PlayerForm({
         <input ref={activeFileInputRef} id="avatar_active" name="avatar_active" type="file" accept="image/*" onChange={(event) => handleAvatarChange(event, "active")} className="sr-only" />
         <input ref={alternateFileInputRef} id="avatar_alternate" name="avatar_alternate" type="file" accept="image/*" onChange={(event) => handleAvatarChange(event, "alternate")} className="sr-only" />
 
-        <p className="max-w-md text-center text-[10px] leading-4 text-muted">Mantenha até duas fotos. Toque em “Usar agora” na foto extra e salve para trocar a foto exibida no app.</p>
+        <p className="max-w-md text-center text-[10px] leading-4 text-muted">Mantenha até duas fotos. “Usar agora” troca a foto exibida no app. Se você acabou de enviar uma imagem, salve o perfil para concluir.</p>
         {(nameplateKey || titleName) && (
           <CosmeticNameplate assetKey={nameplateKey} playerName={previewName} titleName={titleName} className="w-full max-w-[18rem]" />
         )}

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { cache } from "react";
 import { supabase } from "../supabase";
 import { buildAwardSeasonsByPlayer } from "../awards";
@@ -28,7 +28,9 @@ function normalizeOverallTraits(value: unknown) {
 }
 
 function revalidatePlayerPaths(id?: string) {
-  revalidatePath("/");
+  // O avatar está presente no cabeçalho compartilhado. Invalidar o layout
+  // garante que a foto nova apareça imediatamente em qualquer tela do app.
+  revalidatePath("/", "layout");
   revalidatePath("/mais");
   revalidatePath("/meu-perfil");
   revalidatePath("/jogadores");
@@ -36,7 +38,8 @@ function revalidatePlayerPaths(id?: string) {
   revalidatePath("/admin/jogadores");
   revalidatePath("/admin/rodada");
   revalidatePath("/admin/prelistas");
-  revalidatePath("/cartola");
+  revalidatePath("/cartola", "layout");
+  revalidateTag("ranking", "max");
   if (id) revalidatePath(`/jogadores/${id}`);
 }
 
@@ -688,6 +691,43 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
 
   revalidatePlayerPaths(id);
   return { success: true, data: { id } };
+}
+
+/** Alterna as duas fotos que já estão salvas, sem exigir que o usuário edite
+ * ou envie novamente o restante do formulário. */
+export async function swapPlayerAvatars(playerId: string) {
+  const account = await getCurrentAccount();
+  if (!account.user) return { success: false, error: "Sessão expirada. Entre novamente." };
+
+  const ownsPlayer = account.profile?.player_id === playerId;
+  if (!account.isAdmin && !ownsPlayer) {
+    return { success: false, error: "Você só pode trocar a foto do seu próprio perfil." };
+  }
+
+  const { data: player, error: playerError } = await account.client
+    .from("players")
+    .select("avatar_url, avatar_alternate_url")
+    .eq("id", playerId)
+    .single();
+
+  if (playerError || !player) return { success: false, error: "Jogador não encontrado." };
+  if (!player.avatar_alternate_url) return { success: false, error: "Adicione uma foto extra antes de alternar." };
+
+  const { error: updateError } = await account.client
+    .from("players")
+    .update({
+      avatar_url: player.avatar_alternate_url,
+      avatar_alternate_url: player.avatar_url || null,
+    })
+    .eq("id", playerId);
+
+  if (updateError) {
+    console.error("Erro ao alternar fotos do jogador:", updateError);
+    return { success: false, error: updateError.message };
+  }
+
+  revalidatePlayerPaths(playerId);
+  return { success: true };
 }
 
 export async function getRosterGroups(roundType: RoundType = "official") {
