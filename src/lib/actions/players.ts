@@ -10,6 +10,7 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import { TEAM_PRESETS } from "../teamPresets";
 import { getMatchElapsedSeconds } from "../utils";
 import { parseMonthlyAwardWinners, parseMonthlyAwards, previousMonthStart } from "../monthly-awards";
+import { getLatestPlayerCardOverallMap } from "./stats";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -645,12 +646,20 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
 }
 
 export async function getRosterGroups(roundType: RoundType = "official") {
-  const players = await getPlayersWithStats(roundType);
+  const [players, overallByPlayer] = await Promise.all([
+    getPlayersWithStats(roundType),
+    roundType === "official" ? getLatestPlayerCardOverallMap() : Promise.resolve(new Map()),
+  ]);
+  const rosterPlayers = players.map((player) => {
+    if (player.member_category !== "player") return player;
+    const overall = overallByPlayer.get(player.id);
+    return overall ? { ...player, overall: overall.overall, overallPositions: overall.positions } : player;
+  });
   return {
-    officialPlayers: players.filter((player) => player.member_category === "player"),
-    activeGuests: players.filter((player) => player.member_category === "guest"),
-    wags: players.filter((player) => player.member_category === "wag"),
-    supporters: players.filter((player) => player.member_category === "supporter"),
+    officialPlayers: rosterPlayers.filter((player) => player.member_category === "player"),
+    activeGuests: rosterPlayers.filter((player) => player.member_category === "guest"),
+    wags: rosterPlayers.filter((player) => player.member_category === "wag"),
+    supporters: rosterPlayers.filter((player) => player.member_category === "supporter"),
   };
 }
 

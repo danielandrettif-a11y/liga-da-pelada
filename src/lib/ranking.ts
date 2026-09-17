@@ -68,5 +68,5 @@ export type RankingExperienceData = {
   } | null;
 };
 
-export type RankingFilter = "general" | "goals" | "assists" | "wins" | "winRate" | "awards";
+export type RankingFilter = "general" | "goals" | "assists" | "wins" | "winRate" | "awards" | "overall" | "overallDef" | "overallAlaMei" | "overallAta" | "overallGol";
 export type RankingView = "season" | "latest";

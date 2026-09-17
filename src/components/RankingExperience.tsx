@@ -39,6 +39,11 @@ const FILTERS: Array<{ key: RankingFilter; label: string }> = [
   { key: "wins", label: "Vitórias" },
   { key: "winRate", label: "Aproveitamento" },
   { key: "awards", label: "Prêmios" },
+  { key: "overall", label: "OVR geral" },
+  { key: "overallDef", label: "OVR DEF" },
+  { key: "overallAlaMei", label: "OVR ALA/MEI" },
+  { key: "overallAta", label: "OVR ATA" },
+  { key: "overallGol", label: "OVR GOL" },
 ];
 
 const FILTER_LABELS: Record<RankingFilter, string> = {
@@ -48,24 +53,34 @@ const FILTER_LABELS: Record<RankingFilter, string> = {
   wins: "vitórias",
   winRate: "p.p. de aproveitamento",
   awards: "prêmios",
+  overall: "OVR geral",
+  overallDef: "OVR DEF",
+  overallAlaMei: "OVR ALA/MEI",
+  overallAta: "OVR ATA",
+  overallGol: "OVR GOL",
 };
 
 function awardsTotal(entry: RankingEntry) {
   return entry.awards.roundMvp + entry.awards.topScorer + entry.awards.topAssister + entry.awards.kingOfWins;
 }
 
-function metricValue(entry: RankingEntry, filter: RankingFilter) {
+function metricValue(entry: RankingEntry, filter: RankingFilter): number | null {
   if (filter === "goals") return entry.goals;
   if (filter === "assists") return entry.assists;
   if (filter === "wins") return entry.wins;
   if (filter === "winRate") return entry.winRate;
   if (filter === "awards") return awardsTotal(entry);
+  if (filter === "overall") return entry.overall ?? null;
+  if (filter === "overallDef") return entry.overallPositions?.DEF ?? null;
+  if (filter === "overallAlaMei") return entry.overallPositions?.ALA_MEI ?? null;
+  if (filter === "overallAta") return entry.overallPositions?.ATA ?? null;
+  if (filter === "overallGol") return entry.overallPositions?.GOL ?? null;
   return entry.points;
 }
 
 function sortRanking(entries: RankingEntry[], filter: RankingFilter) {
   return [...entries].sort((a, b) => {
-    const metricDifference = metricValue(b, filter) - metricValue(a, filter);
+    const metricDifference = (metricValue(b, filter) ?? Number.NEGATIVE_INFINITY) - (metricValue(a, filter) ?? Number.NEGATIVE_INFINITY);
     if (metricDifference !== 0) return metricDifference;
     if (b.points !== a.points) return b.points - a.points;
     if (b.wins !== a.wins) return b.wins - a.wins;
@@ -76,8 +91,19 @@ function sortRanking(entries: RankingEntry[], filter: RankingFilter) {
 
 function metricDisplay(entry: RankingEntry, filter: RankingFilter) {
   const value = metricValue(entry, filter);
+  if (value == null) return "—";
   if (filter === "winRate") return `${value}%`;
+  if (filter.startsWith("overall")) return value.toFixed(1);
   return String(value);
+}
+
+function metricGap(above: RankingEntry | null, entry: RankingEntry, filter: RankingFilter) {
+  if (!above) return null;
+  const aboveValue = metricValue(above, filter);
+  const currentValue = metricValue(entry, filter);
+  if (aboveValue == null || currentValue == null) return null;
+  if (filter.startsWith("overall")) return Math.max(0.1, Math.round((aboveValue - currentValue) * 10) / 10).toFixed(1);
+  return Math.max(1, aboveValue - currentValue + 1);
 }
 
 function podiumStyle(position: number) {
@@ -402,7 +428,7 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
               const style = podiumStyle(position);
               const height = position === 1 ? "h-36" : position === 2 ? "h-28" : "h-24";
               const above = position > 1 ? ranking[position - 2] : null;
-              const gap = above ? Math.max(1, metricValue(above, filter) - metricValue(entry, filter) + 1) : 0;
+              const gap = metricGap(above, entry, filter);
               return (
                 <button
                   key={entry.player.id}
@@ -445,7 +471,7 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                   </div>
                   <div className={`w-full rounded-t-2xl border-x border-t bg-gradient-to-b pt-3 ${height} ${style.base}`}>
                     <span className="font-athletic text-3xl font-black text-white/45">{position}</span>
-                    {above && (
+                    {above && gap != null && (
                       <span className="mt-1 block px-1 text-[8px] font-black text-white/55">Faltam {gap} para subir</span>
                     )}
                   </div>
@@ -465,7 +491,7 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
           const index = showPodium ? listIndex + 3 : listIndex;
           const position = index + 1;
           const above = index > 0 ? ranking[index - 1] : null;
-          const gap = above ? Math.max(1, metricValue(above, filter) - metricValue(entry, filter) + 1) : 0;
+          const gap = metricGap(above, entry, filter);
           const displayName = entry.player.name;
           return (
             <button
@@ -525,7 +551,7 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
                   </div>
                 ))}
               </div>
-              {above && <p className="relative mt-2 text-center text-[8px] font-semibold uppercase tracking-wide text-muted/80">Faltam {gap} {FILTER_LABELS[filter]} para subir</p>}
+              {above && gap != null && <p className="relative mt-2 text-center text-[8px] font-semibold uppercase tracking-wide text-muted/80">Faltam {gap} {FILTER_LABELS[filter]} para subir</p>}
             </button>
           );
         })}

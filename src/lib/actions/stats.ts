@@ -60,13 +60,13 @@ function isSelectableAthlete(player: Player | null | undefined) {
   return Boolean(player?.is_selectable && (player.member_category === "player" || player.member_category === "guest"));
 }
 
-type PlayerCardOverall = {
+export type PlayerCardOverall = {
   overall: number;
   trend: "rising" | "steady" | "falling";
   positions: { DEF: number; ALA_MEI: number; ATA: number; GOL: number } | null;
 };
 
-async function getLatestPlayerCardOverallMap(client: any) {
+export async function getLatestPlayerCardOverallMap(client: any = supabase) {
   const { data, error } = await client.rpc("get_latest_player_card_overalls");
   if (error) {
     console.error("Erro ao buscar OVR para as cartas:", error);

@@ -20,6 +20,8 @@ export type PlayerStats = Player & {
   draws: number;
   losses: number;
   points: number;
+  overall?: number | null;
+  overallPositions?: { DEF: number; ALA_MEI: number; ATA: number; GOL: number } | null;
 };
 
 type SortOption = "alphabetical" | "games" | "rounds" | "goals" | "assists" | "wins" | "losses" | "winRate";
@@ -116,6 +118,12 @@ export function PlayersStatsGrid({
                         <p className="truncate text-sm font-bold text-foreground drop-shadow-sm">{getDisplayName(player.name)}</p>
                         <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />
                       </div>
+                      {player.overall != null && (
+                        <div className="shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-1.5 py-1 text-center shadow-[0_0_14px_rgba(204,255,0,.12)]">
+                          <p className="font-athletic text-base font-black leading-none text-accent">{player.overall.toFixed(1)}</p>
+                          <p className="mt-0.5 text-[6px] font-black uppercase tracking-[.12em] text-accent/80">OVR</p>
+                        </div>
+                      )}
                     </div>
 
                     <div className="mb-3 grid grid-cols-2 gap-2">
