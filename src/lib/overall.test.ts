@@ -47,6 +47,26 @@ describe("motor adaptativo de OVR", () => {
     hardPositionCapsEnabled: false,
     provisionalAtConfidenceThreshold: false,
   });
+  const trendFormula = parseOverallFormulaConfig({
+    legacySeedEnabled: false,
+    unselectedTraitEvidence: 0.15,
+    weeklyEvidenceCap: true,
+    traitWeightedChange: false,
+    traitBasedOverall: true,
+    overallConfidenceShrink: false,
+    rankedTraitOverall: true,
+    performanceChangeBonus: 0.05,
+    hardPositionCapsEnabled: false,
+    provisionalAtConfidenceThreshold: false,
+    trendEnabled: true,
+    trendWindowRounds: 3,
+    trendMinimumRounds: 3,
+    trendRequiredRounds: 2,
+    trendHighScore: 0.56,
+    trendLowScore: 0.42,
+    trendUpwardMultiplier: 0.2,
+    trendDownwardMultiplier: 0.3,
+  });
 
   it("mantém todo jogador novo no OVR neutro, independente da tag operacional", () => {
     const result = calculatePlayerOveralls(observedPlayers, []);
@@ -316,5 +336,53 @@ describe("motor adaptativo de OVR", () => {
     const inputs = Array.from({ length: 3 }, (_, index) => round(index + 1, [appearance("ata", { goals: 1 })]));
     const result = calculatePlayerOveralls([observedPlayers[1]], inputs, characteristicsFormula);
     expect(result.snapshots[0].isProvisional).toBe(false);
+  });
+
+  it("acelera a subida da posição quando duas das últimas três rodadas são boas", () => {
+    const inputs = Array.from({ length: 3 }, (_, index) => round(index + 1, [
+      appearance("ata", { goals: 2, assists: 1, result: "win" }),
+    ]));
+    const withTrend = calculatePlayerOveralls([observedPlayers[1]], inputs, trendFormula).snapshots[0];
+    const withoutTrend = calculatePlayerOveralls([observedPlayers[1]], inputs, characteristicsFormula).snapshots[0];
+
+    expect(withTrend.positionTrends.ATA).toBe("rising");
+    expect(withTrend.trend).toBe("rising");
+    expect(withTrend.positions.ATA.value).toBeGreaterThan(withoutTrend.positions.ATA.value);
+  });
+
+  it("acelera a queda somente depois de uma sequência ruim na posição", () => {
+    const inputs = [
+      ...Array.from({ length: 3 }, (_, index) => round(index + 1, [appearance("ata", { goals: 3, assists: 1, result: "win" })])),
+      ...Array.from({ length: 3 }, (_, index) => round(index + 4, [appearance("ata", { goalsConceded: 2, concededGoalSeconds: [30, 90], result: "loss" })])),
+    ];
+    const withTrend = calculatePlayerOveralls([observedPlayers[1]], inputs, trendFormula).snapshots[0];
+    const withoutTrend = calculatePlayerOveralls([observedPlayers[1]], inputs, characteristicsFormula).snapshots[0];
+
+    expect(withTrend.positionTrends.ATA).toBe("falling");
+    expect(withTrend.trend).toBe("falling");
+    expect(withTrend.positions.ATA.value).toBeLessThan(withoutTrend.positions.ATA.value);
+  });
+
+  it("mantém a tendência estável antes de três rodadas jogadas", () => {
+    const result = calculatePlayerOveralls([observedPlayers[1]], [
+      round(1, [appearance("ata", { goals: 3, result: "win" })]),
+      round(2, [appearance("ata", { goals: 3, result: "win" })]),
+    ], trendFormula).snapshots[0];
+
+    expect(result.positionTrends.ATA).toBe("steady");
+    expect(result.trend).toBe("steady");
+  });
+
+  it("não conta uma ausência como rodada ruim para a tendência", () => {
+    const result = calculatePlayerOveralls([observedPlayers[1]], [
+      round(1, [appearance("ata", { goals: 2, result: "win" })]),
+      round(2, [appearance("ata", { goals: 2, result: "win" })]),
+      round(3, [appearance("ata", { goals: 2, result: "win" })]),
+      round(4, []),
+      round(5, []),
+      round(6, [appearance("ata", { goals: 2, result: "win" })]),
+    ], trendFormula).snapshots[0];
+
+    expect(result.positionTrends.ATA).toBe("rising");
   });
 });

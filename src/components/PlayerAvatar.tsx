@@ -18,6 +18,7 @@ type PlayerAvatarProps = {
   auraKey?: string | null;
   frameClass?: string;
   sizes?: string;
+  quality?: 75 | 90;
 };
 
 export function PlayerAvatar({
@@ -30,6 +31,7 @@ export function PlayerAvatar({
   auraKey,
   frameClass,
   sizes = "(max-width: 640px) 80px, 96px",
+  quality = 75,
 }: PlayerAvatarProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -96,7 +98,7 @@ export function PlayerAvatar({
               alt={`Foto de ${name}`}
               fill
               sizes={sizes}
-              quality={75}
+              quality={quality}
               className={`player-avatar__image object-cover ${imageClassName}`}
               onError={() => setImageFailed(true)}
             />

@@ -5,8 +5,8 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import { calculatePlayerOveralls, parseOverallFormulaConfig, type OverallPlayer, type OverallRole } from "../overall";
 import { buildOverallHistoryInput } from "../overall-history";
 
-const FORMULA_KEY = "adaptive-v8-soft-progression-shadow";
-const COMPARISON_FORMULA_KEY = "adaptive-v7-trait-composed-shadow";
+const FORMULA_KEY = "adaptive-v9-player-form-trend-shadow";
+const COMPARISON_FORMULA_KEY = "adaptive-v8-soft-progression-shadow";
 
 function numberValue(value: unknown) {
   const result = Number(value || 0);
@@ -63,6 +63,8 @@ export type OverallShadowAdminData = {
     playerId: string; playerName: string; overall: number; def: number; alaMei: number; ata: number; gol: number; confidence: number;
     positionConfidence: PositionMap; provisional: boolean; stale: boolean; roundsPlayed: number; goals: number; assists: number;
     seedMode: "legacy_tag" | "observed"; recentRounds: RecentRound[];
+    trend: "rising" | "steady" | "falling";
+    positionTrends: Record<OverallRole, "rising" | "steady" | "falling">;
     comparison: { overallDelta: number; defDelta: number; alaMeiDelta: number; ataDelta: number; golDelta: number } | null;
   }>;
 };
@@ -112,6 +114,8 @@ export async function getOverallShadowAdminData(): Promise<OverallShadowAdminDat
     snapshots: (rows || []).map((row: any) => ({
       playerId: row.player_id, playerName: row.player?.name || "Jogador", overall: numberValue(row.overall), def: numberValue(row.def_overall), alaMei: numberValue(row.ala_mei_overall), ata: numberValue(row.ata_overall), gol: numberValue(row.gol_overall), confidence: numberValue(row.confidence),
       positionConfidence: row.data_quality?.position_confidence || { DEF: 0, ALA_MEI: 0, ATA: 0, GOL: 0 }, provisional: Boolean(row.is_provisional), stale: Boolean(row.is_stale), roundsPlayed: numberValue(row.rounds_played), goals: numberValue(row.data_quality?.scout_totals?.goals), assists: numberValue(row.data_quality?.scout_totals?.assists), seedMode: row.data_quality?.seed_mode === "legacy_tag" ? "legacy_tag" : "observed",
+      trend: row.data_quality?.overall_trend === "rising" || row.data_quality?.overall_trend === "falling" ? row.data_quality.overall_trend : "steady",
+      positionTrends: Object.fromEntries((["DEF", "ALA_MEI", "ATA", "GOL"] as OverallRole[]).map((role) => [role, row.data_quality?.position_trends?.[role] === "rising" || row.data_quality?.position_trends?.[role] === "falling" ? row.data_quality.position_trends[role] : "steady"])) as Record<OverallRole, "rising" | "steady" | "falling">,
       recentRounds: (roundsByPlayer.get(row.player_id) || []).map((item) => ({ date: item.round_date, goals: numberValue(item.goals), assists: numberValue(item.assists), goalsConceded: numberValue(item.goals_conceded), attackingScore: numberValue(item.attacking_score), defensiveScore: numberValue(item.defensive_score), timingQuality: item.timing_quality === "exact" ? "exact" : "fallback", playedProfile: item.played_profile || null, traitEvidence: item.trait_evidence || { DEF: 0, ALA_MEI: 0, ATA: 0, GOL: 0 }, positions: item.positions || { DEF: 0, ALA_MEI: 0, ATA: 0, GOL: 0 } })),
       comparison: (() => {
         const previous = comparisonByPlayer.get(row.player_id) as any;
@@ -136,7 +140,7 @@ export async function recalculateOverallShadow() {
   let runId: string | null = null;
   try {
     const { data: formula, error: formulaError } = await database.from("overall_formula_versions").select("id, config").eq("key", FORMULA_KEY).single();
-    if (formulaError || !formula) throw new Error("A fórmula v8 não foi encontrada. Confirme a migration 168.");
+    if (formulaError || !formula) throw new Error("A fórmula v9 não foi encontrada. Confirme a migration 170.");
     const source = await loadOverallHistory(database);
     const latestRound = [...source.rounds].filter((round) => round.roundType === "official" && round.status === "finished").at(-1);
     const { data: run, error: runError } = await database.from("overall_calculation_runs").insert({ formula_version_id: formula.id, status: "processing", source_through_round_id: latestRound?.id || null, started_at: new Date().toISOString(), created_by: account.user.id }).select("id").single();
@@ -146,7 +150,7 @@ export async function recalculateOverallShadow() {
     const rows = calculation.snapshots.map((snapshot) => ({
       calculation_run_id: runId, player_id: snapshot.playerId, overall: snapshot.overall, def_overall: snapshot.positions.DEF.value, ala_mei_overall: snapshot.positions.ALA_MEI.value, ata_overall: snapshot.positions.ATA.value, gol_overall: snapshot.positions.GOL.value,
       confidence: Math.max(snapshot.positions.DEF.confidence, snapshot.positions.ALA_MEI.confidence, snapshot.positions.ATA.confidence), rounds_played: snapshot.roundsPlayed, goalkeeper_rounds: snapshot.goalkeeperRounds, is_provisional: snapshot.isProvisional, is_stale: snapshot.isStale, last_round_id: snapshot.lastRoundId,
-      data_quality: { mode: "shadow", goal_timing: "first_conceded_goal_with_legacy_fallback", scoring_unit: "weekly_round", characteristics: "admin_weighted", seed_mode: "disabled_in_v5", scout_totals: snapshot.scoutTotals, position_confidence: Object.fromEntries(Object.entries(snapshot.positions).map(([role, position]) => [role, position.confidence])) },
+      data_quality: { mode: "shadow", goal_timing: "first_conceded_goal_with_legacy_fallback", scoring_unit: "weekly_round", characteristics: "admin_weighted", seed_mode: "disabled_in_v5", scout_totals: snapshot.scoutTotals, position_confidence: Object.fromEntries(Object.entries(snapshot.positions).map(([role, position]) => [role, position.confidence])), overall_trend: snapshot.trend, position_trends: snapshot.positionTrends },
     }));
     if (rows.length) {
       const { error } = await database.from("player_overall_snapshots").insert(rows);

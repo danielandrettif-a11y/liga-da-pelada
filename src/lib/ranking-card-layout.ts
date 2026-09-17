@@ -33,17 +33,19 @@ export type RankingCardTheme = {
 };
 
 export type RankingCardAwardKey = "roundMvp" | "topScorer" | "topAssister" | "kingOfWins";
+export type RankingCardPositionKey = "DEF" | "ALA_MEI" | "ATA" | "GOL";
 
 export type RankingCardContent = {
   header: string;
   rating: string;
   ratingLabel: "OVR";
+  ratingTrend: "rising" | "steady" | "falling" | null;
   profile: string;
   placement: string;
   name: string;
   title: string | null;
   awards: Array<{ key: RankingCardAwardKey; label: string; value: number }>;
-  stats: Array<{ label: string; value: string }>;
+  positionRatings: Array<{ key: RankingCardPositionKey; label: string; value: string; isBest: boolean }>;
 };
 
 /** All card tiers use this exact 2:3 content grid. */
@@ -128,11 +130,23 @@ export function getRankingCardTheme(position: number) {
 export function buildRankingCardContent(entry: RankingEntry, position: number): RankingCardContent {
   const theme = getRankingCardTheme(position);
   const profile = `${PROFILE_LABELS[entry.player.player_profile || "midfield"]}${entry.player.is_goalkeeper ? " / GOL" : ""}`;
+  const positionRatings = ([
+    ["DEF", "DEF"],
+    ["ALA_MEI", "ALA/MEI"],
+    ["ATA", "ATA"],
+    ["GOL", "GOL"],
+  ] as const).map(([key, label]) => ({ key, label, rawValue: entry.overallPositions?.[key] ?? null }));
+  const bestPosition = positionRatings.reduce<number | null>((bestIndex, item, index, values) => {
+    if (item.rawValue == null) return bestIndex;
+    if (bestIndex == null || item.rawValue > (values[bestIndex].rawValue ?? Number.NEGATIVE_INFINITY)) return index;
+    return bestIndex;
+  }, null);
 
   return {
     header: `PBQ • ${theme.label}`,
     rating: entry.overall == null ? "—" : entry.overall.toFixed(1),
     ratingLabel: "OVR",
+    ratingTrend: entry.overall == null ? null : entry.overallTrend || "steady",
     profile,
     placement: `${position}º`,
     name: entry.player.name,
@@ -143,14 +157,12 @@ export function buildRankingCardContent(entry: RankingEntry, position: number): 
       { key: "topAssister", label: "Garçom", value: entry.awards.topAssister },
       { key: "kingOfWins", label: "Rei das Vitórias", value: entry.awards.kingOfWins },
     ],
-    stats: [
-      { value: String(entry.goals), label: "GOL" },
-      { value: String(entry.assists), label: "AST" },
-      { value: String(entry.wins), label: "VIT" },
-      { value: String(entry.games), label: "JOG" },
-      { value: String(entry.losses), label: "DER" },
-      { value: `${entry.winRate}%`, label: "APR" },
-    ],
+    positionRatings: positionRatings.map((item, index) => ({
+      key: item.key,
+      label: item.label,
+      value: item.rawValue == null ? "—" : item.rawValue.toFixed(1),
+      isBest: bestPosition === index,
+    })),
   };
 }
 

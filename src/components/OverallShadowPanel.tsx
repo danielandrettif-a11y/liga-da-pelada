@@ -4,6 +4,12 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { recalculateOverallShadow, type OverallShadowAdminData } from "@/lib/actions/overall";
 
+const TREND_LABELS = {
+  rising: "↑ Em alta",
+  steady: "→ Estável",
+  falling: "↓ Em baixa",
+} as const;
+
 export function OverallShadowPanel({ initialData }: { initialData: OverallShadowAdminData }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -15,7 +21,7 @@ export function OverallShadowPanel({ initialData }: { initialData: OverallShadow
     startTransition(async () => {
       const result = await recalculateOverallShadow();
       setMessage(result.success
-        ? `Rascunho calculado para ${result.players} jogadores em ${result.rounds} rodadas. ${result.pendingPlayers} aguardam características. Nada foi publicado.`
+        ? `OVR calculado para ${result.players} jogadores em ${result.rounds} rodadas. ${result.pendingPlayers} aguardam características. As cartas foram atualizadas; ranking, Cartola e sorteio não mudam.`
         : result.error || "Não foi possível calcular o OVR.");
       if (result.success) router.refresh();
     });
@@ -27,7 +33,7 @@ export function OverallShadowPanel({ initialData }: { initialData: OverallShadow
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-black text-foreground">Modo sombra do OVR</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">Calcula o histórico oficial, mas não altera ranking, Cartola, sorteio ou telas dos jogadores.</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">Calcula o histórico oficial e atualiza somente o OVR e a tendência nas cartas dos jogadores. Ranking, Cartola e sorteio não mudam.</p>
           </div>
           <button type="button" onClick={recalculate} disabled={pending} className="rounded-xl bg-accent px-4 py-3 text-xs font-black text-background disabled:opacity-50">
             {pending ? "Calculando..." : initialData.latestRun ? "Recalcular rascunho" : "Calcular histórico"}
@@ -43,7 +49,7 @@ export function OverallShadowPanel({ initialData }: { initialData: OverallShadow
       {initialData.pendingPlayers.length > 0 && (
         <section className="rounded-2xl border border-warning/30 bg-warning/5 p-4">
           <p className="text-sm font-black text-foreground">Características pendentes ({initialData.pendingPlayers.length})</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">Esses jogadores oficiais não entram no OVR v5 até um administrador escolher uma ou mais características no perfil. Convidados só passam a ter OVR quando virarem jogadores oficiais.</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">Esses jogadores oficiais não entram no OVR até um administrador escolher uma ou mais características no perfil. Convidados só passam a ter OVR quando virarem jogadores oficiais.</p>
           <p className="mt-2 text-xs font-bold text-warning">{initialData.pendingPlayers.map((player) => player.name).join(" · ")}</p>
         </section>
       )}
@@ -58,7 +64,8 @@ export function OverallShadowPanel({ initialData }: { initialData: OverallShadow
               <span className="rounded-lg bg-accent/15 px-3 py-1 text-lg font-black text-accent">OVR {item.overall.toFixed(1)}</span>
             </div>
             <p className="mt-3 text-[11px] font-bold tracking-wide text-muted">DEF {item.def.toFixed(1)} · ALA/MEI {item.alaMei.toFixed(1)} · ATA {item.ata.toFixed(1)} · GOL {item.gol.toFixed(1)} {item.provisional ? "· PROV" : ""}{item.stale ? " · DESATUALIZADO" : ""}</p>
-            {item.comparison && <p className="mt-1 text-[10px] font-bold text-accent">vs v7: OVR {item.comparison.overallDelta >= 0 ? "+" : ""}{item.comparison.overallDelta.toFixed(1)} · DEF {item.comparison.defDelta >= 0 ? "+" : ""}{item.comparison.defDelta.toFixed(1)} · ALA/MEI {item.comparison.alaMeiDelta >= 0 ? "+" : ""}{item.comparison.alaMeiDelta.toFixed(1)} · ATA {item.comparison.ataDelta >= 0 ? "+" : ""}{item.comparison.ataDelta.toFixed(1)}</p>}
+            <p className={`mt-1 text-[10px] font-black ${item.trend === "rising" ? "text-accent" : item.trend === "falling" ? "text-danger" : "text-muted"}`}>Tendência geral: {TREND_LABELS[item.trend]} · DEF {TREND_LABELS[item.positionTrends.DEF]} · ALA/MEI {TREND_LABELS[item.positionTrends.ALA_MEI]} · ATA {TREND_LABELS[item.positionTrends.ATA]} · GOL {TREND_LABELS[item.positionTrends.GOL]}</p>
+            {item.comparison && <p className="mt-1 text-[10px] font-bold text-accent">vs v8: OVR {item.comparison.overallDelta >= 0 ? "+" : ""}{item.comparison.overallDelta.toFixed(1)} · DEF {item.comparison.defDelta >= 0 ? "+" : ""}{item.comparison.defDelta.toFixed(1)} · ALA/MEI {item.comparison.alaMeiDelta >= 0 ? "+" : ""}{item.comparison.alaMeiDelta.toFixed(1)} · ATA {item.comparison.ataDelta >= 0 ? "+" : ""}{item.comparison.ataDelta.toFixed(1)}</p>}
             <p className="mt-1 text-[10px] text-muted">Confiança por posição: DEF {Math.round(item.positionConfidence.DEF * 100)}% · ALA/MEI {Math.round(item.positionConfidence.ALA_MEI * 100)}% · ATA {Math.round(item.positionConfidence.ATA * 100)}% · GOL {Math.round(item.positionConfidence.GOL * 100)}%</p>
             <button type="button" onClick={() => setOpenPlayer(openPlayer === item.playerId ? null : item.playerId)} className="mt-3 text-xs font-black text-accent">
               {openPlayer === item.playerId ? "Ocultar explicação" : "Ver por que a nota mudou"}

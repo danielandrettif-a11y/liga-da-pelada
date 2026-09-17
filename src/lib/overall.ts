@@ -5,6 +5,7 @@ export type OverallRole = "DEF" | "ALA_MEI" | "ATA" | "GOL";
 export type OverallResult = "win" | "draw" | "loss";
 export type OverallSeedMode = "legacy_tag" | "observed";
 export type GoalTimingQuality = "exact" | "fallback";
+export type OverallTrend = "rising" | "steady" | "falling";
 
 type LineRole = Exclude<OverallRole, "GOL">;
 type PositionWeights = { defense: number; attack: number; result: number };
@@ -53,6 +54,22 @@ export type OverallFormulaConfig = {
   hardPositionCapsEnabled: boolean;
   /** Fórmulas antigas ainda marcavam a terceira rodada como provisória. */
   provisionalAtConfidenceThreshold: boolean;
+  /** Ativa o acelerador suave por sequência recente de atuações. */
+  trendEnabled: boolean;
+  /** Quantas rodadas jogadas entram na leitura de forma recente. */
+  trendWindowRounds: number;
+  /** Amostra mínima antes de exibir ou aplicar uma tendência. */
+  trendMinimumRounds: number;
+  /** Quantas rodadas boas/ruins dentro da janela formam uma tendência. */
+  trendRequiredRounds: number;
+  /** Corte de qualidade para uma atuação considerada boa. */
+  trendHighScore: number;
+  /** Corte de qualidade para uma atuação considerada ruim. */
+  trendLowScore: number;
+  /** Aceleração máxima de subida quando a tendência é positiva. */
+  trendUpwardMultiplier: number;
+  /** Aceleração máxima de queda quando a tendência é negativa. */
+  trendDownwardMultiplier: number;
 };
 
 export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
@@ -91,6 +108,14 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   performanceChangeBonus: 0,
   hardPositionCapsEnabled: true,
   provisionalAtConfidenceThreshold: true,
+  trendEnabled: false,
+  trendWindowRounds: 3,
+  trendMinimumRounds: 3,
+  trendRequiredRounds: 2,
+  trendHighScore: 0.56,
+  trendLowScore: 0.42,
+  trendUpwardMultiplier: 0.2,
+  trendDownwardMultiplier: 0.3,
 };
 
 export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig {
@@ -129,6 +154,12 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
   };
+  const wholeNumber = (value: unknown, fallback: number, minimum: number, maximum: number) => (
+    clamp(Math.round(bounded(value, fallback)), minimum, maximum)
+  );
+  const trendWindowRounds = wholeNumber(candidate.trendWindowRounds, DEFAULT_OVERALL_FORMULA.trendWindowRounds, 2, 5);
+  const trendMinimumRounds = wholeNumber(candidate.trendMinimumRounds, DEFAULT_OVERALL_FORMULA.trendMinimumRounds, 2, trendWindowRounds);
+  const trendRequiredRounds = wholeNumber(candidate.trendRequiredRounds, DEFAULT_OVERALL_FORMULA.trendRequiredRounds, 2, trendWindowRounds);
   const normalizedPositionWeights = (role: LineRole): PositionWeights => {
     const source = positionWeights[role] && typeof positionWeights[role] === "object"
       ? positionWeights[role] as Record<string, unknown>
@@ -213,6 +244,16 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     provisionalAtConfidenceThreshold: typeof candidate.provisionalAtConfidenceThreshold === "boolean"
       ? candidate.provisionalAtConfidenceThreshold
       : DEFAULT_OVERALL_FORMULA.provisionalAtConfidenceThreshold,
+    trendEnabled: typeof candidate.trendEnabled === "boolean"
+      ? candidate.trendEnabled
+      : DEFAULT_OVERALL_FORMULA.trendEnabled,
+    trendWindowRounds,
+    trendMinimumRounds,
+    trendRequiredRounds,
+    trendHighScore: clamp(bounded(candidate.trendHighScore, DEFAULT_OVERALL_FORMULA.trendHighScore), 0, 1),
+    trendLowScore: clamp(bounded(candidate.trendLowScore, DEFAULT_OVERALL_FORMULA.trendLowScore), 0, 1),
+    trendUpwardMultiplier: clamp(bounded(candidate.trendUpwardMultiplier, DEFAULT_OVERALL_FORMULA.trendUpwardMultiplier), 0, 0.5),
+    trendDownwardMultiplier: clamp(bounded(candidate.trendDownwardMultiplier, DEFAULT_OVERALL_FORMULA.trendDownwardMultiplier), 0, 0.5),
   };
 }
 
@@ -269,6 +310,8 @@ export type PlayerOverallSnapshot = {
   playerId: string;
   overall: number;
   positions: Record<OverallRole, OverallPositionSnapshot>;
+  trend: OverallTrend;
+  positionTrends: Record<OverallRole, OverallTrend>;
   roundsPlayed: number;
   goalkeeperRounds: number;
   isProvisional: boolean;
@@ -545,20 +588,76 @@ function positionEstimate(
   return { target, confidence, validRounds, seedBonus };
 }
 
-function calculateGeneral(player: OverallPlayer, values: Record<OverallRole, number>, goalkeeperRounds: number, confidence: number, config: OverallFormulaConfig) {
+function positionTrend(
+  state: MutablePlayerState,
+  role: OverallRole,
+  config: OverallFormulaConfig,
+): OverallTrend {
+  if (!config.trendEnabled) return "steady";
+  const eligibleRounds = role === "GOL" ? state.goalkeeperRoundIds.size : state.playedRoundIds.size;
+  if (eligibleRounds < config.trendMinimumRounds) return "steady";
+
+  // Várias partidas na mesma pelada formam uma amostra semanal única. A
+  // tendência olha somente rodadas em que o atleta participou, portanto uma
+  // ausência não reduz a nota nem conta como atuação ruim.
+  const byRound = new Map<string, { roundIndex: number; scoreTotal: number; seconds: number }>();
+  for (const record of state.history) {
+    if (record.role !== role) continue;
+    const current = byRound.get(record.roundId) || { roundIndex: record.roundIndex, scoreTotal: 0, seconds: 0 };
+    const seconds = exposure(record.secondsPlayed);
+    current.scoreTotal += record.score * seconds;
+    current.seconds += seconds;
+    byRound.set(record.roundId, current);
+  }
+  const recentRounds = [...byRound.values()]
+    .sort((left, right) => right.roundIndex - left.roundIndex)
+    .slice(0, config.trendWindowRounds);
+  if (recentRounds.length < config.trendMinimumRounds) return "steady";
+
+  const goodRounds = recentRounds.filter((round) => round.seconds > 0 && round.scoreTotal / round.seconds >= config.trendHighScore).length;
+  const badRounds = recentRounds.filter((round) => round.seconds > 0 && round.scoreTotal / round.seconds <= config.trendLowScore).length;
+  if (goodRounds >= config.trendRequiredRounds && goodRounds > badRounds) return "rising";
+  if (badRounds >= config.trendRequiredRounds && badRounds > goodRounds) return "falling";
+  return "steady";
+}
+
+function calculateLineOverall(player: OverallPlayer, values: Record<OverallRole, number>, config: OverallFormulaConfig) {
   const lineValues = [values.DEF, values.ALA_MEI, values.ATA].sort((a, b) => b - a);
-  const traitRoles = [...new Set(player.overallTraits || [])].map((trait) => profileRole(trait));
+  const traitRoles = [...new Set(player.overallTraits || [])].map((trait) => profileRole(trait)).filter((role): role is LineRole => role !== "GOL");
   const traitValues = traitRoles.map((role) => values[role]).sort((left, right) => right - left);
   const rankedWeights = traitValues.length === 1
     ? [1]
     : traitValues.length === 2
       ? [0.7, 0.3]
       : [0.6, 0.25, 0.15];
-  const lineOverall = config.traitBasedOverall && traitValues.length > 0
+  return config.traitBasedOverall && traitValues.length > 0
     ? config.rankedTraitOverall
       ? traitValues.reduce((total, value, index) => total + value * rankedWeights[index], 0)
       : traitValues.reduce((total, value) => total + value, 0) / traitValues.length
     : lineValues[0] * 0.7 + lineValues[1] * 0.3;
+}
+
+function overallTrend(
+  player: OverallPlayer,
+  positionTrends: Record<OverallRole, OverallTrend>,
+  values: Record<OverallRole, number>,
+  goalkeeperRounds: number,
+  config: OverallFormulaConfig,
+) {
+  if (goalkeeperRounds >= config.goalkeeperEligibilityRounds && values.GOL >= calculateLineOverall(player, values, config)) {
+    return positionTrends.GOL;
+  }
+  const traitRoles = [...new Set(player.overallTraits || [])].map((trait) => profileRole(trait)).filter((role): role is LineRole => role !== "GOL");
+  const relevantRoles = traitRoles.length > 0 ? traitRoles : ["DEF", "ALA_MEI", "ATA"] as LineRole[];
+  const rising = relevantRoles.filter((role) => positionTrends[role] === "rising").length;
+  const falling = relevantRoles.filter((role) => positionTrends[role] === "falling").length;
+  if (rising > falling) return "rising" as const;
+  if (falling > rising) return "falling" as const;
+  return "steady" as const;
+}
+
+function calculateGeneral(player: OverallPlayer, values: Record<OverallRole, number>, goalkeeperRounds: number, confidence: number, config: OverallFormulaConfig) {
+  const lineOverall = calculateLineOverall(player, values, config);
   const rawOverall = goalkeeperRounds >= config.goalkeeperEligibilityRounds
     ? Math.max(lineOverall, values.GOL)
     : lineOverall;
@@ -579,6 +678,7 @@ function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, current
       validRounds: estimate.validRounds,
     }];
   })) as Record<OverallRole, OverallPositionSnapshot>;
+  const positionTrends = Object.fromEntries(ROLES.map((role) => [role, positionTrend(state, role, config)])) as Record<OverallRole, OverallTrend>;
   const roundsPlayed = state.playedRoundIds.size;
   const goalkeeperRounds = state.goalkeeperRoundIds.size;
   const overallConfidence = Math.max(positions.DEF.confidence, positions.ALA_MEI.confidence, positions.ATA.confidence);
@@ -586,6 +686,8 @@ function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, current
     playerId: player.id,
     overall: calculateGeneral(player, state.values, goalkeeperRounds, overallConfidence, config),
     positions,
+    trend: overallTrend(player, positionTrends, state.values, goalkeeperRounds, config),
+    positionTrends,
     roundsPlayed,
     goalkeeperRounds,
     isProvisional: roundsPlayed < config.confidenceRounds
@@ -707,8 +809,14 @@ export function calculatePlayerOveralls(
         const changeScale = formula.traitWeightedChange
           ? traitEvidenceWeight(player, role, formula)
           : 1;
-        const maximumChange = (formula.maxChangePerRound
+        const positionForm = positionTrend(state, role, formula);
+        let maximumChange = (formula.maxChangePerRound
           + Math.abs(estimate.target - formula.base) * formula.performanceChangeBonus) * changeScale;
+        if (estimate.target > previous && positionForm === "rising") {
+          maximumChange *= 1 + formula.trendUpwardMultiplier;
+        } else if (estimate.target < previous && positionForm === "falling") {
+          maximumChange *= 1 + formula.trendDownwardMultiplier;
+        }
         const upperLimit = formula.hardPositionCapsEnabled
           ? provisionalPositionCap(estimate.validRounds, formula) - estimate.seedBonus
           : 99;

@@ -37,6 +37,8 @@ export type RankingEntry = {
   assists: number;
   points: number;
   overall?: number | null;
+  overallTrend?: "rising" | "steady" | "falling" | null;
+  overallPositions?: { DEF: number; ALA_MEI: number; ATA: number; GOL: number } | null;
   totalRawPoints?: number;
   bestRounds?: RankingBestRound[];
   minPointsToEnterTop6?: number | null;

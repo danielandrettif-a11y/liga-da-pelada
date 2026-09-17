@@ -59,6 +59,7 @@ describe("ranking card layout", () => {
       player: { name: "Jogador Teste", player_profile: "defensive", is_goalkeeper: false },
       points: 53.5,
       overall: 74.6,
+      overallPositions: { DEF: 75.2, ALA_MEI: 72.4, ATA: 71.6, GOL: 70.8 },
       goals: 5,
       assists: 4,
       wins: 12,
@@ -74,6 +75,7 @@ describe("ranking card layout", () => {
       header: "PBQ • RANKED",
       rating: "74.6",
       ratingLabel: "OVR",
+      ratingTrend: "steady",
       profile: "DEF",
       placement: "7º",
       name: "Jogador Teste",
@@ -85,7 +87,12 @@ describe("ranking card layout", () => {
       ["Garçom", 1],
       ["Rei das Vitórias", 3],
     ]);
-    expect(content.stats.map(({ label }) => label)).toEqual(["GOL", "AST", "VIT", "JOG", "DER", "APR"]);
+    expect(content.positionRatings).toEqual([
+      { key: "DEF", label: "DEF", value: "75.2", isBest: true },
+      { key: "ALA_MEI", label: "ALA/MEI", value: "72.4", isBest: false },
+      { key: "ATA", label: "ATA", value: "71.6", isBest: false },
+      { key: "GOL", label: "GOL", value: "70.8", isBest: false },
+    ]);
   });
 
   it("does not reuse ranking points when the player has no calculated OVR", () => {
@@ -101,6 +108,25 @@ describe("ranking card layout", () => {
       awards: { roundMvp: 0, topScorer: 0, topAssister: 0, kingOfWins: 0 },
     } as RankingEntry;
 
-    expect(buildRankingCardContent(entry, 10)).toMatchObject({ rating: "—", ratingLabel: "OVR" });
+    expect(buildRankingCardContent(entry, 10)).toMatchObject({ rating: "—", ratingLabel: "OVR", ratingTrend: null });
+    expect(buildRankingCardContent(entry, 10).positionRatings.every((item) => item.value === "—" && !item.isBest)).toBe(true);
+  });
+
+  it("keeps the player form indicator separate from the OVR value", () => {
+    const entry = {
+      player: { name: "Em alta", player_profile: "offensive", is_goalkeeper: false },
+      points: 40,
+      overall: 77.1,
+      overallTrend: "rising",
+      goals: 0,
+      assists: 0,
+      wins: 0,
+      games: 0,
+      losses: 0,
+      winRate: 0,
+      awards: { roundMvp: 0, topScorer: 0, topAssister: 0, kingOfWins: 0 },
+    } as RankingEntry;
+
+    expect(buildRankingCardContent(entry, 4)).toMatchObject({ rating: "77.1", ratingTrend: "rising" });
   });
 });
