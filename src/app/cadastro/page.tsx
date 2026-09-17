@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ArrowLeft, CheckCircle2, Loader2, Mail, MailCheck, Lock, UserRoundPlus } from "@/components/icons";
 import { GoogleAuthButton } from "@/components/GoogleAuthButton";
-import { PLAYER_PROFILE_OPTIONS } from "@/lib/playerProfiles";
 import { signup } from "./actions";
 
 function CadastroContent() {
@@ -112,18 +111,9 @@ function CadastroContent() {
           </div>
         </div>
 
-        <fieldset className="space-y-2">
-          <legend className="text-xs font-bold uppercase tracking-wider text-muted">Estilo de jogo</legend>
-          <div className="grid grid-cols-3 gap-2">
-            {PLAYER_PROFILE_OPTIONS.map((option) => (
-              <label key={option.value} className="cursor-pointer rounded-xl border border-border bg-surface-hover p-3 text-center has-[:checked]:border-accent has-[:checked]:bg-accent/10">
-                <input type="radio" name="player_profile" value={option.value} defaultChecked={option.value === "midfield"} className="sr-only" />
-                <span className="block text-xs font-black text-foreground">{option.label}</span>
-                <span className="mt-1 block text-[9px] text-muted">{option.shortLabel}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <p className="rounded-xl border border-accent/20 bg-accent/5 p-3 text-[10px] leading-4 text-muted">
+          Seu OVR começa neutro e se adapta automaticamente às suas primeiras rodadas. Você não precisa escolher uma posição no cadastro.
+        </p>
 
         <div className="space-y-1.5">
           <label className="text-xs font-bold uppercase tracking-wider text-muted">E-mail</label>

@@ -3,10 +3,13 @@ import type { PlayerProfile } from "./types";
 /** Motor puro do OVR BQ. Não lê nem escreve no banco. */
 export type OverallRole = "DEF" | "ALA_MEI" | "ATA" | "GOL";
 export type OverallResult = "win" | "draw" | "loss";
+export type OverallSeedMode = "legacy_tag" | "observed";
 
 export type OverallPlayer = {
   id: string;
+  /** Tag histórica; só jogadores legados a usam como estimativa temporária. */
   playerProfile: PlayerProfile | null;
+  overallSeedMode?: OverallSeedMode;
   isGoalkeeper?: boolean;
 };
 
@@ -103,22 +106,6 @@ function profileRole(profile: PlayerProfile | null): OverallRole {
   return "ALA_MEI";
 }
 
-function defensiveResponsibility(profile: PlayerProfile | null) {
-  if (profile === "defensive") return 1;
-  if (profile === "midfield") return 0.75;
-  return 0.5;
-}
-
-function offensiveResponsibility(profile: PlayerProfile | null) {
-  if (profile === "offensive") return 1;
-  if (profile === "midfield") return 0.75;
-  return 0.5;
-}
-
-function towardNeutral(value: number, responsibility: number) {
-  return clamp(0.5 + (value - 0.5) * responsibility, 0, 1);
-}
-
 function resultScore(result: OverallResult) {
   return result === "win" ? 1 : result === "draw" ? 0.5 : 0;
 }
@@ -132,11 +119,9 @@ function perSevenMinuteRate(goals: number, secondsPlayed: number) {
 }
 
 function basePositionValue(player: OverallPlayer, role: OverallRole) {
-  // A tag não pode transformar uma classificação inicial em nota pública.
-  // Todo mundo começa neutro; a tag influencia o crédito das atuações abaixo.
-  void player;
-  void role;
-  return 70;
+  // A tag é uma estimativa histórica, não uma regra permanente. Jogadores
+  // novos entram pelo modo observado, neutros até construírem evidência.
+  return player.overallSeedMode === "legacy_tag" && profileRole(player.playerProfile) === role ? 73 : 70;
 }
 
 function emptyPositions(player: OverallPlayer): Record<OverallRole, number> {
@@ -189,7 +174,7 @@ function calculateMatchScore(
   const resilience = clamp(seconds / (MAX_MATCH_SECONDS * (conceded + 0.5)), 0, 1);
   const cleanTime = conceded === 0 ? seconds / MAX_MATCH_SECONDS : 0;
   const defensive = clamp(
-    rateImpact * 0.42 + resilience * 0.27 + cleanTime * 0.16 + resultScore(appearance.result) * 0.1 + (ownGoals === 0 ? 1 : 0) * 0.05,
+    rateImpact * 0.47 + resilience * 0.30 + cleanTime * 0.18 + resultScore(appearance.result) * 0.02 + (ownGoals === 0 ? 1 : 0) * 0.03,
     0,
     1,
   );
@@ -197,10 +182,8 @@ function calculateMatchScore(
 
   if (role === "GOL") return clamp(defensive * 0.9 + attacking * 0.1, 0, 1);
 
-  const defensiveWithResponsibility = towardNeutral(defensive, defensiveResponsibility(appearance.playerProfileLocked));
-  const attackingWithResponsibility = towardNeutral(attacking, offensiveResponsibility(appearance.playerProfileLocked));
   const weights = role === "DEF" ? [0.85, 0.15] : role === "ALA_MEI" ? [0.5, 0.5] : [0.2, 0.8];
-  return clamp(defensiveWithResponsibility * weights[0] + attackingWithResponsibility * weights[1], 0, 1);
+  return clamp(defensive * weights[0] + attacking * weights[1], 0, 1);
 }
 
 function positionEstimate(
@@ -223,13 +206,12 @@ function positionEstimate(
   const exposureConfidence = clamp(totalWeight / PROVISIONAL_ROUNDS, 0, 1);
   const roundConfidence = clamp(validRounds / PROVISIONAL_ROUNDS, 0, 1);
   const confidence = Math.sqrt(exposureConfidence * roundConfidence);
-  const priorRounds = role === "GOL" ? state.goalkeeperRoundIds.size : state.playedRoundIds.size;
-  const priorBonus = profileRole(player.playerProfile) === role
-    // A tag dá apenas um impulso de aprendizado depois que existe evidência.
-    // Sem partidas não há bônus, e com pouca confiança ele é quase nulo.
-    ? 1.5 * confidence * clamp(1 - priorRounds / PROVISIONAL_ROUNDS, 0, 1)
+  const seedBonus = player.overallSeedMode === "legacy_tag" && profileRole(player.playerProfile) === role
+    // O ponto de partida 73 perde 20% a cada rodada válida. Na quinta, a
+    // especialidade inicial some e ficam somente as atuações observadas.
+    ? 3 * clamp(1 - validRounds / PROVISIONAL_ROUNDS, 0, 1)
     : 0;
-  const target = clamp(70 + (weightedScore - 0.5) * 40 * confidence + priorBonus, 40, 99);
+  const target = clamp(70 + (weightedScore - 0.5) * 40 * confidence + seedBonus, 40, 99);
 
   return { target, confidence, validRounds };
 }

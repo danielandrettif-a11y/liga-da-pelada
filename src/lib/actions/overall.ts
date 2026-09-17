@@ -16,9 +16,9 @@ async function loadOverallHistory(client: any) {
   const [{ data: players, error: playersError }, { data: rounds, error: roundsError }] = await Promise.all([
     client
       .from("players")
-      .select("id, player_profile, is_goalkeeper")
+      .select("id, player_profile, overall_seed_mode, is_goalkeeper")
       .eq("is_selectable", true)
-      .in("member_category", ["player", "guest"]),
+      .eq("member_category", "player"),
     client
       .from("rounds")
       .select(`
@@ -50,6 +50,7 @@ async function loadOverallHistory(client: any) {
     players: (players || []).map((player: any) => ({
       id: player.id,
       playerProfile: player.player_profile,
+      overallSeedMode: player.overall_seed_mode,
       isGoalkeeper: Boolean(player.is_goalkeeper),
     })) satisfies OverallPlayer[],
     rounds: rounds || [],
@@ -79,6 +80,7 @@ export type OverallShadowAdminData = {
     roundsPlayed: number;
     goals: number;
     assists: number;
+    seedMode: "legacy_tag" | "observed";
   }>;
 };
 
@@ -119,6 +121,7 @@ export async function getOverallShadowAdminData(): Promise<OverallShadowAdminDat
       roundsPlayed: numberValue(row.rounds_played),
       goals: numberValue(row.data_quality?.scout_totals?.goals),
       assists: numberValue(row.data_quality?.scout_totals?.assists),
+      seedMode: row.data_quality?.seed_mode === "legacy_tag" ? "legacy_tag" : "observed",
     })),
   };
 }
@@ -174,6 +177,7 @@ export async function recalculateOverallShadow() {
         mode: "shadow",
         goal_timing: "elapsed_seconds_with_legacy_fallback",
         scoring_unit: "weekly_round",
+        seed_mode: source.players.find((player) => player.id === snapshot.playerId)?.overallSeedMode || "observed",
         scout_totals: snapshot.scoutTotals,
       },
     }));

@@ -45,7 +45,7 @@ export function OverallShadowPanel({ initialData }: { initialData: OverallShadow
         ) : initialData.snapshots.map((item) => (
           <div key={item.playerId} className="border-b border-border p-4 last:border-0">
             <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0"><p className="truncate text-sm font-black text-foreground">{item.playerName}</p><p className="mt-0.5 text-[11px] text-muted">{item.roundsPlayed} rodadas · confiança {Math.round(item.confidence * 100)}% · {item.goals} G · {item.assists} A</p></div>
+              <div className="min-w-0"><p className="truncate text-sm font-black text-foreground">{item.playerName}</p><p className="mt-0.5 text-[11px] text-muted">{item.roundsPlayed} rodadas · confiança {Math.round(item.confidence * 100)}% · {item.goals} G · {item.assists} A · {item.seedMode === "legacy_tag" ? "base legada" : "observado"}</p></div>
               <span className="rounded-lg bg-accent/15 px-3 py-1 text-lg font-black text-accent">OVR {item.overall.toFixed(1)}</span>
             </div>
             <p className="mt-3 text-[11px] font-bold tracking-wide text-muted">DEF {item.def.toFixed(1)} · ALA/MEI {item.alaMei.toFixed(1)} · ATA {item.ata.toFixed(1)} · GOL {item.gol.toFixed(1)} {item.provisional ? "· PROV" : ""}{item.stale ? " · DESATUALIZADO" : ""}</p>

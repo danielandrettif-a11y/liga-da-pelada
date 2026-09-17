@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { calculatePlayerOveralls, type OverallAppearance, type OverallPlayer, type OverallRoundInput } from "./overall";
 
 const players: OverallPlayer[] = [
-  { id: "def", playerProfile: "defensive" },
-  { id: "ata", playerProfile: "offensive" },
-  { id: "gk", playerProfile: "midfield", isGoalkeeper: true },
+  { id: "def", playerProfile: "defensive", overallSeedMode: "legacy_tag" },
+  { id: "ata", playerProfile: "offensive", overallSeedMode: "legacy_tag" },
+  { id: "gk", playerProfile: "midfield", overallSeedMode: "legacy_tag", isGoalkeeper: true },
 ];
+
+const observedPlayers: OverallPlayer[] = players.map((player) => ({ ...player, overallSeedMode: "observed" }));
 
 function appearance(playerId: string, overrides: Partial<OverallAppearance> = {}): OverallAppearance {
   return {
@@ -28,12 +30,21 @@ function round(sequence: number, appearances: OverallAppearance[]): OverallRound
 }
 
 describe("motor adaptativo de OVR", () => {
-  it("mantém todo jogador novo no OVR neutro, independente da tag", () => {
-    const result = calculatePlayerOveralls(players, []);
+  it("mantém todo jogador novo no OVR neutro, independente da tag operacional", () => {
+    const result = calculatePlayerOveralls(observedPlayers, []);
     const defender = result.snapshots.find((snapshot) => snapshot.playerId === "def")!;
     expect(defender.overall).toBe(70);
     expect(defender.positions.DEF.value).toBe(70);
     expect(defender.positions.ATA.value).toBe(70);
+  });
+
+  it("dá aos jogadores oficiais legados 73 somente na posição indicada pela tag", () => {
+    const result = calculatePlayerOveralls(players, []);
+    const defender = result.snapshots.find((snapshot) => snapshot.playerId === "def")!;
+    expect(defender.positions.DEF.value).toBe(73);
+    expect(defender.positions.ALA_MEI.value).toBe(70);
+    expect(defender.positions.ATA.value).toBe(70);
+    expect(defender.overall).toBe(70);
   });
 
   it("dá mais crédito defensivo ao DEF do que ao ATA na mesma atuação coletiva", () => {
@@ -66,18 +77,18 @@ describe("motor adaptativo de OVR", () => {
       { ...round(1, [appearance("def", { goals: 3 })]), roundType: "friendly" },
       { ...round(2, [appearance("def", { goals: 3 })]), status: "active" },
     ];
-    const result = calculatePlayerOveralls([players[0]], inputs);
+    const result = calculatePlayerOveralls([observedPlayers[0]], inputs);
     expect(result.snapshots[0].positions.DEF.value).toBe(70);
     expect(result.snapshotsByRound).toHaveLength(0);
   });
 
   it("limita a mudança de cada posição a dois pontos por rodada", () => {
-    const result = calculatePlayerOveralls([players[1]], [round(1, [appearance("ata", { goals: 5 })])]);
+    const result = calculatePlayerOveralls([observedPlayers[1]], [round(1, [appearance("ata", { goals: 5 })])]);
     expect(result.snapshots[0].positions.ATA.value).toBeLessThanOrEqual(72);
   });
 
   it("mantém o OVR geral perto de 70 quando existe somente uma rodada", () => {
-    const result = calculatePlayerOveralls([players[1]], [round(1, [
+    const result = calculatePlayerOveralls([observedPlayers[1]], [round(1, [
       appearance("ata", { goals: 2 }),
       appearance("ata", { goals: 2 }),
       appearance("ata", { goals: 2 }),
@@ -96,7 +107,7 @@ describe("motor adaptativo de OVR", () => {
       goals: index === 0 ? 3 : 0,
       assists: index === 0 ? 2 : 0,
     }));
-    const result = calculatePlayerOveralls(players, [
+    const result = calculatePlayerOveralls(observedPlayers, [
       round(1, [...quietMatches, ...scorerMatches]),
       round(2, [...quietMatches, ...scorerMatches]),
       round(3, [...quietMatches, ...scorerMatches]),
@@ -106,5 +117,16 @@ describe("motor adaptativo de OVR", () => {
     expect(scorer.positions.ATA.value).toBeGreaterThan(70);
     expect(scorer.positions.ATA.value).toBeGreaterThan(quiet.positions.ATA.value);
     expect(scorer.scoutTotals).toEqual({ goals: 9, assists: 6, ownGoals: 0 });
+  });
+
+  it("faz a estimativa legada desaparecer depois de cinco rodadas", () => {
+    const badDefender = { ...players[0] };
+    const observedDefender = { ...players[0], overallSeedMode: "observed" as const };
+    const difficultRounds = Array.from({ length: 8 }, (_, index) => round(index + 1, [
+      appearance("def", { goalsConceded: 2, result: "loss" }),
+    ]));
+    const legacy = calculatePlayerOveralls([badDefender], difficultRounds).snapshots[0];
+    const observed = calculatePlayerOveralls([observedDefender], difficultRounds).snapshots[0];
+    expect(Math.abs(legacy.positions.DEF.value - observed.positions.DEF.value)).toBeLessThanOrEqual(0.1);
   });
 });
