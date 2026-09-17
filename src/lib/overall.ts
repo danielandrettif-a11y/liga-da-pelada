@@ -45,6 +45,14 @@ export type OverallFormulaConfig = {
   traitBasedOverall: boolean;
   /** Compatibilidade com versões antigas que reduziam o OVR geral pela confiança novamente. */
   overallConfidenceShrink: boolean;
+  /** Usa 70/30 ou 60/25/15, favorecendo a melhor característica sem ignorar as demais. */
+  rankedTraitOverall: boolean;
+  /** Bônus suave de variação proporcional à distância do alvo, sem degrau rígido. */
+  performanceChangeBonus: number;
+  /** Mantém os tetos rígidos das fórmulas antigas. */
+  hardPositionCapsEnabled: boolean;
+  /** Fórmulas antigas ainda marcavam a terceira rodada como provisória. */
+  provisionalAtConfidenceThreshold: boolean;
 };
 
 export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
@@ -79,6 +87,10 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   traitWeightedChange: false,
   traitBasedOverall: false,
   overallConfidenceShrink: true,
+  rankedTraitOverall: false,
+  performanceChangeBonus: 0,
+  hardPositionCapsEnabled: true,
+  provisionalAtConfidenceThreshold: true,
 };
 
 export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig {
@@ -191,6 +203,16 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     overallConfidenceShrink: typeof candidate.overallConfidenceShrink === "boolean"
       ? candidate.overallConfidenceShrink
       : DEFAULT_OVERALL_FORMULA.overallConfidenceShrink,
+    rankedTraitOverall: typeof candidate.rankedTraitOverall === "boolean"
+      ? candidate.rankedTraitOverall
+      : DEFAULT_OVERALL_FORMULA.rankedTraitOverall,
+    performanceChangeBonus: clamp(bounded(candidate.performanceChangeBonus, DEFAULT_OVERALL_FORMULA.performanceChangeBonus), 0, 0.2),
+    hardPositionCapsEnabled: typeof candidate.hardPositionCapsEnabled === "boolean"
+      ? candidate.hardPositionCapsEnabled
+      : DEFAULT_OVERALL_FORMULA.hardPositionCapsEnabled,
+    provisionalAtConfidenceThreshold: typeof candidate.provisionalAtConfidenceThreshold === "boolean"
+      ? candidate.provisionalAtConfidenceThreshold
+      : DEFAULT_OVERALL_FORMULA.provisionalAtConfidenceThreshold,
   };
 }
 
@@ -526,8 +548,16 @@ function positionEstimate(
 function calculateGeneral(player: OverallPlayer, values: Record<OverallRole, number>, goalkeeperRounds: number, confidence: number, config: OverallFormulaConfig) {
   const lineValues = [values.DEF, values.ALA_MEI, values.ATA].sort((a, b) => b - a);
   const traitRoles = [...new Set(player.overallTraits || [])].map((trait) => profileRole(trait));
-  const lineOverall = config.traitBasedOverall && traitRoles.length > 0
-    ? traitRoles.reduce((total, role) => total + values[role], 0) / traitRoles.length
+  const traitValues = traitRoles.map((role) => values[role]).sort((left, right) => right - left);
+  const rankedWeights = traitValues.length === 1
+    ? [1]
+    : traitValues.length === 2
+      ? [0.7, 0.3]
+      : [0.6, 0.25, 0.15];
+  const lineOverall = config.traitBasedOverall && traitValues.length > 0
+    ? config.rankedTraitOverall
+      ? traitValues.reduce((total, value, index) => total + value * rankedWeights[index], 0)
+      : traitValues.reduce((total, value) => total + value, 0) / traitValues.length
     : lineValues[0] * 0.7 + lineValues[1] * 0.3;
   const rawOverall = goalkeeperRounds >= config.goalkeeperEligibilityRounds
     ? Math.max(lineOverall, values.GOL)
@@ -558,7 +588,8 @@ function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, current
     positions,
     roundsPlayed,
     goalkeeperRounds,
-    isProvisional: roundsPlayed <= config.confidenceRounds,
+    isProvisional: roundsPlayed < config.confidenceRounds
+      || (config.provisionalAtConfidenceThreshold && roundsPlayed === config.confidenceRounds),
     isStale: state.lastRoundIndex !== null && currentRoundIndex - state.lastRoundIndex >= config.staleAfterRounds,
     lastRoundId: state.lastRoundId,
     scoutTotals: { ...state.scoutTotals },
@@ -676,11 +707,15 @@ export function calculatePlayerOveralls(
         const changeScale = formula.traitWeightedChange
           ? traitEvidenceWeight(player, role, formula)
           : 1;
-        const maximumChange = formula.maxChangePerRound * changeScale;
+        const maximumChange = (formula.maxChangePerRound
+          + Math.abs(estimate.target - formula.base) * formula.performanceChangeBonus) * changeScale;
+        const upperLimit = formula.hardPositionCapsEnabled
+          ? provisionalPositionCap(estimate.validRounds, formula) - estimate.seedBonus
+          : 99;
         state.values[role] = roundOverall(clamp(
           estimate.target,
           previous - maximumChange,
-          Math.min(previous + maximumChange, provisionalPositionCap(estimate.validRounds, formula) - estimate.seedBonus),
+          Math.min(previous + maximumChange, upperLimit),
         ));
       }
       const snapshot = cloneSnapshot(player, state, roundIndex, formula);

@@ -42,6 +42,10 @@ describe("motor adaptativo de OVR", () => {
     traitWeightedChange: false,
     traitBasedOverall: true,
     overallConfidenceShrink: false,
+    rankedTraitOverall: true,
+    performanceChangeBonus: 0.05,
+    hardPositionCapsEnabled: false,
+    provisionalAtConfidenceThreshold: false,
   });
 
   it("mantém todo jogador novo no OVR neutro, independente da tag operacional", () => {
@@ -280,7 +284,7 @@ describe("motor adaptativo de OVR", () => {
     expect(defAta.positions.ATA.value).toBeGreaterThan(mei.positions.ATA.value);
   });
 
-  it("compõe o OVR geral somente com as características avaliadas pelo ADM", () => {
+  it("compõe o OVR geral favorecendo a melhor característica sem ignorar a segunda", () => {
     const midfielder = { ...observedPlayers[0], overallTraits: ["midfield" as const] };
     const versatile = { ...observedPlayers[1], overallTraits: ["defensive" as const, "offensive" as const] };
     const inputs = Array.from({ length: 3 }, (_, index) => round(index + 1, [
@@ -291,6 +295,26 @@ describe("motor adaptativo de OVR", () => {
     const mei = result.snapshots.find((snapshot) => snapshot.playerId === "def")!;
     const defAta = result.snapshots.find((snapshot) => snapshot.playerId === "ata")!;
     expect(mei.overall).toBe(mei.positions.ALA_MEI.value);
-    expect(defAta.overall).toBeCloseTo((defAta.positions.DEF.value + defAta.positions.ATA.value) / 2, 1);
+    const ordered = [defAta.positions.DEF.value, defAta.positions.ATA.value].sort((left, right) => right - left);
+    expect(defAta.overall).toBeCloseTo(ordered[0] * 0.7 + ordered[1] * 0.3, 1);
+  });
+
+  it("preserva diferença entre atacantes fortes sem empate no teto rígido", () => {
+    const good = { id: "good", playerProfile: "offensive" as const, overallTraits: ["offensive" as const], overallSeedMode: "observed" as const };
+    const exceptional = { id: "exceptional", playerProfile: "offensive" as const, overallTraits: ["offensive" as const], overallSeedMode: "observed" as const };
+    const inputs = Array.from({ length: 3 }, (_, index) => round(index + 1, [
+      appearance("good", { goals: 2, assists: 1, playerProfileLocked: "offensive" }),
+      appearance("exceptional", { goals: 4, assists: 3, playerProfileLocked: "offensive" }),
+    ]));
+    const result = calculatePlayerOveralls([good, exceptional], inputs, characteristicsFormula);
+    const goodSnapshot = result.snapshots.find((snapshot) => snapshot.playerId === "good")!;
+    const exceptionalSnapshot = result.snapshots.find((snapshot) => snapshot.playerId === "exceptional")!;
+    expect(exceptionalSnapshot.positions.ATA.value).toBeGreaterThan(goodSnapshot.positions.ATA.value);
+  });
+
+  it("deixa de marcar como provisório ao completar três rodadas", () => {
+    const inputs = Array.from({ length: 3 }, (_, index) => round(index + 1, [appearance("ata", { goals: 1 })]));
+    const result = calculatePlayerOveralls([observedPlayers[1]], inputs, characteristicsFormula);
+    expect(result.snapshots[0].isProvisional).toBe(false);
   });
 });
