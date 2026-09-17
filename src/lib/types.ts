@@ -72,6 +72,8 @@ export type Player = {
   nickname: string | null;
   profile_bio: string | null;
   avatar_url: string | null;
+  /** Segunda foto guardada pelo perfil; avatar_url continua sendo a foto ativa. */
+  avatar_alternate_url: string | null;
   player_profile: PlayerProfile | null;
   overall_traits: PlayerProfile[];
   overall_seed_mode: OverallSeedMode;

@@ -99,6 +99,7 @@ export async function getPlayer(id: string) {
       name,
       nickname,
       avatar_url,
+      avatar_alternate_url,
       profile_bio,
       player_profile,
       overall_traits,
@@ -512,9 +513,22 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   const requestedOverallTraits = normalizeOverallTraits(formData.getAll("overall_traits"));
   const requestedCategory = String(formData.get("member_category") || "player") as MemberCategory;
   const requestedSelectable = formData.get("is_selectable") !== "false";
-  const removeAvatar = formData.get("remove_avatar") === "true";
-  const avatar = formData.get("avatar");
-  const hasNewAvatar = avatar instanceof File && avatar.size > 0;
+  // Mantemos compatibilidade com o campo avatar da versão anterior do perfil.
+  const removeActiveAvatar = formData.get("remove_active_avatar") === "true" || formData.get("remove_avatar") === "true";
+  const removeAlternateAvatar = formData.get("remove_alternate_avatar") === "true";
+  const useAlternateAvatar = formData.get("use_alternate_avatar") === "true";
+  const legacyAvatar = formData.get("avatar");
+  const requestedActiveAvatar = formData.get("avatar_active");
+  const requestedAlternateAvatar = formData.get("avatar_alternate");
+  const activeAvatar = requestedActiveAvatar instanceof File && requestedActiveAvatar.size > 0
+    ? requestedActiveAvatar
+    : legacyAvatar instanceof File && legacyAvatar.size > 0
+      ? legacyAvatar
+      : null;
+  const alternateAvatar = requestedAlternateAvatar instanceof File && requestedAlternateAvatar.size > 0
+    ? requestedAlternateAvatar
+    : null;
+  const avatarUploads = [activeAvatar, alternateAvatar].filter((file): file is File => file instanceof File);
 
   if (!["player", "guest", "wag", "supporter"].includes(requestedCategory)) {
     return { success: false, error: "Escolha uma categoria valida." };
@@ -528,7 +542,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   if (nickname.length > 60) return { success: false, error: "O apelido deve ter no máximo 60 caracteres." };
   if (profileBio.length > 500) return { success: false, error: "O texto do perfil deve ter no máximo 500 caracteres." };
 
-  if (hasNewAvatar) {
+  for (const avatar of avatarUploads) {
     if (!AVATAR_EXTENSIONS[avatar.type]) {
       return { success: false, error: "Use uma imagem JPG, PNG ou WebP." };
     }
@@ -538,6 +552,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   }
 
   let currentAvatarUrl: string | null = null;
+  let currentAlternateAvatarUrl: string | null = null;
   let currentCategory: MemberCategory = "player";
   let currentSelectable = true;
   let currentPlayerProfile: PlayerProfile | null = "midfield";
@@ -548,7 +563,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   if (playerId) {
     const { data: currentPlayer, error: currentPlayerError } = await client
       .from("players")
-      .select("avatar_url, member_category, is_selectable, player_profile, overall_traits, is_goalkeeper")
+      .select("avatar_url, avatar_alternate_url, member_category, is_selectable, player_profile, overall_traits, is_goalkeeper")
       .eq("id", playerId)
       .single();
 
@@ -556,6 +571,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
       return { success: false, error: "Jogador não encontrado." };
     }
     currentAvatarUrl = currentPlayer.avatar_url;
+    currentAlternateAvatarUrl = currentPlayer.avatar_alternate_url || null;
     currentCategory = currentPlayer.member_category as MemberCategory;
     currentSelectable = currentPlayer.is_selectable;
     currentPlayerProfile = currentPlayer.player_profile as PlayerProfile | null;
@@ -563,12 +579,14 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     currentIsGoalkeeper = Boolean(currentPlayer.is_goalkeeper);
   }
 
-  let uploadedPath: string | null = null;
-  let nextAvatarUrl = removeAvatar ? null : currentAvatarUrl;
+  const uploadedPaths: string[] = [];
+  let nextAvatarUrl = removeActiveAvatar ? null : currentAvatarUrl;
+  let nextAlternateAvatarUrl = removeAlternateAvatar ? null : currentAlternateAvatarUrl;
 
-  if (hasNewAvatar) {
+  for (const [slot, avatar] of [["active", activeAvatar], ["alternate", alternateAvatar]] as const) {
+    if (!avatar) continue;
     const extension = AVATAR_EXTENSIONS[avatar.type];
-    uploadedPath = `${id}/${crypto.randomUUID()}.${extension}`;
+    const uploadedPath = `${id}/${crypto.randomUUID()}.${extension}`;
     const bytes = await avatar.arrayBuffer();
     const { error: uploadError } = await client.storage
       .from(AVATAR_BUCKET)
@@ -579,12 +597,31 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
       });
 
     if (uploadError) {
+      if (uploadedPaths.length) await client.storage.from(AVATAR_BUCKET).remove(uploadedPaths);
       console.error("Erro ao enviar foto do jogador:", uploadError);
       return { success: false, error: `Não foi possível enviar a foto: ${uploadError.message}` };
     }
 
-    nextAvatarUrl = client.storage.from(AVATAR_BUCKET).getPublicUrl(uploadedPath).data.publicUrl;
+    uploadedPaths.push(uploadedPath);
+    const publicUrl = client.storage.from(AVATAR_BUCKET).getPublicUrl(uploadedPath).data.publicUrl;
+    if (slot === "active") nextAvatarUrl = publicUrl;
+    else nextAlternateAvatarUrl = publicUrl;
   }
+
+  // A troca é pedida no perfil e só é persistida ao salvar. Fazemos isso após
+  // receber uploads/remoções para que as duas vagas continuem coerentes.
+  if (useAlternateAvatar && nextAlternateAvatarUrl) {
+    [nextAvatarUrl, nextAlternateAvatarUrl] = [nextAlternateAvatarUrl, nextAvatarUrl];
+  }
+
+  // A primeira vaga é sempre a foto ativa. Se ela for removida e houver uma
+  // extra salva, promovemos a extra automaticamente para não deixar o perfil
+  // sem foto por acidente.
+  if (!nextAvatarUrl && nextAlternateAvatarUrl) {
+    nextAvatarUrl = nextAlternateAvatarUrl;
+    nextAlternateAvatarUrl = null;
+  }
+  if (nextAvatarUrl && nextAvatarUrl === nextAlternateAvatarUrl) nextAlternateAvatarUrl = null;
 
   const memberCategory = account.isAdmin ? requestedCategory : currentCategory;
   const isSelectable = account.isAdmin
@@ -599,6 +636,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     nickname: nickname || null,
     ...(account.isAdmin ? { profile_bio: profileBio || null } : {}),
     avatar_url: nextAvatarUrl,
+    avatar_alternate_url: nextAlternateAvatarUrl,
     player_profile: memberCategory === "wag" || memberCategory === "supporter"
       ? null
       : playerProfile,
@@ -619,6 +657,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
         nickname: playerData.nickname,
         ...(account.isAdmin ? { profile_bio: playerData.profile_bio } : {}),
         avatar_url: playerData.avatar_url,
+        avatar_alternate_url: playerData.avatar_alternate_url,
         player_profile: playerData.player_profile,
         ...(account.isAdmin ? { overall_traits: playerData.overall_traits } : {}),
         is_goalkeeper: playerData.is_goalkeeper,
@@ -630,14 +669,20 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   const { error: saveError } = await query;
 
   if (saveError) {
-    if (uploadedPath) await client.storage.from(AVATAR_BUCKET).remove([uploadedPath]);
+    if (uploadedPaths.length) await client.storage.from(AVATAR_BUCKET).remove(uploadedPaths);
     console.error("Erro ao salvar jogador:", saveError);
     return { success: false, error: saveError.message };
   }
 
-  const oldAvatarPath = avatarPathFromUrl(currentAvatarUrl);
-  if ((hasNewAvatar || removeAvatar) && oldAvatarPath && oldAvatarPath !== uploadedPath) {
-    const { error: cleanupError } = await client.storage.from(AVATAR_BUCKET).remove([oldAvatarPath]);
+  const retainedAvatarUrls = new Set([nextAvatarUrl, nextAlternateAvatarUrl].filter((url): url is string => Boolean(url)));
+  const previousAvatarUrls = [currentAvatarUrl, currentAlternateAvatarUrl]
+    .filter((url): url is string => Boolean(url));
+  const removedAvatarPaths = [...new Set(previousAvatarUrls
+    .filter((url) => !retainedAvatarUrls.has(url))
+    .map(avatarPathFromUrl)
+    .filter((path): path is string => Boolean(path)))];
+  if (removedAvatarPaths.length) {
+    const { error: cleanupError } = await client.storage.from(AVATAR_BUCKET).remove(removedAvatarPaths);
     if (cleanupError) console.error("Erro ao remover foto antiga:", cleanupError);
   }
 
@@ -669,7 +714,7 @@ export async function deletePlayer(id: string) {
 
   const { data: player } = await client
     .from("players")
-    .select("avatar_url")
+    .select("avatar_url, avatar_alternate_url")
     .eq("id", id)
     .single();
 
@@ -683,9 +728,11 @@ export async function deletePlayer(id: string) {
     return { success: false, error: error.message };
   }
 
-  const avatarPath = avatarPathFromUrl(player?.avatar_url || null);
-  if (avatarPath) {
-    const { error: storageError } = await client.storage.from(AVATAR_BUCKET).remove([avatarPath]);
+  const avatarPaths = [...new Set([player?.avatar_url, player?.avatar_alternate_url]
+    .map((url) => avatarPathFromUrl(url || null))
+    .filter((path): path is string => Boolean(path)))];
+  if (avatarPaths.length) {
+    const { error: storageError } = await client.storage.from(AVATAR_BUCKET).remove(avatarPaths);
     if (storageError) console.error("Erro ao remover foto do jogador:", storageError);
   }
 

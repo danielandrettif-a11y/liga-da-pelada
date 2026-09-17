@@ -13,6 +13,7 @@ import { cosmeticImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
 import { CosmeticNameplate } from "@/components/fantasy/CosmeticNameplate";
 
 const MAX_SOURCE_SIZE = 20 * 1024 * 1024;
+type AvatarSlot = "active" | "alternate";
 
 export function PlayerForm({
   player,
@@ -36,28 +37,50 @@ export function PlayerForm({
   initialSpeedRating?: 1 | 2 | 3 | null;
 }) {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const previewObjectUrlRef = useRef<string | null>(null);
+  const activeFileInputRef = useRef<HTMLInputElement>(null);
+  const alternateFileInputRef = useRef<HTMLInputElement>(null);
+  const previewObjectUrlRef = useRef<Record<AvatarSlot, string | null>>({ active: null, alternate: null });
   const cropSourceUrlRef = useRef<string | null>(null);
   const isEditing = !!player;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [previewUrl, setPreviewUrl] = useState(player?.avatar_url || "");
-  const [removeAvatar, setRemoveAvatar] = useState(false);
-  const [croppedFile, setCroppedFile] = useState<File | null>(null);
+  const [activePreviewUrl, setActivePreviewUrl] = useState(player?.avatar_url || "");
+  const [alternatePreviewUrl, setAlternatePreviewUrl] = useState(player?.avatar_alternate_url || "");
+  const [removeActiveAvatar, setRemoveActiveAvatar] = useState(false);
+  const [removeAlternateAvatar, setRemoveAlternateAvatar] = useState(false);
+  const [croppedActiveAvatar, setCroppedActiveAvatar] = useState<File | null>(null);
+  const [croppedAlternateAvatar, setCroppedAlternateAvatar] = useState<File | null>(null);
+  const [cropTarget, setCropTarget] = useState<AvatarSlot>("active");
+  const [useAlternateAsActive, setUseAlternateAsActive] = useState(false);
   const [cropSourceUrl, setCropSourceUrl] = useState("");
   const [memberCategory, setMemberCategory] = useState<MemberCategory>(player?.member_category || "player");
   const [speedRating, setSpeedRating] = useState<1 | 2 | 3 | null>(initialSpeedRating);
 
   useEffect(() => {
     return () => {
-      if (previewObjectUrlRef.current) URL.revokeObjectURL(previewObjectUrlRef.current);
+      for (const objectUrl of Object.values(previewObjectUrlRef.current)) {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+      }
       if (cropSourceUrlRef.current) URL.revokeObjectURL(cropSourceUrlRef.current);
     };
   }, []);
 
-  function handleAvatarChange(event: React.ChangeEvent<HTMLInputElement>) {
+  function openAvatarPicker(slot: AvatarSlot) {
+    setCropTarget(slot);
+    (slot === "active" ? activeFileInputRef : alternateFileInputRef).current?.click();
+  }
+
+  function resetAvatarInput(slot: AvatarSlot) {
+    const input = (slot === "active" ? activeFileInputRef : alternateFileInputRef).current;
+    if (input) input.value = "";
+  }
+
+  function previewFor(slot: AvatarSlot) {
+    return slot === "active" ? activePreviewUrl : alternatePreviewUrl;
+  }
+
+  function handleAvatarChange(event: React.ChangeEvent<HTMLInputElement>, slot: AvatarSlot) {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -74,6 +97,7 @@ export function PlayerForm({
     }
 
     if (cropSourceUrlRef.current) URL.revokeObjectURL(cropSourceUrlRef.current);
+    setCropTarget(slot);
     cropSourceUrlRef.current = URL.createObjectURL(file);
     setCropSourceUrl(cropSourceUrlRef.current);
     setError("");
@@ -84,7 +108,7 @@ export function PlayerForm({
       URL.revokeObjectURL(cropSourceUrlRef.current);
       cropSourceUrlRef.current = null;
     }
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    resetAvatarInput(cropTarget);
     setCropSourceUrl("");
   }
 
@@ -93,25 +117,45 @@ export function PlayerForm({
       URL.revokeObjectURL(cropSourceUrlRef.current);
       cropSourceUrlRef.current = null;
     }
-    if (previewObjectUrlRef.current) URL.revokeObjectURL(previewObjectUrlRef.current);
+    if (previewObjectUrlRef.current[cropTarget]) URL.revokeObjectURL(previewObjectUrlRef.current[cropTarget]!);
 
-    previewObjectUrlRef.current = URL.createObjectURL(file);
-    setPreviewUrl(previewObjectUrlRef.current);
-    setCroppedFile(file);
-    setRemoveAvatar(false);
+    const previewUrl = URL.createObjectURL(file);
+    previewObjectUrlRef.current[cropTarget] = previewUrl;
+    if (cropTarget === "active") {
+      setActivePreviewUrl(previewUrl);
+      setCroppedActiveAvatar(file);
+      setRemoveActiveAvatar(false);
+    } else {
+      setAlternatePreviewUrl(previewUrl);
+      setCroppedAlternateAvatar(file);
+      setRemoveAlternateAvatar(false);
+    }
     setCropSourceUrl("");
     setError("");
   }
 
-  function handleRemoveAvatar() {
-    if (previewObjectUrlRef.current) {
-      URL.revokeObjectURL(previewObjectUrlRef.current);
-      previewObjectUrlRef.current = null;
+  function handleRemoveAvatar(slot: AvatarSlot) {
+    if (previewObjectUrlRef.current[slot]) {
+      URL.revokeObjectURL(previewObjectUrlRef.current[slot]!);
+      previewObjectUrlRef.current[slot] = null;
     }
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    setPreviewUrl("");
-    setCroppedFile(null);
-    setRemoveAvatar(true);
+    resetAvatarInput(slot);
+
+    if (slot === "active") {
+      setActivePreviewUrl("");
+      setCroppedActiveAvatar(null);
+      setRemoveActiveAvatar(true);
+    } else {
+      setAlternatePreviewUrl("");
+      setCroppedAlternateAvatar(null);
+      setRemoveAlternateAvatar(true);
+    }
+  }
+
+  function handleUseAlternateAvatar() {
+    if (!alternatePreviewUrl) return;
+    setUseAlternateAsActive((current) => !current);
+    setError("");
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -120,8 +164,11 @@ export function PlayerForm({
     setError("");
 
     const formData = new FormData(event.currentTarget);
-    formData.set("remove_avatar", String(removeAvatar));
-    if (croppedFile) formData.set("avatar", croppedFile, croppedFile.name);
+    formData.set("remove_active_avatar", String(removeActiveAvatar));
+    formData.set("remove_alternate_avatar", String(removeAlternateAvatar));
+    formData.set("use_alternate_avatar", String(useAlternateAsActive));
+    if (croppedActiveAvatar) formData.set("avatar_active", croppedActiveAvatar, croppedActiveAvatar.name);
+    if (croppedAlternateAvatar) formData.set("avatar_alternate", croppedAlternateAvatar, croppedAlternateAvatar.name);
 
     try {
       const result = await savePlayer(player?.id || null, formData);
@@ -160,6 +207,10 @@ export function PlayerForm({
   }
 
   const previewName = player?.name || "Novo jogador";
+  const currentAvatarSlot: AvatarSlot = useAlternateAsActive ? "alternate" : "active";
+  const extraAvatarSlot: AvatarSlot = useAlternateAsActive ? "active" : "alternate";
+  const currentPreviewUrl = previewFor(currentAvatarSlot);
+  const extraPreviewUrl = previewFor(extraAvatarSlot);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 glass-card p-5">
@@ -185,58 +236,79 @@ export function PlayerForm({
         } : undefined}
       >
       <div className="relative flex flex-col items-center gap-3 pb-5">
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={loading}
-          className={`relative rounded-full group disabled:opacity-50 ${frameKey ? "mb-5" : ""}`}
-          aria-label={previewUrl ? "Trocar foto do jogador" : "Adicionar foto do jogador"}
-        >
-          <PlayerAvatar
-            name={previewName}
-            avatarUrl={previewUrl}
-            frameKey={frameKey}
-            auraKey={auraKey}
-            className="w-28 h-28 rounded-full bg-surface-hover border-2 border-border text-2xl font-bold text-muted ring-4 ring-background"
-          />
-          <span className="absolute bottom-0 right-0 z-20 w-9 h-9 rounded-full bg-accent text-background flex items-center justify-center border-4 border-background group-hover:bg-accent-light transition-colors">
-            <Camera className="w-4 h-4" />
-          </span>
-        </button>
-
-        <input
-          ref={fileInputRef}
-          id="avatar"
-          name="avatar"
-          type="file"
-          accept="image/*"
-          onChange={handleAvatarChange}
-          className="sr-only"
-        />
-
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={loading}
-            className="flex items-center gap-1.5 text-xs font-bold text-accent hover:text-accent-light disabled:opacity-50"
-          >
-            <ImagePlus className="w-4 h-4" />
-            {previewUrl ? "Trocar foto" : "Adicionar foto"}
-          </button>
-          {previewUrl && (
+        <div className="grid w-full max-w-md grid-cols-2 gap-4">
+          <div className="flex flex-col items-center gap-2 rounded-2xl border border-accent/30 bg-background/25 px-3 py-3">
             <button
               type="button"
-              onClick={handleRemoveAvatar}
+              onClick={() => openAvatarPicker(currentAvatarSlot)}
               disabled={loading}
-              className="flex items-center gap-1.5 text-xs font-bold text-danger hover:text-danger/80 disabled:opacity-50"
+              className={`relative rounded-full group disabled:opacity-50 ${frameKey ? "mb-4" : ""}`}
+              aria-label={currentPreviewUrl ? "Trocar foto atual do jogador" : "Adicionar foto atual do jogador"}
             >
-              <Trash2 className="w-4 h-4" />
-              Remover
+              <PlayerAvatar
+                name={previewName}
+                avatarUrl={currentPreviewUrl}
+                frameKey={frameKey}
+                auraKey={auraKey}
+                className="w-24 h-24 rounded-full border-2 border-border bg-surface-hover text-xl font-bold text-muted ring-4 ring-background"
+              />
+              <span className="absolute bottom-0 right-0 z-20 flex h-8 w-8 items-center justify-center rounded-full border-4 border-background bg-accent text-background transition-colors group-hover:bg-accent-light">
+                <Camera className="h-3.5 w-3.5" />
+              </span>
             </button>
-          )}
+            <p className="text-xs font-extrabold uppercase tracking-wide text-foreground">Foto atual</p>
+            <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
+              <button type="button" onClick={() => openAvatarPicker(currentAvatarSlot)} disabled={loading} className="flex items-center gap-1 text-[11px] font-bold text-accent hover:text-accent-light disabled:opacity-50">
+                <ImagePlus className="h-3.5 w-3.5" /> {currentPreviewUrl ? "Trocar" : "Adicionar"}
+              </button>
+              {currentPreviewUrl && (
+                <button type="button" onClick={() => handleRemoveAvatar(currentAvatarSlot)} disabled={loading} className="flex items-center gap-1 text-[11px] font-bold text-danger hover:text-danger/80 disabled:opacity-50">
+                  <Trash2 className="h-3.5 w-3.5" /> Remover
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-background/25 px-3 py-3">
+            <button
+              type="button"
+              onClick={() => openAvatarPicker(extraAvatarSlot)}
+              disabled={loading}
+              className="relative rounded-full group disabled:opacity-50"
+              aria-label={extraPreviewUrl ? "Trocar foto extra do jogador" : "Adicionar foto extra do jogador"}
+            >
+              <PlayerAvatar
+                name={previewName}
+                avatarUrl={extraPreviewUrl}
+                className="h-24 w-24 rounded-full border-2 border-border bg-surface-hover text-xl font-bold text-muted ring-4 ring-background"
+              />
+              <span className="absolute bottom-0 right-0 z-20 flex h-8 w-8 items-center justify-center rounded-full border-4 border-background bg-accent text-background transition-colors group-hover:bg-accent-light">
+                <Camera className="h-3.5 w-3.5" />
+              </span>
+            </button>
+            <p className="text-xs font-extrabold uppercase tracking-wide text-foreground">Foto extra</p>
+            <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
+              <button type="button" onClick={() => openAvatarPicker(extraAvatarSlot)} disabled={loading} className="flex items-center gap-1 text-[11px] font-bold text-accent hover:text-accent-light disabled:opacity-50">
+                <ImagePlus className="h-3.5 w-3.5" /> {extraPreviewUrl ? "Trocar" : "Adicionar"}
+              </button>
+              {extraPreviewUrl && (
+                <button type="button" onClick={() => handleRemoveAvatar(extraAvatarSlot)} disabled={loading} className="flex items-center gap-1 text-[11px] font-bold text-danger hover:text-danger/80 disabled:opacity-50">
+                  <Trash2 className="h-3.5 w-3.5" /> Remover
+                </button>
+              )}
+            </div>
+            {alternatePreviewUrl && (
+              <button type="button" onClick={handleUseAlternateAvatar} disabled={loading} className="mt-1 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-accent hover:bg-accent/20 disabled:opacity-50">
+                Usar agora
+              </button>
+            )}
+          </div>
         </div>
-        <p className="text-[10px] text-muted text-center">Escolha uma imagem e ajuste o enquadramento antes de salvar</p>
+
+        <input ref={activeFileInputRef} id="avatar_active" name="avatar_active" type="file" accept="image/*" onChange={(event) => handleAvatarChange(event, "active")} className="sr-only" />
+        <input ref={alternateFileInputRef} id="avatar_alternate" name="avatar_alternate" type="file" accept="image/*" onChange={(event) => handleAvatarChange(event, "alternate")} className="sr-only" />
+
+        <p className="max-w-md text-center text-[10px] leading-4 text-muted">Mantenha até duas fotos. Toque em “Usar agora” na foto extra e salve para trocar a foto exibida no app.</p>
         {(nameplateKey || titleName) && (
           <CosmeticNameplate assetKey={nameplateKey} playerName={previewName} titleName={titleName} className="w-full max-w-[18rem]" />
         )}
