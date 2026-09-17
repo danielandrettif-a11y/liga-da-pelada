@@ -100,6 +100,14 @@ function roundOverall(value: number) {
   return Math.round(value * 10) / 10;
 }
 
+function provisionalPositionCap(validRounds: number) {
+  if (validRounds <= 0) return 99;
+  if (validRounds === 1) return 74;
+  if (validRounds === 2) return 76;
+  if (validRounds < PROVISIONAL_ROUNDS) return 78;
+  return 99;
+}
+
 function profileRole(profile: PlayerProfile | null): OverallRole {
   if (profile === "defensive") return "DEF";
   if (profile === "offensive") return "ATA";
@@ -301,7 +309,11 @@ export function calculatePlayerOveralls(players: OverallPlayer[], rounds: Overal
       for (const role of ROLES) {
         const estimate = positionEstimate(player, state, role, round.sequence);
         const previous = state.values[role];
-        state.values[role] = roundOverall(clamp(estimate.target, previous - MAX_CHANGE_PER_ROUND, previous + MAX_CHANGE_PER_ROUND));
+        state.values[role] = roundOverall(clamp(
+          estimate.target,
+          previous - MAX_CHANGE_PER_ROUND,
+          Math.min(previous + MAX_CHANGE_PER_ROUND, provisionalPositionCap(estimate.validRounds)),
+        ));
       }
     }
 

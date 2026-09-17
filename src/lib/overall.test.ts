@@ -87,6 +87,17 @@ describe("motor adaptativo de OVR", () => {
     expect(result.snapshots[0].positions.ATA.value).toBeLessThanOrEqual(72);
   });
 
+  it("impede que uma posição provisória ultrapasse o teto da amostra", () => {
+    const result = calculatePlayerOveralls([players[0]], [
+      round(1, [appearance("def", { goalsConceded: 0, result: "win" })]),
+      round(2, [appearance("def", { goalsConceded: 0, result: "win" })]),
+    ]);
+    const firstRound = result.snapshotsByRound[0].snapshots[0];
+    const secondRound = result.snapshotsByRound[1].snapshots[0];
+    expect(firstRound.positions.DEF.value).toBeLessThanOrEqual(74);
+    expect(secondRound.positions.DEF.value).toBeLessThanOrEqual(76);
+  });
+
   it("mantém o OVR geral perto de 70 quando existe somente uma rodada", () => {
     const result = calculatePlayerOveralls([observedPlayers[1]], [round(1, [
       appearance("ata", { goals: 2 }),
