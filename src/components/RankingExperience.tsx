@@ -40,8 +40,8 @@ const FILTERS: Array<{ key: RankingFilter; label: string }> = [
   { key: "winRate", label: "Aproveitamento" },
   { key: "awards", label: "Prêmios" },
   { key: "overall", label: "OVR geral" },
-  { key: "overallDef", label: "OVR DEF" },
-  { key: "overallAlaMei", label: "OVR ALA/MEI" },
+  { key: "overallDef", label: "OVR DEF/VOL" },
+  { key: "overallAlaMei", label: "OVR ALA" },
   { key: "overallAta", label: "OVR ATA" },
   { key: "overallGol", label: "OVR GOL" },
 ];
@@ -54,8 +54,8 @@ const FILTER_LABELS: Record<RankingFilter, string> = {
   winRate: "p.p. de aproveitamento",
   awards: "prêmios",
   overall: "OVR geral",
-  overallDef: "OVR DEF",
-  overallAlaMei: "OVR ALA/MEI",
+  overallDef: "OVR DEF/VOL",
+  overallAlaMei: "OVR ALA",
   overallAta: "OVR ATA",
   overallGol: "OVR GOL",
 };

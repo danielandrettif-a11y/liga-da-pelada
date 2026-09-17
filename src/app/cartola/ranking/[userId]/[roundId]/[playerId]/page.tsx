@@ -30,6 +30,7 @@ export default async function FantasyLineupPlayerDetailPage({ params }: { params
   }, { suppressGoalkeeperRewards });
   const slotRole = (["GOL", "DEF", "MEI", "ATA"].includes(item.slot_role) ? item.slot_role : "ATA") as FantasySlotRole;
   const position = calculatePositionBreakdown({
+    scoringVersion: value(settings, "scoring_version", 5),
     slotRole,
     playerProfile: item.player_profile_locked,
     goals: value(stat, "goals"),

@@ -92,3 +92,34 @@ describe("pacotes de bônus por posição — BQ v5", () => {
     expect(calculateFantasyPositionPackageBonus({ ...stats, slotRole: "DEF" }, DEFAULT_FANTASY_SETTINGS)).toBe(0);
   });
 });
+
+describe("pacotes de bônus por posição — BQ v7", () => {
+  const settings = { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 7 };
+  const baseInput = {
+    goals: 0, assists: 0, games: 3, losses: 0, goalkeeperGames: 0,
+    goalsConceded: 0, cleanSheets: 0, defensiveCleanGames: 0,
+    defensiveOneGoalGames: 0,
+  };
+
+  it("reduz o teto do DEF/VOL e preserva a proteção como eixo principal", () => {
+    const input = { ...baseInput, slotRole: "DEF" as const, playerProfile: "defensive" as const };
+    expect(calculateFantasyPositionPackageBonus({ ...input, defensiveCleanGames: 3 }, settings)).toBe(6.25);
+    expect(calculateFantasyPositionPackageBonus({ ...input, defensiveCleanGames: 6 }, settings)).toBe(8);
+  });
+
+  it("premia o ALA que participa do ataque e recompõe", () => {
+    const input = { ...baseInput, slotRole: "MEI" as const, playerProfile: "midfield" as const };
+    // 1 gol (.5) + 1 assistência (.75) + 1 clean (.5) + 1 proteção (.25)
+    // + Vai e volta (1.5) = 3.5.
+    expect(calculateFantasyPositionPackageBonus({
+      ...input, goals: 1, assists: 1, defensiveCleanGames: 1, defensiveOneGoalGames: 1,
+    }, settings)).toBe(3.5);
+    expect(calculateFantasyPositionPackageBonus({ ...input, goals: 10, assists: 10, defensiveCleanGames: 10 }, settings)).toBe(6);
+  });
+
+  it("reduz Artilheiro do ATA para +2", () => {
+    const input = { ...baseInput, slotRole: "ATA" as const, playerProfile: "offensive" as const };
+    expect(calculateFantasyPositionPackageBonus({ ...input, goals: 1 }, settings)).toBe(0);
+    expect(calculateFantasyPositionPackageBonus({ ...input, goals: 2 }, settings)).toBe(2);
+  });
+});

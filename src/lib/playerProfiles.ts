@@ -14,15 +14,15 @@ export const PLAYER_PROFILE_OPTIONS: Array<{
   },
   {
     value: "midfield",
-    label: "Ala / Meio",
-    shortLabel: "ALA/MEI",
-    description: "Ajuda na marcação e na criação das jogadas.",
+    label: "Ala",
+    shortLabel: "ALA",
+    description: "Faz o corredor, participa do ataque e recompõe na defesa.",
   },
   {
     value: "defensive",
-    label: "Defensivo",
-    shortLabel: "DEF",
-    description: "Prioriza a marcacao e a protecao do time.",
+    label: "Defensor / Volante",
+    shortLabel: "DEF/VOL",
+    description: "Prioriza a proteção do time e apoia a construção das jogadas.",
   },
 ];
 

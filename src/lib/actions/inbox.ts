@@ -94,7 +94,7 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
       type: "tactical_revolution_r2",
       key: `announcement:tactical_r2:${league.id}`,
       title: "⚡ Bônus de Posição Ativos no Cartola!",
-      body: "Pontuação atualizada: DEF soma proteção base + bônus na vaga; ALA/MEI e ATA ativam bônus na posição correta; GOL premia o clean sheet de quem você apostou no rodízio. Confira o Guia de Pontuação!",
+      body: "Pontuação atualizada: DEF/VOL soma proteção; ALA combina ataque e recomposição; ATA premia finalização; GOL usa apenas atuações reais no rodízio. Confira o Guia de Pontuação!",
       href: "/cartola",
     });
 
@@ -215,7 +215,7 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
         const awardCopy = {
           topScorer: { title: "⚽ Você foi o Artilheiro da Rodada", body: "Você terminou a rodada como o maior goleador da Ranked." },
           topAssister: { title: "🎯 Você foi o Garçom da Rodada", body: "Você terminou a rodada com o maior número de assistências." },
-          bestDefender: { title: "🛡️ Você foi o Xerife da Rodada", body: "Você teve a melhor média defensiva entre os atletas DEF." },
+          bestDefender: { title: "🛡️ Você foi o Xerife da Rodada", body: "Você teve a melhor média defensiva entre os atletas DEF/VOL." },
         } as const;
         for (const award of playerAwards) {
           if (!(award.type in awardCopy)) continue;

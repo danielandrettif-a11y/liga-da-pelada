@@ -6,8 +6,8 @@ export type MonthlyAwardStoryEntry = {
 };
 
 const AWARD_COLORS: Record<MonthlyAwardType, { accent: string; background: string; code: string }> = {
-  bestDefenderMonth: { accent: "#71d7ff", background: "#0d3040", code: "DEF" },
-  bestMidfielderMonth: { accent: "#c8a8ff", background: "#2b1d4b", code: "ALA/MEI" },
+  bestDefenderMonth: { accent: "#71d7ff", background: "#0d3040", code: "DEF/VOL" },
+  bestMidfielderMonth: { accent: "#c8a8ff", background: "#2b1d4b", code: "ALA" },
   bestAttackerMonth: { accent: "#ff9aad", background: "#491f2a", code: "ATA" },
   bestGoalkeeperMonth: { accent: "#69edff", background: "#0a3942", code: "GOL" },
   goldenBootMonth: { accent: "#ffe16d", background: "#4a3b08", code: "GOLS" },

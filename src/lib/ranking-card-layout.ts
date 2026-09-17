@@ -109,8 +109,8 @@ const CARD_THEMES: Record<RankingCardTier, RankingCardTheme> = {
 
 const PROFILE_LABELS = {
   offensive: "ATA",
-  midfield: "ALA/MEI",
-  defensive: "DEF",
+  midfield: "ALA",
+  defensive: "DEF/VOL",
 } as const;
 
 export function getRankingCardTier(position: number): RankingCardTier {
@@ -132,8 +132,8 @@ export function buildRankingCardContent(entry: RankingEntry, position: number): 
   const theme = getRankingCardTheme(position);
   const profile = `${PROFILE_LABELS[entry.player.player_profile || "midfield"]}${entry.player.is_goalkeeper ? " / GOL" : ""}`;
   const positionRatings = ([
-    ["DEF", "DEF"],
-    ["ALA_MEI", "ALA/MEI"],
+    ["DEF", "DEF/VOL"],
+    ["ALA_MEI", "ALA"],
     ["ATA", "ATA"],
     ["GOL", "GOL"],
   ] as const).map(([key, label]) => ({ key, label, rawValue: entry.overallPositions?.[key] ?? null }));

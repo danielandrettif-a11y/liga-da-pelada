@@ -83,6 +83,7 @@ export function calculateFantasyPositionPackageBonus(
     goalkeeperGames: input.goalkeeperGames,
     cleanSheets: input.cleanSheets,
     suppressGoalkeeperRewards: input.suppressGoalkeeperRewards ?? _settings.suppressGoalkeeperRewards,
+    scoringVersion: _settings.scoringVersion,
   };
 
   return calculatePositionBonusValue(breakdownInput);

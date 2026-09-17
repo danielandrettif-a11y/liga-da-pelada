@@ -1,6 +1,8 @@
 import { BQ_SCORING_V5 } from "../bq-scoring";
 
 export type FantasySettings = {
+  /** Versão das regras de scouts e bônus congelada para a rodada. */
+  scoringVersion?: number;
   /** Versão do motor de mercado congelada no snapshot da rodada. */
   marketVersion?: number;
   /** Rodada 2 em diante ativa o sistema de vagas, rodízio e mercado 65/35. */
@@ -82,6 +84,7 @@ export type FantasySettings = {
 };
 
 export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
+  scoringVersion: 5,
   marketVersion: 11,
   roleScoringActive: true,
   suppressGoalkeeperRewards: false,
@@ -155,6 +158,7 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
 export const FANTASY_RECENT_ROUND_WEIGHTS = [0.40, 0.25, 0.15, 0.12, 0.08] as const;
 
 const FANTASY_SETTING_COLUMNS = {
+  scoringVersion: "scoring_version",
   initialBudget: "initial_budget", initialPlayerPrice: "initial_player_price", minPlayerPrice: "min_player_price", maxPlayerPrice: "max_player_price",
   goalPoints: "goal_points", attackerGoalPoints: "attacker_goal_points", assistPoints: "assist_points", winPoints: "win_points", drawPoints: "draw_points", lossPoints: "loss_points",
   goalkeeperLossPoints: "goalkeeper_loss_points", goalkeeperAppearancePoints: "goalkeeper_appearance_points", goalConcededPoints: "goal_conceded_points", teamGoalConcededPoints: "team_goal_conceded_points", ownGoalPoints: "own_goal_points",

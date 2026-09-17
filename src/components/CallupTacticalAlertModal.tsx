@@ -59,11 +59,11 @@ export function CallupTacticalAlertModal() {
 
         <div className="space-y-2 mb-4">
           <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs">
-            <span className="rounded bg-blue-500/20 px-1.5 py-0.5 font-athletic font-black text-blue-400 text-[10px]">DEF</span>
+            <span className="rounded bg-blue-500/20 px-1.5 py-0.5 font-athletic font-black text-blue-400 text-[10px]">DEF/VOL</span>
             <span className="text-muted text-[11px]">Bônus de Zaga (+2 se não tomar gol / +1 se levar só 1)</span>
           </div>
           <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs">
-            <span className="rounded bg-warning/20 px-1.5 py-0.5 font-athletic font-black text-warning text-[10px]">ALA/MEI</span>
+            <span className="rounded bg-warning/20 px-1.5 py-0.5 font-athletic font-black text-warning text-[10px]">ALA</span>
             <span className="text-muted text-[11px]">Bônus de Garçom (+4,5 pts por assistência)</span>
           </div>
           <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs">

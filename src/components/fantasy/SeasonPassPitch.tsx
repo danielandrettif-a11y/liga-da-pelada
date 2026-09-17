@@ -237,8 +237,8 @@ export const SEASON_PASS_STAGES: SeasonStage[] = [
   },
   {
     id: "field-34",
-    name: "Ala/Meio Ofensivo / Maestro (ALA/MEI)",
-    shortLabel: "ALA/MEI",
+    name: "Ala de ida e volta (ALA)",
+    shortLabel: "ALA",
     zone: "field",
     start: 34,
     end: 34,

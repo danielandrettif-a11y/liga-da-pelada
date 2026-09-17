@@ -343,8 +343,9 @@ export async function getFantasyDashboard() {
   const betweenRounds = !isTest && !activeOfficialRound;
   const scoringSnapshot = fantasyRound?.settings_snapshot || null;
   const scoringSettings: FantasySettings = scoringSnapshot
-    ? {
+      ? {
         ...settings,
+        scoringVersion: Number(scoringSnapshot.scoring_version ?? fantasyRound?.scoring_version ?? 5),
         roleScoringActive: scoringSnapshot.role_scoring_active !== false,
         suppressGoalkeeperRewards: Boolean(fantasyRound?.round?.suppress_goalkeeper_rewards),
         goalPoints: Number(scoringSnapshot.goal_points ?? settings.goalPoints),
@@ -1416,7 +1417,7 @@ export async function getFantasyDashboard() {
     authenticated: true as const,
     available: true as const,
     isAdmin: account.isAdmin,
-    settings,
+    settings: scoringSettings,
     playersPerTeam,
     round: displayRound,
     fantasySeasonId: fantasySeason.id,
@@ -1428,6 +1429,7 @@ export async function getFantasyDashboard() {
       betweenRounds,
       challengeType: (fantasyRound?.challenge_type || null) as FantasyChallengeType | null,
       rulesVersion: Number(fantasyRound?.rules_version || 0),
+      scoringVersion: Number(fantasyRound?.scoring_version || 5),
     },
     market,
     lineup: effectiveLineup,
@@ -1939,6 +1941,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       ? liveSettings.attackerGoalPoints
       : liveSettings.goalPoints) ?? liveSettings.goalPoints;
     const defensivePosition = calculatePositionBreakdown({
+      scoringVersion: liveSettings.scoringVersion,
       slotRole: "DEF",
       playerProfile,
       goals: current.goals,

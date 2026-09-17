@@ -76,7 +76,7 @@ describe("ranking card layout", () => {
       rating: "74.6",
       ratingLabel: "OVR",
       ratingTrend: "steady",
-      profile: "DEF",
+      profile: "DEF/VOL",
       placement: "7º",
       name: "Jogador Teste",
       title: null,
@@ -88,8 +88,8 @@ describe("ranking card layout", () => {
       ["Rei das Vitórias", 3],
     ]);
     expect(content.positionRatings).toEqual([
-      { key: "DEF", label: "DEF", value: "75.2", isBest: true },
-      { key: "ALA_MEI", label: "ALA/MEI", value: "72.4", isBest: false },
+      { key: "DEF", label: "DEF/VOL", value: "75.2", isBest: true },
+      { key: "ALA_MEI", label: "ALA", value: "72.4", isBest: false },
       { key: "ATA", label: "ATA", value: "71.6", isBest: false },
       { key: "GOL", label: "GOL", value: "70.8", isBest: false },
     ]);

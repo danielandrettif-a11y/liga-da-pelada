@@ -20,9 +20,11 @@ import { useDialogViewport } from "@/lib/useDialogViewport";
 export function FantasyTutorialModal({
   isOpen,
   onClose,
+  scoringVersion = 5,
 }: {
   isOpen: boolean;
   onClose: () => void;
+  scoringVersion?: number;
 }) {
   const [step, setStep] = useState(1);
   const [mounted, setMounted] = useState(false);
@@ -33,6 +35,7 @@ export function FantasyTutorialModal({
   }, []);
 
   if (!isOpen || !mounted || typeof document === "undefined") return null;
+  const roleReframeActive = scoringVersion >= 7;
 
   const steps = [
     {
@@ -54,7 +57,9 @@ export function FantasyTutorialModal({
       tag: "Passo 3 de 5 · Bônus de Posição",
       title: "Esquemas & Bônus de Posição",
       description:
-        "Com 6 atletas, escolha 1 GOL, 2 DEF e complete com 2 ALA/MEI + 1 ATA ou 1 ALA/MEI + 2 ATA.\n\n• 🛡️ DEF: +1,5 por clean sheet de linha, +0,5 com exatamente 1 gol sofrido, Muralha +3 com 3+ clean sheets e teto +10.\n• 🪄 ALA/MEI: assistência vale +2,5 base; na vaga ALA/MEI recebe +1 e 2+ assistências dão +3 de Maestro.\n• 🎯 ATA: gol vale +4; 2+ gols na vaga ATA dão +3 de Artilheiro.\n• 🧤 GOL: atuação real vale +2 e gol sofrido -1; o +4 de clean sheet só vem quando ele realmente atuou no gol sem sofrer gol.",
+        roleReframeActive
+          ? "Com 6 atletas, escolha 1 GOL, 2 DEF/VOL e complete com 2 ALA + 1 ATA ou 1 ALA + 2 ATA.\n\n• 🛡️ DEF/VOL: +1,25 por clean sheet de linha, +0,5 com exatamente 1 gol sofrido, Muralha +2,5 com 3+ clean sheets e teto +8.\n• 🏃 ALA: soma ataque e recomposição; gol +0,5, assistência +0,75, clean sheet +0,5 e bônus Vai e volta +1,5. Teto +6.\n• 🎯 ATA: gol vale +4; 2+ gols na vaga ATA dão +2 de Artilheiro.\n• 🧤 GOL: segue baseado somente nas atuações reais no gol."
+          : "Com 6 atletas, escolha 1 GOL, 2 DEF e complete com 2 ALA/MEI + 1 ATA ou 1 ALA/MEI + 2 ATA.\n\n• 🛡️ DEF: +1,5 por clean sheet de linha, +0,5 com exatamente 1 gol sofrido, Muralha +3 com 3+ clean sheets e teto +10.\n• 🪄 ALA/MEI: assistência vale +2,5 base; na vaga ALA/MEI recebe +1 e 2+ assistências dão +3 de Maestro.\n• 🎯 ATA: gol vale +4; 2+ gols na vaga ATA dão +3 de Artilheiro.\n• 🧤 GOL: atuação real vale +2 e gol sofrido -1; o +4 de clean sheet só vem quando ele realmente atuou no gol sem sofrer gol.",
     },
     {
       icon: <Target className="h-8 w-8 text-warning" />,

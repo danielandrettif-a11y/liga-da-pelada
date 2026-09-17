@@ -206,6 +206,7 @@ export async function calculateRoundStats(roundId: string) {
         league_id,
         round_type,
         suppress_goalkeeper_rewards,
+        scoring_version,
         scoring_snapshot,
         best_goalkeeper_player_id,
         matches (
@@ -311,7 +312,13 @@ export async function calculateRoundStats(roundId: string) {
           s.team_goals_conceded += teamGoalsConceded;
           // Mantém os scouts defensivos brutos exclusivamente para o motor do
           // Cartola. Eles não entram no cálculo da Ranked.
-          if (profileByPlayerId.get(participant.player_id) === "defensive" && !goalkeeperIds.has(participant.player_id)) {
+          const profile = profileByPlayerId.get(participant.player_id);
+          // Na V7 o scout bruto é guardado para todo jogador de linha. Quem
+          // pode convertê-lo em bônus continua sendo decidido pela posição
+          // travada na escalação, não pela tag que o perfil tiver depois.
+          const receivesLineDefenseScout = profile === "defensive"
+            || Number(round.scoring_version || 5) >= 7;
+          if (receivesLineDefenseScout && !goalkeeperIds.has(participant.player_id)) {
             if (teamGoalsConceded === 0) {
               s.defensive_clean_games += 1;
             } else if (teamGoalsConceded === 1) {

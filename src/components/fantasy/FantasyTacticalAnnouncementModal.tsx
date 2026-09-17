@@ -4,18 +4,20 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Sparkles, Shield, Target, Trophy, Users, X, ChevronRight } from "@/components/icons";
 
-export function FantasyTacticalAnnouncementModal() {
+export function FantasyTacticalAnnouncementModal({ scoringVersion = 5 }: { scoringVersion?: number }) {
   const [isOpen, setIsOpen] = useState(false);
+  const roleReframeActive = scoringVersion >= 7;
+  const storageKey = roleReframeActive ? "fantasy_tactical_v7_role_reframe_seen" : "fantasy_tactical_v4_role_scoring_seen";
 
   useEffect(() => {
-    const seen = localStorage.getItem("fantasy_tactical_v4_role_scoring_seen");
+    const seen = localStorage.getItem(storageKey);
     if (!seen) {
       setIsOpen(true);
     }
-  }, []);
+  }, [storageKey]);
 
   const handleClose = () => {
-    localStorage.setItem("fantasy_tactical_v4_role_scoring_seen", "true");
+    localStorage.setItem(storageKey, "true");
     setIsOpen(false);
   };
 
@@ -48,13 +50,13 @@ export function FantasyTacticalAnnouncementModal() {
               Guia atualizado
             </span>
             <h2 className="font-athletic text-lg font-black uppercase italic tracking-tight text-white mt-0.5">
-              Revolução Tática no Cartola!
+              {roleReframeActive ? "Novas funções no Cartola!" : "Revolução Tática no Cartola!"}
             </h2>
           </div>
         </div>
 
         <p className="text-xs text-muted leading-relaxed mb-4">
-          Escale <strong>1 GOL, 2 DEF</strong> e complete com <strong>2 ALA/MEI + 1 ATA</strong> ou <strong>1 ALA/MEI + 2 ATA</strong>. O que acontece em campo dá pontos-base; a vaga certa ativa o bônus.
+          Escale <strong>1 GOL, 2 {roleReframeActive ? "DEF/VOL" : "DEF"}</strong> e complete com <strong>2 {roleReframeActive ? "ALA" : "ALA/MEI"} + 1 ATA</strong> ou <strong>1 {roleReframeActive ? "ALA" : "ALA/MEI"} + 2 ATA</strong>. O que acontece em campo dá pontos-base; a vaga certa ativa o bônus.
         </p>
 
         {/* Grid de Novidades */}
@@ -66,11 +68,11 @@ export function FantasyTacticalAnnouncementModal() {
             </div>
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-black text-blue-300">Zaga & Proteção (DEF)</span>
-                <span className="font-black text-accent text-[10px]">+1,5 / +0,5 pts</span>
+                <span className="font-black text-blue-300">{roleReframeActive ? "Defesa & Volância (DEF/VOL)" : "Zaga & Proteção (DEF)"}</span>
+                <span className="font-black text-accent text-[10px]">{roleReframeActive ? "+1,25 / +0,5 pts" : "+1,5 / +0,5 pts"}</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Na vaga DEF, jogar na linha sem sofrer gol vale <strong>+1,5</strong>; sofrer exatamente um vale <strong>+0,5</strong>. Três clean sheets ativam Muralha (+3 uma vez), sempre com teto de <strong>+10</strong>.
+                {roleReframeActive ? <>Na vaga DEF/VOL, jogar na linha sem sofrer gol vale <strong>+1,25</strong>; sofrer exatamente um vale <strong>+0,5</strong>. Três clean sheets ativam Muralha (+2,5), com teto de <strong>+8</strong>.</> : <>Na vaga DEF, jogar na linha sem sofrer gol vale <strong>+1,5</strong>; sofrer exatamente um vale <strong>+0,5</strong>. Três clean sheets ativam Muralha (+3 uma vez), sempre com teto de <strong>+10</strong>.</>}
               </p>
             </div>
           </div>
@@ -82,11 +84,11 @@ export function FantasyTacticalAnnouncementModal() {
             </div>
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-black text-warning">Armação & Passes (ALA/MEI)</span>
-                <span className="font-black text-accent text-[10px]">+3,5 pts / assist + bônus</span>
+                <span className="font-black text-warning">{roleReframeActive ? "Ida & Volta (ALA)" : "Armação & Passes (ALA/MEI)"}</span>
+                <span className="font-black text-accent text-[10px]">{roleReframeActive ? "ataque + recomposição" : "+3,5 pts / assist + bônus"}</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Assistência vale <strong>+2,5 pts base</strong>; na vaga ALA/MEI recebe +1 e chega a <strong>+3,5 pts</strong>. Com 2+ assistências, ainda há <strong>+3,0 pts</strong> de Maestro.
+                {roleReframeActive ? <>Na vaga ALA, gol vale +0,5 extra, assistência +0,75, clean sheet +0,5 e proteção parcial +0,25. Participar de gol e recompor em 2 jogos ativa <strong>Vai e volta +1,5</strong>, com teto +6.</> : <>Assistência vale <strong>+2,5 pts base</strong>; na vaga ALA/MEI recebe +1 e chega a <strong>+3,5 pts</strong>. Com 2+ assistências, ainda há <strong>+3,0 pts</strong> de Maestro.</>}
               </p>
             </div>
           </div>
@@ -102,7 +104,7 @@ export function FantasyTacticalAnnouncementModal() {
                 <span className="font-black text-accent text-[10px]">4,0 pts / gol + bônus</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Gol vale <strong>4,0 pts base</strong>. Na vaga ATA, 2+ gols rendem <strong>+3,0 pts</strong> de Artilheiro da Rodada.
+                Gol vale <strong>4,0 pts base</strong>. Na vaga ATA, 2+ gols rendem <strong>{roleReframeActive ? "+2,0" : "+3,0"} pts</strong> de Artilheiro da Rodada.
               </p>
             </div>
           </div>
@@ -127,7 +129,7 @@ export function FantasyTacticalAnnouncementModal() {
         {/* Chamada para o perfil */}
         <div className="rounded-2xl border border-accent/35 bg-gradient-to-r from-accent/15 via-[#0c2415] to-surface p-3 mb-4">
           <p className="text-[11px] font-bold text-foreground leading-snug">
-            ⚠️ <strong>Atualize sua Posição no Perfil:</strong> Vá em <em>Meu Perfil</em> e garanta que sua tag (DEF, ALA/MEI ou ATA) está correta para pontuar com os bônus!
+            ⚠️ <strong>Atualize sua Posição no Perfil:</strong> Vá em <em>Meu Perfil</em> e garanta que sua tag ({roleReframeActive ? "DEF/VOL, ALA ou ATA" : "DEF, ALA/MEI ou ATA"}) está correta para pontuar com os bônus!
           </p>
         </div>
 

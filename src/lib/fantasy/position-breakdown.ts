@@ -68,6 +68,8 @@ const GOL_CLEAN_SHEET_BONUS = 4;
 // ---------------------------------------------------------------------------
 
 export type PositionBreakdownInput = {
+  /** V5 preserva rodadas antigas; V7 ativa DEF/VOL e ALA ida e volta. */
+  scoringVersion?: number;
   slotRole: FantasySlotRole;
   playerProfile: string | null | undefined;
   goals: number;
@@ -103,6 +105,7 @@ function isCorrectSlot(slotRole: FantasySlotRole, playerProfile: string | null |
  */
 export function calculatePositionBreakdown(input: PositionBreakdownInput): PositionBonusBreakdown {
   const { slotRole, playerProfile } = input;
+  const scoringVersion = Number(input.scoringVersion || 5);
 
   // GOL — clean sheet quando realmente atuou no gol
   if (slotRole === "GOL") {
@@ -131,6 +134,105 @@ export function calculatePositionBreakdown(input: PositionBreakdownInput): Posit
       grossBonus: 0,
       cap: null,
       appliedBonus: 0,
+      capReached: false,
+    };
+  }
+
+  // BQ V7 — novos conceitos públicos, mantendo os papéis internos estáveis.
+  if (scoringVersion >= 7) {
+    if (slotRole === "DEF") {
+      const events: PositionBonusEvent[] = [];
+      let gross = 0;
+      if (input.defensiveCleanGames > 0) {
+        const value = input.defensiveCleanGames * 1.25;
+        events.push({ label: "Clean sheet", count: input.defensiveCleanGames, value });
+        gross += value;
+      }
+      if (input.defensiveOneGoalGames > 0) {
+        const value = input.defensiveOneGoalGames * 0.5;
+        events.push({ label: "Proteção parcial (1 gol)", count: input.defensiveOneGoalGames, value });
+        gross += value;
+      }
+      const activated = input.defensiveCleanGames >= 3;
+      const specialBonus: SpecialBonus = {
+        name: "Muralha",
+        activated,
+        value: activated ? 2.5 : 0,
+        progress: activated ? null : `${input.defensiveCleanGames}/3 clean sheets`,
+      };
+      if (activated) gross += 2.5;
+      const applied = Math.min(gross, 8);
+      return {
+        position: "DEF",
+        events,
+        specialBonus,
+        grossBonus: gross,
+        cap: 8,
+        appliedBonus: applied,
+        capReached: gross > 8,
+      };
+    }
+
+    if (slotRole === "MEI") {
+      const events: PositionBonusEvent[] = [];
+      let gross = 0;
+      if (input.goals > 0) {
+        const value = input.goals * 0.5;
+        events.push({ label: "Participação com gols", count: input.goals, value });
+        gross += value;
+      }
+      if (input.assists > 0) {
+        const value = input.assists * 0.75;
+        events.push({ label: "Participação com assistências", count: input.assists, value });
+        gross += value;
+      }
+      if (input.defensiveCleanGames > 0) {
+        const value = input.defensiveCleanGames * 0.5;
+        events.push({ label: "Recomposição sem sofrer gol", count: input.defensiveCleanGames, value });
+        gross += value;
+      }
+      if (input.defensiveOneGoalGames > 0) {
+        const value = input.defensiveOneGoalGames * 0.25;
+        events.push({ label: "Recomposição parcial", count: input.defensiveOneGoalGames, value });
+        gross += value;
+      }
+      const attackContributions = input.goals + input.assists;
+      const defensiveGames = input.defensiveCleanGames + input.defensiveOneGoalGames;
+      const activated = attackContributions >= 1 && defensiveGames >= 2;
+      const specialBonus: SpecialBonus = {
+        name: "Vai e volta",
+        activated,
+        value: activated ? 1.5 : 0,
+        progress: activated
+          ? null
+          : `${Math.min(attackContributions, 1)}/1 participação · ${Math.min(defensiveGames, 2)}/2 proteções`,
+      };
+      if (activated) gross += 1.5;
+      const applied = Math.min(gross, 6);
+      return {
+        position: "MEI",
+        events,
+        specialBonus,
+        grossBonus: gross,
+        cap: 6,
+        appliedBonus: applied,
+        capReached: gross > 6,
+      };
+    }
+
+    const activated = input.goals >= 2;
+    return {
+      position: "ATA",
+      events: [],
+      specialBonus: {
+        name: "Artilheiro",
+        activated,
+        value: activated ? 2 : 0,
+        progress: activated ? null : `${input.goals}/2 gols`,
+      },
+      grossBonus: activated ? 2 : 0,
+      cap: null,
+      appliedBonus: activated ? 2 : 0,
       capReached: false,
     };
   }

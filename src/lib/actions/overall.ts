@@ -5,8 +5,8 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import { calculatePlayerOveralls, parseOverallFormulaConfig, type OverallPlayer, type OverallRole } from "../overall";
 import { buildOverallHistoryInput } from "../overall-history";
 
-const FORMULA_KEY = "adaptive-v9-player-form-trend-shadow";
-const COMPARISON_FORMULA_KEY = "adaptive-v8-soft-progression-shadow";
+const FORMULA_KEY = "adaptive-v10-role-reframe";
+const COMPARISON_FORMULA_KEY = "adaptive-v9-player-form-trend-shadow";
 
 function numberValue(value: unknown) {
   const result = Number(value || 0);
@@ -54,7 +54,7 @@ async function loadOverallHistory(client: any) {
 }
 
 type PositionMap = Record<OverallRole, number>;
-type RecentRound = { date: string; goals: number; assists: number; goalsConceded: number; attackingScore: number; defensiveScore: number; timingQuality: "exact" | "fallback"; playedProfile: string | null; traitEvidence: PositionMap; positions: PositionMap };
+type RecentRound = { date: string; goals: number; assists: number; goalsConceded: number; attackingScore: number; goalScore: number; assistScore: number; defensiveScore: number; timingQuality: "exact" | "fallback"; playedProfile: string | null; traitEvidence: PositionMap; positions: PositionMap };
 
 export type OverallShadowAdminData = {
   latestRun: { id: string; status: string; created_at: string; completed_at: string | null; error_message: string | null; formulaLabel: string } | null;
@@ -94,7 +94,7 @@ export async function getOverallShadowAdminData(): Promise<OverallShadowAdminDat
     : { data: null };
   const [{ data: rows, error: snapshotsError }, { data: breakdownRows, error: breakdownError }, { data: comparisonRows }] = await Promise.all([
     database.from("player_overall_snapshots").select("player_id, overall, def_overall, ala_mei_overall, ata_overall, gol_overall, confidence, rounds_played, is_provisional, is_stale, data_quality, player:player_id(name)").eq("calculation_run_id", latestRun.id).order("overall", { ascending: false }),
-    database.from("player_overall_round_breakdowns").select("player_id, round_date, round_index, goals, assists, goals_conceded, attacking_score, defensive_score, timing_quality, played_profile, trait_evidence, positions").eq("calculation_run_id", latestRun.id).order("round_index", { ascending: false }),
+    database.from("player_overall_round_breakdowns").select("player_id, round_date, round_index, goals, assists, goals_conceded, attacking_score, goal_score, assist_score, defensive_score, timing_quality, played_profile, trait_evidence, positions").eq("calculation_run_id", latestRun.id).order("round_index", { ascending: false }),
     comparisonRun
       ? database.from("player_overall_snapshots").select("player_id, overall, def_overall, ala_mei_overall, ata_overall, gol_overall").eq("calculation_run_id", comparisonRun.id)
       : Promise.resolve({ data: [] }),
@@ -116,7 +116,7 @@ export async function getOverallShadowAdminData(): Promise<OverallShadowAdminDat
       positionConfidence: row.data_quality?.position_confidence || { DEF: 0, ALA_MEI: 0, ATA: 0, GOL: 0 }, provisional: Boolean(row.is_provisional), stale: Boolean(row.is_stale), roundsPlayed: numberValue(row.rounds_played), goals: numberValue(row.data_quality?.scout_totals?.goals), assists: numberValue(row.data_quality?.scout_totals?.assists), seedMode: row.data_quality?.seed_mode === "legacy_tag" ? "legacy_tag" : "observed",
       trend: row.data_quality?.overall_trend === "rising" || row.data_quality?.overall_trend === "falling" ? row.data_quality.overall_trend : "steady",
       positionTrends: Object.fromEntries((["DEF", "ALA_MEI", "ATA", "GOL"] as OverallRole[]).map((role) => [role, row.data_quality?.position_trends?.[role] === "rising" || row.data_quality?.position_trends?.[role] === "falling" ? row.data_quality.position_trends[role] : "steady"])) as Record<OverallRole, "rising" | "steady" | "falling">,
-      recentRounds: (roundsByPlayer.get(row.player_id) || []).map((item) => ({ date: item.round_date, goals: numberValue(item.goals), assists: numberValue(item.assists), goalsConceded: numberValue(item.goals_conceded), attackingScore: numberValue(item.attacking_score), defensiveScore: numberValue(item.defensive_score), timingQuality: item.timing_quality === "exact" ? "exact" : "fallback", playedProfile: item.played_profile || null, traitEvidence: item.trait_evidence || { DEF: 0, ALA_MEI: 0, ATA: 0, GOL: 0 }, positions: item.positions || { DEF: 0, ALA_MEI: 0, ATA: 0, GOL: 0 } })),
+      recentRounds: (roundsByPlayer.get(row.player_id) || []).map((item) => ({ date: item.round_date, goals: numberValue(item.goals), assists: numberValue(item.assists), goalsConceded: numberValue(item.goals_conceded), attackingScore: numberValue(item.attacking_score), goalScore: numberValue(item.goal_score), assistScore: numberValue(item.assist_score), defensiveScore: numberValue(item.defensive_score), timingQuality: item.timing_quality === "exact" ? "exact" : "fallback", playedProfile: item.played_profile || null, traitEvidence: item.trait_evidence || { DEF: 0, ALA_MEI: 0, ATA: 0, GOL: 0 }, positions: item.positions || { DEF: 0, ALA_MEI: 0, ATA: 0, GOL: 0 } })),
       comparison: (() => {
         const previous = comparisonByPlayer.get(row.player_id) as any;
         return previous ? {
@@ -140,7 +140,7 @@ export async function recalculateOverallShadow() {
   let runId: string | null = null;
   try {
     const { data: formula, error: formulaError } = await database.from("overall_formula_versions").select("id, config").eq("key", FORMULA_KEY).single();
-    if (formulaError || !formula) throw new Error("A fórmula v9 não foi encontrada. Confirme a migration 170.");
+    if (formulaError || !formula) throw new Error("A fórmula v10 não foi encontrada. Confirme a migration 171.");
     const source = await loadOverallHistory(database);
     const latestRound = [...source.rounds].filter((round) => round.roundType === "official" && round.status === "finished").at(-1);
     const { data: run, error: runError } = await database.from("overall_calculation_runs").insert({ formula_version_id: formula.id, status: "processing", source_through_round_id: latestRound?.id || null, started_at: new Date().toISOString(), created_by: account.user.id }).select("id").single();
@@ -157,7 +157,7 @@ export async function recalculateOverallShadow() {
       if (error) throw new Error(`Não foi possível gravar os OVRs: ${error.message}`);
     }
     if (calculation.breakdowns.length) {
-      const { error } = await database.from("player_overall_round_breakdowns").insert(calculation.breakdowns.map((item) => ({ calculation_run_id: runId, player_id: item.playerId, round_id: item.roundId, round_date: item.roundDate, round_index: item.roundIndex, goals: item.goals, assists: item.assists, own_goals: item.ownGoals, goals_conceded: item.goalsConceded, attacking_score: item.attackingScore, defensive_score: item.defensiveScore, timing_quality: item.timingQuality, played_profile: item.playedProfile, role_evidence: item.roleEvidence, trait_evidence: item.traitEvidence, positions: item.positions, position_confidence: item.confidence })));
+      const { error } = await database.from("player_overall_round_breakdowns").insert(calculation.breakdowns.map((item) => ({ calculation_run_id: runId, player_id: item.playerId, round_id: item.roundId, round_date: item.roundDate, round_index: item.roundIndex, goals: item.goals, assists: item.assists, own_goals: item.ownGoals, goals_conceded: item.goalsConceded, attacking_score: item.attackingScore, goal_score: item.goalScore, assist_score: item.assistScore, defensive_score: item.defensiveScore, timing_quality: item.timingQuality, played_profile: item.playedProfile, role_evidence: item.roleEvidence, trait_evidence: item.traitEvidence, positions: item.positions, position_confidence: item.confidence })));
       if (error) throw new Error(`Não foi possível gravar a auditoria das rodadas: ${error.message}`);
     }
     const { error: finishError } = await database.from("overall_calculation_runs").update({ status: "succeeded", completed_at: new Date().toISOString() }).eq("id", runId);

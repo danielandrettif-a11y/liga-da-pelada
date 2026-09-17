@@ -68,8 +68,8 @@ describe("monthly awards", () => {
   });
 
   it("exibe as posições dos prêmios por extenso", () => {
-    expect(MONTHLY_AWARD_LABELS.bestDefenderMonth).toBe("Melhor Defensor do mês");
-    expect(MONTHLY_AWARD_LABELS.bestMidfielderMonth).toBe("Melhor Ala/Meio do mês");
+    expect(MONTHLY_AWARD_LABELS.bestDefenderMonth).toBe("Melhor Defensor/Volante do mês");
+    expect(MONTHLY_AWARD_LABELS.bestMidfielderMonth).toBe("Melhor Ala do mês");
     expect(MONTHLY_AWARD_LABELS.bestAttackerMonth).toBe("Melhor Atacante do mês");
   });
 });

@@ -23,8 +23,8 @@ export type MonthlyAwardWinner = MonthlyAward & {
 };
 
 export const MONTHLY_AWARD_LABELS: Record<MonthlyAwardType, string> = {
-  bestDefenderMonth: "Melhor Defensor do mês",
-  bestMidfielderMonth: "Melhor Ala/Meio do mês",
+  bestDefenderMonth: "Melhor Defensor/Volante do mês",
+  bestMidfielderMonth: "Melhor Ala do mês",
   bestAttackerMonth: "Melhor Atacante do mês",
   bestGoalkeeperMonth: "Melhor Goleiro do mês",
   goldenBootMonth: "Chuteira de Ouro",

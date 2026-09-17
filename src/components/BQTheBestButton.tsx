@@ -25,13 +25,13 @@ const AWARD_ORDER: MonthlyAwardType[] = [
 
 const AWARD_VISUALS: Record<MonthlyAwardType, { code: string; card: string; icon: string; eyebrow: string }> = {
   bestDefenderMonth: {
-    code: "DEF",
+    code: "DEF/VOL",
     card: "border-sky-300/30 bg-gradient-to-r from-sky-400/15 via-[#0a1d1b] to-[#07130c]",
     icon: "border-sky-300/35 bg-sky-400/15 text-sky-300",
     eyebrow: "text-sky-300",
   },
   bestMidfielderMonth: {
-    code: "ALA/MEI",
+    code: "ALA",
     card: "border-violet-300/30 bg-gradient-to-r from-violet-400/15 via-[#151522] to-[#07130c]",
     icon: "border-violet-300/35 bg-violet-400/15 text-violet-300",
     eyebrow: "text-violet-300",
@@ -69,8 +69,8 @@ const AWARD_VISUALS: Record<MonthlyAwardType, { code: string; card: string; icon
 };
 
 const AWARD_EXPLANATIONS: Record<MonthlyAwardType, string> = {
-  bestDefenderMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag Defensor.",
-  bestMidfielderMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag Ala/Meio.",
+  bestDefenderMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag Defensor/Volante.",
+  bestMidfielderMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag Ala.",
   bestAttackerMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag Atacante.",
   bestGoalkeeperMonth: "Foi quem menos sofreu gols durante as partidas em que atuou no gol.",
   goldenBootMonth: "Foi o jogador que marcou mais gols nas rodadas oficiais do mês.",

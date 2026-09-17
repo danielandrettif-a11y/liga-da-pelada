@@ -67,6 +67,32 @@ describe("motor adaptativo de OVR", () => {
     trendUpwardMultiplier: 0.2,
     trendDownwardMultiplier: 0.3,
   });
+  const roleReframeFormula = parseOverallFormulaConfig({
+    ...characteristicsFormula,
+    traitWeightedChange: true,
+    separateAttackScores: true,
+    goalCurve: 0.32,
+    assistCurve: 0.28,
+    positionWeights: {
+      DEF: { defense: 0.70, goals: 0.05, assists: 0.20, result: 0.05 },
+      ALA_MEI: { defense: 0.40, goals: 0.25, assists: 0.30, result: 0.05 },
+      ATA: { defense: 0.10, goals: 0.60, assists: 0.25, result: 0.05 },
+    },
+  });
+
+  it("separa gols e assistências no OVR V10 sem transformar vitória em defesa", () => {
+    const scorer = { id: "scorer", playerProfile: "offensive" as const, overallTraits: ["offensive" as const], overallSeedMode: "observed" as const };
+    const creator = { id: "creator", playerProfile: "midfield" as const, overallTraits: ["midfield" as const], overallSeedMode: "observed" as const };
+    const rounds = Array.from({ length: 3 }, (_, index) => round(index + 1, [
+      appearance("scorer", { goals: 2, assists: 0, playerProfileLocked: "offensive" }),
+      appearance("creator", { goals: 0, assists: 3, playerProfileLocked: "midfield" }),
+    ]));
+    const result = calculatePlayerOveralls([scorer, creator], rounds, roleReframeFormula);
+    const scorerResult = result.snapshots.find((item) => item.playerId === "scorer")!;
+    const creatorResult = result.snapshots.find((item) => item.playerId === "creator")!;
+    expect(scorerResult.positions.ATA.value).toBeGreaterThan(scorerResult.positions.DEF.value);
+    expect(creatorResult.positions.ALA_MEI.value).toBeGreaterThan(creatorResult.positions.ATA.value);
+  });
 
   it("mantém todo jogador novo no OVR neutro, independente da tag operacional", () => {
     const result = calculatePlayerOveralls(observedPlayers, []);

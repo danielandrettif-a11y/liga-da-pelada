@@ -31,6 +31,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
   }, []);
 
   if (!isOpen || !mounted || typeof document === "undefined") return null;
+  const roleReframeActive = Number(settings.scoringVersion || 5) >= 7;
 
   return createPortal(
     <div
@@ -119,7 +120,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
           {activeTab === "positions" && (
             <div className="space-y-3">
               <div className="rounded-2xl border border-accent/30 bg-accent/10 p-3 text-xs text-emerald-100/90 leading-relaxed">
-                💡 <strong>Como escalar:</strong> escolha 1 GOL, 2 DEF e complete com <strong>2 ALA/MEI + 1 ATA</strong> ou <strong>1 ALA/MEI + 2 ATA</strong>. DEF, ALA/MEI e ATA precisam coincidir com a tag oficial. A vaga GOL é livre: você aposta em quem deve atuar melhor no rodízio do gol.
+                💡 <strong>Como escalar:</strong> escolha 1 GOL, 2 {roleReframeActive ? "DEF/VOL" : "DEF"} e complete com <strong>2 {roleReframeActive ? "ALA" : "ALA/MEI"} + 1 ATA</strong> ou <strong>1 {roleReframeActive ? "ALA" : "ALA/MEI"} + 2 ATA</strong>. As posições de linha precisam coincidir com a tag oficial. A vaga GOL é livre.
               </div>
 
               {/* 1. Defensores (DEF) */}
@@ -127,20 +128,20 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500/20 text-blue-300 font-black text-xs">
-                      DEF
+                      {roleReframeActive ? "DEF/VOL" : "DEF"}
                     </span>
                     <span className="font-athletic text-sm font-black uppercase text-blue-200">
-                      Zagueiro & Proteção
+                      {roleReframeActive ? "Defensor / Volante" : "Zagueiro & Proteção"}
                     </span>
                   </div>
                   <span className="rounded bg-blue-500/20 px-2 py-0.5 text-[9px] font-black text-blue-300">
-                    Teto de +10
+                    Teto de +{roleReframeActive ? "8" : "10"}
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-muted">
                   <div className="flex justify-between py-0.5 border-b border-white/5">
                     <span>🧱 0 gols sofridos jogando na linha:</span>
-                    <strong className="text-accent font-black">+1.5 pts</strong>
+                    <strong className="text-accent font-black">+{roleReframeActive ? "1.25" : "1.5"} pts</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
                     <span>🛡️ Exatamente 1 gol sofrido na linha:</span>
@@ -148,7 +149,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                   </div>
                   <div className="flex justify-between py-0.5">
                     <span>🏰 Muralha com 3+ clean sheets:</span>
-                    <strong className="text-accent font-black">+3.0 pts uma vez</strong>
+                    <strong className="text-accent font-black">+{roleReframeActive ? "2.5" : "3.0"} pts uma vez</strong>
                   </div>
                 </div>
               </div>
@@ -158,28 +159,28 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-warning/20 text-warning font-black text-xs">
-                      MEI
+                      {roleReframeActive ? "ALA" : "MEI"}
                     </span>
                     <span className="font-athletic text-sm font-black uppercase text-yellow-200">
-                      Meia, Ala & Armação
+                      {roleReframeActive ? "Ala & Ida e volta" : "Meia, Ala & Armação"}
                     </span>
                   </div>
                   <span className="rounded bg-warning/20 px-2 py-0.5 text-[9px] font-black text-warning">
-                    Maestro da Rodada
+                    {roleReframeActive ? "Teto de +6" : "Maestro da Rodada"}
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-muted">
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🎯 Assistência: +2.5 base +1 na vaga ALA/MEI</span>
-                    <strong className="text-accent font-black">+3.5 pts / assist</strong>
+                    <span>{roleReframeActive ? "🎯 Assistência na vaga ALA" : "🎯 Assistência: +2.5 base +1 na vaga ALA/MEI"}</span>
+                    <strong className="text-accent font-black">{roleReframeActive ? "+0.75 extra" : "+3.5 pts / assist"}</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🪄 Bônus Maestro (2+ assistências):</span>
-                    <strong className="text-warning font-black">+3.0 pts extras</strong>
+                    <span>{roleReframeActive ? "🏃 Vai e volta (participação + 2 proteções):" : "🪄 Bônus Maestro (2+ assistências):"}</span>
+                    <strong className="text-warning font-black">+{roleReframeActive ? "1.5" : "3.0"} pts extras</strong>
                   </div>
                   <div className="flex justify-between py-0.5">
                     <span>⚽ Gol marcado (scout base):</span>
-                    <strong className="text-foreground font-black">+{settings.goalPoints.toFixed(1)} pts</strong>
+                    <strong className="text-foreground font-black">+{settings.goalPoints.toFixed(1)} base{roleReframeActive ? " +0.5 extra" : " pts"}</strong>
                   </div>
                 </div>
               </div>
@@ -206,7 +207,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
                     <span>🔥 Bônus Artilheiro (2+ gols):</span>
-                    <strong className="text-danger font-black">+3.0 pts extras</strong>
+                    <strong className="text-danger font-black">+{roleReframeActive ? "2.0" : "3.0"} pts extras</strong>
                   </div>
                   <div className="flex justify-between py-0.5">
                     <span>🎯 Assistência:</span>
@@ -317,9 +318,9 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
 
                   <div className="flex items-center justify-between p-3">
                     <span className="font-bold text-white flex items-center gap-1.5">
-                      🧱 DEF jogando na linha (bônus da vaga)
+                      🧱 {roleReframeActive ? "DEF/VOL" : "DEF"} jogando na linha (bônus da vaga)
                     </span>
-                    <span className="font-black text-blue-300">+1.5 (SG) / +0.5 (1 sofrido), teto +10</span>
+                    <span className="font-black text-blue-300">+{roleReframeActive ? "1.25" : "1.5"} (SG) / +0.5 (1 sofrido), teto +{roleReframeActive ? "8" : "10"}</span>
                   </div>
                 </div>
               </div>

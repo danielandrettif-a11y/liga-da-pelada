@@ -8,7 +8,7 @@ export type GoalTimingQuality = "exact" | "fallback";
 export type OverallTrend = "rising" | "steady" | "falling";
 
 type LineRole = Exclude<OverallRole, "GOL">;
-type PositionWeights = { defense: number; attack: number; result: number };
+type PositionWeights = { defense: number; attack: number; goals: number; assists: number; result: number };
 
 export type OverallFormulaConfig = {
   base: number;
@@ -30,6 +30,9 @@ export type OverallFormulaConfig = {
   legacyTimingConfidence: number;
   assistValue: number;
   attackCurve: number;
+  goalCurve: number;
+  assistCurve: number;
+  separateAttackScores: boolean;
   positionWeights: Record<LineRole, PositionWeights>;
   /** Quanto uma atuação na função declarada revela sobre cada posição. */
   roleEvidence: Record<LineRole, Record<LineRole, number>>;
@@ -88,10 +91,13 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   assistValue: 0.65,
   attackCurve: 0.32,
   positionWeights: {
-    DEF: { defense: 0.85, attack: 0.10, result: 0.05 },
-    ALA_MEI: { defense: 0.45, attack: 0.45, result: 0.10 },
-    ATA: { defense: 0.15, attack: 0.75, result: 0.10 },
+    DEF: { defense: 0.85, attack: 0.10, goals: 0, assists: 0, result: 0.05 },
+    ALA_MEI: { defense: 0.45, attack: 0.45, goals: 0, assists: 0, result: 0.10 },
+    ATA: { defense: 0.15, attack: 0.75, goals: 0, assists: 0, result: 0.10 },
   },
+  goalCurve: 0.32,
+  assistCurve: 0.28,
+  separateAttackScores: false,
   roleEvidence: {
     DEF: { DEF: 1, ALA_MEI: 0.45, ATA: 0.15 },
     ALA_MEI: { DEF: 0.5, ALA_MEI: 1, ATA: 0.5 },
@@ -160,18 +166,35 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
   const trendWindowRounds = wholeNumber(candidate.trendWindowRounds, DEFAULT_OVERALL_FORMULA.trendWindowRounds, 2, 5);
   const trendMinimumRounds = wholeNumber(candidate.trendMinimumRounds, DEFAULT_OVERALL_FORMULA.trendMinimumRounds, 2, trendWindowRounds);
   const trendRequiredRounds = wholeNumber(candidate.trendRequiredRounds, DEFAULT_OVERALL_FORMULA.trendRequiredRounds, 2, trendWindowRounds);
+  const separateAttackScores = candidate.separateAttackScores === true;
   const normalizedPositionWeights = (role: LineRole): PositionWeights => {
     const source = positionWeights[role] && typeof positionWeights[role] === "object"
       ? positionWeights[role] as Record<string, unknown>
       : {};
     const fallback = DEFAULT_OVERALL_FORMULA.positionWeights[role];
-    const raw = {
-      defense: bounded(source.defense, fallback.defense),
-      attack: bounded(source.attack, fallback.attack),
-      result: bounded(source.result, fallback.result),
+    const raw = separateAttackScores
+      ? {
+          defense: bounded(source.defense, fallback.defense),
+          attack: 0,
+          goals: bounded(source.goals, fallback.goals),
+          assists: bounded(source.assists, fallback.assists),
+          result: bounded(source.result, fallback.result),
+        }
+      : {
+          defense: bounded(source.defense, fallback.defense),
+          attack: bounded(source.attack, fallback.attack),
+          goals: 0,
+          assists: 0,
+          result: bounded(source.result, fallback.result),
+        };
+    const sum = raw.defense + raw.attack + raw.goals + raw.assists + raw.result || 1;
+    return {
+      defense: raw.defense / sum,
+      attack: raw.attack / sum,
+      goals: raw.goals / sum,
+      assists: raw.assists / sum,
+      result: raw.result / sum,
     };
-    const sum = raw.defense + raw.attack + raw.result || 1;
-    return { defense: raw.defense / sum, attack: raw.attack / sum, result: raw.result / sum };
   };
   const evidence = (playedRole: LineRole, targetRole: LineRole) => {
     const source = roleEvidence[playedRole] && typeof roleEvidence[playedRole] === "object"
@@ -203,6 +226,9 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     legacyTimingConfidence: number("legacyTimingConfidence", DEFAULT_OVERALL_FORMULA.legacyTimingConfidence),
     assistValue: number("assistValue", DEFAULT_OVERALL_FORMULA.assistValue),
     attackCurve: number("attackCurve", DEFAULT_OVERALL_FORMULA.attackCurve),
+    goalCurve: number("goalCurve", DEFAULT_OVERALL_FORMULA.goalCurve),
+    assistCurve: number("assistCurve", DEFAULT_OVERALL_FORMULA.assistCurve),
+    separateAttackScores,
     positionWeights: {
       DEF: normalizedPositionWeights("DEF"),
       ALA_MEI: normalizedPositionWeights("ALA_MEI"),
@@ -340,6 +366,8 @@ export type OverallRoundBreakdown = {
   ownGoals: number;
   goalsConceded: number;
   attackingScore: number;
+  goalScore: number;
+  assistScore: number;
   defensiveScore: number;
   timingQuality: GoalTimingQuality;
   playedProfile: PlayerProfile | null;
@@ -466,7 +494,9 @@ function calculateRoundScores(appearances: OverallAppearance[], config: OverallF
     0,
     1,
   );
-  return { attackingScore, collectiveScore: resultAverage, totals };
+  const goalScore = clamp(0.25 + 0.75 * (1 - Math.exp(-totals.goals * config.goalCurve)), 0, 1);
+  const assistScore = clamp(0.25 + 0.75 * (1 - Math.exp(-totals.assists * config.assistCurve)), 0, 1);
+  return { attackingScore, goalScore, assistScore, collectiveScore: resultAverage, totals };
 }
 
 function calculateMatchScore(
@@ -474,7 +504,7 @@ function calculateMatchScore(
   player: OverallPlayer,
   appearance: OverallAppearance,
   baselineConcededRate: number,
-  roundAttackingScore: number,
+  roundScores: { attackingScore: number; goalScore: number; assistScore: number },
   collectiveScore: number,
   config: OverallFormulaConfig,
 ): { score: number; defensiveScore: number; evidenceWeight: number } | null {
@@ -501,7 +531,7 @@ function calculateMatchScore(
     0,
     1,
   );
-  const attacking = roundAttackingScore;
+  const attacking = roundScores.attackingScore;
   const defensiveQuality = appearance.goalTimingQuality === "exact" ? 1 : config.legacyTimingConfidence;
 
   // O goleiro é lido exclusivamente pela proteção do gol. Gols ou assistências
@@ -509,10 +539,15 @@ function calculateMatchScore(
   if (role === "GOL") return { score: defensive, defensiveScore: defensive, evidenceWeight: defensiveQuality };
 
   const weights = config.positionWeights[role];
-  const roleQuality = defensiveQuality * weights.defense + weights.attack + weights.result;
+  const roleQuality = defensiveQuality * weights.defense
+    + weights.attack + weights.goals + weights.assists + weights.result;
   return {
     score: clamp(
-      defensive * weights.defense + attacking * weights.attack + collectiveScore * weights.result,
+      defensive * weights.defense
+        + attacking * weights.attack
+        + roundScores.goalScore * weights.goals
+        + roundScores.assistScore * weights.assists
+        + collectiveScore * weights.result,
       0,
       1,
     ),
@@ -775,7 +810,7 @@ export function calculatePlayerOveralls(
             player,
             appearance,
             baselineConcededRate,
-            roundScores.attackingScore,
+            roundScores,
             roundScores.collectiveScore,
             formula,
           );
@@ -838,6 +873,8 @@ export function calculatePlayerOveralls(
         ownGoals: roundScores.totals.ownGoals,
         goalsConceded,
         attackingScore: roundScores.attackingScore,
+        goalScore: roundScores.goalScore,
+        assistScore: roundScores.assistScore,
         defensiveScore: defensiveWeight ? defensiveTotal / defensiveWeight : 0.5,
         timingQuality,
         playedProfile,

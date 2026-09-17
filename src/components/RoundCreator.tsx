@@ -9,6 +9,8 @@ import type { RoundType, TeamFormationMode } from "@/lib/types";
 import { drawTeamsByAttendance, drawTeamsDirect } from "@/lib/round-draw";
 import { drawTeamsBySpeedOnServer } from "@/lib/actions/speed-draw";
 import type { SpeedTeamSummary } from "@/lib/speed-draw";
+import { drawTeamsAdaptiveOnServer } from "@/lib/actions/adaptive-draw";
+import type { AdaptiveTeamSummary } from "@/lib/adaptive-draw";
 import {
   Users,
   AlertTriangle,
@@ -81,6 +83,7 @@ export function RoundCreator({
   const [attendanceOrder, setAttendanceOrder] = useState<string[]>([]);
   const [pendingDrawMode, setPendingDrawMode] = useState<Exclude<TeamFormationMode, "manual"> | null>(null);
   const [speedSummary, setSpeedSummary] = useState<{ teams: SpeedTeamSummary[]; unratedCount: number } | null>(null);
+  const [adaptiveSummary, setAdaptiveSummary] = useState<{ teams: AdaptiveTeamSummary[]; missingOverallCount: number; missingSpeedCount: number; balanceScore: number } | null>(null);
   const [underfilledPrompt, setUnderfilledPrompt] = useState<"count" | "size" | null>(null);
   const [mounted, setMounted] = useState(false);
   useDialogViewport(Boolean(pendingDrawMode || underfilledPrompt));
@@ -315,6 +318,7 @@ export function RoundCreator({
   function assignToTeam(player: DrawPlayer, teamId: string) {
     setFormationMode("manual");
     setSpeedSummary(null);
+    setAdaptiveSummary(null);
     setAttendanceOrder([]);
     const targetTeam = teams.find((team) => team.id === teamId);
     const alreadyInTarget = targetTeam?.players.some((item) => item.id === player.id);
@@ -337,6 +341,7 @@ export function RoundCreator({
   function removeFromTeam(player: DrawPlayer) {
     setFormationMode("manual");
     setSpeedSummary(null);
+    setAdaptiveSummary(null);
     setAttendanceOrder([]);
     setTeams(prev => prev.map(t => ({
       ...t,
@@ -350,7 +355,26 @@ export function RoundCreator({
       return;
     }
     try {
-      if (mode === "speed") {
+      if (mode === "adaptive") {
+        const serverResult = await drawTeamsAdaptiveOnServer({
+          playerIds: selectedPlayers.map((player) => player.id),
+          teamCount,
+          playersPerTeam: teamCapacity,
+        });
+        if (!serverResult.success || !serverResult.teams) throw new Error(serverResult.error || "Não foi possível executar o equilíbrio completo.");
+        const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
+        setTeams((current) => current.map((team, index) => ({
+          ...team,
+          players: (serverResult.teams?.[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
+        })));
+        setAdaptiveSummary({
+          teams: serverResult.teamSummaries || [],
+          missingOverallCount: serverResult.missingOverallCount || 0,
+          missingSpeedCount: serverResult.missingSpeedCount || 0,
+          balanceScore: serverResult.balanceScore || 0,
+        });
+        setSpeedSummary(null);
+      } else if (mode === "speed") {
         const serverResult = await drawTeamsBySpeedOnServer({
           playerIds: selectedPlayers.map((player) => player.id),
           teamCount,
@@ -363,6 +387,7 @@ export function RoundCreator({
           players: (serverResult.teams?.[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
         })));
         setSpeedSummary({ teams: serverResult.teamSummaries || [], unratedCount: serverResult.unratedCount || 0 });
+        setAdaptiveSummary(null);
       } else {
         const result = drawTeamsDirect({
           players: selectedPlayers,
@@ -376,6 +401,7 @@ export function RoundCreator({
           players: (result[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
         })));
         setSpeedSummary(null);
+        setAdaptiveSummary(null);
       }
       setFormationMode(mode);
       // Sorteio normal não usa a regra de bloquear o terceiro time pela
@@ -427,6 +453,32 @@ export function RoundCreator({
       return;
     }
     try {
+      if (pendingDrawMode === "adaptive") {
+        const serverResult = await drawTeamsAdaptiveOnServer({
+          playerIds: selectedPlayers.map((player) => player.id),
+          attendanceOrder,
+          teamCount,
+          playersPerTeam: teamCapacity,
+        });
+        if (!serverResult.success || !serverResult.teams) throw new Error(serverResult.error || "Não foi possível executar o equilíbrio completo.");
+        const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
+        setTeams((current) => current.map((team, index) => ({
+          ...team,
+          players: (serverResult.teams?.[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
+        })));
+        setAttendanceOrder(serverResult.attendanceOrder || attendanceOrder);
+        setAdaptiveSummary({
+          teams: serverResult.teamSummaries || [],
+          missingOverallCount: serverResult.missingOverallCount || 0,
+          missingSpeedCount: serverResult.missingSpeedCount || 0,
+          balanceScore: serverResult.balanceScore || 0,
+        });
+        setSpeedSummary(null);
+        setFormationMode("adaptive");
+        setPendingDrawMode(null);
+        setError("");
+        return;
+      }
       if (pendingDrawMode === "speed") {
         const serverResult = await drawTeamsBySpeedOnServer({
           playerIds: selectedPlayers.map((player) => player.id),
@@ -442,12 +494,14 @@ export function RoundCreator({
         })));
         setAttendanceOrder(serverResult.attendanceOrder || attendanceOrder);
         setSpeedSummary({ teams: serverResult.teamSummaries || [], unratedCount: serverResult.unratedCount || 0 });
+        setAdaptiveSummary(null);
         setFormationMode("speed");
         setPendingDrawMode(null);
         setError("");
         return;
       }
       setSpeedSummary(null);
+      setAdaptiveSummary(null);
       const minimumPresent = Math.min(selectedPlayers.length, teamCapacity * 2);
       if (attendanceOrder.length < minimumPresent) {
         // Se marcou apenas alguns, completa com os outros selecionados
@@ -1058,7 +1112,7 @@ export function RoundCreator({
               <p className="text-[10px] font-black uppercase tracking-wider text-muted">Como montar os times?</p>
               <span className="text-[9px] font-bold text-accent">Sorteio com 1 toque</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
               <button
                 type="button"
                 onClick={() => requestDraw("random")}
@@ -1082,6 +1136,13 @@ export function RoundCreator({
               </button>
               <button
                 type="button"
+                onClick={() => requestDraw("adaptive")}
+                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "adaptive" ? "border-accent bg-accent/15 text-accent shadow-sm" : "border-border bg-surface text-foreground hover:border-accent/40"}`}
+              >
+                🧠 Equilíbrio Completo
+              </button>
+              <button
+                type="button"
                 onClick={() => openAttendanceDrawModal("random")}
                 className="rounded-xl border border-border bg-surface px-2 py-3 text-[10px] font-black uppercase text-muted hover:text-foreground hover:border-border/80 transition-all active:scale-95"
               >
@@ -1089,7 +1150,7 @@ export function RoundCreator({
               </button>
               <button
                 type="button"
-                onClick={() => { setFormationMode("manual"); setSpeedSummary(null); setTeams((current) => current.map((team) => ({ ...team, players: [] }))); }}
+                onClick={() => { setFormationMode("manual"); setSpeedSummary(null); setAdaptiveSummary(null); setTeams((current) => current.map((team) => ({ ...team, players: [] }))); }}
                 className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "manual" ? "border-accent bg-accent/15 text-accent" : "border-border bg-surface text-muted"}`}
               >
                 ✋ Manual
@@ -1104,6 +1165,8 @@ export function RoundCreator({
                 ? "Times equilibrados por pontuação e posições com sucesso!"
                 : formationMode === "speed"
                 ? "Times equilibrados por velocidade (★) com sucesso!"
+                : formationMode === "adaptive"
+                ? "Times equilibrados por OVR (45%), velocidade (40%) e funções (15%)."
                 : "Escolha um modo acima para montar os times."}
             </p>
             {formationMode === "speed" && speedSummary && (
@@ -1119,6 +1182,26 @@ export function RoundCreator({
                 {speedSummary.unratedCount > 0 && (
                   <p className="mt-2 text-[9px] font-bold text-warning">
                     {speedSummary.unratedCount} jogador(es) sem avaliação foram considerados como 2★ somente neste cálculo.
+                  </p>
+                )}
+              </div>
+            )}
+            {formationMode === "adaptive" && adaptiveSummary && (
+              <div className="mt-3 rounded-xl border border-accent/25 bg-accent/5 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-accent">Resumo privado do equilíbrio completo</p>
+                  <span className="rounded-full bg-accent/15 px-2 py-1 text-[9px] font-black text-accent">{adaptiveSummary.balanceScore.toFixed(0)}% equilíbrio</span>
+                </div>
+                <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                  {adaptiveSummary.teams.map((summary, index) => (
+                    <p key={index} className="rounded-lg bg-background/60 px-2.5 py-2 text-[10px] font-bold text-muted">
+                      <span className="text-foreground">Time {index + 1}</span> · OVR {summary.overallAverage.toFixed(1)} · {summary.speedAverage.toFixed(2)}★ · {summary.profiles.defensive} DEF/VOL · {summary.profiles.midfield} ALA · {summary.profiles.offensive} ATA
+                    </p>
+                  ))}
+                </div>
+                {(adaptiveSummary.missingOverallCount > 0 || adaptiveSummary.missingSpeedCount > 0) && (
+                  <p className="mt-2 text-[9px] font-bold text-warning">
+                    Dados ausentes: {adaptiveSummary.missingOverallCount} OVR e {adaptiveSummary.missingSpeedCount} velocidade. O cálculo usou a mediana do grupo e 2★ sem gravar valores.
                   </p>
                 )}
               </div>
