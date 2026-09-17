@@ -23,7 +23,7 @@ begin
   where player_id = new.id
     and avatar_url_locked is distinct from new.avatar_url;
 
-  update public.registration_events
+  update public.player_registration_events
   set avatar_url = new.avatar_url
   where player_id = new.id
     and avatar_url is distinct from new.avatar_url;
