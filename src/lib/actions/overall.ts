@@ -77,6 +77,8 @@ export type OverallShadowAdminData = {
     provisional: boolean;
     stale: boolean;
     roundsPlayed: number;
+    goals: number;
+    assists: number;
   }>;
 };
 
@@ -96,7 +98,7 @@ export async function getOverallShadowAdminData(): Promise<OverallShadowAdminDat
 
   const { data: rows, error: snapshotsError } = await database
     .from("player_overall_snapshots")
-    .select("player_id, overall, def_overall, ala_mei_overall, ata_overall, gol_overall, confidence, rounds_played, is_provisional, is_stale, player:player_id(name)")
+    .select("player_id, overall, def_overall, ala_mei_overall, ata_overall, gol_overall, confidence, rounds_played, is_provisional, is_stale, data_quality, player:player_id(name)")
     .eq("calculation_run_id", latestRun.id)
     .order("overall", { ascending: false });
   if (snapshotsError) throw new Error(`Não foi possível carregar os OVRs: ${snapshotsError.message}`);
@@ -115,6 +117,8 @@ export async function getOverallShadowAdminData(): Promise<OverallShadowAdminDat
       provisional: Boolean(row.is_provisional),
       stale: Boolean(row.is_stale),
       roundsPlayed: numberValue(row.rounds_played),
+      goals: numberValue(row.data_quality?.scout_totals?.goals),
+      assists: numberValue(row.data_quality?.scout_totals?.assists),
     })),
   };
 }
@@ -169,6 +173,8 @@ export async function recalculateOverallShadow() {
       data_quality: {
         mode: "shadow",
         goal_timing: "elapsed_seconds_with_legacy_fallback",
+        scoring_unit: "weekly_round",
+        scout_totals: snapshot.scoutTotals,
       },
     }));
     if (rows.length) {

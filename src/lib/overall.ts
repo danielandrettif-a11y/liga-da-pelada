@@ -51,6 +51,11 @@ export type PlayerOverallSnapshot = {
   isProvisional: boolean;
   isStale: boolean;
   lastRoundId: string | null;
+  scoutTotals: {
+    goals: number;
+    assists: number;
+    ownGoals: number;
+  };
 };
 
 export type OverallCalculationResult = {
@@ -81,6 +86,7 @@ type MutablePlayerState = {
   goalkeeperRoundIds: Set<string>;
   lastRoundId: string | null;
   lastRoundSequence: number | null;
+  scoutTotals: PlayerOverallSnapshot["scoutTotals"];
 };
 
 function clamp(value: number, minimum: number, maximum: number) {
@@ -145,20 +151,37 @@ function createPlayerState(player: OverallPlayer): MutablePlayerState {
     goalkeeperRoundIds: new Set<string>(),
     lastRoundId: null,
     lastRoundSequence: null,
+    scoutTotals: { goals: 0, assists: 0, ownGoals: 0 },
   };
+}
+
+function calculateRoundAttackingScore(appearances: OverallAppearance[]) {
+  const totals = appearances.reduce((result, appearance) => ({
+    goals: result.goals + Number(appearance.goals || 0),
+    assists: result.assists + Number(appearance.assists || 0),
+    ownGoals: result.ownGoals + Number(appearance.ownGoals || 0),
+    seconds: result.seconds + exposure(appearance.secondsPlayed),
+    resultSeconds: result.resultSeconds + resultScore(appearance.result) * exposure(appearance.secondsPlayed),
+  }), { goals: 0, assists: 0, ownGoals: 0, seconds: 0, resultSeconds: 0 });
+  const resultAverage = totals.seconds > 0 ? totals.resultSeconds / totals.seconds : 0.5;
+  const production = totals.goals + totals.assists * 0.7;
+  // A rodada semanal é a unidade competitiva da pelada. Cada gol e assistência
+  // acrescenta valor de forma linear, em vez de ser achatado por partida.
+  const individualActions = clamp(0.25 + production * 0.14, 0, 1);
+  const score = clamp(individualActions * 0.8 + resultAverage * 0.2 - totals.ownGoals * 0.15, 0, 1);
+  return { score, totals };
 }
 
 function calculateMatchScore(
   role: OverallRole,
   appearance: OverallAppearance,
   baselineConcededRate: number,
+  roundAttackingScore: number,
 ) {
   if (role === "GOL" && !appearance.isGoalkeeper) return null;
 
   const seconds = exposure(appearance.secondsPlayed);
   if (seconds === 0) return null;
-  const goals = Number(appearance.goals || 0);
-  const assists = Number(appearance.assists || 0);
   const ownGoals = Number(appearance.ownGoals || 0);
   const conceded = Number(appearance.goalsConceded || 0);
   const concededRate = perSevenMinuteRate(conceded, seconds);
@@ -170,8 +193,7 @@ function calculateMatchScore(
     0,
     1,
   );
-  const offensiveActions = 1 - Math.exp(-(goals * 1.25 + assists * 0.85));
-  const attacking = clamp(resultScore(appearance.result) * 0.35 + offensiveActions * 0.65 - ownGoals * 0.2, 0, 1);
+  const attacking = roundAttackingScore;
 
   if (role === "GOL") return clamp(defensive * 0.9 + attacking * 0.1, 0, 1);
 
@@ -245,6 +267,7 @@ function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, current
     isProvisional: roundsPlayed < PROVISIONAL_ROUNDS,
     isStale: state.lastRoundSequence !== null && currentSequence - state.lastRoundSequence >= STALE_AFTER_ROUNDS,
     lastRoundId: state.lastRoundId,
+    scoutTotals: { ...state.scoutTotals },
   };
 }
 
@@ -276,14 +299,18 @@ export function calculatePlayerOveralls(players: OverallPlayer[], rounds: Overal
     for (const [playerId, appearances] of appearancesByPlayer) {
       const player = playerById.get(playerId)!;
       const state = stateByPlayerId.get(playerId)!;
+      const roundAttack = calculateRoundAttackingScore(appearances);
       for (const appearance of appearances) {
         for (const role of ROLES) {
-          const score = calculateMatchScore(role, appearance, baselineConcededRate);
+          const score = calculateMatchScore(role, appearance, baselineConcededRate, roundAttack.score);
           if (score === null) continue;
           state.history.push({ roundId: round.id, roundSequence: round.sequence, role, score, secondsPlayed: exposure(appearance.secondsPlayed) });
         }
         historicalConcededRates.push(perSevenMinuteRate(appearance.goalsConceded, appearance.secondsPlayed));
       }
+      state.scoutTotals.goals += roundAttack.totals.goals;
+      state.scoutTotals.assists += roundAttack.totals.assists;
+      state.scoutTotals.ownGoals += roundAttack.totals.ownGoals;
       state.playedRoundIds.add(round.id);
       if (appearances.some((appearance) => appearance.isGoalkeeper)) state.goalkeeperRoundIds.add(round.id);
       state.lastRoundId = round.id;

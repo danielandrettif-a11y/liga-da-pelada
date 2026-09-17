@@ -85,4 +85,26 @@ describe("motor adaptativo de OVR", () => {
     ])]);
     expect(result.snapshots[0].overall).toBeLessThanOrEqual(71);
   });
+
+  it("preserva a diferença entre o artilheiro da rodada e quem não produziu no ataque", () => {
+    const quietMatches = Array.from({ length: 12 }, () => appearance("def", { goalsConceded: 1, result: "draw" }));
+    const scorerMatches = Array.from({ length: 12 }, (_, index) => appearance("ata", {
+      goalsConceded: 1,
+      result: "draw",
+      // Concentrar os scouts em uma partida reproduz o caso que antes era
+      // achatado e depois diluído pelas demais partidas da rodada.
+      goals: index === 0 ? 3 : 0,
+      assists: index === 0 ? 2 : 0,
+    }));
+    const result = calculatePlayerOveralls(players, [
+      round(1, [...quietMatches, ...scorerMatches]),
+      round(2, [...quietMatches, ...scorerMatches]),
+      round(3, [...quietMatches, ...scorerMatches]),
+    ]);
+    const scorer = result.snapshots.find((snapshot) => snapshot.playerId === "ata")!;
+    const quiet = result.snapshots.find((snapshot) => snapshot.playerId === "def")!;
+    expect(scorer.positions.ATA.value).toBeGreaterThan(70);
+    expect(scorer.positions.ATA.value).toBeGreaterThan(quiet.positions.ATA.value);
+    expect(scorer.scoutTotals).toEqual({ goals: 9, assists: 6, ownGoals: 0 });
+  });
 });
