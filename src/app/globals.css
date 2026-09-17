@@ -782,16 +782,20 @@ textarea {
 
 .ranking-card-positions > div {
   min-width: 0;
-  padding: .12rem .05rem;
+  padding: .16rem .05rem .14rem;
 }
 
 .ranking-card-position {
-  margin: .08rem;
-  border-radius: .42rem;
+  border-radius: .3rem;
 }
 
 .ranking-card-position--best {
   border: 1px solid transparent;
+}
+
+.ranking-card-stats > div {
+  min-width: 0;
+  padding: .12rem .05rem;
 }
 
 /* O pódio tem só um terço da tela: preserva a arte e prioriza o nome. */

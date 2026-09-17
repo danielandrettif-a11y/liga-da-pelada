@@ -93,6 +93,14 @@ describe("ranking card layout", () => {
       { key: "ATA", label: "ATA", value: "71.6", isBest: false },
       { key: "GOL", label: "GOL", value: "70.8", isBest: false },
     ]);
+    expect(content.stats).toEqual([
+      { value: "5", label: "GOL" },
+      { value: "4", label: "AST" },
+      { value: "12", label: "VIT" },
+      { value: "23", label: "JOG" },
+      { value: "6", label: "DER" },
+      { value: "59%", label: "APR" },
+    ]);
   });
 
   it("does not reuse ranking points when the player has no calculated OVR", () => {

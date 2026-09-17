@@ -46,6 +46,7 @@ export type RankingCardContent = {
   title: string | null;
   awards: Array<{ key: RankingCardAwardKey; label: string; value: number }>;
   positionRatings: Array<{ key: RankingCardPositionKey; label: string; value: string; isBest: boolean }>;
+  stats: Array<{ label: string; value: string }>;
 };
 
 /** All card tiers use this exact 2:3 content grid. */
@@ -163,6 +164,14 @@ export function buildRankingCardContent(entry: RankingEntry, position: number): 
       value: item.rawValue == null ? "—" : item.rawValue.toFixed(1),
       isBest: bestPosition === index,
     })),
+    stats: [
+      { value: String(entry.goals), label: "GOL" },
+      { value: String(entry.assists), label: "AST" },
+      { value: String(entry.wins), label: "VIT" },
+      { value: String(entry.games), label: "JOG" },
+      { value: String(entry.losses), label: "DER" },
+      { value: `${entry.winRate}%`, label: "APR" },
+    ],
   };
 }
 
