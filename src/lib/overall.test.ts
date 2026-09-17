@@ -105,7 +105,7 @@ describe("motor adaptativo de OVR", () => {
       appearance("ata", { goals: 2 }),
       appearance("ata", { goals: 2 }),
     ])]);
-    expect(result.snapshots[0].overall).toBeLessThanOrEqual(71);
+    expect(result.snapshots[0].overall).toBeLessThanOrEqual(71.5);
   });
 
   it("preserva a diferença entre o artilheiro da rodada e quem não produziu no ataque", () => {
@@ -130,14 +130,25 @@ describe("motor adaptativo de OVR", () => {
     expect(scorer.scoutTotals).toEqual({ goals: 9, assists: 6, ownGoals: 0 });
   });
 
-  it("faz a estimativa legada desaparecer depois de cinco rodadas", () => {
+  it("faz a estimativa legada desaparecer depois de três rodadas", () => {
     const badDefender = { ...players[0] };
     const observedDefender = { ...players[0], overallSeedMode: "observed" as const };
-    const difficultRounds = Array.from({ length: 8 }, (_, index) => round(index + 1, [
+    const difficultRounds = Array.from({ length: 6 }, (_, index) => round(index + 1, [
       appearance("def", { goalsConceded: 2, result: "loss" }),
     ]));
     const legacy = calculatePlayerOveralls([badDefender], difficultRounds).snapshots[0];
     const observed = calculatePlayerOveralls([observedDefender], difficultRounds).snapshots[0];
     expect(Math.abs(legacy.positions.DEF.value - observed.positions.DEF.value)).toBeLessThanOrEqual(0.1);
+  });
+
+  it("marca como desatualizado após quatro rodadas semanais sem jogar", () => {
+    const result = calculatePlayerOveralls([observedPlayers[0]], [
+      round(1, [appearance("def")]),
+      round(2, []),
+      round(3, []),
+      round(4, []),
+      round(5, []),
+    ]);
+    expect(result.snapshots[0].isStale).toBe(true);
   });
 });

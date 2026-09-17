@@ -68,10 +68,14 @@ export type OverallCalculationResult = {
 
 const ROLES: OverallRole[] = ["DEF", "ALA_MEI", "ATA", "GOL"];
 const MAX_MATCH_SECONDS = 7 * 60;
-const RECENT_ROUND_WINDOW = 20;
-const HALF_LIFE_ROUNDS = 8;
-const PROVISIONAL_ROUNDS = 5;
-const STALE_AFTER_ROUNDS = 6;
+// Uma rodada equivale a uma semana. O modelo precisa acompanhar o momento
+// recente sem transformar uma única atuação em tendência definitiva.
+const RECENT_ROUND_WINDOW = 8;
+const HALF_LIFE_ROUNDS = 3;
+const CONFIDENCE_ROUNDS = 3;
+const SEED_FADE_ROUNDS = 3;
+const GOALKEEPER_ELIGIBILITY_ROUNDS = 3;
+const STALE_AFTER_ROUNDS = 4;
 const MAX_CHANGE_PER_ROUND = 2;
 
 type Performance = {
@@ -104,7 +108,7 @@ function provisionalPositionCap(validRounds: number) {
   if (validRounds <= 0) return 99;
   if (validRounds === 1) return 74;
   if (validRounds === 2) return 76;
-  if (validRounds < PROVISIONAL_ROUNDS) return 78;
+  if (validRounds === 3) return 78;
   return 99;
 }
 
@@ -211,13 +215,13 @@ function positionEstimate(
   const weightedScore = totalWeight > 0
     ? relevant.reduce((total, record) => total + record.score * record.weight, 0) / totalWeight
     : 0.5;
-  const exposureConfidence = clamp(totalWeight / PROVISIONAL_ROUNDS, 0, 1);
-  const roundConfidence = clamp(validRounds / PROVISIONAL_ROUNDS, 0, 1);
+  const exposureConfidence = clamp(totalWeight / CONFIDENCE_ROUNDS, 0, 1);
+  const roundConfidence = clamp(validRounds / CONFIDENCE_ROUNDS, 0, 1);
   const confidence = Math.sqrt(exposureConfidence * roundConfidence);
   const seedBonus = player.overallSeedMode === "legacy_tag" && profileRole(player.playerProfile) === role
-    // O ponto de partida 73 perde 20% a cada rodada válida. Na quinta, a
-    // especialidade inicial some e ficam somente as atuações observadas.
-    ? 3 * clamp(1 - validRounds / PROVISIONAL_ROUNDS, 0, 1)
+    // Em uma pelada semanal, três rodadas já cobrem quase um mês. Nesse
+    // ponto a especialidade inicial some e ficam somente as atuações.
+    ? 3 * clamp(1 - validRounds / SEED_FADE_ROUNDS, 0, 1)
     : 0;
   const target = clamp(70 + (weightedScore - 0.5) * 40 * confidence + seedBonus, 40, 99);
 
@@ -226,7 +230,7 @@ function positionEstimate(
 
 function calculateGeneral(values: Record<OverallRole, number>, goalkeeperRounds: number, confidence: number) {
   const lineValues = [values.DEF, values.ALA_MEI, values.ATA].sort((a, b) => b - a);
-  const eligible = goalkeeperRounds >= PROVISIONAL_ROUNDS
+  const eligible = goalkeeperRounds >= GOALKEEPER_ELIGIBILITY_ROUNDS
     ? [...lineValues, values.GOL].sort((a, b) => b - a)
     : lineValues;
   const rawOverall = eligible[0] * 0.7 + eligible[1] * 0.3;
@@ -254,7 +258,7 @@ function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, current
     positions,
     roundsPlayed,
     goalkeeperRounds,
-    isProvisional: roundsPlayed < PROVISIONAL_ROUNDS,
+    isProvisional: roundsPlayed <= CONFIDENCE_ROUNDS,
     isStale: state.lastRoundSequence !== null && currentSequence - state.lastRoundSequence >= STALE_AFTER_ROUNDS,
     lastRoundId: state.lastRoundId,
     scoutTotals: { ...state.scoutTotals },

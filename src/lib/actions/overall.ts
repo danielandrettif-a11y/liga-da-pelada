@@ -5,7 +5,7 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import { calculatePlayerOveralls, type OverallPlayer } from "../overall";
 import { buildOverallHistoryInput } from "../overall-history";
 
-const FORMULA_KEY = "adaptive-v1-shadow";
+const FORMULA_KEY = "adaptive-v2-weekly-shadow";
 
 function numberValue(value: unknown) {
   const result = Number(value || 0);
