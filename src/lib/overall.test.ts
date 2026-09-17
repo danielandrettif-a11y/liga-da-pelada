@@ -35,7 +35,12 @@ function round(sequence: number, appearances: OverallAppearance[]): OverallRound
 }
 
 describe("motor adaptativo de OVR", () => {
-  const characteristicsFormula = parseOverallFormulaConfig({ legacySeedEnabled: false, unselectedTraitEvidence: 0.15 });
+  const characteristicsFormula = parseOverallFormulaConfig({
+    legacySeedEnabled: false,
+    unselectedTraitEvidence: 0.15,
+    weeklyEvidenceCap: true,
+    traitWeightedChange: true,
+  });
 
   it("mantém todo jogador novo no OVR neutro, independente da tag operacional", () => {
     const result = calculatePlayerOveralls(observedPlayers, []);
@@ -240,5 +245,36 @@ describe("motor adaptativo de OVR", () => {
     const defensive = calculatePlayerOveralls([defensiveGoalkeeper], inputs, characteristicsFormula).snapshots[0];
     const attacking = calculatePlayerOveralls([attackingGoalkeeper], inputs, characteristicsFormula).snapshots[0];
     expect(defensive.positions.GOL.value).toBe(attacking.positions.GOL.value);
+  });
+
+  it("não deixa muitas partidas da mesma rodada levarem todas as posições a 100% de confiança", () => {
+    const midfielder = { ...observedPlayers[0], overallTraits: ["midfield" as const] };
+    const manyMatches = Array.from({ length: 12 }, (_, index) => appearance("def", {
+      matchId: `m-${index}`,
+      goals: index === 0 ? 2 : 0,
+    }));
+    const result = calculatePlayerOveralls([midfielder], [
+      round(1, manyMatches),
+      round(2, manyMatches),
+      round(3, manyMatches),
+    ], characteristicsFormula).snapshots[0];
+    expect(result.positions.ALA_MEI.confidence).toBeGreaterThan(0.8);
+    expect(result.positions.DEF.confidence).toBeLessThan(0.5);
+    expect(result.positions.ATA.confidence).toBeLessThan(0.5);
+  });
+
+  it("faz a característica selecionada evoluir claramente mais que uma não selecionada", () => {
+    const midfielder = { ...observedPlayers[0], overallTraits: ["midfield" as const] };
+    const defensiveAttacker = { ...observedPlayers[1], overallTraits: ["defensive" as const, "offensive" as const] };
+    const inputs = Array.from({ length: 3 }, (_, index) => round(index + 1, [
+      appearance("def", { goals: 2, assists: 2, goalsConceded: 0 }),
+      appearance("ata", { goals: 2, assists: 2, goalsConceded: 0 }),
+    ]));
+    const result = calculatePlayerOveralls([midfielder, defensiveAttacker], inputs, characteristicsFormula);
+    const mei = result.snapshots.find((snapshot) => snapshot.playerId === "def")!;
+    const defAta = result.snapshots.find((snapshot) => snapshot.playerId === "ata")!;
+    expect(mei.positions.ALA_MEI.value).toBeGreaterThan(defAta.positions.ALA_MEI.value);
+    expect(defAta.positions.DEF.value).toBeGreaterThan(mei.positions.DEF.value);
+    expect(defAta.positions.ATA.value).toBeGreaterThan(mei.positions.ATA.value);
   });
 });

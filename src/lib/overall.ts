@@ -37,6 +37,10 @@ export type OverallFormulaConfig = {
   unselectedTraitEvidence: number;
   /** A fórmula v5 ignora a tag legada; ela continua apenas nas fórmulas antigas. */
   legacySeedEnabled: boolean;
+  /** Impede que várias partidas da mesma pelada multipliquem a confiança semanal. */
+  weeklyEvidenceCap: boolean;
+  /** Faz a velocidade de mudança respeitar 100%/50%/33%/15% das características. */
+  traitWeightedChange: boolean;
 };
 
 export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
@@ -67,6 +71,8 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   unassignedRoleEvidence: { DEF: 0.4, ALA_MEI: 0.55, ATA: 0.4 },
   unselectedTraitEvidence: 0.15,
   legacySeedEnabled: true,
+  weeklyEvidenceCap: false,
+  traitWeightedChange: false,
 };
 
 export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig {
@@ -167,6 +173,12 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     legacySeedEnabled: typeof candidate.legacySeedEnabled === "boolean"
       ? candidate.legacySeedEnabled
       : DEFAULT_OVERALL_FORMULA.legacySeedEnabled,
+    weeklyEvidenceCap: typeof candidate.weeklyEvidenceCap === "boolean"
+      ? candidate.weeklyEvidenceCap
+      : DEFAULT_OVERALL_FORMULA.weeklyEvidenceCap,
+    traitWeightedChange: typeof candidate.traitWeightedChange === "boolean"
+      ? candidate.traitWeightedChange
+      : DEFAULT_OVERALL_FORMULA.traitWeightedChange,
   };
 }
 
@@ -439,8 +451,35 @@ function positionEstimate(
   currentRoundIndex: number,
   config: OverallFormulaConfig,
 ) {
-  const relevant = state.history
-    .filter((record) => record.role === role && currentRoundIndex - record.roundIndex < config.recentRoundWindow)
+  const history = state.history
+    .filter((record) => record.role === role && currentRoundIndex - record.roundIndex < config.recentRoundWindow);
+  const evidence = config.weeklyEvidenceCap
+    ? [...history.reduce((rounds, record) => {
+        const current = rounds.get(record.roundId) || {
+          ...record,
+          scoreTotal: 0,
+          evidenceTotal: 0,
+          totalSeconds: 0,
+        };
+        const seconds = exposure(record.secondsPlayed);
+        current.scoreTotal += record.score * seconds;
+        current.evidenceTotal += record.evidenceWeight * seconds;
+        current.totalSeconds += seconds;
+        rounds.set(record.roundId, current);
+        return rounds;
+      }, new Map<string, Performance & { scoreTotal: number; evidenceTotal: number; totalSeconds: number }>()).values()]
+      .map((record) => ({
+        roundId: record.roundId,
+        roundIndex: record.roundIndex,
+        role: record.role,
+        score: record.totalSeconds > 0 ? record.scoreTotal / record.totalSeconds : 0.5,
+        evidenceWeight: record.totalSeconds > 0 ? record.evidenceTotal / record.totalSeconds : 0,
+        // Uma pelada semanal fornece no máximo uma unidade de amostra, mesmo
+        // quando o atleta disputa muitas partidas naquela noite.
+        secondsPlayed: Math.min(MAX_MATCH_SECONDS, record.totalSeconds),
+      }))
+    : history;
+  const relevant = evidence
     .map((record) => ({
       ...record,
       weight: Math.pow(0.5, (currentRoundIndex - record.roundIndex) / config.halfLifeRounds)
@@ -612,10 +651,14 @@ export function calculatePlayerOveralls(
       for (const role of ROLES) {
         const estimate = positionEstimate(player, state, role, roundIndex, formula);
         const previous = state.values[role];
+        const changeScale = formula.traitWeightedChange
+          ? traitEvidenceWeight(player, role, formula)
+          : 1;
+        const maximumChange = formula.maxChangePerRound * changeScale;
         state.values[role] = roundOverall(clamp(
           estimate.target,
-          previous - formula.maxChangePerRound,
-          Math.min(previous + formula.maxChangePerRound, provisionalPositionCap(estimate.validRounds, formula) - estimate.seedBonus),
+          previous - maximumChange,
+          Math.min(previous + maximumChange, provisionalPositionCap(estimate.validRounds, formula) - estimate.seedBonus),
         ));
       }
       const snapshot = cloneSnapshot(player, state, roundIndex, formula);
