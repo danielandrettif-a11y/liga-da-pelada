@@ -41,6 +41,10 @@ export type OverallFormulaConfig = {
   weeklyEvidenceCap: boolean;
   /** Faz a velocidade de mudança respeitar 100%/50%/33%/15% das características. */
   traitWeightedChange: boolean;
+  /** Compõe o OVR geral apenas pelas características escolhidas pelo ADM. */
+  traitBasedOverall: boolean;
+  /** Compatibilidade com versões antigas que reduziam o OVR geral pela confiança novamente. */
+  overallConfidenceShrink: boolean;
 };
 
 export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
@@ -73,6 +77,8 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   legacySeedEnabled: true,
   weeklyEvidenceCap: false,
   traitWeightedChange: false,
+  traitBasedOverall: false,
+  overallConfidenceShrink: true,
 };
 
 export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig {
@@ -179,6 +185,12 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     traitWeightedChange: typeof candidate.traitWeightedChange === "boolean"
       ? candidate.traitWeightedChange
       : DEFAULT_OVERALL_FORMULA.traitWeightedChange,
+    traitBasedOverall: typeof candidate.traitBasedOverall === "boolean"
+      ? candidate.traitBasedOverall
+      : DEFAULT_OVERALL_FORMULA.traitBasedOverall,
+    overallConfidenceShrink: typeof candidate.overallConfidenceShrink === "boolean"
+      ? candidate.overallConfidenceShrink
+      : DEFAULT_OVERALL_FORMULA.overallConfidenceShrink,
   };
 }
 
@@ -487,10 +499,15 @@ function positionEstimate(
     }));
   const validRounds = new Set(relevant.map((record) => record.roundId)).size;
   const totalWeight = relevant.reduce((total, record) => total + record.weight, 0);
+  const totalConfidenceWeight = evidence.reduce((total, record) => (
+    total + (record.secondsPlayed / MAX_MATCH_SECONDS) * record.evidenceWeight
+  ), 0);
   const weightedScore = totalWeight > 0
     ? relevant.reduce((total, record) => total + record.score * record.weight, 0) / totalWeight
     : 0.5;
-  const exposureConfidence = clamp(totalWeight / config.confidenceRounds, 0, 1);
+  // O decaimento temporal escolhe quais atuações pesam mais na nota, mas não
+  // apaga a quantidade de evidência já coletada dentro da janela recente.
+  const exposureConfidence = clamp(totalConfidenceWeight / config.confidenceRounds, 0, 1);
   const roundConfidence = clamp(validRounds / config.confidenceRounds, 0, 1);
   const confidence = Math.sqrt(exposureConfidence * roundConfidence);
   const seedBonus = config.legacySeedEnabled && player.overallSeedMode === "legacy_tag" && profileRole(player.playerProfile) === role
@@ -506,15 +523,20 @@ function positionEstimate(
   return { target, confidence, validRounds, seedBonus };
 }
 
-function calculateGeneral(values: Record<OverallRole, number>, goalkeeperRounds: number, confidence: number, config: OverallFormulaConfig) {
+function calculateGeneral(player: OverallPlayer, values: Record<OverallRole, number>, goalkeeperRounds: number, confidence: number, config: OverallFormulaConfig) {
   const lineValues = [values.DEF, values.ALA_MEI, values.ATA].sort((a, b) => b - a);
-  const eligible = goalkeeperRounds >= config.goalkeeperEligibilityRounds
-    ? [...lineValues, values.GOL].sort((a, b) => b - a)
-    : lineValues;
-  const rawOverall = eligible[0] * 0.7 + eligible[1] * 0.3;
+  const traitRoles = [...new Set(player.overallTraits || [])].map((trait) => profileRole(trait));
+  const lineOverall = config.traitBasedOverall && traitRoles.length > 0
+    ? traitRoles.reduce((total, role) => total + values[role], 0) / traitRoles.length
+    : lineValues[0] * 0.7 + lineValues[1] * 0.3;
+  const rawOverall = goalkeeperRounds >= config.goalkeeperEligibilityRounds
+    ? Math.max(lineOverall, values.GOL)
+    : lineOverall;
   // A nota pública só se afasta de 70 na proporção da amostra. Isso impede
   // que uma rodada excelente coloque um estreante acima de veteranos.
-  return roundOverall(config.base + (rawOverall - config.base) * confidence);
+  return roundOverall(config.overallConfidenceShrink
+    ? config.base + (rawOverall - config.base) * confidence
+    : rawOverall);
 }
 
 function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, currentRoundIndex: number, config: OverallFormulaConfig): PlayerOverallSnapshot {
@@ -532,7 +554,7 @@ function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, current
   const overallConfidence = Math.max(positions.DEF.confidence, positions.ALA_MEI.confidence, positions.ATA.confidence);
   return {
     playerId: player.id,
-    overall: calculateGeneral(state.values, goalkeeperRounds, overallConfidence, config),
+    overall: calculateGeneral(player, state.values, goalkeeperRounds, overallConfidence, config),
     positions,
     roundsPlayed,
     goalkeeperRounds,

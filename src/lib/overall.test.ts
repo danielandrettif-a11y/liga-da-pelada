@@ -39,7 +39,9 @@ describe("motor adaptativo de OVR", () => {
     legacySeedEnabled: false,
     unselectedTraitEvidence: 0.15,
     weeklyEvidenceCap: true,
-    traitWeightedChange: true,
+    traitWeightedChange: false,
+    traitBasedOverall: true,
+    overallConfidenceShrink: false,
   });
 
   it("mantém todo jogador novo no OVR neutro, independente da tag operacional", () => {
@@ -276,5 +278,19 @@ describe("motor adaptativo de OVR", () => {
     expect(mei.positions.ALA_MEI.value).toBeGreaterThan(defAta.positions.ALA_MEI.value);
     expect(defAta.positions.DEF.value).toBeGreaterThan(mei.positions.DEF.value);
     expect(defAta.positions.ATA.value).toBeGreaterThan(mei.positions.ATA.value);
+  });
+
+  it("compõe o OVR geral somente com as características avaliadas pelo ADM", () => {
+    const midfielder = { ...observedPlayers[0], overallTraits: ["midfield" as const] };
+    const versatile = { ...observedPlayers[1], overallTraits: ["defensive" as const, "offensive" as const] };
+    const inputs = Array.from({ length: 3 }, (_, index) => round(index + 1, [
+      appearance("def", { goals: 3, assists: 2, goalsConceded: 1 }),
+      appearance("ata", { goals: 3, assists: 2, goalsConceded: 1 }),
+    ]));
+    const result = calculatePlayerOveralls([midfielder, versatile], inputs, characteristicsFormula);
+    const mei = result.snapshots.find((snapshot) => snapshot.playerId === "def")!;
+    const defAta = result.snapshots.find((snapshot) => snapshot.playerId === "ata")!;
+    expect(mei.overall).toBe(mei.positions.ALA_MEI.value);
+    expect(defAta.overall).toBeCloseTo((defAta.positions.DEF.value + defAta.positions.ATA.value) / 2, 1);
   });
 });

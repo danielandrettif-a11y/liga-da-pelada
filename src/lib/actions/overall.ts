@@ -5,8 +5,8 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import { calculatePlayerOveralls, parseOverallFormulaConfig, type OverallPlayer, type OverallRole } from "../overall";
 import { buildOverallHistoryInput } from "../overall-history";
 
-const FORMULA_KEY = "adaptive-v6-weekly-characteristics-shadow";
-const COMPARISON_FORMULA_KEY = "adaptive-v5-characteristics-shadow";
+const FORMULA_KEY = "adaptive-v7-trait-composed-shadow";
+const COMPARISON_FORMULA_KEY = "adaptive-v6-weekly-characteristics-shadow";
 
 function numberValue(value: unknown) {
   const result = Number(value || 0);
@@ -136,7 +136,7 @@ export async function recalculateOverallShadow() {
   let runId: string | null = null;
   try {
     const { data: formula, error: formulaError } = await database.from("overall_formula_versions").select("id, config").eq("key", FORMULA_KEY).single();
-    if (formulaError || !formula) throw new Error("A fórmula v6 não foi encontrada. Confirme a migration 166.");
+    if (formulaError || !formula) throw new Error("A fórmula v7 não foi encontrada. Confirme a migration 167.");
     const source = await loadOverallHistory(database);
     const latestRound = [...source.rounds].filter((round) => round.roundType === "official" && round.status === "finished").at(-1);
     const { data: run, error: runError } = await database.from("overall_calculation_runs").insert({ formula_version_id: formula.id, status: "processing", source_through_round_id: latestRound?.id || null, started_at: new Date().toISOString(), created_by: account.user.id }).select("id").single();
