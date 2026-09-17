@@ -18,6 +18,13 @@ const AVATAR_EXTENSIONS: Record<string, string> = {
   "image/png": "png",
   "image/webp": "webp",
 };
+const OVERALL_TRAITS = ["defensive", "midfield", "offensive"] as const;
+
+function normalizeOverallTraits(value: unknown) {
+  const values = Array.isArray(value) ? value : [];
+  const traits = [...new Set(values.filter((item): item is PlayerProfile => typeof item === "string" && OVERALL_TRAITS.includes(item as PlayerProfile)))];
+  return traits.slice(0, 3);
+}
 
 function revalidatePlayerPaths(id?: string) {
   revalidatePath("/");
@@ -93,6 +100,8 @@ export async function getPlayer(id: string) {
       avatar_url,
       profile_bio,
       player_profile,
+      overall_traits,
+      overall_seed_mode,
       is_goalkeeper,
       member_category,
       is_selectable,
@@ -430,6 +439,7 @@ export async function createPlayer(input: CreatePlayerInput) {
         nickname: input.nickname || null,
         avatar_url: input.avatar_url || null,
         player_profile: input.player_profile || "midfield",
+        overall_traits: normalizeOverallTraits(input.overall_traits),
         is_goalkeeper: false,
         member_category: input.member_category || "player",
         is_selectable: input.member_category === "wag" || input.member_category === "supporter"
@@ -460,6 +470,7 @@ export async function updatePlayer(id: string, input: Partial<CreatePlayerInput>
     ...(input.nickname !== undefined ? { nickname: input.nickname.trim() || null } : {}),
     ...(input.avatar_url !== undefined ? { avatar_url: input.avatar_url || null } : {}),
     ...(input.player_profile !== undefined ? { player_profile: input.player_profile } : {}),
+    ...(input.overall_traits !== undefined ? { overall_traits: normalizeOverallTraits(input.overall_traits) } : {}),
     ...(input.member_category !== undefined ? { member_category: input.member_category } : {}),
     ...(input.is_selectable !== undefined ? { is_selectable: input.is_selectable } : {}),
   };
@@ -497,6 +508,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   const nickname = String(formData.get("nickname") || "").trim();
   const profileBio = String(formData.get("profile_bio") || "").trim();
   const playerProfile = String(formData.get("player_profile") || "midfield") as PlayerProfile;
+  const requestedOverallTraits = normalizeOverallTraits(formData.getAll("overall_traits"));
   const requestedCategory = String(formData.get("member_category") || "player") as MemberCategory;
   const requestedSelectable = formData.get("is_selectable") !== "false";
   const removeAvatar = formData.get("remove_avatar") === "true";
@@ -529,12 +541,13 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   let currentSelectable = true;
   let currentPlayerProfile: PlayerProfile | null = "midfield";
   let currentIsGoalkeeper = false;
+  let currentOverallTraits: PlayerProfile[] = [];
   const id = playerId || crypto.randomUUID();
 
   if (playerId) {
     const { data: currentPlayer, error: currentPlayerError } = await client
       .from("players")
-      .select("avatar_url, member_category, is_selectable, player_profile, is_goalkeeper")
+      .select("avatar_url, member_category, is_selectable, player_profile, overall_traits, is_goalkeeper")
       .eq("id", playerId)
       .single();
 
@@ -545,6 +558,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     currentCategory = currentPlayer.member_category as MemberCategory;
     currentSelectable = currentPlayer.is_selectable;
     currentPlayerProfile = currentPlayer.player_profile as PlayerProfile | null;
+    currentOverallTraits = normalizeOverallTraits(currentPlayer.overall_traits);
     currentIsGoalkeeper = Boolean(currentPlayer.is_goalkeeper);
   }
 
@@ -575,6 +589,9 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   const isSelectable = account.isAdmin
     ? (memberCategory === "wag" || memberCategory === "supporter" ? false : memberCategory === "guest" ? true : requestedSelectable)
     : currentSelectable;
+  const overallTraits = memberCategory === "wag" || memberCategory === "supporter"
+    ? []
+    : account.isAdmin ? requestedOverallTraits : currentOverallTraits;
   const playerData = {
     id,
     name,
@@ -584,6 +601,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     player_profile: memberCategory === "wag" || memberCategory === "supporter"
       ? null
       : playerProfile,
+    overall_traits: overallTraits,
     // GOL deixou de ser uma tag de perfil. Mantemos o valor legado apenas para
     // o histórico operacional de partidas, sem expor ou editar pelo app.
     is_goalkeeper: memberCategory === "wag" || memberCategory === "supporter"
@@ -601,6 +619,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
         ...(account.isAdmin ? { profile_bio: playerData.profile_bio } : {}),
         avatar_url: playerData.avatar_url,
         player_profile: playerData.player_profile,
+        ...(account.isAdmin ? { overall_traits: playerData.overall_traits } : {}),
         is_goalkeeper: playerData.is_goalkeeper,
         member_category: playerData.member_category,
         is_selectable: playerData.is_selectable,

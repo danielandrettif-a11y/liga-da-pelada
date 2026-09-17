@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { calculatePlayerOveralls, type OverallAppearance, type OverallPlayer, type OverallRoundInput } from "./overall";
+import { calculatePlayerOveralls, parseOverallFormulaConfig, type OverallAppearance, type OverallPlayer, type OverallRoundInput } from "./overall";
 
 const players: OverallPlayer[] = [
-  { id: "def", playerProfile: "defensive", overallSeedMode: "legacy_tag" },
-  { id: "ata", playerProfile: "offensive", overallSeedMode: "legacy_tag" },
-  { id: "gk", playerProfile: "midfield", overallSeedMode: "legacy_tag", isGoalkeeper: true },
+  { id: "def", playerProfile: "defensive", overallTraits: ["defensive"], overallSeedMode: "legacy_tag" },
+  { id: "ata", playerProfile: "offensive", overallTraits: ["offensive"], overallSeedMode: "legacy_tag" },
+  { id: "gk", playerProfile: "midfield", overallTraits: ["midfield"], overallSeedMode: "legacy_tag", isGoalkeeper: true },
 ];
 
 const observedPlayers: OverallPlayer[] = players.map((player) => ({ ...player, overallSeedMode: "observed" }));
@@ -17,6 +17,7 @@ function appearance(playerId: string, overrides: Partial<OverallAppearance> = {}
     secondsPlayed: 420,
     matchSeconds: 420,
     goalsConceded: 0,
+    teamGoalsConceded: 0,
     concededGoalSeconds: [],
     goalTimingQuality: "exact",
     goals: 0,
@@ -34,6 +35,8 @@ function round(sequence: number, appearances: OverallAppearance[]): OverallRound
 }
 
 describe("motor adaptativo de OVR", () => {
+  const characteristicsFormula = parseOverallFormulaConfig({ legacySeedEnabled: false, unselectedTraitEvidence: 0.15 });
+
   it("mantém todo jogador novo no OVR neutro, independente da tag operacional", () => {
     const result = calculatePlayerOveralls(observedPlayers, []);
     const defender = result.snapshots.find((snapshot) => snapshot.playerId === "def")!;
@@ -62,10 +65,33 @@ describe("motor adaptativo de OVR", () => {
     expect(defender.positions.DEF.value).toBeGreaterThan(attacker.positions.DEF.value);
   });
 
+  it("usa a função exercida para separar confiança e evolução das posições", () => {
+    const inputs = Array.from({ length: 4 }, (_, index) => round(index + 1, [
+      appearance("def", { playerProfileLocked: "defensive", goalsConceded: 0 }),
+      appearance("ata", { playerProfileLocked: "offensive", goalsConceded: 0 }),
+    ]));
+    const result = calculatePlayerOveralls(observedPlayers.slice(0, 2), inputs);
+    const defender = result.snapshots.find((snapshot) => snapshot.playerId === "def")!;
+    const attacker = result.snapshots.find((snapshot) => snapshot.playerId === "ata")!;
+    expect(defender.positions.DEF.confidence).toBeGreaterThan(attacker.positions.DEF.confidence);
+    expect(attacker.positions.ATA.confidence).toBeGreaterThan(defender.positions.ATA.confidence);
+  });
+
+  it("continua distinguindo ataques muito acima da média sem teto brusco", () => {
+    const inputs = Array.from({ length: 10 }, (_, index) => round(index + 1, [
+      appearance("def", { playerProfileLocked: "offensive", goals: 6 }),
+      appearance("ata", { playerProfileLocked: "offensive", goals: 10 }),
+    ]));
+    const result = calculatePlayerOveralls(observedPlayers.slice(0, 2), inputs);
+    const sixGoals = result.snapshots.find((snapshot) => snapshot.playerId === "def")!;
+    const tenGoals = result.snapshots.find((snapshot) => snapshot.playerId === "ata")!;
+    expect(tenGoals.positions.ATA.value).toBeGreaterThan(sixGoals.positions.ATA.value);
+  });
+
   it("recompensa sete minutos sem sofrer mais do que uma partida curta sem sofrer", () => {
     const full = calculatePlayerOveralls([players[0]], [round(1, [appearance("def")])]);
     const short = calculatePlayerOveralls([players[0]], [round(1, [appearance("def", { secondsPlayed: 120 })])]);
-    expect(full.snapshots[0].positions.DEF.value).toBeGreaterThan(short.snapshots[0].positions.DEF.value);
+    expect(full.snapshots[0].positions.DEF.confidence).toBeGreaterThan(short.snapshots[0].positions.DEF.confidence);
   });
 
   it("só calcula GOL para quem realmente atuou como goleiro", () => {
@@ -184,5 +210,35 @@ describe("motor adaptativo de OVR", () => {
       round(5, []),
     ]);
     expect(result.snapshots[0].isStale).toBe(true);
+  });
+
+  it("usa características, e não a posição congelada da partida, como peso de evolução", () => {
+    const traitDefender = { ...observedPlayers[0], overallTraits: ["defensive" as const] };
+    const sameStatsDifferentOperationalRole = calculatePlayerOveralls([traitDefender], [
+      round(1, [appearance("def", { playerProfileLocked: "offensive", goalsConceded: 0 })]),
+      round(2, [appearance("def", { playerProfileLocked: "offensive", goalsConceded: 0 })]),
+      round(3, [appearance("def", { playerProfileLocked: "offensive", goalsConceded: 0 })]),
+    ], characteristicsFormula).snapshots[0];
+    expect(sameStatsDifferentOperationalRole.positions.DEF.confidence).toBeGreaterThan(sameStatsDifferentOperationalRole.positions.ATA.confidence);
+  });
+
+  it("divide igualmente o peso entre duas características e deixa as demais em 15%", () => {
+    const specialist = { ...observedPlayers[0], overallTraits: ["defensive" as const] };
+    const versatile = { ...observedPlayers[0], overallTraits: ["defensive" as const, "midfield" as const] };
+    const inputs = Array.from({ length: 3 }, (_, index) => round(index + 1, [appearance("def", { goalsConceded: 0 })]));
+    const specialistSnapshot = calculatePlayerOveralls([specialist], inputs, characteristicsFormula).snapshots[0];
+    const versatileSnapshot = calculatePlayerOveralls([versatile], inputs, characteristicsFormula).snapshots[0];
+    expect(specialistSnapshot.positions.DEF.confidence).toBeGreaterThan(versatileSnapshot.positions.DEF.confidence);
+    expect(versatileSnapshot.positions.ALA_MEI.confidence).toBeGreaterThan(specialistSnapshot.positions.ALA_MEI.confidence);
+    expect(specialistSnapshot.positions.ATA.confidence).toBeLessThan(specialistSnapshot.positions.DEF.confidence);
+  });
+
+  it("mantém o OVR de goleiro independente das características selecionadas", () => {
+    const defensiveGoalkeeper = { ...observedPlayers[2], overallTraits: ["defensive" as const] };
+    const attackingGoalkeeper = { ...observedPlayers[2], overallTraits: ["offensive" as const] };
+    const inputs = [round(1, [appearance("gk", { isGoalkeeper: true, goalsConceded: 0 })])];
+    const defensive = calculatePlayerOveralls([defensiveGoalkeeper], inputs, characteristicsFormula).snapshots[0];
+    const attacking = calculatePlayerOveralls([attackingGoalkeeper], inputs, characteristicsFormula).snapshots[0];
+    expect(defensive.positions.GOL.value).toBe(attacking.positions.GOL.value);
   });
 });

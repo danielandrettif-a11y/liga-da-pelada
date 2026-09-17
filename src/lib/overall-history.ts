@@ -97,9 +97,11 @@ function completedGoalEvents(match: HistoryMatch) {
   return scoringEvents.length >= Number(match.score_a || 0) + Number(match.score_b || 0);
 }
 
-function duringAppearance(event: HistoryEvent, start: number, end: number) {
+function duringAppearance(event: HistoryEvent, start: number, end: number, matchEnd: number) {
   const seconds = eventSeconds(event);
-  return seconds !== null && seconds >= start && seconds <= end;
+  // Em uma substituição no mesmo segundo do gol, o jogador que saiu não pode
+  // receber o mesmo gol que passa a contar para quem entrou.
+  return seconds !== null && seconds >= start && (seconds < end || end === matchEnd);
 }
 
 /** Converte o histórico cru do Supabase no contrato puro do motor de OVR. */
@@ -130,7 +132,7 @@ export function buildOverallHistoryInput(source: OverallHistorySource): {
           : boundedSeconds(participant.left_elapsed_seconds);
         const secondsPlayed = Math.max(0, leave - start);
         if (secondsPlayed === 0) continue;
-        const eventsDuringAppearance = (match.match_events || []).filter((event) => duringAppearance(event, start, leave));
+        const eventsDuringAppearance = (match.match_events || []).filter((event) => duringAppearance(event, start, leave, end));
         const opponentGoalEvents = eventsDuringAppearance.filter((event) => event.team_id !== participant.team_id);
         const ownGoals = eventsDuringAppearance.filter((event) => event.player_id === participant.player_id && event.is_own_goal).length;
         const goals = eventsDuringAppearance.filter((event) => event.player_id === participant.player_id && !event.is_own_goal).length;
@@ -151,6 +153,7 @@ export function buildOverallHistoryInput(source: OverallHistorySource): {
           secondsPlayed,
           matchSeconds: end,
           goalsConceded: useGoalEvents ? opponentGoalEvents.length : teamConceded(match, participant.team_id),
+          teamGoalsConceded: teamConceded(match, participant.team_id),
           concededGoalSeconds: useGoalEvents
             ? opponentGoalEvents.map((event) => Math.max(0, Number(eventSeconds(event) || 0) - start))
             : [],

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, Trash2 } from "@/components/icons";
 import { deletePlayer, savePlayer } from "@/lib/actions/players";
 import { setPlayerSpeedRating } from "@/lib/actions/speed-draw";
-import type { MemberCategory, Player } from "@/lib/types";
+import type { MemberCategory, Player, PlayerProfile } from "@/lib/types";
 import { AvatarCropModal } from "./AvatarCropModal";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PLAYER_PROFILE_OPTIONS } from "@/lib/playerProfiles";
@@ -346,6 +346,23 @@ export function PlayerForm({
             Esta é sua tag oficial no Cartola. Ela libera os bônus quando você for escalado na vaga correspondente. GOL não é tag de perfil: qualquer atleta pode ser escolhido para a vaga de goleiro.
           </p>
         )}
+      </fieldset>}
+
+      {mode === "admin" && (memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2 rounded-2xl border border-accent/25 bg-accent/5 p-4">
+        <legend className="px-1 text-xs font-bold uppercase tracking-wider text-accent">Características de jogo do OVR</legend>
+        <p className="text-[11px] leading-4 text-muted">Definem onde as estatísticas do histórico têm mais peso no OVR. Uma seleção vale 100%; duas, 50% para cada; três, 33% para cada. As não selecionadas ainda evoluem devagar, a 15%. Goleiro é calculado só pelas ações no gol.</p>
+        <div className="grid gap-2 pt-1">
+          {PLAYER_PROFILE_OPTIONS.map((option) => {
+            const selected = (player?.overall_traits || []).includes(option.value as PlayerProfile);
+            return (
+              <label key={`overall-${option.value}`} className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface-hover px-4 py-3 has-[:checked]:border-accent has-[:checked]:bg-accent/10">
+                <input type="checkbox" name="overall_traits" value={option.value} defaultChecked={selected} className="h-4 w-4 rounded" />
+                <span className="text-sm font-bold text-foreground">{option.label}</span>
+              </label>
+            );
+          })}
+        </div>
+        {memberCategory === "guest" && <p className="text-[10px] leading-4 text-warning">Convidado pode ser avaliado agora, mas só ganha OVR quando for convertido em jogador oficial.</p>}
       </fieldset>}
 
       <div className="pt-4 flex flex-col gap-3">

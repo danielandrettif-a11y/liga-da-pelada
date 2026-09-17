@@ -73,6 +73,7 @@ export type Player = {
   profile_bio: string | null;
   avatar_url: string | null;
   player_profile: PlayerProfile | null;
+  overall_traits: PlayerProfile[];
   overall_seed_mode: OverallSeedMode;
   is_goalkeeper: boolean;
   member_category: MemberCategory;
@@ -472,6 +473,7 @@ export type CreatePlayerInput = {
   profile_bio?: string;
   avatar_url?: string;
   player_profile?: PlayerProfile;
+  overall_traits?: PlayerProfile[];
   is_goalkeeper?: boolean;
   member_category?: MemberCategory;
   is_selectable?: boolean;

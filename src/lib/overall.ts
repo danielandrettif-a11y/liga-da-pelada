@@ -6,6 +6,9 @@ export type OverallResult = "win" | "draw" | "loss";
 export type OverallSeedMode = "legacy_tag" | "observed";
 export type GoalTimingQuality = "exact" | "fallback";
 
+type LineRole = Exclude<OverallRole, "GOL">;
+type PositionWeights = { defense: number; attack: number; result: number };
+
 export type OverallFormulaConfig = {
   base: number;
   legacyInitialTagBonus: number;
@@ -24,6 +27,16 @@ export type OverallFormulaConfig = {
     discipline: number;
   };
   legacyTimingConfidence: number;
+  assistValue: number;
+  attackCurve: number;
+  positionWeights: Record<LineRole, PositionWeights>;
+  /** Quanto uma atuação na função declarada revela sobre cada posição. */
+  roleEvidence: Record<LineRole, Record<LineRole, number>>;
+  unassignedRoleEvidence: Record<LineRole, number>;
+  /** Peso dado a uma característica não selecionada pelo administrador. */
+  unselectedTraitEvidence: number;
+  /** A fórmula v5 ignora a tag legada; ela continua apenas nas fórmulas antigas. */
+  legacySeedEnabled: boolean;
 };
 
 export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
@@ -39,6 +52,21 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   maxChangePerRound: 2,
   defensiveWeights: { concededRate: 0.5, survival: 0.35, exposure: 0.1, discipline: 0.05 },
   legacyTimingConfidence: 0.75,
+  assistValue: 0.65,
+  attackCurve: 0.32,
+  positionWeights: {
+    DEF: { defense: 0.85, attack: 0.10, result: 0.05 },
+    ALA_MEI: { defense: 0.45, attack: 0.45, result: 0.10 },
+    ATA: { defense: 0.15, attack: 0.75, result: 0.10 },
+  },
+  roleEvidence: {
+    DEF: { DEF: 1, ALA_MEI: 0.45, ATA: 0.15 },
+    ALA_MEI: { DEF: 0.5, ALA_MEI: 1, ATA: 0.5 },
+    ATA: { DEF: 0.15, ALA_MEI: 0.45, ATA: 1 },
+  },
+  unassignedRoleEvidence: { DEF: 0.4, ALA_MEI: 0.55, ATA: 0.4 },
+  unselectedTraitEvidence: 0.15,
+  legacySeedEnabled: true,
 };
 
 export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig {
@@ -53,6 +81,15 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
   const defensiveWeights = candidate.defensiveWeights && typeof candidate.defensiveWeights === "object"
     ? candidate.defensiveWeights as Record<string, unknown>
     : {};
+  const positionWeights = candidate.positionWeights && typeof candidate.positionWeights === "object"
+    ? candidate.positionWeights as Record<string, unknown>
+    : {};
+  const roleEvidence = candidate.roleEvidence && typeof candidate.roleEvidence === "object"
+    ? candidate.roleEvidence as Record<string, unknown>
+    : {};
+  const unassignedRoleEvidence = candidate.unassignedRoleEvidence && typeof candidate.unassignedRoleEvidence === "object"
+    ? candidate.unassignedRoleEvidence as Record<string, unknown>
+    : {};
   const weight = (key: keyof OverallFormulaConfig["defensiveWeights"]) => {
     const parsed = Number(defensiveWeights[key]);
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_OVERALL_FORMULA.defensiveWeights[key];
@@ -64,6 +101,29 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     discipline: weight("discipline"),
   };
   const totalWeight = Object.values(rawWeights).reduce((total, item) => total + item, 0) || 1;
+  const bounded = (value: unknown, fallback: number) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+  };
+  const normalizedPositionWeights = (role: LineRole): PositionWeights => {
+    const source = positionWeights[role] && typeof positionWeights[role] === "object"
+      ? positionWeights[role] as Record<string, unknown>
+      : {};
+    const fallback = DEFAULT_OVERALL_FORMULA.positionWeights[role];
+    const raw = {
+      defense: bounded(source.defense, fallback.defense),
+      attack: bounded(source.attack, fallback.attack),
+      result: bounded(source.result, fallback.result),
+    };
+    const sum = raw.defense + raw.attack + raw.result || 1;
+    return { defense: raw.defense / sum, attack: raw.attack / sum, result: raw.result / sum };
+  };
+  const evidence = (playedRole: LineRole, targetRole: LineRole) => {
+    const source = roleEvidence[playedRole] && typeof roleEvidence[playedRole] === "object"
+      ? roleEvidence[playedRole] as Record<string, unknown>
+      : {};
+    return bounded(source[targetRole], DEFAULT_OVERALL_FORMULA.roleEvidence[playedRole][targetRole]);
+  };
   return {
     base: number("base", DEFAULT_OVERALL_FORMULA.base),
     legacyInitialTagBonus: number("legacyInitialTagBonus", DEFAULT_OVERALL_FORMULA.legacyInitialTagBonus),
@@ -86,6 +146,27 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
       discipline: rawWeights.discipline / totalWeight,
     },
     legacyTimingConfidence: number("legacyTimingConfidence", DEFAULT_OVERALL_FORMULA.legacyTimingConfidence),
+    assistValue: number("assistValue", DEFAULT_OVERALL_FORMULA.assistValue),
+    attackCurve: number("attackCurve", DEFAULT_OVERALL_FORMULA.attackCurve),
+    positionWeights: {
+      DEF: normalizedPositionWeights("DEF"),
+      ALA_MEI: normalizedPositionWeights("ALA_MEI"),
+      ATA: normalizedPositionWeights("ATA"),
+    },
+    roleEvidence: {
+      DEF: { DEF: evidence("DEF", "DEF"), ALA_MEI: evidence("DEF", "ALA_MEI"), ATA: evidence("DEF", "ATA") },
+      ALA_MEI: { DEF: evidence("ALA_MEI", "DEF"), ALA_MEI: evidence("ALA_MEI", "ALA_MEI"), ATA: evidence("ALA_MEI", "ATA") },
+      ATA: { DEF: evidence("ATA", "DEF"), ALA_MEI: evidence("ATA", "ALA_MEI"), ATA: evidence("ATA", "ATA") },
+    },
+    unassignedRoleEvidence: {
+      DEF: bounded(unassignedRoleEvidence.DEF, DEFAULT_OVERALL_FORMULA.unassignedRoleEvidence.DEF),
+      ALA_MEI: bounded(unassignedRoleEvidence.ALA_MEI, DEFAULT_OVERALL_FORMULA.unassignedRoleEvidence.ALA_MEI),
+      ATA: bounded(unassignedRoleEvidence.ATA, DEFAULT_OVERALL_FORMULA.unassignedRoleEvidence.ATA),
+    },
+    unselectedTraitEvidence: clamp(bounded(candidate.unselectedTraitEvidence, DEFAULT_OVERALL_FORMULA.unselectedTraitEvidence), 0, 1),
+    legacySeedEnabled: typeof candidate.legacySeedEnabled === "boolean"
+      ? candidate.legacySeedEnabled
+      : DEFAULT_OVERALL_FORMULA.legacySeedEnabled,
   };
 }
 
@@ -95,6 +176,8 @@ export type OverallPlayer = {
   playerProfile: PlayerProfile | null;
   overallSeedMode?: OverallSeedMode;
   isGoalkeeper?: boolean;
+  /** Características avaliadas pelo ADM. Não dependem da posição operacional do Cartola. */
+  overallTraits?: PlayerProfile[];
 };
 
 /** Uma atuação em uma partida. A camada de dados reconstrói estes valores a partir do histórico oficial. */
@@ -105,6 +188,8 @@ export type OverallAppearance = {
   secondsPlayed: number;
   matchSeconds: number;
   goalsConceded: number;
+  /** Placar total sofrido pelo time na partida; é a base comparável da liga. */
+  teamGoalsConceded: number;
   concededGoalSeconds?: number[];
   goalTimingQuality: GoalTimingQuality;
   goals?: number;
@@ -168,6 +253,9 @@ export type OverallRoundBreakdown = {
   attackingScore: number;
   defensiveScore: number;
   timingQuality: GoalTimingQuality;
+  playedProfile: PlayerProfile | null;
+  roleEvidence: Record<OverallRole, number>;
+  traitEvidence: Record<OverallRole, number>;
   positions: Record<OverallRole, number>;
   confidence: Record<OverallRole, number>;
 };
@@ -182,7 +270,7 @@ type Performance = {
   role: OverallRole;
   score: number;
   secondsPlayed: number;
-  qualityWeight: number;
+  evidenceWeight: number;
 };
 
 type MutablePlayerState = {
@@ -217,6 +305,30 @@ function profileRole(profile: PlayerProfile | null): OverallRole {
   return "ALA_MEI";
 }
 
+function roleEvidenceWeight(
+  profile: PlayerProfile | null,
+  role: OverallRole,
+  config: OverallFormulaConfig,
+) {
+  if (role === "GOL") return 1;
+  if (!profile) return config.unassignedRoleEvidence[role];
+  return config.roleEvidence[profileRole(profile) as LineRole][role];
+}
+
+function traitEvidenceWeight(player: OverallPlayer, role: OverallRole, config: OverallFormulaConfig) {
+  if (role === "GOL") return 1;
+  const traits = [...new Set((player.overallTraits || []).filter((trait): trait is PlayerProfile => (
+    trait === "defensive" || trait === "midfield" || trait === "offensive"
+  )))];
+  if (traits.length === 0) return config.unselectedTraitEvidence;
+  const traitForRole: Record<LineRole, PlayerProfile> = {
+    DEF: "defensive",
+    ALA_MEI: "midfield",
+    ATA: "offensive",
+  };
+  return traits.includes(traitForRole[role as LineRole]) ? 1 / traits.length : config.unselectedTraitEvidence;
+}
+
 function resultScore(result: OverallResult) {
   return result === "win" ? 1 : result === "draw" ? 0.5 : 0;
 }
@@ -229,21 +341,16 @@ function perSevenMinuteRate(goals: number, secondsPlayed: number) {
   return Number(goals || 0) * MAX_MATCH_SECONDS / Math.max(exposure(secondsPlayed), 90);
 }
 
-function basePositionValue(player: OverallPlayer, role: OverallRole, config: OverallFormulaConfig) {
-  // A tag é uma estimativa histórica, não uma regra permanente. Jogadores
-  // novos entram pelo modo observado, neutros até construírem evidência.
-  return player.overallSeedMode === "legacy_tag" && profileRole(player.playerProfile) === role
-    ? config.base + config.legacyInitialTagBonus
-    : config.base;
+function emptyPositions(config: OverallFormulaConfig): Record<OverallRole, number> {
+  // O valor guardado começa neutro. A estimativa legada é só de exibição antes
+  // da primeira atuação; assim ela desaparece de fato em três rodadas, sem
+  // deixar uma diferença escondida pela limitação de dois pontos por rodada.
+  return Object.fromEntries(ROLES.map((role) => [role, config.base])) as Record<OverallRole, number>;
 }
 
-function emptyPositions(player: OverallPlayer, config: OverallFormulaConfig): Record<OverallRole, number> {
-  return Object.fromEntries(ROLES.map((role) => [role, basePositionValue(player, role, config)])) as Record<OverallRole, number>;
-}
-
-function createPlayerState(player: OverallPlayer, config: OverallFormulaConfig): MutablePlayerState {
+function createPlayerState(config: OverallFormulaConfig): MutablePlayerState {
   return {
-    values: emptyPositions(player, config),
+    values: emptyPositions(config),
     history: [],
     playedRoundIds: new Set<string>(),
     goalkeeperRoundIds: new Set<string>(),
@@ -253,7 +360,7 @@ function createPlayerState(player: OverallPlayer, config: OverallFormulaConfig):
   };
 }
 
-function calculateRoundAttackingScore(appearances: OverallAppearance[]) {
+function calculateRoundScores(appearances: OverallAppearance[], config: OverallFormulaConfig) {
   const totals = appearances.reduce((result, appearance) => ({
     goals: result.goals + Number(appearance.goals || 0),
     assists: result.assists + Number(appearance.assists || 0),
@@ -262,21 +369,26 @@ function calculateRoundAttackingScore(appearances: OverallAppearance[]) {
     resultSeconds: result.resultSeconds + resultScore(appearance.result) * exposure(appearance.secondsPlayed),
   }), { goals: 0, assists: 0, ownGoals: 0, seconds: 0, resultSeconds: 0 });
   const resultAverage = totals.seconds > 0 ? totals.resultSeconds / totals.seconds : 0.5;
-  const production = totals.goals + totals.assists * 0.7;
-  // A rodada semanal é a unidade competitiva da pelada. Cada gol e assistência
-  // acrescenta valor de forma linear, em vez de ser achatado por partida.
-  const individualActions = clamp(0.25 + production * 0.14, 0, 1);
-  const score = clamp(individualActions * 0.8 + resultAverage * 0.2 - totals.ownGoals * 0.15, 0, 1);
-  return { score, totals };
+  const production = totals.goals + totals.assists * config.assistValue;
+  // Curva suave: atuações grandes continuam se diferenciando, sem transformar
+  // 5 e 10 participações em gol na mesma nota máxima.
+  const attackingScore = clamp(
+    0.25 + 0.75 * (1 - Math.exp(-production * config.attackCurve)) - totals.ownGoals * 0.15,
+    0,
+    1,
+  );
+  return { attackingScore, collectiveScore: resultAverage, totals };
 }
 
 function calculateMatchScore(
   role: OverallRole,
+  player: OverallPlayer,
   appearance: OverallAppearance,
   baselineConcededRate: number,
   roundAttackingScore: number,
+  collectiveScore: number,
   config: OverallFormulaConfig,
-): { score: number; defensiveScore: number; qualityWeight: number } | null {
+): { score: number; defensiveScore: number; evidenceWeight: number } | null {
   if (role === "GOL" && !appearance.isGoalkeeper) return null;
 
   const seconds = exposure(appearance.secondsPlayed);
@@ -301,17 +413,22 @@ function calculateMatchScore(
     1,
   );
   const attacking = roundAttackingScore;
-  const qualityWeight = appearance.goalTimingQuality === "exact" ? 1 : config.legacyTimingConfidence;
+  const defensiveQuality = appearance.goalTimingQuality === "exact" ? 1 : config.legacyTimingConfidence;
 
   // O goleiro é lido exclusivamente pela proteção do gol. Gols ou assistências
   // não mudam essa posição, mesmo se ele participar da jogada ofensiva.
-  if (role === "GOL") return { score: defensive, defensiveScore: defensive, qualityWeight };
+  if (role === "GOL") return { score: defensive, defensiveScore: defensive, evidenceWeight: defensiveQuality };
 
-  const weights = role === "DEF" ? [0.85, 0.15] : role === "ALA_MEI" ? [0.5, 0.5] : [0.2, 0.8];
+  const weights = config.positionWeights[role];
+  const roleQuality = defensiveQuality * weights.defense + weights.attack + weights.result;
   return {
-    score: clamp(defensive * weights[0] + attacking * weights[1], 0, 1),
+    score: clamp(
+      defensive * weights.defense + attacking * weights.attack + collectiveScore * weights.result,
+      0,
+      1,
+    ),
     defensiveScore: defensive,
-    qualityWeight,
+    evidenceWeight: roleQuality * traitEvidenceWeight(player, role, config),
   };
 }
 
@@ -327,7 +444,7 @@ function positionEstimate(
     .map((record) => ({
       ...record,
       weight: Math.pow(0.5, (currentRoundIndex - record.roundIndex) / config.halfLifeRounds)
-        * (record.secondsPlayed / MAX_MATCH_SECONDS) * record.qualityWeight,
+        * (record.secondsPlayed / MAX_MATCH_SECONDS) * record.evidenceWeight,
     }));
   const validRounds = new Set(relevant.map((record) => record.roundId)).size;
   const totalWeight = relevant.reduce((total, record) => total + record.weight, 0);
@@ -337,14 +454,17 @@ function positionEstimate(
   const exposureConfidence = clamp(totalWeight / config.confidenceRounds, 0, 1);
   const roundConfidence = clamp(validRounds / config.confidenceRounds, 0, 1);
   const confidence = Math.sqrt(exposureConfidence * roundConfidence);
-  const seedBonus = player.overallSeedMode === "legacy_tag" && profileRole(player.playerProfile) === role
+  const seedBonus = config.legacySeedEnabled && player.overallSeedMode === "legacy_tag" && profileRole(player.playerProfile) === role
     // Em uma pelada semanal, três rodadas já cobrem quase um mês. Nesse
     // ponto a especialidade inicial some e ficam somente as atuações.
     ? config.legacyInitialTagBonus * clamp(1 - validRounds / config.seedFadeRounds, 0, 1)
     : 0;
-  const target = clamp(config.base + (weightedScore - 0.5) * 40 * confidence + seedBonus, 40, 99);
+  // O motor guarda apenas o valor observado. A estimativa legada é uma camada
+  // temporária de exibição, evitando que um bônus inicial deixe resíduo depois
+  // da terceira rodada por causa do limitador semanal de variação.
+  const target = clamp(config.base + (weightedScore - 0.5) * 40 * confidence, 40, 99);
 
-  return { target, confidence, validRounds };
+  return { target, confidence, validRounds, seedBonus };
 }
 
 function calculateGeneral(values: Record<OverallRole, number>, goalkeeperRounds: number, confidence: number, config: OverallFormulaConfig) {
@@ -363,7 +483,7 @@ function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, current
     const estimate = positionEstimate(player, state, role, currentRoundIndex, config);
     return [role, {
       role,
-      value: roundOverall(state.values[role]),
+      value: roundOverall(state.values[role] + estimate.seedBonus),
       confidence: roundOverall(estimate.confidence),
       validRounds: estimate.validRounds,
     }];
@@ -399,7 +519,7 @@ function teamSamplesForRound(round: OverallRoundInput, roundIndex: number) {
         roundIndex,
         matchId: appearance.matchId,
         teamId: appearance.teamId,
-        rate: perSevenMinuteRate(appearance.goalsConceded, appearance.matchSeconds || MAX_MATCH_SECONDS),
+        rate: perSevenMinuteRate(appearance.teamGoalsConceded, appearance.matchSeconds || MAX_MATCH_SECONDS),
       });
     }
   }
@@ -417,7 +537,7 @@ export function calculatePlayerOveralls(
   formula: OverallFormulaConfig = DEFAULT_OVERALL_FORMULA,
 ): OverallCalculationResult {
   const playerById = new Map(players.map((player) => [player.id, player]));
-  const stateByPlayerId = new Map<string, MutablePlayerState>(players.map((player) => [player.id, createPlayerState(player, formula)]));
+  const stateByPlayerId = new Map<string, MutablePlayerState>(players.map((player) => [player.id, createPlayerState(formula)]));
   const completedRounds = [...rounds]
     .filter((round) => round.roundType === "official" && round.status === "finished")
     .sort((left, right) => left.date.localeCompare(right.date)
@@ -429,7 +549,9 @@ export function calculatePlayerOveralls(
 
   for (const [roundIndex, round] of completedRounds.entries()) {
     const currentTeamSamples = teamSamplesForRound(round, roundIndex);
-    const recentSamples = [...historicalConcededRates, ...currentTeamSamples]
+    // A referência precisa existir antes da rodada atual; incluir o próprio
+    // placar suavizaria artificialmente uma atuação muito boa ou muito ruim.
+    const recentSamples = historicalConcededRates
       .filter((sample) => roundIndex - sample.roundIndex < formula.recentRoundWindow);
     const baselineConcededRate = recentSamples.length
       ? recentSamples.reduce((total, sample) => total + sample.rate, 0) / recentSamples.length
@@ -445,7 +567,7 @@ export function calculatePlayerOveralls(
     for (const [playerId, appearances] of appearancesByPlayer) {
       const player = playerById.get(playerId)!;
       const state = stateByPlayerId.get(playerId)!;
-      const roundAttack = calculateRoundAttackingScore(appearances);
+      const roundScores = calculateRoundScores(appearances, formula);
       let defensiveTotal = 0;
       let defensiveWeight = 0;
       let timingQuality: GoalTimingQuality = "exact";
@@ -454,7 +576,15 @@ export function calculatePlayerOveralls(
         goalsConceded += Number(appearance.goalsConceded || 0);
         if (appearance.goalTimingQuality === "fallback") timingQuality = "fallback";
         for (const role of ROLES) {
-          const outcome = calculateMatchScore(role, appearance, baselineConcededRate, roundAttack.score, formula);
+          const outcome = calculateMatchScore(
+            role,
+            player,
+            appearance,
+            baselineConcededRate,
+            roundScores.attackingScore,
+            roundScores.collectiveScore,
+            formula,
+          );
           if (outcome === null) continue;
           state.history.push({
             roundId: round.id,
@@ -462,7 +592,7 @@ export function calculatePlayerOveralls(
             role,
             score: outcome.score,
             secondsPlayed: exposure(appearance.secondsPlayed),
-            qualityWeight: outcome.qualityWeight,
+            evidenceWeight: outcome.evidenceWeight,
           });
           if (role === "DEF") {
             const weight = exposure(appearance.secondsPlayed);
@@ -471,9 +601,9 @@ export function calculatePlayerOveralls(
           }
         }
       }
-      state.scoutTotals.goals += roundAttack.totals.goals;
-      state.scoutTotals.assists += roundAttack.totals.assists;
-      state.scoutTotals.ownGoals += roundAttack.totals.ownGoals;
+      state.scoutTotals.goals += roundScores.totals.goals;
+      state.scoutTotals.assists += roundScores.totals.assists;
+      state.scoutTotals.ownGoals += roundScores.totals.ownGoals;
       state.playedRoundIds.add(round.id);
       if (appearances.some((appearance) => appearance.isGoalkeeper)) state.goalkeeperRoundIds.add(round.id);
       state.lastRoundId = round.id;
@@ -485,22 +615,26 @@ export function calculatePlayerOveralls(
         state.values[role] = roundOverall(clamp(
           estimate.target,
           previous - formula.maxChangePerRound,
-          Math.min(previous + formula.maxChangePerRound, provisionalPositionCap(estimate.validRounds, formula)),
+          Math.min(previous + formula.maxChangePerRound, provisionalPositionCap(estimate.validRounds, formula) - estimate.seedBonus),
         ));
       }
       const snapshot = cloneSnapshot(player, state, roundIndex, formula);
+      const playedProfile = appearances.find((appearance) => appearance.playerProfileLocked)?.playerProfileLocked || null;
       breakdowns.push({
         playerId,
         roundId: round.id,
         roundDate: round.date,
         roundIndex,
-        goals: roundAttack.totals.goals,
-        assists: roundAttack.totals.assists,
-        ownGoals: roundAttack.totals.ownGoals,
+        goals: roundScores.totals.goals,
+        assists: roundScores.totals.assists,
+        ownGoals: roundScores.totals.ownGoals,
         goalsConceded,
-        attackingScore: roundAttack.score,
+        attackingScore: roundScores.attackingScore,
         defensiveScore: defensiveWeight ? defensiveTotal / defensiveWeight : 0.5,
         timingQuality,
+        playedProfile,
+        roleEvidence: Object.fromEntries(ROLES.map((role) => [role, roleEvidenceWeight(playedProfile, role, formula)])) as Record<OverallRole, number>,
+        traitEvidence: Object.fromEntries(ROLES.map((role) => [role, traitEvidenceWeight(player, role, formula)])) as Record<OverallRole, number>,
         positions: Object.fromEntries(ROLES.map((role) => [role, snapshot.positions[role].value])) as Record<OverallRole, number>,
         confidence: Object.fromEntries(ROLES.map((role) => [role, snapshot.positions[role].confidence])) as Record<OverallRole, number>,
       });
