@@ -679,7 +679,10 @@ function overallTrend(
   goalkeeperRounds: number,
   config: OverallFormulaConfig,
 ) {
-  if (goalkeeperRounds >= config.goalkeeperEligibilityRounds && values.GOL >= calculateLineOverall(player, values, config)) {
+  // Jogar ocasionalmente no gol gera um atributo GOL real, mas não muda a
+  // identidade principal de um atleta de linha. Só goleiros declarados no
+  // perfil podem ter a tendência geral definida pelo desempenho no gol.
+  if (player.isGoalkeeper && goalkeeperRounds >= config.goalkeeperEligibilityRounds && values.GOL >= calculateLineOverall(player, values, config)) {
     return positionTrends.GOL;
   }
   const traitRoles = [...new Set(player.overallTraits || [])].map((trait) => profileRole(trait)).filter((role): role is LineRole => role !== "GOL");
@@ -693,7 +696,11 @@ function overallTrend(
 
 function calculateGeneral(player: OverallPlayer, values: Record<OverallRole, number>, goalkeeperRounds: number, confidence: number, config: OverallFormulaConfig) {
   const lineOverall = calculateLineOverall(player, values, config);
-  const rawOverall = goalkeeperRounds >= config.goalkeeperEligibilityRounds
+  // O atributo GOL continua sendo calculado para qualquer pessoa que tenha
+  // atuado ali. Ele só pode compor o OVR principal quando o ADM marcou o
+  // atleta como goleiro; rodízios no gol não podem sobrescrever DEF/VOL, ALA
+  // ou ATA de jogadores de linha.
+  const rawOverall = player.isGoalkeeper && goalkeeperRounds >= config.goalkeeperEligibilityRounds
     ? Math.max(lineOverall, values.GOL)
     : lineOverall;
   // A nota pública só se afasta de 70 na proporção da amostra. Isso impede

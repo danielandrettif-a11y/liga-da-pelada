@@ -299,6 +299,29 @@ describe("motor adaptativo de OVR", () => {
     expect(defensive.positions.GOL.value).toBe(attacking.positions.GOL.value);
   });
 
+  it("não deixa rodízio no gol sobrescrever o OVR geral de atleta de linha", () => {
+    const linePlayer: OverallPlayer = {
+      id: "line-player",
+      playerProfile: "offensive",
+      overallTraits: ["offensive"],
+      overallSeedMode: "observed",
+      isGoalkeeper: false,
+    };
+    const rounds = Array.from({ length: 3 }, (_, index) => round(index + 1, [
+      appearance("line-player", {
+        isGoalkeeper: true,
+        playerProfileLocked: "offensive",
+        goalsConceded: 0,
+      }),
+    ]));
+
+    const snapshot = calculatePlayerOveralls([linePlayer], rounds, characteristicsFormula).snapshots[0];
+
+    expect(snapshot.positions.GOL.value).toBeGreaterThan(snapshot.positions.ATA.value);
+    expect(snapshot.overall).toBe(snapshot.positions.ATA.value);
+    expect(snapshot.trend).toBe(snapshot.positionTrends.ATA);
+  });
+
   it("não deixa muitas partidas da mesma rodada levarem todas as posições a 100% de confiança", () => {
     const midfielder = { ...observedPlayers[0], overallTraits: ["midfield" as const] };
     const manyMatches = Array.from({ length: 12 }, (_, index) => appearance("def", {
