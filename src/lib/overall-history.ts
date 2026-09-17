@@ -22,6 +22,7 @@ type HistoryMatchPlayer = {
 };
 
 type HistoryMatch = {
+  id?: string | null;
   status: string;
   team_a_id: string;
   team_b_id: string;
@@ -39,6 +40,7 @@ type HistoryRound = {
   id: string;
   number: number;
   date: string;
+  created_at?: string | null;
   round_type: "official" | "friendly";
   status: "finished" | "draft" | "active";
   matches?: HistoryMatch[] | null;
@@ -142,9 +144,17 @@ export function buildOverallHistoryInput(source: OverallHistorySource): {
         const index = appearances.length;
         appearances.push({
           playerId: participant.player_id,
+          // Todo registro novo possui id; o fallback mantém o modo sombra
+          // compatível com o histórico e fixtures anteriores.
+          matchId: match.id || `${round.id}:${match.team_a_id}:${match.team_b_id}`,
           teamId: participant.team_id,
           secondsPlayed,
+          matchSeconds: end,
           goalsConceded: useGoalEvents ? opponentGoalEvents.length : teamConceded(match, participant.team_id),
+          concededGoalSeconds: useGoalEvents
+            ? opponentGoalEvents.map((event) => Math.max(0, Number(eventSeconds(event) || 0) - start))
+            : [],
+          goalTimingQuality: useGoalEvents ? "exact" : "fallback",
           goals,
           assists,
           ownGoals,
@@ -185,6 +195,7 @@ export function buildOverallHistoryInput(source: OverallHistorySource): {
       id: round.id,
       sequence: round.number,
       date: round.date,
+      createdAt: round.created_at || undefined,
       roundType: round.round_type,
       status: round.status,
       appearances,

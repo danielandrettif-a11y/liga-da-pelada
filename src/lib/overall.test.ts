@@ -12,9 +12,13 @@ const observedPlayers: OverallPlayer[] = players.map((player) => ({ ...player, o
 function appearance(playerId: string, overrides: Partial<OverallAppearance> = {}): OverallAppearance {
   return {
     playerId,
+    matchId: "m1",
     teamId: "team-a",
     secondsPlayed: 420,
+    matchSeconds: 420,
     goalsConceded: 0,
+    concededGoalSeconds: [],
+    goalTimingQuality: "exact",
     goals: 0,
     assists: 0,
     ownGoals: 0,
@@ -70,6 +74,36 @@ describe("motor adaptativo de OVR", () => {
     const goalkeeper = result.snapshots.find((snapshot) => snapshot.playerId === "gk")!;
     expect(defender.positions.GOL.validRounds).toBe(0);
     expect(goalkeeper.positions.GOL.validRounds).toBe(1);
+  });
+
+  it("valoriza mais a resistência até o fim do jogo do que sofrer cedo", () => {
+    const early = calculatePlayerOveralls([observedPlayers[0]], [round(1, [appearance("def", {
+      goalsConceded: 1,
+      concededGoalSeconds: [30],
+    })])]);
+    const late = calculatePlayerOveralls([observedPlayers[0]], [round(1, [appearance("def", {
+      goalsConceded: 1,
+      concededGoalSeconds: [390],
+    })])]);
+    expect(late.snapshots[0].positions.DEF.value).toBeGreaterThan(early.snapshots[0].positions.DEF.value);
+  });
+
+  it("não deixa gols e assistências aumentarem a nota de goleiro", () => {
+    const cleanGoalkeeper = calculatePlayerOveralls([players[2]], [round(1, [appearance("gk", { isGoalkeeper: true })])]);
+    const attackingGoalkeeper = calculatePlayerOveralls([players[2]], [round(1, [appearance("gk", {
+      isGoalkeeper: true,
+      goals: 4,
+      assists: 3,
+    })])]);
+    expect(attackingGoalkeeper.snapshots[0].positions.GOL.value).toBe(cleanGoalkeeper.snapshots[0].positions.GOL.value);
+  });
+
+  it("mantém a ordem real entre temporadas, mesmo quando o número da rodada reinicia", () => {
+    const result = calculatePlayerOveralls([observedPlayers[1]], [
+      { ...round(10, [appearance("ata", { goals: 3 })]), id: "old", date: "2026-08-01" },
+      { ...round(1, [appearance("ata", { goals: 0 })]), id: "new", date: "2026-09-01" },
+    ]);
+    expect(result.snapshotsByRound.map((item) => item.roundId)).toEqual(["old", "new"]);
   });
 
   it("não altera OVR com amistosos ou rodadas ainda abertas", () => {

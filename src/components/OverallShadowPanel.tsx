@@ -8,6 +8,7 @@ export function OverallShadowPanel({ initialData }: { initialData: OverallShadow
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  const [openPlayer, setOpenPlayer] = useState<string | null>(null);
 
   function recalculate() {
     setMessage(null);
@@ -36,7 +37,7 @@ export function OverallShadowPanel({ initialData }: { initialData: OverallShadow
       </section>
 
       {initialData.latestRun && (
-        <p className="px-1 text-xs text-muted">Última execução: {new Date(initialData.latestRun.created_at).toLocaleString("pt-BR")} · {initialData.latestRun.status}</p>
+        <p className="px-1 text-xs text-muted">{initialData.latestRun.formulaLabel} · {new Date(initialData.latestRun.created_at).toLocaleString("pt-BR")} · {initialData.latestRun.status}</p>
       )}
 
       <section className="glass-card overflow-hidden">
@@ -49,6 +50,18 @@ export function OverallShadowPanel({ initialData }: { initialData: OverallShadow
               <span className="rounded-lg bg-accent/15 px-3 py-1 text-lg font-black text-accent">OVR {item.overall.toFixed(1)}</span>
             </div>
             <p className="mt-3 text-[11px] font-bold tracking-wide text-muted">DEF {item.def.toFixed(1)} · ALA/MEI {item.alaMei.toFixed(1)} · ATA {item.ata.toFixed(1)} · GOL {item.gol.toFixed(1)} {item.provisional ? "· PROV" : ""}{item.stale ? " · DESATUALIZADO" : ""}</p>
+            <p className="mt-1 text-[10px] text-muted">Confiança por posição: DEF {Math.round(item.positionConfidence.DEF * 100)}% · ALA/MEI {Math.round(item.positionConfidence.ALA_MEI * 100)}% · ATA {Math.round(item.positionConfidence.ATA * 100)}% · GOL {Math.round(item.positionConfidence.GOL * 100)}%</p>
+            <button type="button" onClick={() => setOpenPlayer(openPlayer === item.playerId ? null : item.playerId)} className="mt-3 text-xs font-black text-accent">
+              {openPlayer === item.playerId ? "Ocultar explicação" : "Ver por que a nota mudou"}
+            </button>
+            {openPlayer === item.playerId && (
+              <div className="mt-3 space-y-2 rounded-xl bg-surface p-3 text-[11px] text-muted">
+                <p className="font-bold text-foreground">Últimas rodadas usadas no cálculo</p>
+                {item.recentRounds.length === 0 ? <p>Ainda não há atuação oficial registrada.</p> : item.recentRounds.map((round) => (
+                  <p key={`${round.date}-${round.positions.DEF}`}>{new Date(`${round.date}T12:00:00`).toLocaleDateString("pt-BR")} · {round.goals} G · {round.assists} A · sofreu {round.goalsConceded} · ataque {Math.round(round.attackingScore * 100)}% · defesa {Math.round(round.defensiveScore * 100)}% · tempo do gol {round.timingQuality === "exact" ? "exato" : "estimado"}</p>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </section>
