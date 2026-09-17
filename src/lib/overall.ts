@@ -126,7 +126,11 @@ function perSevenMinuteRate(goals: number, secondsPlayed: number) {
 }
 
 function basePositionValue(player: OverallPlayer, role: OverallRole) {
-  return profileRole(player.playerProfile) === role ? 73 : 70;
+  // A tag não pode transformar uma classificação inicial em nota pública.
+  // Todo mundo começa neutro; a tag influencia o crédito das atuações abaixo.
+  void player;
+  void role;
+  return 70;
 }
 
 function emptyPositions(player: OverallPlayer): Record<OverallRole, number> {
@@ -199,19 +203,24 @@ function positionEstimate(
   const confidence = Math.sqrt(exposureConfidence * roundConfidence);
   const priorRounds = role === "GOL" ? state.goalkeeperRoundIds.size : state.playedRoundIds.size;
   const priorBonus = profileRole(player.playerProfile) === role
-    ? 3 * clamp(1 - priorRounds / PROVISIONAL_ROUNDS, 0, 1)
+    // A tag dá apenas um impulso de aprendizado depois que existe evidência.
+    // Sem partidas não há bônus, e com pouca confiança ele é quase nulo.
+    ? 1.5 * confidence * clamp(1 - priorRounds / PROVISIONAL_ROUNDS, 0, 1)
     : 0;
   const target = clamp(70 + (weightedScore - 0.5) * 40 * confidence + priorBonus, 40, 99);
 
   return { target, confidence, validRounds };
 }
 
-function calculateGeneral(values: Record<OverallRole, number>, goalkeeperRounds: number) {
+function calculateGeneral(values: Record<OverallRole, number>, goalkeeperRounds: number, confidence: number) {
   const lineValues = [values.DEF, values.ALA_MEI, values.ATA].sort((a, b) => b - a);
   const eligible = goalkeeperRounds >= PROVISIONAL_ROUNDS
     ? [...lineValues, values.GOL].sort((a, b) => b - a)
     : lineValues;
-  return roundOverall(eligible[0] * 0.7 + eligible[1] * 0.3);
+  const rawOverall = eligible[0] * 0.7 + eligible[1] * 0.3;
+  // A nota pública só se afasta de 70 na proporção da amostra. Isso impede
+  // que uma rodada excelente coloque um estreante acima de veteranos.
+  return roundOverall(70 + (rawOverall - 70) * confidence);
 }
 
 function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, currentSequence: number): PlayerOverallSnapshot {
@@ -226,9 +235,10 @@ function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, current
   })) as Record<OverallRole, OverallPositionSnapshot>;
   const roundsPlayed = state.playedRoundIds.size;
   const goalkeeperRounds = state.goalkeeperRoundIds.size;
+  const overallConfidence = Math.max(positions.DEF.confidence, positions.ALA_MEI.confidence, positions.ATA.confidence);
   return {
     playerId: player.id,
-    overall: calculateGeneral(state.values, goalkeeperRounds),
+    overall: calculateGeneral(state.values, goalkeeperRounds, overallConfidence),
     positions,
     roundsPlayed,
     goalkeeperRounds,

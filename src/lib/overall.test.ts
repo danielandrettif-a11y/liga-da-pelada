@@ -28,15 +28,20 @@ function round(sequence: number, appearances: OverallAppearance[]): OverallRound
 }
 
 describe("motor adaptativo de OVR", () => {
-  it("mantém a vantagem inicial temporária da tag e a limita a três pontos", () => {
+  it("mantém todo jogador novo no OVR neutro, independente da tag", () => {
     const result = calculatePlayerOveralls(players, []);
     const defender = result.snapshots.find((snapshot) => snapshot.playerId === "def")!;
-    expect(defender.positions.DEF.value).toBe(73);
+    expect(defender.overall).toBe(70);
+    expect(defender.positions.DEF.value).toBe(70);
     expect(defender.positions.ATA.value).toBe(70);
   });
 
   it("dá mais crédito defensivo ao DEF do que ao ATA na mesma atuação coletiva", () => {
-    const result = calculatePlayerOveralls(players, [round(1, [appearance("def"), appearance("ata")])]);
+    const result = calculatePlayerOveralls(players, [
+      round(1, [appearance("def"), appearance("ata")]),
+      round(2, [appearance("def"), appearance("ata")]),
+      round(3, [appearance("def"), appearance("ata")]),
+    ]);
     const defender = result.snapshots.find((snapshot) => snapshot.playerId === "def")!;
     const attacker = result.snapshots.find((snapshot) => snapshot.playerId === "ata")!;
     expect(defender.positions.DEF.value).toBeGreaterThan(attacker.positions.DEF.value);
@@ -62,12 +67,22 @@ describe("motor adaptativo de OVR", () => {
       { ...round(2, [appearance("def", { goals: 3 })]), status: "active" },
     ];
     const result = calculatePlayerOveralls([players[0]], inputs);
-    expect(result.snapshots[0].positions.DEF.value).toBe(73);
+    expect(result.snapshots[0].positions.DEF.value).toBe(70);
     expect(result.snapshotsByRound).toHaveLength(0);
   });
 
   it("limita a mudança de cada posição a dois pontos por rodada", () => {
     const result = calculatePlayerOveralls([players[1]], [round(1, [appearance("ata", { goals: 5 })])]);
-    expect(result.snapshots[0].positions.ATA.value).toBeLessThanOrEqual(75);
+    expect(result.snapshots[0].positions.ATA.value).toBeLessThanOrEqual(72);
+  });
+
+  it("mantém o OVR geral perto de 70 quando existe somente uma rodada", () => {
+    const result = calculatePlayerOveralls([players[1]], [round(1, [
+      appearance("ata", { goals: 2 }),
+      appearance("ata", { goals: 2 }),
+      appearance("ata", { goals: 2 }),
+      appearance("ata", { goals: 2 }),
+    ])]);
+    expect(result.snapshots[0].overall).toBeLessThanOrEqual(71);
   });
 });
