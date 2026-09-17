@@ -60,6 +60,19 @@ function isSelectableAthlete(player: Player | null | undefined) {
   return Boolean(player?.is_selectable && (player.member_category === "player" || player.member_category === "guest"));
 }
 
+async function getLatestPlayerCardOverallMap(client: any) {
+  const { data, error } = await client.rpc("get_latest_player_card_overalls");
+  if (error) {
+    console.error("Erro ao buscar OVR para as cartas:", error);
+    return new Map<string, number>();
+  }
+
+  return new Map<string, number>((data || []).flatMap((row: any) => {
+    const overall = Number(row.overall);
+    return row.player_id && Number.isFinite(overall) ? [[row.player_id, overall] as const] : [];
+  }));
+}
+
 function sortRankingEntries<T extends Pick<RankingEntry, "points" | "wins" | "goals" | "assists">>(entries: T[]) {
   return [...entries].sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
@@ -665,12 +678,13 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   );
   const rankingAccount = await getCurrentAccount();
   const fitnessClient = rankingAccount.user ? rankingAccount.client : supabase;
-  const [{ data: fitnessRows }, cosmeticsByPlayer] = await Promise.all([
+  const [{ data: fitnessRows }, cosmeticsByPlayer, overallByPlayer] = await Promise.all([
     fitnessClient
       .from("player_round_fitness")
       .select("player_id, distance_km, average_speed_kmh")
       .in("round_id", currentRounds.map((round) => round.id)),
     getAllPlayersEquippedCosmeticsMap(),
+    getLatestPlayerCardOverallMap(fitnessClient),
   ]);
   const fitnessByPlayer = new Map<string, { distanceKm: number; speedTotal: number; entries: number }>();
   for (const row of fitnessRows || []) {
@@ -697,6 +711,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       awardSeasons: getAwardSeasons(entry.player.id),
       seasonPosition: index + 1,
       positionChange: previousPosition ? previousPosition - (index + 1) : null,
+      overall: overallByPlayer.get(entry.player.id) ?? null,
       fitness: getFitness(entry.player.id),
       cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
     };
@@ -709,6 +724,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     awardSeasons: getAwardSeasons(entry.player.id),
     seasonPosition: seasonPositions.get(entry.player.id) || general.length + 1,
     positionChange: generalByPlayer.get(entry.player.id)?.positionChange ?? null,
+    overall: overallByPlayer.get(entry.player.id) ?? null,
     fitness: getFitness(entry.player.id),
     cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
   }));
@@ -738,10 +754,13 @@ export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: 
   const { data: player } = await supabase.from("players").select("*").eq("id", playerId).maybeSingle();
   if (!player) return null;
 
-  const { data: cosmeticsData } = await supabase
-    .from("player_equipped_cosmetics")
-    .select("slot, cosmetic:cosmetic_id(name, asset_key, slot)")
-    .eq("player_id", playerId);
+  const [{ data: cosmeticsData }, overallByPlayer] = await Promise.all([
+    supabase
+      .from("player_equipped_cosmetics")
+      .select("slot, cosmetic:cosmetic_id(name, asset_key, slot)")
+      .eq("player_id", playerId),
+    getLatestPlayerCardOverallMap(supabase),
+  ]);
 
   const cosmeticsMap = new Map((cosmeticsData || []).map((item: any) => [item.slot, item.cosmetic]));
   const frame = cosmeticsMap.get("frame");
@@ -759,6 +778,7 @@ export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: 
     goals: 0,
     assists: 0,
     points: 0,
+    overall: overallByPlayer.get(playerId) ?? null,
     winRate: 0,
     awards: { roundMvp: 0, topScorer: 0, topAssister: 0, kingOfWins: 0 },
     awardSeasons: [],

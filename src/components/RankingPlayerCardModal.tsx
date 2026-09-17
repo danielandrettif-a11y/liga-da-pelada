@@ -185,9 +185,9 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
   context.textAlign = "left";
   context.fillStyle = theme.ink;
   context.font = `900 ${Math.min(105, scoreBox.width * .43)}px Arial`;
-  context.fillText(cardContent.points, scoreBox.x, scoreBox.y + scoreBox.height * .34, scoreBox.width);
+  context.fillText(cardContent.rating, scoreBox.x, scoreBox.y + scoreBox.height * .34, scoreBox.width);
   context.font = "900 22px Arial";
-  context.fillText("PTS", scoreBox.x + 8, scoreBox.y + scoreBox.height * .44);
+  context.fillText(cardContent.ratingLabel, scoreBox.x + 8, scoreBox.y + scoreBox.height * .44);
   context.font = "900 27px Arial";
   context.fillText(cardContent.profile, scoreBox.x, scoreBox.y + scoreBox.height * .65, scoreBox.width);
   context.font = "900 20px Arial";
@@ -363,8 +363,8 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
           </header>
 
           <div className="absolute z-10 flex flex-col items-start pl-1 font-athletic drop-shadow-[0_2px_5px_rgba(0,0,0,.9)]" style={rankingCardBoxStyle(layout.score)}>
-              <span className={`player-card-rating font-black leading-none ${cardContent.points.length > 4 ? "text-[2.05rem]" : "text-[2.65rem]"}`} style={{ color: theme.edge }}>{cardContent.points}</span>
-              <span className="mt-0.5 text-[9px] font-black tracking-[.22em] text-white/75">PTS</span>
+              <span className={`player-card-rating font-black leading-none ${cardContent.rating.length > 4 ? "text-[2.05rem]" : "text-[2.65rem]"}`} style={{ color: theme.edge }}>{cardContent.rating}</span>
+              <span className="mt-0.5 text-[9px] font-black tracking-[.22em] text-white/75">{cardContent.ratingLabel}</span>
               <span className="mt-2 border-t border-white/30 pt-2 text-[11px] font-black uppercase leading-tight text-white">{cardContent.profile}</span>
               <span className="mt-2 rounded-md border border-white/25 bg-black/35 px-2 py-0.5 text-xs font-black text-white">{cardContent.placement}</span>
           </div>

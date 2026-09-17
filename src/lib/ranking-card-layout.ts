@@ -36,7 +36,8 @@ export type RankingCardAwardKey = "roundMvp" | "topScorer" | "topAssister" | "ki
 
 export type RankingCardContent = {
   header: string;
-  points: string;
+  rating: string;
+  ratingLabel: "OVR";
   profile: string;
   placement: string;
   name: string;
@@ -130,7 +131,8 @@ export function buildRankingCardContent(entry: RankingEntry, position: number): 
 
   return {
     header: `PBQ • ${theme.label}`,
-    points: String(entry.points),
+    rating: entry.overall == null ? "—" : entry.overall.toFixed(1),
+    ratingLabel: "OVR",
     profile,
     placement: `${position}º`,
     name: entry.player.name,

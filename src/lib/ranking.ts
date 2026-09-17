@@ -36,6 +36,7 @@ export type RankingEntry = {
   goals: number;
   assists: number;
   points: number;
+  overall?: number | null;
   totalRawPoints?: number;
   bestRounds?: RankingBestRound[];
   minPointsToEnterTop6?: number | null;

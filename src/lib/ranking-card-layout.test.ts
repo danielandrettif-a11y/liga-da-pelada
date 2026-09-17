@@ -58,6 +58,7 @@ describe("ranking card layout", () => {
     const entry = {
       player: { name: "Jogador Teste", player_profile: "defensive", is_goalkeeper: false },
       points: 53.5,
+      overall: 74.6,
       goals: 5,
       assists: 4,
       wins: 12,
@@ -71,7 +72,8 @@ describe("ranking card layout", () => {
     const content = buildRankingCardContent(entry, 7);
     expect(content).toMatchObject({
       header: "PBQ • RANKED",
-      points: "53.5",
+      rating: "74.6",
+      ratingLabel: "OVR",
       profile: "DEF",
       placement: "7º",
       name: "Jogador Teste",
@@ -84,5 +86,21 @@ describe("ranking card layout", () => {
       ["Rei das Vitórias", 3],
     ]);
     expect(content.stats.map(({ label }) => label)).toEqual(["GOL", "AST", "VIT", "JOG", "DER", "APR"]);
+  });
+
+  it("does not reuse ranking points when the player has no calculated OVR", () => {
+    const entry = {
+      player: { name: "Sem OVR", player_profile: "midfield", is_goalkeeper: false },
+      points: 99,
+      goals: 0,
+      assists: 0,
+      wins: 0,
+      games: 0,
+      losses: 0,
+      winRate: 0,
+      awards: { roundMvp: 0, topScorer: 0, topAssister: 0, kingOfWins: 0 },
+    } as RankingEntry;
+
+    expect(buildRankingCardContent(entry, 10)).toMatchObject({ rating: "—", ratingLabel: "OVR" });
   });
 });
