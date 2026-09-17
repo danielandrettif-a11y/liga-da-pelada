@@ -11,8 +11,8 @@ const source = {
     round_type: "official" as const,
     status: "finished" as const,
     player_round_stats: [
-      { player_id: "def", player_profile_locked: "defensive" as const },
-      { player_id: "ata", player_profile_locked: "offensive" as const },
+      { player_id: "def", player_profile_locked: "defensive" as const, goals: 0, assists: 0, own_goals: 0 },
+      { player_id: "ata", player_profile_locked: "offensive" as const, goals: 2, assists: 0, own_goals: 0 },
     ],
     matches: [{
       status: "finished",
@@ -59,5 +59,22 @@ describe("adaptação do histórico para OVR", () => {
     });
     expect(result.rounds[0].appearances[0].secondsPlayed).toBe(420);
     expect(result.rounds[0].appearances[0].goalsConceded).toBe(1);
+  });
+
+  it("completa somente scouts ofensivos ausentes no histórico antigo", () => {
+    const result = buildOverallHistoryInput({
+      ...source,
+      rounds: [{
+        ...source.rounds[0],
+        player_round_stats: [
+          source.rounds[0].player_round_stats[0],
+          { player_id: "ata", player_profile_locked: "offensive", goals: 4, assists: 3, own_goals: 0 },
+        ],
+        matches: [{ ...source.rounds[0].matches[0], match_events: [] }],
+      }],
+    });
+    const attacker = result.rounds[0].appearances.find((item) => item.playerId === "ata")!;
+    expect(attacker.goals).toBe(4);
+    expect(attacker.assists).toBe(3);
   });
 });

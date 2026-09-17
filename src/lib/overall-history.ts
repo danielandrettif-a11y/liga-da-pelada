@@ -42,7 +42,13 @@ type HistoryRound = {
   round_type: "official" | "friendly";
   status: "finished" | "draft" | "active";
   matches?: HistoryMatch[] | null;
-  player_round_stats?: Array<{ player_id: string; player_profile_locked?: OverallAppearance["playerProfileLocked"] | null }> | null;
+  player_round_stats?: Array<{
+    player_id: string;
+    player_profile_locked?: OverallAppearance["playerProfileLocked"] | null;
+    goals?: number | null;
+    assists?: number | null;
+    own_goals?: number | null;
+  }> | null;
 };
 
 export type OverallHistorySource = {
@@ -104,7 +110,10 @@ export function buildOverallHistoryInput(source: OverallHistorySource): {
 
   const rounds = source.rounds.map((round) => {
     const profileByPlayer = new Map((round.player_round_stats || []).map((stat) => [stat.player_id, stat.player_profile_locked || null]));
+    const statsByPlayer = new Map((round.player_round_stats || []).map((stat) => [stat.player_id, stat]));
     const appearances: OverallAppearance[] = [];
+    const appearanceIndexesByPlayer = new Map<string, number[]>();
+    const registeredByPlayer = new Map<string, { goals: number; assists: number; ownGoals: number }>();
 
     for (const match of (round.matches || []).filter((item) => item.status === "finished")) {
       const end = matchEndSeconds(match);
@@ -125,6 +134,12 @@ export function buildOverallHistoryInput(source: OverallHistorySource): {
         const goals = eventsDuringAppearance.filter((event) => event.player_id === participant.player_id && !event.is_own_goal).length;
         const assists = eventsDuringAppearance.filter((event) => event.assist_player_id === participant.player_id && !event.is_own_goal).length;
 
+        const current = registeredByPlayer.get(participant.player_id) || { goals: 0, assists: 0, ownGoals: 0 };
+        current.goals += goals;
+        current.assists += assists;
+        current.ownGoals += ownGoals;
+        registeredByPlayer.set(participant.player_id, current);
+        const index = appearances.length;
         appearances.push({
           playerId: participant.player_id,
           teamId: participant.team_id,
@@ -137,6 +152,32 @@ export function buildOverallHistoryInput(source: OverallHistorySource): {
           playerProfileLocked: profileByPlayer.get(participant.player_id) || null,
           isGoalkeeper: goalkeeperIds.has(participant.player_id),
         });
+        const indexes = appearanceIndexesByPlayer.get(participant.player_id) || [];
+        indexes.push(index);
+        appearanceIndexesByPlayer.set(participant.player_id, indexes);
+      }
+    }
+
+    // Parte do histórico antigo possui o placar consolidado, mas não o segundo
+    // exato de cada evento. Eventos completos continuam sendo a fonte primária;
+    // estes valores entram apenas como complemento para não apagar artilheiros e
+    // garçons já reconhecidos pelas estatísticas oficiais da rodada.
+    for (const [playerId, stats] of statsByPlayer) {
+      const indexes = appearanceIndexesByPlayer.get(playerId) || [];
+      if (indexes.length === 0) continue;
+      const registered = registeredByPlayer.get(playerId) || { goals: 0, assists: 0, ownGoals: 0 };
+      const missing = {
+        goals: Math.max(0, Number(stats.goals || 0) - registered.goals),
+        assists: Math.max(0, Number(stats.assists || 0) - registered.assists),
+        ownGoals: Math.max(0, Number(stats.own_goals || 0) - registered.ownGoals),
+      };
+      const totalSeconds = indexes.reduce((total, index) => total + appearances[index].secondsPlayed, 0);
+      if (totalSeconds <= 0) continue;
+      for (const index of indexes) {
+        const share = appearances[index].secondsPlayed / totalSeconds;
+        appearances[index].goals = Number(appearances[index].goals || 0) + missing.goals * share;
+        appearances[index].assists = Number(appearances[index].assists || 0) + missing.assists * share;
+        appearances[index].ownGoals = Number(appearances[index].ownGoals || 0) + missing.ownGoals * share;
       }
     }
 

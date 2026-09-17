@@ -23,7 +23,7 @@ async function loadOverallHistory(client: any) {
       .from("rounds")
       .select(`
         id, number, date, round_type, status,
-        player_round_stats (player_id, player_profile_locked),
+        player_round_stats (player_id, player_profile_locked, goals, assists, own_goals),
         matches (
           status, team_a_id, team_b_id, score_a, score_b,
           duration_seconds, timer_accumulated_seconds, eligibility_elapsed_offset_seconds,
