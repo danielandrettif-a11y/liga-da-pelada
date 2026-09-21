@@ -8,6 +8,7 @@ import { supabase } from "../supabase";
 import type { CreateMatchInput, RegisterGoalInput, SubstituteMatchPlayerInput } from "../types";
 import { calculateRoundStats } from "./stats";
 import { getAdminClient } from "../auth";
+import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
 import { sendMatchFinishedNotifications, sendMatchTimerNotifications } from "../push-notifications";
 import { scheduleMatchTimerAlerts } from "../match-timer-scheduler";
 import { buildStructuralLoans } from "../underfilled-rounds";
@@ -549,11 +550,27 @@ export async function getMatch(matchId: string) {
   )];
   const player_cosmetics: Record<string, { bannerAssetKey: string | null; frameKey: string | null; auraKey: string | null }> = {};
 
-  if (playerIds.length > 0) {
+  // Fonte principal: a seleção atual feita pelo usuário no perfil/Cartola,
+  // vinculada à conta e à temporada ativa.
+  const selectedCosmetics = await getAllPlayersEquippedCosmeticsMap();
+  for (const playerId of playerIds) {
+    const selected = selectedCosmetics.get(playerId);
+    if (!selected) continue;
+    player_cosmetics[playerId] = {
+      bannerAssetKey: selected.bannerAssetKey,
+      frameKey: selected.frameKey,
+      auraKey: selected.auraKey,
+    };
+  }
+
+  // Compatibilidade com cosméticos antigos ainda gravados diretamente por
+  // jogador. Eles só completam lacunas e nunca sobrescrevem a escolha atual.
+  const missingPlayerIds = playerIds.filter((playerId) => !player_cosmetics[playerId]);
+  if (missingPlayerIds.length > 0) {
     const { data: equippedCosmetics, error: cosmeticsError } = await supabase
       .from("player_equipped_cosmetics")
       .select("player_id, slot, cosmetic:cosmetic_id(asset_key)")
-      .in("player_id", playerIds)
+      .in("player_id", missingPlayerIds)
       .in("slot", ["banner", "frame", "aura"]);
 
     if (cosmeticsError) {
