@@ -8,7 +8,7 @@ import Link from "next/link";
 import { TeamCrest } from "./TeamCrest";
 import { markRoundTeamArrived, setRoundTeamCaptain, setRoundTeamVestColor } from "@/lib/actions/rounds";
 import { VEST_COLORS } from "@/lib/vest-colors";
-import { pickFairSubstitute } from "@/lib/substitution-draw";
+import { canTeamLendToMatch, pickFairSubstitute } from "@/lib/substitution-draw";
 import { buildStructuralLoans } from "@/lib/underfilled-rounds";
 
 type MatchCreatorProps = {
@@ -66,11 +66,14 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
       .filter((entry: any) => availability.get(entry.player_id) === "injured" || (tracksAttendance && attendance.get(entry.player_id) !== "present"))
       .map((entry: any) => ({ team, player: entry.players, playerId: entry.player_id, reason: availability.get(entry.player_id) === "injured" ? "Machucado" : "Ainda nao chegou" })),
   );
-  const outgoingTeamIds = previousMatch
-    ? [previousMatch.team_a_id, previousMatch.team_b_id].filter((id: string) => !selectedTeamIds.includes(id))
-    : teams.filter((team: any) => !selectedTeamIds.includes(team.id)).map((team: any) => team.id);
+  // Cobertura de desfalque não depende do rodízio do último jogo: qualquer
+  // atleta presente de um time que não participa deste confronto pode entrar.
+  // A API repete a validação para impedir que a regra seja burlada pelo cliente.
+  const lenderTeamIds = teams
+    .filter((team: any) => canTeamLendToMatch(team.id, selectedTeamIds))
+    .map((team: any) => team.id);
   const waitingPlayers = teams
-    .filter((team: any) => outgoingTeamIds.includes(team.id))
+    .filter((team: any) => lenderTeamIds.includes(team.id))
     .flatMap((team: any) => (team.team_players || [])
       .filter((entry: any) => availability.get(entry.player_id) === "available" && (!tracksAttendance || attendance.get(entry.player_id) === "present"))
       .map((entry: any) => ({ team, player: entry.players, playerId: entry.player_id })))
@@ -585,7 +588,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
             <div className="space-y-4 p-4">
               {tracksAttendance && [...new Set(injuredPlayers.filter((entry: any) => entry.reason === "Ainda nao chegou").map((entry: any) => entry.team.id))].map((teamId: any) => {
                 const team = teams.find((item: any) => item.id === teamId);
-                return <div key={teamId} className="rounded-xl border border-warning/25 bg-warning/5 p-3"><div className="flex items-center gap-2"><Users className="h-4 w-4 text-warning" /><p className="flex-1 text-xs font-bold text-foreground">Todo mundo do {team?.name} chegou?</p><button type="button" disabled={managementLoading} onClick={() => markTeamArrived(teamId)} className="rounded-lg bg-accent px-3 py-2 text-[9px] font-black uppercase text-background">Sim, todos</button></div><p className="mt-2 text-[10px] text-muted">Se nao, escolha abaixo quem sera emprestado pelo time que acabou de sair.</p></div>;
+                return <div key={teamId} className="rounded-xl border border-warning/25 bg-warning/5 p-3"><div className="flex items-center gap-2"><Users className="h-4 w-4 text-warning" /><p className="flex-1 text-xs font-bold text-foreground">Todo mundo do {team?.name} chegou?</p><button type="button" disabled={managementLoading} onClick={() => markTeamArrived(teamId)} className="rounded-lg bg-accent px-3 py-2 text-[9px] font-black uppercase text-background">Sim, todos</button></div><p className="mt-2 text-[10px] text-muted">Se não, escolha abaixo alguém presente de qualquer time que não joga esta partida.</p></div>;
               })}
               {injuredPlayers.map((entry: any) => {
                 const usedByAnother = new Set(
@@ -618,7 +621,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
               })}
               {waitingPlayers.length === 0 && (
                 <p className="rounded-xl bg-warning/10 p-3 text-xs font-semibold text-warning">
-                  Nao ha jogadores disponiveis nos times que estao aguardando.
+                  Não há jogadores presentes e disponíveis fora deste confronto.
                 </p>
               )}
             </div>

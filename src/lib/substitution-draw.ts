@@ -1,3 +1,7 @@
+export function canTeamLendToMatch(teamId: string | null | undefined, selectedTeamIds: readonly string[]) {
+  return typeof teamId === "string" && teamId.length > 0 && !selectedTeamIds.includes(teamId);
+}
+
 export function pickFairSubstitute<T extends { playerId: string }>(
   candidates: T[],
   previousLoanCount: ReadonlyMap<string, number>,

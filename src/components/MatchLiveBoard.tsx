@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, memo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo, memo, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   registerGoal,
@@ -42,6 +42,7 @@ import { TeamCrest } from "./TeamCrest";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { formatGoalTime } from "@/lib/goal-time";
 import { QuickNextMatchModal } from "./QuickNextMatchModal";
+import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
 
 // ============================================
 // MatchTimer: Isolado com memo para evitar re-render global da tela a cada segundo
@@ -310,6 +311,54 @@ type MatchLiveBoardProps = {
   canManage: boolean;
 };
 
+type GoalPickerPlayerOptionProps = {
+  entry: any;
+  cosmetics?: Record<string, { bannerAssetKey?: string | null; frameKey?: string | null; auraKey?: string | null }>;
+  onClick: () => void;
+  disabled?: boolean;
+  icon: ReactNode;
+  tone?: "accent" | "danger";
+};
+
+function GoalPickerPlayerOption({ entry, cosmetics, onClick, disabled, icon, tone = "accent" }: GoalPickerPlayerOptionProps) {
+  const cosmetic = cosmetics?.[entry.player_id];
+  const bannerImage = cosmeticHighResolutionImage(cosmetic?.bannerAssetKey);
+  const border = tone === "danger" ? "border-danger/30 hover:border-danger/60" : "border-border hover:border-accent/40";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`relative flex w-full items-center gap-3 overflow-hidden rounded-xl border bg-surface p-3 text-left transition-colors disabled:opacity-50 ${border}`}
+    >
+      {bannerImage && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-70"
+          style={{
+            backgroundImage: `linear-gradient(90deg, rgba(3,14,8,.18), rgba(3,14,8,.78)), url(${bannerImage})`,
+            backgroundPosition: cosmeticBackgroundPosition("banner", cosmetic?.bannerAssetKey),
+            backgroundSize: "cover",
+          }}
+        />
+      )}
+      <span className="relative z-10 flex min-w-0 flex-1 items-center gap-3">
+        <PlayerAvatar
+          name={entry.player?.name || "Jogador"}
+          avatarUrl={entry.player?.avatar_url}
+          clickable={false}
+          frameKey={cosmetic?.frameKey}
+          auraKey={cosmetic?.auraKey}
+          className="h-10 w-10 shrink-0 rounded-full bg-background text-xs font-bold"
+        />
+        <span className="truncate font-bold text-foreground">{entry.player?.name}</span>
+      </span>
+      <span className={`relative z-10 shrink-0 ${tone === "danger" ? "text-danger" : "text-accent"}`}>{icon}</span>
+    </button>
+  );
+}
+
 export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoardProps) {
   const router = useRouter();
   const refreshTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -319,6 +368,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [quickStart, setQuickStart] = useState<any | null>(null);
+  const playerCosmetics = match.player_cosmetics as GoalPickerPlayerOptionProps["cosmetics"] | undefined;
   useDialogViewport(Boolean(quickStart));
 
   // Placar e Eventos locais para Optimistic UI
@@ -938,10 +988,16 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
             </div>
             <div className="mobile-dialog-scroll min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4 pb-6 touch-pan-y" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
               <button type="button" disabled={loading} onClick={() => handleCorrectAssist(null)} className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-left text-xs font-bold text-muted hover:border-accent/40 hover:text-foreground disabled:opacity-50">Sem assistência</button>
-              {assistEditPlayers.map((entry: any) => <button key={entry.player_id} type="button" disabled={loading} onClick={() => handleCorrectAssist(entry.player_id)} className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2 text-left hover:border-accent/40 disabled:opacity-50">
-                <PlayerAvatar name={entry.player?.name || "Jogador"} avatarUrl={entry.player?.avatar_url} clickable={false} className="h-9 w-9 rounded-full bg-background text-[10px] font-black text-accent" />
-                <span className="text-xs font-bold text-foreground">{entry.player?.name}</span>
-              </button>)}
+              {assistEditPlayers.map((entry: any) => (
+                <GoalPickerPlayerOption
+                  key={entry.player_id}
+                  entry={entry}
+                  cosmetics={playerCosmetics}
+                  disabled={loading}
+                  onClick={() => handleCorrectAssist(entry.player_id)}
+                  icon={<Target className="h-5 w-5" strokeWidth={1.8} />}
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -970,20 +1026,15 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                     Escolha o jogador do outro time que marcou contra. O gol entra no placar do time selecionado e o autor recebe o desconto configurado.
                   </p>
                   {opposingActivePlayers.map((tp: any) => (
-                    <button
+                    <GoalPickerPlayerOption
                       key={tp.player_id}
-                      onClick={() => handleRegisterOwnGoal(tp.player_id)}
+                      entry={tp}
+                      cosmetics={playerCosmetics}
                       disabled={loading}
-                      className="flex w-full items-center gap-3 rounded-xl border border-danger/30 bg-surface p-3 text-left transition-colors hover:bg-danger/10 disabled:opacity-50"
-                    >
-                      <PlayerAvatar
-                        name={tp.player?.name || "Jogador"}
-                        avatarUrl={tp.player?.avatar_url}
-                        className="h-10 w-10 shrink-0 rounded-full bg-background text-xs font-bold"
-                      />
-                      <span className="flex-1 font-bold text-foreground">{tp.player?.name}</span>
-                      <Football className="h-5 w-5 text-danger" strokeWidth={1.8} />
-                    </button>
+                      onClick={() => handleRegisterOwnGoal(tp.player_id)}
+                      icon={<Football className="h-5 w-5" strokeWidth={1.8} />}
+                      tone="danger"
+                    />
                   ))}
                 </>
               ) : !goalModal.scorerId ? (
@@ -996,19 +1047,13 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                     <Football className="h-5 w-5" /> Gol contra
                   </button>
                   {activePlayers.map((tp: any) => (
-                    <button
+                    <GoalPickerPlayerOption
                       key={tp.player_id}
+                      entry={tp}
+                      cosmetics={playerCosmetics}
                       onClick={() => setGoalModal((p) => ({ ...p, scorerId: tp.player_id }))}
-                      className="w-full flex items-center gap-3 p-3 bg-surface hover:bg-surface-hover border border-border rounded-xl transition-colors text-left"
-                    >
-                      <PlayerAvatar
-                        name={tp.player?.name || "Jogador"}
-                        avatarUrl={tp.player?.avatar_url}
-                        className="w-10 h-10 rounded-full bg-background text-xs font-bold flex-shrink-0"
-                      />
-                      <span className="font-bold text-foreground flex-1">{tp.player?.name}</span>
-                      <Football className="h-5 w-5 text-accent" strokeWidth={1.8} />
-                    </button>
+                      icon={<Football className="h-5 w-5" strokeWidth={1.8} />}
+                    />
                   ))}
                 </>
               ) : (
@@ -1027,20 +1072,14 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                   </p>
 
                   {otherPlayers.map((tp: any) => (
-                    <button
+                    <GoalPickerPlayerOption
                       key={tp.player_id}
-                      onClick={() => handleRegisterGoal(tp.player_id)}
+                      entry={tp}
+                      cosmetics={playerCosmetics}
                       disabled={loading}
-                      className="w-full flex items-center gap-3 p-3 bg-surface hover:bg-surface-hover border border-border rounded-xl transition-colors text-left disabled:opacity-50"
-                    >
-                      <PlayerAvatar
-                        name={tp.player?.name || "Jogador"}
-                        avatarUrl={tp.player?.avatar_url}
-                        className="w-10 h-10 rounded-full bg-background text-xs font-bold flex-shrink-0"
-                      />
-                      <span className="font-bold text-foreground flex-1">{tp.player?.name}</span>
-                      <Target className="h-5 w-5 text-accent" strokeWidth={1.8} />
-                    </button>
+                      onClick={() => handleRegisterGoal(tp.player_id)}
+                      icon={<Target className="h-5 w-5" strokeWidth={1.8} />}
+                    />
                   ))}
                 </>
               )}

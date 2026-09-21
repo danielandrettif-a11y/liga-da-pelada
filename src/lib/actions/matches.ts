@@ -8,9 +8,11 @@ import { supabase } from "../supabase";
 import type { CreateMatchInput, RegisterGoalInput, SubstituteMatchPlayerInput } from "../types";
 import { calculateRoundStats } from "./stats";
 import { getAdminClient } from "../auth";
+import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
 import { sendMatchFinishedNotifications, sendMatchTimerNotifications } from "../push-notifications";
 import { scheduleMatchTimerAlerts } from "../match-timer-scheduler";
 import { buildStructuralLoans } from "../underfilled-rounds";
+import { canTeamLendToMatch } from "../substitution-draw";
 import { suggestNextMatchRotation } from "../next-match";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
@@ -26,7 +28,13 @@ async function getMatchState(
     .single();
 
   if (error || !data) throw new Error("Partida não encontrada");
-  return data;
+  const cosmetics = await getAllPlayersEquippedCosmeticsMap();
+  return {
+    ...data,
+    // O modal de gol/assistência precisa receber a capa ativa de cada atleta,
+    // assim como as cartas do elenco e da convocação.
+    player_cosmetics: Object.fromEntries(cosmetics),
+  };
 }
 
 async function buildQuickStartSuggestion(client: SupabaseClient, roundId: string, matchId: string) {
@@ -162,11 +170,8 @@ export async function createMatch(input: CreateMatchInput) {
       }
 
       const originalTeamId = originalTeamByPlayer.get(replacement.replacement_player_id);
-      const previousTeamIds = previousMatch ? [previousMatch.team_a_id, previousMatch.team_b_id] : [];
-      const outgoingTeamIds = previousTeamIds.filter((id) => !selectedTeamIds.includes(id));
-      if (!originalTeamId || selectedTeamIds.includes(originalTeamId)
-        || (previousMatch && !outgoingTeamIds.includes(originalTeamId))) {
-        return { success: false, error: "O substituto precisa vir do time que acabou de sair." };
+      if (!canTeamLendToMatch(originalTeamId, selectedTeamIds)) {
+        return { success: false, error: "O substituto precisa vir de um time que não participa desta partida." };
       }
       if (availability.get(replacement.replacement_player_id) !== "available"
         || (tracksAttendance && attendance.get(replacement.replacement_player_id) !== "present")) {
