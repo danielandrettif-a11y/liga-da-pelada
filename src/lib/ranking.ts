@@ -60,6 +60,11 @@ export type RankingEntry = {
 export type RankingExperienceData = {
   seasonLabel: string;
   general: RankingEntry[];
+  monthly: {
+    key: string;
+    label: string;
+    entries: RankingEntry[];
+  } | null;
   latestRound: {
     id: string;
     number: number;
@@ -69,4 +74,4 @@ export type RankingExperienceData = {
 };
 
 export type RankingFilter = "general" | "goals" | "assists" | "wins" | "winRate" | "awards" | "overall" | "overallDef" | "overallAlaMei" | "overallAta" | "overallGol";
-export type RankingView = "season" | "latest";
+export type RankingView = "season" | "month" | "latest";

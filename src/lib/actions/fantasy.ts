@@ -1666,7 +1666,7 @@ export async function getRevealedLineups(roundId?: string) {
   const { data: activations } = userIds.length
     ? await revealedReadClient
         .from("fantasy_card_activations")
-        .select("user_id, status, result_bonus, result_details, cards(name, slug, rarity)")
+        .select("user_id, status, result_bonus, result_details, card:fantasy_cards(name, slug, rarity)")
         .eq("round_id", targetFantasyRound.round.id)
         .in("user_id", userIds)
     : { data: [] as any[] };
@@ -1678,7 +1678,7 @@ export async function getRevealedLineups(roundId?: string) {
     const assist: any = predictedMap.get(l.top_assist_player_id);
     const challenge: any = predictedMap.get(l.challenge_player_id);
     const activation: any = activationMap.get(l.user_id);
-    const activatedCard: any = activation?.cards;
+    const activatedCard: any = activation?.card;
 
     return {
       lineupId: l.id,
@@ -3255,7 +3255,7 @@ export async function getFantasyUserHistory(userId: string) {
   const { data: activations } = roundIds.length
     ? await historyReadClient
       .from("fantasy_card_activations")
-      .select("round_id, status, result_bonus, result_details, cards(name, slug, rarity, description)")
+      .select("round_id, status, result_bonus, result_details, card:fantasy_cards(name, slug, rarity, description)")
       .eq("user_id", userId)
       .in("round_id", roundIds)
     : { data: [] as any[] };
@@ -3275,11 +3275,11 @@ export async function getFantasyUserHistory(userId: string) {
         ...lineup,
         fantasyRound: lineup.fantasy_rounds,
         round: lineup.fantasy_rounds?.rounds,
-        activeCard: activation?.cards ? {
-          name: activation.cards.name,
-          slug: activation.cards.slug,
-          rarity: activation.cards.rarity,
-          description: activation.cards.description,
+        activeCard: activation?.card ? {
+          name: activation.card.name,
+          slug: activation.card.slug,
+          rarity: activation.card.rarity,
+          description: activation.card.description,
           status: activation.status,
           bonus: Number(activation.result_bonus || 0),
           details: activation.result_details || null,
@@ -3375,13 +3375,13 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
   const historyLineup = history?.lineups?.find((item: any) => item.fantasyRound?.round_id === roundId);
   const { data: directActivation } = await lineupReadClient
     .from("fantasy_card_activations")
-    .select("status, result_bonus, result_details, cards(name, slug, rarity, description)")
+    .select("status, result_bonus, result_details, card:fantasy_cards(name, slug, rarity, description)")
     .eq("round_id", roundId)
     .eq("user_id", userId)
     .maybeSingle();
-  const directCard: any = Array.isArray((directActivation as any)?.cards)
-    ? (directActivation as any).cards[0]
-    : (directActivation as any)?.cards;
+  const directCard: any = Array.isArray((directActivation as any)?.card)
+    ? (directActivation as any).card[0]
+    : (directActivation as any)?.card;
   return {
     history: history || { player: profile?.players || null },
     lineup,

@@ -229,7 +229,7 @@ export function CallupBoard({
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-0.5 font-athletic text-[10px] font-black uppercase tracking-wider text-background">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-background" />
-                {callup.status === "locked" ? "Lista Fechada" : "Convocação Aberta"}
+                {callup.status === "locked" ? "Lista Fechada" : callup.status === "converted" ? "Times Sorteados" : "Convocação Aberta"}
               </span>
               <span className="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 text-[10px] font-bold text-muted uppercase">
                 {callup.round_type === "friendly" ? "Amistoso" : "Ranked"}
@@ -428,7 +428,7 @@ export function CallupBoard({
               </div>
             )}
           </div>
-        ) : currentPlayerId ? (
+        ) : currentPlayerId && callup.status !== "converted" ? (
           /* Botão de Entrar na Lista (Confirmar Presença) */
           <button
             onClick={() => run("join", () => joinActiveCallup(callup.id))}
@@ -453,6 +453,11 @@ export function CallupBoard({
               </>
             )}
           </button>
+        ) : currentPlayerId ? (
+          <div className="rounded-2xl border border-accent/25 bg-accent/[.06] p-4 text-center">
+            <p className="text-xs font-black uppercase tracking-wider text-accent">Times já sorteados</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted">A lista está completa. Se alguém desistir antes do primeiro jogo, a vaga reabre aqui no mesmo time.</p>
+          </div>
         ) : (
           <div className="rounded-2xl border border-warning/25 bg-warning/10 p-3.5 text-center text-xs font-bold text-warning">
             <p>Seu cadastro de jogador ainda não foi concluído.</p>

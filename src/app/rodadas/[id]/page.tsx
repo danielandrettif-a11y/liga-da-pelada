@@ -213,6 +213,11 @@ export default async function RodadaDetalhePage({
           participants={round.round_players || []}
           teams={round.teams || []}
           allPlayers={allSelectablePlayers}
+          canReopenCallup={
+            round.status === "draft" &&
+            Boolean((round.callups || []).length) &&
+            !(round.matches || []).some((match: any) => match.started_at || match.status === "live" || match.status === "finished")
+          }
         />
       )}
     </div>

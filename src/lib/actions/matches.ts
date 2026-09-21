@@ -11,6 +11,7 @@ import { getAdminClient } from "../auth";
 import { sendMatchFinishedNotifications, sendMatchTimerNotifications } from "../push-notifications";
 import { scheduleMatchTimerAlerts } from "../match-timer-scheduler";
 import { buildStructuralLoans } from "../underfilled-rounds";
+import { suggestNextMatchRotation } from "../next-match";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 
@@ -26,6 +27,56 @@ async function getMatchState(
 
   if (error || !data) throw new Error("Partida não encontrada");
   return data;
+}
+
+async function buildQuickStartSuggestion(client: SupabaseClient, roundId: string, matchId: string) {
+  const { data: round, error } = await client
+    .from("rounds")
+    .select(`
+      *,
+      round_players (
+        player_id,
+        availability_status,
+        availability_updated_at,
+        attendance_status,
+        attendance_order,
+        attendance_marked_at,
+        players (*)
+      ),
+      teams (
+        *,
+        team_players (
+          player_id,
+          goalkeeper_order,
+          loan_order,
+          players (*)
+        )
+      ),
+      matches (
+        *,
+        match_events (*),
+        match_players (player_id, team_id, original_team_id),
+        match_goalkeepers (*)
+      ),
+      league:league_id (stadium_name, stadium_map_url, event_duration_minutes, players_per_team, match_duration)
+    `)
+    .eq("id", roundId)
+    .single();
+
+  if (error || !round) {
+    console.error("Erro ao preparar início rápido:", error);
+    return null;
+  }
+
+  const teams = [...(round.teams || [])].sort((a: any, b: any) => Number(a.position || 0) - Number(b.position || 0));
+  const matches = [...(round.matches || [])].sort((a: any, b: any) =>
+    Number(a.match_order || 0) - Number(b.match_order || 0)
+      || String(a.created_at || "").localeCompare(String(b.created_at || "")),
+  );
+  const rotation = suggestNextMatchRotation(teams, matches, matchId);
+  if (!rotation) return null;
+
+  return { round: { ...round, teams, matches }, rotation };
 }
 
 export async function createMatch(input: CreateMatchInput) {
@@ -364,6 +415,11 @@ export async function createMatch(input: CreateMatchInput) {
     }
 
     revalidatePath(`/rodadas/${input.round_id}`);
+    // O primeiro apito encerra a janela de desistência da convocação. Força
+    // menu, início e página da lista a esconderem a aba imediatamente.
+    revalidatePath("/", "layout");
+    revalidatePath("/convocacao");
+    revalidatePath("/mais");
     return { success: true, matchId: data.id };
   } catch (err: any) {
     console.error("Erro ao criar partida:", err);
@@ -802,7 +858,8 @@ export async function finishMatch(matchId: string) {
       if (recoveryError) throw new Error(recoveryError.message);
       const recoveryStats = await calculateRoundStats(existingMatch.round_id);
       if (!recoveryStats.success) throw new Error(recoveryStats.error || "Erro ao recalcular estatisticas.");
-      return { success: true, alreadyFinished: true, roundId: existingMatch.round_id };
+      const quickStart = await buildQuickStartSuggestion(client, existingMatch.round_id, matchId);
+      return { success: true, alreadyFinished: true, roundId: existingMatch.round_id, quickStart };
     }
 
     const { error: lineupTimeError } = await client
@@ -838,7 +895,8 @@ export async function finishMatch(matchId: string) {
       }
     });
     
-    return { success: true, roundId: match.round_id };
+    const quickStart = await buildQuickStartSuggestion(client, match.round_id, matchId);
+    return { success: true, roundId: match.round_id, quickStart };
   } catch (err: any) {
     console.error("Erro ao finalizar partida:", err);
     return { success: false, error: err.message };

@@ -3,19 +3,20 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeftRight, ChevronDown, Loader2 } from "@/components/icons";
-import { addRoundEmergencySubstitute, transferRoundPlayerIdentity, zeroPlayerRoundPoints } from "@/lib/actions/rounds";
+import { addRoundEmergencySubstitute, openCallupReplacementVacancy, transferRoundPlayerIdentity, zeroPlayerRoundPoints } from "@/lib/actions/rounds";
 import type { Player } from "@/lib/types";
 
 type Participant = { player_id: string; players: Player | null };
 type Team = { id: string; name: string; team_players?: Array<{ player_id: string }> };
 
-export function RoundAdminPlayerTools({ roundId, status, participants, teams, allPlayers }: { roundId: string; status: string; participants: Participant[]; teams: Team[]; allPlayers: Player[] }) {
+export function RoundAdminPlayerTools({ roundId, status, participants, teams, allPlayers, canReopenCallup }: { roundId: string; status: string; participants: Participant[]; teams: Team[]; allPlayers: Player[]; canReopenCallup: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [sourceId, setSourceId] = useState("");
   const [targetId, setTargetId] = useState("");
   const [teamId, setTeamId] = useState("");
   const [zeroPlayerId, setZeroPlayerId] = useState("");
+  const [vacancyPlayerId, setVacancyPlayerId] = useState("");
   const [zeroReason, setZeroReason] = useState("Jogador não participou da rodada");
   const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
@@ -47,6 +48,17 @@ export function RoundAdminPlayerTools({ roundId, status, participants, teams, al
     });
   }
 
+  function openVacancy() {
+    if (!vacancyPlayerId) return;
+    if (window.prompt("Digite ABRIR VAGA para confirmar.") !== "ABRIR VAGA") return;
+    setMessage("");
+    startTransition(async () => {
+      const result = await openCallupReplacementVacancy(roundId, vacancyPlayerId);
+      setMessage(result.success ? "Vaga aberta na convocação. O próximo confirmado ficará neste mesmo time." : result.error || "Não foi possível abrir a vaga.");
+      if (result.success) { setVacancyPlayerId(""); router.refresh(); }
+    });
+  }
+
   return (
     <section className="space-y-2">
       <button type="button" onClick={() => setOpen((value) => !value)} className="glass-card flex w-full items-center gap-3 p-4 text-left">
@@ -60,6 +72,16 @@ export function RoundAdminPlayerTools({ roundId, status, participants, teams, al
           <label className="block text-[10px] font-black uppercase text-muted">{status === "finished" ? "Perfil correto" : "Jogador que vai entrar"}<select value={targetId} onChange={(event) => setTargetId(event.target.value)} className="mt-1 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"><option value="">Escolha</option>{(status === "finished" ? allPlayers.filter((player) => player.id !== sourceId) : outsidePlayers).map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label>
           {status !== "finished" && <label className="block text-[10px] font-black uppercase text-muted">Time de destino<select value={teamId} onChange={(event) => setTeamId(event.target.value)} className="mt-1 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"><option value="">Escolha</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>}
           <button type="button" disabled={pending || !sourceId || !targetId || (status !== "finished" && !teamId)} onClick={submit} className="flex w-full items-center justify-center gap-2 rounded-xl bg-warning py-3 text-xs font-black text-background disabled:opacity-40">{pending && <Loader2 className="h-4 w-4 animate-spin" />}{status === "finished" ? "Transferir participação" : "Confirmar substituição"}</button>
+          {canReopenCallup && (
+            <div className="space-y-2 border-t border-border pt-3">
+              <div>
+                <p className="text-[10px] font-black uppercase text-accent">Desistência antes do primeiro jogo</p>
+                <p className="mt-1 text-[10px] text-muted">Abre uma vaga na convocação. Quem confirmá-la entra no mesmo time do jogador que saiu.</p>
+              </div>
+              <label className="block text-[10px] font-black uppercase text-muted">Jogador que desistiu<select value={vacancyPlayerId} onChange={(event) => setVacancyPlayerId(event.target.value)} className="mt-1 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"><option value="">Escolha</option>{participants.filter((entry) => entry.players).map((entry) => <option key={entry.player_id} value={entry.player_id}>{entry.players?.name}</option>)}</select></label>
+              <button type="button" disabled={pending || !vacancyPlayerId} onClick={openVacancy} className="flex w-full items-center justify-center gap-2 rounded-xl border border-accent/40 bg-accent/10 py-3 text-xs font-black text-accent disabled:opacity-40">{pending && <Loader2 className="h-4 w-4 animate-spin" />}Abrir vaga na convocação</button>
+            </div>
+          )}
           {status === "finished" && (
             <div className="space-y-2 border-t border-border pt-3">
               <div>

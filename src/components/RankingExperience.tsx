@@ -22,6 +22,7 @@ import type {
 import { formatDateShort, getInitials } from "@/lib/utils";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { CosmeticNameplate } from "./fantasy/CosmeticNameplate";
+import { RANKED_GOALKEEPER_SCORING_RULES, RANKED_SCORING_RULES } from "@/lib/ranked-scoring";
 
 const RankingPlayerCardModal = dynamic(() =>
   import("./RankingPlayerCardModal").then((module) => module.RankingPlayerCardModal),
@@ -160,6 +161,7 @@ async function createPodiumStory(
   podium: RankingEntry[],
   seasonLabel: string,
   rankingLabel: string,
+  periodTitle: string,
 ) {
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
@@ -189,7 +191,7 @@ async function createPodiumStory(
   ctx.fillText("PELADA DE BAIXA QUALIDADE", 540, 120);
   ctx.fillStyle = "#f8fafc";
   ctx.font = "900 78px Arial";
-  ctx.fillText("PÓDIO DA TEMPORADA", 540, 235);
+  ctx.fillText(periodTitle, 540, 235);
   ctx.fillStyle = "#91aa9a";
   ctx.font = "700 30px Arial";
   ctx.fillText(`${seasonLabel} · ${rankingLabel}`, 540, 290);
@@ -284,7 +286,9 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
 
   const sourceEntries = view === "latest" && data.latestRound
     ? data.latestRound.entries
-    : data.general;
+    : view === "month" && data.monthly
+      ? data.monthly.entries
+      : data.general;
   const ranking = useMemo(() => sortRanking(sourceEntries, filter), [sourceEntries, filter]);
   const podium = ranking.slice(0, 3);
   const podiumOrder = podium.length === 3 ? [podium[1], podium[0], podium[2]] : podium;
@@ -302,8 +306,11 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
       const filterLabel = FILTERS.find((item) => item.key === filter)?.label || "Geral";
       const roundLabel = view === "latest" && data.latestRound
         ? `Rodada ${String(data.latestRound.number).padStart(2, "0")} · ${filterLabel}`
-        : filterLabel;
-      const blob = await createPodiumStory(podium, data.seasonLabel, roundLabel);
+        : view === "month" && data.monthly
+          ? `${data.monthly.label} · ${filterLabel}`
+          : filterLabel;
+      const periodTitle = view === "latest" ? "PÓDIO DA RODADA" : view === "month" ? "PÓDIO DO MÊS" : "PÓDIO DA TEMPORADA";
+      const blob = await createPodiumStory(podium, data.seasonLabel, roundLabel, periodTitle);
       const file = new File([blob], "podio-pelada-de-baixa-qualidade.png", { type: "image/png" });
 
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
@@ -360,13 +367,21 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 rounded-xl border border-border bg-surface p-1">
+      <div className="grid grid-cols-3 rounded-xl border border-border bg-surface p-1">
         <button
           type="button"
           onClick={() => setView("season")}
           className={`rounded-lg py-2.5 text-xs font-black transition-colors ${view === "season" ? "bg-accent text-background" : "text-muted"}`}
         >
           Temporada
+        </button>
+        <button
+          type="button"
+          onClick={() => data.monthly && setView("month")}
+          disabled={!data.monthly}
+          className={`rounded-lg py-2.5 text-xs font-black transition-colors disabled:opacity-40 ${view === "month" ? "bg-accent text-background" : "text-muted"}`}
+        >
+          Mês
         </button>
         <button
           type="button"
@@ -400,6 +415,34 @@ export function RankingExperience({ data, currentPlayerId }: Props) {
           Rodada {String(data.latestRound.number).padStart(2, "0")} · {formatDateShort(data.latestRound.date)}
         </div>
       )}
+
+      {view === "month" && data.monthly && (
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 py-2.5 text-xs text-muted">
+          <CalendarDays className="h-4 w-4 text-accent" />
+          {data.monthly.label} · todas as rodadas finalizadas do mês
+        </div>
+      )}
+
+      <details className="group overflow-hidden rounded-2xl border border-border bg-surface/60">
+        <summary className="flex cursor-pointer list-none items-center gap-3 p-3.5 marker:hidden">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent/10 text-accent">⚡</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-black text-foreground">Como pontuar no ranking</span>
+            <span className="block text-[10px] text-muted">Guia rápido dos scouts básicos</span>
+          </span>
+          <span className="text-lg font-black text-accent transition-transform group-open:rotate-45">+</span>
+        </summary>
+        <div className="grid grid-cols-2 gap-2 border-t border-border p-3 sm:grid-cols-4">
+          {[...RANKED_SCORING_RULES, ...RANKED_GOALKEEPER_SCORING_RULES].map((rule) => (
+            <div key={rule.key} className="rounded-xl border border-white/[.06] bg-background/55 p-2.5">
+              <p className="text-[11px] font-black text-foreground">{rule.icon} {rule.label}</p>
+              <p className={`mt-1 font-athletic text-base font-black ${rule.points >= 0 ? "text-accent" : "text-danger"}`}>
+                {rule.points > 0 ? "+" : ""}{rule.points.toLocaleString("pt-BR")}{"suffix" in rule ? rule.suffix : " pts"}
+              </p>
+            </div>
+          ))}
+        </div>
+      </details>
 
       <div className="hide-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
         {FILTERS.map((item) => (

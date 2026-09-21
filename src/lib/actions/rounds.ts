@@ -123,6 +123,7 @@ export async function getRound(id: string) {
         ),
         match_goalkeepers (*)
       ),
+      callups (id, status),
       league:league_id (stadium_name, stadium_map_url, event_duration_minutes, players_per_team)
     `)
     .eq("id", id)
@@ -1056,5 +1057,26 @@ export async function addRoundEmergencySubstitute(roundId: string, outPlayerId: 
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
+  }
+}
+
+export async function openCallupReplacementVacancy(roundId: string, outPlayerId: string) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem abrir vagas na convocação." };
+    const { error } = await client.rpc("open_callup_replacement_vacancy", {
+      p_round_id: roundId,
+      p_out_player_id: outPlayerId,
+    });
+    if (error) throw new Error(error.message);
+
+    revalidatePath(`/rodadas/${roundId}`);
+    revalidatePath(`/rodadas/${roundId}/nova-partida`);
+    revalidatePath("/convocacao");
+    revalidatePath("/");
+    revalidatePath("/admin/rodada");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Não foi possível abrir a vaga na convocação." };
   }
 }

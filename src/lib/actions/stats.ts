@@ -600,6 +600,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   const emptyData: RankingExperienceData = {
     seasonLabel: "Temporada atual",
     general: [],
+    monthly: null,
     latestRound: null,
   };
 
@@ -680,6 +681,19 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   const generalBase = aggregateRankingRows(currentStats, roundsMap, 6);
   const previousBase = aggregateRankingRows(currentStats.filter((row) => row.round_id !== latestRound.id), roundsMap, 6);
   const latestBase = aggregateRankingRows(currentStats.filter((row) => row.round_id === latestRound.id), roundsMap, 6);
+  // A lista vem ordenada por data decrescente. Portanto, o primeiro mês é o
+  // mês atual quando há jogo nele ou, caso contrário, o último mês com dados.
+  const monthlyKey = String(latestRound.date).slice(0, 7);
+  const monthlyRoundIds = new Set(currentRounds
+    .filter((round) => String(round.date).slice(0, 7) === monthlyKey)
+    .map((round) => round.id));
+  // No mês entram todas as rodadas (normalmente quatro ou cinco), sem o corte
+  // das seis melhores usado apenas na classificação da temporada.
+  const monthlyBase = aggregateRankingRows(
+    currentStats.filter((row) => monthlyRoundIds.has(row.round_id)),
+    roundsMap,
+    Number.MAX_SAFE_INTEGER,
+  );
   const previousPositions = new Map(previousBase.map((entry, index) => [entry.player.id, index + 1]));
   const seasonPositions = new Map(generalBase.map((entry, index) => [entry.player.id, index + 1]));
   const awardSeasonsByPlayer = buildAwardSeasonsByPlayer(
@@ -724,6 +738,13 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     return awardSeasonsByPlayer.get(playerId) || [];
   }
 
+  function getMonthlyAwardSeasons(playerId: string) {
+    return getAwardSeasons(playerId).map((awardSeason) => ({
+      ...awardSeason,
+      awards: awardSeason.awards.filter((award) => String(award.roundDate).slice(0, 7) === monthlyKey),
+    }));
+  }
+
   const general = generalBase.map((entry, index): RankingEntry => {
     const previousPosition = previousPositions.get(entry.player.id);
     return {
@@ -754,9 +775,33 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
   }));
 
+  const monthlyEntries = monthlyBase.map((entry): RankingEntry => ({
+    ...entry,
+    awards: countAwards(getMonthlyAwardSeasons(entry.player.id), "active"),
+    awardSeasons: getMonthlyAwardSeasons(entry.player.id),
+    seasonPosition: seasonPositions.get(entry.player.id) || general.length + 1,
+    positionChange: null,
+    overall: overallByPlayer.get(entry.player.id)?.overall ?? null,
+    overallTrend: overallByPlayer.get(entry.player.id)?.trend ?? null,
+    overallPositions: overallByPlayer.get(entry.player.id)?.positions ?? null,
+    fitness: getFitness(entry.player.id),
+    cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
+  }));
+  const [monthlyYear, monthlyMonth] = monthlyKey.split("-").map(Number);
+  const monthlyLabel = new Intl.DateTimeFormat("pt-BR", {
+    month: "long",
+    year: "numeric",
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date(Date.UTC(monthlyYear, monthlyMonth - 1, 15)));
+
   return {
     seasonLabel,
     general,
+    monthly: {
+      key: monthlyKey,
+      label: monthlyLabel.charAt(0).toUpperCase() + monthlyLabel.slice(1),
+      entries: monthlyEntries,
+    },
     latestRound: {
       id: latestRound.id,
       number: latestRound.number,

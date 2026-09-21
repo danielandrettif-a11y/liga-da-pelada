@@ -4,6 +4,7 @@ import { supabase } from "../supabase";
 import { getRanking } from "./stats";
 import { getActiveSeason } from "./seasons";
 import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
+import { hasCallupClosingMatch } from "../callup-lifecycle";
 
 export async function getDashboardData() {
   try {
@@ -91,7 +92,7 @@ export async function getDashboardData() {
       .from("callups")
       .select("id, date, start_time, stadium_name, stadium_map_url, round_type, capacity, waitlist_capacity, callup_entries(player_id, status, position), round:round_id(id, status, matches(status, started_at))")
       .eq("league_id", season.league_id)
-      .in("status", ["open", "locked"])
+      .in("status", ["open", "locked", "converted"])
       .order("date", { ascending: true })
       .order("start_time", { ascending: true });
 
@@ -125,15 +126,8 @@ export async function getDashboardData() {
     const visibleCallups = (activeCallupsData || []).filter((callup: any) => {
       if (!callup.round) return true;
       const linkedRound: any = callup.round;
-      const isRoundStarted = linkedRound.status !== "draft";
-      const hasStartedMatches = (linkedRound.matches || []).some(
-        (m: any) =>
-          Boolean(m.started_at) ||
-          m.status === "in_progress" ||
-          m.status === "live" ||
-          m.status === "finished"
-      );
-      return !isRoundStarted && !hasStartedMatches;
+      const hasStartedMatches = hasCallupClosingMatch(linkedRound.matches);
+      return !hasStartedMatches;
     });
 
     const mappedCallups = visibleCallups.map((callup: any) => ({

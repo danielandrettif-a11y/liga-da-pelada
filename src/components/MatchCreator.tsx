@@ -11,10 +11,17 @@ import { VEST_COLORS } from "@/lib/vest-colors";
 import { pickFairSubstitute } from "@/lib/substitution-draw";
 import { buildStructuralLoans } from "@/lib/underfilled-rounds";
 
-export function MatchCreator({ round }: { round: any }) {
+type MatchCreatorProps = {
+  round: any;
+  initialTeamIds?: [string, string];
+  quickStart?: boolean;
+  onCancel?: () => void;
+};
+
+export function MatchCreator({ round, initialTeamIds, quickStart = false, onCancel }: MatchCreatorProps) {
   const router = useRouter();
-  const [teamAId, setTeamAId] = useState<string>("");
-  const [teamBId, setTeamBId] = useState<string>("");
+  const [teamAId, setTeamAId] = useState<string>(initialTeamIds?.[0] || "");
+  const [teamBId, setTeamBId] = useState<string>(initialTeamIds?.[1] || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [replacementByAbsent, setReplacementByAbsent] = useState<Record<string, string>>({});
@@ -369,7 +376,7 @@ export function MatchCreator({ round }: { round: any }) {
         </div>
       )}
       {/* Top bar */}
-      <div className="flex items-center gap-3">
+      {!quickStart && <div className="flex items-center gap-3">
         <Link
           href={`/rodadas/${round.id}`}
           className="w-10 h-10 rounded-full bg-surface hover:bg-surface-hover flex items-center justify-center transition-colors"
@@ -382,9 +389,9 @@ export function MatchCreator({ round }: { round: any }) {
             Rodada {String(round.number).padStart(2, "0")}
           </p>
         </div>
-      </div>
+      </div>}
 
-      <section className="glass-card overflow-hidden">
+      {!quickStart && <section className="glass-card overflow-hidden">
         <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent"><Crown className="h-4.5 w-4.5" /></span>
           <div><h2 className="text-sm font-black text-foreground">Identidade dos times</h2><p className="text-[10px] text-muted">Escolha o colete e o capitão de referência no mesmo lugar.</p></div>
@@ -416,9 +423,9 @@ export function MatchCreator({ round }: { round: any }) {
             </div>
           ))}
         </div>
-      </section>
+      </section>}
 
-      <div className="glass-card p-6 flex flex-col items-center gap-6 animate-fade-in-up">
+      {!quickStart ? <div className="glass-card p-6 flex flex-col items-center gap-6 animate-fade-in-up">
         
         {error && (
           <div className="w-full p-3 rounded-lg bg-danger/10 text-danger text-xs font-semibold text-center">
@@ -532,7 +539,33 @@ export function MatchCreator({ round }: { round: any }) {
           </div>
         </div>
 
-      </div>
+      </div> : (
+        <div className="space-y-3">
+          {error && <div className="rounded-xl bg-danger/10 p-3 text-center text-xs font-semibold text-danger">{error}</div>}
+          <section className="rounded-2xl border border-accent/25 bg-accent/[.06] p-4">
+            <p className="text-[10px] font-black uppercase tracking-[.16em] text-accent">Próximo confronto sugerido</p>
+            <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+              {[teamAId, teamBId].map((teamId, index) => {
+                const team = teams.find((item: any) => item.id === teamId);
+                return index === 1 ? (
+                  <div key={teamId} className="contents">
+                    <Swords className="h-5 w-5 text-muted" />
+                    <div className="min-w-0 text-center">
+                      <TeamCrest name={team?.name || "Time"} crestUrl={team?.crest_url} color={team?.color} className="mx-auto h-12 w-12" />
+                      <p className="mt-2 truncate text-xs font-black text-foreground">{team?.name}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div key={teamId} className="min-w-0 text-center">
+                    <TeamCrest name={team?.name || "Time"} crestUrl={team?.crest_url} color={team?.color} className="mx-auto h-12 w-12" />
+                    <p className="mt-2 truncate text-xs font-black text-foreground">{team?.name}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      )}
 
       {selectedTeamIds.length === 2 && (
         <section className="glass-card overflow-hidden animate-fade-in-up">
@@ -691,9 +724,15 @@ export function MatchCreator({ round }: { round: any }) {
         disabled={loading || !teamAId || !teamBId || !goalkeeperByTeam[teamAId] || !goalkeeperByTeam[teamBId]}
         className="w-full bg-accent hover:bg-accent-light text-background font-bold py-4 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-accent/20"
       >
-        {loading ? "Criando..." : "Apita o Árbitro!"}
+        {loading ? "Criando..." : quickStart ? "Iniciar próxima partida" : "Apita o Árbitro!"}
         <ChevronRight className="w-5 h-5" />
       </button>
+
+      {quickStart && onCancel && (
+        <button type="button" onClick={onCancel} disabled={loading} className="w-full rounded-xl border border-border bg-surface py-3 text-xs font-black text-muted disabled:opacity-50">
+          Agora não · voltar para a rodada
+        </button>
+      )}
 
     </div>
   );

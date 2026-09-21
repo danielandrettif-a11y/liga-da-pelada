@@ -13,6 +13,7 @@ import {
   MIN_TEAMS_PER_ROUND,
   TEAMS_PER_ROUND,
 } from "../constants";
+import { hasCallupClosingMatch } from "../callup-lifecycle";
 
 export type CallupEntryWithPlayer = CallupEntry & {
   player: Player;
@@ -23,17 +24,10 @@ export type CallupWithEntries = Callup & { entries: CallupEntryWithPlayer[] };
 function normalizeCallup(data: any): CallupWithEntries | null {
   const linkedRound = data?.round;
   if (linkedRound) {
-    // A pré-lista permanece em "draft". Ao iniciar a primeira partida a
-    // rodada muda para "active", então a convocação não deve mais aparecer.
-    const isRoundStarted = linkedRound.status !== "draft";
-    const hasStartedMatches = (linkedRound.matches || []).some(
-      (match: any) =>
-        Boolean(match.started_at) ||
-        match.status === "in_progress" ||
-        match.status === "live" ||
-        match.status === "finished",
-    );
-    if (isRoundStarted || hasStartedMatches) return null;
+    // Sorteio concluído não encerra a convocação. Ela continua acessível para
+    // desistências e reposições até o primeiro jogo realmente começar.
+    const hasStartedMatches = hasCallupClosingMatch(linkedRound.matches);
+    if (hasStartedMatches) return null;
   }
 
   const rawEntries = (data?.callup_entries || []) as CallupEntryWithPlayer[];
@@ -69,7 +63,7 @@ export async function getActiveCallups(): Promise<CallupWithEntries[]> {
       )
     `)
     .eq("league.is_active", true)
-    .in("status", ["open", "locked"])
+    .in("status", ["open", "locked", "converted"])
     .order("date", { ascending: true })
     .order("start_time", { ascending: true })
     .order("created_at", { ascending: true });
@@ -194,9 +188,19 @@ export async function joinActiveCallup(callupId: string) {
 export async function leaveActiveCallup(callupId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre na sua conta para sair." };
+  const { data: callup } = await account.client
+    .from("callups")
+    .select("round_id")
+    .eq("id", callupId)
+    .maybeSingle();
   const { error } = await account.client.rpc("leave_callup", { p_callup_id: callupId });
   if (error) return { success: false, error: error.message };
   refreshCallups();
+  revalidatePath("/rodadas");
+  if (callup?.round_id) {
+    revalidatePath(`/rodadas/${callup.round_id}`);
+    revalidatePath(`/rodadas/${callup.round_id}/nova-partida`);
+  }
   return { success: true };
 }
 

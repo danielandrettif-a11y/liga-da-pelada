@@ -41,6 +41,7 @@ import {
 import { TeamCrest } from "./TeamCrest";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { formatGoalTime } from "@/lib/goal-time";
+import { QuickNextMatchModal } from "./QuickNextMatchModal";
 
 // ============================================
 // MatchTimer: Isolado com memo para evitar re-render global da tela a cada segundo
@@ -317,6 +318,8 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [quickStart, setQuickStart] = useState<any | null>(null);
+  useDialogViewport(Boolean(quickStart));
 
   // Placar e Eventos locais para Optimistic UI
   const [displayScore, setDisplayScore] = useState({
@@ -511,6 +514,8 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       setLoading(false);
       return;
     }
+    if (res.quickStart) setQuickStart(res.quickStart);
+    else router.push(`/rodadas/${res.roundId || match.round_id}`);
     setLoading(false);
   }
 
@@ -1042,6 +1047,12 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
             </div>
           </div>
         </div>
+      )}
+      {quickStart && canManage && (
+        <QuickNextMatchModal
+          suggestion={quickStart}
+          onClose={() => router.push(`/rodadas/${match.round_id}`)}
+        />
       )}
     </div>
   );
