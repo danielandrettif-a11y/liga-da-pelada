@@ -18,6 +18,8 @@ import { drawGoalkeeperOrder } from "../goalkeeperOrder";
 import { TEAM_CREST_URLS } from "../teamPresets";
 import { scheduleCartolaRoundReminders } from "../cartola-reminder-scheduler";
 import { validateUnderfilledTeamSizes } from "../underfilled-rounds";
+import { getLatestPlayerCardOverallMap } from "./stats";
+import { previewRoundReshuffle, type RoundReshuffleMode } from "../round-reshuffle";
 
 const getActiveLeagueCached = unstable_cache(async () => {
   const { data, error } = await supabase
@@ -357,6 +359,127 @@ export async function shuffleRoundTeams(roundId: string) {
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || "Não foi possível misturar os times." };
+  }
+}
+
+export type RoundTeamShufflePreview = {
+  success: boolean;
+  mode?: RoundReshuffleMode;
+  assignments?: Array<{ teamId: string; playerIds: string[] }>;
+  summaries?: Array<{
+    overallAverage: number;
+    speedAverage: number;
+    profiles: { defensive: number; midfield: number; offensive: number };
+  }>;
+  balanceScore?: number;
+  error?: string;
+};
+
+const ROUND_RESHUFFLE_MODES: RoundReshuffleMode[] = ["random", "balanced", "speed", "adaptive"];
+
+/** Gera uma formação de teste. Não grava nada enquanto o ADM estiver comparando os times. */
+export async function previewRoundTeamShuffle(roundId: string, mode: RoundReshuffleMode): Promise<RoundTeamShufflePreview> {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem sortear os times." };
+    if (!roundId || !ROUND_RESHUFFLE_MODES.includes(mode)) return { success: false, error: "Tipo de sorteio inválido." };
+
+    const { data: round, error: roundError } = await client
+      .from("rounds")
+      .select(`
+        id,
+        status,
+        matches (status),
+        teams (
+          id,
+          position,
+          team_players (
+            player_id,
+            players (id, player_profile, is_goalkeeper)
+          )
+        )
+      `)
+      .eq("id", roundId)
+      .single();
+    if (roundError || !round) throw new Error(roundError?.message || "Rodada não encontrada.");
+    if (round.status === "finished") return { success: false, error: "A rodada já foi encerrada." };
+    if ((round.matches || []).some((match: any) => match.status === "live")) {
+      return { success: false, error: "Encerre a partida ao vivo antes de preparar uma nova formação." };
+    }
+
+    const teams = [...(round.teams || [])].sort((left: any, right: any) => (left.position || 0) - (right.position || 0));
+    const playerIds = teams.flatMap((team: any) => (team.team_players || []).map((entry: any) => entry.player_id).filter(Boolean));
+    if (teams.length < 2 || playerIds.length < teams.length * 2) {
+      return { success: false, error: "São necessários pelo menos dois times completos para criar uma nova formação." };
+    }
+
+    const [{ data: attributes, error: attributesError }, overallByPlayer] = await Promise.all([
+      client.from("player_admin_attributes").select("player_id, speed_rating").in("player_id", playerIds),
+      getLatestPlayerCardOverallMap(client),
+    ]);
+    if (attributesError) throw new Error(attributesError.message);
+
+    const speedByPlayer = new Map<string, 1 | 2 | 3 | null>((attributes || []).map((attribute: any) => [
+      attribute.player_id,
+      [1, 2, 3].includes(attribute.speed_rating) ? attribute.speed_rating : null,
+    ]));
+    const playerById = new Map<string, any>(teams.flatMap((team: any) => (team.team_players || []).map((entry: any) => [entry.player_id, entry.players])));
+    const preview = previewRoundReshuffle({
+      players: playerIds.map((playerId) => {
+        const player = playerById.get(playerId);
+        return {
+          id: playerId,
+          overall: overallByPlayer.get(playerId)?.overall ?? null,
+          speedRating: speedByPlayer.get(playerId) ?? null,
+          playerProfile: player?.player_profile || null,
+          isGoalkeeper: player?.is_goalkeeper === true,
+        };
+      }),
+      capacities: teams.map((team: any) => (team.team_players || []).length),
+      mode,
+    });
+
+    return {
+      success: true,
+      mode,
+      assignments: teams.map((team: any, index: number) => ({ teamId: team.id, playerIds: preview.teams[index] || [] })),
+      summaries: preview.summaries,
+      balanceScore: preview.balanceScore,
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Não foi possível preparar a nova formação." };
+  }
+}
+
+/** Aplica exatamente a prévia aprovada pelo ADM após a confirmação textual. */
+export async function applyRoundTeamShuffle(input: {
+  roundId: string;
+  mode: RoundReshuffleMode;
+  assignments: Array<{ teamId: string; playerIds: string[] }>;
+  confirmation: string;
+}) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem misturar os times." };
+    if (input.confirmation.trim().toUpperCase() !== "MISTURAR") return { success: false, error: "Digite MISTURAR para confirmar a nova formação." };
+    if (!input.roundId || !ROUND_RESHUFFLE_MODES.includes(input.mode)) return { success: false, error: "Dados do sorteio inválidos." };
+    if (!Array.isArray(input.assignments) || input.assignments.length < 2) return { success: false, error: "A formação precisa conter pelo menos dois times." };
+
+    const assignments = input.assignments.map((assignment) => ({
+      team_id: assignment.teamId,
+      player_ids: [...new Set(assignment.playerIds.filter(Boolean))],
+    }));
+    const { error } = await client.rpc("apply_round_team_shuffle", {
+      p_round_id: input.roundId,
+      p_assignments: assignments,
+      p_formation_mode: input.mode,
+    });
+    if (error) throw new Error(error.message);
+
+    refreshRoundManagement(input.roundId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Não foi possível aplicar a nova formação." };
   }
 }
 
