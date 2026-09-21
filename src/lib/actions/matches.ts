@@ -8,7 +8,6 @@ import { supabase } from "../supabase";
 import type { CreateMatchInput, RegisterGoalInput, SubstituteMatchPlayerInput } from "../types";
 import { calculateRoundStats } from "./stats";
 import { getAdminClient } from "../auth";
-import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
 import { sendMatchFinishedNotifications, sendMatchTimerNotifications } from "../push-notifications";
 import { scheduleMatchTimerAlerts } from "../match-timer-scheduler";
 import { buildStructuralLoans } from "../underfilled-rounds";
@@ -28,13 +27,7 @@ async function getMatchState(
     .single();
 
   if (error || !data) throw new Error("Partida não encontrada");
-  const cosmetics = await getAllPlayersEquippedCosmeticsMap();
-  return {
-    ...data,
-    // O modal de gol/assistência precisa receber a capa ativa de cada atleta,
-    // assim como as cartas do elenco e da convocação.
-    player_cosmetics: Object.fromEntries(cosmetics),
-  };
+  return data;
 }
 
 async function buildQuickStartSuggestion(client: SupabaseClient, roundId: string, matchId: string) {
@@ -546,7 +539,44 @@ export async function getMatch(matchId: string) {
     );
   }
 
-  return data;
+  // A fonte das capas equipadas é a mesma view usada pelas cartas de jogador.
+  // Usar os IDs da partida inclui empréstimos e substituições, não só os
+  // jogadores originalmente escalados no time.
+  const playerIds = [...new Set(
+    (data.match_players || [])
+      .map((matchPlayer: any) => matchPlayer.player_id)
+      .filter(Boolean),
+  )];
+  const player_cosmetics: Record<string, { bannerAssetKey: string | null; frameKey: string | null; auraKey: string | null }> = {};
+
+  if (playerIds.length > 0) {
+    const { data: equippedCosmetics, error: cosmeticsError } = await supabase
+      .from("player_equipped_cosmetics")
+      .select("player_id, slot, cosmetic:cosmetic_id(asset_key)")
+      .in("player_id", playerIds)
+      .in("slot", ["banner", "frame", "aura"]);
+
+    if (cosmeticsError) {
+      console.error("Erro ao buscar capas equipadas da partida:", cosmeticsError);
+    } else {
+      for (const item of equippedCosmetics || []) {
+        const playerId = item.player_id;
+        if (!playerId) continue;
+
+        const equipped = player_cosmetics[playerId] ||= {
+          bannerAssetKey: null,
+          frameKey: null,
+          auraKey: null,
+        };
+        const assetKey = (item.cosmetic as { asset_key?: string | null } | null)?.asset_key || null;
+        if (item.slot === "banner") equipped.bannerAssetKey = assetKey;
+        if (item.slot === "frame") equipped.frameKey = assetKey;
+        if (item.slot === "aura") equipped.auraKey = assetKey;
+      }
+    }
+  }
+
+  return { ...data, player_cosmetics };
 }
 
 export async function registerGoal(input: RegisterGoalInput) {

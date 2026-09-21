@@ -335,9 +335,9 @@ function GoalPickerPlayerOption({ entry, cosmetics, onClick, disabled, icon, ton
       {bannerImage && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-70"
+          className="pointer-events-none absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(90deg, rgba(3,14,8,.18), rgba(3,14,8,.78)), url(${bannerImage})`,
+            backgroundImage: `linear-gradient(90deg, rgba(3,14,8,.08), rgba(3,14,8,.58)), url(${bannerImage})`,
             backgroundPosition: cosmeticBackgroundPosition("banner", cosmetic?.bannerAssetKey),
             backgroundSize: "cover",
           }}
@@ -352,7 +352,10 @@ function GoalPickerPlayerOption({ entry, cosmetics, onClick, disabled, icon, ton
           auraKey={cosmetic?.auraKey}
           className="h-10 w-10 shrink-0 rounded-full bg-background text-xs font-bold"
         />
-        <span className="truncate font-bold text-foreground">{entry.player?.name}</span>
+        <span className="min-w-0">
+          <span className="block truncate font-bold text-foreground">{entry.player?.name}</span>
+          {bannerImage && <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-wide text-foreground/70">Capa equipada</span>}
+        </span>
       </span>
       <span className={`relative z-10 shrink-0 ${tone === "danger" ? "text-danger" : "text-accent"}`}>{icon}</span>
     </button>
