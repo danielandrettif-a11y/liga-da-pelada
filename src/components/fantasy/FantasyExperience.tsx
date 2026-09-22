@@ -28,7 +28,7 @@ import {
   X,
 } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
-import { TeamCrest } from "@/components/TeamCrest";
+import { TeamMiniPitch } from "@/components/TeamMiniPitch";
 import { formatFantasyMoney } from "@/lib/fantasy/config";
 import { cosmeticImage } from "@/lib/fantasy/cosmetics";
 import { CHALLENGE_LABELS, fantasyChallengeOffer } from "@/lib/fantasy/challenges";
@@ -275,10 +275,18 @@ export function FantasyExperience({
   const hasPersistedRoundLineup = Boolean(
     lineup?.fantasy_round_id || (isTest && lineup?.test_session_id),
   );
-  const roundTeams = useMemo(
-    () => (round?.teams || []).filter((team) => (team.team_players || []).length > 0),
-    [round?.teams],
-  );
+  const roundTeams = useMemo(() => {
+    const pointsByPlayerId = new Map(market.map((player) => [player.id, player.totalPoints] as const));
+    return (round?.teams || [])
+      .filter((team) => (team.team_players || []).length > 0)
+      .map((team) => ({
+        ...team,
+        team_players: (team.team_players || []).map((entry) => ({
+          ...entry,
+          cartola_points: pointsByPlayerId.get(entry.player_id) || 0,
+        })),
+      }));
+  }, [market, round?.teams]);
   const canShowRoundTeams = (status === "open" || status === "in_progress") && roundTeams.length >= 2;
   const [savedSignature, setSavedSignature] = useState(() =>
     hasPersistedRoundLineup
@@ -1262,44 +1270,10 @@ export function FantasyExperience({
           </button>
 
           {showRoundTeams && (
-            <div id="times-da-rodada" className="grid gap-2 border-t border-border/80 p-3 sm:grid-cols-2">
-              {roundTeams.map((team) => {
-                const players = team.team_players || [];
-                return (
-                  <article key={team.id} className="overflow-hidden rounded-xl border border-border bg-background/35">
-                    <header className="flex items-center gap-2 border-b border-border/80 px-3 py-2.5">
-                      <TeamCrest
-                        name={team.name}
-                        crestUrl={team.crest_url}
-                        color={team.color}
-                        className="h-7 w-7"
-                      />
-                      <span className="min-w-0 flex-1 truncate text-xs font-black text-foreground">{team.name}</span>
-                      <span className="text-[9px] font-bold text-muted">{players.length} jogadores</span>
-                    </header>
-                    <ul className="divide-y divide-border/60">
-                      {players.map((teamPlayer) => {
-                        const player = teamPlayer.players;
-                        if (!player) return null;
-                        return (
-                          <li key={teamPlayer.player_id} className="flex items-center gap-2 px-3 py-2">
-                            <PlayerAvatar
-                              name={player.name}
-                              avatarUrl={player.avatar_url}
-                              clickable={false}
-                              className="h-7 w-7 rounded-full"
-                              sizes="28px"
-                            />
-                            <span className="truncate text-[11px] font-bold text-foreground">
-                              {player.nickname || player.name}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </article>
-                );
-              })}
+            <div id="times-da-rodada" className="grid gap-3 border-t border-border/80 p-3 sm:grid-cols-2 xl:grid-cols-3">
+              {roundTeams.map((team, index) => (
+                <TeamMiniPitch key={team.id} team={team} index={index} showPositionDetails />
+              ))}
             </div>
           )}
         </section>

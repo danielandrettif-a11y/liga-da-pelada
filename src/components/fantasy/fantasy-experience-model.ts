@@ -23,11 +23,16 @@ export type FantasyExperienceProps = {
       crest_url?: string | null;
       team_players?: Array<{
         player_id: string;
+        goalkeeper_order?: number | null;
+        loan_order?: number | null;
+        cartola_points?: number;
         players?: {
           id: string;
           name: string;
           nickname?: string | null;
           avatar_url?: string | null;
+          player_profile?: string | null;
+          is_goalkeeper?: boolean;
         } | null;
       }>;
     }>;

@@ -4,11 +4,22 @@ import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { TeamCrest } from "./TeamCrest";
 
+type PitchPlayerProfile = string | null | undefined;
+
+type PitchPlayerDetails = {
+  id: string;
+  name: string;
+  avatar_url?: string | null;
+  player_profile?: PitchPlayerProfile;
+  is_goalkeeper?: boolean;
+};
+
 type PitchPlayer = {
   player_id: string;
   goalkeeper_order?: number | null;
   loan_order?: number | null;
-  players: Player | null;
+  cartola_points?: number;
+  players?: PitchPlayerDetails | null;
 };
 
 type TeamMiniPitchProps = {
@@ -22,6 +33,7 @@ type TeamMiniPitchProps = {
   index: number;
   selectedPlayerId?: string;
   onPlayerClick?: (player: Player) => void;
+  showPositionDetails?: boolean;
 };
 
 const POSITIONS: Record<number, Array<[number, number]>> = {
@@ -37,12 +49,38 @@ const POSITIONS: Record<number, Array<[number, number]>> = {
   10: [[25, 9], [75, 9], [25, 28], [75, 28], [25, 48], [75, 48], [25, 68], [75, 68], [25, 87], [75, 87]],
 };
 
-export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick }: TeamMiniPitchProps) {
-  const players = team.team_players
-    .flatMap((entry) => entry.players ? [{ player: entry.players, goalkeeperOrder: entry.goalkeeper_order ?? null, loanOrder: entry.loan_order ?? null }] : [])
-    .slice(0, 10);
-  const positions = POSITIONS[Math.max(1, players.length)];
-  const isCrowded = players.length > 6;
+function getPitchPosition(player: PitchPlayerDetails) {
+  if (player.is_goalkeeper) {
+    return { label: "GOL", priority: 3, className: "border-sky-300/40 bg-sky-400/15 text-sky-100" };
+  }
+  if (player.player_profile === "offensive") {
+    return { label: "ATA", priority: 0, className: "border-rose-300/35 bg-rose-400/15 text-rose-100" };
+  }
+  if (player.player_profile === "defensive") {
+    return { label: "DEF/VOL", priority: 2, className: "border-blue-300/35 bg-blue-400/15 text-blue-100" };
+  }
+  return { label: "ALA", priority: 1, className: "border-amber-300/35 bg-amber-300/15 text-amber-100" };
+}
+
+export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, showPositionDetails = false }: TeamMiniPitchProps) {
+  const playerEntries = team.team_players
+    .flatMap((entry) => entry.players ? [{
+      player: entry.players,
+      goalkeeperOrder: entry.goalkeeper_order ?? null,
+      loanOrder: entry.loan_order ?? null,
+      cartolaPoints: Number(entry.cartola_points || 0),
+    }] : []);
+  const players = showPositionDetails
+    ? playerEntries.sort((a, b) => {
+      const roleDifference = getPitchPosition(a.player).priority - getPitchPosition(b.player).priority;
+      if (roleDifference !== 0) return roleDifference;
+      if (b.cartolaPoints !== a.cartolaPoints) return b.cartolaPoints - a.cartolaPoints;
+      return a.player.name.localeCompare(b.player.name, "pt-BR");
+    })
+    : playerEntries;
+  const visiblePlayers = players.slice(0, 10);
+  const positions = POSITIONS[Math.max(1, visiblePlayers.length)];
+  const isCrowded = visiblePlayers.length > 6;
 
   return (
     <article className={`glass-card min-w-0 overflow-hidden p-1.5 animate-fade-in-up stagger-${Math.min(index + 1, 5)}`}>
@@ -51,7 +89,7 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick }: 
         <h3 className="min-w-0 flex-1 truncate text-[10px] font-black leading-tight text-foreground" title={team.name}>
           {team.name}
         </h3>
-        <span className="shrink-0 text-[7px] font-black text-muted">{players.length}J</span>
+        <span className="shrink-0 text-[7px] font-black text-muted">{visiblePlayers.length}J</span>
       </div>
 
       <div className="mb-1 flex items-center justify-end px-0.5">
@@ -72,14 +110,15 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick }: 
         <div className="absolute left-1/2 top-1.5 h-6 w-12 -translate-x-1/2 border border-t-0 border-white/30" />
         <div className="absolute bottom-1.5 left-1/2 h-6 w-12 -translate-x-1/2 border border-b-0 border-white/30" />
 
-        {players.map(({ player, goalkeeperOrder, loanOrder }, playerIndex) => {
+        {visiblePlayers.map(({ player, goalkeeperOrder, loanOrder, cartolaPoints }, playerIndex) => {
           const [left, top] = positions[playerIndex];
+          const position = getPitchPosition(player);
           return (
             <button
               key={player.id}
               type="button"
               disabled={!onPlayerClick}
-              onClick={() => onPlayerClick?.(player)}
+              onClick={() => onPlayerClick?.(player as Player)}
               aria-pressed={onPlayerClick ? selectedPlayerId === player.id : undefined}
               className={`absolute flex w-[48%] -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-md transition-transform enabled:active:scale-95 ${selectedPlayerId === player.id ? "z-10 bg-warning/20 ring-2 ring-warning" : ""}`}
               style={{ left: `${left}%`, top: `${top}%` }}
@@ -112,6 +151,14 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick }: 
               <span className={`mt-0.5 line-clamp-2 w-full rounded bg-black/75 px-0.5 py-0.5 text-center font-black leading-[1.05] text-white shadow-sm ${isCrowded ? "text-[6px]" : "text-[8px]"}`}>
                 {player.name}
               </span>
+              {showPositionDetails && (
+                <span
+                  className={`mt-0.5 rounded border px-1 py-0.5 text-center font-black leading-none ${position.className} ${isCrowded ? "text-[5px]" : "text-[7px]"}`}
+                  title={`${position.label} · ${cartolaPoints.toFixed(1)} pontos no Cartola`}
+                >
+                  {position.label} · {cartolaPoints.toFixed(1)}
+                </span>
+              )}
             </button>
           );
         })}

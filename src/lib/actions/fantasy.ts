@@ -234,7 +234,7 @@ export async function getFantasyDashboard() {
     account.client
       .from("fantasy_test_sessions")
       .select(
-        "*, round:round_id(id, number, date, start_time, status, round_type, teams(id, name, color, crest_url, team_players(player_id, players(id, name, nickname, avatar_url))), matches(id, status))"
+        "*, round:round_id(id, number, date, start_time, status, round_type, teams(id, name, color, crest_url, team_players(player_id, goalkeeper_order, loan_order, players(id, name, nickname, avatar_url, player_profile, is_goalkeeper))), matches(id, status))"
       )
       .eq("league_id", league.id)
       .eq("season_id", season.id)
@@ -274,7 +274,7 @@ export async function getFantasyDashboard() {
     account.client
       .from("fantasy_rounds")
       .select(
-        "*, round:round_id(id, number, date, start_time, status, round_type, preparation_stage, suppress_goalkeeper_rewards, teams(id, name, color, crest_url, team_players(player_id, players(id, name, nickname, avatar_url))), matches(id, status))"
+        "*, round:round_id(id, number, date, start_time, status, round_type, preparation_stage, suppress_goalkeeper_rewards, teams(id, name, color, crest_url, team_players(player_id, goalkeeper_order, loan_order, players(id, name, nickname, avatar_url, player_profile, is_goalkeeper))), matches(id, status))"
       )
       .eq("fantasy_season_id", fantasySeason.id),
     account.client.rpc("get_fantasy_market_v11_public_health", {
