@@ -28,6 +28,7 @@ import {
   X,
 } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { TeamCrest } from "@/components/TeamCrest";
 import { TeamMiniPitch } from "@/components/TeamMiniPitch";
 import { formatFantasyMoney } from "@/lib/fantasy/config";
 import { cosmeticImage } from "@/lib/fantasy/cosmetics";
@@ -248,10 +249,9 @@ export function FantasyExperience({
   const [selectedDrawerPlayer, setSelectedDrawerPlayer] = useState<FantasyMarketPlayer | null>(null);
   const [showRevealedLineups, setShowRevealedLineups] = useState(false);
   const [showRoundTeams, setShowRoundTeams] = useState(false);
+  const [selectedRoundTeamId, setSelectedRoundTeamId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const refreshTimerRef = useRef<number | null>(null);
-
-  useDialogViewport(Boolean(infoModal));
 
   useEffect(() => {
     setMounted(true);
@@ -288,6 +288,17 @@ export function FantasyExperience({
       }));
   }, [market, round?.teams]);
   const canShowRoundTeams = (status === "open" || status === "in_progress") && roundTeams.length >= 2;
+  const roundTeamByPlayerId = useMemo(() => {
+    const result = new Map<string, (typeof roundTeams)[number]>();
+    for (const team of roundTeams) {
+      for (const entry of team.team_players) result.set(entry.player_id, team);
+    }
+    return result;
+  }, [roundTeams]);
+  const selectedRoundTeam = selectedRoundTeamId
+    ? roundTeams.find((team) => team.id === selectedRoundTeamId) || null
+    : null;
+  useDialogViewport(Boolean(infoModal) || Boolean(selectedRoundTeam));
   const [savedSignature, setSavedSignature] = useState(() =>
     hasPersistedRoundLineup
       ? lineupSignature({
@@ -1249,24 +1260,26 @@ export function FantasyExperience({
       </nav>
 
       {canShowRoundTeams && (
-        <section className="overflow-hidden rounded-2xl border border-accent/25 bg-surface/80 shadow-[0_10px_26px_rgba(0,0,0,.18)]">
+        <section className="overflow-hidden rounded-2xl border border-accent/60 bg-[linear-gradient(135deg,rgba(204,255,0,.13),rgba(7,30,17,.96)_48%,rgba(204,255,0,.07))] shadow-[0_0_28px_rgba(204,255,0,.12)]">
           <button
             type="button"
             onClick={() => setShowRoundTeams((current) => !current)}
             aria-expanded={showRoundTeams}
             aria-controls="times-da-rodada"
-            className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-hover"
+            className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-accent/10"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent text-background shadow-[0_0_18px_rgba(204,255,0,.35)]">
               <Users className="h-5 w-5" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-xs font-black uppercase tracking-wide text-foreground">Times da rodada</span>
-              <span className="mt-0.5 block text-[10px] font-medium text-muted">
-                Rodada {round?.number} · {roundTeams.length} times sorteados
+              <span className="block text-sm font-black uppercase tracking-wide text-accent">Times da rodada</span>
+              <span className="mt-0.5 block text-[10px] font-bold text-foreground/75">
+                Veja os {roundTeams.length} times sorteados e escolha sua escalação
               </span>
             </span>
-            <ChevronDown className={`h-5 w-5 shrink-0 text-accent transition-transform ${showRoundTeams ? "rotate-180" : ""}`} />
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/35 bg-accent/10">
+              <ChevronDown className={`h-5 w-5 text-accent transition-transform ${showRoundTeams ? "rotate-180" : ""}`} />
+            </span>
           </button>
 
           {showRoundTeams && (
@@ -1902,6 +1915,7 @@ export function FantasyExperience({
                 const simulatedRemaining = bought ? remaining + player.price : remaining - player.price;
                 const backgroundImage = cosmeticImage(player.cosmetics?.backgroundAssetKey);
                 const displayedPoints = sort === "lastRound" ? player.roundPoints : player.totalPoints;
+                const playerRoundTeam = roundTeamByPlayerId.get(player.id) || null;
 
                 return (
                   <div
@@ -2033,7 +2047,23 @@ export function FantasyExperience({
                       </button>
 
                       {/* Pontos & Ação */}
-                      <div className="text-right shrink-0">
+                      <div className="flex shrink-0 flex-col items-end text-right">
+                        {playerRoundTeam && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRoundTeamId(playerRoundTeam.id)}
+                            className="mb-1.5 flex h-9 w-9 items-center justify-center rounded-xl border border-accent/35 bg-black/30 transition hover:border-accent hover:bg-accent/10 active:scale-90"
+                            title={`Ver escalação do ${playerRoundTeam.name}`}
+                            aria-label={`Ver escalação do ${playerRoundTeam.name}`}
+                          >
+                            <TeamCrest
+                              name={playerRoundTeam.name}
+                              crestUrl={playerRoundTeam.crest_url}
+                              color={playerRoundTeam.color}
+                              className="h-7 w-7"
+                            />
+                          </button>
+                        )}
                         <p className="text-sm font-black text-foreground">
                           {displayedPoints.toFixed(1)}
                         </p>
@@ -2119,6 +2149,47 @@ export function FantasyExperience({
       {/* MODAL DE TUTORIAL & MODAL DE SISTEMA DE PONTUAÇÃO */}
       {showTutorial && <FantasyTutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} scoringVersion={settings.scoringVersion} />}
       {showScoringModal && <FantasyScoringModal isOpen={showScoringModal} onClose={() => setShowScoringModal(false)} settings={settings} />}
+
+      {mounted &&
+        selectedRoundTeam &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="mobile-dialog-backdrop z-[99999] bg-black/85 px-4 backdrop-blur-md animate-fade-in"
+            onClick={() => setSelectedRoundTeamId(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Escalação do ${selectedRoundTeam.name}`}
+          >
+            <div
+              className="relative my-auto w-full max-w-sm overflow-hidden rounded-3xl border border-accent/45 bg-[#07150d] p-4 shadow-[0_24px_80px_rgba(0,0,0,.9)] animate-fade-in-up"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="mb-3 flex items-center gap-3 pr-10">
+                <TeamCrest
+                  name={selectedRoundTeam.name}
+                  crestUrl={selectedRoundTeam.crest_url}
+                  color={selectedRoundTeam.color}
+                  className="h-10 w-10"
+                />
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-[.16em] text-accent">Time da rodada</p>
+                  <h3 className="truncate text-base font-black text-foreground">{selectedRoundTeam.name}</h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedRoundTeamId(null)}
+                className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+                aria-label="Fechar escalação do time"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <TeamMiniPitch team={selectedRoundTeam} index={0} showPositionDetails />
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {/* MODAL DE ANÚNCIO DA REVOLUÇÃO TÁTICA (RODADA 02) */}
       <FantasyTacticalAnnouncementModal scoringVersion={settings.scoringVersion} />

@@ -99,7 +99,9 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
       </div>
 
       <div
-        className="relative h-[196px] overflow-hidden rounded-lg border border-white/25 shadow-[inset_0_0_22px_rgba(0,0,0,.3)]"
+        className={`relative overflow-hidden rounded-lg border border-white/25 shadow-[inset_0_0_22px_rgba(0,0,0,.3)] ${
+          showPositionDetails ? "h-[286px]" : "h-[196px]"
+        }`}
         style={{
           background: "repeating-linear-gradient(90deg, #0d5b32 0, #0d5b32 24px, #0b512c 24px, #0b512c 48px)",
         }}
