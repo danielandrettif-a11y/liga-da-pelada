@@ -11,7 +11,27 @@ import type { FantasySettings } from "@/lib/fantasy/config";
 import { getFantasySlotRoles } from "@/lib/fantasy/lineup-positions";
 
 export type FantasyExperienceProps = {
-  round: { id: string; number: number; date: string; start_time: string | null; teams?: { id: string; name: string; color: string }[] } | null;
+  round: {
+    id: string;
+    number: number;
+    date: string;
+    start_time: string | null;
+    teams?: Array<{
+      id: string;
+      name: string;
+      color: string;
+      crest_url?: string | null;
+      team_players?: Array<{
+        player_id: string;
+        players?: {
+          id: string;
+          name: string;
+          nickname?: string | null;
+          avatar_url?: string | null;
+        } | null;
+      }>;
+    }>;
+  } | null;
   fantasySeasonId: string;
   status: string;
   settings: FantasySettings;

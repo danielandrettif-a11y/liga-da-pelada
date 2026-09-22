@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   Cards,
+  ChevronDown,
   CheckCircle2,
   Clock,
   Crown,
@@ -23,9 +24,11 @@ import {
   Target,
   TrendingDown,
   Trophy,
+  Users,
   X,
 } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { TeamCrest } from "@/components/TeamCrest";
 import { formatFantasyMoney } from "@/lib/fantasy/config";
 import { cosmeticImage } from "@/lib/fantasy/cosmetics";
 import { CHALLENGE_LABELS, fantasyChallengeOffer } from "@/lib/fantasy/challenges";
@@ -244,6 +247,7 @@ export function FantasyExperience({
   const [infoModal, setInfoModal] = useState<{ title: string; description: string } | null>(null);
   const [selectedDrawerPlayer, setSelectedDrawerPlayer] = useState<FantasyMarketPlayer | null>(null);
   const [showRevealedLineups, setShowRevealedLineups] = useState(false);
+  const [showRoundTeams, setShowRoundTeams] = useState(false);
   const [mounted, setMounted] = useState(false);
   const refreshTimerRef = useRef<number | null>(null);
 
@@ -271,6 +275,11 @@ export function FantasyExperience({
   const hasPersistedRoundLineup = Boolean(
     lineup?.fantasy_round_id || (isTest && lineup?.test_session_id),
   );
+  const roundTeams = useMemo(
+    () => (round?.teams || []).filter((team) => (team.team_players || []).length > 0),
+    [round?.teams],
+  );
+  const canShowRoundTeams = (status === "open" || status === "in_progress") && roundTeams.length >= 2;
   const [savedSignature, setSavedSignature] = useState(() =>
     hasPersistedRoundLineup
       ? lineupSignature({
@@ -1230,6 +1239,71 @@ export function FantasyExperience({
           <span className="truncate text-[10px] font-black text-accent">Pontuação</span>
         </button>
       </nav>
+
+      {canShowRoundTeams && (
+        <section className="overflow-hidden rounded-2xl border border-accent/25 bg-surface/80 shadow-[0_10px_26px_rgba(0,0,0,.18)]">
+          <button
+            type="button"
+            onClick={() => setShowRoundTeams((current) => !current)}
+            aria-expanded={showRoundTeams}
+            aria-controls="times-da-rodada"
+            className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-hover"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+              <Users className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-black uppercase tracking-wide text-foreground">Times da rodada</span>
+              <span className="mt-0.5 block text-[10px] font-medium text-muted">
+                Rodada {round?.number} · {roundTeams.length} times sorteados
+              </span>
+            </span>
+            <ChevronDown className={`h-5 w-5 shrink-0 text-accent transition-transform ${showRoundTeams ? "rotate-180" : ""}`} />
+          </button>
+
+          {showRoundTeams && (
+            <div id="times-da-rodada" className="grid gap-2 border-t border-border/80 p-3 sm:grid-cols-2">
+              {roundTeams.map((team) => {
+                const players = team.team_players || [];
+                return (
+                  <article key={team.id} className="overflow-hidden rounded-xl border border-border bg-background/35">
+                    <header className="flex items-center gap-2 border-b border-border/80 px-3 py-2.5">
+                      <TeamCrest
+                        name={team.name}
+                        crestUrl={team.crest_url}
+                        color={team.color}
+                        className="h-7 w-7"
+                      />
+                      <span className="min-w-0 flex-1 truncate text-xs font-black text-foreground">{team.name}</span>
+                      <span className="text-[9px] font-bold text-muted">{players.length} jogadores</span>
+                    </header>
+                    <ul className="divide-y divide-border/60">
+                      {players.map((teamPlayer) => {
+                        const player = teamPlayer.players;
+                        if (!player) return null;
+                        return (
+                          <li key={teamPlayer.player_id} className="flex items-center gap-2 px-3 py-2">
+                            <PlayerAvatar
+                              name={player.name}
+                              avatarUrl={player.avatar_url}
+                              clickable={false}
+                              className="h-7 w-7 rounded-full"
+                              sizes="28px"
+                            />
+                            <span className="truncate text-[11px] font-bold text-foreground">
+                              {player.nickname || player.name}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* SELETOR DE ABAS PRINCIPAIS (MEU TIME × MERCADO) */}
       <div className="sticky top-[calc(4rem+env(safe-area-inset-top)+0.5rem)] z-30 -mx-1 rounded-2xl border border-border bg-[#05100B]/95 p-1.5 backdrop-blur-xl shadow-[0_12px_35px_rgba(0,0,0,.35)]">
