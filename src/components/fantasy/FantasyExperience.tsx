@@ -1936,18 +1936,12 @@ export function FantasyExperience({
                       />
                     )}
                     <div className="relative flex items-center gap-3">
-                      {/* Área única para abrir a ficha do atleta */}
-                      <button
-                        type="button"
-                        onClick={() => setSelectedDrawerPlayer(player)}
-                        className="group flex min-w-0 flex-1 items-center gap-3 text-left"
-                        title="Ver perfil completo do Cartola"
-                      >
+                      <div className="group flex min-w-0 flex-1 items-center gap-3 text-left">
                         <span className="relative shrink-0">
                           <PlayerAvatar
                             name={player.name}
+                            playerId={player.id}
                             avatarUrl={player.avatarUrl}
-                            clickable={false}
                             frameKey={player.cosmetics?.frameKey}
                             auraKey={player.cosmetics?.auraKey}
                             className="h-12 w-12 rounded-full border border-border bg-background text-xs font-black text-accent group-hover:border-accent transition-colors"
@@ -1956,7 +1950,12 @@ export function FantasyExperience({
                         </span>
 
                         {/* Dados Centrais */}
-                        <div className="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDrawerPlayer(player)}
+                          className="min-w-0 flex-1 text-left"
+                          title="Ver perfil completo do Cartola"
+                        >
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <p className="truncate text-xs font-black text-foreground hover:text-accent transition-colors">
                             {player.name}
@@ -2043,8 +2042,8 @@ export function FantasyExperience({
                             </span>
                           )}
                         </div>
-                        </div>
-                      </button>
+                        </button>
+                      </div>
 
                       {/* Pontos & Ação */}
                       <div className="flex shrink-0 flex-col items-end text-right">

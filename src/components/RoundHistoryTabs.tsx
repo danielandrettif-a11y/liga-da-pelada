@@ -75,7 +75,7 @@ export function RoundHistoryTabs({ overview, statistics }: { overview: ReactNode
             {sortedEntries.map((entry, index) => (
               <div key={entry.player.id} className="glass-card flex items-center gap-3 p-3">
                 <span className="stat-number w-6 shrink-0 text-center text-lg text-muted">{index + 1}</span>
-                <PlayerAvatar name={entry.player.name} avatarUrl={entry.player.avatar_url} className="h-11 w-11 shrink-0 rounded-full bg-surface text-xs font-black text-accent" />
+                <PlayerAvatar name={entry.player.name} playerId={entry.player.id} avatarUrl={entry.player.avatar_url} className="h-11 w-11 shrink-0 rounded-full bg-surface text-xs font-black text-accent" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-black text-foreground">{entry.player.name}</p>
                   <p className="mt-1 text-[10px] font-bold text-muted">{entry.games}J · {entry.wins}V · {entry.draws}E · {entry.losses}D · {entry.winRate}%</p>
@@ -94,4 +94,3 @@ export function RoundHistoryTabs({ overview, statistics }: { overview: ReactNode
     </div>
   );
 }
-

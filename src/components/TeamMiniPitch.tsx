@@ -49,6 +49,22 @@ const POSITIONS: Record<number, Array<[number, number]>> = {
   10: [[25, 9], [75, 9], [25, 28], [75, 28], [25, 48], [75, 48], [25, 68], [75, 68], [25, 87], [75, 87]],
 };
 
+const ROLE_ROW_TOP: Record<string, number> = {
+  ATA: 16,
+  ALA: 41,
+  "DEF/VOL": 66,
+  GOL: 86,
+};
+
+const ROW_HORIZONTAL_POSITIONS: Record<number, number[]> = {
+  1: [50],
+  2: [27, 73],
+  3: [18, 50, 82],
+  4: [14, 38, 62, 86],
+  5: [11, 30, 50, 70, 89],
+  6: [9, 25, 41, 59, 75, 91],
+};
+
 function getPitchPosition(player: PitchPlayerDetails) {
   if (player.is_goalkeeper) {
     return { label: "GOL", priority: 3, className: "border-sky-300/40 bg-sky-400/15 text-sky-100" };
@@ -60,6 +76,27 @@ function getPitchPosition(player: PitchPlayerDetails) {
     return { label: "DEF/VOL", priority: 2, className: "border-blue-300/35 bg-blue-400/15 text-blue-100" };
   }
   return { label: "ALA", priority: 1, className: "border-amber-300/35 bg-amber-300/15 text-amber-100" };
+}
+
+function getPositionAwareCoordinates(players: Array<{ player: PitchPlayerDetails }>) {
+  const countByRole = new Map<string, number>();
+  for (const item of players) {
+    const label = getPitchPosition(item.player).label;
+    countByRole.set(label, (countByRole.get(label) || 0) + 1);
+  }
+
+  const indexByRole = new Map<string, number>();
+  const coordinates = players.map((item) => {
+    const label = getPitchPosition(item.player).label;
+    const playerIndex = indexByRole.get(label) || 0;
+    const playersInRole = countByRole.get(label) || 1;
+    indexByRole.set(label, playerIndex + 1);
+    const row = ROLE_ROW_TOP[label] ?? 50;
+    const horizontalPositions = ROW_HORIZONTAL_POSITIONS[Math.min(playersInRole, 6)] || [50];
+    return [horizontalPositions[playerIndex] ?? 50, row] as [number, number];
+  });
+
+  return { coordinates, countByRole };
 }
 
 export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, showPositionDetails = false }: TeamMiniPitchProps) {
@@ -79,7 +116,10 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
     })
     : playerEntries;
   const visiblePlayers = players.slice(0, 10);
-  const positions = POSITIONS[Math.max(1, visiblePlayers.length)];
+  const positionAwareLayout = getPositionAwareCoordinates(visiblePlayers);
+  const positions = showPositionDetails
+    ? positionAwareLayout.coordinates
+    : POSITIONS[Math.max(1, visiblePlayers.length)];
   const isCrowded = visiblePlayers.length > 6;
 
   return (
@@ -115,20 +155,29 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
         {visiblePlayers.map(({ player, goalkeeperOrder, loanOrder, cartolaPoints }, playerIndex) => {
           const [left, top] = positions[playerIndex];
           const position = getPitchPosition(player);
+          const playersInRole = positionAwareLayout.countByRole.get(position.label) || 1;
+          const widthClass = !showPositionDetails
+            ? "w-[48%]"
+            : playersInRole >= 4
+              ? "w-[22%]"
+              : playersInRole === 3
+                ? "w-[30%]"
+                : "w-[44%]";
           return (
             <button
               key={player.id}
               type="button"
-              disabled={!onPlayerClick}
+              disabled={!onPlayerClick && !showPositionDetails}
               onClick={() => onPlayerClick?.(player as Player)}
               aria-pressed={onPlayerClick ? selectedPlayerId === player.id : undefined}
-              className={`absolute flex w-[48%] -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-md transition-transform enabled:active:scale-95 ${selectedPlayerId === player.id ? "z-10 bg-warning/20 ring-2 ring-warning" : ""}`}
+              className={`absolute flex ${widthClass} -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-md transition-transform enabled:active:scale-95 ${selectedPlayerId === player.id ? "z-10 bg-warning/20 ring-2 ring-warning" : ""}`}
               style={{ left: `${left}%`, top: `${top}%` }}
               title={`${player.name}${goalkeeperOrder ? ` · G${goalkeeperOrder}` : ""}${loanOrder ? ` · E${loanOrder}` : ""}`}
             >
               <div className="relative rounded-full border-2" style={{ borderColor: team.color }}>
                 <PlayerAvatar
                   name={player.name}
+                  playerId={showPositionDetails ? player.id : undefined}
                   avatarUrl={player.avatar_url}
                   className={`${isCrowded ? "h-6 w-6 text-[7px]" : "h-8 w-8 text-[8px]"} rounded-full bg-[#07170f] font-black text-white shadow-[0_4px_9px_rgba(0,0,0,.5)]`}
                   imageClassName="object-cover"

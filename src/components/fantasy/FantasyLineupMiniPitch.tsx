@@ -30,6 +30,7 @@ export function FantasyLineupMiniPitch({
   const normalized = players.map((player, index) => ({
     source: player,
     id: player.playerId || player.player_id || player.id || String(index),
+    cardPlayerId: player.playerId || player.player_id || player.id || null,
     name: player.name || player.player_name_locked || player.players?.name || "Jogador",
     avatarUrl: player.avatarUrl || player.avatar_url_locked || player.players?.avatar_url || null,
     role: player.slotRole || player.slot_role || null,
@@ -55,7 +56,7 @@ export function FantasyLineupMiniPitch({
             {row.map((player) => {
               const content = <>
                 <div className={`relative rounded-full ${player.captain ? "ring-2 ring-accent" : ""}`}>
-                  <PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} clickable={false} className="h-12 w-12 rounded-full border-2 border-emerald-200 bg-background text-xs font-black text-accent" />
+                  <PlayerAvatar name={player.name} playerId={player.cardPlayerId} avatarUrl={player.avatarUrl} className="h-12 w-12 rounded-full border-2 border-emerald-200 bg-background text-xs font-black text-accent" />
                   {player.captain && <span className="absolute -right-2 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-background"><Crown className="h-3 w-3" /></span>}
                 </div>
                 <span className="mt-1 max-w-28 truncate rounded-md bg-black/80 px-1.5 py-0.5 text-[9px] font-black text-white">{player.name}</span>

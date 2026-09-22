@@ -309,6 +309,7 @@ export default async function HomePage() {
                   {/* Foto do jogador, com iniciais apenas como fallback */}
                   <PlayerAvatar
                     name={name}
+                    playerId={stats.player?.id}
                     avatarUrl={stats.player?.avatar_url}
                     frameKey={stats.cosmetics?.frameKey}
                     auraKey={stats.cosmetics?.auraKey}

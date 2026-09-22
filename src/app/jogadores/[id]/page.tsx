@@ -211,6 +211,7 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
             <div className="relative mb-4">
               <PlayerAvatar
                 name={player.name}
+                playerId={player.id}
                 avatarUrl={player.avatar_url}
                 frameKey={cosmetics?.frameKey}
                 auraKey={cosmetics?.auraKey}

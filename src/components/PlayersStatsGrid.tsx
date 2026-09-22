@@ -109,6 +109,7 @@ export function PlayersStatsGrid({
                     <div className="mb-3 flex items-center gap-3">
                       <PlayerAvatar
                         name={player.name}
+                        playerId={player.id}
                         avatarUrl={player.avatar_url}
                         frameKey={cosmetic?.frameKey}
                         auraKey={cosmetic?.auraKey}

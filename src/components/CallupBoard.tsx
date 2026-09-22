@@ -679,6 +679,7 @@ export function CallupBoard({
 
                     <PlayerAvatar
                       name={entry.player.name}
+                      playerId={entry.player.member_category === "player" ? entry.player_id : undefined}
                       avatarUrl={entry.player.avatar_url}
                       frameKey={playerCosmetics[entry.player_id]?.frameKey}
                       auraKey={playerCosmetics[entry.player_id]?.auraKey}
@@ -782,6 +783,7 @@ export function CallupBoard({
 
                       <PlayerAvatar
                         name={entry.player.name}
+                        playerId={entry.player.member_category === "player" ? entry.player_id : undefined}
                         avatarUrl={entry.player.avatar_url}
                         frameKey={playerCosmetics[entry.player_id]?.frameKey}
                         auraKey={playerCosmetics[entry.player_id]?.auraKey}

@@ -3,13 +3,22 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { getInitials } from "@/lib/utils";
 import { useDialogViewport } from "@/lib/useDialogViewport";
-import { X, ZoomIn } from "@/components/icons";
+import { Loader2, Sparkles, X, ZoomIn } from "@/components/icons";
 import { cosmeticAuraClass, cosmeticAuraVariant, cosmeticFrameClass, cosmeticFrameImage } from "@/lib/fantasy/cosmetics";
+import { getPlayerRankingEntry } from "@/lib/actions/stats";
+import type { RankingEntry } from "@/lib/ranking";
+
+const RankingPlayerCardModal = dynamic(
+  () => import("./RankingPlayerCardModal").then((module) => module.RankingPlayerCardModal),
+  { ssr: false },
+);
 
 type PlayerAvatarProps = {
   name: string;
+  playerId?: string | null;
   avatarUrl?: string | null;
   className?: string;
   imageClassName?: string;
@@ -23,6 +32,7 @@ type PlayerAvatarProps = {
 
 export function PlayerAvatar({
   name,
+  playerId,
   avatarUrl,
   className = "",
   imageClassName = "",
@@ -35,6 +45,8 @@ export function PlayerAvatar({
 }: PlayerAvatarProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [loadingCard, setLoadingCard] = useState(false);
+  const [rankingCard, setRankingCard] = useState<{ entry: RankingEntry; position: number } | null>(null);
   const [mounted, setMounted] = useState(false);
   useDialogViewport(isOpen);
 
@@ -47,7 +59,7 @@ export function PlayerAvatar({
   }, [avatarUrl]);
 
   const hasImage = Boolean(avatarUrl && !imageFailed);
-  const isInteractive = clickable && hasImage;
+  const isInteractive = clickable && (hasImage || Boolean(playerId));
   const frameEffect = frameClass || cosmeticFrameClass(frameKey);
   const auraEffect = cosmeticAuraClass(auraKey);
   const auraVariant = cosmeticAuraVariant(auraKey);
@@ -62,11 +74,29 @@ export function PlayerAvatar({
     })()
   ));
 
+  async function openContent() {
+    if (playerId) {
+      if (rankingCard || loadingCard) return;
+      setLoadingCard(true);
+      try {
+        const card = await getPlayerRankingEntry(playerId);
+        if (card) setRankingCard(card);
+        else if (hasImage) setIsOpen(true);
+      } catch {
+        if (hasImage) setIsOpen(true);
+      } finally {
+        setLoadingCard(false);
+      }
+      return;
+    }
+    if (hasImage) setIsOpen(true);
+  }
+
   function handleClick(e: React.MouseEvent) {
     if (!isInteractive) return;
     e.stopPropagation();
     e.preventDefault();
-    setIsOpen(true);
+    void openContent();
   }
 
   return (
@@ -77,14 +107,14 @@ export function PlayerAvatar({
           isInteractive ? "cursor-pointer active:scale-95 transition-transform" : ""
         } ${className} ${auraEffect ? `${auraEffect} ` : ""}`}
         style={auraEffect ? { overflow: "visible" } : undefined}
-        aria-label={`Foto de ${name}`}
+        aria-label={playerId ? `Abrir carta de ${name}` : `Foto de ${name}`}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
         onKeyDown={(e) => {
           if (isInteractive && (e.key === "Enter" || e.key === " ")) {
             e.stopPropagation();
             e.preventDefault();
-            setIsOpen(true);
+            void openContent();
           }
         }}
       >
@@ -123,7 +153,13 @@ export function PlayerAvatar({
 
           {isInteractive && (
             <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35 opacity-0 transition-opacity group-hover/avatar:opacity-100">
-              <ZoomIn className="h-3.5 w-3.5 text-accent drop-shadow" />
+              {loadingCard ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-accent drop-shadow" />
+              ) : playerId ? (
+                <Sparkles className="h-3.5 w-3.5 text-accent drop-shadow" />
+              ) : (
+                <ZoomIn className="h-3.5 w-3.5 text-accent drop-shadow" />
+              )}
             </span>
           )}
         </div>
@@ -179,6 +215,14 @@ export function PlayerAvatar({
           </div>,
           document.body
         )}
+
+      {rankingCard && (
+        <RankingPlayerCardModal
+          entry={rankingCard.entry}
+          position={rankingCard.position}
+          onClose={() => setRankingCard(null)}
+        />
+      )}
     </>
   );
 }

@@ -46,8 +46,8 @@ function CompactPlayer({
       {rank ? <span className="w-3 shrink-0 text-[9px] font-black text-muted">{rank}</span> : null}
       <PlayerAvatar
         name={player.name}
+        playerId={player.id}
         avatarUrl={player.avatarUrl}
-        clickable={false}
         className="h-7 w-7 shrink-0 rounded-full border border-white/10 bg-background text-[8px] font-black text-accent"
       />
       <span className="min-w-0 flex-1">
