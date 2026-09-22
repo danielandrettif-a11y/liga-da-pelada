@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, ClipboardList, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag, CalendarDays } from "@/components/icons";
+import { Home, CartolaHat, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag, CalendarDays } from "@/components/icons";
 
 const NAV_ITEMS = [
   { href: "/", label: "Início", icon: Home },
-  { href: "/cartola", label: "Cartola", icon: ClipboardList },
+  { href: "/cartola", label: "Cartola", icon: CartolaHat },
   { href: "/ranking", label: "Ranking", icon: Trophy },
   { href: "/jogadores", label: "Elenco", icon: Users },
   { href: "/mais", label: "Mais", icon: MoreHorizontal },

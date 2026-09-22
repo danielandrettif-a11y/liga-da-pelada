@@ -44,6 +44,7 @@ import type { Player, PlayerProfile, Stadium } from "@/lib/types";
 import type { FantasyQuickHighlight } from "@/lib/actions/fantasy";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
+import { TeamCrest } from "./TeamCrest";
 import { RoundCalendarButton } from "./RoundCalendarButton";
 import { CallupTacticalAlertModal } from "./CallupTacticalAlertModal";
 import { useDialogViewport } from "@/lib/useDialogViewport";
@@ -334,7 +335,16 @@ export function CallupBoard({
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 bg-black/25 text-accent shadow-[0_0_15px_rgba(204,255,0,.2)]"
               style={{ borderColor: myDrawnTeam?.color || "rgba(204,255,0,.65)" }}
             >
-              <Shirt className="h-5 w-5" />
+              {myDrawnTeam ? (
+                <TeamCrest
+                  name={myDrawnTeam.name}
+                  crestUrl={myDrawnTeam.crest_url}
+                  color={myDrawnTeam.color}
+                  className="h-8 w-8 rounded-full"
+                />
+              ) : (
+                <Shirt className="h-5 w-5" />
+              )}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[10px] font-black uppercase tracking-[.15em] text-accent">Times já sorteados</span>

@@ -1042,7 +1042,7 @@ export function FantasyExperience({
   }
 
   return (
-    <div className="w-full space-y-5">
+    <div className="w-full space-y-4">
       {/* Radar independente no topo da experiência. */}
       {radar && (
         <FantasyRadarCarousel
@@ -1072,22 +1072,21 @@ export function FantasyExperience({
         />
       )}
 
-      {/* Painel principal */}
-      <header className="relative overflow-hidden rounded-[1.75rem] border border-accent/30 bg-[radial-gradient(circle_at_88%_6%,rgba(204,255,0,.22),transparent_31%),linear-gradient(145deg,rgba(10,57,31,.96),rgba(3,20,12,.98)_58%)] shadow-[0_22px_60px_rgba(0,0,0,.3)]">
-        <div className="pointer-events-none absolute inset-0 opacity-[.08]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,.8) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.8) 1px,transparent 1px)", backgroundSize: "32px 32px" }} />
-        <div className="relative p-5">
+      {/* Painel principal: informação antes de ornamentação. */}
+      <header className="overflow-hidden rounded-2xl border border-white/10 bg-[#07150d] shadow-[0_14px_36px_rgba(0,0,0,.22)]">
+        <div className="p-4 sm:p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[9px] font-black uppercase tracking-[.26em] text-accent">Fantasy da Pelada</p>
-              <h1 className="mt-1 font-athletic text-[2rem] font-black uppercase italic leading-none text-foreground">Cartola</h1>
-              <p className="mt-2 max-w-[250px] text-xs leading-5 text-muted">
+              <p className="text-[9px] font-bold uppercase tracking-[.18em] text-accent/80">Fantasy da pelada</p>
+              <h1 className="mt-1 font-athletic text-[1.8rem] font-black uppercase leading-none text-foreground">Cartola</h1>
+              <p className="mt-1.5 max-w-[260px] text-[11px] leading-4 text-muted">
                 {betweenRounds
                   ? "Acompanhe as tendências enquanto aguarda a abertura da próxima Ranked"
                   : `Ranked ${round?.number || ""} · escale ${playersPerTeam} craques`}
               </p>
             </div>
             <span
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-[9px] font-black uppercase tracking-wider ${
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] ${
                 isTest
                   ? "border-warning/30 bg-warning/15 text-warning"
                   : open
@@ -1097,7 +1096,7 @@ export function FantasyExperience({
                   : "border-white/10 bg-black/20 text-muted"
               }`}
             >
-              <span className={`h-1.5 w-1.5 rounded-full ${open ? "bg-accent shadow-[0_0_8px_rgba(204,255,0,.8)]" : "bg-current"}`} />
+              <span className={`h-1.5 w-1.5 rounded-full ${open ? "bg-accent" : "bg-current"}`} />
               {isTest
                 ? `Teste · ${open ? "aberto" : status === "in_progress" ? "em jogo" : "finalizado"}`
                 : betweenRounds
@@ -1110,7 +1109,7 @@ export function FantasyExperience({
             </span>
           </div>
 
-          <div className="mt-5 grid grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/10 bg-black/20 px-1 py-3 backdrop-blur-sm">
+          <div className="mt-4 grid grid-cols-3 divide-x divide-white/10 border-y border-white/10 py-3">
             <Metric label="Patrimônio" value={formatFantasyMoney(budget, settings.currencyName)} />
             <Metric
               label={status === "in_progress" ? "Ao vivo" : betweenRounds ? "Pontos" : "Escalação"}
@@ -1123,30 +1122,33 @@ export function FantasyExperience({
             />
           </div>
           {marketHealth?.version === 11 && (
-            <div className={`mt-3 rounded-xl border px-3 py-2 text-[10px] ${
-              marketHealth.level === "COMPETITIVE" ? "border-warning/35 bg-warning/10 text-warning" :
-              marketHealth.level === "ACCESSIBLE" ? "border-sky-300/25 bg-sky-300/10 text-sky-100" :
-              "border-accent/25 bg-accent/10 text-accent"
-            }`}>
-              <p className="font-black uppercase tracking-[.16em]">Mercado {marketHealth.level === "COMPETITIVE" ? "competitivo" : marketHealth.level === "ACCESSIBLE" ? "acessível" : "equilibrado"}</p>
-              <p className="mt-0.5 text-[9px] leading-4 text-foreground/75">Preços são iguais para todos e se ajustam gradualmente à economia da liga.</p>
+            <div className="mt-3 flex items-start gap-2 text-[10px] leading-4 text-muted">
+              <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                marketHealth.level === "COMPETITIVE" ? "bg-warning" :
+                marketHealth.level === "ACCESSIBLE" ? "bg-sky-300" :
+                "bg-accent"
+              }`} />
+              <p>
+                <strong className="font-bold text-foreground/85">Mercado {marketHealth.level === "COMPETITIVE" ? "competitivo" : marketHealth.level === "ACCESSIBLE" ? "acessível" : "equilibrado"}.</strong>{" "}
+                Preços iguais para todos, ajustados gradualmente à economia da liga.
+              </p>
             </div>
           )}
           {status === "in_progress" && (
-            <div className="mt-3 flex items-center gap-3 rounded-xl border border-accent/20 bg-accent/10 px-3 py-2 text-[10px] font-bold text-accent">
+            <div className="mt-3 flex items-center gap-2 text-[10px] font-bold text-accent">
               <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" /> Prévia ao vivo</span>
             </div>
           )}
         </div>
 
         {!betweenRounds && round && (
-          <div className={`relative flex items-center gap-3 border-t px-5 py-3.5 ${open ? "border-accent/20 bg-accent/[.08]" : "border-white/10 bg-black/20"}`}>
-            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${open ? "bg-accent text-background" : "bg-white/5 text-muted"}`}>
-              {open ? <Clock className="h-4.5 w-4.5" /> : <Lock className="h-4.5 w-4.5" />}
+          <div className={`flex items-center gap-3 border-t px-4 py-3 sm:px-5 ${open ? "border-accent/15 bg-accent/[.045]" : "border-white/10 bg-black/15"}`}>
+            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${open ? "bg-accent/15 text-accent" : "bg-white/5 text-muted"}`}>
+              {open ? <Clock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[8px] font-black uppercase tracking-[.2em] text-muted">Janela de escalação</p>
-              <p className="mt-0.5 text-xs font-black text-foreground">
+              <p className="text-[8px] font-bold uppercase tracking-[.16em] text-muted">Janela de escalação</p>
+              <p className="mt-0.5 text-[11px] font-bold text-foreground">
                 {open && scheduledAt ? <MarketCountdown scheduledAt={scheduledAt} /> : open ? "Fecha no início da primeira partida" : "Escalações bloqueadas"}
               </p>
             </div>
@@ -1154,13 +1156,13 @@ export function FantasyExperience({
         )}
 
         {betweenRounds && (
-          <div className="relative flex items-center gap-3 border-t border-warning/25 bg-warning/[.08] px-5 py-3.5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-warning/15 text-warning">
-              <Lock className="h-4.5 w-4.5" />
+          <div className="flex items-center gap-3 border-t border-warning/20 bg-warning/[.05] px-4 py-3 sm:px-5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning">
+              <Lock className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[8px] font-black uppercase tracking-[.2em] text-warning">Janela de transferências fechada</p>
-              <p className="mt-0.5 text-xs font-black text-foreground">As compras voltam quando uma nova Ranked for aberta.</p>
+              <p className="text-[8px] font-bold uppercase tracking-[.16em] text-warning">Transferências fechadas</p>
+              <p className="mt-0.5 text-[11px] font-bold text-foreground">As compras voltam quando uma nova Ranked for aberta.</p>
             </div>
           </div>
         )}
@@ -1232,23 +1234,23 @@ export function FantasyExperience({
         </button>
       )}
 
-      {/* Central do Cartola */}
-      <nav aria-label="Central do Cartola" className="grid grid-cols-4 gap-2">
+      {/* Atalhos principais em uma única barra: menos ruído e alvos de toque maiores. */}
+      <nav aria-label="Central do Cartola" className="grid grid-cols-4 divide-x divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-[#07150d]">
         <Link
-          className="group flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-border bg-surface/80 px-1.5 py-3 text-center transition-colors hover:border-accent/40 hover:bg-surface-hover"
+          className="group flex min-h-16 min-w-0 flex-col items-center justify-center gap-1.5 px-1 py-2.5 text-center transition-colors hover:bg-white/[.04] focus-visible:z-10"
           href="/cartola/ranking"
           prefetch={true}
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent group-hover:bg-accent group-hover:text-background"><Trophy className="h-4.5 w-4.5" /></span>
-          <span className="truncate text-[10px] font-black text-foreground">Ranking</span>
+          <Trophy className="h-[18px] w-[18px] text-muted transition-colors group-hover:text-accent" />
+          <span className="w-full truncate text-[9px] font-bold text-foreground/85">Ranking</span>
         </Link>
         <Link
-          className="group flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-border bg-surface/80 px-1.5 py-3 text-center transition-colors hover:border-accent/40 hover:bg-surface-hover"
+          className="group flex min-h-16 min-w-0 flex-col items-center justify-center gap-1.5 px-1 py-2.5 text-center transition-colors hover:bg-white/[.04] focus-visible:z-10"
           href="/cartola/historico"
           prefetch={true}
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent group-hover:bg-accent group-hover:text-background"><History className="h-4.5 w-4.5" /></span>
-          <span className="truncate text-[10px] font-black text-foreground">Histórico</span>
+          <History className="h-[18px] w-[18px] text-muted transition-colors group-hover:text-accent" />
+          <span className="w-full truncate text-[9px] font-bold text-foreground/85">Histórico</span>
         </Link>
         <button
           type="button"
@@ -1256,48 +1258,47 @@ export function FantasyExperience({
           onPointerEnter={preloadInventoryModal}
           onFocus={preloadInventoryModal}
           onTouchStart={preloadInventoryModal}
-          className="group flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-accent/30 bg-accent/[.08] px-1.5 py-3 text-center transition-colors hover:bg-accent/15"
+          className="group flex min-h-16 min-w-0 flex-col items-center justify-center gap-1.5 bg-accent/[.055] px-1 py-2.5 text-center transition-colors hover:bg-accent/10 focus-visible:z-10"
         >
-          <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-background"><Cards className="h-4.5 w-4.5" />{currentInventoryCount > 0 && <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full border border-background bg-foreground px-1 text-[8px] font-black leading-4 text-background">{currentInventoryCount}</span>}</span>
-          <span className="truncate text-[10px] font-black text-accent">Cartas</span>
+          <span className="relative"><Cards className="h-[18px] w-[18px] text-accent" />{currentInventoryCount > 0 && <span className="absolute -right-3 -top-2 min-w-4 rounded-full bg-accent px-1 text-[8px] font-black leading-4 text-background">{currentInventoryCount}</span>}</span>
+          <span className="w-full truncate text-[9px] font-bold text-accent">Cartas</span>
         </button>
         <button
           type="button"
           onClick={() => setShowScoringModal(true)}
-          className="group flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-accent/30 bg-accent/[.08] px-1.5 py-3 text-center transition-colors hover:border-accent/60 hover:bg-accent/15"
+          className="group flex min-h-16 min-w-0 flex-col items-center justify-center gap-1.5 px-1 py-2.5 text-center transition-colors hover:bg-white/[.04] focus-visible:z-10"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-background font-black text-sm shadow-md shadow-accent/25">
-            ⚡
-          </span>
-          <span className="truncate text-[10px] font-black text-accent">Pontuação</span>
+          <span aria-hidden="true" className="text-base leading-none text-muted transition-colors group-hover:text-accent">⚡</span>
+          <span className="w-full truncate text-[9px] font-bold text-foreground/85">Pontuação</span>
         </button>
       </nav>
 
       {canShowRoundTeams && (
-        <section className="overflow-hidden rounded-2xl border border-accent/60 bg-[linear-gradient(135deg,rgba(204,255,0,.13),rgba(7,30,17,.96)_48%,rgba(204,255,0,.07))] shadow-[0_0_28px_rgba(204,255,0,.12)]">
+        <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#07150d]">
           <button
             type="button"
             onClick={() => setShowRoundTeams((current) => !current)}
             aria-expanded={showRoundTeams}
             aria-controls="times-da-rodada"
-            className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-accent/10"
+            className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[.035]"
           >
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent text-background shadow-[0_0_18px_rgba(204,255,0,.35)]">
-              <Users className="h-5 w-5" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+              <Users className="h-[18px] w-[18px]" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-black uppercase tracking-wide text-accent">Times da rodada</span>
-              <span className="mt-0.5 block text-[10px] font-bold text-foreground/75">
-                Veja os {roundTeams.length} times sorteados e escolha sua escalação
+              <span className="flex items-center gap-2 text-sm font-bold text-foreground">
+                Times da rodada
+                <span className="rounded-full bg-white/[.07] px-2 py-0.5 text-[9px] font-bold text-muted">{roundTeams.length}</span>
+              </span>
+              <span className="mt-0.5 block text-[10px] text-muted">
+                Confira as formações e escolha sua escalação
               </span>
             </span>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/35 bg-accent/10">
-              <ChevronDown className={`h-5 w-5 text-accent transition-transform ${showRoundTeams ? "rotate-180" : ""}`} />
-            </span>
+            <ChevronDown className={`h-5 w-5 shrink-0 text-muted transition-transform duration-200 ${showRoundTeams ? "rotate-180" : ""}`} />
           </button>
 
           {showRoundTeams && (
-            <div id="times-da-rodada" className="grid gap-3 border-t border-border/80 p-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div id="times-da-rodada" className="grid gap-3 border-t border-white/10 p-3 sm:grid-cols-2 xl:grid-cols-3">
               {roundTeams.map((team, index) => (
                 <TeamMiniPitch key={team.id} team={team} index={index} showPositionDetails />
               ))}
@@ -1307,15 +1308,17 @@ export function FantasyExperience({
       )}
 
       {/* SELETOR DE ABAS PRINCIPAIS (MEU TIME × MERCADO) */}
-      <div className="sticky top-[calc(4rem+env(safe-area-inset-top)+0.5rem)] z-30 -mx-1 rounded-2xl border border-border bg-[#05100B]/95 p-1.5 backdrop-blur-xl shadow-[0_12px_35px_rgba(0,0,0,.35)]">
-        <div className="grid grid-cols-2 gap-1.5">
+      <div className="sticky top-[calc(4rem+env(safe-area-inset-top)+0.5rem)] z-30 rounded-xl border border-white/10 bg-[#06130c]/95 p-1 backdrop-blur-xl shadow-[0_8px_24px_rgba(0,0,0,.28)]">
+        <div className="grid grid-cols-2 gap-1" role="tablist" aria-label="Área do Cartola">
           <button
             type="button"
             onClick={() => setActiveTab("team")}
-            className={`relative flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+            role="tab"
+            aria-selected={activeTab === "team"}
+            className={`relative flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition-colors duration-200 ${
               activeTab === "team"
-                ? "bg-accent text-background shadow-[0_0_15px_rgba(204,255,0,0.35)]"
-                : "bg-surface/70 text-muted hover:text-foreground hover:bg-surface"
+                ? "bg-accent text-background"
+                : "text-muted hover:bg-white/[.04] hover:text-foreground"
             }`}
           >
             <Shirt className="h-4 w-4" />
@@ -1336,10 +1339,12 @@ export function FantasyExperience({
           <button
             type="button"
             onClick={() => setActiveTab("market")}
-            className={`relative flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+            role="tab"
+            aria-selected={activeTab === "market"}
+            className={`relative flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition-colors duration-200 ${
               activeTab === "market"
-                ? "bg-accent text-background shadow-[0_0_15px_rgba(204,255,0,0.35)]"
-                : "bg-surface/70 text-muted hover:text-foreground hover:bg-surface"
+                ? "bg-accent text-background"
+                : "text-muted hover:bg-white/[.04] hover:text-foreground"
             }`}
           >
             <ShoppingCart className="h-4 w-4" />
@@ -1362,7 +1367,7 @@ export function FantasyExperience({
         {/* ABA: MEU TIME */}
         {activeTab === "team" && (
           <section className="space-y-4 w-full animate-fade-in">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-sm font-black uppercase text-foreground">
                   {betweenRounds ? "Meu elenco" : "Meu time"}
@@ -1380,17 +1385,10 @@ export function FantasyExperience({
                   {saveState}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 {open && selected.length > 0 && (
-                  <button type="button" onClick={sellAll} className="rounded-xl border border-danger/35 bg-danger/10 px-2.5 py-1.5 text-[10px] font-black text-danger transition-colors hover:bg-danger/20">Vender todos</button>
+                  <button type="button" onClick={sellAll} className="rounded-lg border border-danger/30 bg-danger/[.07] px-2.5 py-1.5 text-[10px] font-bold text-danger transition-colors hover:bg-danger/15">Vender todos</button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("market")}
-                  className="rounded-xl border border-accent/40 bg-accent/15 px-3 py-1.5 text-xs font-black text-accent hover:bg-accent/25 transition-colors shadow-sm"
-                >
-                  + Mercado ({market.length})
-                </button>
               </div>
             </div>
 
@@ -2296,9 +2294,9 @@ function Metric({
   accent?: boolean;
 }) {
   return (
-    <div className="min-w-0 px-2.5">
-      <p className="truncate text-[7px] font-black uppercase tracking-[.16em] text-muted">{label}</p>
-      <p className={`mt-1 truncate font-athletic text-sm font-black ${accent ? "text-accent" : "text-foreground"}`}>
+    <div className="min-w-0 px-2.5 first:pl-0 last:pr-0 sm:px-4">
+      <p className="truncate text-[8px] font-bold uppercase tracking-[.12em] text-muted">{label}</p>
+      <p className={`mt-1 truncate font-athletic text-[15px] font-black leading-none ${accent ? "text-accent" : "text-foreground"}`}>
         {value}
       </p>
     </div>
