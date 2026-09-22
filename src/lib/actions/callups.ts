@@ -19,7 +19,23 @@ export type CallupEntryWithPlayer = CallupEntry & {
   player: Player;
   joined_by_name?: string | null;
 };
-export type CallupWithEntries = Callup & { entries: CallupEntryWithPlayer[] };
+type CallupRoundTeam = {
+  id: string;
+  name: string;
+  color: string;
+  crest_url?: string | null;
+  team_players: Array<{ player_id: string }>;
+};
+
+export type CallupWithEntries = Callup & {
+  entries: CallupEntryWithPlayer[];
+  round?: {
+    id: string;
+    status: string;
+    matches?: Array<{ id: string; status: string; started_at: string | null }>;
+    teams?: CallupRoundTeam[];
+  } | null;
+};
 
 function normalizeCallup(data: any): CallupWithEntries | null {
   const linkedRound = data?.round;
@@ -59,7 +75,8 @@ export async function getActiveCallups(): Promise<CallupWithEntries[]> {
       round:round_id (
         id,
         status,
-        matches (id, status, started_at)
+        matches (id, status, started_at),
+        teams (id, name, color, crest_url, team_players (player_id))
       )
     `)
     .eq("league.is_active", true)

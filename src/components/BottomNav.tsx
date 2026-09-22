@@ -40,10 +40,10 @@ export function BottomNav({
     setPendingHref(null);
   }, [pathname]);
 
-  // A segunda posição nunca muda. O destino contextual fica sob o mesmo rótulo
-  // para impedir que a navegação "ande" quando uma convocação ou cobrança abre.
+  // A segunda posição nunca muda. Quando houver lista aberta, ela volta a usar
+  // o nome familiar "Convocação" e mantém os demais atalhos no mesmo lugar.
   const agendaItem = hasOpenCallup
-    ? { href: "/convocacao", label: "Agenda", icon: Flag, notification: true }
+    ? { href: "/convocacao", label: "Convocação", icon: Flag, notification: true }
     : hasReleasedPayment
       ? { href: "/pagamentos", label: "Agenda", icon: ArrowLeftRight, notification: true }
       : { href: "/rodadas", label: "Agenda", icon: CalendarDays, notification: false };

@@ -18,6 +18,7 @@ import {
   MapPin,
   PencilLine,
   Shield,
+  Shirt,
   Sparkles,
   Stadium as StadiumIcon,
   TrendingDown,
@@ -121,6 +122,11 @@ export function CallupBoard({
 
   const progressPercent = Math.min(100, Math.round((confirmed.length / capacity) * 100));
   const remainingSlots = Math.max(0, capacity - confirmed.length);
+  const drawnTeams = callup.round?.teams || [];
+  const myDrawnTeam = currentPlayerId
+    ? drawnTeams.find((team) => team.team_players.some((entry) => entry.player_id === currentPlayerId)) || null
+    : null;
+  const hasDrawnTeams = callup.status === "converted" && drawnTeams.length > 0;
 
   async function handleEditCallup(formData: FormData) {
     setEditLoading(true);
@@ -318,6 +324,31 @@ export function CallupBoard({
           )}
         </div>
 
+        {hasDrawnTeams && callup.round_id && (
+          <Link
+            href={`/rodadas/${callup.round_id}`}
+            className="mt-4 flex items-center gap-3 rounded-2xl border border-accent/45 bg-[linear-gradient(120deg,rgba(204,255,0,.18),rgba(5,29,15,.82)_55%,rgba(9,49,27,.8))] p-3.5 shadow-[0_0_24px_rgba(204,255,0,.12)] transition-transform hover:border-accent/75 active:scale-[.99]"
+            aria-label={myDrawnTeam ? `Ver meu time: ${myDrawnTeam.name}` : "Ver times sorteados"}
+          >
+            <span
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 bg-black/25 text-accent shadow-[0_0_15px_rgba(204,255,0,.2)]"
+              style={{ borderColor: myDrawnTeam?.color || "rgba(204,255,0,.65)" }}
+            >
+              <Shirt className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[10px] font-black uppercase tracking-[.15em] text-accent">Times já sorteados</span>
+              <span className="mt-0.5 block truncate text-sm font-black text-foreground">
+                {myDrawnTeam ? `Você ficou no ${myDrawnTeam.name}` : "Veja como ficaram os times da rodada"}
+              </span>
+              <span className="mt-0.5 block text-[10px] font-semibold text-muted">
+                Toque para ver a escalação completa.
+              </span>
+            </span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-accent" />
+          </Link>
+        )}
+
         {/* Barra de Progresso de Vagas */}
         <div className="mt-4 rounded-2xl border border-white/10 bg-black/40 p-3">
           <div className="flex items-center justify-between text-xs">
@@ -460,7 +491,7 @@ export function CallupBoard({
         ) : currentPlayerId ? (
           <div className="rounded-2xl border border-accent/25 bg-accent/[.06] p-4 text-center">
             <p className="text-xs font-black uppercase tracking-wider text-accent">Times já sorteados</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted">A lista está completa. Se alguém desistir antes do primeiro jogo, a vaga reabre aqui no mesmo time.</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted">Seu time aparece no destaque acima. Se alguém desistir antes do primeiro jogo, a vaga reabre aqui no mesmo time.</p>
           </div>
         ) : (
           <div className="rounded-2xl border border-warning/25 bg-warning/10 p-3.5 text-center text-xs font-bold text-warning">
