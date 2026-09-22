@@ -12,6 +12,7 @@ import { Crown } from "@/components/icons";
 
 import type { EquippedCosmeticsSummary } from "@/lib/actions/cosmetics";
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
+import { useUrlState } from "@/lib/useUrlState";
 
 type RosterFilter = "all" | "players" | "wags" | "supporters";
 type RosterView = "roster" | "pass";
@@ -26,6 +27,8 @@ type Props = {
   unreadPlayerIds?: string[];
   unreadSeenThrough?: string | null;
   initialView?: RosterView;
+  initialFilter?: RosterFilter;
+  initialStatsMode?: StatsMode;
   seasonPass?: ReactNode;
   seasonPassProgress?: number;
   seasonPassMaxProgress?: number;
@@ -37,6 +40,9 @@ const FILTERS: Array<{ value: RosterFilter; label: string }> = [
   { value: "wags", label: "WAGs" },
   { value: "supporters", label: "Torcida" },
 ];
+const ROSTER_VIEWS: readonly RosterView[] = ["roster", "pass"];
+const ROSTER_FILTERS: readonly RosterFilter[] = ["all", "players", "wags", "supporters"];
+const STATS_MODES: readonly StatsMode[] = ["ranked", "friendly"];
 
 function SectionDivider({ title, subtitle, count, tone = "accent" }: { title: string; subtitle: string; count?: number; tone?: "accent" | "warning" | "muted" }) {
   const toneClass = tone === "warning"
@@ -94,12 +100,12 @@ function CommunityGrid({ players, label, unreadPlayerIds, playerCosmetics }: { p
   );
 }
 
-export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters, playerCosmetics, unreadPlayerIds = [], unreadSeenThrough = null, initialView = "roster", seasonPass, seasonPassProgress, seasonPassMaxProgress = 40 }: Props) {
+export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters, playerCosmetics, unreadPlayerIds = [], unreadSeenThrough = null, initialView = "roster", initialFilter = "all", initialStatsMode = "ranked", seasonPass, seasonPassProgress, seasonPassMaxProgress = 40 }: Props) {
   const router = useRouter();
-  const [view, setView] = useState<RosterView>(initialView);
+  const [view, setView] = useUrlState({ key: "view", initialValue: initialView, defaultValue: "roster", allowedValues: ROSTER_VIEWS });
   const [passPending, startPassTransition] = useTransition();
-  const [filter, setFilter] = useState<RosterFilter>("all");
-  const [statsMode, setStatsMode] = useState<StatsMode>("ranked");
+  const [filter, setFilter] = useUrlState({ key: "filter", initialValue: initialFilter, defaultValue: "all", allowedValues: ROSTER_FILTERS, history: "replace" });
+  const [statsMode, setStatsMode] = useUrlState({ key: "stats", initialValue: initialStatsMode, defaultValue: "ranked", allowedValues: STATS_MODES, history: "replace" });
   const [visibleUnreadPlayerIds, setVisibleUnreadPlayerIds] = useState(unreadPlayerIds);
   const passPanelRef = useRef<HTMLElement>(null);
   const unreadIds = new Set(visibleUnreadPlayerIds);
@@ -109,7 +115,6 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
   const visibleOfficialPlayers = officialPlayers[statsMode];
   const visibleGuests = activeGuests[statsMode];
 
-  useEffect(() => setView(initialView), [initialView]);
   useEffect(() => setVisibleUnreadPlayerIds(unreadPlayerIds), [unreadPlayerIds]);
 
   // A visita ao Elenco é a confirmação de leitura. Antes, a confirmação só
@@ -147,7 +152,7 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
       setView("pass");
       return;
     }
-    startPassTransition(() => router.push("/jogadores?tab=passe"));
+    startPassTransition(() => router.push("/jogadores?view=pass"));
   }
 
   return (

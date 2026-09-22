@@ -318,7 +318,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
       return;
     }
 
-    router.push(`/partidas/${res.matchId}`);
+    router.replace(`/partidas/${res.matchId}`);
   }
 
   async function markTeamArrived(teamId: string) {

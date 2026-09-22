@@ -25,7 +25,7 @@ export function MatchSubstitutionManager({
   const [markInjured, setMarkInjured] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  useDialogViewport(open);
+  useDialogViewport(open, () => !loading && setOpen(false));
 
   const participantIds = useMemo(
     () => new Set((match.match_players || []).map((entry: any) => entry.player_id)),

@@ -32,6 +32,7 @@ type Props = {
     basePoints: number;
   }>;
   onRefresh?: () => void;
+  onCardRemoved?: (userCardId: string) => void;
   marketPlayers?: Array<{ id: string; name: string; price: number }>;
   lineupPlayers?: Array<{ id: string; name: string; price: number }>;
   captainPlayerId?: string | null;
@@ -199,17 +200,30 @@ export function FantasyActiveCardSlot({
   isRoundLive = false,
   liveStats = [],
   onRefresh,
+  onCardRemoved,
   marketPlayers = [],
   lineupPlayers = [],
   captainPlayerId = null,
 }: Props) {
   const [showInventory, setShowInventory] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function handleRemove() {
     if (!roundId) return;
+    setRemoveError(null);
     startTransition(async () => {
-      await removeActiveCardForRound(roundId);
+      const result = await removeActiveCardForRound(roundId);
+      if (!result.success) {
+        setRemoveError(result.error || "Não foi possível devolver a carta ao inventário.");
+        return;
+      }
+
+      if (activeCard?.userCardId) {
+        const { restoreFantasyInventoryCard } = await import("./FantasyInventoryModal");
+        restoreFantasyInventoryCard(activeCard.userCardId);
+        onCardRemoved?.(activeCard.userCardId);
+      }
       onRefresh?.();
     });
   }
@@ -392,6 +406,11 @@ export function FantasyActiveCardSlot({
               </button>
             )}
           </div>
+        )}
+        {removeError && (
+          <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-[10px] font-bold text-danger">
+            {removeError}
+          </p>
         )}
       </section>
 

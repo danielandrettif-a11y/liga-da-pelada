@@ -1350,6 +1350,24 @@ textarea {
   animation: aura-soft-breathe 2.8s ease-in-out infinite;
 }
 
+/* Os selos esportivos continuam compactos, mas nunca ficam ilegíveis no
+   celular. Isso eleva os antigos rótulos de 5–9px sem alterar o desktop. */
+@media (max-width: 639px) {
+  [class~="text-[5px]"],
+  [class~="text-[6px]"] {
+    font-size: 0.5rem;
+  }
+
+  [class~="text-[7px]"] {
+    font-size: 0.5625rem;
+  }
+
+  [class~="text-[8px]"],
+  [class~="text-[9px]"] {
+    font-size: 0.625rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cosmetic-card-shimmer::after,
   .cosmetic-title-preview::before,

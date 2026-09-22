@@ -36,7 +36,7 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
   const serverOffersPromiseRef = useRef<Promise<any> | null>(null);
   const [pending, startTransition] = useTransition();
 
-  useDialogViewport(isOpen);
+  useDialogViewport(isOpen, onClose);
 
   useEffect(() => {
     setMounted(true);

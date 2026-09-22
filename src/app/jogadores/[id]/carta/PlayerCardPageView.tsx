@@ -19,7 +19,7 @@ export function PlayerCardPageView({
     <RankingPlayerCardModal
       entry={entry}
       position={position}
-      onClose={() => router.push(`/jogadores/${playerId}`)}
+      onClose={() => router.replace(`/jogadores/${playerId}`)}
     />
   );
 }

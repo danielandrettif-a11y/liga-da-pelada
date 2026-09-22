@@ -13,7 +13,18 @@ import { CosmeticsCollection } from "@/components/fantasy/CosmeticsExperience";
 
 export const revalidate = 0;
 
-export default async function MeuPerfilPage() {
+export default async function MeuPerfilPage({ searchParams }: PageProps<"/meu-perfil">) {
+  const query = await searchParams;
+  const initialPreviewLoadout = query.mode === "preview" ? {
+    banner: typeof query.banner === "string" ? query.banner : null,
+    frame: typeof query.frame === "string" ? query.frame : null,
+    title: typeof query.title === "string" ? query.title : null,
+    aura: typeof query.aura === "string" ? query.aura : null,
+    nameplate: typeof query.nameplate === "string" ? query.nameplate : null,
+    background: typeof query.background === "string" ? query.background : null,
+    showcase: typeof query.showcase === "string" ? query.showcase : null,
+    pitch: typeof query.pitch === "string" ? query.pitch : null,
+  } : undefined;
   const account = await getCurrentAccount();
   if (!account.user) redirect("/login");
 
@@ -67,7 +78,9 @@ export default async function MeuPerfilPage() {
         bannerAssetKey={myEquipped?.bannerAssetKey}
         backgroundAssetKey={myEquipped?.backgroundAssetKey}
       />
-      <CosmeticsCollection cosmetics={cosmetics} playerId={player.id} playerName={player.name} avatarUrl={player.avatar_url} />
+      <section id="colecao" className="scroll-mt-24">
+        <CosmeticsCollection cosmetics={cosmetics} playerId={player.id} playerName={player.name} avatarUrl={player.avatar_url} initialPreviewMode={query.mode === "preview"} initialPreviewLoadout={initialPreviewLoadout} />
+      </section>
       <section className="glass-card p-4">
         <p className="text-[10px] font-black uppercase tracking-wider text-muted">Tempo em quadra</p>
         <p className="mt-1 text-2xl font-black text-accent">{formatDuration(playtime.totalSeconds)}</p>

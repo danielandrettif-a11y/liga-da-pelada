@@ -212,7 +212,7 @@ export function PlayerForm({
         if (!speedResult.success) throw new Error(speedResult.error || "Não foi possível salvar as estrelas de velocidade.");
       }
 
-      router.push(mode === "self" ? "/meu-perfil" : "/admin/jogadores");
+      router.replace(mode === "self" ? "/meu-perfil" : "/admin/jogadores");
       router.refresh();
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Ocorreu um erro ao salvar o jogador.");
@@ -231,7 +231,7 @@ export function PlayerForm({
     try {
       const result = await deletePlayer(player!.id);
       if (!result.success) throw new Error(result.error);
-      router.push("/admin/jogadores");
+      router.replace("/admin/jogadores");
       router.refresh();
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Erro ao excluir o jogador.");

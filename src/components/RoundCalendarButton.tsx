@@ -17,7 +17,7 @@ export function RoundCalendarButton({
 }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  useDialogViewport(open);
+  useDialogViewport(open, () => setOpen(false));
 
   useEffect(() => {
     setMounted(true);

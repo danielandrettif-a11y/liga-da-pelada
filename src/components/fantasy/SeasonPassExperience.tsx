@@ -22,7 +22,7 @@ export function SeasonPassExperience({ pass, cosmetics, rewardId }: { pass: Seas
       {!pass.authenticated ? (
         <section className="rounded-2xl border border-border bg-surface p-5 text-center">
           <p className="text-sm font-black text-foreground">Entre para acompanhar sua trilha</p>
-          <Link href="/login?next=/jogadores?tab=passe" className="mt-4 inline-flex rounded-xl bg-accent px-4 py-3 text-xs font-black uppercase text-background">Entrar ou criar conta</Link>
+          <Link href="/login?next=/jogadores?view=pass" className="mt-4 inline-flex rounded-xl bg-accent px-4 py-3 text-xs font-black uppercase text-background">Entrar ou criar conta</Link>
         </section>
       ) : !pass.available ? (
         <section className="rounded-2xl border border-warning/25 bg-warning/10 p-5 text-center"><p className="text-sm font-black text-foreground">Passe aguardando ativação</p><p className="mt-1 text-xs text-muted">Execute a migration 060 no Supabase para liberar sua progressão.</p></section>

@@ -15,7 +15,7 @@ export function SeasonPassRules({ mode }: Props) {
   const [mounted, setMounted] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
 
-  useDialogViewport(showTutorial);
+  useDialogViewport(showTutorial, () => setShowTutorial(false));
 
   useEffect(() => {
     setMounted(true);
@@ -24,15 +24,6 @@ export function SeasonPassRules({ mode }: Props) {
       window.localStorage.setItem(STORAGE_KEY, "1");
     }
   }, []);
-
-  useEffect(() => {
-    if (!showTutorial) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShowTutorial(false);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [showTutorial]);
 
   const rules = [
     "Toda escalação completa, com a quantidade de atletas configurada na liga, avança +4 casas para qualquer perfil.",

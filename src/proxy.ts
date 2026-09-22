@@ -35,6 +35,8 @@ export default async function proxy(request: NextRequest) {
     pathname.startsWith('/admin') ||
     /^\/rodadas\/[^/]+\/nova-partida$/.test(pathname)
   const isAccountRoute = pathname.startsWith('/meu-perfil')
+  const loginUrl = new URL('/login', request.url)
+  loginUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
   let isAdmin = false
 
   if (user && (isAdminRoute || pathname === '/login' || pathname === '/cadastro')) {
@@ -48,11 +50,11 @@ export default async function proxy(request: NextRequest) {
 
   if (isAdminRoute && !isAdmin) {
     if (user) return NextResponse.redirect(new URL('/', request.url))
-    return NextResponse.redirect(new URL('/login', request.url))
+    return NextResponse.redirect(loginUrl)
   }
 
   if (isAccountRoute && !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    return NextResponse.redirect(loginUrl)
   }
 
   if (user && (pathname === '/login' || pathname === '/cadastro')) {
@@ -64,6 +66,6 @@ export default async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|api/internal/observability|favicon.ico|manifest.webmanifest|offline.html|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

@@ -57,6 +57,33 @@ export function invalidateFantasyInventory() {
   cachedInventory = null;
 }
 
+/**
+ * Recoloca imediatamente no cache a carta cuja reserva foi cancelada.
+ * O inventário retornado pelo servidor contém também as cartas RESERVED, então
+ * conseguimos liberar a mesma instância sem aguardar outro request.
+ */
+export function restoreFantasyInventoryCard(userCardId: string) {
+  if (!cachedInventory) return;
+  const existing = cachedInventory.cards.find((card) => card.id === userCardId);
+  if (!existing || existing.status === "OWNED") return;
+
+  const restored = { ...existing, status: "OWNED" as const };
+  const group = cachedInventory.groupedBySlug[existing.slug];
+  cachedInventory = {
+    ...cachedInventory,
+    cards: cachedInventory.cards.map((card) => card.id === userCardId ? restored : card),
+    availableCount: cachedInventory.availableCount + 1,
+    groupedBySlug: group ? {
+      ...cachedInventory.groupedBySlug,
+      [existing.slug]: {
+        ...group,
+        count: group.count + 1,
+        instances: group.instances.map((card) => card.id === userCardId ? restored : card),
+      },
+    } : cachedInventory.groupedBySlug,
+  };
+}
+
 export function FantasyInventoryModal({
   isOpen,
   onClose,
@@ -83,7 +110,7 @@ export function FantasyInventoryModal({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  useDialogViewport(isOpen);
+  useDialogViewport(isOpen, onClose);
 
   useEffect(() => {
     setMounted(true);

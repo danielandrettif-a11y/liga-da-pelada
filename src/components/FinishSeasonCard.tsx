@@ -16,7 +16,7 @@ export function FinishSeasonCard() {
   const [exportError, setExportError] = useState("");
   const [summary, setSummary] = useState<SeasonSummary | null>(null);
   const [newSeasonNumber, setNewSeasonNumber] = useState<number | null>(null);
-  useDialogViewport(modalOpen);
+  useDialogViewport(modalOpen, () => !loading && setModalOpen(false));
 
   function openModal() {
     setConfirmation("");

@@ -47,7 +47,7 @@ export function RoundInstagramStoryGenerator({
   const fileInputCameraRef = useRef<HTMLInputElement | null>(null);
   const fileInputGalleryRef = useRef<HTMLInputElement | null>(null);
 
-  useDialogViewport(isOpen);
+  useDialogViewport(isOpen, () => !generating && setIsOpen(false));
 
   // Calcular resumo dos 3 times e destaques de cada time
   const teamsData: TeamSummary[] = (round.teams || []).map((team: any) => {

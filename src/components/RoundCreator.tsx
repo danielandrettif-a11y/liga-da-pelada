@@ -653,7 +653,7 @@ export function RoundCreator({
       return;
     }
 
-    router.push(`/rodadas/${res.roundId}`);
+    router.replace(`/rodadas/${res.roundId}`);
   }
 
   return (

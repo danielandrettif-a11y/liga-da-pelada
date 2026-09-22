@@ -7,7 +7,7 @@ import { CHALLENGE_LABELS, isFantasyChallengeType } from "@/lib/fantasy/challeng
 export default async function FantasyRoundHistoryPage({ params }: { params: Promise<{ roundId: string }> }) {
   const { roundId } = await params;
   const account = await getCurrentAccount();
-  if (!account.user) redirect("/login");
+  if (!account.user) redirect(`/login?next=${encodeURIComponent(`/cartola/historico/${roundId}`)}`);
   const { data: fantasyRound } = await account.client.from("fantasy_rounds").select("id, market_status, challenge_type, rules_version, round:round_id(number, date)").eq("round_id", roundId).maybeSingle();
   if (!fantasyRound) notFound();
   const { data: lineup } = await account.client.from("fantasy_lineups").select("*, fantasy_lineup_players(*, players(name, avatar_url))").eq("fantasy_round_id", fantasyRound.id).eq("user_id", account.user.id).maybeSingle();

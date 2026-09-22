@@ -3,18 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, ClipboardList, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag } from "@/components/icons";
+import { Home, ClipboardList, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag, CalendarDays } from "@/components/icons";
 
 const NAV_ITEMS = [
   { href: "/", label: "Início", icon: Home },
   { href: "/cartola", label: "Cartola", icon: ClipboardList },
   { href: "/ranking", label: "Ranking", icon: Trophy },
   { href: "/jogadores", label: "Elenco", icon: Users },
-  { href: "/pagamentos", label: "Transfermarket", icon: ArrowLeftRight },
   { href: "/mais", label: "Mais", icon: MoreHorizontal },
 ] as const;
-
-const CALLUP_NAV_ITEM = { href: "/convocacao", label: "Convocação", icon: Flag } as const;
 
 export function BottomNav({
   isAuthenticated,
@@ -43,13 +40,14 @@ export function BottomNav({
     setPendingHref(null);
   }, [pathname]);
 
-  // Pagamentos pendentes têm prioridade na barra mobile. A convocação continua
-  // acessível pela tela inicial/Mais sem criar uma navegação com sete itens.
-  const showCallupInNav = hasOpenCallup && !hasReleasedPayment;
-  const baseItems = showCallupInNav
-    ? [NAV_ITEMS[0], CALLUP_NAV_ITEM, ...NAV_ITEMS.slice(1)]
-    : [...NAV_ITEMS];
-  const contextualItems = baseItems.filter((item) => item.href !== "/pagamentos" || hasReleasedPayment);
+  // A segunda posição nunca muda. O destino contextual fica sob o mesmo rótulo
+  // para impedir que a navegação "ande" quando uma convocação ou cobrança abre.
+  const agendaItem = hasOpenCallup
+    ? { href: "/convocacao", label: "Agenda", icon: Flag, notification: true }
+    : hasReleasedPayment
+      ? { href: "/pagamentos", label: "Agenda", icon: ArrowLeftRight, notification: true }
+      : { href: "/rodadas", label: "Agenda", icon: CalendarDays, notification: false };
+  const contextualItems = [NAV_ITEMS[0], agendaItem, ...NAV_ITEMS.slice(1)];
   const visibleItems = isAuthenticated
     ? contextualItems
     : contextualItems.filter((item) => item.href !== "/mais");
@@ -107,12 +105,13 @@ export function BottomNav({
                     {unreadRoster > 99 ? "99+" : unreadRoster}
                   </span>
                 )}
+                {"notification" in item && item.notification && (
+                  <span className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-accent shadow-[0_0_8px_rgba(204,255,0,.65)]" />
+                )}
               </span>
               <span
                 className={`block w-full truncate whitespace-nowrap text-center font-semibold leading-none tracking-tight transition-colors duration-150 ${
-                  item.label === "Transfermarket" || item.label === "Convocação"
-                    ? "text-[7px] min-[360px]:text-[8px] min-[430px]:text-[9px]"
-                    : "text-[9px] min-[390px]:text-[10px]"
+                  "text-[9px] min-[390px]:text-[10px]"
                 } ${
                   isActive ? "text-accent" : ""
                 }`}

@@ -23,10 +23,13 @@ export const revalidate = 0;
 
 export default async function RodadaDetalhePage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams: Promise<{ tab?: string; sort?: string }>;
 }) {
   const { id } = await params;
+  const query = await searchParams;
   const roundPromise = getRound(id);
   const accountPromise = getCurrentAccount();
   const allSelectablePlayersPromise = accountPromise.then((acc) => acc.isAdmin ? getPlayers(true) : []);
@@ -224,6 +227,11 @@ export default async function RodadaDetalhePage({
   );
 
   return roundStatistics
-    ? <RoundHistoryTabs overview={overview} statistics={roundStatistics} />
+    ? <RoundHistoryTabs
+        overview={overview}
+        statistics={roundStatistics}
+        initialTab={query.tab === "statistics" ? "statistics" : "overview"}
+        initialSort={query.sort === "assists" || query.sort === "points" || query.sort === "wins" || query.sort === "losses" || query.sort === "winRate" ? query.sort : "goals"}
+      />
     : overview;
 }

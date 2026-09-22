@@ -58,15 +58,15 @@ export function PassCosmeticRewards({ cosmetics, progress }: { cosmetics: Cosmet
   );
 }
 
-export function CosmeticsCollection({ cosmetics, playerId, playerName = "Jogador", avatarUrl }: { cosmetics: CosmeticsDashboard; playerId: string; playerName?: string; avatarUrl?: string | null }) {
+export function CosmeticsCollection({ cosmetics, playerId, playerName = "Jogador", avatarUrl, initialPreviewMode = false, initialPreviewLoadout }: { cosmetics: CosmeticsDashboard; playerId: string; playerName?: string; avatarUrl?: string | null; initialPreviewMode?: boolean; initialPreviewLoadout?: Partial<Record<CosmeticSlot, string | null>> }) {
   const router = useRouter();
   const [busy, startTransition] = useTransition();
   const [selectedSlot, setSelectedSlot] = useState<CosmeticSlot | "all">("all");
   const [message, setMessage] = useState("");
-  const [previewMode, setPreviewMode] = useState(false);
+  const [previewMode, setPreviewMode] = useState(initialPreviewMode);
   const [profilePreview, setProfilePreview] = useState(false);
   const [cartolaPreview, setCartolaPreview] = useState(false);
-  const [previewLoadout, setPreviewLoadout] = useState<Partial<Record<CosmeticSlot, string | null>>>(() => ({ ...cosmetics.equipped }));
+  const [previewLoadout, setPreviewLoadout] = useState<Partial<Record<CosmeticSlot, string | null>>>(() => initialPreviewLoadout ? { ...cosmetics.equipped, ...initialPreviewLoadout } : { ...cosmetics.equipped });
 
   if (!cosmetics.available) return <section className="glass-card p-5 text-center"><p className="font-black text-foreground">Coleção em preparação</p><p className="mt-1 text-xs text-muted">Aplique as migrations de cosméticos para ativar o Passe.</p></section>;
 

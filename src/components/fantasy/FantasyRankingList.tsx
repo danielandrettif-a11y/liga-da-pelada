@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Cards, CheckCircle2, ChevronRight, Clock, Crown, RotateCcw } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
@@ -10,6 +10,7 @@ import type { FantasyRoundLineupOverview } from "@/lib/actions/fantasy";
 import { cosmeticImage } from "@/lib/fantasy/cosmetics";
 import { resolveFantasyCardBenefit } from "@/lib/fantasy/card-benefits";
 import { supabase } from "@/lib/supabase";
+import { useUrlState } from "@/lib/useUrlState";
 
 export type FantasyRankingEntry = {
   id: string;
@@ -79,6 +80,8 @@ const FANTASY_RANKING_METRICS: FantasyRankingMetric[] = [
   { id: "mid", label: "ALA", title: "Eficiência dos Alas", description: "Média por atleta escalado em ALA", valueLabel: "pts por ALA", field: "mid_average_points", sampleField: "mid_selection_count", minimumSelections: 3 },
   { id: "attack", label: "ATA", title: "Eficiência no Ataque", description: "Média por atleta escalado no ATA", valueLabel: "pts por ATA", field: "attack_average_points", sampleField: "attack_selection_count", minimumSelections: 3 },
 ];
+const FANTASY_RANKING_TABS = ["confirmed", "pending"] as const;
+const FANTASY_RANKING_FILTERS: readonly FantasyRankingFilter[] = ["points", "best", "budget", "captain", "def", "mid", "attack"];
 
 function metricValue(item: FantasyRankingEntry, metric: FantasyRankingMetric) {
   return Number(item[metric.field] || 0);
@@ -257,8 +260,8 @@ export function FantasyRankingList({
   scope?: "general" | "round";
 }) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"confirmed" | "pending">("confirmed");
-  const [rankingFilter, setRankingFilter] = useState<FantasyRankingFilter>("points");
+  const [activeTab, setActiveTab] = useUrlState({ key: "status", initialValue: "confirmed", defaultValue: "confirmed", allowedValues: FANTASY_RANKING_TABS });
+  const [rankingFilter, setRankingFilter] = useUrlState({ key: "metric", initialValue: "points", defaultValue: "points", allowedValues: FANTASY_RANKING_FILTERS, history: "replace" });
   const [refreshing, startRefresh] = useTransition();
   const refreshTimer = useRef<number | null>(null);
   const refresh = useCallback((delay = 0) => {
@@ -277,7 +280,7 @@ export function FantasyRankingList({
       .subscribe();
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") refresh();
-    }, 15_000);
+    }, 45_000);
     return () => {
       supabase.removeChannel(channel);
       window.clearInterval(interval);

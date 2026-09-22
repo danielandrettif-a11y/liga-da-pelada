@@ -58,7 +58,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ConvocacaoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callup?: string }>;
+  searchParams: Promise<{ callup?: string; list?: string }>;
 }) {
   const params = await searchParams;
   const [callups, account, leagueConfig, fantasyHighlights, stadiums, cosmeticsMap] = await Promise.all([
@@ -123,6 +123,7 @@ export default async function ConvocacaoPage({
         stadiums={stadiums}
         fantasyHighlights={fantasyHighlights}
         playerCosmetics={Object.fromEntries(cosmeticsMap)}
+        initialListTab={params.list === "waitlist" ? "waitlist" : "confirmed"}
       />
     </div>
   );

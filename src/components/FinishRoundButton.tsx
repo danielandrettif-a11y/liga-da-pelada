@@ -15,7 +15,7 @@ export function FinishRoundButton({ roundId, status, canManage, recipients = [] 
   const [error, setError] = useState("");
   const [recipientId, setRecipientId] = useState("");
   const [recipientName, setRecipientName] = useState("");
-  useDialogViewport(open);
+  useDialogViewport(open, () => !loading && setOpen(false));
 
   if (status === "finished") {
     return (

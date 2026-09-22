@@ -671,14 +671,23 @@ export async function removeActiveCardForRound(
 
   // Devolver carta para OWNED
   if (act.user_card_id) {
-    await client
+    const { error: restoreError } = await client
       .from("fantasy_user_cards")
       .update({ status: "OWNED" })
       .eq("id", act.user_card_id);
+    if (restoreError) {
+      return { success: false, error: "Não foi possível devolver a carta ao inventário." };
+    }
   }
 
   // Deletar ativação
-  await client.from("fantasy_card_activations").delete().eq("id", act.id);
+  const { error: deleteError } = await client.from("fantasy_card_activations").delete().eq("id", act.id);
+  if (deleteError) {
+    if (act.user_card_id) {
+      await client.from("fantasy_user_cards").update({ status: "RESERVED" }).eq("id", act.user_card_id);
+    }
+    return { success: false, error: "Não foi possível cancelar o uso da carta." };
+  }
 
   revalidatePath("/cartola");
   return { success: true };

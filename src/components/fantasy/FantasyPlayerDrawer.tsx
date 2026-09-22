@@ -46,7 +46,7 @@ export function FantasyPlayerDrawer({
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "scouts">("overview");
 
-  useDialogViewport(isOpen);
+  useDialogViewport(isOpen, onClose);
 
   useEffect(() => {
     setMounted(true);

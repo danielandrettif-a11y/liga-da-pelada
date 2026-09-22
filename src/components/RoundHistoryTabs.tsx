@@ -1,10 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { RoundStatisticEntry, RoundStatistics } from "@/lib/actions/stats";
 import { Football, Medal, Target, Trophy } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { useUrlState } from "@/lib/useUrlState";
 
 type SortKey = "goals" | "assists" | "points" | "wins" | "losses" | "winRate";
 
@@ -16,14 +17,16 @@ const sortOptions: Array<{ key: SortKey; label: string }> = [
   { key: "losses", label: "Derrotas" },
   { key: "winRate", label: "Aproveitamento" },
 ];
+const ROUND_TABS = ["overview", "statistics"] as const;
+const ROUND_SORTS: readonly SortKey[] = ["goals", "assists", "points", "wins", "losses", "winRate"];
 
 function names(entries: RoundStatisticEntry[]) {
   return entries.map((entry) => entry.player.name).join(" · ");
 }
 
-export function RoundHistoryTabs({ overview, statistics }: { overview: ReactNode; statistics: RoundStatistics }) {
-  const [tab, setTab] = useState<"overview" | "statistics">("overview");
-  const [sort, setSort] = useState<SortKey>("goals");
+export function RoundHistoryTabs({ overview, statistics, initialTab = "overview", initialSort = "goals" }: { overview: ReactNode; statistics: RoundStatistics; initialTab?: typeof ROUND_TABS[number]; initialSort?: SortKey }) {
+  const [tab, setTab] = useUrlState({ key: "tab", initialValue: initialTab, defaultValue: "overview", allowedValues: ROUND_TABS });
+  const [sort, setSort] = useUrlState({ key: "sort", initialValue: initialSort, defaultValue: "goals", allowedValues: ROUND_SORTS, history: "replace" });
   const sortedEntries = useMemo(() => [...statistics.entries].sort((a, b) =>
     Number(b[sort]) - Number(a[sort])
       || b.goals - a.goals
@@ -41,9 +44,9 @@ export function RoundHistoryTabs({ overview, statistics }: { overview: ReactNode
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 rounded-2xl border border-border bg-surface/70 p-1">
-        <button type="button" onClick={() => setTab("overview")} className={`rounded-xl px-3 py-3 text-xs font-black transition-colors ${tab === "overview" ? "bg-accent text-background" : "text-muted"}`}>Visão geral</button>
-        <button type="button" onClick={() => setTab("statistics")} className={`rounded-xl px-3 py-3 text-xs font-black transition-colors ${tab === "statistics" ? "bg-accent text-background" : "text-muted"}`}>Estatísticas</button>
+      <div className="grid grid-cols-2 rounded-2xl border border-border bg-surface/70 p-1" role="tablist" aria-label="Detalhes da rodada">
+        <button type="button" role="tab" aria-selected={tab === "overview"} onClick={() => setTab("overview")} className={`rounded-xl px-3 py-3 text-xs font-black transition-colors ${tab === "overview" ? "bg-accent text-background" : "text-muted"}`}>Visão geral</button>
+        <button type="button" role="tab" aria-selected={tab === "statistics"} onClick={() => setTab("statistics")} className={`rounded-xl px-3 py-3 text-xs font-black transition-colors ${tab === "statistics" ? "bg-accent text-background" : "text-muted"}`}>Estatísticas</button>
       </div>
 
       {tab === "overview" ? overview : (

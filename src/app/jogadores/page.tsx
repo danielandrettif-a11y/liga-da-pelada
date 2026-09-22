@@ -8,8 +8,10 @@ import { SeasonPassExperience } from "@/components/fantasy/SeasonPassExperience"
 export const revalidate = 0;
 
 export default async function JogadoresPage({ searchParams }: PageProps<"/jogadores">) {
-  const { tab, reward } = await searchParams;
-  const shouldLoadPass = tab === "passe" || typeof reward === "string";
+  const { tab, view, filter, stats, reward } = await searchParams;
+  const shouldLoadPass = view === "pass" || tab === "passe" || typeof reward === "string";
+  const initialFilter = filter === "players" || filter === "wags" || filter === "supporters" ? filter : "all";
+  const initialStatsMode = stats === "friendly" ? "friendly" : "ranked";
   const passDataRequest = shouldLoadPass
     ? Promise.all([getSeasonPassDashboard(), getMyCosmeticsDashboard()]).then(([pass, cosmetics]) => ({ pass, cosmetics }))
     : Promise.resolve(null);
@@ -39,6 +41,8 @@ export default async function JogadoresPage({ searchParams }: PageProps<"/jogado
         unreadPlayerIds={unreadRoster.playerIds}
         unreadSeenThrough={unreadRoster.seenThrough}
         initialView={shouldLoadPass ? "pass" : "roster"}
+        initialFilter={initialFilter}
+        initialStatsMode={initialStatsMode}
         seasonPassProgress={passData?.pass.progress}
         seasonPassMaxProgress={passData?.pass.maxProgress}
         seasonPass={passData ? <SeasonPassExperience pass={passData.pass} cosmetics={passData.cosmetics} rewardId={typeof reward === "string" ? reward : undefined} /> : undefined}

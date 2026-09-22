@@ -57,6 +57,7 @@ export type FantasyExperienceProps = {
   liveProjection?: FantasyLiveProjection;
   playersPerTeam?: number;
   initialPackId?: string;
+  initialTab?: "team" | "market";
   pitchAssetKey?: string | null;
 };
 

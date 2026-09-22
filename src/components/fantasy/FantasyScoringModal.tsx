@@ -24,7 +24,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
   const [activeTab, setActiveTab] = useState<"positions" | "base" | "bonuses">("positions");
   const [mounted, setMounted] = useState(false);
 
-  useDialogViewport(isOpen);
+  useDialogViewport(isOpen, onClose);
 
   useEffect(() => {
     setMounted(true);

@@ -28,7 +28,7 @@ export function FantasyTutorialModal({
 }) {
   const [step, setStep] = useState(1);
   const [mounted, setMounted] = useState(false);
-  useDialogViewport(isOpen);
+  useDialogViewport(isOpen, onClose);
 
   useEffect(() => {
     setMounted(true);

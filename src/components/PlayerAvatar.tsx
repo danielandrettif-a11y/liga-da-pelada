@@ -48,7 +48,7 @@ export function PlayerAvatar({
   const [loadingCard, setLoadingCard] = useState(false);
   const [rankingCard, setRankingCard] = useState<{ entry: RankingEntry; position: number } | null>(null);
   const [mounted, setMounted] = useState(false);
-  useDialogViewport(isOpen);
+  useDialogViewport(isOpen, () => setIsOpen(false));
 
   useEffect(() => {
     setMounted(true);

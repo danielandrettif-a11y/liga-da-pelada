@@ -14,7 +14,7 @@ export function SeasonPassBanner({ pass, compact = false }: Props) {
 
   return (
     <Link
-      href="/jogadores?tab=passe"
+      href="/jogadores?view=pass"
       className={`group relative isolate block overflow-hidden border border-[#b778ff]/55 bg-[#170b2b] shadow-[0_0_28px_rgba(126,63,255,0.22)] transition-transform active:scale-[0.985] ${compact ? "min-h-[158px] rounded-3xl" : "min-h-[184px] rounded-[2rem]"}`}
     >
       <span

@@ -11,7 +11,7 @@ export function DeleteMatchButton({ matchId, matchNumber }: { matchId: string; m
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
-  useDialogViewport(open);
+  useDialogViewport(open, () => !isPending && setOpen(false));
 
   const confirmDelete = () => {
     startTransition(async () => {

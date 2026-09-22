@@ -32,7 +32,7 @@ export function FantasyTestManager({ testSession, friendlyRounds }: { testSessio
   const [confirmReset, setConfirmReset] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
-  useDialogViewport(confirmReset);
+  useDialogViewport(confirmReset, () => !pending && setConfirmReset(false));
 
   function run(action: () => Promise<{ success: boolean; error?: string }>, successMessage: string, closeReset = false) {
     startTransition(async () => {

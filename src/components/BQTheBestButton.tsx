@@ -102,7 +102,7 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
   const [selectedWinner, setSelectedWinner] = useState<MonthlyAwardWinner | null>(null);
   const [sharing, setSharing] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
-  useDialogViewport(open);
+  useDialogViewport(open, () => setOpen(false));
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {

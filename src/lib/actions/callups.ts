@@ -105,6 +105,28 @@ export async function getActiveCallup(): Promise<CallupWithEntries | null> {
   return (await getActiveCallups())[0] || null;
 }
 
+// O shell só precisa saber se deve exibir o atalho. Evita baixar todos os
+// convocados, perfis e responsáveis em toda troca de página do aplicativo.
+export async function hasActiveCallup(): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("callups")
+    .select(`
+      id,
+      league:league_id!inner (is_active),
+      round:round_id (matches (status, started_at))
+    `)
+    .eq("league.is_active", true)
+    .in("status", ["open", "locked", "converted"])
+    .order("date", { ascending: true })
+    .limit(5);
+
+  if (error) {
+    console.error("Erro ao verificar convocação ativa:", error);
+    return false;
+  }
+  return (data || []).some((callup: any) => !hasCallupClosingMatch(callup.round?.matches));
+}
+
 export async function getActiveCallupById(callupId: string): Promise<CallupWithEntries | null> {
   const callups = await getActiveCallups();
   return callups.find((callup) => callup.id === callupId) || null;

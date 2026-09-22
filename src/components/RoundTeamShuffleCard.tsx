@@ -49,7 +49,7 @@ export function RoundTeamShuffleCard({
   ), [teams]);
 
   useEffect(() => setMounted(true), []);
-  useDialogViewport(shuffleModalOpen);
+  useDialogViewport(shuffleModalOpen, closeShuffleModal);
 
   if (!canManage) return null;
 

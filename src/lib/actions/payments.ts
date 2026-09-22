@@ -95,8 +95,24 @@ export async function getPaymentRounds(): Promise<PaymentRound[]> {
 }
 
 export async function hasReleasedPaymentRound(): Promise<boolean> {
-  const rounds = await getPaymentRounds();
-  const latestRound = findLatestReleasedPaymentRound(rounds);
+  const league = await getActiveLeague();
+  const season = await getActiveSeason(league.id);
+  if (!season) return false;
+  const { data: releasedRounds, error: roundError } = await supabase
+    .from("rounds")
+    .select("id, status, payment_pix, payment_total")
+    .eq("season_id", season.id)
+    .eq("status", "finished")
+    .not("payment_pix", "is", null)
+    .gt("payment_total", 0)
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(5);
+  if (roundError) {
+    console.error("Erro ao verificar rodada de pagamento:", roundError);
+    return false;
+  }
+  const latestRound = findLatestReleasedPaymentRound(releasedRounds || []);
   if (!latestRound) return false;
 
   const { data: payments, error } = await supabase

@@ -41,9 +41,8 @@ import { supabase } from "@/lib/supabase";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { getFantasySlotRoles, isCorrectFantasySlot } from "@/lib/fantasy/lineup-positions";
 import { resolveFantasyPitchPoints } from "@/lib/fantasy/pitch-points";
-import { FantasyRadarCarousel } from "./FantasyRadarCarousel";
+import { useUrlState } from "@/lib/useUrlState";
 import { FantasyPackClaimBanner } from "./cards/FantasyPackClaimBanner";
-import { FantasyActiveCardSlot } from "./cards/FantasyActiveCardSlot";
 import {
   lineupFormationFromSlots,
   lineupPlayersFromSource,
@@ -76,6 +75,14 @@ const FantasyScoringModal = dynamic(
   () => import("./FantasyScoringModal").then((mod) => mod.FantasyScoringModal),
   { ssr: false },
 );
+const FantasyRadarCarousel = dynamic(
+  () => import("./FantasyRadarCarousel").then((mod) => mod.FantasyRadarCarousel),
+  { loading: () => <div className="h-28 animate-pulse rounded-2xl border border-border bg-surface" /> },
+);
+const FantasyActiveCardSlot = dynamic(
+  () => import("./cards/FantasyActiveCardSlot").then((mod) => mod.FantasyActiveCardSlot),
+  { loading: () => <div className="h-20 animate-pulse rounded-2xl border border-border bg-surface" /> },
+);
 
 function preloadInventoryModal() {
   void import("./cards/FantasyInventoryModal").then((mod) => mod.preloadFantasyInventory());
@@ -83,6 +90,7 @@ function preloadInventoryModal() {
 
 const MOBILE_DRAG_HOLD_MS = 320;
 const MOBILE_DRAG_CANCEL_DISTANCE_PX = 12;
+const FANTASY_TABS = ["team", "market"] as const;
 
 export function FantasyExperience({
   round,
@@ -106,6 +114,7 @@ export function FantasyExperience({
   liveProjection,
   playersPerTeam = 5,
   initialPackId,
+  initialTab = "team",
   pitchAssetKey = null,
 }: FantasyExperienceProps) {
   const router = useRouter();
@@ -237,7 +246,7 @@ export function FantasyExperience({
   const [challengeId, setChallengeId] = useState<string | null>(lineup?.challenge_player_id || null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("points");
-  const [activeTab, setActiveTab] = useState<"team" | "market">("team");
+  const [activeTab, setActiveTab] = useUrlState({ key: "tab", initialValue: initialTab, defaultValue: "team", allowedValues: FANTASY_TABS });
   const [filterTag, setFilterTag] = useState<string>("ALL");
   const hasCurrentCallup = market.some((player) => player.isInCurrentRound);
   const [calledUpOnly, setCalledUpOnly] = useState(() => hasCurrentCallup);
@@ -250,12 +259,17 @@ export function FantasyExperience({
   const [showRevealedLineups, setShowRevealedLineups] = useState(false);
   const [showRoundTeams, setShowRoundTeams] = useState(false);
   const [selectedRoundTeamId, setSelectedRoundTeamId] = useState<string | null>(null);
+  const [currentActiveCard, setCurrentActiveCard] = useState(activeCard);
+  const [currentInventoryCount, setCurrentInventoryCount] = useState(inventoryCount);
   const [mounted, setMounted] = useState(false);
   const refreshTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => setCurrentActiveCard(activeCard), [activeCard]);
+  useEffect(() => setCurrentInventoryCount(inventoryCount), [inventoryCount]);
 
   useEffect(() => {
     try {
@@ -323,11 +337,11 @@ export function FantasyExperience({
   const midfieldRoleLabel = roleReframeActive ? "Ala · ALA" : "Ala / Meio · ALA/MEI";
 
   // V3: Bônus de orçamento temporário da carta Crédito Extra
-  const budgetBonus = activeCard?.card?.effectType === "BUDGET_BONUS" ? (activeCard.card.effectConfig?.bonus || 5) : 0;
+  const budgetBonus = currentActiveCard?.card?.effectType === "BUDGET_BONUS" ? (currentActiveCard.card.effectConfig?.bonus || 5) : 0;
   const effectiveBudget = budget + budgetBonus;
 
   // V3: Desconto temporário no preço do jogador da carta Barganha
-  const discountedPlayerId = activeCard?.card?.effectType === "PLAYER_DISCOUNT" ? activeCard.targetPlayerId : null;
+  const discountedPlayerId = currentActiveCard?.card?.effectType === "PLAYER_DISCOUNT" ? currentActiveCard.targetPlayerId : null;
 
   const selectedPlayers = selected.map((id) =>
     id ? market.find((player) => player.id === id) || null : null
@@ -609,7 +623,7 @@ export function FantasyExperience({
     const refreshIfVisible = () => {
       if (document.visibilityState === "visible") requestRefresh(0);
     };
-    const interval = window.setInterval(refreshIfVisible, 15_000);
+    const interval = window.setInterval(refreshIfVisible, 30_000);
     document.addEventListener("visibilitychange", refreshIfVisible);
     return () => {
       window.clearInterval(interval);
@@ -644,7 +658,7 @@ export function FantasyExperience({
       .on("postgres_changes", { event: "*", schema: "public", table: "fantasy_lineups" }, refreshRadarIfVisible)
       .on("postgres_changes", { event: "*", schema: "public", table: "fantasy_lineup_players" }, refreshRadarIfVisible)
       .subscribe();
-    const interval = window.setInterval(refreshRadarIfVisible, 15_000);
+    const interval = window.setInterval(refreshRadarIfVisible, 45_000);
     document.addEventListener("visibilitychange", refreshRadarIfVisible);
     return () => {
       window.clearInterval(interval);
@@ -1244,7 +1258,7 @@ export function FantasyExperience({
           onTouchStart={preloadInventoryModal}
           className="group flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-accent/30 bg-accent/[.08] px-1.5 py-3 text-center transition-colors hover:bg-accent/15"
         >
-          <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-background"><Cards className="h-4.5 w-4.5" />{inventoryCount > 0 && <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full border border-background bg-foreground px-1 text-[8px] font-black leading-4 text-background">{inventoryCount}</span>}</span>
+          <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-background"><Cards className="h-4.5 w-4.5" />{currentInventoryCount > 0 && <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full border border-background bg-foreground px-1 text-[8px] font-black leading-4 text-background">{currentInventoryCount}</span>}</span>
           <span className="truncate text-[10px] font-black text-accent">Cartas</span>
         </button>
         <button
@@ -1669,13 +1683,17 @@ export function FantasyExperience({
             {!betweenRounds && round && (
               <FantasyActiveCardSlot
                 roundId={round.id}
-                activeCard={activeCard}
+                activeCard={currentActiveCard}
                 isMarketOpen={open}
                 isRoundLive={liveProjection?.isLive || status === "in_progress"}
                 liveStats={liveProjection?.playerStats || []}
                 marketPlayers={market}
                 lineupPlayers={validSelectedPlayers}
                 captainPlayerId={captainId}
+                onCardRemoved={() => {
+                  setCurrentActiveCard(null);
+                  setCurrentInventoryCount((count) => count + 1);
+                }}
                 onRefresh={() => requestRefresh(0)}
               />
             )}

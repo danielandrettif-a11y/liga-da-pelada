@@ -49,6 +49,7 @@ import { useDialogViewport } from "@/lib/useDialogViewport";
 import type { EquippedCosmeticsSummary } from "@/lib/actions/cosmetics";
 import Image from "next/image";
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
+import { useUrlState } from "@/lib/useUrlState";
 
 type Props = {
   callup: CallupWithEntries;
@@ -62,7 +63,9 @@ type Props = {
   stadiums?: Stadium[];
   fantasyHighlights?: FantasyQuickHighlight | null;
   playerCosmetics?: Record<string, EquippedCosmeticsSummary>;
+  initialListTab?: "confirmed" | "waitlist";
 };
+const CALLUP_LIST_TABS = ["confirmed", "waitlist"] as const;
 
 export function CallupBoard({
   callup,
@@ -76,6 +79,7 @@ export function CallupBoard({
   stadiums = [],
   fantasyHighlights,
   playerCosmetics = {},
+  initialListTab = "confirmed",
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState("");
@@ -84,7 +88,7 @@ export function CallupBoard({
   const [editingCallup, setEditingCallup] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
-  const [activeTab, setActiveTab] = useState<"confirmed" | "waitlist">("confirmed");
+  const [activeTab, setActiveTab] = useUrlState({ key: "list", initialValue: initialListTab, defaultValue: "confirmed", allowedValues: CALLUP_LIST_TABS });
 
   // Estado para Contratação de Amigo (Convidado)
   const [isHireGuestOpen, setIsHireGuestOpen] = useState(false);
@@ -92,7 +96,7 @@ export function CallupBoard({
   const [guestProfile, setGuestProfile] = useState<PlayerProfile>("midfield");
   const [isGuestGk, setIsGuestGk] = useState(false);
 
-  useDialogViewport(editingCallup);
+  useDialogViewport(editingCallup, () => !editLoading && setEditingCallup(false));
 
   const confirmed = callup.entries.filter((entry) => entry.status === "confirmed");
   const waitlist = callup.entries.filter((entry) => entry.status === "waitlist");

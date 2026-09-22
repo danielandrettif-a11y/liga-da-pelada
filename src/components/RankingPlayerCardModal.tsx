@@ -304,7 +304,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   const [expandedRoundId, setExpandedRoundId] = useState<string | null>(null);
   const dialogScrollRef = useRef<HTMLDivElement>(null);
   const bestRoundsRef = useRef<HTMLDivElement>(null);
-  useDialogViewport(true);
+  useDialogViewport(true, onClose);
 
   useEffect(() => {
     setMounted(true);

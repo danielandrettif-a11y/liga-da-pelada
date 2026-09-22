@@ -372,7 +372,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
   const [error, setError] = useState("");
   const [quickStart, setQuickStart] = useState<any | null>(null);
   const playerCosmetics = match.player_cosmetics as GoalPickerPlayerOptionProps["cosmetics"] | undefined;
-  useDialogViewport(Boolean(quickStart));
+  useDialogViewport(Boolean(quickStart), () => !loading && setQuickStart(null));
 
   // Placar e Eventos locais para Optimistic UI
   const [displayScore, setDisplayScore] = useState({
@@ -519,9 +519,9 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
     scorerId: string | null;
     isOwnGoal: boolean;
   }>({ open: false, teamId: "", scorerId: null, isOwnGoal: false });
-  useDialogViewport(goalModal.open);
+  useDialogViewport(goalModal.open, () => !loading && setGoalModal({ open: false, teamId: "", scorerId: null, isOwnGoal: false }));
   const [assistEdit, setAssistEdit] = useState<any | null>(null);
-  useDialogViewport(Boolean(assistEdit));
+  useDialogViewport(Boolean(assistEdit), () => !loading && setAssistEdit(null));
 
   // Jogadores ativos para o modal
   const activePlayers = useMemo(() => {
@@ -568,7 +568,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       return;
     }
     if (res.quickStart) setQuickStart(res.quickStart);
-    else router.push(`/rodadas/${res.roundId || match.round_id}`);
+    else router.replace(`/rodadas/${res.roundId || match.round_id}`);
     setLoading(false);
   }
 
@@ -1093,7 +1093,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       {quickStart && canManage && (
         <QuickNextMatchModal
           suggestion={quickStart}
-          onClose={() => router.push(`/rodadas/${match.round_id}`)}
+          onClose={() => router.replace(`/rodadas/${match.round_id}`)}
         />
       )}
     </div>

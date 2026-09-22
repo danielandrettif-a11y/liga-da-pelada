@@ -13,7 +13,7 @@ export function DeleteRoundButton({ round, redirectTo }: { round: { id: string; 
   const [confirmation, setConfirmation] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  useDialogViewport(open);
+  useDialogViewport(open, () => !loading && setOpen(false));
 
   async function handleDelete() {
     setLoading(true);
@@ -25,7 +25,7 @@ export function DeleteRoundButton({ round, redirectTo }: { round: { id: string; 
       return;
     }
     setOpen(false);
-    if (redirectTo) router.push(redirectTo);
+    if (redirectTo) router.replace(redirectTo);
     else router.refresh();
   }
 
