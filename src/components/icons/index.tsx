@@ -57,19 +57,24 @@ export const ClipboardList = createSportIcon(
   <path d="m8 5-3 1.7-1.8 4.5 3 1.7V20h11.6v-7.1l3-1.7L19 6.7 16 5c-.5 1.7-1.9 2.7-4 2.7S8.5 6.7 8 5Z" fill="currentColor" opacity=".14" stroke="none" />,
 );
 
-// Cartola levemente inclinada para identificar o modo fantasy sem parecer uma camisa.
-export const CartolaHat = createSportIcon(
-  <g transform="rotate(-11 12 12)">
-    <path d="M8 5.2h8l.9 10.4H7.1Z" />
-    <path d="M5 15.6h14l1.5 2.1c.5.7 0 1.6-.9 1.6H4.4c-.9 0-1.4-.9-.9-1.6Z" />
-    <path d="M8.6 11.8h7.1" opacity=".65" />
-    <path d="M10.2 5.2v-1h3.6v1" opacity=".55" />
-  </g>,
-  <g transform="rotate(-11 12 12)" fill="currentColor" opacity=".16" stroke="none">
-    <path d="M8 5.2h8l.9 10.4H7.1Z" />
-    <path d="M5 15.6h14l1.5 2.1c.5.7 0 1.6-.9 1.6H4.4c-.9 0-1.4-.9-.9-1.6Z" />
-  </g>,
-);
+// Cartola frontal, com copa larga, faixa colorida e aba bem marcada.
+export const CartolaHat = createSportIcon((active) => (
+  <>
+    <path
+      d="M7.1 4.5h9.8l-1.1 10H8.2Z"
+      fill={active ? "currentColor" : "none"}
+    />
+    <path
+      d="M3.2 14.5h17.6l-1.9 4H5.1Z"
+      fill={active ? "currentColor" : "none"}
+    />
+    <path
+      d="M8.55 11.25h6.9l-.35 3.25H8.9Z"
+      fill="var(--warning)"
+      stroke="none"
+    />
+  </>
+));
 
 export const Trophy = createSportIcon(
   <>

@@ -1079,7 +1079,7 @@ export function FantasyExperience({
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-accent/20 bg-accent/10 text-accent">
-                <CartolaHat className="h-6 w-6" />
+                <CartolaHat active className="h-6 w-6" />
               </span>
               <div className="min-w-0">
                 <p className="text-[9px] font-bold uppercase tracking-[.16em] text-accent/75">Fantasy da pelada</p>
