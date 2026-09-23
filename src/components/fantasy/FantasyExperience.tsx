@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   Cards,
+  CartolaHat,
   ChevronDown,
   CheckCircle2,
   Clock,
@@ -102,7 +103,6 @@ export function FantasyExperience({
   lineup,
   insights,
   radar,
-  marketHealth = null,
   account,
   isTest = false,
   lastRound = null,
@@ -1072,21 +1072,27 @@ export function FantasyExperience({
         />
       )}
 
-      {/* Painel principal: informação antes de ornamentação. */}
-      <header className="overflow-hidden rounded-2xl border border-white/10 bg-[#07150d] shadow-[0_14px_36px_rgba(0,0,0,.22)]">
-        <div className="p-4 sm:p-5">
+      {/* Painel principal */}
+      <header className="relative overflow-hidden rounded-2xl border border-accent/20 bg-[#07150d] shadow-[0_14px_36px_rgba(0,0,0,.22)]">
+        <div className="absolute inset-x-0 top-0 h-0.5 bg-accent/75" />
+        <div className="px-4 pb-4 pt-[18px] sm:px-5 sm:pb-5 sm:pt-5">
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[9px] font-bold uppercase tracking-[.18em] text-accent/80">Fantasy da pelada</p>
-              <h1 className="mt-1 font-athletic text-[1.8rem] font-black uppercase leading-none text-foreground">Cartola</h1>
-              <p className="mt-1.5 max-w-[260px] text-[11px] leading-4 text-muted">
-                {betweenRounds
-                  ? "Acompanhe as tendências enquanto aguarda a abertura da próxima Ranked"
-                  : `Ranked ${round?.number || ""} · escale ${playersPerTeam} craques`}
-              </p>
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-accent/20 bg-accent/10 text-accent">
+                <CartolaHat className="h-6 w-6" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold uppercase tracking-[.16em] text-accent/75">Fantasy da pelada</p>
+                <h1 className="mt-0.5 font-athletic text-[1.65rem] font-black uppercase leading-none text-foreground">Cartola</h1>
+                <p className="mt-1 truncate text-[10px] text-muted">
+                  {betweenRounds
+                    ? "Aguardando a próxima Ranked"
+                    : `Ranked ${round?.number || ""} · ${playersPerTeam} jogadores`}
+                </p>
+              </div>
             </div>
             <span
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.1em] ${
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[.08em] ${
                 isTest
                   ? "border-warning/30 bg-warning/15 text-warning"
                   : open
@@ -1109,7 +1115,7 @@ export function FantasyExperience({
             </span>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 divide-x divide-white/10 border-y border-white/10 py-3">
+          <div className="mt-4 grid grid-cols-3 divide-x divide-white/10 rounded-xl border border-white/10 bg-black/15 py-3.5">
             <Metric label="Patrimônio" value={formatFantasyMoney(budget, settings.currencyName)} />
             <Metric
               label={status === "in_progress" ? "Ao vivo" : betweenRounds ? "Pontos" : "Escalação"}
@@ -1121,19 +1127,6 @@ export function FantasyExperience({
               accent={betweenRounds || remaining >= 0}
             />
           </div>
-          {marketHealth?.version === 11 && (
-            <div className="mt-3 flex items-start gap-2 text-[10px] leading-4 text-muted">
-              <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
-                marketHealth.level === "COMPETITIVE" ? "bg-warning" :
-                marketHealth.level === "ACCESSIBLE" ? "bg-sky-300" :
-                "bg-accent"
-              }`} />
-              <p>
-                <strong className="font-bold text-foreground/85">Mercado {marketHealth.level === "COMPETITIVE" ? "competitivo" : marketHealth.level === "ACCESSIBLE" ? "acessível" : "equilibrado"}.</strong>{" "}
-                Preços iguais para todos, ajustados gradualmente à economia da liga.
-              </p>
-            </div>
-          )}
           {status === "in_progress" && (
             <div className="mt-3 flex items-center gap-2 text-[10px] font-bold text-accent">
               <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" /> Prévia ao vivo</span>
@@ -1142,7 +1135,7 @@ export function FantasyExperience({
         </div>
 
         {!betweenRounds && round && (
-          <div className={`flex items-center gap-3 border-t px-4 py-3 sm:px-5 ${open ? "border-accent/15 bg-accent/[.045]" : "border-white/10 bg-black/15"}`}>
+          <div className={`flex items-center gap-3 border-t px-4 py-3 sm:px-5 ${open ? "border-accent/15 bg-accent/[.06]" : "border-white/10 bg-black/15"}`}>
             <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${open ? "bg-accent/15 text-accent" : "bg-white/5 text-muted"}`}>
               {open ? <Clock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
             </div>
@@ -1274,31 +1267,36 @@ export function FantasyExperience({
       </nav>
 
       {canShowRoundTeams && (
-        <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#07150d]">
+        <section className="relative overflow-hidden rounded-2xl border border-accent/45 bg-[#0a1d11] shadow-[0_12px_30px_rgba(0,0,0,.2)]">
+          <span className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-accent" aria-hidden="true" />
           <button
             type="button"
             onClick={() => setShowRoundTeams((current) => !current)}
             aria-expanded={showRoundTeams}
             aria-controls="times-da-rodada"
-            className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[.035]"
+            className="group flex w-full items-center gap-3 py-4 pl-5 pr-4 text-left transition-colors duration-300 ease-out hover:bg-accent/[.07] motion-reduce:transition-none"
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
-              <Users className="h-[18px] w-[18px]" />
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent text-background shadow-[0_8px_20px_rgba(0,0,0,.2)]">
+              <Users className="h-5 w-5" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-2 text-sm font-bold text-foreground">
-                Times da rodada
-                <span className="rounded-full bg-white/[.07] px-2 py-0.5 text-[9px] font-bold text-muted">{roundTeams.length}</span>
+              <span className="block text-[8px] font-black uppercase tracking-[.16em] text-accent/80">
+                Escalações disponíveis
               </span>
-              <span className="mt-0.5 block text-[10px] text-muted">
-                Confira as formações e escolha sua escalação
+              <span className="mt-0.5 flex items-center gap-2 text-[15px] font-black leading-tight text-foreground">
+                Veja os times da rodada
+              </span>
+              <span className="mt-1 block text-[10px] text-muted">
+                {roundTeams.length} {roundTeams.length === 1 ? "time sorteado" : "times sorteados"} · toque para conferir
               </span>
             </span>
-            <ChevronDown className={`h-5 w-5 shrink-0 text-muted transition-transform duration-200 ${showRoundTeams ? "rotate-180" : ""}`} />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-accent/25 bg-accent/10 text-accent transition-colors duration-300 ease-out group-hover:bg-accent group-hover:text-background motion-reduce:transition-none">
+              <ChevronDown className={`h-5 w-5 transition-transform duration-300 ease-out motion-reduce:transition-none ${showRoundTeams ? "rotate-180" : ""}`} />
+            </span>
           </button>
 
           {showRoundTeams && (
-            <div id="times-da-rodada" className="grid gap-3 border-t border-white/10 p-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div id="times-da-rodada" className="grid gap-3 border-t border-accent/15 bg-black/10 p-3 sm:grid-cols-2 xl:grid-cols-3">
               {roundTeams.map((team, index) => (
                 <TeamMiniPitch key={team.id} team={team} index={index} showPositionDetails />
               ))}
