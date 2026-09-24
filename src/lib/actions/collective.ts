@@ -58,10 +58,10 @@ async function listCollectiveCandidates() {
 }
 
 function isCollectiveOpen(callup: any) {
-  const draft = Array.isArray(callup.team_drafts) ? callup.team_drafts[0] : callup.team_drafts;
   const round = Array.isArray(callup.round) ? callup.round[0] : callup.round;
-  const started = callup.status === "converted" || (draft && draft.status !== "cancelled");
-  if (!started) return false;
+  // Antes dos times serem confirmados, a Coletiva fica exclusivamente dentro
+  // da Convocação. Só então ela substitui o Elenco no menu inferior.
+  if (callup.status !== "converted") return false;
   if (!round || round.status !== "finished") return true;
   if (!round.payment_pix || Number(round.payment_total) <= 0) return false;
   const payments = round.round_payments || [];

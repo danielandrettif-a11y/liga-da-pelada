@@ -41,6 +41,11 @@ function alphabeticalCompare(a: PlayerStats, b: PlayerStats) {
   return getDisplayName(a.name).localeCompare(getDisplayName(b.name), "pt-BR");
 }
 
+function rosterDisplayName(name: string) {
+  const parts = getDisplayName(name).split(/\s+/).filter(Boolean);
+  return parts.slice(0, 2).join(" ") || "Jogador";
+}
+
 export function PlayersStatsGrid({
   players,
   unreadPlayerIds = new Set<string>(),
@@ -73,7 +78,7 @@ export function PlayersStatsGrid({
         </select>
       </div>
 
-      <div className="grid min-w-0 grid-cols-2 gap-3">
+      <div className="grid min-w-0 grid-cols-1 gap-3 min-[480px]:grid-cols-2">
         {sortedPlayers.map((player, index) => {
           const cosmetic = playerCosmetics?.[player.id];
           const bannerImg = cosmeticHighResolutionImage(cosmetic?.bannerAssetKey);
@@ -106,23 +111,23 @@ export function PlayersStatsGrid({
 
                 <div className="relative z-10 flex flex-col h-full justify-between">
                   <div>
-                    <div className="mb-3 flex items-center gap-3">
+                    <div className="mb-3 flex items-start gap-3">
                       <PlayerAvatar
                         name={player.name}
                         playerId={player.id}
                         avatarUrl={player.avatar_url}
                         frameKey={cosmetic?.frameKey}
                         auraKey={cosmetic?.auraKey}
-                        className="h-11 w-11 flex-shrink-0 rounded-full border border-accent/25 bg-surface-hover text-sm font-bold text-muted ring-2 ring-background shadow-[0_0_16px_rgba(204,255,0,.08)]"
+                        className="h-14 w-14 flex-shrink-0 rounded-full border border-accent/25 bg-surface-hover text-sm font-bold text-muted ring-2 ring-background shadow-[0_0_16px_rgba(204,255,0,.08)]"
                       />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-foreground drop-shadow-sm">{getDisplayName(player.name)}</p>
-                        <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <p title={player.name} className="break-words text-base font-black leading-5 text-foreground drop-shadow-sm">{rosterDisplayName(player.name)}</p>
+                        <div className="mt-1"><PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} /></div>
                       </div>
                       {player.overall != null && (
-                        <div className="shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-1.5 py-1 text-center shadow-[0_0_14px_rgba(204,255,0,.12)]">
-                          <p className="font-athletic text-base font-black leading-none text-accent">{player.overall.toFixed(1)}</p>
-                          <p className="mt-0.5 text-[6px] font-black uppercase tracking-[.12em] text-accent/80">OVR</p>
+                        <div className="shrink-0 rounded-xl border border-accent/40 bg-accent/10 px-2 py-1.5 text-center shadow-[0_0_14px_rgba(204,255,0,.12)]">
+                          <p className="font-athletic text-lg font-black leading-none text-accent">{player.overall.toFixed(1)}</p>
+                          <p className="mt-0.5 text-[7px] font-black uppercase tracking-[.12em] text-accent/80">OVR</p>
                         </div>
                       )}
                     </div>
