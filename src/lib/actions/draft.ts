@@ -30,7 +30,7 @@ export type DraftCaptain = {
 
 export type DraftWorkspace = {
   id: string;
-  callupId: string;
+  callupId: string | null;
   roundId: string;
   status: "setup" | "active" | "paused" | "completed" | "confirmed" | "cancelled";
   currentPick: number;
@@ -46,24 +46,30 @@ export type DraftWorkspace = {
 
 function refreshDraft(roundId?: string) {
   revalidatePath("/convocacao");
+  revalidatePath("/draft");
   revalidatePath("/coletiva");
   revalidatePath("/", "layout");
   revalidatePath("/admin/rodada");
   if (roundId) revalidatePath(`/rodadas/${roundId}`);
 }
 
-export async function createTeamDraft(input: { callupId: string; roundId: string }) {
+export async function createTeamDraft(input: { callupId?: string | null; roundId: string }) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem iniciar o Draft." };
   const { data: round } = await client.from("rounds").select("season_id").eq("id", input.roundId).maybeSingle();
   if (!round) return { success: false, error: "Pré-rodada não encontrada." };
-  const { data: entries, error: entriesError } = await client
-    .from("callup_entries")
-    .select("player_id, players!inner(id, member_category, is_selectable)")
-    .eq("callup_id", input.callupId)
-    .eq("status", "confirmed");
-  if (entriesError) return { success: false, error: entriesError.message };
-  const confirmedIds = (entries || []).map((entry: any) => entry.player_id);
+  const { data: sourceRows, error: sourceError } = input.callupId
+    ? await client
+        .from("callup_entries")
+        .select("player_id, players!inner(id, member_category, is_selectable)")
+        .eq("callup_id", input.callupId)
+        .eq("status", "confirmed")
+    : await client
+        .from("round_players")
+        .select("player_id, players!inner(id, member_category, is_selectable)")
+        .eq("round_id", input.roundId);
+  if (sourceError) return { success: false, error: sourceError.message };
+  const confirmedIds = (sourceRows || []).map((entry: any) => entry.player_id);
   const { data: stats, error: statsError } = await client
     .from("player_season_stats")
     .select("player_id, rounds_count")
@@ -73,14 +79,14 @@ export async function createTeamDraft(input: { callupId: string; roundId: string
     .in("player_id", confirmedIds);
   if (statsError) return { success: false, error: statsError.message };
   const eligible = (stats || []).filter((stat: any) => {
-    const entry: any = entries?.find((item: any) => item.player_id === stat.player_id);
+    const entry: any = sourceRows?.find((item: any) => item.player_id === stat.player_id);
     const player = Array.isArray(entry?.players) ? entry.players[0] : entry?.players;
     return player?.member_category === "player" && player?.is_selectable;
   }).map((stat: any) => stat.player_id);
   if (eligible.length < 3) return { success: false, error: "São necessários três jogadores oficiais com pelo menos três rodadas oficiais nesta temporada." };
   const captainIds = [...eligible].sort(() => Math.random() - 0.5).slice(0, 3);
   const { data: draftId, error } = await client.rpc("create_team_draft", {
-    p_callup_id: input.callupId,
+    p_callup_id: input.callupId || null,
     p_round_id: input.roundId,
     p_captain_ids: captainIds,
   });
@@ -89,10 +95,10 @@ export async function createTeamDraft(input: { callupId: string; roundId: string
   return { success: true, draftId: String(draftId) };
 }
 
-export async function getDraftWorkspace(callupId: string): Promise<DraftWorkspace | null> {
+async function getDraftWorkspaceBy(column: "callup_id" | "round_id", value: string): Promise<DraftWorkspace | null> {
   const account = await getCurrentAccount();
   if (!account.user) return null;
-  const { data: draft } = await account.client.from("team_drafts").select("*").eq("callup_id", callupId).maybeSingle();
+  const { data: draft } = await account.client.from("team_drafts").select("*").eq(column, value).maybeSingle();
   if (!draft) return null;
   const [{ data: captainRows }, { data: pickRows }, { data: poolRows }] = await Promise.all([
     account.client.from("team_draft_captains").select("*").eq("draft_id", draft.id).order("team_slot"),
@@ -160,6 +166,14 @@ export async function getDraftWorkspace(callupId: string): Promise<DraftWorkspac
     balanceScore: calculateDraftBalanceScore(balancePlayers),
     suggestion: suggestion ? { ...suggestion, playerAName: playerById.get(suggestion.playerAId)?.name || "Jogador", playerBName: playerById.get(suggestion.playerBId)?.name || "Jogador" } : null,
   };
+}
+
+export async function getDraftWorkspace(callupId: string) {
+  return getDraftWorkspaceBy("callup_id", callupId);
+}
+
+export async function getDraftWorkspaceByRound(roundId: string) {
+  return getDraftWorkspaceBy("round_id", roundId);
 }
 
 export async function startTeamDraft(draftId: string) {

@@ -48,7 +48,7 @@ export function DraftBoard({ workspace }: { workspace: DraftWorkspace }) {
       <section className="overflow-hidden rounded-3xl border border-accent/35 bg-[radial-gradient(circle_at_top_right,rgba(204,255,0,.18),transparent_42%),linear-gradient(145deg,#092318,#04120b)] p-5 shadow-[0_18px_55px_rgba(0,0,0,.35)]">
         <div className="flex items-start justify-between gap-3">
           <div><p className="text-[10px] font-black uppercase tracking-[.18em] text-accent">Formação oficial</p><h1 className="mt-1 font-athletic text-3xl font-black uppercase italic text-foreground">Draft BQ</h1><p className="mt-2 max-w-md text-xs leading-5 text-muted">Os três capitães montam seus times em ordem cobra. Cada escolha aparece para todos em tempo real.</p></div>
-          <Link href={`/convocacao?callup=${workspace.callupId}&section=collective`} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-accent/30 bg-accent/10 text-accent" aria-label="Abrir Coletiva de imprensa"><Microphone className="h-6 w-6" /></Link>
+          {workspace.callupId && <Link href={`/convocacao?callup=${workspace.callupId}&section=collective`} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-accent/30 bg-accent/10 text-accent" aria-label="Abrir Coletiva de imprensa"><Microphone className="h-6 w-6" /></Link>}
         </div>
         <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-black uppercase">
           <span className="rounded-full bg-white/8 px-3 py-1.5 text-foreground">{workspace.players.length - available.length}/{workspace.players.length} escalados</span>

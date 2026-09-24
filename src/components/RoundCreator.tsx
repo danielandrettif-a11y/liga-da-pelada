@@ -660,15 +660,19 @@ export function RoundCreator({
   }
 
   async function handleStartDraft() {
-    if (!sourceCallupId || !currentPrelistId) {
-      setError("O Draft precisa de uma convocação vinculada e de uma pré-lista salva.");
+    if (!currentPrelistId) {
+      setError("Salve a pré-lista antes de iniciar o Draft.");
       return;
     }
     if (teamCount !== 3) {
       setError("O Draft desta versão exige exatamente três times.");
       return;
     }
-    if (selectedPlayers.length !== selectionCapacity) {
+    if (selectedPlayers.length < 6) {
+      setError("Selecione pelo menos 6 jogadores para iniciar o Draft.");
+      return;
+    }
+    if (sourceCallupId && selectedPlayers.length !== selectionCapacity) {
       setError(`Complete as ${selectionCapacity} vagas da convocação antes de iniciar o Draft.`);
       return;
     }
@@ -680,7 +684,9 @@ export function RoundCreator({
       setLoading(false);
       return;
     }
-    router.push(`/convocacao?callup=${sourceCallupId}&section=draft`);
+    router.push(sourceCallupId
+      ? `/convocacao?callup=${sourceCallupId}&section=draft`
+      : `/draft?round=${currentPrelistId}`);
   }
 
   return (
@@ -1142,20 +1148,6 @@ export function RoundCreator({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
-                onClick={() => requestDraw("random")}
-                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "random" ? "border-accent bg-accent/15 text-accent shadow-sm" : "border-border bg-surface text-foreground hover:border-accent/40"}`}
-              >
-                ⚡ Sorteio Aleatório
-              </button>
-              <button
-                type="button"
-                onClick={() => requestDraw("balanced")}
-                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "balanced" ? "border-accent bg-accent/15 text-accent shadow-sm" : "border-border bg-surface text-foreground hover:border-accent/40"}`}
-              >
-                ⚖️ Equilibrado
-              </button>
-              <button
-                type="button"
                 onClick={() => requestDraw("speed")}
                 className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "speed" ? "border-accent bg-accent/15 text-accent shadow-sm" : "border-border bg-surface text-foreground hover:border-accent/40"}`}
               >
@@ -1166,11 +1158,11 @@ export function RoundCreator({
                 onClick={() => requestDraw("adaptive")}
                 className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "adaptive" ? "border-accent bg-accent/15 text-accent shadow-sm" : "border-border bg-surface text-foreground hover:border-accent/40"}`}
               >
-                🧠 Equilíbrio Completo
+                🧠 Equilibrado
               </button>
               <button
                 type="button"
-                onClick={() => openAttendanceDrawModal("random")}
+                onClick={() => openAttendanceDrawModal("adaptive")}
                 className="rounded-xl border border-border bg-surface px-2 py-3 text-[10px] font-black uppercase text-muted hover:text-foreground hover:border-border/80 transition-all active:scale-95"
               >
                 📋 Ordem de Chegada
@@ -1178,7 +1170,7 @@ export function RoundCreator({
               <button
                 type="button"
                 onClick={() => void handleStartDraft()}
-                disabled={loading || !sourceCallupId || !currentPrelistId}
+                disabled={loading || !currentPrelistId}
                 className="rounded-xl border border-accent/45 bg-accent/10 px-2 py-3 text-[10px] font-black uppercase text-accent transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 👑 Draft de Capitães
@@ -1194,10 +1186,6 @@ export function RoundCreator({
             <p className="mt-2 text-[10px] text-muted">
               {formationMode === "manual"
                 ? "Toque em cada jogador e escolha o time manualmente."
-                : formationMode === "random"
-                ? "Times sorteados aleatoriamente com sucesso!"
-                : formationMode === "balanced"
-                ? "Times equilibrados por pontuação e posições com sucesso!"
                 : formationMode === "speed"
                 ? "Times equilibrados por velocidade (★) com sucesso!"
                 : formationMode === "adaptive"
@@ -1224,7 +1212,7 @@ export function RoundCreator({
             {formationMode === "adaptive" && adaptiveSummary && (
               <div className="mt-3 rounded-xl border border-accent/25 bg-accent/5 p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-[9px] font-black uppercase tracking-wider text-accent">Resumo privado do equilíbrio completo</p>
+                  <p className="text-[9px] font-black uppercase tracking-wider text-accent">Resumo privado do equilíbrio</p>
                   <span className="rounded-full bg-accent/15 px-2 py-1 text-[9px] font-black text-accent">{adaptiveSummary.balanceScore.toFixed(0)}% equilíbrio</span>
                 </div>
                 <div className="mt-2 grid gap-1.5 sm:grid-cols-2">

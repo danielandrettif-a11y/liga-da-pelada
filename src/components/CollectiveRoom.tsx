@@ -7,6 +7,27 @@ import { PlayerAvatar } from "./PlayerAvatar";
 import { deleteCollectiveMessage, editCollectiveMessage, markCollectiveRead, sendCollectiveMessage, type CollectiveRoomData } from "@/lib/actions/collective";
 import { supabase } from "@/lib/supabase";
 
+function audioExtension(mime: string) {
+  if (mime.includes("mp4")) return "m4a";
+  if (mime.includes("mpeg")) return "mp3";
+  if (mime.includes("ogg")) return "ogg";
+  return "webm";
+}
+
+function CollectiveAudioPlayer({ src, mime }: { src: string; mime: string | null }) {
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <div className="mt-2">
+      <audio controls preload="metadata" className="w-full max-w-[260px]" onError={() => setFailed(true)}>
+        <source src={src} type={mime || undefined} />
+        Seu navegador não suporta a reprodução deste áudio.
+      </audio>
+      {failed && <p className="mt-1 text-[10px] font-bold text-danger">Não foi possível reproduzir este áudio neste navegador.</p>}
+    </div>
+  );
+}
+
 export function CollectiveRoom({ room, compact = false }: { room: CollectiveRoomData; compact?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -40,13 +61,15 @@ export function CollectiveRoom({ room, compact = false }: { room: CollectiveRoom
     if (recording) { mediaRecorder.current?.stop(); return; }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const preferredMime = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"]
+        .find((mime) => MediaRecorder.isTypeSupported(mime));
+      const recorder = preferredMime ? new MediaRecorder(stream, { mimeType: preferredMime }) : new MediaRecorder(stream);
       chunks.current = [];
       recorder.ondataavailable = (event) => { if (event.data.size) chunks.current.push(event.data); };
       recorder.onstop = () => {
         const mime = (recorder.mimeType || "audio/webm").split(";")[0];
         const blob = new Blob(chunks.current, { type: mime });
-        setFile(new File([blob], `coletiva-${Date.now()}.webm`, { type: mime }));
+        setFile(new File([blob], `coletiva-${Date.now()}.${audioExtension(mime)}`, { type: mime }));
         setRecording(false);
         stream.getTracks().forEach((track) => track.stop());
       };
@@ -98,7 +121,7 @@ export function CollectiveRoom({ room, compact = false }: { room: CollectiveRoom
               <div className="flex items-center gap-2"><p className="text-[10px] font-black text-foreground">{message.senderName}</p><span className="text-[8px] text-muted">{new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(message.createdAt))}{message.editedAt ? " · editada" : ""}</span></div>
               {message.deletedAt ? <p className="mt-1 text-xs italic text-muted">Mensagem removida</p> : <>
                 {message.kind === "image" && message.mediaUrl && <img src={message.mediaUrl} alt="Imagem enviada na coletiva" className="mt-2 max-h-72 w-full rounded-xl object-cover" />}
-                {message.kind === "audio" && message.mediaUrl && <audio controls preload="metadata" src={message.mediaUrl} className="mt-2 w-full max-w-[260px]" />}
+                {message.kind === "audio" && message.mediaUrl && <CollectiveAudioPlayer src={message.mediaUrl} mime={message.mediaMime} />}
                 {message.body && !(["image", "audio"].includes(message.kind) && ["Imagem", "Áudio"].includes(message.body)) && <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-5 text-foreground">{message.body}</p>}
                 <div className="mt-2 flex items-center justify-end gap-1">
                   {message.body && <button onClick={() => void navigator.clipboard.writeText(message.body || "")} className="rounded-lg p-1.5 text-muted" aria-label="Copiar mensagem"><Copy className="h-3.5 w-3.5" /></button>}

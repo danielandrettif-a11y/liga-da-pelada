@@ -125,10 +125,10 @@ export default async function ConvocacaoPage({
         </nav>
       )}
       {(draftWorkspace || collectiveRoom) && (
-        <nav className="mb-4 grid grid-cols-3 rounded-2xl border border-border bg-surface p-1" aria-label="Áreas da convocação">
+        <nav className={`mb-4 grid rounded-2xl border border-border bg-surface p-1 ${draftWorkspace && collectiveRoom ? "grid-cols-3" : "grid-cols-2"}`} aria-label="Áreas da convocação">
           <Link href={`/convocacao?callup=${callup.id}`} className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black uppercase ${section === "list" ? "bg-accent text-background" : "text-muted"}`}><Flag className="h-4 w-4" /> Lista</Link>
-          <Link href={`/convocacao?callup=${callup.id}&section=draft`} className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black uppercase ${!draftWorkspace ? "pointer-events-none opacity-35" : section === "draft" ? "bg-accent text-background" : "text-muted"}`}><Sparkles className="h-4 w-4" /> Draft</Link>
-          <Link href={`/convocacao?callup=${callup.id}&section=collective`} className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black uppercase ${!collectiveRoom ? "pointer-events-none opacity-35" : section === "collective" ? "bg-accent text-background" : "text-muted"}`}><Microphone className="h-4 w-4" /> Coletiva</Link>
+          {draftWorkspace && <Link href={`/convocacao?callup=${callup.id}&section=draft`} className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black uppercase ${section === "draft" ? "bg-accent text-background" : "text-muted"}`}><Sparkles className="h-4 w-4" /> Draft</Link>}
+          {collectiveRoom && <Link href={`/convocacao?callup=${callup.id}&section=collective`} className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black uppercase ${section === "collective" ? "bg-accent text-background" : "text-muted"}`}><Microphone className="h-4 w-4" /> Coletiva</Link>}
         </nav>
       )}
       {section === "draft" && draftWorkspace ? <DraftBoard workspace={draftWorkspace} /> : section === "collective" && collectiveRoom ? <CollectiveRoom room={collectiveRoom} compact /> : (
