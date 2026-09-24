@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { createRoundWithTeams, saveRoundPrelist, setCallupMatchSize, type TeamInput } from "@/lib/actions/rounds";
+import { createTeamDraft } from "@/lib/actions/draft";
 import { adminAddCallupPlayer, adminRemoveCallupPlayer } from "@/lib/actions/callups";
 import type { RoundType, TeamFormationMode } from "@/lib/types";
 import { drawTeamsByAttendance, drawTeamsDirect } from "@/lib/round-draw";
@@ -40,6 +41,8 @@ import { isPlayerVisibleInPrelistTab } from "@/lib/callup-ui";
 import { VEST_COLORS } from "@/lib/vest-colors";
 import { createDefaultTeams, type DrawPlayer, type DrawTeam, type RoundCreatorProps } from "./round-creator-model";
 import { MIN_UNDERFILLED_PLAYERS, rebalanceTeamRosters, validateUnderfilledTeamSizes, type RoundTeamSizeMode } from "@/lib/underfilled-rounds";
+
+type InstantFormationMode = Exclude<TeamFormationMode, "manual" | "draft">;
 
 export function RoundCreator({
   allPlayers,
@@ -81,7 +84,7 @@ export function RoundCreator({
   const [openVestPickerTeamId, setOpenVestPickerTeamId] = useState<string | null>(null);
   const [formationMode, setFormationMode] = useState<TeamFormationMode>("manual");
   const [attendanceOrder, setAttendanceOrder] = useState<string[]>([]);
-  const [pendingDrawMode, setPendingDrawMode] = useState<Exclude<TeamFormationMode, "manual"> | null>(null);
+  const [pendingDrawMode, setPendingDrawMode] = useState<InstantFormationMode | null>(null);
   const [speedSummary, setSpeedSummary] = useState<{ teams: SpeedTeamSummary[]; unratedCount: number } | null>(null);
   const [adaptiveSummary, setAdaptiveSummary] = useState<{ teams: AdaptiveTeamSummary[]; missingOverallCount: number; missingSpeedCount: number; balanceScore: number } | null>(null);
   const [underfilledPrompt, setUnderfilledPrompt] = useState<"count" | "size" | null>(null);
@@ -349,7 +352,7 @@ export function RoundCreator({
     })));
   }
 
-  async function executeDirectDraw(mode: Exclude<TeamFormationMode, "manual">) {
+  async function executeDirectDraw(mode: InstantFormationMode) {
     if (selectedPlayers.length === 0) {
       setError("Selecione os jogadores antes de sortear os times.");
       return;
@@ -414,7 +417,7 @@ export function RoundCreator({
     }
   }
 
-  function requestDraw(mode: Exclude<TeamFormationMode, "manual">) {
+  function requestDraw(mode: InstantFormationMode) {
     if (selectedPlayers.length < 2) {
       setError("Selecione pelo menos 2 jogadores para sortear.");
       return;
@@ -423,7 +426,7 @@ export function RoundCreator({
     executeDirectDraw(mode);
   }
 
-  function openAttendanceDrawModal(mode: Exclude<TeamFormationMode, "manual">) {
+  function openAttendanceDrawModal(mode: InstantFormationMode) {
     if (selectedPlayers.length < 2) {
       setError("Selecione pelo menos 2 jogadores para marcar presenças.");
       return;
@@ -654,6 +657,30 @@ export function RoundCreator({
     }
 
     router.replace(`/rodadas/${res.roundId}`);
+  }
+
+  async function handleStartDraft() {
+    if (!sourceCallupId || !currentPrelistId) {
+      setError("O Draft precisa de uma convocação vinculada e de uma pré-lista salva.");
+      return;
+    }
+    if (teamCount !== 3) {
+      setError("O Draft desta versão exige exatamente três times.");
+      return;
+    }
+    if (selectedPlayers.length !== selectionCapacity) {
+      setError(`Complete as ${selectionCapacity} vagas da convocação antes de iniciar o Draft.`);
+      return;
+    }
+    setLoading(true);
+    setError("");
+    const result = await createTeamDraft({ callupId: sourceCallupId, roundId: currentPrelistId });
+    if (!result.success) {
+      setError(result.error || "Não foi possível iniciar o Draft.");
+      setLoading(false);
+      return;
+    }
+    router.push(`/convocacao?callup=${sourceCallupId}&section=draft`);
   }
 
   return (
@@ -1112,7 +1139,7 @@ export function RoundCreator({
               <p className="text-[10px] font-black uppercase tracking-wider text-muted">Como montar os times?</p>
               <span className="text-[9px] font-bold text-accent">Sorteio com 1 toque</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
                 onClick={() => requestDraw("random")}
@@ -1147,6 +1174,14 @@ export function RoundCreator({
                 className="rounded-xl border border-border bg-surface px-2 py-3 text-[10px] font-black uppercase text-muted hover:text-foreground hover:border-border/80 transition-all active:scale-95"
               >
                 📋 Ordem de Chegada
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleStartDraft()}
+                disabled={loading || !sourceCallupId || !currentPrelistId}
+                className="rounded-xl border border-accent/45 bg-accent/10 px-2 py-3 text-[10px] font-black uppercase text-accent transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                👑 Draft de Capitães
               </button>
               <button
                 type="button"

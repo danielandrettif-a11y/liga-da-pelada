@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { ClipboardList, Trophy } from "@/components/icons";
+import Link from "next/link";
+import { ClipboardList, Trophy, Users } from "@/components/icons";
 import type { RankingExperienceData } from "@/lib/ranking";
 import type { FantasyRankingEntry } from "./fantasy/FantasyRankingList";
 import { RankingExperience } from "./RankingExperience";
@@ -28,7 +29,7 @@ export function RankingHub({ data, fantasyRanking, currentPlayerId, initialMode,
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 rounded-xl border border-border bg-surface p-1" role="tablist" aria-label="Tipo de ranking">
+      <div className="grid grid-cols-3 rounded-xl border border-border bg-surface p-1" role="tablist" aria-label="Área de consulta">
         <button
           type="button"
           role="tab"
@@ -47,6 +48,9 @@ export function RankingHub({ data, fantasyRanking, currentPlayerId, initialMode,
         >
           <ClipboardList className="h-4 w-4" /> Cartola
         </button>
+        <Link href="/jogadores" role="tab" aria-selected="false" className="flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-black text-muted">
+          <Users className="h-4 w-4" /> Elenco
+        </Link>
       </div>
 
       {mode === "ranked" ? (

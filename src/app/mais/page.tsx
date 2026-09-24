@@ -24,6 +24,7 @@ import {
   Stadium,
   Bell,
   RotateCcw,
+  Microphone,
 } from "@/components/icons";
 import { getStadiums } from "@/lib/actions/stadiums";
 
@@ -83,6 +84,12 @@ const ADMIN_SECTIONS = [
         icon: Sliders,
         label: "Pontuação",
         description: "Configurar regras de pontuação",
+      },
+      {
+        href: "/mais/coletivas",
+        icon: Microphone,
+        label: "Última coletiva",
+        description: "Consultar o chat arquivado da rodada anterior",
       },
       {
         href: "/admin/overall",

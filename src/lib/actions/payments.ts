@@ -224,7 +224,14 @@ export async function setPlayerPayment(roundId: string, playerId: string, paid: 
     return { success: false, error: error.message };
   }
 
+  if (paid) {
+    // Só elimina coletivas antigas quando todos os participantes desta rodada
+    // estiverem pagos; a RPC mantém esta última rodada como arquivo do ADM.
+    await client.rpc("prune_collective_history_after_payment", { p_round_id: roundId });
+  }
+
   revalidatePath("/pagamentos");
+  revalidatePath("/coletiva");
   revalidatePath("/admin/transfermarket");
   revalidatePath("/", "layout");
   return { success: true };

@@ -11,6 +11,11 @@ import { getFantasyQuickHighlights } from "@/lib/actions/fantasy";
 import { getStadiums } from "@/lib/actions/stadiums";
 import { labelCallupTabs } from "@/lib/callup-ui";
 import { getAllPlayersEquippedCosmeticsMap } from "@/lib/actions/cosmetics";
+import { getDraftWorkspace } from "@/lib/actions/draft";
+import { getCollectiveRoom } from "@/lib/actions/collective";
+import { DraftBoard } from "@/components/DraftBoard";
+import { CollectiveRoom } from "@/components/CollectiveRoom";
+import { Flag, Microphone, Sparkles } from "@/components/icons";
 
 export const revalidate = 0;
 
@@ -58,7 +63,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ConvocacaoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callup?: string; list?: string }>;
+  searchParams: Promise<{ callup?: string; list?: string; section?: string }>;
 }) {
   const params = await searchParams;
   const [callups, account, leagueConfig, fantasyHighlights, stadiums, cosmeticsMap] = await Promise.all([
@@ -82,6 +87,15 @@ export default async function ConvocacaoPage({
 
   const callup = callups.find((item) => item.id === params.callup) || callups[0];
   const labeledCallups = labelCallupTabs(callups);
+  const [draftWorkspace, collectiveRoom] = await Promise.all([
+    getDraftWorkspace(callup.id),
+    getCollectiveRoom(callup.id),
+  ]);
+  const section = params.section === "draft" && draftWorkspace
+    ? "draft"
+    : params.section === "collective" && collectiveRoom
+      ? "collective"
+      : "list";
 
   // A convocação é colaborativa: qualquer pessoa logada pode escolher um
   // atleta elegível do elenco. A RPC ainda valida a liga, a abertura e a vaga.
@@ -110,6 +124,14 @@ export default async function ConvocacaoPage({
           })}
         </nav>
       )}
+      {(draftWorkspace || collectiveRoom) && (
+        <nav className="mb-4 grid grid-cols-3 rounded-2xl border border-border bg-surface p-1" aria-label="Áreas da convocação">
+          <Link href={`/convocacao?callup=${callup.id}`} className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black uppercase ${section === "list" ? "bg-accent text-background" : "text-muted"}`}><Flag className="h-4 w-4" /> Lista</Link>
+          <Link href={`/convocacao?callup=${callup.id}&section=draft`} className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black uppercase ${!draftWorkspace ? "pointer-events-none opacity-35" : section === "draft" ? "bg-accent text-background" : "text-muted"}`}><Sparkles className="h-4 w-4" /> Draft</Link>
+          <Link href={`/convocacao?callup=${callup.id}&section=collective`} className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black uppercase ${!collectiveRoom ? "pointer-events-none opacity-35" : section === "collective" ? "bg-accent text-background" : "text-muted"}`}><Microphone className="h-4 w-4" /> Coletiva</Link>
+        </nav>
+      )}
+      {section === "draft" && draftWorkspace ? <DraftBoard workspace={draftWorkspace} /> : section === "collective" && collectiveRoom ? <CollectiveRoom room={collectiveRoom} compact /> : (
       <CallupBoard
         key={callup.id}
         callup={callup}
@@ -125,6 +147,7 @@ export default async function ConvocacaoPage({
         playerCosmetics={Object.fromEntries(cosmeticsMap)}
         initialListTab={params.list === "waitlist" ? "waitlist" : "confirmed"}
       />
+      )}
     </div>
   );
 }

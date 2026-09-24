@@ -177,6 +177,10 @@ export const PencilLine = createSportIcon(<><path d="m4 17-.7 3.7L7 20l11-11-3-3
 export const Trash2 = createSportIcon(<><path d="M4.5 7h15M9 3.5h6L16 7H8ZM6.5 7l1 13h9l1-13M10 11v5M14 11v5" /></>);
 export const AlertTriangle = createSportIcon(<><path d="M12 3.5 21 20H3Z" /><path d="M12 9v5M12 17.2v.2" /></>);
 export const Radio = createSportIcon(<><circle cx="12" cy="12" r="2.2" fill="currentColor" opacity=".22" /><path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.5 5.5a9 9 0 0 0 0 13M18.5 5.5a9 9 0 0 1 0 13" /></>);
+export const Microphone = createSportIcon(<><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v4M8.5 21h7" /></>);
+export const Send = createSportIcon(<><path d="m3.5 4 17 8-17 8 2.2-6.2L14 12l-8.3-1.8Z" /><path d="M5.7 10.2 14 12l-8.3 1.8" opacity=".55" /></>);
+export const Paperclip = createSportIcon(<path d="m9 12.5 5.5-5.5a3 3 0 0 1 4.2 4.2l-7.5 7.5a5 5 0 0 1-7.1-7.1l7.3-7.3a3 3 0 0 1 4.2 4.2L8.8 15.3a1.2 1.2 0 0 1-1.7-1.7l6.2-6.2" />);
+export const Edit3 = createSportIcon(<><path d="M4 20h4l11-11-4-4L4 16Z" /><path d="m13.5 6.5 4 4M4 20h16" /></>);
 export const MapPin = createSportIcon(<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></>);
 export const ExternalLink = createSportIcon(<><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></>);
 export const Sparkles = createSportIcon(<><path d="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2ZM18.5 14l.7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7ZM5.5 13l.8 2.7 2.7.8-2.7.8L5.5 20l-.8-2.7-2.7-.8 2.7-.8Z" /></>);

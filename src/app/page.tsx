@@ -5,6 +5,7 @@ import {
   Football,
   LogIn,
   Medal,
+  Microphone,
   Target,
   TrendingUp,
   Trophy,
@@ -28,6 +29,7 @@ import { getSeasonPassDashboard } from "@/lib/actions/fantasy";
 import { SeasonPassBanner } from "@/components/fantasy/SeasonPassBanner";
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
 import { getPreviousMonthAwardWinners } from "@/lib/actions/players";
+import { getActiveCollectiveSummary } from "@/lib/actions/collective";
 
 export const dynamic = "force-dynamic";
 
@@ -103,13 +105,14 @@ function IncompleteProfileBanner() {
 
 export default async function HomePage() {
   const accountPromise = getCurrentAccount();
-  const [{ data }, previousSeason, account, identity, seasonPass, monthlyAwards] = await Promise.all([
+  const [{ data }, previousSeason, account, identity, seasonPass, monthlyAwards, collective] = await Promise.all([
     getDashboardData(),
     getLatestFinishedSeason(),
     accountPromise,
     getCurrentAccountIdentity(),
     getSeasonPassDashboard(),
     getPreviousMonthAwardWinners(),
+    getActiveCollectiveSummary(),
   ]);
   const inheritedGoogleAvatars = [
     account.user?.user_metadata?.avatar_url,
@@ -155,6 +158,15 @@ export default async function HomePage() {
         initialMatch={liveMatch as unknown as HomeLiveMatch | null}
         matchDuration={matchDuration}
       />
+
+      {collective && (
+        <Link href={`/coletiva?callup=${collective.callupId}`} className="group flex items-center gap-3 overflow-hidden rounded-2xl border border-accent/35 bg-[radial-gradient(circle_at_right,rgba(204,255,0,.2),transparent_45%),#071b11] p-4 shadow-[0_12px_36px_rgba(0,0,0,.25)]">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent text-background shadow-[0_0_24px_rgba(204,255,0,.2)]"><Microphone className="h-6 w-6" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-[9px] font-black uppercase tracking-[.17em] text-accent">Coletiva de imprensa aberta</span><span className="mt-0.5 block truncate text-sm font-black text-foreground">Entre na resenha da {collective.roundNumber ? `Rodada ${collective.roundNumber}` : "próxima pelada"}</span><span className="block text-[10px] text-muted">Draft, fotos, áudios e mensagens da lista</span></span>
+          {collective.unreadCount > 0 && <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-danger px-2 text-[10px] font-black text-white">{collective.unreadCount > 99 ? "99+" : collective.unreadCount}</span>}
+          <ChevronRight className="h-5 w-5 text-accent transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      )}
 
       {/* Carrossel Principal Unificado (Convocação + Rodada/Pré-lista) */}
       <section className="space-y-3">

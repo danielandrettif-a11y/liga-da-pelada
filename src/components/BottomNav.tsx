@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, CartolaHat, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag, CalendarDays } from "@/components/icons";
+import { Home, CartolaHat, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag, CalendarDays, Microphone } from "@/components/icons";
 
 const NAV_ITEMS = [
   { href: "/", label: "Início", icon: Home },
@@ -17,11 +17,13 @@ export function BottomNav({
   isAuthenticated,
   hasOpenCallup,
   hasReleasedPayment,
+  collective,
   newRosterCount,
 }: {
   isAuthenticated: boolean;
   hasOpenCallup: boolean;
   hasReleasedPayment: boolean;
+  collective: { callupId: string; unreadCount: number } | null;
   newRosterCount: number;
 }) {
   const pathname = usePathname();
@@ -47,7 +49,10 @@ export function BottomNav({
     : hasReleasedPayment
       ? { href: "/pagamentos", label: "Agenda", icon: ArrowLeftRight, notification: true }
       : { href: "/rodadas", label: "Agenda", icon: CalendarDays, notification: false };
-  const contextualItems = [NAV_ITEMS[0], agendaItem, ...NAV_ITEMS.slice(1)];
+  const communityItem = collective
+    ? { href: `/coletiva?callup=${collective.callupId}`, label: "Coletiva", icon: Microphone }
+    : NAV_ITEMS[3];
+  const contextualItems = [NAV_ITEMS[0], agendaItem, NAV_ITEMS[1], NAV_ITEMS[2], communityItem, NAV_ITEMS[4]];
   const visibleItems = isAuthenticated
     ? contextualItems
     : contextualItems.filter((item) => item.href !== "/mais");
@@ -59,10 +64,11 @@ export function BottomNav({
         style={{ gridTemplateColumns: `repeat(${visibleItems.length}, minmax(0, 1fr))` }}
       >
         {visibleItems.map((item) => {
+          const itemPath = item.href.split("?")[0];
           const isCurrentRoute =
-            item.href === "/"
+            itemPath === "/"
               ? pathname === "/"
-              : pathname.startsWith(item.href);
+              : pathname.startsWith(itemPath);
 
           const isPending = pendingHref === item.href;
           const isActive = pendingHref ? isPending : isCurrentRoute;
@@ -105,7 +111,12 @@ export function BottomNav({
                     {unreadRoster > 99 ? "99+" : unreadRoster}
                   </span>
                 )}
-                {"notification" in item && item.notification && (
+                {item.href.startsWith("/coletiva") && collective && collective.unreadCount > 0 && (
+                  <span className="absolute -right-2.5 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full border border-background bg-danger px-1 text-[8px] font-black leading-none text-white shadow-lg">
+                    {collective.unreadCount > 99 ? "99+" : collective.unreadCount}
+                  </span>
+                )}
+                {"notification" in item && Boolean(item.notification) && (
                   <span className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-accent shadow-[0_0_8px_rgba(204,255,0,.65)]" />
                 )}
               </span>
