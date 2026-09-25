@@ -128,6 +128,8 @@ export function CallupBoard({
     ? drawnTeams.find((team) => team.team_players.some((entry) => entry.player_id === currentPlayerId)) || null
     : null;
   const hasDrawnTeams = callup.status === "converted" && drawnTeams.length > 0;
+  const isQueueOnlyAfterDraw = callup.status === "converted";
+  const canJoinCallup = callup.status === "open" || isQueueOnlyAfterDraw;
 
   async function handleEditCallup(formData: FormData) {
     setEditLoading(true);
@@ -143,14 +145,14 @@ export function CallupBoard({
     }
   }
 
-  async function run(key: string, action: () => Promise<{ success: boolean; error?: string }>) {
+  async function run(key: string, action: () => Promise<{ success: boolean; error?: string; status?: "confirmed" | "waitlist" }>) {
     setLoading(key);
     setError("");
     const result = await action();
     if (!result.success) {
       setError(result.error || "Não foi possível atualizar a lista.");
     } else {
-      if (key === "join") {
+      if (key === "join" && result.status === "confirmed") {
         setShowCartolaPopup(true);
       }
       router.refresh();
@@ -240,7 +242,7 @@ export function CallupBoard({
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-0.5 font-athletic text-[10px] font-black uppercase tracking-wider text-background">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-background" />
-                {callup.status === "locked" ? "Lista Fechada" : callup.status === "converted" ? "Times Sorteados" : "Convocação Aberta"}
+                {callup.status === "locked" ? "Lista Fechada" : isQueueOnlyAfterDraw ? "Times Sorteados · Fila Aberta" : "Convocação Aberta"}
               </span>
               <span className="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 text-[10px] font-bold text-muted uppercase">
                 {callup.round_type === "friendly" ? "Amistoso" : "Ranked"}
@@ -473,13 +475,13 @@ export function CallupBoard({
               </div>
             )}
           </div>
-        ) : currentPlayerId && callup.status !== "converted" ? (
+        ) : currentPlayerId && canJoinCallup ? (
           /* Botão de Entrar na Lista (Confirmar Presença) */
           <button
             onClick={() => run("join", () => joinActiveCallup(callup.id))}
             disabled={!!loading}
             className={`flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-black uppercase tracking-wider text-background shadow-lg transition-transform active:scale-[0.98] disabled:opacity-50 ${
-              confirmed.length < capacity
+              !isQueueOnlyAfterDraw && confirmed.length < capacity
                 ? "bg-accent shadow-[0_0_30px_rgba(204,255,0,0.3)] animate-pulse"
                 : "bg-warning shadow-[0_0_30px_rgba(234,179,8,0.25)]"
             }`}
@@ -488,7 +490,7 @@ export function CallupBoard({
               <>
                 <Loader2 className="h-5 w-5 animate-spin" /> Confirmando...
               </>
-            ) : confirmed.length < capacity ? (
+            ) : !isQueueOnlyAfterDraw && confirmed.length < capacity ? (
               <>
                 <CheckCircle2 className="h-5 w-5" /> Confirmar Minha Presença ({remainingSlots} vagas)
               </>
@@ -520,7 +522,7 @@ export function CallupBoard({
       </section>
 
       {/* 3. PAINEL DE CONTRATAÇÃO DE AMIGO (CONVIDADO) & ADMIN */}
-      {callup.status === "open" && (
+      {canJoinCallup && (
         <section className="overflow-hidden rounded-2xl border border-accent/25 bg-accent/[0.04]">
           <button
             type="button"
@@ -597,7 +599,7 @@ export function CallupBoard({
                       <span>É goleiro</span>
                     </label>
                     <span className="text-[10px] text-muted/60 ml-auto">
-                      {confirmed.length < capacity ? "Entrará como Titular" : "Entrará na Fila de Espera"}
+                      {!isQueueOnlyAfterDraw && confirmed.length < capacity ? "Entrará como Titular" : "Entrará na Fila de Espera"}
                     </span>
                   </div>
                 </form>

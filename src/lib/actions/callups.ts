@@ -218,10 +218,10 @@ export async function joinActiveCallup(callupId: string) {
   if (!account.user) return { success: false, error: "Entre na sua conta para participar." };
   const { error: profileError } = await account.client.rpc("ensure_my_player_account");
   if (profileError) return { success: false, error: profileError.message };
-  const { error } = await account.client.rpc("join_callup", { p_callup_id: callupId });
+  const { data, error } = await account.client.rpc("join_callup", { p_callup_id: callupId });
   if (error) return { success: false, error: error.message };
   refreshCallups();
-  return { success: true };
+  return { success: true, status: (data as { status?: "confirmed" | "waitlist" } | null)?.status };
 }
 
 export async function leaveActiveCallup(callupId: string) {
@@ -353,6 +353,21 @@ export async function removeCallupEntry(callupId: string, playerId: string) {
 
   const adminClient = await getAdminClient();
   const client = adminClient || account.client;
+
+  // Depois do sorteio, a saída precisa passar por leave_callup para preservar
+  // o time e a vaga de reposição. Esta ação só pode remover entradas da lista
+  // ainda não sorteada.
+  const { data: callup, error: callupError } = await client
+    .from("callups")
+    .select("status")
+    .eq("id", callupId)
+    .maybeSingle();
+  if (callupError || !callup) {
+    return { success: false, error: callupError?.message || "Convocação não encontrada." };
+  }
+  if (callup.status !== "open") {
+    return { success: false, error: "Depois do sorteio, a saída deve ser feita pela própria pessoa." };
+  }
 
   // 1. Buscar a entrada
   const { data: entry, error: entryError } = await client
