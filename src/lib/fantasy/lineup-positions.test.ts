@@ -123,3 +123,21 @@ describe("pacotes de bônus por posição — BQ v7", () => {
     expect(calculateFantasyPositionPackageBonus({ ...input, goals: 2 }, settings)).toBe(2);
   });
 });
+
+describe("pacotes de bônus por posição — BQ v8", () => {
+  const settings = { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 8 };
+  const input = {
+    goals: 0, assists: 0, games: 3, losses: 0, goalkeeperGames: 0,
+    goalsConceded: 0, cleanSheets: 0, defensiveCleanGames: 0,
+    defensiveOneGoalGames: 0, slotRole: "DEF" as const, playerProfile: "defensive" as const,
+  };
+
+  it("dá +0,5 por assistência ao DEF/VOL, limitado a +1,5", () => {
+    expect(calculateFantasyPositionPackageBonus({ ...input, assists: 1 }, settings)).toBe(.5);
+    expect(calculateFantasyPositionPackageBonus({ ...input, assists: 5 }, settings)).toBe(1.5);
+  });
+
+  it("mantém o teto total de extras do DEF/VOL em +8", () => {
+    expect(calculateFantasyPositionPackageBonus({ ...input, assists: 4, defensiveCleanGames: 6 }, settings)).toBe(8);
+  });
+});

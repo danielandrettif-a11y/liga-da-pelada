@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Home, CartolaHat, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag, CalendarDays, Microphone } from "@/components/icons";
+import { supabase } from "@/lib/supabase";
 
 const NAV_ITEMS = [
   { href: "/", label: "Início", icon: Home },
@@ -19,18 +20,36 @@ export function BottomNav({
   hasReleasedPayment,
   collective,
   newRosterCount,
+  currentUserId,
 }: {
   isAuthenticated: boolean;
   hasOpenCallup: boolean;
   hasReleasedPayment: boolean;
   collective: { callupId: string; unreadCount: number } | null;
   newRosterCount: number;
+  currentUserId: string | null;
 }) {
   const pathname = usePathname();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [unreadRoster, setUnreadRoster] = useState(newRosterCount);
+  const [collectiveUnread, setCollectiveUnread] = useState(collective?.unreadCount || 0);
 
   useEffect(() => setUnreadRoster(newRosterCount), [newRosterCount]);
+  useEffect(() => setCollectiveUnread(collective?.unreadCount || 0), [collective?.callupId, collective?.unreadCount]);
+  useEffect(() => {
+    if (!collective?.callupId) return;
+    const channel = supabase.channel(`bottom-collective-${collective.callupId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "collective_messages", filter: `callup_id=eq.${collective.callupId}` }, (event) => {
+        const message = event.new as { sender_user_id?: string; kind?: string };
+        if (!pathname.startsWith("/coletiva") && message.sender_user_id !== currentUserId && message.kind !== "system") setCollectiveUnread((value) => value + 1);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "collective_messages", filter: `callup_id=eq.${collective.callupId}` }, (event) => {
+        const before = event.old as { deleted_at?: string | null; sender_user_id?: string; kind?: string };
+        const after = event.new as { deleted_at?: string | null };
+        if (!pathname.startsWith("/coletiva") && !before.deleted_at && after.deleted_at && before.sender_user_id !== currentUserId && before.kind !== "system") setCollectiveUnread((value) => Math.max(0, value - 1));
+      }).subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [collective?.callupId, currentUserId, pathname]);
   useEffect(() => {
     const clearRosterBadge = () => setUnreadRoster(0);
     window.addEventListener("roster-unread-cleared", clearRosterBadge);
@@ -38,6 +57,7 @@ export function BottomNav({
   }, []);
   useEffect(() => {
     if (pathname.startsWith("/admin/jogadores")) setUnreadRoster(0);
+    if (pathname.startsWith("/coletiva")) setCollectiveUnread(0);
     // Limpa o estado pendente quando a rota realmente terminar de navegar
     setPendingHref(null);
   }, [pathname]);
@@ -111,9 +131,9 @@ export function BottomNav({
                     {unreadRoster > 99 ? "99+" : unreadRoster}
                   </span>
                 )}
-                {item.href.startsWith("/coletiva") && collective && collective.unreadCount > 0 && (
+                {item.href.startsWith("/coletiva") && collective && collectiveUnread > 0 && (
                   <span className="absolute -right-2.5 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full border border-background bg-danger px-1 text-[8px] font-black leading-none text-white shadow-lg">
-                    {collective.unreadCount > 99 ? "99+" : collective.unreadCount}
+                    {collectiveUnread > 99 ? "99+" : collectiveUnread}
                   </span>
                 )}
                 {"notification" in item && Boolean(item.notification) && (

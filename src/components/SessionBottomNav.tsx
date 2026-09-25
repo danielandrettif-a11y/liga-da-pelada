@@ -23,6 +23,7 @@ export async function SessionBottomNav() {
       hasReleasedPayment={hasReleasedPayment}
       collective={collective ? { callupId: collective.callupId, unreadCount: collective.unreadCount } : null}
       newRosterCount={rosterUnread.count}
+      currentUserId={account.user?.id || null}
     />
   );
 }

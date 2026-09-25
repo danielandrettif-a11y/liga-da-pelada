@@ -499,4 +499,42 @@ describe("motor adaptativo de OVR", () => {
 
     expect(result.positionTrends.ATA).toBe("rising");
   });
+
+  it("distribui no máximo 30% de aceleração entre as características da v12", () => {
+    const formula = parseOverallFormulaConfig({
+      ...balancedCharacteristicsFormula,
+      traitBasedOverall: false,
+      rankedTraitOverall: false,
+      traitsAsProgressionBonus: true,
+      traitProgressionBonusBudget: .30,
+      topThreeOverall: true,
+      unselectedTraitEvidence: 1,
+    });
+    const variants: OverallPlayer[] = [
+      { id: "none", playerProfile: "offensive", overallTraits: [], overallSeedMode: "observed" },
+      { id: "single", playerProfile: "offensive", overallTraits: ["offensive"], overallSeedMode: "observed" },
+      { id: "primary", playerProfile: "offensive", overallTraits: ["offensive", "defensive"], overallSeedMode: "observed" },
+      { id: "secondary", playerProfile: "offensive", overallTraits: ["defensive", "offensive"], overallSeedMode: "observed" },
+      { id: "triple", playerProfile: "offensive", overallTraits: ["defensive", "midfield", "offensive"], overallSeedMode: "observed" },
+    ];
+    const inputs = Array.from({ length: 3 }, (_, index) => round(index + 1, variants.map((player) => appearance(player.id, { matchId: `bonus-${index}-${player.id}`, goals: 5, assists: 2, playerProfileLocked: "offensive" }))));
+    const snapshots = new Map(calculatePlayerOveralls(variants, inputs, formula).snapshots.map((item) => [item.playerId, item]));
+    expect(snapshots.get("single")!.positions.ATA.value).toBeGreaterThan(snapshots.get("primary")!.positions.ATA.value);
+    expect(snapshots.get("primary")!.positions.ATA.value).toBeGreaterThan(snapshots.get("secondary")!.positions.ATA.value);
+    expect(snapshots.get("secondary")!.positions.ATA.value).toBeGreaterThanOrEqual(snapshots.get("triple")!.positions.ATA.value);
+    expect(snapshots.get("triple")!.positions.ATA.value).toBeGreaterThan(snapshots.get("none")!.positions.ATA.value);
+    expect(snapshots.get("single")!.positions.DEF.value).toBe(snapshots.get("none")!.positions.DEF.value);
+  });
+
+  it("conta partidas distintas no gol para liberar a elegibilidade no oitavo jogo", () => {
+    const keeper: OverallPlayer = { id: "keeper-v12", playerProfile: "midfield", overallTraits: [], overallSeedMode: "observed" };
+    const formula = parseOverallFormulaConfig({ ...balancedCharacteristicsFormula, traitsAsProgressionBonus: true, topThreeOverall: true, goalkeeperEligibilityGames: 8 });
+    const keeperAppearance = (matchId: string) => appearance(keeper.id, { matchId, isGoalkeeper: true, playerProfileLocked: "midfield" });
+    const result = calculatePlayerOveralls([keeper], [
+      round(1, Array.from({ length: 7 }, (_, index) => keeperAppearance(`gk-${index + 1}`))),
+      round(2, [keeperAppearance("gk-8")]),
+    ], formula);
+    expect(result.snapshotsByRound[0].snapshots[0].goalkeeperGames).toBe(7);
+    expect(result.snapshotsByRound[1].snapshots[0].goalkeeperGames).toBe(8);
+  });
 });

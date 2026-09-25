@@ -329,8 +329,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   const displayName = cardContent.name;
   const nameplateArtwork = cosmeticNameplateImage(entry.cosmetics?.nameplateKey);
   const overallComposition = getOverallComposition(entry.player.overall_traits, entry.overallPositions, {
-    isGoalkeeper: entry.player.is_goalkeeper,
-    overall: entry.overall,
+    goalkeeperGames: entry.overallGoalkeeperGames,
   });
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState("");
@@ -503,11 +502,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
                       {overallComposition.items.map((item) => `${item.value.toFixed(1).replace(".", ",")} (${item.label}) × ${Math.round(item.weight * 100)}%`).join(" + ")}
                       {` ≈ ${(entry.overall ?? overallComposition.value).toFixed(1).replace(".", ",")}`}
                     </p>
-                    <p className="mt-1.5">
-                      {overallComposition.source === "goalkeeper"
-                        ? "Como o perfil está marcado como goleiro e já atingiu a amostra mínima, a nota GOL assumiu o geral por ser maior que o OVR de linha."
-                        : "As características escolhidas pelo ADM definem quais posições formam seu OVR geral. Uma usa 100%; duas usam 70% da maior e 30% da outra; três usam 60%, 25% e 15%."}
-                    </p>
+                    <p className="mt-1.5">O geral usa sempre 50% da maior nota elegível, 35% da segunda e 15% da terceira. GOL só participa depois de 8 partidas reais no gol.</p>
                   </div>
 
                   <div>
@@ -517,16 +512,16 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
 
                   <div className="grid grid-cols-1 gap-1.5">
                     <p><strong className="text-foreground">DEF/VOL:</strong> 70% defesa, 5% gols, 20% assistências e 5% resultado.</p>
-                    <p><strong className="text-foreground">ALA:</strong> 40% defesa, 25% gols, 30% assistências e 5% resultado.</p>
+                    <p><strong className="text-foreground">ALA:</strong> 30% defesa, 30% gols, 35% assistências e 5% resultado.</p>
                     <p><strong className="text-foreground">ATA:</strong> 10% defesa, 60% gols, 25% assistências e 5% resultado.</p>
                     <p><strong className="text-foreground">GOL:</strong> desempenho defensivo nas partidas em que atuou no gol.</p>
                   </div>
 
-                  <p>A defesa compara gols sofridos por tempo jogado com a média da liga, além do tempo até sofrer o primeiro gol, participação e gols contra. A confiança cresce com minutos e rodadas observadas. Para goleiros cadastrados, o OVR GOL pode assumir o geral após 3 rodadas no gol se for a maior nota.</p>
+                  <p>A defesa compara gols sofridos por tempo jogado com a média da liga, além do tempo até sofrer o primeiro gol, participação e gols contra. A confiança cresce com minutos e rodadas observadas. As características escolhidas pelo ADM só aceleram a evolução: +30% em uma; +19,5%/+10,5% em duas; ou +10% em cada uma quando são três.</p>
                 </>
               ) : (
                 <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-warning">
-                  O OVR fica indisponível até o administrador definir ao menos uma característica de jogo: DEF/VOL, ALA ou ATA.
+                  O OVR será calculado após a primeira execução da fórmula, mesmo sem bônus de característica definido pelo administrador.
                 </div>
               )}
             </div>

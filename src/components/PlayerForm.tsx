@@ -56,6 +56,8 @@ export function PlayerForm({
   const [cropSourceUrl, setCropSourceUrl] = useState("");
   const [memberCategory, setMemberCategory] = useState<MemberCategory>(player?.member_category || "player");
   const [speedRating, setSpeedRating] = useState<1 | 2 | 3 | null>(initialSpeedRating);
+  const [overallTraits, setOverallTraits] = useState<PlayerProfile[]>(player?.overall_traits || []);
+  const [primaryOverallTrait, setPrimaryOverallTrait] = useState<PlayerProfile | null>(player?.overall_traits?.[0] || null);
 
   useEffect(() => {
     return () => {
@@ -197,6 +199,11 @@ export function PlayerForm({
     setError("");
 
     const formData = new FormData(event.currentTarget);
+    formData.delete("overall_traits");
+    const orderedTraits = overallTraits.length === 2 && primaryOverallTrait
+      ? [primaryOverallTrait, ...overallTraits.filter((trait) => trait !== primaryOverallTrait)]
+      : overallTraits;
+    for (const trait of orderedTraits) formData.append("overall_traits", trait);
     formData.set("remove_active_avatar", String(removeActiveAvatar));
     formData.set("remove_alternate_avatar", String(removeAlternateAvatar));
     formData.set("use_alternate_avatar", String(useAlternateAsActive));
@@ -455,18 +462,45 @@ export function PlayerForm({
 
       {mode === "admin" && (memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2 rounded-2xl border border-accent/25 bg-accent/5 p-4">
         <legend className="px-1 text-xs font-bold uppercase tracking-wider text-accent">Características de jogo do OVR</legend>
-        <p className="text-[11px] leading-4 text-muted">Definem onde as estatísticas do histórico têm mais peso no OVR. Uma seleção vale 100%; duas, 50% para cada; três, 33% para cada. As não selecionadas ainda evoluem devagar, a 15%. Goleiro é calculado só pelas ações no gol.</p>
+        <p className="text-[11px] leading-4 text-muted">As características não escolhem mais o OVR geral. Elas distribuem um bônus total de 30% na velocidade de evolução: uma recebe +30%; duas recebem +19,5% e +10,5%; três recebem +10% cada. Todas as posições continuam evoluindo normalmente.</p>
         <div className="grid gap-2 pt-1">
           {PLAYER_PROFILE_OPTIONS.map((option) => {
-            const selected = (player?.overall_traits || []).includes(option.value as PlayerProfile);
+            const trait = option.value as PlayerProfile;
+            const selected = overallTraits.includes(trait);
             return (
               <label key={`overall-${option.value}`} className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface-hover px-4 py-3 has-[:checked]:border-accent has-[:checked]:bg-accent/10">
-                <input type="checkbox" name="overall_traits" value={option.value} defaultChecked={selected} className="h-4 w-4 rounded" />
+                <input
+                  type="checkbox"
+                  name="overall_traits"
+                  value={option.value}
+                  checked={selected}
+                  onChange={() => setOverallTraits((current) => {
+                    const next = current.includes(trait) ? current.filter((item) => item !== trait) : [...current, trait];
+                    if (!next.includes(primaryOverallTrait as PlayerProfile)) setPrimaryOverallTrait(next[0] || null);
+                    return next;
+                  })}
+                  className="h-4 w-4 rounded"
+                />
                 <span className="text-sm font-bold text-foreground">{option.label}</span>
               </label>
             );
           })}
         </div>
+        {overallTraits.length === 2 && (
+          <div className="rounded-xl border border-warning/25 bg-warning/8 p-3">
+            <p className="text-[10px] font-black uppercase tracking-wider text-warning">Qual é a característica principal?</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {overallTraits.map((trait) => {
+                const option = PLAYER_PROFILE_OPTIONS.find((item) => item.value === trait);
+                return <label key={`primary-${trait}`} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold text-foreground has-[:checked]:border-warning">
+                  <input type="radio" name="overall_trait_primary" checked={primaryOverallTrait === trait} onChange={() => setPrimaryOverallTrait(trait)} />
+                  {option?.label || trait}
+                </label>;
+              })}
+            </div>
+            <p className="mt-2 text-[10px] text-muted">A principal recebe +19,5% e a secundária +10,5%.</p>
+          </div>
+        )}
         {memberCategory === "guest" && <p className="text-[10px] leading-4 text-warning">Convidado pode ser avaliado agora, mas só ganha OVR quando for convertido em jogador oficial.</p>}
       </fieldset>}
 

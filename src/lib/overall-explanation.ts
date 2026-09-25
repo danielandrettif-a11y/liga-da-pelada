@@ -16,68 +16,30 @@ export type OverallCompositionItem = {
 };
 
 type OverallCompositionOptions = {
-  isGoalkeeper?: boolean;
-  overall?: number | null;
+  goalkeeperGames?: number;
 };
 
-const TRAIT_ROLE = {
-  defensive: { role: "DEF", label: "DEF/VOL" },
-  midfield: { role: "ALA_MEI", label: "ALA" },
-  offensive: { role: "ATA", label: "ATA" },
-} as const;
-
-const RANKED_WEIGHTS: Record<number, number[]> = {
-  1: [1],
-  2: [0.7, 0.3],
-  3: [0.6, 0.25, 0.15],
-};
+const ROLE_LABELS = { DEF: "DEF/VOL", ALA_MEI: "ALA", ATA: "ATA", GOL: "GOL" } as const;
+const RANKED_WEIGHTS = [0.5, 0.35, 0.15] as const;
 
 /**
- * Reproduz somente a composição final do OVR geral da fórmula v11.
- * Os pesos acompanham as características escolhidas pelo ADM e são aplicados
- * da maior para a menor nota selecionada.
+ * Reproduz a composição final do OVR geral da fórmula v12.
+ * Usa as três maiores posições; GOL só entra após oito jogos reais no gol.
  */
 export function getOverallComposition(
-  traits: PlayerProfile[] | null | undefined,
+  _traits: PlayerProfile[] | null | undefined,
   positions: OverallPositionValues | null | undefined,
   options: OverallCompositionOptions = {},
 ) {
   if (!positions) return null;
 
-  const uniqueTraits = [...new Set((traits || []).filter((trait) => trait in TRAIT_ROLE))].slice(0, 3);
-  if (uniqueTraits.length === 0) return null;
-
-  const weights = RANKED_WEIGHTS[uniqueTraits.length];
-  const items = uniqueTraits
-    .map((trait) => {
-      const mapping = TRAIT_ROLE[trait];
-      return {
-        trait,
-        role: mapping.role,
-        label: mapping.label,
-        value: positions[mapping.role],
-      };
-    })
+  const eligibleRoles: Array<keyof OverallPositionValues> = ["DEF", "ALA_MEI", "ATA"];
+  if (Number(options.goalkeeperGames || 0) >= 8) eligibleRoles.push("GOL");
+  const items = eligibleRoles
+    .map((role) => ({ trait: null, role, label: ROLE_LABELS[role], value: positions[role] }))
     .sort((left, right) => right.value - left.value)
-    .map((item, index): OverallCompositionItem => ({ ...item, weight: weights[index] }));
-
-  const lineValue = Math.round(items.reduce((total, item) => total + item.value * item.weight, 0) * 10) / 10;
-  const displayedOverall = options.overall;
-  // As posições públicas têm uma casa decimal, então toleramos 0,1 de
-  // arredondamento. Uma diferença maior, acompanhada de igualdade com GOL,
-  // identifica com segurança quando a regra especial do goleiro assumiu o geral.
-  const goalkeeperOverride = options.isGoalkeeper
-    && typeof displayedOverall === "number"
-    && Math.abs(displayedOverall - lineValue) > 0.11
-    && Math.abs(displayedOverall - positions.GOL) <= 0.11;
-
-  if (goalkeeperOverride) {
-    return {
-      source: "goalkeeper" as const,
-      items: [{ trait: null, role: "GOL", label: "GOL", value: positions.GOL, weight: 1 }] satisfies OverallCompositionItem[],
-      value: positions.GOL,
-    };
-  }
-
-  return { source: "traits" as const, items, value: lineValue };
+    .slice(0, 3)
+    .map((item, index): OverallCompositionItem => ({ ...item, weight: RANKED_WEIGHTS[index] }));
+  const value = Math.round(items.reduce((total, item) => total + item.value * item.weight, 0) * 10) / 10;
+  return { source: "positions" as const, items, value };
 }

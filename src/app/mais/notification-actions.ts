@@ -139,6 +139,7 @@ export type NotificationPreferences = {
   matchPushEnabled: boolean;
   cartolaPushEnabled: boolean;
   cartolaEmailEnabled: boolean;
+  collectivePushEnabled: boolean;
   collectiveEnabled: boolean;
   emailTestedAt: string | null;
   emailConfigured: boolean;
@@ -149,13 +150,14 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
   if (!account.user) return null;
   const league = await getActiveLeague();
   const [{ data: preference }, { data: leagueSettings }] = await Promise.all([
-    account.client.from("user_notification_preferences").select("match_push_enabled, cartola_push_enabled, cartola_email_enabled").eq("user_id", account.user.id).maybeSingle(),
+    account.client.from("user_notification_preferences").select("match_push_enabled, cartola_push_enabled, cartola_email_enabled, collective_push_enabled").eq("user_id", account.user.id).maybeSingle(),
     account.client.from("leagues").select("cartola_reminders_enabled, cartola_email_tested_at").eq("id", league.id).maybeSingle(),
   ]);
   return {
     matchPushEnabled: preference?.match_push_enabled !== false,
     cartolaPushEnabled: preference?.cartola_push_enabled !== false,
     cartolaEmailEnabled: preference?.cartola_email_enabled !== false,
+    collectivePushEnabled: preference?.collective_push_enabled !== false,
     collectiveEnabled: leagueSettings?.cartola_reminders_enabled === true,
     emailTestedAt: leagueSettings?.cartola_email_tested_at || null,
     emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL && process.env.EMAIL_UNSUBSCRIBE_SECRET),
@@ -166,6 +168,7 @@ export async function updateNotificationPreferences(input: {
   matchPushEnabled: boolean;
   cartolaPushEnabled: boolean;
   cartolaEmailEnabled: boolean;
+  collectivePushEnabled: boolean;
 }) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre na sua conta para alterar as notificações." };
@@ -174,6 +177,7 @@ export async function updateNotificationPreferences(input: {
     match_push_enabled: input.matchPushEnabled,
     cartola_push_enabled: input.cartolaPushEnabled,
     cartola_email_enabled: input.cartolaEmailEnabled,
+    collective_push_enabled: input.collectivePushEnabled,
     updated_at: new Date().toISOString(),
   }, { onConflict: "user_id" });
   if (error) return { success: false, error: error.message };

@@ -28,13 +28,13 @@ export function NotificationPreferencesPanel({ initial, isAdmin }: { initial: No
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
-  async function change(key: "matchPushEnabled" | "cartolaPushEnabled" | "cartolaEmailEnabled", value: boolean) {
+  async function change(key: "matchPushEnabled" | "cartolaPushEnabled" | "cartolaEmailEnabled" | "collectivePushEnabled", value: boolean) {
     const previous = settings;
     const next = { ...settings, [key]: value };
     setSettings(next);
     setBusy(key);
     setMessage("");
-    const result = await updateNotificationPreferences({ matchPushEnabled: next.matchPushEnabled, cartolaPushEnabled: next.cartolaPushEnabled, cartolaEmailEnabled: next.cartolaEmailEnabled });
+    const result = await updateNotificationPreferences({ matchPushEnabled: next.matchPushEnabled, cartolaPushEnabled: next.cartolaPushEnabled, cartolaEmailEnabled: next.cartolaEmailEnabled, collectivePushEnabled: next.collectivePushEnabled });
     if (!result.success) {
       setSettings(previous);
       setMessage(result.error || "Não foi possível salvar.");
@@ -68,6 +68,7 @@ export function NotificationPreferencesPanel({ initial, isAdmin }: { initial: No
       <div className="divide-y divide-border">
         <div className="grid grid-cols-[minmax(0,1fr)_3rem] items-center gap-3 p-4"><div className="min-w-0"><p className="text-sm font-semibold text-foreground">Partidas e cronômetro</p><p className="text-xs leading-5 text-muted">1 minuto, 30 segundos, fim de jogo e resultados.</p></div><Toggle label="Alertas de partida" checked={settings.matchPushEnabled} disabled={busy !== null} onChange={(value) => void change("matchPushEnabled", value)} /></div>
         <div className="grid grid-cols-[minmax(0,1fr)_3rem] items-center gap-3 p-4"><div className="min-w-0"><p className="text-sm font-semibold text-foreground">Lembretes do Cartola</p><p className="text-xs leading-5 text-muted">Abertura do mercado, 1 dia, 12 horas e 1 hora antes.</p></div><Toggle label="Push do Cartola" checked={settings.cartolaPushEnabled} disabled={busy !== null} onChange={(value) => void change("cartolaPushEnabled", value)} /></div>
+        <div className="grid grid-cols-[minmax(0,1fr)_3rem] items-center gap-3 p-4"><div className="min-w-0"><p className="text-sm font-semibold text-foreground">Coletiva de imprensa</p><p className="text-xs leading-5 text-muted">Novas mensagens, fotos e áudios da rodada.</p></div><Toggle label="Push da Coletiva" checked={settings.collectivePushEnabled} disabled={busy !== null} onChange={(value) => void change("collectivePushEnabled", value)} /></div>
       </div>
     </section>
 

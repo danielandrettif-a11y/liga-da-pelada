@@ -9,17 +9,18 @@ const positions = {
 };
 
 describe("getOverallComposition", () => {
-  it("reproduz o OVR do Lucas usando somente DEF/VOL e ATA", () => {
+  it("usa as três melhores posições de linha em 50/35/15", () => {
     const result = getOverallComposition(["offensive", "defensive"], positions);
 
     expect(result?.items.map((item) => [item.role, item.weight])).toEqual([
-      ["DEF", 0.7],
-      ["ATA", 0.3],
+      ["DEF", 0.5],
+      ["ALA_MEI", 0.35],
+      ["ATA", 0.15],
     ]);
-    expect(result?.value).toBe(72.1);
+    expect(result?.value).toBe(71.7);
   });
 
-  it("reproduz o OVR do Matheus usando DEF/VOL e ALA", () => {
+  it("não deixa a ordem das características alterar a composição", () => {
     const result = getOverallComposition(["midfield", "defensive"], {
       DEF: 73.1,
       ALA_MEI: 70.2,
@@ -28,26 +29,46 @@ describe("getOverallComposition", () => {
     });
 
     expect(result?.items.map((item) => [item.role, item.weight])).toEqual([
-      ["DEF", 0.7],
-      ["ALA_MEI", 0.3],
+      ["DEF", 0.5],
+      ["ALA_MEI", 0.35],
+      ["ATA", 0.15],
     ]);
-    expect(result?.value).toBe(72.2);
+    expect(result?.value).toBe(71.3);
   });
 
-  it("não inventa OVR geral sem características definidas", () => {
-    expect(getOverallComposition([], positions)).toBeNull();
+  it("calcula normalmente sem características definidas", () => {
+    expect(getOverallComposition([], positions)?.value).toBe(71.7);
   });
 
-  it("explica quando o OVR GOL assume o geral de um goleiro elegível", () => {
+  it("inclui GOL entre as três melhores somente depois de oito jogos", () => {
     const result = getOverallComposition(["defensive"], { ...positions, GOL: 76.4 }, {
-      isGoalkeeper: true,
-      overall: 76.4,
+      goalkeeperGames: 8,
     });
 
     expect(result).toMatchObject({
-      source: "goalkeeper",
-      value: 76.4,
-      items: [{ role: "GOL", weight: 1 }],
+      source: "positions",
+      value: 74.4,
+      items: [{ role: "GOL", weight: 0.5 }, { role: "DEF", weight: 0.35 }, { role: "ALA_MEI", weight: 0.15 }],
     });
+  });
+
+  it("mantém a ordenação 50/35/15 em qualquer ordem das quatro notas", () => {
+    const variants = [
+      { DEF: 80, ALA_MEI: 75, ATA: 70, GOL: 90 },
+      { DEF: 70, ALA_MEI: 90, ATA: 80, GOL: 75 },
+      { DEF: 75, ALA_MEI: 70, ATA: 90, GOL: 80 },
+      { DEF: 90, ALA_MEI: 80, ATA: 75, GOL: 70 },
+    ];
+    for (const values of variants) {
+      const result = getOverallComposition([], values, { goalkeeperGames: 8 });
+      expect(result?.items.map((item) => item.value)).toEqual([90, 80, 75]);
+      expect(result?.value).toBe(84.3);
+    }
+  });
+
+  it("mantém GOL fora no sétimo jogo e libera exatamente no oitavo", () => {
+    const values = { DEF: 72, ALA_MEI: 71, ATA: 70, GOL: 90 };
+    expect(getOverallComposition([], values, { goalkeeperGames: 7 })?.items.map((item) => item.role)).toEqual(["DEF", "ALA_MEI", "ATA"]);
+    expect(getOverallComposition([], values, { goalkeeperGames: 8 })?.items.map((item) => item.role)).toEqual(["GOL", "DEF", "ALA_MEI"]);
   });
 });

@@ -5,8 +5,8 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import { calculatePlayerOveralls, parseOverallFormulaConfig, type OverallPlayer, type OverallRole } from "../overall";
 import { buildOverallHistoryInput } from "../overall-history";
 
-const FORMULA_KEY = "adaptive-v11-balanced-characteristics";
-const COMPARISON_FORMULA_KEY = "adaptive-v10-role-reframe";
+const FORMULA_KEY = "adaptive-v12-top-three-progression";
+const COMPARISON_FORMULA_KEY = "adaptive-v11-balanced-characteristics";
 
 function numberValue(value: unknown) {
   const result = Number(value || 0);
@@ -41,10 +41,10 @@ async function loadOverallHistory(client: any) {
     .map((member: any) => Array.isArray(member.players) ? member.players[0] : member.players)
     .filter((player: any) => player?.is_selectable && player.member_category === "player")
     .map((player: any) => ({ id: player.id, name: player.name || "Jogador", playerProfile: player.player_profile, overallTraits: Array.isArray(player.overall_traits) ? player.overall_traits : [], overallSeedMode: player.overall_seed_mode, isGoalkeeper: Boolean(player.is_goalkeeper) }));
-  // Sem características, o atleta fica pendente para o ADM e não recebe uma
-  // nota v5 por inferência da antiga posição do Cartola.
+  // Na v12 todos os jogadores oficiais recebem OVR. Sem características, as
+  // três posições evoluem normalmente e apenas deixam de receber aceleração.
   const pendingPlayers = officialPlayers.filter((player) => (player.overallTraits || []).length === 0).map(({ id, name }) => ({ id, name }));
-  const players = officialPlayers.filter((player) => (player.overallTraits || []).length > 0).map(({ name: _name, ...player }) => player) satisfies OverallPlayer[];
+  const players = officialPlayers.map(({ name: _name, ...player }) => player) satisfies OverallPlayer[];
   const roundIds = (rounds || []).map((round: any) => round.id);
   const { data: overrides, error: overridesError } = roundIds.length
     ? await client.from("player_round_stat_overrides").select("round_id, player_id").in("round_id", roundIds).eq("override_type", "zero_points")
@@ -140,7 +140,7 @@ export async function recalculateOverallShadow() {
   let runId: string | null = null;
   try {
     const { data: formula, error: formulaError } = await database.from("overall_formula_versions").select("id, config").eq("key", FORMULA_KEY).single();
-    if (formulaError || !formula) throw new Error("A fórmula v11 não foi encontrada. Confirme a migration 174.");
+    if (formulaError || !formula) throw new Error("A fórmula v12 não foi encontrada. Confirme a migration 186.");
     const source = await loadOverallHistory(database);
     const latestRound = [...source.rounds].filter((round) => round.roundType === "official" && round.status === "finished").at(-1);
     const { data: run, error: runError } = await database.from("overall_calculation_runs").insert({ formula_version_id: formula.id, status: "processing", source_through_round_id: latestRound?.id || null, started_at: new Date().toISOString(), created_by: account.user.id }).select("id").single();
@@ -149,8 +149,8 @@ export async function recalculateOverallShadow() {
     const calculation = calculatePlayerOveralls(source.players, source.rounds, parseOverallFormulaConfig(formula.config));
     const rows = calculation.snapshots.map((snapshot) => ({
       calculation_run_id: runId, player_id: snapshot.playerId, overall: snapshot.overall, def_overall: snapshot.positions.DEF.value, ala_mei_overall: snapshot.positions.ALA_MEI.value, ata_overall: snapshot.positions.ATA.value, gol_overall: snapshot.positions.GOL.value,
-      confidence: Math.max(snapshot.positions.DEF.confidence, snapshot.positions.ALA_MEI.confidence, snapshot.positions.ATA.confidence), rounds_played: snapshot.roundsPlayed, goalkeeper_rounds: snapshot.goalkeeperRounds, is_provisional: snapshot.isProvisional, is_stale: snapshot.isStale, last_round_id: snapshot.lastRoundId,
-      data_quality: { mode: "shadow", goal_timing: "first_conceded_goal_with_legacy_fallback", scoring_unit: "weekly_round", characteristics: "admin_weighted", seed_mode: "disabled_in_v5", scout_totals: snapshot.scoutTotals, position_confidence: Object.fromEntries(Object.entries(snapshot.positions).map(([role, position]) => [role, position.confidence])), overall_trend: snapshot.trend, position_trends: snapshot.positionTrends },
+      confidence: Math.max(snapshot.positions.DEF.confidence, snapshot.positions.ALA_MEI.confidence, snapshot.positions.ATA.confidence), rounds_played: snapshot.roundsPlayed, goalkeeper_rounds: snapshot.goalkeeperRounds, goalkeeper_games: snapshot.goalkeeperGames, is_provisional: snapshot.isProvisional, is_stale: snapshot.isStale, last_round_id: snapshot.lastRoundId,
+      data_quality: { mode: "shadow", goal_timing: "first_conceded_goal_with_legacy_fallback", scoring_unit: "weekly_round", characteristics: "progression_bonus", seed_mode: "disabled_in_v5", scout_totals: snapshot.scoutTotals, position_confidence: Object.fromEntries(Object.entries(snapshot.positions).map(([role, position]) => [role, position.confidence])), overall_trend: snapshot.trend, position_trends: snapshot.positionTrends },
     }));
     if (rows.length) {
       const { error } = await database.from("player_overall_snapshots").insert(rows);
@@ -168,4 +168,21 @@ export async function recalculateOverallShadow() {
     if (runId) await database.from("overall_calculation_runs").update({ status: "failed", completed_at: new Date().toISOString(), error_message: error.message || "Erro desconhecido" }).eq("id", runId);
     return { success: false, error: error.message || "Não foi possível calcular os OVRs." };
   }
+}
+
+export async function publishOverallShadow(runId: string) {
+  const account = await getCurrentAccount();
+  const client = await getAdminClient();
+  if (!client || !account.user) return { success: false, error: "Somente administradores podem publicar o OVR." };
+  const database = client as any;
+  const { data: formula } = await database.from("overall_formula_versions").select("id").eq("key", FORMULA_KEY).maybeSingle();
+  if (!formula) return { success: false, error: "A fórmula v12 não foi encontrada." };
+  const { data: run } = await database.from("overall_calculation_runs").select("id, status, formula_version_id").eq("id", runId).maybeSingle();
+  if (!run || run.formula_version_id !== formula.id || run.status !== "succeeded") return { success: false, error: "Escolha um rascunho v12 concluído e ainda não publicado." };
+  const { error } = await database.from("overall_calculation_runs").update({ status: "published", published_at: new Date().toISOString() }).eq("id", runId).eq("status", "succeeded");
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/overall");
+  revalidatePath("/ranking");
+  revalidatePath("/jogadores");
+  return { success: true };
 }

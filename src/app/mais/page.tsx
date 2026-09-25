@@ -134,6 +134,15 @@ export default async function MaisPage() {
     <div className="space-y-6">
       <h1 className="text-xl font-bold text-foreground">Mais</h1>
 
+      <Link href="/bq-manager" className="glass-card flex items-center gap-3 border border-accent/25 p-4 hover:bg-surface-hover">
+        <Football className="h-8 w-8 shrink-0 text-accent" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-black text-foreground">BQ Manager <span className="ml-1 text-[10px] text-accent">PRÉVIA</span></p>
+          <p className="mt-1 text-xs text-muted">Seu clube, cartas BQ e uma nova carreira de técnico</p>
+        </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted" />
+      </Link>
+
       {account.user && (
         <div className="glass-card flex items-center gap-3 p-4">
           <PlayerAvatar

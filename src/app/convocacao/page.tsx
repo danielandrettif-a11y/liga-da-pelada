@@ -15,7 +15,8 @@ import { getDraftWorkspace } from "@/lib/actions/draft";
 import { getCollectiveRoom } from "@/lib/actions/collective";
 import { DraftBoard } from "@/components/DraftBoard";
 import { CollectiveRoom } from "@/components/CollectiveRoom";
-import { Flag, Microphone, Sparkles } from "@/components/icons";
+import { CollectiveNavLink } from "@/components/CollectiveNavLink";
+import { Flag, Sparkles } from "@/components/icons";
 
 export const revalidate = 0;
 
@@ -129,7 +130,7 @@ export default async function ConvocacaoPage({
         <nav className={`mb-4 grid rounded-2xl border border-border bg-surface p-1 ${draftWorkspace && showCollectiveInCallup ? "grid-cols-3" : "grid-cols-2"}`} aria-label="Áreas da convocação">
           <Link href={`/convocacao?callup=${callup.id}`} className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black uppercase ${section === "list" ? "bg-accent text-background" : "text-muted"}`}><Flag className="h-4 w-4" /> Lista</Link>
           {draftWorkspace && <Link href={`/convocacao?callup=${callup.id}&section=draft`} className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black uppercase ${section === "draft" ? "bg-accent text-background" : "text-muted"}`}><Sparkles className="h-4 w-4" /> Draft</Link>}
-          {showCollectiveInCallup && <Link href={`/convocacao?callup=${callup.id}&section=collective`} className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black uppercase ${section === "collective" ? "bg-accent text-background" : "text-muted"}`}><Microphone className="h-4 w-4" /> Coletiva</Link>}
+          {showCollectiveInCallup && <CollectiveNavLink callupId={callup.id} currentUserId={account.user?.id || null} initialUnread={collectiveRoom?.summary.unreadCount || 0} active={section === "collective"} />}
         </nav>
       )}
       {section === "draft" && draftWorkspace ? <DraftBoard workspace={draftWorkspace} /> : section === "collective" && collectiveRoom ? <CollectiveRoom room={collectiveRoom} compact /> : (

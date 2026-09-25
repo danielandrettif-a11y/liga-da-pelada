@@ -64,6 +64,7 @@ export type PlayerCardOverall = {
   overall: number;
   trend: "rising" | "steady" | "falling";
   positions: { DEF: number; ALA_MEI: number; ATA: number; GOL: number } | null;
+  goalkeeperGames: number;
 };
 
 export async function getLatestPlayerCardOverallMap(client: any = supabase) {
@@ -83,7 +84,7 @@ export async function getLatestPlayerCardOverallMap(client: any = supabase) {
       GOL: Number(row.gol_overall),
     };
     const positions = Object.values(values).every(Number.isFinite) ? values : null;
-    return row.player_id && Number.isFinite(overall) ? [[row.player_id, { overall, trend, positions }] as const] : [];
+    return row.player_id && Number.isFinite(overall) ? [[row.player_id, { overall, trend, positions, goalkeeperGames: Number(row.goalkeeper_games || 0) }] as const] : [];
   }));
 }
 
@@ -756,6 +757,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       overall: overallByPlayer.get(entry.player.id)?.overall ?? null,
       overallTrend: overallByPlayer.get(entry.player.id)?.trend ?? null,
       overallPositions: overallByPlayer.get(entry.player.id)?.positions ?? null,
+      overallGoalkeeperGames: overallByPlayer.get(entry.player.id)?.goalkeeperGames ?? 0,
       fitness: getFitness(entry.player.id),
       cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
     };
@@ -771,6 +773,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     overall: overallByPlayer.get(entry.player.id)?.overall ?? null,
     overallTrend: overallByPlayer.get(entry.player.id)?.trend ?? null,
     overallPositions: overallByPlayer.get(entry.player.id)?.positions ?? null,
+    overallGoalkeeperGames: overallByPlayer.get(entry.player.id)?.goalkeeperGames ?? 0,
     fitness: getFitness(entry.player.id),
     cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
   }));
@@ -784,6 +787,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     overall: overallByPlayer.get(entry.player.id)?.overall ?? null,
     overallTrend: overallByPlayer.get(entry.player.id)?.trend ?? null,
     overallPositions: overallByPlayer.get(entry.player.id)?.positions ?? null,
+    overallGoalkeeperGames: overallByPlayer.get(entry.player.id)?.goalkeeperGames ?? 0,
     fitness: getFitness(entry.player.id),
     cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
   }));
@@ -851,6 +855,7 @@ export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: 
     overall: overallByPlayer.get(playerId)?.overall ?? null,
     overallTrend: overallByPlayer.get(playerId)?.trend ?? null,
     overallPositions: overallByPlayer.get(playerId)?.positions ?? null,
+    overallGoalkeeperGames: overallByPlayer.get(playerId)?.goalkeeperGames ?? 0,
     winRate: 0,
     awards: { roundMvp: 0, topScorer: 0, topAssister: 0, kingOfWins: 0 },
     awardSeasons: [],

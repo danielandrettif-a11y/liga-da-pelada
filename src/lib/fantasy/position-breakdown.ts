@@ -1,5 +1,5 @@
 /**
- * Breakdown autoritativo da pontuação por posição — BQ v5.
+ * Breakdown autoritativo da pontuação por posição — BQ v5–v8.
  *
  * Usado na prévia ao vivo, processamento final e histórico para garantir
  * uma representação única e consistente em todas as interfaces.
@@ -68,7 +68,7 @@ const GOL_CLEAN_SHEET_BONUS = 4;
 // ---------------------------------------------------------------------------
 
 export type PositionBreakdownInput = {
-  /** V5 preserva rodadas antigas; V7 ativa DEF/VOL e ALA ida e volta. */
+  /** V5 preserva rodadas antigas; V7 ativa novos papéis; V8 inclui assistência do DEF/VOL. */
   scoringVersion?: number;
   slotRole: FantasySlotRole;
   playerProfile: string | null | undefined;
@@ -151,6 +151,11 @@ export function calculatePositionBreakdown(input: PositionBreakdownInput): Posit
       if (input.defensiveOneGoalGames > 0) {
         const value = input.defensiveOneGoalGames * 0.5;
         events.push({ label: "Proteção parcial (1 gol)", count: input.defensiveOneGoalGames, value });
+        gross += value;
+      }
+      if (scoringVersion >= 8 && input.assists > 0) {
+        const value = Math.min(input.assists * 0.5, 1.5);
+        events.push({ label: "Construção com assistência", count: input.assists, value });
         gross += value;
       }
       const activated = input.defensiveCleanGames >= 3;

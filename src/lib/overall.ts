@@ -16,6 +16,7 @@ export type OverallFormulaConfig = {
   seedFadeRounds: number;
   confidenceRounds: number;
   goalkeeperEligibilityRounds: number;
+  goalkeeperEligibilityGames: number;
   positionCaps: Record<"1" | "2" | "3", number>;
   staleAfterRounds: number;
   halfLifeRounds: number;
@@ -51,6 +52,12 @@ export type OverallFormulaConfig = {
   overallConfidenceShrink: boolean;
   /** Usa 70/30 ou 60/25/15, favorecendo a melhor característica sem ignorar as demais. */
   rankedTraitOverall: boolean;
+  /** V12: características aceleram a reação da posição, sem definir o OVR geral. */
+  traitsAsProgressionBonus: boolean;
+  /** Orçamento total de aceleração distribuído sem favorecer quem tem mais tags. */
+  traitProgressionBonusBudget: number;
+  /** V12: usa as três maiores posições elegíveis no OVR geral. */
+  topThreeOverall: boolean;
   /** Bônus suave de variação proporcional à distância do alvo, sem degrau rígido. */
   performanceChangeBonus: number;
   /** Mantém os tetos rígidos das fórmulas antigas. */
@@ -81,6 +88,7 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   seedFadeRounds: 3,
   confidenceRounds: 3,
   goalkeeperEligibilityRounds: 3,
+  goalkeeperEligibilityGames: 8,
   positionCaps: { "1": 74, "2": 76, "3": 78 },
   staleAfterRounds: 4,
   halfLifeRounds: 3,
@@ -111,6 +119,9 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   traitBasedOverall: false,
   overallConfidenceShrink: true,
   rankedTraitOverall: false,
+  traitsAsProgressionBonus: false,
+  traitProgressionBonusBudget: 0.30,
+  topThreeOverall: false,
   performanceChangeBonus: 0,
   hardPositionCapsEnabled: true,
   provisionalAtConfidenceThreshold: true,
@@ -208,6 +219,7 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     seedFadeRounds: number("seedFadeRounds", DEFAULT_OVERALL_FORMULA.seedFadeRounds),
     confidenceRounds: number("confidenceRounds", DEFAULT_OVERALL_FORMULA.confidenceRounds),
     goalkeeperEligibilityRounds: number("goalkeeperEligibilityRounds", DEFAULT_OVERALL_FORMULA.goalkeeperEligibilityRounds),
+    goalkeeperEligibilityGames: number("goalkeeperEligibilityGames", DEFAULT_OVERALL_FORMULA.goalkeeperEligibilityGames),
     positionCaps: {
       "1": Number(positionCaps["1"]) || DEFAULT_OVERALL_FORMULA.positionCaps["1"],
       "2": Number(positionCaps["2"]) || DEFAULT_OVERALL_FORMULA.positionCaps["2"],
@@ -263,6 +275,13 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     rankedTraitOverall: typeof candidate.rankedTraitOverall === "boolean"
       ? candidate.rankedTraitOverall
       : DEFAULT_OVERALL_FORMULA.rankedTraitOverall,
+    traitsAsProgressionBonus: typeof candidate.traitsAsProgressionBonus === "boolean"
+      ? candidate.traitsAsProgressionBonus
+      : DEFAULT_OVERALL_FORMULA.traitsAsProgressionBonus,
+    traitProgressionBonusBudget: clamp(bounded(candidate.traitProgressionBonusBudget, DEFAULT_OVERALL_FORMULA.traitProgressionBonusBudget), 0, 0.5),
+    topThreeOverall: typeof candidate.topThreeOverall === "boolean"
+      ? candidate.topThreeOverall
+      : DEFAULT_OVERALL_FORMULA.topThreeOverall,
     performanceChangeBonus: clamp(bounded(candidate.performanceChangeBonus, DEFAULT_OVERALL_FORMULA.performanceChangeBonus), 0, 0.2),
     hardPositionCapsEnabled: typeof candidate.hardPositionCapsEnabled === "boolean"
       ? candidate.hardPositionCapsEnabled
@@ -340,6 +359,7 @@ export type PlayerOverallSnapshot = {
   positionTrends: Record<OverallRole, OverallTrend>;
   roundsPlayed: number;
   goalkeeperRounds: number;
+  goalkeeperGames: number;
   isProvisional: boolean;
   isStale: boolean;
   lastRoundId: string | null;
@@ -395,6 +415,7 @@ type MutablePlayerState = {
   history: Performance[];
   playedRoundIds: Set<string>;
   goalkeeperRoundIds: Set<string>;
+  goalkeeperMatchIds: Set<string>;
   lastRoundId: string | null;
   lastRoundIndex: number | null;
   scoutTotals: PlayerOverallSnapshot["scoutTotals"];
@@ -434,6 +455,7 @@ function roleEvidenceWeight(
 
 function traitEvidenceWeight(player: OverallPlayer, role: OverallRole, config: OverallFormulaConfig) {
   if (role === "GOL") return 1;
+  if (config.traitsAsProgressionBonus) return 1;
   const traits = [...new Set((player.overallTraits || []).filter((trait): trait is PlayerProfile => (
     trait === "defensive" || trait === "midfield" || trait === "offensive"
   )))];
@@ -444,6 +466,24 @@ function traitEvidenceWeight(player: OverallPlayer, role: OverallRole, config: O
     ATA: "offensive",
   };
   return traits.includes(traitForRole[role as LineRole]) ? 1 / traits.length : config.unselectedTraitEvidence;
+}
+
+function traitProgressionMultiplier(player: OverallPlayer, role: OverallRole, config: OverallFormulaConfig) {
+  if (!config.traitsAsProgressionBonus || role === "GOL") return 1;
+  const traits = [...new Set((player.overallTraits || []).filter((trait): trait is PlayerProfile => (
+    trait === "defensive" || trait === "midfield" || trait === "offensive"
+  )))];
+  const roleByTrait: Record<PlayerProfile, LineRole> = {
+    defensive: "DEF",
+    midfield: "ALA_MEI",
+    offensive: "ATA",
+  };
+  const index = traits.findIndex((trait) => roleByTrait[trait] === role);
+  if (index < 0 || traits.length === 0) return 1;
+  const budget = config.traitProgressionBonusBudget;
+  if (traits.length === 1) return 1 + budget;
+  if (traits.length === 2) return 1 + budget * (index === 0 ? 0.65 : 0.35);
+  return 1 + budget / 3;
 }
 
 function resultScore(result: OverallResult) {
@@ -471,6 +511,7 @@ function createPlayerState(config: OverallFormulaConfig): MutablePlayerState {
     history: [],
     playedRoundIds: new Set<string>(),
     goalkeeperRoundIds: new Set<string>(),
+    goalkeeperMatchIds: new Set<string>(),
     lastRoundId: null,
     lastRoundIndex: null,
     scoutTotals: { goals: 0, assists: 0, ownGoals: 0 },
@@ -672,13 +713,30 @@ function calculateLineOverall(player: OverallPlayer, values: Record<OverallRole,
     : lineValues[0] * 0.7 + lineValues[1] * 0.3;
 }
 
+function generalOverallItems(values: Record<OverallRole, number>, goalkeeperGames: number, config: OverallFormulaConfig) {
+  const roles: OverallRole[] = ["DEF", "ALA_MEI", "ATA"];
+  if (goalkeeperGames >= config.goalkeeperEligibilityGames) roles.push("GOL");
+  return roles
+    .map((role) => ({ role, value: values[role] }))
+    .sort((left, right) => right.value - left.value)
+    .slice(0, 3);
+}
+
 function overallTrend(
   player: OverallPlayer,
   positionTrends: Record<OverallRole, OverallTrend>,
   values: Record<OverallRole, number>,
   goalkeeperRounds: number,
+  goalkeeperGames: number,
   config: OverallFormulaConfig,
 ) {
+  if (config.topThreeOverall) {
+    const score = generalOverallItems(values, goalkeeperGames, config).reduce((total, item, index) => {
+      const direction = positionTrends[item.role] === "rising" ? 1 : positionTrends[item.role] === "falling" ? -1 : 0;
+      return total + direction * [0.5, 0.35, 0.15][index];
+    }, 0);
+    return score > 0.001 ? "rising" as const : score < -0.001 ? "falling" as const : "steady" as const;
+  }
   // Jogar ocasionalmente no gol gera um atributo GOL real, mas não muda a
   // identidade principal de um atleta de linha. Só goleiros declarados no
   // perfil podem ter a tendência geral definida pelo desempenho no gol.
@@ -694,7 +752,14 @@ function overallTrend(
   return "steady" as const;
 }
 
-function calculateGeneral(player: OverallPlayer, values: Record<OverallRole, number>, goalkeeperRounds: number, confidence: number, config: OverallFormulaConfig) {
+function calculateGeneral(player: OverallPlayer, values: Record<OverallRole, number>, goalkeeperRounds: number, goalkeeperGames: number, confidence: number, config: OverallFormulaConfig) {
+  if (config.topThreeOverall) {
+    const rawOverall = generalOverallItems(values, goalkeeperGames, config)
+      .reduce((total, item, index) => total + item.value * [0.5, 0.35, 0.15][index], 0);
+    return roundOverall(config.overallConfidenceShrink
+      ? config.base + (rawOverall - config.base) * confidence
+      : rawOverall);
+  }
   const lineOverall = calculateLineOverall(player, values, config);
   // O atributo GOL continua sendo calculado para qualquer pessoa que tenha
   // atuado ali. Ele só pode compor o OVR principal quando o ADM marcou o
@@ -723,15 +788,17 @@ function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, current
   const positionTrends = Object.fromEntries(ROLES.map((role) => [role, positionTrend(state, role, config)])) as Record<OverallRole, OverallTrend>;
   const roundsPlayed = state.playedRoundIds.size;
   const goalkeeperRounds = state.goalkeeperRoundIds.size;
+  const goalkeeperGames = state.goalkeeperMatchIds.size;
   const overallConfidence = Math.max(positions.DEF.confidence, positions.ALA_MEI.confidence, positions.ATA.confidence);
   return {
     playerId: player.id,
-    overall: calculateGeneral(player, state.values, goalkeeperRounds, overallConfidence, config),
+    overall: calculateGeneral(player, state.values, goalkeeperRounds, goalkeeperGames, overallConfidence, config),
     positions,
-    trend: overallTrend(player, positionTrends, state.values, goalkeeperRounds, config),
+    trend: overallTrend(player, positionTrends, state.values, goalkeeperRounds, goalkeeperGames, config),
     positionTrends,
     roundsPlayed,
     goalkeeperRounds,
+    goalkeeperGames,
     isProvisional: roundsPlayed < config.confidenceRounds
       || (config.provisionalAtConfidenceThreshold && roundsPlayed === config.confidenceRounds),
     isStale: state.lastRoundIndex !== null && currentRoundIndex - state.lastRoundIndex >= config.staleAfterRounds,
@@ -842,6 +909,9 @@ export function calculatePlayerOveralls(
       state.scoutTotals.ownGoals += roundScores.totals.ownGoals;
       state.playedRoundIds.add(round.id);
       if (appearances.some((appearance) => appearance.isGoalkeeper)) state.goalkeeperRoundIds.add(round.id);
+      for (const appearance of appearances) {
+        if (appearance.isGoalkeeper) state.goalkeeperMatchIds.add(appearance.matchId);
+      }
       state.lastRoundId = round.id;
       state.lastRoundIndex = roundIndex;
 
@@ -853,7 +923,9 @@ export function calculatePlayerOveralls(
           : 1;
         const positionForm = positionTrend(state, role, formula);
         let maximumChange = (formula.maxChangePerRound
-          + Math.abs(estimate.target - formula.base) * formula.performanceChangeBonus) * changeScale;
+          + Math.abs(estimate.target - formula.base) * formula.performanceChangeBonus)
+          * changeScale
+          * traitProgressionMultiplier(player, role, formula);
         if (estimate.target > previous && positionForm === "rising") {
           maximumChange *= 1 + formula.trendUpwardMultiplier;
         } else if (estimate.target < previous && positionForm === "falling") {

@@ -125,9 +125,9 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
 
               {/* 1. Defensores (DEF) */}
               <div className="rounded-2xl border border-blue-500/25 bg-blue-950/20 p-3.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500/20 text-blue-300 font-black text-xs">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="flex h-7 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 px-2 text-blue-300 font-black text-[10px]">
                       {roleReframeActive ? "DEF/VOL" : "DEF"}
                     </span>
                     <span className="font-athletic text-sm font-black uppercase text-blue-200">
@@ -139,26 +139,31 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-muted">
-                  <div className="flex justify-between py-0.5 border-b border-white/5">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-1 border-b border-white/5">
                     <span>🧱 0 gols sofridos jogando na linha:</span>
                     <strong className="text-accent font-black">+{roleReframeActive ? "1.25" : "1.5"} pts</strong>
                   </div>
-                  <div className="flex justify-between py-0.5 border-b border-white/5">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-1 border-b border-white/5">
                     <span>🛡️ Exatamente 1 gol sofrido na linha:</span>
                     <strong className="text-blue-300 font-black">+0.5 pt</strong>
                   </div>
-                  <div className="flex justify-between py-0.5">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-1 border-b border-white/5">
                     <span>🏰 Muralha com 3+ clean sheets:</span>
-                    <strong className="text-accent font-black">+{roleReframeActive ? "2.5" : "3.0"} pts uma vez</strong>
+                    <strong className="text-right text-accent font-black">+{roleReframeActive ? "2.5" : "3.0"} pts uma vez</strong>
                   </div>
+                  {roleReframeActive && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-1">
+                    <span>🎯 Assistência na vaga DEF/VOL:</span>
+                    <strong className="text-right font-black text-blue-300">+2,5 base +0,5 extra<br /><span className="text-[9px] text-muted">extra máximo +1,5</span></strong>
+                  </div>}
                 </div>
+                {roleReframeActive && <p className="rounded-xl bg-blue-500/8 px-3 py-2 text-[10px] leading-4 text-blue-100/80">Scouts básicos contam em qualquer posição. O bônus de assistência valoriza a saída de bola, mas todos os extras de DEF/VOL continuam limitados a +8.</p>}
               </div>
 
               {/* 2. Meias / Alas (MEI) */}
               <div className="rounded-2xl border border-warning/25 bg-yellow-950/20 p-3.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-warning/20 text-warning font-black text-xs">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="flex h-7 shrink-0 items-center justify-center rounded-lg bg-warning/20 px-2 text-warning font-black text-xs">
                       {roleReframeActive ? "ALA" : "MEI"}
                     </span>
                     <span className="font-athletic text-sm font-black uppercase text-yellow-200">
@@ -170,7 +175,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-muted">
-                  <div className="flex justify-between py-0.5 border-b border-white/5">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-1 border-b border-white/5">
                     <span>{roleReframeActive ? "🎯 Assistência na vaga ALA" : "🎯 Assistência: +2.5 base +1 na vaga ALA/MEI"}</span>
                     <strong className="text-accent font-black">{roleReframeActive ? "+0.75 extra" : "+3.5 pts / assist"}</strong>
                   </div>
@@ -178,7 +183,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                     <span>{roleReframeActive ? "🏃 Vai e volta (participação + 2 proteções):" : "🪄 Bônus Maestro (2+ assistências):"}</span>
                     <strong className="text-warning font-black">+{roleReframeActive ? "1.5" : "3.0"} pts extras</strong>
                   </div>
-                  <div className="flex justify-between py-0.5">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-1 border-b border-white/5">
                     <span>⚽ Gol marcado (scout base):</span>
                     <strong className="text-foreground font-black">+{settings.goalPoints.toFixed(1)} base{roleReframeActive ? " +0.5 extra" : " pts"}</strong>
                   </div>
@@ -187,8 +192,8 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
 
               {/* 3. Atacantes (ATA) */}
               <div className="rounded-2xl border border-danger/25 bg-red-950/20 p-3.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-danger/20 text-danger font-black text-xs">
                       ATA
                     </span>
@@ -218,8 +223,8 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
 
               {/* 4. Goleiro no Rodízio (GOL) */}
               <div className="rounded-2xl border border-emerald-500/25 bg-emerald-950/20 p-3.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 font-black text-xs">
                       GOL
                     </span>
