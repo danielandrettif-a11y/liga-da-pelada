@@ -17,6 +17,7 @@ import {
 } from "@/lib/ranking-card-layout";
 import { getInitials } from "@/lib/utils";
 import { useDialogViewport } from "@/lib/useDialogViewport";
+import { getOverallComposition } from "@/lib/overall-explanation";
 
 type Props = {
   entry: RankingEntry;
@@ -301,6 +302,7 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
 export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   const [mounted, setMounted] = useState(false);
   const [showBestRounds, setShowBestRounds] = useState(false);
+  const [showOverallExplanation, setShowOverallExplanation] = useState(false);
   const [expandedRoundId, setExpandedRoundId] = useState<string | null>(null);
   const dialogScrollRef = useRef<HTMLDivElement>(null);
   const bestRoundsRef = useRef<HTMLDivElement>(null);
@@ -326,6 +328,10 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   const cardContent = buildRankingCardContent(entry, position);
   const displayName = cardContent.name;
   const nameplateArtwork = cosmeticNameplateImage(entry.cosmetics?.nameplateKey);
+  const overallComposition = getOverallComposition(entry.player.overall_traits, entry.overallPositions, {
+    isGoalkeeper: entry.player.is_goalkeeper,
+    overall: entry.overall,
+  });
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState("");
 
@@ -465,6 +471,67 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
           <div><p className="font-athletic text-sm font-black text-accent">{entry.fitness.distanceKm} km</p><p className="text-[7px] font-black uppercase text-muted">Distância Ranked</p></div>
           <div><p className="font-athletic text-sm font-black text-accent">{entry.fitness.averageSpeedKmh} km/h</p><p className="text-[7px] font-black uppercase text-muted">Velocidade média</p></div>
         </div>}
+
+        <div className="mx-auto mt-3.5 w-[94%] overflow-hidden rounded-2xl border border-accent/25 bg-[#07150d]/95 shadow-xl backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => setShowOverallExplanation((current) => !current)}
+            className="flex w-full items-center justify-between gap-3 p-3.5 text-left transition-colors hover:bg-white/[0.03] active:bg-white/[0.06]"
+            aria-expanded={showOverallExplanation}
+          >
+            <div className="flex min-w-0 items-center gap-2.5">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
+                <Target className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="block font-athletic text-xs font-black uppercase tracking-wider text-foreground">Como seu OVR é calculado</span>
+                <span className="block truncate text-[10px] text-muted">
+                  {overallComposition ? `Seu geral usa ${overallComposition.items.map((item) => item.label).join(" + ")}` : "Entenda as notas da sua carta"}
+                </span>
+              </div>
+            </div>
+            <ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${showOverallExplanation ? "rotate-180 text-accent" : ""}`} />
+          </button>
+
+          {showOverallExplanation && (
+            <div className="space-y-3 border-t border-border/60 p-3.5 text-[10px] leading-relaxed text-muted animate-fade-in">
+              {overallComposition ? (
+                <>
+                  <div className="rounded-xl border border-accent/20 bg-accent/[0.07] p-3">
+                    <p className="font-black uppercase tracking-wide text-accent">Sua conta nesta carta</p>
+                    <p className="mt-1.5 text-xs font-black text-foreground">
+                      {overallComposition.items.map((item) => `${item.value.toFixed(1).replace(".", ",")} (${item.label}) × ${Math.round(item.weight * 100)}%`).join(" + ")}
+                      {` ≈ ${(entry.overall ?? overallComposition.value).toFixed(1).replace(".", ",")}`}
+                    </p>
+                    <p className="mt-1.5">
+                      {overallComposition.source === "goalkeeper"
+                        ? "Como o perfil está marcado como goleiro e já atingiu a amostra mínima, a nota GOL assumiu o geral por ser maior que o OVR de linha."
+                        : "As características escolhidas pelo ADM definem quais posições formam seu OVR geral. Uma usa 100%; duas usam 70% da maior e 30% da outra; três usam 60%, 25% e 15%."}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="font-black text-foreground">Como cada posição evolui</p>
+                    <p className="mt-1">A nota começa em 70 e usa até as 8 rodadas oficiais finalizadas mais recentes. Rodadas novas pesam mais; faltar não derruba a nota, e várias partidas na mesma pelada contam como uma amostra semanal.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-1.5">
+                    <p><strong className="text-foreground">DEF/VOL:</strong> 70% defesa, 5% gols, 20% assistências e 5% resultado.</p>
+                    <p><strong className="text-foreground">ALA:</strong> 40% defesa, 25% gols, 30% assistências e 5% resultado.</p>
+                    <p><strong className="text-foreground">ATA:</strong> 10% defesa, 60% gols, 25% assistências e 5% resultado.</p>
+                    <p><strong className="text-foreground">GOL:</strong> desempenho defensivo nas partidas em que atuou no gol.</p>
+                  </div>
+
+                  <p>A defesa compara gols sofridos por tempo jogado com a média da liga, além do tempo até sofrer o primeiro gol, participação e gols contra. A confiança cresce com minutos e rodadas observadas. Para goleiros cadastrados, o OVR GOL pode assumir o geral após 3 rodadas no gol se for a maior nota.</p>
+                </>
+              ) : (
+                <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-warning">
+                  O OVR fica indisponível até o administrador definir ao menos uma característica de jogo: DEF/VOL, ALA ou ATA.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* 6 MELHORES PARTIDAS - SANFONA / ACCORDION */}
         {entry.bestRounds && entry.bestRounds.length > 0 && (
