@@ -323,9 +323,9 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
 
                   <div className="flex items-center justify-between p-3">
                     <span className="font-bold text-white flex items-center gap-1.5">
-                      🧱 {roleReframeActive ? "DEF/VOL" : "DEF"} jogando na linha (bônus da vaga)
+                      ⚠️ Gol contra
                     </span>
-                    <span className="font-black text-blue-300">+{roleReframeActive ? "1.25" : "1.5"} (SG) / +0.5 (1 sofrido), teto +{roleReframeActive ? "8" : "10"}</span>
+                    <span className="font-black text-danger">{settings.ownGoalPoints.toFixed(1)} pts</span>
                   </div>
                 </div>
               </div>

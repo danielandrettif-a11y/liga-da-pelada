@@ -351,22 +351,36 @@ export async function removeCallupEntry(callupId: string, playerId: string) {
     return { success: false, error: "Entre na sua conta para alterar a lista." };
   }
 
-  const adminClient = await getAdminClient();
-  const client = adminClient || account.client;
+  const client = account.client;
 
-  // Depois do sorteio, a saída precisa passar por leave_callup para preservar
-  // o time e a vaga de reposição. Esta ação só pode remover entradas da lista
-  // ainda não sorteada.
   const { data: callup, error: callupError } = await client
     .from("callups")
-    .select("status")
+    .select("status, round_id")
     .eq("id", callupId)
     .maybeSingle();
   if (callupError || !callup) {
     return { success: false, error: callupError?.message || "Convocação não encontrada." };
   }
+
+  // O administrador pode retirar qualquer pessoa até o primeiro jogo, inclusive
+  // depois do sorteio. A RPC preserva o time da vaga e promove a fila quando
+  // houver alguém esperando.
+  if (account.isAdmin) {
+    const { error } = await client.rpc("admin_remove_callup_player", {
+      p_callup_id: callupId,
+      p_player_id: playerId,
+    });
+    if (error) return { success: false, error: error.message };
+    refreshCallups();
+    if (callup.round_id) {
+      revalidatePath(`/rodadas/${callup.round_id}`);
+      revalidatePath(`/rodadas/${callup.round_id}/nova-partida`);
+    }
+    return { success: true };
+  }
+
   if (callup.status !== "open") {
-    return { success: false, error: "Depois do sorteio, a saída deve ser feita pela própria pessoa." };
+    return { success: false, error: "Depois do sorteio, somente o administrador pode retirar outro jogador." };
   }
 
   // 1. Buscar a entrada

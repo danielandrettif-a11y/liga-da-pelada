@@ -52,6 +52,7 @@ import type { EquippedCosmeticsSummary } from "@/lib/actions/cosmetics";
 import Image from "next/image";
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
 import { useUrlState } from "@/lib/useUrlState";
+import { hasCallupClosingMatch } from "@/lib/callup-lifecycle";
 
 type Props = {
   callup: CallupWithEntries;
@@ -130,6 +131,8 @@ export function CallupBoard({
   const hasDrawnTeams = callup.status === "converted" && drawnTeams.length > 0;
   const isQueueOnlyAfterDraw = callup.status === "converted";
   const canJoinCallup = callup.status === "open" || isQueueOnlyAfterDraw;
+  const hasStartedMatch = hasCallupClosingMatch(callup.round?.matches);
+  const canLeaveBeforeFirstMatch = (callup.status === "open" || callup.status === "converted") && !hasStartedMatch;
 
   async function handleEditCallup(formData: FormData) {
     setEditLoading(true);
@@ -446,19 +449,23 @@ export function CallupBoard({
                 </div>
               </div>
 
-              <button
-                onClick={() => run("leave", () => leaveActiveCallup(callup.id))}
-                disabled={!!loading}
-                className="rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-xs font-bold text-danger hover:bg-danger/20 transition-colors disabled:opacity-50"
-              >
-                {loading === "leave" ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : myEntry.status === "confirmed" ? (
-                  "Desistir da vaga"
-                ) : (
-                  "Sair da fila"
-                )}
-              </button>
+              {canLeaveBeforeFirstMatch ? (
+                <button
+                  onClick={() => run("leave", () => leaveActiveCallup(callup.id))}
+                  disabled={!!loading}
+                  className="rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-xs font-bold text-danger hover:bg-danger/20 transition-colors disabled:opacity-50"
+                >
+                  {loading === "leave" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : myEntry.status === "confirmed" ? (
+                    "Desistir da vaga"
+                  ) : (
+                    "Sair da fila"
+                  )}
+                </button>
+              ) : (
+                <span className="text-right text-[10px] font-bold text-muted">Lista encerrada<br />após o início do jogo</span>
+              )}
             </div>
 
             {myEntry.status === "confirmed" && (
@@ -691,7 +698,9 @@ export function CallupBoard({
                     (entry.joined_by === currentUserId ||
                       (entry.player as any)?.created_by_user_id === currentUserId)
                 );
-                const canRemove = (isAdmin || isMyGuest) && callup.status === "open";
+                const canRemove = callup.status === "open"
+                  ? (isAdmin || isMyGuest)
+                  : isAdmin && callup.status === "converted" && !hasStartedMatch;
 
                 return (
                   <div
@@ -795,7 +804,9 @@ export function CallupBoard({
                       (entry.joined_by === currentUserId ||
                         (entry.player as any)?.created_by_user_id === currentUserId)
                   );
-                  const canRemove = (isAdmin || isMyGuest) && callup.status === "open";
+                const canRemove = callup.status === "open"
+                  ? (isAdmin || isMyGuest)
+                  : isAdmin && callup.status === "converted" && !hasStartedMatch;
 
                   return (
                     <div

@@ -104,6 +104,10 @@ function aggregateRankingRows(
 ) {
   const playerRowsMap = new Map<string, RankingStatsRow[]>();
   for (const row of rows) {
+    // A rodada guarda uma linha zerada para todos os convocados, inclusive
+    // quem acabou não entrando em campo. Essa linha é útil na consolidação,
+    // mas não é uma partida e jamais deve aparecer entre as melhores atuações.
+    if (Number(row.games || 0) <= 0) continue;
     const list = playerRowsMap.get(row.player_id) || [];
     list.push(row);
     playerRowsMap.set(row.player_id, list);
@@ -561,6 +565,9 @@ export async function getRoundStatistics(roundId: string): Promise<RoundStatisti
     const player = Array.isArray(raw.player) ? raw.player[0] : raw.player;
     if (!player) return [];
     const games = Number(raw.games || 0);
+    // Convocados que não participaram recebem uma linha 0 no fechamento da
+    // rodada. Ela não representa presença, portanto não vai para o histórico.
+    if (games <= 0) return [];
     const wins = Number(raw.wins || 0);
     const draws = Number(raw.draws || 0);
     return [{
