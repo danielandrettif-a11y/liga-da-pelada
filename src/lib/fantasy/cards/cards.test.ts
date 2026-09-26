@@ -3,6 +3,7 @@ import { CardEffectResolver, type CardResolverPlayer, type CardResolverContext }
 import { generatePackOffers, rollRarity } from "./pack-generator";
 import { FANTASY_CARDS_CATALOG, getCardBySlug } from "./catalog";
 import { MAX_SPECIAL_CARDS_PER_ROUND, FANTASY_RARITY_PROBABILITIES } from "./config";
+import { fantasyCardRequiresSavedLineup } from "./eligibility";
 
 describe("Cartola V3 — Catálogo & Probabilidades", () => {
   it("contém as 20 cartas oficiais habilitadas e nenhuma experimental", () => {
@@ -42,6 +43,13 @@ describe("Cartola V3 — Catálogo & Probabilidades", () => {
 
   it("respeita a regra de no máximo 1 carta ativa por rodada", () => {
     expect(MAX_SPECIAL_CARDS_PER_ROUND).toBe(1);
+  });
+
+  it("exige escalação salva apenas nas cartas que dependem do próprio time", () => {
+    const withoutLineup = FANTASY_CARDS_CATALOG
+      .filter((card) => card.enabled && !fantasyCardRequiresSavedLineup(card))
+      .map((card) => card.slug);
+    expect(withoutLineup).toEqual(["extra_credit", "double_prediction", "bargain", "all_in"]);
   });
 });
 
@@ -92,6 +100,10 @@ describe("Cartola V3.2 — Novas cartas", () => {
   it("aplica Samu e Bagre ou Craque sem duplicar a regra", () => {
     expect(CardEffectResolver.resolveScoreEffect(getCardBySlug("samu_do_cartola")!, { targetPlayerId: "a" }, players, null, context).bonusPoints).toBe(2);
     expect(CardEffectResolver.resolveScoreEffect(getCardBySlug("bagre_or_craque")!, { targetPlayerId: "e" }, players, null, context).bonusPoints).toBe(5);
+  });
+
+  it("aplica Só Vim Pela Resenha", () => {
+    expect(CardEffectResolver.resolveScoreEffect(getCardBySlug("so_vim_pela_resenha")!, { targetPlayerId: "a" }, players, null, context).bonusPoints).toBe(3);
   });
 });
 

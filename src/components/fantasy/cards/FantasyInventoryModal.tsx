@@ -10,7 +10,7 @@ import {
   type FantasyCardDefinition,
 } from "@/lib/fantasy/cards/catalog";
 import { getCardArtUrl, preloadCardArt } from "@/lib/fantasy/cards/card-assets";
-import { filterFantasyCardTargets } from "@/lib/fantasy/cards/eligibility";
+import { fantasyCardRequiresSavedLineup, filterFantasyCardTargets } from "@/lib/fantasy/cards/eligibility";
 import type { FantasyUserCardDTO } from "@/lib/actions/fantasy-cards";
 import { activateCardForRound, getMyInventory } from "@/lib/actions/fantasy-cards";
 import { useDialogViewport } from "@/lib/useDialogViewport";
@@ -24,6 +24,7 @@ type Props = {
   marketPlayers?: Array<{ id: string; name: string; price: number }>;
   lineupPlayers?: Array<{ id: string; name: string; price: number }>;
   captainPlayerId?: string | null;
+  lineupSaved?: boolean;
 };
 
 type InventoryData = {
@@ -93,6 +94,7 @@ export function FantasyInventoryModal({
   marketPlayers = [],
   lineupPlayers = [],
   captainPlayerId = null,
+  lineupSaved = true,
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -151,6 +153,7 @@ export function FantasyInventoryModal({
    * - Para cartas gerais: jogadores do mercado.
    */
   function getEligiblePlayers(card: FantasyCardDefinition) {
+    if (fantasyCardRequiresSavedLineup(card) && !lineupSaved) return [];
     if (card.slug === "vice_captain") {
       return lineupPlayers.filter((p) => p.id !== captainPlayerId);
     }
@@ -164,7 +167,7 @@ export function FantasyInventoryModal({
       return filterFantasyCardTargets(card, lineupPlayers, marketPlayers);
     }
     if (card.targetFilter === "ANY_IN_LINEUP" || card.slug === "emergency_sub") {
-      return lineupPlayers.length > 0 ? lineupPlayers : marketPlayers;
+      return lineupPlayers;
     }
     return marketPlayers;
   }
@@ -396,6 +399,12 @@ export function FantasyInventoryModal({
                 </div>
               </div>
 
+              {fantasyCardRequiresSavedLineup(selectedToUse.card) && !lineupSaved && (
+                <p role="alert" className="rounded-2xl border border-warning/40 bg-warning/10 px-3.5 py-3 text-xs font-bold text-warning">
+                  Salve sua escalação antes de ativar esta carta.
+                </p>
+              )}
+
               {selectedToUse.card.slug === "bargain" && (
                 <div className="rounded-2xl border border-warning/40 bg-warning/10 px-3.5 py-3 text-xs leading-relaxed text-warning">
                   <strong>Use antes de escalar.</strong> Escolha o atleta agora; depois ele precisa entrar na sua escalação para o desconto valer.
@@ -558,6 +567,7 @@ export function FantasyInventoryModal({
                   onClick={handleConfirmActivation}
                   disabled={
                     pending ||
+                    (fantasyCardRequiresSavedLineup(selectedToUse.card) && !lineupSaved) ||
                     (selectedToUse.card.requiresTarget === "SINGLE_PLAYER" && !targetPlayerId) ||
                     (selectedToUse.card.slug === "vice_captain" && getEligiblePlayers(selectedToUse.card).length === 0) ||
                     (selectedToUse.card.requiresTarget === "DUO_PLAYERS" && (

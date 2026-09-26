@@ -33,9 +33,11 @@ type Props = {
   }>;
   onRefresh?: () => void;
   onCardRemoved?: (userCardId: string) => void;
+  onCardActivated?: (replacedActiveCard: boolean) => void;
   marketPlayers?: Array<{ id: string; name: string; price: number }>;
   lineupPlayers?: Array<{ id: string; name: string; price: number }>;
   captainPlayerId?: string | null;
+  lineupSaved?: boolean;
 };
 
 type CardLiveProgress = {
@@ -201,9 +203,11 @@ export function FantasyActiveCardSlot({
   liveStats = [],
   onRefresh,
   onCardRemoved,
+  onCardActivated,
   marketPlayers = [],
   lineupPlayers = [],
   captainPlayerId = null,
+  lineupSaved = true,
 }: Props) {
   const [showInventory, setShowInventory] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
@@ -424,7 +428,9 @@ export function FantasyActiveCardSlot({
           marketPlayers={marketPlayers}
           lineupPlayers={lineupPlayers}
           captainPlayerId={captainPlayerId}
+          lineupSaved={lineupSaved}
           onCardActivated={() => {
+            onCardActivated?.(Boolean(activeCard));
             onRefresh?.();
           }}
         />

@@ -5,6 +5,14 @@ export type PricedFantasyPlayer = {
   price: number;
 };
 
+export function fantasyCardRequiresSavedLineup(
+  card: Pick<FantasyCardDefinition, "slug" | "effectType" | "targetFilter">,
+) {
+  return card.effectType !== "BUDGET_BONUS"
+    && card.slug !== "double_prediction"
+    && card.targetFilter !== "ANY_IN_MARKET";
+}
+
 function sortedPrices(players: PricedFantasyPlayer[]) {
   return players
     .map((player) => Number(player.price))

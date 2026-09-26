@@ -5,7 +5,7 @@ import { getCurrentAccount, getAdminClient } from "@/lib/auth";
 import { FANTASY_CARDS_CATALOG, getCardBySlug, type FantasyCardDefinition } from "@/lib/fantasy/cards/catalog";
 import { generatePackOffers } from "@/lib/fantasy/cards/pack-generator";
 import { MAX_SPECIAL_CARDS_PER_ROUND } from "@/lib/fantasy/cards/config";
-import { isFantasyPriceEligible } from "@/lib/fantasy/cards/eligibility";
+import { fantasyCardRequiresSavedLineup, isFantasyPriceEligible } from "@/lib/fantasy/cards/eligibility";
 import type { FantasyActiveCardDTO, FantasyPackDTO, FantasyUserCardDTO } from "@/lib/fantasy/cards/dtos";
 
 export type { FantasyActiveCardDTO, FantasyPackDTO, FantasyUserCardDTO } from "@/lib/fantasy/cards/dtos";
@@ -488,9 +488,12 @@ export async function activateCardForRound({
   const marketPlayerIds = new Set((marketPrices || []).map((price: any) => price.player_id as string));
 
   const catalogCard = getCardBySlug(userCardObj?.slug || "");
+  if (catalogCard && fantasyCardRequiresSavedLineup(catalogCard) && lineupPlayerIds.length === 0) {
+    return { success: false, error: "Salve sua escalação antes de ativar esta carta." };
+  }
   if (catalogCard?.requiresTarget === "SINGLE_PLAYER" && !["bargain", "all_in"].includes(userCardObj?.slug || "")) {
     if (!targetPlayerId || !lineupPlayerIds.includes(targetPlayerId)) {
-      return { success: false, error: "Escolha um atleta que esteja na sua escalação." };
+      return { success: false, error: "Esse atleta não está na escalação salva. Salve o time e tente novamente." };
     }
   }
 

@@ -1068,7 +1068,11 @@ export function FantasyExperience({
         <FantasyPackClaimBanner
           packs={availablePacks}
           initialPackId={initialPackId}
-          onPackClaimed={() => requestRefresh(0)}
+          onPackClaimed={() => {
+            void import("./cards/FantasyInventoryModal").then((mod) => mod.invalidateFantasyInventory());
+            setCurrentInventoryCount((count) => count + 1);
+            requestRefresh(0);
+          }}
         />
       )}
 
@@ -1686,6 +1690,10 @@ export function FantasyExperience({
                 marketPlayers={market}
                 lineupPlayers={validSelectedPlayers}
                 captainPlayerId={captainId}
+                lineupSaved={isSaved}
+                onCardActivated={(replacedActiveCard) => {
+                  if (!replacedActiveCard) setCurrentInventoryCount((count) => Math.max(0, count - 1));
+                }}
                 onCardRemoved={() => {
                   setCurrentActiveCard(null);
                   setCurrentInventoryCount((count) => count + 1);
@@ -2155,7 +2163,11 @@ export function FantasyExperience({
           marketPlayers={market}
           lineupPlayers={validSelectedPlayers}
           captainPlayerId={captainId}
-          onCardActivated={() => requestRefresh(0)}
+          lineupSaved={isSaved}
+          onCardActivated={() => {
+            if (!currentActiveCard) setCurrentInventoryCount((count) => Math.max(0, count - 1));
+            requestRefresh(0);
+          }}
         />
       )}
 
