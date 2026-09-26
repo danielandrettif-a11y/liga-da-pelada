@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentAccount } from "@/lib/auth";
+import { areRoundParticipantsPaid } from "@/lib/paymentStatus";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
@@ -275,7 +276,7 @@ export async function getFantasyDashboard() {
     account.client
       .from("fantasy_rounds")
       .select(
-        "*, round:round_id(id, number, date, start_time, status, round_type, preparation_stage, suppress_goalkeeper_rewards, teams(id, name, color, crest_url, team_players(player_id, goalkeeper_order, loan_order, players(id, name, nickname, avatar_url, player_profile, is_goalkeeper))), matches(id, status))"
+        "*, round:round_id(id, number, date, start_time, status, round_type, preparation_stage, suppress_goalkeeper_rewards, round_players(player_id), round_payments(player_id, paid), teams(id, name, color, crest_url, team_players(player_id, goalkeeper_order, loan_order, players(id, name, nickname, avatar_url, player_profile, is_goalkeeper))), matches(id, status))"
       )
       .eq("fantasy_season_id", fantasySeason.id),
     account.client.rpc("get_fantasy_market_v11_public_health", {
@@ -336,6 +337,10 @@ export async function getFantasyDashboard() {
 
   const latestFinishedRound = finishedOfficialRounds[0] || null;
   const previousFinishedRound = finishedOfficialRounds[1] || null;
+  const latestFinishedRoundPaid = areRoundParticipantsPaid(
+    latestFinishedRound?.round?.round_players || [],
+    latestFinishedRound?.round?.round_payments || [],
+  );
 
   const isTest = Boolean(testSession);
   const fantasyRound: any = testSession
@@ -1432,6 +1437,7 @@ export async function getFantasyDashboard() {
       rulesVersion: Number(fantasyRound?.rules_version || 0),
       scoringVersion: Number(fantasyRound?.scoring_version || 5),
     },
+    latestFinishedRoundPaid,
     market,
     lineup: effectiveLineup,
     insights,

@@ -62,12 +62,20 @@ export function RoundLiveStats({ matches, players, teams }: { matches: Match[]; 
             {teamStats.map((team) => <div key={team.id} className="flex items-center gap-2.5 rounded-xl bg-background/35 px-2.5 py-2">
               <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-8 w-8" />
               <span className="min-w-0 flex-1 truncate text-xs font-bold text-foreground">{team.name}</span>
-              <span className="text-right text-[10px] font-black text-accent"><strong className="block text-xs">{team.wins}</strong>Vitórias</span>
-              <span className="border-l border-border pl-2 text-right text-[10px] font-black text-info"><strong className="block text-xs">{team.goalsFor}</strong>Fez</span>
-              <span className="border-l border-border pl-2 text-right text-[10px] font-black text-danger"><strong className="block text-xs">{team.goalsAgainst}</strong>Tomou</span>
+              <span className="shrink-0 border-l border-border pl-2 text-right text-[9px] font-black">
+                <span className="flex justify-end gap-2.5">
+                  <span className="text-accent">{team.wins} V</span>
+                  <span className="text-warning">{team.draws} E</span>
+                  <span className="text-danger">{team.losses} D</span>
+                </span>
+                <span className="mt-1 flex justify-end gap-2.5 border-t border-border/60 pt-1">
+                  <span className="text-info">{team.goalsFor} GM</span>
+                  <span className="text-danger">{team.goalsAgainst} GS</span>
+                </span>
+              </span>
             </div>)}
           </div>
-          {hasLiveMatch && <p className="-mt-2 mb-4 text-[10px] font-bold text-muted">Gols atualizados ao vivo; vitórias entram ao encerrar a partida.</p>}
+          {hasLiveMatch && <p className="-mt-2 mb-4 text-[10px] font-bold text-muted">Gols atualizados ao vivo; V/E/D entram ao encerrar a partida.</p>}
         </>}
 
         {entries.length === 0 ? <p className="py-2 text-center text-xs text-muted">Ainda sem gols registrados nesta rodada.</p> : <>

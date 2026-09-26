@@ -7,7 +7,8 @@ import {
   finishMatch,
   deleteEvent,
   correctFinishedGoal,
-  correctFinishedGoalAssist,
+  correctFinishedGoalEvent,
+  type MatchAdminAuditEntry,
   updateMatchTimer,
   resetMatchTimer,
   addMatchExtraTime,
@@ -28,6 +29,7 @@ import {
   X,
   ArrowLeftRight,
   PencilLine,
+  History,
 } from "@/components/icons";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -309,6 +311,7 @@ type MatchLiveBoardProps = {
   match: any;
   matchDuration: number;
   canManage: boolean;
+  auditLog?: MatchAdminAuditEntry[];
 };
 
 type GoalPickerPlayerOptionProps = {
@@ -362,7 +365,7 @@ function GoalPickerPlayerOption({ entry, cosmetics, onClick, disabled, icon, ton
   );
 }
 
-export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoardProps) {
+export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] }: MatchLiveBoardProps) {
   const router = useRouter();
   const refreshTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submittingGoalRef = useRef(false);
@@ -520,8 +523,8 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
     isOwnGoal: boolean;
   }>({ open: false, teamId: "", scorerId: null, isOwnGoal: false });
   useDialogViewport(goalModal.open, () => !loading && setGoalModal({ open: false, teamId: "", scorerId: null, isOwnGoal: false }));
-  const [assistEdit, setAssistEdit] = useState<any | null>(null);
-  useDialogViewport(Boolean(assistEdit), () => !loading && setAssistEdit(null));
+  const [goalEdit, setGoalEdit] = useState<{ event: any; scorerId: string; assistId: string | null } | null>(null);
+  useDialogViewport(Boolean(goalEdit), () => !loading && setGoalEdit(null));
 
   // Jogadores ativos para o modal
   const activePlayers = useMemo(() => {
@@ -540,12 +543,17 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
     );
   }, [match.match_players, goalModal.teamId]);
 
-  const assistEditPlayers = useMemo(() => {
-    if (!assistEdit) return [];
-    return (match.match_players || []).filter(
-      (entry: any) => entry.team_id === assistEdit.team_id && entry.player_id !== assistEdit.player_id,
-    );
-  }, [assistEdit, match.match_players]);
+  const goalEditPlayers = useMemo(() => {
+    if (!goalEdit) return [];
+    return [...new Map(
+      (match.match_players || [])
+        .filter((entry: any) => entry.team_id === goalEdit.event.team_id)
+        .map((entry: any) => [entry.player_id, entry]),
+    ).values()] as any[];
+  }, [goalEdit, match.match_players]);
+  const playerNameById = useMemo(() => new Map(
+    (match.match_players || []).map((entry: any) => [entry.player_id, entry.player?.name || "Jogador"]),
+  ), [match.match_players]);
 
   // Timeline unificada e ordenada
   const timelineItems = useMemo(() => {
@@ -708,19 +716,26 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
     }
   }
 
-  async function handleCorrectAssist(assistPlayerId: string | null) {
-    if (!assistEdit || loading) return;
-    const selected = assistEditPlayers.find((entry: any) => entry.player_id === assistPlayerId);
+  async function handleCorrectGoalEvent() {
+    if (!goalEdit || loading) return;
+    const scorer = goalEditPlayers.find((entry: any) => entry.player_id === goalEdit.scorerId);
+    const assist = goalEditPlayers.find((entry: any) => entry.player_id === goalEdit.assistId);
     setLoading(true);
     setError("");
-    const result = await correctFinishedGoalAssist(assistEdit.id, assistPlayerId);
+    const result = await correctFinishedGoalEvent(goalEdit.event.id, goalEdit.scorerId, goalEdit.assistId);
     if (!result.success) {
-      setError(result.error || "Não foi possível corrigir a assistência.");
+      setError(result.error || "Não foi possível corrigir o gol.");
     } else {
-      setEvents((current) => current.map((event) => event.id === assistEdit.id
-        ? { ...event, assist_player_id: assistPlayerId, assist_player: selected?.player || null }
+      setEvents((current) => current.map((event) => event.id === goalEdit.event.id
+        ? {
+            ...event,
+            player_id: goalEdit.scorerId,
+            player: scorer?.player || event.player,
+            assist_player_id: goalEdit.assistId,
+            assist_player: assist?.player || null,
+          }
         : event));
-      setAssistEdit(null);
+      setGoalEdit(null);
       router.refresh();
     }
     setLoading(false);
@@ -931,11 +946,11 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
                     {canManage && <div className="flex shrink-0 items-center gap-1">
                       {isFinished && <button
                         type="button"
-                        onClick={() => setAssistEdit(ev)}
+                        onClick={() => setGoalEdit({ event: ev, scorerId: ev.player_id, assistId: ev.assist_player_id || null })}
                         disabled={loading || ev.isOptimistic || ev.is_own_goal}
-                        title="Editar assistência"
+                        title="Editar gol e assistência"
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50"
-                        aria-label="Editar assistência do gol"
+                        aria-label="Editar autor e assistência do gol"
                       >
                         <PencilLine className="h-4 w-4" />
                       </button>}
@@ -956,6 +971,39 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
           )}
         </div>
       </section>
+
+      {isFinished && canManage && (
+        <section className="animate-fade-in-up rounded-2xl border border-border bg-surface/70 p-4">
+          <h2 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted">
+            <History className="h-4 w-4" /> Histórico de correções
+          </h2>
+          {auditLog.length === 0 ? (
+            <p className="mt-3 text-xs text-muted">Nenhuma correção registrada nesta partida.</p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {auditLog.map((entry) => {
+                const payload = entry.payload as Record<string, any>;
+                const playerName = (id: unknown, empty = "sem assistência") => id
+                  ? playerNameById.get(String(id)) || "Jogador"
+                  : empty;
+                const description = entry.action === "goal_corrected"
+                  ? `Gol de ${playerName(payload.player_id)} removido`
+                  : entry.action === "goal_assist_corrected"
+                    ? `Gol de ${playerName(payload.player_id)} · Assistência: ${playerName(payload.previous_assist_player_id)} → ${playerName(payload.assist_player_id)}`
+                    : `Gol: ${playerName(payload.previous_player_id)} → ${playerName(payload.player_id)} · Assistência: ${playerName(payload.previous_assist_player_id)} → ${playerName(payload.assist_player_id)}`;
+                return (
+                  <div key={entry.id} className="rounded-xl bg-background/40 px-3 py-2.5">
+                    <p className="text-xs font-bold text-foreground">{description}</p>
+                    <p className="mt-1 text-[10px] font-semibold text-muted">
+                      {entry.changedByName} · {new Date(entry.createdAt).toLocaleString("pt-BR")}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Substituições */}
       <MatchSubstitutionManager
@@ -982,25 +1030,30 @@ export function MatchLiveBoard({ match, matchDuration, canManage }: MatchLiveBoa
       )}
 
       {/* MODAL DE REGISTRO DE GOL */}
-      {assistEdit && canManage && (
+      {goalEdit && canManage && (
         <div className="mobile-dialog-backdrop bg-background/85 backdrop-blur-sm animate-fade-in">
           <div className="glass-card flex max-h-[85dvh] w-full max-w-sm flex-col overflow-hidden animate-fade-in-up">
             <div className="flex shrink-0 items-center justify-between border-b border-border bg-surface p-4">
-              <div><h3 className="font-bold text-foreground">Editar assistência</h3><p className="mt-0.5 text-[10px] text-muted">Gol de {assistEdit.player?.name}</p></div>
-              <button type="button" onClick={() => setAssistEdit(null)} className="text-muted hover:text-foreground" aria-label="Fechar edição"><X className="h-5 w-5" /></button>
+              <div><h3 className="font-bold text-foreground">Editar gol e assistência</h3><p className="mt-0.5 text-[10px] text-muted">A partida, o Ranking e o Cartola serão recalculados.</p></div>
+              <button type="button" onClick={() => setGoalEdit(null)} className="text-muted hover:text-foreground" aria-label="Fechar edição"><X className="h-5 w-5" /></button>
             </div>
-            <div className="mobile-dialog-scroll min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4 pb-6 touch-pan-y" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
-              <button type="button" disabled={loading} onClick={() => handleCorrectAssist(null)} className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-left text-xs font-bold text-muted hover:border-accent/40 hover:text-foreground disabled:opacity-50">Sem assistência</button>
-              {assistEditPlayers.map((entry: any) => (
-                <GoalPickerPlayerOption
-                  key={entry.player_id}
-                  entry={entry}
-                  cosmetics={playerCosmetics}
-                  disabled={loading}
-                  onClick={() => handleCorrectAssist(entry.player_id)}
-                  icon={<Target className="h-5 w-5" strokeWidth={1.8} />}
-                />
-              ))}
+            <div className="mobile-dialog-scroll min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 pb-6 touch-pan-y" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
+              <label className="block text-xs font-bold text-muted">
+                Autor do gol
+                <select value={goalEdit.scorerId} onChange={(event) => setGoalEdit((current) => current ? { ...current, scorerId: event.target.value, assistId: current.assistId === event.target.value ? null : current.assistId } : current)} className="mt-1.5 w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm font-bold text-foreground">
+                  {goalEditPlayers.map((entry: any) => <option key={entry.player_id} value={entry.player_id}>{entry.player?.name}</option>)}
+                </select>
+              </label>
+              <label className="block text-xs font-bold text-muted">
+                Assistência
+                <select value={goalEdit.assistId || ""} onChange={(event) => setGoalEdit((current) => current ? { ...current, assistId: event.target.value || null } : current)} className="mt-1.5 w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm font-bold text-foreground">
+                  <option value="">Sem assistência</option>
+                  {goalEditPlayers.filter((entry: any) => entry.player_id !== goalEdit.scorerId).map((entry: any) => <option key={entry.player_id} value={entry.player_id}>{entry.player?.name}</option>)}
+                </select>
+              </label>
+              <button type="button" disabled={loading || (goalEdit.scorerId === goalEdit.event.player_id && goalEdit.assistId === (goalEdit.event.assist_player_id || null))} onClick={handleCorrectGoalEvent} className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-black text-background transition-colors hover:bg-accent/90 disabled:opacity-50">
+                Salvar correção
+              </button>
             </div>
           </div>
         </div>

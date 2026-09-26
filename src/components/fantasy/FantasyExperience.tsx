@@ -97,6 +97,7 @@ export function FantasyExperience({
   round,
   fantasySeasonId,
   status,
+  latestFinishedRoundPaid = false,
   settings,
   market,
   budget,
@@ -330,9 +331,15 @@ export function FantasyExperience({
   const betweenRounds = status === "between_rounds";
   const open = status === "open";
   const isMarketClosed = !open && (betweenRounds || status === "in_progress" || status === "finished");
-  // A rodada atualmente aberta preserva os rótulos V5. A nomenclatura nova
-  // aparece somente quando o snapshot da própria rodada for V7 ou superior.
-  const roleReframeActive = Number(settings.scoringVersion || 5) >= 7;
+  // Entre rodadas, o campo é o portfólio da próxima Ranked e deve apresentar
+  // as funções vigentes; uma rodada aberta continua obedecendo ao seu snapshot.
+  const guideScoringVersion = betweenRounds
+    ? Math.max(8, Number(settings.scoringVersion || 5))
+    : Number(settings.scoringVersion || 5);
+  const scoringGuideSettings = guideScoringVersion === settings.scoringVersion
+    ? settings
+    : { ...settings, scoringVersion: guideScoringVersion };
+  const roleReframeActive = guideScoringVersion >= 7;
   const defenseRoleLabel = roleReframeActive ? "Defensor / Volante · DEF/VOL" : "Defensor / DEF";
   const midfieldRoleLabel = roleReframeActive ? "Ala · ALA" : "Ala / Meio · ALA/MEI";
 
@@ -1502,7 +1509,7 @@ export function FantasyExperience({
                 }}
               />
 
-              {betweenRounds && (
+              {betweenRounds && latestFinishedRoundPaid && (
                 <div className="pointer-events-none absolute inset-0 z-20 bg-[#020b06]/40 backdrop-blur-[10px] backdrop-saturate-[.35]" />
               )}
 
@@ -2172,8 +2179,8 @@ export function FantasyExperience({
       )}
 
       {/* MODAL DE TUTORIAL & MODAL DE SISTEMA DE PONTUAÇÃO */}
-      {showTutorial && <FantasyTutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} scoringVersion={settings.scoringVersion} />}
-      {showScoringModal && <FantasyScoringModal isOpen={showScoringModal} onClose={() => setShowScoringModal(false)} settings={settings} />}
+      {showTutorial && <FantasyTutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} scoringVersion={guideScoringVersion} />}
+      {showScoringModal && <FantasyScoringModal isOpen={showScoringModal} onClose={() => setShowScoringModal(false)} settings={scoringGuideSettings} />}
 
       {mounted &&
         selectedRoundTeam &&
@@ -2217,7 +2224,7 @@ export function FantasyExperience({
         )}
 
       {/* MODAL DE ANÚNCIO DA REVOLUÇÃO TÁTICA (RODADA 02) */}
-      <FantasyTacticalAnnouncementModal scoringVersion={settings.scoringVersion} />
+      <FantasyTacticalAnnouncementModal scoringVersion={guideScoringVersion} />
 
       {/* POPUP BÁSICO DE AJUDA DO DESAFIO */}
       {mounted &&

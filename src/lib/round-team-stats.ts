@@ -15,21 +15,23 @@ export type RoundTeamStatsMatch = {
 
 export type RoundTeamStat = RoundTeamStatsTeam & {
   wins: number;
+  draws: number;
+  losses: number;
   goalsFor: number;
   goalsAgainst: number;
 };
 
 /**
  * Builds a round table directly from the scoreboard. Goals in a live match are
- * already useful in the summary, while a win is only awarded after the match
- * is finished so the table never treats a temporary lead as a result.
+ * already useful in the summary, while results are only awarded after the
+ * match is finished so the table never treats a temporary score as final.
  */
 export function getRoundTeamStats(
   teams: RoundTeamStatsTeam[],
   matches: RoundTeamStatsMatch[],
 ): RoundTeamStat[] {
   const statsByTeamId = new Map<string, RoundTeamStat>(
-    teams.map((team) => [team.id, { ...team, wins: 0, goalsFor: 0, goalsAgainst: 0 }]),
+    teams.map((team) => [team.id, { ...team, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 }]),
   );
 
   for (const match of matches) {
@@ -47,8 +49,16 @@ export function getRoundTeamStats(
     teamB.goalsAgainst += scoreA;
 
     if (match.status === "finished") {
-      if (scoreA > scoreB) teamA.wins += 1;
-      if (scoreB > scoreA) teamB.wins += 1;
+      if (scoreA > scoreB) {
+        teamA.wins += 1;
+        teamB.losses += 1;
+      } else if (scoreB > scoreA) {
+        teamB.wins += 1;
+        teamA.losses += 1;
+      } else {
+        teamA.draws += 1;
+        teamB.draws += 1;
+      }
     }
   }
 

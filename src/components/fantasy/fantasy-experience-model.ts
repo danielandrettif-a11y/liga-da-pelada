@@ -39,6 +39,7 @@ export type FantasyExperienceProps = {
   } | null;
   fantasySeasonId: string;
   status: string;
+  latestFinishedRoundPaid?: boolean;
   settings: FantasySettings;
   market: FantasyMarketPlayer[];
   budget: number;

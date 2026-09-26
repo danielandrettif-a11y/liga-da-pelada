@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findLatestReleasedPaymentRound, isPaymentChecklistComplete } from "./paymentStatus";
+import { areRoundParticipantsPaid, findLatestReleasedPaymentRound, isPaymentChecklistComplete } from "./paymentStatus";
 
 describe("isPaymentChecklistComplete", () => {
   it("mantem o Transfermarket aberto enquanto existe pagamento pendente", () => {
@@ -12,6 +12,17 @@ describe("isPaymentChecklistComplete", () => {
 
   it("nao considera uma lista vazia como concluida", () => {
     expect(isPaymentChecklistComplete([])).toBe(false);
+  });
+});
+
+describe("areRoundParticipantsPaid", () => {
+  it("exige confirmação de cada participante da rodada", () => {
+    const participants = [{ player_id: "a" }, { player_id: "b" }];
+    expect(areRoundParticipantsPaid(participants, [{ player_id: "a", paid: true }])).toBe(false);
+    expect(areRoundParticipantsPaid(participants, [
+      { player_id: "a", paid: true },
+      { player_id: "b", paid: true },
+    ])).toBe(true);
   });
 });
 

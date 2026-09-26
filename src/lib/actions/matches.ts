@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "../supabase";
 import type { CreateMatchInput, RegisterGoalInput, SubstituteMatchPlayerInput } from "../types";
 import { calculateRoundStats } from "./stats";
-import { getAdminClient } from "../auth";
+import { getAdminClient, getCurrentAccount } from "../auth";
 import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
 import { sendMatchFinishedNotifications, sendMatchTimerNotifications } from "../push-notifications";
 import { scheduleMatchTimerAlerts } from "../match-timer-scheduler";
@@ -596,6 +596,50 @@ export async function getMatch(matchId: string) {
   return { ...data, player_cosmetics };
 }
 
+export type MatchAdminAuditEntry = {
+  id: number;
+  action: string;
+  changedByName: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+};
+
+export async function getFinishedMatchAudit(matchId: string): Promise<MatchAdminAuditEntry[]> {
+  const account = await getCurrentAccount();
+  if (!account.isAdmin || !matchId) return [];
+
+  const { data: rows, error } = await (account.client as any)
+    .from("sports_admin_audit")
+    .select("id, action, changed_by, changed_by_name, payload, created_at")
+    .eq("match_id", matchId)
+    .in("action", ["goal_corrected", "goal_assist_corrected", "goal_event_corrected"])
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("Erro ao buscar auditoria da partida:", error);
+    return [];
+  }
+
+  const userIds = [...new Set((rows || []).map((row: any) => row.changed_by).filter(Boolean))] as string[];
+  const { data: profiles } = userIds.length
+    ? await account.client
+        .from("account_profiles")
+        .select("user_id, player:players!account_profiles_player_id_fkey(name)")
+        .in("user_id", userIds)
+    : { data: [] };
+  const nameByUserId = new Map((profiles || []).map((profile: any) => {
+    const player = Array.isArray(profile.player) ? profile.player[0] : profile.player;
+    return [profile.user_id, player?.name || "Administrador"];
+  }));
+
+  return (rows || []).map((row: any) => ({
+    id: Number(row.id),
+    action: row.action,
+    changedByName: String(row.changed_by_name || nameByUserId.get(row.changed_by) || "Administrador"),
+    payload: row.payload || {},
+    createdAt: row.created_at,
+  }));
+}
+
 export async function registerGoal(input: RegisterGoalInput) {
   try {
     const client = await getAdminClient();
@@ -832,12 +876,14 @@ export async function correctFinishedGoal(eventId: string) {
   }
 }
 
-export async function correctFinishedGoalAssist(eventId: string, assistPlayerId: string | null) {
+export async function correctFinishedGoalEvent(eventId: string, playerId: string, assistPlayerId: string | null) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
-    const { data, error } = await client.rpc("correct_finished_goal_assist", {
+    if (!eventId || !playerId) return { success: false, error: "Escolha o autor do gol." };
+    const { data, error } = await (client as any).rpc("correct_finished_goal_event", {
       p_event_id: eventId,
+      p_player_id: playerId,
       p_assist_player_id: assistPlayerId,
     });
     if (error) throw new Error(error.message);
@@ -850,7 +896,7 @@ export async function correctFinishedGoalAssist(eventId: string, assistPlayerId:
     const { data: fantasyRound } = await client.from("fantasy_rounds").select("id").eq("round_id", result.round_id).maybeSingle();
     if (fantasyRound) {
       const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: result.round_id });
-      if (fantasyError) throw new Error(`Assistência corrigida, mas o Cartola precisa ser reprocessado: ${fantasyError.message}`);
+      if (fantasyError) throw new Error(`Gol corrigido, mas o Cartola precisa ser reprocessado: ${fantasyError.message}`);
     }
 
     revalidatePath(`/partidas/${result.match_id}`);
@@ -859,7 +905,7 @@ export async function correctFinishedGoalAssist(eventId: string, assistPlayerId:
     revalidatePath("/cartola", "layout");
     return { success: true };
   } catch (err: any) {
-    console.error("Erro ao corrigir assistência em gol finalizado:", err);
+    console.error("Erro ao corrigir gol finalizado:", err);
     return { success: false, error: err.message };
   }
 }

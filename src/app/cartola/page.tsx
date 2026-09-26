@@ -19,6 +19,7 @@ export default async function CartolaPage({ searchParams }: PageProps<"/cartola"
       round={data.round}
       fantasySeasonId={data.fantasySeasonId}
       status={data.fantasyRound.status}
+      latestFinishedRoundPaid={data.latestFinishedRoundPaid}
       settings={data.settings}
       playersPerTeam={data.playersPerTeam}
       market={data.market}

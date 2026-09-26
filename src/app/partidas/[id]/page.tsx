@@ -1,4 +1,4 @@
-import { getMatch } from "@/lib/actions/matches";
+import { getFinishedMatchAudit, getMatch } from "@/lib/actions/matches";
 import { getLeagueConfig } from "@/lib/actions/league";
 import { notFound } from "next/navigation";
 import { MatchLiveBoard } from "@/components/MatchLiveBoard";
@@ -12,10 +12,11 @@ export default async function PartidaAoVivoPage({
   params: { id: string };
 }) {
   const { id } = await params;
-  const [match, league, account] = await Promise.all([
+  const [match, league, account, auditLog] = await Promise.all([
     getMatch(id),
     getLeagueConfig(),
     getCurrentAccount(),
+    getFinishedMatchAudit(id),
   ]);
 
   if (!match) {
@@ -25,6 +26,6 @@ export default async function PartidaAoVivoPage({
   const duration = league?.match_duration || 7;
 
   return (
-    <MatchLiveBoard match={match} matchDuration={duration} canManage={account.isAdmin} />
+    <MatchLiveBoard match={match} matchDuration={duration} canManage={account.isAdmin} auditLog={auditLog} />
   );
 }
