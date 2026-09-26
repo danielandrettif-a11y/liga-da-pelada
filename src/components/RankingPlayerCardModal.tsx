@@ -517,7 +517,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
                     <p><strong className="text-foreground">GOL:</strong> desempenho defensivo nas partidas em que atuou no gol.</p>
                   </div>
 
-                  <p>A defesa compara gols sofridos por tempo jogado com a média da liga, além do tempo até sofrer o primeiro gol, participação e gols contra. A confiança cresce com minutos e rodadas observadas. As características escolhidas pelo ADM só aceleram a evolução: +30% em uma; +19,5%/+10,5% em duas; ou +10% em cada uma quando são três.</p>
+                  <p>A defesa compara gols sofridos por tempo jogado com a média da liga, além do tempo até sofrer o primeiro gol, participação e gols contra. As características escolhidas pelo ADM controlam a evidência e a velocidade de evolução: 100% para a principal, 60% para a secundária e 20% para posições não marcadas. A posição do Cartola não interfere no OVR.</p>
                 </>
               ) : (
                 <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-warning">

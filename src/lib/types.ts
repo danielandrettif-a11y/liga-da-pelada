@@ -82,6 +82,8 @@ export type Player = {
   is_goalkeeper: boolean;
   member_category: MemberCategory;
   is_selectable: boolean;
+  /** Gerado pelo banco a partir de nome, foto, posição e estilos aprovados pelo ADM. */
+  is_competitive_profile_complete?: boolean;
   show_fitness_stats: boolean;
   registration_source: RegistrationSource;
   created_by_user_id: string | null;

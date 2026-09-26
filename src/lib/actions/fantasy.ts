@@ -13,6 +13,7 @@ import {
 } from "@/lib/fantasy/config";
 import { type FantasyMarketHealth } from "@/lib/fantasy/market-v11";
 import { parseFantasyMarketReadModel } from "@/lib/fantasy/market-read-model";
+import { isCompetitiveProfileComplete } from "@/lib/player-eligibility";
 import {
   calculateCostBenefit,
   calculateExpectedFantasyPoints,
@@ -524,7 +525,7 @@ export async function getFantasyDashboard() {
       ? Promise.resolve({ data: marketReadModel.players || [] })
       : account.client
           .from("players")
-          .select("id, name, avatar_url, player_profile, member_category, is_selectable")
+          .select("id, name, avatar_url, player_profile, overall_traits, member_category, is_selectable, is_competitive_profile_complete")
           .eq("is_selectable", true)
           .eq("member_category", "player"),
     marketReadModel
@@ -571,7 +572,7 @@ export async function getFantasyDashboard() {
   const { data: additionalPlayers } = additionalPlayerIds.length
     ? await account.client
         .from("players")
-        .select("id, name, avatar_url, player_profile, member_category, is_selectable")
+        .select("id, name, avatar_url, player_profile, overall_traits, member_category, is_selectable, is_competitive_profile_complete")
         .in("id", additionalPlayerIds)
     : { data: [] as any[] };
   const allPlayersById = new Map([
@@ -785,7 +786,7 @@ export async function getFantasyDashboard() {
   });
 
   const market: FantasyMarketPlayer[] = (players || [])
-    .filter((player: any) => player.member_category === "player" && player.is_selectable)
+    .filter((player: any) => isCompetitiveProfileComplete(player))
     .map((player: any) => {
       const priceRow = priceByPlayer.get(player.id) as any;
       const stats = statsByPlayer.get(player.id) || {

@@ -56,6 +56,13 @@ export type OverallFormulaConfig = {
   traitsAsProgressionBonus: boolean;
   /** Orçamento total de aceleração distribuído sem favorecer quem tem mais tags. */
   traitProgressionBonusBudget: number;
+  /** V13: a ordem definida pelo ADM controla a evidência e a evolução de cada posição. */
+  prioritizedTraitProgression: boolean;
+  traitProgressionWeights: {
+    primary: number;
+    secondary: number;
+    unselected: number;
+  };
   /** V12: usa as três maiores posições elegíveis no OVR geral. */
   topThreeOverall: boolean;
   /** Bônus suave de variação proporcional à distância do alvo, sem degrau rígido. */
@@ -121,6 +128,8 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   rankedTraitOverall: false,
   traitsAsProgressionBonus: false,
   traitProgressionBonusBudget: 0.30,
+  prioritizedTraitProgression: false,
+  traitProgressionWeights: { primary: 1, secondary: 0.6, unselected: 0.2 },
   topThreeOverall: false,
   performanceChangeBonus: 0,
   hardPositionCapsEnabled: true,
@@ -155,6 +164,9 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     : {};
   const unassignedRoleEvidence = candidate.unassignedRoleEvidence && typeof candidate.unassignedRoleEvidence === "object"
     ? candidate.unassignedRoleEvidence as Record<string, unknown>
+    : {};
+  const traitProgressionWeights = candidate.traitProgressionWeights && typeof candidate.traitProgressionWeights === "object"
+    ? candidate.traitProgressionWeights as Record<string, unknown>
     : {};
   const weight = (key: keyof OverallFormulaConfig["defensiveWeights"]) => {
     const parsed = Number(defensiveWeights[key]);
@@ -279,6 +291,14 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
       ? candidate.traitsAsProgressionBonus
       : DEFAULT_OVERALL_FORMULA.traitsAsProgressionBonus,
     traitProgressionBonusBudget: clamp(bounded(candidate.traitProgressionBonusBudget, DEFAULT_OVERALL_FORMULA.traitProgressionBonusBudget), 0, 0.5),
+    prioritizedTraitProgression: typeof candidate.prioritizedTraitProgression === "boolean"
+      ? candidate.prioritizedTraitProgression
+      : DEFAULT_OVERALL_FORMULA.prioritizedTraitProgression,
+    traitProgressionWeights: {
+      primary: clamp(bounded(traitProgressionWeights.primary, DEFAULT_OVERALL_FORMULA.traitProgressionWeights.primary), 0, 1),
+      secondary: clamp(bounded(traitProgressionWeights.secondary, DEFAULT_OVERALL_FORMULA.traitProgressionWeights.secondary), 0, 1),
+      unselected: clamp(bounded(traitProgressionWeights.unselected, DEFAULT_OVERALL_FORMULA.traitProgressionWeights.unselected), 0, 1),
+    },
     topThreeOverall: typeof candidate.topThreeOverall === "boolean"
       ? candidate.topThreeOverall
       : DEFAULT_OVERALL_FORMULA.topThreeOverall,
@@ -455,6 +475,20 @@ function roleEvidenceWeight(
 
 function traitEvidenceWeight(player: OverallPlayer, role: OverallRole, config: OverallFormulaConfig) {
   if (role === "GOL") return 1;
+  if (config.prioritizedTraitProgression) {
+    const traits = [...new Set((player.overallTraits || []).filter((trait): trait is PlayerProfile => (
+      trait === "defensive" || trait === "midfield" || trait === "offensive"
+    )))].slice(0, 2);
+    const traitForRole: Record<LineRole, PlayerProfile> = {
+      DEF: "defensive",
+      ALA_MEI: "midfield",
+      ATA: "offensive",
+    };
+    const index = traits.indexOf(traitForRole[role as LineRole]);
+    if (index === 0) return config.traitProgressionWeights.primary;
+    if (index === 1) return config.traitProgressionWeights.secondary;
+    return config.traitProgressionWeights.unselected;
+  }
   if (config.traitsAsProgressionBonus) return 1;
   const traits = [...new Set((player.overallTraits || []).filter((trait): trait is PlayerProfile => (
     trait === "defensive" || trait === "midfield" || trait === "offensive"
@@ -469,6 +503,7 @@ function traitEvidenceWeight(player: OverallPlayer, role: OverallRole, config: O
 }
 
 function traitProgressionMultiplier(player: OverallPlayer, role: OverallRole, config: OverallFormulaConfig) {
+  if (config.prioritizedTraitProgression) return traitEvidenceWeight(player, role, config);
   if (!config.traitsAsProgressionBonus || role === "GOL") return 1;
   const traits = [...new Set((player.overallTraits || []).filter((trait): trait is PlayerProfile => (
     trait === "defensive" || trait === "midfield" || trait === "offensive"

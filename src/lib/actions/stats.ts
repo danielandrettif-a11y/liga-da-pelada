@@ -8,9 +8,10 @@ import { buildRankedPointBreakdown, calculateRankedPoints } from "../ranked-scor
 import { buildAwardSeasonsByPlayer, countAwards } from "../awards";
 import type { SeasonStatus } from "../types";
 import type { Player } from "../types";
-import type { RankingEntry, RankingExperienceData } from "../ranking";
+import { rankingActivePlayerIds, type RankingEntry, type RankingExperienceData } from "../ranking";
 import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
 import { normalizeBQScoringSnapshot } from "../bq-scoring";
+import { isCompetitiveProfileComplete } from "../player-eligibility";
 
 type RankingStatsRow = {
   player_id: string;
@@ -678,16 +679,22 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     player: Array.isArray(row.player) ? row.player[0] || null : row.player,
   })) as RankingStatsRow[];
   const currentRoundIds = new Set(currentRounds.map((round) => round.id));
-  // Convidados continuam com histórico e scouts nas partidas, mas o ranking
-  // competitivo só começa quando o perfil é oficial. A união de perfis move os
-  // scouts antigos para o perfil oficial e o recálculo passa a incluí-los.
-  const currentStats = stats.filter(
-    (row) => currentRoundIds.has(row.round_id) && row.player?.is_selectable && row.player.member_category === "player",
+  // O histórico permanece intacto. A classificação pública exige cadastro
+  // competitivo completo e ao menos uma atuação nas três peladas mais recentes.
+  const eligibleCurrentStats = stats.filter(
+    (row) => currentRoundIds.has(row.round_id) && isCompetitiveProfileComplete(row.player),
   );
   const latestRound = currentRounds[0];
   const roundsMap = new Map((rounds || []).map((round) => [round.id, { id: round.id, number: round.number, date: round.date }]));
+  const activePlayerIds = rankingActivePlayerIds(currentRounds.slice(0, 3).map((round) => round.id), eligibleCurrentStats);
+  const previousActivePlayerIds = rankingActivePlayerIds(currentRounds.slice(1, 4).map((round) => round.id), eligibleCurrentStats);
+  const currentStats = eligibleCurrentStats.filter((row) => activePlayerIds.has(row.player_id));
   const generalBase = aggregateRankingRows(currentStats, roundsMap, 6);
-  const previousBase = aggregateRankingRows(currentStats.filter((row) => row.round_id !== latestRound.id), roundsMap, 6);
+  const previousBase = aggregateRankingRows(
+    eligibleCurrentStats.filter((row) => row.round_id !== latestRound.id && previousActivePlayerIds.has(row.player_id)),
+    roundsMap,
+    6,
+  );
   const latestBase = aggregateRankingRows(currentStats.filter((row) => row.round_id === latestRound.id), roundsMap, 6);
   // A lista vem ordenada por data decrescente. Portanto, o primeiro mês é o
   // mês atual quando há jogo nele ou, caso contrário, o último mês com dados.

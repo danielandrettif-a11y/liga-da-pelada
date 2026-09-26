@@ -429,6 +429,22 @@ export function PlayerForm({
         </div>
       )}
 
+      {mode === "self" && (
+        <div className="rounded-2xl border border-accent/25 bg-accent/5 p-4">
+          <p className="text-xs font-black uppercase tracking-wider text-accent">Cadastro competitivo</p>
+          <p className="mt-1 text-[11px] leading-4 text-muted">Para aparecer no Cartola e no ranking, complete seus dados e aguarde o ADM definir seu estilo de jogo.</p>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] font-bold">
+            <span className={player?.name?.trim() ? "text-success" : "text-warning"}>{player?.name?.trim() ? "✓" : "○"} Nome</span>
+            <span className={player?.avatar_url ? "text-success" : "text-warning"}>{player?.avatar_url ? "✓" : "○"} Foto</span>
+            <span className={player?.player_profile ? "text-success" : "text-warning"}>{player?.player_profile ? "✓" : "○"} Posição</span>
+            <span className={overallTraits.length >= 1 && overallTraits.length <= 2 ? "text-success" : "text-warning"}>
+              {overallTraits.length >= 1 && overallTraits.length <= 2 ? "✓" : "○"} Estilo pelo ADM
+            </span>
+          </div>
+          {overallTraits.length > 2 && <p className="mt-3 text-[10px] font-bold text-warning">O ADM precisa revisar suas três características antigas e escolher uma principal e, opcionalmente, uma secundária.</p>}
+        </div>
+      )}
+
       {(memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2">
         <legend className="text-xs font-bold text-muted uppercase tracking-wider">
           Perfil de jogo
@@ -462,7 +478,7 @@ export function PlayerForm({
 
       {mode === "admin" && (memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2 rounded-2xl border border-accent/25 bg-accent/5 p-4">
         <legend className="px-1 text-xs font-bold uppercase tracking-wider text-accent">Características de jogo do OVR</legend>
-        <p className="text-[11px] leading-4 text-muted">As características não escolhem mais o OVR geral. Elas distribuem um bônus total de 30% na velocidade de evolução: uma recebe +30%; duas recebem +19,5% e +10,5%; três recebem +10% cada. Todas as posições continuam evoluindo normalmente.</p>
+        <p className="text-[11px] leading-4 text-muted">Escolha no máximo duas. A principal recebe 100% da evolução daquela posição, a secundária 60% e posições não marcadas 20%. A posição do Cartola não interfere no OVR.</p>
         <div className="grid gap-2 pt-1">
           {PLAYER_PROFILE_OPTIONS.map((option) => {
             const trait = option.value as PlayerProfile;
@@ -474,12 +490,15 @@ export function PlayerForm({
                   name="overall_traits"
                   value={option.value}
                   checked={selected}
+                  disabled={!selected && overallTraits.length >= 2}
                   onChange={() => setOverallTraits((current) => {
-                    const next = current.includes(trait) ? current.filter((item) => item !== trait) : [...current, trait];
+                    const next = current.includes(trait)
+                      ? current.filter((item) => item !== trait)
+                      : current.length < 2 ? [...current, trait] : current;
                     if (!next.includes(primaryOverallTrait as PlayerProfile)) setPrimaryOverallTrait(next[0] || null);
                     return next;
                   })}
-                  className="h-4 w-4 rounded"
+                  className="h-4 w-4 rounded disabled:opacity-40"
                 />
                 <span className="text-sm font-bold text-foreground">{option.label}</span>
               </label>
@@ -498,7 +517,7 @@ export function PlayerForm({
                 </label>;
               })}
             </div>
-            <p className="mt-2 text-[10px] text-muted">A principal recebe +19,5% e a secundária +10,5%.</p>
+            <p className="mt-2 text-[10px] text-muted">A principal evolui a 100%; a secundária, a 60%.</p>
           </div>
         )}
         {memberCategory === "guest" && <p className="text-[10px] leading-4 text-warning">Convidado pode ser avaliado agora, mas só ganha OVR quando for convertido em jogador oficial.</p>}

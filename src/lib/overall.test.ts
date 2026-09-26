@@ -526,6 +526,52 @@ describe("motor adaptativo de OVR", () => {
     expect(snapshots.get("single")!.positions.DEF.value).toBe(snapshots.get("none")!.positions.DEF.value);
   });
 
+  it("usa a prioridade do ADM para limitar a evolução de cada posição na v13", () => {
+    const formula = parseOverallFormulaConfig({
+      ...balancedCharacteristicsFormula,
+      traitsAsProgressionBonus: false,
+      prioritizedTraitProgression: true,
+      traitProgressionWeights: { primary: 1, secondary: 0.6, unselected: 0.2 },
+      topThreeOverall: true,
+    });
+    const variants: OverallPlayer[] = [
+      { id: "def-primary", playerProfile: "offensive", overallTraits: ["defensive"], overallSeedMode: "observed" },
+      { id: "def-secondary", playerProfile: "offensive", overallTraits: ["offensive", "defensive"], overallSeedMode: "observed" },
+      { id: "def-unselected", playerProfile: "defensive", overallTraits: ["offensive"], overallSeedMode: "observed" },
+    ];
+    const inputs = Array.from({ length: 3 }, (_, index) => round(index + 1, variants.map((player) => appearance(player.id, {
+      matchId: `v13-${index}-${player.id}`,
+      playerProfileLocked: player.id === "def-unselected" ? "defensive" : "offensive",
+      goalsConceded: 0,
+      teamGoalsConceded: 0,
+      result: "win",
+    }))));
+    const snapshots = new Map(calculatePlayerOveralls(variants, inputs, formula).snapshots.map((item) => [item.playerId, item]));
+    const primaryGain = snapshots.get("def-primary")!.positions.DEF.value - formula.base;
+    const secondaryGain = snapshots.get("def-secondary")!.positions.DEF.value - formula.base;
+    const unselectedGain = snapshots.get("def-unselected")!.positions.DEF.value - formula.base;
+
+    expect(primaryGain).toBeGreaterThan(secondaryGain);
+    expect(secondaryGain).toBeGreaterThan(unselectedGain);
+    expect(unselectedGain).toBeLessThanOrEqual(primaryGain * 0.25);
+  });
+
+  it("não usa a posição operacional do Cartola na progressão priorizada", () => {
+    const formula = parseOverallFormulaConfig({
+      ...balancedCharacteristicsFormula,
+      traitsAsProgressionBonus: false,
+      prioritizedTraitProgression: true,
+      traitProgressionWeights: { primary: 1, secondary: 0.6, unselected: 0.2 },
+      topThreeOverall: true,
+    });
+    const player: OverallPlayer = { id: "style-only", playerProfile: "offensive", overallTraits: ["offensive"], overallSeedMode: "observed" };
+    const offensiveRole = calculatePlayerOveralls([player], [round(1, [appearance(player.id, { playerProfileLocked: "offensive", goals: 2 })])], formula).snapshots[0];
+    const defensiveRole = calculatePlayerOveralls([player], [round(1, [appearance(player.id, { playerProfileLocked: "defensive", goals: 2 })])], formula).snapshots[0];
+
+    expect(defensiveRole.positions).toEqual(offensiveRole.positions);
+    expect(defensiveRole.overall).toBe(offensiveRole.overall);
+  });
+
   it("conta partidas distintas no gol para liberar a elegibilidade no oitavo jogo", () => {
     const keeper: OverallPlayer = { id: "keeper-v12", playerProfile: "midfield", overallTraits: [], overallSeedMode: "observed" };
     const formula = parseOverallFormulaConfig({ ...balancedCharacteristicsFormula, traitsAsProgressionBonus: true, topThreeOverall: true, goalkeeperEligibilityGames: 8 });

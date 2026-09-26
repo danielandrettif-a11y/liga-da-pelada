@@ -76,3 +76,13 @@ export type RankingExperienceData = {
 
 export type RankingFilter = "general" | "goals" | "assists" | "wins" | "winRate" | "awards" | "overall" | "overallDef" | "overallAlaMei" | "overallAta" | "overallGol";
 export type RankingView = "season" | "month" | "latest";
+
+export function rankingActivePlayerIds(
+  recentRoundIds: string[],
+  rows: Array<{ round_id: string; player_id: string; games: number }>,
+) {
+  const recent = new Set(recentRoundIds.slice(0, 3));
+  return new Set(rows.flatMap((row) => (
+    recent.has(row.round_id) && Number(row.games || 0) > 0 ? [row.player_id] : []
+  )));
+}

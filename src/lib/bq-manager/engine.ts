@@ -32,7 +32,7 @@ export function cardPositions(card: ManagerCard): Ratings {
 }
 
 export function composedOverall(source: AthleteSource, positions: Ratings): number {
-  if (source.formula === "adaptive-v12-top-three-progression") {
+  if (source.formula === "adaptive-v12-top-three-progression" || source.formula === "adaptive-v13-admin-style-evidence") {
     const composition = getOverallComposition(source.traits, positions, { goalkeeperGames: source.goalkeeperEligible ? 8 : 0 });
     assert(composition, "Esta carta ainda não tem posições válidas para calcular o OVR.");
     return round(composition.value);

@@ -23,7 +23,7 @@ const ROLE_LABELS = { DEF: "DEF/VOL", ALA_MEI: "ALA", ATA: "ATA", GOL: "GOL" } a
 const RANKED_WEIGHTS = [0.5, 0.35, 0.15] as const;
 
 /**
- * Reproduz a composição final do OVR geral da fórmula v12.
+ * Reproduz a composição final do OVR geral das fórmulas v12 e v13.
  * Usa as três maiores posições; GOL só entra após oito jogos reais no gol.
  */
 export function getOverallComposition(
