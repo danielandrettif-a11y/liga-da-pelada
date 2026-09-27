@@ -6,6 +6,7 @@ import {
   registerGoal,
   finishMatch,
   deleteEvent,
+  addFinishedGoalEvent,
   correctFinishedGoal,
   correctFinishedGoalEvent,
   type MatchAdminAuditEntry,
@@ -529,9 +530,9 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
   // Jogadores ativos para o modal
   const activePlayers = useMemo(() => {
     return (match.match_players || []).filter(
-      (entry: any) => entry.team_id === goalModal.teamId && entry.is_active
+      (entry: any) => entry.team_id === goalModal.teamId && (isFinished || entry.is_active)
     );
-  }, [match.match_players, goalModal.teamId]);
+  }, [match.match_players, goalModal.teamId, isFinished]);
 
   const otherPlayers = useMemo(() => {
     return activePlayers.filter((entry: any) => entry.player_id !== goalModal.scorerId);
@@ -588,6 +589,22 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
     const request = requestOverride || { ...goalModal };
     if (!canManage || submittingGoalRef.current || !request.scorerId) return;
     submittingGoalRef.current = true;
+
+    if (isFinished) {
+      setLoading(true);
+      setError("");
+      const result = await addFinishedGoalEvent(match.id, request.teamId, request.scorerId, assistPlayerId);
+      if (!result.success) {
+        setError(result.error || "Não foi possível adicionar o gol.");
+      } else {
+        setGoalModal({ open: false, teamId: "", scorerId: null, isOwnGoal: false });
+        if (result.warning) setError(`Gol adicionado. ${result.warning}`);
+        router.refresh();
+      }
+      setLoading(false);
+      submittingGoalRef.current = false;
+      return;
+    }
 
     const previousScore = displayScore;
     const previousEvents = events;
@@ -807,10 +824,11 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
             </span>
             <span className="stat-number text-5xl text-foreground">{displayScore.a}</span>
 
-            {!isFinished && canManage && (
+            {canManage && (
               <button
                 onClick={() => setGoalModal({ open: true, teamId: match.team_a_id, scorerId: null, isOwnGoal: false })}
                 disabled={loading}
+                title={isFinished ? "Adicionar gol à partida finalizada" : "Registrar gol"}
                 className="mt-2 w-12 h-12 rounded-full bg-surface hover:bg-surface-hover flex items-center justify-center text-foreground border border-border transition-transform active:scale-95 disabled:opacity-50"
                 aria-label={`Registrar gol para ${match.team_a.name}`}
               >
@@ -834,10 +852,11 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
             </span>
             <span className="stat-number text-5xl text-foreground">{displayScore.b}</span>
 
-            {!isFinished && canManage && (
+            {canManage && (
               <button
                 onClick={() => setGoalModal({ open: true, teamId: match.team_b_id, scorerId: null, isOwnGoal: false })}
                 disabled={loading}
+                title={isFinished ? "Adicionar gol à partida finalizada" : "Registrar gol"}
                 className="mt-2 w-12 h-12 rounded-full bg-surface hover:bg-surface-hover flex items-center justify-center text-foreground border border-border transition-transform active:scale-95 disabled:opacity-50"
                 aria-label={`Registrar gol para ${match.team_b.name}`}
               >
@@ -973,24 +992,28 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
       </section>
 
       {isFinished && canManage && (
-        <section className="animate-fade-in-up rounded-2xl border border-border bg-surface/70 p-4">
-          <h2 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted">
-            <History className="h-4 w-4" /> Histórico de correções
-          </h2>
-          {auditLog.length === 0 ? (
-            <p className="mt-3 text-xs text-muted">Nenhuma correção registrada nesta partida.</p>
-          ) : (
-            <div className="mt-3 space-y-2">
+        <details className="animate-fade-in-up overflow-hidden rounded-2xl border border-border bg-surface/70">
+          <summary className="flex cursor-pointer list-none items-center justify-between p-4 text-xs font-bold uppercase tracking-wider text-muted">
+            <span className="flex items-center gap-1.5"><History className="h-4 w-4" /> Histórico de correções</span>
+            <span className="rounded-full bg-background/60 px-2 py-1 text-[9px]">Ver ({auditLog.length})</span>
+          </summary>
+          <div className="border-t border-border p-4 pt-3">
+            {auditLog.length === 0 ? (
+              <p className="text-xs text-muted">Nenhuma correção registrada nesta partida.</p>
+            ) : (
+              <div className="space-y-2">
               {auditLog.map((entry) => {
                 const payload = entry.payload as Record<string, any>;
                 const playerName = (id: unknown, empty = "sem assistência") => id
                   ? playerNameById.get(String(id)) || "Jogador"
                   : empty;
-                const description = entry.action === "goal_corrected"
-                  ? `Gol de ${playerName(payload.player_id)} removido`
-                  : entry.action === "goal_assist_corrected"
-                    ? `Gol de ${playerName(payload.player_id)} · Assistência: ${playerName(payload.previous_assist_player_id)} → ${playerName(payload.assist_player_id)}`
-                    : `Gol: ${playerName(payload.previous_player_id)} → ${playerName(payload.player_id)} · Assistência: ${playerName(payload.previous_assist_player_id)} → ${playerName(payload.assist_player_id)}`;
+                const description = entry.action === "goal_event_added"
+                  ? `Gol adicionado: ${playerName(payload.player_id)} · Assistência: ${playerName(payload.assist_player_id)}`
+                  : entry.action === "goal_corrected"
+                    ? `Gol de ${playerName(payload.player_id)} removido`
+                    : entry.action === "goal_assist_corrected"
+                      ? `Gol de ${playerName(payload.player_id)} · Assistência: ${playerName(payload.previous_assist_player_id)} → ${playerName(payload.assist_player_id)}`
+                      : `Gol: ${playerName(payload.previous_player_id)} → ${playerName(payload.player_id)} · Assistência: ${playerName(payload.previous_assist_player_id)} → ${playerName(payload.assist_player_id)}`;
                 return (
                   <div key={entry.id} className="rounded-xl bg-background/40 px-3 py-2.5">
                     <p className="text-xs font-bold text-foreground">{description}</p>
@@ -1000,9 +1023,10 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
                   </div>
                 );
               })}
-            </div>
-          )}
-        </section>
+              </div>
+            )}
+          </div>
+        </details>
       )}
 
       {/* Substituições */}
@@ -1096,12 +1120,12 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
               ) : !goalModal.scorerId ? (
                 // SELECIONAR ARTILHEIRO
                 <>
-                  <button
+                  {!isFinished && <button
                     onClick={() => setGoalModal((current) => ({ ...current, isOwnGoal: true }))}
                     className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-black text-danger transition-colors hover:bg-danger hover:text-background"
                   >
                     <Football className="h-5 w-5" /> Gol contra
-                  </button>
+                  </button>}
                   {activePlayers.map((tp: any) => (
                     <GoalPickerPlayerOption
                       key={tp.player_id}
