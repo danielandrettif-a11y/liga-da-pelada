@@ -75,12 +75,15 @@ export function BottomNav({
   const visibleItems = isAuthenticated
     ? contextualItems
     : contextualItems.filter((item) => item.href !== "/mais");
+  const gridTemplateColumns = visibleItems.some((item) => item.label === "Transfermarket")
+    ? visibleItems.map((item) => `minmax(0, ${item.label === "Transfermarket" ? "1.35" : ".93"}fr)`).join(" ")
+    : `repeat(${visibleItems.length}, minmax(0, 1fr))`;
 
   return (
     <nav className="app-bottom-nav fixed inset-x-0 bottom-0 z-[100] border-t border-border bg-background pb-[env(safe-area-inset-bottom)]">
       <div
         className="mx-auto grid h-16 w-full max-w-lg items-stretch px-1"
-        style={{ gridTemplateColumns: `repeat(${visibleItems.length}, minmax(0, 1fr))` }}
+        style={{ gridTemplateColumns }}
       >
         {visibleItems.map((item) => {
           const itemPath = item.href.split("?")[0];
