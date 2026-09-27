@@ -3,6 +3,7 @@
 import { getCurrentAccount } from "../auth";
 import { drawTeamsAdaptive, type AdaptiveTeamSummary } from "../adaptive-draw";
 import type { PlayerProfile } from "../types";
+import { getPrivateBalanceTagsForDraw } from "../private-balance-tags";
 
 export type ServerAdaptiveDrawResult = {
   success: boolean;
@@ -63,12 +64,14 @@ export async function drawTeamsAdaptiveOnServer(input: {
     return { success: false, error: "A lista contém uma pessoa que não está elegível nesta liga." };
   }
 
-  const [{ data: attributes, error: attributesError }, { data: overalls, error: overallsError }] = await Promise.all([
-    account.client.from("player_admin_attributes").select("player_id, speed_rating").in("player_id", playerIds),
-    account.client.rpc("get_latest_player_card_overalls"),
-  ]);
-  if (attributesError) return { success: false, error: attributesError.message };
-  if (overallsError) return { success: false, error: `Não foi possível ler os OVRs: ${overallsError.message}` };
+  try {
+    const [{ data: attributes, error: attributesError }, { data: overalls, error: overallsError }, balanceTags] = await Promise.all([
+      account.client.from("player_admin_attributes").select("player_id, speed_rating").in("player_id", playerIds),
+      account.client.rpc("get_latest_player_card_overalls"),
+      getPrivateBalanceTagsForDraw(playerIds),
+    ]);
+    if (attributesError) return { success: false, error: attributesError.message };
+    if (overallsError) return { success: false, error: `Não foi possível ler os OVRs: ${overallsError.message}` };
 
   const speedByPlayer = new Map<string, 1 | 2 | 3 | null>((attributes || []).map((row: any) => [
     row.player_id,
@@ -83,9 +86,9 @@ export async function drawTeamsAdaptiveOnServer(input: {
     overall: overallByPlayer.get(id) ?? null,
     speedRating: speedByPlayer.get(id) ?? null,
     playerProfile: profileByPlayer.get(id) ?? null,
+    balanceTag: balanceTags.get(id) ?? null,
   }));
 
-  try {
     const requestedOrder = [...new Set(input.attendanceOrder || [])].filter((id) => eligibleIds.has(id));
     if (requestedOrder.length) {
       const minimumPresent = Math.min(playerIds.length, playersPerTeam * 2);

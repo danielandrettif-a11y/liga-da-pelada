@@ -43,4 +43,32 @@ describe("sorteio adaptativo", () => {
     expect(result.missingSpeedCount).toBe(2);
     expect(result.teams.flat()).toHaveLength(4);
   });
+
+  it("separa Bagres e Craques e compensa os níveis no equilíbrio completo", () => {
+    const taggedPlayers: AdaptiveDrawPlayer[] = Array.from({ length: 18 }, (_, index) => ({
+      id: `tag-${index}`,
+      overall: 68 + (index % 7),
+      speedRating: ((index % 3) + 1) as 1 | 2 | 3,
+      playerProfile: (["defensive", "midfield", "offensive"] as const)[index % 3],
+      balanceTag: index < 3
+        ? (["craque_2", "craque_1", "craque_1"] as const)[index]
+        : index < 6
+          ? (["bagre_2", "bagre_1", "bagre_1"] as const)[index - 3]
+          : null,
+    }));
+    const result = drawTeamsAdaptive({
+      players: taggedPlayers,
+      teamCount: 3,
+      playersPerTeam: 6,
+      random: seededRandom(19),
+      iterations: 500,
+    });
+    const byId = new Map(taggedPlayers.map((player) => [player.id, player]));
+
+    for (const team of result.teams) {
+      const tags = team.map((id) => byId.get(id)?.balanceTag).filter(Boolean);
+      expect(tags.filter((tag) => tag?.startsWith("craque_")).length).toBeLessThanOrEqual(1);
+      expect(tags.filter((tag) => tag?.startsWith("bagre_")).length).toBeLessThanOrEqual(1);
+    }
+  });
 });

@@ -20,6 +20,7 @@ import { scheduleCartolaRoundReminders } from "../cartola-reminder-scheduler";
 import { validateUnderfilledTeamSizes } from "../underfilled-rounds";
 import { getLatestPlayerCardOverallMap } from "./stats";
 import { previewRoundReshuffle, type RoundReshuffleMode } from "../round-reshuffle";
+import { getPrivateBalanceTagsForDraw } from "../private-balance-tags";
 
 const getActiveLeagueCached = unstable_cache(async () => {
   const { data, error } = await supabase
@@ -413,9 +414,10 @@ export async function previewRoundTeamShuffle(roundId: string, mode: RoundReshuf
       return { success: false, error: "São necessários pelo menos dois times completos para criar uma nova formação." };
     }
 
-    const [{ data: attributes, error: attributesError }, overallByPlayer] = await Promise.all([
+    const [{ data: attributes, error: attributesError }, overallByPlayer, balanceTags] = await Promise.all([
       client.from("player_admin_attributes").select("player_id, speed_rating").in("player_id", playerIds),
       getLatestPlayerCardOverallMap(client),
+      mode === "adaptive" ? getPrivateBalanceTagsForDraw(playerIds) : Promise.resolve(new Map()),
     ]);
     if (attributesError) throw new Error(attributesError.message);
 
@@ -433,6 +435,7 @@ export async function previewRoundTeamShuffle(roundId: string, mode: RoundReshuf
           speedRating: speedByPlayer.get(playerId) ?? null,
           playerProfile: player?.player_profile || null,
           isGoalkeeper: player?.is_goalkeeper === true,
+          balanceTag: balanceTags.get(playerId) ?? null,
         };
       }),
       capacities: teams.map((team: any) => (team.team_players || []).length),

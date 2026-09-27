@@ -76,6 +76,7 @@ export type FantasyMarketPlayer = {
   costBenefitFormatted: string;
   expectedPoints: number;
   popularityPercent: number;
+  demandPremiumPercent: number;
   selectionCount: number;
   previousSelectionCount: number;
   previousPopularityPercent: number;
@@ -849,6 +850,11 @@ export async function getFantasyDashboard() {
       });
       const costBenefit = calculateCostBenefit(expectedPoints, price);
       const popularity = popularityAgg.getPopularity(player.id);
+      const demandPremiumPercent = popularity.percent >= 65 ? 20
+        : popularity.percent >= 50 ? 15
+          : popularity.percent >= 35 ? 10
+            : popularity.percent >= 20 ? 5
+              : 0;
       const cosmetics = playerCosmetics.get(player.id);
 
       const gkGames = stats.goalkeeperGames || 0;
@@ -903,6 +909,7 @@ export async function getFantasyDashboard() {
         costBenefitFormatted: costBenefit.formattedRatio,
         expectedPoints,
         popularityPercent: popularity.percent,
+        demandPremiumPercent,
         selectionCount: popularity.count,
         previousSelectionCount: popularity.previousCount,
         previousPopularityPercent: popularity.previousPercent,

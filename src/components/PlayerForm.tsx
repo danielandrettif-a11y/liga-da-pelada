@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, Trash2 } from "@/components/icons";
 import { deletePlayer, savePlayer, swapPlayerAvatars } from "@/lib/actions/players";
 import { setPlayerSpeedRating } from "@/lib/actions/speed-draw";
-import type { MemberCategory, Player, PlayerProfile } from "@/lib/types";
+import { setPlayerPrivateBalanceTag } from "@/lib/actions/private-balance-tags";
+import type { MemberCategory, Player, PlayerProfile, PrivateBalanceTag } from "@/lib/types";
 import { AvatarCropModal } from "./AvatarCropModal";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PLAYER_PROFILE_OPTIONS } from "@/lib/playerProfiles";
@@ -25,6 +26,8 @@ export function PlayerForm({
   bannerAssetKey,
   backgroundAssetKey,
   initialSpeedRating = null,
+  canManagePrivateBalanceTag = false,
+  initialPrivateBalanceTag = null,
 }: {
   player?: Player;
   mode?: "admin" | "self";
@@ -35,6 +38,8 @@ export function PlayerForm({
   bannerAssetKey?: string | null;
   backgroundAssetKey?: string | null;
   initialSpeedRating?: 1 | 2 | 3 | null;
+  canManagePrivateBalanceTag?: boolean;
+  initialPrivateBalanceTag?: PrivateBalanceTag | null;
 }) {
   const router = useRouter();
   const activeFileInputRef = useRef<HTMLInputElement>(null);
@@ -56,6 +61,7 @@ export function PlayerForm({
   const [cropSourceUrl, setCropSourceUrl] = useState("");
   const [memberCategory, setMemberCategory] = useState<MemberCategory>(player?.member_category || "player");
   const [speedRating, setSpeedRating] = useState<1 | 2 | 3 | null>(initialSpeedRating);
+  const [privateBalanceTag, setPrivateBalanceTag] = useState<PrivateBalanceTag | null>(initialPrivateBalanceTag);
   const [overallTraits, setOverallTraits] = useState<PlayerProfile[]>(player?.overall_traits || []);
   const [primaryOverallTrait, setPrimaryOverallTrait] = useState<PlayerProfile | null>(player?.overall_traits?.[0] || null);
 
@@ -217,6 +223,10 @@ export function PlayerForm({
       if (player?.id && mode === "admin") {
         const speedResult = await setPlayerSpeedRating(player.id, speedRating);
         if (!speedResult.success) throw new Error(speedResult.error || "Não foi possível salvar as estrelas de velocidade.");
+      }
+      if (player?.id && canManagePrivateBalanceTag) {
+        const balanceResult = await setPlayerPrivateBalanceTag(player.id, privateBalanceTag);
+        if (!balanceResult.success) throw new Error(balanceResult.error || "Não foi possível salvar a classificação privada.");
       }
 
       router.replace(mode === "self" ? "/meu-perfil" : "/admin/jogadores");
@@ -442,6 +452,29 @@ export function PlayerForm({
             </span>
           </div>
           {overallTraits.length > 2 && <p className="mt-3 text-[10px] font-bold text-warning">O ADM precisa revisar suas três características antigas e escolher uma principal e, opcionalmente, uma secundária.</p>}
+        </div>
+      )}
+
+      {mode === "admin" && canManagePrivateBalanceTag && (memberCategory === "player" || memberCategory === "guest") && (
+        <div className="space-y-1.5 rounded-2xl border border-danger/25 bg-danger/5 p-4">
+          <label htmlFor="private_balance_tag" className="text-xs font-bold uppercase tracking-wider text-danger">
+            Equilíbrio secreto dos times
+          </label>
+          <select
+            id="private_balance_tag"
+            value={privateBalanceTag || ""}
+            onChange={(event) => setPrivateBalanceTag((event.target.value || null) as PrivateBalanceTag | null)}
+            className="w-full rounded-xl border border-border bg-surface-hover px-4 py-3 text-sm text-foreground outline-none focus:border-danger"
+          >
+            <option value="">Sem classificação</option>
+            <option value="bagre_1">Bagre nível 1 — abaixo da média</option>
+            <option value="bagre_2">Bagre nível 2 — precisa de mais apoio</option>
+            <option value="craque_1">Craque nível 1 — acima da média</option>
+            <option value="craque_2">Craque nível 2 — destaque forte</option>
+          </select>
+          <p className="text-[10px] leading-4 text-muted">
+            Somente Daniel Andretti vê esta escolha. O equilíbrio completo evita juntar Bagres ou Craques e compensa Bagres com um time um pouco mais forte.
+          </p>
         </div>
       )}
 

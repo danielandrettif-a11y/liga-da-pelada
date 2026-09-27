@@ -1,4 +1,4 @@
-import type { PlayerProfile, TeamFormationMode } from "./types";
+import type { PlayerProfile, PrivateBalanceTag, TeamFormationMode } from "./types";
 
 export type RoundReshuffleMode = Exclude<TeamFormationMode, "manual">;
 
@@ -8,6 +8,7 @@ export type RoundReshufflePlayer = {
   speedRating: 1 | 2 | 3 | null;
   playerProfile: PlayerProfile | null;
   isGoalkeeper: boolean;
+  balanceTag?: PrivateBalanceTag | null;
 };
 
 export type RoundReshuffleSummary = {
@@ -26,12 +27,19 @@ type WorkingTeam = {
   capacity: number;
   players: RoundReshufflePlayer[];
   overallTotal: number;
+  effectiveOverallTotal: number;
   speedTotal: number;
   profiles: Record<PlayerProfile, number>;
   goalkeepers: number;
+  bagres: number;
+  craques: number;
 };
 
 const PROFILES: PlayerProfile[] = ["defensive", "midfield", "offensive"];
+
+function balanceTagOverallDelta(tag: PrivateBalanceTag | null | undefined) {
+  return tag === "craque_2" ? 4 : tag === "craque_1" ? 2 : tag === "bagre_2" ? -4 : tag === "bagre_1" ? -2 : 0;
+}
 
 function rounded(value: number, decimals = 1) {
   const multiplier = 10 ** decimals;
@@ -61,18 +69,24 @@ function makeWorkingTeams(capacities: number[]): WorkingTeam[] {
     capacity,
     players: [],
     overallTotal: 0,
+    effectiveOverallTotal: 0,
     speedTotal: 0,
     profiles: { defensive: 0, midfield: 0, offensive: 0 },
     goalkeepers: 0,
+    bagres: 0,
+    craques: 0,
   }));
 }
 
 function addPlayer(team: WorkingTeam, player: RoundReshufflePlayer, fallbackOverall: number) {
   team.players.push(player);
   team.overallTotal += player.overall ?? fallbackOverall;
+  team.effectiveOverallTotal += (player.overall ?? fallbackOverall) + balanceTagOverallDelta(player.balanceTag);
   team.speedTotal += player.speedRating ?? 2;
   if (player.playerProfile) team.profiles[player.playerProfile] += 1;
   if (player.isGoalkeeper) team.goalkeepers += 1;
+  if (player.balanceTag?.startsWith("bagre_")) team.bagres += 1;
+  if (player.balanceTag?.startsWith("craque_")) team.craques += 1;
 }
 
 function summarize(teams: WorkingTeam[]) {
@@ -132,8 +146,12 @@ export function previewRoundReshuffle({
     const ordered = [...available]
       .map((player) => ({ player, tieBreaker: random() }))
       .sort((left, right) => {
-        const leftPrimary = mode === "speed" ? (left.player.speedRating ?? 2) : (left.player.overall ?? fallbackOverall);
-        const rightPrimary = mode === "speed" ? (right.player.speedRating ?? 2) : (right.player.overall ?? fallbackOverall);
+        const leftPrimary = mode === "speed"
+          ? (left.player.speedRating ?? 2)
+          : (left.player.overall ?? fallbackOverall) + (mode === "adaptive" ? balanceTagOverallDelta(left.player.balanceTag) : 0);
+        const rightPrimary = mode === "speed"
+          ? (right.player.speedRating ?? 2)
+          : (right.player.overall ?? fallbackOverall) + (mode === "adaptive" ? balanceTagOverallDelta(right.player.balanceTag) : 0);
         return rightPrimary - leftPrimary || right.tieBreaker - left.tieBreaker;
       });
 
@@ -145,14 +163,21 @@ export function previewRoundReshuffle({
       const selected = availableTeams
         .map(({ team, index }) => {
           const overallLoad = team.overallTotal / Math.max(1, team.capacity * 10);
+          const effectiveOverallLoad = team.effectiveOverallTotal / Math.max(1, team.capacity * 10);
           const speedLoad = team.speedTotal / Math.max(1, team.capacity * 3);
           const profileLoad = profile ? team.profiles[profile] / Math.max(1, team.capacity) : 0;
           const goalkeeperLoad = player.isGoalkeeper ? team.goalkeepers / Math.max(1, team.capacity) : 0;
+          const tagCollisionLoad = player.balanceTag?.startsWith("bagre_")
+            ? team.bagres / Math.max(1, team.capacity)
+            : player.balanceTag?.startsWith("craque_")
+              ? team.craques / Math.max(1, team.capacity)
+              : 0;
           const score = mode === "balanced"
             ? overallLoad * 0.75 + profileLoad * 0.18 + goalkeeperLoad * 0.07
             : mode === "speed"
               ? speedLoad * 0.9 + goalkeeperLoad * 0.1
-              : overallLoad * 0.45 + speedLoad * 0.4 + profileLoad * 0.1 + goalkeeperLoad * 0.05;
+              : effectiveOverallLoad * 0.40 + overallLoad * 0.15 + speedLoad * 0.25
+                + profileLoad * 0.1 + goalkeeperLoad * 0.05 + tagCollisionLoad * 0.20;
           return { team, index, score, tieBreaker: random() };
         })
         .sort((left, right) => left.score - right.score || left.tieBreaker - right.tieBreaker)[0];

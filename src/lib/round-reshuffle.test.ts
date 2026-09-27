@@ -37,4 +37,26 @@ describe("prévia de nova formação", () => {
 
     expect(first.teams).not.toEqual(second.teams);
   });
+
+  it("separa craques e bagres no equilíbrio completo", () => {
+    const taggedPlayers = Array.from({ length: 9 }, (_, index) => ({
+      id: `tag-${index + 1}`,
+      overall: 70,
+      speedRating: 2 as const,
+      playerProfile: (["defensive", "midfield", "offensive"] as const)[index % 3],
+      isGoalkeeper: false,
+      balanceTag: index < 3 ? "craque_2" as const : index < 6 ? "bagre_2" as const : null,
+    }));
+    const result = previewRoundReshuffle({
+      players: taggedPlayers,
+      capacities: [3, 3, 3],
+      mode: "adaptive",
+      random: seededRandom(12),
+    });
+
+    for (const team of result.teams) {
+      expect(team.filter((id) => taggedPlayers.find((player) => player.id === id)?.balanceTag === "craque_2")).toHaveLength(1);
+      expect(team.filter((id) => taggedPlayers.find((player) => player.id === id)?.balanceTag === "bagre_2")).toHaveLength(1);
+    }
+  });
 });

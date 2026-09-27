@@ -17,6 +17,7 @@ export type User = {
 
 export type PlayerProfile = 'offensive' | 'midfield' | 'defensive';
 export type OverallSeedMode = 'legacy_tag' | 'observed';
+export type PrivateBalanceTag = 'bagre_1' | 'bagre_2' | 'craque_1' | 'craque_2';
 export type MemberCategory = 'player' | 'guest' | 'wag' | 'supporter';
 export type RoundType = 'official' | 'friendly';
 export type TeamFormationMode = 'manual' | 'random' | 'balanced' | 'speed' | 'adaptive' | 'draft';

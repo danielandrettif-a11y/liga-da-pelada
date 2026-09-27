@@ -5,6 +5,7 @@ import { PlayerForm } from "@/components/PlayerForm";
 import { getPlayer } from "@/lib/actions/players";
 import { getPlayerSpeedRatings } from "@/lib/actions/speed-draw";
 import { getRegisteredMergeCandidates } from "@/lib/actions/registrations";
+import { getPlayerPrivateBalanceTag } from "@/lib/actions/private-balance-tags";
 import { GuestProfileMerge } from "@/components/GuestProfileMerge";
 
 export const revalidate = 0;
@@ -20,12 +21,14 @@ export default async function EditarJogadorPage({
   if (!player) {
     notFound();
   }
-  const speedRatings = await getPlayerSpeedRatings();
+  const [speedRatings, privateBalance, mergeCandidates] = await Promise.all([
+    getPlayerSpeedRatings(),
+    getPlayerPrivateBalanceTag(player.id),
+    player.is_selectable && (player.member_category === "player" || player.member_category === "guest")
+      ? getRegisteredMergeCandidates(player.id)
+      : Promise.resolve([]),
+  ]);
   const speedRating = speedRatings[player.id] ?? null;
-
-  const mergeCandidates = player.is_selectable && (player.member_category === "player" || player.member_category === "guest")
-    ? await getRegisteredMergeCandidates(player.id)
-    : [];
 
   return (
     <div className="space-y-6">
@@ -44,7 +47,12 @@ export default async function EditarJogadorPage({
         </div>
       </div>
 
-      <PlayerForm player={player} initialSpeedRating={speedRating} />
+      <PlayerForm
+        player={player}
+        initialSpeedRating={speedRating}
+        canManagePrivateBalanceTag={privateBalance.allowed}
+        initialPrivateBalanceTag={privateBalance.tag}
+      />
       {player.is_selectable && (player.member_category === "player" || player.member_category === "guest") && <GuestProfileMerge guest={player} candidates={mergeCandidates} />}
     </div>
   );

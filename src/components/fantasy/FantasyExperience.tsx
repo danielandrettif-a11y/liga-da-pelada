@@ -1994,6 +1994,11 @@ export function FantasyExperience({
                               Aposta de recuperação
                             </span>
                           )}
+                          {player.demandPremiumPercent > 0 && (
+                            <span className="rounded border border-warning/35 bg-warning/10 px-1.5 py-0.5 text-[7px] font-black uppercase text-warning">
+                              🔥 Alta procura +{player.demandPremiumPercent}%
+                            </span>
+                          )}
                         </div>
 
                         {/* Tags Compactas */}

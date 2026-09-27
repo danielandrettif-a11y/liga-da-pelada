@@ -1,4 +1,4 @@
-import type { PlayerProfile } from "./types";
+import type { PlayerProfile, PrivateBalanceTag } from "./types";
 import type { SpeedRating } from "./speed-draw";
 
 export type AdaptiveDrawPlayer = {
@@ -6,6 +6,7 @@ export type AdaptiveDrawPlayer = {
   overall: number | null;
   speedRating: SpeedRating | null;
   playerProfile: PlayerProfile | null;
+  balanceTag?: PrivateBalanceTag | null;
 };
 
 export type AdaptiveTeamSummary = {
@@ -23,6 +24,10 @@ export type AdaptiveDrawResult = {
 };
 
 const PROFILES: PlayerProfile[] = ["defensive", "midfield", "offensive"];
+
+function balanceTagOverallDelta(tag: PrivateBalanceTag | null | undefined) {
+  return tag === "craque_2" ? 4 : tag === "craque_1" ? 2 : tag === "bagre_2" ? -4 : tag === "bagre_1" ? -2 : 0;
+}
 
 function safeRandom(random: () => number) {
   const value = random();
@@ -68,9 +73,9 @@ function summarize(
 }
 
 /**
- * Nota de desequilibrio: 45% OVR, 40% velocidade e 15% composicao de funcoes.
- * Quanto menor, mais proximos estao os times. As escalas convertem uma
- * diferenca de 10 OVR ou 2 estrelas no pior caso de cada eixo.
+ * Nota de desequilibrio: 25% OVR, 30% velocidade, 15% funcoes, 20% OVR
+ * ajustado pela tag privada e 10% repeticao de bagres/craques no mesmo time.
+ * Quanto menor, mais proximos estao os times.
  */
 function imbalanceScore(teams: AdaptiveDrawPlayer[][], fallbackOverall: number, playersPerTeam: number) {
   const summaries = summarize(teams, fallbackOverall);
@@ -82,7 +87,22 @@ function imbalanceScore(teams: AdaptiveDrawPlayer[][], fallbackOverall: number, 
     const values = summaries.map((item) => item.profiles[profile]);
     return total + (Math.max(...values) - Math.min(...values)) / Math.max(1, playersPerTeam);
   }, 0) / PROFILES.length;
-  return overallGap * 0.45 + speedGap * 0.40 + Math.min(1, profileGap) * 0.15;
+  const effectiveOverallValues = teams.map((team) => team.reduce(
+    (total, player) => total + (player.overall ?? fallbackOverall) + balanceTagOverallDelta(player.balanceTag),
+    0,
+  ) / Math.max(1, team.length));
+  const effectiveOverallGap = Math.min(1, (Math.max(...effectiveOverallValues) - Math.min(...effectiveOverallValues)) / 10);
+  const collisions = teams.reduce((total, team) => {
+    const bagres = team.filter((player) => player.balanceTag?.startsWith("bagre_")).length;
+    const craques = team.filter((player) => player.balanceTag?.startsWith("craque_")).length;
+    return total + Math.max(0, bagres - 1) + Math.max(0, craques - 1);
+  }, 0);
+  const collisionPenalty = Math.min(1, collisions / Math.max(1, teams.length));
+  return overallGap * 0.25
+    + speedGap * 0.30
+    + Math.min(1, profileGap) * 0.15
+    + effectiveOverallGap * 0.20
+    + collisionPenalty * 0.10;
 }
 
 export function drawTeamsAdaptive({
