@@ -16,6 +16,7 @@ import { canTeamLendToMatch } from "../substitution-draw";
 import { suggestNextMatchRotation } from "../next-match";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
+const FINISHED_CORRECTION_ERROR = "Digite EDITAR para liberar correções em partidas finalizadas.";
 
 async function getMatchState(
   client: SupabaseClient,
@@ -868,10 +869,11 @@ async function refreshFinishedGoalCorrection(
   revalidatePath("/cartola", "layout");
 }
 
-export async function correctFinishedGoal(eventId: string) {
+export async function correctFinishedGoal(eventId: string, confirmation: string) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    if (confirmation !== "EDITAR") return { success: false, error: FINISHED_CORRECTION_ERROR };
     const { data, error } = await client.rpc("correct_finished_goal", { p_event_id: eventId });
     if (error) throw new Error(error.message);
     const result = data as { round_id?: string; match_id?: string } | null;
@@ -883,10 +885,11 @@ export async function correctFinishedGoal(eventId: string) {
   }
 }
 
-export async function correctFinishedGoalEvent(eventId: string, playerId: string, assistPlayerId: string | null) {
+export async function correctFinishedGoalEvent(eventId: string, playerId: string, assistPlayerId: string | null, confirmation: string) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    if (confirmation !== "EDITAR") return { success: false, error: FINISHED_CORRECTION_ERROR };
     if (!eventId || !playerId) return { success: false, error: "Escolha o autor do gol." };
     const { data, error } = await (client as any).rpc("correct_finished_goal_event", {
       p_event_id: eventId,
@@ -908,11 +911,13 @@ export async function addFinishedGoalEvent(
   teamId: string,
   playerId: string,
   assistPlayerId: string | null,
+  confirmation: string,
 ) {
   let goalAdded = false;
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    if (confirmation !== "EDITAR") return { success: false, error: FINISHED_CORRECTION_ERROR };
     if (!matchId || !teamId || !playerId) return { success: false, error: "Escolha o time e o autor do gol." };
     const { data, error } = await (client as any).rpc("add_finished_goal_event", {
       p_match_id: matchId,

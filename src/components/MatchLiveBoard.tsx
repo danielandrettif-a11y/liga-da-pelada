@@ -398,6 +398,17 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
   );
 
   const isFinished = match.status === "finished";
+  const [correctionsUnlocked, setCorrectionsUnlocked] = useState(false);
+
+  function unlockFinishedCorrections() {
+    const confirmation = window.prompt("Digite EDITAR para liberar a alteração de gols e assistências desta partida.");
+    if (confirmation?.trim().toUpperCase() === "EDITAR") {
+      setCorrectionsUnlocked(true);
+      setError("");
+    } else if (confirmation !== null) {
+      setError("Palavra incorreta. Digite EDITAR para liberar as correções.");
+    }
+  }
 
   // Sincronizações com props vindas do servidor
   useEffect(() => {
@@ -588,12 +599,13 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
   ) {
     const request = requestOverride || { ...goalModal };
     if (!canManage || submittingGoalRef.current || !request.scorerId) return;
+    if (isFinished && !correctionsUnlocked) return;
     submittingGoalRef.current = true;
 
     if (isFinished) {
       setLoading(true);
       setError("");
-      const result = await addFinishedGoalEvent(match.id, request.teamId, request.scorerId, assistPlayerId);
+      const result = await addFinishedGoalEvent(match.id, request.teamId, request.scorerId, assistPlayerId, "EDITAR");
       if (!result.success) {
         setError(result.error || "Não foi possível adicionar o gol.");
       } else {
@@ -688,12 +700,13 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
     if (!canManage || deletingEventRef.current.has(eventId)) return;
 
     if (isFinished) {
+      if (!correctionsUnlocked) return;
       const confirmation = window.prompt(
         "Esta correção recalculará placar, Ranking e Cartola. Digite CORRIGIR para remover o gol."
       );
       if (confirmation !== "CORRIGIR") return;
       setLoading(true);
-      const result = await correctFinishedGoal(eventId);
+      const result = await correctFinishedGoal(eventId, "EDITAR");
       if (!result.success) setError(result.error || "Não foi possível corrigir o gol.");
       setLoading(false);
       return;
@@ -734,12 +747,12 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
   }
 
   async function handleCorrectGoalEvent() {
-    if (!goalEdit || loading) return;
+    if (!goalEdit || loading || !correctionsUnlocked) return;
     const scorer = goalEditPlayers.find((entry: any) => entry.player_id === goalEdit.scorerId);
     const assist = goalEditPlayers.find((entry: any) => entry.player_id === goalEdit.assistId);
     setLoading(true);
     setError("");
-    const result = await correctFinishedGoalEvent(goalEdit.event.id, goalEdit.scorerId, goalEdit.assistId);
+    const result = await correctFinishedGoalEvent(goalEdit.event.id, goalEdit.scorerId, goalEdit.assistId, "EDITAR");
     if (!result.success) {
       setError(result.error || "Não foi possível corrigir o gol.");
     } else {
@@ -824,7 +837,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
             </span>
             <span className="stat-number text-5xl text-foreground">{displayScore.a}</span>
 
-            {canManage && (
+            {canManage && (!isFinished || correctionsUnlocked) && (
               <button
                 onClick={() => setGoalModal({ open: true, teamId: match.team_a_id, scorerId: null, isOwnGoal: false })}
                 disabled={loading}
@@ -852,7 +865,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
             </span>
             <span className="stat-number text-5xl text-foreground">{displayScore.b}</span>
 
-            {canManage && (
+            {canManage && (!isFinished || correctionsUnlocked) && (
               <button
                 onClick={() => setGoalModal({ open: true, teamId: match.team_b_id, scorerId: null, isOwnGoal: false })}
                 disabled={loading}
@@ -866,6 +879,28 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
           </div>
         </div>
       </div>
+
+      {isFinished && canManage && (
+        <div className={`rounded-2xl border p-4 ${correctionsUnlocked ? "border-accent/30 bg-accent/5" : "border-warning/30 bg-warning/5"}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider text-foreground">
+                {correctionsUnlocked ? "🔓 Correções liberadas" : "🔒 Correções bloqueadas"}
+              </p>
+              <p className="mt-1 text-[10px] font-semibold text-muted">
+                {correctionsUnlocked ? "Você pode adicionar, editar ou remover gols e assistências." : "Proteção contra alterações acidentais na partida finalizada."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={correctionsUnlocked ? () => setCorrectionsUnlocked(false) : unlockFinishedCorrections}
+              className="shrink-0 rounded-xl border border-border bg-surface px-3 py-2 text-[10px] font-black uppercase text-foreground hover:border-accent/50"
+            >
+              {correctionsUnlocked ? "Bloquear" : "Liberar"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Timeline de Eventos */}
       <section className="animate-fade-in-up stagger-1">
@@ -962,7 +997,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
                       )}
                     </div>
 
-                    {canManage && <div className="flex shrink-0 items-center gap-1">
+                    {canManage && (!isFinished || correctionsUnlocked) && <div className="flex shrink-0 items-center gap-1">
                       {isFinished && <button
                         type="button"
                         onClick={() => setGoalEdit({ event: ev, scorerId: ev.player_id, assistId: ev.assist_player_id || null })}
