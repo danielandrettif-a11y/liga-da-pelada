@@ -65,6 +65,9 @@ describe("rateio dos pagamentos", () => {
     });
 
     expect(result.amountByPlayer).toEqual({ a: 39.34, b: 48.33, c: 54.33 });
+    expect(result.baseByPlayer).toEqual({ a: 33.34, b: 33.33, c: 33.33 });
+    expect(result.extraTimeByPlayer).toEqual({ a: 0, b: 15, c: 15 });
+    expect(result.ballFundByPlayer).toEqual({ a: 6, b: 0, c: 6 });
     expect(result.grandTotal).toBe(142);
   });
 });

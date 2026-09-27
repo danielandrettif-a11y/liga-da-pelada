@@ -314,8 +314,14 @@ export function PaymentChecklist({
             <div className="min-w-0 flex-1">
               <p className={`truncate text-sm font-bold ${player.paid ? "text-accent" : "text-foreground"}`}>{player.name}</p>
               <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />
+              <p className="mt-1 text-[9px] font-bold leading-4 text-muted">
+                Pelada {currency.format(breakdown.baseByPlayer[player.id] || 0)}
+                {breakdown.extraTimeByPlayer[player.id] > 0 && <> · Tempo extra {currency.format(breakdown.extraTimeByPlayer[player.id])}</>}
+                {breakdown.ballFundByPlayer[player.id] > 0 && <> · Caixinha {currency.format(breakdown.ballFundByPlayer[player.id])}</>}
+              </p>
             </div>
             <div className="shrink-0 text-right">
+              <p className="text-[8px] font-black uppercase tracking-wider text-muted">Total</p>
               <p className="text-xs font-black text-foreground">{currency.format(breakdown.amountByPlayer[player.id] || 0)}</p>
               <span className={`text-[9px] font-black uppercase ${player.paid ? "text-accent" : "text-muted"}`}>{player.paid ? "Pago" : "Pendente"}</span>
             </div>
