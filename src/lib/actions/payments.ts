@@ -17,6 +17,10 @@ export type PaymentRound = {
   payment_pix: string | null;
   payment_total: number | null;
   payment_recipient_name: string | null;
+  payment_extra_time_total: number;
+  payment_extra_time_player_ids: string[];
+  payment_ball_fund_total: number;
+  payment_ball_fund_player_ids: string[];
 };
 
 export type PaymentRecipient = { id: string; name: string; pix_key: string; pix_type: string | null; is_active: boolean };
@@ -81,7 +85,7 @@ export async function getPaymentRounds(): Promise<PaymentRound[]> {
 
   const { data, error } = await supabase
     .from("rounds")
-    .select("id, number, date, status, round_type, payment_pix, payment_total, payment_recipient_name, created_at")
+    .select("id, number, date, status, round_type, payment_pix, payment_total, payment_recipient_name, payment_extra_time_total, payment_extra_time_player_ids, payment_ball_fund_total, payment_ball_fund_player_ids, created_at")
     .eq("season_id", season.id)
     .order("date", { ascending: false })
     .order("created_at", { ascending: false });
@@ -237,28 +241,60 @@ export async function setPlayerPayment(roundId: string, playerId: string, paid: 
   return { success: true };
 }
 
-export async function updateRoundPaymentDetails(roundId: string, paymentPix: string, paymentTotal: number) {
+export async function updateRoundPaymentDetails(input: {
+  roundId: string;
+  paymentPix: string;
+  paymentTotal: number;
+  extraTimeTotal: number;
+  extraTimePlayerIds: string[];
+  ballFundTotal: number;
+  ballFundPlayerIds: string[];
+}) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem editar os dados do PIX." };
 
-  const pix = paymentPix.trim();
-  const total = Number(paymentTotal);
+  const pix = input.paymentPix.trim();
+  const total = Number(input.paymentTotal);
+  const extraTimeTotal = Number(input.extraTimeTotal);
+  const ballFundTotal = Number(input.ballFundTotal);
   if (!pix) return { success: false, error: "Informe a chave PIX." };
+  if (pix.length > 200) return { success: false, error: "A chave PIX deve ter no máximo 200 caracteres." };
   if (!Number.isFinite(total) || total <= 0) return { success: false, error: "Informe um valor total valido." };
+  if (!Number.isFinite(extraTimeTotal) || extraTimeTotal < 0 || !Number.isFinite(ballFundTotal) || ballFundTotal < 0) {
+    return { success: false, error: "Informe valores extras válidos." };
+  }
 
-  const { data, error } = await client
-    .from("rounds")
-    .update({ payment_pix: pix, payment_total: Math.round(total * 100) / 100 })
-    .eq("id", roundId)
-    .eq("status", "finished")
-    .select("id")
-    .maybeSingle();
+  const extraTimePlayerIds = extraTimeTotal > 0 ? [...new Set(input.extraTimePlayerIds.filter(Boolean))] : [];
+  const ballFundPlayerIds = ballFundTotal > 0 ? [...new Set(input.ballFundPlayerIds.filter(Boolean))] : [];
+  if (extraTimeTotal > 0 && !extraTimePlayerIds.length) return { success: false, error: "Selecione quem ficou no tempo extra." };
+  if (ballFundTotal > 0 && !ballFundPlayerIds.length) return { success: false, error: "Selecione quem participa da caixinha da bola." };
+
+  const { data, error } = await client.rpc("update_round_payment_details_v2", {
+    p_round_id: input.roundId,
+    p_payment_pix: pix,
+    p_payment_total: total,
+    p_extra_time_total: extraTimeTotal,
+    p_extra_time_player_ids: extraTimePlayerIds,
+    p_ball_fund_total: ballFundTotal,
+    p_ball_fund_player_ids: ballFundPlayerIds,
+  });
 
   if (error) return { success: false, error: error.message };
   if (!data) return { success: false, error: "Rodada finalizada nao encontrada." };
 
   revalidatePath("/pagamentos");
+  revalidatePath("/coletiva");
   revalidatePath("/admin/transfermarket");
   revalidatePath("/", "layout");
-  return { success: true };
+  return {
+    success: true,
+    details: {
+      pix,
+      total: Math.round(total * 100) / 100,
+      extraTimeTotal: Math.round(extraTimeTotal * 100) / 100,
+      extraTimePlayerIds,
+      ballFundTotal: Math.round(ballFundTotal * 100) / 100,
+      ballFundPlayerIds,
+    },
+  };
 }

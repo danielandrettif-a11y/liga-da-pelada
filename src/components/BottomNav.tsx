@@ -62,12 +62,11 @@ export function BottomNav({
     setPendingHref(null);
   }, [pathname]);
 
-  // A segunda posição nunca muda. Quando houver lista aberta, ela volta a usar
-  // o nome familiar "Convocação" e mantém os demais atalhos no mesmo lugar.
-  const agendaItem = hasOpenCallup
-    ? { href: "/convocacao", label: "Convocação", icon: Flag, notification: true }
-    : hasReleasedPayment
-      ? { href: "/pagamentos", label: "Agenda", icon: ArrowLeftRight, notification: true }
+  // A segunda posição nunca muda; o nome acompanha a etapa atual da rodada.
+  const agendaItem = hasReleasedPayment
+    ? { href: "/pagamentos", label: "Transfermarket", icon: ArrowLeftRight, notification: true }
+    : hasOpenCallup
+      ? { href: "/convocacao", label: "Convocação", icon: Flag, notification: true }
       : { href: "/rodadas", label: "Agenda", icon: CalendarDays, notification: false };
   const communityItem = collective
     ? { href: `/coletiva?callup=${collective.callupId}`, label: "Coletiva", icon: Microphone }
@@ -142,7 +141,9 @@ export function BottomNav({
               </span>
               <span
                 className={`block w-full truncate whitespace-nowrap text-center font-semibold leading-none tracking-tight transition-colors duration-150 ${
-                  "text-[9px] min-[390px]:text-[10px]"
+                  item.label === "Transfermarket" || item.label === "Convocação"
+                    ? "text-[7px] min-[360px]:text-[8px] min-[430px]:text-[9px]"
+                    : "text-[9px] min-[390px]:text-[10px]"
                 } ${
                   isActive ? "text-accent" : ""
                 }`}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { areRoundParticipantsPaid, findLatestReleasedPaymentRound, isPaymentChecklistComplete } from "./paymentStatus";
+import { areRoundParticipantsPaid, calculateRoundPaymentAmounts, findLatestReleasedPaymentRound, isPaymentChecklistComplete } from "./paymentStatus";
 
 describe("isPaymentChecklistComplete", () => {
   it("mantem o Transfermarket aberto enquanto existe pagamento pendente", () => {
@@ -50,5 +50,21 @@ describe("rodada liberada no Transfermarket", () => {
       { ...finishedRound, id: "without-pix", payment_pix: null },
       { ...finishedRound, id: "without-total", payment_total: null },
     ])).toBeNull();
+  });
+});
+
+describe("rateio dos pagamentos", () => {
+  it("soma tempo extra e caixinha somente para os participantes escolhidos sem perder centavos", () => {
+    const result = calculateRoundPaymentAmounts({
+      playerIds: ["a", "b", "c"],
+      baseTotal: 100,
+      extraTimeTotal: 30,
+      extraTimePlayerIds: ["b", "c"],
+      ballFundTotal: 12,
+      ballFundPlayerIds: ["a", "c"],
+    });
+
+    expect(result.amountByPlayer).toEqual({ a: 39.34, b: 48.33, c: 54.33 });
+    expect(result.grandTotal).toBe(142);
   });
 });

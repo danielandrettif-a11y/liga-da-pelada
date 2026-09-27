@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, CheckCircle2, ClipboardList, Copy, LockKeyhole, PencilLine, X } from "@/components/icons";
 import { setPlayerPayment, updateRoundPaymentDetails, type PaymentPlayer, type PaymentRound } from "@/lib/actions/payments";
+import { calculateRoundPaymentAmounts } from "@/lib/paymentStatus";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
 
@@ -12,6 +13,49 @@ const currency = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
 });
+
+function ExtraChargeEditor({
+  title,
+  description,
+  total,
+  setTotal,
+  selectedIds,
+  setSelectedIds,
+  players,
+}: {
+  title: string;
+  description: string;
+  total: string;
+  setTotal: (value: string) => void;
+  selectedIds: string[];
+  setSelectedIds: (value: string[]) => void;
+  players: PaymentPlayer[];
+}) {
+  return (
+    <fieldset className="rounded-xl border border-border bg-background/60 p-3">
+      <legend className="px-1 text-[10px] font-black uppercase tracking-wider text-accent">{title}</legend>
+      <p className="mb-3 text-[10px] leading-4 text-muted">{description}</p>
+      <label className="text-[9px] font-black uppercase tracking-wider text-muted">Valor total do extra
+        <input type="number" min="0" step="0.01" inputMode="decimal" value={total} onChange={(event) => setTotal(event.target.value)} className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs font-bold normal-case text-foreground outline-none focus:border-accent" />
+      </label>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="text-[9px] font-black uppercase text-muted">Quem vai pagar</span>
+        <div className="flex gap-2 text-[9px] font-bold text-accent">
+          <button type="button" onClick={() => setSelectedIds(players.map((player) => player.id))}>Todos</button>
+          <button type="button" onClick={() => setSelectedIds([])}>Nenhum</button>
+        </div>
+      </div>
+      <div className="mt-2 grid max-h-44 grid-cols-2 gap-1.5 overflow-y-auto">
+        {players.map((player) => (
+          <label key={player.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-border/70 px-2 py-2 text-[10px] font-bold text-foreground">
+            <input type="checkbox" checked={selectedIds.includes(player.id)} onChange={(event) => setSelectedIds(event.target.checked ? [...selectedIds, player.id] : selectedIds.filter((id) => id !== player.id))} className="h-4 w-4 shrink-0 accent-[var(--accent)]" />
+            <span className="truncate">{player.name}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
 
 export function PaymentChecklist({
   round,
@@ -31,15 +75,34 @@ export function PaymentChecklist({
   const [copiedPaymentList, setCopiedPaymentList] = useState(false);
   const [error, setError] = useState("");
   const [showCompletedList, setShowCompletedList] = useState(false);
-  const [paymentDetails, setPaymentDetails] = useState({ pix: round.payment_pix || "", total: Number(round.payment_total) || 0 });
+  const allPlayerIds = initialPlayers.map((player) => player.id);
+  const [paymentDetails, setPaymentDetails] = useState({
+    pix: round.payment_pix || "",
+    total: Number(round.payment_total) || 0,
+    extraTimeTotal: Number(round.payment_extra_time_total) || 0,
+    extraTimePlayerIds: round.payment_extra_time_player_ids || [],
+    ballFundTotal: Number(round.payment_ball_fund_total) || 0,
+    ballFundPlayerIds: round.payment_ball_fund_player_ids || [],
+  });
   const [draftPix, setDraftPix] = useState(paymentDetails.pix);
   const [draftTotal, setDraftTotal] = useState(String(paymentDetails.total || ""));
+  const [draftExtraTimeTotal, setDraftExtraTimeTotal] = useState(String(paymentDetails.extraTimeTotal || ""));
+  const [draftExtraTimePlayerIds, setDraftExtraTimePlayerIds] = useState(paymentDetails.extraTimePlayerIds.length ? paymentDetails.extraTimePlayerIds : allPlayerIds);
+  const [draftBallFundTotal, setDraftBallFundTotal] = useState(String(paymentDetails.ballFundTotal || ""));
+  const [draftBallFundPlayerIds, setDraftBallFundPlayerIds] = useState(paymentDetails.ballFundPlayerIds.length ? paymentDetails.ballFundPlayerIds : allPlayerIds);
   const [editingPayment, setEditingPayment] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
   const paidCount = useMemo(() => players.filter((player) => player.paid).length, [players]);
   const allPaid = players.length > 0 && paidCount === players.length;
-  const total = paymentDetails.total;
-  const perPlayer = players.length > 0 ? total / players.length : 0;
+  const breakdown = useMemo(() => calculateRoundPaymentAmounts({
+    playerIds: players.map((player) => player.id),
+    baseTotal: paymentDetails.total,
+    extraTimeTotal: paymentDetails.extraTimeTotal,
+    extraTimePlayerIds: paymentDetails.extraTimePlayerIds,
+    ballFundTotal: paymentDetails.ballFundTotal,
+    ballFundPlayerIds: paymentDetails.ballFundPlayerIds,
+  }), [players, paymentDetails]);
+  const basePerPlayer = players.length > 0 ? paymentDetails.total / players.length : 0;
 
   async function copyPix() {
     if (!paymentDetails.pix) return;
@@ -66,7 +129,7 @@ export function PaymentChecklist({
     const text = [
       `⚽ *Pelada BQ – ${date}*`,
       "",
-      ...players.map((player, index) => `${player.paid ? "✅" : "❌"} ${index + 1}. ${player.name}`),
+      ...players.map((player, index) => `${player.paid ? "✅" : "❌"} ${index + 1}. ${player.name} — ${currency.format(breakdown.amountByPlayer[player.id] || 0)}`),
     ].join("\n");
 
     try {
@@ -89,11 +152,34 @@ export function PaymentChecklist({
     setSavingDetails(true);
     setError("");
     const parsedTotal = Number(draftTotal.replace(",", "."));
-    const result = await updateRoundPaymentDetails(round.id, draftPix, parsedTotal);
+    const parsedExtraTimeTotal = Number(draftExtraTimeTotal.replace(",", ".") || 0);
+    const parsedBallFundTotal = Number(draftBallFundTotal.replace(",", ".") || 0);
+    const result = await updateRoundPaymentDetails({
+      roundId: round.id,
+      paymentPix: draftPix,
+      paymentTotal: parsedTotal,
+      extraTimeTotal: parsedExtraTimeTotal,
+      extraTimePlayerIds: draftExtraTimePlayerIds,
+      ballFundTotal: parsedBallFundTotal,
+      ballFundPlayerIds: draftBallFundPlayerIds,
+    });
     if (!result.success) {
       setError(result.error || "Nao foi possivel atualizar os dados do PIX.");
     } else {
-      setPaymentDetails({ pix: draftPix.trim(), total: parsedTotal });
+      const next = result.details!;
+      const nextBreakdown = calculateRoundPaymentAmounts({
+        playerIds: players.map((player) => player.id),
+        baseTotal: next.total,
+        extraTimeTotal: next.extraTimeTotal,
+        extraTimePlayerIds: next.extraTimePlayerIds,
+        ballFundTotal: next.ballFundTotal,
+        ballFundPlayerIds: next.ballFundPlayerIds,
+      });
+      setPlayers((current) => current.map((player) => ({
+        ...player,
+        paid: player.paid && (nextBreakdown.amountByPlayer[player.id] || 0) <= (breakdown.amountByPlayer[player.id] || 0),
+      })));
+      setPaymentDetails(next);
       setEditingPayment(false);
       router.refresh();
     }
@@ -160,20 +246,27 @@ export function PaymentChecklist({
             <label className="text-[9px] font-black uppercase tracking-wider text-muted">Valor total
               <input type="number" min="0.01" step="0.01" inputMode="decimal" value={draftTotal} onChange={(event) => setDraftTotal(event.target.value)} className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs font-bold normal-case text-foreground outline-none focus:border-accent" />
             </label>
+            <ExtraChargeEditor title="Tempo extra" description="O valor será dividido somente entre quem ficou jogando e somado à parte normal." total={draftExtraTimeTotal} setTotal={setDraftExtraTimeTotal} selectedIds={draftExtraTimePlayerIds} setSelectedIds={setDraftExtraTimePlayerIds} players={players} />
+            <ExtraChargeEditor title="Caixinha da bola" description="O valor semanal será dividido entre os selecionados. Desmarque quem não vai participar." total={draftBallFundTotal} setTotal={setDraftBallFundTotal} selectedIds={draftBallFundPlayerIds} setSelectedIds={setDraftBallFundPlayerIds} players={players} />
             <button type="button" onClick={savePaymentDetails} disabled={savingDetails || !draftPix.trim() || Number(draftTotal.replace(",", ".")) <= 0} className="rounded-xl bg-accent py-2.5 text-xs font-black text-background disabled:opacity-50">
-              {savingDetails ? "Salvando..." : "Salvar PIX e valor"}
+              {savingDetails ? "Salvando..." : "Salvar cobrança completa"}
             </button>
           </div>
         )}
         <div className="grid grid-cols-2 gap-3 border-b border-accent/20 pb-3">
           <div>
-            <p className="text-[9px] font-black uppercase tracking-widest text-muted">Valor total</p>
-            <p className="mt-1 text-lg font-black text-foreground">{currency.format(total)}</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-muted">Total a receber</p>
+            <p className="mt-1 text-lg font-black text-foreground">{currency.format(breakdown.grandTotal)}</p>
           </div>
           <div>
-            <p className="text-[9px] font-black uppercase tracking-widest text-accent">Por pessoa</p>
-            <p className="mt-1 text-lg font-black text-accent">{currency.format(perPlayer)}</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-accent">Pelada por pessoa</p>
+            <p className="mt-1 text-lg font-black text-accent">{currency.format(basePerPlayer)}</p>
           </div>
+        </div>
+        <div className="mt-3 space-y-1 text-[10px] font-bold text-muted">
+          <p>Valor normal da pelada: <span className="text-foreground">{currency.format(paymentDetails.total)}</span></p>
+          {paymentDetails.extraTimeTotal > 0 && <p>Tempo extra: <span className="text-foreground">{currency.format(paymentDetails.extraTimeTotal)}</span> dividido entre {paymentDetails.extraTimePlayerIds.length}</p>}
+          {paymentDetails.ballFundTotal > 0 && <p>Caixinha da bola: <span className="text-foreground">{currency.format(paymentDetails.ballFundTotal)}</span> dividido entre {paymentDetails.ballFundPlayerIds.length}</p>}
         </div>
         <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-accent">PIX para pagamento</p>
         {round.payment_recipient_name && <p className="mt-1 text-xs font-bold text-foreground">Recebedor: {round.payment_recipient_name}</p>}
@@ -222,7 +315,10 @@ export function PaymentChecklist({
               <p className={`truncate text-sm font-bold ${player.paid ? "text-accent" : "text-foreground"}`}>{player.name}</p>
               <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />
             </div>
-            <span className={`text-[10px] font-black uppercase ${player.paid ? "text-accent" : "text-muted"}`}>{player.paid ? "Pago" : "Pendente"}</span>
+            <div className="shrink-0 text-right">
+              <p className="text-xs font-black text-foreground">{currency.format(breakdown.amountByPlayer[player.id] || 0)}</p>
+              <span className={`text-[9px] font-black uppercase ${player.paid ? "text-accent" : "text-muted"}`}>{player.paid ? "Pago" : "Pendente"}</span>
+            </div>
           </label>
         ))}
         {players.length === 0 && <p className="p-8 text-center text-sm text-muted">Nenhum jogador nesta rodada.</p>}

@@ -39,7 +39,7 @@ export function CollectiveRoom({ room, compact = false }: { room: CollectiveRoom
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [replyingTo, setReplyingTo] = useState<CollectiveRoomData["messages"][number] | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [firstUnreadMessageId] = useState(room.firstUnreadMessageId);
+  const firstUnreadMessageId = room.firstUnreadMessageId;
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -53,8 +53,8 @@ export function CollectiveRoom({ room, compact = false }: { room: CollectiveRoom
   useEffect(() => {
     const target = firstUnreadMessageId ? document.getElementById(`collective-${firstUnreadMessageId}`) : null;
     if (target) target.scrollIntoView({ block: "center" });
-    else if (messageList.current) messageList.current.scrollTop = messageList.current.scrollHeight;
-  }, [firstUnreadMessageId]);
+    else if (latestMessageId) document.getElementById(`collective-${latestMessageId}`)?.scrollIntoView({ block: "end" });
+  }, [firstUnreadMessageId, latestMessageId]);
   useEffect(() => {
     const channel = supabase.channel(`collective-${room.summary.callupId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "collective_messages", filter: `callup_id=eq.${room.summary.callupId}` }, () => startTransition(() => router.refresh()))
