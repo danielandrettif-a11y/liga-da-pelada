@@ -141,3 +141,18 @@ describe("pacotes de bônus por posição — BQ v8", () => {
     expect(calculateFantasyPositionPackageBonus({ ...input, assists: 4, defensiveCleanGames: 6 }, settings)).toBe(8);
   });
 });
+
+describe("pacotes de bônus por posição — BQ v9", () => {
+  const settings = { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 9 };
+  const input = {
+    goals: 0, assists: 0, draws: 0, games: 4, losses: 0, goalkeeperGames: 0,
+    goalsConceded: 0, cleanSheets: 0, defensiveCleanGames: 0,
+    defensiveOneGoalGames: 0, slotRole: "DEF" as const, playerProfile: "defensive" as const,
+  };
+
+  it("premia empates do DEF/VOL sem passar de +2 e eleva o teto total para +10", () => {
+    expect(calculateFantasyPositionPackageBonus({ ...input, draws: 1 }, settings)).toBe(.5);
+    expect(calculateFantasyPositionPackageBonus({ ...input, draws: 8 }, settings)).toBe(2);
+    expect(calculateFantasyPositionPackageBonus({ ...input, draws: 8, assists: 4, defensiveCleanGames: 6 }, settings)).toBe(10);
+  });
+});

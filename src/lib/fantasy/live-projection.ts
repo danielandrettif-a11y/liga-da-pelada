@@ -203,6 +203,7 @@ export function projectFantasyLiveLineups(
               playerProfile: slot.playerProfile ?? stats.playerProfile,
               goals: stats.goals,
               assists: stats.assists,
+              draws: stats.draws,
               games: stats.games,
               losses: stats.losses,
               goalkeeperGames: stats.goalkeeperGames,

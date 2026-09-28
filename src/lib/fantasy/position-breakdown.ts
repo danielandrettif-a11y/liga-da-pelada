@@ -1,5 +1,5 @@
 /**
- * Breakdown autoritativo da pontuação por posição — BQ v5–v8.
+ * Breakdown autoritativo da pontuação por posição — BQ v5–v9.
  *
  * Usado na prévia ao vivo, processamento final e histórico para garantir
  * uma representação única e consistente em todas as interfaces.
@@ -68,12 +68,13 @@ const GOL_CLEAN_SHEET_BONUS = 4;
 // ---------------------------------------------------------------------------
 
 export type PositionBreakdownInput = {
-  /** V5 preserva rodadas antigas; V7 ativa novos papéis; V8 inclui assistência do DEF/VOL. */
+  /** V5 preserva rodadas antigas; V7 ativa novos papéis; V8/V9 evoluem o DEF/VOL. */
   scoringVersion?: number;
   slotRole: FantasySlotRole;
   playerProfile: string | null | undefined;
   goals: number;
   assists: number;
+  draws?: number;
   /** Partidas finalizadas como jogador de linha (excl. goleiro) com 0 gols sofridos */
   defensiveCleanGames: number;
   /** Partidas finalizadas com exatamente 1 gol sofrido */
@@ -158,6 +159,11 @@ export function calculatePositionBreakdown(input: PositionBreakdownInput): Posit
         events.push({ label: "Construção com assistência", count: input.assists, value });
         gross += value;
       }
+      if (scoringVersion >= 9 && Number(input.draws || 0) > 0) {
+        const value = Math.min(Number(input.draws || 0) * 0.5, 2);
+        events.push({ label: "Empates segurados", count: Number(input.draws), value });
+        gross += value;
+      }
       const activated = input.defensiveCleanGames >= 3;
       const specialBonus: SpecialBonus = {
         name: "Muralha",
@@ -166,15 +172,16 @@ export function calculatePositionBreakdown(input: PositionBreakdownInput): Posit
         progress: activated ? null : `${input.defensiveCleanGames}/3 clean sheets`,
       };
       if (activated) gross += 2.5;
-      const applied = Math.min(gross, 8);
+      const cap = scoringVersion >= 9 ? 10 : 8;
+      const applied = Math.min(gross, cap);
       return {
         position: "DEF",
         events,
         specialBonus,
         grossBonus: gross,
-        cap: 8,
+        cap,
         appliedBonus: applied,
-        capReached: gross > 8,
+        capReached: gross > cap,
       };
     }
 

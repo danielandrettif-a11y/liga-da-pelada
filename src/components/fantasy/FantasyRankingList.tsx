@@ -164,14 +164,16 @@ function podiumStyle(position: number) {
   };
 }
 
-function rankingHref(item: FantasyRankingEntry, scope: "general" | "round") {
+type FantasyRankingScope = "season" | "month" | "round";
+
+function rankingHref(item: FantasyRankingEntry, scope: FantasyRankingScope) {
   if (!item.user_id) return "/cartola/ranking";
   return scope === "round" && item.round_id
     ? `/cartola/ranking/${item.user_id}/${item.round_id}`
     : `/cartola/ranking/${item.user_id}`;
 }
 
-function FantasyPodium({ ranking, scope, metric }: { ranking: FantasyRankingEntry[]; scope: "general" | "round"; metric: FantasyRankingMetric }) {
+function FantasyPodium({ ranking, scope, metric }: { ranking: FantasyRankingEntry[]; scope: FantasyRankingScope; metric: FantasyRankingMetric }) {
   const podium = ranking.slice(0, 3);
   if (podium.length < 3) return null;
   const podiumOrder = [podium[1], podium[0], podium[2]];
@@ -253,11 +255,11 @@ function FantasyPodium({ ranking, scope, metric }: { ranking: FantasyRankingEntr
 export function FantasyRankingList({
   ranking,
   roundOverview,
-  scope = "general",
+  scope = "season",
 }: {
   ranking: FantasyRankingEntry[];
   roundOverview?: FantasyRoundLineupOverview | null;
-  scope?: "general" | "round";
+  scope?: FantasyRankingScope;
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useUrlState({ key: "status", initialValue: "confirmed", defaultValue: "confirmed", allowedValues: FANTASY_RANKING_TABS });
@@ -288,9 +290,12 @@ export function FantasyRankingList({
     };
   }, [refresh, scope]);
 
-  const activeMetric = FANTASY_RANKING_METRICS.find((metric) => metric.id === rankingFilter) || FANTASY_RANKING_METRICS[0];
+  const selectedMetric = FANTASY_RANKING_METRICS.find((metric) => metric.id === rankingFilter) || FANTASY_RANKING_METRICS[0];
+  const activeMetric = scope === "month" && selectedMetric.id === "points"
+    ? { ...selectedMetric, description: "Pontuação total do mês" }
+    : selectedMetric;
   const displayedRanking = useMemo(() => {
-    if (scope !== "general") return ranking;
+    if (scope === "round") return ranking;
     const eligibleRanking = activeMetric.minimumSelections && activeMetric.sampleField
       ? ranking.filter((item) => Number(item[activeMetric.sampleField!] || 0) >= activeMetric.minimumSelections!)
       : ranking;
@@ -484,14 +489,14 @@ export function FantasyRankingList({
           <button type="button" onClick={() => startRefresh(() => router.refresh())} disabled={refreshing} className="flex items-center gap-1 disabled:opacity-50"><RotateCcw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Atualizar</button>
         </div>
       )}
-      {scope === "general" && (
+      {scope !== "round" && (
         <section className="overflow-hidden rounded-2xl border border-accent/20 bg-[#06150d]/90 p-2.5 shadow-[0_12px_30px_rgba(0,0,0,.18)]" aria-label="Filtros do ranking do Cartola">
           <div className="flex items-center justify-between gap-3 px-1 pb-2">
             <div>
               <p className="text-[9px] font-black uppercase tracking-[.16em] text-accent">Escolha o ranking</p>
               <p className="text-[10px] text-muted">{activeMetric.description}{activeMetric.minimumSelections ? ` · mínimo ${activeMetric.minimumSelections} escolhas` : ""}</p>
             </div>
-            <span className="shrink-0 rounded-full border border-accent/20 bg-accent/[.08] px-2 py-1 text-[8px] font-black uppercase text-accent">Temporada</span>
+            <span className="shrink-0 rounded-full border border-accent/20 bg-accent/[.08] px-2 py-1 text-[8px] font-black uppercase text-accent">{scope === "month" ? "Mês" : "Temporada"}</span>
           </div>
           <div className="flex snap-x gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {FANTASY_RANKING_METRICS.map((metric) => (

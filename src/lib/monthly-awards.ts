@@ -5,6 +5,7 @@ export type MonthlyAwardType =
   | "bestGoalkeeperMonth"
   | "goldenBootMonth"
   | "topAssistMonth"
+  | "rankedMvpMonth"
   | "bestManagerMonth";
 
 export type MonthlyAward = {
@@ -29,6 +30,7 @@ export const MONTHLY_AWARD_LABELS: Record<MonthlyAwardType, string> = {
   bestGoalkeeperMonth: "Melhor Goleiro do mês",
   goldenBootMonth: "Chuteira de Ouro",
   topAssistMonth: "Garçom do mês",
+  rankedMvpMonth: "Craque do mês",
   bestManagerMonth: "Melhor Técnico do mês",
 };
 

@@ -32,6 +32,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
 
   if (!isOpen || !mounted || typeof document === "undefined") return null;
   const roleReframeActive = Number(settings.scoringVersion || 5) >= 7;
+  const defensiveDrawBonusActive = Number(settings.scoringVersion || 5) >= 9;
 
   return createPortal(
     <div
@@ -135,7 +136,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                     </span>
                   </div>
                   <span className="rounded bg-blue-500/20 px-2 py-0.5 text-[9px] font-black text-blue-300">
-                    Teto de +{roleReframeActive ? "8" : "10"}
+                    Teto de +{defensiveDrawBonusActive ? "10" : roleReframeActive ? "8" : "10"}
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-muted">
@@ -155,8 +156,12 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                     <span>🎯 Assistência na vaga DEF/VOL:</span>
                     <strong className="text-right font-black text-blue-300">+2,5 base +0,5 extra<br /><span className="text-[9px] text-muted">extra máximo +1,5</span></strong>
                   </div>}
+                  {defensiveDrawBonusActive && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-t border-white/5 py-1">
+                    <span>🤝 Empate na vaga DEF/VOL:</span>
+                    <strong className="text-right font-black text-blue-300">+0,5 por empate<br /><span className="text-[9px] text-muted">máximo +2</span></strong>
+                  </div>}
                 </div>
-                {roleReframeActive && <p className="rounded-xl bg-blue-500/8 px-3 py-2 text-[10px] leading-4 text-blue-100/80">Scouts básicos contam em qualquer posição. O bônus de assistência valoriza a saída de bola, mas todos os extras de DEF/VOL continuam limitados a +8.</p>}
+                {roleReframeActive && <p className="rounded-xl bg-blue-500/8 px-3 py-2 text-[10px] leading-4 text-blue-100/80">Scouts básicos contam em qualquer posição. A vaga DEF/VOL valoriza saída de bola{defensiveDrawBonusActive ? " e empate segurado" : ""}, com extras limitados a +{defensiveDrawBonusActive ? "10" : "8"}.</p>}
               </div>
 
               {/* 2. Meias / Alas (MEI) */}

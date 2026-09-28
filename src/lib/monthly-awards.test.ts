@@ -65,6 +65,14 @@ describe("monthly awards", () => {
       metric_value: 9,
       is_final: true,
     }])[0]).toMatchObject({ type: "goldenBootMonth", metricValue: 9 });
+    expect(parseMonthlyAwards([{
+      award_type: "rankedMvpMonth",
+      period_start: "2026-08-01",
+      points: 31,
+      rounds_played: 4,
+      metric_value: 31,
+      is_final: true,
+    }])[0]).toMatchObject({ type: "rankedMvpMonth", metricValue: 31 });
   });
 
   it("exibe as posições dos prêmios por extenso", () => {

@@ -12,6 +12,7 @@ const AWARD_COLORS: Record<MonthlyAwardType, { accent: string; background: strin
   bestGoalkeeperMonth: { accent: "#69edff", background: "#0a3942", code: "GOL" },
   goldenBootMonth: { accent: "#ffe16d", background: "#4a3b08", code: "GOLS" },
   topAssistMonth: { accent: "#63edb4", background: "#0b4030", code: "ASSIST" },
+  rankedMvpMonth: { accent: "#ffe16d", background: "#46370a", code: "CRAQUE" },
   bestManagerMonth: { accent: "#d3ff31", background: "#34450c", code: "TÉC" },
 };
 

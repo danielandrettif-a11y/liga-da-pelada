@@ -1458,6 +1458,8 @@ export async function getFantasyDashboard() {
     },
     lastRound: latestFinishedRound
       ? {
+          roundId: latestFinishedRound.round_id as string,
+          userId: account.user.id,
           number: latestFinishedRound.round?.number,
           date: latestFinishedRound.round?.date,
           playerPoints: Number(latestLineup?.player_points || 0),
@@ -2251,9 +2253,10 @@ async function getLiveRoundProjections(
 }
 
 export async function getFantasyRanking(
-  scope: "general" | "round" = "general",
+  scope: "general" | "season" | "month" | "round" = "season",
   roundId?: string
 ) {
+  const periodScope = scope === "general" ? "season" : scope;
   const account = await getCurrentAccount();
   if (!account.user) return [];
   const league = await getActiveLeague();
@@ -2273,13 +2276,13 @@ export async function getFantasyRanking(
   // Para o ranking geral basta a rodada ativa. No escopo de rodada a leitura
   // é feita depois de resolver o alvo, evitando projetar pontos de outra
   // rodada que esteja aberta ao mesmo tempo.
-  let live = scope === "general"
+  let live = periodScope !== "round"
     ? await getLiveRoundProjections(account.client, fs.id, league.id)
     : null;
   let rankingRoundId: string | null = roundId || null;
 
   let entries: any[] = [];
-  if (scope === "round") {
+  if (periodScope === "round") {
     let fantasyRoundId: string | null = null;
     let resolvedRoundId: string | null = roundId || null;
     if (roundId) {
@@ -2378,10 +2381,19 @@ export async function getFantasyRanking(
         .eq("fantasy_season_id", fs.id),
       rankingReadClient
         .from("fantasy_rounds")
-        .select("id")
+        .select("id, round_id, market_status, round:round_id(date, status)")
         .eq("fantasy_season_id", fs.id),
     ]);
-    const fantasyRoundIds = (seasonRounds || []).map((item: any) => item.id);
+    const datedRounds = (seasonRounds || []) as any[];
+    const latestPeriodRound = [...datedRounds]
+      .filter((item: any) => item.market_status === "finished" || item.market_status === "in_progress" || item.round?.status === "finished")
+      .sort((a: any, b: any) => String(b.round?.date || "").localeCompare(String(a.round?.date || "")))[0];
+    const monthlyKey = String(latestPeriodRound?.round?.date || "").slice(0, 7);
+    const selectedRounds = periodScope === "month"
+      ? datedRounds.filter((item: any) => String(item.round?.date || "").startsWith(monthlyKey))
+      : datedRounds;
+    const fantasyRoundIds = selectedRounds.map((item: any) => item.id);
+    if (periodScope === "month" && live && !selectedRounds.some((item: any) => item.round_id === live?.roundId)) live = null;
     const { data: scoredLineups } = fantasyRoundIds.length
       ? await rankingReadClient
           .from("fantasy_lineups")
@@ -2544,7 +2556,7 @@ export async function getFantasyRanking(
           .select("user_id, frame:frame_cosmetic_id(asset_key), aura:aura_cosmetic_id(asset_key), nameplate:nameplate_cosmetic_id(asset_key), title:title_cosmetic_id(name), background:background_cosmetic_id(asset_key)")
           .eq("fantasy_season_id", fs.id)
           .in("user_id", userIds),
-        scope === "round" && rankingRoundId
+        periodScope === "round" && rankingRoundId
           ? rankingReadClient
               .from("fantasy_card_activations")
               .select("user_id, status, result_bonus, result_details, card:fantasy_cards(slug, name, rarity)")

@@ -63,14 +63,16 @@ export function BottomNav({
   }, [pathname]);
 
   // A segunda posição nunca muda; o nome acompanha a etapa atual da rodada.
-  const agendaItem = hasReleasedPayment
-    ? { href: "/pagamentos", label: "Transfermarket", icon: ArrowLeftRight, notification: true }
-    : hasOpenCallup
-      ? { href: "/convocacao", label: "Convocação", icon: Flag, notification: true }
+  const agendaItem = hasOpenCallup
+    ? { href: "/convocacao", label: "Convocação", icon: Flag, notification: true }
+    : hasReleasedPayment
+      ? { href: "/pagamentos", label: "Transfermarket", icon: ArrowLeftRight, notification: true }
       : { href: "/rodadas", label: "Agenda", icon: CalendarDays, notification: false };
-  const communityItem = collective
-    ? { href: `/coletiva?callup=${collective.callupId}`, label: "Coletiva", icon: Microphone }
-    : NAV_ITEMS[3];
+  const communityItem = {
+    href: collective ? `/coletiva?callup=${collective.callupId}` : "/coletiva",
+    label: "Coletiva",
+    icon: Microphone,
+  };
   const contextualItems = [NAV_ITEMS[0], agendaItem, NAV_ITEMS[1], NAV_ITEMS[2], communityItem, NAV_ITEMS[4]];
   const visibleItems = isAuthenticated
     ? contextualItems

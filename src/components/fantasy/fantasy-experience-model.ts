@@ -49,7 +49,7 @@ export type FantasyExperienceProps = {
   marketHealth?: FantasyPublicMarketHealth | null;
   account: { totalPoints: number; roundsPlayed: number; bestRoundPoints: number };
   isTest?: boolean;
-  lastRound?: { number: number; date: string; playerPoints: number; cardPoints: number; totalPoints: number; playerScores: Array<{ playerId: string; points: number }> } | null;
+  lastRound?: { roundId: string; userId: string; number: number; date: string; playerPoints: number; cardPoints: number; totalPoints: number; playerScores: Array<{ playerId: string; points: number }> } | null;
   challengeType?: FantasyChallengeType | null;
   activeCard?: FantasyActiveCardDTO | null;
   availablePacks?: FantasyPackDTO[];
@@ -60,6 +60,7 @@ export type FantasyExperienceProps = {
   initialPackId?: string;
   initialTab?: "team" | "market";
   pitchAssetKey?: string | null;
+  hasActiveCallup?: boolean;
 };
 
 export const positionLabel: Record<string, string> = {

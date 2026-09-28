@@ -6,7 +6,7 @@ export function MonthlyAwards({ awards }: { awards: MonthlyAward[] }) {
   return (
     <div className="mb-4 grid gap-2 sm:grid-cols-2">
       {awards.map((award) => {
-        const Icon = award.type === "bestManagerMonth" ? Trophy : Medal;
+        const Icon = award.type === "bestManagerMonth" || award.type === "rankedMvpMonth" ? Trophy : Medal;
         return (
           <article key={`${award.type}-${award.periodStart}`} className="relative overflow-hidden rounded-xl border border-amber-300/30 bg-gradient-to-br from-amber-300/15 via-surface to-surface p-3">
             <div className="absolute -right-5 -top-5 h-16 w-16 rounded-full bg-amber-300/10 blur-xl" />

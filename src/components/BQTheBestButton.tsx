@@ -20,6 +20,7 @@ const AWARD_ORDER: MonthlyAwardType[] = [
   "bestGoalkeeperMonth",
   "goldenBootMonth",
   "topAssistMonth",
+  "rankedMvpMonth",
   "bestManagerMonth",
 ];
 
@@ -60,6 +61,12 @@ const AWARD_VISUALS: Record<MonthlyAwardType, { code: string; card: string; icon
     icon: "border-emerald-300/35 bg-emerald-400/15 text-emerald-300",
     eyebrow: "text-emerald-300",
   },
+  rankedMvpMonth: {
+    code: "CRAQUE",
+    card: "border-amber-300/35 bg-gradient-to-r from-amber-300/20 via-[#2a210a] to-[#07130c]",
+    icon: "border-amber-300/40 bg-amber-300/20 text-amber-200",
+    eyebrow: "text-amber-200",
+  },
   bestManagerMonth: {
     code: "TÉC",
     card: "border-accent/35 bg-gradient-to-r from-accent/15 via-[#19230a] to-[#07130c]",
@@ -75,6 +82,7 @@ const AWARD_EXPLANATIONS: Record<MonthlyAwardType, string> = {
   bestGoalkeeperMonth: "Foi quem menos sofreu gols durante as partidas em que atuou no gol.",
   goldenBootMonth: "Foi o jogador que marcou mais gols nas rodadas oficiais do mês.",
   topAssistMonth: "Foi o jogador que distribuiu mais assistências nas rodadas oficiais do mês.",
+  rankedMvpMonth: "Somou a maior pontuação no ranking das rodadas oficiais do mês.",
   bestManagerMonth: "Conquistou a maior pontuação acumulada no Cartola durante o mês.",
 };
 
@@ -84,7 +92,7 @@ type AwardEntry = {
 };
 
 function AwardIcon({ type, className }: { type: MonthlyAwardType; className?: string }) {
-  const Icon = type === "bestManagerMonth"
+  const Icon = type === "bestManagerMonth" || type === "rankedMvpMonth"
     ? Trophy
     : type === "bestGoalkeeperMonth"
       ? Shield

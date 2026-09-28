@@ -71,6 +71,18 @@ function awardsTotal(entry: RankingEntry) {
   return entry.awards.roundMvp + entry.awards.topScorer + entry.awards.topAssister + entry.awards.kingOfWins;
 }
 
+function AwardBadges({ entry, compact = false }: { entry: RankingEntry; compact?: boolean }) {
+  const size = compact ? "px-1 py-0.5 text-[6px]" : "px-1.5 py-0.5 text-[8px]";
+  return (
+    <div className={`flex flex-wrap ${compact ? "mt-1 justify-center gap-0.5" : "mt-1.5 gap-1"}`}>
+      {entry.awards.roundMvp > 0 && <span className={`rounded bg-warning/10 font-black text-warning ${size}`}>Craque da rodada {entry.awards.roundMvp}x</span>}
+      {entry.awards.topScorer > 0 && <span className={`rounded bg-accent/10 font-black text-accent ${size}`}>Artilheiro da rodada {entry.awards.topScorer}x</span>}
+      {entry.awards.topAssister > 0 && <span className={`rounded bg-accent/10 font-black text-accent ${size}`}>Garçom da rodada {entry.awards.topAssister}x</span>}
+      {entry.awards.kingOfWins > 0 && <span className={`rounded bg-amber-400/10 font-black text-amber-300 ${size}`}>Rei das vitórias {entry.awards.kingOfWins}x</span>}
+    </div>
+  );
+}
+
 function metricValue(entry: RankingEntry, filter: RankingFilter): number | null {
   if (filter === "goals") return entry.goals;
   if (filter === "assists") return entry.assists;
@@ -381,6 +393,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
                     <p className="mt-1 truncate text-[8px] font-bold text-muted">
                       {entry.wins}V · {entry.draws}E · {entry.losses}D · {entry.goals}G · {entry.assists}A
                     </p>
+                    <AwardBadges entry={entry} compact />
                     <p className={`mt-0.5 text-xs font-black ${style.label}`}>{metricDisplay(entry, filter)} <span className="text-[8px] uppercase opacity-70">{FILTER_LABELS[filter]}</span></p>
                   </div>
                   <div className={`w-full rounded-t-2xl border-x border-t bg-gradient-to-b pt-3 ${height} ${style.base}`}>
@@ -445,12 +458,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
                       </span>
                     )}
                   </div>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {entry.awards.roundMvp > 0 && <span className="rounded bg-warning/10 px-1.5 py-0.5 text-[8px] font-black text-warning">Craque da rodada {entry.awards.roundMvp}x</span>}
-                    {entry.awards.topScorer > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Artilheiro da rodada {entry.awards.topScorer}x</span>}
-                    {entry.awards.topAssister > 0 && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[8px] font-black text-accent">Garçom da rodada {entry.awards.topAssister}x</span>}
-                    {entry.awards.kingOfWins > 0 && <span className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black text-amber-300">Rei das vitórias {entry.awards.kingOfWins}x</span>}
-                  </div>
+                  <AwardBadges entry={entry} />
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="stat-number text-xl text-foreground">{metricDisplay(entry, filter)}</p>

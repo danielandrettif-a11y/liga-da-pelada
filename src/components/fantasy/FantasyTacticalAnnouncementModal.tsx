@@ -7,7 +7,8 @@ import { Sparkles, Shield, Target, Trophy, Users, X, ChevronRight } from "@/comp
 export function FantasyTacticalAnnouncementModal({ scoringVersion = 5 }: { scoringVersion?: number }) {
   const [isOpen, setIsOpen] = useState(false);
   const roleReframeActive = scoringVersion >= 7;
-  const storageKey = roleReframeActive ? "fantasy_tactical_v7_role_reframe_seen" : "fantasy_tactical_v4_role_scoring_seen";
+  const defensiveDrawBonusActive = scoringVersion >= 9;
+  const storageKey = defensiveDrawBonusActive ? "fantasy_tactical_v9_defense_seen" : roleReframeActive ? "fantasy_tactical_v7_role_reframe_seen" : "fantasy_tactical_v4_role_scoring_seen";
 
   useEffect(() => {
     const seen = localStorage.getItem(storageKey);
@@ -72,7 +73,7 @@ export function FantasyTacticalAnnouncementModal({ scoringVersion = 5 }: { scori
                 <span className="font-black text-accent text-[10px]">{roleReframeActive ? "+1,25 / +0,5 pts" : "+1,5 / +0,5 pts"}</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                {roleReframeActive ? <>Na vaga DEF/VOL, jogar na linha sem sofrer gol vale <strong>+1,25</strong>; sofrer exatamente um vale <strong>+0,5</strong>. Cada assistência dá +0,5 extra, até +1,5. Três clean sheets ativam Muralha (+2,5), com teto total de <strong>+8</strong>.</> : <>Na vaga DEF, jogar na linha sem sofrer gol vale <strong>+1,5</strong>; sofrer exatamente um vale <strong>+0,5</strong>. Três clean sheets ativam Muralha (+3 uma vez), sempre com teto de <strong>+10</strong>.</>}
+                {roleReframeActive ? <>Na vaga DEF/VOL, jogar na linha sem sofrer gol vale <strong>+1,25</strong>; sofrer exatamente um vale <strong>+0,5</strong>. Cada assistência dá +0,5 extra, até +1,5. Três clean sheets ativam Muralha (+2,5). {defensiveDrawBonusActive ? <>Cada empate dá +0,5 extra (máximo +2), com teto total de <strong>+10</strong>.</> : <>Teto total de <strong>+8</strong>.</>}</> : <>Na vaga DEF, jogar na linha sem sofrer gol vale <strong>+1,5</strong>; sofrer exatamente um vale <strong>+0,5</strong>. Três clean sheets ativam Muralha (+3 uma vez), sempre com teto de <strong>+10</strong>.</>}
               </p>
             </div>
           </div>

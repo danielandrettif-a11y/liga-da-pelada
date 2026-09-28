@@ -90,14 +90,41 @@ function isCollectiveOpen(callup: any) {
   return (round.round_players || []).some((participant: any) => !paidIds.has(participant.player_id));
 }
 
+function isCollectiveVisible(callup: any) {
+  if (callup.status !== "converted") return false;
+  const round = Array.isArray(callup.round) ? callup.round[0] : callup.round;
+  if (!round || round.status !== "finished") return true;
+  const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return String(callup.date) >= cutoff;
+}
+
+function collectiveSummary(callup: any, unreadCount: number): CollectiveSummary {
+  const round = Array.isArray(callup.round) ? callup.round[0] : callup.round;
+  return {
+    callupId: callup.id,
+    roundId: round?.id || callup.round_id || null,
+    roundNumber: round?.number || null,
+    date: callup.date,
+    status: round?.status || null,
+    unreadCount,
+  };
+}
+
 export async function getActiveCollectiveSummary(): Promise<CollectiveSummary | null> {
   const { account, callups } = await listCollectiveCandidates();
   if (!account.user) return null;
-  const callup = callups.find(isCollectiveOpen);
+  const callup = callups.find(isCollectiveOpen) || callups.find(isCollectiveVisible);
   if (!callup) return null;
-  const round = Array.isArray(callup.round) ? callup.round[0] : callup.round;
   const unreadCount = (await collectiveUnreadState(account.client, callup.id, account.user.id)).count;
-  return { callupId: callup.id, roundId: round?.id || callup.round_id || null, roundNumber: round?.number || null, date: callup.date, status: round?.status || null, unreadCount };
+  return collectiveSummary(callup, unreadCount);
+}
+
+export async function getCollectiveHistory(): Promise<CollectiveSummary[]> {
+  const { account, callups } = await listCollectiveCandidates();
+  if (!account.user) return [];
+  return Promise.all(callups.filter(isCollectiveVisible).map(async (callup) =>
+    collectiveSummary(callup, (await collectiveUnreadState(account.client, callup.id, account.user!.id)).count)
+  ));
 }
 
 export async function getCollectiveRoom(callupId?: string): Promise<CollectiveRoomData | null> {

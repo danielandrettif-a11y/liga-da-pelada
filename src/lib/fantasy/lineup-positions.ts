@@ -44,7 +44,7 @@ export function isCorrectFantasySlot(
 }
 
 /**
- * Calcula o bônus posicional conforme o snapshot imutável da rodada (BQ v5–v8).
+ * Calcula o bônus posicional conforme o snapshot imutável da rodada (BQ v5–v9).
  *
  * DEF: +1.5 por clean sheet, +0.5 por partida com 1 gol, Muralha +3 (≥3 CS), teto 10.
  * MEI: +1 por assistência, Maestro +3 (≥2 assistências).
@@ -59,6 +59,7 @@ export function calculateFantasyPositionPackageBonus(
     playerProfile: FantasyPlayerProfile;
     goals: number;
     assists: number;
+    draws?: number;
     games: number;
     losses: number;
     goalkeeperGames: number;
@@ -78,6 +79,7 @@ export function calculateFantasyPositionPackageBonus(
     playerProfile: input.playerProfile,
     goals: input.goals,
     assists: input.assists,
+    draws: input.draws,
     defensiveCleanGames: input.defensiveCleanGames,
     defensiveOneGoalGames: input.defensiveOneGoalGames,
     goalkeeperGames: input.goalkeeperGames,

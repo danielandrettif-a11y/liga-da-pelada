@@ -6,7 +6,7 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import type { Player, RoundStatus, RoundType } from "../types";
 import { getActiveSeason } from "./seasons";
 import { getActiveLeague } from "./rounds";
-import { findLatestReleasedPaymentRound, isPaymentChecklistComplete } from "../paymentStatus";
+import { findLatestReleasedPaymentRound } from "../paymentStatus";
 
 export type PaymentRound = {
   id: string;
@@ -104,31 +104,17 @@ export async function hasReleasedPaymentRound(): Promise<boolean> {
   if (!season) return false;
   const { data: releasedRounds, error: roundError } = await supabase
     .from("rounds")
-    .select("id, status, payment_pix, payment_total")
+    .select("id")
     .eq("season_id", season.id)
     .eq("status", "finished")
-    .not("payment_pix", "is", null)
-    .gt("payment_total", 0)
     .order("date", { ascending: false })
     .order("created_at", { ascending: false })
-    .limit(5);
+    .limit(1);
   if (roundError) {
     console.error("Erro ao verificar rodada de pagamento:", roundError);
     return false;
   }
-  const latestRound = findLatestReleasedPaymentRound(releasedRounds || []);
-  if (!latestRound) return false;
-
-  const { data: payments, error } = await supabase
-    .from("round_payments")
-    .select("paid")
-    .eq("round_id", latestRound.id);
-  if (error) {
-    console.error("Erro ao verificar conclusao dos pagamentos:", error);
-    return true;
-  }
-  const allPaid = isPaymentChecklistComplete(payments);
-  return !allPaid;
+  return Boolean(releasedRounds?.length);
 }
 
 export async function getRoundPaymentPlayers(roundId: string): Promise<PaymentPlayer[]> {

@@ -117,6 +117,7 @@ export function FantasyExperience({
   initialPackId,
   initialTab = "team",
   pitchAssetKey = null,
+  hasActiveCallup = false,
 }: FantasyExperienceProps) {
   const router = useRouter();
   const persistedPlayers = lineupPlayersFromSource(lineup);
@@ -1058,6 +1059,29 @@ export function FantasyExperience({
         />
       )}
 
+      {/* Entre rodadas, a escalação final fica logo abaixo do Radar até a próxima convocação. */}
+      {betweenRounds && lastRound && !hasActiveCallup && (
+        <button
+          type="button"
+          onClick={() => setShowRevealedLineups(true)}
+          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-accent/40 bg-gradient-to-r from-accent/20 via-surface to-accent/10 p-4 text-left shadow-lg transition-all duration-300 hover:scale-[1.01] active:scale-[0.99]"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-background shadow">
+              <Eye className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-black uppercase text-foreground">Times da última Ranked</span>
+                <span className="rounded-full bg-success/20 px-2 py-0.5 text-[8px] font-black uppercase text-success">Final</span>
+              </div>
+              <p className="text-[10px] text-muted">Consulte os {playersPerTeam} jogadores, capitão e cartas usados na rodada anterior.</p>
+            </div>
+          </div>
+          <span className="shrink-0 rounded-xl bg-accent px-3 py-1.5 text-xs font-black text-background">Ver Times →</span>
+        </button>
+      )}
+
       {/* Banner de Modo Teste */}
       {isTest && (
         <div className="overflow-hidden rounded-2xl border border-warning/45 bg-warning/12 p-4 text-center shadow-[0_0_28px_rgba(245,158,11,.08)]">
@@ -1174,7 +1198,7 @@ export function FantasyExperience({
       </header>
 
       {/* Resumo da Última Rodada */}
-      {lastRound && !isTest && betweenRounds && (
+      {lastRound && !isTest && status !== "in_progress" && (
         <section className="overflow-hidden rounded-2xl border border-accent/25 bg-gradient-to-br from-[#0b2415] via-surface to-[#10190d] shadow-[0_12px_30px_rgba(0,0,0,.2)]">
           <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3.5">
             <div className="flex min-w-0 items-center gap-3">
@@ -1202,11 +1226,18 @@ export function FantasyExperience({
               <p className="mt-1 text-lg font-black text-warning">{lastRound.cardPoints > 0 ? "+" : ""}{lastRound.cardPoints.toFixed(1)} <span className="text-[10px] text-warning/70">pts</span></p>
             </div>
           </div>
+          <Link
+            href={`/cartola/ranking/${lastRound.userId}/${lastRound.roundId}`}
+            className="mx-3 mb-3 flex items-center justify-between rounded-xl border border-accent/25 bg-accent/10 px-3 py-2.5 text-[10px] font-black text-accent transition-colors hover:bg-accent/15"
+          >
+            Clique aqui para ver seu time escalado na última rodada
+            <span aria-hidden="true">→</span>
+          </Link>
         </section>
       )}
 
       {/* Botão de Revelação de Escalações Pós-Fechamento */}
-      {isMarketClosed && (
+      {isMarketClosed && !betweenRounds && (
         <button
           type="button"
           onClick={() => setShowRevealedLineups(true)}
@@ -1219,16 +1250,14 @@ export function FantasyExperience({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-black uppercase text-foreground">
-                  {betweenRounds ? "Times da última Ranked" : "Escalações reveladas"}
+                  Escalações reveladas
                 </span>
                 <span className="rounded-full bg-success/20 text-success px-2 py-0.5 text-[8px] font-black uppercase">
-                  {betweenRounds ? "Final" : "Ao Vivo"}
+                  Ao Vivo
                 </span>
               </div>
               <p className="text-[10px] text-muted">
-                {betweenRounds
-                  ? `Consulte os ${playersPerTeam} jogadores, capitão e cartas usados na rodada anterior.`
-                  : `O mercado fechou! Toque para ver os ${playersPerTeam} jogadores, capitão e cartas de todos os rivais.`}
+                O mercado fechou! Toque para ver os {playersPerTeam} jogadores, capitão e cartas de todos os rivais.
               </p>
             </div>
           </div>
