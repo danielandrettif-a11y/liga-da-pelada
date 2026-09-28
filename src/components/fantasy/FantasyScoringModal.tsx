@@ -33,6 +33,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
   if (!isOpen || !mounted || typeof document === "undefined") return null;
   const roleReframeActive = Number(settings.scoringVersion || 5) >= 7;
   const defensiveDrawBonusActive = Number(settings.scoringVersion || 5) >= 9;
+  const goalkeeperSlotOnly = Number(settings.scoringVersion || 5) >= 10;
 
   return createPortal(
     <div
@@ -71,7 +72,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
           </div>
 
           <p className="mt-2 text-xs text-muted leading-relaxed">
-            Primeiro vêm os oito scouts do que aconteceu em campo; depois, o bônus da vaga que você escolheu. O mesmo cálculo vale no ao vivo e no fechamento.
+            {goalkeeperSlotOnly ? "Cada vaga usa os scouts compatíveis com sua função. Na vaga GOL, só entram as partidas em que o atleta foi goleiro." : "Primeiro vêm os oito scouts do que aconteceu em campo; depois, o bônus da vaga que você escolheu. O mesmo cálculo vale no ao vivo e no fechamento."}
           </p>
 
           {/* Abas Internas */}
@@ -158,7 +159,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                   </div>}
                   {defensiveDrawBonusActive && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-t border-white/5 py-1">
                     <span>🤝 Empate na vaga DEF/VOL:</span>
-                    <strong className="text-right font-black text-blue-300">+0,5 por empate<br /><span className="text-[9px] text-muted">máximo +2</span></strong>
+                    <strong className="text-right font-black text-blue-300">+{goalkeeperSlotOnly ? "1" : "0,5"} por empate<br /><span className="text-[9px] text-muted">máximo +2</span></strong>
                   </div>}
                 </div>
                 {roleReframeActive && <p className="rounded-xl bg-blue-500/8 px-3 py-2 text-[10px] leading-4 text-blue-100/80">Scouts básicos contam em qualquer posição. A vaga DEF/VOL valoriza saída de bola{defensiveDrawBonusActive ? " e empate segurado" : ""}, com extras limitados a +{defensiveDrawBonusActive ? "10" : "8"}.</p>}
@@ -244,18 +245,18 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                 <div className="space-y-1 text-xs text-muted">
                   <div className="flex justify-between py-0.5 border-b border-white/5">
                     <span>🧤 Atuação real no gol (scout base):</span>
-                    <strong className="text-accent font-black">+{settings.goalkeeperAppearancePoints.toFixed(1)} pts / jogo</strong>
+                    <strong className="text-accent font-black">+{(goalkeeperSlotOnly ? settings.goalkeeperSlotAppearancePoints : settings.goalkeeperAppearancePoints).toFixed(1)} pts / jogo</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
                     <span>🧱 Clean sheet: escalado GOL e atuou no gol:</span>
-                    <strong className="text-accent font-black">+4.0 pts / jogo</strong>
+                    <strong className="text-accent font-black">+{settings.goalkeeperSlotCleanSheetPoints.toFixed(1)} pts / jogo</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
                     <span>🥅 Gol sofrido enquanto goleiro:</span>
-                    <strong className="text-danger font-black">{settings.goalConcededPoints.toFixed(1)} pt / gol</strong>
+                    <strong className="text-danger font-black">{(goalkeeperSlotOnly ? settings.goalkeeperSlotGoalConcededPoints : settings.goalConcededPoints).toFixed(1)} pt / gol</strong>
                   </div>
                   <div className="flex justify-between py-0.5">
-                    <span>📌 Se não atuar no gol, não recebe o clean sheet:</span>
+                    <span>{goalkeeperSlotOnly ? "📌 O que fizer na linha não entra na vaga GOL:" : "📌 Se não atuar no gol, não recebe o clean sheet:"}</span>
                     <strong className="text-foreground font-black">0.0 pt</strong>
                   </div>
                 </div>
@@ -267,7 +268,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
           {activeTab === "base" && (
             <div className="space-y-3">
               <p className="text-xs text-muted leading-relaxed">
-                Scouts são pontos do atleta e contam onde ele estiver escalado. O bônus de posição é separado e só depende da vaga correta.
+                {goalkeeperSlotOnly ? "Nas vagas de linha, os scouts gerais continuam valendo. Na vaga GOL, gols, assistências e resultados só contam se acontecerem numa partida em que o atleta estava no gol." : "Scouts são pontos do atleta e contam onde ele estiver escalado. O bônus de posição é separado e só depende da vaga correta."}
               </p>
 
               <div className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden text-xs">
@@ -309,7 +310,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                     <span className="font-bold text-white flex items-center gap-1.5">
                       🧤 Jogo como goleiro real
                     </span>
-                    <span className="font-black text-accent">+{settings.goalkeeperAppearancePoints.toFixed(1)} pts / jogo</span>
+                    <span className="font-black text-accent">+{(goalkeeperSlotOnly ? settings.goalkeeperSlotAppearancePoints : settings.goalkeeperAppearancePoints).toFixed(1)} pts / jogo</span>
                   </div>
 
                   <div className="flex items-center justify-between p-3">
@@ -323,7 +324,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                     <span className="font-bold text-white flex items-center gap-1.5">
                       🥅 Gol sofrido como goleiro real
                     </span>
-                    <span className="font-black text-danger">{settings.goalConcededPoints.toFixed(1)} pt / gol</span>
+                    <span className="font-black text-danger">{(goalkeeperSlotOnly ? settings.goalkeeperSlotGoalConcededPoints : settings.goalConcededPoints).toFixed(1)} pt / gol</span>
                   </div>
 
                   <div className="flex items-center justify-between p-3">

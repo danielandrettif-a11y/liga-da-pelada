@@ -274,12 +274,12 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
     // Resolver notificações ativas que já foram solucionadas (ex: usuário escolheu o capitão)
     const { data: activeNotifications } = await account.client
       .from("user_inbox_notifications")
-      .select("id, dedupe_key")
+      .select("id, dedupe_key, notification_type")
       .eq("user_id", account.user.id)
       .eq("state", "active");
 
     const staleIds = (activeNotifications || [])
-      .filter((item) => !keys.has(item.dedupe_key))
+      .filter((item) => item.notification_type !== "callup_withdrawal" && !keys.has(item.dedupe_key))
       .map((item) => item.id);
 
     if (staleIds.length) {

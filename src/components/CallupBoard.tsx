@@ -241,18 +241,18 @@ export function CallupBoard({
     <div className="min-w-0 space-y-4 overflow-x-clip pb-6">
       {/* 1. HERO CARD DA CONVOCAÇÃO */}
       <section className="relative overflow-hidden rounded-3xl border border-accent/30 bg-gradient-to-br from-accent/15 via-[#07150d] to-surface p-4 sm:p-5 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
-        <div className="flex items-start justify-between gap-3">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-0.5 font-athletic text-[10px] font-black uppercase tracking-wider text-background">
+              <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-accent px-2.5 py-0.5 font-athletic text-[10px] font-black uppercase tracking-wider text-background">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-background" />
                 {callup.status === "locked" ? "Lista Fechada" : isQueueOnlyAfterDraw ? "Times Sorteados · Fila Aberta" : "Convocação Aberta"}
               </span>
-              <span className="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 text-[10px] font-bold text-muted uppercase">
+              <span className="shrink-0 whitespace-nowrap rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 text-[10px] font-bold text-muted uppercase">
                 {callup.round_type === "friendly" ? "Amistoso" : "Ranked"}
               </span>
               {isAdmin && (
-                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${callup.is_public ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>
+                <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${callup.is_public ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>
                   <Shield className="h-3 w-3" /> {callup.is_public ? "Lista pública" : "Só convite"}
                 </span>
               )}
@@ -264,7 +264,7 @@ export function CallupBoard({
           </div>
 
           {/* Botões de Ação do Topo */}
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:w-auto sm:justify-end">
             <RoundCalendarButton
               event={{
                 title: `Pelada BQ - ${callup.round_type === "friendly" ? "Amistoso" : "Rodada Oficial"}`,
@@ -282,7 +282,7 @@ export function CallupBoard({
                 type="button"
                 onClick={() => run("visibility", () => setCallupVisibility(callup.id, !callup.is_public))}
                 disabled={!!loading}
-                className={`flex h-10 shrink-0 items-center gap-1.5 rounded-xl border px-2.5 text-[10px] font-black uppercase transition-colors disabled:opacity-50 ${callup.is_public ? "border-accent/40 bg-accent/15 text-accent hover:bg-accent/25" : "border-warning/40 bg-warning/10 text-warning hover:bg-warning/20"}`}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-[10px] font-black uppercase transition-colors disabled:opacity-50 sm:w-auto sm:gap-1.5 sm:px-2.5 ${callup.is_public ? "border-accent/40 bg-accent/15 text-accent hover:bg-accent/25" : "border-warning/40 bg-warning/10 text-warning hover:bg-warning/20"}`}
                 title={callup.is_public ? "Fechar lista para convidados" : "Abrir lista para todos"}
                 aria-label={callup.is_public ? "Fechar lista para convidados" : "Abrir lista para todos"}
               >

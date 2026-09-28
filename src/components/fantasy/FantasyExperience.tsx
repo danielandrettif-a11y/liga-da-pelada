@@ -31,7 +31,7 @@ import {
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { TeamCrest } from "@/components/TeamCrest";
 import { TeamMiniPitch } from "@/components/TeamMiniPitch";
-import { formatFantasyMoney } from "@/lib/fantasy/config";
+import { CURRENT_FANTASY_SCORING_VERSION, formatFantasyMoney } from "@/lib/fantasy/config";
 import { cosmeticImage } from "@/lib/fantasy/cosmetics";
 import { CHALLENGE_LABELS, fantasyChallengeOffer } from "@/lib/fantasy/challenges";
 import {
@@ -336,7 +336,7 @@ export function FantasyExperience({
   // Entre rodadas, o campo é o portfólio da próxima Ranked e deve apresentar
   // as funções vigentes; uma rodada aberta continua obedecendo ao seu snapshot.
   const guideScoringVersion = betweenRounds
-    ? Math.max(9, Number(settings.scoringVersion || 5))
+    ? Math.max(CURRENT_FANTASY_SCORING_VERSION, Number(settings.scoringVersion || 5))
     : Number(settings.scoringVersion || 5);
   const scoringGuideSettings = guideScoringVersion === settings.scoringVersion
     ? settings

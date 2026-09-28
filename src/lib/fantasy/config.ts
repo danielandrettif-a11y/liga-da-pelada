@@ -21,6 +21,10 @@ export type FantasySettings = {
   lossPoints: number;
   goalConcededPoints: number;
   goalkeeperAppearancePoints: number;
+  /** Valores exclusivos da vaga GOL a partir da pontuação v10. */
+  goalkeeperSlotAppearancePoints: number;
+  goalkeeperSlotGoalConcededPoints: number;
+  goalkeeperSlotCleanSheetPoints: number;
   ownGoalPoints: number;
   captainMultiplier: number;
   topScorerPredictionPoints: number;
@@ -80,8 +84,9 @@ export type FantasySettings = {
   attackerGoalPoints?: number;
   goalkeeperLossPoints?: number;
   teamGoalConcededPoints?: number;
-  goalkeeperSlotCleanSheetPoints?: number;
 };
+
+export const CURRENT_FANTASY_SCORING_VERSION = 10;
 
 export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   scoringVersion: 5,
@@ -101,6 +106,9 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   lossPoints: BQ_SCORING_V5.loss,
   goalConcededPoints: BQ_SCORING_V5.goalkeeperGoalConceded,
   goalkeeperAppearancePoints: BQ_SCORING_V5.goalkeeperAppearance,
+  goalkeeperSlotAppearancePoints: 4,
+  goalkeeperSlotGoalConcededPoints: -2.5,
+  goalkeeperSlotCleanSheetPoints: 4,
   ownGoalPoints: BQ_SCORING_V5.ownGoal,
   captainMultiplier: 1.5,
   topScorerPredictionPoints: 8,
@@ -152,7 +160,6 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   attackerGoalPoints: BQ_SCORING_V5.goal,
   goalkeeperLossPoints: BQ_SCORING_V5.loss,
   teamGoalConcededPoints: 0,
-  goalkeeperSlotCleanSheetPoints: 4,
 };
 
 export const FANTASY_RECENT_ROUND_WEIGHTS = [0.40, 0.25, 0.15, 0.12, 0.08] as const;

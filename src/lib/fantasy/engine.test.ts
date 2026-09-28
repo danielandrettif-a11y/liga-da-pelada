@@ -7,6 +7,7 @@ import {
   calculateFantasyPredictionIndex,
   calculateFantasyForm,
   calculateFantasyPlayerPoints,
+  calculateFantasyGoalkeeperSlotPoints,
   calculateFantasyPrices,
   calculateCompetitivePriceTarget,
   calculateFantasyTrend,
@@ -60,6 +61,13 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
       expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, goalkeeperGames: 2, goalsConceded: 2 }, DEFAULT_FANTASY_SETTINGS)).toBe(2);
       expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 0, teamGoalsConceded: 2 }, DEFAULT_FANTASY_SETTINGS)).toBe(0);
       expect(calculateFantasyPlayerPoints({ goals: 0, assists: 0, wins: 0, losses: 2, goalkeeperGames: 1 }, DEFAULT_FANTASY_SETTINGS)).toBe(-3);
+    });
+
+    it("calcula a base exclusiva da vaga GOL na v10", () => {
+      const settings = { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 10 };
+      expect(calculateFantasyGoalkeeperSlotPoints({ goalkeeperGames: 1, goalkeeperWins: 1 }, settings)).toBe(7);
+      expect(calculateFantasyGoalkeeperSlotPoints({ goalkeeperGames: 1, goalkeeperWins: 1, goalsConceded: 1 }, settings)).toBe(4.5);
+      expect(calculateFantasyGoalkeeperSlotPoints({ goalkeeperGames: 1, goalkeeperLosses: 1, goalsConceded: 2 }, settings)).toBe(-3.5);
     });
 
     it("mantém o patrimônio proporcional nas modalidades de 5 e 6 atletas", () => {

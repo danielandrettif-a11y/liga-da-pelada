@@ -407,6 +407,12 @@ export type PlayerRoundStats = {
   draws: number;
   losses: number;
   goalkeeper_games: number;
+  goalkeeper_goals: number;
+  goalkeeper_assists: number;
+  goalkeeper_own_goals: number;
+  goalkeeper_wins: number;
+  goalkeeper_draws: number;
+  goalkeeper_losses: number;
   clean_sheets: number;
   goals_conceded: number;
   defensive_clean_games: number;
@@ -664,7 +670,7 @@ export type Database = {
       };
       player_round_stats: {
         Row: PlayerRoundStats;
-        Insert: Omit<PlayerRoundStats, 'id' | 'games' | 'goals' | 'assists' | 'wins' | 'draws' | 'losses' | 'own_goals' | 'points'> & { id?: string; games?: number; goals?: number; assists?: number; wins?: number; draws?: number; losses?: number; own_goals?: number; points?: number };
+        Insert: Omit<PlayerRoundStats, 'id' | 'games' | 'goals' | 'assists' | 'wins' | 'draws' | 'losses' | 'own_goals' | 'goalkeeper_goals' | 'goalkeeper_assists' | 'goalkeeper_own_goals' | 'goalkeeper_wins' | 'goalkeeper_draws' | 'goalkeeper_losses' | 'points'> & { id?: string; games?: number; goals?: number; assists?: number; wins?: number; draws?: number; losses?: number; own_goals?: number; goalkeeper_goals?: number; goalkeeper_assists?: number; goalkeeper_own_goals?: number; goalkeeper_wins?: number; goalkeeper_draws?: number; goalkeeper_losses?: number; points?: number };
         Update: Partial<Omit<PlayerRoundStats, 'id'>>;
       };
     };

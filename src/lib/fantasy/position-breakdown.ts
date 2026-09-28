@@ -1,5 +1,5 @@
 /**
- * Breakdown autoritativo da pontuação por posição — BQ v5–v9.
+ * Breakdown autoritativo da pontuação por posição — BQ v5–v10.
  *
  * Usado na prévia ao vivo, processamento final e histórico para garantir
  * uma representação única e consistente em todas as interfaces.
@@ -83,6 +83,7 @@ export type PositionBreakdownInput = {
   goalkeeperGames: number;
   /** Clean sheets como goleiro */
   cleanSheets: number;
+  goalkeeperCleanSheetPoints?: number;
   suppressGoalkeeperRewards?: boolean;
 };
 
@@ -111,7 +112,7 @@ export function calculatePositionBreakdown(input: PositionBreakdownInput): Posit
   // GOL — clean sheet quando realmente atuou no gol
   if (slotRole === "GOL") {
     const cleanSheetBonus = !input.suppressGoalkeeperRewards && input.goalkeeperGames > 0
-      ? input.cleanSheets * GOL_CLEAN_SHEET_BONUS
+      ? input.cleanSheets * (input.goalkeeperCleanSheetPoints ?? GOL_CLEAN_SHEET_BONUS)
       : 0;
     return {
       position: "GOL",
@@ -160,7 +161,7 @@ export function calculatePositionBreakdown(input: PositionBreakdownInput): Posit
         gross += value;
       }
       if (scoringVersion >= 9 && Number(input.draws || 0) > 0) {
-        const value = Math.min(Number(input.draws || 0) * 0.5, 2);
+        const value = Math.min(Number(input.draws || 0) * (scoringVersion >= 10 ? 1 : 0.5), 2);
         events.push({ label: "Empates segurados", count: Number(input.draws), value });
         gross += value;
       }

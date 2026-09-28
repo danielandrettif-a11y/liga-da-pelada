@@ -1,4 +1,4 @@
-import { calculateFantasyPlayerPoints } from "./engine";
+import { calculateFantasyGoalkeeperSlotPoints, calculateFantasyPlayerPoints } from "./engine";
 import type { FantasySettings } from "./config";
 import {
   calculateFantasyPositionPackageBonus,
@@ -37,6 +37,12 @@ export type FantasyLivePlayerStats = {
   games: number;
   goalkeeperGames: number;
   goalsConceded: number;
+  goalkeeperGoals: number;
+  goalkeeperAssists: number;
+  goalkeeperOwnGoals: number;
+  goalkeeperWins: number;
+  goalkeeperDraws: number;
+  goalkeeperLosses: number;
   cleanSheets: number;
   defensiveCleanGames: number;
   defensiveOneGoalGames: number;
@@ -107,6 +113,12 @@ export function projectFantasyLiveStats(
       games: 0,
       goalkeeperGames: 0,
       goalsConceded: 0,
+      goalkeeperGoals: 0,
+      goalkeeperAssists: 0,
+      goalkeeperOwnGoals: 0,
+      goalkeeperWins: 0,
+      goalkeeperDraws: 0,
+      goalkeeperLosses: 0,
       cleanSheets: 0,
       defensiveCleanGames: 0,
       defensiveOneGoalGames: 0,
@@ -150,14 +162,27 @@ export function projectFantasyLiveStats(
       // somente as recompensas positivas de goleiro.
       current.goalkeeperGames += 1;
       if (conceded === 0) current.cleanSheets += 1;
+      if (isFinished) {
+        if (isDraw) current.goalkeeperDraws += 1;
+        else if (winner === goalkeeper.teamId) current.goalkeeperWins += 1;
+        else current.goalkeeperLosses += 1;
+      }
     }
 
     for (const event of match.events) {
       if (event.isOwnGoal) {
-        ensure(event.playerId).ownGoals += 1;
+        const scorer = ensure(event.playerId);
+        scorer.ownGoals += 1;
+        if (goalkeeperIds.has(event.playerId)) scorer.goalkeeperOwnGoals += 1;
       } else {
-        ensure(event.playerId).goals += 1;
-        if (event.assistPlayerId) ensure(event.assistPlayerId).assists += 1;
+        const scorer = ensure(event.playerId);
+        scorer.goals += 1;
+        if (goalkeeperIds.has(event.playerId)) scorer.goalkeeperGoals += 1;
+        if (event.assistPlayerId) {
+          const assister = ensure(event.assistPlayerId);
+          assister.assists += 1;
+          if (goalkeeperIds.has(event.assistPlayerId)) assister.goalkeeperAssists += 1;
+        }
       }
     }
   }
@@ -191,6 +216,7 @@ export function projectFantasyLiveLineups(
   return lineups.map((lineup) => {
     const slotByPlayer = new Map((lineup.slots || []).map((slot) => [slot.playerId, slot]));
     const pointsByPlayer = new Map<string, number>();
+    const basePointsByPlayer = new Map<string, number>();
     let positionBonus = 0;
 
     for (const playerId of lineup.playerIds) {
@@ -216,8 +242,12 @@ export function projectFantasyLiveLineups(
             settings,
           )
         : 0;
+      const basePoints = stats && slot?.slotRole === "GOL" && Number(settings.scoringVersion || 5) >= 10
+        ? calculateFantasyGoalkeeperSlotPoints(stats, settings)
+        : stats?.basePoints || 0;
       positionBonus += bonus;
-      pointsByPlayer.set(playerId, (stats?.basePoints || 0) + bonus);
+      basePointsByPlayer.set(playerId, basePoints);
+      pointsByPlayer.set(playerId, basePoints + bonus);
     }
 
     const playerPoints = [...pointsByPlayer.values()].reduce((sum, points) => sum + points, 0);
@@ -225,7 +255,7 @@ export function projectFantasyLiveLineups(
     const captainBonus = Math.round(captainBase * Math.max(0, settings.captainMultiplier - 1) * 100) / 100;
     const players = lineup.playerIds.map((playerId) => {
       const slot = slotByPlayer.get(playerId);
-      const basePoints = playerStats.get(playerId)?.basePoints || 0;
+      const basePoints = basePointsByPlayer.get(playerId) || 0;
       const totalWithoutCaptain = pointsByPlayer.get(playerId) || 0;
       const positionBonus = totalWithoutCaptain - basePoints;
       const playerCaptainBonus = playerId === lineup.captainPlayerId

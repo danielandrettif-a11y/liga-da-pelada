@@ -288,6 +288,12 @@ export async function calculateRoundStats(roundId: string) {
           goals: 0,
           assists: 0,
           goalkeeper_games: 0,
+          goalkeeper_goals: 0,
+          goalkeeper_assists: 0,
+          goalkeeper_own_goals: 0,
+          goalkeeper_wins: 0,
+          goalkeeper_draws: 0,
+          goalkeeper_losses: 0,
           clean_sheets: 0,
           goals_conceded: 0,
           defensive_clean_games: 0,
@@ -348,6 +354,9 @@ export async function calculateRoundStats(roundId: string) {
         s.goalkeeper_games += 1;
         s.goals_conceded += conceded;
         if (conceded === 0) s.clean_sheets += 1;
+        if (isDraw) s.goalkeeper_draws += 1;
+        else if (winnerId === goalkeeper.team_id) s.goalkeeper_wins += 1;
+        else s.goalkeeper_losses += 1;
       }
 
       // Processar eventos (gols e assistências)
@@ -357,6 +366,7 @@ export async function calculateRoundStats(roundId: string) {
             const offender = statsMap[ev.player_id];
             if (offender && !voidedPlayerIds.has(ev.player_id)) {
               offender.own_goals += 1;
+              if (goalkeeperIds.has(ev.player_id)) offender.goalkeeper_own_goals += 1;
             }
             continue;
           }
@@ -364,12 +374,14 @@ export async function calculateRoundStats(roundId: string) {
           const scorer = statsMap[ev.player_id];
           if (scorer && !voidedPlayerIds.has(ev.player_id)) {
             scorer.goals += 1;
+            if (goalkeeperIds.has(ev.player_id)) scorer.goalkeeper_goals += 1;
           }
           // Assistências
           if (ev.assist_player_id) {
             const assister = statsMap[ev.assist_player_id];
             if (assister && !voidedPlayerIds.has(ev.assist_player_id)) {
               assister.assists += 1;
+              if (goalkeeperIds.has(ev.assist_player_id)) assister.goalkeeper_assists += 1;
             }
           }
         }

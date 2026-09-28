@@ -200,15 +200,36 @@ describe("live fantasy projection", () => {
   });
 
   it("aplica o pacote de GOL a qualquer atleta nessa vaga e dá +4 de clean sheet", () => {
-    const stats = projectFantasyLiveStats([{ ...baseMatch, status: "finished" }], DEFAULT_FANTASY_SETTINGS);
+    const settings = { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 10 };
+    const stats = projectFantasyLiveStats([{ ...baseMatch, status: "finished" }], settings);
     const [goalkeeperSlot, fieldSlot] = projectFantasyLiveLineups([
       { id: "gol", userId: "gol", playerIds: ["keeper"], slots: [{ playerId: "keeper", slotRole: "GOL" }] },
       { id: "mei", userId: "mei", playerIds: ["keeper"], slots: [{ playerId: "keeper", slotRole: "MEI", playerProfile: "midfield" }] },
-    ], stats, DEFAULT_FANTASY_SETTINGS);
+    ], stats, settings);
 
     expect(goalkeeperSlot.positionBonus).toBe(4);
-    // Fora da vaga GOL, ele recebe apenas o eventual pacote da posição MEI.
-    expect(fieldSlot.positionBonus).toBe(1);
-    expect(goalkeeperSlot.playerPoints).toBe(fieldSlot.playerPoints + 3);
+    expect(goalkeeperSlot.players[0]).toMatchObject({ basePoints: 9.5, positionBonus: 4, totalPoints: 13.5 });
+    // Fora da vaga GOL, os scouts gerais continuam seguindo a posição escolhida.
+    expect(fieldSlot.players[0]).toMatchObject({ basePoints: 7.5, positionBonus: 0.75, totalPoints: 8.25 });
+  });
+
+  it("na v10 ignora no slot GOL tudo que o atleta fez somente na linha", () => {
+    const settings = { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 10 };
+    const stats = projectFantasyLiveStats([{
+      ...baseMatch,
+      status: "finished",
+      goalkeepers: [],
+      scoreA: 2,
+      events: [
+        { playerId: "scorer", teamId: "a" },
+        { playerId: "scorer", teamId: "a" },
+      ],
+    }], settings);
+    const [lineup] = projectFantasyLiveLineups([{
+      id: "gol", userId: "gol", playerIds: ["scorer"], slots: [{ playerId: "scorer", slotRole: "GOL" }],
+    }], stats, settings);
+
+    expect(stats.get("scorer")?.basePoints).toBe(11);
+    expect(lineup.players[0]).toMatchObject({ basePoints: 0, positionBonus: 0, totalPoints: 0 });
   });
 });

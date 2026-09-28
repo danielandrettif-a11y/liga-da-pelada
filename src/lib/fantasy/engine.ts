@@ -13,6 +13,12 @@ export type FantasyPerformance = {
   playerProfile?: "offensive" | "midfield" | "defensive" | null;
   goalkeeperGames?: number;
   goalsConceded?: number;
+  goalkeeperGoals?: number;
+  goalkeeperAssists?: number;
+  goalkeeperOwnGoals?: number;
+  goalkeeperWins?: number;
+  goalkeeperDraws?: number;
+  goalkeeperLosses?: number;
   defensiveCleanGames?: number;
   defensiveOneGoalGames?: number;
   teamGoalsConceded?: number;
@@ -109,6 +115,47 @@ export function calculateFantasyPlayerPoints(
   const goalsConcededCents = Math.round((stats.goalsConceded || 0) * settings.goalConcededPoints * 100);
   const ownGoalsCents = Math.round((stats.ownGoals || 0) * settings.ownGoalPoints * 100);
   return (goalsCents + assistsCents + winsCents + drawsCents + lossesCents + goalkeeperCents + goalsConcededCents + ownGoalsCents) / 100;
+}
+
+export type FantasyGoalkeeperSlotStats = Pick<
+  FantasyPerformance,
+  | "goalkeeperGames"
+  | "goalsConceded"
+  | "goalkeeperGoals"
+  | "goalkeeperAssists"
+  | "goalkeeperOwnGoals"
+  | "goalkeeperWins"
+  | "goalkeeperDraws"
+  | "goalkeeperLosses"
+>;
+
+export function buildFantasyGoalkeeperSlotBreakdown(
+  stats: FantasyGoalkeeperSlotStats,
+  settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
+) {
+  const rows = [
+    ["goalkeeperGoals", "Gols enquanto estava no gol", stats.goalkeeperGoals, settings.goalPoints],
+    ["goalkeeperAssists", "Assistências enquanto estava no gol", stats.goalkeeperAssists, settings.assistPoints],
+    ["goalkeeperWins", "Vitórias enquanto estava no gol", stats.goalkeeperWins, settings.winPoints],
+    ["goalkeeperDraws", "Empates enquanto estava no gol", stats.goalkeeperDraws, settings.drawPoints],
+    ["goalkeeperLosses", "Derrotas enquanto estava no gol", stats.goalkeeperLosses, settings.lossPoints],
+    ["goalkeeperGames", "Atuações no gol", stats.goalkeeperGames, settings.suppressGoalkeeperRewards ? 0 : settings.goalkeeperSlotAppearancePoints],
+    ["goalsConceded", "Gols sofridos enquanto estava no gol", stats.goalsConceded, settings.goalkeeperSlotGoalConcededPoints],
+    ["goalkeeperOwnGoals", "Gols contra enquanto estava no gol", stats.goalkeeperOwnGoals, settings.ownGoalPoints],
+  ] as const;
+
+  return rows.flatMap(([key, label, countValue, unitPoints]) => {
+    const count = Number(countValue || 0);
+    return count === 0 ? [] : [{ key, label, count, unitPoints, points: Math.round(count * unitPoints * 100) / 100 }];
+  });
+}
+
+export function calculateFantasyGoalkeeperSlotPoints(
+  stats: FantasyGoalkeeperSlotStats,
+  settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
+) {
+  return buildFantasyGoalkeeperSlotBreakdown(stats, settings)
+    .reduce((total, item) => total + item.points, 0);
 }
 
 export function predictionIsCorrect<T>(choice: T | null | undefined, leaders: T[], leaderValue: number) {

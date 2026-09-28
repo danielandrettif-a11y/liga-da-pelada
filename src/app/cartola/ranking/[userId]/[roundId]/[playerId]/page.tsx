@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { getFantasyUserRoundHistory } from "@/lib/actions/fantasy";
 import { buildBQBasePointBreakdown, normalizeBQScoringSnapshot } from "@/lib/bq-scoring";
+import { DEFAULT_FANTASY_SETTINGS } from "@/lib/fantasy/config";
+import { buildFantasyGoalkeeperSlotBreakdown } from "@/lib/fantasy/engine";
 import { calculatePositionBreakdown } from "@/lib/fantasy/position-breakdown";
 import type { FantasySlotRole } from "@/lib/fantasy/lineup-positions";
 
@@ -18,7 +20,32 @@ export default async function FantasyLineupPlayerDetailPage({ params }: { params
   const settings = data.settingsSnapshot as Record<string, unknown>;
   const suppressGoalkeeperRewards = Boolean(data.round?.suppress_goalkeeper_rewards);
   const snapshot = normalizeBQScoringSnapshot(settings);
-  const entries = buildBQBasePointBreakdown(snapshot, {
+  const slotRole = (["GOL", "DEF", "MEI", "ATA"].includes(item.slot_role) ? item.slot_role : "ATA") as FantasySlotRole;
+  const scoringVersion = value(settings, "scoring_version", 5);
+  const goalkeeperSlotOnly = slotRole === "GOL" && scoringVersion >= 10;
+  const entries = goalkeeperSlotOnly ? buildFantasyGoalkeeperSlotBreakdown({
+    goalkeeperGoals: value(stat, "goalkeeper_goals"),
+    goalkeeperAssists: value(stat, "goalkeeper_assists"),
+    goalkeeperOwnGoals: value(stat, "goalkeeper_own_goals"),
+    goalkeeperWins: value(stat, "goalkeeper_wins"),
+    goalkeeperDraws: value(stat, "goalkeeper_draws"),
+    goalkeeperLosses: value(stat, "goalkeeper_losses"),
+    goalkeeperGames: value(stat, "goalkeeper_games"),
+    goalsConceded: value(stat, "goals_conceded"),
+  }, {
+    ...DEFAULT_FANTASY_SETTINGS,
+    scoringVersion,
+    suppressGoalkeeperRewards,
+    goalPoints: snapshot.goal,
+    assistPoints: snapshot.assist,
+    winPoints: snapshot.win,
+    drawPoints: snapshot.draw,
+    lossPoints: snapshot.loss,
+    ownGoalPoints: snapshot.ownGoal,
+    goalkeeperSlotAppearancePoints: value(settings, "goalkeeper_slot_appearance_points", 4),
+    goalkeeperSlotGoalConcededPoints: value(settings, "goalkeeper_slot_goal_conceded_points", -2.5),
+    goalkeeperSlotCleanSheetPoints: value(settings, "goalkeeper_slot_clean_sheet_points", 4),
+  }) : buildBQBasePointBreakdown(snapshot, {
     goals: value(stat, "goals"),
     assists: value(stat, "assists"),
     wins: value(stat, "wins"),
@@ -28,9 +55,8 @@ export default async function FantasyLineupPlayerDetailPage({ params }: { params
     goalkeeperAppearances: value(stat, "goalkeeper_games"),
     goalkeeperGoalsConceded: value(stat, "goals_conceded"),
   }, { suppressGoalkeeperRewards });
-  const slotRole = (["GOL", "DEF", "MEI", "ATA"].includes(item.slot_role) ? item.slot_role : "ATA") as FantasySlotRole;
   const position = calculatePositionBreakdown({
-    scoringVersion: value(settings, "scoring_version", 5),
+    scoringVersion,
     slotRole,
     playerProfile: item.player_profile_locked,
     goals: value(stat, "goals"),
@@ -39,6 +65,7 @@ export default async function FantasyLineupPlayerDetailPage({ params }: { params
     defensiveOneGoalGames: value(stat, "defensive_one_goal_games"),
     goalkeeperGames: value(stat, "goalkeeper_games"),
     cleanSheets: value(stat, "clean_sheets"),
+    goalkeeperCleanSheetPoints: value(settings, "goalkeeper_slot_clean_sheet_points", 4),
     suppressGoalkeeperRewards,
   });
   const captain = item.player_id === data.lineup.captain_player_id;

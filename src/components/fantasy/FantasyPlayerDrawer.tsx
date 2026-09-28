@@ -583,8 +583,8 @@ export function FantasyPlayerDrawer({
                   { label: "Assistência", unitPoints: settings.assistPoints, icon: "👟" },
                   { label: "Vitória na partida", unitPoints: settings.winPoints, icon: "🏆" },
                   { label: "Derrota na partida", unitPoints: settings.lossPoints, icon: "❌" },
-                  { label: "Jogar no gol", unitPoints: settings.goalkeeperAppearancePoints, icon: "🧤" },
-                  { label: "Gol sofrido no gol", unitPoints: settings.goalConcededPoints, icon: "🛡️" },
+                  { label: "Jogar no gol", unitPoints: Number(settings.scoringVersion || 5) >= 10 ? settings.goalkeeperSlotAppearancePoints : settings.goalkeeperAppearancePoints, icon: "🧤" },
+                  { label: "Gol sofrido no gol", unitPoints: Number(settings.scoringVersion || 5) >= 10 ? settings.goalkeeperSlotGoalConcededPoints : settings.goalConcededPoints, icon: "🛡️" },
                   { label: "Gol contra", unitPoints: settings.ownGoalPoints, icon: "⚠️" },
                 ]).map((rule: any) => (
                   <div key={rule.label} className="rounded-xl border border-white/5 bg-surface/30 p-2">

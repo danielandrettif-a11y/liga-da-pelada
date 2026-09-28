@@ -8,7 +8,8 @@ export function FantasyTacticalAnnouncementModal({ scoringVersion = 5 }: { scori
   const [isOpen, setIsOpen] = useState(false);
   const roleReframeActive = scoringVersion >= 7;
   const defensiveDrawBonusActive = scoringVersion >= 9;
-  const storageKey = defensiveDrawBonusActive ? "fantasy_tactical_v9_defense_seen" : roleReframeActive ? "fantasy_tactical_v7_role_reframe_seen" : "fantasy_tactical_v4_role_scoring_seen";
+  const goalkeeperSlotOnly = scoringVersion >= 10;
+  const storageKey = goalkeeperSlotOnly ? "fantasy_tactical_v10_goalkeeper_seen" : defensiveDrawBonusActive ? "fantasy_tactical_v9_defense_seen" : roleReframeActive ? "fantasy_tactical_v7_role_reframe_seen" : "fantasy_tactical_v4_role_scoring_seen";
 
   useEffect(() => {
     const seen = localStorage.getItem(storageKey);
@@ -118,10 +119,10 @@ export function FantasyTacticalAnnouncementModal({ scoringVersion = 5 }: { scori
             <div className="min-w-0 flex-1 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-black text-accent">Paredão no Rodízio (GOL)</span>
-                <span className="font-black text-accent text-[10px]">+2,0 pres / +4,0 SG</span>
+                <span className="font-black text-accent text-[10px]">{goalkeeperSlotOnly ? "+4,0 pres / -2,5 GS" : "+2,0 pres / +4,0 SG"}</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Qualquer atleta pode ser a sua aposta. Quem <strong>realmente atuar no gol</strong> ganha +2 base e -1 por gol sofrido. Se você o escalou em GOL e ele não sofreu gol, ganha <strong>+4,0 pts por clean sheet</strong>.
+                {goalkeeperSlotOnly ? <>Na vaga GOL, só conta o que o atleta fez enquanto era goleiro: <strong>+4 por atuação</strong>, -2,5 por gol sofrido e <strong>+4 por clean sheet</strong>. O que ele fizer na linha não entra nessa vaga.</> : <>Qualquer atleta pode ser a sua aposta. Quem <strong>realmente atuar no gol</strong> ganha +2 base e -1 por gol sofrido. Se você o escalou em GOL e ele não sofreu gol, ganha <strong>+4,0 pts por clean sheet</strong>.</>}
               </p>
             </div>
           </div>
