@@ -46,21 +46,25 @@ export function CollectiveRoom({ room, compact = false }: { room: CollectiveRoom
   const messageList = useRef<HTMLDivElement | null>(null);
   const composer = useRef<HTMLTextAreaElement | null>(null);
   const latestMessageId = room.messages.at(-1)?.id || null;
+  const readTargets = [...room.messages.reduce((targets, message) => {
+    targets.set(message.callupId, { callupId: message.callupId, messageId: message.id });
+    return targets;
+  }, new Map<string, { callupId: string; messageId: string }>()).values()];
 
   useEffect(() => {
-    if (latestMessageId) void markCollectiveRead(room.summary.callupId, latestMessageId);
-  }, [room.summary.callupId, latestMessageId]);
+    if (readTargets.length) void markCollectiveRead(readTargets);
+  }, [latestMessageId]);
   useEffect(() => {
     const target = firstUnreadMessageId ? document.getElementById(`collective-${firstUnreadMessageId}`) : null;
     if (target) target.scrollIntoView({ block: "center" });
     else if (latestMessageId) document.getElementById(`collective-${latestMessageId}`)?.scrollIntoView({ block: "end" });
   }, [firstUnreadMessageId, latestMessageId]);
   useEffect(() => {
-    const channel = supabase.channel(`collective-${room.summary.callupId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "collective_messages", filter: `callup_id=eq.${room.summary.callupId}` }, () => startTransition(() => router.refresh()))
+    const channel = supabase.channel("collective")
+      .on("postgres_changes", { event: "*", schema: "public", table: "collective_messages" }, () => startTransition(() => router.refresh()))
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
-  }, [room.summary.callupId, router]);
+  }, [router]);
   useEffect(() => {
     if (!recording) return;
     const timer = window.setInterval(() => setRecordingSeconds((value) => {
@@ -135,11 +139,11 @@ export function CollectiveRoom({ room, compact = false }: { room: CollectiveRoom
   return (
     <div className={`flex min-h-0 flex-col ${compact ? "h-[72vh]" : "min-h-[72vh]"}`}>
       <header className="rounded-t-3xl border border-accent/30 bg-[radial-gradient(circle_at_top_right,rgba(204,255,0,.16),transparent_45%),#071b11] p-5">
-        <div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-background"><Microphone className="h-6 w-6" /></span><div><p className="text-[9px] font-black uppercase tracking-[.18em] text-accent">Resenha oficial da rodada</p><h1 className="font-athletic text-2xl font-black uppercase italic text-foreground">Coletiva de imprensa</h1><p className="text-[10px] text-muted">{room.summary.roundNumber ? `Rodada ${room.summary.roundNumber}` : "Draft em andamento"} · mensagens em tempo real</p></div></div>
+        <div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-background"><Microphone className="h-6 w-6" /></span><div><p className="text-[9px] font-black uppercase tracking-[.18em] text-accent">Resenha oficial</p><h1 className="font-athletic text-2xl font-black uppercase italic text-foreground">Coletiva de imprensa</h1><p className="text-[10px] text-muted">Uma conversa · mensagens dos últimos 14 dias</p></div></div>
       </header>
 
       <div ref={messageList} className="min-h-0 flex-1 space-y-3 overflow-y-auto border-x border-border bg-black/15 p-3 sm:p-4">
-        {room.messages.length === 0 && <div className="py-16 text-center"><Microphone className="mx-auto h-9 w-9 text-muted" /><p className="mt-3 text-sm font-black text-foreground">A coletiva está aberta</p><p className="mt-1 text-xs text-muted">Mande a primeira mensagem da rodada.</p></div>}
+        {room.messages.length === 0 && <div className="py-16 text-center"><Microphone className="mx-auto h-9 w-9 text-muted" /><p className="mt-3 text-sm font-black text-foreground">A coletiva está aberta</p><p className="mt-1 text-xs text-muted">Mande a primeira mensagem da conversa.</p></div>}
         {room.messages.map((message) => {
           const unreadMarker = message.id === firstUnreadMessageId ? <div className="my-4 flex items-center gap-2" aria-label="Mensagens não lidas"><span className="h-px flex-1 bg-accent/35" /><span className="rounded-full bg-accent px-3 py-1 text-[9px] font-black uppercase text-background">Novas mensagens</span><span className="h-px flex-1 bg-accent/35" /></div> : null;
           if (message.kind === "system") return <div key={message.id} id={`collective-${message.id}`}>{unreadMarker}<div className="mx-auto max-w-sm rounded-full border border-accent/20 bg-accent/8 px-4 py-2 text-center text-[10px] font-bold text-accent">{message.body}</div></div>;

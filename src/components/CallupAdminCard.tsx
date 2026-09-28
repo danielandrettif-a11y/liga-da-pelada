@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CalendarPlus, CheckCircle2, ChevronRight, Clock, Copy, Lock, MapPin, PencilLine, Stadium as StadiumIcon, X } from "@/components/icons";
-import { closeCallup, openCallup, updateCallup, type CallupWithEntries } from "@/lib/actions/callups";
+import { closeCallup, openCallup, setCallupVisibility, updateCallup, type CallupWithEntries } from "@/lib/actions/callups";
 import type { Stadium } from "@/lib/types";
 
 export function CallupAdminCard({
@@ -66,6 +66,16 @@ export function CallupAdminCard({
     setLoading(false);
   }
 
+  async function toggleVisibility() {
+    if (!callup) return;
+    setLoading(true);
+    setError("");
+    const result = await setCallupVisibility(callup.id, !callup.is_public);
+    if (!result.success) setError(result.error || "Erro ao atualizar a visibilidade.");
+    else router.refresh();
+    setLoading(false);
+  }
+
   async function buildRound() {
     if (!callup) return;
     router.push(callup.round_id ? `/admin/rodada?round=${callup.round_id}&mount=1` : `/admin/rodada?callup=${callup.id}`);
@@ -80,7 +90,7 @@ export function CallupAdminCard({
     const venueText = callup.stadium_name ? `\n📍 Local: ${callup.stadium_name}` : "";
     const mapText = callup.stadium_map_url ? `\n🗺️ Como chegar: ${callup.stadium_map_url}` : "";
 
-    const text = `⚽ Convocação aberta para ${type}!\n📅 Data: ${dateFormatted}\n⏰ Horário: ${time}${venueText}${mapText}\n\n👉 Confirme sua presença: ${window.location.origin}/convocacao?callup=${callup.id}`;
+    const text = `⚽ Convocação aberta para ${type}!\n📅 Data: ${dateFormatted}\n⏰ Horário: ${time}${venueText}${mapText}\n\n👉 Confirme sua presença: ${window.location.origin}/convocacao?callup=${callup.id}&invite=${callup.invite_token}`;
 
     await navigator.clipboard.writeText(text);
     setCopied(true);
@@ -325,6 +335,20 @@ export function CallupAdminCard({
                 <X className="h-4 w-4" /> Fechar
               </button>
             </div>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={callup.is_public}
+              onClick={toggleVisibility}
+              disabled={loading}
+              className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs font-bold disabled:opacity-50 ${callup.is_public ? "border-accent/40 bg-accent/10 text-accent" : "border-warning/35 bg-warning/10 text-warning"}`}
+            >
+              <span>{callup.is_public ? "Lista aberta para todos" : "Lista privada: ADM e convite"}</span>
+              <span className={`h-5 w-9 rounded-full p-0.5 transition-colors ${callup.is_public ? "bg-accent" : "bg-warning/50"}`}>
+                <span className={`block h-4 w-4 rounded-full bg-background transition-transform ${callup.is_public ? "translate-x-4" : "translate-x-0"}`} />
+              </span>
+            </button>
 
             <button
               type="button"

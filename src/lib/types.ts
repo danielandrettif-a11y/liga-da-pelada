@@ -190,6 +190,8 @@ export type Callup = {
   stadium_id?: string | null;
   stadium_name?: string | null;
   stadium_map_url?: string | null;
+  is_public: boolean;
+  invite_token: string;
   round_id: string | null;
   created_by: string | null;
   created_at: string;
@@ -587,7 +589,7 @@ export type Database = {
       };
       callups: {
         Row: Callup;
-        Insert: Omit<Callup, 'id' | 'created_at' | 'updated_at' | 'status' | 'capacity' | 'waitlist_capacity' | 'round_id' | 'created_by'> & { id?: string; created_at?: string; updated_at?: string; status?: CallupStatus; capacity?: number; waitlist_capacity?: number; round_id?: string | null; created_by?: string | null };
+        Insert: Omit<Callup, 'id' | 'created_at' | 'updated_at' | 'status' | 'capacity' | 'waitlist_capacity' | 'is_public' | 'invite_token' | 'round_id' | 'created_by'> & { id?: string; created_at?: string; updated_at?: string; status?: CallupStatus; capacity?: number; waitlist_capacity?: number; is_public?: boolean; invite_token?: string; round_id?: string | null; created_by?: string | null };
         Update: Partial<Omit<Callup, 'id'>>;
       };
       callup_entries: {

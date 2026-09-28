@@ -5,13 +5,15 @@ import { getRanking } from "./stats";
 import { getActiveSeason } from "./seasons";
 import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
+import { getCurrentAccount } from "../auth";
 
 export async function getDashboardData() {
   try {
+    const account = await getCurrentAccount();
     const season = await getActiveSeason();
     if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
 
-    const { data: readModelData, error: readModelError } = await supabase.rpc("get_home_read_model", {
+    const { data: readModelData, error: readModelError } = await account.client.rpc("get_home_read_model", {
       p_season_id: season.id,
       p_league_id: season.league_id,
     });
@@ -88,7 +90,7 @@ export async function getDashboardData() {
       .eq("id", season.league_id)
       .single();
 
-    const activeCallupsPromise = readModel ? Promise.resolve({ data: readModel.activeCallups }) : supabase
+    const activeCallupsPromise = readModel ? Promise.resolve({ data: readModel.activeCallups }) : account.client
       .from("callups")
       .select("id, date, start_time, stadium_name, stadium_map_url, round_type, capacity, waitlist_capacity, callup_entries(player_id, status, position), round:round_id(id, status, matches(status, started_at))")
       .eq("league_id", season.league_id)

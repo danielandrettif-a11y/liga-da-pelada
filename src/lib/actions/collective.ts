@@ -44,19 +44,31 @@ export type CollectiveRoomData = {
   lastReadMessageId: string | null;
 };
 
+const COLLECTIVE_MESSAGE_WINDOW_DAYS = 14;
+
+function collectiveMessageCutoff() {
+  return new Date(Date.now() - COLLECTIVE_MESSAGE_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+}
+
 function unreadMessages(rows: any[], userId: string, lastReadMessageId: string | null) {
   const markerIndex = lastReadMessageId ? rows.findIndex((row) => row.id === lastReadMessageId) : -1;
   const candidates = markerIndex >= 0 ? rows.slice(markerIndex + 1) : rows;
   return candidates.filter((row) => row.sender_user_id !== userId && row.kind !== "system" && !row.deleted_at);
 }
 
-async function collectiveUnreadState(client: any, callupId: string, userId: string) {
-  const { data: read } = await client.from("collective_reads").select("read_at, last_read_message_id").eq("callup_id", callupId).eq("user_id", userId).maybeSingle();
-  let query = client.from("collective_messages").select("id, sender_user_id, kind, deleted_at, created_at").eq("callup_id", callupId);
-  if (read?.read_at) query = query.gte("created_at", read.read_at);
-  const { data: rows } = await query.order("created_at", { ascending: true }).order("id", { ascending: true });
-  const unread = unreadMessages(rows || [], userId, read?.last_read_message_id || null);
-  return { count: unread.length, firstUnreadMessageId: unread[0]?.id || null, lastReadMessageId: read?.last_read_message_id || null };
+async function collectiveUnreadState(client: any, callupIds: string[], userId: string) {
+  if (!callupIds.length) return { count: 0, firstUnreadMessageId: null, lastReadMessageId: null };
+  const [{ data: reads }, { data: rows }] = await Promise.all([
+    client.from("collective_reads").select("callup_id, last_read_message_id").eq("user_id", userId).in("callup_id", callupIds),
+    client.from("collective_messages").select("id, callup_id, sender_user_id, kind, deleted_at, created_at").in("callup_id", callupIds).gte("created_at", collectiveMessageCutoff()).order("created_at", { ascending: true }).order("id", { ascending: true }),
+  ]);
+  const readByCallupId = new Map<string, string | null>((reads || []).map((read: any) => [String(read.callup_id), typeof read.last_read_message_id === "string" ? read.last_read_message_id : null]));
+  const rowsByCallupId = new Map<string, any[]>();
+  for (const row of rows || []) rowsByCallupId.set(row.callup_id, [...(rowsByCallupId.get(row.callup_id) || []), row]);
+  const unread = [...rowsByCallupId.entries()]
+    .flatMap(([callupId, callupRows]) => unreadMessages(callupRows, userId, readByCallupId.get(callupId) || null))
+    .sort((a, b) => `${a.created_at}-${a.id}`.localeCompare(`${b.created_at}-${b.id}`));
+  return { count: unread.length, firstUnreadMessageId: unread[0]?.id || null, lastReadMessageId: null };
 }
 
 async function listCollectiveCandidates() {
@@ -110,41 +122,29 @@ function collectiveSummary(callup: any, unreadCount: number): CollectiveSummary 
 export async function getActiveCollectiveSummary(): Promise<CollectiveSummary | null> {
   const { account, callups } = await listCollectiveCandidates();
   if (!account.user) return null;
-  const callup = callups.find(isCollectiveOpen) || callups.find(isCollectiveVisible);
+  const visibleCallups = callups.filter(isCollectiveVisible);
+  const callup = callups.find(isCollectiveOpen) || visibleCallups[0];
   if (!callup) return null;
-  const unreadCount = (await collectiveUnreadState(account.client, callup.id, account.user.id)).count;
+  const unreadCount = (await collectiveUnreadState(account.client, visibleCallups.map((item) => item.id), account.user.id)).count;
   return collectiveSummary(callup, unreadCount);
 }
 
-export async function getCollectiveHistory(): Promise<CollectiveSummary[]> {
+export async function getCollectiveRoom(_callupId?: string): Promise<CollectiveRoomData | null> {
   const { account, callups } = await listCollectiveCandidates();
-  if (!account.user) return [];
-  return Promise.all(callups.filter(isCollectiveVisible).map(async (callup) =>
-    collectiveSummary(callup, (await collectiveUnreadState(account.client, callup.id, account.user!.id)).count)
-  ));
-}
-
-export async function getCollectiveRoom(callupId?: string): Promise<CollectiveRoomData | null> {
-  const account = await getCurrentAccount();
   if (!account.user) return null;
-  const summary = callupId
-    ? await (async () => {
-        const { data: callup } = await account.client.from("callups").select("id, date, round_id, round:round_id(id, number, status)").eq("id", callupId).maybeSingle();
-        if (!callup) return null;
-        const { data: allowed } = await account.client.rpc("can_access_collective_chat", { p_callup_id: callupId });
-        if (!allowed) return null;
-        const round: any = Array.isArray(callup.round) ? callup.round[0] : callup.round;
-        return { callupId, roundId: round?.id || callup.round_id || null, roundNumber: round?.number || null, date: callup.date, status: round?.status || null, unreadCount: 0 };
-      })()
-    : await getActiveCollectiveSummary();
-  if (!summary) return null;
+  const visibleCallups = callups.filter(isCollectiveVisible);
+  const activeCallup = callups.find(isCollectiveOpen) || visibleCallups[0];
+  if (!activeCallup || !visibleCallups.length) return null;
+  const summary = collectiveSummary(activeCallup, 0);
+  const callupIds = visibleCallups.map((item) => item.id);
   const [{ data: descendingRows, error }, readState] = await Promise.all([account.client
     .from("collective_messages")
     .select("*, sender:sender_player_id(name, avatar_url)")
-    .eq("callup_id", summary.callupId)
+    .in("callup_id", callupIds)
+    .gte("created_at", collectiveMessageCutoff())
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
-    .limit(300), collectiveUnreadState(account.client, summary.callupId, account.user.id)]);
+    .limit(300), collectiveUnreadState(account.client, callupIds, account.user.id)]);
   if (error) return null;
   const rows = [...(descendingRows || [])].reverse();
   summary.unreadCount = readState.count;
@@ -207,8 +207,8 @@ async function pushCollectiveMessage(callupId: string, senderUserId: string, sen
   const preview = kind === "image" ? "enviou uma foto" : kind === "audio" ? "enviou um áudio" : String(body || "Nova mensagem").slice(0, 110);
   const senderName = String(sender?.name || fallbackSenderName || "Jogador");
   await sendPushNotificationsToUsers(service, userIds.filter((id) => !disabled.has(id)), {
-    title: `${senderName} na Coletiva`, body: preview, tag: `collective-${callupId}`, url: `/coletiva?callup=${callupId}`,
-  }, `/coletiva?callup=${callupId}`);
+    title: `${senderName} na Coletiva`, body: preview, tag: "collective", url: "/coletiva",
+  }, "/coletiva");
 }
 
 export async function sendCollectiveMessage(formData: FormData) {
@@ -292,12 +292,16 @@ export async function deleteCollectiveMessage(messageId: string) {
   return { success: true };
 }
 
-export async function markCollectiveRead(callupId: string, messageId: string) {
+export async function markCollectiveRead(readTargets: Array<{ callupId: string; messageId: string }>) {
   const account = await getCurrentAccount();
-  if (!account.user) return { success: false };
-  const { data: message } = await account.client.from("collective_messages").select("id, created_at").eq("id", messageId).eq("callup_id", callupId).maybeSingle();
-  if (!message) return { success: false };
-  const { error } = await account.client.from("collective_reads").upsert({ callup_id: callupId, user_id: account.user.id, read_at: message.created_at, last_read_message_id: message.id });
+  if (!account.user || !readTargets.length) return { success: false };
+  const targetByMessageId = new Map(readTargets.map((target) => [target.messageId, target.callupId]));
+  const { data: messages } = await account.client.from("collective_messages").select("id, callup_id, created_at").in("id", [...targetByMessageId.keys()]);
+  const reads = (messages || [])
+    .filter((message: any) => targetByMessageId.get(message.id) === message.callup_id)
+    .map((message: any) => ({ callup_id: message.callup_id, user_id: account.user!.id, read_at: message.created_at, last_read_message_id: message.id }));
+  if (!reads.length) return { success: false };
+  const { error } = await account.client.from("collective_reads").upsert(reads, { onConflict: "callup_id,user_id" });
   return { success: !error };
 }
 

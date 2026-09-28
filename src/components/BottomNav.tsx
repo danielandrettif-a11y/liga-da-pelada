@@ -70,7 +70,7 @@ export function BottomNav({
       ? { href: "/pagamentos", label: "Transfermarket", icon: ArrowLeftRight, notification: true }
       : null;
   const communityItem = {
-    href: collective ? `/coletiva?callup=${collective.callupId}` : "/coletiva",
+    href: "/coletiva",
     label: "Coletiva de imprensa",
     icon: Microphone,
   };

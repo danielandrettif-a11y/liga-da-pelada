@@ -37,6 +37,7 @@ import {
   leaveActiveCallup,
   removeCallupEntry,
   repairMyPlayerAccount,
+  setCallupVisibility,
   updateCallup,
   type CallupWithEntries,
 } from "@/lib/actions/callups";
@@ -194,7 +195,7 @@ export function CallupBoard({
       ? `\n📍 *Localização:*\n🗺️ ${stadiumMapUrl}`
       : "";
 
-    const text = `⚽ *CONVOCAÇÃO ABERTA*\n${window.location.origin}/convocacao?callup=${callup.id}\n\n🏆 *${type}*\n📅 *Data:* ${dateFormatted}\n⏰ *Horário:* ${startTime}${venueText}\n\n👉 Toque no link acima para confirmar sua presença e ver a lista!`;
+    const text = `⚽ *CONVOCAÇÃO ABERTA*\n${window.location.origin}/convocacao?callup=${callup.id}&invite=${callup.invite_token}\n\n🏆 *${type}*\n📅 *Data:* ${dateFormatted}\n⏰ *Horário:* ${startTime}${venueText}\n\n👉 Toque no link acima para confirmar sua presença e ver a lista!`;
 
     await navigator.clipboard.writeText(text);
     setLoading("copied");
@@ -250,6 +251,11 @@ export function CallupBoard({
               <span className="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 text-[10px] font-bold text-muted uppercase">
                 {callup.round_type === "friendly" ? "Amistoso" : "Ranked"}
               </span>
+              {isAdmin && (
+                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${callup.is_public ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>
+                  <Shield className="h-3 w-3" /> {callup.is_public ? "Lista pública" : "Só convite"}
+                </span>
+              )}
             </div>
 
             <h1 className="mt-2 text-xl font-black text-foreground capitalize leading-tight">
@@ -271,6 +277,19 @@ export function CallupBoard({
               }}
               variant="glass"
             />
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => run("visibility", () => setCallupVisibility(callup.id, !callup.is_public))}
+                disabled={!!loading}
+                className={`flex h-10 shrink-0 items-center gap-1.5 rounded-xl border px-2.5 text-[10px] font-black uppercase transition-colors disabled:opacity-50 ${callup.is_public ? "border-accent/40 bg-accent/15 text-accent hover:bg-accent/25" : "border-warning/40 bg-warning/10 text-warning hover:bg-warning/20"}`}
+                title={callup.is_public ? "Fechar lista para convidados" : "Abrir lista para todos"}
+                aria-label={callup.is_public ? "Fechar lista para convidados" : "Abrir lista para todos"}
+              >
+                {loading === "visibility" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+                <span className="hidden sm:inline">{callup.is_public ? "Pública" : "Privada"}</span>
+              </button>
+            )}
             {isAdmin && (
               <button
                 type="button"

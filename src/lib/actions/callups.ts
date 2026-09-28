@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { getAdminClient, getCurrentAccount } from "../auth";
-import { supabase } from "../supabase";
 import type { Callup, CallupEntry, Player, RoundType } from "../types";
 import { scheduleCartolaRoundReminders } from "../cartola-reminder-scheduler";
 import { getActiveLeague } from "./rounds";
@@ -62,8 +61,18 @@ function refreshCallups() {
   revalidatePath("/admin/prelistas");
 }
 
-export async function getActiveCallups(): Promise<CallupWithEntries[]> {
-  const { data, error } = await supabase
+export async function getActiveCallups(invite?: { callupId?: string; inviteToken?: string }): Promise<CallupWithEntries[]> {
+  const account = await getCurrentAccount();
+  const client = account.client;
+
+  if (invite?.callupId && invite.inviteToken && account.user) {
+    await client.rpc("claim_callup_invite", {
+      p_callup_id: invite.callupId,
+      p_invite_token: invite.inviteToken,
+    });
+  }
+
+  const { data, error } = await client
     .from("callups")
     .select(`
       *,
@@ -93,7 +102,7 @@ export async function getActiveCallups(): Promise<CallupWithEntries[]> {
   const callups = (data || []).map(normalizeCallup).filter((callup): callup is CallupWithEntries => Boolean(callup));
   if (callups.length === 0) return callups;
 
-  const { data: joiners, error: joinersError } = await supabase.rpc("get_callup_entry_joiners", {
+  const { data: joiners, error: joinersError } = await client.rpc("get_callup_entry_joiners", {
     p_callup_ids: callups.map((callup) => callup.id),
   });
   if (joinersError) {
@@ -473,6 +482,20 @@ export async function closeCallup(callupId: string) {
   if (!client) return { success: false, error: "Somente administradores podem fechar convocacoes." };
   const { error } = await client.from("callups").update({ status: "closed", updated_at: new Date().toISOString() }).eq("id", callupId);
   if (error) return { success: false, error: error.message };
+  refreshCallups();
+  return { success: true };
+}
+
+export async function setCallupVisibility(callupId: string, isPublic: boolean) {
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem alterar a visibilidade da convocação." };
+
+  const { error } = await client
+    .from("callups")
+    .update({ is_public: isPublic, updated_at: new Date().toISOString() })
+    .eq("id", callupId);
+  if (error) return { success: false, error: error.message };
+
   refreshCallups();
   return { success: true };
 }
