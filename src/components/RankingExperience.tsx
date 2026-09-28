@@ -352,7 +352,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
             {podiumOrder.map((entry, visualIndex) => {
               const position = visualIndex === 0 ? 2 : visualIndex === 1 ? 1 : 3;
               const style = podiumStyle(position);
-              const height = position === 1 ? "h-36" : position === 2 ? "h-28" : "h-24";
+              const height = position === 1 ? "h-48" : position === 2 ? "h-40" : "h-36";
               const above = position > 1 ? ranking[position - 2] : null;
               const gap = metricGap(above, entry, filter);
               return (
@@ -393,13 +393,13 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
                     <p className="mt-1 truncate text-[8px] font-bold text-muted">
                       {entry.wins}V · {entry.draws}E · {entry.losses}D · {entry.goals}G · {entry.assists}A
                     </p>
-                    <AwardBadges entry={entry} compact />
                     <p className={`mt-0.5 text-xs font-black ${style.label}`}>{metricDisplay(entry, filter)} <span className="text-[8px] uppercase opacity-70">{FILTER_LABELS[filter]}</span></p>
                   </div>
-                  <div className={`w-full rounded-t-2xl border-x border-t bg-gradient-to-b pt-3 ${height} ${style.base}`}>
+                  <div className={`flex w-full flex-col items-center rounded-t-2xl border-x border-t bg-gradient-to-b px-1 pt-3 ${height} ${style.base}`}>
                     <span className="font-athletic text-3xl font-black text-white/45">{position}</span>
+                    {awardsTotal(entry) > 0 && <AwardBadges entry={entry} compact />}
                     {above && gap != null && (
-                      <span className="mt-1 block px-1 text-[8px] font-black text-white/55">Faltam {gap} para subir</span>
+                      <span className="mt-auto block px-1 pb-2 text-[8px] font-black text-white/55">Faltam {gap} para subir</span>
                     )}
                   </div>
                 </button>

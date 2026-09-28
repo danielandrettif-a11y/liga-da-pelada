@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { suggestNextMatchRotation } from "./next-match";
+import { sortMatchesChronologically, suggestNextMatchRotation } from "./next-match";
+
+describe("sortMatchesChronologically", () => {
+  it("respeita a ordem da partida mesmo quando a última começou mais tarde", () => {
+    const ordered = sortMatchesChronologically([
+      { id: "last", team_a_id: "blue", team_b_id: "yellow", score_a: 0, score_b: 2, match_order: 4, started_at: "2026-09-28T17:58:00Z" },
+      { id: "first", team_a_id: "red", team_b_id: "blue", score_a: 0, score_b: 2, match_order: 1, started_at: "2026-09-28T17:46:00Z" },
+    ]);
+
+    expect(ordered.map((match) => match.id)).toEqual(["first", "last"]);
+  });
+});
 
 const teams = [
   { id: "blue", name: "Azul", position: 1 },

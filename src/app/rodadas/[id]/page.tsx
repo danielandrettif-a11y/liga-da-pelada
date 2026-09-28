@@ -154,6 +154,7 @@ export default async function RodadaDetalhePage({
               const teamB = round.teams.find((t: any) => t.id === match.team_b_id);
               const isFinished = match.status === "finished";
               const isLive = match.status === "live";
+              const matchNumber = Number(match.match_order) > 0 ? Number(match.match_order) : index + 1;
               
               return (
                 <div key={match.id} className="space-y-2">
@@ -168,7 +169,7 @@ export default async function RodadaDetalhePage({
                 <div className={`glass-card glass-card-hover overflow-hidden p-4 animate-fade-in stagger-${Math.min(index + 1, 5)} ${isLive ? "border-accent/40 shadow-[0_0_24px_rgba(190,255,0,0.06)]" : ""}`}>
                     <div className="mb-3 flex items-center justify-between border-b border-border pb-2.5">
                       <span className="text-[10px] font-black uppercase tracking-wider text-muted">
-                        Partida {String(index + 1).padStart(2, "0")}
+                        Partida {String(matchNumber).padStart(2, "0")}
                       </span>
                       <div className="flex items-center gap-2">
                         <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${isFinished ? "bg-muted/15 text-muted" : isLive ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>

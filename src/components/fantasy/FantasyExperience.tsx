@@ -1540,7 +1540,15 @@ export function FantasyExperience({
               />
 
               {marketClosedBetweenRounds && (
-                <div className="pointer-events-none absolute inset-0 z-20 bg-[#020b06]/40 backdrop-blur-[10px] backdrop-saturate-[.35]" />
+                <div className="pointer-events-none absolute inset-0 z-20 bg-[#020b06]/40 backdrop-blur-[10px] backdrop-saturate-[.35]">
+                  <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-y border-warning/45 bg-[#07160d]/90 px-4 py-3.5 text-center shadow-[0_0_28px_rgba(0,0,0,.6)]">
+                    <div className="flex items-center justify-center gap-2 text-warning">
+                      <Lock className="h-4 w-4" />
+                      <span className="font-athletic text-sm font-black uppercase tracking-[.16em]">Mercado fechado</span>
+                    </div>
+                    <p className="mt-1 text-[9px] font-bold uppercase tracking-[.12em] text-foreground/80">Aguardando a próxima Ranked</p>
+                  </div>
+                </div>
               )}
 
               {/* RENDERIZAÇÃO ADAPTÁVEL DO CAMPO (5 vs 6 JOGADORES) */}

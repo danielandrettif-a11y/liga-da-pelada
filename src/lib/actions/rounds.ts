@@ -21,6 +21,7 @@ import { validateUnderfilledTeamSizes } from "../underfilled-rounds";
 import { getLatestPlayerCardOverallMap } from "./stats";
 import { previewRoundReshuffle, type RoundReshuffleMode } from "../round-reshuffle";
 import { getPrivateBalanceTagsForDraw } from "../private-balance-tags";
+import { sortMatchesChronologically } from "../next-match";
 
 const getActiveLeagueCached = unstable_cache(async () => {
   const { data, error } = await supabase
@@ -138,16 +139,7 @@ export async function getRound(id: string) {
   }
 
   if (data.teams) data.teams.sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
-  if (data.matches) {
-    const statusOrder: Record<string, number> = { live: 0, pending: 1, finished: 2 };
-    data.matches.sort((a: any, b: any) => {
-      const statusDifference = (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
-      if (statusDifference !== 0) return statusDifference;
-      const aTimestamp = new Date(a.finished_at || a.started_at || a.created_at || 0).getTime();
-      const bTimestamp = new Date(b.finished_at || b.started_at || b.created_at || 0).getTime();
-      return bTimestamp - aTimestamp;
-    });
-  }
+  if (data.matches) data.matches = sortMatchesChronologically(data.matches);
   return data;
 }
 

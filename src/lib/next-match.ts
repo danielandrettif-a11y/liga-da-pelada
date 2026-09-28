@@ -25,11 +25,14 @@ export type NextMatchRotation = {
   reasonLabel: string;
 };
 
-function chronological(matches: RotationMatch[]) {
-  return [...matches].sort((a, b) =>
-    Number(a.match_order || 0) - Number(b.match_order || 0)
-      || String(a.started_at || a.created_at || "").localeCompare(String(b.started_at || b.created_at || "")),
-  );
+export function sortMatchesChronologically<T extends RotationMatch>(matches: T[]) {
+  return [...matches].sort((a, b) => {
+    const aOrder = Number(a.match_order || 0);
+    const bOrder = Number(b.match_order || 0);
+    if (aOrder > 0 && bOrder > 0 && aOrder !== bOrder) return aOrder - bOrder;
+    if (aOrder > 0 !== bOrder > 0) return aOrder > 0 ? -1 : 1;
+    return String(a.started_at || a.created_at || "").localeCompare(String(b.started_at || b.created_at || ""));
+  });
 }
 
 function consecutiveAppearances(matches: RotationMatch[], teamId: string) {
@@ -54,7 +57,7 @@ export function suggestNextMatchRotation(
   matches: RotationMatch[],
   finishedMatchId: string,
 ): NextMatchRotation | null {
-  const orderedMatches = chronological(matches);
+  const orderedMatches = sortMatchesChronologically(matches);
   const currentIndex = orderedMatches.findIndex((match) => match.id === finishedMatchId);
   if (currentIndex < 0) return null;
   const history = orderedMatches.slice(0, currentIndex + 1);
