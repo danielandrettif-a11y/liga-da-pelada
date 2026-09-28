@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, CartolaHat, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag, CalendarDays, Microphone } from "@/components/icons";
+import { Home, CartolaHat, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag, Microphone } from "@/components/icons";
 import { supabase } from "@/lib/supabase";
 
 const NAV_ITEMS = [
@@ -17,14 +17,14 @@ const NAV_ITEMS = [
 export function BottomNav({
   isAuthenticated,
   hasOpenCallup,
-  hasReleasedPayment,
+  hasPendingPayment,
   collective,
   newRosterCount,
   currentUserId,
 }: {
   isAuthenticated: boolean;
   hasOpenCallup: boolean;
-  hasReleasedPayment: boolean;
+  hasPendingPayment: boolean;
   collective: { callupId: string; unreadCount: number } | null;
   newRosterCount: number;
   currentUserId: string | null;
@@ -62,18 +62,24 @@ export function BottomNav({
     setPendingHref(null);
   }, [pathname]);
 
-  // A segunda posição nunca muda; o nome acompanha a etapa atual da rodada.
-  const agendaItem = hasOpenCallup
+  const roundFlowItem = hasOpenCallup
     ? { href: "/convocacao", label: "Convocação", icon: Flag, notification: true }
-    : hasReleasedPayment
+    : hasPendingPayment
       ? { href: "/pagamentos", label: "Transfermarket", icon: ArrowLeftRight, notification: true }
-      : { href: "/rodadas", label: "Agenda", icon: CalendarDays, notification: false };
+      : null;
   const communityItem = {
     href: collective ? `/coletiva?callup=${collective.callupId}` : "/coletiva",
-    label: "Coletiva",
+    label: "Coletiva de imprensa",
     icon: Microphone,
   };
-  const contextualItems = [NAV_ITEMS[0], agendaItem, NAV_ITEMS[1], NAV_ITEMS[2], communityItem, NAV_ITEMS[4]];
+  const contextualItems = [
+    NAV_ITEMS[0],
+    ...(roundFlowItem ? [roundFlowItem] : []),
+    NAV_ITEMS[1],
+    NAV_ITEMS[2],
+    communityItem,
+    NAV_ITEMS[4],
+  ];
   const visibleItems = isAuthenticated
     ? contextualItems
     : contextualItems.filter((item) => item.href !== "/mais");
@@ -145,10 +151,12 @@ export function BottomNav({
                 )}
               </span>
               <span
-                className={`block w-full truncate whitespace-nowrap text-center font-semibold leading-none tracking-tight transition-colors duration-150 ${
+                className={`block w-full text-center font-semibold tracking-tight transition-colors duration-150 ${
                   item.label === "Transfermarket" || item.label === "Convocação"
                     ? "text-[7px] min-[360px]:text-[8px] min-[430px]:text-[9px]"
-                    : "text-[9px] min-[390px]:text-[10px]"
+                    : item.label === "Coletiva de imprensa"
+                      ? "whitespace-normal text-[8px] leading-[.72rem] min-[390px]:text-[9px]"
+                      : "truncate whitespace-nowrap text-[9px] leading-none min-[390px]:text-[10px]"
                 } ${
                   isActive ? "text-accent" : ""
                 }`}

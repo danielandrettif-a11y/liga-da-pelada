@@ -6,7 +6,7 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import type { Player, RoundStatus, RoundType } from "../types";
 import { getActiveSeason } from "./seasons";
 import { getActiveLeague } from "./rounds";
-import { findLatestReleasedPaymentRound } from "../paymentStatus";
+import { areRoundParticipantsPaid, findLatestReleasedPaymentRound } from "../paymentStatus";
 
 export type PaymentRound = {
   id: string;
@@ -98,11 +98,11 @@ export async function getPaymentRounds(): Promise<PaymentRound[]> {
   return data as PaymentRound[];
 }
 
-export async function hasReleasedPaymentRound(): Promise<boolean> {
+export async function hasPendingPaymentRound(): Promise<boolean> {
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
   if (!season) return false;
-  const { data: releasedRounds, error: roundError } = await supabase
+  const { data: finishedRounds, error: roundError } = await supabase
     .from("rounds")
     .select("id")
     .eq("season_id", season.id)
@@ -114,7 +114,19 @@ export async function hasReleasedPaymentRound(): Promise<boolean> {
     console.error("Erro ao verificar rodada de pagamento:", roundError);
     return false;
   }
-  return Boolean(releasedRounds?.length);
+  const round = finishedRounds?.[0];
+  if (!round) return false;
+
+  const [{ data: participants, error: participantError }, { data: payments, error: paymentError }] = await Promise.all([
+    supabase.from("round_players").select("player_id").eq("round_id", round.id),
+    supabase.from("round_payments").select("player_id, paid").eq("round_id", round.id),
+  ]);
+  if (participantError || paymentError) {
+    console.error("Erro ao verificar pagamentos pendentes:", participantError || paymentError);
+    return false;
+  }
+
+  return !areRoundParticipantsPaid(participants || [], payments || []);
 }
 
 export async function getRoundPaymentPlayers(roundId: string): Promise<PaymentPlayer[]> {

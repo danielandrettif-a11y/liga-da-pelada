@@ -332,10 +332,11 @@ export function FantasyExperience({
   const betweenRounds = status === "between_rounds";
   const open = status === "open";
   const isMarketClosed = !open && (betweenRounds || status === "in_progress" || status === "finished");
+  const marketClosedBetweenRounds = betweenRounds && latestFinishedRoundPaid;
   // Entre rodadas, o campo é o portfólio da próxima Ranked e deve apresentar
   // as funções vigentes; uma rodada aberta continua obedecendo ao seu snapshot.
   const guideScoringVersion = betweenRounds
-    ? Math.max(8, Number(settings.scoringVersion || 5))
+    ? Math.max(9, Number(settings.scoringVersion || 5))
     : Number(settings.scoringVersion || 5);
   const scoringGuideSettings = guideScoringVersion === settings.scoringVersion
     ? settings
@@ -1183,14 +1184,14 @@ export function FantasyExperience({
           </div>
         )}
 
-        {betweenRounds && (
+        {marketClosedBetweenRounds && (
           <div className="flex items-center gap-3 border-t border-warning/20 bg-warning/[.05] px-4 py-3 sm:px-5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning">
               <Lock className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[8px] font-bold uppercase tracking-[.16em] text-warning">Transferências fechadas</p>
-              <p className="mt-0.5 text-[11px] font-bold text-foreground">As compras voltam quando uma nova Ranked for aberta.</p>
+              <p className="text-[8px] font-bold uppercase tracking-[.16em] text-warning">Mercado fechado</p>
+              <p className="mt-0.5 text-[11px] font-bold text-foreground">As transferências voltam quando uma nova Ranked for aberta.</p>
             </div>
           </div>
         )}
@@ -1538,7 +1539,7 @@ export function FantasyExperience({
                 }}
               />
 
-              {betweenRounds && latestFinishedRoundPaid && (
+              {marketClosedBetweenRounds && (
                 <div className="pointer-events-none absolute inset-0 z-20 bg-[#020b06]/40 backdrop-blur-[10px] backdrop-saturate-[.35]" />
               )}
 
