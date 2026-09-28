@@ -78,7 +78,11 @@ export function OpenCallupBanner({
 
   return (
     <div className="group relative isolate flex h-full min-h-[350px] sm:min-h-[360px] flex-col justify-between overflow-hidden rounded-[28px] border border-accent/45 bg-[#07150d] p-5 shadow-[0_18px_45px_rgba(0,0,0,.34),0_0_28px_rgba(204,255,0,.08)] sm:p-6">
-      <Link href="/rodadas" className="absolute inset-0 z-10" aria-label="Abrir agenda da pelada" />
+      <Link
+        href={`/convocacao?callup=${callup.id}`}
+        className="absolute inset-0 z-10"
+        aria-label="Abrir convocação"
+      />
       <div
         className="pointer-events-none absolute inset-0 opacity-35"
         style={{
@@ -167,7 +171,7 @@ export function OpenCallupBanner({
             </div>
           </div>
           <span className="max-w-[112px] text-right text-[9px] font-black uppercase leading-4 tracking-wide text-accent">
-            Toque para ver a agenda
+            Toque para abrir a convocação
           </span>
         </div>
       </div>
