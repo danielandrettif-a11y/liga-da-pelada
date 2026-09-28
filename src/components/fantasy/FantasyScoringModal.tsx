@@ -260,6 +260,11 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                     <strong className="text-foreground font-black">0.0 pt</strong>
                   </div>
                 </div>
+                {goalkeeperSlotOnly && (
+                  <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[10px] leading-4 text-emerald-100/80">
+                    <strong className="text-emerald-200">Como funciona:</strong> o Cartola separa as partidas em que o atleta foi goleiro das partidas em que jogou na linha. Na vaga GOL, só entram os scouts das atuações no gol. Exemplo: 2 atuações, 1 clean sheet e 1 gol sofrido = <strong className="text-white">8 + 4 - 2,5 = 9,5 pontos</strong>.
+                  </div>
+                )}
               </div>
             </div>
           )}
