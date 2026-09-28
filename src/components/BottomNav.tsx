@@ -18,6 +18,7 @@ export function BottomNav({
   isAuthenticated,
   hasOpenCallup,
   hasPendingPayment,
+  canAccessCollective,
   collective,
   newRosterCount,
   currentUserId,
@@ -25,6 +26,7 @@ export function BottomNav({
   isAuthenticated: boolean;
   hasOpenCallup: boolean;
   hasPendingPayment: boolean;
+  canAccessCollective: boolean;
   collective: { callupId: string; unreadCount: number } | null;
   newRosterCount: number;
   currentUserId: string | null;
@@ -77,7 +79,7 @@ export function BottomNav({
     ...(roundFlowItem ? [roundFlowItem] : []),
     NAV_ITEMS[1],
     NAV_ITEMS[2],
-    communityItem,
+    ...(canAccessCollective ? [communityItem] : []),
     NAV_ITEMS[4],
   ];
   const visibleItems = isAuthenticated

@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { getCurrentAccount } from "../auth";
 import { sendPushNotificationsToUsers } from "../push-notifications";
 import { createServiceClient } from "../supabase/service";
+import { canUseCollective } from "../collective-access";
 
 export type CollectiveSummary = {
   callupId: string;
@@ -61,20 +62,16 @@ async function collectiveUnreadState(client: any, callupId: string, userId: stri
 async function listCollectiveCandidates() {
   const account = await getCurrentAccount();
   if (!account.user) return { account, callups: [] as any[] };
-  let callupIds: string[] = [];
-  if (account.isAdmin) {
-    const { data } = await account.client.from("callups").select("id").order("created_at", { ascending: false }).limit(12);
-    callupIds = (data || []).map((row: any) => row.id);
-  } else if (account.profile?.player_id) {
-    const { data } = await account.client.from("callup_entries").select("callup_id").eq("player_id", account.profile.player_id).order("created_at", { ascending: false }).limit(12);
-    callupIds = (data || []).map((row: any) => row.callup_id);
-  }
-  if (!callupIds.length) return { account, callups: [] as any[] };
+  const { data: player } = account.profile?.player_id
+    ? await account.client.from("players").select("member_category").eq("id", account.profile.player_id).maybeSingle()
+    : { data: null };
+  if (!canUseCollective(account.isAdmin, player?.member_category)) return { account, callups: [] as any[] };
   const { data: callups } = await account.client
     .from("callups")
     .select("id, date, created_at, round_id, status, round:round_id(id, number, status, payment_pix, payment_total, round_players(player_id), round_payments(player_id, paid)), team_drafts(id, status)")
-    .in("id", [...new Set(callupIds)])
-    .order("date", { ascending: false });
+    .eq("status", "converted")
+    .order("date", { ascending: false })
+    .limit(12);
   return { account, callups: callups || [] };
 }
 
@@ -134,7 +131,7 @@ export async function getCollectiveRoom(callupId?: string): Promise<CollectiveRo
     ? await (async () => {
         const { data: callup } = await account.client.from("callups").select("id, date, round_id, round:round_id(id, number, status)").eq("id", callupId).maybeSingle();
         if (!callup) return null;
-        const { data: allowed } = await account.client.rpc("can_access_collective", { p_callup_id: callupId });
+        const { data: allowed } = await account.client.rpc("can_access_collective_chat", { p_callup_id: callupId });
         if (!allowed) return null;
         const round: any = Array.isArray(callup.round) ? callup.round[0] : callup.round;
         return { callupId, roundId: round?.id || callup.round_id || null, roundNumber: round?.number || null, date: callup.date, status: round?.status || null, unreadCount: 0 };
@@ -194,11 +191,11 @@ export async function getCollectiveRoom(callupId?: string): Promise<CollectiveRo
 async function pushCollectiveMessage(callupId: string, senderUserId: string, senderPlayerId: string, fallbackSenderName: string, kind: string, body: string | null) {
   const service = createServiceClient();
   if (!service) return;
-  const [{ data: entries }, { data: sender }] = await Promise.all([
-    service.from("callup_entries").select("player_id").eq("callup_id", callupId),
+  const [{ data: officialPlayers }, { data: sender }] = await Promise.all([
+    service.from("players").select("id").eq("member_category", "player"),
     service.from("players").select("name").eq("id", senderPlayerId).maybeSingle(),
   ]);
-  const playerIds = [...new Set((entries || []).map((entry: any) => entry.player_id).filter(Boolean))];
+  const playerIds = (officialPlayers || []).map((player: any) => player.id);
   const [{ data: participants }, { data: admins }] = await Promise.all([
     playerIds.length ? service.from("account_profiles").select("user_id").in("player_id", playerIds) : Promise.resolve({ data: [] as any[] }),
     service.from("account_profiles").select("user_id").eq("role", "admin"),
@@ -222,7 +219,7 @@ export async function sendCollectiveMessage(formData: FormData) {
   const file = formData.get("media");
   const duration = Math.trunc(Number(formData.get("duration") || 0));
   const replyToMessageId = String(formData.get("reply_to_message_id") || "").trim() || null;
-  const { data: allowed } = await account.client.rpc("can_access_collective", { p_callup_id: callupId });
+  const { data: allowed } = await account.client.rpc("can_access_collective_chat", { p_callup_id: callupId });
   if (!allowed) return { success: false, error: "A Coletiva não está disponível para esta conta." };
   let kind: "text" | "image" | "audio" = "text";
   let mediaPath: string | null = null;

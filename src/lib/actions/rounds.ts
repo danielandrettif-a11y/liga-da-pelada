@@ -409,7 +409,7 @@ export async function previewRoundTeamShuffle(roundId: string, mode: RoundReshuf
     const [{ data: attributes, error: attributesError }, overallByPlayer, balanceTags] = await Promise.all([
       client.from("player_admin_attributes").select("player_id, speed_rating").in("player_id", playerIds),
       getLatestPlayerCardOverallMap(client),
-      mode === "adaptive" ? getPrivateBalanceTagsForDraw(playerIds) : Promise.resolve(new Map()),
+      mode === "adaptive" ? getPrivateBalanceTagsForDraw(playerIds, client) : Promise.resolve(new Map()),
     ]);
     if (attributesError) throw new Error(attributesError.message);
 

@@ -117,7 +117,6 @@ export function FantasyExperience({
   initialPackId,
   initialTab = "team",
   pitchAssetKey = null,
-  hasActiveCallup = false,
 }: FantasyExperienceProps) {
   const router = useRouter();
   const persistedPlayers = lineupPlayersFromSource(lineup);
@@ -259,6 +258,7 @@ export function FantasyExperience({
   const [infoModal, setInfoModal] = useState<{ title: string; description: string } | null>(null);
   const [selectedDrawerPlayer, setSelectedDrawerPlayer] = useState<FantasyMarketPlayer | null>(null);
   const [showRevealedLineups, setShowRevealedLineups] = useState(false);
+  const [revealedRound, setRevealedRound] = useState<{ id: string; number: number } | null>(null);
   const [showRoundTeams, setShowRoundTeams] = useState(false);
   const [selectedRoundTeamId, setSelectedRoundTeamId] = useState<string | null>(null);
   const [currentActiveCard, setCurrentActiveCard] = useState(activeCard);
@@ -344,6 +344,12 @@ export function FantasyExperience({
   const roleReframeActive = guideScoringVersion >= 7;
   const defenseRoleLabel = roleReframeActive ? "Defensor / Volante · DEF/VOL" : "Defensor / DEF";
   const midfieldRoleLabel = roleReframeActive ? "Ala · ALA" : "Ala / Meio · ALA/MEI";
+
+  function openRevealedLineups(roundId?: string | null, roundNumber?: number | null) {
+    if (!roundId) return;
+    setRevealedRound({ id: roundId, number: roundNumber || 0 });
+    setShowRevealedLineups(true);
+  }
 
   // V3: Bônus de orçamento temporário da carta Crédito Extra
   const budgetBonus = currentActiveCard?.card?.effectType === "BUDGET_BONUS" ? (currentActiveCard.card.effectConfig?.bonus || 5) : 0;
@@ -1060,27 +1066,37 @@ export function FantasyExperience({
         />
       )}
 
-      {/* Entre rodadas, a escalação final fica logo abaixo do Radar até a próxima convocação. */}
-      {betweenRounds && lastRound && !hasActiveCallup && (
-        <button
-          type="button"
-          onClick={() => setShowRevealedLineups(true)}
-          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-accent/40 bg-gradient-to-r from-accent/20 via-surface to-accent/10 p-4 text-left shadow-lg transition-all duration-300 hover:scale-[1.01] active:scale-[0.99]"
-        >
+      {/* O resultado anterior só sai quando a próxima Ranked começa de fato. */}
+      {lastRound && !isTest && status !== "in_progress" && (
+        <section className="flex w-full items-center justify-between gap-3 rounded-2xl border border-accent/40 bg-gradient-to-r from-accent/20 via-surface to-accent/10 p-4 shadow-lg">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-background shadow">
               <Eye className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-black uppercase text-foreground">Times da última Ranked</span>
+                <span className="text-sm font-black uppercase text-foreground">Última Ranked</span>
                 <span className="rounded-full bg-success/20 px-2 py-0.5 text-[8px] font-black uppercase text-success">Final</span>
               </div>
-              <p className="text-[10px] text-muted">Consulte os {playersPerTeam} jogadores, capitão e cartas usados na rodada anterior.</p>
+              <p className="text-[10px] text-muted">Escalações e classificação da rodada {lastRound.number}.</p>
             </div>
           </div>
-          <span className="shrink-0 rounded-xl bg-accent px-3 py-1.5 text-xs font-black text-background">Ver Times →</span>
-        </button>
+          <div className="flex shrink-0 flex-col gap-1.5 text-center text-[9px] font-black sm:flex-row">
+            <button
+              type="button"
+              onClick={() => openRevealedLineups(lastRound.roundId, lastRound.number)}
+              className="rounded-lg bg-accent px-2.5 py-1.5 text-background transition-transform active:scale-95"
+            >
+              Escalações
+            </button>
+            <Link
+              href={`/cartola/ranking?scope=round&roundId=${encodeURIComponent(lastRound.roundId)}`}
+              className="rounded-lg border border-accent/45 px-2.5 py-1.5 text-accent transition-colors hover:bg-accent/10"
+            >
+              Classificação
+            </Link>
+          </div>
+        </section>
       )}
 
       {/* Banner de Modo Teste */}
@@ -1241,7 +1257,7 @@ export function FantasyExperience({
       {isMarketClosed && !betweenRounds && (
         <button
           type="button"
-          onClick={() => setShowRevealedLineups(true)}
+          onClick={() => openRevealedLineups(round?.id, round?.number)}
           className="flex w-full items-center justify-between gap-3 rounded-2xl border border-accent/40 bg-gradient-to-r from-accent/20 via-surface to-accent/10 p-4 text-left shadow-lg transition-all duration-300 hover:scale-[1.01] active:scale-[0.99]"
         >
           <div className="flex items-center gap-3">
@@ -2187,10 +2203,13 @@ export function FantasyExperience({
       {/* MODAL DE ESCALAÇÕES REVELADAS */}
       {showRevealedLineups && (
         <FantasyRevealedLineupsModal
-          roundId={round?.id}
-          roundNumber={round?.number}
+          roundId={revealedRound?.id || round?.id}
+          roundNumber={revealedRound?.number || round?.number}
           isOpen={showRevealedLineups}
-          onClose={() => setShowRevealedLineups(false)}
+          onClose={() => {
+            setShowRevealedLineups(false);
+            setRevealedRound(null);
+          }}
         />
       )}
 

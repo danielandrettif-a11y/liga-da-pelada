@@ -68,7 +68,7 @@ export async function drawTeamsAdaptiveOnServer(input: {
     const [{ data: attributes, error: attributesError }, { data: overalls, error: overallsError }, balanceTags] = await Promise.all([
       account.client.from("player_admin_attributes").select("player_id, speed_rating").in("player_id", playerIds),
       account.client.rpc("get_latest_player_card_overalls"),
-      getPrivateBalanceTagsForDraw(playerIds),
+      getPrivateBalanceTagsForDraw(playerIds, account.client),
     ]);
     if (attributesError) return { success: false, error: attributesError.message };
     if (overallsError) return { success: false, error: `Não foi possível ler os OVRs: ${overallsError.message}` };

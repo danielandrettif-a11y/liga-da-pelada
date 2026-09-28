@@ -3,7 +3,6 @@ import { ClipboardList, LogIn, Trophy } from "@/components/icons";
 import { FantasyExperience } from "@/components/fantasy/FantasyExperience";
 import { getFantasyDashboard } from "@/lib/actions/fantasy";
 import { getMyEquippedCosmetics } from "@/lib/actions/cosmetics";
-import { hasActiveCallup } from "@/lib/actions/callups";
 
 // Pontuação ao vivo não pode reutilizar uma resposta de navegação anterior.
 export const dynamic = "force-dynamic";
@@ -11,7 +10,7 @@ export const revalidate = 0;
 
 export default async function CartolaPage({ searchParams }: PageProps<"/cartola">) {
   const { pack, tab } = await searchParams;
-  const [data, cosmetics, activeCallup] = await Promise.all([getFantasyDashboard(), getMyEquippedCosmetics(), hasActiveCallup()]);
+  const [data, cosmetics] = await Promise.all([getFantasyDashboard(), getMyEquippedCosmetics()]);
   if (!data.authenticated) return <Empty title="Entre para jogar o Cartola" description="Monte seu time, use cartas e dispute com seus amigos." login />;
   if (!data.available) return <Empty title="Atualização do Cartola pendente" description="Execute as migrations do Cartola até a 039 para liberar a V1 desta temporada." />;
   return (
@@ -41,7 +40,6 @@ export default async function CartolaPage({ searchParams }: PageProps<"/cartola"
       initialPackId={typeof pack === "string" ? pack : undefined}
       initialTab={tab === "market" ? "market" : "team"}
       pitchAssetKey={cosmetics?.pitchAssetKey || null}
-      hasActiveCallup={activeCallup}
       />
     </div>
   );

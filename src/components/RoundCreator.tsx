@@ -7,9 +7,6 @@ import { createRoundWithTeams, saveRoundPrelist, setCallupMatchSize, type TeamIn
 import { createTeamDraft } from "@/lib/actions/draft";
 import { adminAddCallupPlayer, adminRemoveCallupPlayer } from "@/lib/actions/callups";
 import type { RoundType, TeamFormationMode } from "@/lib/types";
-import { drawTeamsByAttendance, drawTeamsDirect } from "@/lib/round-draw";
-import { drawTeamsBySpeedOnServer } from "@/lib/actions/speed-draw";
-import type { SpeedTeamSummary } from "@/lib/speed-draw";
 import { drawTeamsAdaptiveOnServer } from "@/lib/actions/adaptive-draw";
 import type { AdaptiveTeamSummary } from "@/lib/adaptive-draw";
 import {
@@ -22,7 +19,6 @@ import {
   PencilLine,
   RotateCcw,
   Search,
-  Sparkles,
   Stadium as StadiumIcon,
   X,
 } from "@/components/icons";
@@ -41,8 +37,6 @@ import { isPlayerVisibleInPrelistTab } from "@/lib/callup-ui";
 import { VEST_COLORS } from "@/lib/vest-colors";
 import { createDefaultTeams, type DrawPlayer, type DrawTeam, type RoundCreatorProps } from "./round-creator-model";
 import { MIN_UNDERFILLED_PLAYERS, rebalanceTeamRosters, validateUnderfilledTeamSizes, type RoundTeamSizeMode } from "@/lib/underfilled-rounds";
-
-type InstantFormationMode = Exclude<TeamFormationMode, "manual" | "draft">;
 
 export function RoundCreator({
   allPlayers,
@@ -83,13 +77,10 @@ export function RoundCreator({
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [openVestPickerTeamId, setOpenVestPickerTeamId] = useState<string | null>(null);
   const [formationMode, setFormationMode] = useState<TeamFormationMode>("manual");
-  const [attendanceOrder, setAttendanceOrder] = useState<string[]>([]);
-  const [pendingDrawMode, setPendingDrawMode] = useState<InstantFormationMode | null>(null);
-  const [speedSummary, setSpeedSummary] = useState<{ teams: SpeedTeamSummary[]; unratedCount: number } | null>(null);
   const [adaptiveSummary, setAdaptiveSummary] = useState<{ teams: AdaptiveTeamSummary[]; missingOverallCount: number; missingSpeedCount: number; balanceScore: number } | null>(null);
   const [underfilledPrompt, setUnderfilledPrompt] = useState<"count" | "size" | null>(null);
   const [mounted, setMounted] = useState(false);
-  useDialogViewport(Boolean(pendingDrawMode || underfilledPrompt));
+  useDialogViewport(Boolean(underfilledPrompt));
 
   useEffect(() => {
     setMounted(true);
@@ -131,7 +122,6 @@ export function RoundCreator({
       ...team,
       players: team.players.filter((player) => synchronizedIds.has(player.id)),
     })));
-    setAttendanceOrder((current) => current.filter((playerId) => synchronizedIds.has(playerId)));
   }, [sourceCallupId, synchronizedPlayerKey]);
 
   useEffect(() => {
@@ -198,7 +188,6 @@ export function RoundCreator({
     }
     setError("");
     setSelectedPlayerIds(next);
-    if (!next.has(id)) setAttendanceOrder((current) => current.filter((playerId) => playerId !== id));
   }
 
   async function addPlayerToPrelist(playerId: string) {
@@ -243,7 +232,6 @@ export function RoundCreator({
 
     const previous = new Set(selectedPlayerIds);
     const previousTeams = teams;
-    const previousAttendance = attendanceOrder;
     setSelectedPlayerIds((current) => {
       const next = new Set(current);
       next.delete(playerId);
@@ -253,7 +241,6 @@ export function RoundCreator({
       ...team,
       players: team.players.filter((item) => item.id !== playerId),
     })));
-    setAttendanceOrder((current) => current.filter((id) => id !== playerId));
     setChangingPlayerId(playerId);
     setError("");
     setNotice("");
@@ -261,7 +248,6 @@ export function RoundCreator({
     if (!result.success) {
       setSelectedPlayerIds(previous);
       setTeams(previousTeams);
-      setAttendanceOrder(previousAttendance);
       setError(result.error || "Não foi possível remover o jogador da convocação.");
     } else {
       router.refresh();
@@ -320,9 +306,7 @@ export function RoundCreator({
 
   function assignToTeam(player: DrawPlayer, teamId: string) {
     setFormationMode("manual");
-    setSpeedSummary(null);
     setAdaptiveSummary(null);
-    setAttendanceOrder([]);
     const targetTeam = teams.find((team) => team.id === teamId);
     const alreadyInTarget = targetTeam?.players.some((item) => item.id === player.id);
     if (!targetTeam || (!alreadyInTarget && targetTeam.players.length >= teamCapacity)) {
@@ -343,205 +327,49 @@ export function RoundCreator({
 
   function removeFromTeam(player: DrawPlayer) {
     setFormationMode("manual");
-    setSpeedSummary(null);
     setAdaptiveSummary(null);
-    setAttendanceOrder([]);
     setTeams(prev => prev.map(t => ({
       ...t,
       players: t.players.filter(p => p.id !== player.id)
     })));
   }
 
-  async function executeDirectDraw(mode: InstantFormationMode) {
-    if (selectedPlayers.length === 0) {
-      setError("Selecione os jogadores antes de sortear os times.");
+  async function executeBalancedDraw() {
+    if (selectedPlayers.length < teamCount) {
+      setError(`Selecione pelo menos ${teamCount} jogadores para montar ${teamCount} times.`);
       return;
     }
+    setLoading(true);
     try {
-      if (mode === "adaptive") {
-        const serverResult = await drawTeamsAdaptiveOnServer({
-          playerIds: selectedPlayers.map((player) => player.id),
-          teamCount,
-          playersPerTeam: teamCapacity,
-        });
-        if (!serverResult.success || !serverResult.teams) throw new Error(serverResult.error || "Não foi possível executar o equilíbrio completo.");
-        const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
-        setTeams((current) => current.map((team, index) => ({
-          ...team,
-          players: (serverResult.teams?.[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
-        })));
-        setAdaptiveSummary({
-          teams: serverResult.teamSummaries || [],
-          missingOverallCount: serverResult.missingOverallCount || 0,
-          missingSpeedCount: serverResult.missingSpeedCount || 0,
-          balanceScore: serverResult.balanceScore || 0,
-        });
-        setSpeedSummary(null);
-      } else if (mode === "speed") {
-        const serverResult = await drawTeamsBySpeedOnServer({
-          playerIds: selectedPlayers.map((player) => player.id),
-          teamCount,
-          playersPerTeam: teamCapacity,
-        });
-        if (!serverResult.success || !serverResult.teams) throw new Error(serverResult.error || "Não foi possível sortear por velocidade.");
-        const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
-        setTeams((current) => current.map((team, index) => ({
-          ...team,
-          players: (serverResult.teams?.[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
-        })));
-        setSpeedSummary({ teams: serverResult.teamSummaries || [], unratedCount: serverResult.unratedCount || 0 });
-        setAdaptiveSummary(null);
-      } else {
-        const result = drawTeamsDirect({
-          players: selectedPlayers,
-          teamCount,
-          playersPerTeam: teamCapacity,
-          mode,
-        });
-        const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
-        setTeams((current) => current.map((team, index) => ({
-          ...team,
-          players: (result[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
-        })));
-        setSpeedSummary(null);
-        setAdaptiveSummary(null);
-      }
-      setFormationMode(mode);
-      // Sorteio normal não usa a regra de bloquear o terceiro time pela
-      // ordem de chegada. As presenças começam todas marcadas na rodada.
-      setAttendanceOrder([]);
-      setPendingDrawMode(null);
+      const serverResult = await drawTeamsAdaptiveOnServer({
+        playerIds: selectedPlayers.map((player) => player.id),
+        teamCount,
+        playersPerTeam: teamCapacity,
+      });
+      if (!serverResult.success || !serverResult.teams) throw new Error(serverResult.error || "Não foi possível executar o equilíbrio completo.");
+      const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
+      setTeams((current) => current.map((team, index) => ({
+        ...team,
+        players: (serverResult.teams?.[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
+      })));
+      setAdaptiveSummary({
+        teams: serverResult.teamSummaries || [],
+        missingOverallCount: serverResult.missingOverallCount || 0,
+        missingSpeedCount: serverResult.missingSpeedCount || 0,
+        balanceScore: serverResult.balanceScore || 0,
+      });
+      setFormationMode("adaptive");
       setError("");
     } catch (drawError) {
       setError(drawError instanceof Error ? drawError.message : "Não foi possível sortear os times.");
+    } finally {
+      setLoading(false);
     }
   }
 
-  function requestDraw(mode: InstantFormationMode) {
-    if (selectedPlayers.length < 2) {
-      setError("Selecione pelo menos 2 jogadores para sortear.");
-      return;
-    }
+  function requestDraw() {
     setError("");
-    executeDirectDraw(mode);
-  }
-
-  function openAttendanceDrawModal(mode: InstantFormationMode) {
-    if (selectedPlayers.length < 2) {
-      setError("Selecione pelo menos 2 jogadores para marcar presenças.");
-      return;
-    }
-    setError("");
-    setPendingDrawMode(mode);
-  }
-
-  function toggleAttendance(playerId: string) {
-    setAttendanceOrder((current) => current.includes(playerId)
-      ? current.filter((id) => id !== playerId)
-      : [...current, playerId]);
-  }
-
-  function markAllAttendance() {
-    setAttendanceOrder(selectedPlayers.map((p) => p.id));
-  }
-
-  function clearAttendance() {
-    setAttendanceOrder([]);
-  }
-
-  async function confirmAttendanceDraw() {
-    if (!pendingDrawMode) return;
-    if (attendanceOrder.length === 0) {
-      await executeDirectDraw(pendingDrawMode);
-      return;
-    }
-    try {
-      if (pendingDrawMode === "adaptive") {
-        const serverResult = await drawTeamsAdaptiveOnServer({
-          playerIds: selectedPlayers.map((player) => player.id),
-          attendanceOrder,
-          teamCount,
-          playersPerTeam: teamCapacity,
-        });
-        if (!serverResult.success || !serverResult.teams) throw new Error(serverResult.error || "Não foi possível executar o equilíbrio completo.");
-        const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
-        setTeams((current) => current.map((team, index) => ({
-          ...team,
-          players: (serverResult.teams?.[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
-        })));
-        setAttendanceOrder(serverResult.attendanceOrder || attendanceOrder);
-        setAdaptiveSummary({
-          teams: serverResult.teamSummaries || [],
-          missingOverallCount: serverResult.missingOverallCount || 0,
-          missingSpeedCount: serverResult.missingSpeedCount || 0,
-          balanceScore: serverResult.balanceScore || 0,
-        });
-        setSpeedSummary(null);
-        setFormationMode("adaptive");
-        setPendingDrawMode(null);
-        setError("");
-        return;
-      }
-      if (pendingDrawMode === "speed") {
-        const serverResult = await drawTeamsBySpeedOnServer({
-          playerIds: selectedPlayers.map((player) => player.id),
-          attendanceOrder,
-          teamCount,
-          playersPerTeam: teamCapacity,
-        });
-        if (!serverResult.success || !serverResult.teams) throw new Error(serverResult.error || "Não foi possível sortear por velocidade.");
-        const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
-        setTeams((current) => current.map((team, index) => ({
-          ...team,
-          players: (serverResult.teams?.[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
-        })));
-        setAttendanceOrder(serverResult.attendanceOrder || attendanceOrder);
-        setSpeedSummary({ teams: serverResult.teamSummaries || [], unratedCount: serverResult.unratedCount || 0 });
-        setAdaptiveSummary(null);
-        setFormationMode("speed");
-        setPendingDrawMode(null);
-        setError("");
-        return;
-      }
-      setSpeedSummary(null);
-      setAdaptiveSummary(null);
-      const minimumPresent = Math.min(selectedPlayers.length, teamCapacity * 2);
-      if (attendanceOrder.length < minimumPresent) {
-        // Se marcou apenas alguns, completa com os outros selecionados
-        const remaining = selectedPlayers.filter((p) => !attendanceOrder.includes(p.id)).map((p) => p.id);
-        const fullOrder = [...attendanceOrder, ...remaining];
-        const result = drawTeamsByAttendance({
-          players: selectedPlayers,
-          attendanceOrder: fullOrder,
-          teamCount,
-          playersPerTeam: teamCapacity,
-          mode: pendingDrawMode,
-        });
-        const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
-        setTeams((current) => current.map((team, index) => ({
-          ...team,
-          players: (result.teams[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
-        })));
-      } else {
-        const result = drawTeamsByAttendance({
-          players: selectedPlayers,
-          attendanceOrder,
-          teamCount,
-          playersPerTeam: teamCapacity,
-          mode: pendingDrawMode,
-        });
-        const playerById = new Map(selectedPlayers.map((player) => [player.id, player]));
-        setTeams((current) => current.map((team, index) => ({
-          ...team,
-          players: (result.teams[index] || []).map((id) => playerById.get(id)!).filter(Boolean),
-        })));
-      }
-      setFormationMode(pendingDrawMode);
-      setPendingDrawMode(null);
-      setError("");
-    } catch (drawError) {
-      setError(drawError instanceof Error ? drawError.message : "Não foi possível sortear os times.");
-    }
+    void executeBalancedDraw();
   }
 
   function updateTeamName(teamId: string, name: string) {
@@ -642,7 +470,7 @@ export function RoundCreator({
       roundType: selectedRoundType,
       callupId: sourceCallupId,
       formationMode,
-      attendanceOrder: formationMode === "manual" ? [] : attendanceOrder,
+      attendanceOrder: [],
       prelistRoundId: currentPrelistId,
       startTime,
       stadiumId: selectedStadiumId,
@@ -1145,27 +973,25 @@ export function RoundCreator({
               <p className="text-[10px] font-black uppercase tracking-wider text-muted">Como montar os times?</p>
               <span className="text-[9px] font-bold text-accent">Sorteio com 1 toque</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               <button
                 type="button"
-                onClick={() => requestDraw("speed")}
-                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "speed" ? "border-accent bg-accent/15 text-accent shadow-sm" : "border-border bg-surface text-foreground hover:border-accent/40"}`}
-              >
-                🏎️ Por Velocidade
-              </button>
-              <button
-                type="button"
-                onClick={() => requestDraw("adaptive")}
-                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "adaptive" ? "border-accent bg-accent/15 text-accent shadow-sm" : "border-border bg-surface text-foreground hover:border-accent/40"}`}
+                onClick={requestDraw}
+                disabled={loading}
+                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 disabled:opacity-40 ${formationMode === "adaptive" ? "border-accent bg-accent text-background shadow-[0_0_20px_rgba(204,255,0,.18)]" : "border-accent/45 bg-accent/10 text-accent hover:bg-accent/15"}`}
               >
                 🧠 Equilibrado
               </button>
               <button
                 type="button"
-                onClick={() => openAttendanceDrawModal("adaptive")}
-                className="rounded-xl border border-border bg-surface px-2 py-3 text-[10px] font-black uppercase text-muted hover:text-foreground hover:border-border/80 transition-all active:scale-95"
+                onClick={() => {
+                  setFormationMode("manual");
+                  setAdaptiveSummary(null);
+                  setTeams((current) => current.map((team) => ({ ...team, players: [] })));
+                }}
+                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "manual" ? "border-accent bg-accent text-background shadow-[0_0_20px_rgba(204,255,0,.18)]" : "border-accent/45 bg-accent/10 text-accent hover:bg-accent/15"}`}
               >
-                📋 Ordem de Chegada
+                ✋ Manual
               </button>
               <button
                 type="button"
@@ -1175,40 +1001,12 @@ export function RoundCreator({
               >
                 👑 Draft de Capitães
               </button>
-              <button
-                type="button"
-                onClick={() => { setFormationMode("manual"); setSpeedSummary(null); setAdaptiveSummary(null); setTeams((current) => current.map((team) => ({ ...team, players: [] }))); }}
-                className={`rounded-xl border px-2 py-3 text-[10px] font-black uppercase transition-all active:scale-95 ${formationMode === "manual" ? "border-accent bg-accent/15 text-accent" : "border-border bg-surface text-muted"}`}
-              >
-                ✋ Manual
-              </button>
             </div>
             <p className="mt-2 text-[10px] text-muted">
               {formationMode === "manual"
                 ? "Toque em cada jogador e escolha o time manualmente."
-                : formationMode === "speed"
-                ? "Times equilibrados por velocidade (★) com sucesso!"
-                : formationMode === "adaptive"
-                ? "Times equilibrados por OVR (45%), velocidade (40%) e funções (15%)."
-                : "Escolha um modo acima para montar os times."}
+                : "Equilibrado: OVR 25% · velocidade 30% · funções 15% · nível Bagre/Craque 20% · separação dessas tags 10%."}
             </p>
-            {formationMode === "speed" && speedSummary && (
-              <div className="mt-3 rounded-xl border border-accent/25 bg-accent/5 p-3">
-                <p className="text-[9px] font-black uppercase tracking-wider text-accent">Resumo privado do ADM</p>
-                <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
-                  {speedSummary.teams.map((summary, index) => (
-                    <p key={index} className="rounded-lg bg-background/60 px-2.5 py-2 text-[10px] font-bold text-muted">
-                      <span className="text-foreground">Time {index + 1}</span> · média {summary.average.toFixed(2)}★ · {summary.stars[3]}×3★ · {summary.stars[2]}×2★ · {summary.stars[1]}×1★
-                    </p>
-                  ))}
-                </div>
-                {speedSummary.unratedCount > 0 && (
-                  <p className="mt-2 text-[9px] font-bold text-warning">
-                    {speedSummary.unratedCount} jogador(es) sem avaliação foram considerados como 2★ somente neste cálculo.
-                  </p>
-                )}
-              </div>
-            )}
             {formationMode === "adaptive" && adaptiveSummary && (
               <div className="mt-3 rounded-xl border border-accent/25 bg-accent/5 p-3">
                 <div className="flex items-center justify-between gap-3">
@@ -1230,131 +1028,6 @@ export function RoundCreator({
               </div>
             )}
           </div>
-
-          {mounted && pendingDrawMode && typeof document !== "undefined" && createPortal(
-            <div
-              className="mobile-dialog-backdrop z-[99999] items-end bg-black/85 p-0 backdrop-blur-sm animate-fade-in sm:items-center sm:p-4"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Sorteio de times"
-              onClick={(e) => {
-                if (e.target === e.currentTarget) setPendingDrawMode(null);
-              }}
-            >
-              <div
-                className="mobile-dialog-panel relative flex max-w-lg flex-col rounded-t-[2rem] border-t border-accent/40 bg-[#07150d] pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-20px_60px_rgba(0,0,0,0.9)] animate-slide-in-bottom sm:rounded-3xl sm:border sm:animate-fade-in-up"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* Puxador visual no mobile */}
-                <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-white/20 sm:hidden" />
-
-                {/* Header fixo do Modal */}
-                <div className="shrink-0 flex items-start justify-between border-b border-border/70 bg-[#07150d] px-5 py-3.5">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-accent" />
-                      <h2 className="text-base font-black uppercase tracking-wide text-foreground">
-                        Ordem de Chegada (1º Jogo)
-                      </h2>
-                    </div>
-                    <p className="mt-0.5 text-[11px] text-muted">
-                      Marque quem chegou primeiro para jogar a primeira partida ou faça o sorteio direto.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setPendingDrawMode(null)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
-                    aria-label="Fechar"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {/* Ações rápidas de presença fixas */}
-                <div className="shrink-0 flex items-center justify-between border-b border-border/50 bg-black/30 px-5 py-2 text-xs">
-                  <span className="text-[10px] font-bold text-muted">
-                    {attendanceOrder.length} de {selectedPlayers.length} marcados
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={markAllAttendance}
-                      className="text-[10px] font-bold text-accent hover:underline"
-                    >
-                      Marcar todos
-                    </button>
-                    {attendanceOrder.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={clearAttendance}
-                        className="text-[10px] font-bold text-danger hover:underline"
-                      >
-                        Limpar
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Lista de jogadores com scroll interno suave */}
-                <div className="mobile-dialog-scroll flex-1 divide-y divide-border/40">
-                  {selectedPlayers.map((player) => {
-                    const position = attendanceOrder.indexOf(player.id);
-                    return (
-                      <button
-                        key={player.id}
-                        type="button"
-                        onClick={() => toggleAttendance(player.id)}
-                        className={`flex w-full items-center gap-3 px-5 py-2.5 text-left transition-colors ${position >= 0 ? "bg-accent/10" : "hover:bg-surface/50"}`}
-                      >
-                        <span
-                          className={`stat-number flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-black ${
-                            position >= 0 ? "bg-accent text-background" : "border border-border bg-surface text-muted"
-                          }`}
-                        >
-                          {position >= 0 ? position + 1 : "—"}
-                        </span>
-                        <PlayerAvatar
-                          name={player.name}
-                          avatarUrl={player.avatar_url}
-                          className="h-8 w-8 rounded-full text-[10px] font-bold"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-bold text-foreground">{player.name}</p>
-                          <div className="flex items-center gap-1.5 text-[9px] text-muted">
-                            <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />
-                            <span>{player.points || 0} pts</span>
-                          </div>
-                        </div>
-                        {position >= 0 && <CheckCircle2 className="h-4 w-4 text-accent" />}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Rodapé fixo com os botões de ação */}
-                <div className="shrink-0 space-y-2 border-t border-border/70 bg-[#07150d] p-4">
-                  <button
-                    type="button"
-                    onClick={confirmAttendanceDraw}
-                    className="w-full rounded-xl bg-accent py-3 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_20px_rgba(204,255,0,0.2)] transition-transform active:scale-95"
-                  >
-                    {attendanceOrder.length > 0 ? "Sortear por Ordem de Chegada" : "⚡ Sortear Imediatamente"}
-                  </button>
-                  {attendanceOrder.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => executeDirectDraw(pendingDrawMode)}
-                      className="w-full rounded-xl border border-border bg-surface py-2.5 text-[11px] font-bold text-muted hover:text-foreground transition-colors"
-                    >
-                      ⚡ Ignorar chegadas e sortear imediatamente
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>,
-            document.body
-          )}
 
           {/* Unassigned Pool */}
           {unassignedPlayers.length > 0 && (

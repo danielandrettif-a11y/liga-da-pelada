@@ -434,7 +434,7 @@ export function PlayerForm({
             <option value="3">3★ — Alta velocidade</option>
           </select>
           <p className="text-[10px] text-muted">
-            Visível apenas para administradores. Usado pelo algoritmo de Sorteio por Velocidade.
+            Visível apenas para administradores. Usado como parte do Sorteio Equilibrado.
           </p>
         </div>
       )}
