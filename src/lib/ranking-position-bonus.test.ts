@@ -23,14 +23,37 @@ describe("ranking position bonus", () => {
     expect(resolveRankingRoleWeights({ DEF: 80, ALA_MEI: 80, ATA: 79 }, "midfield")[0]).toEqual({ role: "MEI", overall: 80, weight: 1 });
   });
 
-  it("aplica o teto de cada posição antes do peso secundário", () => {
+  it("normaliza pacotes diferentes para o mesmo teto de 7 pontos", () => {
     expect(calculateRankingPositionBonus({
       ...stats,
       roleWeights: [
         { role: "DEF", overall: 90, weight: 1 },
         { role: "MEI", overall: 88, weight: 0.5 },
       ],
-    })).toBe(13);
+    })).toBe(7);
+
+    expect(calculateRankingPositionBonus({
+      ...stats,
+      roleWeights: [
+        { role: "MEI", overall: 90, weight: 1 },
+        { role: "ATA", overall: 88, weight: 0.5 },
+      ],
+    })).toBe(7);
+  });
+
+  it("preserva proporcionalmente bônus abaixo do teto", () => {
+    expect(calculateRankingPositionBonus({
+      ...stats,
+      goals: 0,
+      assists: 0,
+      draws: 0,
+      defensiveCleanGames: 1,
+      defensiveOneGoalGames: 0,
+      roleWeights: [
+        { role: "DEF", overall: 90, weight: 1 },
+        { role: "MEI", overall: 88, weight: 0.5 },
+      ],
+    })).toBe(0.81);
   });
 
   it("ignora pesos persistidos inválidos", () => {

@@ -16,6 +16,8 @@ export type RankingPositionOveralls = {
 };
 
 const ROLE_ORDER: RankingLineRole[] = ["DEF", "MEI", "ATA"];
+const ROLE_BONUS_CAP: Record<RankingLineRole, number> = { DEF: 10, MEI: 6, ATA: 2 };
+export const RANKING_POSITION_BONUS_CAP = 7;
 
 function profileRole(profile: PlayerProfile | null | undefined): RankingLineRole | null {
   if (profile === "defensive") return "DEF";
@@ -68,7 +70,8 @@ export function calculateRankingPositionBonus(input: RankingPositionBonusInput):
     slotRole: roleWeight.role,
     playerProfile: roleWeight.role === "DEF" ? "defensive" : roleWeight.role === "MEI" ? "midfield" : "offensive",
   }) * roleWeight.weight, 0);
-  return Math.round(bonus * 100) / 100;
+  const packageCap = input.roleWeights.reduce((total, { role, weight }) => total + ROLE_BONUS_CAP[role] * weight, 0);
+  return packageCap > 0 ? Math.round((bonus * RANKING_POSITION_BONUS_CAP / packageCap) * 100) / 100 : 0;
 }
 
 export function rankingRoleWeightsLabel(weights: RankingRoleWeight[]) {
