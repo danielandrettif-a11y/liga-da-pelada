@@ -355,6 +355,11 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
   const overallComposition = getOverallComposition(entry.player.overall_traits, entry.overallPositions, {
     goalkeeperGames: entry.overallGoalkeeperGames,
   });
+  const goalkeeperEligible = Number(entry.overallGoalkeeperGames || 0) >= 8;
+  const goalkeeperIncluded = overallComposition?.items.some((item) => item.role === "GOL") === true;
+  const goalkeeperAverage = entry.goalkeeperStats?.games
+    ? entry.goalkeeperStats.goalsConceded / entry.goalkeeperStats.games
+    : 0;
   const displayedBestRounds = scoringMode === "legacy" ? entry.legacyBestRounds : entry.bestRounds;
   const displayedMinimum = scoringMode === "legacy" ? entry.legacyMinPointsToEnterTop6 : entry.minPointsToEnterTop6;
   const [sharing, setSharing] = useState(false);
@@ -520,7 +525,15 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
               <div className="min-w-0">
                 <span className="block font-athletic text-xs font-black uppercase tracking-wider text-foreground">Como seu OVR é calculado</span>
                 <span className="block truncate text-[10px] text-muted">
-                  {overallComposition ? `Seu geral usa ${overallComposition.items.map((item) => item.label).join(" + ")}` : "Entenda as notas da sua carta"}
+                  {Number(entry.overallGoalkeeperGames || 0) > 0
+                    ? goalkeeperIncluded
+                      ? "Seu OVR GOL participa do cálculo geral"
+                      : goalkeeperEligible
+                        ? "Seu OVR GOL já é elegível, mas está fora das 3 maiores notas"
+                        : `${entry.overallGoalkeeperGames}/8 partidas no gol para entrar no geral`
+                    : overallComposition
+                      ? `Seu geral usa ${overallComposition.items.map((item) => item.label).join(" + ")}`
+                      : "Entenda as notas da sua carta"}
                 </span>
               </div>
             </div>
@@ -544,6 +557,36 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                     <p className="font-black text-foreground">Como cada posição evolui</p>
                     <p className="mt-1">A nota começa em 70 e usa até as 8 rodadas oficiais finalizadas mais recentes. Rodadas novas pesam mais; faltar não derruba a nota, e várias partidas na mesma pelada contam como uma amostra semanal.</p>
                   </div>
+
+                  {Number(entry.overallGoalkeeperGames || 0) > 0 && (
+                    <div className="rounded-xl border border-cyan-300/25 bg-cyan-300/[0.07] p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-black uppercase tracking-wide text-cyan-200">🧤 Detalhes do OVR GOL</p>
+                        <span className="font-athletic text-lg font-black text-cyan-200">{entry.overallPositions?.GOL.toFixed(1).replace(".", ",")}</span>
+                      </div>
+                      {entry.goalkeeperStats && (
+                        <div className="mt-2">
+                          <p className="mb-1 text-[8px] font-black uppercase tracking-wide text-cyan-100/60">Scouts do período exibido</p>
+                          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                            <div className="rounded-lg bg-black/20 p-2 text-center"><strong className="block text-sm text-foreground">{entry.goalkeeperStats.games}</strong><span className="text-[8px] uppercase">jogos no gol</span></div>
+                            <div className="rounded-lg bg-black/20 p-2 text-center"><strong className="block text-sm text-foreground">{entry.goalkeeperStats.goalsConceded}</strong><span className="text-[8px] uppercase">gols sofridos</span></div>
+                            <div className="rounded-lg bg-black/20 p-2 text-center"><strong className="block text-sm text-foreground">{goalkeeperAverage.toFixed(2).replace(".", ",")}</strong><span className="text-[8px] uppercase">por jogo</span></div>
+                            <div className="rounded-lg bg-black/20 p-2 text-center"><strong className="block text-sm text-foreground">{entry.goalkeeperStats.cleanSheets}</strong><span className="text-[8px] uppercase">clean sheets</span></div>
+                          </div>
+                        </div>
+                      )}
+                      <p className="mt-2">
+                        O OVR GOL usa somente atuações reais no gol: 50% controle de gols sofridos por tempo, 35% resistência até o primeiro gol, 10% tempo de atuação e 5% disciplina.
+                      </p>
+                      <p className={`mt-1.5 font-bold ${goalkeeperIncluded ? "text-cyan-200" : "text-muted"}`}>
+                        {!goalkeeperEligible
+                          ? `Ainda não entra no OVR geral: faltam ${8 - Number(entry.overallGoalkeeperGames || 0)} partidas reais no gol para completar a amostra mínima de 8.`
+                          : goalkeeperIncluded
+                            ? "Entra no OVR geral porque completou 8 partidas no gol e está entre as três maiores notas posicionais."
+                            : "Já completou as 8 partidas necessárias, mas o geral usa apenas as três maiores notas entre DEF/VOL, ALA, ATA e GOL."}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 gap-1.5">
                     <p><strong className="text-foreground">DEF/VOL:</strong> 70% defesa, 5% gols, 15% assistências e 10% resultado.</p>

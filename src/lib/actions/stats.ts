@@ -32,6 +32,7 @@ type RankingStatsRow = {
   points: number;
   goalkeeper_games: number;
   goals_conceded: number;
+  clean_sheets: number;
   own_goals: number;
   defensive_clean_games: number;
   defensive_one_goal_games: number;
@@ -155,6 +156,9 @@ function aggregateRankingRows(
     let losses = 0;
     let goals = 0;
     let assists = 0;
+    let goalkeeperGames = 0;
+    let goalsConceded = 0;
+    let cleanSheets = 0;
 
     for (const r of playerRows) {
       totalRawPoints += r.points;
@@ -164,6 +168,9 @@ function aggregateRankingRows(
       losses += r.losses;
       goals += r.goals;
       assists += r.assists;
+      goalkeeperGames += r.goalkeeper_games;
+      goalsConceded += r.goals_conceded;
+      cleanSheets += r.clean_sheets;
     }
 
     const mapRound = (r: RankingStatsRow, countedInTop6: boolean, legacy = false) => {
@@ -240,6 +247,7 @@ function aggregateRankingRows(
       losses,
       goals,
       assists,
+      goalkeeperStats: goalkeeperGames > 0 ? { games: goalkeeperGames, goalsConceded, cleanSheets } : null,
       points: top6Points,
       legacyPoints,
       positionBonus,
@@ -786,6 +794,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       points,
       goalkeeper_games,
       goals_conceded,
+      clean_sheets,
       own_goals,
       defensive_clean_games,
       defensive_one_goal_games,

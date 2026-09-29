@@ -79,7 +79,7 @@ const AWARD_EXPLANATIONS: Record<MonthlyAwardType, string> = {
   bestDefenderMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag Defensor/Volante.",
   bestMidfielderMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag Ala.",
   bestAttackerMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag Atacante.",
-  bestGoalkeeperMonth: "Foi quem menos sofreu gols durante as partidas em que atuou no gol.",
+  bestGoalkeeperMonth: "Teve a menor média de gols sofridos entre quem fez pelo menos 4 partidas no gol. Em caso de empate, vencem o melhor percentual de clean sheets e a maior amostra.",
   goldenBootMonth: "Foi o jogador que marcou mais gols nas rodadas oficiais do mês.",
   topAssistMonth: "Foi o jogador que distribuiu mais assistências nas rodadas oficiais do mês.",
   rankedMvpMonth: "Somou a maior pontuação no ranking das rodadas oficiais do mês.",
@@ -234,6 +234,11 @@ export function BQTheBestButton({ periodStart, winners }: { periodStart: string;
                       <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/45">O que fez para ganhar</p>
                       <p className="mt-2 font-athletic text-3xl font-black italic text-amber-200">{formatAwardPerformance(selectedWinner)}</p>
                       <p className="mt-1 text-[11px] font-semibold text-white/55">em {selectedWinner.roundsPlayed} rodada{selectedWinner.roundsPlayed === 1 ? "" : "s"} oficial{selectedWinner.roundsPlayed === 1 ? "" : "is"}</p>
+                      {selectedWinner.type === "bestGoalkeeperMonth" && selectedWinner.goalkeeperGames != null && (
+                        <p className="mt-2 text-[10px] font-bold text-cyan-100/80">
+                          {selectedWinner.goalkeeperGames} jogos no gol · {selectedWinner.goalsConceded || 0} gols sofridos · {selectedWinner.cleanSheets || 0} clean sheets
+                        </p>
+                      )}
                     </div>
 
                     <div className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[.04] p-4 text-left">

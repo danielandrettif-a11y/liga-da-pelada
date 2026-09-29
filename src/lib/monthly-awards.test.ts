@@ -51,12 +51,29 @@ describe("monthly awards", () => {
 
   it("apresenta a métrica específica dos novos prêmios", () => {
     const base = { periodStart: "2026-08-01", points: 15, roundsPlayed: 4, isFinal: true };
-    expect(formatAwardPerformance({ ...base, type: "bestGoalkeeperMonth", metricValue: 2 })).toBe("2 gols sofridos");
+    expect(formatAwardPerformance({ ...base, type: "bestGoalkeeperMonth", metricValue: 0.75 })).toBe("0,75 gols por jogo");
     expect(formatAwardPerformance({ ...base, type: "goldenBootMonth", metricValue: 7 })).toBe("7 gols");
     expect(formatAwardPerformance({ ...base, type: "topAssistMonth", metricValue: 1 })).toBe("1 assistência");
   });
 
   it("aceita as novas categorias retornadas pelo banco", () => {
+    expect(parseMonthlyAwards([{
+      award_type: "bestGoalkeeperMonth",
+      period_start: "2026-08-01",
+      points: 18,
+      rounds_played: 4,
+      metric_value: 0.75,
+      goalkeeper_games: 8,
+      goals_conceded: 6,
+      clean_sheets: 3,
+      is_final: true,
+    }])[0]).toMatchObject({
+      type: "bestGoalkeeperMonth",
+      metricValue: 0.75,
+      goalkeeperGames: 8,
+      goalsConceded: 6,
+      cleanSheets: 3,
+    });
     expect(parseMonthlyAwards([{
       award_type: "goldenBootMonth",
       period_start: "2026-08-01",

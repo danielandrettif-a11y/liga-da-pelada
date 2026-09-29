@@ -15,6 +15,9 @@ export type MonthlyAward = {
   roundsPlayed: number;
   isFinal: boolean;
   metricValue?: number;
+  goalkeeperGames?: number;
+  goalsConceded?: number;
+  cleanSheets?: number;
 };
 
 export type MonthlyAwardWinner = MonthlyAward & {
@@ -44,6 +47,9 @@ export function parseMonthlyAwards(rows: unknown): MonthlyAward[] {
     const type = String(row.award_type || "");
     if (!MONTHLY_AWARD_TYPES.has(type) || typeof row.period_start !== "string") return [];
     const metricValue = row.metric_value == null ? undefined : Number(row.metric_value);
+    const goalkeeperGames = row.goalkeeper_games == null ? undefined : Number(row.goalkeeper_games);
+    const goalsConceded = row.goals_conceded == null ? undefined : Number(row.goals_conceded);
+    const cleanSheets = row.clean_sheets == null ? undefined : Number(row.clean_sheets);
     return [{
       type: type as MonthlyAwardType,
       periodStart: row.period_start,
@@ -51,6 +57,9 @@ export function parseMonthlyAwards(rows: unknown): MonthlyAward[] {
       roundsPlayed: Number(row.rounds_played || 0),
       isFinal: row.is_final === true,
       ...(metricValue === undefined ? {} : { metricValue }),
+      ...(goalkeeperGames === undefined ? {} : { goalkeeperGames }),
+      ...(goalsConceded === undefined ? {} : { goalsConceded }),
+      ...(cleanSheets === undefined ? {} : { cleanSheets }),
     }];
   });
 }
@@ -68,6 +77,9 @@ export function parseMonthlyAwardWinners(rows: unknown): MonthlyAwardWinner[] {
       || typeof row.player_name !== "string"
     ) return [];
     const metricValue = row.metric_value == null ? undefined : Number(row.metric_value);
+    const goalkeeperGames = row.goalkeeper_games == null ? undefined : Number(row.goalkeeper_games);
+    const goalsConceded = row.goals_conceded == null ? undefined : Number(row.goals_conceded);
+    const cleanSheets = row.clean_sheets == null ? undefined : Number(row.clean_sheets);
     return [{
       type: type as MonthlyAwardType,
       periodStart: row.period_start,
@@ -75,6 +87,9 @@ export function parseMonthlyAwardWinners(rows: unknown): MonthlyAwardWinner[] {
       roundsPlayed: Number(row.rounds_played || 0),
       isFinal: row.is_final === true,
       ...(metricValue === undefined ? {} : { metricValue }),
+      ...(goalkeeperGames === undefined ? {} : { goalkeeperGames }),
+      ...(goalsConceded === undefined ? {} : { goalsConceded }),
+      ...(cleanSheets === undefined ? {} : { cleanSheets }),
       playerId: row.player_id,
       playerName: row.player_name,
       avatarUrl: typeof row.avatar_url === "string" ? row.avatar_url : null,
@@ -85,7 +100,7 @@ export function parseMonthlyAwardWinners(rows: unknown): MonthlyAwardWinner[] {
 export function formatAwardPerformance(award: MonthlyAward) {
   const value = award.metricValue ?? award.points;
   if (award.type === "bestGoalkeeperMonth") {
-    return `${value} ${value === 1 ? "gol sofrido" : "gols sofridos"}`;
+    return `${value.toFixed(2).replace(".", ",")} gols por jogo`;
   }
   if (award.type === "goldenBootMonth") {
     return `${value} ${value === 1 ? "gol" : "gols"}`;
