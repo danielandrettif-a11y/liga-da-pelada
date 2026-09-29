@@ -101,6 +101,19 @@ export async function getLatestPlayerCardOverallMap(client: any = supabase) {
   }));
 }
 
+async function getPublicSpeedRatingMap(client: any = supabase) {
+  const { data, error } = await client.rpc("get_public_player_speed_ratings");
+  if (error) {
+    console.error("Erro ao buscar estrelas de velocidade para as cartas:", error);
+    return new Map<string, 1 | 2 | 3>();
+  }
+  return new Map<string, 1 | 2 | 3>((data || []).flatMap((row: any) => (
+    row.player_id && [1, 2, 3].includes(Number(row.speed_rating))
+      ? [[row.player_id, Number(row.speed_rating) as 1 | 2 | 3] as const]
+      : []
+  )));
+}
+
 function sortRankingEntries<T extends Pick<RankingEntry, "points" | "wins" | "goals" | "assists">>(entries: T[]) {
   return [...entries].sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
@@ -845,13 +858,14 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   );
   const rankingAccount = await getCurrentAccount();
   const fitnessClient = rankingAccount.user ? rankingAccount.client : supabase;
-  const [{ data: fitnessRows }, cosmeticsByPlayer, overallByPlayer] = await Promise.all([
+  const [{ data: fitnessRows }, cosmeticsByPlayer, overallByPlayer, speedByPlayer] = await Promise.all([
     fitnessClient
       .from("player_round_fitness")
       .select("player_id, distance_km, average_speed_kmh")
       .in("round_id", currentRounds.map((round) => round.id)),
     getAllPlayersEquippedCosmeticsMap(),
     getLatestPlayerCardOverallMap(fitnessClient),
+    getPublicSpeedRatingMap(fitnessClient),
   ]);
   const fitnessByPlayer = new Map<string, { distanceKm: number; speedTotal: number; entries: number }>();
   for (const row of fitnessRows || []) {
@@ -889,6 +903,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       overallTrend: overallByPlayer.get(entry.player.id)?.trend ?? null,
       overallPositions: overallByPlayer.get(entry.player.id)?.positions ?? null,
       overallGoalkeeperGames: overallByPlayer.get(entry.player.id)?.goalkeeperGames ?? 0,
+      speedRating: speedByPlayer.get(entry.player.id) ?? null,
       fitness: getFitness(entry.player.id),
       cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
     };
@@ -905,6 +920,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     overallTrend: overallByPlayer.get(entry.player.id)?.trend ?? null,
     overallPositions: overallByPlayer.get(entry.player.id)?.positions ?? null,
     overallGoalkeeperGames: overallByPlayer.get(entry.player.id)?.goalkeeperGames ?? 0,
+    speedRating: speedByPlayer.get(entry.player.id) ?? null,
     fitness: getFitness(entry.player.id),
     cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
   }));
@@ -919,6 +935,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     overallTrend: overallByPlayer.get(entry.player.id)?.trend ?? null,
     overallPositions: overallByPlayer.get(entry.player.id)?.positions ?? null,
     overallGoalkeeperGames: overallByPlayer.get(entry.player.id)?.goalkeeperGames ?? 0,
+    speedRating: speedByPlayer.get(entry.player.id) ?? null,
     fitness: getFitness(entry.player.id),
     cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
   }));
@@ -959,12 +976,13 @@ export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: 
   const { data: player } = await supabase.from("players").select("*").eq("id", playerId).maybeSingle();
   if (!player) return null;
 
-  const [{ data: cosmeticsData }, overallByPlayer] = await Promise.all([
+  const [{ data: cosmeticsData }, overallByPlayer, speedByPlayer] = await Promise.all([
     supabase
       .from("player_equipped_cosmetics")
       .select("slot, cosmetic:cosmetic_id(name, asset_key, slot)")
       .eq("player_id", playerId),
     getLatestPlayerCardOverallMap(supabase),
+    getPublicSpeedRatingMap(supabase),
   ]);
 
   const cosmeticsMap = new Map((cosmeticsData || []).map((item: any) => [item.slot, item.cosmetic]));
@@ -989,6 +1007,7 @@ export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: 
     overallTrend: overallByPlayer.get(playerId)?.trend ?? null,
     overallPositions: overallByPlayer.get(playerId)?.positions ?? null,
     overallGoalkeeperGames: overallByPlayer.get(playerId)?.goalkeeperGames ?? 0,
+    speedRating: speedByPlayer.get(playerId) ?? null,
     winRate: 0,
     awards: { roundMvp: 0, topScorer: 0, topAssister: 0, kingOfWins: 0 },
     awardSeasons: [],

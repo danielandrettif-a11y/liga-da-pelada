@@ -514,13 +514,13 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                   </div>
 
                   <div className="grid grid-cols-1 gap-1.5">
-                    <p><strong className="text-foreground">DEF/VOL:</strong> 70% defesa, 5% gols, 20% assistências e 5% resultado.</p>
-                    <p><strong className="text-foreground">ALA:</strong> 30% defesa, 30% gols, 35% assistências e 5% resultado.</p>
-                    <p><strong className="text-foreground">ATA:</strong> 10% defesa, 60% gols, 25% assistências e 5% resultado.</p>
+                    <p><strong className="text-foreground">DEF/VOL:</strong> 70% defesa, 5% gols, 15% assistências e 10% resultado.</p>
+                    <p><strong className="text-foreground">ALA:</strong> 30% defesa, 25% gols, 35% assistências e 10% resultado.</p>
+                    <p><strong className="text-foreground">ATA:</strong> 5% defesa, 55% gols, 30% assistências e 10% resultado.</p>
                     <p><strong className="text-foreground">GOL:</strong> desempenho defensivo nas partidas em que atuou no gol.</p>
                   </div>
 
-                  <p>A defesa compara gols sofridos por tempo jogado com a média da liga, além do tempo até sofrer o primeiro gol, participação e gols contra. As características escolhidas pelo ADM controlam a evidência e a velocidade de evolução: 100% para a principal, 60% para a secundária e 20% para posições não marcadas. A posição do Cartola não interfere no OVR.</p>
+                  <p>Gols e assistências são comparados por 7 minutos jogados. A defesa usa gols sofridos por tempo, resistência até o primeiro gol, participação e gols contra. A característica pesa a evidência uma única vez: 100% para a principal, 60% para a secundária e 20% para as demais. A função exercida na rodada também dá mais validade à posição correspondente.</p>
                 </>
               ) : (
                 <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-warning">

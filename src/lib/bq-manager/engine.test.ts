@@ -46,8 +46,8 @@ describe("BQ Manager: OVR snapshots", () => {
     expect(composedOverall({ ...source, traits: [...source.traits] }, positions)).toBe(74.5);
     expect(composedOverall({ ...source, traits: [...source.traits], goalkeeperEligible: true }, positions)).toBe(90);
   });
-  it("keeps the v13 card composition aligned with the public 50/35/15 overall", () => {
-    const source = { ...demoCatalog()[0], formula: "adaptive-v13-admin-style-evidence" };
+  it("keeps the v14 card composition aligned with the public 50/35/15 overall", () => {
+    const source = { ...demoCatalog()[0], formula: "adaptive-v14-role-adjusted-rates" };
     expect(composedOverall(source, { DEF: 73.1, ALA_MEI: 70.5, ATA: 69.7, GOL: 90 })).toBe(71.7);
     expect(composedOverall({ ...source, goalkeeperEligible: true }, { DEF: 73.1, ALA_MEI: 70.5, ATA: 69.7, GOL: 90 })).toBe(81.2);
   });

@@ -511,7 +511,7 @@ export function PlayerForm({
 
       {mode === "admin" && (memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2 rounded-2xl border border-accent/25 bg-accent/5 p-4">
         <legend className="px-1 text-xs font-bold uppercase tracking-wider text-accent">Características de jogo do OVR</legend>
-        <p className="text-[11px] leading-4 text-muted">Escolha no máximo duas. A principal recebe 100% da evolução daquela posição, a secundária 60% e posições não marcadas 20%. A posição do Cartola não interfere no OVR.</p>
+        <p className="text-[11px] leading-4 text-muted">Escolha no máximo duas. A principal recebe 100% da evidência daquela posição, a secundária 60% e posições não marcadas 20%. A função realmente exercida na rodada também participa do OVR.</p>
         <div className="grid gap-2 pt-1">
           {PLAYER_PROFILE_OPTIONS.map((option) => {
             const trait = option.value as PlayerProfile;
@@ -550,7 +550,7 @@ export function PlayerForm({
                 </label>;
               })}
             </div>
-            <p className="mt-2 text-[10px] text-muted">A principal evolui a 100%; a secundária, a 60%.</p>
+            <p className="mt-2 text-[10px] text-muted">A principal recebe 100% da evidência; a secundária, 60%.</p>
           </div>
         )}
         {memberCategory === "guest" && <p className="text-[10px] leading-4 text-warning">Convidado pode ser avaliado agora, mas só ganha OVR quando for convertido em jogador oficial.</p>}

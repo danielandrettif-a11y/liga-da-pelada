@@ -113,6 +113,10 @@ const PROFILE_LABELS = {
   defensive: "DEF/VOL",
 } as const;
 
+export function formatSpeedStars(rating: RankingEntry["speedRating"]) {
+  return rating ? `${"★".repeat(rating)}${"☆".repeat(3 - rating)}` : null;
+}
+
 export function getRankingCardTier(position: number): RankingCardTier {
   if (position === 1) return "gold";
   if (position === 2) return "silver";
@@ -130,6 +134,7 @@ export function getRankingCardTheme(position: number) {
 
 export function buildRankingCardContent(entry: RankingEntry, position: number): RankingCardContent {
   const theme = getRankingCardTheme(position);
+  const speedStars = formatSpeedStars(entry.speedRating);
   const profile = `${PROFILE_LABELS[entry.player.player_profile || "midfield"]}${entry.player.is_goalkeeper ? " / GOL" : ""}`;
   const positionRatings = ([
     ["DEF", "DEF/VOL"],
@@ -144,7 +149,7 @@ export function buildRankingCardContent(entry: RankingEntry, position: number): 
   }, null);
 
   return {
-    header: `PBQ • ${theme.label}`,
+    header: `PBQ • ${theme.label}${speedStars ? ` • VEL ${speedStars}` : ""}`,
     rating: entry.overall == null ? "—" : entry.overall.toFixed(1),
     ratingLabel: "OVR",
     ratingTrend: entry.overall == null ? null : entry.overallTrend || "steady",

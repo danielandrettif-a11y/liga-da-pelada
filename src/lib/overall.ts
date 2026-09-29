@@ -33,11 +33,14 @@ export type OverallFormulaConfig = {
   attackCurve: number;
   goalCurve: number;
   assistCurve: number;
+  /** Compara gols e assistências por sete minutos, em vez do total bruto da rodada. */
+  attackRatesByPlayingTime: boolean;
   separateAttackScores: boolean;
   positionWeights: Record<LineRole, PositionWeights>;
   /** Quanto uma atuação na função declarada revela sobre cada posição. */
   roleEvidence: Record<LineRole, Record<LineRole, number>>;
   unassignedRoleEvidence: Record<LineRole, number>;
+  playedRoleEvidenceEnabled: boolean;
   /** Peso dado a uma característica não selecionada pelo administrador. */
   unselectedTraitEvidence: number;
   /** A fórmula v5 ignora a tag legada; ela continua apenas nas fórmulas antigas. */
@@ -58,6 +61,7 @@ export type OverallFormulaConfig = {
   traitProgressionBonusBudget: number;
   /** V13: a ordem definida pelo ADM controla a evidência e a evolução de cada posição. */
   prioritizedTraitProgression: boolean;
+  prioritizedTraitsAsEvidenceOnly: boolean;
   traitProgressionWeights: {
     primary: number;
     secondary: number;
@@ -112,6 +116,7 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   },
   goalCurve: 0.32,
   assistCurve: 0.28,
+  attackRatesByPlayingTime: false,
   separateAttackScores: false,
   roleEvidence: {
     DEF: { DEF: 1, ALA_MEI: 0.45, ATA: 0.15 },
@@ -119,6 +124,7 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
     ATA: { DEF: 0.15, ALA_MEI: 0.45, ATA: 1 },
   },
   unassignedRoleEvidence: { DEF: 0.4, ALA_MEI: 0.55, ATA: 0.4 },
+  playedRoleEvidenceEnabled: false,
   unselectedTraitEvidence: 0.15,
   legacySeedEnabled: true,
   weeklyEvidenceCap: false,
@@ -129,6 +135,7 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   traitsAsProgressionBonus: false,
   traitProgressionBonusBudget: 0.30,
   prioritizedTraitProgression: false,
+  prioritizedTraitsAsEvidenceOnly: false,
   traitProgressionWeights: { primary: 1, secondary: 0.6, unselected: 0.2 },
   topThreeOverall: false,
   performanceChangeBonus: 0,
@@ -252,6 +259,7 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     attackCurve: number("attackCurve", DEFAULT_OVERALL_FORMULA.attackCurve),
     goalCurve: number("goalCurve", DEFAULT_OVERALL_FORMULA.goalCurve),
     assistCurve: number("assistCurve", DEFAULT_OVERALL_FORMULA.assistCurve),
+    attackRatesByPlayingTime: candidate.attackRatesByPlayingTime === true,
     separateAttackScores,
     positionWeights: {
       DEF: normalizedPositionWeights("DEF"),
@@ -268,6 +276,7 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
       ALA_MEI: bounded(unassignedRoleEvidence.ALA_MEI, DEFAULT_OVERALL_FORMULA.unassignedRoleEvidence.ALA_MEI),
       ATA: bounded(unassignedRoleEvidence.ATA, DEFAULT_OVERALL_FORMULA.unassignedRoleEvidence.ATA),
     },
+    playedRoleEvidenceEnabled: candidate.playedRoleEvidenceEnabled === true,
     unselectedTraitEvidence: clamp(bounded(candidate.unselectedTraitEvidence, DEFAULT_OVERALL_FORMULA.unselectedTraitEvidence), 0, 1),
     legacySeedEnabled: typeof candidate.legacySeedEnabled === "boolean"
       ? candidate.legacySeedEnabled
@@ -294,6 +303,7 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     prioritizedTraitProgression: typeof candidate.prioritizedTraitProgression === "boolean"
       ? candidate.prioritizedTraitProgression
       : DEFAULT_OVERALL_FORMULA.prioritizedTraitProgression,
+    prioritizedTraitsAsEvidenceOnly: candidate.prioritizedTraitsAsEvidenceOnly === true,
     traitProgressionWeights: {
       primary: clamp(bounded(traitProgressionWeights.primary, DEFAULT_OVERALL_FORMULA.traitProgressionWeights.primary), 0, 1),
       secondary: clamp(bounded(traitProgressionWeights.secondary, DEFAULT_OVERALL_FORMULA.traitProgressionWeights.secondary), 0, 1),
@@ -503,7 +513,11 @@ function traitEvidenceWeight(player: OverallPlayer, role: OverallRole, config: O
 }
 
 function traitProgressionMultiplier(player: OverallPlayer, role: OverallRole, config: OverallFormulaConfig) {
-  if (config.prioritizedTraitProgression) return traitEvidenceWeight(player, role, config);
+  // Na progressão priorizada, a característica já pesa a evidência. Repetir o
+  // fator aqui faria 20% virar 4% e 60% virar 36%.
+  if (config.prioritizedTraitProgression) {
+    return config.prioritizedTraitsAsEvidenceOnly ? 1 : traitEvidenceWeight(player, role, config);
+  }
   if (!config.traitsAsProgressionBonus || role === "GOL") return 1;
   const traits = [...new Set((player.overallTraits || []).filter((trait): trait is PlayerProfile => (
     trait === "defensive" || trait === "midfield" || trait === "offensive"
@@ -530,7 +544,7 @@ function exposure(secondsPlayed: number) {
 }
 
 function perSevenMinuteRate(goals: number, secondsPlayed: number) {
-  return Number(goals || 0) * MAX_MATCH_SECONDS / Math.max(exposure(secondsPlayed), 90);
+  return Number(goals || 0) * MAX_MATCH_SECONDS / Math.max(Number(secondsPlayed) || 0, 90);
 }
 
 function emptyPositions(config: OverallFormulaConfig): Record<OverallRole, number> {
@@ -562,7 +576,9 @@ function calculateRoundScores(appearances: OverallAppearance[], config: OverallF
     resultSeconds: result.resultSeconds + resultScore(appearance.result) * exposure(appearance.secondsPlayed),
   }), { goals: 0, assists: 0, ownGoals: 0, seconds: 0, resultSeconds: 0 });
   const resultAverage = totals.seconds > 0 ? totals.resultSeconds / totals.seconds : 0.5;
-  const production = totals.goals + totals.assists * config.assistValue;
+  const goals = config.attackRatesByPlayingTime ? perSevenMinuteRate(totals.goals, totals.seconds) : totals.goals;
+  const assists = config.attackRatesByPlayingTime ? perSevenMinuteRate(totals.assists, totals.seconds) : totals.assists;
+  const production = goals + assists * config.assistValue;
   // Curva suave: atuações grandes continuam se diferenciando, sem transformar
   // 5 e 10 participações em gol na mesma nota máxima.
   const attackingScore = clamp(
@@ -570,8 +586,8 @@ function calculateRoundScores(appearances: OverallAppearance[], config: OverallF
     0,
     1,
   );
-  const goalScore = clamp(0.25 + 0.75 * (1 - Math.exp(-totals.goals * config.goalCurve)), 0, 1);
-  const assistScore = clamp(0.25 + 0.75 * (1 - Math.exp(-totals.assists * config.assistCurve)), 0, 1);
+  const goalScore = clamp(0.25 + 0.75 * (1 - Math.exp(-goals * config.goalCurve)), 0, 1);
+  const assistScore = clamp(0.25 + 0.75 * (1 - Math.exp(-assists * config.assistCurve)), 0, 1);
   return { attackingScore, goalScore, assistScore, collectiveScore: resultAverage, totals };
 }
 
@@ -628,7 +644,9 @@ function calculateMatchScore(
       1,
     ),
     defensiveScore: defensive,
-    evidenceWeight: roleQuality * traitEvidenceWeight(player, role, config),
+    evidenceWeight: roleQuality
+      * traitEvidenceWeight(player, role, config)
+      * (config.playedRoleEvidenceEnabled ? roleEvidenceWeight(appearance.playerProfileLocked, role, config) : 1),
   };
 }
 

@@ -88,6 +88,27 @@ describe("motor adaptativo de OVR", () => {
     maxChangePerRound: 1.5,
     performanceChangeBonus: 0.03,
   });
+  const roleAdjustedRateFormula = parseOverallFormulaConfig({
+    ...balancedCharacteristicsFormula,
+    prioritizedTraitProgression: true,
+    prioritizedTraitsAsEvidenceOnly: true,
+    traitProgressionWeights: { primary: 1, secondary: 0.6, unselected: 0.2 },
+    topThreeOverall: true,
+    attackRatesByPlayingTime: true,
+    playedRoleEvidenceEnabled: true,
+    goalCurve: 3,
+    assistCurve: 2.4,
+    positionWeights: {
+      DEF: { defense: 0.70, goals: 0.05, assists: 0.15, result: 0.10 },
+      ALA_MEI: { defense: 0.30, goals: 0.25, assists: 0.35, result: 0.10 },
+      ATA: { defense: 0.05, goals: 0.55, assists: 0.30, result: 0.10 },
+    },
+    roleEvidence: {
+      DEF: { DEF: 1, ALA_MEI: 0.5, ATA: 0.2 },
+      ALA_MEI: { DEF: 0.5, ALA_MEI: 1, ATA: 0.5 },
+      ATA: { DEF: 0.2, ALA_MEI: 0.5, ATA: 1 },
+    },
+  });
 
   it("separa gols e assistências no OVR V10 sem transformar vitória em defesa", () => {
     const scorer = { id: "scorer", playerProfile: "offensive" as const, overallTraits: ["offensive" as const], overallSeedMode: "observed" as const };
@@ -556,20 +577,40 @@ describe("motor adaptativo de OVR", () => {
     expect(unselectedGain).toBeLessThanOrEqual(primaryGain * 0.25);
   });
 
-  it("não usa a posição operacional do Cartola na progressão priorizada", () => {
-    const formula = parseOverallFormulaConfig({
-      ...balancedCharacteristicsFormula,
-      traitsAsProgressionBonus: false,
-      prioritizedTraitProgression: true,
-      traitProgressionWeights: { primary: 1, secondary: 0.6, unselected: 0.2 },
-      topThreeOverall: true,
-    });
+  it("usa a função realmente exercida para validar a posição na v14", () => {
     const player: OverallPlayer = { id: "style-only", playerProfile: "offensive", overallTraits: ["offensive"], overallSeedMode: "observed" };
-    const offensiveRole = calculatePlayerOveralls([player], [round(1, [appearance(player.id, { playerProfileLocked: "offensive", goals: 2 })])], formula).snapshots[0];
-    const defensiveRole = calculatePlayerOveralls([player], [round(1, [appearance(player.id, { playerProfileLocked: "defensive", goals: 2 })])], formula).snapshots[0];
+    const inputs = (playedRole: "offensive" | "defensive") => Array.from({ length: 3 }, (_, index) => round(index + 1, [
+      appearance(player.id, { playerProfileLocked: playedRole, goals: 2 }),
+    ]));
+    const offensiveRole = calculatePlayerOveralls([player], inputs("offensive"), roleAdjustedRateFormula).snapshots[0];
+    const defensiveRole = calculatePlayerOveralls([player], inputs("defensive"), roleAdjustedRateFormula).snapshots[0];
 
-    expect(defensiveRole.positions).toEqual(offensiveRole.positions);
-    expect(defensiveRole.overall).toBe(offensiveRole.overall);
+    expect(offensiveRole.positions.ATA.value).toBeGreaterThan(defensiveRole.positions.ATA.value);
+    expect(defensiveRole.positions.DEF.confidence).toBeGreaterThan(offensiveRole.positions.DEF.confidence);
+  });
+
+  it("normaliza gols e assistências pelo tempo jogado na v14", () => {
+    const player: OverallPlayer = { id: "rate", playerProfile: "offensive", overallTraits: ["offensive"], overallSeedMode: "observed" };
+    const oneMatch = calculatePlayerOveralls([player], [round(1, [
+      appearance(player.id, { playerProfileLocked: "offensive", goals: 1, assists: 1 }),
+    ])], roleAdjustedRateFormula).breakdowns[0];
+    const twoMatches = calculatePlayerOveralls([player], [round(1, [
+      appearance(player.id, { matchId: "m1", playerProfileLocked: "offensive", goals: 1, assists: 1 }),
+      appearance(player.id, { matchId: "m2", playerProfileLocked: "offensive", goals: 1, assists: 1 }),
+    ])], roleAdjustedRateFormula).breakdowns[0];
+
+    expect(twoMatches.goalScore).toBeCloseTo(oneMatch.goalScore, 8);
+    expect(twoMatches.assistScore).toBeCloseTo(oneMatch.assistScore, 8);
+  });
+
+  it("mantém o ATA acima do DEF para um ofensivo produtivo na função correta", () => {
+    const player: OverallPlayer = { id: "productive-forward", playerProfile: "offensive", overallTraits: ["offensive"], overallSeedMode: "observed" };
+    const inputs = Array.from({ length: 6 }, (_, index) => round(index + 1, [
+      appearance(player.id, { playerProfileLocked: "offensive", goals: 1, assists: 1, goalsConceded: 0 }),
+    ]));
+    const snapshot = calculatePlayerOveralls([player], inputs, roleAdjustedRateFormula).snapshots[0];
+
+    expect(snapshot.positions.ATA.value).toBeGreaterThan(snapshot.positions.DEF.value);
   });
 
   it("conta partidas distintas no gol para liberar a elegibilidade no oitavo jogo", () => {

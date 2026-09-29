@@ -60,7 +60,7 @@ export function OverallShadowPanel({ initialData }: { initialData: OverallShadow
       {initialData.pendingPlayers.length > 0 && (
         <section className="rounded-2xl border border-warning/30 bg-warning/5 p-4">
           <p className="text-sm font-black text-foreground">Estilo aguardando revisão ({initialData.pendingPlayers.length})</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">Escolha uma característica principal e, opcionalmente, uma secundária. Perfis com zero ou três características não recebem o OVR v13 nem entram no ranking e no Cartola.</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">Escolha uma característica principal e, opcionalmente, uma secundária. Perfis com zero ou três características não recebem o OVR v14 nem entram no ranking e no Cartola.</p>
           <p className="mt-2 text-xs font-bold text-warning">{initialData.pendingPlayers.map((player) => player.name).join(" · ")}</p>
         </section>
       )}

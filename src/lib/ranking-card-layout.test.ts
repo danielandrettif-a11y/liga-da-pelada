@@ -59,6 +59,7 @@ describe("ranking card layout", () => {
       player: { name: "Jogador Teste", player_profile: "defensive", is_goalkeeper: false },
       points: 53.5,
       overall: 74.6,
+      speedRating: 2,
       overallPositions: { DEF: 75.2, ALA_MEI: 72.4, ATA: 71.6, GOL: 70.8 },
       goals: 5,
       assists: 4,
@@ -72,7 +73,7 @@ describe("ranking card layout", () => {
 
     const content = buildRankingCardContent(entry, 7);
     expect(content).toMatchObject({
-      header: "PBQ • RANKED",
+      header: "PBQ • RANKED • VEL ★★☆",
       rating: "74.6",
       ratingLabel: "OVR",
       ratingTrend: "steady",
