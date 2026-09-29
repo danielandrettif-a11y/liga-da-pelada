@@ -248,6 +248,21 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
   tracePhotoShape(context, layout.photoShape, photoBox, 3.5);
   context.stroke();
 
+  if (cardContent.speedStars) {
+    const speedBox = rankingCardBoxPixels(layout.speed, card);
+    context.fillStyle = `${theme.edge}24`;
+    roundedRect(context, speedBox.x, speedBox.y, speedBox.width, speedBox.height, 12);
+    context.fill();
+    context.strokeStyle = `${theme.edge}b8`;
+    context.lineWidth = 2;
+    roundedRect(context, speedBox.x, speedBox.y, speedBox.width, speedBox.height, 12);
+    context.stroke();
+    context.fillStyle = theme.edge;
+    context.textAlign = "center";
+    context.font = "900 18px Arial";
+    context.fillText(`VEL ${cardContent.speedStars}`, speedBox.x + speedBox.width / 2, speedBox.y + speedBox.height * .68, speedBox.width * .88);
+  }
+
   const nameBox = rankingCardBoxPixels(layout.name, card);
   if (nameplateArtwork) context.drawImage(nameplateArtwork, nameBox.x, nameBox.y, nameBox.width, nameBox.height);
   else {
@@ -435,6 +450,12 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
               quality={90}
             />
           </div>
+
+          {cardContent.speedStars && (
+            <div className="absolute z-10 flex items-center justify-center rounded-md border text-[7px] font-black tracking-[.08em]" style={{ ...rankingCardBoxStyle(layout.speed), borderColor: `${theme.edge}b8`, backgroundColor: `${theme.edge}24`, color: theme.edge }}>
+              VEL {cardContent.speedStars}
+            </div>
+          )}
 
           <div className="absolute z-10 flex items-center justify-center px-1 text-center" style={rankingCardBoxStyle(layout.name)}>
             <div

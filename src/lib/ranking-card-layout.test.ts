@@ -31,7 +31,7 @@ describe("ranking card layout", () => {
 
   it("keeps every content box inside the card artwork", () => {
     const layout = getRankingCardLayout();
-    for (const box of [layout.header, layout.score, layout.photo, layout.name, layout.awards, layout.stats]) {
+    for (const box of [layout.header, layout.score, layout.photo, layout.speed, layout.name, layout.awards, layout.stats]) {
       expect(box.left).toBeGreaterThanOrEqual(0);
       expect(box.top).toBeGreaterThanOrEqual(0);
       expect(box.left + box.width).toBeLessThanOrEqual(100);
@@ -40,9 +40,11 @@ describe("ranking card layout", () => {
   });
 
   it("keeps stacked content regions separated", () => {
-    const { score, photo, name, awards, stats } = getRankingCardLayout();
+    const { score, photo, speed, name, awards, stats } = getRankingCardLayout();
     expect(score.left + score.width).toBeLessThan(photo.left);
-    expect(Math.max(score.top + score.height, photo.top + photo.height)).toBeLessThan(name.top);
+    expect(photo.top + photo.height).toBeLessThan(speed.top);
+    expect(speed.top + speed.height).toBeLessThan(name.top);
+    expect(score.top + score.height).toBeLessThan(name.top);
     expect(name.top + name.height).toBeLessThan(awards.top);
     expect(awards.top + awards.height).toBeLessThan(stats.top);
   });
@@ -73,10 +75,11 @@ describe("ranking card layout", () => {
 
     const content = buildRankingCardContent(entry, 7);
     expect(content).toMatchObject({
-      header: "PBQ • RANKED • VEL ★★☆",
+      header: "PBQ • RANKED",
       rating: "74.6",
       ratingLabel: "OVR",
       ratingTrend: "steady",
+      speedStars: "★★☆",
       profile: "DEF/VOL",
       placement: "7º",
       name: "Jogador Teste",
