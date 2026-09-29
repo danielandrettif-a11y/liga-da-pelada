@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rankingActivePlayerIds } from "./ranking";
+import { rankingActivePlayerIds, sortRankingRounds } from "./ranking";
 
 describe("rankingActivePlayerIds", () => {
   const rows = [
@@ -18,3 +18,13 @@ describe("rankingActivePlayerIds", () => {
   });
 });
 
+describe("sortRankingRounds", () => {
+  it("permite que Oficial e Legado tenham seis melhores diferentes", () => {
+    const rows = [
+      { id: "base", legacy: 10, official: 10 },
+      { id: "bonus", legacy: 8, official: 13 },
+    ];
+    expect(sortRankingRounds(rows, (row) => row.official)[0].id).toBe("bonus");
+    expect(sortRankingRounds(rows, (row) => row.legacy)[0].id).toBe("base");
+  });
+});

@@ -31,6 +31,13 @@ test("abas do ranking respeitam URL e o botão voltar", async ({ page }) => {
   await expect(fieldTab).toHaveClass(/bg-accent/);
 });
 
+test("ranking aceita o filtro legado pela URL", async ({ page }) => {
+  await page.goto("/ranking?filter=legacy");
+  await expect(page).toHaveURL(/filter=legacy/);
+  await expect(page.getByRole("tab", { name: /Em Campo/ })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("Algo saiu do jogo");
+});
+
 test("filtro do elenco sobrevive a recarregamento", async ({ page }) => {
   await page.goto("/jogadores");
   const wagsTab = page.getByRole("tab", { name: "WAGs" });

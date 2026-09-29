@@ -37,10 +37,11 @@ type Props = {
 };
 
 const RANKING_VIEWS: readonly RankingView[] = ["season", "latest", "month"];
-const RANKING_FILTERS: readonly RankingFilter[] = ["general", "goals", "assists", "wins", "winRate", "awards", "overall", "overallDef", "overallAlaMei", "overallAta", "overallGol"];
+const RANKING_FILTERS: readonly RankingFilter[] = ["general", "legacy", "goals", "assists", "wins", "winRate", "awards", "overall", "overallDef", "overallAlaMei", "overallAta", "overallGol"];
 
 const FILTERS: Array<{ key: RankingFilter; label: string }> = [
   { key: "general", label: "Geral" },
+  { key: "legacy", label: "Legado" },
   { key: "goals", label: "Gols" },
   { key: "assists", label: "Assistências" },
   { key: "wins", label: "Vitórias" },
@@ -55,6 +56,7 @@ const FILTERS: Array<{ key: RankingFilter; label: string }> = [
 
 const FILTER_LABELS: Record<RankingFilter, string> = {
   general: "pontos",
+  legacy: "pontos básicos",
   goals: "gols",
   assists: "assistências",
   wins: "vitórias",
@@ -84,6 +86,7 @@ function AwardBadges({ entry, compact = false }: { entry: RankingEntry; compact?
 }
 
 function metricValue(entry: RankingEntry, filter: RankingFilter): number | null {
+  if (filter === "legacy") return entry.legacyPoints;
   if (filter === "goals") return entry.goals;
   if (filter === "assists") return entry.assists;
   if (filter === "wins") return entry.wins;
@@ -287,7 +290,9 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
             <span className="text-sm font-black text-accent transition-transform group-open:rotate-45">+</span>
           </summary>
           <p className="border-t border-accent/15 px-4 pb-4 pt-3 text-[11px] leading-relaxed text-foreground/90">
-            Os pontos da Geral somam as <strong className="text-accent">6 melhores atuações</strong> de cada jogador no ano. Faltas ou dias ruins não prejudicam sua classificação. Toque em qualquer atleta para ver as partidas e a nota de corte.
+            {filter === "legacy"
+              ? <>O Legado soma as <strong className="text-accent">6 melhores atuações pelos scouts básicos</strong>, sem bônus de posição.</>
+              : <>A Geral soma as <strong className="text-accent">6 melhores atuações oficiais</strong>, já com os bônus posicionais.</>} Faltas ou dias ruins não prejudicam sua classificação. Toque em qualquer atleta para ver as partidas e a nota de corte.
           </p>
         </details>
       )}
@@ -324,6 +329,9 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
               </p>
             </div>
           ))}
+          <p className="col-span-2 rounded-xl border border-accent/15 bg-accent/[0.06] p-2.5 text-[10px] leading-relaxed text-muted sm:col-span-4">
+            Na Geral, o maior OVR entre DEF, ALA e ATA recebe 100% do bônus atual da posição no Cartola; o segundo recebe 50%. O filtro Legado mostra somente os scouts básicos acima.
+          </p>
         </div>
       </details>
 
@@ -507,6 +515,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
         <RankingPlayerCardModal
           entry={selected.entry}
           position={selected.position}
+          scoringMode={filter === "legacy" ? "legacy" : "official"}
           onClose={() => setSelected(null)}
         />
       )}

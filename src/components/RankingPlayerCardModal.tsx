@@ -23,6 +23,7 @@ type Props = {
   entry: RankingEntry;
   position: number;
   onClose: () => void;
+  scoringMode?: "official" | "legacy";
 };
 
 function signedPoints(points: number) {
@@ -299,7 +300,7 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
   return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Não foi possível gerar a imagem.")), "image/png", 0.95));
 }
 
-export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
+export function RankingPlayerCardModal({ entry, position, onClose, scoringMode = "official" }: Props) {
   const [mounted, setMounted] = useState(false);
   const [showBestRounds, setShowBestRounds] = useState(false);
   const [showOverallExplanation, setShowOverallExplanation] = useState(false);
@@ -331,6 +332,8 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
   const overallComposition = getOverallComposition(entry.player.overall_traits, entry.overallPositions, {
     goalkeeperGames: entry.overallGoalkeeperGames,
   });
+  const displayedBestRounds = scoringMode === "legacy" ? entry.legacyBestRounds : entry.bestRounds;
+  const displayedMinimum = scoringMode === "legacy" ? entry.legacyMinPointsToEnterTop6 : entry.minPointsToEnterTop6;
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState("");
 
@@ -529,7 +532,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
         </div>
 
         {/* 6 MELHORES PARTIDAS - SANFONA / ACCORDION */}
-        {entry.bestRounds && entry.bestRounds.length > 0 && (
+        {displayedBestRounds && displayedBestRounds.length > 0 && (
           <div ref={bestRoundsRef} className="mx-auto mt-3.5 w-[94%] overflow-hidden rounded-2xl border border-border/80 bg-[#07150d]/95 shadow-xl backdrop-blur-md transition-all">
             <button
               type="button"
@@ -544,7 +547,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
                   </div>
                   <div>
                     <span className="block font-athletic text-xs font-black uppercase tracking-wider text-foreground">
-                      6 Melhores Partidas
+                      6 Melhores Partidas {scoringMode === "legacy" ? "· Legado" : "· Oficial"}
                     </span>
                     <span className="text-[10px] text-muted">
                       {showBestRounds ? "Toque para recolher" : "Toque para ver os scouts"}
@@ -554,7 +557,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
 
                 <div className="flex items-center gap-2">
                   <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-black text-accent">
-                    {entry.bestRounds.filter((r) => r.countedInTop6).length}/6 no ranking
+                    {displayedBestRounds.filter((r) => r.countedInTop6).length}/6 no ranking
                   </span>
                   <ChevronDown
                     className={`h-4 w-4 text-muted transition-transform duration-200 ${
@@ -566,7 +569,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
 
               {!showBestRounds && (
                 <div className="mt-3 grid grid-cols-3 gap-1.5">
-                  {entry.bestRounds.filter((r) => r.countedInTop6).slice(0, 6).map((round) => (
+                  {displayedBestRounds.filter((r) => r.countedInTop6).slice(0, 6).map((round) => (
                     <span key={round.roundId} className="flex items-center justify-between rounded-lg border border-accent/15 bg-accent/[0.07] px-2 py-1.5">
                       <span className="text-[8px] font-black uppercase text-muted">R{String(round.roundNumber).padStart(2, "0")}</span>
                       <span className="font-athletic text-sm font-black text-accent">{round.points}</span>
@@ -583,7 +586,7 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
                   Toque em uma rodada para ver como os pontos foram feitos
                 </p>
                 <div className="divide-y divide-border/40">
-                  {entry.bestRounds.filter((r) => r.countedInTop6).slice(0, 6).map((r, idx) => (
+                  {displayedBestRounds.filter((r) => r.countedInTop6).slice(0, 6).map((r, idx) => (
                     <div
                       key={r.roundId}
                       className="text-xs text-foreground"
@@ -657,14 +660,14 @@ export function RankingPlayerCardModal({ entry, position, onClose }: Props) {
 
                 {/* Nota de Corte */}
                 <div className="mt-3 rounded-xl border border-accent/25 bg-accent/10 p-2.5 text-center text-[11px] font-bold text-foreground">
-                  {entry.bestRounds.length >= 6 ? (
+                  {displayedBestRounds.length >= 6 ? (
                     <span>
                       🎯 <strong className="text-accent">Nota de corte:</strong> Precisa fazer{" "}
-                      <strong className="text-accent">&gt; {entry.minPointsToEnterTop6} pts</strong> na próxima rodada para subir no ranking.
+                      <strong className="text-accent">&gt; {displayedMinimum} pts</strong> na próxima rodada para subir no ranking.
                     </span>
                   ) : (
                     <span>
-                      🎯 <strong className="text-accent">Vagas livres:</strong> {entry.bestRounds.length}/6 jogos. Qualquer pontuação na próxima rodada entrará somando!
+                      🎯 <strong className="text-accent">Vagas livres:</strong> {displayedBestRounds.length}/6 jogos. Qualquer pontuação na próxima rodada entrará somando!
                     </span>
                   )}
                 </div>

@@ -13,6 +13,9 @@ export type RankingBestRound = {
   roundNumber: number;
   date: string;
   points: number;
+  legacyPoints: number;
+  positionBonus: number;
+  roleWeights: Array<{ role: "DEF" | "MEI" | "ATA"; overall: number; weight: 1 | 0.5 }>;
   goals: number;
   assists: number;
   wins: number;
@@ -36,13 +39,17 @@ export type RankingEntry = {
   goals: number;
   assists: number;
   points: number;
+  legacyPoints: number;
+  positionBonus: number;
   overall?: number | null;
   overallTrend?: "rising" | "steady" | "falling" | null;
   overallPositions?: { DEF: number; ALA_MEI: number; ATA: number; GOL: number } | null;
   overallGoalkeeperGames?: number;
   totalRawPoints?: number;
   bestRounds?: RankingBestRound[];
+  legacyBestRounds?: RankingBestRound[];
   minPointsToEnterTop6?: number | null;
+  legacyMinPointsToEnterTop6?: number | null;
   winRate: number;
   awards: RankingAwards;
   awardSeasons: PlayerAwardSeason[];
@@ -74,8 +81,12 @@ export type RankingExperienceData = {
   } | null;
 };
 
-export type RankingFilter = "general" | "goals" | "assists" | "wins" | "winRate" | "awards" | "overall" | "overallDef" | "overallAlaMei" | "overallAta" | "overallGol";
+export type RankingFilter = "general" | "legacy" | "goals" | "assists" | "wins" | "winRate" | "awards" | "overall" | "overallDef" | "overallAlaMei" | "overallAta" | "overallGol";
 export type RankingView = "season" | "month" | "latest";
+
+export function sortRankingRounds<T>(rows: T[], points: (row: T) => number) {
+  return [...rows].sort((a, b) => points(b) - points(a));
+}
 
 export function rankingActivePlayerIds(
   recentRoundIds: string[],

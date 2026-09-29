@@ -419,6 +419,11 @@ export type PlayerRoundStats = {
   defensive_one_goal_games: number;
   own_goals: number;
   points: number;
+  ranking_defensive_clean_games: number;
+  ranking_defensive_one_goal_games: number;
+  ranking_role_weights: Array<{ role: "DEF" | "MEI" | "ATA"; overall: number; weight: 1 | 0.5 }>;
+  ranking_position_bonus: number;
+  ranking_points: number;
   player_profile_locked?: PlayerProfile | null;
 };
 
@@ -670,8 +675,8 @@ export type Database = {
       };
       player_round_stats: {
         Row: PlayerRoundStats;
-        Insert: Omit<PlayerRoundStats, 'id' | 'games' | 'goals' | 'assists' | 'wins' | 'draws' | 'losses' | 'own_goals' | 'goalkeeper_goals' | 'goalkeeper_assists' | 'goalkeeper_own_goals' | 'goalkeeper_wins' | 'goalkeeper_draws' | 'goalkeeper_losses' | 'points'> & { id?: string; games?: number; goals?: number; assists?: number; wins?: number; draws?: number; losses?: number; own_goals?: number; goalkeeper_goals?: number; goalkeeper_assists?: number; goalkeeper_own_goals?: number; goalkeeper_wins?: number; goalkeeper_draws?: number; goalkeeper_losses?: number; points?: number };
-        Update: Partial<Omit<PlayerRoundStats, 'id'>>;
+        Insert: Omit<PlayerRoundStats, 'id' | 'games' | 'goals' | 'assists' | 'wins' | 'draws' | 'losses' | 'own_goals' | 'goalkeeper_goals' | 'goalkeeper_assists' | 'goalkeeper_own_goals' | 'goalkeeper_wins' | 'goalkeeper_draws' | 'goalkeeper_losses' | 'points' | 'ranking_defensive_clean_games' | 'ranking_defensive_one_goal_games' | 'ranking_role_weights' | 'ranking_position_bonus' | 'ranking_points'> & { id?: string; games?: number; goals?: number; assists?: number; wins?: number; draws?: number; losses?: number; own_goals?: number; goalkeeper_goals?: number; goalkeeper_assists?: number; goalkeeper_own_goals?: number; goalkeeper_wins?: number; goalkeeper_draws?: number; goalkeeper_losses?: number; points?: number; ranking_defensive_clean_games?: number; ranking_defensive_one_goal_games?: number; ranking_role_weights?: PlayerRoundStats['ranking_role_weights']; ranking_position_bonus?: number };
+        Update: Partial<Omit<PlayerRoundStats, 'id' | 'ranking_points'>>;
       };
     };
     Views: {

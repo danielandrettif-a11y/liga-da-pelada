@@ -8,10 +8,17 @@ import { buildRankedPointBreakdown, calculateRankedPoints } from "../ranked-scor
 import { buildAwardSeasonsByPlayer, countAwards } from "../awards";
 import type { SeasonStatus } from "../types";
 import type { Player } from "../types";
-import { rankingActivePlayerIds, type RankingEntry, type RankingExperienceData } from "../ranking";
+import { rankingActivePlayerIds, sortRankingRounds, type RankingEntry, type RankingExperienceData } from "../ranking";
 import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
 import { normalizeBQScoringSnapshot } from "../bq-scoring";
 import { isCompetitiveProfileComplete } from "../player-eligibility";
+import {
+  calculateRankingPositionBonus,
+  parseRankingRoleWeights,
+  rankingRoleWeightsLabel,
+  resolveRankingRoleWeights,
+  type RankingRoleWeight,
+} from "../ranking-position-bonus";
 
 type RankingStatsRow = {
   player_id: string;
@@ -29,6 +36,11 @@ type RankingStatsRow = {
   defensive_clean_games: number;
   defensive_one_goal_games: number;
   team_goals_conceded: number;
+  ranking_defensive_clean_games: number;
+  ranking_defensive_one_goal_games: number;
+  ranking_role_weights: unknown;
+  ranking_position_bonus: number;
+  ranking_points: number;
   player: Player;
 };
 
@@ -120,7 +132,8 @@ function aggregateRankingRows(
     if (!playerRows.length) continue;
     const first = playerRows[0];
 
-    const sortedRows = [...playerRows].sort((a, b) => b.points - a.points);
+    const officialRows = sortRankingRounds(playerRows, (row) => Number(row.ranking_points ?? row.points));
+    const legacyRows = sortRankingRounds(playerRows, (row) => row.points);
 
     let totalRawPoints = 0;
     let games = 0;
@@ -130,7 +143,7 @@ function aggregateRankingRows(
     let goals = 0;
     let assists = 0;
 
-    const bestRounds = sortedRows.map((r, idx) => {
+    for (const r of playerRows) {
       totalRawPoints += r.points;
       games += r.games;
       wins += r.wins;
@@ -138,7 +151,9 @@ function aggregateRankingRows(
       losses += r.losses;
       goals += r.goals;
       assists += r.assists;
+    }
 
+    const mapRound = (r: RankingStatsRow, countedInTop6: boolean, legacy = false) => {
       const roundInfo = roundsMap?.get(r.round_id);
       const pointBreakdown = buildRankedPointBreakdown({
         goals: r.goals,
@@ -154,11 +169,23 @@ function aggregateRankingRows(
       if (explainedPoints !== r.points) {
         pointBreakdown.push({ label: "Ajuste da rodada", count: 1, points: r.points - explainedPoints });
       }
+      const roleWeights = parseRankingRoleWeights(r.ranking_role_weights);
+      const positionBonus = Number(r.ranking_position_bonus || 0);
+      if (!legacy && positionBonus !== 0) {
+        pointBreakdown.push({
+          label: `Bônus posicional · ${rankingRoleWeightsLabel(roleWeights)}`,
+          count: 1,
+          points: positionBonus,
+        });
+      }
       return {
         roundId: r.round_id,
         roundNumber: roundInfo?.number ?? 0,
         date: roundInfo?.date ?? "",
-        points: r.points,
+        points: legacy ? r.points : Number(r.ranking_points ?? r.points),
+        legacyPoints: r.points,
+        positionBonus,
+        roleWeights,
         goals: r.goals,
         assists: r.assists,
         wins: r.wins,
@@ -166,9 +193,12 @@ function aggregateRankingRows(
         losses: r.losses,
         games: r.games,
         pointBreakdown,
-        countedInTop6: idx < maxBestRounds,
+        countedInTop6,
       };
-    });
+    };
+
+    const bestRounds = officialRows.map((row, index) => mapRound(row, index < maxBestRounds));
+    const legacyBestRounds = legacyRows.map((row, index) => mapRound(row, index < maxBestRounds, true));
 
     const top6Points = bestRounds
       .filter((r) => r.countedInTop6)
@@ -177,6 +207,15 @@ function aggregateRankingRows(
     const minPointsToEnterTop6 = bestRounds.length >= maxBestRounds
       ? bestRounds[maxBestRounds - 1].points
       : null;
+    const legacyMinPointsToEnterTop6 = legacyBestRounds.length >= maxBestRounds
+      ? legacyBestRounds[maxBestRounds - 1].points
+      : null;
+    const legacyPoints = legacyBestRounds
+      .filter((r) => r.countedInTop6)
+      .reduce((sum, r) => sum + r.points, 0);
+    const positionBonus = bestRounds
+      .filter((r) => r.countedInTop6)
+      .reduce((sum, r) => sum + r.positionBonus, 0);
 
     const winRate = games === 0 ? 0 : Math.round(((wins * 3 + draws) / (games * 3)) * 100);
 
@@ -189,9 +228,13 @@ function aggregateRankingRows(
       goals,
       assists,
       points: top6Points,
+      legacyPoints,
+      positionBonus,
       totalRawPoints,
       bestRounds,
+      legacyBestRounds,
       minPointsToEnterTop6,
+      legacyMinPointsToEnterTop6,
       winRate,
     });
   }
@@ -252,10 +295,19 @@ export async function calculateRoundStats(roundId: string) {
     const scoringSnapshot = normalizeBQScoringSnapshot(round.scoring_snapshot as Record<string, unknown> | null);
     const roundPlayerIds = (round.round_players || []).map((item: any) => item.player_id);
     const { data: roundPlayerProfiles, error: profileError } = roundPlayerIds.length
-      ? await client.from("players").select("id, player_profile").in("id", roundPlayerIds)
+      ? await client.from("players").select("id, player_profile, member_category, is_selectable, is_competitive_profile_complete").in("id", roundPlayerIds)
       : { data: [], error: null };
     if (profileError) throw new Error(`Erro ao buscar posições dos atletas: ${profileError.message}`);
     const profileByPlayerId = new Map((roundPlayerProfiles || []).map((player: any) => [player.id, player.player_profile]));
+    const playerById = new Map((roundPlayerProfiles || []).map((player: any) => [player.id, player]));
+    const [{ data: frozenRankingRows, error: frozenRankingError }, overallByPlayer] = await Promise.all([
+      roundPlayerIds.length
+        ? client.from("player_round_stats").select("player_id, ranking_role_weights").eq("round_id", roundId).in("player_id", roundPlayerIds)
+        : Promise.resolve({ data: [], error: null }),
+      getLatestPlayerCardOverallMap(client),
+    ]);
+    if (frozenRankingError) throw new Error(`Erro ao buscar posições congeladas do ranking: ${frozenRankingError.message}`);
+    const frozenRankingWeights = new Map((frozenRankingRows || []).map((row: any) => [row.player_id, parseRankingRoleWeights(row.ranking_role_weights)]));
 
     // Correções administrativas são persistentes e reaplicadas a cada consolidação.
     // Isso permite zerar apenas um jogador sem apagar gols/assistências dos demais.
@@ -298,6 +350,8 @@ export async function calculateRoundStats(roundId: string) {
           goals_conceded: 0,
           defensive_clean_games: 0,
           defensive_one_goal_games: 0,
+          ranking_defensive_clean_games: 0,
+          ranking_defensive_one_goal_games: 0,
           own_goals: 0,
           team_goals_conceded: 0,
           points: 0,
@@ -330,6 +384,13 @@ export async function calculateRoundStats(roundId: string) {
           // travada na escalação, não pela tag que o perfil tiver depois.
           const receivesLineDefenseScout = profile === "defensive"
             || Number(round.scoring_version || 5) >= 7;
+          if (!goalkeeperIds.has(participant.player_id)) {
+            if (teamGoalsConceded === 0) {
+              s.ranking_defensive_clean_games += 1;
+            } else if (teamGoalsConceded === 1) {
+              s.ranking_defensive_one_goal_games += 1;
+            }
+          }
           if (receivesLineDefenseScout && !goalkeeperIds.has(participant.player_id)) {
             if (teamGoalsConceded === 0) {
               s.defensive_clean_games += 1;
@@ -389,9 +450,34 @@ export async function calculateRoundStats(roundId: string) {
     }
 
     // 4. Salvar tudo (Upsert)
-    const statsArray = Object.values(statsMap).map((stats: any) => ({
-      ...stats,
-      points: countsForRanking ? calculateRankedPoints({
+    const statsArray = Object.values(statsMap).map((stats: any) => {
+      const frozen = frozenRankingWeights.get(stats.player_id) || [];
+      const overallPositions = overallByPlayer.get(stats.player_id)?.positions;
+      const player = playerById.get(stats.player_id);
+      const fallbackRole = player?.player_profile === "defensive" ? "DEF" : player?.player_profile === "midfield" ? "MEI" : "ATA";
+      const roleWeights: RankingRoleWeight[] = !countsForRanking || stats.games <= 0 || !player?.is_competitive_profile_complete
+        ? []
+        : frozen.length
+          ? frozen
+          : overallPositions
+            ? resolveRankingRoleWeights({ DEF: overallPositions.DEF, ALA_MEI: overallPositions.ALA_MEI, ATA: overallPositions.ATA }, player.player_profile)
+            : [{ role: fallbackRole, overall: 0, weight: 1 }];
+      const rankingPositionBonus = calculateRankingPositionBonus({
+        roleWeights,
+        goals: stats.goals,
+        assists: stats.assists,
+        draws: stats.draws,
+        defensiveCleanGames: stats.ranking_defensive_clean_games,
+        defensiveOneGoalGames: stats.ranking_defensive_one_goal_games,
+        goalkeeperGames: stats.goalkeeper_games,
+        cleanSheets: stats.clean_sheets,
+        suppressGoalkeeperRewards,
+      });
+      return {
+        ...stats,
+        ranking_role_weights: roleWeights,
+        ranking_position_bonus: rankingPositionBonus,
+        points: countsForRanking ? calculateRankedPoints({
         wins: stats.wins,
         goals: stats.goals,
         assists: stats.assists,
@@ -400,8 +486,9 @@ export async function calculateRoundStats(roundId: string) {
         ownGoals: stats.own_goals,
         goalkeeperAppearances: suppressGoalkeeperRewards ? 0 : stats.goalkeeper_games,
         goalkeeperGoalsConceded: stats.goals_conceded,
-      }, scoringSnapshot) : 0,
-    }));
+        }, scoringSnapshot) : 0,
+      };
+    });
     if (statsArray.length > 0) {
       const { error: upsertError } = await client
         .from("player_round_stats")
@@ -441,6 +528,7 @@ async function getRankingUncached() {
       goals,
       assists,
       points,
+      ranking_points,
       win_rate
     `)
     .eq("season_id", season.id)
@@ -470,7 +558,9 @@ async function getRankingUncached() {
       losses: Number(row.losses || 0),
       goals: Number(row.goals || 0),
       assists: Number(row.assists || 0),
-      points: Number(row.points || 0),
+      points: Number(row.ranking_points ?? row.points ?? 0),
+      legacyPoints: Number(row.points || 0),
+      positionBonus: Number(row.ranking_points ?? row.points ?? 0) - Number(row.points || 0),
       winRate: Number(row.win_rate || 0),
     }));
   }
@@ -491,6 +581,7 @@ async function getRankingUncached() {
       goals,
       assists,
       points,
+      ranking_points,
       player:player_id (
         id,
         name,
@@ -524,6 +615,8 @@ async function getRankingUncached() {
         goals: 0,
         assists: 0,
         points: 0,
+        legacyPoints: 0,
+        positionBonus: 0,
       });
     }
 
@@ -534,7 +627,9 @@ async function getRankingUncached() {
     s.losses += row.losses;
     s.goals += row.goals;
     s.assists += row.assists;
-    s.points += row.points;
+    s.points += Number(row.ranking_points ?? row.points ?? 0);
+    s.legacyPoints += Number(row.points || 0);
+    s.positionBonus += Number(row.ranking_points ?? row.points ?? 0) - Number(row.points || 0);
   }
 
   const ranking = Array.from(map.values());
@@ -565,7 +660,7 @@ export async function getRoundStatistics(roundId: string): Promise<RoundStatisti
       .maybeSingle(),
     supabase
       .from("player_round_stats")
-      .select("games, wins, draws, losses, goals, assists, points, player:player_id(*)")
+      .select("games, wins, draws, losses, goals, assists, points, ranking_points, player:player_id(*)")
       .eq("round_id", roundId),
   ]);
 
@@ -591,7 +686,7 @@ export async function getRoundStatistics(roundId: string): Promise<RoundStatisti
       losses: Number(raw.losses || 0),
       goals: Number(raw.goals || 0),
       assists: Number(raw.assists || 0),
-      points: Number(raw.points || 0),
+      points: Number(raw.ranking_points ?? raw.points ?? 0),
       winRate: games > 0 ? Math.round(((wins * 3 + draws) / (games * 3)) * 100) : 0,
       isBestGoalkeeper: false,
     } satisfies RoundStatisticEntry];
@@ -677,6 +772,11 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       defensive_clean_games,
       defensive_one_goal_games,
       team_goals_conceded,
+      ranking_defensive_clean_games,
+      ranking_defensive_one_goal_games,
+      ranking_role_weights,
+      ranking_position_bonus,
+      ranking_points,
       player:player_id (*)
     `)
     .in("round_id", (rounds || []).map((round) => round.id));
@@ -878,6 +978,8 @@ export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: 
     goals: 0,
     assists: 0,
     points: 0,
+    legacyPoints: 0,
+    positionBonus: 0,
     overall: overallByPlayer.get(playerId)?.overall ?? null,
     overallTrend: overallByPlayer.get(playerId)?.trend ?? null,
     overallPositions: overallByPlayer.get(playerId)?.positions ?? null,
