@@ -1099,6 +1099,45 @@ export function FantasyExperience({
         </section>
       )}
 
+      {/* Boletim da última Ranked fica junto ao acesso às escalações finais. */}
+      {lastRound && !isTest && status !== "in_progress" && (
+        <section className="overflow-hidden rounded-2xl border border-accent/25 bg-gradient-to-br from-[#0b2415] via-surface to-[#10190d] shadow-[0_12px_30px_rgba(0,0,0,.2)]">
+          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3.5">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent ring-1 ring-accent/25">
+                <Trophy className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[.18em] text-accent">Boletim final</p>
+                <p className="mt-0.5 text-sm font-black text-foreground">Ranked {String(lastRound.number).padStart(2, "0")}</p>
+                <p className="text-[10px] text-muted">Sua atuação na última rodada</p>
+              </div>
+            </div>
+            <div className="shrink-0 text-right">
+              <strong className="block text-2xl font-black leading-none text-accent">{lastRound.totalPoints.toFixed(1)}</strong>
+              <span className="text-[9px] font-black uppercase tracking-[.14em] text-muted">pontos</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 p-3">
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <p className="text-[9px] font-black uppercase tracking-[.12em] text-muted">Em campo</p>
+              <p className="mt-1 text-lg font-black text-foreground">{lastRound.playerPoints.toFixed(1)} <span className="text-[10px] text-muted">pts</span></p>
+            </div>
+            <div className="rounded-xl border border-warning/20 bg-warning/10 p-3">
+              <p className="text-[9px] font-black uppercase tracking-[.12em] text-warning">Bônus da carta</p>
+              <p className="mt-1 text-lg font-black text-warning">{lastRound.cardPoints > 0 ? "+" : ""}{lastRound.cardPoints.toFixed(1)} <span className="text-[10px] text-warning/70">pts</span></p>
+            </div>
+          </div>
+          <Link
+            href={`/cartola/ranking/${lastRound.userId}/${lastRound.roundId}`}
+            className="mx-3 mb-3 flex items-center justify-between rounded-xl border border-accent/25 bg-accent/10 px-3 py-2.5 text-[10px] font-black text-accent transition-colors hover:bg-accent/15"
+          >
+            Clique aqui para ver seu time escalado na última rodada
+            <span aria-hidden="true">→</span>
+          </Link>
+        </section>
+      )}
+
       {/* Banner de Modo Teste */}
       {isTest && (
         <div className="overflow-hidden rounded-2xl border border-warning/45 bg-warning/12 p-4 text-center shadow-[0_0_28px_rgba(245,158,11,.08)]">
@@ -1213,45 +1252,6 @@ export function FantasyExperience({
         )}
 
       </header>
-
-      {/* Resumo da Última Rodada */}
-      {lastRound && !isTest && status !== "in_progress" && (
-        <section className="overflow-hidden rounded-2xl border border-accent/25 bg-gradient-to-br from-[#0b2415] via-surface to-[#10190d] shadow-[0_12px_30px_rgba(0,0,0,.2)]">
-          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3.5">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent ring-1 ring-accent/25">
-                <Trophy className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[.18em] text-accent">Boletim final</p>
-                <p className="mt-0.5 text-sm font-black text-foreground">Ranked {String(lastRound.number).padStart(2, "0")}</p>
-                <p className="text-[10px] text-muted">Sua atuação na última rodada</p>
-              </div>
-            </div>
-            <div className="shrink-0 text-right">
-              <strong className="block text-2xl font-black leading-none text-accent">{lastRound.totalPoints.toFixed(1)}</strong>
-              <span className="text-[9px] font-black uppercase tracking-[.14em] text-muted">pontos</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 p-3">
-            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-              <p className="text-[9px] font-black uppercase tracking-[.12em] text-muted">Em campo</p>
-              <p className="mt-1 text-lg font-black text-foreground">{lastRound.playerPoints.toFixed(1)} <span className="text-[10px] text-muted">pts</span></p>
-            </div>
-            <div className="rounded-xl border border-warning/20 bg-warning/10 p-3">
-              <p className="text-[9px] font-black uppercase tracking-[.12em] text-warning">Bônus da carta</p>
-              <p className="mt-1 text-lg font-black text-warning">{lastRound.cardPoints > 0 ? "+" : ""}{lastRound.cardPoints.toFixed(1)} <span className="text-[10px] text-warning/70">pts</span></p>
-            </div>
-          </div>
-          <Link
-            href={`/cartola/ranking/${lastRound.userId}/${lastRound.roundId}`}
-            className="mx-3 mb-3 flex items-center justify-between rounded-xl border border-accent/25 bg-accent/10 px-3 py-2.5 text-[10px] font-black text-accent transition-colors hover:bg-accent/15"
-          >
-            Clique aqui para ver seu time escalado na última rodada
-            <span aria-hidden="true">→</span>
-          </Link>
-        </section>
-      )}
 
       {/* Botão de Revelação de Escalações Pós-Fechamento */}
       {isMarketClosed && !betweenRounds && (
