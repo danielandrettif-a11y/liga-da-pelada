@@ -318,7 +318,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent/10 text-accent">⚡</span>
           <span className="min-w-0 flex-1">
             <span className="block text-xs font-black text-foreground">Como pontuar no ranking</span>
-            <span className="block text-[10px] text-muted">Guia rápido dos scouts básicos</span>
+            <span className="block text-[10px] text-muted">Scouts básicos e bônus de posição</span>
           </span>
           <span className="text-lg font-black text-accent transition-transform group-open:rotate-45">+</span>
         </summary>
@@ -331,8 +331,48 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
               </p>
             </div>
           ))}
+          <section className="col-span-2 rounded-xl border border-accent/20 bg-background/45 p-2.5 sm:col-span-4">
+            <div className="mb-2">
+              <p className="text-[11px] font-black uppercase tracking-wider text-accent">Bônus posicionais da Geral</p>
+              <p className="mt-0.5 text-[9px] leading-relaxed text-muted">São pontos extras somados aos scouts acima. Vale apenas a posição com o maior OVR do atleta.</p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <article className="rounded-xl border border-sky-400/25 bg-sky-400/[0.07] p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-black text-sky-300">🛡️ DEF/VOL</p>
+                  <span className="rounded bg-sky-400/15 px-1.5 py-0.5 text-[9px] font-black text-sky-300">TETO +10</span>
+                </div>
+                <p className="mt-1.5 text-[9px] leading-relaxed text-foreground/85">
+                  +1,25 por jogo sem sofrer gol; +0,50 sofrendo exatamente 1; +0,50 por assistência (máx. +1,50); +1 por empate (máx. +2); Muralha +2,50 com 3 jogos sem sofrer gol.
+                </p>
+                <p className="mt-1.5 border-t border-sky-400/15 pt-1.5 text-[9px] font-bold text-sky-200">Exemplo do teto: 6 jogos sem sofrer gol + Muralha = +10.</p>
+              </article>
+
+              <article className="rounded-xl border border-amber-300/25 bg-amber-300/[0.07] p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-black text-amber-200">🏃 ALA</p>
+                  <span className="rounded bg-amber-300/15 px-1.5 py-0.5 text-[9px] font-black text-amber-200">TETO +8</span>
+                </div>
+                <p className="mt-1.5 text-[9px] leading-relaxed text-foreground/85">
+                  Cerca de +0,67 por gol; +1 por assistência; +0,67 por jogo sem sofrer gol; +0,33 sofrendo exatamente 1; Vai e volta +2 ao participar de gol e proteger em 2 jogos.
+                </p>
+                <p className="mt-1.5 border-t border-amber-300/15 pt-1.5 text-[9px] font-bold text-amber-100">Exemplo do teto: 3 gols + 2 assistências + 3 jogos sem sofrer gol + Vai e volta = +8.</p>
+              </article>
+
+              <article className="rounded-xl border border-rose-400/25 bg-rose-400/[0.07] p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-black text-rose-300">🎯 ATA</p>
+                  <span className="rounded bg-rose-400/15 px-1.5 py-0.5 text-[9px] font-black text-rose-300">TETO +7</span>
+                </div>
+                <p className="mt-1.5 text-[9px] leading-relaxed text-foreground/85">
+                  +2 por gol: 1 gol = +2; 2 gols = +4; 3 gols = +6; 4 ou mais gols = +7.
+                </p>
+                <p className="mt-1.5 border-t border-rose-400/15 pt-1.5 text-[9px] font-bold text-rose-200">Chega ao teto com 4 gols na rodada.</p>
+              </article>
+            </div>
+          </section>
           <p className="col-span-2 rounded-xl border border-accent/15 bg-accent/[0.06] p-2.5 text-[10px] leading-relaxed text-muted sm:col-span-4">
-            Na Geral, somente o maior OVR entre DEF, ALA e ATA define a posição da rodada. O bônus mantém o desempenho proporcional, com teto de 10 para DEF, 8 para ALA e 7 para ATA. O filtro Legado mostra somente os scouts básicos acima.
+            A aba <strong className="text-foreground">Geral</strong> soma scouts básicos + bônus posicional. O filtro <strong className="text-foreground">Legado</strong> mostra somente os scouts básicos, sem nenhum bônus de posição.
           </p>
         </div>
       </details>
