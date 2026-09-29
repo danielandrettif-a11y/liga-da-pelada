@@ -84,6 +84,14 @@ export type RankingExperienceData = {
 export type RankingFilter = "general" | "legacy" | "goals" | "assists" | "wins" | "winRate" | "awards" | "overall" | "overallDef" | "overallAlaMei" | "overallAta" | "overallGol";
 export type RankingView = "season" | "month" | "latest";
 
+export function roundRankingPoints(value: number) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+export function formatRankingPoints(value: number) {
+  return roundRankingPoints(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+}
+
 export function sortRankingRounds<T>(rows: T[], points: (row: T) => number) {
   return [...rows].sort((a, b) => points(b) - points(a));
 }

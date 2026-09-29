@@ -19,6 +19,7 @@ import type {
   RankingFilter,
   RankingView,
 } from "@/lib/ranking";
+import { formatRankingPoints, roundRankingPoints } from "@/lib/ranking";
 import { formatDateShort } from "@/lib/utils";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { CosmeticNameplate } from "./fantasy/CosmeticNameplate";
@@ -116,6 +117,7 @@ function metricDisplay(entry: RankingEntry, filter: RankingFilter) {
   if (value == null) return "—";
   if (filter === "winRate") return `${value}%`;
   if (filter.startsWith("overall")) return value.toFixed(1);
+  if (filter === "general" || filter === "legacy") return formatRankingPoints(value);
   return String(value);
 }
 
@@ -125,7 +127,7 @@ function metricGap(above: RankingEntry | null, entry: RankingEntry, filter: Rank
   const currentValue = metricValue(entry, filter);
   if (aboveValue == null || currentValue == null) return null;
   if (filter.startsWith("overall")) return Math.max(0.1, Math.round((aboveValue - currentValue) * 10) / 10).toFixed(1);
-  return Math.max(1, aboveValue - currentValue + 1);
+  return formatRankingPoints(Math.max(1, roundRankingPoints(aboveValue - currentValue + 1)));
 }
 
 function podiumStyle(position: number) {

@@ -8,7 +8,7 @@ import { buildRankedPointBreakdown, calculateRankedPoints } from "../ranked-scor
 import { buildAwardSeasonsByPlayer, countAwards } from "../awards";
 import type { SeasonStatus } from "../types";
 import type { Player } from "../types";
-import { rankingActivePlayerIds, sortRankingRounds, type RankingEntry, type RankingExperienceData } from "../ranking";
+import { rankingActivePlayerIds, roundRankingPoints, sortRankingRounds, type RankingEntry, type RankingExperienceData } from "../ranking";
 import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
 import { normalizeBQScoringSnapshot } from "../bq-scoring";
 import { isCompetitiveProfileComplete } from "../player-eligibility";
@@ -132,7 +132,7 @@ function aggregateRankingRows(
     if (!playerRows.length) continue;
     const first = playerRows[0];
 
-    const officialRows = sortRankingRounds(playerRows, (row) => Number(row.ranking_points ?? row.points));
+    const officialRows = sortRankingRounds(playerRows, (row) => roundRankingPoints(Number(row.ranking_points ?? row.points)));
     const legacyRows = sortRankingRounds(playerRows, (row) => row.points);
 
     let totalRawPoints = 0;
@@ -165,12 +165,12 @@ function aggregateRankingRows(
         goalkeeperGoalsConceded: r.goals_conceded,
         ownGoals: r.own_goals,
       });
-      const explainedPoints = pointBreakdown.reduce((sum, item) => sum + item.points, 0);
-      if (explainedPoints !== r.points) {
-        pointBreakdown.push({ label: "Ajuste da rodada", count: 1, points: r.points - explainedPoints });
+      const explainedPoints = roundRankingPoints(pointBreakdown.reduce((sum, item) => sum + item.points, 0));
+      if (explainedPoints !== roundRankingPoints(r.points)) {
+        pointBreakdown.push({ label: "Ajuste da rodada", count: 1, points: roundRankingPoints(r.points - explainedPoints) });
       }
       const roleWeights = parseRankingRoleWeights(r.ranking_role_weights);
-      const positionBonus = Number(r.ranking_position_bonus || 0);
+      const positionBonus = roundRankingPoints(Number(r.ranking_position_bonus || 0));
       if (!legacy && positionBonus !== 0) {
         pointBreakdown.push({
           label: `Bônus posicional · ${rankingRoleWeightsLabel(roleWeights)}`,
@@ -182,8 +182,8 @@ function aggregateRankingRows(
         roundId: r.round_id,
         roundNumber: roundInfo?.number ?? 0,
         date: roundInfo?.date ?? "",
-        points: legacy ? r.points : Number(r.ranking_points ?? r.points),
-        legacyPoints: r.points,
+        points: roundRankingPoints(legacy ? r.points : Number(r.ranking_points ?? r.points)),
+        legacyPoints: roundRankingPoints(r.points),
         positionBonus,
         roleWeights,
         goals: r.goals,
@@ -200,9 +200,9 @@ function aggregateRankingRows(
     const bestRounds = officialRows.map((row, index) => mapRound(row, index < maxBestRounds));
     const legacyBestRounds = legacyRows.map((row, index) => mapRound(row, index < maxBestRounds, true));
 
-    const top6Points = bestRounds
+    const top6Points = roundRankingPoints(bestRounds
       .filter((r) => r.countedInTop6)
-      .reduce((sum, r) => sum + r.points, 0);
+      .reduce((sum, r) => sum + r.points, 0));
 
     const minPointsToEnterTop6 = bestRounds.length >= maxBestRounds
       ? bestRounds[maxBestRounds - 1].points
@@ -210,12 +210,12 @@ function aggregateRankingRows(
     const legacyMinPointsToEnterTop6 = legacyBestRounds.length >= maxBestRounds
       ? legacyBestRounds[maxBestRounds - 1].points
       : null;
-    const legacyPoints = legacyBestRounds
+    const legacyPoints = roundRankingPoints(legacyBestRounds
       .filter((r) => r.countedInTop6)
-      .reduce((sum, r) => sum + r.points, 0);
-    const positionBonus = bestRounds
+      .reduce((sum, r) => sum + r.points, 0));
+    const positionBonus = roundRankingPoints(bestRounds
       .filter((r) => r.countedInTop6)
-      .reduce((sum, r) => sum + r.positionBonus, 0);
+      .reduce((sum, r) => sum + r.positionBonus, 0));
 
     const winRate = games === 0 ? 0 : Math.round(((wins * 3 + draws) / (games * 3)) * 100);
 
@@ -230,7 +230,7 @@ function aggregateRankingRows(
       points: top6Points,
       legacyPoints,
       positionBonus,
-      totalRawPoints,
+      totalRawPoints: roundRankingPoints(totalRawPoints),
       bestRounds,
       legacyBestRounds,
       minPointsToEnterTop6,
@@ -558,9 +558,9 @@ async function getRankingUncached() {
       losses: Number(row.losses || 0),
       goals: Number(row.goals || 0),
       assists: Number(row.assists || 0),
-      points: Number(row.ranking_points ?? row.points ?? 0),
-      legacyPoints: Number(row.points || 0),
-      positionBonus: Number(row.ranking_points ?? row.points ?? 0) - Number(row.points || 0),
+      points: roundRankingPoints(Number(row.ranking_points ?? row.points ?? 0)),
+      legacyPoints: roundRankingPoints(Number(row.points || 0)),
+      positionBonus: roundRankingPoints(Number(row.ranking_points ?? row.points ?? 0) - Number(row.points || 0)),
       winRate: Number(row.win_rate || 0),
     }));
   }
@@ -632,7 +632,12 @@ async function getRankingUncached() {
     s.positionBonus += Number(row.ranking_points ?? row.points ?? 0) - Number(row.points || 0);
   }
 
-  const ranking = Array.from(map.values());
+  const ranking = Array.from(map.values()).map((entry) => ({
+    ...entry,
+    points: roundRankingPoints(entry.points),
+    legacyPoints: roundRankingPoints(entry.legacyPoints),
+    positionBonus: roundRankingPoints(entry.positionBonus),
+  }));
   ranking.sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
     if (b.wins !== a.wins) return b.wins - a.wins;

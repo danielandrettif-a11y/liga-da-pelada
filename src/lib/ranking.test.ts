@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rankingActivePlayerIds, sortRankingRounds } from "./ranking";
+import { formatRankingPoints, rankingActivePlayerIds, roundRankingPoints, sortRankingRounds } from "./ranking";
 
 describe("rankingActivePlayerIds", () => {
   const rows = [
@@ -26,5 +26,16 @@ describe("sortRankingRounds", () => {
     ];
     expect(sortRankingRounds(rows, (row) => row.official)[0].id).toBe("bonus");
     expect(sortRankingRounds(rows, (row) => row.legacy)[0].id).toBe("base");
+  });
+});
+
+describe("ranking points precision", () => {
+  it("normaliza resíduos de ponto flutuante em duas casas", () => {
+    expect(roundRankingPoints(110.00999999999999)).toBe(110.01);
+    expect(formatRankingPoints(21.99000000000001)).toBe("21,99");
+  });
+
+  it("não força casas decimais em números inteiros", () => {
+    expect(formatRankingPoints(131)).toBe("131");
   });
 });
