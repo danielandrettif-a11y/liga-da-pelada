@@ -12,10 +12,9 @@ const stats = {
 };
 
 describe("ranking position bonus", () => {
-  it("usa o maior OVR inteiro e o segundo pela metade, sem GOL", () => {
+  it("usa somente o maior OVR entre as posições de linha", () => {
     expect(resolveRankingRoleWeights({ DEF: 80, ALA_MEI: 84, ATA: 82 }, "defensive")).toEqual([
       { role: "MEI", overall: 84, weight: 1 },
-      { role: "ATA", overall: 82, weight: 0.5 },
     ]);
   });
 
@@ -23,21 +22,23 @@ describe("ranking position bonus", () => {
     expect(resolveRankingRoleWeights({ DEF: 80, ALA_MEI: 80, ATA: 79 }, "midfield")[0]).toEqual({ role: "MEI", overall: 80, weight: 1 });
   });
 
-  it("normaliza pacotes diferentes para o mesmo teto de 7 pontos", () => {
+  it("aplica tetos 10 para DEF, 8 para ALA e 7 para ATA", () => {
     expect(calculateRankingPositionBonus({
       ...stats,
       roleWeights: [
         { role: "DEF", overall: 90, weight: 1 },
         { role: "MEI", overall: 88, weight: 0.5 },
       ],
-    })).toBe(7);
+    })).toBe(10);
 
     expect(calculateRankingPositionBonus({
       ...stats,
-      roleWeights: [
-        { role: "MEI", overall: 90, weight: 1 },
-        { role: "ATA", overall: 88, weight: 0.5 },
-      ],
+      roleWeights: [{ role: "MEI", overall: 90, weight: 1 }],
+    })).toBe(8);
+
+    expect(calculateRankingPositionBonus({
+      ...stats,
+      roleWeights: [{ role: "ATA", overall: 90, weight: 1 }],
     })).toBe(7);
   });
 
@@ -53,7 +54,7 @@ describe("ranking position bonus", () => {
         { role: "DEF", overall: 90, weight: 1 },
         { role: "MEI", overall: 88, weight: 0.5 },
       ],
-    })).toBe(0.81);
+    })).toBe(1.25);
   });
 
   it("ignora pesos persistidos inválidos", () => {

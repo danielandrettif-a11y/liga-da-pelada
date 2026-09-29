@@ -332,7 +332,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
             </div>
           ))}
           <p className="col-span-2 rounded-xl border border-accent/15 bg-accent/[0.06] p-2.5 text-[10px] leading-relaxed text-muted sm:col-span-4">
-            Na Geral, o maior OVR entre DEF, ALA e ATA recebe 100% do bônus atual da posição no Cartola; o segundo recebe 50%. O pacote é normalizado proporcionalmente para o teto comum de 7 pontos por rodada. O filtro Legado mostra somente os scouts básicos acima.
+            Na Geral, somente o maior OVR entre DEF, ALA e ATA define a posição da rodada. O bônus mantém o desempenho proporcional, com teto de 10 para DEF, 8 para ALA e 7 para ATA. O filtro Legado mostra somente os scouts básicos acima.
           </p>
         </div>
       </details>

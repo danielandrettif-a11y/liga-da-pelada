@@ -17,7 +17,7 @@ export type RankingPositionOveralls = {
 
 const ROLE_ORDER: RankingLineRole[] = ["DEF", "MEI", "ATA"];
 const ROLE_BONUS_CAP: Record<RankingLineRole, number> = { DEF: 10, MEI: 6, ATA: 2 };
-export const RANKING_POSITION_BONUS_CAP = 7;
+export const RANKING_POSITION_TARGET_CAP: Record<RankingLineRole, number> = { DEF: 10, MEI: 8, ATA: 7 };
 
 function profileRole(profile: PlayerProfile | null | undefined): RankingLineRole | null {
   if (profile === "defensive") return "DEF";
@@ -42,8 +42,8 @@ export function resolveRankingRoleWeights(
       || Number(b.role === preferredRole) - Number(a.role === preferredRole)
       || ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role)
     ))
-    .slice(0, 2)
-    .map((item, index) => ({ ...item, weight: index === 0 ? 1 : 0.5 }));
+    .slice(0, 1)
+    .map((item) => ({ ...item, weight: 1 as const }));
 }
 
 export function parseRankingRoleWeights(value: unknown): RankingRoleWeight[] {
@@ -64,16 +64,18 @@ export type RankingPositionBonusInput = Omit<PositionBreakdownInput, "slotRole" 
 };
 
 export function calculateRankingPositionBonus(input: RankingPositionBonusInput): number {
-  const bonus = input.roleWeights.reduce((total, roleWeight) => total + calculatePositionBonusValue({
+  const primary = input.roleWeights.find(({ weight }) => weight === 1);
+  if (!primary) return 0;
+  const bonus = calculatePositionBonusValue({
     ...input,
     scoringVersion: 10,
-    slotRole: roleWeight.role,
-    playerProfile: roleWeight.role === "DEF" ? "defensive" : roleWeight.role === "MEI" ? "midfield" : "offensive",
-  }) * roleWeight.weight, 0);
-  const packageCap = input.roleWeights.reduce((total, { role, weight }) => total + ROLE_BONUS_CAP[role] * weight, 0);
-  return packageCap > 0 ? Math.round((bonus * RANKING_POSITION_BONUS_CAP / packageCap) * 100) / 100 : 0;
+    slotRole: primary.role,
+    playerProfile: primary.role === "DEF" ? "defensive" : primary.role === "MEI" ? "midfield" : "offensive",
+  });
+  return Math.round((bonus * RANKING_POSITION_TARGET_CAP[primary.role] / ROLE_BONUS_CAP[primary.role]) * 100) / 100;
 }
 
 export function rankingRoleWeightsLabel(weights: RankingRoleWeight[]) {
-  return weights.map(({ role, weight }) => `${role === "MEI" ? "ALA" : role} ${weight === 1 ? "100%" : "50%"}`).join(" + ");
+  const primary = weights.find(({ weight }) => weight === 1);
+  return primary ? `${primary.role === "MEI" ? "ALA" : primary.role} · teto ${RANKING_POSITION_TARGET_CAP[primary.role]}` : "sem posição";
 }
