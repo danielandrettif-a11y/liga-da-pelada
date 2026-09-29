@@ -250,17 +250,25 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
 
   if (cardContent.speedStars) {
     const speedBox = rankingCardBoxPixels(layout.speed, card);
-    context.fillStyle = `${theme.edge}24`;
+    context.save();
+    context.shadowColor = "rgba(0,0,0,.85)";
+    context.shadowBlur = 10;
+    context.shadowOffsetY = 3;
+    context.fillStyle = "rgba(2,12,8,.9)";
     roundedRect(context, speedBox.x, speedBox.y, speedBox.width, speedBox.height, 12);
     context.fill();
-    context.strokeStyle = `${theme.edge}b8`;
-    context.lineWidth = 2;
+    context.shadowColor = "transparent";
+    context.strokeStyle = theme.edge;
+    context.lineWidth = 3;
     roundedRect(context, speedBox.x, speedBox.y, speedBox.width, speedBox.height, 12);
     context.stroke();
+    context.shadowColor = "rgba(0,0,0,.95)";
+    context.shadowBlur = 4;
     context.fillStyle = theme.edge;
     context.textAlign = "center";
     context.font = "900 18px Arial";
     context.fillText(`VEL ${cardContent.speedStars}`, speedBox.x + speedBox.width / 2, speedBox.y + speedBox.height * .68, speedBox.width * .88);
+    context.restore();
   }
 
   const nameBox = rankingCardBoxPixels(layout.name, card);
@@ -452,8 +460,11 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
           </div>
 
           {cardContent.speedStars && (
-            <div className="absolute z-10 flex items-center justify-center rounded-md border text-[7px] font-black tracking-[.08em]" style={{ ...rankingCardBoxStyle(layout.speed), borderColor: `${theme.edge}b8`, backgroundColor: `${theme.edge}24`, color: theme.edge }}>
-              VEL {cardContent.speedStars}
+            <div
+              className="absolute z-20 flex items-center justify-center gap-1 rounded-md border-[1.5px] bg-[#020c08]/90 text-[8px] font-black tracking-[.08em] shadow-[0_3px_10px_rgba(0,0,0,.85)]"
+              style={{ ...rankingCardBoxStyle(layout.speed), borderColor: theme.edge, color: theme.edge, textShadow: "0 1px 3px rgba(0,0,0,.95)" }}
+            >
+              <span className="text-white">VEL</span><span>{cardContent.speedStars}</span>
             </div>
           )}
 
