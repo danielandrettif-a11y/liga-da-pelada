@@ -34,6 +34,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
   const roleReframeActive = Number(settings.scoringVersion || 5) >= 7;
   const defensiveDrawBonusActive = Number(settings.scoringVersion || 5) >= 9;
   const goalkeeperSlotOnly = Number(settings.scoringVersion || 5) >= 10;
+  const progressiveAttackerBonus = Number(settings.scoringVersion || 5) >= 11;
 
   return createPortal(
     <div
@@ -217,8 +218,8 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
                     <strong className="text-accent font-black">+{settings.goalPoints.toFixed(1)} pts / gol</strong>
                   </div>
                   <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🔥 Bônus Artilheiro (2+ gols):</span>
-                    <strong className="text-danger font-black">+{roleReframeActive ? "2.0" : "3.0"} pts extras</strong>
+                    <span>🔥 {progressiveAttackerBonus ? "Bônus ATA (1 gol / 2+ gols):" : "Bônus Artilheiro (2+ gols):"}</span>
+                    <strong className="text-danger font-black">{progressiveAttackerBonus ? "+1.0 / +2.0" : `+${roleReframeActive ? "2.0" : "3.0"}`} pts extras</strong>
                   </div>
                   <div className="flex justify-between py-0.5">
                     <span>🎯 Assistência:</span>

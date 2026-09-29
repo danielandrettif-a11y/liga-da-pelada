@@ -9,7 +9,8 @@ export function FantasyTacticalAnnouncementModal({ scoringVersion = 5 }: { scori
   const roleReframeActive = scoringVersion >= 7;
   const defensiveDrawBonusActive = scoringVersion >= 9;
   const goalkeeperSlotOnly = scoringVersion >= 10;
-  const storageKey = goalkeeperSlotOnly ? "fantasy_tactical_v10_goalkeeper_seen" : defensiveDrawBonusActive ? "fantasy_tactical_v9_defense_seen" : roleReframeActive ? "fantasy_tactical_v7_role_reframe_seen" : "fantasy_tactical_v4_role_scoring_seen";
+  const progressiveAttackerBonus = scoringVersion >= 11;
+  const storageKey = progressiveAttackerBonus ? "fantasy_tactical_v11_attacker_seen" : goalkeeperSlotOnly ? "fantasy_tactical_v10_goalkeeper_seen" : defensiveDrawBonusActive ? "fantasy_tactical_v9_defense_seen" : roleReframeActive ? "fantasy_tactical_v7_role_reframe_seen" : "fantasy_tactical_v4_role_scoring_seen";
 
   useEffect(() => {
     const seen = localStorage.getItem(storageKey);
@@ -106,7 +107,7 @@ export function FantasyTacticalAnnouncementModal({ scoringVersion = 5 }: { scori
                 <span className="font-black text-accent text-[10px]">4,0 pts / gol + bônus</span>
               </div>
               <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Gol vale <strong>4,0 pts base</strong>. Na vaga ATA, 2+ gols rendem <strong>{roleReframeActive ? "+2,0" : "+3,0"} pts</strong> de Artilheiro da Rodada.
+                Gol vale <strong>4,0 pts base</strong>. Na vaga ATA, {progressiveAttackerBonus ? <>1 gol rende <strong>+1,0</strong> e 2+ gols completam <strong>+2,0</strong> com Artilheiro.</> : <>2+ gols rendem <strong>{roleReframeActive ? "+2,0" : "+3,0"} pts</strong> de Artilheiro da Rodada.</>}
               </p>
             </div>
           </div>

@@ -170,3 +170,18 @@ describe("pacotes de bônus por posição — BQ v10", () => {
     expect(calculateFantasyPositionPackageBonus({ ...input, draws: 3 }, settings)).toBe(2);
   });
 });
+
+describe("pacotes de bônus por posição — BQ v11", () => {
+  const settings = { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 11 };
+  const input = {
+    goals: 0, assists: 0, draws: 0, games: 4, losses: 0, goalkeeperGames: 0,
+    goalsConceded: 0, cleanSheets: 0, defensiveCleanGames: 0,
+    defensiveOneGoalGames: 0, slotRole: "ATA" as const, playerProfile: "offensive" as const,
+  };
+
+  it("torna o bônus do ATA progressivo sem aumentar o teto", () => {
+    expect(calculateFantasyPositionPackageBonus({ ...input, goals: 1 }, settings)).toBe(1);
+    expect(calculateFantasyPositionPackageBonus({ ...input, goals: 2 }, settings)).toBe(2);
+    expect(calculateFantasyPositionPackageBonus({ ...input, goals: 5 }, settings)).toBe(2);
+  });
+});

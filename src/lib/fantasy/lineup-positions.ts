@@ -44,11 +44,11 @@ export function isCorrectFantasySlot(
 }
 
 /**
- * Calcula o bônus posicional conforme o snapshot imutável da rodada (BQ v5–v10).
+ * Calcula o bônus posicional conforme o snapshot imutável da rodada (BQ v5–v11).
  *
  * DEF: +1.5 por clean sheet, +0.5 por partida com 1 gol, Muralha +3 (≥3 CS), teto 10.
  * MEI: +1 por assistência, Maestro +3 (≥2 assistências).
- * ATA: Artilheiro +3 (≥2 gols).
+ * ATA: bônus progressivo até o teto de Artilheiro.
  * GOL: +4 por clean sheet quando realmente atuou no gol.
  *
  * Delega para position-breakdown.ts para manter uma fonte única.

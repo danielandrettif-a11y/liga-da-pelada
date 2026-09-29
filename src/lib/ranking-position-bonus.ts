@@ -68,7 +68,7 @@ export function calculateRankingPositionBonus(input: RankingPositionBonusInput):
   if (!primary) return 0;
   const bonus = calculatePositionBonusValue({
     ...input,
-    scoringVersion: 10,
+    scoringVersion: 11,
     slotRole: primary.role,
     playerProfile: primary.role === "DEF" ? "defensive" : primary.role === "MEI" ? "midfield" : "offensive",
   });

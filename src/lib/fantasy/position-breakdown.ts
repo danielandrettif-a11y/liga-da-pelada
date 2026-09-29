@@ -1,5 +1,5 @@
 /**
- * Breakdown autoritativo da pontuação por posição — BQ v5–v10.
+ * Breakdown autoritativo da pontuação por posição — BQ v5–v11.
  *
  * Usado na prévia ao vivo, processamento final e histórico para garantir
  * uma representação única e consistente em todas as interfaces.
@@ -233,19 +233,24 @@ export function calculatePositionBreakdown(input: PositionBreakdownInput): Posit
       };
     }
 
+    const progressiveAttackBonus = scoringVersion >= 11 ? Math.min(input.goals, 1) : 0;
     const activated = input.goals >= 2;
+    const artilheiroBonus = activated ? (scoringVersion >= 11 ? 1 : 2) : 0;
+    const gross = progressiveAttackBonus + artilheiroBonus;
     return {
       position: "ATA",
-      events: [],
+      events: progressiveAttackBonus > 0
+        ? [{ label: "Presença ofensiva", count: 1, value: progressiveAttackBonus }]
+        : [],
       specialBonus: {
         name: "Artilheiro",
         activated,
-        value: activated ? 2 : 0,
+        value: artilheiroBonus,
         progress: activated ? null : `${input.goals}/2 gols`,
       },
-      grossBonus: activated ? 2 : 0,
+      grossBonus: gross,
       cap: null,
-      appliedBonus: activated ? 2 : 0,
+      appliedBonus: gross,
       capReached: false,
     };
   }

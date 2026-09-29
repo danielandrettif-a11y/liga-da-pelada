@@ -57,6 +57,12 @@ describe("ranking position bonus", () => {
     })).toBe(1.25);
   });
 
+  it("dá metade do teto ofensivo com um gol e o teto com dois", () => {
+    const roleWeights = [{ role: "ATA" as const, overall: 90, weight: 1 as const }];
+    expect(calculateRankingPositionBonus({ ...stats, goals: 1, roleWeights })).toBe(3.5);
+    expect(calculateRankingPositionBonus({ ...stats, goals: 2, roleWeights })).toBe(7);
+  });
+
   it("ignora pesos persistidos inválidos", () => {
     expect(parseRankingRoleWeights([{ role: "GOL", overall: 99, weight: 1 }, { role: "ATA", overall: 82, weight: 0.5 }])).toEqual([
       { role: "ATA", overall: 82, weight: 0.5 },
