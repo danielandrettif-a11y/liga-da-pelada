@@ -38,6 +38,7 @@ describe("ranking position bonus", () => {
 
     expect(calculateRankingPositionBonus({
       ...stats,
+      goals: 4,
       roleWeights: [{ role: "ATA", overall: 90, weight: 1 }],
     })).toBe(7);
   });
@@ -57,10 +58,12 @@ describe("ranking position bonus", () => {
     })).toBe(1.25);
   });
 
-  it("dá metade do teto ofensivo com um gol e o teto com dois", () => {
+  it("dá dois pontos por gol ao ATA até o teto de sete", () => {
     const roleWeights = [{ role: "ATA" as const, overall: 90, weight: 1 as const }];
-    expect(calculateRankingPositionBonus({ ...stats, goals: 1, roleWeights })).toBe(3.5);
-    expect(calculateRankingPositionBonus({ ...stats, goals: 2, roleWeights })).toBe(7);
+    expect(calculateRankingPositionBonus({ ...stats, goals: 1, roleWeights })).toBe(2);
+    expect(calculateRankingPositionBonus({ ...stats, goals: 2, roleWeights })).toBe(4);
+    expect(calculateRankingPositionBonus({ ...stats, goals: 3, roleWeights })).toBe(6);
+    expect(calculateRankingPositionBonus({ ...stats, goals: 4, roleWeights })).toBe(7);
   });
 
   it("ignora pesos persistidos inválidos", () => {

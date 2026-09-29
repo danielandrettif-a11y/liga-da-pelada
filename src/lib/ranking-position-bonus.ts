@@ -66,6 +66,7 @@ export type RankingPositionBonusInput = Omit<PositionBreakdownInput, "slotRole" 
 export function calculateRankingPositionBonus(input: RankingPositionBonusInput): number {
   const primary = input.roleWeights.find(({ weight }) => weight === 1);
   if (!primary) return 0;
+  if (primary.role === "ATA") return Math.min(Math.max(input.goals, 0) * 2, RANKING_POSITION_TARGET_CAP.ATA);
   const bonus = calculatePositionBonusValue({
     ...input,
     scoringVersion: 11,
