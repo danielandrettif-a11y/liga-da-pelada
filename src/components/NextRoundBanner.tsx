@@ -8,7 +8,9 @@ import {
   Users,
 } from "@/components/icons";
 import { BQTheBestButton } from "@/components/BQTheBestButton";
+import { WeatherBadge } from "@/components/WeatherBadge";
 import type { MonthlyAwardWinner } from "@/lib/monthly-awards";
+import type { EventWeather } from "@/lib/weather";
 
 type NextRound = {
   id: string;
@@ -25,6 +27,7 @@ export function NextRoundBanner({
   isAdmin = false,
   venue,
   eventDurationMinutes = 120,
+  weather,
   awardsPeriodStart,
   awardWinners = [],
 }: {
@@ -32,6 +35,7 @@ export function NextRoundBanner({
   isAdmin?: boolean;
   venue?: { name?: string | null; mapUrl?: string | null } | null;
   eventDurationMinutes?: number;
+  weather?: EventWeather | null;
   awardsPeriodStart: string;
   awardWinners?: MonthlyAwardWinner[];
 }) {
@@ -154,6 +158,8 @@ export function NextRoundBanner({
                 <span className="truncate max-w-[130px]">{venue.name}</span>
               </span>
             )}
+
+            <WeatherBadge weather={weather} />
           </div>
         </div>
 

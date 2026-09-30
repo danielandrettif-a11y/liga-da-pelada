@@ -6,6 +6,7 @@ import { getActiveSeason } from "./seasons";
 import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getCurrentAccount } from "../auth";
+import { getEventWeather } from "../weather";
 
 export async function getDashboardData() {
   try {
@@ -92,7 +93,7 @@ export async function getDashboardData() {
 
     const activeCallupsPromise = readModel ? Promise.resolve({ data: readModel.activeCallups }) : account.client
       .from("callups")
-      .select("id, date, start_time, stadium_name, stadium_map_url, round_type, capacity, waitlist_capacity, callup_entries(player_id, status, position), round:round_id(id, status, matches(status, started_at))")
+      .select("id, date, start_time, stadium_id, stadium_name, stadium_map_url, round_type, capacity, waitlist_capacity, callup_entries(player_id, status, position), round:round_id(id, status, matches(status, started_at))")
       .eq("league_id", season.league_id)
       .in("status", ["open", "locked", "converted"])
       .order("date", { ascending: true })
@@ -132,7 +133,37 @@ export async function getDashboardData() {
       return !hasStartedMatches;
     });
 
-    const mappedCallups = visibleCallups.map((callup: any) => ({
+    const stadiumIds = [...new Set([
+      nextRoundData?.stadium_id,
+      ...visibleCallups.map((callup: any) => callup.stadium_id),
+    ].filter(Boolean))];
+    const { data: stadiumRows } = stadiumIds.length
+      ? await account.client.from("stadiums").select("id, latitude, longitude").in("id", stadiumIds)
+      : { data: [] };
+    const stadiumsById = new Map((stadiumRows || []).map((stadium: any) => [stadium.id, stadium]));
+    const eventDurationMinutes = leagueData?.event_duration_minutes || 120;
+    const roundStadium: any = stadiumsById.get(nextRoundData?.stadium_id);
+    const [roundWeather, ...callupWeather] = await Promise.all([
+      getEventWeather({
+        latitude: roundStadium?.latitude,
+        longitude: roundStadium?.longitude,
+        date: nextRoundData?.date,
+        startTime: nextRoundData?.start_time,
+        durationMinutes: eventDurationMinutes,
+      }),
+      ...visibleCallups.map((callup: any) => {
+        const stadium: any = stadiumsById.get(callup.stadium_id);
+        return getEventWeather({
+          latitude: stadium?.latitude,
+          longitude: stadium?.longitude,
+          date: callup.date,
+          startTime: callup.start_time || "08:00",
+          durationMinutes: eventDurationMinutes,
+        });
+      }),
+    ]);
+
+    const mappedCallups = visibleCallups.map((callup: any, index: number) => ({
       id: callup.id,
       roundId: callup.round?.id || null,
       date: callup.date,
@@ -144,6 +175,7 @@ export async function getDashboardData() {
       waitlistCapacity: callup.waitlist_capacity,
       confirmed: (callup.callup_entries || []).filter((entry: any) => entry.status === "confirmed").length,
       waiting: (callup.callup_entries || []).filter((entry: any) => entry.status === "waitlist").length,
+      weather: callupWeather[index],
       entries: (callup.callup_entries || []).map((entry: any) => ({
         playerId: entry.player_id,
         status: entry.status as "confirmed" | "waitlist",
@@ -206,10 +238,11 @@ export async function getDashboardData() {
         liveMatch: liveMatchData,
         matchDuration: leagueData?.match_duration || 7,
         venue: {
-          name: leagueData?.stadium_name || null,
-          mapUrl: leagueData?.stadium_map_url || null,
+          name: nextRoundData?.stadium_name || leagueData?.stadium_name || null,
+          mapUrl: nextRoundData?.stadium_map_url || leagueData?.stadium_map_url || null,
         },
-        eventDurationMinutes: leagueData?.event_duration_minutes || 120,
+        nextRoundWeather: matchingOfficialCallup?.weather || roundWeather,
+        eventDurationMinutes,
         preseasonEnabled: leagueData?.preseason_enabled === true,
         activeCallup: mappedCallups[0] || null,
         activeCallups: mappedCallups,

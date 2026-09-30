@@ -9,6 +9,8 @@ import {
   Radio,
   Users,
 } from "@/components/icons";
+import { WeatherBadge } from "@/components/WeatherBadge";
+import type { EventWeather } from "@/lib/weather";
 
 export type ActiveCallupData = {
   id: string;
@@ -21,6 +23,7 @@ export type ActiveCallupData = {
   waitlistCapacity: number;
   confirmed: number;
   waiting: number;
+  weather?: EventWeather | null;
 };
 
 export type UserCallupEntry = {
@@ -151,6 +154,8 @@ export function OpenCallupBanner({
             )}
           </div>
         )}
+
+        <WeatherBadge weather={callup.weather} />
 
         {/* Barra de Status e indicação única de navegação */}
         <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-t border-white/10 pt-3">

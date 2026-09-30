@@ -142,7 +142,7 @@ export default async function HomePage() {
     );
   }
 
-  const { nextRound, nextFriendly, preseasonEnabled, activeCallups = [], liveMatch, matchDuration, venue, eventDurationMinutes, lastRound, rankingPreview, highlights } = data;
+  const { nextRound, nextFriendly, preseasonEnabled, activeCallups = [], liveMatch, matchDuration, venue, nextRoundWeather, eventDurationMinutes, lastRound, rankingPreview, highlights } = data;
 
   const currentPlayerId = account.profile?.player_id || null;
 
@@ -184,6 +184,7 @@ export default async function HomePage() {
               isAdmin={account.isAdmin}
               venue={venue}
               eventDurationMinutes={eventDurationMinutes}
+              weather={nextRoundWeather}
               awardsPeriodStart={monthlyAwards.periodStart}
               awardWinners={monthlyAwards.winners}
             />

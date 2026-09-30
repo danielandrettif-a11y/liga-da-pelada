@@ -34,12 +34,16 @@ export function StadiumsManager({ initialStadiums }: { initialStadiums: Stadium[
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [googleMapsUrl, setGoogleMapsUrl] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
 
   function openCreate() {
     setEditingStadium(null);
     setName("");
     setAddress("");
     setGoogleMapsUrl("");
+    setLatitude("");
+    setLongitude("");
     setIsCreating(true);
     setError("");
     setSuccess("");
@@ -51,6 +55,8 @@ export function StadiumsManager({ initialStadiums }: { initialStadiums: Stadium[
     setName(stadium.name);
     setAddress(stadium.address || "");
     setGoogleMapsUrl(stadium.google_maps_url);
+    setLatitude(stadium.latitude?.toString() || "");
+    setLongitude(stadium.longitude?.toString() || "");
     setError("");
     setSuccess("");
   }
@@ -61,6 +67,8 @@ export function StadiumsManager({ initialStadiums }: { initialStadiums: Stadium[
     setName("");
     setAddress("");
     setGoogleMapsUrl("");
+    setLatitude("");
+    setLongitude("");
     setError("");
   }
 
@@ -77,6 +85,8 @@ export function StadiumsManager({ initialStadiums }: { initialStadiums: Stadium[
     formData.set("name", name);
     formData.set("address", address);
     formData.set("google_maps_url", googleMapsUrl);
+    formData.set("latitude", latitude);
+    formData.set("longitude", longitude);
 
     const result = await saveStadium(formData);
     if (!result.success) {
@@ -227,6 +237,39 @@ export function StadiumsManager({ initialStadiums }: { initialStadiums: Stadium[
               />
               <p className="text-[10px] text-muted leading-relaxed">
                 Cole o link de compartilhamento do Google Maps. Os jogadores poderão clicar para abrir a rota no GPS.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-muted uppercase tracking-wider">
+                Coordenadas para previsão do tempo
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  step="any"
+                  min={-90}
+                  max={90}
+                  value={latitude}
+                  onChange={(e) => setLatitude(e.target.value)}
+                  placeholder="Latitude"
+                  aria-label="Latitude do estádio"
+                  className="min-w-0 rounded-xl border border-border bg-surface-hover px-4 py-3 text-sm text-foreground focus:border-accent focus:outline-none"
+                />
+                <input
+                  type="number"
+                  step="any"
+                  min={-180}
+                  max={180}
+                  value={longitude}
+                  onChange={(e) => setLongitude(e.target.value)}
+                  placeholder="Longitude"
+                  aria-label="Longitude do estádio"
+                  className="min-w-0 rounded-xl border border-border bg-surface-hover px-4 py-3 text-sm text-foreground focus:border-accent focus:outline-none"
+                />
+              </div>
+              <p className="text-[10px] text-muted leading-relaxed">
+                No Google Maps, clique com o botão direito no campo para copiar latitude e longitude. Informe ambas para ativar a previsão.
               </p>
             </div>
 

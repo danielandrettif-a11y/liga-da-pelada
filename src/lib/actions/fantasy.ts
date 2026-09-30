@@ -1004,10 +1004,10 @@ export async function getFantasyDashboard() {
       return sumB - sumA;
     });
   const sortedByBought = [...market]
-    .filter((p) => popularityAgg.hasComparableSample && p.marketShareDelta > 0)
+    .filter((p) => popularityAgg.hasComparableSample && p.selectionCount > 0 && p.previousSelectionCount > 0 && p.marketShareDelta > 0)
     .sort((a, b) => b.marketShareDelta - a.marketShareDelta || b.selectionCount - a.selectionCount);
   const sortedBySold = [...market]
-    .filter((p) => popularityAgg.hasComparableSample && p.marketShareDelta < 0)
+    .filter((p) => popularityAgg.hasComparableSample && p.selectionCount > 0 && p.previousSelectionCount > 0 && p.marketShareDelta < 0)
     .sort((a, b) => a.marketShareDelta - b.marketShareDelta || a.selectionCount - b.selectionCount);
 
   const marketById = new Map(market.map((player) => [player.id, player] as const));

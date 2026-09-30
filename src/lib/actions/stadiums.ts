@@ -42,6 +42,10 @@ export async function saveStadium(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const address = String(formData.get("address") || "").trim() || null;
   let googleMapsUrl = String(formData.get("google_maps_url") || "").trim();
+  const latitudeText = String(formData.get("latitude") || "").trim();
+  const longitudeText = String(formData.get("longitude") || "").trim();
+  const latitude = latitudeText ? Number(latitudeText) : null;
+  const longitude = longitudeText ? Number(longitudeText) : null;
 
   if (!name) {
     return { success: false, error: "Informe o nome do estádio/campo." };
@@ -49,6 +53,18 @@ export async function saveStadium(formData: FormData) {
 
   if (!googleMapsUrl) {
     return { success: false, error: "Informe o link do Google Maps para localização." };
+  }
+
+  if ((latitude === null) !== (longitude === null)) {
+    return { success: false, error: "Informe latitude e longitude juntas para ativar a previsão do tempo." };
+  }
+
+  if (
+    latitude !== null && longitude !== null
+    && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
+      || !Number.isFinite(longitude) || longitude < -180 || longitude > 180)
+  ) {
+    return { success: false, error: "Latitude ou longitude inválida." };
   }
 
   if (!googleMapsUrl.startsWith("http://") && !googleMapsUrl.startsWith("https://")) {
@@ -63,6 +79,8 @@ export async function saveStadium(formData: FormData) {
           name,
           address,
           google_maps_url: googleMapsUrl,
+          latitude,
+          longitude,
           updated_at: new Date().toISOString(),
         })
         .eq("id", id)
@@ -86,6 +104,8 @@ export async function saveStadium(formData: FormData) {
         name,
         address,
         google_maps_url: googleMapsUrl,
+        latitude,
+        longitude,
         display_order: nextOrder,
         is_active: true,
       });

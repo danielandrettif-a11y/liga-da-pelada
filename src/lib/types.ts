@@ -113,6 +113,8 @@ export type Stadium = {
   name: string;
   address: string | null;
   google_maps_url: string;
+  latitude: number | null;
+  longitude: number | null;
   display_order: number;
   is_active: boolean;
   created_at: string;
