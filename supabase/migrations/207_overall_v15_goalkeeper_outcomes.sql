@@ -22,7 +22,8 @@ VALUES (
     'prioritizedTraitProgression', true, 'prioritizedTraitsAsEvidenceOnly', true,
     'traitProgressionWeights', jsonb_build_object('primary', 1, 'secondary', 0.6, 'unselected', 0.2),
     'playedRoleEvidenceEnabled', true,
-    'topThreeOverall', true, 'performanceChangeBonus', 0.03,
+    'topThreeOverall', true, 'performanceChangeBonus', 0.03
+  ) || jsonb_build_object(
     'hardPositionCapsEnabled', false, 'provisionalAtConfidenceThreshold', false,
     'defensiveWeights', jsonb_build_object('concededRate', 0.50, 'survival', 0.35, 'exposure', 0.10, 'discipline', 0.05),
     'legacyTimingConfidence', 0.75, 'assistValue', 0.65,
