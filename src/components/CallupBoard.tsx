@@ -54,6 +54,8 @@ import Image from "next/image";
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
 import { useUrlState } from "@/lib/useUrlState";
 import { hasCallupClosingMatch } from "@/lib/callup-lifecycle";
+import { WeatherBadge } from "./WeatherBadge";
+import type { EventWeather } from "@/lib/weather";
 
 type Props = {
   callup: CallupWithEntries;
@@ -68,6 +70,7 @@ type Props = {
   fantasyHighlights?: FantasyQuickHighlight | null;
   playerCosmetics?: Record<string, EquippedCosmeticsSummary>;
   initialListTab?: "confirmed" | "waitlist";
+  weather?: EventWeather | null;
 };
 const CALLUP_LIST_TABS = ["confirmed", "waitlist"] as const;
 
@@ -84,6 +87,7 @@ export function CallupBoard({
   fantasyHighlights,
   playerCosmetics = {},
   initialListTab = "confirmed",
+  weather,
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState("");
@@ -347,6 +351,7 @@ export function CallupBoard({
               </span>
             )
           )}
+          <WeatherBadge weather={weather} locationName={stadiumName} />
         </div>
 
         {hasDrawnTeams && callup.round_id && (

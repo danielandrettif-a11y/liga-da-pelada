@@ -17,6 +17,7 @@ import { DraftBoard } from "@/components/DraftBoard";
 import { CollectiveRoom } from "@/components/CollectiveRoom";
 import { CollectiveNavLink } from "@/components/CollectiveNavLink";
 import { Flag, Sparkles } from "@/components/icons";
+import { getEventWeather } from "@/lib/weather";
 
 export const revalidate = 0;
 
@@ -109,6 +110,14 @@ export default async function ConvocacaoPage({
   const selectablePlayers = account.user ? await getSelectableLeaguePlayers(callup.league_id) : [];
   const stadiumName = callup.stadium_name || leagueConfig?.stadium_name || null;
   const stadiumMapUrl = callup.stadium_map_url || leagueConfig?.stadium_map_url || null;
+  const stadium = stadiums.find((item) => item.id === callup.stadium_id);
+  const weather = await getEventWeather({
+    latitude: stadium?.latitude,
+    longitude: stadium?.longitude,
+    date: callup.date,
+    startTime: callup.start_time || "08:00",
+    durationMinutes: leagueConfig?.event_duration_minutes || 120,
+  });
 
   return (
     <div className="min-w-0 overflow-x-clip">
@@ -153,6 +162,7 @@ export default async function ConvocacaoPage({
         fantasyHighlights={fantasyHighlights}
         playerCosmetics={Object.fromEntries(cosmeticsMap)}
         initialListTab={params.list === "waitlist" ? "waitlist" : "confirmed"}
+        weather={weather}
       />
       )}
     </div>

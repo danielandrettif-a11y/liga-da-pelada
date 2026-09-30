@@ -159,7 +159,7 @@ export function NextRoundBanner({
               </span>
             )}
 
-            <WeatherBadge weather={weather} />
+            <WeatherBadge weather={weather} locationName={venue?.name} />
           </div>
         </div>
 

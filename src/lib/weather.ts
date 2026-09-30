@@ -4,6 +4,16 @@ export type EventWeather = {
   precipitationProbability: number | null;
   precipitationMm: number;
   label: string;
+  forecast?: WeatherForecastDay[];
+};
+
+export type WeatherForecastDay = {
+  date: string;
+  precipitationProbability: number | null;
+  precipitationMm: number;
+  temperatureMin: number | null;
+  temperatureMax: number | null;
+  label: string;
 };
 
 type OpenMeteoHourly = {
@@ -11,6 +21,22 @@ type OpenMeteoHourly = {
   precipitation_probability?: Array<number | null>;
   precipitation?: Array<number | null>;
 };
+
+type OpenMeteoDaily = {
+  time?: string[];
+  precipitation_probability_max?: Array<number | null>;
+  precipitation_sum?: Array<number | null>;
+  temperature_2m_min?: Array<number | null>;
+  temperature_2m_max?: Array<number | null>;
+};
+
+function rainLabel(probability: number | null, precipitationMm: number) {
+  return precipitationMm >= 5 || (probability ?? 0) >= 70
+    ? "Chuva provável"
+    : precipitationMm > 0 || (probability ?? 0) >= 30
+      ? "Pode chover"
+      : "Sem chuva prevista";
+}
 
 export function summarizeEventWeather(
   hourly: OpenMeteoHourly,
@@ -36,13 +62,24 @@ export function summarizeEventWeather(
     0,
   ) * 10) / 10;
   const precipitationProbability = probabilities.length ? Math.max(...probabilities) : null;
-  const label = precipitationMm >= 5 || (precipitationProbability ?? 0) >= 70
-    ? "Chuva provável"
-    : precipitationMm > 0 || (precipitationProbability ?? 0) >= 30
-      ? "Pode chover"
-      : "Sem chuva prevista";
+  const label = rainLabel(precipitationProbability, precipitationMm);
 
   return { precipitationProbability, precipitationMm, label };
+}
+
+export function summarizeWeeklyForecast(daily: OpenMeteoDaily): WeatherForecastDay[] {
+  return (daily.time || []).slice(0, 7).map((date, index) => {
+    const precipitationProbability = daily.precipitation_probability_max?.[index] ?? null;
+    const precipitationMm = Math.round((daily.precipitation_sum?.[index] || 0) * 10) / 10;
+    return {
+      date,
+      precipitationProbability,
+      precipitationMm,
+      temperatureMin: daily.temperature_2m_min?.[index] ?? null,
+      temperatureMax: daily.temperature_2m_max?.[index] ?? null,
+      label: rainLabel(precipitationProbability, precipitationMm),
+    };
+  });
 }
 
 const getCachedEventWeather = unstable_cache(async (
@@ -74,6 +111,28 @@ const getCachedEventWeather = unstable_cache(async (
   }
 }, ["open-meteo-event-weather"], { revalidate: 1800 });
 
+const getCachedWeeklyForecast = unstable_cache(async (latitude: number, longitude: number) => {
+  const query = new URLSearchParams({
+    latitude: String(latitude),
+    longitude: String(longitude),
+    daily: "temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum",
+    timezone: "America/Sao_Paulo",
+    forecast_days: "7",
+  });
+
+  try {
+    const response = await fetch(`https://api.open-meteo.com/v1/forecast?${query}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) return [];
+    const data = await response.json() as { daily?: OpenMeteoDaily };
+    return data.daily ? summarizeWeeklyForecast(data.daily) : [];
+  } catch {
+    return [];
+  }
+}, ["open-meteo-weekly-weather"], { revalidate: 1800 });
+
 export async function getEventWeather(input: {
   latitude?: number | null;
   longitude?: number | null;
@@ -88,6 +147,10 @@ export async function getEventWeather(input: {
     || !Number.isFinite(longitude) || longitude < -180 || longitude > 180
   ) return null;
 
-  return getCachedEventWeather(latitude, longitude, date, startTime, input.durationMinutes || 120);
+  const [weather, forecast] = await Promise.all([
+    getCachedEventWeather(latitude, longitude, date, startTime, input.durationMinutes || 120),
+    getCachedWeeklyForecast(latitude, longitude),
+  ]);
+  return weather ? { ...weather, forecast } : null;
 }
 
