@@ -6,45 +6,67 @@ INSERT INTO public.overall_formula_versions (key, label, config)
 VALUES (
   'adaptive-v15-goalkeeper-outcomes',
   'OVR adaptativo v15 — resultados de goleiro',
-  jsonb_build_object(
-    'base', 70, 'legacyInitialTagBonus', 3, 'legacySeedEnabled', false,
-    'seedFadeRounds', 3, 'confidenceRounds', 3,
-    'goalkeeperEligibilityRounds', 3, 'goalkeeperEligibilityGames', 8,
-    'goalkeeperConfidenceRounds', 6, 'goalkeeperMaxChangePerRound', 0.8,
-    'goalkeeperOutcomeScoring', true,
-    'goalkeeperWeights', jsonb_build_object('conceded', 0.60, 'cleanSheet', 0.25, 'survival', 0.10, 'discipline', 0.05),
-    'positionCaps', jsonb_build_object('1', 74, '2', 76, '3', 78),
-    'staleAfterRounds', 4, 'halfLifeRounds', 3, 'recentRoundWindow', 8,
-    'maxChangePerRound', 1.5, 'weeklyEvidenceCap', true,
-    'traitWeightedChange', false, 'traitBasedOverall', false,
-    'overallConfidenceShrink', false, 'rankedTraitOverall', false,
-    'traitsAsProgressionBonus', false, 'traitProgressionBonusBudget', 0.30,
-    'prioritizedTraitProgression', true, 'prioritizedTraitsAsEvidenceOnly', true,
-    'traitProgressionWeights', jsonb_build_object('primary', 1, 'secondary', 0.6, 'unselected', 0.2),
-    'playedRoleEvidenceEnabled', true,
-    'topThreeOverall', true, 'performanceChangeBonus', 0.03
-  ) || jsonb_build_object(
-    'hardPositionCapsEnabled', false, 'provisionalAtConfidenceThreshold', false,
-    'defensiveWeights', jsonb_build_object('concededRate', 0.50, 'survival', 0.35, 'exposure', 0.10, 'discipline', 0.05),
-    'legacyTimingConfidence', 0.75, 'assistValue', 0.65,
-    'attackRatesByPlayingTime', true, 'attackCurve', 2.7,
-    'separateAttackScores', true, 'goalCurve', 3, 'assistCurve', 2.4,
-    'positionWeights', jsonb_build_object(
-      'DEF', jsonb_build_object('defense', 0.70, 'goals', 0.05, 'assists', 0.15, 'result', 0.10),
-      'ALA_MEI', jsonb_build_object('defense', 0.30, 'goals', 0.25, 'assists', 0.35, 'result', 0.10),
-      'ATA', jsonb_build_object('defense', 0.05, 'goals', 0.55, 'assists', 0.30, 'result', 0.10)
-    ),
-    'roleEvidence', jsonb_build_object(
-      'DEF', jsonb_build_object('DEF', 1, 'ALA_MEI', 0.5, 'ATA', 0.2),
-      'ALA_MEI', jsonb_build_object('DEF', 0.5, 'ALA_MEI', 1, 'ATA', 0.5),
-      'ATA', jsonb_build_object('DEF', 0.2, 'ALA_MEI', 0.5, 'ATA', 1)
-    ),
-    'unassignedRoleEvidence', jsonb_build_object('DEF', 0.4, 'ALA_MEI', 0.55, 'ATA', 0.4),
-    'unselectedTraitEvidence', 0.2,
-    'trendEnabled', true, 'trendWindowRounds', 3, 'trendMinimumRounds', 3,
-    'trendRequiredRounds', 2, 'trendHighScore', 0.56, 'trendLowScore', 0.42,
-    'trendUpwardMultiplier', 0.20, 'trendDownwardMultiplier', 0.30
-  )
+  $config${
+    "base": 70,
+    "legacyInitialTagBonus": 3,
+    "legacySeedEnabled": false,
+    "seedFadeRounds": 3,
+    "confidenceRounds": 3,
+    "goalkeeperEligibilityRounds": 3,
+    "goalkeeperEligibilityGames": 8,
+    "goalkeeperConfidenceRounds": 6,
+    "goalkeeperMaxChangePerRound": 0.8,
+    "goalkeeperOutcomeScoring": true,
+    "goalkeeperWeights": { "conceded": 0.60, "cleanSheet": 0.25, "survival": 0.10, "discipline": 0.05 },
+    "positionCaps": { "1": 74, "2": 76, "3": 78 },
+    "staleAfterRounds": 4,
+    "halfLifeRounds": 3,
+    "recentRoundWindow": 8,
+    "maxChangePerRound": 1.5,
+    "weeklyEvidenceCap": true,
+    "traitWeightedChange": false,
+    "traitBasedOverall": false,
+    "overallConfidenceShrink": false,
+    "rankedTraitOverall": false,
+    "traitsAsProgressionBonus": false,
+    "traitProgressionBonusBudget": 0.30,
+    "prioritizedTraitProgression": true,
+    "prioritizedTraitsAsEvidenceOnly": true,
+    "traitProgressionWeights": { "primary": 1, "secondary": 0.6, "unselected": 0.2 },
+    "playedRoleEvidenceEnabled": true,
+    "topThreeOverall": true,
+    "performanceChangeBonus": 0.03,
+    "hardPositionCapsEnabled": false,
+    "provisionalAtConfidenceThreshold": false,
+    "defensiveWeights": { "concededRate": 0.50, "survival": 0.35, "exposure": 0.10, "discipline": 0.05 },
+    "legacyTimingConfidence": 0.75,
+    "assistValue": 0.65,
+    "attackRatesByPlayingTime": true,
+    "attackCurve": 2.7,
+    "separateAttackScores": true,
+    "goalCurve": 3,
+    "assistCurve": 2.4,
+    "positionWeights": {
+      "DEF": { "defense": 0.70, "goals": 0.05, "assists": 0.15, "result": 0.10 },
+      "ALA_MEI": { "defense": 0.30, "goals": 0.25, "assists": 0.35, "result": 0.10 },
+      "ATA": { "defense": 0.05, "goals": 0.55, "assists": 0.30, "result": 0.10 }
+    },
+    "roleEvidence": {
+      "DEF": { "DEF": 1, "ALA_MEI": 0.5, "ATA": 0.2 },
+      "ALA_MEI": { "DEF": 0.5, "ALA_MEI": 1, "ATA": 0.5 },
+      "ATA": { "DEF": 0.2, "ALA_MEI": 0.5, "ATA": 1 }
+    },
+    "unassignedRoleEvidence": { "DEF": 0.4, "ALA_MEI": 0.55, "ATA": 0.4 },
+    "unselectedTraitEvidence": 0.2,
+    "trendEnabled": true,
+    "trendWindowRounds": 3,
+    "trendMinimumRounds": 3,
+    "trendRequiredRounds": 2,
+    "trendHighScore": 0.56,
+    "trendLowScore": 0.42,
+    "trendUpwardMultiplier": 0.20,
+    "trendDownwardMultiplier": 0.30
+  }$config$::jsonb
 )
 ON CONFLICT (key) DO UPDATE SET label = EXCLUDED.label, config = EXCLUDED.config;
 
