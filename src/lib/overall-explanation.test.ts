@@ -40,9 +40,10 @@ describe("getOverallComposition", () => {
     expect(getOverallComposition([], positions)?.value).toBe(71.7);
   });
 
-  it("inclui GOL entre as três melhores somente depois de oito jogos", () => {
+  it("inclui GOL entre as três melhores somente depois de oito jogos em três rodadas", () => {
     const result = getOverallComposition(["defensive"], { ...positions, GOL: 76.4 }, {
       goalkeeperGames: 8,
+      goalkeeperRounds: 3,
     });
 
     expect(result).toMatchObject({
@@ -60,15 +61,16 @@ describe("getOverallComposition", () => {
       { DEF: 90, ALA_MEI: 80, ATA: 75, GOL: 70 },
     ];
     for (const values of variants) {
-      const result = getOverallComposition([], values, { goalkeeperGames: 8 });
+      const result = getOverallComposition([], values, { goalkeeperGames: 8, goalkeeperRounds: 3 });
       expect(result?.items.map((item) => item.value)).toEqual([90, 80, 75]);
       expect(result?.value).toBe(84.3);
     }
   });
 
-  it("mantém GOL fora no sétimo jogo e libera exatamente no oitavo", () => {
+  it("exige oito jogos e três rodadas para liberar GOL", () => {
     const values = { DEF: 72, ALA_MEI: 71, ATA: 70, GOL: 90 };
-    expect(getOverallComposition([], values, { goalkeeperGames: 7 })?.items.map((item) => item.role)).toEqual(["DEF", "ALA_MEI", "ATA"]);
-    expect(getOverallComposition([], values, { goalkeeperGames: 8 })?.items.map((item) => item.role)).toEqual(["GOL", "DEF", "ALA_MEI"]);
+    expect(getOverallComposition([], values, { goalkeeperGames: 7, goalkeeperRounds: 3 })?.items.map((item) => item.role)).toEqual(["DEF", "ALA_MEI", "ATA"]);
+    expect(getOverallComposition([], values, { goalkeeperGames: 8, goalkeeperRounds: 2 })?.items.map((item) => item.role)).toEqual(["DEF", "ALA_MEI", "ATA"]);
+    expect(getOverallComposition([], values, { goalkeeperGames: 8, goalkeeperRounds: 3 })?.items.map((item) => item.role)).toEqual(["GOL", "DEF", "ALA_MEI"]);
   });
 });

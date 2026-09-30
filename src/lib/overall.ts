@@ -17,6 +17,15 @@ export type OverallFormulaConfig = {
   confidenceRounds: number;
   goalkeeperEligibilityRounds: number;
   goalkeeperEligibilityGames: number;
+  goalkeeperConfidenceRounds: number;
+  goalkeeperMaxChangePerRound: number;
+  goalkeeperOutcomeScoring: boolean;
+  goalkeeperWeights: {
+    conceded: number;
+    cleanSheet: number;
+    survival: number;
+    discipline: number;
+  };
   positionCaps: Record<"1" | "2" | "3", number>;
   staleAfterRounds: number;
   halfLifeRounds: number;
@@ -100,6 +109,10 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   confidenceRounds: 3,
   goalkeeperEligibilityRounds: 3,
   goalkeeperEligibilityGames: 8,
+  goalkeeperConfidenceRounds: 6,
+  goalkeeperMaxChangePerRound: 0.8,
+  goalkeeperOutcomeScoring: false,
+  goalkeeperWeights: { conceded: 0.6, cleanSheet: 0.25, survival: 0.1, discipline: 0.05 },
   positionCaps: { "1": 74, "2": 76, "3": 78 },
   staleAfterRounds: 4,
   halfLifeRounds: 3,
@@ -163,6 +176,9 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
   const defensiveWeights = candidate.defensiveWeights && typeof candidate.defensiveWeights === "object"
     ? candidate.defensiveWeights as Record<string, unknown>
     : {};
+  const goalkeeperWeights = candidate.goalkeeperWeights && typeof candidate.goalkeeperWeights === "object"
+    ? candidate.goalkeeperWeights as Record<string, unknown>
+    : {};
   const positionWeights = candidate.positionWeights && typeof candidate.positionWeights === "object"
     ? candidate.positionWeights as Record<string, unknown>
     : {};
@@ -190,6 +206,13 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
   };
+  const rawGoalkeeperWeights = {
+    conceded: bounded(goalkeeperWeights.conceded, DEFAULT_OVERALL_FORMULA.goalkeeperWeights.conceded),
+    cleanSheet: bounded(goalkeeperWeights.cleanSheet, DEFAULT_OVERALL_FORMULA.goalkeeperWeights.cleanSheet),
+    survival: bounded(goalkeeperWeights.survival, DEFAULT_OVERALL_FORMULA.goalkeeperWeights.survival),
+    discipline: bounded(goalkeeperWeights.discipline, DEFAULT_OVERALL_FORMULA.goalkeeperWeights.discipline),
+  };
+  const totalGoalkeeperWeight = Object.values(rawGoalkeeperWeights).reduce((total, item) => total + item, 0) || 1;
   const wholeNumber = (value: unknown, fallback: number, minimum: number, maximum: number) => (
     clamp(Math.round(bounded(value, fallback)), minimum, maximum)
   );
@@ -239,6 +262,15 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     confidenceRounds: number("confidenceRounds", DEFAULT_OVERALL_FORMULA.confidenceRounds),
     goalkeeperEligibilityRounds: number("goalkeeperEligibilityRounds", DEFAULT_OVERALL_FORMULA.goalkeeperEligibilityRounds),
     goalkeeperEligibilityGames: number("goalkeeperEligibilityGames", DEFAULT_OVERALL_FORMULA.goalkeeperEligibilityGames),
+    goalkeeperConfidenceRounds: number("goalkeeperConfidenceRounds", DEFAULT_OVERALL_FORMULA.goalkeeperConfidenceRounds),
+    goalkeeperMaxChangePerRound: number("goalkeeperMaxChangePerRound", DEFAULT_OVERALL_FORMULA.goalkeeperMaxChangePerRound),
+    goalkeeperOutcomeScoring: candidate.goalkeeperOutcomeScoring === true,
+    goalkeeperWeights: {
+      conceded: rawGoalkeeperWeights.conceded / totalGoalkeeperWeight,
+      cleanSheet: rawGoalkeeperWeights.cleanSheet / totalGoalkeeperWeight,
+      survival: rawGoalkeeperWeights.survival / totalGoalkeeperWeight,
+      discipline: rawGoalkeeperWeights.discipline / totalGoalkeeperWeight,
+    },
     positionCaps: {
       "1": Number(positionCaps["1"]) || DEFAULT_OVERALL_FORMULA.positionCaps["1"],
       "2": Number(positionCaps["2"]) || DEFAULT_OVERALL_FORMULA.positionCaps["2"],
@@ -591,6 +623,12 @@ function calculateRoundScores(appearances: OverallAppearance[], config: OverallF
   return { attackingScore, goalScore, assistScore, collectiveScore: resultAverage, totals };
 }
 
+function goalkeeperConcededScore(concededRate: number) {
+  if (concededRate <= 1) return 1 - concededRate * 0.45;
+  if (concededRate <= 2) return 0.55 - (concededRate - 1) * 0.35;
+  return Math.max(0, 0.2 - (concededRate - 2) * 0.2);
+}
+
 function calculateMatchScore(
   role: OverallRole,
   player: OverallPlayer,
@@ -615,6 +653,18 @@ function calculateMatchScore(
       ? clamp(Number(firstConcededSecond) / Math.max(seconds, 1), 0, 1)
       : conceded === 1 ? 0.5 : 0;
   const exposureScore = clamp(seconds / Math.max(appearance.matchSeconds || MAX_MATCH_SECONDS, 1), 0, 1);
+  const defensiveQuality = appearance.goalTimingQuality === "exact" ? 1 : config.legacyTimingConfidence;
+  if (role === "GOL" && config.goalkeeperOutcomeScoring) {
+    const goalkeeperScore = clamp(
+      goalkeeperConcededScore(concededRate) * config.goalkeeperWeights.conceded
+        + (conceded === 0 ? 1 : 0) * config.goalkeeperWeights.cleanSheet
+        + survival * config.goalkeeperWeights.survival
+        + (ownGoals === 0 ? 1 : 0) * config.goalkeeperWeights.discipline,
+      0,
+      1,
+    );
+    return { score: goalkeeperScore, defensiveScore: goalkeeperScore, evidenceWeight: defensiveQuality };
+  }
   const defensive = clamp(
     rateImpact * config.defensiveWeights.concededRate
       + survival * config.defensiveWeights.survival
@@ -624,7 +674,6 @@ function calculateMatchScore(
     1,
   );
   const attacking = roundScores.attackingScore;
-  const defensiveQuality = appearance.goalTimingQuality === "exact" ? 1 : config.legacyTimingConfidence;
 
   // O goleiro é lido exclusivamente pela proteção do gol. Gols ou assistências
   // não mudam essa posição, mesmo se ele participar da jogada ofensiva.
@@ -701,8 +750,11 @@ function positionEstimate(
     : 0.5;
   // O decaimento temporal escolhe quais atuações pesam mais na nota, mas não
   // apaga a quantidade de evidência já coletada dentro da janela recente.
-  const exposureConfidence = clamp(totalConfidenceWeight / config.confidenceRounds, 0, 1);
-  const roundConfidence = clamp(validRounds / config.confidenceRounds, 0, 1);
+  const confidenceRounds = role === "GOL" && config.goalkeeperOutcomeScoring
+    ? config.goalkeeperConfidenceRounds
+    : config.confidenceRounds;
+  const exposureConfidence = clamp(totalConfidenceWeight / confidenceRounds, 0, 1);
+  const roundConfidence = clamp(validRounds / confidenceRounds, 0, 1);
   const confidence = Math.sqrt(exposureConfidence * roundConfidence);
   const seedBonus = config.legacySeedEnabled && player.overallSeedMode === "legacy_tag" && profileRole(player.playerProfile) === role
     // Em uma pelada semanal, três rodadas já cobrem quase um mês. Nesse
@@ -766,9 +818,9 @@ function calculateLineOverall(player: OverallPlayer, values: Record<OverallRole,
     : lineValues[0] * 0.7 + lineValues[1] * 0.3;
 }
 
-function generalOverallItems(values: Record<OverallRole, number>, goalkeeperGames: number, config: OverallFormulaConfig) {
+function generalOverallItems(values: Record<OverallRole, number>, goalkeeperRounds: number, goalkeeperGames: number, config: OverallFormulaConfig) {
   const roles: OverallRole[] = ["DEF", "ALA_MEI", "ATA"];
-  if (goalkeeperGames >= config.goalkeeperEligibilityGames) roles.push("GOL");
+  if (goalkeeperGames >= config.goalkeeperEligibilityGames && goalkeeperRounds >= config.goalkeeperEligibilityRounds) roles.push("GOL");
   return roles
     .map((role) => ({ role, value: values[role] }))
     .sort((left, right) => right.value - left.value)
@@ -784,7 +836,7 @@ function overallTrend(
   config: OverallFormulaConfig,
 ) {
   if (config.topThreeOverall) {
-    const score = generalOverallItems(values, goalkeeperGames, config).reduce((total, item, index) => {
+    const score = generalOverallItems(values, goalkeeperRounds, goalkeeperGames, config).reduce((total, item, index) => {
       const direction = positionTrends[item.role] === "rising" ? 1 : positionTrends[item.role] === "falling" ? -1 : 0;
       return total + direction * [0.5, 0.35, 0.15][index];
     }, 0);
@@ -807,7 +859,7 @@ function overallTrend(
 
 function calculateGeneral(player: OverallPlayer, values: Record<OverallRole, number>, goalkeeperRounds: number, goalkeeperGames: number, confidence: number, config: OverallFormulaConfig) {
   if (config.topThreeOverall) {
-    const rawOverall = generalOverallItems(values, goalkeeperGames, config)
+    const rawOverall = generalOverallItems(values, goalkeeperRounds, goalkeeperGames, config)
       .reduce((total, item, index) => total + item.value * [0.5, 0.35, 0.15][index], 0);
     return roundOverall(config.overallConfidenceShrink
       ? config.base + (rawOverall - config.base) * confidence
@@ -924,6 +976,7 @@ export function calculatePlayerOveralls(
       const player = playerById.get(playerId)!;
       const state = stateByPlayerId.get(playerId)!;
       const roundScores = calculateRoundScores(appearances, formula);
+      const playedGoalkeeperThisRound = appearances.some((appearance) => appearance.isGoalkeeper);
       let defensiveTotal = 0;
       let defensiveWeight = 0;
       let timingQuality: GoalTimingQuality = "exact";
@@ -969,6 +1022,7 @@ export function calculatePlayerOveralls(
       state.lastRoundIndex = roundIndex;
 
       for (const role of ROLES) {
+        if (role === "GOL" && formula.goalkeeperOutcomeScoring && !playedGoalkeeperThisRound) continue;
         const estimate = positionEstimate(player, state, role, roundIndex, formula);
         const previous = state.values[role];
         const changeScale = formula.traitWeightedChange
@@ -983,6 +1037,9 @@ export function calculatePlayerOveralls(
           maximumChange *= 1 + formula.trendUpwardMultiplier;
         } else if (estimate.target < previous && positionForm === "falling") {
           maximumChange *= 1 + formula.trendDownwardMultiplier;
+        }
+        if (role === "GOL" && formula.goalkeeperOutcomeScoring) {
+          maximumChange = Math.min(maximumChange, formula.goalkeeperMaxChangePerRound);
         }
         const upperLimit = formula.hardPositionCapsEnabled
           ? provisionalPositionCap(estimate.validRounds, formula) - estimate.seedBonus

@@ -5,8 +5,8 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import { calculatePlayerOveralls, parseOverallFormulaConfig, type OverallPlayer, type OverallRole } from "../overall";
 import { buildOverallHistoryInput } from "../overall-history";
 
-const FORMULA_KEY = "adaptive-v14-role-adjusted-rates";
-const COMPARISON_FORMULA_KEY = "adaptive-v13-admin-style-evidence";
+const FORMULA_KEY = "adaptive-v15-goalkeeper-outcomes";
+const COMPARISON_FORMULA_KEY = "adaptive-v14-role-adjusted-rates";
 
 function numberValue(value: unknown) {
   const result = Number(value || 0);
@@ -41,7 +41,7 @@ async function loadOverallHistory(client: any) {
     .map((member: any) => Array.isArray(member.players) ? member.players[0] : member.players)
     .filter((player: any) => player?.is_selectable && player.member_category === "player")
     .map((player: any) => ({ id: player.id, name: player.name || "Jogador", playerProfile: player.player_profile, overallTraits: Array.isArray(player.overall_traits) ? player.overall_traits : [], overallSeedMode: player.overall_seed_mode, isGoalkeeper: Boolean(player.is_goalkeeper) }));
-  // A v14 depende da prioridade definida pelo ADM. Perfis sem estilo ou com
+  // A v15 mantém a prioridade definida pelo ADM. Perfis sem estilo ou com
   // três tags legadas ficam pendentes até a revisão principal/secundária.
   const pendingPlayers = officialPlayers
     .filter((player) => (player.overallTraits || []).length < 1 || (player.overallTraits || []).length > 2)
@@ -144,7 +144,7 @@ export async function recalculateOverallShadow() {
   let runId: string | null = null;
   try {
     const { data: formula, error: formulaError } = await database.from("overall_formula_versions").select("id, config").eq("key", FORMULA_KEY).single();
-    if (formulaError || !formula) throw new Error("A fórmula v14 não foi encontrada. Confirme a migration 202.");
+    if (formulaError || !formula) throw new Error("A fórmula v15 não foi encontrada. Confirme a migration 207.");
     const source = await loadOverallHistory(database);
     const latestRound = [...source.rounds].filter((round) => round.roundType === "official" && round.status === "finished").at(-1);
     const { data: run, error: runError } = await database.from("overall_calculation_runs").insert({ formula_version_id: formula.id, status: "processing", source_through_round_id: latestRound?.id || null, started_at: new Date().toISOString(), created_by: account.user.id }).select("id").single();
@@ -180,9 +180,9 @@ export async function publishOverallShadow(runId: string) {
   if (!client || !account.user) return { success: false, error: "Somente administradores podem publicar o OVR." };
   const database = client as any;
   const { data: formula } = await database.from("overall_formula_versions").select("id").eq("key", FORMULA_KEY).maybeSingle();
-  if (!formula) return { success: false, error: "A fórmula v14 não foi encontrada." };
+  if (!formula) return { success: false, error: "A fórmula v15 não foi encontrada." };
   const { data: run } = await database.from("overall_calculation_runs").select("id, status, formula_version_id").eq("id", runId).maybeSingle();
-  if (!run || run.formula_version_id !== formula.id || run.status !== "succeeded") return { success: false, error: "Escolha um rascunho v14 concluído e ainda não publicado." };
+  if (!run || run.formula_version_id !== formula.id || run.status !== "succeeded") return { success: false, error: "Escolha um rascunho v15 concluído e ainda não publicado." };
   const { error } = await database.from("overall_calculation_runs").update({ status: "published", published_at: new Date().toISOString() }).eq("id", runId).eq("status", "succeeded");
   if (error) return { success: false, error: error.message };
   revalidatePath("/admin/overall");

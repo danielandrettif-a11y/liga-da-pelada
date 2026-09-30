@@ -45,6 +45,7 @@ export type RankingEntry = {
   overallTrend?: "rising" | "steady" | "falling" | null;
   overallPositions?: { DEF: number; ALA_MEI: number; ATA: number; GOL: number } | null;
   overallGoalkeeperGames?: number;
+  overallGoalkeeperRounds?: number;
   goalkeeperStats?: {
     games: number;
     goalsConceded: number;

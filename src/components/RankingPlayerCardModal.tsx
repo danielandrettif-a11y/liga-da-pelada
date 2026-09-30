@@ -354,8 +354,11 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
   const nameplateArtwork = cosmeticNameplateImage(entry.cosmetics?.nameplateKey);
   const overallComposition = getOverallComposition(entry.player.overall_traits, entry.overallPositions, {
     goalkeeperGames: entry.overallGoalkeeperGames,
+    goalkeeperRounds: entry.overallGoalkeeperRounds,
   });
-  const goalkeeperEligible = Number(entry.overallGoalkeeperGames || 0) >= 8;
+  const goalkeeperGames = Number(entry.overallGoalkeeperGames || 0);
+  const goalkeeperRounds = Number(entry.overallGoalkeeperRounds || 0);
+  const goalkeeperEligible = goalkeeperGames >= 8 && goalkeeperRounds >= 3;
   const goalkeeperIncluded = overallComposition?.items.some((item) => item.role === "GOL") === true;
   const goalkeeperAverage = entry.goalkeeperStats?.games
     ? entry.goalkeeperStats.goalsConceded / entry.goalkeeperStats.games
@@ -530,7 +533,7 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                       ? "Seu OVR GOL participa do cálculo geral"
                       : goalkeeperEligible
                         ? "Seu OVR GOL já é elegível, mas está fora das 3 maiores notas"
-                        : `${entry.overallGoalkeeperGames}/8 partidas no gol para entrar no geral`
+                        : `${goalkeeperGames}/8 jogos e ${goalkeeperRounds}/3 rodadas no gol para entrar no geral`
                     : overallComposition
                       ? `Seu geral usa ${overallComposition.items.map((item) => item.label).join(" + ")}`
                       : "Entenda as notas da sua carta"}
@@ -550,7 +553,7 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                       {overallComposition.items.map((item) => `${item.value.toFixed(1).replace(".", ",")} (${item.label}) × ${Math.round(item.weight * 100)}%`).join(" + ")}
                       {` ≈ ${(entry.overall ?? overallComposition.value).toFixed(1).replace(".", ",")}`}
                     </p>
-                    <p className="mt-1.5">O geral usa sempre 50% da maior nota elegível, 35% da segunda e 15% da terceira. GOL só participa depois de 8 partidas reais no gol.</p>
+                    <p className="mt-1.5">O geral usa sempre 50% da maior nota elegível, 35% da segunda e 15% da terceira. GOL só participa depois de 8 partidas reais distribuídas em pelo menos 3 rodadas.</p>
                   </div>
 
                   <div>
@@ -576,14 +579,14 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                         </div>
                       )}
                       <p className="mt-2">
-                        O OVR GOL usa somente atuações reais no gol: 50% controle de gols sofridos por tempo, 35% resistência até o primeiro gol, 10% tempo de atuação e 5% disciplina.
+                        O OVR GOL só muda em rodadas realmente jogadas no gol: 60% controle absoluto de gols sofridos por tempo, 25% jogos sem sofrer, 10% resistência até o primeiro gol e 5% disciplina. A confiança leva 6 rodadas de goleiro para completar e a nota pode variar no máximo 0,8 por rodada.
                       </p>
                       <p className={`mt-1.5 font-bold ${goalkeeperIncluded ? "text-cyan-200" : "text-muted"}`}>
                         {!goalkeeperEligible
-                          ? `Ainda não entra no OVR geral: faltam ${8 - Number(entry.overallGoalkeeperGames || 0)} partidas reais no gol para completar a amostra mínima de 8.`
+                          ? `Ainda não entra no OVR geral: precisa completar 8 partidas em pelo menos 3 rodadas (agora ${goalkeeperGames} partidas em ${goalkeeperRounds} rodadas).`
                           : goalkeeperIncluded
-                            ? "Entra no OVR geral porque completou 8 partidas no gol e está entre as três maiores notas posicionais."
-                            : "Já completou as 8 partidas necessárias, mas o geral usa apenas as três maiores notas entre DEF/VOL, ALA, ATA e GOL."}
+                            ? "Entra no OVR geral porque completou a amostra mínima e está entre as três maiores notas posicionais."
+                            : "Já completou a amostra mínima, mas o geral usa apenas as três maiores notas entre DEF/VOL, ALA, ATA e GOL."}
                       </p>
                     </div>
                   )}

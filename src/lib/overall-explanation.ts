@@ -17,14 +17,15 @@ export type OverallCompositionItem = {
 
 type OverallCompositionOptions = {
   goalkeeperGames?: number;
+  goalkeeperRounds?: number;
 };
 
 const ROLE_LABELS = { DEF: "DEF/VOL", ALA_MEI: "ALA", ATA: "ATA", GOL: "GOL" } as const;
 const RANKED_WEIGHTS = [0.5, 0.35, 0.15] as const;
 
 /**
- * Reproduz a composição final do OVR geral das fórmulas v12 e v13.
- * Usa as três maiores posições; GOL só entra após oito jogos reais no gol.
+ * Reproduz a composição final do OVR geral das fórmulas v12 em diante.
+ * Usa as três maiores posições; GOL só entra após oito jogos em pelo menos três rodadas.
  */
 export function getOverallComposition(
   _traits: PlayerProfile[] | null | undefined,
@@ -34,7 +35,7 @@ export function getOverallComposition(
   if (!positions) return null;
 
   const eligibleRoles: Array<keyof OverallPositionValues> = ["DEF", "ALA_MEI", "ATA"];
-  if (Number(options.goalkeeperGames || 0) >= 8) eligibleRoles.push("GOL");
+  if (Number(options.goalkeeperGames || 0) >= 8 && Number(options.goalkeeperRounds || 0) >= 3) eligibleRoles.push("GOL");
   const items = eligibleRoles
     .map((role) => ({ trait: null, role, label: ROLE_LABELS[role], value: positions[role] }))
     .sort((left, right) => right.value - left.value)

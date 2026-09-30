@@ -109,6 +109,13 @@ describe("motor adaptativo de OVR", () => {
       ATA: { DEF: 0.2, ALA_MEI: 0.5, ATA: 1 },
     },
   });
+  const goalkeeperOutcomeFormula = parseOverallFormulaConfig({
+    ...roleAdjustedRateFormula,
+    goalkeeperConfidenceRounds: 6,
+    goalkeeperMaxChangePerRound: 0.8,
+    goalkeeperOutcomeScoring: true,
+    goalkeeperWeights: { conceded: 0.6, cleanSheet: 0.25, survival: 0.1, discipline: 0.05 },
+  });
 
   it("separa gols e assistências no OVR V10 sem transformar vitória em defesa", () => {
     const scorer = { id: "scorer", playerProfile: "offensive" as const, overallTraits: ["offensive" as const], overallSeedMode: "observed" as const };
@@ -623,5 +630,34 @@ describe("motor adaptativo de OVR", () => {
     ], formula);
     expect(result.snapshotsByRound[0].snapshots[0].goalkeeperGames).toBe(7);
     expect(result.snapshotsByRound[1].snapshots[0].goalkeeperGames).toBe(8);
+  });
+
+  it("não aumenta OVR GOL em rodadas jogadas somente na linha", () => {
+    const keeper: OverallPlayer = { id: "keeper", playerProfile: "defensive", overallTraits: ["defensive"], overallSeedMode: "observed" };
+    const result = calculatePlayerOveralls([keeper], [
+      round(1, [appearance(keeper.id, { isGoalkeeper: true, goalsConceded: 0 })]),
+      round(2, [appearance(keeper.id, { isGoalkeeper: false, goals: 2 })]),
+      round(3, [appearance(keeper.id, { isGoalkeeper: false, goals: 2 })]),
+    ], goalkeeperOutcomeFormula);
+
+    const first = result.snapshotsByRound[0].snapshots[0].positions.GOL.value;
+    expect(result.snapshots[0].positions.GOL.value).toBe(first);
+  });
+
+  it("mantém moderado o OVR de 10 jogos, 13 gols sofridos e só 2 jogos sem sofrer", () => {
+    const keeper: OverallPlayer = { id: "keeper", playerProfile: "defensive", overallTraits: ["defensive"], overallSeedMode: "observed" };
+    const conceded = [0, 0, 1, 1, 1, 2, 2, 2, 2, 2];
+    const inputs = conceded.map((goals, index) => round(index + 1, [appearance(keeper.id, {
+      matchId: `keeper-${index}`,
+      isGoalkeeper: true,
+      goalsConceded: goals,
+      concededGoalSeconds: goals ? Array.from({ length: goals }, (_, goal) => 140 + goal * 100) : [],
+      result: goals < 2 ? "win" : "loss",
+    })]));
+    const result = calculatePlayerOveralls([keeper], inputs, goalkeeperOutcomeFormula);
+    const values = result.snapshotsByRound.map((item) => item.snapshots[0].positions.GOL.value);
+
+    expect(result.snapshots[0].positions.GOL.value).toBeLessThanOrEqual(71);
+    expect(values.every((value, index) => index === 0 || Math.abs(value - values[index - 1]) <= 0.81)).toBe(true);
   });
 });
