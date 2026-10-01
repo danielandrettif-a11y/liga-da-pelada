@@ -51,6 +51,10 @@ describe("Cartola V3 — Catálogo & Probabilidades", () => {
       .map((card) => card.slug);
     expect(withoutLineup).toEqual(["extra_credit", "double_prediction", "bargain", "all_in"]);
   });
+
+  it("permite usar a Barganha durante a edição da escalação", () => {
+    expect(getCardBySlug("bargain")?.description).not.toContain("Antes de montar");
+  });
 });
 
 describe("Cartola V3.2 — Novas cartas", () => {

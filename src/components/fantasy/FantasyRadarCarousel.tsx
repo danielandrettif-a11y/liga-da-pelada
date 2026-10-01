@@ -60,10 +60,10 @@ function CompactPlayer({
 }
 
 export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
-  const [expandedStoryId, setExpandedStoryId] = useState<string | null>(null);
+  const [allStoriesExpanded, setAllStoriesExpanded] = useState(false);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const interactingRef = useRef(false);
-  const expandedStoryIdRef = useRef<string | null>(null);
+  const allStoriesExpandedRef = useRef(false);
   const lastFrameRef = useRef<number | null>(null);
   const initializedRef = useRef(false);
   const resumeTimerRef = useRef<number | null>(null);
@@ -122,8 +122,8 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
   const storySignature = stories.map((story) => story.id).join("|");
 
   useEffect(() => {
-    expandedStoryIdRef.current = expandedStoryId;
-  }, [expandedStoryId]);
+    allStoriesExpandedRef.current = allStoriesExpanded;
+  }, [allStoriesExpanded]);
 
   useEffect(() => {
     const track = trackRef.current;
@@ -147,7 +147,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
       const elapsed = Math.min(timestamp - previous, 40);
       lastFrameRef.current = timestamp;
 
-      if (!prefersReducedMotion && !interactingRef.current && !expandedStoryIdRef.current) {
+      if (!prefersReducedMotion && !interactingRef.current && !allStoriesExpandedRef.current) {
         const width = sectionWidth();
         if (width > 0 && track.scrollWidth > track.clientWidth) {
           // Velocidade intencionalmente perceptível, mas sem competir com o gesto manual.
@@ -215,7 +215,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
         onTouchEnd={releaseInteraction}
       >
         {repeatedStories.map((story, repeatedIndex) => {
-          const isStoryExpanded = story.kind === "list" && expandedStoryId === story.id;
+          const isStoryExpanded = story.kind === "list" && allStoriesExpanded;
           const storyContentId = `radar-story-${repeatedIndex}-${story.id}`;
           return (
             <article
@@ -226,7 +226,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
                 <>
                   <button
                     type="button"
-                    onClick={() => setExpandedStoryId((current) => current === story.id ? null : story.id)}
+                    onClick={() => setAllStoriesExpanded((current) => !current)}
                     aria-expanded={isStoryExpanded}
                     aria-controls={storyContentId}
                     className="flex w-full items-center justify-between gap-2 rounded-lg text-left active:bg-white/[.04]"

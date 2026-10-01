@@ -52,7 +52,7 @@ export const FANTASY_CARDS_CATALOG: FantasyCardDefinition[] = [
     slug: "bargain",
     name: "Barganha",
     icon: "🤑",
-    description: "Antes de montar a escalação, escolha 1 atleta do mercado: ele terá 20% de desconto no orçamento desta rodada.",
+    description: "Escolha 1 atleta do mercado: ele terá 20% de desconto no orçamento desta rodada ao entrar na escalação final.",
     rarity: "COMMON",
     effectType: "PLAYER_DISCOUNT",
     effectConfig: { discountPercent: 20 },

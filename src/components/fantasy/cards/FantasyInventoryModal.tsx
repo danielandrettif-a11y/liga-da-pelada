@@ -407,7 +407,7 @@ export function FantasyInventoryModal({
 
               {selectedToUse.card.slug === "bargain" && (
                 <div className="rounded-2xl border border-warning/40 bg-warning/10 px-3.5 py-3 text-xs leading-relaxed text-warning">
-                  <strong>Use antes de escalar.</strong> Escolha o atleta agora; depois ele precisa entrar na sua escalação para o desconto valer.
+                  <strong>Pode usar enquanto ajusta o time.</strong> Escolha o atleta agora; depois ele precisa entrar na escalação final para o desconto valer.
                 </div>
               )}
 
@@ -441,7 +441,7 @@ export function FantasyInventoryModal({
                       {isVice
                         ? "Escolha quem será o Vice-Capitão do seu time (apenas atletas escalados):"
                         : isBargain
-                          ? "Escolha o atleta do mercado antes de montar sua escalação:"
+                          ? "Escolha o atleta do mercado que receberá o desconto:"
                           : isAllIn
                             ? "Escolha qualquer atleta do mercado:"
                             : selectedToUse.card.slug === "head_to_head"

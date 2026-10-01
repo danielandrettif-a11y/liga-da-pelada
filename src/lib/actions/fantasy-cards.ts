@@ -498,9 +498,6 @@ export async function activateCardForRound({
   }
 
   if (userCardObj?.slug === "bargain") {
-    if (lineupPlayerIds.length > 0) {
-      return { success: false, error: "A Barganha deve ser ativada antes de montar a escalação." };
-    }
     if (!targetPlayerId || !marketPlayerIds.has(targetPlayerId)) {
       return { success: false, error: "Escolha um atleta válido do mercado para a Barganha." };
     }
