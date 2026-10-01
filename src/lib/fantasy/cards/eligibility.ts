@@ -5,6 +5,11 @@ export type PricedFantasyPlayer = {
   price: number;
 };
 
+export function applyFantasyDiscount(price: number, discountPercent: number) {
+  const percent = Number.isFinite(discountPercent) ? Math.min(100, Math.max(0, discountPercent)) : 0;
+  return Math.round((price * (1 - percent / 100) + Number.EPSILON) * 100) / 100;
+}
+
 export function fantasyCardRequiresSavedLineup(
   card: Pick<FantasyCardDefinition, "slug" | "effectType" | "targetFilter">,
 ) {

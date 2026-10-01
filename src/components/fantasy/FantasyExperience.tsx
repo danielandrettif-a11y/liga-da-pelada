@@ -42,6 +42,7 @@ import { supabase } from "@/lib/supabase";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { getFantasySlotRoles, isCorrectFantasySlot } from "@/lib/fantasy/lineup-positions";
 import { resolveFantasyPitchPoints } from "@/lib/fantasy/pitch-points";
+import { applyFantasyDiscount } from "@/lib/fantasy/cards/eligibility";
 import { useUrlState } from "@/lib/useUrlState";
 import { FantasyPackClaimBanner } from "./cards/FantasyPackClaimBanner";
 import {
@@ -357,6 +358,10 @@ export function FantasyExperience({
 
   // V3: Desconto temporário no preço do jogador da carta Barganha
   const discountedPlayerId = currentActiveCard?.card?.effectType === "PLAYER_DISCOUNT" ? currentActiveCard.targetPlayerId : null;
+  const bargainDiscountPercent = Number(currentActiveCard?.card?.effectConfig?.discountPercent ?? 20);
+  const playerPurchasePrice = (player: FantasyMarketPlayer) => discountedPlayerId === player.id
+    ? applyFantasyDiscount(player.price, bargainDiscountPercent)
+    : player.price;
 
   const selectedPlayers = selected.map((id) =>
     id ? market.find((player) => player.id === id) || null : null
@@ -385,11 +390,7 @@ export function FantasyExperience({
     [liveProjection?.currentUser?.players],
   );
 
-  const cost = validSelectedPlayers.reduce((sum, player) => {
-    const isDiscounted = discountedPlayerId === player.id;
-    const price = isDiscounted ? player.price * 0.8 : player.price;
-    return sum + price;
-  }, 0);
+  const cost = validSelectedPlayers.reduce((sum, player) => sum + playerPurchasePrice(player), 0);
 
   const remaining = effectiveBudget - cost;
 
@@ -730,7 +731,7 @@ export function FantasyExperience({
 
     const currentCount = selected.filter(Boolean).length;
     if (currentCount >= playersPerTeam) return setMessage(`Sua escalação já tem ${playersPerTeam} jogadores.`);
-    if (player.price > remaining) return setMessage("Patrimônio insuficiente para comprar este jogador.");
+    if (playerPurchasePrice(player) > remaining) return setMessage("Patrimônio insuficiente para comprar este jogador.");
 
     // Ao entrar pelo campo, permanece no mercado até completar todas as vagas
     // daquela posição. Ex.: o primeiro DEF mantém o segundo slot DEF como alvo.
@@ -1986,7 +1987,9 @@ export function FantasyExperience({
             <div className="space-y-2.5 w-full">
               {filtered.map((player) => {
                 const bought = selected.includes(player.id);
-                const simulatedRemaining = bought ? remaining + player.price : remaining - player.price;
+                const purchasePrice = playerPurchasePrice(player);
+                const hasBargainDiscount = discountedPlayerId === player.id;
+                const simulatedRemaining = bought ? remaining + purchasePrice : remaining - purchasePrice;
                 const backgroundImage = cosmeticImage(player.cosmetics?.backgroundAssetKey);
                 const displayedPoints = sort === "lastRound" ? player.roundPoints : player.totalPoints;
                 const playerRoundTeam = roundTeamByPlayerId.get(player.id) || null;
@@ -2093,9 +2096,19 @@ export function FantasyExperience({
                         </div>
 
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px]">
+                          {hasBargainDiscount && (
+                            <span className="font-bold text-muted line-through">
+                              {formatFantasyMoney(player.price, settings.currencyName)}
+                            </span>
+                          )}
                           <span className="font-black text-accent">
-                            {formatFantasyMoney(player.price, settings.currencyName)}
+                            {formatFantasyMoney(purchasePrice, settings.currencyName)}
                           </span>
+                          {hasBargainDiscount && (
+                            <span className="rounded bg-accent/15 px-1.5 py-0.5 font-black text-accent">
+                              Barganha -{bargainDiscountPercent}%
+                            </span>
+                          )}
                           <span
                             className={`font-black ${
                               player.variation >= 0 ? "text-success" : "text-danger"
@@ -2151,11 +2164,11 @@ export function FantasyExperience({
                           <button
                             type="button"
                             onClick={() => togglePlayer(player)}
-                            disabled={!bought && player.price > remaining}
+                            disabled={!bought && purchasePrice > remaining}
                             className={`mt-1.5 rounded-xl px-3 py-1 text-[9px] font-black uppercase transition-transform active:scale-90 ${
                               bought
                                 ? "bg-danger/20 text-danger border border-danger/30 hover:bg-danger/30"
-                                : player.price > remaining
+                                : purchasePrice > remaining
                                 ? "bg-white/5 text-muted cursor-not-allowed opacity-50"
                                 : "bg-accent text-background hover:brightness-110 shadow-sm"
                             }`}
