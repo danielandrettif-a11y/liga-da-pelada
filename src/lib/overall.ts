@@ -70,6 +70,11 @@ export type OverallFormulaConfig = {
   traitsAsProgressionBonus: boolean;
   /** Orçamento total de aceleração distribuído sem favorecer quem tem mais tags. */
   traitProgressionBonusBudget: number;
+  /** Rodadas jogadas com influência integral das características. */
+  traitFullInfluenceRounds: number;
+  /** Rodadas adicionais usadas para retirar gradualmente essa influência. */
+  traitFadeRounds: number;
+  traitInfluenceFadeEnabled: boolean;
   /** Compatibilidade com a v13-v15, nas quais a ordem controlava a evidência. */
   prioritizedTraitProgression: boolean;
   prioritizedTraitsAsEvidenceOnly: boolean;
@@ -150,6 +155,9 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   rankedTraitOverall: false,
   traitsAsProgressionBonus: false,
   traitProgressionBonusBudget: 0.30,
+  traitFullInfluenceRounds: 8,
+  traitFadeRounds: 8,
+  traitInfluenceFadeEnabled: false,
   prioritizedTraitProgression: false,
   prioritizedTraitsAsEvidenceOnly: false,
   traitProgressionWeights: { primary: 1, secondary: 0.6, unselected: 0.2 },
@@ -336,6 +344,9 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
       ? candidate.traitsAsProgressionBonus
       : DEFAULT_OVERALL_FORMULA.traitsAsProgressionBonus,
     traitProgressionBonusBudget: clamp(bounded(candidate.traitProgressionBonusBudget, DEFAULT_OVERALL_FORMULA.traitProgressionBonusBudget), 0, 0.5),
+    traitFullInfluenceRounds: wholeNumber(candidate.traitFullInfluenceRounds, DEFAULT_OVERALL_FORMULA.traitFullInfluenceRounds, 1, 50),
+    traitFadeRounds: wholeNumber(candidate.traitFadeRounds, DEFAULT_OVERALL_FORMULA.traitFadeRounds, 1, 50),
+    traitInfluenceFadeEnabled: candidate.traitInfluenceFadeEnabled === true,
     prioritizedTraitProgression: typeof candidate.prioritizedTraitProgression === "boolean"
       ? candidate.prioritizedTraitProgression
       : DEFAULT_OVERALL_FORMULA.prioritizedTraitProgression,
@@ -519,8 +530,14 @@ function roleEvidenceWeight(
   return config.roleEvidence[profileRole(profile) as LineRole][role];
 }
 
-function traitEvidenceWeight(player: OverallPlayer, role: OverallRole, config: OverallFormulaConfig) {
+function traitEvidenceWeight(
+  player: OverallPlayer,
+  role: OverallRole,
+  config: OverallFormulaConfig,
+  influence = 1,
+) {
   if (role === "GOL") return 1;
+  let evidence: number;
   if (config.prioritizedTraitProgression) {
     const traits = [...new Set((player.overallTraits || []).filter((trait): trait is PlayerProfile => (
       trait === "defensive" || trait === "midfield" || trait === "offensive"
@@ -531,9 +548,10 @@ function traitEvidenceWeight(player: OverallPlayer, role: OverallRole, config: O
       ATA: "offensive",
     };
     const index = traits.indexOf(traitForRole[role as LineRole]);
-    if (index === 0) return config.traitProgressionWeights.primary;
-    if (index === 1) return config.traitProgressionWeights.secondary;
-    return config.traitProgressionWeights.unselected;
+    if (index === 0) evidence = config.traitProgressionWeights.primary;
+    else if (index === 1) evidence = config.traitProgressionWeights.secondary;
+    else evidence = config.traitProgressionWeights.unselected;
+    return 1 - influence * (1 - evidence);
   }
   const traits = [...new Set((player.overallTraits || []).filter((trait): trait is PlayerProfile => (
     trait === "defensive" || trait === "midfield" || trait === "offensive"
@@ -544,19 +562,27 @@ function traitEvidenceWeight(player: OverallPlayer, role: OverallRole, config: O
     ATA: "offensive",
   };
   if (config.traitsAsProgressionBonus) {
-    return !config.unselectedTraitEvidenceEnabled || traits.includes(traitForRole[role as LineRole])
+    evidence = !config.unselectedTraitEvidenceEnabled || traits.includes(traitForRole[role as LineRole])
       ? 1
       : config.unselectedTraitEvidence;
+    return 1 - influence * (1 - evidence);
   }
-  if (traits.length === 0) return config.unselectedTraitEvidence;
-  return traits.includes(traitForRole[role as LineRole]) ? 1 / traits.length : config.unselectedTraitEvidence;
+  evidence = traits.length === 0
+    ? config.unselectedTraitEvidence
+    : traits.includes(traitForRole[role as LineRole]) ? 1 / traits.length : config.unselectedTraitEvidence;
+  return 1 - influence * (1 - evidence);
 }
 
-function traitProgressionMultiplier(player: OverallPlayer, role: OverallRole, config: OverallFormulaConfig) {
+function traitProgressionMultiplier(
+  player: OverallPlayer,
+  role: OverallRole,
+  config: OverallFormulaConfig,
+  influence = 1,
+) {
   // Na progressão priorizada, a característica já pesa a evidência. Repetir o
   // fator aqui faria 20% virar 4% e 60% virar 36%.
   if (config.prioritizedTraitProgression) {
-    return config.prioritizedTraitsAsEvidenceOnly ? 1 : traitEvidenceWeight(player, role, config);
+    return config.prioritizedTraitsAsEvidenceOnly ? 1 : traitEvidenceWeight(player, role, config, influence);
   }
   if (!config.traitsAsProgressionBonus || role === "GOL") return 1;
   const traits = [...new Set((player.overallTraits || []).filter((trait): trait is PlayerProfile => (
@@ -570,9 +596,14 @@ function traitProgressionMultiplier(player: OverallPlayer, role: OverallRole, co
   const index = traits.findIndex((trait) => roleByTrait[trait] === role);
   if (index < 0 || traits.length === 0) return 1;
   const budget = config.traitProgressionBonusBudget;
-  if (traits.length === 1) return 1 + budget;
-  if (traits.length === 2) return 1 + budget * [0.6, 0.4][index];
-  return 1 + budget * [0.5, 0.3, 0.2][index];
+  if (traits.length === 1) return 1 + budget * influence;
+  if (traits.length === 2) return 1 + budget * [0.6, 0.4][index] * influence;
+  return 1 + budget * [0.5, 0.3, 0.2][index] * influence;
+}
+
+function traitInfluenceForRound(playedRound: number, config: OverallFormulaConfig) {
+  if (!config.traitInfluenceFadeEnabled || playedRound <= config.traitFullInfluenceRounds) return 1;
+  return clamp(1 - (playedRound - config.traitFullInfluenceRounds) / config.traitFadeRounds, 0, 1);
 }
 
 function resultScore(result: OverallResult) {
@@ -645,6 +676,7 @@ function calculateMatchScore(
   roundScores: { attackingScore: number; goalScore: number; assistScore: number },
   collectiveScore: number,
   config: OverallFormulaConfig,
+  traitInfluence: number,
 ): { score: number; defensiveScore: number; evidenceWeight: number } | null {
   if (role === "GOL" && !appearance.isGoalkeeper) return null;
 
@@ -702,7 +734,7 @@ function calculateMatchScore(
     ),
     defensiveScore: defensive,
     evidenceWeight: roleQuality
-      * traitEvidenceWeight(player, role, config)
+      * traitEvidenceWeight(player, role, config, traitInfluence)
       * (config.playedRoleEvidenceEnabled ? roleEvidenceWeight(appearance.playerProfileLocked, role, config) : 1),
   };
 }
@@ -984,6 +1016,7 @@ export function calculatePlayerOveralls(
       const player = playerById.get(playerId)!;
       const state = stateByPlayerId.get(playerId)!;
       const roundScores = calculateRoundScores(appearances, formula);
+      const traitInfluence = traitInfluenceForRound(state.playedRoundIds.size + 1, formula);
       const playedGoalkeeperThisRound = appearances.some((appearance) => appearance.isGoalkeeper);
       let defensiveTotal = 0;
       let defensiveWeight = 0;
@@ -1001,6 +1034,7 @@ export function calculatePlayerOveralls(
             roundScores,
             roundScores.collectiveScore,
             formula,
+            traitInfluence,
           );
           if (outcome === null) continue;
           state.history.push({
@@ -1034,13 +1068,13 @@ export function calculatePlayerOveralls(
         const estimate = positionEstimate(player, state, role, roundIndex, formula);
         const previous = state.values[role];
         const changeScale = formula.traitWeightedChange
-          ? traitEvidenceWeight(player, role, formula)
+          ? traitEvidenceWeight(player, role, formula, traitInfluence)
           : 1;
         const positionForm = positionTrend(state, role, formula);
         let maximumChange = (formula.maxChangePerRound
           + Math.abs(estimate.target - formula.base) * formula.performanceChangeBonus)
           * changeScale
-          * traitProgressionMultiplier(player, role, formula);
+          * traitProgressionMultiplier(player, role, formula, traitInfluence);
         if (estimate.target > previous && positionForm === "rising") {
           maximumChange *= 1 + formula.trendUpwardMultiplier;
         } else if (estimate.target < previous && positionForm === "falling") {
@@ -1076,7 +1110,7 @@ export function calculatePlayerOveralls(
         timingQuality,
         playedProfile,
         roleEvidence: Object.fromEntries(ROLES.map((role) => [role, roleEvidenceWeight(playedProfile, role, formula)])) as Record<OverallRole, number>,
-        traitEvidence: Object.fromEntries(ROLES.map((role) => [role, traitEvidenceWeight(player, role, formula)])) as Record<OverallRole, number>,
+        traitEvidence: Object.fromEntries(ROLES.map((role) => [role, traitEvidenceWeight(player, role, formula, traitInfluence)])) as Record<OverallRole, number>,
         positions: Object.fromEntries(ROLES.map((role) => [role, snapshot.positions[role].value])) as Record<OverallRole, number>,
         confidence: Object.fromEntries(ROLES.map((role) => [role, snapshot.positions[role].confidence])) as Record<OverallRole, number>,
       });

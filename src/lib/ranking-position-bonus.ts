@@ -28,22 +28,26 @@ function profileRole(profile: PlayerProfile | null | undefined): RankingLineRole
 
 export function resolveRankingRoleWeights(
   positions: RankingPositionOveralls,
-  profile: PlayerProfile | null | undefined,
+  preferredProfile: PlayerProfile | null | undefined,
+  forcePreferred = false,
 ): RankingRoleWeight[] {
-  const preferredRole = profileRole(profile);
-  return [
+  const preferredRole = profileRole(preferredProfile);
+  const candidates = [
     { role: "DEF" as const, overall: Number(positions.DEF) },
     { role: "MEI" as const, overall: Number(positions.ALA_MEI) },
     { role: "ATA" as const, overall: Number(positions.ATA) },
   ]
-    .filter((item) => Number.isFinite(item.overall))
+    .filter((item) => Number.isFinite(item.overall));
+  const selected = forcePreferred && preferredRole
+    ? candidates.find(({ role }) => role === preferredRole)
+    : candidates
     .sort((a, b) => (
       b.overall - a.overall
       || Number(b.role === preferredRole) - Number(a.role === preferredRole)
       || ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role)
     ))
-    .slice(0, 1)
-    .map((item) => ({ ...item, weight: 1 as const }));
+    .at(0);
+  return selected ? [{ ...selected, weight: 1 as const }] : [];
 }
 
 export function parseRankingRoleWeights(value: unknown): RankingRoleWeight[] {

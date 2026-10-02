@@ -31,7 +31,7 @@ function appearance(playerId: string, overrides: Partial<OverallAppearance> = {}
 }
 
 function round(sequence: number, appearances: OverallAppearance[]): OverallRoundInput {
-  return { id: `r${sequence}`, sequence, date: `2026-0${sequence}-01`, roundType: "official", status: "finished", appearances };
+  return { id: `r${sequence}`, sequence, date: `2026-01-${String(sequence).padStart(2, "0")}`, roundType: "official", status: "finished", appearances };
 }
 
 describe("motor adaptativo de OVR", () => {
@@ -619,6 +619,30 @@ describe("motor adaptativo de OVR", () => {
     expect(limited.positions.DEF.confidence).toBeLessThan(unrestricted.positions.DEF.confidence);
     expect(limited.positions.ALA_MEI.value).toBe(unrestricted.positions.ALA_MEI.value);
     expect(limited.positions.ATA.value).toBe(unrestricted.positions.ATA.value);
+  });
+
+  it("retira gradualmente a influência das características após oito rodadas", () => {
+    const player: OverallPlayer = {
+      id: "organic-after-eight",
+      playerProfile: "offensive",
+      overallTraits: ["offensive"],
+      overallSeedMode: "observed",
+    };
+    const formula = parseOverallFormulaConfig({
+      ...distributedTraitBonusFormula,
+      unselectedTraitEvidenceEnabled: true,
+      unselectedTraitEvidence: 0.2,
+      traitInfluenceFadeEnabled: true,
+      traitFullInfluenceRounds: 8,
+      traitFadeRounds: 8,
+    });
+    const result = calculatePlayerOveralls([player], Array.from({ length: 16 }, (_, index) => round(index + 1, [
+      appearance(player.id, { matchId: `organic-${index}`, playerProfileLocked: "offensive" }),
+    ])), formula);
+
+    expect(result.breakdowns[7].traitEvidence.DEF).toBeCloseTo(0.2);
+    expect(result.breakdowns[8].traitEvidence.DEF).toBeCloseTo(0.3);
+    expect(result.breakdowns[15].traitEvidence.DEF).toBe(1);
   });
 
   it("usa a prioridade do ADM para limitar a evolução de cada posição na v13", () => {

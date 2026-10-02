@@ -60,7 +60,7 @@ export function OverallShadowPanel({ initialData }: { initialData: OverallShadow
       {initialData.pendingPlayers.length > 0 && (
         <section className="rounded-2xl border border-warning/30 bg-warning/5 p-4">
           <p className="text-sm font-black text-foreground">Estilo aguardando revisão ({initialData.pendingPlayers.length})</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">Escolha de uma a três características em ordem de prioridade. O bônus de evolução é dividido em 100%; 60%/40%; ou 50%/30%/20%. Posições não marcadas usam 20% da evidência. Perfis sem característica não recebem o OVR nem entram no ranking e no Cartola.</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">Escolha de uma a três características em ordem de prioridade. O bônus é dividido em 100%; 60%/40%; ou 50%/30%/20%, vale integralmente por 8 rodadas e desaparece aos poucos até a 16ª. Perfis sem característica não recebem o OVR nem entram no ranking e no Cartola.</p>
           <p className="mt-2 text-xs font-bold text-warning">{initialData.pendingPlayers.map((player) => player.name).join(" · ")}</p>
         </section>
       )}

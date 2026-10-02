@@ -275,6 +275,8 @@ export async function calculateRoundStats(roundId: string) {
       .select(`
         id,
         league_id,
+        date,
+        created_at,
         round_type,
         suppress_goalkeeper_rewards,
         scoring_version,
@@ -317,19 +319,31 @@ export async function calculateRoundStats(roundId: string) {
     const scoringSnapshot = normalizeBQScoringSnapshot(round.scoring_snapshot as Record<string, unknown> | null);
     const roundPlayerIds = (round.round_players || []).map((item: any) => item.player_id);
     const { data: roundPlayerProfiles, error: profileError } = roundPlayerIds.length
-      ? await client.from("players").select("id, player_profile, member_category, is_selectable, is_competitive_profile_complete").in("id", roundPlayerIds)
+      ? await client.from("players").select("id, player_profile, overall_traits, member_category, is_selectable, is_competitive_profile_complete").in("id", roundPlayerIds)
       : { data: [], error: null };
     if (profileError) throw new Error(`Erro ao buscar posições dos atletas: ${profileError.message}`);
     const profileByPlayerId = new Map((roundPlayerProfiles || []).map((player: any) => [player.id, player.player_profile]));
     const playerById = new Map((roundPlayerProfiles || []).map((player: any) => [player.id, player]));
-    const [{ data: frozenRankingRows, error: frozenRankingError }, overallByPlayer] = await Promise.all([
+    const [{ data: frozenRankingRows, error: frozenRankingError }, { data: playedRankingRows, error: playedRankingError }, overallByPlayer] = await Promise.all([
       roundPlayerIds.length
         ? client.from("player_round_stats").select("player_id, ranking_role_weights").eq("round_id", roundId).in("player_id", roundPlayerIds)
+        : Promise.resolve({ data: [], error: null }),
+      roundPlayerIds.length
+        ? client.from("player_round_stats")
+          .select("player_id, games, round:round_id(id, date, created_at, round_type, status)")
+          .eq("league_id", round.league_id).in("player_id", roundPlayerIds).gt("games", 0)
         : Promise.resolve({ data: [], error: null }),
       getLatestPlayerCardOverallMap(client),
     ]);
     if (frozenRankingError) throw new Error(`Erro ao buscar posições congeladas do ranking: ${frozenRankingError.message}`);
+    if (playedRankingError) throw new Error(`Erro ao buscar histórico do ranking: ${playedRankingError.message}`);
     const frozenRankingWeights = new Map((frozenRankingRows || []).map((row: any) => [row.player_id, parseRankingRoleWeights(row.ranking_role_weights)]));
+    const currentRoundOrder = `${round.date}|${round.created_at}|${round.id}`;
+    const playersWithPriorOfficialRound = new Set((playedRankingRows || []).flatMap((row: any) => {
+      const previousRound = Array.isArray(row.round) ? row.round[0] : row.round;
+      if (!previousRound || previousRound.id === roundId || previousRound.round_type !== "official" || previousRound.status !== "finished") return [];
+      return `${previousRound.date}|${previousRound.created_at}|${previousRound.id}` < currentRoundOrder ? [row.player_id] : [];
+    }));
 
     // Correções administrativas são persistentes e reaplicadas a cada consolidação.
     // Isso permite zerar apenas um jogador sem apagar gols/assistências dos demais.
@@ -476,13 +490,18 @@ export async function calculateRoundStats(roundId: string) {
       const frozen = frozenRankingWeights.get(stats.player_id) || [];
       const overallPositions = overallByPlayer.get(stats.player_id)?.positions;
       const player = playerById.get(stats.player_id);
-      const fallbackRole = player?.player_profile === "defensive" ? "DEF" : player?.player_profile === "midfield" ? "MEI" : "ATA";
+      const primaryTrait = Array.isArray(player?.overall_traits) ? player.overall_traits[0] : null;
+      const fallbackRole = primaryTrait === "defensive" ? "DEF" : primaryTrait === "midfield" ? "MEI" : "ATA";
       const roleWeights: RankingRoleWeight[] = !countsForRanking || stats.games <= 0 || !player?.is_competitive_profile_complete
         ? []
         : frozen.length
           ? frozen
           : overallPositions
-            ? resolveRankingRoleWeights({ DEF: overallPositions.DEF, ALA_MEI: overallPositions.ALA_MEI, ATA: overallPositions.ATA }, player.player_profile)
+            ? resolveRankingRoleWeights(
+              { DEF: overallPositions.DEF, ALA_MEI: overallPositions.ALA_MEI, ATA: overallPositions.ATA },
+              primaryTrait,
+              !playersWithPriorOfficialRound.has(stats.player_id),
+            )
             : [{ role: fallbackRole, overall: 0, weight: 1 }];
       const rankingPositionBonus = calculateRankingPositionBonus({
         roleWeights,

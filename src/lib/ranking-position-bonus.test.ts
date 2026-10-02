@@ -22,6 +22,12 @@ describe("ranking position bonus", () => {
     expect(resolveRankingRoleWeights({ DEF: 80, ALA_MEI: 80, ATA: 79 }, "midfield")[0]).toEqual({ role: "MEI", overall: 80, weight: 1 });
   });
 
+  it("usa a característica principal na primeira rodada mesmo sem ser o maior OVR", () => {
+    expect(resolveRankingRoleWeights({ DEF: 84, ALA_MEI: 82, ATA: 78 }, "offensive", true)).toEqual([
+      { role: "ATA", overall: 78, weight: 1 },
+    ]);
+  });
+
   it("aplica tetos 10 para DEF, 8 para ALA e 7 para ATA", () => {
     expect(calculateRankingPositionBonus({
       ...stats,

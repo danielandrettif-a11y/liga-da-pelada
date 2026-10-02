@@ -334,7 +334,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
           <section className="col-span-2 rounded-xl border border-accent/20 bg-background/45 p-2.5 sm:col-span-4">
             <div className="mb-2">
               <p className="text-[11px] font-black uppercase tracking-wider text-accent">Bônus posicionais da Geral</p>
-              <p className="mt-0.5 text-[9px] leading-relaxed text-muted">São pontos extras somados aos scouts acima. Vale apenas a posição com o maior OVR do atleta.</p>
+              <p className="mt-0.5 text-[9px] leading-relaxed text-muted">São pontos extras somados aos scouts acima. Na estreia vale a característica principal; depois, a maior nota da rodada anterior fica congelada.</p>
             </div>
             <div className="grid gap-2 sm:grid-cols-3">
               <article className="rounded-xl border border-sky-400/25 bg-sky-400/[0.07] p-2.5">
