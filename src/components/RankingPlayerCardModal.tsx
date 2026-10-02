@@ -598,7 +598,7 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                     <p><strong className="text-foreground">GOL:</strong> desempenho defensivo nas partidas em que atuou no gol.</p>
                   </div>
 
-                  <p>Gols e assistências são comparados por 7 minutos jogados. A defesa usa gols sofridos por tempo, resistência até o primeiro gol, participação e gols contra. As características aceleram a evolução das posições escolhidas: 100% do bônus para uma; 60%/40% para duas; ou 50%/30%/20% para três. As demais posições continuam evoluindo sem o bônus. A função exercida na rodada também dá mais validade à posição correspondente.</p>
+                  <p>Gols e assistências são comparados por 7 minutos jogados. A defesa usa gols sofridos por tempo, resistência até o primeiro gol, participação e gols contra. As características aceleram a evolução das posições escolhidas: 100% do bônus para uma; 60%/40% para duas; ou 50%/30%/20% para três. As demais posições continuam evoluindo com 20% da evidência e sem o bônus. A função exercida na rodada também dá mais validade à posição correspondente.</p>
                 </>
               ) : (
                 <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-warning">

@@ -515,7 +515,7 @@ export function PlayerForm({
 
       {mode === "admin" && (memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2 rounded-2xl border border-accent/25 bg-accent/5 p-4">
         <legend className="px-1 text-xs font-bold uppercase tracking-wider text-accent">Características de jogo do OVR</legend>
-        <p className="text-[11px] leading-4 text-muted">Escolha até três. O bônus de evolução é dividido em 100%; 60%/40%; ou 50%/30%/20%. Posições não marcadas continuam evoluindo, mas sem essa aceleração. A função realmente exercida na rodada também participa do OVR.</p>
+        <p className="text-[11px] leading-4 text-muted">Escolha até três. O bônus de evolução é dividido em 100%; 60%/40%; ou 50%/30%/20%. Posições não marcadas continuam evoluindo com 20% da evidência e sem essa aceleração. A função realmente exercida na rodada também participa do OVR.</p>
         <div className="grid gap-2 pt-1">
           {PLAYER_PROFILE_OPTIONS.map((option) => {
             const trait = option.value as PlayerProfile;

@@ -592,6 +592,35 @@ describe("motor adaptativo de OVR", () => {
     expect(ata.get("three-tertiary")).toBe(75.3);
   });
 
+  it("mantém posição não marcada perto da base usando somente 20% da evidência", () => {
+    const player: OverallPlayer = {
+      id: "wing-forward",
+      playerProfile: "midfield",
+      overallTraits: ["midfield", "offensive"],
+      overallSeedMode: "observed",
+    };
+    const inputs = Array.from({ length: 5 }, (_, index) => round(index + 1, [appearance(player.id, {
+      matchId: `unselected-${index}`,
+      playerProfileLocked: "midfield",
+      goals: 2,
+      assists: 2,
+      goalsConceded: 0,
+      result: "win",
+    })]));
+    const unrestricted = calculatePlayerOveralls([player], inputs, distributedTraitBonusFormula).snapshots[0];
+    const limited = calculatePlayerOveralls([player], inputs, parseOverallFormulaConfig({
+      ...distributedTraitBonusFormula,
+      unselectedTraitEvidenceEnabled: true,
+      unselectedTraitEvidence: 0.2,
+    })).snapshots[0];
+
+    expect(limited.positions.DEF.value).toBeGreaterThan(70);
+    expect(limited.positions.DEF.value).toBeLessThan(unrestricted.positions.DEF.value);
+    expect(limited.positions.DEF.confidence).toBeLessThan(unrestricted.positions.DEF.confidence);
+    expect(limited.positions.ALA_MEI.value).toBe(unrestricted.positions.ALA_MEI.value);
+    expect(limited.positions.ATA.value).toBe(unrestricted.positions.ATA.value);
+  });
+
   it("usa a prioridade do ADM para limitar a evolução de cada posição na v13", () => {
     const formula = parseOverallFormulaConfig({
       ...balancedCharacteristicsFormula,

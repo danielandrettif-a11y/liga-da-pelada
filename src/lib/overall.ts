@@ -52,6 +52,8 @@ export type OverallFormulaConfig = {
   playedRoleEvidenceEnabled: boolean;
   /** Peso dado a uma característica não selecionada pelo administrador. */
   unselectedTraitEvidence: number;
+  /** Reduz a evidência das posições não marcadas sem retirar sua progressão. */
+  unselectedTraitEvidenceEnabled: boolean;
   /** A fórmula v5 ignora a tag legada; ela continua apenas nas fórmulas antigas. */
   legacySeedEnabled: boolean;
   /** Impede que várias partidas da mesma pelada multipliquem a confiança semanal. */
@@ -139,6 +141,7 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   unassignedRoleEvidence: { DEF: 0.4, ALA_MEI: 0.55, ATA: 0.4 },
   playedRoleEvidenceEnabled: false,
   unselectedTraitEvidence: 0.15,
+  unselectedTraitEvidenceEnabled: false,
   legacySeedEnabled: true,
   weeklyEvidenceCap: false,
   traitWeightedChange: false,
@@ -310,6 +313,7 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     },
     playedRoleEvidenceEnabled: candidate.playedRoleEvidenceEnabled === true,
     unselectedTraitEvidence: clamp(bounded(candidate.unselectedTraitEvidence, DEFAULT_OVERALL_FORMULA.unselectedTraitEvidence), 0, 1),
+    unselectedTraitEvidenceEnabled: candidate.unselectedTraitEvidenceEnabled === true,
     legacySeedEnabled: typeof candidate.legacySeedEnabled === "boolean"
       ? candidate.legacySeedEnabled
       : DEFAULT_OVERALL_FORMULA.legacySeedEnabled,
@@ -531,16 +535,20 @@ function traitEvidenceWeight(player: OverallPlayer, role: OverallRole, config: O
     if (index === 1) return config.traitProgressionWeights.secondary;
     return config.traitProgressionWeights.unselected;
   }
-  if (config.traitsAsProgressionBonus) return 1;
   const traits = [...new Set((player.overallTraits || []).filter((trait): trait is PlayerProfile => (
     trait === "defensive" || trait === "midfield" || trait === "offensive"
   )))];
-  if (traits.length === 0) return config.unselectedTraitEvidence;
   const traitForRole: Record<LineRole, PlayerProfile> = {
     DEF: "defensive",
     ALA_MEI: "midfield",
     ATA: "offensive",
   };
+  if (config.traitsAsProgressionBonus) {
+    return !config.unselectedTraitEvidenceEnabled || traits.includes(traitForRole[role as LineRole])
+      ? 1
+      : config.unselectedTraitEvidence;
+  }
+  if (traits.length === 0) return config.unselectedTraitEvidence;
   return traits.includes(traitForRole[role as LineRole]) ? 1 / traits.length : config.unselectedTraitEvidence;
 }
 
