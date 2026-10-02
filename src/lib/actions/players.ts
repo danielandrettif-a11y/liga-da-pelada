@@ -539,8 +539,8 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   if (!["offensive", "midfield", "defensive"].includes(playerProfile)) {
     return { success: false, error: "Escolha um perfil de jogo valido." };
   }
-  if (account.isAdmin && requestedOverallTraits.length > 2) {
-    return { success: false, error: "Escolha no máximo duas características: principal e secundária." };
+  if (account.isAdmin && requestedOverallTraits.length > 3) {
+    return { success: false, error: "Escolha no máximo três características: principal, secundária e terciária." };
   }
 
   if (!name) return { success: false, error: "O nome é obrigatório." };

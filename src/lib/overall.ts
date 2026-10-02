@@ -64,11 +64,11 @@ export type OverallFormulaConfig = {
   overallConfidenceShrink: boolean;
   /** Usa 70/30 ou 60/25/15, favorecendo a melhor característica sem ignorar as demais. */
   rankedTraitOverall: boolean;
-  /** V12: características aceleram a reação da posição, sem definir o OVR geral. */
+  /** Características aceleram a reação da posição, sem definir o OVR geral. */
   traitsAsProgressionBonus: boolean;
   /** Orçamento total de aceleração distribuído sem favorecer quem tem mais tags. */
   traitProgressionBonusBudget: number;
-  /** V13: a ordem definida pelo ADM controla a evidência e a evolução de cada posição. */
+  /** Compatibilidade com a v13-v15, nas quais a ordem controlava a evidência. */
   prioritizedTraitProgression: boolean;
   prioritizedTraitsAsEvidenceOnly: boolean;
   traitProgressionWeights: {
@@ -553,7 +553,7 @@ function traitProgressionMultiplier(player: OverallPlayer, role: OverallRole, co
   if (!config.traitsAsProgressionBonus || role === "GOL") return 1;
   const traits = [...new Set((player.overallTraits || []).filter((trait): trait is PlayerProfile => (
     trait === "defensive" || trait === "midfield" || trait === "offensive"
-  )))];
+  )))].slice(0, 3);
   const roleByTrait: Record<PlayerProfile, LineRole> = {
     defensive: "DEF",
     midfield: "ALA_MEI",
@@ -563,8 +563,8 @@ function traitProgressionMultiplier(player: OverallPlayer, role: OverallRole, co
   if (index < 0 || traits.length === 0) return 1;
   const budget = config.traitProgressionBonusBudget;
   if (traits.length === 1) return 1 + budget;
-  if (traits.length === 2) return 1 + budget * (index === 0 ? 0.65 : 0.35);
-  return 1 + budget / 3;
+  if (traits.length === 2) return 1 + budget * [0.6, 0.4][index];
+  return 1 + budget * [0.5, 0.3, 0.2][index];
 }
 
 function resultScore(result: OverallResult) {

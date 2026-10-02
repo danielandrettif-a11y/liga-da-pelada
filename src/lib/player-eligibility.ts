@@ -20,6 +20,5 @@ export function isCompetitiveProfileComplete(player: CompetitiveProfile | null |
     && Boolean(player.avatar_url?.trim())
     && Boolean(player.player_profile && LINE_PROFILES.includes(player.player_profile))
     && traits.length >= 1
-    && traits.length <= 2;
+    && traits.length <= 3;
 }
-

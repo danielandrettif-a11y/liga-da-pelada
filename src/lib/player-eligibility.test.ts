@@ -11,19 +11,18 @@ const complete = {
 };
 
 describe("isCompetitiveProfileComplete", () => {
-  it("aceita jogador oficial com nome, foto, posição e até dois estilos", () => {
+  it("aceita jogador oficial com nome, foto, posição e até três estilos", () => {
     expect(isCompetitiveProfileComplete(complete)).toBe(true);
     expect(isCompetitiveProfileComplete({ ...complete, overall_traits: ["offensive", "defensive"] })).toBe(true);
+    expect(isCompetitiveProfileComplete({ ...complete, overall_traits: ["offensive", "midfield", "defensive"] })).toBe(true);
   });
 
-  it("recusa perfil sem foto, sem estilo ou com três estilos legados", () => {
+  it("recusa perfil sem foto ou sem estilo", () => {
     expect(isCompetitiveProfileComplete({ ...complete, avatar_url: null })).toBe(false);
     expect(isCompetitiveProfileComplete({ ...complete, overall_traits: [] })).toBe(false);
-    expect(isCompetitiveProfileComplete({ ...complete, overall_traits: ["offensive", "midfield", "defensive"] })).toBe(false);
   });
 
   it("prioriza a coluna calculada pelo banco quando ela estiver presente", () => {
     expect(isCompetitiveProfileComplete({ ...complete, is_competitive_profile_complete: false })).toBe(false);
   });
 });
-

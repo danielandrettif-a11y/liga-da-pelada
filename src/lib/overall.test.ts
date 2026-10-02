@@ -116,6 +116,12 @@ describe("motor adaptativo de OVR", () => {
     goalkeeperOutcomeScoring: true,
     goalkeeperWeights: { conceded: 0.6, cleanSheet: 0.25, survival: 0.1, discipline: 0.05 },
   });
+  const distributedTraitBonusFormula = parseOverallFormulaConfig({
+    ...goalkeeperOutcomeFormula,
+    traitsAsProgressionBonus: true,
+    traitProgressionBonusBudget: 0.30,
+    prioritizedTraitProgression: false,
+  });
 
   it("separa gols e assistências no OVR V10 sem transformar vitória em defesa", () => {
     const scorer = { id: "scorer", playerProfile: "offensive" as const, overallTraits: ["offensive" as const], overallSeedMode: "observed" as const };
@@ -552,6 +558,38 @@ describe("motor adaptativo de OVR", () => {
     expect(snapshots.get("secondary")!.positions.ATA.value).toBeGreaterThanOrEqual(snapshots.get("triple")!.positions.ATA.value);
     expect(snapshots.get("triple")!.positions.ATA.value).toBeGreaterThan(snapshots.get("none")!.positions.ATA.value);
     expect(snapshots.get("single")!.positions.DEF.value).toBe(snapshots.get("none")!.positions.DEF.value);
+  });
+
+  it("divide o bônus de progressão em 100%, 60/40 ou 50/30/20 na v16", () => {
+    const formula = parseOverallFormulaConfig({
+      ...distributedTraitBonusFormula,
+      maxChangePerRound: 5,
+      performanceChangeBonus: 0,
+    });
+    const variants: OverallPlayer[] = [
+      { id: "none", playerProfile: "offensive", overallTraits: [], overallSeedMode: "observed" },
+      { id: "single", playerProfile: "offensive", overallTraits: ["offensive"], overallSeedMode: "observed" },
+      { id: "two-primary", playerProfile: "offensive", overallTraits: ["offensive", "defensive"], overallSeedMode: "observed" },
+      { id: "two-secondary", playerProfile: "offensive", overallTraits: ["defensive", "offensive"], overallSeedMode: "observed" },
+      { id: "three-primary", playerProfile: "offensive", overallTraits: ["offensive", "defensive", "midfield"], overallSeedMode: "observed" },
+      { id: "three-secondary", playerProfile: "offensive", overallTraits: ["defensive", "offensive", "midfield"], overallSeedMode: "observed" },
+      { id: "three-tertiary", playerProfile: "offensive", overallTraits: ["defensive", "midfield", "offensive"], overallSeedMode: "observed" },
+    ];
+    const result = calculatePlayerOveralls(variants, [round(1, variants.map((player) => appearance(player.id, {
+      matchId: `v16-${player.id}`,
+      playerProfileLocked: "offensive",
+      goals: 5,
+      assists: 2,
+    })))], formula);
+    const ata = new Map(result.snapshots.map((snapshot) => [snapshot.playerId, snapshot.positions.ATA.value]));
+
+    expect(ata.get("none")).toBe(75);
+    expect(ata.get("single")).toBe(76.5);
+    expect(ata.get("two-primary")).toBe(75.9);
+    expect(ata.get("two-secondary")).toBe(75.6);
+    expect(ata.get("three-primary")).toBe(75.8);
+    expect(ata.get("three-secondary")).toBe(75.5);
+    expect(ata.get("three-tertiary")).toBe(75.3);
   });
 
   it("usa a prioridade do ADM para limitar a evolução de cada posição na v13", () => {

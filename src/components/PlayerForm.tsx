@@ -64,6 +64,7 @@ export function PlayerForm({
   const [privateBalanceTag, setPrivateBalanceTag] = useState<PrivateBalanceTag | null>(initialPrivateBalanceTag);
   const [overallTraits, setOverallTraits] = useState<PlayerProfile[]>(player?.overall_traits || []);
   const [primaryOverallTrait, setPrimaryOverallTrait] = useState<PlayerProfile | null>(player?.overall_traits?.[0] || null);
+  const [secondaryOverallTrait, setSecondaryOverallTrait] = useState<PlayerProfile | null>(player?.overall_traits?.[1] || null);
 
   useEffect(() => {
     return () => {
@@ -206,9 +207,13 @@ export function PlayerForm({
 
     const formData = new FormData(event.currentTarget);
     formData.delete("overall_traits");
-    const orderedTraits = overallTraits.length === 2 && primaryOverallTrait
-      ? [primaryOverallTrait, ...overallTraits.filter((trait) => trait !== primaryOverallTrait)]
-      : overallTraits;
+    const orderedTraits = [
+      ...(primaryOverallTrait && overallTraits.includes(primaryOverallTrait) ? [primaryOverallTrait] : []),
+      ...(overallTraits.length === 3 && secondaryOverallTrait && secondaryOverallTrait !== primaryOverallTrait
+        && overallTraits.includes(secondaryOverallTrait) ? [secondaryOverallTrait] : []),
+      ...overallTraits.filter((trait) => trait !== primaryOverallTrait
+        && (overallTraits.length !== 3 || trait !== secondaryOverallTrait)),
+    ];
     for (const trait of orderedTraits) formData.append("overall_traits", trait);
     formData.set("remove_active_avatar", String(removeActiveAvatar));
     formData.set("remove_alternate_avatar", String(removeAlternateAvatar));
@@ -447,11 +452,10 @@ export function PlayerForm({
             <span className={player?.name?.trim() ? "text-success" : "text-warning"}>{player?.name?.trim() ? "✓" : "○"} Nome</span>
             <span className={player?.avatar_url ? "text-success" : "text-warning"}>{player?.avatar_url ? "✓" : "○"} Foto</span>
             <span className={player?.player_profile ? "text-success" : "text-warning"}>{player?.player_profile ? "✓" : "○"} Posição</span>
-            <span className={overallTraits.length >= 1 && overallTraits.length <= 2 ? "text-success" : "text-warning"}>
-              {overallTraits.length >= 1 && overallTraits.length <= 2 ? "✓" : "○"} Estilo pelo ADM
+            <span className={overallTraits.length >= 1 && overallTraits.length <= 3 ? "text-success" : "text-warning"}>
+              {overallTraits.length >= 1 && overallTraits.length <= 3 ? "✓" : "○"} Estilo pelo ADM
             </span>
           </div>
-          {overallTraits.length > 2 && <p className="mt-3 text-[10px] font-bold text-warning">O ADM precisa revisar suas três características antigas e escolher uma principal e, opcionalmente, uma secundária.</p>}
         </div>
       )}
 
@@ -511,7 +515,7 @@ export function PlayerForm({
 
       {mode === "admin" && (memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2 rounded-2xl border border-accent/25 bg-accent/5 p-4">
         <legend className="px-1 text-xs font-bold uppercase tracking-wider text-accent">Características de jogo do OVR</legend>
-        <p className="text-[11px] leading-4 text-muted">Escolha no máximo duas. A principal recebe 100% da evidência daquela posição, a secundária 60% e posições não marcadas 20%. A função realmente exercida na rodada também participa do OVR.</p>
+        <p className="text-[11px] leading-4 text-muted">Escolha até três. O bônus de evolução é dividido em 100%; 60%/40%; ou 50%/30%/20%. Posições não marcadas continuam evoluindo, mas sem essa aceleração. A função realmente exercida na rodada também participa do OVR.</p>
         <div className="grid gap-2 pt-1">
           {PLAYER_PROFILE_OPTIONS.map((option) => {
             const trait = option.value as PlayerProfile;
@@ -523,14 +527,21 @@ export function PlayerForm({
                   name="overall_traits"
                   value={option.value}
                   checked={selected}
-                  disabled={!selected && overallTraits.length >= 2}
-                  onChange={() => setOverallTraits((current) => {
-                    const next = current.includes(trait)
-                      ? current.filter((item) => item !== trait)
-                      : current.length < 2 ? [...current, trait] : current;
-                    if (!next.includes(primaryOverallTrait as PlayerProfile)) setPrimaryOverallTrait(next[0] || null);
-                    return next;
-                  })}
+                  disabled={!selected && overallTraits.length >= 3}
+                  onChange={() => {
+                    const next = selected
+                      ? overallTraits.filter((item) => item !== trait)
+                      : [...overallTraits, trait];
+                    const nextPrimary = primaryOverallTrait && next.includes(primaryOverallTrait)
+                      ? primaryOverallTrait
+                      : next[0] || null;
+                    const nextSecondary = secondaryOverallTrait && secondaryOverallTrait !== nextPrimary && next.includes(secondaryOverallTrait)
+                      ? secondaryOverallTrait
+                      : next.find((item) => item !== nextPrimary) || null;
+                    setOverallTraits(next);
+                    setPrimaryOverallTrait(nextPrimary);
+                    setSecondaryOverallTrait(nextSecondary);
+                  }}
                   className="h-4 w-4 rounded disabled:opacity-40"
                 />
                 <span className="text-sm font-bold text-foreground">{option.label}</span>
@@ -538,19 +549,39 @@ export function PlayerForm({
             );
           })}
         </div>
-        {overallTraits.length === 2 && (
+        {overallTraits.length >= 2 && (
           <div className="rounded-xl border border-warning/25 bg-warning/8 p-3">
             <p className="text-[10px] font-black uppercase tracking-wider text-warning">Qual é a característica principal?</p>
             <div className="mt-2 grid grid-cols-2 gap-2">
               {overallTraits.map((trait) => {
                 const option = PLAYER_PROFILE_OPTIONS.find((item) => item.value === trait);
                 return <label key={`primary-${trait}`} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold text-foreground has-[:checked]:border-warning">
-                  <input type="radio" name="overall_trait_primary" checked={primaryOverallTrait === trait} onChange={() => setPrimaryOverallTrait(trait)} />
+                  <input type="radio" name="overall_trait_primary" checked={primaryOverallTrait === trait} onChange={() => {
+                    const previousPrimary = primaryOverallTrait;
+                    setPrimaryOverallTrait(trait);
+                    if (secondaryOverallTrait === trait) {
+                      setSecondaryOverallTrait(previousPrimary && previousPrimary !== trait
+                        ? previousPrimary
+                        : overallTraits.find((item) => item !== trait) || null);
+                    }
+                  }} />
                   {option?.label || trait}
                 </label>;
               })}
             </div>
-            <p className="mt-2 text-[10px] text-muted">A principal recebe 100% da evidência; a secundária, 60%.</p>
+            {overallTraits.length === 3 && <>
+              <p className="mt-3 text-[10px] font-black uppercase tracking-wider text-warning">Qual é a característica secundária?</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {overallTraits.filter((trait) => trait !== primaryOverallTrait).map((trait) => {
+                  const option = PLAYER_PROFILE_OPTIONS.find((item) => item.value === trait);
+                  return <label key={`secondary-${trait}`} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold text-foreground has-[:checked]:border-warning">
+                    <input type="radio" name="overall_trait_secondary" checked={secondaryOverallTrait === trait} onChange={() => setSecondaryOverallTrait(trait)} />
+                    {option?.label || trait}
+                  </label>;
+                })}
+              </div>
+            </>}
+            <p className="mt-2 text-[10px] text-muted">{overallTraits.length === 2 ? "O bônus é dividido em 60% para a principal e 40% para a segunda." : "O bônus é dividido em 50% para a principal, 30% para a secundária e 20% para a terceira."}</p>
           </div>
         )}
         {memberCategory === "guest" && <p className="text-[10px] leading-4 text-warning">Convidado pode ser avaliado agora, mas só ganha OVR quando for convertido em jogador oficial.</p>}
