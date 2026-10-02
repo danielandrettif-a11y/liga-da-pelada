@@ -10,8 +10,9 @@ import {
   type FantasyCardDefinition,
 } from "@/lib/fantasy/cards/catalog";
 import { getCardArtUrl, preloadCardArt } from "@/lib/fantasy/cards/card-assets";
-import { fantasyCardRequiresSavedLineup, filterFantasyCardTargets } from "@/lib/fantasy/cards/eligibility";
-import type { FantasyUserCardDTO } from "@/lib/actions/fantasy-cards";
+import { applyFantasyDiscount, canSelectFantasyCardInstance, fantasyCardRequiresSavedLineup, filterFantasyCardTargets } from "@/lib/fantasy/cards/eligibility";
+import { formatFantasyMoney } from "@/lib/fantasy/config";
+import type { FantasyActiveCardDTO, FantasyUserCardDTO } from "@/lib/actions/fantasy-cards";
 import { activateCardForRound, getMyInventory } from "@/lib/actions/fantasy-cards";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 
@@ -25,6 +26,7 @@ type Props = {
   lineupPlayers?: Array<{ id: string; name: string; price: number }>;
   captainPlayerId?: string | null;
   lineupSaved?: boolean;
+  activeCard?: FantasyActiveCardDTO | null;
 };
 
 type InventoryData = {
@@ -95,6 +97,7 @@ export function FantasyInventoryModal({
   lineupPlayers = [],
   captainPlayerId = null,
   lineupSaved = true,
+  activeCard = null,
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -173,14 +176,19 @@ export function FantasyInventoryModal({
   }
 
   function handleSelectInstance(card: FantasyCardDefinition, instances: FantasyUserCardDTO[]) {
-    const availableInstance = instances.find((i) => i.status === "OWNED");
+    const availableInstance = instances.find((instance) =>
+      instance.id === activeCard?.userCardId
+        && canSelectFantasyCardInstance(instance.status, instance.id, activeCard.userCardId),
+    )
+      || instances.find((instance) => canSelectFantasyCardInstance(instance.status, instance.id));
     if (!availableInstance) return;
 
     const eligible = getEligiblePlayers(card);
+    const editingActiveCard = availableInstance.id === activeCard?.userCardId;
     setSelectedToUse({ card, instance: availableInstance });
-    setTargetPlayerId(eligible[0]?.id || "");
-    setTargetPlayer2Id(eligible[1]?.id || (eligible.length > 1 ? eligible[1]?.id : eligible[0]?.id) || "");
-    setTargetPrediction("TOP_SCORER");
+    setTargetPlayerId(editingActiveCard ? activeCard?.targetPlayerId || eligible[0]?.id || "" : eligible[0]?.id || "");
+    setTargetPlayer2Id(editingActiveCard ? activeCard?.targetPlayer2Id || eligible[1]?.id || "" : eligible[1]?.id || "");
+    setTargetPrediction(editingActiveCard ? activeCard?.targetPrediction || "TOP_SCORER" : "TOP_SCORER");
   }
 
   function handleConfirmActivation() {
@@ -448,17 +456,43 @@ export function FantasyInventoryModal({
                               ? "Escolha seu representante no duelo:"
                               : "Escolha o jogador alvo desta carta:"}
                     </label>
-                    <select
-                      value={targetPlayerId}
-                      onChange={(e) => setTargetPlayerId(e.target.value)}
-                      className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground"
-                    >
-                      {eligible.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} (C$ {p.price.toFixed(2)})
-                        </option>
-                      ))}
-                    </select>
+                    {isBargain ? (
+                      <div role="radiogroup" aria-label="Atleta que receberá o desconto" className="mobile-dialog-scroll max-h-64 space-y-1.5 overflow-y-auto pr-1">
+                        {eligible.map((player) => {
+                          const discountPercent = Number(selectedToUse.card.effectConfig.discountPercent ?? 20);
+                          const discountedPrice = applyFantasyDiscount(player.price, discountPercent);
+                          const selected = targetPlayerId === player.id;
+                          return (
+                            <button
+                              key={player.id}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              onClick={() => setTargetPlayerId(player.id)}
+                              className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left ${selected ? "border-accent bg-accent/10" : "border-border bg-background"}`}
+                            >
+                              <span className="min-w-0 truncate text-xs font-bold text-foreground">{player.name}</span>
+                              <span className="flex shrink-0 items-center gap-1.5 text-[10px]">
+                                <span className="font-bold text-muted line-through">{formatFantasyMoney(player.price)}</span>
+                                <strong className="text-accent">{formatFantasyMoney(discountedPrice)}</strong>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <select
+                        value={targetPlayerId}
+                        onChange={(e) => setTargetPlayerId(e.target.value)}
+                        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground"
+                      >
+                        {eligible.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} (C$ {p.price.toFixed(2)})
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 );
               })()}
@@ -600,7 +634,11 @@ export function FantasyInventoryModal({
             groupsList.map((group) => {
               const { card, count, instances } = group;
               const rarityInfo = RARITY_CONFIG[card.rarity];
-              const available = count > 0;
+              const activeInstance = instances.find((instance) =>
+                canSelectFantasyCardInstance(instance.status, instance.id, activeCard?.userCardId)
+                  && instance.id === activeCard?.userCardId,
+              );
+              const available = count > 0 || Boolean(activeInstance);
 
               return (
                 <div
@@ -638,7 +676,7 @@ export function FantasyInventoryModal({
                           {card.name}
                         </h3>
                         <span className="rounded-full bg-white/10 px-1.5 py-0.2 text-[8px] font-black text-white">
-                          ×{count}
+                          {activeInstance ? "Em uso" : `×${count}`}
                         </span>
                         <span className={`rounded px-1.5 py-0.2 text-[7px] font-black uppercase ${rarityInfo.badgeBg}`}>
                           {rarityInfo.label}
@@ -661,7 +699,7 @@ export function FantasyInventoryModal({
                           : "bg-white/5 text-muted cursor-not-allowed opacity-50"
                       }`}
                     >
-                      {available ? "Usar" : "Esgotada"}
+                      {activeInstance ? "Ajustar" : available ? "Usar" : "Esgotada"}
                     </button>
                   )}
                 </div>

@@ -10,6 +10,10 @@ export function applyFantasyDiscount(price: number, discountPercent: number) {
   return Math.round((price * (1 - percent / 100) + Number.EPSILON) * 100) / 100;
 }
 
+export function canSelectFantasyCardInstance(status: string, userCardId: string, activeUserCardId?: string | null) {
+  return status === "OWNED" || (status === "RESERVED" && userCardId === activeUserCardId);
+}
+
 export function fantasyCardRequiresSavedLineup(
   card: Pick<FantasyCardDefinition, "slug" | "effectType" | "targetFilter">,
 ) {

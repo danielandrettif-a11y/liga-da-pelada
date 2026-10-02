@@ -429,6 +429,7 @@ export function FantasyActiveCardSlot({
           lineupPlayers={lineupPlayers}
           captainPlayerId={captainPlayerId}
           lineupSaved={lineupSaved}
+          activeCard={activeCard}
           onCardActivated={() => {
             onCardActivated?.(Boolean(activeCard));
             onRefresh?.();

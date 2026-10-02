@@ -5,7 +5,7 @@ import { getCurrentAccount, getAdminClient } from "@/lib/auth";
 import { FANTASY_CARDS_CATALOG, getCardBySlug, type FantasyCardDefinition } from "@/lib/fantasy/cards/catalog";
 import { generatePackOffers } from "@/lib/fantasy/cards/pack-generator";
 import { MAX_SPECIAL_CARDS_PER_ROUND } from "@/lib/fantasy/cards/config";
-import { fantasyCardRequiresSavedLineup, isFantasyPriceEligible } from "@/lib/fantasy/cards/eligibility";
+import { canSelectFantasyCardInstance, fantasyCardRequiresSavedLineup, isFantasyPriceEligible } from "@/lib/fantasy/cards/eligibility";
 import type { FantasyActiveCardDTO, FantasyPackDTO, FantasyUserCardDTO } from "@/lib/fantasy/cards/dtos";
 
 export type { FantasyActiveCardDTO, FantasyPackDTO, FantasyUserCardDTO } from "@/lib/fantasy/cards/dtos";
@@ -447,10 +447,6 @@ export async function activateCardForRound({
     return { success: false, error: "Carta não encontrada no seu inventário." };
   }
 
-  if (userCard.status !== "OWNED") {
-    return { success: false, error: "Esta carta não está disponível para uso." };
-  }
-
   // Mantemos a ativação atual reservada até que a nova carta passe por todas as validações.
   const { data: existingAct } = await client
     .from("fantasy_card_activations")
@@ -458,6 +454,10 @@ export async function activateCardForRound({
     .eq("round_id", roundId)
     .eq("user_id", account.user.id)
     .maybeSingle();
+
+  if (!canSelectFantasyCardInstance(userCard.status, userCard.id, existingAct?.user_card_id)) {
+    return { success: false, error: "Esta carta não está disponível para uso." };
+  }
 
   const userCardObj = Array.isArray(userCard.card) ? userCard.card[0] : userCard.card;
 
@@ -609,7 +609,7 @@ export async function activateCardForRound({
   };
 
   // Só agora a carta anteriormente reservada é devolvida ao inventário.
-  if (existingAct?.user_card_id) {
+  if (existingAct?.user_card_id && existingAct.user_card_id !== userCardId) {
     await client
       .from("fantasy_user_cards")
       .update({ status: "OWNED" })

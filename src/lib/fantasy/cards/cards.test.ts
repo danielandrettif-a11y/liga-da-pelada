@@ -3,7 +3,7 @@ import { CardEffectResolver, type CardResolverPlayer, type CardResolverContext }
 import { generatePackOffers, rollRarity } from "./pack-generator";
 import { FANTASY_CARDS_CATALOG, getCardBySlug } from "./catalog";
 import { MAX_SPECIAL_CARDS_PER_ROUND, FANTASY_RARITY_PROBABILITIES } from "./config";
-import { applyFantasyDiscount, fantasyCardRequiresSavedLineup } from "./eligibility";
+import { applyFantasyDiscount, canSelectFantasyCardInstance, fantasyCardRequiresSavedLineup } from "./eligibility";
 
 describe("Cartola V3 — Catálogo & Probabilidades", () => {
   it("contém as 20 cartas oficiais habilitadas e nenhuma experimental", () => {
@@ -55,6 +55,11 @@ describe("Cartola V3 — Catálogo & Probabilidades", () => {
   it("permite usar a Barganha durante a edição da escalação", () => {
     expect(getCardBySlug("bargain")?.description).not.toContain("Antes de montar");
     expect(applyFantasyDiscount(20, 20)).toBe(16);
+  });
+
+  it("permite ajustar a própria carta reservada sem liberar outras reservas", () => {
+    expect(canSelectFantasyCardInstance("RESERVED", "card-1", "card-1")).toBe(true);
+    expect(canSelectFantasyCardInstance("RESERVED", "card-2", "card-1")).toBe(false);
   });
 });
 

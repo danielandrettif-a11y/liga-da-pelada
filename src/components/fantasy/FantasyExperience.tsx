@@ -850,6 +850,7 @@ export function FantasyExperience({
     const isBeingDragged = draggedSlot === slot;
     const isDragOver = dragOverSlot === slot;
     const isOutsideCallup = Boolean(player && hasCurrentCallup && !player.isInCurrentRound);
+    const hasBargainDiscount = Boolean(player && discountedPlayerId === player.id);
 
     // O mesmo critério persistido no servidor decide o selo e o pacote de pontos.
     const isCorrectPosition = Boolean(
@@ -1032,8 +1033,11 @@ export function FantasyExperience({
               <span className="mt-0.5 text-[9px] font-black text-accent drop-shadow">
                 {displayedPoints.toFixed(1)} pts
               </span>
-              <span className="text-[8px] font-bold text-white/70">
-                {formatFantasyMoney(player.price, settings.currencyName)}
+              <span className="flex items-center gap-1 text-[8px] font-bold text-white/70">
+                {hasBargainDiscount && <span className="line-through opacity-60">{formatFantasyMoney(player.price, settings.currencyName)}</span>}
+                <strong className={hasBargainDiscount ? "text-accent" : ""}>
+                  {formatFantasyMoney(playerPurchasePrice(player), settings.currencyName)}
+                </strong>
               </span>
             </button>
           </div>
@@ -2237,6 +2241,7 @@ export function FantasyExperience({
           lineupPlayers={validSelectedPlayers}
           captainPlayerId={captainId}
           lineupSaved={isSaved}
+          activeCard={currentActiveCard}
           onCardActivated={() => {
             if (!currentActiveCard) setCurrentInventoryCount((count) => Math.max(0, count - 1));
             requestRefresh(0);
