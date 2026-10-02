@@ -369,6 +369,12 @@ export function FantasyActiveCardSlot({
               </div>
             )}
 
+            {activeCard.card.slug === "bargain" && !activeCard.targetPlayerId && (
+              <div className="rounded-xl border border-accent/30 bg-accent/10 px-3 py-2 text-xs font-bold text-accent">
+                {Number(activeCard.card.effectConfig.discountPercent ?? 20)}% de desconto disponível na próxima compra do mercado.
+              </div>
+            )}
+
             {cardProgress && (
               <div className={`rounded-xl border px-3 py-2.5 ${
                 cardProgress.done

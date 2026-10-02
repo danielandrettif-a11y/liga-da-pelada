@@ -10,8 +10,7 @@ import {
   type FantasyCardDefinition,
 } from "@/lib/fantasy/cards/catalog";
 import { getCardArtUrl, preloadCardArt } from "@/lib/fantasy/cards/card-assets";
-import { applyFantasyDiscount, canSelectFantasyCardInstance, fantasyCardRequiresSavedLineup, filterFantasyCardTargets } from "@/lib/fantasy/cards/eligibility";
-import { formatFantasyMoney } from "@/lib/fantasy/config";
+import { canSelectFantasyCardInstance, fantasyCardRequiresSavedLineup, filterFantasyCardTargets } from "@/lib/fantasy/cards/eligibility";
 import type { FantasyActiveCardDTO, FantasyUserCardDTO } from "@/lib/actions/fantasy-cards";
 import { activateCardForRound, getMyInventory } from "@/lib/actions/fantasy-cards";
 import { useDialogViewport } from "@/lib/useDialogViewport";
@@ -415,7 +414,7 @@ export function FantasyInventoryModal({
 
               {selectedToUse.card.slug === "bargain" && (
                 <div className="rounded-2xl border border-warning/40 bg-warning/10 px-3.5 py-3 text-xs leading-relaxed text-warning">
-                  <strong>Pode usar enquanto ajusta o time.</strong> Escolha o atleta agora; depois ele precisa entrar na escalação final para o desconto valer.
+                  <strong>A próxima compra terá desconto.</strong> No mercado, todos os atletas disponíveis mostrarão o preço com 20% de desconto. Ao comprar um, o benefício ficará preso nele.
                 </div>
               )}
 
@@ -429,7 +428,6 @@ export function FantasyInventoryModal({
               {selectedToUse.card.requiresTarget === "SINGLE_PLAYER" && (() => {
                 const eligible = getEligiblePlayers(selectedToUse.card);
                 const isVice = selectedToUse.card.slug === "vice_captain";
-                const isBargain = selectedToUse.card.slug === "bargain";
                 const isAllIn = selectedToUse.card.slug === "all_in";
 
                 if (isVice && eligible.length === 0) {
@@ -448,51 +446,23 @@ export function FantasyInventoryModal({
                     <label className="text-[10px] font-bold text-muted block">
                       {isVice
                         ? "Escolha quem será o Vice-Capitão do seu time (apenas atletas escalados):"
-                        : isBargain
-                          ? "Escolha o atleta do mercado que receberá o desconto:"
-                          : isAllIn
+                        : isAllIn
                             ? "Escolha qualquer atleta do mercado:"
                             : selectedToUse.card.slug === "head_to_head"
                               ? "Escolha seu representante no duelo:"
                               : "Escolha o jogador alvo desta carta:"}
                     </label>
-                    {isBargain ? (
-                      <div role="radiogroup" aria-label="Atleta que receberá o desconto" className="mobile-dialog-scroll max-h-64 space-y-1.5 overflow-y-auto pr-1">
-                        {eligible.map((player) => {
-                          const discountPercent = Number(selectedToUse.card.effectConfig.discountPercent ?? 20);
-                          const discountedPrice = applyFantasyDiscount(player.price, discountPercent);
-                          const selected = targetPlayerId === player.id;
-                          return (
-                            <button
-                              key={player.id}
-                              type="button"
-                              role="radio"
-                              aria-checked={selected}
-                              onClick={() => setTargetPlayerId(player.id)}
-                              className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left ${selected ? "border-accent bg-accent/10" : "border-border bg-background"}`}
-                            >
-                              <span className="min-w-0 truncate text-xs font-bold text-foreground">{player.name}</span>
-                              <span className="flex shrink-0 items-center gap-1.5 text-[10px]">
-                                <span className="font-bold text-muted line-through">{formatFantasyMoney(player.price)}</span>
-                                <strong className="text-accent">{formatFantasyMoney(discountedPrice)}</strong>
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <select
-                        value={targetPlayerId}
-                        onChange={(e) => setTargetPlayerId(e.target.value)}
-                        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground"
-                      >
-                        {eligible.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} (C$ {p.price.toFixed(2)})
-                          </option>
-                        ))}
-                      </select>
-                    )}
+                    <select
+                      value={targetPlayerId}
+                      onChange={(e) => setTargetPlayerId(e.target.value)}
+                      className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground"
+                    >
+                      {eligible.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} (C$ {p.price.toFixed(2)})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 );
               })()}

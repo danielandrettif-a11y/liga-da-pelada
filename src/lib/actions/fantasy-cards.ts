@@ -498,7 +498,7 @@ export async function activateCardForRound({
   }
 
   if (userCardObj?.slug === "bargain") {
-    if (!targetPlayerId || !marketPlayerIds.has(targetPlayerId)) {
+    if (targetPlayerId && !marketPlayerIds.has(targetPlayerId)) {
       return { success: false, error: "Escolha um atleta válido do mercado para a Barganha." };
     }
   }

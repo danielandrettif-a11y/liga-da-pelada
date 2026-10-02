@@ -38,6 +38,7 @@ import {
   saveFantasyLineup,
   type FantasyMarketPlayer,
 } from "@/lib/actions/fantasy";
+import { activateCardForRound } from "@/lib/actions/fantasy-cards";
 import { supabase } from "@/lib/supabase";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { getFantasySlotRoles, isCorrectFantasySlot } from "@/lib/fantasy/lineup-positions";
@@ -253,6 +254,7 @@ export function FantasyExperience({
   const hasCurrentCallup = market.some((player) => player.isInCurrentRound);
   const [calledUpOnly, setCalledUpOnly] = useState(() => hasCurrentCallup);
   const [message, setMessage] = useState("");
+  const [bargainPurchasePending, setBargainPurchasePending] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showScoringModal, setShowScoringModal] = useState(false);
   const [showInventoryModal, setShowInventoryModal] = useState(false);
@@ -359,9 +361,13 @@ export function FantasyExperience({
   // V3: Desconto temporário no preço do jogador da carta Barganha
   const discountedPlayerId = currentActiveCard?.card?.effectType === "PLAYER_DISCOUNT" ? currentActiveCard.targetPlayerId : null;
   const bargainDiscountPercent = Number(currentActiveCard?.card?.effectConfig?.discountPercent ?? 20);
+  const bargainAwaitingPurchase = currentActiveCard?.card?.effectType === "PLAYER_DISCOUNT" && !discountedPlayerId;
   const playerPurchasePrice = (player: FantasyMarketPlayer) => discountedPlayerId === player.id
     ? applyFantasyDiscount(player.price, bargainDiscountPercent)
     : player.price;
+  const marketPlayerPurchasePrice = (player: FantasyMarketPlayer, bought: boolean) => bargainAwaitingPurchase && !bought
+    ? applyFantasyDiscount(player.price, bargainDiscountPercent)
+    : playerPurchasePrice(player);
 
   const selectedPlayers = selected.map((id) =>
     id ? market.find((player) => player.id === id) || null : null
@@ -717,7 +723,8 @@ export function FantasyExperience({
     setMessage("Elenco limpo. Salve para confirmar a venda de todos.");
   }
 
-  function togglePlayer(player: FantasyMarketPlayer) {
+  async function togglePlayer(player: FantasyMarketPlayer) {
+    if (bargainPurchasePending) return;
     if (!open) {
       setSelectedDrawerPlayer(player);
       return;
@@ -731,7 +738,27 @@ export function FantasyExperience({
 
     const currentCount = selected.filter(Boolean).length;
     if (currentCount >= playersPerTeam) return setMessage(`Sua escalação já tem ${playersPerTeam} jogadores.`);
-    if (playerPurchasePrice(player) > remaining) return setMessage("Patrimônio insuficiente para comprar este jogador.");
+    const purchasePrice = marketPlayerPurchasePrice(player, false);
+    if (purchasePrice > remaining) return setMessage("Patrimônio insuficiente para comprar este jogador.");
+
+    if (bargainAwaitingPurchase) {
+      if (!round || !currentActiveCard) return setMessage("Não foi possível aplicar a Barganha agora.");
+      setMessage("Aplicando a Barganha...");
+      setBargainPurchasePending(player.id);
+      try {
+        const result = await activateCardForRound({
+          roundId: round.id,
+          userCardId: currentActiveCard.userCardId,
+          targetPlayerId: player.id,
+        });
+        if (!result.success) return setMessage(result.error || "Não foi possível aplicar a Barganha.");
+        setCurrentActiveCard({ ...currentActiveCard, targetPlayerId: player.id, targetPlayerName: player.name });
+      } catch {
+        return setMessage("Não foi possível aplicar a Barganha agora.");
+      } finally {
+        setBargainPurchasePending(null);
+      }
+    }
 
     // Ao entrar pelo campo, permanece no mercado até completar todas as vagas
     // daquela posição. Ex.: o primeiro DEF mantém o segundo slot DEF como alvo.
@@ -1991,8 +2018,8 @@ export function FantasyExperience({
             <div className="space-y-2.5 w-full">
               {filtered.map((player) => {
                 const bought = selected.includes(player.id);
-                const purchasePrice = playerPurchasePrice(player);
-                const hasBargainDiscount = discountedPlayerId === player.id;
+                const purchasePrice = marketPlayerPurchasePrice(player, bought);
+                const hasBargainDiscount = purchasePrice < player.price;
                 const simulatedRemaining = bought ? remaining + purchasePrice : remaining - purchasePrice;
                 const backgroundImage = cosmeticImage(player.cosmetics?.backgroundAssetKey);
                 const displayedPoints = sort === "lastRound" ? player.roundPoints : player.totalPoints;
@@ -2168,16 +2195,18 @@ export function FantasyExperience({
                           <button
                             type="button"
                             onClick={() => togglePlayer(player)}
-                            disabled={!bought && purchasePrice > remaining}
+                            disabled={Boolean(bargainPurchasePending) || (!bought && purchasePrice > remaining)}
                             className={`mt-1.5 rounded-xl px-3 py-1 text-[9px] font-black uppercase transition-transform active:scale-90 ${
-                              bought
+                              bargainPurchasePending
+                                ? "bg-white/5 text-muted cursor-wait opacity-60"
+                                : bought
                                 ? "bg-danger/20 text-danger border border-danger/30 hover:bg-danger/30"
                                 : purchasePrice > remaining
                                 ? "bg-white/5 text-muted cursor-not-allowed opacity-50"
                                 : "bg-accent text-background hover:brightness-110 shadow-sm"
                             }`}
                           >
-                            {bought ? "Vender" : "Comprar"}
+                            {bargainPurchasePending === player.id ? "Aplicando..." : bought ? "Vender" : "Comprar"}
                           </button>
                         )}
                       </div>

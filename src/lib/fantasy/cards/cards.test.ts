@@ -53,7 +53,8 @@ describe("Cartola V3 — Catálogo & Probabilidades", () => {
   });
 
   it("permite usar a Barganha durante a edição da escalação", () => {
-    expect(getCardBySlug("bargain")?.description).not.toContain("Antes de montar");
+    expect(getCardBySlug("bargain")?.description).toContain("próxima compra");
+    expect(getCardBySlug("bargain")?.requiresTarget).toBe("NONE");
     expect(applyFantasyDiscount(20, 20)).toBe(16);
   });
 
