@@ -42,6 +42,7 @@ import {
   transitionMatchTimer,
 } from "@/lib/match-rules";
 import { TeamCrest } from "./TeamCrest";
+import { TeamReferenceBadge } from "./TeamReferenceBadge";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { formatGoalTime } from "@/lib/goal-time";
 import { QuickNextMatchModal } from "./QuickNextMatchModal";
@@ -826,13 +827,14 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
         <div className="flex items-center justify-between w-full">
           {/* Team A */}
           <div className="flex min-w-0 flex-1 flex-col items-center gap-2 sm:gap-3">
+            <TeamReferenceBadge position={match.team_a.position} fallbackIndex={0} color={match.team_a.color} className="h-16 w-16 text-3xl sm:h-20 sm:w-20 sm:text-4xl" />
             <TeamCrest
               name={match.team_a.name}
               crestUrl={match.team_a.crest_url}
               color={match.team_a.color}
               className="h-14 w-14 sm:h-16 sm:w-16"
             />
-            <span className="max-w-[8rem] truncate text-center text-xs font-black text-foreground">
+            <span className="max-w-[8rem] truncate text-center text-[10px] font-bold text-muted">
               {match.team_a.name}
             </span>
             <span className="stat-number text-5xl text-foreground">{displayScore.a}</span>
@@ -854,13 +856,14 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
 
           {/* Team B */}
           <div className="flex min-w-0 flex-1 flex-col items-center gap-2 sm:gap-3">
+            <TeamReferenceBadge position={match.team_b.position} fallbackIndex={1} color={match.team_b.color} className="h-16 w-16 text-3xl sm:h-20 sm:w-20 sm:text-4xl" />
             <TeamCrest
               name={match.team_b.name}
               crestUrl={match.team_b.crest_url}
               color={match.team_b.color}
               className="h-14 w-14 sm:h-16 sm:w-16"
             />
-            <span className="max-w-[8rem] truncate text-center text-xs font-black text-foreground">
+            <span className="max-w-[8rem] truncate text-center text-[10px] font-bold text-muted">
               {match.team_b.name}
             </span>
             <span className="stat-number text-5xl text-foreground">{displayScore.b}</span>

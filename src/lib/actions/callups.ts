@@ -21,6 +21,7 @@ export type CallupEntryWithPlayer = CallupEntry & {
 type CallupRoundTeam = {
   id: string;
   name: string;
+  position?: number | null;
   color: string;
   crest_url?: string | null;
   team_players: Array<{ player_id: string }>;
@@ -85,7 +86,7 @@ export async function getActiveCallups(invite?: { callupId?: string; inviteToken
         id,
         status,
         matches (id, status, started_at),
-        teams (id, name, color, crest_url, team_players (player_id))
+        teams (id, name, position, color, crest_url, team_players (player_id))
       )
     `)
     .eq("league.is_active", true)

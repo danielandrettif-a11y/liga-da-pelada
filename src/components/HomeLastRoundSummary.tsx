@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ClipboardList, Football, Target, X } from "@/components/icons";
 import { TeamCrest } from "@/components/TeamCrest";
+import { TeamReferenceBadge } from "@/components/TeamReferenceBadge";
 import { formatGoalTime } from "@/lib/goal-time";
 
 const PREVIEW_MATCH_COUNT = 5;
@@ -101,8 +102,9 @@ function MatchResult({ match }: { match: any }) {
   return (
     <div className="flex items-center gap-2 py-1.5 px-2 text-xs">
       <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
-        <span className="truncate font-semibold text-foreground/80">{teamA.name}</span>
+        <span className="truncate text-[9px] font-semibold text-muted">{teamA.name}</span>
         <TeamCrest name={teamA.name} crestUrl={teamA.crest_url} color={teamA.color} className="h-4 w-4 shrink-0" />
+        <TeamReferenceBadge position={teamA.position} fallbackIndex={0} color={teamA.color} className="h-8 w-8 text-base" />
       </div>
       <div className="flex min-w-[3.5rem] items-center justify-center gap-1.5 rounded-lg bg-surface px-2 py-1 shadow-inner border border-white/5">
         <span className={`font-bold ${match.score_a > match.score_b ? "text-accent" : "text-foreground/60"}`}>{match.score_a}</span>
@@ -110,8 +112,9 @@ function MatchResult({ match }: { match: any }) {
         <span className={`font-bold ${match.score_b > match.score_a ? "text-accent" : "text-foreground/60"}`}>{match.score_b}</span>
       </div>
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <TeamReferenceBadge position={teamB.position} fallbackIndex={1} color={teamB.color} className="h-8 w-8 text-base" />
         <TeamCrest name={teamB.name} crestUrl={teamB.crest_url} color={teamB.color} className="h-4 w-4 shrink-0" />
-        <span className="truncate font-semibold text-foreground/80">{teamB.name}</span>
+        <span className="truncate text-[9px] font-semibold text-muted">{teamB.name}</span>
       </div>
     </div>
   );
@@ -170,8 +173,9 @@ function MatchDetailsModal({
         {/* Placar Destaque */}
         <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-black/40 p-4">
           <div className="flex flex-1 flex-col items-center text-center">
+            <TeamReferenceBadge position={teamA.position} fallbackIndex={0} color={teamA.color} className="h-12 w-12 text-2xl" />
             <TeamCrest name={teamA.name} crestUrl={teamA.crest_url} color={teamA.color} className="h-10 w-10 shrink-0" />
-            <span className="mt-1.5 max-w-[100px] truncate text-xs font-black text-foreground">{teamA.name}</span>
+            <span className="mt-1.5 max-w-[100px] truncate text-[10px] font-bold text-muted">{teamA.name}</span>
           </div>
 
           <div className="flex items-center gap-2 px-3">
@@ -181,8 +185,9 @@ function MatchDetailsModal({
           </div>
 
           <div className="flex flex-1 flex-col items-center text-center">
+            <TeamReferenceBadge position={teamB.position} fallbackIndex={1} color={teamB.color} className="h-12 w-12 text-2xl" />
             <TeamCrest name={teamB.name} crestUrl={teamB.crest_url} color={teamB.color} className="h-10 w-10 shrink-0" />
-            <span className="mt-1.5 max-w-[100px] truncate text-xs font-black text-foreground">{teamB.name}</span>
+            <span className="mt-1.5 max-w-[100px] truncate text-[10px] font-bold text-muted">{teamB.name}</span>
           </div>
         </div>
 

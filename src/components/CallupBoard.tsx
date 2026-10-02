@@ -45,7 +45,8 @@ import type { Player, PlayerProfile, Stadium } from "@/lib/types";
 import type { FantasyQuickHighlight } from "@/lib/actions/fantasy";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
-import { TeamCrest } from "./TeamCrest";
+import { TeamReferenceBadge } from "./TeamReferenceBadge";
+import { getTeamReference } from "@/lib/team-reference";
 import { RoundCalendarButton } from "./RoundCalendarButton";
 import { CallupTacticalAlertModal } from "./CallupTacticalAlertModal";
 import { useDialogViewport } from "@/lib/useDialogViewport";
@@ -360,28 +361,18 @@ export function CallupBoard({
             className="mt-4 flex items-center gap-3 rounded-2xl border border-accent/45 bg-[linear-gradient(120deg,rgba(204,255,0,.18),rgba(5,29,15,.82)_55%,rgba(9,49,27,.8))] p-3.5 shadow-[0_0_24px_rgba(204,255,0,.12)] transition-transform hover:border-accent/75 active:scale-[.99]"
             aria-label={myDrawnTeam ? `Ver meu time: ${myDrawnTeam.name}` : "Ver times sorteados"}
           >
-            <span
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 bg-black/25 text-accent shadow-[0_0_15px_rgba(204,255,0,.2)]"
-              style={{ borderColor: myDrawnTeam?.color || "rgba(204,255,0,.65)" }}
-            >
-              {myDrawnTeam ? (
-                <TeamCrest
-                  name={myDrawnTeam.name}
-                  crestUrl={myDrawnTeam.crest_url}
-                  color={myDrawnTeam.color}
-                  className="h-8 w-8 rounded-full"
-                />
-              ) : (
-                <Shirt className="h-5 w-5" />
-              )}
-            </span>
+            {myDrawnTeam ? (
+              <TeamReferenceBadge position={myDrawnTeam.position} color={myDrawnTeam.color} className="h-14 w-14 bg-black/25 text-3xl text-white shadow-[0_0_15px_rgba(204,255,0,.2)]" />
+            ) : (
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-accent/60 bg-black/25 text-accent"><Shirt className="h-5 w-5" /></span>
+            )}
             <span className="min-w-0 flex-1">
               <span className="block text-[10px] font-black uppercase tracking-[.15em] text-accent">Times já sorteados</span>
-              <span className="mt-0.5 block truncate text-sm font-black text-foreground">
-                {myDrawnTeam ? `Você ficou no ${myDrawnTeam.name}` : "Veja como ficaram os times da rodada"}
+              <span className="mt-0.5 block truncate text-base font-black text-foreground">
+                {myDrawnTeam ? `Você ficou no Time ${getTeamReference(myDrawnTeam)}` : "Veja como ficaram os times da rodada"}
               </span>
               <span className="mt-0.5 block text-[10px] font-semibold text-muted">
-                Toque para ver a escalação completa.
+                {myDrawnTeam ? `${myDrawnTeam.name} · toque para ver a escalação completa.` : "Toque para ver a escalação completa."}
               </span>
             </span>
             <ChevronRight className="h-5 w-5 shrink-0 text-accent" />

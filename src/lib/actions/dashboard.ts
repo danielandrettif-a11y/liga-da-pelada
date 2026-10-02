@@ -76,8 +76,8 @@ export async function getDashboardData() {
         timer_started_at,
         timer_accumulated_seconds,
         round:round_id!inner (id, number, season_id),
-        teamA:team_a_id (id, name, color, crest_url),
-        teamB:team_b_id (id, name, color, crest_url)
+        teamA:team_a_id (id, name, position, color, crest_url),
+        teamB:team_b_id (id, name, position, color, crest_url)
       `)
       .eq("status", "live")
       .eq("round.season_id", season.id)
@@ -182,6 +182,20 @@ export async function getDashboardData() {
         position: entry.position,
       })),
     }));
+
+    let liveMatch = liveMatchData;
+    if (liveMatchData && (liveMatchData.teamA?.position == null || liveMatchData.teamB?.position == null)) {
+      const liveTeamIds = [liveMatchData.teamA?.id, liveMatchData.teamB?.id].filter(Boolean);
+      const { data: liveTeamPositions } = liveTeamIds.length
+        ? await account.client.from("teams").select("id, position").in("id", liveTeamIds)
+        : { data: [] };
+      const positionByTeamId = new Map((liveTeamPositions || []).map((team: any) => [team.id, team.position]));
+      liveMatch = {
+        ...liveMatchData,
+        teamA: liveMatchData.teamA ? { ...liveMatchData.teamA, position: positionByTeamId.get(liveMatchData.teamA.id) } : null,
+        teamB: liveMatchData.teamB ? { ...liveMatchData.teamB, position: positionByTeamId.get(liveMatchData.teamB.id) } : null,
+      };
+    }
     
     let topScorer = null;
     let topAssists = null;
@@ -235,7 +249,7 @@ export async function getDashboardData() {
           ...nextFriendlyData,
           confirmedPlayers: effectiveFriendlyConfirmed,
         } : null,
-        liveMatch: liveMatchData,
+        liveMatch,
         matchDuration: leagueData?.match_duration || 7,
         venue: {
           name: nextRoundData?.stadium_name || leagueData?.stadium_name || null,

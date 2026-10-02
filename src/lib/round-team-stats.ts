@@ -1,6 +1,7 @@
 export type RoundTeamStatsTeam = {
   id: string;
   name: string;
+  position?: number | null;
   color?: string | null;
   crest_url?: string | null;
 };

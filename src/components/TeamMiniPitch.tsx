@@ -3,6 +3,7 @@
 import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { TeamCrest } from "./TeamCrest";
+import { TeamReferenceBadge } from "./TeamReferenceBadge";
 
 type PitchPlayerProfile = string | null | undefined;
 
@@ -28,6 +29,7 @@ type TeamMiniPitchProps = {
     name: string;
     color: string;
     crest_url?: string | null;
+    position?: number | null;
     team_players: PitchPlayer[];
   };
   index: number;
@@ -125,10 +127,14 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
   return (
     <article className={`glass-card min-w-0 overflow-hidden p-1.5 animate-fade-in-up stagger-${Math.min(index + 1, 5)}`}>
       <div className="mb-1.5 flex min-w-0 items-center gap-1.5 px-0.5 py-0.5">
-        <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-6 w-6" />
-        <h3 className="min-w-0 flex-1 truncate text-[10px] font-black leading-tight text-foreground" title={team.name}>
-          {team.name}
-        </h3>
+        <TeamReferenceBadge position={team.position} fallbackIndex={index} color={team.color} className="h-7 w-7 text-sm" />
+        <div className="min-w-0 flex-1">
+          <span className="block text-[7px] font-black uppercase leading-none tracking-wide text-muted">Time</span>
+          <h3 className="truncate text-[9px] font-bold leading-tight text-foreground/75" title={team.name}>
+            {team.name}
+          </h3>
+        </div>
+        <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-5 w-5" />
         <span className="shrink-0 text-[7px] font-black text-muted">{visiblePlayers.length}J</span>
       </div>
 

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChevronRight, Clock3, Radio } from "@/components/icons";
 import { supabase } from "@/lib/supabase";
 import { TeamCrest } from "./TeamCrest";
+import { TeamReferenceBadge } from "./TeamReferenceBadge";
 
 export type HomeLiveMatch = {
   id: string;
@@ -15,8 +16,8 @@ export type HomeLiveMatch = {
   timer_started_at: string | null;
   timer_accumulated_seconds: number | null;
   round: { id: string; number: number } | null;
-  teamA: { id: string; name: string; color: string; crest_url?: string | null } | null;
-  teamB: { id: string; name: string; color: string; crest_url?: string | null } | null;
+  teamA: { id: string; name: string; position?: number | null; color: string; crest_url?: string | null } | null;
+  teamB: { id: string; name: string; position?: number | null; color: string; crest_url?: string | null } | null;
 };
 
 function formatClock(totalSeconds: number) {
@@ -108,8 +109,9 @@ export function LiveMatchBanner({
 
       <div className="relative grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 py-5">
         <div className="flex min-w-0 flex-col items-center gap-2 text-center">
+          <TeamReferenceBadge position={match.teamA?.position} fallbackIndex={0} color={match.teamA?.color} className="h-12 w-12 border-white/30 bg-black/30 text-2xl text-white" />
           <TeamCrest name={match.teamA?.name || "Time A"} crestUrl={match.teamA?.crest_url} color={match.teamA?.color} className="h-10 w-10" />
-          <p className="w-full truncate text-sm font-black text-white">{match.teamA?.name || "Time A"}</p>
+          <p className="w-full truncate text-[10px] font-bold text-white/60">{match.teamA?.name || "Time A"}</p>
         </div>
 
         <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/35 px-4 py-2 shadow-inner">
@@ -119,8 +121,9 @@ export function LiveMatchBanner({
         </div>
 
         <div className="flex min-w-0 flex-col items-center gap-2 text-center">
+          <TeamReferenceBadge position={match.teamB?.position} fallbackIndex={1} color={match.teamB?.color} className="h-12 w-12 border-white/30 bg-black/30 text-2xl text-white" />
           <TeamCrest name={match.teamB?.name || "Time B"} crestUrl={match.teamB?.crest_url} color={match.teamB?.color} className="h-10 w-10" />
-          <p className="w-full truncate text-sm font-black text-white">{match.teamB?.name || "Time B"}</p>
+          <p className="w-full truncate text-[10px] font-bold text-white/60">{match.teamB?.name || "Time B"}</p>
         </div>
       </div>
 

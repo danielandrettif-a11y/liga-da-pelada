@@ -19,6 +19,7 @@ export type FantasyExperienceProps = {
     teams?: Array<{
       id: string;
       name: string;
+      position?: number | null;
       color: string;
       crest_url?: string | null;
       team_players?: Array<{

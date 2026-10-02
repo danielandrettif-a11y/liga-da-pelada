@@ -30,6 +30,7 @@ import {
 } from "@/components/icons";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { TeamCrest } from "@/components/TeamCrest";
+import { TeamReferenceBadge } from "@/components/TeamReferenceBadge";
 import { TeamMiniPitch } from "@/components/TeamMiniPitch";
 import { CURRENT_FANTASY_SCORING_VERSION, formatFantasyMoney } from "@/lib/fantasy/config";
 import { cosmeticImage } from "@/lib/fantasy/cosmetics";
@@ -2178,12 +2179,7 @@ export function FantasyExperience({
                             title={`Ver escalação do ${playerRoundTeam.name}`}
                             aria-label={`Ver escalação do ${playerRoundTeam.name}`}
                           >
-                            <TeamCrest
-                              name={playerRoundTeam.name}
-                              crestUrl={playerRoundTeam.crest_url}
-                              color={playerRoundTeam.color}
-                              className="h-7 w-7"
-                            />
+                            <TeamReferenceBadge position={playerRoundTeam.position} color={playerRoundTeam.color} className="h-8 w-8 rounded-lg text-base" />
                           </button>
                         )}
                         <p className="text-sm font-black text-foreground">
@@ -2298,6 +2294,7 @@ export function FantasyExperience({
               onClick={(event) => event.stopPropagation()}
             >
               <div className="mb-3 flex items-center gap-3 pr-10">
+                <TeamReferenceBadge position={selectedRoundTeam.position} color={selectedRoundTeam.color} className="h-14 w-14 text-3xl" />
                 <TeamCrest
                   name={selectedRoundTeam.name}
                   crestUrl={selectedRoundTeam.crest_url}
@@ -2306,7 +2303,7 @@ export function FantasyExperience({
                 />
                 <div className="min-w-0">
                   <p className="text-[9px] font-black uppercase tracking-[.16em] text-accent">Time da rodada</p>
-                  <h3 className="truncate text-base font-black text-foreground">{selectedRoundTeam.name}</h3>
+                  <h3 className="truncate text-xs font-bold text-muted">{selectedRoundTeam.name}</h3>
                 </div>
               </div>
               <button

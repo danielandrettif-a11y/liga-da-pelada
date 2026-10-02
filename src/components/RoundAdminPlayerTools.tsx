@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { ArrowLeftRight, ChevronDown, Loader2 } from "@/components/icons";
 import { addRoundEmergencySubstitute, openCallupReplacementVacancy, transferRoundPlayerIdentity, zeroPlayerRoundPoints } from "@/lib/actions/rounds";
 import type { Player } from "@/lib/types";
+import { formatTeamNameWithReference } from "@/lib/team-reference";
 
 type Participant = { player_id: string; players: Player | null };
-type Team = { id: string; name: string; team_players?: Array<{ player_id: string }> };
+type Team = { id: string; name: string; position?: number | null; team_players?: Array<{ player_id: string }> };
 
 export function RoundAdminPlayerTools({ roundId, status, participants, teams, allPlayers, canReopenCallup }: { roundId: string; status: string; participants: Participant[]; teams: Team[]; allPlayers: Player[]; canReopenCallup: boolean }) {
   const router = useRouter();
@@ -70,7 +71,7 @@ export function RoundAdminPlayerTools({ roundId, status, participants, teams, al
         <div className="glass-card space-y-3 p-4 animate-fade-in">
           <label className="block text-[10px] font-black uppercase text-muted">Perfil usado por engano<select value={sourceId} onChange={(event) => setSourceId(event.target.value)} className="mt-1 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"><option value="">Escolha</option>{participants.filter((entry) => entry.players).map((entry) => <option key={entry.player_id} value={entry.player_id}>{entry.players?.name}</option>)}</select></label>
           <label className="block text-[10px] font-black uppercase text-muted">{status === "finished" ? "Perfil correto" : "Jogador que vai entrar"}<select value={targetId} onChange={(event) => setTargetId(event.target.value)} className="mt-1 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"><option value="">Escolha</option>{(status === "finished" ? allPlayers.filter((player) => player.id !== sourceId) : outsidePlayers).map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select></label>
-          {status !== "finished" && <label className="block text-[10px] font-black uppercase text-muted">Time de destino<select value={teamId} onChange={(event) => setTeamId(event.target.value)} className="mt-1 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"><option value="">Escolha</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>}
+          {status !== "finished" && <label className="block text-[10px] font-black uppercase text-muted">Time de destino<select value={teamId} onChange={(event) => setTeamId(event.target.value)} className="mt-1 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"><option value="">Escolha</option>{teams.map((team, index) => <option key={team.id} value={team.id}>{formatTeamNameWithReference(team, index)}</option>)}</select></label>}
           <button type="button" disabled={pending || !sourceId || !targetId || (status !== "finished" && !teamId)} onClick={submit} className="flex w-full items-center justify-center gap-2 rounded-xl bg-warning py-3 text-xs font-black text-background disabled:opacity-40">{pending && <Loader2 className="h-4 w-4 animate-spin" />}{status === "finished" ? "Transferir participação" : "Confirmar substituição"}</button>
           {canReopenCallup && (
             <div className="space-y-2 border-t border-border pt-3">

@@ -3,11 +3,12 @@
 import { useMemo, useState } from "react";
 import { ChevronDown } from "@/components/icons";
 import { TeamCrest } from "@/components/TeamCrest";
+import { TeamReferenceBadge } from "@/components/TeamReferenceBadge";
 import { getRoundTeamStats } from "@/lib/round-team-stats";
 
 type Player = { id: string; name: string; nickname?: string | null; avatar_url?: string | null };
 type MatchEvent = { player_id?: string | null; assist_player_id?: string | null; is_own_goal?: boolean | null };
-type Team = { id: string; name: string; color?: string | null; crest_url?: string | null };
+type Team = { id: string; name: string; position?: number | null; color?: string | null; crest_url?: string | null };
 type Match = { status: "pending" | "live" | "finished"; team_a_id: string; team_b_id: string; score_a: number | null; score_b: number | null; match_events?: MatchEvent[] | null };
 
 export function RoundLiveStats({ matches, players, teams }: { matches: Match[]; players: Player[]; teams: Team[] }) {
@@ -59,9 +60,10 @@ export function RoundLiveStats({ matches, players, teams }: { matches: Match[]; 
         {teamStats.length > 0 && <>
           <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-muted">Desempenho dos times</p>
           <div className="mb-4 space-y-1">
-            {teamStats.map((team) => <div key={team.id} className="flex items-center gap-2.5 rounded-xl bg-background/35 px-2.5 py-2">
+            {teamStats.map((team, index) => <div key={team.id} className="flex items-center gap-2.5 rounded-xl bg-background/35 px-2.5 py-2">
+              <TeamReferenceBadge position={team.position} fallbackIndex={index} color={team.color} className="h-9 w-9 text-lg" />
               <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-8 w-8" />
-              <span className="min-w-0 flex-1 truncate text-xs font-bold text-foreground">{team.name}</span>
+              <span className="min-w-0 flex-1 truncate text-[10px] font-bold text-muted">{team.name}</span>
               <span className="shrink-0 border-l border-border pl-2 text-right text-[9px] font-black">
                 <span className="flex justify-end gap-2.5">
                   <span className="text-accent">{team.wins} V</span>

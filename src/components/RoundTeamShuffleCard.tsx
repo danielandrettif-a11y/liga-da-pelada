@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeftRight, CheckCircle2, ChevronDown, RotateCcw, Sparkles, X } from "@/components/icons";
 import { applyRoundTeamShuffle, previewRoundTeamShuffle, swapRoundTeamPlayers, type RoundTeamShufflePreview } from "@/lib/actions/rounds";
 import { TeamCrest } from "@/components/TeamCrest";
+import { TeamReferenceBadge } from "@/components/TeamReferenceBadge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import type { RoundReshuffleMode } from "@/lib/round-reshuffle";
@@ -196,11 +197,12 @@ export function RoundTeamShuffleCard({
             </button>
 
             {swapPanelOpen && <div id="round-permanent-swap-panel" className="mt-3 grid gap-3 sm:grid-cols-2">
-              {teams.map((team: any) => (
+              {teams.map((team: any, index: number) => (
                 <div key={team.id} className="overflow-hidden rounded-xl border border-border bg-background/45">
                   <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
+                    <TeamReferenceBadge position={team.position} fallbackIndex={index} color={team.color} className="h-9 w-9 text-lg" />
                     <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-7 w-7" />
-                    <span className="min-w-0 flex-1 truncate text-xs font-black text-foreground">{team.name}</span>
+                    <span className="min-w-0 flex-1 truncate text-[10px] font-bold text-muted">{team.name}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-1.5 p-2">
                     {(team.team_players || []).map((entry: any) => {
@@ -273,8 +275,9 @@ export function RoundTeamShuffleCard({
                     const summary = shufflePreview.summaries?.[index];
                     return <article key={assignment.teamId} className="overflow-hidden rounded-2xl border border-border bg-surface/70">
                       <div className="flex items-center gap-2 border-b border-border bg-background/45 px-3 py-2.5">
+                        <TeamReferenceBadge position={team?.position} fallbackIndex={index} color={team?.color} className="h-9 w-9 text-lg" />
                         <TeamCrest name={team?.name || `Time ${index + 1}`} crestUrl={team?.crest_url} color={team?.color} className="h-7 w-7" />
-                        <div className="min-w-0 flex-1"><p className="truncate text-xs font-black text-foreground">{team?.name || `Time ${index + 1}`}</p>{summary && <p className="mt-0.5 text-[9px] font-semibold text-muted">OVR {summary.overallAverage.toFixed(1)} · Vel. {summary.speedAverage.toFixed(2)}★</p>}</div>
+                        <div className="min-w-0 flex-1"><p className="truncate text-[10px] font-bold text-muted">{team?.name || `Time ${index + 1}`}</p>{summary && <p className="mt-0.5 text-[9px] font-semibold text-muted">OVR {summary.overallAverage.toFixed(1)} · Vel. {summary.speedAverage.toFixed(2)}★</p>}</div>
                       </div>
                       <div className="grid grid-cols-2 gap-1.5 p-2.5">
                         {assignment.playerIds.map((playerId) => {

@@ -25,6 +25,7 @@ import {
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
 import { TeamCrest } from "./TeamCrest";
+import { TeamReferenceBadge } from "./TeamReferenceBadge";
 import {
   MAX_PLAYERS_PER_TEAM,
   MAX_TEAMS_PER_ROUND,
@@ -868,9 +869,7 @@ export function RoundCreator({
                 return (
                   <div key={team.id} className="rounded-2xl border border-border bg-background/50 p-3.5 space-y-3">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-muted">
-                        Time {index + 1}
-                      </span>
+                      <TeamReferenceBadge fallbackIndex={index} color={team.color} className="h-11 w-11 text-xl" />
                       <span
                         className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black uppercase"
                         style={{
@@ -1047,8 +1046,8 @@ export function RoundCreator({
                     </div>
                     {/* Menu de times (aberto ao clicar) */}
                     {openDropdownId === p.id && (
-                      <div className="absolute top-full left-0 mt-1 flex bg-surface border border-border rounded-lg shadow-xl overflow-hidden z-10 flex-col w-28">
-                        {teams.map(t => (
+                      <div className="absolute top-full left-0 mt-1 flex w-44 flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-xl z-10">
+                        {teams.map((t, index) => (
                           <button
                             key={t.id}
                             onClick={() => {
@@ -1059,7 +1058,8 @@ export function RoundCreator({
                             className="px-3 py-2 text-left text-[10px] font-bold text-foreground hover:bg-surface-hover flex items-center gap-2 border-b border-border last:border-0 disabled:cursor-not-allowed disabled:opacity-35"
                           >
                             <TeamCrest name={t.name} crestUrl={t.crestUrl} color={t.color} className="h-5 w-5" />
-                            <span className="truncate">{t.name}{t.players.length >= teamCapacity ? " (cheio)" : ""}</span>
+                            <TeamReferenceBadge fallbackIndex={index} color={t.color} className="h-6 w-6 rounded-lg text-xs" />
+                            <span className="truncate text-muted">{t.name}{t.players.length >= teamCapacity ? " (cheio)" : ""}</span>
                           </button>
                         ))}
                       </div>
@@ -1073,12 +1073,13 @@ export function RoundCreator({
 
           {/* Teams Buckets */}
           <div className="space-y-3">
-            {teams.map(team => (
+            {teams.map((team, index) => (
               <div key={team.id} className="glass-card overflow-hidden">
                 <div className="px-4 py-2 bg-surface flex items-center justify-between border-b border-border">
                   <div className="flex items-center gap-2">
+                    <TeamReferenceBadge fallbackIndex={index} color={team.color} className="h-10 w-10 text-xl" />
                     <TeamCrest name={team.name || "Time"} crestUrl={team.crestUrl} color={team.color} className="h-7 w-7" />
-                    <span className="max-w-[170px] truncate text-sm font-bold text-foreground">{team.name || "Sem nome"}</span>
+                    <span className="max-w-[170px] truncate text-[10px] font-bold text-muted">{team.name || "Sem nome"}</span>
                   </div>
                   <span className="text-[10px] font-bold text-muted bg-surface-hover px-2 py-0.5 rounded-md">
                     {team.players.length}/{teamCapacity} jogadores

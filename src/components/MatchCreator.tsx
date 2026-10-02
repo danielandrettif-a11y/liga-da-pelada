@@ -6,6 +6,7 @@ import { createMatch } from "@/lib/actions/matches";
 import { Swords, ArrowLeft, ChevronRight, AlertTriangle, Check, ArrowLeftRight, Crown, Users } from "@/components/icons";
 import Link from "next/link";
 import { TeamCrest } from "./TeamCrest";
+import { TeamReferenceBadge } from "./TeamReferenceBadge";
 import { markRoundTeamArrived, setRoundTeamCaptain, setRoundTeamVestColor } from "@/lib/actions/rounds";
 import { VEST_COLORS } from "@/lib/vest-colors";
 import { canTeamLendToMatch, pickFairSubstitute } from "@/lib/substitution-draw";
@@ -400,17 +401,18 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
           <div><h2 className="text-sm font-black text-foreground">Identidade dos times</h2><p className="text-[10px] text-muted">Escolha o colete e o capitão de referência no mesmo lugar.</p></div>
         </div>
         <div className="divide-y divide-border">
-          {teams.map((team: any) => (
-            <div key={team.id} className="grid min-w-0 grid-cols-[auto_1fr] gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[auto_1fr_auto_auto] sm:items-center">
+          {teams.map((team: any, index: number) => (
+            <div key={team.id} className="grid min-w-0 grid-cols-[auto_auto_1fr] gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[auto_auto_1fr_auto_auto] sm:items-center">
+              <TeamReferenceBadge position={team.position} fallbackIndex={index} color={colorByTeam[team.id] || team.color} className="h-11 w-11 text-xl row-span-2 sm:row-span-1" />
               <TeamCrest name={team.name} crestUrl={team.crest_url} color={colorByTeam[team.id] || team.color} className="h-9 w-9 shrink-0 row-span-2 sm:row-span-1" />
-              <span className="min-w-0 flex-1 truncate text-xs font-black text-foreground">{team.name}</span>
-              <label className="col-start-2 flex min-w-0 items-center gap-2 sm:col-start-auto">
+              <span className="min-w-0 flex-1 truncate text-[10px] font-bold text-muted">{team.name}</span>
+              <label className="col-start-3 flex min-w-0 items-center gap-2 sm:col-start-auto">
                 <span className="text-[9px] font-black uppercase text-muted">Colete</span>
                 <select value={colorByTeam[team.id] || team.color} onChange={(event) => handleVestColorChange(team.id, event.target.value)} disabled={managementLoading} className="min-w-0 flex-1 rounded-xl border border-border bg-background px-2.5 py-2 text-[10px] font-bold text-foreground disabled:opacity-50 sm:w-28">
                   {VEST_COLORS.map((item) => <option key={item.color} value={item.color}>{item.label}</option>)}
                 </select>
               </label>
-              <label className="col-start-2 flex min-w-0 items-center gap-2 sm:col-start-auto">
+              <label className="col-start-3 flex min-w-0 items-center gap-2 sm:col-start-auto">
                 <span className="text-[9px] font-black uppercase text-muted">Capitão</span>
               <select
                 value={captainByTeam[team.id] || ""}
@@ -442,7 +444,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
             Time 1
           </label>
           <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
-            {teams.map((t: any) => {
+            {teams.map((t: any, index: number) => {
               const isSelected = teamAId === t.id;
               const isDisabled = teamBId === t.id || (!previousMatch && usesArrivalOrder && !firstMatchAllowedIds.has(t.id));
               const vestColor = colorByTeam[t.id] || t.color || "#CCFF00";
@@ -464,8 +466,9 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
                   `}
                   disabled={isDisabled}
                 >
+                  <TeamReferenceBadge position={t.position} fallbackIndex={index} color={vestColor} className="h-14 w-14 text-3xl" />
                   <TeamCrest name={t.name} crestUrl={t.crest_url} color={vestColor} className="h-11 w-11" />
-                  <span className="text-xs font-black truncate w-full text-center text-foreground">{t.name}</span>
+                  <span className="w-full truncate text-center text-[10px] font-bold text-muted">{t.name}</span>
                   <span
                     className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-black uppercase"
                     style={{
@@ -497,7 +500,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
             Time 2
           </label>
           <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
-            {teams.map((t: any) => {
+            {teams.map((t: any, index: number) => {
               const isSelected = teamBId === t.id;
               const isDisabled = teamAId === t.id || (!previousMatch && usesArrivalOrder && !firstMatchAllowedIds.has(t.id));
               const vestColor = colorByTeam[t.id] || t.color || "#CCFF00";
@@ -519,8 +522,9 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
                   `}
                   disabled={isDisabled}
                 >
+                  <TeamReferenceBadge position={t.position} fallbackIndex={index} color={vestColor} className="h-14 w-14 text-3xl" />
                   <TeamCrest name={t.name} crestUrl={t.crest_url} color={vestColor} className="h-11 w-11" />
-                  <span className="text-xs font-black truncate w-full text-center text-foreground">{t.name}</span>
+                  <span className="w-full truncate text-center text-[10px] font-bold text-muted">{t.name}</span>
                   <span
                     className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-black uppercase"
                     style={{
@@ -554,14 +558,16 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
                   <div key={teamId} className="contents">
                     <Swords className="h-5 w-5 text-muted" />
                     <div className="min-w-0 text-center">
+                      <TeamReferenceBadge position={team?.position} fallbackIndex={index} color={team?.color} className="mx-auto h-14 w-14 text-3xl" />
                       <TeamCrest name={team?.name || "Time"} crestUrl={team?.crest_url} color={team?.color} className="mx-auto h-12 w-12" />
-                      <p className="mt-2 truncate text-xs font-black text-foreground">{team?.name}</p>
+                      <p className="mt-2 truncate text-[10px] font-bold text-muted">{team?.name}</p>
                     </div>
                   </div>
                 ) : (
                   <div key={teamId} className="min-w-0 text-center">
+                    <TeamReferenceBadge position={team?.position} fallbackIndex={index} color={team?.color} className="mx-auto h-14 w-14 text-3xl" />
                     <TeamCrest name={team?.name || "Time"} crestUrl={team?.crest_url} color={team?.color} className="mx-auto h-12 w-12" />
-                    <p className="mt-2 truncate text-xs font-black text-foreground">{team?.name}</p>
+                    <p className="mt-2 truncate text-[10px] font-bold text-muted">{team?.name}</p>
                   </div>
                 );
               })}
@@ -680,11 +686,12 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
             <p className="mt-1 text-[10px] font-semibold text-muted">Cada goleiro recebe +3 por atuar e −1 por gol sofrido.</p>
           </div>
           <div className="grid gap-3 p-4 sm:grid-cols-2">
-            {selectedTeams.map((team: any) => (
+            {selectedTeams.map((team: any, index: number) => (
               <label key={team.id} className="block">
                 <span className="mb-2 flex items-center gap-2 text-xs font-black text-foreground">
+                  <TeamReferenceBadge position={team.position} fallbackIndex={index} color={team.color} className="h-8 w-8 text-base" />
                   <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-6 w-6" />
-                  {team.name}
+                  <span className="truncate text-[10px] font-bold text-muted">{team.name}</span>
                 </span>
                 <select
                   value={goalkeeperModeByTeam[team.id] === "bq" && bqGoalkeeperSuggestionByTeam[team.id]

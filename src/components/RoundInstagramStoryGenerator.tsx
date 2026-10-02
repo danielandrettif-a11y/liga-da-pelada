@@ -15,10 +15,12 @@ import {
 } from "@/components/icons";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import type { RoundStatistics } from "@/lib/actions/stats";
+import { getTeamReference } from "@/lib/team-reference";
 
 type TeamSummary = {
   id: string;
   name: string;
+  position?: number | null;
   color: string;
   crest_url?: string | null;
   wins: number;
@@ -89,6 +91,7 @@ export function RoundInstagramStoryGenerator({
     return {
       id: team.id,
       name: team.name,
+      position: team.position,
       color: team.color || "#CCFF00",
       crest_url: team.crest_url,
       wins,
@@ -255,17 +258,16 @@ export function RoundInstagramStoryGenerator({
       ctx.textAlign = "left";
       ctx.fillText(`${idx + 1}º`, tableLeft + 40, rowY);
 
-      // Círculo de cor do colete
+      // Letra do time como referência principal
       ctx.fillStyle = team.color || "#CCFF00";
-      ctx.beginPath();
-      ctx.arc(tableLeft + 125, rowY - 12, 16, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.font = "italic 900 54px sans-serif";
+      ctx.fillText(getTeamReference(team), tableLeft + 115, rowY);
 
-      // Nome do Time
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "bold 38px sans-serif";
+      // Nome do time como informação secundária
+      ctx.fillStyle = "#A9B8AF";
+      ctx.font = "bold 28px sans-serif";
       const truncatedName = team.name.length > 18 ? `${team.name.slice(0, 17)}...` : team.name;
-      ctx.fillText(truncatedName, tableLeft + 160, rowY);
+      ctx.fillText(truncatedName, tableLeft + 175, rowY - 4);
 
       // Estatísticas
       ctx.fillStyle = "#F8FAFC";
@@ -303,16 +305,16 @@ export function RoundInstagramStoryGenerator({
       ctx.lineWidth = 2;
       roundRect(ctx, tableLeft + 30, cardY, tableWidth - 60, 185, 24, true, true);
 
-      // Nome do time com tag da cor
+      // Referência e nome do time
       ctx.fillStyle = team.color || "#CCFF00";
       ctx.beginPath();
-      ctx.arc(tableLeft + 65, cardY + 42, 12, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "bold 32px sans-serif";
+      ctx.font = "italic 900 44px sans-serif";
       ctx.textAlign = "left";
-      ctx.fillText(team.name, tableLeft + 90, cardY + 52);
+      ctx.fillText(getTeamReference(team), tableLeft + 55, cardY + 56);
+
+      ctx.fillStyle = "#A9B8AF";
+      ctx.font = "bold 26px sans-serif";
+      ctx.fillText(team.name, tableLeft + 100, cardY + 52);
 
       // Artilheiro do Time
       ctx.fillStyle = "#82A391";

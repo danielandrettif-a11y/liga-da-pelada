@@ -8,6 +8,7 @@ import { getCurrentAccount } from "@/lib/auth";
 import { TeamMiniPitch } from "@/components/TeamMiniPitch";
 import { RoundAvailabilityManager } from "@/components/RoundAvailabilityManager";
 import { TeamCrest } from "@/components/TeamCrest";
+import { TeamReferenceBadge } from "@/components/TeamReferenceBadge";
 import { RoundAttendanceManager } from "@/components/RoundAttendanceManager";
 import { StadiumLink } from "@/components/StadiumLink";
 import { getRoundStatistics } from "@/lib/actions/stats";
@@ -184,8 +185,9 @@ export default async function RodadaDetalhePage({
 
                       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
                       <div className="flex min-w-0 items-center justify-end gap-2 text-right">
-                        <span className="truncate text-sm font-bold text-foreground">{teamA?.name}</span>
+                        <span className="truncate text-[10px] font-bold text-muted">{teamA?.name}</span>
                         <TeamCrest name={teamA?.name || "Time A"} crestUrl={teamA?.crest_url} color={teamA?.color} className="h-6 w-6" />
+                        <TeamReferenceBadge position={teamA?.position} fallbackIndex={0} color={teamA?.color} className="h-9 w-9 text-lg" />
                       </div>
 
                       <div className="flex min-w-[5.75rem] items-center justify-center gap-2 rounded-xl border border-border bg-background/60 px-3 py-2">
@@ -195,8 +197,9 @@ export default async function RodadaDetalhePage({
                       </div>
 
                       <div className="flex min-w-0 items-center gap-2">
+                        <TeamReferenceBadge position={teamB?.position} fallbackIndex={1} color={teamB?.color} className="h-9 w-9 text-lg" />
                         <TeamCrest name={teamB?.name || "Time B"} crestUrl={teamB?.crest_url} color={teamB?.color} className="h-6 w-6" />
-                        <span className="truncate text-sm font-bold text-foreground">{teamB?.name}</span>
+                        <span className="truncate text-[10px] font-bold text-muted">{teamB?.name}</span>
                       </div>
                       </div>
                     </Link>
