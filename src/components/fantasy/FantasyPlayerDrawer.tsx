@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Crown,
@@ -45,6 +45,7 @@ export function FantasyPlayerDrawer({
   const [detailData, setDetailData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "scouts">("overview");
+  const drawerScrollRef = useRef<HTMLDivElement>(null);
 
   useDialogViewport(isOpen, onClose);
 
@@ -115,13 +116,18 @@ export function FantasyPlayerDrawer({
     try {
       const result = await getFantasyPlayerDetail(player.id, fantasyRoundId);
       if (result) setDetailData(result);
-      setActiveTab("scouts");
+      selectTab("scouts");
     } catch {
       // Mantém o perfil aberto com os dados já carregados quando a rede falhar.
     } finally {
       setLoading(false);
     }
   };
+
+  function selectTab(tab: "overview" | "scouts") {
+    drawerScrollRef.current?.scrollTo({ top: 0 });
+    setActiveTab(tab);
+  }
 
   return createPortal(
     <div
@@ -132,6 +138,7 @@ export function FantasyPlayerDrawer({
       aria-label={`Perfil Cartola de ${player.name}`}
     >
       <div
+        ref={drawerScrollRef}
         className="mobile-dialog-scroll relative flex w-full max-w-lg max-h-[85dvh] sm:max-h-[85vh] flex-col overflow-y-auto rounded-3xl border border-accent/40 bg-[#06160d] p-5 sm:p-6 shadow-[0_0_60px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto touch-pan-y overscroll-contain"
         style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
         onClick={(e) => e.stopPropagation()}
@@ -218,7 +225,7 @@ export function FantasyPlayerDrawer({
         <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-black/40 p-1">
           <button
             type="button"
-            onClick={() => setActiveTab("overview")}
+            onClick={() => selectTab("overview")}
             className={`flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition-all ${
               activeTab === "overview"
                 ? "bg-accent text-background shadow-[0_0_15px_rgba(204,255,0,0.3)]"
@@ -229,7 +236,7 @@ export function FantasyPlayerDrawer({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("scouts")}
+            onClick={() => selectTab("scouts")}
             className={`flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition-all ${
               activeTab === "scouts"
                 ? "bg-accent text-background shadow-[0_0_15px_rgba(204,255,0,0.3)]"
