@@ -1,4 +1,4 @@
-import type { RankingEntry } from "./ranking";
+import type { OverallTrend, RankingEntry } from "./ranking";
 
 export type RankingCardTier = "gold" | "silver" | "bronze" | "ranked";
 export type RankingCardPhotoShape = "shield";
@@ -47,7 +47,7 @@ export type RankingCardContent = {
   name: string;
   title: string | null;
   awards: Array<{ key: RankingCardAwardKey; label: string; value: number }>;
-  positionRatings: Array<{ key: RankingCardPositionKey; label: string; value: string; isBest: boolean }>;
+  positionRatings: Array<{ key: RankingCardPositionKey; label: string; value: string; trend: OverallTrend; isBest: boolean }>;
   stats: Array<{ label: string; value: string }>;
 };
 
@@ -171,6 +171,7 @@ export function buildRankingCardContent(entry: RankingEntry, position: number): 
       key: item.key,
       label: item.label,
       value: item.rawValue == null ? "—" : item.rawValue.toFixed(1),
+      trend: entry.overallPositionTrends?.[item.key] || "steady",
       isBest: bestPosition === index,
     })),
     stats: [

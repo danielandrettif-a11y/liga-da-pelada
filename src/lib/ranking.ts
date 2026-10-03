@@ -8,6 +8,8 @@ export type RankingAwards = {
   kingOfWins: number;
 };
 
+export type OverallTrend = "rising" | "steady" | "falling";
+
 export type RankingBestRound = {
   roundId: string;
   roundNumber: number;
@@ -42,8 +44,9 @@ export type RankingEntry = {
   legacyPoints: number;
   positionBonus: number;
   overall?: number | null;
-  overallTrend?: "rising" | "steady" | "falling" | null;
+  overallTrend?: OverallTrend | null;
   overallPositions?: { DEF: number; ALA_MEI: number; ATA: number; GOL: number } | null;
+  overallPositionTrends?: Record<"DEF" | "ALA_MEI" | "ATA" | "GOL", OverallTrend> | null;
   overallGoalkeeperGames?: number;
   overallGoalkeeperRounds?: number;
   goalkeeperStats?: {

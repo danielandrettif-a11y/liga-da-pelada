@@ -63,6 +63,7 @@ describe("ranking card layout", () => {
       overall: 74.6,
       speedRating: 2,
       overallPositions: { DEF: 75.2, ALA_MEI: 72.4, ATA: 71.6, GOL: 70.8 },
+      overallPositionTrends: { DEF: "rising", ALA_MEI: "steady", ATA: "falling", GOL: "steady" },
       goals: 5,
       assists: 4,
       wins: 12,
@@ -92,10 +93,10 @@ describe("ranking card layout", () => {
       ["Rei das Vitórias", 3],
     ]);
     expect(content.positionRatings).toEqual([
-      { key: "DEF", label: "DEF/VOL", value: "75.2", isBest: true },
-      { key: "ALA_MEI", label: "ALA", value: "72.4", isBest: false },
-      { key: "ATA", label: "ATA", value: "71.6", isBest: false },
-      { key: "GOL", label: "GOL", value: "70.8", isBest: false },
+      { key: "DEF", label: "DEF/VOL", value: "75.2", trend: "rising", isBest: true },
+      { key: "ALA_MEI", label: "ALA", value: "72.4", trend: "steady", isBest: false },
+      { key: "ATA", label: "ATA", value: "71.6", trend: "falling", isBest: false },
+      { key: "GOL", label: "GOL", value: "70.8", trend: "steady", isBest: false },
     ]);
     expect(content.stats).toEqual([
       { value: "5", label: "GOL" },
@@ -121,7 +122,7 @@ describe("ranking card layout", () => {
     } as RankingEntry;
 
     expect(buildRankingCardContent(entry, 10)).toMatchObject({ rating: "—", ratingLabel: "OVR", ratingTrend: null });
-    expect(buildRankingCardContent(entry, 10).positionRatings.every((item) => item.value === "—" && !item.isBest)).toBe(true);
+    expect(buildRankingCardContent(entry, 10).positionRatings.every((item) => item.value === "—" && item.trend === "steady" && !item.isBest)).toBe(true);
   });
 
   it("keeps the player form indicator separate from the OVR value", () => {

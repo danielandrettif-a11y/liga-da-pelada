@@ -112,12 +112,12 @@ function drawCanvasName(
   const showTitle = Boolean(title);
   const titleHeight = showTitle ? 22 : 0;
   const nameHeight = box.height - titleHeight;
-  let fontSize = Math.min(54, nameHeight * .48);
+  let fontSize = Math.min(46, nameHeight * .44);
   let lines: string[] = [];
   while (fontSize >= 22) {
     context.font = `900 ${fontSize}px Arial`;
-    lines = wrapCanvasName(context, name, box.width * .72);
-    if (lines.length <= 2 && lines.every((line) => context.measureText(line).width <= box.width * .72)) break;
+    lines = wrapCanvasName(context, name, box.width * .66);
+    if (lines.length <= 2 && lines.every((line) => context.measureText(line).width <= box.width * .66)) break;
     fontSize -= 2;
   }
   context.fillStyle = color;
@@ -126,7 +126,7 @@ function drawCanvasName(
   const lineHeight = fontSize * .9;
   const contentHeight = lines.length * lineHeight;
   const firstY = box.y + (nameHeight - contentHeight) / 2 + lineHeight / 2;
-  lines.slice(0, 2).forEach((line, index) => context.fillText(line, box.x + box.width / 2, firstY + index * lineHeight, box.width * .74));
+  lines.slice(0, 2).forEach((line, index) => context.fillText(line, box.x + box.width / 2, firstY + index * lineHeight, box.width * .68));
   if (showTitle) {
     context.font = "900 16px Arial";
     context.fillStyle = "rgba(255,255,255,.78)";
@@ -202,7 +202,7 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
   const positionHeight = scoreBox.height * .47;
   const positionCellWidth = scoreBox.width / 2;
   const positionCellHeight = positionHeight / 2;
-  cardContent.positionRatings.forEach(({ value, label, isBest }, index) => {
+  cardContent.positionRatings.forEach(({ value, label, trend, isBest }, index) => {
     const col = index % 2;
     const row = Math.floor(index / 2);
     const cellX = scoreBox.x + positionCellWidth * col;
@@ -217,13 +217,25 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
       roundedRect(context, cellX + 3, cellY + 3, positionCellWidth - 6, positionCellHeight - 6, 10);
       context.stroke();
     }
-    context.textAlign = "center";
+    context.textAlign = "left";
     context.fillStyle = isBest ? theme.edge : theme.ink;
     context.font = isBest
       ? `900 italic ${Math.min(38, positionCellHeight * .48)}px Arial`
       : `900 ${Math.min(32, positionCellHeight * .42)}px Arial`;
-    context.fillText(value, centerX, cellY + positionCellHeight * .5, positionCellWidth * .78);
+    const valueWidth = context.measureText(value).width;
+    const trendFontSize = Math.min(20, positionCellHeight * .25);
+    context.font = `900 ${trendFontSize}px Arial`;
+    const trendWidth = context.measureText(CARD_TREND[trend].symbol).width;
+    const valueStart = centerX - (valueWidth + trendWidth + 5) / 2;
+    context.font = isBest
+      ? `900 italic ${Math.min(38, positionCellHeight * .48)}px Arial`
+      : `900 ${Math.min(32, positionCellHeight * .42)}px Arial`;
+    context.fillText(value, valueStart, cellY + positionCellHeight * .5, positionCellWidth * .65);
+    context.fillStyle = CARD_TREND[trend].color;
+    context.font = `900 ${trendFontSize}px Arial`;
+    context.fillText(CARD_TREND[trend].symbol, valueStart + valueWidth + 5, cellY + positionCellHeight * .5);
     context.fillStyle = isBest ? theme.edge : "rgba(255,255,255,.68)";
+    context.textAlign = "center";
     context.font = `900 ${Math.min(14, positionCellHeight * .16)}px Arial`;
     context.fillText(label, centerX, cellY + positionCellHeight * .76, positionCellWidth * .82);
   });
@@ -440,9 +452,12 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                 {cardContent.ratingLabel}{cardContent.ratingTrend && <> <span style={{ color: CARD_TREND[cardContent.ratingTrend].color }}>{CARD_TREND[cardContent.ratingTrend].symbol}</span></>} <span className="tracking-normal">· {cardContent.placement}</span>
               </span>
               <div className="ranking-card-positions mt-2 grid min-h-0 w-full flex-1 grid-cols-2 grid-rows-2 gap-1 pr-1">
-                {cardContent.positionRatings.map(({ key, value, label, isBest }) => (
-                  <div key={key} className={`ranking-card-position flex min-w-0 flex-col items-center justify-center text-center ${isBest ? "ranking-card-position--best" : ""}`} style={isBest ? { borderColor: `${theme.edge}a8`, backgroundColor: `${theme.edge}24`, boxShadow: `inset 0 0 8px ${theme.edge}1f` } : undefined}>
-                    <span className={`leading-none ${isBest ? "font-athletic text-[19px] font-black italic" : "font-sans text-[16px] font-black text-white"}`} style={isBest ? { color: theme.edge } : undefined}>{value}</span>
+                {cardContent.positionRatings.map(({ key, value, label, trend, isBest }) => (
+                  <div key={key} aria-label={`${label} ${value}, ${CARD_TREND[trend].label}`} className={`ranking-card-position flex min-w-0 flex-col items-center justify-center text-center ${isBest ? "ranking-card-position--best" : ""}`} style={isBest ? { borderColor: `${theme.edge}a8`, backgroundColor: `${theme.edge}24`, boxShadow: `inset 0 0 8px ${theme.edge}1f` } : undefined}>
+                    <span className="flex items-center gap-0.5 leading-none">
+                      <span className={isBest ? "font-athletic text-[19px] font-black italic" : "font-sans text-[16px] font-black text-white"} style={isBest ? { color: theme.edge } : undefined}>{value}</span>
+                      <span className="text-[10px] font-black" style={{ color: CARD_TREND[trend].color }}>{CARD_TREND[trend].symbol}</span>
+                    </span>
                     <span className={`mt-0.5 text-[6px] font-black leading-none tracking-[.08em] ${isBest ? "text-white" : "text-white/60"}`}>{label}</span>
                   </div>
                 ))}
@@ -478,13 +493,11 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
 
           <div className="absolute z-10 flex items-center justify-center px-1 text-center" style={rankingCardBoxStyle(layout.name)}>
             <div
-              className="ranking-card-nameplate-surface flex h-full min-w-0 w-full flex-col items-center justify-center bg-[length:100%_100%] bg-center bg-no-repeat px-[9%]"
+              className="ranking-card-nameplate-surface flex h-full min-w-0 w-full flex-col items-center justify-center overflow-hidden bg-[length:100%_100%] bg-center bg-no-repeat px-[14%] py-[3%]"
               style={nameplateArtwork ? { backgroundImage: `url(${nameplateArtwork})` } : undefined}
             >
-              <h2 className={`ranking-card-player-name font-athletic font-black uppercase text-white drop-shadow-[0_2px_4px_rgba(0,0,0,.9)] ${displayName.length > 22 ? "text-sm leading-[.9] tracking-normal" : displayName.length > 15 ? "text-base leading-none tracking-tight" : "text-xl leading-none tracking-wide"}`}>{displayName}</h2>
-              <p className="mt-0.5 min-h-[.55rem] max-w-full truncate text-[7px] font-black uppercase tracking-[.13em]" style={{ color: theme.edge }}>
-                {cardContent.title ? `✦ ${cardContent.title}` : ""}
-              </p>
+              <h2 className={`ranking-card-player-name max-h-[1.9em] overflow-hidden font-athletic font-black uppercase text-white drop-shadow-[0_2px_4px_rgba(0,0,0,.9)] ${displayName.length > 22 ? "text-[11px] leading-[.92] tracking-normal" : displayName.length > 13 ? "text-[13px] leading-[.95] tracking-normal" : "text-[17px] leading-none tracking-[.04em]"}`}>{displayName}</h2>
+              {cardContent.title && <p className="mt-0.5 max-w-full truncate text-[7px] font-black uppercase tracking-[.13em]" style={{ color: theme.edge }}>✦ {cardContent.title}</p>}
             </div>
           </div>
 
