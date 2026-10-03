@@ -4,6 +4,7 @@ import {
   getMatchTimerElapsedSeconds,
   getOfficialElapsedSeconds,
   isEntryResultEligible,
+  shouldOfferMatchFinishAfterGoal,
   transitionMatchTimer,
 } from "./match-rules";
 
@@ -42,5 +43,11 @@ describe("match participation rules", () => {
     expect(started).toEqual({ startedAt: "1970-01-01T00:00:10.000Z", accumulated: 12 });
     expect(getMatchTimerElapsedSeconds(started, 15_900)).toBe(17);
     expect(transitionMatchTimer(started, "pause", 15_900)).toEqual({ startedAt: null, accumulated: 17 });
+  });
+
+  it("offers to finish only when the scoring team reaches two goals", () => {
+    expect(shouldOfferMatchFinishAfterGoal(1, 2)).toBe(true);
+    expect(shouldOfferMatchFinishAfterGoal(2, 3)).toBe(false);
+    expect(shouldOfferMatchFinishAfterGoal(0, 1)).toBe(false);
   });
 });

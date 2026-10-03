@@ -39,6 +39,7 @@ import { MatchSubstitutionManager } from "./MatchSubstitutionManager";
 import {
   getMatchTimerElapsedSeconds,
   getOfficialElapsedSeconds,
+  shouldOfferMatchFinishAfterGoal,
   transitionMatchTimer,
 } from "@/lib/match-rules";
 import { TeamCrest } from "./TeamCrest";
@@ -577,10 +578,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
   }, [events, match.match_substitutions]);
 
   // Encerramento da partida
-  async function handleFinish() {
-    if (!canManage) return;
-    if (!confirm("Tem certeza que deseja encerrar esta partida? O placar não poderá mais ser alterado.")) return;
-
+  async function finishCurrentMatch() {
     setLoading(true);
     const res = await finishMatch(match.id);
     if (!res.success) {
@@ -591,6 +589,12 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
     if (res.quickStart) setQuickStart(res.quickStart);
     else router.replace(`/rodadas/${res.roundId || match.round_id}`);
     setLoading(false);
+  }
+
+  async function handleFinish() {
+    if (!canManage) return;
+    if (!confirm("Tem certeza que deseja encerrar esta partida? O placar não poderá mais ser alterado.")) return;
+    await finishCurrentMatch();
   }
 
   // Registro de gol (Optimistic UI com proteção double-tap e RPC transacional)
@@ -679,6 +683,15 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
         setEvents(previousEvents);
         setGoalModal(request);
         setError(res.error || "Erro ao registrar gol.");
+      } else {
+        const previousTeamScore = isTeamA ? previousScore.a : previousScore.b;
+        const currentTeamScore = Number(isTeamA ? res.scoreA : res.scoreB);
+        if (!res.idempotent && shouldOfferMatchFinishAfterGoal(previousTeamScore, currentTeamScore)) {
+          const teamName = isTeamA ? match.team_a.name : match.team_b.name;
+          if (confirm(`${teamName} chegou a 2 gols. Deseja encerrar a partida?`)) {
+            await finishCurrentMatch();
+          }
+        }
       }
     } catch (err: any) {
       // Rollback em caso de erro de rede

@@ -10,6 +10,10 @@ export function getOfficialElapsedSeconds(displayedElapsedSeconds: number, eligi
   return Math.max(0, displayedElapsedSeconds) + Math.max(0, eligibilityOffsetSeconds);
 }
 
+export function shouldOfferMatchFinishAfterGoal(previousScore: number, currentScore: number) {
+  return previousScore < 2 && currentScore >= 2;
+}
+
 export type MatchTimerSnapshot = {
   startedAt: string | null;
   accumulated: number;
