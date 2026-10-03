@@ -498,9 +498,11 @@ export function FantasyPlayerDrawer({
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm">{item.icon || "⚽"}</span>
                           <span className="truncate text-xs font-black text-foreground">{item.label}</span>
-                          <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[9px] font-bold text-accent">
-                            {item.count}x
-                          </span>
+                          {!item.hideCount && (
+                            <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[9px] font-bold text-accent">
+                              {item.count}x
+                            </span>
+                          )}
                         </div>
                         <p className="mt-0.5 text-[10px] text-muted">
                           {item.description

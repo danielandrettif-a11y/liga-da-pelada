@@ -2000,6 +2000,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       points: number;
       icon: string;
       description?: string;
+      hideCount?: boolean;
     }> = [
       { key: "goals", label: "Gols", count: current.goals, unitPoints: goalValue, points: current.goals * goalValue, icon: "⚽" },
       { key: "assists", label: "Assistências", count: current.assists, unitPoints: liveSettings.assistPoints, points: current.assists * liveSettings.assistPoints, icon: "👟" },
@@ -2015,12 +2016,13 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     if (!scoringRoundIsLive && Math.abs(historicalAdjustment) >= 0.005) {
       breakdown.push({
         key: "historical_adjustment",
-        label: "Correção oficial da rodada",
+        label: "Diferença do fechamento",
         count: 1,
         unitPoints: historicalAdjustment,
         points: historicalAdjustment,
         icon: "🧾",
-        description: "Diferença preservada no fechamento oficial; não é bônus de carta.",
+        hideCount: true,
+        description: `Fechamento: ${authoritativeBasePoints.toFixed(1)} pts · scouts atuais: ${current.basePoints.toFixed(1)} pts. Não é carta.`,
       });
     }
 
