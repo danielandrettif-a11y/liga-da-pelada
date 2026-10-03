@@ -503,7 +503,10 @@ export function FantasyPlayerDrawer({
                           </span>
                         </div>
                         <p className="mt-0.5 text-[10px] text-muted">
-                          {item.unitPoints != null ? `${item.count} × ${item.unitPoints > 0 ? "+" : ""}${Number(item.unitPoints).toFixed(1)} pts cada` : `${item.count} ocorrências`}
+                          {item.description
+                            || (item.unitPoints != null
+                              ? `${item.count} × ${item.unitPoints > 0 ? "+" : ""}${Number(item.unitPoints).toFixed(1)} pts cada`
+                              : `${item.count} ocorrências`)}
                         </p>
                       </div>
                       <strong className={`text-sm font-black shrink-0 ${item.points < 0 ? "text-danger" : "text-accent"}`}>

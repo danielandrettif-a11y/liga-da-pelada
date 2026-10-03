@@ -1992,7 +1992,15 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     const authoritativeBasePoints = scoringRoundIsLive
       ? current.basePoints
       : Number((selectedHistory || latestValidHistory)?.roundPoints ?? current.basePoints);
-    const breakdown = [
+    const breakdown: Array<{
+      key: string;
+      label: string;
+      count: number;
+      unitPoints: number;
+      points: number;
+      icon: string;
+      description?: string;
+    }> = [
       { key: "goals", label: "Gols", count: current.goals, unitPoints: goalValue, points: current.goals * goalValue, icon: "⚽" },
       { key: "assists", label: "Assistências", count: current.assists, unitPoints: liveSettings.assistPoints, points: current.assists * liveSettings.assistPoints, icon: "👟" },
       { key: "wins", label: "Vitórias", count: current.wins, unitPoints: liveSettings.winPoints, points: current.wins * liveSettings.winPoints, icon: "🏆" },
@@ -2007,11 +2015,12 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     if (!scoringRoundIsLive && Math.abs(historicalAdjustment) >= 0.005) {
       breakdown.push({
         key: "historical_adjustment",
-        label: "Ajuste da apuração histórica",
+        label: "Correção oficial da rodada",
         count: 1,
         unitPoints: historicalAdjustment,
         points: historicalAdjustment,
-        icon: "📌",
+        icon: "🧾",
+        description: "Diferença preservada no fechamento oficial; não é bônus de carta.",
       });
     }
 
