@@ -129,8 +129,12 @@ function drawCanvasName(
   lines.slice(0, 2).forEach((line, index) => context.fillText(line, box.x + box.width / 2, firstY + index * lineHeight, box.width * .68));
   if (showTitle) {
     context.font = "900 16px Arial";
-    context.fillStyle = "rgba(255,255,255,.78)";
+    context.fillStyle = color;
+    context.shadowColor = "rgba(0,0,0,.95)";
+    context.shadowBlur = 4;
+    context.shadowOffsetY = 1;
     context.fillText(`✦ ${title!.toUpperCase()}`, box.x + box.width / 2, box.y + box.height - 13, box.width * .68);
+    context.shadowColor = "transparent";
   }
   context.textBaseline = "alphabetic";
 }
@@ -497,7 +501,7 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
               style={nameplateArtwork ? { backgroundImage: `url(${nameplateArtwork})` } : undefined}
             >
               <h2 className={`ranking-card-player-name max-h-[1.9em] overflow-hidden font-athletic font-black uppercase text-white drop-shadow-[0_2px_4px_rgba(0,0,0,.9)] ${displayName.length > 22 ? "text-[11px] leading-[.92] tracking-normal" : displayName.length > 13 ? "text-[13px] leading-[.95] tracking-normal" : "text-[17px] leading-none tracking-[.04em]"}`}>{displayName}</h2>
-              {cardContent.title && <p className="mt-0.5 max-w-full truncate text-[7px] font-black uppercase tracking-[.13em]" style={{ color: theme.edge }}>✦ {cardContent.title}</p>}
+              {cardContent.title && <p className="mt-0.5 max-w-full truncate text-[7px] font-black uppercase tracking-[.13em] drop-shadow-[0_1px_2px_rgba(0,0,0,.95)]" style={{ color: theme.ink }}>✦ {cardContent.title}</p>}
             </div>
           </div>
 
