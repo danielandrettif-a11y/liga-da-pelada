@@ -3,7 +3,9 @@
 
 BEGIN;
 
-CREATE OR REPLACE FUNCTION public.get_latest_player_card_overalls()
+DROP FUNCTION IF EXISTS public.get_latest_player_card_overalls();
+
+CREATE FUNCTION public.get_latest_player_card_overalls()
 RETURNS TABLE (
   player_id UUID, overall NUMERIC, trend TEXT, def_overall NUMERIC,
   ala_mei_overall NUMERIC, ata_overall NUMERIC, gol_overall NUMERIC,
