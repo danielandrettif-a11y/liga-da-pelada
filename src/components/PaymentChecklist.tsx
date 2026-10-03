@@ -62,11 +62,13 @@ export function PaymentChecklist({
   initialPlayers,
   canEdit,
   canManagePayment,
+  currentPlayerId,
 }: {
   round: PaymentRound;
   initialPlayers: PaymentPlayer[];
   canEdit: boolean;
   canManagePayment: boolean;
+  currentPlayerId: string | null;
 }) {
   const router = useRouter();
   const [players, setPlayers] = useState(initialPlayers);
@@ -102,7 +104,9 @@ export function PaymentChecklist({
     ballFundTotal: paymentDetails.ballFundTotal,
     ballFundPlayerIds: paymentDetails.ballFundPlayerIds,
   }), [players, paymentDetails]);
-  const basePerPlayer = players.length > 0 ? paymentDetails.total / players.length : 0;
+  const currentPlayerTotal = currentPlayerId ? breakdown.amountByPlayer[currentPlayerId] : null;
+  const averageTotalPerPlayer = players.length > 0 ? breakdown.grandTotal / players.length : 0;
+  const highlightedTotal = currentPlayerTotal ?? averageTotalPerPlayer;
 
   async function copyPix() {
     if (!paymentDetails.pix) return;
@@ -259,8 +263,8 @@ export function PaymentChecklist({
             <p className="mt-1 text-lg font-black text-foreground">{currency.format(breakdown.grandTotal)}</p>
           </div>
           <div>
-            <p className="text-[9px] font-black uppercase tracking-widest text-accent">Pelada por pessoa</p>
-            <p className="mt-1 text-lg font-black text-accent">{currency.format(basePerPlayer)}</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-accent">{currentPlayerTotal != null ? "Seu total" : "Total por pessoa"}</p>
+            <p className="mt-1 text-lg font-black text-accent">{currency.format(highlightedTotal)}</p>
           </div>
         </div>
         <div className="mt-3 space-y-1 text-[10px] font-bold text-muted">

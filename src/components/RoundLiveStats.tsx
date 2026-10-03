@@ -64,6 +64,10 @@ export function RoundLiveStats({ matches, players, teams }: { matches: Match[]; 
               <TeamReferenceBadge position={team.position} fallbackIndex={index} color={team.color} className="h-9 w-9 text-lg" />
               <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-8 w-8" />
               <span className="min-w-0 flex-1 truncate text-[10px] font-bold text-muted">{team.name}</span>
+              <span className="shrink-0 rounded-lg border border-accent/25 bg-accent/10 px-2 py-1 text-center">
+                <span className="block font-athletic text-lg font-black leading-none text-accent">{team.points}</span>
+                <span className="mt-0.5 block text-[6px] font-black uppercase tracking-wider text-accent/75">pts</span>
+              </span>
               <span className="shrink-0 border-l border-border pl-2 text-right text-[9px] font-black">
                 <span className="flex justify-end gap-2.5">
                   <span className="text-accent">{team.wins} V</span>

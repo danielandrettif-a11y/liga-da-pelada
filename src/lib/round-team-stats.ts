@@ -20,6 +20,7 @@ export type RoundTeamStat = RoundTeamStatsTeam & {
   losses: number;
   goalsFor: number;
   goalsAgainst: number;
+  points: number;
 };
 
 /**
@@ -32,7 +33,7 @@ export function getRoundTeamStats(
   matches: RoundTeamStatsMatch[],
 ): RoundTeamStat[] {
   const statsByTeamId = new Map<string, RoundTeamStat>(
-    teams.map((team) => [team.id, { ...team, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 }]),
+    teams.map((team) => [team.id, { ...team, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 }]),
   );
 
   for (const match of matches) {
@@ -52,19 +53,24 @@ export function getRoundTeamStats(
     if (match.status === "finished") {
       if (scoreA > scoreB) {
         teamA.wins += 1;
+        teamA.points += 3;
         teamB.losses += 1;
       } else if (scoreB > scoreA) {
         teamB.wins += 1;
+        teamB.points += 3;
         teamA.losses += 1;
       } else {
         teamA.draws += 1;
         teamB.draws += 1;
+        teamA.points += 1;
+        teamB.points += 1;
       }
     }
   }
 
   return [...statsByTeamId.values()].sort((a, b) =>
-    b.wins - a.wins
+    b.points - a.points
+    || b.wins - a.wins
     || (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst)
     || b.goalsFor - a.goalsFor
     || a.name.localeCompare(b.name, "pt-BR"),

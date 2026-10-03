@@ -52,6 +52,7 @@ export default async function PagamentosPage() {
           initialPlayers={players}
           canEdit={!!account.user}
           canManagePayment={account.isAdmin}
+          currentPlayerId={account.profile?.player_id || null}
         />
       )}
     </div>

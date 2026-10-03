@@ -17,15 +17,15 @@ describe("getRoundTeamStats", () => {
     ]);
 
     expect(stats).toEqual([
-      expect.objectContaining({ id: "a", wins: 1, draws: 1, losses: 0, goalsFor: 5, goalsAgainst: 3 }),
-      expect.objectContaining({ id: "b", wins: 0, draws: 0, losses: 1, goalsFor: 3, goalsAgainst: 3 }),
-      expect.objectContaining({ id: "c", wins: 0, draws: 1, losses: 0, goalsFor: 2, goalsAgainst: 4 }),
+      expect.objectContaining({ id: "a", wins: 1, draws: 1, losses: 0, points: 4, goalsFor: 5, goalsAgainst: 3 }),
+      expect.objectContaining({ id: "c", wins: 0, draws: 1, losses: 0, points: 1, goalsFor: 2, goalsAgainst: 4 }),
+      expect.objectContaining({ id: "b", wins: 0, draws: 0, losses: 1, points: 0, goalsFor: 3, goalsAgainst: 3 }),
     ]);
   });
 
   it("keeps teams with no completed appearance in the summary", () => {
     const stats = getRoundTeamStats(teams, []);
     expect(stats).toHaveLength(3);
-    expect(stats[0]).toMatchObject({ id: "a", wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 });
+    expect(stats[0]).toMatchObject({ id: "a", wins: 0, draws: 0, losses: 0, points: 0, goalsFor: 0, goalsAgainst: 0 });
   });
 });
