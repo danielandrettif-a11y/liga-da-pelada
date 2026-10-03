@@ -184,7 +184,7 @@ async function loadFantasyMatchSnapshots(client: any, roundId: string | null) {
       .eq("event_type", "goal"),
     client
       .from("match_players")
-      .select("match_id, player_id, team_id, result_eligible")
+      .select("match_id, player_id, team_id, result_eligible, scoring_eligible")
       .in("match_id", matchIds),
     client
       .from("match_goalkeepers")
@@ -694,6 +694,7 @@ export async function getFantasyDashboard() {
         playerId: item.player_id,
         teamId: item.team_id,
         resultEligible: Boolean(item.result_eligible),
+        scoringEligible: item.scoring_eligible !== false,
         playerProfile: allPlayersById.get(item.player_id)?.player_profile || null,
       })),
       goalkeepers: (match.match_goalkeepers || []).map((item: any) => ({
@@ -1939,6 +1940,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
           playerId: item.player_id,
           teamId: item.team_id,
           resultEligible: Boolean(item.result_eligible),
+          scoringEligible: item.scoring_eligible !== false,
           playerProfile: item.player_id === playerId ? playerProfile : null,
         })),
         goalkeepers: (match.match_goalkeepers || []).map((item: any) => ({
@@ -2224,7 +2226,7 @@ async function getLiveRoundProjections(
       teamBId: match.team_b_id,
       scoreA: Number(match.score_a || 0),
       scoreB: Number(match.score_b || 0),
-      players: (match.match_players || []).map((item: any) => ({ playerId: item.player_id, teamId: item.team_id, resultEligible: Boolean(item.result_eligible), playerProfile: playerProfileById.get(item.player_id) || null })),
+      players: (match.match_players || []).map((item: any) => ({ playerId: item.player_id, teamId: item.team_id, resultEligible: Boolean(item.result_eligible), scoringEligible: item.scoring_eligible !== false, playerProfile: playerProfileById.get(item.player_id) || null })),
       goalkeepers: (match.match_goalkeepers || []).map((item: any) => ({ playerId: item.player_id, teamId: item.team_id })),
       events: (match.match_events || []).map((item: any) => ({ playerId: item.player_id, assistPlayerId: item.assist_player_id, teamId: item.team_id, isOwnGoal: Boolean(item.is_own_goal) })),
     })),

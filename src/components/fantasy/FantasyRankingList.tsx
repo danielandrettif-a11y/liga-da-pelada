@@ -293,6 +293,8 @@ export function FantasyRankingList({
   const selectedMetric = FANTASY_RANKING_METRICS.find((metric) => metric.id === rankingFilter) || FANTASY_RANKING_METRICS[0];
   const activeMetric = scope === "month" && selectedMetric.id === "points"
     ? { ...selectedMetric, description: "Pontuação total do mês" }
+    : scope === "round" && selectedMetric.id === "points"
+      ? { ...selectedMetric, title: "Pódio da rodada", description: "Pontuação total desta rodada" }
     : selectedMetric;
   const displayedRanking = useMemo(() => {
     if (scope === "round") return ranking;

@@ -10,6 +10,7 @@ export type FantasyLiveMatchPlayer = {
   playerId: string;
   teamId: string;
   resultEligible: boolean;
+  scoringEligible?: boolean;
   playerProfile?: "offensive" | "midfield" | "defensive" | null;
 };
 export type FantasyLiveGoalkeeper = { playerId: string; teamId: string };
@@ -134,9 +135,12 @@ export function projectFantasyLiveStats(
     const isDraw = match.scoreA === match.scoreB;
     const winner = isDraw ? null : match.scoreA > match.scoreB ? match.teamAId : match.teamBId;
     const goalkeeperIds = new Set(match.goalkeepers.map((goalkeeper) => goalkeeper.playerId));
+    const scoringEligibleByPlayerId = new Map(
+      match.players.map((participant) => [participant.playerId, participant.scoringEligible !== false] as const),
+    );
 
     for (const participant of match.players) {
-      if (!participant.resultEligible) continue;
+      if (!participant.resultEligible || participant.scoringEligible === false) continue;
       const current = ensure(participant.playerId, participant.playerProfile);
       const conceded = participant.teamId === match.teamAId ? match.scoreB : match.scoreA;
       current.teamGoalsConceded += conceded;
@@ -155,6 +159,7 @@ export function projectFantasyLiveStats(
     }
 
     for (const goalkeeper of match.goalkeepers) {
+      if (scoringEligibleByPlayerId.get(goalkeeper.playerId) === false) continue;
       const current = ensure(goalkeeper.playerId);
       const conceded = goalkeeper.teamId === match.teamAId ? match.scoreB : match.scoreA;
       current.goalsConceded += conceded;
@@ -171,14 +176,18 @@ export function projectFantasyLiveStats(
 
     for (const event of match.events) {
       if (event.isOwnGoal) {
-        const scorer = ensure(event.playerId);
-        scorer.ownGoals += 1;
-        if (goalkeeperIds.has(event.playerId)) scorer.goalkeeperOwnGoals += 1;
+        if (scoringEligibleByPlayerId.get(event.playerId) !== false) {
+          const scorer = ensure(event.playerId);
+          scorer.ownGoals += 1;
+          if (goalkeeperIds.has(event.playerId)) scorer.goalkeeperOwnGoals += 1;
+        }
       } else {
-        const scorer = ensure(event.playerId);
-        scorer.goals += 1;
-        if (goalkeeperIds.has(event.playerId)) scorer.goalkeeperGoals += 1;
-        if (event.assistPlayerId) {
+        if (scoringEligibleByPlayerId.get(event.playerId) !== false) {
+          const scorer = ensure(event.playerId);
+          scorer.goals += 1;
+          if (goalkeeperIds.has(event.playerId)) scorer.goalkeeperGoals += 1;
+        }
+        if (event.assistPlayerId && scoringEligibleByPlayerId.get(event.assistPlayerId) !== false) {
           const assister = ensure(event.assistPlayerId);
           assister.assists += 1;
           if (goalkeeperIds.has(event.assistPlayerId)) assister.goalkeeperAssists += 1;

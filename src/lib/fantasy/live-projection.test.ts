@@ -32,6 +32,25 @@ describe("live fantasy projection", () => {
     expect(projected.get("loser")?.losses).toBe(1);
   });
 
+  it("não pontua a atuação emprestada para cobrir uma ausência", () => {
+    const projected = projectFantasyLiveStats([{
+      ...baseMatch,
+      status: "finished",
+      players: [
+        ...baseMatch.players,
+        { playerId: "replacement", teamId: "b", resultEligible: false, scoringEligible: false },
+      ],
+      goalkeepers: [{ playerId: "replacement", teamId: "b" }],
+      events: [
+        { playerId: "replacement", teamId: "b" },
+        { playerId: "scorer", assistPlayerId: "replacement", teamId: "a" },
+      ],
+    }], DEFAULT_FANTASY_SETTINGS);
+
+    expect(projected.has("replacement")).toBe(false);
+    expect(projected.get("scorer")?.goals).toBe(1);
+  });
+
   it("Rodada 02 preserva scouts brutos e suprime somente recompensas positivas de goleiro", () => {
     const projected = projectFantasyLiveStats(
       [{ ...baseMatch, status: "finished" }],

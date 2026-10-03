@@ -310,7 +310,8 @@ export async function calculateRoundStats(roundId: string) {
           match_players (
             player_id,
             team_id,
-            result_eligible
+            result_eligible,
+            scoring_eligible
           ),
           match_goalkeepers (
             player_id,
@@ -412,11 +413,19 @@ export async function calculateRoundStats(roundId: string) {
       const winnerId = isDraw ? null : (match.score_a > match.score_b ? match.team_a_id : match.team_b_id);
 
       const goalkeeperIds = new Set((match.match_goalkeepers || []).map((goalkeeper: any) => goalkeeper.player_id));
+      const scoringEligiblePlayerIds = new Set(
+        (match.match_players || [])
+          .filter((participant: any) => participant.scoring_eligible !== false)
+          .map((participant: any) => participant.player_id),
+      );
       // Resultado vale somente para participantes marcados como elegiveis.
       const processTeamMatch = (teamId: string, result: 'win' | 'draw' | 'loss') => {
         const teamGoalsConceded = teamId === match.team_a_id ? match.score_b : match.score_a;
         const participants = (match.match_players || []).filter(
-          (participant: any) => participant.team_id === teamId && participant.result_eligible && !voidedPlayerIds.has(participant.player_id),
+          (participant: any) => participant.team_id === teamId
+            && participant.result_eligible
+            && participant.scoring_eligible !== false
+            && !voidedPlayerIds.has(participant.player_id),
         );
         for (const participant of participants) {
           const s = statsMap[participant.player_id];
@@ -455,7 +464,7 @@ export async function calculateRoundStats(roundId: string) {
       processTeamMatch(match.team_b_id, isDraw ? 'draw' : (winnerId === match.team_b_id ? 'win' : 'loss'));
 
       for (const goalkeeper of match.match_goalkeepers || []) {
-        if (voidedPlayerIds.has(goalkeeper.player_id)) continue;
+        if (voidedPlayerIds.has(goalkeeper.player_id) || !scoringEligiblePlayerIds.has(goalkeeper.player_id)) continue;
         const s = statsMap[goalkeeper.player_id];
         if (!s) continue;
         const conceded = goalkeeper.team_id === match.team_a_id ? match.score_b : match.score_a;
@@ -472,7 +481,7 @@ export async function calculateRoundStats(roundId: string) {
         if (ev.event_type === 'goal') {
           if (ev.is_own_goal) {
             const offender = statsMap[ev.player_id];
-            if (offender && !voidedPlayerIds.has(ev.player_id)) {
+            if (offender && scoringEligiblePlayerIds.has(ev.player_id) && !voidedPlayerIds.has(ev.player_id)) {
               offender.own_goals += 1;
               if (goalkeeperIds.has(ev.player_id)) offender.goalkeeper_own_goals += 1;
             }
@@ -480,14 +489,14 @@ export async function calculateRoundStats(roundId: string) {
           }
           // Gols
           const scorer = statsMap[ev.player_id];
-          if (scorer && !voidedPlayerIds.has(ev.player_id)) {
+          if (scorer && scoringEligiblePlayerIds.has(ev.player_id) && !voidedPlayerIds.has(ev.player_id)) {
             scorer.goals += 1;
             if (goalkeeperIds.has(ev.player_id)) scorer.goalkeeper_goals += 1;
           }
           // Assistências
           if (ev.assist_player_id) {
             const assister = statsMap[ev.assist_player_id];
-            if (assister && !voidedPlayerIds.has(ev.assist_player_id)) {
+            if (assister && scoringEligiblePlayerIds.has(ev.assist_player_id) && !voidedPlayerIds.has(ev.assist_player_id)) {
               assister.assists += 1;
               if (goalkeeperIds.has(ev.assist_player_id)) assister.goalkeeper_assists += 1;
             }

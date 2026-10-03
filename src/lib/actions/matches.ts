@@ -153,6 +153,7 @@ export async function createMatch(input: CreateMatchInput) {
 
     const usedAbsentPlayers = new Set<string>();
     const usedReplacementPlayers = new Set<string>();
+    const forcedGoalkeeperByTeam = new Map<string, string>();
     for (const replacement of replacements) {
       if (!selectedTeamIds.includes(replacement.team_id)) {
         return { success: false, error: "O time do emprestimo nao participa desta partida." };
@@ -174,6 +175,9 @@ export async function createMatch(input: CreateMatchInput) {
       }
       usedAbsentPlayers.add(replacement.absent_player_id);
       usedReplacementPlayers.add(replacement.replacement_player_id);
+      if (!forcedGoalkeeperByTeam.has(replacement.team_id)) {
+        forcedGoalkeeperByTeam.set(replacement.team_id, replacement.replacement_player_id);
+      }
     }
     const missingReplacementCount = [...unavailableByTeam.values()].reduce((total, ids) => total + ids.size, 0) - usedAbsentPlayers.size;
     if (missingReplacementCount > 0) {
@@ -274,6 +278,12 @@ export async function createMatch(input: CreateMatchInput) {
       || effectiveTeamByPlayer.get(input.goalkeeper_b_id) !== input.team_b_id) {
       return { success: false, error: "O goleiro precisa estar escalado pelo time nesta partida." };
     }
+    for (const [teamId, replacementPlayerId] of forcedGoalkeeperByTeam) {
+      const selectedGoalkeeperId = teamId === input.team_a_id ? input.goalkeeper_a_id : input.goalkeeper_b_id;
+      if (selectedGoalkeeperId !== replacementPlayerId) {
+        return { success: false, error: "O substituto do jogador ausente precisa iniciar no gol e não pontua nesta partida." };
+      }
+    }
     const liveMatchIds = (liveMatches || []).map((match: any) => match.id);
     if (liveMatchIds.length > 0 && proposedPlayerIds.size > 0) {
       const { data: busyPlayers, error: busyPlayersError } = await client
@@ -335,6 +345,7 @@ export async function createMatch(input: CreateMatchInput) {
             is_starter: true,
             is_active: true,
             result_eligible: true,
+            scoring_eligible: true,
             entered_elapsed_seconds: 0,
           });
         }
@@ -348,7 +359,8 @@ export async function createMatch(input: CreateMatchInput) {
         original_team_id: originalTeamByPlayer.get(replacement.replacement_player_id),
         is_starter: true,
         is_active: true,
-        result_eligible: true,
+        result_eligible: false,
+        scoring_eligible: false,
         entered_elapsed_seconds: 0,
       });
     }
@@ -361,6 +373,7 @@ export async function createMatch(input: CreateMatchInput) {
         is_starter: true,
         is_active: true,
         result_eligible: true,
+        scoring_eligible: true,
         entered_elapsed_seconds: 0,
       });
     }

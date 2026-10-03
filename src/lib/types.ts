@@ -361,6 +361,7 @@ export type MatchPlayer = {
   is_starter: boolean;
   is_active: boolean;
   result_eligible: boolean;
+  scoring_eligible: boolean;
   entered_elapsed_seconds: number;
   left_elapsed_seconds: number | null;
   created_at: string;
@@ -662,7 +663,7 @@ export type Database = {
       };
       match_players: {
         Row: MatchPlayer;
-        Insert: Omit<MatchPlayer, 'id' | 'created_at' | 'is_starter' | 'is_active' | 'result_eligible' | 'entered_elapsed_seconds' | 'left_elapsed_seconds'> & { id?: string; created_at?: string; is_starter?: boolean; is_active?: boolean; result_eligible?: boolean; entered_elapsed_seconds?: number; left_elapsed_seconds?: number | null };
+        Insert: Omit<MatchPlayer, 'id' | 'created_at' | 'is_starter' | 'is_active' | 'result_eligible' | 'scoring_eligible' | 'entered_elapsed_seconds' | 'left_elapsed_seconds'> & { id?: string; created_at?: string; is_starter?: boolean; is_active?: boolean; result_eligible?: boolean; scoring_eligible?: boolean; entered_elapsed_seconds?: number; left_elapsed_seconds?: number | null };
         Update: Partial<Omit<MatchPlayer, 'id'>>;
       };
       match_substitutions: {

@@ -61,12 +61,15 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
     (b.match_order || 0) - (a.match_order || 0) || String(b.created_at).localeCompare(String(a.created_at)),
   )[0], [round?.matches]);
   const firstMatchAllowedIds = new Set(teams.filter((team: any) => (team.position || 0) <= 2).map((team: any) => team.id));
-  const selectedTeams = teams.filter((team: any) => selectedTeamIds.includes(team.id));
-  const injuredPlayers = selectedTeams.flatMap((team: any) =>
+  const selectedTeams = useMemo(
+    () => teams.filter((team: any) => selectedTeamIds.includes(team.id)),
+    [teams, selectedTeamIds],
+  );
+  const injuredPlayers = useMemo(() => selectedTeams.flatMap((team: any) =>
     (team.team_players || [])
       .filter((entry: any) => availability.get(entry.player_id) === "injured" || (tracksAttendance && attendance.get(entry.player_id) !== "present"))
       .map((entry: any) => ({ team, player: entry.players, playerId: entry.player_id, reason: availability.get(entry.player_id) === "injured" ? "Machucado" : "Ainda nao chegou" })),
-  );
+  ), [selectedTeams, availability, tracksAttendance, attendance]);
   // Cobertura de desfalque não depende do rodízio do último jogo: qualquer
   // atleta presente de um time que não participa deste confronto pode entrar.
   // A API repete a validação para impedir que a regra seja burlada pelo cliente.
@@ -79,6 +82,14 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
       .filter((entry: any) => availability.get(entry.player_id) === "available" && (!tracksAttendance || attendance.get(entry.player_id) === "present"))
       .map((entry: any) => ({ team, player: entry.players, playerId: entry.player_id })))
     .filter((entry: any) => entry.player);
+  const forcedAbsenceGoalkeeperByTeam = useMemo(() => {
+    const forced = new Map<string, string>();
+    for (const entry of injuredPlayers) {
+      const replacementId = replacementByAbsent[entry.playerId];
+      if (replacementId && !forced.has(entry.team.id)) forced.set(entry.team.id, replacementId);
+    }
+    return forced;
+  }, [injuredPlayers, replacementByAbsent]);
   const previousLoanCount = useMemo(() => {
     const counts = new Map<string, number>();
     for (const match of round?.matches || []) {
@@ -169,6 +180,11 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
     rotation.sort((a, b) => a.order - b.order);
     const eligible = [...(eligibleGoalkeepersByTeam[team.id] || [])]
       .sort((a: any, b: any) => a.goalkeeperOrder - b.goalkeeperOrder || a.name.localeCompare(b.name, "pt-BR"));
+    const forcedReplacementId = forcedAbsenceGoalkeeperByTeam.get(team.id);
+    if (forcedReplacementId) {
+      const forcedReplacement = eligible.find((player: any) => player.id === forcedReplacementId);
+      if (forcedReplacement) return [team.id, { ...forcedReplacement, order: 0 }] as const;
+    }
     if (!rotation.length || !eligible.length) return [team.id, null] as const;
 
     const lastMatchWithGoalkeeper = [...(round?.matches || [])]
@@ -191,7 +207,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
     }
 
     return [team.id, null] as const;
-  })), [teams, eligibleGoalkeepersByTeam, round?.matches, replacementByAbsent, structuralLoans]);
+  })), [teams, eligibleGoalkeepersByTeam, round?.matches, replacementByAbsent, structuralLoans, forcedAbsenceGoalkeeperByTeam]);
 
   useEffect(() => {
     setReplacementByAbsent({});
@@ -236,8 +252,9 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
         const eligible = eligibleGoalkeepersByTeam[teamId] || [];
         const currentPlayerId = current[teamId];
         const currentMode = goalkeeperModeByTeam[teamId];
-        const keepsManualChoice = currentMode === "manual" && eligible.some((player: any) => player.id === currentPlayerId);
-        const nextPlayerId = keepsManualChoice ? currentPlayerId : suggested?.id || currentPlayerId || "";
+        const forcedReplacementId = forcedAbsenceGoalkeeperByTeam.get(teamId);
+        const keepsManualChoice = !forcedReplacementId && currentMode === "manual" && eligible.some((player: any) => player.id === currentPlayerId);
+        const nextPlayerId = forcedReplacementId || (keepsManualChoice ? currentPlayerId : suggested?.id || currentPlayerId || "");
         next[teamId] = nextPlayerId;
         if (nextPlayerId !== currentPlayerId) changed = true;
       }
@@ -247,13 +264,13 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
       const next: Record<string, "bq" | "manual"> = {};
       let changed = false;
       for (const teamId of selectedTeamIds) {
-        const nextMode = current[teamId] || "bq";
+        const nextMode = forcedAbsenceGoalkeeperByTeam.has(teamId) ? "bq" : current[teamId] || "bq";
         next[teamId] = nextMode;
         if (nextMode !== current[teamId]) changed = true;
       }
       return changed ? next : current;
     });
-  }, [selectedTeamIds, bqGoalkeeperSuggestionByTeam, eligibleGoalkeepersByTeam, goalkeeperModeByTeam]);
+  }, [selectedTeamIds, bqGoalkeeperSuggestionByTeam, eligibleGoalkeepersByTeam, goalkeeperModeByTeam, forcedAbsenceGoalkeeperByTeam]);
 
   useEffect(() => {
     setCaptainByTeam(Object.fromEntries(
@@ -366,7 +383,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
           <div className="w-full max-w-sm rounded-3xl border border-warning/35 bg-[#07150d] p-5 shadow-2xl">
             <div className="flex items-center gap-3">
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-warning/15 text-warning"><ArrowLeftRight className="h-5 w-5" /></span>
-              <div><h2 className="text-base font-black text-foreground">Substituição sorteada</h2><p className="text-[10px] font-semibold text-muted">Quem foi menos sorteado teve prioridade.</p></div>
+              <div><h2 className="text-base font-black text-foreground">Substituição sorteada</h2><p className="text-[10px] font-semibold text-muted">Quem foi menos sorteado teve prioridade. O substituto entra no gol e não pontua nesta partida.</p></div>
             </div>
             <div className="mt-4 space-y-2">
               {substitutionNotice.map((item) => (
@@ -706,11 +723,14 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
                     }));
                     setGoalkeeperModeByTeam((current) => ({ ...current, [team.id]: useBqRotation ? "bq" : "manual" }));
                   }}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-semibold text-foreground outline-none focus:border-accent"
+                  disabled={forcedAbsenceGoalkeeperByTeam.has(team.id)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-semibold text-foreground outline-none focus:border-accent disabled:cursor-not-allowed disabled:opacity-75"
                 >
                   {bqGoalkeeperSuggestionByTeam[team.id] && (
                     <option value="__bq_rotation__">
-                      Seguir ordem BQ · {bqGoalkeeperSuggestionByTeam[team.id].name} · fila {bqGoalkeeperSuggestionByTeam[team.id].order}
+                      {forcedAbsenceGoalkeeperByTeam.has(team.id)
+                        ? `Substituto no gol · ${bqGoalkeeperSuggestionByTeam[team.id].name}`
+                        : `Seguir ordem BQ · ${bqGoalkeeperSuggestionByTeam[team.id].name} · fila ${bqGoalkeeperSuggestionByTeam[team.id].order}`}
                     </option>
                   )}
                   {!bqGoalkeeperSuggestionByTeam[team.id] && <option value="">Quem começa no gol?</option>}
@@ -720,7 +740,9 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
                 </select>
                 {bqGoalkeeperSuggestionByTeam[team.id] && (
                   <span className="mt-1.5 block text-[9px] font-semibold leading-relaxed text-muted">
-                    A sugestão usa o próximo da fila após o último goleiro deste time. Você pode escolher outro nome na lista.
+                    {forcedAbsenceGoalkeeperByTeam.has(team.id)
+                      ? "O substituto cobre a ausência no gol e não recebe nenhum ponto ou scout desta partida."
+                      : "A sugestão usa o próximo da fila após o último goleiro deste time. Você pode escolher outro nome na lista."}
                   </span>
                 )}
               </label>
