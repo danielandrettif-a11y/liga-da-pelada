@@ -1,3 +1,5 @@
+import { calculateRankedPoints } from "./ranked-scoring";
+
 export type RoundTeamStatsTeam = {
   id: string;
   name: string;
@@ -12,6 +14,11 @@ export type RoundTeamStatsMatch = {
   team_b_id: string;
   score_a: number | null | undefined;
   score_b: number | null | undefined;
+  match_events?: Array<{
+    team_id?: string | null;
+    assist_player_id?: string | null;
+    is_own_goal?: boolean | null;
+  }> | null;
 };
 
 export type RoundTeamStat = RoundTeamStatsTeam & {
@@ -20,6 +27,7 @@ export type RoundTeamStat = RoundTeamStatsTeam & {
   losses: number;
   goalsFor: number;
   goalsAgainst: number;
+  assists: number;
   points: number;
 };
 
@@ -33,7 +41,7 @@ export function getRoundTeamStats(
   matches: RoundTeamStatsMatch[],
 ): RoundTeamStat[] {
   const statsByTeamId = new Map<string, RoundTeamStat>(
-    teams.map((team) => [team.id, { ...team, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 }]),
+    teams.map((team) => [team.id, { ...team, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, assists: 0, points: 0 }]),
   );
 
   for (const match of matches) {
@@ -50,22 +58,34 @@ export function getRoundTeamStats(
     teamB.goalsFor += scoreB;
     teamB.goalsAgainst += scoreA;
 
+    for (const event of match.match_events || []) {
+      if (!event.assist_player_id || event.is_own_goal) continue;
+      const eventTeam = event.team_id ? statsByTeamId.get(event.team_id) : null;
+      if (eventTeam) eventTeam.assists += 1;
+    }
+
     if (match.status === "finished") {
       if (scoreA > scoreB) {
         teamA.wins += 1;
-        teamA.points += 3;
         teamB.losses += 1;
       } else if (scoreB > scoreA) {
         teamB.wins += 1;
-        teamB.points += 3;
         teamA.losses += 1;
       } else {
         teamA.draws += 1;
         teamB.draws += 1;
-        teamA.points += 1;
-        teamB.points += 1;
       }
     }
+  }
+
+  for (const team of statsByTeamId.values()) {
+    team.points = calculateRankedPoints({
+      wins: team.wins,
+      draws: team.draws,
+      losses: team.losses,
+      goals: team.goalsFor,
+      assists: team.assists,
+    });
   }
 
   return [...statsByTeamId.values()].sort((a, b) =>

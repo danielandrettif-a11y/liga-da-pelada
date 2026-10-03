@@ -7,7 +7,7 @@ import { TeamReferenceBadge } from "@/components/TeamReferenceBadge";
 import { getRoundTeamStats } from "@/lib/round-team-stats";
 
 type Player = { id: string; name: string; nickname?: string | null; avatar_url?: string | null };
-type MatchEvent = { player_id?: string | null; assist_player_id?: string | null; is_own_goal?: boolean | null };
+type MatchEvent = { team_id?: string | null; player_id?: string | null; assist_player_id?: string | null; is_own_goal?: boolean | null };
 type Team = { id: string; name: string; position?: number | null; color?: string | null; crest_url?: string | null };
 type Match = { status: "pending" | "live" | "finished"; team_a_id: string; team_b_id: string; score_a: number | null; score_b: number | null; match_events?: MatchEvent[] | null };
 
@@ -65,7 +65,7 @@ export function RoundLiveStats({ matches, players, teams }: { matches: Match[]; 
               <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-8 w-8" />
               <span className="min-w-0 flex-1 truncate text-[10px] font-bold text-muted">{team.name}</span>
               <span className="shrink-0 rounded-lg border border-accent/25 bg-accent/10 px-2 py-1 text-center">
-                <span className="block font-athletic text-lg font-black leading-none text-accent">{team.points}</span>
+                <span className="block font-athletic text-lg font-black leading-none text-accent">{Number.isInteger(team.points) ? team.points : team.points.toFixed(1).replace(".", ",")}</span>
                 <span className="mt-0.5 block text-[6px] font-black uppercase tracking-wider text-accent/75">pts</span>
               </span>
               <span className="shrink-0 border-l border-border pl-2 text-right text-[9px] font-black">
@@ -75,13 +75,14 @@ export function RoundLiveStats({ matches, players, teams }: { matches: Match[]; 
                   <span className="text-danger">{team.losses} D</span>
                 </span>
                 <span className="mt-1 flex justify-end gap-2.5 border-t border-border/60 pt-1">
-                  <span className="text-info">{team.goalsFor} GM</span>
+                  <span className="text-info">{team.goalsFor} G</span>
+                  <span className="text-accent">{team.assists} A</span>
                   <span className="text-danger">{team.goalsAgainst} GS</span>
                 </span>
               </span>
             </div>)}
           </div>
-          {hasLiveMatch && <p className="-mt-2 mb-4 text-[10px] font-bold text-muted">Gols atualizados ao vivo; V/E/D entram ao encerrar a partida.</p>}
+          <p className="-mt-2 mb-4 text-[10px] font-bold leading-4 text-muted">V +3 · E +1 · D −2,5 · Gol +4 · Assistência +2,5. Gols e assistências atualizam ao vivo; V/E/D entram ao encerrar.</p>
         </>}
 
         {entries.length === 0 ? <p className="py-2 text-center text-xs text-muted">Ainda sem gols registrados nesta rodada.</p> : <>
