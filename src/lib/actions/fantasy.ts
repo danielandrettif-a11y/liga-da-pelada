@@ -47,6 +47,7 @@ import {
   shouldUseFantasyRoundProjection,
 } from "@/lib/fantasy/lineup-player-total";
 import { isParticipantScoringEligible } from "@/lib/scoring-eligibility";
+import { resolveFantasyCardPointBonus } from "@/lib/fantasy/card-benefits";
 
 export type FantasyMarketPlayer = {
   id: string;
@@ -2784,7 +2785,6 @@ export async function getFantasyRanking(
     entries = [...byUserId.values()];
   }
 
-  entries.sort((a: any, b: any) => Number(b.total_points) - Number(a.total_points));
   const userIds = entries.map((item: any) => item.user_id);
   const [{ data: profiles }, { data: cosmeticLoadouts }, { data: roundCardActivations }] = userIds.length
     ? await Promise.all([
@@ -2836,6 +2836,17 @@ export async function getFantasyRanking(
       }];
     }),
   );
+  if (periodScope === "round") {
+    entries = entries.map((item: any) => {
+      const card = cardByUser.get(item.user_id);
+      const cardPoints = card ? resolveFantasyCardPointBonus(card) : 0;
+      return {
+        ...item,
+        total_points: Number(item.total_points || 0) + cardPoints,
+      };
+    });
+  }
+  entries.sort((a: any, b: any) => Number(b.total_points) - Number(a.total_points));
   let previousPoints: number | null = null;
   let previousPosition = 0;
   return entries.map((item: any, index: number) => {

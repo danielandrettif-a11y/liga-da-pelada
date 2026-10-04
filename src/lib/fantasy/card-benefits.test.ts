@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveFantasyCardBenefit } from "./card-benefits";
+import { resolveFantasyCardBenefit, resolveFantasyCardPointBonus } from "./card-benefits";
 
 describe("resolveFantasyCardBenefit", () => {
   it("uses persisted points and the lineup fallback", () => {
@@ -13,5 +13,11 @@ describe("resolveFantasyCardBenefit", () => {
 
   it("keeps unresolved cards in dispute", () => {
     expect(resolveFantasyCardBenefit({ slug: "head_to_head", status: "LOCKED" }).kind).toBe("pending");
+  });
+
+  it("soma no ranking apenas cartas que concedem pontos", () => {
+    expect(resolveFantasyCardPointBonus({ slug: "golden_pass", status: "RESOLVED", bonus: 3 })).toBe(3);
+    expect(resolveFantasyCardPointBonus({ slug: "bargain", status: "RESOLVED", details: { discountAmount: 2.5 } })).toBe(0);
+    expect(resolveFantasyCardPointBonus({ slug: "head_to_head", status: "LOCKED", fallbackBonus: 6 })).toBe(0);
   });
 });

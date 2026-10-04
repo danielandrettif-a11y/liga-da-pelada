@@ -69,3 +69,9 @@ export function resolveFantasyCardBenefit(input: CardBenefitInput): FantasyCardB
 
   return { kind: "none", amount: 0, unit: "none", applied: false, label: "Sem benefício", description };
 }
+
+/** Retorna somente o benefício que efetivamente soma pontos ao placar. */
+export function resolveFantasyCardPointBonus(input: CardBenefitInput) {
+  const benefit = resolveFantasyCardBenefit(input);
+  return benefit.kind === "points" ? benefit.amount : 0;
+}

@@ -294,7 +294,7 @@ export function FantasyRankingList({
   const activeMetric = scope === "month" && selectedMetric.id === "points"
     ? { ...selectedMetric, description: "Pontuação total do mês" }
     : scope === "round" && selectedMetric.id === "points"
-      ? { ...selectedMetric, title: "Pódio da rodada", description: "Soma dos jogadores escalados nesta rodada" }
+      ? { ...selectedMetric, title: "Pódio da rodada", description: "Pontuação total da escalação, incluindo cartas" }
     : selectedMetric;
   const displayedRanking = useMemo(() => {
     if (scope === "round") return ranking;
