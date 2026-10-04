@@ -296,4 +296,49 @@ describe("live fantasy projection", () => {
     expect(stats.get("scorer")?.basePoints).toBe(11);
     expect(lineup.players[0]).toMatchObject({ basePoints: 0, positionBonus: 0, totalPoints: 0 });
   });
+
+  it("regressão R06: Yann fecha 16.5 na vaga GOL a partir das atuações reais", () => {
+    const settings = { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 11 };
+    const stats = new Map([[
+      "yann",
+      {
+        playerId: "yann",
+        playerProfile: "midfield" as const,
+        goals: 6,
+        assists: 3,
+        ownGoals: 0,
+        wins: 6,
+        draws: 2,
+        losses: 7,
+        games: 15,
+        goalkeeperGames: 3,
+        goalsConceded: 2,
+        goalkeeperGoals: 1,
+        goalkeeperAssists: 0,
+        goalkeeperOwnGoals: 0,
+        goalkeeperWins: 1,
+        goalkeeperDraws: 1,
+        goalkeeperLosses: 1,
+        cleanSheets: 1,
+        defensiveCleanGames: 0,
+        defensiveOneGoalGames: 0,
+        teamGoalsConceded: 16,
+        basePoints: 38,
+      },
+    ]]);
+    const [lineup] = projectFantasyLiveLineups([{
+      id: "r06-yann",
+      userId: "user",
+      playerIds: ["yann"],
+      slots: [{ playerId: "yann", slotRole: "GOL", playerProfile: "midfield" }],
+    }], stats, settings);
+
+    expect(lineup.players[0]).toMatchObject({
+      basePoints: 12.5,
+      positionBonus: 4,
+      captainBonus: 0,
+      totalPoints: 16.5,
+    });
+    expect(lineup.totalPoints).toBe(16.5);
+  });
 });
