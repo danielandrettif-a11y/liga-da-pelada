@@ -1841,7 +1841,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       .order("created_at", { ascending: true }),
     account.client
       .from("player_round_stats")
-      .select("goals, assists, wins, losses, games, goalkeeper_games, goals_conceded")
+      .select("round_id, goals, assists, wins, losses, games, goalkeeper_games, goalkeeper_goals, goalkeeper_assists, goalkeeper_own_goals, goalkeeper_wins, goalkeeper_draws, goalkeeper_losses, goals_conceded, clean_sheets")
       .eq("player_id", playerId),
     account.client
       .from("account_profiles")
@@ -2038,21 +2038,25 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       defensiveOneGoalGames: 0, teamGoalsConceded: 0, basePoints: 0,
     };
     const roundIsFinished = scoringRound.market_status === "finished" || scoringRoundInfo?.status === "finished";
+    const fallbackRoundStats = (statRows || []).find(
+      (row: any) => row.round_id === scoringRound.round_id,
+    ) || null;
+    const consolidatedRoundStats = officialRoundStats || fallbackRoundStats;
     // Rodadas encerradas usam os scouts de goleiro já consolidados. Essa
     // fonte não depende de alguém ter escalado o atleta na vaga GOL e evita
     // que a ficha esconda atuações que já foram corrigidas no fechamento.
-    const current = roundIsFinished && officialRoundStats
+    const current = roundIsFinished && consolidatedRoundStats
       ? {
           ...projectedCurrent,
-          goalkeeperGames: Number(officialRoundStats.goalkeeper_games || 0),
-          goalkeeperGoals: Number(officialRoundStats.goalkeeper_goals || 0),
-          goalkeeperAssists: Number(officialRoundStats.goalkeeper_assists || 0),
-          goalkeeperOwnGoals: Number(officialRoundStats.goalkeeper_own_goals || 0),
-          goalkeeperWins: Number(officialRoundStats.goalkeeper_wins || 0),
-          goalkeeperDraws: Number(officialRoundStats.goalkeeper_draws || 0),
-          goalkeeperLosses: Number(officialRoundStats.goalkeeper_losses || 0),
-          goalsConceded: Number(officialRoundStats.goals_conceded || 0),
-          cleanSheets: Number(officialRoundStats.clean_sheets || 0),
+          goalkeeperGames: Number(consolidatedRoundStats.goalkeeper_games || 0),
+          goalkeeperGoals: Number(consolidatedRoundStats.goalkeeper_goals || 0),
+          goalkeeperAssists: Number(consolidatedRoundStats.goalkeeper_assists || 0),
+          goalkeeperOwnGoals: Number(consolidatedRoundStats.goalkeeper_own_goals || 0),
+          goalkeeperWins: Number(consolidatedRoundStats.goalkeeper_wins || 0),
+          goalkeeperDraws: Number(consolidatedRoundStats.goalkeeper_draws || 0),
+          goalkeeperLosses: Number(consolidatedRoundStats.goalkeeper_losses || 0),
+          goalsConceded: Number(consolidatedRoundStats.goals_conceded || 0),
+          cleanSheets: Number(consolidatedRoundStats.clean_sheets || 0),
         }
       : projectedCurrent;
     const goalValue = (liveSettings.roleScoringActive === false && playerProfile === "offensive"
