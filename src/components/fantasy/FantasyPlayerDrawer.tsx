@@ -527,7 +527,7 @@ export function FantasyPlayerDrawer({
                     {goalkeeperPreview.games > 0
                       ? <>Base exclusiva da vaga GOL: {Number(goalkeeperPreview.basePoints).toFixed(1)} pts{Number(goalkeeperPreview.positionBonus) !== 0 ? ` · bônus de clean sheet: ${Number(goalkeeperPreview.positionBonus) > 0 ? "+" : ""}${Number(goalkeeperPreview.positionBonus).toFixed(1)} pts` : ""}.</>
                       : "Sem atuação registrada no gol nesta rodada, a vaga GOL renderia 0,0 ponto."}
-                    {" "}Simulação sem capitão e sem carta; não altera o total oficial.
+                    {" "}Regra exclusiva da vaga GOL aplicada à rodada, sem capitão e sem carta; não altera o total oficial.
                   </p>
                 </div>
               )}
