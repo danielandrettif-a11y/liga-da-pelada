@@ -56,6 +56,29 @@ describe("total dos jogadores escalados", () => {
     expect(scores.reduce((total, player) => total + player.points, 0)).toBe(90.75);
   });
 
+  it("corrige o total do ranking finalizado sem trocar os pontos dos jogadores de linha", () => {
+    const scores = resolveFantasyFinishedPlayerScores({
+      projectedPlayers: [
+        { playerId: "ata", totalPoints: 33.5 },
+        { playerId: "ala-1", totalPoints: 31.5 },
+        { playerId: "ala-2", totalPoints: 74.25 },
+        { playerId: "def-1", totalPoints: 39 },
+        { playerId: "def-2", totalPoints: 22.5 },
+        { playerId: "gol", totalPoints: 0 },
+      ],
+      storedPlayers: [
+        { player_id: "ata", slot_role: "ATA", total_points: 37.5 },
+        { player_id: "ala-1", slot_role: "MEI", total_points: 36.5 },
+        { player_id: "ala-2", slot_role: "MEI", total_points: 78.75 },
+        { player_id: "def-1", slot_role: "DEF", total_points: 43 },
+        { player_id: "def-2", slot_role: "DEF", total_points: 22.5 },
+        { player_id: "gol", slot_role: "GOL", total_points: 16.5 },
+      ],
+    });
+
+    expect(scores.reduce((total, player) => total + player.points, 0)).toBe(217.25);
+  });
+
   it("reconstrói também a rodada finalizada quando o alvo é o mesmo", () => {
     expect(shouldUseFantasyRoundProjection({
       projectionRoundId: "round-6",

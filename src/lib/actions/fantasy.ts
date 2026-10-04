@@ -2519,7 +2519,7 @@ export async function getFantasyRanking(
     if (fantasyRoundId) {
       const { data } = await rankingReadClient
         .from("fantasy_lineups")
-        .select("id, user_id, player_points, total_points, budget_after, budget_before, score_breakdown, status, fantasy_lineup_players(player_id, total_points)")
+        .select("id, user_id, player_points, total_points, budget_after, budget_before, score_breakdown, status, fantasy_lineup_players(player_id, slot_role, total_points)")
         .eq("fantasy_round_id", fantasyRoundId);
       persistedLineups = (data || []).filter(
         (lineup: any) => (lineup.fantasy_lineup_players || []).length > 0,
@@ -2536,8 +2536,19 @@ export async function getFantasyRanking(
       const byUserId = new Map<string, any>();
       for (const lineup of persistedLineups) {
         const projection = live!.byUserId.get(lineup.user_id);
+        const projectedPlayerScores = projection
+          ? live!.isLive
+            ? projection.players.map((player) => ({
+                playerId: player.playerId,
+                points: Number(player.totalPoints || 0),
+              }))
+            : resolveFantasyFinishedPlayerScores({
+                projectedPlayers: projection.players,
+                storedPlayers: lineup.fantasy_lineup_players,
+              })
+          : [];
         const projectedTeamPoints = projection
-          ? resolveFantasyLineupPlayerTotal({ projectedPlayers: projection.players })
+          ? projectedPlayerScores.reduce((total, player) => total + player.points, 0)
           : null;
         const persistedTeamPoints = resolveFantasyLineupPlayerTotal({
           storedPlayers: lineup.fantasy_lineup_players,
