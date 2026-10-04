@@ -130,6 +130,9 @@ SELECT 'adaptive-v17-three-positions-column-c',
 FROM public.overall_formula_versions WHERE key = 'adaptive-v16-distributed-trait-bonus'
 ON CONFLICT (key) DO UPDATE SET label = EXCLUDED.label, config = EXCLUDED.config;
 
+-- Algumas instalações ainda têm a versão antiga deste RPC, com menos colunas
+-- OUT. PostgreSQL não permite alterar o tipo composto usando OR REPLACE.
+DROP FUNCTION IF EXISTS public.get_latest_player_card_overalls();
 CREATE OR REPLACE FUNCTION public.get_latest_player_card_overalls()
 RETURNS TABLE(player_id UUID, overall NUMERIC, trend TEXT, def_overall NUMERIC,
   ala_mei_overall NUMERIC, ata_overall NUMERIC, gol_overall NUMERIC,
