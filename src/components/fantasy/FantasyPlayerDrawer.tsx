@@ -106,6 +106,7 @@ export function FantasyPlayerDrawer({
   const positionLabel = roundDetail?.positionLabel || null;
   const detailIsCaptain = Boolean(roundDetail?.isCaptain);
   const breakdownList = roundDetail?.breakdown || [];
+  const goalkeeperPreview = roundDetail?.goalkeeperPreview || null;
   const matchesList = roundDetail?.matchesBreakdown || [];
   const rulesList = roundDetail?.rulesList || [];
   const detailIsLive = roundDetail?.status === "live";
@@ -545,6 +546,32 @@ export function FantasyPlayerDrawer({
                     {detailIsCurrent || isRoundLive
                       ? "Gols, assistências, vitórias e participações aparecerão aqui assim que as partidas forem disputadas."
                       : "Este atleta não teve uma rodada válida com scouts disponíveis no histórico."}
+                  </p>
+                </div>
+              )}
+
+              {goalkeeperPreview && (
+                <div className="mt-3 rounded-xl border border-emerald-400/30 bg-emerald-400/[0.08] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
+                        🧤 Pontuação se fosse escalado como GOL
+                      </p>
+                      <p className="mt-1 text-[10px] leading-4 text-muted">
+                        {goalkeeperPreview.games} {goalkeeperPreview.games === 1 ? "atuação" : "atuações"} no gol
+                        {` · ${goalkeeperPreview.goalsConceded} ${goalkeeperPreview.goalsConceded === 1 ? "gol sofrido" : "gols sofridos"}`}
+                        {` · ${goalkeeperPreview.cleanSheets} clean ${goalkeeperPreview.cleanSheets === 1 ? "sheet" : "sheets"}`}
+                      </p>
+                    </div>
+                    <strong className={`shrink-0 text-lg font-black ${Number(goalkeeperPreview.totalPoints) < 0 ? "text-danger" : "text-accent"}`}>
+                      {Number(goalkeeperPreview.totalPoints) > 0 ? "+" : ""}{Number(goalkeeperPreview.totalPoints).toFixed(1)} pts
+                    </strong>
+                  </div>
+                  <p className="mt-2 border-t border-emerald-400/15 pt-2 text-[9px] leading-4 text-muted">
+                    Base exclusiva da vaga GOL: {Number(goalkeeperPreview.basePoints).toFixed(1)} pts
+                    {Number(goalkeeperPreview.positionBonus) !== 0
+                      ? ` · bônus de clean sheet: ${Number(goalkeeperPreview.positionBonus) > 0 ? "+" : ""}${Number(goalkeeperPreview.positionBonus).toFixed(1)} pts`
+                      : ""}. Simulação sem capitão e sem carta; não altera o total oficial acima.
                   </p>
                 </div>
               )}

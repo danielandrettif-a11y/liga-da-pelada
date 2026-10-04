@@ -2040,6 +2040,29 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       ? (liveSettings.teamGoalConcededPoints ?? 0)
       : liveSettings.goalConcededPoints;
     const goalkeeperSlotOnly = Number(liveSettings.scoringVersion || 5) >= 10;
+    const goalkeeperBasePoints = goalkeeperSlotOnly
+      ? calculateFantasyGoalkeeperSlotPoints(current, liveSettings)
+      : current.basePoints;
+    const goalkeeperPositionBreakdown = liveSettings.roleScoringActive !== false
+      ? calculatePositionBreakdown({
+          slotRole: "GOL",
+          playerProfile,
+          goals: current.goals,
+          assists: current.assists,
+          draws: current.draws,
+          defensiveCleanGames: current.defensiveCleanGames,
+          defensiveOneGoalGames: current.defensiveOneGoalGames,
+          goalkeeperGames: current.goalkeeperGames,
+          cleanSheets: current.cleanSheets,
+          goalkeeperCleanSheetPoints: liveSettings.goalkeeperSlotCleanSheetPoints,
+          suppressGoalkeeperRewards: liveSettings.suppressGoalkeeperRewards,
+          scoringVersion: liveSettings.scoringVersion,
+        })
+      : null;
+    const goalkeeperPositionBonus = Number(goalkeeperPositionBreakdown?.appliedBonus || 0);
+    const goalkeeperTotalPoints = Math.round(
+      (goalkeeperBasePoints + goalkeeperPositionBonus) * 100,
+    ) / 100;
     // O detalhamento precisa fechar apenas com os scouts reconstruídos da
     // rodada e com o snapshot das regras daquela própria rodada. Um total
     // persistido diferente não vira um scout artificial para completar a soma.
@@ -2200,6 +2223,16 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       isCaptain,
       captainMultiplier: liveSettings.captainMultiplier,
       captainBonus,
+      goalkeeperPreview: current.goalkeeperGames > 0
+        ? {
+            games: current.goalkeeperGames,
+            goalsConceded: current.goalsConceded,
+            cleanSheets: current.cleanSheets,
+            basePoints: goalkeeperBasePoints,
+            positionBonus: goalkeeperPositionBonus,
+            totalPoints: goalkeeperTotalPoints,
+          }
+        : null,
       breakdown,
       matchesBreakdown,
       rulesList,
