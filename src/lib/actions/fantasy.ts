@@ -1857,9 +1857,6 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
 
   const validRecentHistory = history.filter((h) => h.games > 0);
   const latestValidHistory = validRecentHistory[validRecentHistory.length - 1] || null;
-  const selectedHistory = fantasyRoundId
-    ? validRecentHistory.find((item) => item.fantasyRoundId === fantasyRoundId) || null
-    : null;
   const recentPointsList = validRecentHistory.slice(-5).map((h) => h.roundPoints);
   const recentVariations = validRecentHistory.slice(-5).map((h) => h.variationRate);
 
@@ -2006,9 +2003,10 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       ? (liveSettings.teamGoalConcededPoints ?? 0)
       : liveSettings.goalConcededPoints;
     const goalkeeperSlotOnly = Number(liveSettings.scoringVersion || 5) >= 10;
-    const authoritativeBasePoints = scoringRoundIsCurrent
-      ? current.basePoints
-      : Number((selectedHistory || latestValidHistory)?.roundPoints ?? current.basePoints);
+    // O detalhamento precisa fechar apenas com os scouts reconstruídos da
+    // rodada e com o snapshot das regras daquela própria rodada. Um total
+    // persistido diferente não vira um scout artificial para completar a soma.
+    const authoritativeBasePoints = current.basePoints;
     const breakdown: Array<{
       key: string;
       label: string;
@@ -2029,20 +2027,6 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       { key: "defensive_bonus", label: "Bônus DEF aplicado", count: current.defensiveCleanGames + current.defensiveOneGoalGames, unitPoints: 0, points: defensiveBonus, icon: "🔒" },
       { key: "own_goals", label: "Gols Contra", count: current.ownGoals, unitPoints: liveSettings.ownGoalPoints, points: current.ownGoals * liveSettings.ownGoalPoints, icon: "⚠️" },
     ].filter((item) => item.count > 0);
-    const historicalAdjustment = authoritativeBasePoints - current.basePoints;
-    if (!scoringRoundIsCurrent && Math.abs(historicalAdjustment) >= 0.005) {
-      breakdown.push({
-        key: "historical_adjustment",
-        label: "Diferença do fechamento",
-        count: 1,
-        unitPoints: historicalAdjustment,
-        points: historicalAdjustment,
-        icon: "🧾",
-        hideCount: true,
-        description: `Fechamento: ${authoritativeBasePoints.toFixed(1)} pts · scouts atuais: ${current.basePoints.toFixed(1)} pts. Não é carta.`,
-      });
-    }
-
     const matchesBreakdown = (liveMatches || [])
       .filter((match: any) => {
         const inPlayers = (match.match_players || []).some((p: any) => p.player_id === playerId);
