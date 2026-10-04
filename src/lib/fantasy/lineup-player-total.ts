@@ -30,6 +30,17 @@ export function resolveFantasyLineupPlayerTotal({
   return Number(storedPlayerPoints ?? storedTotalPoints ?? 0);
 }
 
+/** O número principal do boletim soma o campo e o bônus final da carta. */
+export function resolveFantasyBulletinTotal({
+  playerPoints,
+  cardPoints,
+}: {
+  playerPoints?: number | string | null;
+  cardPoints?: number | string | null;
+}) {
+  return Number(playerPoints || 0) + Number(cardPoints || 0);
+}
+
 export function shouldUseFantasyRoundProjection({
   projectionRoundId,
   targetRoundId,

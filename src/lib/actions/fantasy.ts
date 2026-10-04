@@ -40,7 +40,11 @@ import {
 } from "@/lib/fantasy/live-projection";
 import type { FantasyLineupSlot, FantasySlotRole } from "@/lib/fantasy/lineup-positions";
 import { calculatePositionBreakdown } from "@/lib/fantasy/position-breakdown";
-import { resolveFantasyLineupPlayerTotal, shouldUseFantasyRoundProjection } from "@/lib/fantasy/lineup-player-total";
+import {
+  resolveFantasyBulletinTotal,
+  resolveFantasyLineupPlayerTotal,
+  shouldUseFantasyRoundProjection,
+} from "@/lib/fantasy/lineup-player-total";
 import { isParticipantScoringEligible } from "@/lib/scoring-eligibility";
 
 export type FantasyMarketPlayer = {
@@ -1461,6 +1465,11 @@ export async function getFantasyDashboard() {
         storedTotalPoints: latestLineup.total_points,
       })
     : 0;
+  const latestCardPoints = Number(
+    latestCardActivation?.result_bonus
+    ?? latestLineup?.score_breakdown?.cardBonus
+    ?? 0,
+  );
 
   return {
     authenticated: true as const,
@@ -1499,14 +1508,13 @@ export async function getFantasyDashboard() {
           number: latestFinishedRound.round?.number,
           date: latestFinishedRound.round?.date,
           playerPoints: latestLineupPlayerTotal,
-          cardPoints: Number(
-            latestCardActivation?.result_bonus
-            ?? latestLineup?.score_breakdown?.cardBonus
-            ?? 0,
-          ),
-          // O placar da rodada é a soma dos atletas exibidos no campo.
-          // Cartas e palpites continuam detalhados separadamente.
-          totalPoints: latestLineupPlayerTotal,
+          cardPoints: latestCardPoints,
+          // O número principal do boletim é o total final visível: campo mais
+          // carta. Os dois componentes permanecem detalhados logo abaixo.
+          totalPoints: resolveFantasyBulletinTotal({
+            playerPoints: latestLineupPlayerTotal,
+            cardPoints: latestCardPoints,
+          }),
           playerScores: latestFinishedProjection?.players?.length
             ? latestFinishedProjection.players.map((player) => ({
                 playerId: player.playerId,

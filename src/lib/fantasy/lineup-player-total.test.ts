@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveFantasyLineupPlayerTotal, shouldUseFantasyRoundProjection } from "./lineup-player-total";
+import {
+  resolveFantasyBulletinTotal,
+  resolveFantasyLineupPlayerTotal,
+  shouldUseFantasyRoundProjection,
+} from "./lineup-player-total";
 
 describe("total dos jogadores escalados", () => {
   it("soma os seis totais exibidos no campo, incluindo o capitão", () => {
@@ -24,6 +28,12 @@ describe("total dos jogadores escalados", () => {
 
   it("usa o agregado apenas quando não existem atletas detalhados", () => {
     expect(resolveFantasyLineupPlayerTotal({ storedPlayerPoints: 200.8 })).toBe(200.8);
+  });
+
+  it("soma o bônus da carta ao número principal do boletim", () => {
+    const total = resolveFantasyBulletinTotal({ playerPoints: 217.25, cardPoints: 3 });
+    expect(total).toBe(220.25);
+    expect(total.toFixed(1)).toBe("220.3");
   });
 
   it("reconstrói também a rodada finalizada quando o alvo é o mesmo", () => {
