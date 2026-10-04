@@ -106,6 +106,8 @@ export function FantasyPlayerDrawer({
   const matchesList = roundDetail?.matchesBreakdown || [];
   const rulesList = roundDetail?.rulesList || [];
   const detailIsLive = roundDetail?.status === "live";
+  const detailIsOpen = roundDetail?.status === "open";
+  const detailIsCurrent = detailIsLive || detailIsOpen;
   const bannerAssetKey = detailData?.cosmetics?.bannerAssetKey || null;
   const bannerImage = cosmeticHighResolutionImage(bannerAssetKey);
   const frameKey = detailData?.cosmetics?.frameKey || null;
@@ -451,7 +453,7 @@ export function FantasyPlayerDrawer({
                     <span className={`h-2 w-2 rounded-full bg-accent ${detailIsLive ? "animate-pulse" : ""}`} />
                     <span className="text-[10px] font-black uppercase tracking-wider text-accent">
                       {roundDetail?.roundNumber
-                        ? `Rodada ${roundDetail.roundNumber} · ${detailIsLive ? "Ao Vivo" : "Finalizada"}`
+                        ? `Rodada ${roundDetail.roundNumber} · ${detailIsLive ? "Ao Vivo" : detailIsOpen ? "Aberta" : "Finalizada"}`
                         : isRoundLive ? "Rodada Atual · Ao Vivo" : "Desempenho da Última Rodada"}
                     </span>
                   </div>
@@ -469,8 +471,10 @@ export function FantasyPlayerDrawer({
                 </div>
               </div>
               <p className="mt-2 text-[10px] leading-relaxed text-muted border-t border-accent/15 pt-2">
-                {detailIsLive
-                  ? "Valores calculados em tempo real a partir dos scouts e eventos de jogo. O bônus de capitão e cartas especiais incidem no total da sua escalação."
+                {detailIsCurrent
+                  ? detailIsLive
+                    ? "Valores calculados em tempo real a partir dos scouts e eventos de jogo. O bônus de capitão e cartas especiais incidem no total da sua escalação."
+                    : "A rodada ainda não começou. Os scouts e a pontuação serão atualizados assim que as partidas forem disputadas."
                   : "Pontuação-base oficial da última rodada válida, calculada com as regras que estavam vigentes naquela rodada. Bônus de posição, capitão e cartas aparecem no total da escalação."}
               </p>
             </div>
@@ -523,7 +527,7 @@ export function FantasyPlayerDrawer({
                     Nenhum scout pontuado encontrado para este atleta nesta rodada.
                   </p>
                   <p className="mt-1 text-[10px] text-muted/70">
-                    {isRoundLive
+                    {detailIsCurrent || isRoundLive
                       ? "Gols, assistências, vitórias e participações aparecerão aqui assim que as partidas forem disputadas."
                       : "Este atleta não teve uma rodada válida com scouts disponíveis no histórico."}
                   </p>

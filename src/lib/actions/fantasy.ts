@@ -1878,9 +1878,9 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
   const [{ data: liveRoundRows }, { data: liveSettingsRow }, { data: cosmeticLoadout }] = await Promise.all([
     liveReadClient
       .from("fantasy_rounds")
-      .select("id, round_id, market_status, settings_snapshot, round:round_id(number, status, suppress_goalkeeper_rewards)")
+      .select("id, round_id, market_status, settings_snapshot, round:round_id(number, date, status, suppress_goalkeeper_rewards)")
       .eq("fantasy_season_id", fs.id)
-      .eq("market_status", "in_progress"),
+      .in("market_status", ["open", "in_progress"]),
     liveReadClient
       .from("fantasy_settings")
       .select("*")
@@ -1888,11 +1888,16 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       .maybeSingle(),
     cosmeticLoadoutPromise,
   ]);
-  const liveRound = (liveRoundRows || []).find((item: any) => {
-    const round = Array.isArray(item.round) ? item.round[0] : item.round;
-    return round?.status !== "finished";
-  }) || null;
-  const historyRoundId = fantasyRoundId || (!liveRound ? latestValidHistory?.fantasyRoundId : null);
+  const linkedRound = (item: any) => Array.isArray(item?.round) ? item.round[0] || null : item?.round || null;
+  const currentRound = [...(liveRoundRows || [])]
+    .filter((item: any) => linkedRound(item)?.status !== "finished")
+    .sort((a: any, b: any) => {
+      if (a.market_status !== b.market_status) return a.market_status === "in_progress" ? -1 : 1;
+      return `${linkedRound(b)?.date || ""}-${String(linkedRound(b)?.number || 0).padStart(4, "0")}`.localeCompare(
+        `${linkedRound(a)?.date || ""}-${String(linkedRound(a)?.number || 0).padStart(4, "0")}`,
+      );
+    })[0] || null;
+  const historyRoundId = fantasyRoundId || (!currentRound ? latestValidHistory?.fantasyRoundId : null);
   const { data: historyRound } = historyRoundId
     ? await liveReadClient
       .from("fantasy_rounds")
@@ -1900,9 +1905,9 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       .eq("id", historyRoundId)
       .maybeSingle()
     : { data: null as any };
-  const scoringRound = fantasyRoundId ? historyRound : (liveRound || historyRound);
+  const scoringRound = fantasyRoundId ? historyRound : (currentRound || historyRound);
   const scoringRoundInfo = Array.isArray(scoringRound?.round) ? scoringRound.round[0] : scoringRound?.round;
-  const scoringRoundIsLive = !fantasyRoundId && Boolean(liveRound);
+  const scoringRoundIsCurrent = !fantasyRoundId && Boolean(currentRound);
   let roundDetail: any = null;
 
   if (scoringRound?.round_id) {
@@ -1929,6 +1934,10 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       captainMultiplier: Number(snapshot.captain_multiplier ?? liveSettingsRow?.captain_multiplier ?? DEFAULT_FANTASY_SETTINGS.captainMultiplier),
     };
     const liveMatches = await loadFantasyMatchSnapshots(liveReadClient, scoringRound.round_id);
+    const scoringRoundIsLive = scoringRoundIsCurrent && (
+      scoringRound.market_status === "in_progress"
+      || liveMatches.some((match: any) => match.status === "live" || match.status === "finished")
+    );
     const playerProfile = playerRow.player_profile as "offensive" | "midfield" | "defensive" | null;
     const liveStats = projectFantasyLiveStats(
       liveMatches.map((match: any) => ({
@@ -1989,7 +1998,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       ? (liveSettings.teamGoalConcededPoints ?? 0)
       : liveSettings.goalConcededPoints;
     const goalkeeperSlotOnly = Number(liveSettings.scoringVersion || 5) >= 10;
-    const authoritativeBasePoints = scoringRoundIsLive
+    const authoritativeBasePoints = scoringRoundIsCurrent
       ? current.basePoints
       : Number((selectedHistory || latestValidHistory)?.roundPoints ?? current.basePoints);
     const breakdown: Array<{
@@ -2013,7 +2022,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       { key: "own_goals", label: "Gols Contra", count: current.ownGoals, unitPoints: liveSettings.ownGoalPoints, points: current.ownGoals * liveSettings.ownGoalPoints, icon: "⚠️" },
     ].filter((item) => item.count > 0);
     const historicalAdjustment = authoritativeBasePoints - current.basePoints;
-    if (!scoringRoundIsLive && Math.abs(historicalAdjustment) >= 0.005) {
+    if (!scoringRoundIsCurrent && Math.abs(historicalAdjustment) >= 0.005) {
       breakdown.push({
         key: "historical_adjustment",
         label: "Diferença do fechamento",
@@ -2080,7 +2089,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     roundDetail = {
       roundNumber: scoringRoundInfo?.number || null,
       roundDate: scoringRoundInfo?.date || null,
-      status: scoringRoundIsLive ? "live" : "finished",
+      status: scoringRoundIsCurrent ? (scoringRoundIsLive ? "live" : "open") : "finished",
       stats: current,
       basePoints: authoritativeBasePoints,
       breakdown,
