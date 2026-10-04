@@ -38,6 +38,7 @@ import {
 } from "@/lib/fantasy/live-projection";
 import type { FantasyLineupSlot } from "@/lib/fantasy/lineup-positions";
 import { calculatePositionBreakdown } from "@/lib/fantasy/position-breakdown";
+import { resolveFantasyLineupPlayerTotal } from "@/lib/fantasy/lineup-player-total";
 
 export type FantasyMarketPlayer = {
   id: string;
@@ -1429,6 +1430,13 @@ export async function getFantasyDashboard() {
   const adjustedBudget = isTest
     ? dynamicInitialBudget
     : Math.max(storedBudget, dynamicInitialBudget);
+  const latestLineupPlayerTotal = latestLineup
+    ? resolveFantasyLineupPlayerTotal({
+        storedPlayers: latestLineup.fantasy_lineup_players || [],
+        storedPlayerPoints: latestLineup.player_points,
+        storedTotalPoints: latestLineup.total_points,
+      })
+    : 0;
 
   return {
     authenticated: true as const,
@@ -1466,7 +1474,7 @@ export async function getFantasyDashboard() {
           userId: account.user.id,
           number: latestFinishedRound.round?.number,
           date: latestFinishedRound.round?.date,
-          playerPoints: Number(latestLineup?.player_points || 0),
+          playerPoints: latestLineupPlayerTotal,
           cardPoints: Number(
             latestCardActivation?.result_bonus
             ?? latestLineup?.score_breakdown?.cardBonus
@@ -1474,7 +1482,7 @@ export async function getFantasyDashboard() {
           ),
           // O placar da rodada é a soma dos atletas exibidos no campo.
           // Cartas e palpites continuam detalhados separadamente.
-          totalPoints: Number(latestLineup?.player_points ?? latestLineup?.total_points ?? 0),
+          totalPoints: latestLineupPlayerTotal,
           playerScores: (latestLineup?.fantasy_lineup_players || []).map((player: any) => ({
             playerId: player.player_id as string,
             // Este total é o mesmo usado no histórico da rodada: base,
@@ -2365,7 +2373,7 @@ export async function getFantasyRanking(
     if (fantasyRoundId) {
       const { data } = await rankingReadClient
         .from("fantasy_lineups")
-        .select("id, user_id, player_points, total_points, budget_after, budget_before, score_breakdown, status, fantasy_lineup_players(player_id)")
+        .select("id, user_id, player_points, total_points, budget_after, budget_before, score_breakdown, status, fantasy_lineup_players(player_id, total_points)")
         .eq("fantasy_round_id", fantasyRoundId);
       persistedLineups = (data || []).filter(
         (lineup: any) => (lineup.fantasy_lineup_players || []).length > 0,
@@ -2381,12 +2389,17 @@ export async function getFantasyRanking(
       for (const lineup of persistedLineups) {
         const projection = live!.byUserId.get(lineup.user_id);
         const projectedTeamPoints = projection
-          ? Number(projection.playerPoints || 0) + Number(projection.captainBonus || 0)
+          ? resolveFantasyLineupPlayerTotal({ projectedPlayers: projection.players })
           : null;
+        const persistedTeamPoints = resolveFantasyLineupPlayerTotal({
+          storedPlayers: lineup.fantasy_lineup_players,
+          storedPlayerPoints: lineup.player_points,
+          storedTotalPoints: lineup.total_points,
+        });
         byUserId.set(lineup.user_id, {
           ...lineup,
           round_id: live!.roundId,
-          total_points: projectedTeamPoints ?? Number(lineup.player_points ?? lineup.total_points ?? 0),
+          total_points: projectedTeamPoints ?? persistedTeamPoints,
           current_budget: lineup.budget_after ?? lineup.budget_before ?? 0,
           rounds_played: 1,
           is_live: live!.isLive,
@@ -2394,7 +2407,7 @@ export async function getFantasyRanking(
       }
       for (const projection of live!.byUserId.values()) {
         if (!byUserId.has(projection.userId)) {
-          const projectedTeamPoints = Number(projection.playerPoints || 0) + Number(projection.captainBonus || 0);
+          const projectedTeamPoints = resolveFantasyLineupPlayerTotal({ projectedPlayers: projection.players });
           byUserId.set(projection.userId, {
             id: projection.lineupId,
             user_id: projection.userId,
@@ -2411,7 +2424,11 @@ export async function getFantasyRanking(
       entries = persistedLineups.map((item: any) => ({
         ...item,
         round_id: resolvedRoundId,
-        total_points: Number(item.player_points ?? item.total_points ?? 0),
+        total_points: resolveFantasyLineupPlayerTotal({
+          storedPlayers: item.fantasy_lineup_players,
+          storedPlayerPoints: item.player_points,
+          storedTotalPoints: item.total_points,
+        }),
         current_budget: item.budget_after ?? item.budget_before,
         rounds_played: 1,
       }));
@@ -3403,7 +3420,11 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
   const livePointsByPlayer = new Map(
     (projection?.players || []).map((item) => [item.playerId, item]),
   );
-  const officialTeamPoints = Number(storedLineup.player_points ?? storedLineup.total_points ?? 0);
+  const officialTeamPoints = resolveFantasyLineupPlayerTotal({
+    storedPlayers: storedLineup.fantasy_lineup_players,
+    storedPlayerPoints: storedLineup.player_points,
+    storedTotalPoints: storedLineup.total_points,
+  });
   const lineup = projection
     ? {
         ...storedLineup,
