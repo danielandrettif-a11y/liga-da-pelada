@@ -1730,14 +1730,30 @@ export async function getRevealedLineups(roundId?: string) {
 
   const predictedMap = new Map((predictedPlayers || []).map((p: any) => [p.id, p]));
 
-  const { data: activations } = userIds.length
+  const targetRound = Array.isArray(targetFantasyRound.round)
+    ? targetFantasyRound.round[0] || null
+    : targetFantasyRound.round;
+  const { data: activations } = userIds.length && targetRound?.id
     ? await revealedReadClient
         .from("fantasy_card_activations")
         .select("user_id, status, result_bonus, result_details, card:fantasy_cards(name, slug, rarity)")
-        .eq("round_id", targetFantasyRound.round.id)
+        .eq("round_id", targetRound.id)
         .in("user_id", userIds)
     : { data: [] as any[] };
   const activationMap = new Map((activations || []).map((activation: any) => [activation.user_id, activation]));
+
+  const roundProjection = targetRound?.id
+    ? await getLiveRoundProjections(
+        revealedReadClient,
+        fs.id,
+        league.id,
+        targetRound.id,
+      )
+    : null;
+  const canUseProjection = shouldUseFantasyRoundProjection({
+    projectionRoundId: roundProjection?.roundId,
+    targetRoundId: targetRound?.id,
+  });
 
   const revealed = (rawLineups || []).map((l: any) => {
     const prof: any = profileMap.get(l.user_id);
@@ -1746,6 +1762,42 @@ export async function getRevealedLineups(roundId?: string) {
     const challenge: any = predictedMap.get(l.challenge_player_id);
     const activation: any = activationMap.get(l.user_id);
     const activatedCard: any = activation?.card;
+    const projection = canUseProjection
+      ? roundProjection?.byUserId.get(l.user_id) || null
+      : null;
+    const resolvedPlayerScores: Array<{ playerId: string; points: number }> = projection
+      ? roundProjection!.isLive
+        ? projection.players.map((player) => ({
+            playerId: player.playerId,
+            points: Number(player.totalPoints || 0),
+          }))
+        : resolveFantasyFinishedPlayerScores({
+            projectedPlayers: projection.players,
+            storedPlayers: l.fantasy_lineup_players,
+          })
+      : (l.fantasy_lineup_players || []).map((player: any) => ({
+          playerId: player.player_id,
+          points: Number(player.total_points || 0),
+        }));
+    const resolvedPointsByPlayerId = new Map(
+      resolvedPlayerScores.map((player) => [player.playerId, player.points]),
+    );
+    const projectedPlayerById = new Map(
+      (projection?.players || []).map((player) => [player.playerId, player]),
+    );
+    const playerPoints = resolvedPlayerScores.reduce(
+      (total, player) => total + player.points,
+      0,
+    );
+    const cardPoints = activation
+      ? resolveFantasyCardPointBonus({
+          slug: activatedCard?.slug,
+          status: activation.status,
+          bonus: Number(activation.result_bonus || 0),
+          details: activation.result_details || null,
+          fallbackBonus: Number(l.score_breakdown?.cardBonus || 0),
+        })
+      : 0;
 
     return {
       lineupId: l.id,
@@ -1753,8 +1805,8 @@ export async function getRevealedLineups(roundId?: string) {
       isCurrentUser: l.user_id === account.user!.id,
       userName: prof?.name || "Cartoleiro",
       userAvatarUrl: prof?.avatar_url || null,
-      totalPoints: Number(l.total_points || 0),
-      playerPoints: Number(l.player_points || 0),
+      totalPoints: resolveFantasyBulletinTotal({ playerPoints, cardPoints }),
+      playerPoints,
       predictionPoints: Number(l.prediction_points || 0),
       position: l.round_position || null,
       captainId: l.captain_player_id,
@@ -1772,19 +1824,32 @@ export async function getRevealedLineups(roundId?: string) {
             fallbackBonus: Number(l.score_breakdown?.cardBonus || 0),
           }
         : null,
-      players: (l.fantasy_lineup_players || []).map((lp: any) => ({
-        playerId: lp.player_id,
-        name: lp.player_name_locked || "Jogador",
-        avatarUrl: lp.avatar_url_locked || null,
-        slotRole: lp.slot_role || null,
-        isCaptain: lp.player_id === l.captain_player_id,
-        priceLocked: Number(lp.price_locked || 0),
-        priceAfter: lp.price_after != null ? Number(lp.price_after) : null,
-        basePoints: Number(lp.base_points || 0),
-        positionBonus: Number(lp.position_bonus || 0),
-        captainBonus: Number(lp.captain_bonus || 0),
-        points: Number(lp.total_points || 0),
-      })),
+      players: (l.fantasy_lineup_players || []).map((lp: any) => {
+        const projectedPlayer = projectedPlayerById.get(lp.player_id);
+        const useProjectedBreakdown = Boolean(
+          projectedPlayer
+          && (roundProjection?.isLive || lp.slot_role !== "GOL"),
+        );
+        return {
+          playerId: lp.player_id,
+          name: lp.player_name_locked || "Jogador",
+          avatarUrl: lp.avatar_url_locked || null,
+          slotRole: lp.slot_role || null,
+          isCaptain: lp.player_id === l.captain_player_id,
+          priceLocked: Number(lp.price_locked || 0),
+          priceAfter: lp.price_after != null ? Number(lp.price_after) : null,
+          basePoints: useProjectedBreakdown
+            ? Number(projectedPlayer?.basePoints || 0)
+            : Number(lp.base_points || 0),
+          positionBonus: useProjectedBreakdown
+            ? Number(projectedPlayer?.positionBonus || 0)
+            : Number(lp.position_bonus || 0),
+          captainBonus: useProjectedBreakdown
+            ? Number(projectedPlayer?.captainBonus || 0)
+            : Number(lp.captain_bonus || 0),
+          points: resolvedPointsByPlayerId.get(lp.player_id) ?? Number(lp.total_points || 0),
+        };
+      }),
     };
   });
 
