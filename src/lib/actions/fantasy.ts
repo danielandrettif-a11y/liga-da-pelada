@@ -1973,7 +1973,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       ownGoalPoints: Number(snapshot.own_goal_points ?? liveSettingsRow?.own_goal_points ?? DEFAULT_FANTASY_SETTINGS.ownGoalPoints),
       captainMultiplier: Number(snapshot.captain_multiplier ?? liveSettingsRow?.captain_multiplier ?? DEFAULT_FANTASY_SETTINGS.captainMultiplier),
     };
-    const [{ data: userLineup }, liveMatches] = await Promise.all([
+    const [{ data: userLineup }, liveMatches, { data: officialRoundStats }] = await Promise.all([
       liveReadClient
         .from("fantasy_lineups")
         .select(
@@ -1983,6 +1983,12 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
         .eq("user_id", account.user.id)
         .maybeSingle(),
       loadFantasyMatchSnapshots(liveReadClient, scoringRound.round_id, scoringRoundInfo?.number),
+      liveReadClient
+        .from("player_round_stats")
+        .select("goalkeeper_games, goalkeeper_goals, goalkeeper_assists, goalkeeper_own_goals, goalkeeper_wins, goalkeeper_draws, goalkeeper_losses, goals_conceded, clean_sheets")
+        .eq("round_id", scoringRound.round_id)
+        .eq("player_id", playerId)
+        .maybeSingle(),
     ]);
     const scoringRoundIsLive = scoringRoundIsCurrent && (
       scoringRound.market_status === "in_progress"
@@ -2023,13 +2029,31 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       liveSettings,
       { suppressGoalkeeperRewards: Boolean(scoringRoundInfo?.suppress_goalkeeper_rewards) },
     );
-    const current = liveStats.get(playerId) || {
+    const projectedCurrent = liveStats.get(playerId) || {
       goals: 0, assists: 0, ownGoals: 0, wins: 0, draws: 0, losses: 0,
       goalkeeperGames: 0, goalsConceded: 0, cleanSheets: 0, defensiveCleanGames: 0,
       goalkeeperGoals: 0, goalkeeperAssists: 0, goalkeeperOwnGoals: 0,
       goalkeeperWins: 0, goalkeeperDraws: 0, goalkeeperLosses: 0,
       defensiveOneGoalGames: 0, teamGoalsConceded: 0, basePoints: 0,
     };
+    const roundIsFinished = scoringRound.market_status === "finished" || scoringRoundInfo?.status === "finished";
+    // Rodadas encerradas usam os scouts de goleiro já consolidados. Essa
+    // fonte não depende de alguém ter escalado o atleta na vaga GOL e evita
+    // que a ficha esconda atuações que já foram corrigidas no fechamento.
+    const current = roundIsFinished && officialRoundStats
+      ? {
+          ...projectedCurrent,
+          goalkeeperGames: Number(officialRoundStats.goalkeeper_games || 0),
+          goalkeeperGoals: Number(officialRoundStats.goalkeeper_goals || 0),
+          goalkeeperAssists: Number(officialRoundStats.goalkeeper_assists || 0),
+          goalkeeperOwnGoals: Number(officialRoundStats.goalkeeper_own_goals || 0),
+          goalkeeperWins: Number(officialRoundStats.goalkeeper_wins || 0),
+          goalkeeperDraws: Number(officialRoundStats.goalkeeper_draws || 0),
+          goalkeeperLosses: Number(officialRoundStats.goalkeeper_losses || 0),
+          goalsConceded: Number(officialRoundStats.goals_conceded || 0),
+          cleanSheets: Number(officialRoundStats.clean_sheets || 0),
+        }
+      : projectedCurrent;
     const goalValue = (liveSettings.roleScoringActive === false && playerProfile === "offensive"
       ? liveSettings.attackerGoalPoints
       : liveSettings.goalPoints) ?? liveSettings.goalPoints;
@@ -2223,16 +2247,14 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       isCaptain,
       captainMultiplier: liveSettings.captainMultiplier,
       captainBonus,
-      goalkeeperPreview: current.goalkeeperGames > 0
-        ? {
-            games: current.goalkeeperGames,
-            goalsConceded: current.goalsConceded,
-            cleanSheets: current.cleanSheets,
-            basePoints: goalkeeperBasePoints,
-            positionBonus: goalkeeperPositionBonus,
-            totalPoints: goalkeeperTotalPoints,
-          }
-        : null,
+      goalkeeperPreview: {
+        games: current.goalkeeperGames,
+        goalsConceded: current.goalsConceded,
+        cleanSheets: current.cleanSheets,
+        basePoints: goalkeeperBasePoints,
+        positionBonus: goalkeeperPositionBonus,
+        totalPoints: goalkeeperTotalPoints,
+      },
       breakdown,
       matchesBreakdown,
       rulesList,
