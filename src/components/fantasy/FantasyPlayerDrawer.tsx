@@ -102,8 +102,9 @@ export function FantasyPlayerDrawer({
     ? recentPoints[recentPoints.length - 1]
     : player.recentPointsList?.[0];
   const basePoints = Number(roundDetail?.basePoints ?? latestSavedPoints ?? player.roundPoints ?? 0);
-  const livePoints = Number(roundDetail?.pointsWithPosition ?? basePoints);
+  const livePoints = Number(roundDetail?.totalPoints ?? roundDetail?.pointsWithPosition ?? basePoints);
   const positionLabel = roundDetail?.positionLabel || null;
+  const detailIsCaptain = Boolean(roundDetail?.isCaptain);
   const breakdownList = roundDetail?.breakdown || [];
   const matchesList = roundDetail?.matchesBreakdown || [];
   const rulesList = roundDetail?.rulesList || [];
@@ -468,7 +469,11 @@ export function FantasyPlayerDrawer({
                     {livePoints.toFixed(1)}
                   </span>
                   <span className="text-[9px] font-bold uppercase tracking-wider text-muted">
-                    {positionLabel ? `Com posição ${positionLabel}` : "Pontos-base"}
+                    {detailIsCaptain
+                      ? `Total com capitão ×${Number(roundDetail?.captainMultiplier || 1.5).toLocaleString("pt-BR")}`
+                      : positionLabel
+                        ? `Com posição ${positionLabel}`
+                        : "Pontos-base"}
                   </span>
                 </div>
               </div>
@@ -476,11 +481,15 @@ export function FantasyPlayerDrawer({
                 {detailIsCurrent
                   ? detailIsLive
                     ? positionLabel
-                      ? `Scouts-base e bônus da posição ${positionLabel}, calculados em tempo real. Capitão e cartas especiais aparecem no total da escalação.`
+                      ? detailIsCaptain
+                        ? `Scouts-base, bônus da posição ${positionLabel} e faixa de capitão calculados em tempo real. Cartas especiais ficam separadas.`
+                        : `Scouts-base e bônus da posição ${positionLabel}, calculados em tempo real. Cartas especiais aparecem separadamente.`
                       : "Valores calculados em tempo real a partir dos scouts e eventos de jogo. O bônus de capitão e cartas especiais incidem no total da sua escalação."
                     : "A rodada ainda não começou. Os scouts e a pontuação serão atualizados assim que as partidas forem disputadas."
                   : positionLabel
-                    ? `Total dos scouts-base com o bônus da posição ${positionLabel} usado na sua escalação. Capitão e cartas especiais são contabilizados separadamente.`
+                    ? detailIsCaptain
+                      ? `Total dos scouts-base com o bônus da posição ${positionLabel} e o adicional exato da faixa de capitão. Cartas especiais ficam separadas.`
+                      : `Total dos scouts-base com o bônus da posição ${positionLabel} usado na sua escalação. Cartas especiais ficam separadas.`
                     : "Pontuação-base da última rodada válida, reconstruída com as regras que estavam vigentes naquela rodada."}
               </p>
             </div>
@@ -542,7 +551,11 @@ export function FantasyPlayerDrawer({
 
               <div className="mt-3 flex items-center justify-between border-t border-accent/20 pt-2.5 text-xs font-black">
                 <span className="text-foreground uppercase text-[10px]">
-                  {positionLabel ? `Total com posição ${positionLabel}` : "Total dos Scouts"}
+                  {detailIsCaptain
+                    ? "Total final com capitão"
+                    : positionLabel
+                      ? `Total com posição ${positionLabel}`
+                      : "Total dos Scouts"}
                 </span>
                 <span className="text-sm text-accent font-black">
                   {livePoints > 0 ? "+" : ""}{livePoints.toFixed(1)} pts

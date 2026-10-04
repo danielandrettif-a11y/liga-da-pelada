@@ -75,6 +75,36 @@ describe("BQ Scoring v5 — Paridade Ranked/Cartola", () => {
     expect(applyCaptainMultiplier(3.5, 1.5)).toBe(5.25);
   });
 
+  it("regressão R06: 43.5 de scouts + 6 de ALA e capitão fecham em 74.25", () => {
+    const base = calculateBQBasePoints(BQ_SCORING_V5, {
+      goals: 6,
+      assists: 3,
+      wins: 6,
+      draws: 4,
+      losses: 4,
+      ownGoals: 0,
+      goalkeeperAppearances: 0,
+      goalkeeperGoalsConceded: 0,
+    });
+    const ala = calculatePositionBreakdown({
+      scoringVersion: 11,
+      slotRole: "MEI",
+      playerProfile: "midfield",
+      goals: 6,
+      assists: 3,
+      draws: 4,
+      defensiveCleanGames: 4,
+      defensiveOneGoalGames: 7,
+      goalkeeperGames: 0,
+      cleanSheets: 0,
+    });
+
+    expect(base).toBe(43.5);
+    expect(ala.appliedBonus).toBe(6);
+    expect(base + ala.appliedBonus).toBe(49.5);
+    expect(applyCaptainMultiplier(base + ala.appliedBonus, 1.5)).toBe(74.25);
+  });
+
   it("snapshot BQ converte ida e volta com ranking_rules", () => {
     const rules = snapshotToRankingRules(BQ_SCORING_V5);
     const restored = rankingRulesToSnapshot(rules, 5);

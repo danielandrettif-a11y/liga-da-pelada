@@ -1,4 +1,5 @@
 import { calculateFantasyGoalkeeperSlotPoints, calculateFantasyPlayerPoints } from "./engine";
+import { applyCaptainMultiplier } from "../bq-scoring";
 import type { FantasySettings } from "./config";
 import {
   calculateFantasyPositionPackageBonus,
@@ -261,14 +262,15 @@ export function projectFantasyLiveLineups(
 
     const playerPoints = [...pointsByPlayer.values()].reduce((sum, points) => sum + points, 0);
     const captainBase = lineup.captainPlayerId ? pointsByPlayer.get(lineup.captainPlayerId) || 0 : 0;
-    const captainBonus = Math.round(captainBase * Math.max(0, settings.captainMultiplier - 1) * 100) / 100;
+    const captainTotal = applyCaptainMultiplier(captainBase, settings.captainMultiplier);
+    const captainBonus = captainTotal - captainBase;
     const players = lineup.playerIds.map((playerId) => {
       const slot = slotByPlayer.get(playerId);
       const basePoints = basePointsByPlayer.get(playerId) || 0;
       const totalWithoutCaptain = pointsByPlayer.get(playerId) || 0;
       const positionBonus = totalWithoutCaptain - basePoints;
       const playerCaptainBonus = playerId === lineup.captainPlayerId
-        ? Math.round(totalWithoutCaptain * Math.max(0, settings.captainMultiplier - 1) * 100) / 100
+        ? applyCaptainMultiplier(totalWithoutCaptain, settings.captainMultiplier) - totalWithoutCaptain
         : 0;
       return {
         playerId,

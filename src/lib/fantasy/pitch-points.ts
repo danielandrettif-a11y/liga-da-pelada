@@ -1,3 +1,5 @@
+import { applyCaptainMultiplier } from "../bq-scoring";
+
 type FantasyPitchPointsInput = {
   status: string;
   marketRoundPoints: number;
@@ -28,7 +30,9 @@ export function resolveFantasyPitchPoints({
 }: FantasyPitchPointsInput) {
   if (status === "in_progress") {
     if (isFiniteNumber(liveLineupPoints)) return liveLineupPoints;
-    return marketRoundPoints * (isCaptain ? captainMultiplier : 1);
+    return isCaptain
+      ? applyCaptainMultiplier(marketRoundPoints, captainMultiplier)
+      : marketRoundPoints;
   }
 
   if (isFiniteNumber(lastRoundLineupPoints)) return lastRoundLineupPoints;

@@ -41,4 +41,13 @@ describe("pontuação exibida no campo do Cartola", () => {
       captainMultiplier: 1.5,
     })).toBe(30);
   });
+
+  it("arredonda o fallback do capitão pela regra canônica", () => {
+    expect(resolveFantasyPitchPoints({
+      status: "in_progress",
+      marketRoundPoints: 49.5,
+      isCaptain: true,
+      captainMultiplier: 1.5,
+    })).toBe(74.25);
+  });
 });

@@ -218,6 +218,51 @@ describe("live fantasy projection", () => {
     expect(lineup).toMatchObject({ playerPoints: 3.5, positionBonus: 1, captainBonus: 1.75, totalPoints: 5.25 });
   });
 
+  it("regressão R06: não reaproveita 46.5 ao calcular capitão sobre 49.5", () => {
+    const stats = new Map([[
+      "daniel",
+      {
+        playerId: "daniel",
+        playerProfile: "midfield" as const,
+        goals: 6,
+        assists: 3,
+        ownGoals: 0,
+        wins: 6,
+        draws: 4,
+        losses: 4,
+        games: 14,
+        goalkeeperGames: 0,
+        goalsConceded: 0,
+        goalkeeperGoals: 0,
+        goalkeeperAssists: 0,
+        goalkeeperOwnGoals: 0,
+        goalkeeperWins: 0,
+        goalkeeperDraws: 0,
+        goalkeeperLosses: 0,
+        cleanSheets: 0,
+        defensiveCleanGames: 4,
+        defensiveOneGoalGames: 7,
+        teamGoalsConceded: 11,
+        basePoints: 43.5,
+      },
+    ]]);
+    const [lineup] = projectFantasyLiveLineups([{
+      id: "r06",
+      userId: "user",
+      playerIds: ["daniel"],
+      slots: [{ playerId: "daniel", slotRole: "MEI", playerProfile: "midfield" }],
+      captainPlayerId: "daniel",
+    }], stats, { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 11 });
+
+    expect(lineup.players[0]).toMatchObject({
+      basePoints: 43.5,
+      positionBonus: 6,
+      captainBonus: 24.75,
+      totalPoints: 74.25,
+    });
+    expect(lineup.totalPoints).toBe(74.25);
+  });
+
   it("aplica o pacote de GOL a qualquer atleta nessa vaga e dá +4 de clean sheet", () => {
     const settings = { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 10 };
     const stats = projectFantasyLiveStats([{ ...baseMatch, status: "finished" }], settings);

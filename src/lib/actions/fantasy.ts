@@ -15,6 +15,7 @@ import {
 import { type FantasyMarketHealth } from "@/lib/fantasy/market-v11";
 import { parseFantasyMarketReadModel } from "@/lib/fantasy/market-read-model";
 import { isCompetitiveProfileComplete } from "@/lib/player-eligibility";
+import { applyCaptainMultiplier } from "@/lib/bq-scoring";
 import {
   calculateCostBenefit,
   calculateExpectedFantasyPoints,
@@ -39,7 +40,7 @@ import {
 } from "@/lib/fantasy/live-projection";
 import type { FantasyLineupSlot, FantasySlotRole } from "@/lib/fantasy/lineup-positions";
 import { calculatePositionBreakdown } from "@/lib/fantasy/position-breakdown";
-import { resolveFantasyLineupPlayerTotal, shouldUseFantasyLiveRanking } from "@/lib/fantasy/lineup-player-total";
+import { resolveFantasyLineupPlayerTotal, shouldUseFantasyRoundProjection } from "@/lib/fantasy/lineup-player-total";
 
 export type FantasyMarketPlayer = {
   id: string;
@@ -1426,6 +1427,19 @@ export async function getFantasyDashboard() {
     currentUser: projectedLineups.find((item) => item.userId === account.user!.id) || null,
   };
 
+  // Mesmo depois do fechamento, o campo precisa ser uma leitura dos scouts
+  // atuais da rodada. Assim, qualquer correção de gol, assistência, resultado
+  // ou elegibilidade não deixa os atletas presos a um total antigo.
+  const latestFinishedProjectionRead = latestFinishedRound?.round_id
+    ? await getLiveRoundProjections(
+        account.client,
+        fantasySeason.id,
+        league.id,
+        latestFinishedRound.round_id,
+      )
+    : null;
+  const latestFinishedProjection = latestFinishedProjectionRead?.byUserId.get(account.user.id) || null;
+
   const dynamicInitialBudget = getFantasyInitialBudget(playersPerTeam);
   const storedBudget = Number(fantasyAccount?.current_budget ?? dynamicInitialBudget);
   const adjustedBudget = isTest
@@ -1433,6 +1447,7 @@ export async function getFantasyDashboard() {
     : Math.max(storedBudget, dynamicInitialBudget);
   const latestLineupPlayerTotal = latestLineup
     ? resolveFantasyLineupPlayerTotal({
+        projectedPlayers: latestFinishedProjection?.players,
         storedPlayers: latestLineup.fantasy_lineup_players || [],
         storedPlayerPoints: latestLineup.player_points,
         storedTotalPoints: latestLineup.total_points,
@@ -1484,12 +1499,16 @@ export async function getFantasyDashboard() {
           // O placar da rodada é a soma dos atletas exibidos no campo.
           // Cartas e palpites continuam detalhados separadamente.
           totalPoints: latestLineupPlayerTotal,
-          playerScores: (latestLineup?.fantasy_lineup_players || []).map((player: any) => ({
-            playerId: player.player_id as string,
-            // Este total é o mesmo usado no histórico da rodada: base,
-            // bônus da posição e eventual bônus de capitão já apurados.
-            points: Number(player.total_points || 0),
-          })),
+          playerScores: latestFinishedProjection?.players?.length
+            ? latestFinishedProjection.players.map((player) => ({
+                playerId: player.playerId,
+                points: Number(player.totalPoints || 0),
+              }))
+            : (latestLineup?.fantasy_lineup_players || []).map((player: any) => ({
+                playerId: player.player_id as string,
+                // Fallback para bancos que ainda não aplicaram a reconciliação.
+                points: Number(player.total_points || 0),
+              })),
         }
       : null,
     // V3: Pacotes, Inventário e Carta Ativa
@@ -1884,7 +1903,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
   const [{ data: liveRoundRows }, { data: liveSettingsRow }, { data: cosmeticLoadout }] = await Promise.all([
     liveReadClient
       .from("fantasy_rounds")
-      .select("id, round_id, market_status, settings_snapshot, round:round_id(number, date, status, suppress_goalkeeper_rewards)")
+      .select("id, round_id, market_status, scoring_version, settings_snapshot, round:round_id(number, date, status, suppress_goalkeeper_rewards)")
       .eq("fantasy_season_id", fs.id)
       .in("market_status", ["open", "in_progress"]),
     liveReadClient
@@ -1907,7 +1926,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
   const { data: historyRound } = historyRoundId
     ? await liveReadClient
       .from("fantasy_rounds")
-      .select("id, round_id, market_status, settings_snapshot, round:round_id(number, date, status, suppress_goalkeeper_rewards)")
+      .select("id, round_id, market_status, scoring_version, settings_snapshot, round:round_id(number, date, status, suppress_goalkeeper_rewards)")
       .eq("id", historyRoundId)
       .maybeSingle()
     : { data: null as any };
@@ -1920,7 +1939,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     const snapshot = scoringRound.settings_snapshot || {};
     const liveSettings: FantasySettings = {
       ...DEFAULT_FANTASY_SETTINGS,
-      scoringVersion: Number(snapshot.scoring_version ?? DEFAULT_FANTASY_SETTINGS.scoringVersion),
+      scoringVersion: Number(snapshot.scoring_version ?? scoringRound.scoring_version ?? DEFAULT_FANTASY_SETTINGS.scoringVersion),
       roleScoringActive: snapshot.role_scoring_active !== false,
       suppressGoalkeeperRewards: Boolean(scoringRoundInfo?.suppress_goalkeeper_rewards),
       goalPoints: Number(snapshot.goal_points ?? liveSettingsRow?.goal_points ?? DEFAULT_FANTASY_SETTINGS.goalPoints),
@@ -2028,11 +2047,15 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
           scoringVersion: liveSettings.scoringVersion,
         })
       : null;
-    const hasStoredPositionBonus = lineupPlayer?.position_bonus != null && userLineup?.status === "scored";
-    const positionBonus = hasStoredPositionBonus
-      ? Number(lineupPlayer.position_bonus || 0)
-      : Number(calculatedPositionBreakdown?.appliedBonus || 0);
+    const positionBonus = calculatedPositionBreakdown
+      ? Number(calculatedPositionBreakdown.appliedBonus || 0)
+      : Number(lineupPlayer?.position_bonus || 0);
     const pointsWithPosition = Math.round((authoritativeBasePoints + positionBonus) * 100) / 100;
+    const isCaptain = userLineup?.captain_player_id === playerId;
+    const finalPoints = isCaptain
+      ? applyCaptainMultiplier(pointsWithPosition, liveSettings.captainMultiplier)
+      : pointsWithPosition;
+    const captainBonus = Math.round((finalPoints - pointsWithPosition) * 100) / 100;
     const slotLabel = slotRole === "MEI"
       ? "ALA"
       : slotRole === "DEF"
@@ -2065,6 +2088,9 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
         calculatedPositionBreakdown?.specialBonus?.activated
           ? `${calculatedPositionBreakdown.specialBonus.name}: +${Number(calculatedPositionBreakdown.specialBonus.value).toFixed(1)}`
           : null,
+        calculatedPositionBreakdown?.capReached && calculatedPositionBreakdown.cap != null
+          ? `Teto aplicado: +${Number(calculatedPositionBreakdown.cap).toFixed(1)}`
+          : null,
       ].filter(Boolean);
       const positionDescription = lineupPlayer?.is_position_correct === false
         ? "A posição da escalação não corresponde ao perfil do atleta."
@@ -2079,6 +2105,18 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
         points: positionBonus,
         icon: "⚡",
         description: positionDescription,
+        hideCount: true,
+      });
+    }
+    if (isCaptain) {
+      breakdown.push({
+        key: "captain_bonus",
+        label: `Capitão ×${Number(liveSettings.captainMultiplier).toLocaleString("pt-BR")}`,
+        count: 1,
+        unitPoints: captainBonus,
+        points: captainBonus,
+        icon: "👑",
+        description: `${pointsWithPosition.toFixed(2).replace(".", ",")} × ${Number(liveSettings.captainMultiplier).toLocaleString("pt-BR")} = ${finalPoints.toFixed(2).replace(".", ",")}`,
         hideCount: true,
       });
     }
@@ -2140,10 +2178,13 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       stats: current,
       basePoints: authoritativeBasePoints,
       pointsWithPosition,
+      totalPoints: finalPoints,
       positionBonus,
       positionLabel: slotLabel,
       slotRole,
-      captainBonus: Number(lineupPlayer?.captain_bonus || 0),
+      isCaptain,
+      captainMultiplier: liveSettings.captainMultiplier,
+      captainBonus,
       breakdown,
       matchesBreakdown,
       rulesList,
@@ -2169,7 +2210,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
   // abertas individualmente.
   const displayHistory = roundDetail && scoringRound?.id
     ? history.map((item) => item.fantasyRoundId === scoringRound.id
-      ? { ...item, roundPoints: Number(roundDetail.pointsWithPosition ?? roundDetail.basePoints ?? item.roundPoints) }
+      ? { ...item, roundPoints: Number(roundDetail.totalPoints ?? roundDetail.pointsWithPosition ?? roundDetail.basePoints ?? item.roundPoints) }
       : item)
     : history;
   const displayRecentPointsList = displayHistory
@@ -2226,7 +2267,7 @@ async function getLiveRoundProjections(
   const readActiveRounds = (readClient: any) => {
     let query = readClient
       .from("fantasy_rounds")
-      .select("id, round_id, market_status, settings_snapshot, round:round_id(status, suppress_goalkeeper_rewards, date, number)")
+      .select("id, round_id, market_status, scoring_version, settings_snapshot, round:round_id(status, suppress_goalkeeper_rewards, date, number)")
       .eq("fantasy_season_id", fantasySeasonId);
     if (targetRoundId) {
       // Uma página histórica pode precisar reconstruir uma rodada já encerrada
@@ -2437,15 +2478,13 @@ export async function getFantasyRanking(
       );
     }
 
-    const isTargetLive = shouldUseFantasyLiveRanking({
-      isLive: Boolean(live?.isLive),
+    const useTargetProjection = shouldUseFantasyRoundProjection({
       projectionRoundId: live?.roundId,
-      requestedRoundId: roundId,
+      targetRoundId: resolvedRoundId,
     });
-    if (isTargetLive) {
-      // A projeção calcula os pontos lance a lance. Os registros persistidos
-      // são um fallback para não deixar a tabela vazia caso uma escalação
-      // antiga esteja sem filhos, ou uma leitura chegue antes do realtime.
+    if (useTargetProjection) {
+      // A reconstrução usa os eventos e o snapshot da própria rodada, tanto
+      // ao vivo quanto após o fechamento. O persistido é apenas o fallback.
       const byUserId = new Map<string, any>();
       for (const lineup of persistedLineups) {
         const projection = live!.byUserId.get(lineup.user_id);
@@ -3046,11 +3085,20 @@ export async function previewFantasyMarketV11() {
 export async function reprocessFantasyRound(roundId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
+  const { calculateRoundStats } = await import("./stats");
+  const statsResult = await calculateRoundStats(roundId);
+  if (!statsResult.success) {
+    return {
+      success: false,
+      error: `Não foi possível reconstruir os scouts antes do reprocessamento: ${statsResult.error || "erro desconhecido"}`,
+    };
+  }
   const { error } = await account.client.rpc("reprocess_fantasy_from_round", {
     p_round_id: roundId,
   });
   if (error) return { success: false, error: error.message };
   revalidatePath("/cartola", "layout");
+  revalidatePath("/ranking");
   return { success: true };
 }
 
@@ -3471,12 +3519,10 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
     .maybeSingle();
   if (!storedLineup) return null;
 
-  // Rodada finalizada deve mostrar o resultado oficial persistido. Recalcular
-  // um histórico como projeção ao vivo pode usar scouts corrigidos depois do
-  // fechamento e fazer o detalhe divergir do ranking geral.
-  const live = fantasyRound.market_status === "in_progress"
-    ? await getLiveRoundProjections(account.client, fantasySeason.id, league.id, roundId)
-    : null;
+  // O histórico usa a mesma reconstrução do campo, da ficha e do ranking.
+  // Correções feitas nos eventos após o fechamento deixam de conviver com um
+  // total antigo salvo na escalação.
+  const live = await getLiveRoundProjections(account.client, fantasySeason.id, league.id, roundId);
   const projection = live?.roundId === roundId ? live.byUserId.get(userId) || null : null;
   const livePointsByPlayer = new Map(
     (projection?.players || []).map((item) => [item.playerId, item]),

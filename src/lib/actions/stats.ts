@@ -288,6 +288,7 @@ export async function calculateRoundStats(roundId: string) {
         league_id,
         date,
         created_at,
+        status,
         round_type,
         suppress_goalkeeper_rewards,
         scoring_version,
@@ -556,6 +557,26 @@ export async function calculateRoundStats(roundId: string) {
         .upsert(statsArray, { onConflict: "player_id, round_id" });
         
       if (upsertError) throw new Error(upsertError.message);
+    }
+
+    // Uma correção feita depois do fechamento precisa atualizar também os
+    // atletas escalados, o capitão, o ranking do Cartola e os agregados da
+    // temporada. Antes, só player_round_stats mudava e o campo ficava preso
+    // ao valor antigo.
+    if (round.status === "finished" && round.round_type === "official") {
+      const { error: reconcileError } = await client.rpc("reconcile_fantasy_round_totals", {
+        p_round_id: roundId,
+      });
+      if (reconcileError) {
+        const migrationPending = /reconcile_fantasy_round_totals|schema cache|function .* does not exist/i.test(
+          reconcileError.message,
+        );
+        if (migrationPending) {
+          console.warn("Migration 217 pendente; totais do Cartola ainda não foram reconciliados.");
+        } else {
+          throw new Error(`Erro ao reconciliar os totais do Cartola: ${reconcileError.message}`);
+        }
+      }
     }
 
     return { success: true };
