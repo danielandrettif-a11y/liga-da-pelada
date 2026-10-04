@@ -12,6 +12,7 @@ import { rankingActivePlayerIds, roundRankingPoints, sortRankingRounds, type Ove
 import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
 import { normalizeBQScoringSnapshot } from "../bq-scoring";
 import { isCompetitiveProfileComplete } from "../player-eligibility";
+import { isParticipantScoringEligible } from "../scoring-eligibility";
 import {
   calculateRankingPositionBonus,
   parseRankingRoleWeights,
@@ -287,6 +288,7 @@ export async function calculateRoundStats(roundId: string) {
         id,
         league_id,
         date,
+        number,
         created_at,
         status,
         round_type,
@@ -416,7 +418,7 @@ export async function calculateRoundStats(roundId: string) {
       const goalkeeperIds = new Set((match.match_goalkeepers || []).map((goalkeeper: any) => goalkeeper.player_id));
       const scoringEligiblePlayerIds = new Set(
         (match.match_players || [])
-          .filter((participant: any) => participant.scoring_eligible !== false)
+          .filter((participant: any) => isParticipantScoringEligible(round.number, participant.scoring_eligible))
           .map((participant: any) => participant.player_id),
       );
       // Resultado vale somente para participantes marcados como elegiveis.
@@ -425,7 +427,7 @@ export async function calculateRoundStats(roundId: string) {
         const participants = (match.match_players || []).filter(
           (participant: any) => participant.team_id === teamId
             && participant.result_eligible
-            && participant.scoring_eligible !== false
+            && isParticipantScoringEligible(round.number, participant.scoring_eligible)
             && !voidedPlayerIds.has(participant.player_id),
         );
         for (const participant of participants) {

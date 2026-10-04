@@ -11,6 +11,7 @@ import { markRoundTeamArrived, setRoundTeamCaptain, setRoundTeamVestColor } from
 import { VEST_COLORS } from "@/lib/vest-colors";
 import { canTeamLendToMatch, pickFairSubstitute } from "@/lib/substitution-draw";
 import { buildStructuralLoans } from "@/lib/underfilled-rounds";
+import { shouldExcludeReplacementScoring } from "@/lib/scoring-eligibility";
 
 type MatchCreatorProps = {
   round: any;
@@ -42,6 +43,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
   const teams = useMemo(() => round?.teams || [], [round?.teams]);
   const leagueConfig = Array.isArray(round?.league) ? round.league[0] : round?.league;
   const targetPlayersPerTeam = Number(round?.target_players_per_team || leagueConfig?.players_per_team || 6);
+  const replacementsDoNotScore = shouldExcludeReplacementScoring(round?.number);
   const playerTeamById = useMemo(() => new Map(
     teams.flatMap((team: any) => (team.team_players || []).map((entry: any) => [entry.player_id, team.id] as const)),
   ), [teams]);
@@ -383,7 +385,12 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
           <div className="w-full max-w-sm rounded-3xl border border-warning/35 bg-[#07150d] p-5 shadow-2xl">
             <div className="flex items-center gap-3">
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-warning/15 text-warning"><ArrowLeftRight className="h-5 w-5" /></span>
-              <div><h2 className="text-base font-black text-foreground">Substituição sorteada</h2><p className="text-[10px] font-semibold text-muted">Quem foi menos sorteado teve prioridade. O substituto entra no gol e não pontua nesta partida.</p></div>
+              <div>
+                <h2 className="text-base font-black text-foreground">Substituição sorteada</h2>
+                <p className="text-[10px] font-semibold text-muted">
+                  Quem foi menos sorteado teve prioridade. O substituto entra no gol e {replacementsDoNotScore ? "não pontua nesta partida." : "pontua normalmente nesta partida."}
+                </p>
+              </div>
             </div>
             <div className="mt-4 space-y-2">
               {substitutionNotice.map((item) => (
@@ -741,7 +748,9 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
                 {bqGoalkeeperSuggestionByTeam[team.id] && (
                   <span className="mt-1.5 block text-[9px] font-semibold leading-relaxed text-muted">
                     {forcedAbsenceGoalkeeperByTeam.has(team.id)
-                      ? "O substituto cobre a ausência no gol e não recebe nenhum ponto ou scout desta partida."
+                      ? replacementsDoNotScore
+                        ? "O substituto cobre a ausência no gol e não recebe nenhum ponto ou scout desta partida."
+                        : "O substituto cobre a ausência no gol e recebe normalmente os pontos e scouts desta partida."
                       : "A sugestão usa o próximo da fila após o último goleiro deste time. Você pode escolher outro nome na lista."}
                   </span>
                 )}

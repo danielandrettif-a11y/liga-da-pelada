@@ -14,6 +14,7 @@ import { scheduleMatchTimerAlerts } from "../match-timer-scheduler";
 import { buildStructuralLoans } from "../underfilled-rounds";
 import { canTeamLendToMatch } from "../substitution-draw";
 import { suggestNextMatchRotation } from "../next-match";
+import { shouldExcludeReplacementScoring } from "../scoring-eligibility";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 const FINISHED_CORRECTION_ERROR = "Digite EDITAR para liberar correções em partidas finalizadas.";
@@ -113,6 +114,7 @@ export async function createMatch(input: CreateMatchInput) {
     if (teamsError || !teams) throw new Error("Nao foi possivel carregar os times.");
     if (roundPlayersError || !roundPlayers) throw new Error("Nao foi possivel carregar os jogadores da rodada.");
     if (round.status === "finished") return { success: false, error: "A rodada ja foi encerrada." };
+    const replacementsDoNotScore = shouldExcludeReplacementScoring(round.number);
 
     const selectedTeams = teams.filter((team: any) => selectedTeamIds.includes(team.id));
     if (selectedTeams.length !== 2) return { success: false, error: "Os times precisam pertencer a esta rodada." };
@@ -281,7 +283,12 @@ export async function createMatch(input: CreateMatchInput) {
     for (const [teamId, replacementPlayerId] of forcedGoalkeeperByTeam) {
       const selectedGoalkeeperId = teamId === input.team_a_id ? input.goalkeeper_a_id : input.goalkeeper_b_id;
       if (selectedGoalkeeperId !== replacementPlayerId) {
-        return { success: false, error: "O substituto do jogador ausente precisa iniciar no gol e não pontua nesta partida." };
+        return {
+          success: false,
+          error: replacementsDoNotScore
+            ? "O substituto do jogador ausente precisa iniciar no gol e não pontua nesta partida."
+            : "O substituto do jogador ausente precisa iniciar no gol nesta partida.",
+        };
       }
     }
     const liveMatchIds = (liveMatches || []).map((match: any) => match.id);
@@ -360,7 +367,7 @@ export async function createMatch(input: CreateMatchInput) {
         is_starter: true,
         is_active: true,
         result_eligible: false,
-        scoring_eligible: false,
+        scoring_eligible: !replacementsDoNotScore,
         entered_elapsed_seconds: 0,
       });
     }

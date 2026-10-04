@@ -41,6 +41,7 @@ import {
 import type { FantasyLineupSlot, FantasySlotRole } from "@/lib/fantasy/lineup-positions";
 import { calculatePositionBreakdown } from "@/lib/fantasy/position-breakdown";
 import { resolveFantasyLineupPlayerTotal, shouldUseFantasyRoundProjection } from "@/lib/fantasy/lineup-player-total";
+import { isParticipantScoringEligible } from "@/lib/scoring-eligibility";
 
 export type FantasyMarketPlayer = {
   id: string;
@@ -164,7 +165,11 @@ export type FantasyDashboardInsights = {
   topDepreciationPlayer: FantasyMarketPlayer | null;
 };
 
-async function loadFantasyMatchSnapshots(client: any, roundId: string | null) {
+async function loadFantasyMatchSnapshots(
+  client: any,
+  roundId: string | null,
+  roundNumber?: number | null,
+) {
   if (!roundId) return [] as any[];
 
   const { data: matches, error: matchesError } = await client
@@ -215,7 +220,10 @@ async function loadFantasyMatchSnapshots(client: any, roundId: string | null) {
   return (matches || []).map((match: any) => ({
     ...match,
     match_events: eventsByMatch.get(match.id) || [],
-    match_players: playersByMatch.get(match.id) || [],
+    match_players: (playersByMatch.get(match.id) || []).map((player: any) => ({
+      ...player,
+      scoring_eligible: isParticipantScoringEligible(roundNumber, player.scoring_eligible),
+    })),
     match_goalkeepers: goalkeepersByMatch.get(match.id) || [],
   }));
 }
@@ -485,7 +493,7 @@ export async function getFantasyDashboard() {
 
   // A prévia é pública para quem já está no Cartola, mas precisa continuar
   // funcionando caso uma regra de RLS da escalação/rodada seja atualizada.
-  const liveMatchesRequest = loadFantasyMatchSnapshots(liveReadClient, displayRoundId);
+  const liveMatchesRequest = loadFantasyMatchSnapshots(liveReadClient, displayRoundId, displayRound?.number);
   const playerCosmeticsRequest = getAllPlayersEquippedCosmeticsMap();
 
   const [
@@ -1967,7 +1975,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
         .eq("fantasy_round_id", scoringRound.id)
         .eq("user_id", account.user.id)
         .maybeSingle(),
-      loadFantasyMatchSnapshots(liveReadClient, scoringRound.round_id),
+      loadFantasyMatchSnapshots(liveReadClient, scoringRound.round_id, scoringRoundInfo?.number),
     ]);
     const scoringRoundIsLive = scoringRoundIsCurrent && (
       scoringRound.market_status === "in_progress"
@@ -2306,7 +2314,7 @@ async function getLiveRoundProjections(
 
   const [{ data: settingsRow }, matches, { data: lineups }, { data: playerRows }] = await Promise.all([
     liveReadClient.from("fantasy_settings").select("*").eq("league_id", leagueId).maybeSingle(),
-    loadFantasyMatchSnapshots(liveReadClient, activeRound.round_id),
+    loadFantasyMatchSnapshots(liveReadClient, activeRound.round_id, activeRoundInfo?.number),
     liveReadClient
       .from("fantasy_lineups")
       .select("id, user_id, status, score_breakdown, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked)")
