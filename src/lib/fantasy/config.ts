@@ -26,10 +26,12 @@ export type FantasySettings = {
   goalkeeperSlotAppearancePoints: number;
   goalkeeperSlotGoalConcededPoints: number;
   goalkeeperSlotCleanSheetPoints: number;
+  goalkeeperSlotOneGoalPoints: number;
   ownGoalPoints: number;
   defenderGoalPoints: number;
   defenderAssistPoints: number;
   defenderCleanSheetPoints: number;
+  defenderOneGoalPoints: number;
   attackerGoalPoints: number;
   attackerAssistPoints: number;
   lineGoalConcededPoints: number;
@@ -115,10 +117,12 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   goalkeeperSlotAppearancePoints: COLUMN_C_SCORING.GOL.appearance,
   goalkeeperSlotGoalConcededPoints: COLUMN_C_SCORING.GOL.conceded,
   goalkeeperSlotCleanSheetPoints: COLUMN_C_SCORING.GOL.cleanSheet,
+  goalkeeperSlotOneGoalPoints: COLUMN_C_SCORING.GOL.oneGoal,
   ownGoalPoints: BQ_SCORING_V5.ownGoal,
   defenderGoalPoints: COLUMN_C_SCORING.DEF.goal,
   defenderAssistPoints: COLUMN_C_SCORING.DEF.assist,
   defenderCleanSheetPoints: COLUMN_C_SCORING.DEF.cleanSheet,
+  defenderOneGoalPoints: COLUMN_C_SCORING.DEF.oneGoal,
   attackerGoalPoints: COLUMN_C_SCORING.ATA.goal,
   attackerAssistPoints: COLUMN_C_SCORING.ATA.assist,
   lineGoalConcededPoints: COLUMN_C_SCORING.ATA.conceded,
@@ -188,6 +192,7 @@ export const LEGACY_FANTASY_SETTINGS: FantasySettings = {
   goalkeeperSlotAppearancePoints: 4,
   goalkeeperSlotGoalConcededPoints: -2.5,
   goalkeeperSlotCleanSheetPoints: 4,
+  goalkeeperSlotOneGoalPoints: 0,
   attackerGoalPoints: 5,
   goalkeeperLossPoints: BQ_SCORING_V5.loss,
   teamGoalConcededPoints: 0,
@@ -200,7 +205,8 @@ const FANTASY_SETTING_COLUMNS = {
   initialBudget: "initial_budget", initialPlayerPrice: "initial_player_price", minPlayerPrice: "min_player_price", maxPlayerPrice: "max_player_price",
   goalPoints: "goal_points", attackerGoalPoints: "attacker_goal_points", assistPoints: "assist_points", winPoints: "win_points", drawPoints: "draw_points", lossPoints: "loss_points",
   goalkeeperLossPoints: "goalkeeper_loss_points", goalkeeperAppearancePoints: "goalkeeper_appearance_points", goalConcededPoints: "goal_conceded_points", teamGoalConcededPoints: "team_goal_conceded_points", ownGoalPoints: "own_goal_points",
-  defenderGoalPoints: "defender_goal_points", defenderAssistPoints: "defender_assist_points", defenderCleanSheetPoints: "defender_clean_sheet_points", attackerAssistPoints: "attacker_assist_points", lineGoalConcededPoints: "line_goal_conceded_points",
+  defenderGoalPoints: "defender_goal_points", defenderAssistPoints: "defender_assist_points", defenderCleanSheetPoints: "defender_clean_sheet_points", defenderOneGoalPoints: "defender_one_goal_points", attackerAssistPoints: "attacker_assist_points", lineGoalConcededPoints: "line_goal_conceded_points",
+  goalkeeperSlotCleanSheetPoints: "goalkeeper_slot_clean_sheet_points", goalkeeperSlotOneGoalPoints: "goalkeeper_slot_one_goal_points",
   captainMultiplier: "captain_multiplier", topScorerPredictionPoints: "top_scorer_prediction_points", topAssistPredictionPoints: "top_assist_prediction_points", topTeamPredictionPoints: "top_team_prediction_points",
   recentWeight: "recent_weight", kingOfWinsPoints: "king_of_wins_points", mvpPredictionPoints: "mvp_prediction_points", betOfRoundPoints: "bet_of_round_points",
   winRateWeight: "win_rate_weight", historicalWeight: "historical_weight", consistencyWeight: "consistency_weight", smoothingGames: "smoothing_games", maxPriceIncrease: "max_price_increase", maxPriceDecrease: "max_price_decrease",

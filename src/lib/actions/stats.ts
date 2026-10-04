@@ -210,6 +210,7 @@ function aggregateRankingRows(
         goalkeeperCleanSheets: r.clean_sheets,
         teamGoalsConceded: r.team_goals_conceded,
         defensiveCleanGames: r.ranking_defensive_clean_games,
+        defensiveOneGoalGames: r.ranking_defensive_one_goal_games,
         lineRole: r.player_profile_locked === "defensive" ? "DEF" : "ATA",
         ownGoals: r.own_goals,
       }, scoringSnapshot);
@@ -577,6 +578,7 @@ export async function calculateRoundStats(roundId: string) {
         goalkeeperCleanSheets: stats.clean_sheets,
         teamGoalsConceded: stats.team_goals_conceded,
         defensiveCleanGames: stats.ranking_defensive_clean_games,
+        defensiveOneGoalGames: stats.ranking_defensive_one_goal_games,
         lineRole,
         }, scoringSnapshot) : 0,
       };

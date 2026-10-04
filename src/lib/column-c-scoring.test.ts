@@ -3,9 +3,10 @@ import {
   calculateColumnCGoalkeeperPoints,
   calculateColumnCLinePoints,
   calculateColumnCRankedPoints,
+  inferOneGoalGames,
 } from "./column-c-scoring";
 
-describe("pontuação Coluna C v11", () => {
+describe("pontuação Coluna C", () => {
   it("aplica os valores distintos de ataque e defesa", () => {
     const stats = { goals: 2, assists: 1, teamGoalsConceded: 3, defensiveCleanGames: 1 };
     expect(calculateColumnCLinePoints("ATA", stats)).toBe(9);
@@ -31,9 +32,19 @@ describe("pontuação Coluna C v11", () => {
     })).toBe(14);
   });
 
-  it("premia clean sheet somente em DEF e GOL", () => {
+  it("aplica as faixas regressivas de GOL 4/2/0 e DEF 2/1/0", () => {
     expect(calculateColumnCLinePoints("ATA", { defensiveCleanGames: 2 })).toBe(0);
-    expect(calculateColumnCLinePoints("DEF", { defensiveCleanGames: 2 })).toBe(4);
-    expect(calculateColumnCGoalkeeperPoints({ goalkeeperGames: 2, goalkeeperCleanSheets: 2 })).toBe(6);
+    expect(calculateColumnCLinePoints("DEF", { defensiveCleanGames: 1 })).toBe(2);
+    expect(calculateColumnCLinePoints("DEF", { teamGoalsConceded: 1, defensiveOneGoalGames: 1 })).toBe(0.5);
+    expect(calculateColumnCLinePoints("DEF", { teamGoalsConceded: 2 })).toBe(-1);
+    expect(calculateColumnCGoalkeeperPoints({ goalkeeperGames: 1, goalkeeperCleanSheets: 1 })).toBe(5);
+    expect(calculateColumnCGoalkeeperPoints({ goalkeeperGames: 1, goalkeeperGoalsConceded: 1 })).toBe(2.5);
+    expect(calculateColumnCGoalkeeperPoints({ goalkeeperGames: 1, goalkeeperGoalsConceded: 2 })).toBe(0);
+  });
+
+  it("reconstrói partidas de um gol e preserva a regra v11", () => {
+    expect(inferOneGoalGames(5, 2, 5)).toBe(1);
+    expect(calculateColumnCGoalkeeperPoints({ goalkeeperGames: 1, goalkeeperCleanSheets: 1 }, 11)).toBe(3);
+    expect(calculateColumnCLinePoints("DEF", { teamGoalsConceded: 1, defensiveOneGoalGames: 1 }, 11)).toBe(-0.5);
   });
 });

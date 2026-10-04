@@ -93,9 +93,9 @@ describe("ranking card layout", () => {
       ["Rei das Vitórias", 3],
     ]);
     expect(content.positionRatings).toEqual([
-      { key: "DEF", label: "DEF/VOL", value: "75.2", trend: "rising", isBest: true },
       { key: "ATA", label: "ATA/ALA", value: "71.6", trend: "falling", isBest: false },
       { key: "GOL", label: "GOL", value: "70.8", trend: "steady", isBest: false },
+      { key: "DEF", label: "DEF/VOL", value: "75.2", trend: "rising", isBest: true },
     ]);
     expect(content.stats).toEqual([
       { value: "5", label: "GOL" },

@@ -7,6 +7,7 @@ import { DEFAULT_FANTASY_SETTINGS } from "@/lib/fantasy/config";
 import { buildFantasyGoalkeeperSlotBreakdown } from "@/lib/fantasy/engine";
 import { calculatePositionBreakdown } from "@/lib/fantasy/position-breakdown";
 import type { FantasySlotRole } from "@/lib/fantasy/lineup-positions";
+import { buildFantasyColumnCLineSlotBreakdown } from "@/lib/fantasy/slot-point-breakdown";
 
 const value = (source: Record<string, unknown>, key: string, fallback = 0) => Number(source[key] ?? fallback);
 
@@ -21,9 +22,16 @@ export default async function FantasyLineupPlayerDetailPage({ params }: { params
   const suppressGoalkeeperRewards = Boolean(data.round?.suppress_goalkeeper_rewards);
   const snapshot = normalizeBQScoringSnapshot(settings);
   const slotRole = (["GOL", "DEF", "MEI", "ATA"].includes(item.slot_role) ? item.slot_role : "ATA") as FantasySlotRole;
-  const scoringVersion = value(settings, "scoring_version", 5);
+  const scoringVersion = Number(data.scoringVersion || value(settings, "scoring_version", 5));
+  const columnCActive = scoringVersion >= 11;
   const goalkeeperSlotOnly = slotRole === "GOL" && scoringVersion >= 10;
-  const entries = goalkeeperSlotOnly ? buildFantasyGoalkeeperSlotBreakdown({
+  const slotStats = {
+    goals: value(stat, "goals"),
+    assists: value(stat, "assists"),
+    ownGoals: value(stat, "own_goals"),
+    teamGoalsConceded: value(stat, "team_goals_conceded"),
+    defensiveCleanGames: value(stat, "defensive_clean_games"),
+    defensiveOneGoalGames: value(stat, "defensive_one_goal_games"),
     goalkeeperGoals: value(stat, "goalkeeper_goals"),
     goalkeeperAssists: value(stat, "goalkeeper_assists"),
     goalkeeperOwnGoals: value(stat, "goalkeeper_own_goals"),
@@ -32,7 +40,9 @@ export default async function FantasyLineupPlayerDetailPage({ params }: { params
     goalkeeperLosses: value(stat, "goalkeeper_losses"),
     goalkeeperGames: value(stat, "goalkeeper_games"),
     goalsConceded: value(stat, "goals_conceded"),
-  }, {
+    cleanSheets: value(stat, "clean_sheets"),
+  };
+  const fantasySettings = {
     ...DEFAULT_FANTASY_SETTINGS,
     scoringVersion,
     suppressGoalkeeperRewards,
@@ -45,7 +55,13 @@ export default async function FantasyLineupPlayerDetailPage({ params }: { params
     goalkeeperSlotAppearancePoints: value(settings, "goalkeeper_slot_appearance_points", 4),
     goalkeeperSlotGoalConcededPoints: value(settings, "goalkeeper_slot_goal_conceded_points", -2.5),
     goalkeeperSlotCleanSheetPoints: value(settings, "goalkeeper_slot_clean_sheet_points", 4),
-  }) : buildBQBasePointBreakdown(snapshot, {
+    goalkeeperSlotOneGoalPoints: value(settings, "goalkeeper_slot_one_goal_points", 2),
+  };
+  const entries = goalkeeperSlotOnly
+    ? buildFantasyGoalkeeperSlotBreakdown(slotStats, fantasySettings)
+    : columnCActive
+      ? buildFantasyColumnCLineSlotBreakdown(slotRole, slotStats, scoringVersion, fantasySettings)
+      : buildBQBasePointBreakdown(snapshot, {
     goals: value(stat, "goals"),
     assists: value(stat, "assists"),
     wins: value(stat, "wins"),
@@ -55,7 +71,7 @@ export default async function FantasyLineupPlayerDetailPage({ params }: { params
     goalkeeperAppearances: value(stat, "goalkeeper_games"),
     goalkeeperGoalsConceded: value(stat, "goals_conceded"),
   }, { suppressGoalkeeperRewards });
-  const position = calculatePositionBreakdown({
+  const position = columnCActive ? null : calculatePositionBreakdown({
     scoringVersion,
     slotRole,
     playerProfile: item.player_profile_locked,
@@ -69,7 +85,7 @@ export default async function FantasyLineupPlayerDetailPage({ params }: { params
     suppressGoalkeeperRewards,
   });
   const captain = item.player_id === data.lineup.captain_player_id;
-  return <div className="space-y-5"><header><Link href={`/cartola/ranking/${userId}/${roundId}`} className="text-xs font-bold text-accent">← Voltar à escalação</Link><div className="mt-4 flex items-center gap-3"><PlayerAvatar name={playerName} avatarUrl={item.avatar_url_locked || item.players?.avatar_url} className="h-14 w-14 rounded-full bg-surface text-base font-black text-accent" /><div><h1 className="text-xl font-black text-foreground">{playerName}</h1><p className="text-xs text-muted">Rodada {String(data.round?.number || 0).padStart(2, "0")} · composição dos pontos</p></div></div></header><section className="glass-card space-y-3 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-muted">O que aconteceu em campo</p>{entries.length ? entries.map((entry) => <Row key={entry.key} label={`${entry.label} · ${entry.count}${entry.unitPoints === 0 ? " (sem prêmio nesta rodada)" : ""}`} points={entry.points} />) : <p className="text-sm text-muted">Nenhuma ação pontuável registrada nesta rodada.</p>}<div className="border-t border-border pt-3"><Row label="Scouts básicos" points={Number(item.base_points || 0) - Number(item.position_bonus || 0)} strong /></div>{position.events.map((event) => <Row key={event.label} label={`${event.label} · ${event.count}`} points={event.value} />)}{position.specialBonus?.activated && <Row label={`Bônus ${position.specialBonus.name}`} points={position.specialBonus.value} />}{Number(item.position_bonus || 0) !== 0 && <Row label={`Bônus ${slotRole} aplicado${position.capReached ? ` (teto ${position.cap})` : ""}`} points={Number(item.position_bonus || 0)} strong />}{captain && <Row label="Bônus de capitão" points={Number(item.captain_bonus || 0)} /> }<div className="border-t border-border pt-3"><Row label="Total deste jogador" points={Number(item.total_points || 0)} strong /></div></section><p className="px-1 text-[11px] leading-5 text-muted">Cartas são bônus da escalação inteira, por isso aparecem no total da rodada — não são atribuídas a um jogador específico.</p></div>;
+  return <div className="space-y-5"><header><Link href={`/cartola/ranking/${userId}/${roundId}`} className="text-xs font-bold text-accent">← Voltar à escalação</Link><div className="mt-4 flex items-center gap-3"><PlayerAvatar name={playerName} avatarUrl={item.avatar_url_locked || item.players?.avatar_url} className="h-14 w-14 rounded-full bg-surface text-base font-black text-accent" /><div><h1 className="text-xl font-black text-foreground">{playerName}</h1><p className="text-xs text-muted">Rodada {String(data.round?.number || 0).padStart(2, "0")} · composição dos pontos</p></div></div></header><section className="glass-card space-y-3 p-4"><p className="text-[10px] font-black uppercase tracking-widest text-muted">O que aconteceu em campo</p>{entries.length ? entries.map((entry) => <Row key={entry.key} label={`${entry.label} · ${entry.count}${entry.unitPoints === 0 ? " (sem prêmio nesta rodada)" : ""}`} points={entry.points} />) : <p className="text-sm text-muted">Nenhuma ação pontuável registrada nesta rodada.</p>}<div className="border-t border-border pt-3"><Row label="Subtotal dos scouts" points={Number(item.base_points || 0) - Number(item.position_bonus || 0)} strong /></div>{position?.events.map((event) => <Row key={event.label} label={`${event.label} · ${event.count}`} points={event.value} />)}{position?.specialBonus?.activated && <Row label={`Bônus ${position.specialBonus.name}`} points={position.specialBonus.value} />}{Number(item.position_bonus || 0) !== 0 && <Row label={`Bônus ${slotRole} aplicado${position?.capReached ? ` (teto ${position.cap})` : ""}`} points={Number(item.position_bonus || 0)} strong />}{captain && <Row label="Bônus de capitão" points={Number(item.captain_bonus || 0)} /> }<div className="border-t border-border pt-3"><Row label="Total deste jogador" points={Number(item.total_points || 0)} strong /></div></section><p className="px-1 text-[11px] leading-5 text-muted">Cartas são bônus da escalação inteira, por isso aparecem no total da rodada — não são atribuídas a um jogador específico.</p></div>;
 }
 
 function Row({ label, points, strong = false }: { label: string; points: number; strong?: boolean }) { return <div className="flex items-center justify-between gap-3"><span className={strong ? "text-sm font-black text-foreground" : "text-xs font-bold text-foreground"}>{label}</span><strong className={points > 0 ? "text-accent" : points < 0 ? "text-danger" : "text-muted"}>{points > 0 ? "+" : ""}{points.toFixed(1)} pts</strong></div>; }

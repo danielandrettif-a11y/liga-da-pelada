@@ -60,7 +60,7 @@ export function CallupTacticalAlertModal() {
         <div className="space-y-2 mb-4">
           <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs">
             <span className="rounded bg-blue-500/20 px-1.5 py-0.5 font-athletic font-black text-blue-400 text-[10px]">DEF/VOL</span>
-            <span className="text-muted text-[11px]">Gol +5, assistência +3, clean sheet +2 e −0,5 por gol sofrido</span>
+            <span className="text-muted text-[11px]">Gol +5, assistência +3, −0,5 por gol sofrido e faixa defensiva +2/+1/0</span>
           </div>
           <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs">
             <span className="rounded bg-danger/20 px-1.5 py-0.5 font-athletic font-black text-danger text-[10px]">ATA/ALA</span>
@@ -68,7 +68,7 @@ export function CallupTacticalAlertModal() {
           </div>
           <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs">
             <span className="rounded bg-emerald-400/20 px-1.5 py-0.5 font-athletic font-black text-emerald-300 text-[10px]">GOL</span>
-            <span className="text-muted text-[11px]">Somente scouts no gol: atuação +1, clean sheet +2 e −0,5 por gol sofrido</span>
+            <span className="text-muted text-[11px]">Somente scouts no gol: atuação +1, −0,5 por gol sofrido e faixa +4/+2/0</span>
           </div>
         </div>
 

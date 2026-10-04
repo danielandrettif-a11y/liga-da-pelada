@@ -55,7 +55,7 @@ export type RankingCardContent = {
 export const RANKING_CARD_LAYOUT: RankingCardLayout = {
   photoShape: "shield",
   header: { left: 29, top: 10.5, width: 42, height: 4.8 },
-  score: { left: 13.5, top: 18, width: 36.5, height: 33 },
+  score: { left: 12.5, top: 18, width: 38.5, height: 33 },
   photo: { left: 52, top: 17.8, width: 32, height: 29.2 },
   speed: { left: 55, top: 48.2, width: 26, height: 4.2 },
   name: { left: 8.5, top: 54.1, width: 83, height: 8.6 },
@@ -140,9 +140,9 @@ export function buildRankingCardContent(entry: RankingEntry, position: number): 
   const speedStars = formatSpeedStars(entry.speedRating);
   const profile = `${PROFILE_LABELS[entry.player.player_profile || "midfield"]}${entry.player.is_goalkeeper ? " / GOL" : ""}`;
   const positionRatings = ([
-    ["DEF", "DEF/VOL"],
     ["ATA", "ATA/ALA"],
     ["GOL", "GOL"],
+    ["DEF", "DEF/VOL"],
   ] as const).map(([key, label]) => ({ key, label, rawValue: entry.overallPositions?.[key] ?? null }));
   const bestPosition = positionRatings.reduce<number | null>((bestIndex, item, index, values) => {
     if (item.rawValue == null) return bestIndex;

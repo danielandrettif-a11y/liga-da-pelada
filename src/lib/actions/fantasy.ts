@@ -16,6 +16,7 @@ import { type FantasyMarketHealth } from "@/lib/fantasy/market-v11";
 import { parseFantasyMarketReadModel } from "@/lib/fantasy/market-read-model";
 import { isCompetitiveProfileComplete } from "@/lib/player-eligibility";
 import { applyCaptainMultiplier } from "@/lib/bq-scoring";
+import { inferOneGoalGames } from "@/lib/column-c-scoring";
 import {
   calculateCostBenefit,
   calculateExpectedFantasyPoints,
@@ -380,6 +381,7 @@ export async function getFantasyDashboard() {
         defenderGoalPoints: Number(scoringSnapshot.defender_goal_points ?? settings.defenderGoalPoints),
         defenderAssistPoints: Number(scoringSnapshot.defender_assist_points ?? settings.defenderAssistPoints),
         defenderCleanSheetPoints: Number(scoringSnapshot.defender_clean_sheet_points ?? settings.defenderCleanSheetPoints),
+        defenderOneGoalPoints: Number(scoringSnapshot.defender_one_goal_points ?? settings.defenderOneGoalPoints),
         lineGoalConcededPoints: Number(scoringSnapshot.line_goal_conceded_points ?? settings.lineGoalConcededPoints),
         assistPoints: Number(scoringSnapshot.assist_points ?? settings.assistPoints),
         winPoints: Number(scoringSnapshot.win_points ?? settings.winPoints),
@@ -393,6 +395,7 @@ export async function getFantasyDashboard() {
         goalkeeperSlotAppearancePoints: Number(scoringSnapshot.goalkeeper_slot_appearance_points ?? settings.goalkeeperSlotAppearancePoints),
         goalkeeperSlotGoalConcededPoints: Number(scoringSnapshot.goalkeeper_slot_goal_conceded_points ?? settings.goalkeeperSlotGoalConcededPoints),
         goalkeeperSlotCleanSheetPoints: Number(scoringSnapshot.goalkeeper_slot_clean_sheet_points ?? settings.goalkeeperSlotCleanSheetPoints),
+        goalkeeperSlotOneGoalPoints: Number(scoringSnapshot.goalkeeper_slot_one_goal_points ?? settings.goalkeeperSlotOneGoalPoints),
         teamGoalConcededPoints: Number(
           scoringSnapshot.team_goal_conceded_points ?? settings.teamGoalConcededPoints,
         ),
@@ -2036,6 +2039,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       defenderGoalPoints: Number(snapshot.defender_goal_points ?? liveSettingsRow?.defender_goal_points ?? DEFAULT_FANTASY_SETTINGS.defenderGoalPoints),
       defenderAssistPoints: Number(snapshot.defender_assist_points ?? liveSettingsRow?.defender_assist_points ?? DEFAULT_FANTASY_SETTINGS.defenderAssistPoints),
       defenderCleanSheetPoints: Number(snapshot.defender_clean_sheet_points ?? liveSettingsRow?.defender_clean_sheet_points ?? DEFAULT_FANTASY_SETTINGS.defenderCleanSheetPoints),
+      defenderOneGoalPoints: Number(snapshot.defender_one_goal_points ?? liveSettingsRow?.defender_one_goal_points ?? DEFAULT_FANTASY_SETTINGS.defenderOneGoalPoints),
       lineGoalConcededPoints: Number(snapshot.line_goal_conceded_points ?? liveSettingsRow?.line_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.lineGoalConcededPoints),
       assistPoints: Number(snapshot.assist_points ?? liveSettingsRow?.assist_points ?? DEFAULT_FANTASY_SETTINGS.assistPoints),
       winPoints: Number(snapshot.win_points ?? liveSettingsRow?.win_points ?? DEFAULT_FANTASY_SETTINGS.winPoints),
@@ -2047,6 +2051,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       goalkeeperSlotAppearancePoints: Number(snapshot.goalkeeper_slot_appearance_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperSlotAppearancePoints),
       goalkeeperSlotGoalConcededPoints: Number(snapshot.goalkeeper_slot_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperSlotGoalConcededPoints),
       goalkeeperSlotCleanSheetPoints: Number(snapshot.goalkeeper_slot_clean_sheet_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperSlotCleanSheetPoints),
+      goalkeeperSlotOneGoalPoints: Number(snapshot.goalkeeper_slot_one_goal_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperSlotOneGoalPoints),
       teamGoalConcededPoints: Number(snapshot.team_goal_conceded_points ?? liveSettingsRow?.team_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.teamGoalConcededPoints),
       ownGoalPoints: Number(snapshot.own_goal_points ?? liveSettingsRow?.own_goal_points ?? DEFAULT_FANTASY_SETTINGS.ownGoalPoints),
       captainMultiplier: Number(snapshot.captain_multiplier ?? liveSettingsRow?.captain_multiplier ?? DEFAULT_FANTASY_SETTINGS.captainMultiplier),
@@ -2266,18 +2271,20 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       description?: string;
       hideCount?: boolean;
     }> = columnCActive && slotRole === "GOL" ? [
-      { key: "goalkeeper_goals", label: "Gols enquanto estava no gol", count: current.goalkeeperGoals, unitPoints: 5, points: current.goalkeeperGoals * 5, icon: "⚽" },
-      { key: "goalkeeper_assists", label: "Assistências enquanto estava no gol", count: current.goalkeeperAssists, unitPoints: 3, points: current.goalkeeperAssists * 3, icon: "👟" },
-      { key: "goalkeeper_games", label: "Atuações no gol", count: current.goalkeeperGames, unitPoints: 1, points: current.goalkeeperGames, icon: "🧤" },
-      { key: "goals_conceded", label: "Gols sofridos no gol", count: current.goalsConceded, unitPoints: -0.5, points: current.goalsConceded * -0.5, icon: "🥅" },
-      { key: "clean_sheets", label: "Clean sheets no gol", count: current.cleanSheets, unitPoints: 2, points: current.cleanSheets * 2, icon: "🔒" },
-      { key: "goalkeeper_own_goals", label: "Gols contra no gol", count: current.goalkeeperOwnGoals, unitPoints: -3, points: current.goalkeeperOwnGoals * -3, icon: "⚠️" },
+      { key: "goalkeeper_goals", label: "Gols enquanto estava no gol", count: current.goalkeeperGoals, unitPoints: liveSettings.defenderGoalPoints, points: current.goalkeeperGoals * liveSettings.defenderGoalPoints, icon: "⚽" },
+      { key: "goalkeeper_assists", label: "Assistências enquanto estava no gol", count: current.goalkeeperAssists, unitPoints: liveSettings.defenderAssistPoints, points: current.goalkeeperAssists * liveSettings.defenderAssistPoints, icon: "👟" },
+      { key: "goalkeeper_games", label: "Atuações no gol", count: current.goalkeeperGames, unitPoints: liveSettings.goalkeeperSlotAppearancePoints, points: current.goalkeeperGames * liveSettings.goalkeeperSlotAppearancePoints, icon: "🧤" },
+      { key: "goals_conceded", label: "Gols sofridos no gol", count: current.goalsConceded, unitPoints: liveSettings.goalkeeperSlotGoalConcededPoints, points: current.goalsConceded * liveSettings.goalkeeperSlotGoalConcededPoints, icon: "🥅" },
+      { key: "clean_sheets", label: "Faixa GOL · 0 gols sofridos", count: current.cleanSheets, unitPoints: Number(liveSettings.scoringVersion || 0) >= 12 ? liveSettings.goalkeeperSlotCleanSheetPoints : 2, points: current.cleanSheets * (Number(liveSettings.scoringVersion || 0) >= 12 ? liveSettings.goalkeeperSlotCleanSheetPoints : 2), icon: "🔒" },
+      { key: "goalkeeper_one_goal_games", label: "Faixa GOL · 1 gol sofrido", count: Number(liveSettings.scoringVersion || 0) >= 12 ? inferOneGoalGames(current.goalkeeperGames, current.cleanSheets, current.goalsConceded) : 0, unitPoints: liveSettings.goalkeeperSlotOneGoalPoints, points: (Number(liveSettings.scoringVersion || 0) >= 12 ? inferOneGoalGames(current.goalkeeperGames, current.cleanSheets, current.goalsConceded) : 0) * liveSettings.goalkeeperSlotOneGoalPoints, icon: "🛡️" },
+      { key: "goalkeeper_own_goals", label: "Gols contra no gol", count: current.goalkeeperOwnGoals, unitPoints: liveSettings.ownGoalPoints, points: current.goalkeeperOwnGoals * liveSettings.ownGoalPoints, icon: "⚠️" },
     ].filter((item) => item.count > 0) : columnCActive && slotRole ? [
-      { key: "goals", label: "Gols", count: Math.max(0, current.goals-current.goalkeeperGoals), unitPoints: slotRole === "DEF" ? 5 : 4, points: Math.max(0, current.goals-current.goalkeeperGoals)*(slotRole === "DEF" ? 5 : 4), icon: "⚽" },
-      { key: "assists", label: "Assistências", count: Math.max(0, current.assists-current.goalkeeperAssists), unitPoints: slotRole === "DEF" ? 3 : 2.5, points: Math.max(0, current.assists-current.goalkeeperAssists)*(slotRole === "DEF" ? 3 : 2.5), icon: "👟" },
-      { key: "team_conceded", label: "Gols sofridos pelo time", count: Math.max(0,current.teamGoalsConceded-current.goalsConceded), unitPoints: -0.5, points: Math.max(0,current.teamGoalsConceded-current.goalsConceded)*-0.5, icon: "🥅" },
-      { key: "clean_sheets", label: "Clean sheets como DEF", count: slotRole === "DEF" ? current.defensiveCleanGames : 0, unitPoints: 2, points: (slotRole === "DEF" ? current.defensiveCleanGames : 0)*2, icon: "🔒" },
-      { key: "own_goals", label: "Gols contra", count: Math.max(0,current.ownGoals-current.goalkeeperOwnGoals), unitPoints: -3, points: Math.max(0,current.ownGoals-current.goalkeeperOwnGoals)*-3, icon: "⚠️" },
+      { key: "goals", label: "Gols", count: Math.max(0, current.goals-current.goalkeeperGoals), unitPoints: slotRole === "DEF" ? liveSettings.defenderGoalPoints : liveSettings.attackerGoalPoints, points: Math.max(0, current.goals-current.goalkeeperGoals)*(slotRole === "DEF" ? liveSettings.defenderGoalPoints : liveSettings.attackerGoalPoints), icon: "⚽" },
+      { key: "assists", label: "Assistências", count: Math.max(0, current.assists-current.goalkeeperAssists), unitPoints: slotRole === "DEF" ? liveSettings.defenderAssistPoints : liveSettings.attackerAssistPoints, points: Math.max(0, current.assists-current.goalkeeperAssists)*(slotRole === "DEF" ? liveSettings.defenderAssistPoints : liveSettings.attackerAssistPoints), icon: "👟" },
+      { key: "team_conceded", label: "Gols sofridos pelo time", count: Math.max(0,current.teamGoalsConceded-current.goalsConceded), unitPoints: liveSettings.lineGoalConcededPoints, points: Math.max(0,current.teamGoalsConceded-current.goalsConceded)*liveSettings.lineGoalConcededPoints, icon: "🥅" },
+      { key: "clean_sheets", label: "Faixa DEF · 0 gols sofridos", count: slotRole === "DEF" ? current.defensiveCleanGames : 0, unitPoints: liveSettings.defenderCleanSheetPoints, points: (slotRole === "DEF" ? current.defensiveCleanGames : 0)*liveSettings.defenderCleanSheetPoints, icon: "🔒" },
+      { key: "defensive_one_goal_games", label: "Faixa DEF · 1 gol sofrido", count: Number(liveSettings.scoringVersion || 0) >= 12 && slotRole === "DEF" ? current.defensiveOneGoalGames : 0, unitPoints: liveSettings.defenderOneGoalPoints, points: (Number(liveSettings.scoringVersion || 0) >= 12 && slotRole === "DEF" ? current.defensiveOneGoalGames : 0) * liveSettings.defenderOneGoalPoints, icon: "🛡️" },
+      { key: "own_goals", label: "Gols contra", count: Math.max(0,current.ownGoals-current.goalkeeperOwnGoals), unitPoints: liveSettings.ownGoalPoints, points: Math.max(0,current.ownGoals-current.goalkeeperOwnGoals)*liveSettings.ownGoalPoints, icon: "⚠️" },
     ].filter((item) => item.count > 0) : [
       { key: "goals", label: "Gols", count: current.goals, unitPoints: goalValue, points: current.goals * goalValue, icon: "⚽" },
       { key: "assists", label: "Assistências", count: current.assists, unitPoints: liveSettings.assistPoints, points: current.assists * liveSettings.assistPoints, icon: "👟" },
@@ -2370,10 +2377,14 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       { label: `Gol como ${activeLineRole === "DEF" ? "DEF/VOL" : "ATA/ALA"}`, unitPoints: activeLineRole === "DEF" ? liveSettings.defenderGoalPoints : liveSettings.attackerGoalPoints, icon: "⚽", description: "Conta quando o atleta está na linha" },
       { label: `Assistência como ${activeLineRole === "DEF" ? "DEF/VOL" : "ATA/ALA"}`, unitPoints: activeLineRole === "DEF" ? liveSettings.defenderAssistPoints : liveSettings.attackerAssistPoints, icon: "👟", description: "Conta quando o atleta está na linha" },
       { label: "Gol sofrido pelo time", unitPoints: liveSettings.lineGoalConcededPoints, icon: "🥅", description: "Aplicado aos atletas de linha do time" },
-      ...(activeLineRole === "DEF" ? [{ label: "Clean sheet DEF/VOL", unitPoints: liveSettings.defenderCleanSheetPoints, icon: "🔒", description: "Partida de linha sem sofrer gol" }] : []),
+      ...(activeLineRole === "DEF" ? [
+        { label: "Faixa DEF/VOL · 0 gols sofridos", unitPoints: liveSettings.defenderCleanSheetPoints, icon: "🔒", description: "Por partida de linha sem sofrer gol" },
+        ...(Number(liveSettings.scoringVersion || 0) >= 12 ? [{ label: "Faixa DEF/VOL · 1 gol sofrido", unitPoints: liveSettings.defenderOneGoalPoints, icon: "🛡️", description: "Por partida de linha sofrendo exatamente um gol" }] : []),
+      ] : []),
       { label: "Atuação na vaga GOL", unitPoints: liveSettings.goalkeeperSlotAppearancePoints, icon: "🧤", description: "Na vaga GOL, somente scouts registrados no gol" },
       { label: "Gol sofrido na vaga GOL", unitPoints: liveSettings.goalkeeperSlotGoalConcededPoints, icon: "🛡️", description: "Por gol sofrido enquanto era goleiro" },
-      { label: "Clean sheet na vaga GOL", unitPoints: liveSettings.goalkeeperSlotCleanSheetPoints, icon: "🔒", description: "Atuação no gol sem sofrer gol" },
+      { label: "Faixa GOL · 0 gols sofridos", unitPoints: Number(liveSettings.scoringVersion || 0) >= 12 ? liveSettings.goalkeeperSlotCleanSheetPoints : 2, icon: "🔒", description: "Por atuação no gol sem sofrer gol" },
+      ...(Number(liveSettings.scoringVersion || 0) >= 12 ? [{ label: "Faixa GOL · 1 gol sofrido", unitPoints: liveSettings.goalkeeperSlotOneGoalPoints, icon: "🛡️", description: "Por atuação no gol sofrendo exatamente um gol" }] : []),
       { label: "Gol contra", unitPoints: liveSettings.ownGoalPoints, icon: "⚠️", description: "Na função em que aconteceu" },
     ] : [
       { label: "Gol marcado", unitPoints: goalValue, icon: "⚽", description: playerProfile === "offensive" ? "Pontuação padrão para atacante" : "Pontuação por gol marcado" },
@@ -2554,6 +2565,7 @@ async function getLiveRoundProjections(
     defenderGoalPoints: Number(snapshot.defender_goal_points ?? settingsRow?.defender_goal_points ?? DEFAULT_FANTASY_SETTINGS.defenderGoalPoints),
     defenderAssistPoints: Number(snapshot.defender_assist_points ?? settingsRow?.defender_assist_points ?? DEFAULT_FANTASY_SETTINGS.defenderAssistPoints),
     defenderCleanSheetPoints: Number(snapshot.defender_clean_sheet_points ?? settingsRow?.defender_clean_sheet_points ?? DEFAULT_FANTASY_SETTINGS.defenderCleanSheetPoints),
+    defenderOneGoalPoints: Number(snapshot.defender_one_goal_points ?? settingsRow?.defender_one_goal_points ?? DEFAULT_FANTASY_SETTINGS.defenderOneGoalPoints),
     lineGoalConcededPoints: Number(snapshot.line_goal_conceded_points ?? settingsRow?.line_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.lineGoalConcededPoints),
     assistPoints: Number(snapshot.assist_points ?? settingsRow?.assist_points ?? DEFAULT_FANTASY_SETTINGS.assistPoints),
     winPoints: Number(snapshot.win_points ?? settingsRow?.win_points ?? DEFAULT_FANTASY_SETTINGS.winPoints),
@@ -2565,6 +2577,7 @@ async function getLiveRoundProjections(
     goalkeeperSlotAppearancePoints: Number(snapshot.goalkeeper_slot_appearance_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperSlotAppearancePoints),
     goalkeeperSlotGoalConcededPoints: Number(snapshot.goalkeeper_slot_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperSlotGoalConcededPoints),
     goalkeeperSlotCleanSheetPoints: Number(snapshot.goalkeeper_slot_clean_sheet_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperSlotCleanSheetPoints),
+    goalkeeperSlotOneGoalPoints: Number(snapshot.goalkeeper_slot_one_goal_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperSlotOneGoalPoints),
     teamGoalConcededPoints: Number(snapshot.team_goal_conceded_points ?? settingsRow?.team_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.teamGoalConcededPoints),
     ownGoalPoints: Number(snapshot.own_goal_points ?? settingsRow?.own_goal_points ?? DEFAULT_FANTASY_SETTINGS.ownGoalPoints),
     captainMultiplier: Number(snapshot.captain_multiplier ?? settingsRow?.captain_multiplier ?? DEFAULT_FANTASY_SETTINGS.captainMultiplier),
@@ -3744,7 +3757,7 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
 
   const { data: fantasyRound } = await account.client
     .from("fantasy_rounds")
-    .select("id, round_id, market_status, settings_snapshot, rounds(number, date, status, suppress_goalkeeper_rewards, matches(id, status, started_at))")
+    .select("id, round_id, market_status, scoring_version, settings_snapshot, rounds(number, date, status, suppress_goalkeeper_rewards, matches(id, status, started_at))")
     .eq("fantasy_season_id", fantasySeason.id)
     .eq("round_id", roundId)
     .maybeSingle();
@@ -3830,6 +3843,11 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
     lineup,
     round: roundInfo,
     isLive: Boolean(projection && live?.isLive),
+    scoringVersion: Number(
+      fantasyRound.settings_snapshot?.scoring_version
+      ?? fantasyRound.scoring_version
+      ?? 5
+    ),
     settingsSnapshot: fantasyRound.settings_snapshot || {},
     statsByPlayer: projection
       ? Object.fromEntries(playerIds.map((playerId: string) => {

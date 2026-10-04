@@ -13,7 +13,7 @@ const RULES = [
   { scout: "Gol", attack: "+4,0", defense: "+5,0", goalkeeper: "+5,0 no gol" },
   { scout: "Assistência", attack: "+2,5", defense: "+3,0", goalkeeper: "+3,0 no gol" },
   { scout: "Gol sofrido", attack: "−0,5", defense: "−0,5", goalkeeper: "−0,5 no gol" },
-  { scout: "Clean sheet", attack: "—", defense: "+2,0", goalkeeper: "+2,0" },
+  { scout: "Faixa 0/1/2 sofridos", attack: "—", defense: "+2/+1/0", goalkeeper: "+4/+2/0" },
   { scout: "Atuação no gol", attack: "—", defense: "—", goalkeeper: "+1,0" },
   { scout: "Gol contra", attack: "−3,0", defense: "−3,0", goalkeeper: "−3,0 no gol" },
 ] as const;
@@ -41,9 +41,9 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
           {tab === "positions" && <>
             <div className="rounded-2xl border border-accent/30 bg-accent/10 p-4 text-xs leading-5 text-foreground"><strong>Escolha um dos dois esquemas:</strong><br />1 GOL + 3 DEF/VOL + 2 ATA/ALA<br />1 GOL + 2 DEF/VOL + 3 ATA/ALA</div>
             <div className="grid gap-3">
-              <article className="rounded-2xl border border-blue-500/25 bg-blue-950/20 p-4"><strong className="text-blue-300">DEF/VOL</strong><p className="mt-1 text-xs text-muted">Gol e assistência valem mais. Recebe +2 por clean sheet e perde 0,5 por gol sofrido pelo time.</p></article>
+              <article className="rounded-2xl border border-blue-500/25 bg-blue-950/20 p-4"><strong className="text-blue-300">DEF/VOL</strong><p className="mt-1 text-xs text-muted">Gol e assistência valem mais. Recebe +2/+1/0 para 0/1/2 gols sofridos e perde 0,5 por gol sofrido pelo time.</p></article>
               <article className="rounded-2xl border border-danger/25 bg-red-950/20 p-4"><strong className="text-danger">ATA/ALA</strong><p className="mt-1 text-xs text-muted">Une atacantes e antigos alas. Pontua por gol e assistência e perde 0,5 por gol sofrido pelo time.</p></article>
-              <article className="rounded-2xl border border-accent/25 bg-accent/10 p-4"><strong className="text-accent">GOL</strong><p className="mt-1 text-xs text-muted">A vaga é livre, mas considera apenas partidas e ações registradas enquanto o atleta estava no gol.</p></article>
+              <article className="rounded-2xl border border-accent/25 bg-accent/10 p-4"><strong className="text-accent">GOL</strong><p className="mt-1 text-xs text-muted">A vaga é livre, considera somente ações no gol e recebe a faixa +4/+2/0 para 0/1/2 gols sofridos.</p></article>
             </div>
           </>}
           {tab === "base" && <div className="overflow-hidden rounded-2xl border border-white/10">
