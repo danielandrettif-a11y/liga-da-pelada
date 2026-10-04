@@ -34,7 +34,7 @@ export type RankingCardTheme = {
 };
 
 export type RankingCardAwardKey = "roundMvp" | "topScorer" | "topAssister" | "kingOfWins";
-export type RankingCardPositionKey = "DEF" | "ALA_MEI" | "ATA" | "GOL";
+export type RankingCardPositionKey = "DEF" | "ATA" | "GOL";
 
 export type RankingCardContent = {
   header: string;
@@ -112,7 +112,7 @@ const CARD_THEMES: Record<RankingCardTier, RankingCardTheme> = {
 
 const PROFILE_LABELS = {
   offensive: "ATA",
-  midfield: "ALA",
+  midfield: "ATA/ALA",
   defensive: "DEF/VOL",
 } as const;
 
@@ -141,8 +141,7 @@ export function buildRankingCardContent(entry: RankingEntry, position: number): 
   const profile = `${PROFILE_LABELS[entry.player.player_profile || "midfield"]}${entry.player.is_goalkeeper ? " / GOL" : ""}`;
   const positionRatings = ([
     ["DEF", "DEF/VOL"],
-    ["ALA_MEI", "ALA"],
-    ["ATA", "ATA"],
+    ["ATA", "ATA/ALA"],
     ["GOL", "GOL"],
   ] as const).map(([key, label]) => ({ key, label, rawValue: entry.overallPositions?.[key] ?? null }));
   const bestPosition = positionRatings.reduce<number | null>((bestIndex, item, index, values) => {

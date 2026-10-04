@@ -1,4 +1,6 @@
 import { DEFAULT_FANTASY_SETTINGS, type FantasySettings } from "./config";
+import { calculateColumnCGoalkeeperPoints, calculateColumnCLinePoints, profileToColumnCRole } from "../column-c-scoring";
+import type { FantasySlotRole } from "./lineup-positions";
 import { calculateMarketV11Price, percentileById, type MarketV11PriceResult } from "./market-v11";
 
 export type FantasyPerformance = {
@@ -19,6 +21,7 @@ export type FantasyPerformance = {
   goalkeeperWins?: number;
   goalkeeperDraws?: number;
   goalkeeperLosses?: number;
+  cleanSheets?: number;
   defensiveCleanGames?: number;
   defensiveOneGoalGames?: number;
   teamGoalsConceded?: number;
@@ -87,6 +90,10 @@ export function calculateFantasyPlayerPoints(
     | "teamGoalsConceded"
     | "ownGoals"
     | "playerProfile"
+    | "goalkeeperGoals"
+    | "goalkeeperAssists"
+    | "goalkeeperOwnGoals"
+    | "cleanSheets"
   >,
   settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
 ) {
@@ -127,7 +134,7 @@ export type FantasyGoalkeeperSlotStats = Pick<
   | "goalkeeperWins"
   | "goalkeeperDraws"
   | "goalkeeperLosses"
->;
+> & { cleanSheets?: number };
 
 export function buildFantasyGoalkeeperSlotBreakdown(
   stats: FantasyGoalkeeperSlotStats,
@@ -154,8 +161,46 @@ export function calculateFantasyGoalkeeperSlotPoints(
   stats: FantasyGoalkeeperSlotStats,
   settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
 ) {
+  if (Number(settings.scoringVersion || 0) >= 11) {
+    return calculateColumnCGoalkeeperPoints({
+      goalkeeperGames: stats.goalkeeperGames,
+      goalkeeperGoals: stats.goalkeeperGoals,
+      goalkeeperAssists: stats.goalkeeperAssists,
+      goalkeeperOwnGoals: stats.goalkeeperOwnGoals,
+      goalkeeperGoalsConceded: stats.goalsConceded,
+      goalkeeperCleanSheets: stats.cleanSheets,
+    });
+  }
   return buildFantasyGoalkeeperSlotBreakdown(stats, settings)
     .reduce((total, item) => total + item.points, 0);
+}
+
+/** Pontuação oficial do atleta na vaga escolhida, sem bônus posicional legado. */
+export function calculateFantasySlotPoints(
+  stats: {
+    goals: number; assists: number; ownGoals?: number; teamGoalsConceded?: number;
+    defensiveCleanGames?: number; goalkeeperGames?: number; goalsConceded?: number;
+    cleanSheets?: number; goalkeeperGoals?: number; goalkeeperAssists?: number;
+    goalkeeperOwnGoals?: number; goalkeeperWins?: number; goalkeeperDraws?: number;
+    goalkeeperLosses?: number; wins?: number; draws?: number; losses?: number;
+    playerProfile?: "offensive" | "midfield" | "defensive" | null;
+  },
+  slotRole: FantasySlotRole,
+  settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
+) {
+  if (Number(settings.scoringVersion || 0) < 11) {
+    return slotRole === "GOL" && Number(settings.scoringVersion || 0) >= 10
+      ? calculateFantasyGoalkeeperSlotPoints(stats, settings)
+      : calculateFantasyPlayerPoints({ wins: 0, ...stats }, settings);
+  }
+  if (slotRole === "GOL") return calculateFantasyGoalkeeperSlotPoints(stats, settings);
+  return calculateColumnCLinePoints(slotRole === "DEF" ? "DEF" : "ATA", {
+    goals: Math.max(0, stats.goals - Number(stats.goalkeeperGoals || 0)),
+    assists: Math.max(0, stats.assists - Number(stats.goalkeeperAssists || 0)),
+    ownGoals: Math.max(0, Number(stats.ownGoals || 0) - Number(stats.goalkeeperOwnGoals || 0)),
+    teamGoalsConceded: Math.max(0, Number(stats.teamGoalsConceded || 0) - Number(stats.goalsConceded || 0)),
+    defensiveCleanGames: stats.defensiveCleanGames || 0,
+  });
 }
 
 export function predictionIsCorrect<T>(choice: T | null | undefined, leaders: T[], leaderValue: number) {

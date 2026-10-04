@@ -73,4 +73,30 @@ describe("getOverallComposition", () => {
     expect(getOverallComposition([], values, { goalkeeperGames: 8, goalkeeperRounds: 2 })?.items.map((item) => item.role)).toEqual(["DEF", "ALA_MEI", "ATA"]);
     expect(getOverallComposition([], values, { goalkeeperGames: 8, goalkeeperRounds: 3 })?.items.map((item) => item.role)).toEqual(["GOL", "DEF", "ALA_MEI"]);
   });
+
+  it("na v17 combina somente DEF/VOL e ATA/ALA em 70/30", () => {
+    const result = getOverallComposition(["defensive", "offensive"], positions, {
+      threePositionModel: true,
+    });
+
+    expect(result?.items.map((item) => [item.role, item.label, item.weight])).toEqual([
+      ["DEF", "DEF/VOL", 0.7],
+      ["ATA", "ATA/ALA", 0.3],
+    ]);
+    expect(result?.value).toBe(72.1);
+  });
+
+  it("na v17 inclui GOL elegível entre as três posições", () => {
+    const result = getOverallComposition([], { ...positions, GOL: 80 }, {
+      goalkeeperGames: 8,
+      goalkeeperRounds: 3,
+      threePositionModel: true,
+    });
+
+    expect(result?.items.map((item) => [item.role, item.weight])).toEqual([
+      ["GOL", 0.5],
+      ["DEF", 0.35],
+      ["ATA", 0.15],
+    ]);
+  });
 });

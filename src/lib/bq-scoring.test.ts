@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BQ_SCORING_V5, calculateBQBasePoints, applyCaptainMultiplier, buildBQBasePointBreakdown, rankingRulesToSnapshot, snapshotToRankingRules } from "./bq-scoring";
 import { calculateRankedPoints, RANKED_SCORING } from "./ranked-scoring";
-import { DEFAULT_FANTASY_SETTINGS } from "./fantasy/config";
+import { LEGACY_FANTASY_SETTINGS as DEFAULT_FANTASY_SETTINGS } from "./fantasy/config";
 import { calculateFantasyPlayerPoints } from "./fantasy/engine";
 import { calculatePositionBreakdown } from "./fantasy/position-breakdown";
 

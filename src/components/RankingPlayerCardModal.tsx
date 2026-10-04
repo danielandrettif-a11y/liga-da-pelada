@@ -371,6 +371,7 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
   const overallComposition = getOverallComposition(entry.player.overall_traits, entry.overallPositions, {
     goalkeeperGames: entry.overallGoalkeeperGames,
     goalkeeperRounds: entry.overallGoalkeeperRounds,
+    threePositionModel: true,
   });
   const goalkeeperGames = Number(entry.overallGoalkeeperGames || 0);
   const goalkeeperRounds = Number(entry.overallGoalkeeperRounds || 0);
@@ -603,19 +604,18 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                           ? `Ainda não entra no OVR geral: precisa completar 8 partidas em pelo menos 3 rodadas (agora ${goalkeeperGames} partidas em ${goalkeeperRounds} rodadas).`
                           : goalkeeperIncluded
                             ? "Entra no OVR geral porque completou a amostra mínima e está entre as três maiores notas posicionais."
-                            : "Já completou a amostra mínima, mas o geral usa apenas as três maiores notas entre DEF/VOL, ALA, ATA e GOL."}
+                            : "Já completou a amostra mínima, mas o geral usa DEF/VOL, ATA/ALA e GOL."}
                       </p>
                     </div>
                   )}
 
                   <div className="grid grid-cols-1 gap-1.5">
-                    <p><strong className="text-foreground">DEF/VOL:</strong> 70% defesa, 5% gols, 15% assistências e 10% resultado.</p>
-                    <p><strong className="text-foreground">ALA:</strong> 30% defesa, 25% gols, 35% assistências e 10% resultado.</p>
-                    <p><strong className="text-foreground">ATA:</strong> 5% defesa, 55% gols, 30% assistências e 10% resultado.</p>
+                    <p><strong className="text-foreground">DEF/VOL:</strong> defesa coletiva, gols e assistências, sem peso de vitória, empate ou derrota.</p>
+                    <p><strong className="text-foreground">ATA/ALA:</strong> gols, assistências e proteção coletiva na mesma nota ofensiva.</p>
                     <p><strong className="text-foreground">GOL:</strong> desempenho defensivo nas partidas em que atuou no gol.</p>
                   </div>
 
-                  <p>Gols e assistências são comparados por 7 minutos jogados. A defesa usa gols sofridos por tempo, resistência até o primeiro gol, participação e gols contra. As características aceleram a evolução das posições escolhidas: 100% do bônus para uma; 60%/40% para duas; ou 50%/30%/20% para três. A influência é integral nas 8 primeiras rodadas, diminui gradualmente nas 8 seguintes e desaparece na 16ª. Depois disso, todas as posições evoluem somente pelas atuações.</p>
+                  <p>Gols e assistências são comparados por 7 minutos jogados. A defesa usa gols sofridos por tempo, resistência até o primeiro gol, participação e gols contra. As características DEF/VOL e ATA/ALA aceleram a evolução da função escolhida; quando as duas são usadas, o bônus é dividido entre elas.</p>
                 </>
               ) : (
                 <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-warning">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_FANTASY_SETTINGS } from "./config";
+import { LEGACY_FANTASY_SETTINGS as DEFAULT_FANTASY_SETTINGS } from "./config";
 import { calculateFantasyGoalkeeperSlotPoints } from "./engine";
 import { buildFantasyGoalkeeperSimulationStats } from "./goalkeeper-simulation";
 import { calculatePositionBreakdown } from "./position-breakdown";

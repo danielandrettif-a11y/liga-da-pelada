@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget } from "./config";
+import { LEGACY_FANTASY_SETTINGS as DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget } from "./config";
 import {
   calculateCostBenefit,
   calculateExpectedFantasyPoints,

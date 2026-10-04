@@ -62,9 +62,10 @@ export function PlayerForm({
   const [memberCategory, setMemberCategory] = useState<MemberCategory>(player?.member_category || "player");
   const [speedRating, setSpeedRating] = useState<1 | 2 | 3 | null>(initialSpeedRating);
   const [privateBalanceTag, setPrivateBalanceTag] = useState<PrivateBalanceTag | null>(initialPrivateBalanceTag);
-  const [overallTraits, setOverallTraits] = useState<PlayerProfile[]>(player?.overall_traits || []);
-  const [primaryOverallTrait, setPrimaryOverallTrait] = useState<PlayerProfile | null>(player?.overall_traits?.[0] || null);
-  const [secondaryOverallTrait, setSecondaryOverallTrait] = useState<PlayerProfile | null>(player?.overall_traits?.[1] || null);
+  const initialOverallTraits = [...new Set((player?.overall_traits || []).map((trait) => trait === "midfield" ? "offensive" : trait))].slice(0, 2) as PlayerProfile[];
+  const [overallTraits, setOverallTraits] = useState<PlayerProfile[]>(initialOverallTraits);
+  const [primaryOverallTrait, setPrimaryOverallTrait] = useState<PlayerProfile | null>(initialOverallTraits[0] || null);
+  const [secondaryOverallTrait, setSecondaryOverallTrait] = useState<PlayerProfile | null>(initialOverallTraits[1] || null);
 
   useEffect(() => {
     return () => {
@@ -452,8 +453,8 @@ export function PlayerForm({
             <span className={player?.name?.trim() ? "text-success" : "text-warning"}>{player?.name?.trim() ? "✓" : "○"} Nome</span>
             <span className={player?.avatar_url ? "text-success" : "text-warning"}>{player?.avatar_url ? "✓" : "○"} Foto</span>
             <span className={player?.player_profile ? "text-success" : "text-warning"}>{player?.player_profile ? "✓" : "○"} Posição</span>
-            <span className={overallTraits.length >= 1 && overallTraits.length <= 3 ? "text-success" : "text-warning"}>
-              {overallTraits.length >= 1 && overallTraits.length <= 3 ? "✓" : "○"} Estilo pelo ADM
+            <span className={overallTraits.length >= 1 && overallTraits.length <= 2 ? "text-success" : "text-warning"}>
+              {overallTraits.length >= 1 && overallTraits.length <= 2 ? "✓" : "○"} Estilo pelo ADM
             </span>
           </div>
         </div>
@@ -496,7 +497,7 @@ export function PlayerForm({
                 type="radio"
                 name="player_profile"
                 value={option.value}
-                defaultChecked={(player?.player_profile || "midfield") === option.value}
+                defaultChecked={(player?.player_profile === "defensive" ? "defensive" : "offensive") === option.value}
                 className="mt-0.5 h-4 w-4"
               />
               <span>
@@ -515,7 +516,7 @@ export function PlayerForm({
 
       {mode === "admin" && (memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2 rounded-2xl border border-accent/25 bg-accent/5 p-4">
         <legend className="px-1 text-xs font-bold uppercase tracking-wider text-accent">Características de jogo do OVR</legend>
-        <p className="text-[11px] leading-4 text-muted">Escolha até três. O bônus de evolução é dividido em 100%; 60%/40%; ou 50%/30%/20%. Ele vale integralmente por 8 rodadas, diminui nas 8 seguintes e então o OVR passa a evoluir somente pelas atuações.</p>
+        <p className="text-[11px] leading-4 text-muted">Escolha até duas. O bônus de evolução é dividido entre a característica principal e a secundária. Ele vale integralmente por 8 rodadas, diminui nas 8 seguintes e então o OVR passa a evoluir somente pelas atuações.</p>
         <div className="grid gap-2 pt-1">
           {PLAYER_PROFILE_OPTIONS.map((option) => {
             const trait = option.value as PlayerProfile;
@@ -527,7 +528,7 @@ export function PlayerForm({
                   name="overall_traits"
                   value={option.value}
                   checked={selected}
-                  disabled={!selected && overallTraits.length >= 3}
+                  disabled={!selected && overallTraits.length >= 2}
                   onChange={() => {
                     const next = selected
                       ? overallTraits.filter((item) => item !== trait)

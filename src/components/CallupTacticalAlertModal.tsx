@@ -8,14 +8,14 @@ export function CallupTacticalAlertModal() {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    const seen = localStorage.getItem("callup_tactical_alert_r2_seen");
+    const seen = localStorage.getItem("callup_tactical_alert_column_c_seen");
     if (!seen) {
       setIsOpen(true);
     }
   }, []);
 
   const handleClose = () => {
-    localStorage.setItem("callup_tactical_alert_r2_seen", "true");
+    localStorage.setItem("callup_tactical_alert_column_c_seen", "true");
     setIsOpen(false);
   };
 
@@ -44,36 +44,36 @@ export function CallupTacticalAlertModal() {
           </span>
           <div>
             <span className="rounded bg-accent/20 px-2 py-0.5 font-athletic text-[9px] font-black uppercase text-accent">
-              Importante · A partir da Rodada 02
+              Novo sistema · Coluna C
             </span>
             <h3 className="font-athletic text-base font-black uppercase italic tracking-tight text-white mt-0.5">
-              Atenção à sua Posição no Perfil!
+              Agora são duas funções de linha
             </h3>
           </div>
         </div>
 
         {/* Descrição */}
         <p className="text-xs text-muted leading-relaxed mb-4">
-          A partir da próxima rodada, o Cartola calcula <strong>bônus táticos exclusivos</strong> para a sua posição real em campo:
+          O perfil ALA foi unido ao ataque. Ranked, Cartola e OVR agora usam <strong>GOL, DEF/VOL e ATA/ALA</strong> com a mesma base de pontuação:
         </p>
 
         <div className="space-y-2 mb-4">
           <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs">
             <span className="rounded bg-blue-500/20 px-1.5 py-0.5 font-athletic font-black text-blue-400 text-[10px]">DEF/VOL</span>
-            <span className="text-muted text-[11px]">Bônus de Zaga (+2 se não tomar gol / +1 se levar só 1)</span>
+            <span className="text-muted text-[11px]">Gol +5, assistência +3, clean sheet +2 e −0,5 por gol sofrido</span>
           </div>
           <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs">
-            <span className="rounded bg-warning/20 px-1.5 py-0.5 font-athletic font-black text-warning text-[10px]">ALA</span>
-            <span className="text-muted text-[11px]">Bônus de Garçom (+4,5 pts por assistência)</span>
+            <span className="rounded bg-danger/20 px-1.5 py-0.5 font-athletic font-black text-danger text-[10px]">ATA/ALA</span>
+            <span className="text-muted text-[11px]">Gol +4, assistência +2,5 e −0,5 por gol sofrido</span>
           </div>
           <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs">
-            <span className="rounded bg-danger/20 px-1.5 py-0.5 font-athletic font-black text-danger text-[10px]">ATA</span>
-            <span className="text-muted text-[11px]">Bônus de Matador (+6,0 pts por gol)</span>
+            <span className="rounded bg-emerald-400/20 px-1.5 py-0.5 font-athletic font-black text-emerald-300 text-[10px]">GOL</span>
+            <span className="text-muted text-[11px]">Somente scouts no gol: atuação +1, clean sheet +2 e −0,5 por gol sofrido</span>
           </div>
         </div>
 
         <p className="text-[11px] font-bold text-accent mb-5 leading-snug">
-          👉 Acesse <strong>Meu Perfil</strong> e confira se a sua tag está configurada corretamente para você e quem te escalar pontuarem certo!
+          👉 Confira no <strong>Meu Perfil</strong> se você está marcado como DEF/VOL ou ATA/ALA.
         </p>
 
         {/* Ações */}

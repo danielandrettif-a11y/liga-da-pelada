@@ -5,7 +5,7 @@ import { useState, useTransition, type CSSProperties } from "react";
 import { createManagerClub, runManagerCommand } from "@/app/bq-manager/actions";
 import { cardOverall, cardPositions, executeCommand, formBonus, fusionPreview, POSITION_LABELS } from "@/lib/bq-manager/engine";
 import { createDemoState, demoCatalog } from "@/lib/bq-manager/demo";
-import { POSITIONS, type AthleteSource, type ClubIdentity, type ManagerCard, type ManagerCommand, type ManagerSave, type Position } from "@/lib/bq-manager/types";
+import { ACTIVE_POSITIONS, type AthleteSource, type ClubIdentity, type ManagerCard, type ManagerCommand, type ManagerSave, type Position } from "@/lib/bq-manager/types";
 import styles from "./manager.module.css";
 
 type Props = { initialSave: ManagerSave | null; catalog: AthleteSource[]; demo?: boolean };
@@ -73,8 +73,8 @@ export function ManagerExperience({ initialSave, catalog, demo = false }: Props)
         <section className={styles.panel}>
           <p className={styles.kicker}>O PRIMEIRO CAPÍTULO</p><h2>Seu clube começa aqui.</h2>
           <p>Monte sua coleção de atletas BQ e acompanhe a evolução de cada carta. A Várzea, os nove jogadores iniciais e as partidas chegam na próxima fase.</p>
-          <div className={styles.pitch} aria-label="Formação prevista: um goleiro, dois defensores, dois alas e um atacante">
-            <div><span>ATA</span></div><div><span>ALA</span><span>MEI</span></div><div><span>DEF</span><span>DEF</span></div><div><span>GOL</span></div>
+          <div className={styles.pitch} aria-label="Formação prevista: um goleiro, dois defensores e três atacantes ou alas">
+            <div><span>ATA/ALA</span><span>ATA/ALA</span></div><div><span>ATA/ALA</span></div><div><span>DEF/VOL</span><span>DEF/VOL</span></div><div><span>GOL</span></div>
           </div>
           <p className={styles.caption}>6 titulares + 3 reservas · prévia da formação</p>
           <div className={styles.actions}><button type="button" className={styles.primary} onClick={() => setTab("packs")}>Ver meus pacotes</button><button type="button" className={styles.secondary} onClick={() => setTab("cards")}>Ver minhas cartas</button></div>
@@ -94,7 +94,7 @@ export function ManagerExperience({ initialSave, catalog, demo = false }: Props)
           <div className={styles.packHeader}><div className={styles.packIcon} aria-hidden="true">BQ</div><div><p className={styles.kicker}>{pack.kind === "choice" ? "ESCOLHA 1 DE 3" : pack.kind === "guaranteed" ? "ATLETA INÉDITO" : "1 CARTA BQ"}</p><h3>{pack.label}</h3><p className={styles.caption}>{pack.bound ? "Vinculada ao clube até concluir a Série D" : "Pode conter atleta repetido"}</p></div></div>
           {pack.status === "sealed" ? <button type="button" disabled={pending} className={styles.primary} onClick={() => run({ type: "open-pack", packId: pack.id })}>Abrir pacote</button> : <>
             <p className={styles.caption}>As opções estão guardadas. Reabrir a página da carreira não muda o sorteio.</p>
-            <div className={styles.stack}>{pack.offers.map(source => <div key={source.playerId} className={styles.offer}><div><b>{source.name}</b><p>{POSITIONS.map(p => `${POSITION_LABELS[p]} ${number(source.positions[p])}`).join(" · ")}</p></div><strong>{number(source.overall)}</strong><button type="button" disabled={pending} className={styles.primary} onClick={() => run({ type: "claim-pack", packId: pack.id, playerId: source.playerId })}>Escolher {source.name}</button></div>)}</div>
+            <div className={styles.stack}>{pack.offers.map(source => <div key={source.playerId} className={styles.offer}><div><b>{source.name}</b><p>{ACTIVE_POSITIONS.map(p => `${POSITION_LABELS[p]} ${number(source.positions[p])}`).join(" · ")}</p></div><strong>{number(source.overall)}</strong><button type="button" disabled={pending} className={styles.primary} onClick={() => run({ type: "claim-pack", packId: pack.id, playerId: source.playerId })}>Escolher {source.name}</button></div>)}</div>
           </>}
         </article>)}
       </section>}
@@ -126,12 +126,12 @@ function Card({ card, trend }: { card: ManagerCard; trend?: AthleteSource["trend
   const bonus = formBonus(trend);
   return <article className={styles.playerCard}>
     <div className={styles.cardTop}><div><strong>{number(cardOverall(card))}</strong><span>OVR GERAL</span></div><div className={styles.portrait}>{card.source.avatarUrl ? <img src={card.source.avatarUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = "none"; }} /> : <span aria-hidden="true">{card.source.name.split(" ").map(part => part[0]).slice(0, 2).join("")}</span>}</div></div>
-    <h3>{card.source.name}</h3><div className={styles.positions}>{POSITIONS.map(p => <div key={p}><b>{number(positions[p])}</b><span>{POSITION_LABELS[p]}</span></div>)}</div>
+    <h3>{card.source.name}</h3><div className={styles.positions}>{ACTIVE_POSITIONS.map(p => <div key={p}><b>{number(positions[p])}</b><span>{POSITION_LABELS[p]}</span></div>)}</div>
     <p className={styles.caption}>Origem {number(card.source.overall)} · {card.bound ? "Vinculada" : "Cópia individual"}</p>
     <details className={styles.cardDetails}><summary>Entender esta carta</summary><p>Forma atual: {trend ? `${bonus > 0 ? "+" : ""}${bonus}` : "indisponível (sem bônus)"}. Temporária, separada do OVR permanente.</p><p>Fonte capturada em {card.source.capturedAt.slice(0, 10).split("-").reverse().join("/")}. Estatísticas dessa amostra: {card.source.stats.rounds} rodadas, {card.source.stats.goals} gols e {card.source.stats.assists} assistências.</p><p>Treino: até +12 por posição. Fusões usadas: {Object.values(card.fusion).reduce((a, b) => a + b, 0)}/8 no total.</p>
-      <p>Composição: {["adaptive-v12-top-three-progression", "adaptive-v13-admin-style-evidence", "adaptive-v14-role-adjusted-rates", "adaptive-v15-goalkeeper-outcomes", "adaptive-v16-distributed-trait-bonus"].includes(card.source.formula) ? "três melhores posições em 50%, 35% e 15%." : `${card.source.traits.map(trait => ({ offensive: "ATA", midfield: "ALA/MEI", defensive: "DEF" })[trait]).join(" + ")}. ${card.source.traits.length === 1 ? "100% da característica." : card.source.traits.length === 2 ? "70% da maior nota e 30% da menor." : "60%, 25% e 15%, da maior para a menor."}`} {card.source.goalkeeperEligible && "GOL participa entre as posições elegíveis."}</p>
+      <p>Composição: {card.source.formula === "adaptive-v17-three-positions-column-c" ? "DEF/VOL e ATA/ALA em 70%/30%; quando elegível, GOL entra nas três posições em 50%/35%/15%." : ["adaptive-v12-top-three-progression", "adaptive-v13-admin-style-evidence", "adaptive-v14-role-adjusted-rates", "adaptive-v15-goalkeeper-outcomes", "adaptive-v16-distributed-trait-bonus"].includes(card.source.formula) ? "três melhores posições em 50%, 35% e 15%." : `${card.source.traits.map(trait => ({ offensive: "ATA", midfield: "ALA/MEI", defensive: "DEF" })[trait]).join(" + ")}. ${card.source.traits.length === 1 ? "100% da característica." : card.source.traits.length === 2 ? "70% da maior nota e 30% da menor." : "60%, 25% e 15%, da maior para a menor."}`} {card.source.goalkeeperEligible && "GOL participa entre as posições elegíveis."}</p>
       <p>Atributos de jogo {card.attributesReviewed ? "revisados" : "estimados; aguardam revisão"}: finalização {number(card.attributes.finishing)}, passe {number(card.attributes.passing)}, defesa {number(card.attributes.defense)}, velocidade {number(card.attributes.speed)}, físico {number(card.attributes.physical)}.</p>
-      <p>Herança / treino / fusão por posição:</p>{POSITIONS.map(p => <p key={p}>{POSITION_LABELS[p]}: {number(card.source.positions[p])} + {number(card.inherited[p])} + {number(card.training[p])} + {number(card.fusion[p])} = {number(positions[p])}</p>)}
+      <p>Herança / treino / fusão por posição:</p>{ACTIVE_POSITIONS.map(p => <p key={p}>{POSITION_LABELS[p]}: {number(card.source.positions[p])} + {number(card.inherited[p])} + {number(card.training[p])} + {number(card.fusion[p])} = {number(positions[p])}</p>)}
     </details>
   </article>;
 }
@@ -148,7 +148,7 @@ function Album({ discovered, cards, catalog }: { discovered: AthleteSource[]; ca
 function Evolution({ state, pending, onRun }: { state: NonNullable<Props["initialSave"]>["state"]; pending: boolean; onRun: (command: ManagerCommand) => void }) {
   const [targetId, setTargetId] = useState(state.cards[0]?.id || "");
   const [mode, setMode] = useState<"inherit" | "four">("inherit");
-  const [position, setPosition] = useState<Position>("ALA_MEI");
+  const [position, setPosition] = useState<Position>("ATA");
   const [donorIds, setDonorIds] = useState<string[]>([]);
   const [confirmed, setConfirmed] = useState(false);
   const target = state.cards.find(card => card.id === targetId);
@@ -162,7 +162,7 @@ function Evolution({ state, pending, onRun }: { state: NonNullable<Props["initia
       <label>Carta principal<select value={targetId} onChange={e => { setTargetId(e.target.value); setDonorIds([]); setConfirmed(false); }}>{state.cards.map((card, index) => <option key={card.id} value={card.id}>{card.source.name} · OVR {number(cardOverall(card))} · cópia {index + 1}</option>)}</select></label>
       <label>Tipo de evolução<select value={mode} onChange={e => { setMode(e.target.value as "inherit" | "four"); setDonorIds([]); setConfirmed(false); }}><option value="inherit">Herdar uma posição superior</option><option value="four">Consumir 4 cópias por +2</option></select></label>
       <p className={styles.caption}>{mode === "inherit" ? "Usa a nota original da doadora. A posição atual sobe até essa nota; os ganhos não são somados duas vezes." : "Quatro cópias sem posição original superior dão +2 em uma posição. Limite de +8 somando todas as posições da carta."}</p>
-      <label>Posição que vai melhorar<select value={position} onChange={e => { setPosition(e.target.value as Position); setConfirmed(false); }}>{POSITIONS.map(p => <option key={p} value={p}>{POSITION_LABELS[p]} · atual {number(cardPositions(target)[p])}</option>)}</select></label>
+      <label>Posição que vai melhorar<select value={position} onChange={e => { setPosition(e.target.value as Position); setConfirmed(false); }}>{ACTIVE_POSITIONS.map(p => <option key={p} value={p}>{POSITION_LABELS[p]} · atual {number(cardPositions(target)[p])}</option>)}</select></label>
       <fieldset className={styles.donors}><legend>Cartas doadoras ({donorIds.length}/{mode === "inherit" ? 1 : 4})</legend>{!donors.length && <p className={styles.caption}>Você ainda não tem cópias deste atleta.</p>}{donors.map((card, index) => <label key={card.id}><input type="checkbox" checked={donorIds.includes(card.id)} onChange={e => { setConfirmed(false); setDonorIds(e.target.checked ? mode === "inherit" ? [card.id] : [...donorIds, card.id] : donorIds.filter(id => id !== card.id)); }} /><span>Cópia {index + 1} · {POSITION_LABELS[position]} original <b>{number(card.source.positions[position])}</b><small>OVR de origem {number(card.source.overall)} · {card.bound ? "vinculada" : "livre"}</small></span></label>)}</fieldset>
       {preview ? <div className={styles.preview}><span>{POSITION_LABELS[position]}</span><strong>{number(preview.before)} → {number(preview.after)}</strong><p>OVR geral após evolução: {number(preview.overall)}</p><p>{donorIds.length} cópia(s) será(ão) consumida(s).</p></div> : <p className={styles.caption}>{reason}</p>}
       <label className={styles.confirm}><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />Entendi que as doadoras serão consumidas e não poderão ser recuperadas.</label>

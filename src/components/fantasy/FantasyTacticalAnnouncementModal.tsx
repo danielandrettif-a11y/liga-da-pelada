@@ -1,160 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Sparkles, Shield, Target, Trophy, Users, X, ChevronRight } from "@/components/icons";
+import { Sparkles, X } from "@/components/icons";
 
 export function FantasyTacticalAnnouncementModal({ scoringVersion = 5 }: { scoringVersion?: number }) {
   const [isOpen, setIsOpen] = useState(false);
-  const roleReframeActive = scoringVersion >= 7;
-  const defensiveDrawBonusActive = scoringVersion >= 9;
-  const goalkeeperSlotOnly = scoringVersion >= 10;
-  const progressiveAttackerBonus = scoringVersion >= 11;
-  const storageKey = progressiveAttackerBonus ? "fantasy_tactical_v11_attacker_seen" : goalkeeperSlotOnly ? "fantasy_tactical_v10_goalkeeper_seen" : defensiveDrawBonusActive ? "fantasy_tactical_v9_defense_seen" : roleReframeActive ? "fantasy_tactical_v7_role_reframe_seen" : "fantasy_tactical_v4_role_scoring_seen";
-
-  useEffect(() => {
-    const seen = localStorage.getItem(storageKey);
-    if (!seen) {
-      setIsOpen(true);
-    }
-  }, [storageKey]);
-
-  const handleClose = () => {
-    localStorage.setItem(storageKey, "true");
-    setIsOpen(false);
-  };
-
+  const storageKey = scoringVersion >= 11 ? "fantasy_three_positions_v11_seen" : `fantasy_tactical_v${scoringVersion}_seen`;
+  useEffect(() => { if (!localStorage.getItem(storageKey)) setIsOpen(true); }, [storageKey]);
+  const close = () => { localStorage.setItem(storageKey, "true"); setIsOpen(false); };
   if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-accent/30 bg-[#07160d] p-5 sm:p-6 shadow-[0_25px_60px_rgba(0,0,0,0.9)] text-foreground">
-        {/* Glow de fundo */}
-        <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-accent/20 blur-3xl" />
-        <div className="pointer-events-none absolute -left-20 -bottom-20 h-56 w-56 rounded-full bg-emerald-500/15 blur-3xl" />
-
-        {/* Botão fechar */}
-        <button
-          type="button"
-          onClick={handleClose}
-          className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-muted hover:text-white hover:bg-white/20 transition-colors"
-          aria-label="Fechar"
-        >
-          <X className="h-4 w-4" />
-        </button>
-
-        {/* Cabeçalho */}
-        <div className="flex items-center gap-2.5 mb-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-background shadow-lg shadow-accent/30">
-            <Sparkles className="h-5 w-5" />
-          </span>
-          <div>
-            <span className="rounded bg-accent/20 px-2 py-0.5 font-athletic text-[9px] font-black uppercase tracking-wider text-accent">
-              Guia atualizado
-            </span>
-            <h2 className="font-athletic text-lg font-black uppercase italic tracking-tight text-white mt-0.5">
-              {roleReframeActive ? "Novas funções no Cartola!" : "Revolução Tática no Cartola!"}
-            </h2>
-          </div>
-        </div>
-
-        <p className="text-xs text-muted leading-relaxed mb-4">
-          Escale <strong>1 GOL, 2 {roleReframeActive ? "DEF/VOL" : "DEF"}</strong> e complete com <strong>2 {roleReframeActive ? "ALA" : "ALA/MEI"} + 1 ATA</strong> ou <strong>1 {roleReframeActive ? "ALA" : "ALA/MEI"} + 2 ATA</strong>. O que acontece em campo dá pontos-base; a vaga certa ativa o bônus.
-        </p>
-
-        {/* Grid de Novidades */}
-        <div className="space-y-2.5 mb-5 max-h-[320px] overflow-y-auto pr-1">
-          {/* 1. Defensores */}
-          <div className="flex items-start gap-3 rounded-2xl border border-blue-500/20 bg-blue-500/10 p-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-500/20 text-blue-400">
-              <Shield className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-black text-blue-300">{roleReframeActive ? "Defesa & Volância (DEF/VOL)" : "Zaga & Proteção (DEF)"}</span>
-                <span className="font-black text-accent text-[10px]">{roleReframeActive ? "+1,25 / +0,5 pts" : "+1,5 / +0,5 pts"}</span>
-              </div>
-              <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                {roleReframeActive ? <>Na vaga DEF/VOL, jogar na linha sem sofrer gol vale <strong>+1,25</strong>; sofrer exatamente um vale <strong>+0,5</strong>. Cada assistência dá +0,5 extra, até +1,5. Três clean sheets ativam Muralha (+2,5). {defensiveDrawBonusActive ? <>Cada empate dá +0,5 extra (máximo +2), com teto total de <strong>+10</strong>.</> : <>Teto total de <strong>+8</strong>.</>}</> : <>Na vaga DEF, jogar na linha sem sofrer gol vale <strong>+1,5</strong>; sofrer exatamente um vale <strong>+0,5</strong>. Três clean sheets ativam Muralha (+3 uma vez), sempre com teto de <strong>+10</strong>.</>}
-              </p>
-            </div>
-          </div>
-
-          {/* 2. Ala / Meio */}
-          <div className="flex items-start gap-3 rounded-2xl border border-warning/20 bg-warning/10 p-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-warning/20 text-warning">
-              <Target className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-black text-warning">{roleReframeActive ? "Ida & Volta (ALA)" : "Armação & Passes (ALA/MEI)"}</span>
-                <span className="font-black text-accent text-[10px]">{roleReframeActive ? "ataque + recomposição" : "+3,5 pts / assist + bônus"}</span>
-              </div>
-              <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                {roleReframeActive ? <>Na vaga ALA, gol vale +0,5 extra, assistência +0,75, clean sheet +0,5 e proteção parcial +0,25. Participar de gol e recompor em 2 jogos ativa <strong>Vai e volta +1,5</strong>, com teto +6.</> : <>Assistência vale <strong>+2,5 pts base</strong>; na vaga ALA/MEI recebe +1 e chega a <strong>+3,5 pts</strong>. Com 2+ assistências, ainda há <strong>+3,0 pts</strong> de Maestro.</>}
-              </p>
-            </div>
-          </div>
-
-          {/* 3. Atacantes */}
-          <div className="flex items-start gap-3 rounded-2xl border border-danger/20 bg-danger/10 p-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-danger/20 text-danger">
-              <Trophy className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-black text-danger">Finalização (ATA)</span>
-                <span className="font-black text-accent text-[10px]">4,0 pts / gol + bônus</span>
-              </div>
-              <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                Gol vale <strong>4,0 pts base</strong>. Na vaga ATA, {progressiveAttackerBonus ? <>1 gol rende <strong>+1,0</strong> e 2+ gols completam <strong>+2,0</strong> com Artilheiro.</> : <>2+ gols rendem <strong>{roleReframeActive ? "+2,0" : "+3,0"} pts</strong> de Artilheiro da Rodada.</>}
-              </p>
-            </div>
-          </div>
-
-          {/* 4. Goleiros no Rodízio */}
-          <div className="flex items-start gap-3 rounded-2xl border border-accent/20 bg-accent/10 p-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/20 text-accent">
-              <Users className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-black text-accent">Paredão no Rodízio (GOL)</span>
-                <span className="font-black text-accent text-[10px]">{goalkeeperSlotOnly ? "+4,0 pres / -2,5 GS" : "+2,0 pres / +4,0 SG"}</span>
-              </div>
-              <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                {goalkeeperSlotOnly ? <>Na vaga GOL, só conta o que o atleta fez enquanto era goleiro: <strong>+4 por atuação</strong>, -2,5 por gol sofrido e <strong>+4 por clean sheet</strong>. O que ele fizer na linha não entra nessa vaga.</> : <>Qualquer atleta pode ser a sua aposta. Quem <strong>realmente atuar no gol</strong> ganha +2 base e -1 por gol sofrido. Se você o escalou em GOL e ele não sofreu gol, ganha <strong>+4,0 pts por clean sheet</strong>.</>}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Chamada para o perfil */}
-        <div className="rounded-2xl border border-accent/35 bg-gradient-to-r from-accent/15 via-[#0c2415] to-surface p-3 mb-4">
-          <p className="text-[11px] font-bold text-foreground leading-snug">
-            ⚠️ <strong>Atualize sua Posição no Perfil:</strong> Vá em <em>Meu Perfil</em> e garanta que sua tag ({roleReframeActive ? "DEF/VOL, ALA ou ATA" : "DEF, ALA/MEI ou ATA"}) está correta para pontuar com os bônus!
-          </p>
-        </div>
-
-        {/* Botões de Ação */}
-        <div className="flex flex-col sm:flex-row items-center gap-2">
-          <Link
-            href="/meu-perfil"
-            onClick={handleClose}
-            className="flex w-full sm:flex-1 items-center justify-center gap-1.5 rounded-xl border border-accent/40 bg-accent/20 px-4 py-2.5 text-xs font-black uppercase text-accent hover:bg-accent hover:text-background transition-all"
-          >
-            <span>Conferir Meu Perfil</span>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </Link>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="flex w-full sm:w-auto items-center justify-center rounded-xl bg-accent px-5 py-2.5 text-xs font-black uppercase text-background shadow-md hover:bg-accent/90 transition-transform active:scale-95"
-          >
-            Entendido!
-          </button>
-        </div>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
+    <div className="relative w-full max-w-lg rounded-3xl border border-accent/30 bg-[#07160d] p-6 text-foreground shadow-2xl">
+      <button onClick={close} className="absolute right-4 top-4 rounded-full bg-white/10 p-2" aria-label="Fechar"><X className="h-4 w-4" /></button>
+      <div className="flex items-center gap-3"><span className="rounded-xl bg-accent p-2 text-background"><Sparkles className="h-5 w-5" /></span><div><p className="text-[9px] font-black uppercase tracking-widest text-accent">Nova regra oficial</p><h2 className="font-athletic text-xl font-black uppercase">Cartola com três posições</h2></div></div>
+      <p className="mt-4 text-sm leading-6 text-muted">ALA agora faz parte de ATA/ALA. Escolha <strong className="text-white">1 GOL + 3 DEF + 2 ATA</strong> ou <strong className="text-white">1 GOL + 2 DEF + 3 ATA</strong>.</p>
+      <div className="mt-4 space-y-2 text-xs">
+        <p className="rounded-xl border border-blue-500/25 bg-blue-950/20 p-3"><strong className="text-blue-300">DEF/VOL:</strong> gol +5, assistência +3, clean sheet +2 e −0,5 por gol sofrido.</p>
+        <p className="rounded-xl border border-danger/25 bg-red-950/20 p-3"><strong className="text-danger">ATA/ALA:</strong> gol +4, assistência +2,5 e −0,5 por gol sofrido.</p>
+        <p className="rounded-xl border border-accent/25 bg-accent/10 p-3"><strong className="text-accent">GOL:</strong> usa apenas scouts no gol; atuação +1, clean sheet +2 e −0,5 por gol sofrido.</p>
       </div>
+      <button onClick={close} className="mt-5 w-full rounded-xl bg-accent py-3 text-xs font-black uppercase text-background">Entendi</button>
     </div>
-  );
+  </div>;
 }

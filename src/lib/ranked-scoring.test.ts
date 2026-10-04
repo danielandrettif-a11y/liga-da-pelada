@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_FANTASY_SETTINGS } from "./fantasy/config";
+import { LEGACY_FANTASY_SETTINGS as DEFAULT_FANTASY_SETTINGS } from "./fantasy/config";
 import { calculateFantasyPlayerPoints } from "./fantasy/engine";
 import { buildRankedPointBreakdown, calculateRankedPoints, RANKED_SCORING } from "./ranked-scoring";
 

@@ -8,15 +8,9 @@ export const PLAYER_PROFILE_OPTIONS: Array<{
 }> = [
   {
     value: "offensive",
-    label: "Ofensivo",
-    shortLabel: "ATA",
-    description: "Atua mais perto do gol e cria chances.",
-  },
-  {
-    value: "midfield",
-    label: "Ala",
-    shortLabel: "ALA",
-    description: "Faz o corredor, participa do ataque e recompõe na defesa.",
+    label: "Atacante / Ala",
+    shortLabel: "ATA/ALA",
+    description: "Atua no ataque ou pelos lados e cria chances.",
   },
   {
     value: "defensive",
@@ -28,7 +22,7 @@ export const PLAYER_PROFILE_OPTIONS: Array<{
 
 export function getPlayerProfile(profile?: PlayerProfile | null) {
   return PLAYER_PROFILE_OPTIONS.find((option) => option.value === profile)
-    ?? PLAYER_PROFILE_OPTIONS[1];
+    ?? PLAYER_PROFILE_OPTIONS[0];
 }
 
 export const PLAYER_PROFILE_STYLES: Record<PlayerProfile, string> = {

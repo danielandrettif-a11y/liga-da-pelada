@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_FANTASY_SETTINGS } from "./config";
-import { calculateFantasyPositionPackageBonus } from "./lineup-positions";
+import { LEGACY_FANTASY_SETTINGS as DEFAULT_FANTASY_SETTINGS } from "./config";
+import { calculateFantasyPositionPackageBonus, getFantasySlotRoles } from "./lineup-positions";
 import { calculatePositionBreakdown } from "./position-breakdown";
 
 describe("pacotes de bônus por posição — BQ v5", () => {
@@ -90,6 +90,13 @@ describe("pacotes de bônus por posição — BQ v5", () => {
     expect(calculateFantasyPositionPackageBonus({ ...stats, goalkeeperGames: 0, slotRole: "GOL" }, DEFAULT_FANTASY_SETTINGS)).toBe(0);
     // Escalado em DEF mas atuou no gol -> 0
     expect(calculateFantasyPositionPackageBonus({ ...stats, slotRole: "DEF" }, DEFAULT_FANTASY_SETTINGS)).toBe(0);
+  });
+});
+
+describe("formações da Coluna C", () => {
+  it("oferece exatamente os dois esquemas de seis atletas", () => {
+    expect(getFantasySlotRoles(6, "3-2")).toEqual(["ATA", "ATA", "DEF", "DEF", "DEF", "GOL"]);
+    expect(getFantasySlotRoles(6, "2-3")).toEqual(["ATA", "ATA", "ATA", "DEF", "DEF", "GOL"]);
   });
 });
 

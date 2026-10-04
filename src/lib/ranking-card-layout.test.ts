@@ -94,8 +94,7 @@ describe("ranking card layout", () => {
     ]);
     expect(content.positionRatings).toEqual([
       { key: "DEF", label: "DEF/VOL", value: "75.2", trend: "rising", isBest: true },
-      { key: "ALA_MEI", label: "ALA", value: "72.4", trend: "steady", isBest: false },
-      { key: "ATA", label: "ATA", value: "71.6", trend: "falling", isBest: false },
+      { key: "ATA", label: "ATA/ALA", value: "71.6", trend: "falling", isBest: false },
       { key: "GOL", label: "GOL", value: "70.8", trend: "steady", isBest: false },
     ]);
     expect(content.stats).toEqual([

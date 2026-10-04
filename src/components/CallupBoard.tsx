@@ -102,7 +102,7 @@ export function CallupBoard({
   // Estado para Contratação de Amigo (Convidado)
   const [isHireGuestOpen, setIsHireGuestOpen] = useState(false);
   const [guestName, setGuestName] = useState("");
-  const [guestProfile, setGuestProfile] = useState<PlayerProfile>("midfield");
+  const [guestProfile, setGuestProfile] = useState<PlayerProfile>("offensive");
   const [isGuestGk, setIsGuestGk] = useState(false);
 
   useDialogViewport(editingCallup, () => !editLoading && setEditingCallup(false));
@@ -592,9 +592,8 @@ export function CallupBoard({
                       onChange={(e) => setGuestProfile(e.target.value as PlayerProfile)}
                       className="sm:col-span-3 rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-accent outline-none"
                     >
-                      <option value="midfield">Ala</option>
-                      <option value="offensive">Ataque</option>
-                      <option value="defensive">Defesa</option>
+                      <option value="offensive">Ataque / Ala</option>
+                      <option value="defensive">Defesa / Volante</option>
                     </select>
                     <button
                       type="submit"

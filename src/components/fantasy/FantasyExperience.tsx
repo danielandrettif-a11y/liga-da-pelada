@@ -42,7 +42,7 @@ import {
 import { activateCardForRound } from "@/lib/actions/fantasy-cards";
 import { supabase } from "@/lib/supabase";
 import { useDialogViewport } from "@/lib/useDialogViewport";
-import { getFantasySlotRoles, isCorrectFantasySlot } from "@/lib/fantasy/lineup-positions";
+import { getFantasySlotRoles, isCorrectFantasySlot, type FantasyFormation } from "@/lib/fantasy/lineup-positions";
 import { resolveFantasyPitchPoints } from "@/lib/fantasy/pitch-points";
 import { applyFantasyDiscount } from "@/lib/fantasy/cards/eligibility";
 import { useUrlState } from "@/lib/useUrlState";
@@ -131,17 +131,17 @@ export function FantasyExperience({
   const draftStorageKey = `fantasy_draft_slots_${fantasySeasonId}_${round?.id || "portfolio"}`;
   const legacyStorageKey = `fantasy_slots_${fantasySeasonId}_${round?.id || "portfolio"}`;
 
-  // Esquema tático selecionado (ex: 2-1-2 ou 2-2-1)
-  const [formation, setFormation] = useState<"2-1-2" | "2-2-1">(() => {
+  // Esquema tático selecionado: defensores-atacantes, além do goleiro.
+  const [formation, setFormation] = useState<FantasyFormation>(() => {
     const persistedFormation = lineupFormationFromSlots(persistedPlayers, playersPerTeam);
     if (persistedFormation) return persistedFormation;
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem(`fantasy_formation_${fantasySeasonId}`);
-        if (saved === "2-1-2" || saved === "2-2-1") return saved;
+        if (saved === "3-2" || saved === "2-3") return saved;
       } catch {}
     }
-    return playersPerTeam === 6 ? "2-1-2" : "2-2-1";
+    return playersPerTeam === 6 ? "2-3" : "2-3";
   });
   const recoveryPriceLimit = useMemo(() => {
     const prices = market.map((player) => player.price).sort((a, b) => a - b);
@@ -347,7 +347,6 @@ export function FantasyExperience({
     : { ...settings, scoringVersion: guideScoringVersion };
   const roleReframeActive = guideScoringVersion >= 7;
   const defenseRoleLabel = roleReframeActive ? "Defensor / Volante · DEF/VOL" : "Defensor / DEF";
-  const midfieldRoleLabel = roleReframeActive ? "Ala · ALA" : "Ala / Meio · ALA/MEI";
 
   function openRevealedLineups(roundId?: string | null, roundNumber?: number | null) {
     if (!roundId) return;
@@ -403,7 +402,7 @@ export function FantasyExperience({
 
 
   // GOL não é tag: o filtro mostra o histórico real de atuações no rodízio.
-  const [positionFilter, setPositionFilter] = useState<"ALL" | "GOL" | "DEF" | "MEI" | "ATA">("ALL");
+  const [positionFilter, setPositionFilter] = useState<"ALL" | "GOL" | "DEF" | "ATA">("ALL");
 
   // Drag and drop / reposicionamento de atletas no campo
   const [draggedSlot, setDraggedSlot] = useState<number | null>(null);
@@ -483,11 +482,8 @@ export function FantasyExperience({
               if (positionFilter === "DEF") {
                 return p.profile === "defensive" ? 3 : 0;
               }
-              if (positionFilter === "MEI") {
-                return p.profile === "midfield" ? 3 : !p.profile ? 1 : 0;
-              }
               if (positionFilter === "ATA") {
-                return p.profile === "offensive" ? 3 : 0;
+                return p.profile === "offensive" || p.profile === "midfield" ? 3 : 0;
               }
               return 0;
             };
@@ -791,7 +787,7 @@ export function FantasyExperience({
     const slotRoles = getFantasySlotRoles(playersPerTeam, formation);
     const slotAssignments = normalizedSelected.flatMap((playerId, slotIndex) =>
       playerId
-        ? [{ playerId, slotIndex, slotRole: slotRoles[slotIndex] || "MEI" }]
+        ? [{ playerId, slotIndex, slotRole: slotRoles[slotIndex] || "ATA" }]
         : [],
     );
     startTransition(async () => {
@@ -861,7 +857,7 @@ export function FantasyExperience({
   function renderSlot(
     slot: number,
     roleLabel: string,
-    targetPos: "ALL" | "GOL" | "DEF" | "MEI" | "ATA" = "ALL"
+    targetPos: "ALL" | "GOL" | "DEF" | "ATA" = "ALL"
   ) {
     const player = selectedPlayers[slot];
     const livePlayerProjection = player ? livePlayerProjectionById.get(player.id) : null;
@@ -1518,25 +1514,25 @@ export function FantasyExperience({
                 <div className="flex rounded-xl bg-black/60 p-0.5 border border-white/10 shrink-0">
                   <button
                     type="button"
-                    onClick={() => setFormation("2-1-2")}
+                    onClick={() => setFormation("2-3")}
                     className={`rounded-lg px-2.5 py-1 font-athletic text-[10px] font-black uppercase transition-all ${
-                      formation === "2-1-2"
+                      formation === "2-3"
                         ? "bg-accent text-background shadow-sm"
                         : "text-muted hover:text-white"
                     }`}
                   >
-                    2-1-2 (2 ATA)
+                    2 DEF · 3 ATA
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFormation("2-2-1")}
+                    onClick={() => setFormation("3-2")}
                     className={`rounded-lg px-2.5 py-1 font-athletic text-[10px] font-black uppercase transition-all ${
-                      formation === "2-2-1"
+                      formation === "3-2"
                         ? "bg-accent text-background shadow-sm"
                         : "text-muted hover:text-white"
                     }`}
                   >
-                    2-2-1 (2 MEI)
+                    3 DEF · 2 ATA
                   </button>
                 </div>
               </div>
@@ -1610,7 +1606,7 @@ export function FantasyExperience({
 
               {/* RENDERIZAÇÃO ADAPTÁVEL DO CAMPO (5 vs 6 JOGADORES) */}
               {playersPerTeam === 6 ? (
-                formation === "2-1-2" ? (
+                formation === "2-3" ? (
                   <div className="relative z-10 flex min-h-[480px] flex-col justify-between py-2">
                     {/* 1. Pontas Abertos (Ataque - 2 vagas) */}
                     <div>
@@ -1622,13 +1618,13 @@ export function FantasyExperience({
                       </div>
                     </div>
 
-                    {/* 2. Meio Avançado (Armador - 1 vaga) */}
+                    {/* 2. Ala/atacante (1 vaga) */}
                     <div>
                       <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                        {roleReframeActive ? "Ala de Ligação" : "Meio Avançado (Armador)"}
+                        Ala / Ataque
                       </span>
                       <div className="flex justify-center">
-                        {renderSlot(2, midfieldRoleLabel, "MEI")}
+                        {renderSlot(2, "Ala / ATA", "ATA")}
                       </div>
                     </div>
 
@@ -1664,13 +1660,14 @@ export function FantasyExperience({
                       </div>
                     </div>
 
-                    {/* 2. Meio-Campo & Alas (2 vagas) */}
+                    {/* 2. Segundo atacante e terceiro defensor */}
                     <div>
                       <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                        {roleReframeActive ? "Alas" : "Meio-Campo & Alas"}
+                        Ala e Volante
                       </span>
                       <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[1, 2].map((slot) => renderSlot(slot, midfieldRoleLabel, "MEI"))}
+                        {renderSlot(1, "Ala / ATA", "ATA")}
+                        {renderSlot(2, "Volante / DEF", "DEF")}
                       </div>
                     </div>
 
@@ -1696,7 +1693,7 @@ export function FantasyExperience({
                   </div>
                 )
               ) : (
-                formation === "2-2-1" ? (
+                formation === "3-2" ? (
                   <div className="relative z-10 flex min-h-[448px] flex-col justify-between py-2">
                     {/* 1. Centroavante (1 vaga) */}
                     <div>
@@ -1714,7 +1711,7 @@ export function FantasyExperience({
                         {roleReframeActive ? "Alas" : "Meio-Campo & Alas"}
                       </span>
                       <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[1, 2].map((slot) => renderSlot(slot, midfieldRoleLabel, "MEI"))}
+                        {[1, 2].map((slot) => renderSlot(slot, "Ala / ATA", "ATA"))}
                       </div>
                     </div>
 
@@ -1746,7 +1743,7 @@ export function FantasyExperience({
                         {roleReframeActive ? "Ala" : "Meio-Campo & Alas"}
                       </span>
                       <div className="flex justify-center">
-                        {renderSlot(2, midfieldRoleLabel, "MEI")}
+                        {renderSlot(2, "Ala / ATA", "ATA")}
                       </div>
                     </div>
 
@@ -1899,8 +1896,7 @@ export function FantasyExperience({
                 { id: "ALL", label: "Todas" },
                 { id: "GOL", label: "🧤 Rodízio no gol" },
                 { id: "DEF", label: roleReframeActive ? "🛡️ Def/Vol (DEF/VOL)" : "🛡️ Zaga (DEF)" },
-                { id: "MEI", label: roleReframeActive ? "🏃 Ala (ALA)" : "🎯 Ala/Meio (ALA/MEI)" },
-                { id: "ATA", label: "⚡ Ataque (ATA)" },
+                { id: "ATA", label: "⚡ Ataque / Ala (ATA/ALA)" },
               ].map((chip) => (
                 <button
                   key={chip.id}
@@ -1926,7 +1922,7 @@ export function FantasyExperience({
                   ) : (
                     <>✨ Atletas de <strong>{
                       positionFilter === "DEF" ? (roleReframeActive ? "Defesa / Volância (DEF/VOL)" : "Defesa (DEF)") :
-                      positionFilter === "MEI" ? (roleReframeActive ? "Ala (ALA)" : "Ala / Meio (ALA/MEI)") : "Ataque (ATA)"
+                      "Ataque / Ala (ATA/ALA)"
                     }</strong> no topo primeiro</>
                   )}
                 </span>
@@ -2074,13 +2070,9 @@ export function FantasyExperience({
                             <span className="rounded bg-blue-500/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-blue-300 border border-blue-500/30">
                               {roleReframeActive ? "DEF/VOL" : "DEF"}
                             </span>
-                          ) : player.profile === "offensive" ? (
-                            <span className="rounded bg-danger/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-danger border border-danger/30">
-                              ATA
-                            </span>
                           ) : (
-                            <span className="rounded bg-warning/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-warning border border-warning/30">
-                              {roleReframeActive ? "ALA" : "ALA/MEI"}
+                            <span className="rounded bg-danger/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-danger border border-danger/30">
+                              ATA/ALA
                             </span>
                           )}
                           <span className="text-[8px] font-bold text-muted ml-auto">

@@ -5,7 +5,7 @@ type CompetitiveProfile = Pick<
   "name" | "avatar_url" | "player_profile" | "overall_traits" | "member_category" | "is_selectable"
 > & { is_competitive_profile_complete?: boolean };
 
-const LINE_PROFILES: PlayerProfile[] = ["defensive", "midfield", "offensive"];
+const LINE_PROFILES: PlayerProfile[] = ["defensive", "offensive"];
 
 /** Espelho em TypeScript da coluna gerada pelo banco; aceita fixtures antigas sem a coluna. */
 export function isCompetitiveProfileComplete(player: CompetitiveProfile | null | undefined) {
@@ -13,12 +13,15 @@ export function isCompetitiveProfileComplete(player: CompetitiveProfile | null |
   if (typeof player.is_competitive_profile_complete === "boolean") {
     return player.is_competitive_profile_complete;
   }
-  const traits = [...new Set((player.overall_traits || []).filter((trait) => LINE_PROFILES.includes(trait)))];
+  const normalizedProfile = player.player_profile === "midfield" ? "offensive" : player.player_profile;
+  const traits = [...new Set((player.overall_traits || [])
+    .map((trait) => trait === "midfield" ? "offensive" : trait)
+    .filter((trait) => LINE_PROFILES.includes(trait)))];
   return player.member_category === "player"
     && player.is_selectable
     && Boolean(player.name?.trim())
     && Boolean(player.avatar_url?.trim())
-    && Boolean(player.player_profile && LINE_PROFILES.includes(player.player_profile))
+    && Boolean(normalizedProfile && LINE_PROFILES.includes(normalizedProfile))
     && traits.length >= 1
-    && traits.length <= 3;
+    && traits.length <= 2;
 }

@@ -52,8 +52,7 @@ const POSITIONS: Record<number, Array<[number, number]>> = {
 };
 
 const ROLE_ROW_TOP: Record<string, number> = {
-  ATA: 16,
-  ALA: 41,
+  "ATA/ALA": 25,
   "DEF/VOL": 66,
   GOL: 86,
 };
@@ -72,12 +71,12 @@ function getPitchPosition(player: PitchPlayerDetails) {
     return { label: "GOL", priority: 3, className: "border-sky-300/40 bg-sky-400/15 text-sky-100" };
   }
   if (player.player_profile === "offensive") {
-    return { label: "ATA", priority: 0, className: "border-rose-300/35 bg-rose-400/15 text-rose-100" };
+    return { label: "ATA/ALA", priority: 0, className: "border-rose-300/35 bg-rose-400/15 text-rose-100" };
   }
   if (player.player_profile === "defensive") {
     return { label: "DEF/VOL", priority: 2, className: "border-blue-300/35 bg-blue-400/15 text-blue-100" };
   }
-  return { label: "ALA", priority: 1, className: "border-amber-300/35 bg-amber-300/15 text-amber-100" };
+  return { label: "ATA/ALA", priority: 0, className: "border-rose-300/35 bg-rose-400/15 text-rose-100" };
 }
 
 function getPositionAwareCoordinates(players: Array<{ player: PitchPlayerDetails }>) {

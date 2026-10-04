@@ -85,6 +85,8 @@ export type OverallFormulaConfig = {
   };
   /** V12: usa as três maiores posições elegíveis no OVR geral. */
   topThreeOverall: boolean;
+  /** V17: publica e compõe somente DEF/VOL, ATA/ALA e GOL. */
+  threePositionModel: boolean;
   /** Bônus suave de variação proporcional à distância do alvo, sem degrau rígido. */
   performanceChangeBonus: number;
   /** Mantém os tetos rígidos das fórmulas antigas. */
@@ -162,6 +164,7 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   prioritizedTraitsAsEvidenceOnly: false,
   traitProgressionWeights: { primary: 1, secondary: 0.6, unselected: 0.2 },
   topThreeOverall: false,
+  threePositionModel: false,
   performanceChangeBonus: 0,
   hardPositionCapsEnabled: true,
   provisionalAtConfidenceThreshold: true,
@@ -359,6 +362,7 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     topThreeOverall: typeof candidate.topThreeOverall === "boolean"
       ? candidate.topThreeOverall
       : DEFAULT_OVERALL_FORMULA.topThreeOverall,
+    threePositionModel: candidate.threePositionModel === true,
     performanceChangeBonus: clamp(bounded(candidate.performanceChangeBonus, DEFAULT_OVERALL_FORMULA.performanceChangeBonus), 0, 0.2),
     hardPositionCapsEnabled: typeof candidate.hardPositionCapsEnabled === "boolean"
       ? candidate.hardPositionCapsEnabled
@@ -516,8 +520,8 @@ function provisionalPositionCap(validRounds: number, config: OverallFormulaConfi
 
 function profileRole(profile: PlayerProfile | null): OverallRole {
   if (profile === "defensive") return "DEF";
-  if (profile === "offensive") return "ATA";
-  return "ALA_MEI";
+  if (profile === "midfield") return "ALA_MEI";
+  return "ATA";
 }
 
 function roleEvidenceWeight(
@@ -843,7 +847,10 @@ function positionTrend(
 }
 
 function calculateLineOverall(player: OverallPlayer, values: Record<OverallRole, number>, config: OverallFormulaConfig) {
-  const lineValues = [values.DEF, values.ALA_MEI, values.ATA].sort((a, b) => b - a);
+  const lineValues = (config.threePositionModel
+    ? [values.DEF, values.ATA]
+    : [values.DEF, values.ALA_MEI, values.ATA]
+  ).sort((a, b) => b - a);
   const traitRoles = [...new Set(player.overallTraits || [])].map((trait) => profileRole(trait)).filter((role): role is LineRole => role !== "GOL");
   const traitValues = traitRoles.map((role) => values[role]).sort((left, right) => right - left);
   const rankedWeights = traitValues.length === 1
@@ -859,12 +866,18 @@ function calculateLineOverall(player: OverallPlayer, values: Record<OverallRole,
 }
 
 function generalOverallItems(values: Record<OverallRole, number>, goalkeeperRounds: number, goalkeeperGames: number, config: OverallFormulaConfig) {
-  const roles: OverallRole[] = ["DEF", "ALA_MEI", "ATA"];
+  const roles: OverallRole[] = config.threePositionModel ? ["DEF", "ATA"] : ["DEF", "ALA_MEI", "ATA"];
   if (goalkeeperGames >= config.goalkeeperEligibilityGames && goalkeeperRounds >= config.goalkeeperEligibilityRounds) roles.push("GOL");
   return roles
     .map((role) => ({ role, value: values[role] }))
     .sort((left, right) => right.value - left.value)
     .slice(0, 3);
+}
+
+function generalOverallWeights(itemCount: number, config: OverallFormulaConfig) {
+  if (config.threePositionModel && itemCount === 2) return [0.7, 0.3];
+  if (itemCount === 1) return [1];
+  return [0.5, 0.35, 0.15];
 }
 
 function overallTrend(
@@ -876,9 +889,11 @@ function overallTrend(
   config: OverallFormulaConfig,
 ) {
   if (config.topThreeOverall) {
-    const score = generalOverallItems(values, goalkeeperRounds, goalkeeperGames, config).reduce((total, item, index) => {
+    const items = generalOverallItems(values, goalkeeperRounds, goalkeeperGames, config);
+    const weights = generalOverallWeights(items.length, config);
+    const score = items.reduce((total, item, index) => {
       const direction = positionTrends[item.role] === "rising" ? 1 : positionTrends[item.role] === "falling" ? -1 : 0;
-      return total + direction * [0.5, 0.35, 0.15][index];
+      return total + direction * weights[index];
     }, 0);
     return score > 0.001 ? "rising" as const : score < -0.001 ? "falling" as const : "steady" as const;
   }
@@ -889,7 +904,9 @@ function overallTrend(
     return positionTrends.GOL;
   }
   const traitRoles = [...new Set(player.overallTraits || [])].map((trait) => profileRole(trait)).filter((role): role is LineRole => role !== "GOL");
-  const relevantRoles = traitRoles.length > 0 ? traitRoles : ["DEF", "ALA_MEI", "ATA"] as LineRole[];
+  const relevantRoles = traitRoles.length > 0
+    ? traitRoles
+    : (config.threePositionModel ? ["DEF", "ATA"] : ["DEF", "ALA_MEI", "ATA"]) as LineRole[];
   const rising = relevantRoles.filter((role) => positionTrends[role] === "rising").length;
   const falling = relevantRoles.filter((role) => positionTrends[role] === "falling").length;
   if (rising > falling) return "rising" as const;
@@ -899,8 +916,9 @@ function overallTrend(
 
 function calculateGeneral(player: OverallPlayer, values: Record<OverallRole, number>, goalkeeperRounds: number, goalkeeperGames: number, confidence: number, config: OverallFormulaConfig) {
   if (config.topThreeOverall) {
-    const rawOverall = generalOverallItems(values, goalkeeperRounds, goalkeeperGames, config)
-      .reduce((total, item, index) => total + item.value * [0.5, 0.35, 0.15][index], 0);
+    const items = generalOverallItems(values, goalkeeperRounds, goalkeeperGames, config);
+    const weights = generalOverallWeights(items.length, config);
+    const rawOverall = items.reduce((total, item, index) => total + item.value * weights[index], 0);
     return roundOverall(config.overallConfidenceShrink
       ? config.base + (rawOverall - config.base) * confidence
       : rawOverall);
@@ -930,16 +948,25 @@ function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, current
       validRounds: estimate.validRounds,
     }];
   })) as Record<OverallRole, OverallPositionSnapshot>;
+  if (config.threePositionModel) {
+    positions.ALA_MEI = { ...positions.ATA, role: "ALA_MEI" };
+  }
   const positionTrends = Object.fromEntries(ROLES.map((role) => [role, positionTrend(state, role, config)])) as Record<OverallRole, OverallTrend>;
+  if (config.threePositionModel) positionTrends.ALA_MEI = positionTrends.ATA;
   const roundsPlayed = state.playedRoundIds.size;
   const goalkeeperRounds = state.goalkeeperRoundIds.size;
   const goalkeeperGames = state.goalkeeperMatchIds.size;
-  const overallConfidence = Math.max(positions.DEF.confidence, positions.ALA_MEI.confidence, positions.ATA.confidence);
+  const effectiveValues = config.threePositionModel
+    ? { ...state.values, ALA_MEI: state.values.ATA }
+    : state.values;
+  const overallConfidence = config.threePositionModel
+    ? Math.max(positions.DEF.confidence, positions.ATA.confidence)
+    : Math.max(positions.DEF.confidence, positions.ALA_MEI.confidence, positions.ATA.confidence);
   return {
     playerId: player.id,
-    overall: calculateGeneral(player, state.values, goalkeeperRounds, goalkeeperGames, overallConfidence, config),
+    overall: calculateGeneral(player, effectiveValues, goalkeeperRounds, goalkeeperGames, overallConfidence, config),
     positions,
-    trend: overallTrend(player, positionTrends, state.values, goalkeeperRounds, goalkeeperGames, config),
+    trend: overallTrend(player, positionTrends, effectiveValues, goalkeeperRounds, goalkeeperGames, config),
     positionTrends,
     roundsPlayed,
     goalkeeperRounds,

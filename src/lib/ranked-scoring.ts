@@ -1,4 +1,5 @@
 import { BQ_SCORING_V5, buildBQBasePointBreakdown, calculateBQBasePoints, type BQBaseScoringSnapshot, type BQPlayerStats } from "./bq-scoring";
+import { COLUMN_C_SCORING, calculateColumnCRankedPoints, type ColumnCLineRole } from "./column-c-scoring";
 
 export const RANKED_SCORING = {
   win: BQ_SCORING_V5.win,
@@ -20,6 +21,13 @@ export type RankedScoringStats = {
   ownGoals?: number;
   goalkeeperAppearances?: number;
   goalkeeperGoalsConceded?: number;
+  goalkeeperGoals?: number;
+  goalkeeperAssists?: number;
+  goalkeeperOwnGoals?: number;
+  goalkeeperCleanSheets?: number;
+  teamGoalsConceded?: number;
+  defensiveCleanGames?: number;
+  lineRole?: ColumnCLineRole;
 };
 
 export type RankedPointBreakdownItem = {
@@ -38,6 +46,21 @@ function amount(value: number | null | undefined) {
  */
 export function calculateRankedPoints(stats: RankedScoringStats, snapshot?: BQBaseScoringSnapshot) {
   const scoring = snapshot ?? BQ_SCORING_V5;
+  if (Number(scoring.version || 0) >= 11) {
+    return calculateColumnCRankedPoints(stats.lineRole || "ATA", {
+      goals: stats.goals,
+      assists: stats.assists,
+      ownGoals: stats.ownGoals,
+      teamGoalsConceded: stats.teamGoalsConceded,
+      defensiveCleanGames: stats.defensiveCleanGames,
+      goalkeeperGames: stats.goalkeeperAppearances,
+      goalkeeperGoals: stats.goalkeeperGoals,
+      goalkeeperAssists: stats.goalkeeperAssists,
+      goalkeeperOwnGoals: stats.goalkeeperOwnGoals,
+      goalkeeperGoalsConceded: stats.goalkeeperGoalsConceded,
+      goalkeeperCleanSheets: stats.goalkeeperCleanSheets,
+    });
+  }
   const bqStats: BQPlayerStats = {
     goals: amount(stats.goals),
     assists: amount(stats.assists),
@@ -56,6 +79,28 @@ export function buildRankedPointBreakdown(
   snapshot: BQBaseScoringSnapshot = BQ_SCORING_V5,
   options: { suppressGoalkeeperRewards?: boolean } = {},
 ): RankedPointBreakdownItem[] {
+  if (Number(snapshot.version || 0) >= 11) {
+    const role = stats.lineRole || "ATA";
+    const rule = COLUMN_C_SCORING[role];
+    const lineGoals = Math.max(0, amount(stats.goals) - amount(stats.goalkeeperGoals));
+    const lineAssists = Math.max(0, amount(stats.assists) - amount(stats.goalkeeperAssists));
+    const lineOwnGoals = Math.max(0, amount(stats.ownGoals) - amount(stats.goalkeeperOwnGoals));
+    const lineConceded = Math.max(0, amount(stats.teamGoalsConceded) - amount(stats.goalkeeperGoalsConceded));
+    const rows: Array<[string, number, number]> = [
+      [`Gols como ${role}`, lineGoals, rule.goal],
+      [`Assistências como ${role}`, lineAssists, rule.assist],
+      ["Gols sofridos pelo time", lineConceded, rule.conceded],
+      ["Clean sheets como DEF", role === "DEF" ? amount(stats.defensiveCleanGames) : 0, COLUMN_C_SCORING.DEF.cleanSheet],
+      ["Gols contra na linha", lineOwnGoals, rule.ownGoal],
+      ["Atuações no gol", amount(stats.goalkeeperAppearances), COLUMN_C_SCORING.GOL.appearance],
+      ["Gols feitos no gol", amount(stats.goalkeeperGoals), COLUMN_C_SCORING.GOL.goal],
+      ["Assistências no gol", amount(stats.goalkeeperAssists), COLUMN_C_SCORING.GOL.assist],
+      ["Gols sofridos no gol", amount(stats.goalkeeperGoalsConceded), COLUMN_C_SCORING.GOL.conceded],
+      ["Clean sheets no gol", amount(stats.goalkeeperCleanSheets), COLUMN_C_SCORING.GOL.cleanSheet],
+      ["Gols contra no gol", amount(stats.goalkeeperOwnGoals), COLUMN_C_SCORING.GOL.ownGoal],
+    ];
+    return rows.filter(([, count]) => count > 0).map(([label, count, unit]) => ({ label, count, points: count * unit }));
+  }
   const normalized: BQPlayerStats = {
     goals: amount(stats.goals), assists: amount(stats.assists), wins: amount(stats.wins),
     draws: amount(stats.draws), losses: amount(stats.losses), ownGoals: amount(stats.ownGoals),
@@ -66,15 +111,19 @@ export function buildRankedPointBreakdown(
 }
 
 export const RANKED_SCORING_RULES = [
-  { key: "win", icon: "🏆", label: "Vitória", description: "Por vitória em uma partida.", points: RANKED_SCORING.win },
-  { key: "goal", icon: "⚽", label: "Gol", description: "Por gol marcado.", points: RANKED_SCORING.goal },
-  { key: "assist", icon: "🎯", label: "Assistência", description: "Por assistência registrada.", points: RANKED_SCORING.assist },
-  { key: "draw", icon: "🤝", label: "Empate", description: "Por empate em uma partida.", points: RANKED_SCORING.draw },
-  { key: "loss", icon: "❌", label: "Derrota", description: "Por derrota em uma partida.", points: RANKED_SCORING.loss },
-  { key: "ownGoal", icon: "⚠️", label: "Gol contra", description: "Por gol contra registrado.", points: RANKED_SCORING.ownGoal },
+  { key: "attackerGoal", icon: "⚽", label: "Gol ATA/ALA", description: "Gol jogando na linha como ATA/ALA.", points: COLUMN_C_SCORING.ATA.goal },
+  { key: "attackerAssist", icon: "🎯", label: "Assist. ATA/ALA", description: "Assistência como ATA/ALA.", points: COLUMN_C_SCORING.ATA.assist },
+  { key: "defenderGoal", icon: "⚽", label: "Gol DEF/VOL", description: "Gol jogando na linha como DEF/VOL.", points: COLUMN_C_SCORING.DEF.goal },
+  { key: "defenderAssist", icon: "🎯", label: "Assist. DEF/VOL", description: "Assistência como DEF/VOL.", points: COLUMN_C_SCORING.DEF.assist },
+  { key: "lineConceded", icon: "🥅", label: "Gol sofrido", description: "Para todo atleta do time em campo.", points: COLUMN_C_SCORING.ATA.conceded, suffix: " por gol" },
+  { key: "defenderClean", icon: "🔒", label: "Clean sheet DEF", description: "Por jogo sem sofrer gol como DEF/VOL.", points: COLUMN_C_SCORING.DEF.cleanSheet },
+  { key: "ownGoal", icon: "⚠️", label: "Gol contra", description: "Por gol contra registrado.", points: COLUMN_C_SCORING.ATA.ownGoal },
 ] as const;
 
 export const RANKED_GOALKEEPER_SCORING_RULES = [
-  { key: "goalkeeperAppearance", icon: "🧤", label: "Atuação como goleiro", description: "Somente quando registrado no gol naquela partida.", points: RANKED_SCORING.goalkeeperAppearance },
-  { key: "goalkeeperGoalConceded", icon: "🥅", label: "Gol sofrido", description: "Por gol sofrido enquanto estiver realmente no gol.", points: RANKED_SCORING.goalkeeperGoalConceded, suffix: " por gol" },
+  { key: "goalkeeperAppearance", icon: "🧤", label: "Atuação no GOL", description: "Somente quando registrado no gol naquela partida.", points: COLUMN_C_SCORING.GOL.appearance },
+  { key: "goalkeeperGoal", icon: "⚽", label: "Gol como GOL", description: "Gol marcado durante a atuação no gol.", points: COLUMN_C_SCORING.GOL.goal },
+  { key: "goalkeeperAssist", icon: "🎯", label: "Assist. como GOL", description: "Assistência durante a atuação no gol.", points: COLUMN_C_SCORING.GOL.assist },
+  { key: "goalkeeperGoalConceded", icon: "🥅", label: "Sofrido no GOL", description: "Por gol sofrido enquanto estiver no gol.", points: COLUMN_C_SCORING.GOL.conceded, suffix: " por gol" },
+  { key: "goalkeeperClean", icon: "🔒", label: "Clean sheet GOL", description: "Por atuação no gol sem sofrer gol.", points: COLUMN_C_SCORING.GOL.cleanSheet },
 ] as const;

@@ -19,12 +19,21 @@ const AVATAR_EXTENSIONS: Record<string, string> = {
   "image/png": "png",
   "image/webp": "webp",
 };
-const OVERALL_TRAITS = ["defensive", "midfield", "offensive"] as const;
+const OVERALL_TRAITS = ["defensive", "offensive"] as const;
+
+function normalizeLineProfile(value: PlayerProfile | null | undefined): "defensive" | "offensive" {
+  return value === "defensive" ? "defensive" : "offensive";
+}
 
 function normalizeOverallTraits(value: unknown) {
   const values = Array.isArray(value) ? value : [];
-  const traits = [...new Set(values.filter((item): item is PlayerProfile => typeof item === "string" && OVERALL_TRAITS.includes(item as PlayerProfile)))];
-  return traits.slice(0, 3);
+  const traits = [...new Set(values.flatMap((item) => {
+    if (item === "midfield") return ["offensive" as const];
+    return typeof item === "string" && OVERALL_TRAITS.includes(item as (typeof OVERALL_TRAITS)[number])
+      ? [item as (typeof OVERALL_TRAITS)[number]]
+      : [];
+  }))];
+  return traits.slice(0, 2);
 }
 
 function revalidatePlayerPaths(id?: string) {
@@ -443,7 +452,7 @@ export async function createPlayer(input: CreatePlayerInput) {
         name: input.name,
         nickname: input.nickname || null,
         avatar_url: input.avatar_url || null,
-        player_profile: input.player_profile || "midfield",
+        player_profile: normalizeLineProfile(input.player_profile),
         overall_traits: normalizeOverallTraits(input.overall_traits),
         is_goalkeeper: false,
         member_category: input.member_category || "player",
@@ -474,7 +483,7 @@ export async function updatePlayer(id: string, input: Partial<CreatePlayerInput>
     ...(input.name !== undefined ? { name: input.name.trim() } : {}),
     ...(input.nickname !== undefined ? { nickname: input.nickname.trim() || null } : {}),
     ...(input.avatar_url !== undefined ? { avatar_url: input.avatar_url || null } : {}),
-    ...(input.player_profile !== undefined ? { player_profile: input.player_profile } : {}),
+    ...(input.player_profile !== undefined ? { player_profile: normalizeLineProfile(input.player_profile) } : {}),
     ...(input.overall_traits !== undefined ? { overall_traits: normalizeOverallTraits(input.overall_traits) } : {}),
     ...(input.member_category !== undefined ? { member_category: input.member_category } : {}),
     ...(input.is_selectable !== undefined ? { is_selectable: input.is_selectable } : {}),
@@ -512,7 +521,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const nickname = String(formData.get("nickname") || "").trim();
   const profileBio = String(formData.get("profile_bio") || "").trim();
-  const playerProfile = String(formData.get("player_profile") || "midfield") as PlayerProfile;
+  const playerProfile = normalizeLineProfile(String(formData.get("player_profile") || "offensive") as PlayerProfile);
   const requestedOverallTraits = normalizeOverallTraits(formData.getAll("overall_traits"));
   const requestedCategory = String(formData.get("member_category") || "player") as MemberCategory;
   const requestedSelectable = formData.get("is_selectable") !== "false";
@@ -536,11 +545,11 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   if (!["player", "guest", "wag", "supporter"].includes(requestedCategory)) {
     return { success: false, error: "Escolha uma categoria valida." };
   }
-  if (!["offensive", "midfield", "defensive"].includes(playerProfile)) {
+  if (!["offensive", "defensive"].includes(playerProfile)) {
     return { success: false, error: "Escolha um perfil de jogo valido." };
   }
-  if (account.isAdmin && requestedOverallTraits.length > 3) {
-    return { success: false, error: "Escolha no máximo três características: principal, secundária e terciária." };
+  if (account.isAdmin && requestedOverallTraits.length > 2) {
+    return { success: false, error: "Escolha no máximo duas características: principal e secundária." };
   }
 
   if (!name) return { success: false, error: "O nome é obrigatório." };
@@ -561,7 +570,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   let currentAlternateAvatarUrl: string | null = null;
   let currentCategory: MemberCategory = "player";
   let currentSelectable = true;
-  let currentPlayerProfile: PlayerProfile | null = "midfield";
+  let currentPlayerProfile: PlayerProfile | null = "offensive";
   let currentIsGoalkeeper = false;
   let currentOverallTraits: PlayerProfile[] = [];
   const id = playerId || crypto.randomUUID();

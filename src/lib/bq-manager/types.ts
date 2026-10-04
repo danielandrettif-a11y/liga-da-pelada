@@ -1,6 +1,8 @@
 import type { PlayerProfile } from "@/lib/types";
 
 export const POSITIONS = ["DEF", "ALA_MEI", "ATA", "GOL"] as const;
+/** Posições oferecidas pela regra atual; ALA_MEI fica somente em saves antigos. */
+export const ACTIVE_POSITIONS = ["DEF", "ATA", "GOL"] as const;
 export type Position = typeof POSITIONS[number];
 export type Ratings = Record<Position, number>;
 export type Trend = "rising" | "steady" | "falling";

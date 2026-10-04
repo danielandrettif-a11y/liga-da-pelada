@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_FANTASY_SETTINGS } from "./config";
+import { LEGACY_FANTASY_SETTINGS as DEFAULT_FANTASY_SETTINGS } from "./config";
 import { projectFantasyLiveLineups, projectFantasyLiveStats } from "./live-projection";
 
 describe("live fantasy projection", () => {
@@ -218,7 +218,7 @@ describe("live fantasy projection", () => {
     expect(lineup).toMatchObject({ playerPoints: 3.5, positionBonus: 1, captainBonus: 1.75, totalPoints: 5.25 });
   });
 
-  it("regressão R06: não reaproveita 46.5 ao calcular capitão sobre 49.5", () => {
+  it("Coluna C: calcula ATA/ALA sem bônus legado e aplica capitão sobre a nova base", () => {
     const stats = new Map([[
       "daniel",
       {
@@ -255,12 +255,12 @@ describe("live fantasy projection", () => {
     }], stats, { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 11 });
 
     expect(lineup.players[0]).toMatchObject({
-      basePoints: 43.5,
-      positionBonus: 6,
-      captainBonus: 24.75,
-      totalPoints: 74.25,
+      basePoints: 26,
+      positionBonus: 0,
+      captainBonus: 13,
+      totalPoints: 39,
     });
-    expect(lineup.totalPoints).toBe(74.25);
+    expect(lineup.totalPoints).toBe(39);
   });
 
   it("aplica o pacote de GOL a qualquer atleta nessa vaga e dá +4 de clean sheet", () => {
@@ -297,7 +297,7 @@ describe("live fantasy projection", () => {
     expect(lineup.players[0]).toMatchObject({ basePoints: 0, positionBonus: 0, totalPoints: 0 });
   });
 
-  it("regressão R06: Yann fecha 16.5 na vaga GOL a partir das atuações reais", () => {
+  it("Coluna C: Yann usa somente os scouts reais da vaga GOL", () => {
     const settings = { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 11 };
     const stats = new Map([[
       "yann",
@@ -334,11 +334,11 @@ describe("live fantasy projection", () => {
     }], stats, settings);
 
     expect(lineup.players[0]).toMatchObject({
-      basePoints: 12.5,
-      positionBonus: 4,
+      basePoints: 9,
+      positionBonus: 0,
       captainBonus: 0,
-      totalPoints: 16.5,
+      totalPoints: 9,
     });
-    expect(lineup.totalPoints).toBe(16.5);
+    expect(lineup.totalPoints).toBe(9);
   });
 });

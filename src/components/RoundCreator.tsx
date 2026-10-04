@@ -1015,7 +1015,7 @@ export function RoundCreator({
                 <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
                   {adaptiveSummary.teams.map((summary, index) => (
                     <p key={index} className="rounded-lg bg-background/60 px-2.5 py-2 text-[10px] font-bold text-muted">
-                      <span className="text-foreground">Time {index + 1}</span> · OVR {summary.overallAverage.toFixed(1)} · {summary.speedAverage.toFixed(2)}★ · {summary.profiles.defensive} DEF/VOL · {summary.profiles.midfield} ALA · {summary.profiles.offensive} ATA
+                      <span className="text-foreground">Time {index + 1}</span> · OVR {summary.overallAverage.toFixed(1)} · {summary.speedAverage.toFixed(2)}★ · {summary.profiles.defensive} DEF/VOL · {summary.profiles.midfield + summary.profiles.offensive} ATA/ALA
                     </p>
                   ))}
                 </div>

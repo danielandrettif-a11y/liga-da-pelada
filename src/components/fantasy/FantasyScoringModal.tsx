@@ -1,397 +1,62 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  Crown,
-  HelpCircle,
-  Shield,
-  Sparkles,
-  Trophy,
-  Users,
-  X,
-} from "@/components/icons";
+import { X } from "@/components/icons";
 import { useDialogViewport } from "@/lib/useDialogViewport";
-import { type FantasySettings } from "@/lib/fantasy/config";
+import type { FantasySettings } from "@/lib/fantasy/config";
 
-type Props = {
-  isOpen: boolean;
-  onClose: () => void;
-  settings: FantasySettings;
-};
+type Props = { isOpen: boolean; onClose: () => void; settings: FantasySettings };
+type Tab = "positions" | "base" | "extras";
+
+const RULES = [
+  { scout: "Gol", attack: "+4,0", defense: "+5,0", goalkeeper: "+5,0 no gol" },
+  { scout: "Assistência", attack: "+2,5", defense: "+3,0", goalkeeper: "+3,0 no gol" },
+  { scout: "Gol sofrido", attack: "−0,5", defense: "−0,5", goalkeeper: "−0,5 no gol" },
+  { scout: "Clean sheet", attack: "—", defense: "+2,0", goalkeeper: "+2,0" },
+  { scout: "Atuação no gol", attack: "—", defense: "—", goalkeeper: "+1,0" },
+  { scout: "Gol contra", attack: "−3,0", defense: "−3,0", goalkeeper: "−3,0 no gol" },
+] as const;
 
 export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
-  const [activeTab, setActiveTab] = useState<"positions" | "base" | "bonuses">("positions");
   const [mounted, setMounted] = useState(false);
-
+  const [tab, setTab] = useState<Tab>("positions");
   useDialogViewport(isOpen, onClose);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
+  useEffect(() => setMounted(true), []);
   if (!isOpen || !mounted || typeof document === "undefined") return null;
-  const roleReframeActive = Number(settings.scoringVersion || 5) >= 7;
-  const defensiveDrawBonusActive = Number(settings.scoringVersion || 5) >= 9;
-  const goalkeeperSlotOnly = Number(settings.scoringVersion || 5) >= 10;
-  const progressiveAttackerBonus = Number(settings.scoringVersion || 5) >= 11;
 
   return createPortal(
-    <div
-      className="mobile-dialog-backdrop z-[99999] bg-black/90 backdrop-blur-md animate-fade-in"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Sistema de Pontuação do Cartola"
-    >
-      <div
-        className="relative flex w-full max-w-lg max-h-[90vh] flex-col overflow-hidden rounded-3xl border border-accent/40 bg-[#07160d] shadow-[0_0_60px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="relative border-b border-white/10 bg-gradient-to-r from-accent/15 via-black/40 to-emerald-950/40 p-5 sm:p-6 pb-4">
-          <button
-            onClick={onClose}
-            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
-            aria-label="Fechar"
-          >
-            <X className="h-4 w-4" />
-          </button>
-
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-background shadow-lg shadow-accent/30 font-black">
-              ⚡
-            </span>
-            <div>
-              <span className="rounded bg-accent/20 px-2 py-0.5 font-athletic text-[9px] font-black uppercase tracking-wider text-accent">
-                Guia Oficial
-              </span>
-              <h2 className="font-athletic text-lg font-black uppercase italic tracking-tight text-white mt-0.5">
-                Sistema de Pontuação
-              </h2>
-            </div>
+    <div className="mobile-dialog-backdrop z-[99999] bg-black/90 backdrop-blur-md" onClick={onClose} role="dialog" aria-modal="true" aria-label="Sistema de pontuação">
+      <div className="relative my-auto flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-accent/40 bg-[#07160d] shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <header className="border-b border-white/10 bg-accent/10 p-5">
+          <button onClick={onClose} className="absolute right-4 top-4 rounded-full bg-white/10 p-2" aria-label="Fechar"><X className="h-4 w-4" /></button>
+          <p className="text-[9px] font-black uppercase tracking-[.2em] text-accent">Guia oficial · Coluna C</p>
+          <h2 className="mt-1 font-athletic text-xl font-black uppercase text-white">Três posições</h2>
+          <p className="mt-2 text-xs leading-5 text-muted">Cada vaga usa somente os scouts daquela função. Vitória, empate e derrota não dão pontos.</p>
+          <div className="mt-4 grid grid-cols-3 gap-1 rounded-xl bg-black/50 p-1">
+            {([["positions","Formações"],["base","Pontuação"],["extras","Extras"]] as const).map(([key,label]) => <button key={key} onClick={() => setTab(key)} className={`rounded-lg py-2 text-[9px] font-black uppercase ${tab===key?"bg-accent text-background":"text-muted"}`}>{label}</button>)}
           </div>
-
-          <p className="mt-2 text-xs text-muted leading-relaxed">
-            {goalkeeperSlotOnly ? "Cada vaga usa os scouts compatíveis com sua função. Na vaga GOL, só entram as partidas em que o atleta foi goleiro." : "Primeiro vêm os oito scouts do que aconteceu em campo; depois, o bônus da vaga que você escolheu. O mesmo cálculo vale no ao vivo e no fechamento."}
-          </p>
-
-          {/* Abas Internas */}
-          <div className="mt-4 grid grid-cols-3 gap-1 rounded-xl bg-black/60 p-1 border border-white/10">
-            <button
-              type="button"
-              onClick={() => setActiveTab("positions")}
-              className={`rounded-lg py-1.5 px-2 text-center text-[10px] font-black uppercase transition-all ${
-                activeTab === "positions"
-                  ? "bg-accent text-background shadow-sm"
-                  : "text-muted hover:text-white"
-              }`}
-            >
-              ⚡ Bônus de Posição
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("base")}
-              className={`rounded-lg py-1.5 px-2 text-center text-[10px] font-black uppercase transition-all ${
-                activeTab === "base"
-                  ? "bg-accent text-background shadow-sm"
-                  : "text-muted hover:text-white"
-              }`}
-            >
-              ⚽ Scouts Básicos
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("bonuses")}
-              className={`rounded-lg py-1.5 px-2 text-center text-[10px] font-black uppercase transition-all ${
-                activeTab === "bonuses"
-                  ? "bg-accent text-background shadow-sm"
-                  : "text-muted hover:text-white"
-              }`}
-            >
-              👑 Capitão & Extras
-            </button>
-          </div>
-        </div>
-
-        {/* Conteúdo com Scroll */}
-        <div
-          className="mobile-dialog-scroll flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 touch-pan-y overscroll-contain"
-          style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
-        >
-          {/* ABA 1: BÔNUS POR POSIÇÃO */}
-          {activeTab === "positions" && (
-            <div className="space-y-3">
-              <div className="rounded-2xl border border-accent/30 bg-accent/10 p-3 text-xs text-emerald-100/90 leading-relaxed">
-                💡 <strong>Como escalar:</strong> escolha 1 GOL, 2 {roleReframeActive ? "DEF/VOL" : "DEF"} e complete com <strong>2 {roleReframeActive ? "ALA" : "ALA/MEI"} + 1 ATA</strong> ou <strong>1 {roleReframeActive ? "ALA" : "ALA/MEI"} + 2 ATA</strong>. As posições de linha precisam coincidir com a tag oficial. A vaga GOL é livre.
-              </div>
-
-              {/* 1. Defensores (DEF) */}
-              <div className="rounded-2xl border border-blue-500/25 bg-blue-950/20 p-3.5 space-y-2">
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="flex h-7 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 px-2 text-blue-300 font-black text-[10px]">
-                      {roleReframeActive ? "DEF/VOL" : "DEF"}
-                    </span>
-                    <span className="font-athletic text-sm font-black uppercase text-blue-200">
-                      {roleReframeActive ? "Defensor / Volante" : "Zagueiro & Proteção"}
-                    </span>
-                  </div>
-                  <span className="rounded bg-blue-500/20 px-2 py-0.5 text-[9px] font-black text-blue-300">
-                    Teto de +{defensiveDrawBonusActive ? "10" : roleReframeActive ? "8" : "10"}
-                  </span>
-                </div>
-                <div className="space-y-1 text-xs text-muted">
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-1 border-b border-white/5">
-                    <span>🧱 0 gols sofridos jogando na linha:</span>
-                    <strong className="text-accent font-black">+{roleReframeActive ? "1.25" : "1.5"} pts</strong>
-                  </div>
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-1 border-b border-white/5">
-                    <span>🛡️ Exatamente 1 gol sofrido na linha:</span>
-                    <strong className="text-blue-300 font-black">+0.5 pt</strong>
-                  </div>
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-1 border-b border-white/5">
-                    <span>🏰 Muralha com 3+ clean sheets:</span>
-                    <strong className="text-right text-accent font-black">+{roleReframeActive ? "2.5" : "3.0"} pts uma vez</strong>
-                  </div>
-                  {roleReframeActive && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-1">
-                    <span>🎯 Assistência na vaga DEF/VOL:</span>
-                    <strong className="text-right font-black text-blue-300">+2,5 base +0,5 extra<br /><span className="text-[9px] text-muted">extra máximo +1,5</span></strong>
-                  </div>}
-                  {defensiveDrawBonusActive && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-t border-white/5 py-1">
-                    <span>🤝 Empate na vaga DEF/VOL:</span>
-                    <strong className="text-right font-black text-blue-300">+{goalkeeperSlotOnly ? "1" : "0,5"} por empate<br /><span className="text-[9px] text-muted">máximo +2</span></strong>
-                  </div>}
-                </div>
-                {roleReframeActive && <p className="rounded-xl bg-blue-500/8 px-3 py-2 text-[10px] leading-4 text-blue-100/80">Scouts básicos contam em qualquer posição. A vaga DEF/VOL valoriza saída de bola{defensiveDrawBonusActive ? " e empate segurado" : ""}, com extras limitados a +{defensiveDrawBonusActive ? "10" : "8"}.</p>}
-              </div>
-
-              {/* 2. Meias / Alas (MEI) */}
-              <div className="rounded-2xl border border-warning/25 bg-yellow-950/20 p-3.5 space-y-2">
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="flex h-7 shrink-0 items-center justify-center rounded-lg bg-warning/20 px-2 text-warning font-black text-xs">
-                      {roleReframeActive ? "ALA" : "MEI"}
-                    </span>
-                    <span className="font-athletic text-sm font-black uppercase text-yellow-200">
-                      {roleReframeActive ? "Ala & Ida e volta" : "Meia, Ala & Armação"}
-                    </span>
-                  </div>
-                  <span className="rounded bg-warning/20 px-2 py-0.5 text-[9px] font-black text-warning">
-                    {roleReframeActive ? "Teto de +6" : "Maestro da Rodada"}
-                  </span>
-                </div>
-                <div className="space-y-1 text-xs text-muted">
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-1 border-b border-white/5">
-                    <span>{roleReframeActive ? "🎯 Assistência na vaga ALA" : "🎯 Assistência: +2.5 base +1 na vaga ALA/MEI"}</span>
-                    <strong className="text-accent font-black">{roleReframeActive ? "+0.75 extra" : "+3.5 pts / assist"}</strong>
-                  </div>
-                  <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>{roleReframeActive ? "🏃 Vai e volta (participação + 2 proteções):" : "🪄 Bônus Maestro (2+ assistências):"}</span>
-                    <strong className="text-warning font-black">+{roleReframeActive ? "1.5" : "3.0"} pts extras</strong>
-                  </div>
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-1 border-b border-white/5">
-                    <span>⚽ Gol marcado (scout base):</span>
-                    <strong className="text-foreground font-black">+{settings.goalPoints.toFixed(1)} base{roleReframeActive ? " +0.5 extra" : " pts"}</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. Atacantes (ATA) */}
-              <div className="rounded-2xl border border-danger/25 bg-red-950/20 p-3.5 space-y-2">
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-danger/20 text-danger font-black text-xs">
-                      ATA
-                    </span>
-                    <span className="font-athletic text-sm font-black uppercase text-red-200">
-                      Atacante & Finalização
-                    </span>
-                  </div>
-                  <span className="rounded bg-danger/20 px-2 py-0.5 text-[9px] font-black text-danger">
-                    Artilheiro da Rodada
-                  </span>
-                </div>
-                <div className="space-y-1 text-xs text-muted">
-                  <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>⚽ Gol marcado (scout base):</span>
-                    <strong className="text-accent font-black">+{settings.goalPoints.toFixed(1)} pts / gol</strong>
-                  </div>
-                  <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🔥 {progressiveAttackerBonus ? "Bônus ATA (1 gol / 2+ gols):" : "Bônus Artilheiro (2+ gols):"}</span>
-                    <strong className="text-danger font-black">{progressiveAttackerBonus ? "+1.0 / +2.0" : `+${roleReframeActive ? "2.0" : "3.0"}`} pts extras</strong>
-                  </div>
-                  <div className="flex justify-between py-0.5">
-                    <span>🎯 Assistência:</span>
-                    <strong className="text-foreground font-black">+{settings.assistPoints.toFixed(1)} pts</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4. Goleiro no Rodízio (GOL) */}
-              <div className="rounded-2xl border border-emerald-500/25 bg-emerald-950/20 p-3.5 space-y-2">
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 font-black text-xs">
-                      GOL
-                    </span>
-                    <span className="font-athletic text-sm font-black uppercase text-emerald-200">
-                      Paredão no Rodízio
-                    </span>
-                  </div>
-                  <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[9px] font-black text-emerald-300">
-                    Qualquer Jogador
-                  </span>
-                </div>
-                <div className="space-y-1 text-xs text-muted">
-                  <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🧤 Atuação real no gol (scout base):</span>
-                    <strong className="text-accent font-black">+{(goalkeeperSlotOnly ? settings.goalkeeperSlotAppearancePoints : settings.goalkeeperAppearancePoints).toFixed(1)} pts / jogo</strong>
-                  </div>
-                  <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🧱 Clean sheet: escalado GOL e atuou no gol:</span>
-                    <strong className="text-accent font-black">+{settings.goalkeeperSlotCleanSheetPoints.toFixed(1)} pts / jogo</strong>
-                  </div>
-                  <div className="flex justify-between py-0.5 border-b border-white/5">
-                    <span>🥅 Gol sofrido enquanto goleiro:</span>
-                    <strong className="text-danger font-black">{(goalkeeperSlotOnly ? settings.goalkeeperSlotGoalConcededPoints : settings.goalConcededPoints).toFixed(1)} pt / gol</strong>
-                  </div>
-                  <div className="flex justify-between py-0.5">
-                    <span>{goalkeeperSlotOnly ? "📌 O que fizer na linha não entra na vaga GOL:" : "📌 Se não atuar no gol, não recebe o clean sheet:"}</span>
-                    <strong className="text-foreground font-black">0.0 pt</strong>
-                  </div>
-                </div>
-                {goalkeeperSlotOnly && (
-                  <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[10px] leading-4 text-emerald-100/80">
-                    <strong className="text-emerald-200">Como funciona:</strong> o Cartola separa as partidas em que o atleta foi goleiro das partidas em que jogou na linha. Na vaga GOL, só entram os scouts das atuações no gol. Exemplo: 2 atuações, 1 clean sheet e 1 gol sofrido = <strong className="text-white">8 + 4 - 2,5 = 9,5 pontos</strong>.
-                  </div>
-                )}
-              </div>
+        </header>
+        <div className="mobile-dialog-scroll flex-1 space-y-4 overflow-y-auto p-5">
+          {tab === "positions" && <>
+            <div className="rounded-2xl border border-accent/30 bg-accent/10 p-4 text-xs leading-5 text-foreground"><strong>Escolha um dos dois esquemas:</strong><br />1 GOL + 3 DEF/VOL + 2 ATA/ALA<br />1 GOL + 2 DEF/VOL + 3 ATA/ALA</div>
+            <div className="grid gap-3">
+              <article className="rounded-2xl border border-blue-500/25 bg-blue-950/20 p-4"><strong className="text-blue-300">DEF/VOL</strong><p className="mt-1 text-xs text-muted">Gol e assistência valem mais. Recebe +2 por clean sheet e perde 0,5 por gol sofrido pelo time.</p></article>
+              <article className="rounded-2xl border border-danger/25 bg-red-950/20 p-4"><strong className="text-danger">ATA/ALA</strong><p className="mt-1 text-xs text-muted">Une atacantes e antigos alas. Pontua por gol e assistência e perde 0,5 por gol sofrido pelo time.</p></article>
+              <article className="rounded-2xl border border-accent/25 bg-accent/10 p-4"><strong className="text-accent">GOL</strong><p className="mt-1 text-xs text-muted">A vaga é livre, mas considera apenas partidas e ações registradas enquanto o atleta estava no gol.</p></article>
             </div>
-          )}
-
-          {/* ABA 2: SCOUTS BÁSICOS */}
-          {activeTab === "base" && (
-            <div className="space-y-3">
-              <p className="text-xs text-muted leading-relaxed">
-                {goalkeeperSlotOnly ? "Nas vagas de linha, os scouts gerais continuam valendo. Na vaga GOL, gols, assistências e resultados só contam se acontecerem numa partida em que o atleta estava no gol." : "Scouts são pontos do atleta e contam onde ele estiver escalado. O bônus de posição é separado e só depende da vaga correta."}
-              </p>
-
-              <div className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden text-xs">
-                <div className="grid grid-cols-2 p-3 border-b border-white/10 font-black uppercase text-[10px] text-muted">
-                  <span>Ação / Evento</span>
-                  <span className="text-right">Pontuação</span>
-                </div>
-
-                <div className="divide-y divide-white/5">
-                  <div className="flex items-center justify-between p-3">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      ⚽ Gol Marcado
-                    </span>
-                    <span className="font-black text-accent">+{settings.goalPoints.toFixed(1)} pts</span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      🎯 Assistência (Passe para Gol)
-                    </span>
-                    <span className="font-black text-accent">+{settings.assistPoints.toFixed(1)} pts</span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      🏆 Vitória do Time
-                    </span>
-                    <span className="font-black text-success">+{settings.winPoints.toFixed(1)} pts</span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      ❌ Derrota do Time
-                    </span>
-                    <span className="font-black text-danger">{settings.lossPoints.toFixed(1)} pts</span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      🧤 Jogo como goleiro real
-                    </span>
-                    <span className="font-black text-accent">+{(goalkeeperSlotOnly ? settings.goalkeeperSlotAppearancePoints : settings.goalkeeperAppearancePoints).toFixed(1)} pts / jogo</span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      🤝 Empate
-                    </span>
-                    <span className="font-black text-success">+{settings.drawPoints.toFixed(1)} pt</span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      🥅 Gol sofrido como goleiro real
-                    </span>
-                    <span className="font-black text-danger">{(goalkeeperSlotOnly ? settings.goalkeeperSlotGoalConcededPoints : settings.goalConcededPoints).toFixed(1)} pt / gol</span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      ⚠️ Gol contra
-                    </span>
-                    <span className="font-black text-danger">{settings.ownGoalPoints.toFixed(1)} pts</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ABA 3: CAPITÃO & EXTRAS */}
-          {activeTab === "bonuses" && (
-            <div className="space-y-3 text-xs">
-              {/* Capitão */}
-              <div className="rounded-2xl border border-yellow-400/30 bg-yellow-950/20 p-4 space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-yellow-400/20 text-yellow-400">
-                    <Crown className="h-4 w-4" />
-                  </span>
-                  <span className="font-athletic text-sm font-black uppercase text-yellow-300">
-                    Braçadeira de Capitão (1.5x)
-                  </span>
-                </div>
-                <p className="text-muted leading-relaxed">
-                  O jogador escolhido como Capitão tem <strong>toda a sua pontuação da rodada multiplicada por 1.5x</strong>. Vale a pena apostar em zagueiros seguros, meias garçons ou atacantes goleadores!
-                </p>
-              </div>
-
-              {/* Cartas Especiais */}
-              <div className="rounded-2xl border border-purple-500/30 bg-purple-950/20 p-4 space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-500/20 text-purple-300">
-                    🃏
-                  </span>
-                  <span className="font-athletic text-sm font-black uppercase text-purple-200">
-                    Cartas & Desafios Especiais
-                  </span>
-                </div>
-                <p className="text-muted leading-relaxed">
-                  Abra pacotes no Cartola e ative cartas táticas no seu elenco (como <em>Paredão</em>, <em>Goleada</em> ou <em>Dupla Dinâmica</em>) para multiplicar pontos de ações específicas!
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-white/10 bg-black/50 p-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full rounded-xl bg-accent py-3 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_20px_rgba(204,255,0,0.25)] transition-transform active:scale-95 hover:bg-accent/90"
-          >
-            Entendido, vamos jogar!
-          </button>
+          </>}
+          {tab === "base" && <div className="overflow-hidden rounded-2xl border border-white/10">
+            <div className="grid grid-cols-[1.25fr_repeat(3,1fr)] bg-white/5 px-3 py-2 text-[8px] font-black uppercase text-muted"><span>Scout</span><span>ATA/ALA</span><span>DEF/VOL</span><span>GOL</span></div>
+            {RULES.map((rule) => <div key={rule.scout} className="grid grid-cols-[1.25fr_repeat(3,1fr)] items-center border-t border-white/5 px-3 py-3 text-[10px]"><strong>{rule.scout}</strong><span>{rule.attack}</span><span>{rule.defense}</span><span>{rule.goalkeeper}</span></div>)}
+          </div>}
+          {tab === "extras" && <div className="space-y-3 text-xs leading-5 text-muted">
+            <p className="rounded-2xl border border-warning/25 bg-warning/10 p-4"><strong className="text-warning">Capitão ×{settings.captainMultiplier.toFixed(1)}</strong><br />O adicional do capitão é aplicado sobre a pontuação final da vaga.</p>
+            <p className="rounded-2xl border border-accent/25 bg-accent/10 p-4"><strong className="text-accent">Cartas e palpites continuam</strong><br />Os efeitos especiais são calculados separadamente e somados depois dos seis atletas.</p>
+            <p className="rounded-2xl border border-white/10 p-4">Exemplo: um goleiro que perde por 0×2 recebe +1 pela atuação e −1 pelos gols sofridos, terminando com 0 ponto.</p>
+          </div>}
         </div>
       </div>
-    </div>,
-    document.body
+    </div>, document.body,
   );
 }

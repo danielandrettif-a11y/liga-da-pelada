@@ -54,7 +54,7 @@ export type FantasyRankingEntry = {
   } | null;
 };
 
-type FantasyRankingFilter = "points" | "best" | "budget" | "captain" | "def" | "mid" | "attack";
+type FantasyRankingFilter = "points" | "best" | "budget" | "captain" | "def" | "attack";
 
 type FantasyRankingMetric = {
   id: FantasyRankingFilter;
@@ -77,11 +77,10 @@ const FANTASY_RANKING_METRICS: FantasyRankingMetric[] = [
   { id: "budget", label: "Cartoletas", title: "Reis das Cartoletas", description: "Maior patrimônio atual", valueLabel: "cartoletas", field: "current_budget", currency: true },
   { id: "captain", label: "Capitão", title: "Mestres da Faixa", description: "Mais pontos extras com o capitão", valueLabel: "bônus capitão", field: "captain_bonus_points" },
   { id: "def", label: "DEF/VOL", title: "Muralha do Cartola", description: "Mais pontos com atletas na DEF/VOL", valueLabel: "pontos DEF/VOL", field: "def_points" },
-  { id: "mid", label: "ALA", title: "Eficiência dos Alas", description: "Média por atleta escalado em ALA", valueLabel: "pts por ALA", field: "mid_average_points", sampleField: "mid_selection_count", minimumSelections: 3 },
-  { id: "attack", label: "ATA", title: "Eficiência no Ataque", description: "Média por atleta escalado no ATA", valueLabel: "pts por ATA", field: "attack_average_points", sampleField: "attack_selection_count", minimumSelections: 3 },
+  { id: "attack", label: "ATA/ALA", title: "Eficiência no Ataque", description: "Média por atleta escalado em ATA/ALA", valueLabel: "pts por ATA/ALA", field: "attack_average_points", sampleField: "attack_selection_count", minimumSelections: 3 },
 ];
 const FANTASY_RANKING_TABS = ["confirmed", "pending"] as const;
-const FANTASY_RANKING_FILTERS: readonly FantasyRankingFilter[] = ["points", "best", "budget", "captain", "def", "mid", "attack"];
+const FANTASY_RANKING_FILTERS: readonly FantasyRankingFilter[] = ["points", "best", "budget", "captain", "def", "attack"];
 
 function metricValue(item: FantasyRankingEntry, metric: FantasyRankingMetric) {
   return Number(item[metric.field] || 0);

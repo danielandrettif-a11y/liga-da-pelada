@@ -514,9 +514,14 @@ export async function calculateRoundStats(roundId: string) {
       const overallPositions = overallByPlayer.get(stats.player_id)?.positions;
       const player = playerById.get(stats.player_id);
       const primaryTrait = Array.isArray(player?.overall_traits) ? player.overall_traits[0] : null;
+      const columnCActive = Number(scoringSnapshot.version || 0) >= 11;
+      const suppressGoalkeeperRewardsForScoring = !columnCActive && suppressGoalkeeperRewards;
+      const currentProfile = profileByPlayerId.get(stats.player_id);
       const fallbackRole = primaryTrait === "defensive" ? "DEF" : primaryTrait === "midfield" ? "MEI" : "ATA";
       const roleWeights: RankingRoleWeight[] = !countsForRanking || stats.games <= 0 || !player?.is_competitive_profile_complete
         ? []
+        : columnCActive
+          ? [{ role: currentProfile === "defensive" ? "DEF" : "ATA", overall: 0, weight: 1 }]
         : frozen.length
           ? frozen
           : overallPositions
@@ -526,7 +531,8 @@ export async function calculateRoundStats(roundId: string) {
               !playersWithPriorOfficialRound.has(stats.player_id),
             )
             : [{ role: fallbackRole, overall: 0, weight: 1 }];
-      const rankingPositionBonus = calculateRankingPositionBonus({
+      const lineRole = currentProfile === "defensive" ? "DEF" : "ATA";
+      const rankingPositionBonus = columnCActive ? 0 : calculateRankingPositionBonus({
         roleWeights,
         goals: stats.goals,
         assists: stats.assists,
@@ -535,7 +541,7 @@ export async function calculateRoundStats(roundId: string) {
         defensiveOneGoalGames: stats.ranking_defensive_one_goal_games,
         goalkeeperGames: stats.goalkeeper_games,
         cleanSheets: stats.clean_sheets,
-        suppressGoalkeeperRewards,
+        suppressGoalkeeperRewards: suppressGoalkeeperRewardsForScoring,
       });
       return {
         ...stats,
@@ -548,8 +554,15 @@ export async function calculateRoundStats(roundId: string) {
         draws: stats.draws,
         losses: stats.losses,
         ownGoals: stats.own_goals,
-        goalkeeperAppearances: suppressGoalkeeperRewards ? 0 : stats.goalkeeper_games,
+        goalkeeperAppearances: suppressGoalkeeperRewardsForScoring ? 0 : stats.goalkeeper_games,
         goalkeeperGoalsConceded: stats.goals_conceded,
+        goalkeeperGoals: stats.goalkeeper_goals,
+        goalkeeperAssists: stats.goalkeeper_assists,
+        goalkeeperOwnGoals: stats.goalkeeper_own_goals,
+        goalkeeperCleanSheets: stats.clean_sheets,
+        teamGoalsConceded: stats.team_goals_conceded,
+        defensiveCleanGames: stats.ranking_defensive_clean_games,
+        lineRole,
         }, scoringSnapshot) : 0,
       };
     });

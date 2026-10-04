@@ -1,7 +1,9 @@
 import type { FantasySettings } from "./config";
 import { calculatePositionBonusValue, type PositionBreakdownInput } from "./position-breakdown";
 
-export type FantasySlotRole = "GOL" | "DEF" | "MEI" | "ATA";
+/** MEI é aceito somente para ler snapshots encerrados anteriores à v11. */
+export type FantasySlotRole = "GOL" | "DEF" | "ATA" | "MEI";
+export type FantasyFormation = "3-2" | "2-3";
 export type FantasyPlayerProfile = string | null | undefined;
 
 export type FantasyLineupSlot = {
@@ -12,22 +14,20 @@ export type FantasyLineupSlot = {
 
 export function getFantasySlotRoles(
   playersPerTeam: number,
-  formation: "2-1-2" | "2-2-1",
+  formation: FantasyFormation,
 ): FantasySlotRole[] {
   if (playersPerTeam === 6) {
-    return formation === "2-1-2"
-      ? ["ATA", "ATA", "MEI", "DEF", "DEF", "GOL"]
-      : ["ATA", "MEI", "MEI", "DEF", "DEF", "GOL"];
+    return formation === "3-2"
+      ? ["ATA", "ATA", "DEF", "DEF", "DEF", "GOL"]
+      : ["ATA", "ATA", "ATA", "DEF", "DEF", "GOL"];
   }
 
   if (playersPerTeam === 5) {
-    return formation === "2-1-2"
-      ? ["ATA", "ATA", "MEI", "DEF", "DEF"]
-      : ["ATA", "MEI", "MEI", "DEF", "DEF"];
+    return ["ATA", "ATA", "DEF", "DEF", "GOL"];
   }
 
   return Array.from({ length: playersPerTeam }, (_, index) =>
-    index === playersPerTeam - 1 ? "GOL" : "MEI",
+    index === playersPerTeam - 1 ? "GOL" : index < Math.ceil((playersPerTeam - 1) / 2) ? "ATA" : "DEF",
   );
 }
 
@@ -39,8 +39,7 @@ export function isCorrectFantasySlot(
   // rodízio no gol, como descrito no guia de pontuação.
   if (slotRole === "GOL") return true;
   if (slotRole === "DEF") return playerProfile === "defensive";
-  if (slotRole === "MEI") return playerProfile === "midfield";
-  return playerProfile === "offensive";
+  return playerProfile === "offensive" || playerProfile === "midfield";
 }
 
 /**

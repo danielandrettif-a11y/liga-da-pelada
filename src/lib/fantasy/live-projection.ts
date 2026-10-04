@@ -1,4 +1,4 @@
-import { calculateFantasyGoalkeeperSlotPoints, calculateFantasyPlayerPoints } from "./engine";
+import { calculateFantasyGoalkeeperSlotPoints, calculateFantasyPlayerPoints, calculateFantasySlotPoints } from "./engine";
 import { applyCaptainMultiplier } from "../bq-scoring";
 import type { FantasySettings } from "./config";
 import {
@@ -232,7 +232,8 @@ export function projectFantasyLiveLineups(
     for (const playerId of lineup.playerIds) {
       const stats = playerStats.get(playerId);
       const slot = slotByPlayer.get(playerId);
-      const bonus = stats && slot
+      const columnC = Number(settings.scoringVersion || 0) >= 11;
+      const bonus = !columnC && stats && slot
         ? calculateFantasyPositionPackageBonus(
             {
               slotRole: slot.slotRole,
@@ -252,9 +253,15 @@ export function projectFantasyLiveLineups(
             settings,
           )
         : 0;
-      const basePoints = stats && slot?.slotRole === "GOL" && Number(settings.scoringVersion || 5) >= 10
-        ? calculateFantasyGoalkeeperSlotPoints(stats, settings)
-        : stats?.basePoints || 0;
+      const basePoints = !stats
+        ? 0
+        : !slot
+          ? stats.basePoints || 0
+          : columnC
+            ? calculateFantasySlotPoints(stats, slot.slotRole, settings)
+            : slot.slotRole === "GOL" && Number(settings.scoringVersion || 5) >= 10
+              ? calculateFantasyGoalkeeperSlotPoints(stats, settings)
+              : stats.basePoints || 0;
       positionBonus += bonus;
       basePointsByPlayer.set(playerId, basePoints);
       pointsByPlayer.set(playerId, basePoints + bonus);

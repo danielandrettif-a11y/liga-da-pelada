@@ -8,7 +8,7 @@ import type {
 } from "@/lib/actions/fantasy";
 import type { FantasyChallengeType } from "@/lib/fantasy/challenges";
 import type { FantasySettings } from "@/lib/fantasy/config";
-import { getFantasySlotRoles } from "@/lib/fantasy/lineup-positions";
+import { getFantasySlotRoles, type FantasyFormation } from "@/lib/fantasy/lineup-positions";
 
 export type FantasyExperienceProps = {
   round: {
@@ -75,7 +75,7 @@ export function lineupPlayersFromSource(lineup: any) {
     : lineup?.fantasy_portfolio_players || []).filter((item: any) => Boolean(item?.player_id));
 }
 
-export function lineupFormationFromSlots(players: any[], playersPerTeam: number): "2-1-2" | "2-2-1" | null {
+export function lineupFormationFromSlots(players: any[], playersPerTeam: number): FantasyFormation | null {
   const roles = Array(playersPerTeam).fill("");
   for (const item of players) {
     if (typeof item.slot_index === "number" && item.slot_index >= 0 && item.slot_index < playersPerTeam && typeof item.slot_role === "string") {
@@ -83,7 +83,7 @@ export function lineupFormationFromSlots(players: any[], playersPerTeam: number)
     }
   }
   if (!roles.some(Boolean)) return null;
-  for (const candidate of ["2-1-2", "2-2-1"] as const) {
+  for (const candidate of ["3-2", "2-3"] as const) {
     const expected = getFantasySlotRoles(playersPerTeam, candidate);
     if (roles.every((role, index) => !role || role === expected[index])) return candidate;
   }
