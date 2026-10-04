@@ -19,6 +19,7 @@ import {
   calculateCostBenefit,
   calculateExpectedFantasyPoints,
   calculateFantasyForm,
+  calculateFantasyGoalkeeperSlotPoints,
   calculateFantasyPredictionIndex,
   calculateFantasyPlayerPoints,
   calculateFantasyTrend,
@@ -36,7 +37,8 @@ import {
   type FantasyLiveLineupProjection,
   type FantasyLivePlayerStats,
 } from "@/lib/fantasy/live-projection";
-import type { FantasyLineupSlot } from "@/lib/fantasy/lineup-positions";
+import type { FantasyLineupSlot, FantasySlotRole } from "@/lib/fantasy/lineup-positions";
+import { calculatePositionBreakdown } from "@/lib/fantasy/position-breakdown";
 import { resolveFantasyLineupPlayerTotal, shouldUseFantasyLiveRanking } from "@/lib/fantasy/lineup-player-total";
 
 export type FantasyMarketPlayer = {
@@ -1937,12 +1939,27 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       ownGoalPoints: Number(snapshot.own_goal_points ?? liveSettingsRow?.own_goal_points ?? DEFAULT_FANTASY_SETTINGS.ownGoalPoints),
       captainMultiplier: Number(snapshot.captain_multiplier ?? liveSettingsRow?.captain_multiplier ?? DEFAULT_FANTASY_SETTINGS.captainMultiplier),
     };
-    const liveMatches = await loadFantasyMatchSnapshots(liveReadClient, scoringRound.round_id);
+    const [{ data: userLineup }, liveMatches] = await Promise.all([
+      liveReadClient
+        .from("fantasy_lineups")
+        .select(
+          "status, captain_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked, is_position_correct, position_bonus, captain_bonus)"
+        )
+        .eq("fantasy_round_id", scoringRound.id)
+        .eq("user_id", account.user.id)
+        .maybeSingle(),
+      loadFantasyMatchSnapshots(liveReadClient, scoringRound.round_id),
+    ]);
     const scoringRoundIsLive = scoringRoundIsCurrent && (
       scoringRound.market_status === "in_progress"
       || liveMatches.some((match: any) => match.status === "live" || match.status === "finished")
     );
     const playerProfile = playerRow.player_profile as "offensive" | "midfield" | "defensive" | null;
+    const lineupPlayer = (userLineup?.fantasy_lineup_players || []).find(
+      (item: any) => item.player_id === playerId,
+    ) || null;
+    const slotRole = (lineupPlayer?.slot_role || null) as FantasySlotRole | null;
+    const slotProfile = lineupPlayer?.player_profile_locked || playerProfile;
     const liveStats = projectFantasyLiveStats(
       liveMatches.map((match: any) => ({
         id: match.id,
@@ -1992,7 +2009,35 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     // O detalhamento precisa fechar apenas com os scouts reconstruídos da
     // rodada e com o snapshot das regras daquela própria rodada. Um total
     // persistido diferente não vira um scout artificial para completar a soma.
-    const authoritativeBasePoints = current.basePoints;
+    const authoritativeBasePoints = slotRole === "GOL" && Number(liveSettings.scoringVersion || 5) >= 10
+      ? calculateFantasyGoalkeeperSlotPoints(current, liveSettings)
+      : current.basePoints;
+    const calculatedPositionBreakdown = slotRole && liveSettings.roleScoringActive !== false
+      ? calculatePositionBreakdown({
+          slotRole,
+          playerProfile: slotProfile,
+          goals: current.goals,
+          assists: current.assists,
+          draws: current.draws,
+          defensiveCleanGames: current.defensiveCleanGames,
+          defensiveOneGoalGames: current.defensiveOneGoalGames,
+          goalkeeperGames: current.goalkeeperGames,
+          cleanSheets: current.cleanSheets,
+          goalkeeperCleanSheetPoints: liveSettings.goalkeeperSlotCleanSheetPoints,
+          suppressGoalkeeperRewards: liveSettings.suppressGoalkeeperRewards,
+          scoringVersion: liveSettings.scoringVersion,
+        })
+      : null;
+    const hasStoredPositionBonus = lineupPlayer?.position_bonus != null && userLineup?.status === "scored";
+    const positionBonus = hasStoredPositionBonus
+      ? Number(lineupPlayer.position_bonus || 0)
+      : Number(calculatedPositionBreakdown?.appliedBonus || 0);
+    const pointsWithPosition = Math.round((authoritativeBasePoints + positionBonus) * 100) / 100;
+    const slotLabel = slotRole === "MEI"
+      ? "ALA"
+      : slotRole === "DEF"
+        ? "DEF/VOL"
+        : slotRole;
     const breakdown: Array<{
       key: string;
       label: string;
@@ -2012,6 +2057,31 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       { key: "goals_conceded", label: "Gols Sofridos no Gol", count: liveSettings.roleScoringActive === false ? current.teamGoalsConceded : current.goalsConceded, unitPoints: concededUnitValue, points: concededValue, icon: "🛡️" },
       { key: "own_goals", label: "Gols Contra", count: current.ownGoals, unitPoints: liveSettings.ownGoalPoints, points: current.ownGoals * liveSettings.ownGoalPoints, icon: "⚠️" },
     ].filter((item) => item.count > 0);
+    if (slotRole) {
+      const positionParts = [
+        ...(calculatedPositionBreakdown?.events || []).map(
+          (event) => `${event.label}: +${Number(event.value).toFixed(1)}`,
+        ),
+        calculatedPositionBreakdown?.specialBonus?.activated
+          ? `${calculatedPositionBreakdown.specialBonus.name}: +${Number(calculatedPositionBreakdown.specialBonus.value).toFixed(1)}`
+          : null,
+      ].filter(Boolean);
+      const positionDescription = lineupPlayer?.is_position_correct === false
+        ? "A posição da escalação não corresponde ao perfil do atleta."
+        : positionParts.length > 0
+          ? positionParts.join(" · ")
+          : `Bônus calculado para a vaga ${slotLabel}.`;
+      breakdown.push({
+        key: "position_bonus",
+        label: `Bônus da posição ${slotLabel}`,
+        count: 1,
+        unitPoints: positionBonus,
+        points: positionBonus,
+        icon: "⚡",
+        description: positionDescription,
+        hideCount: true,
+      });
+    }
     const matchesBreakdown = (liveMatches || [])
       .filter((match: any) => {
         const inPlayers = (match.match_players || []).some((p: any) => p.player_id === playerId);
@@ -2069,6 +2139,11 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       status: scoringRoundIsCurrent ? (scoringRoundIsLive ? "live" : "open") : "finished",
       stats: current,
       basePoints: authoritativeBasePoints,
+      pointsWithPosition,
+      positionBonus,
+      positionLabel: slotLabel,
+      slotRole,
+      captainBonus: Number(lineupPlayer?.captain_bonus || 0),
       breakdown,
       matchesBreakdown,
       rulesList,
@@ -2087,6 +2162,20 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     goalsConceded: gkConceded,
     isGoalkeeper: Boolean(playerRow.is_goalkeeper),
   });
+
+  // Quando o usuário escalou este atleta, a ficha da rodada precisa usar o
+  // mesmo total que o detalhamento: scouts-base + bônus da vaga escolhida.
+  // As demais rodadas continuam com o histórico público do atleta até serem
+  // abertas individualmente.
+  const displayHistory = roundDetail && scoringRound?.id
+    ? history.map((item) => item.fantasyRoundId === scoringRound.id
+      ? { ...item, roundPoints: Number(roundDetail.pointsWithPosition ?? roundDetail.basePoints ?? item.roundPoints) }
+      : item)
+    : history;
+  const displayRecentPointsList = displayHistory
+    .filter((item) => item.games > 0)
+    .slice(-5)
+    .map((item) => item.roundPoints);
 
   return {
     player: {
@@ -2112,10 +2201,10 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     costBenefitRatio: costBenefit.ratio,
     costBenefitFormatted: costBenefit.formattedRatio,
     expectedPoints,
-    recentPointsList,
+    recentPointsList: displayRecentPointsList,
     allTags,
     compactTags,
-    history,
+    history: displayHistory,
     roundDetail,
     cosmetics: {
       bannerAssetKey: (cosmeticLoadout as any)?.banner?.asset_key || null,

@@ -101,7 +101,9 @@ export function FantasyPlayerDrawer({
   const latestSavedPoints = detailData
     ? recentPoints[recentPoints.length - 1]
     : player.recentPointsList?.[0];
-  const livePoints = Number(roundDetail?.basePoints ?? latestSavedPoints ?? player.roundPoints ?? 0);
+  const basePoints = Number(roundDetail?.basePoints ?? latestSavedPoints ?? player.roundPoints ?? 0);
+  const livePoints = Number(roundDetail?.pointsWithPosition ?? basePoints);
+  const positionLabel = roundDetail?.positionLabel || null;
   const breakdownList = roundDetail?.breakdown || [];
   const matchesList = roundDetail?.matchesBreakdown || [];
   const rulesList = roundDetail?.rulesList || [];
@@ -141,14 +143,14 @@ export function FantasyPlayerDrawer({
     >
       <div
         ref={drawerScrollRef}
-        className="mobile-dialog-scroll relative flex w-full max-w-lg max-h-[85dvh] sm:max-h-[85vh] flex-col overflow-y-auto rounded-3xl border border-accent/40 bg-[#06160d] p-5 sm:p-6 shadow-[0_0_60px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto touch-pan-y overscroll-contain"
+        className="mobile-dialog-scroll relative isolate flex w-full max-w-lg max-h-[85dvh] sm:max-h-[85vh] flex-col overflow-y-auto rounded-3xl border border-accent/40 bg-[#06160d] p-5 sm:p-6 shadow-[0_0_60px_rgba(0,0,0,0.95)] animate-fade-in-up my-auto touch-pan-y overscroll-contain"
         style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
         onClick={(e) => e.stopPropagation()}
       >
         {bannerImage && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-[190px] overflow-hidden rounded-t-3xl"
+            className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[190px] overflow-hidden rounded-t-3xl"
           >
             <Image
               src={bannerImage}
@@ -224,7 +226,7 @@ export function FantasyPlayerDrawer({
         </div>
 
         {/* Abas Superiores de Navegação */}
-        <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-black/40 p-1">
+        <div className="relative z-10 mt-4 grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-[#06160d]/95 p-1 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-sm">
           <button
             type="button"
             onClick={() => selectTab("overview")}
@@ -256,7 +258,7 @@ export function FantasyPlayerDrawer({
 
         {/* CONTEÚDO DA ABA 1: VISÃO GERAL & MERCADO */}
         {activeTab === "overview" && (
-          <div className="animate-fade-in space-y-3 pt-2">
+          <div className="relative z-[1] animate-fade-in space-y-3 pt-2">
             {/* Grade de Destaques de Preço e Desempenho */}
             <div className="grid grid-cols-3 gap-2">
               <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
@@ -444,7 +446,7 @@ export function FantasyPlayerDrawer({
 
         {/* CONTEÚDO DA ABA 2: PONTUAÇÃO & SCOUTS DESTRINCHADOS */}
         {activeTab === "scouts" && (
-          <div className="animate-fade-in space-y-4 pt-2">
+          <div className="relative z-[1] animate-fade-in space-y-4 pt-2">
             {/* Hero Card de Pontuação Atual / Rodada */}
             <div className="relative overflow-hidden rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/15 via-[#0c2214] to-black/60 p-4 shadow-[0_0_30px_rgba(204,255,0,0.1)]">
               <div className="flex items-center justify-between gap-3">
@@ -466,16 +468,20 @@ export function FantasyPlayerDrawer({
                     {livePoints.toFixed(1)}
                   </span>
                   <span className="text-[9px] font-bold uppercase tracking-wider text-muted">
-                    Pontos-base
+                    {positionLabel ? `Com posição ${positionLabel}` : "Pontos-base"}
                   </span>
                 </div>
               </div>
               <p className="mt-2 text-[10px] leading-relaxed text-muted border-t border-accent/15 pt-2">
                 {detailIsCurrent
                   ? detailIsLive
-                    ? "Valores calculados em tempo real a partir dos scouts e eventos de jogo. O bônus de capitão e cartas especiais incidem no total da sua escalação."
+                    ? positionLabel
+                      ? `Scouts-base e bônus da posição ${positionLabel}, calculados em tempo real. Capitão e cartas especiais aparecem no total da escalação.`
+                      : "Valores calculados em tempo real a partir dos scouts e eventos de jogo. O bônus de capitão e cartas especiais incidem no total da sua escalação."
                     : "A rodada ainda não começou. Os scouts e a pontuação serão atualizados assim que as partidas forem disputadas."
-                  : "Pontuação-base oficial da última rodada válida, calculada com as regras que estavam vigentes naquela rodada. Bônus de posição, capitão e cartas aparecem no total da escalação."}
+                  : positionLabel
+                    ? `Total dos scouts-base com o bônus da posição ${positionLabel} usado na sua escalação. Capitão e cartas especiais são contabilizados separadamente.`
+                    : "Pontuação-base da última rodada válida, reconstruída com as regras que estavam vigentes naquela rodada."}
               </p>
             </div>
 
@@ -535,7 +541,9 @@ export function FantasyPlayerDrawer({
               )}
 
               <div className="mt-3 flex items-center justify-between border-t border-accent/20 pt-2.5 text-xs font-black">
-                <span className="text-foreground uppercase text-[10px]">Total dos Scouts</span>
+                <span className="text-foreground uppercase text-[10px]">
+                  {positionLabel ? `Total com posição ${positionLabel}` : "Total dos Scouts"}
+                </span>
                 <span className="text-sm text-accent font-black">
                   {livePoints > 0 ? "+" : ""}{livePoints.toFixed(1)} pts
                 </span>
