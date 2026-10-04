@@ -37,8 +37,7 @@ import {
   type FantasyLivePlayerStats,
 } from "@/lib/fantasy/live-projection";
 import type { FantasyLineupSlot } from "@/lib/fantasy/lineup-positions";
-import { calculatePositionBreakdown } from "@/lib/fantasy/position-breakdown";
-import { resolveFantasyLineupPlayerTotal } from "@/lib/fantasy/lineup-player-total";
+import { resolveFantasyLineupPlayerTotal, shouldUseFantasyLiveRanking } from "@/lib/fantasy/lineup-player-total";
 
 export type FantasyMarketPlayer = {
   id: string;
@@ -1983,19 +1982,6 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     const goalValue = (liveSettings.roleScoringActive === false && playerProfile === "offensive"
       ? liveSettings.attackerGoalPoints
       : liveSettings.goalPoints) ?? liveSettings.goalPoints;
-    const defensivePosition = calculatePositionBreakdown({
-      scoringVersion: liveSettings.scoringVersion,
-      slotRole: "DEF",
-      playerProfile,
-      goals: current.goals,
-      assists: current.assists,
-      defensiveCleanGames: current.defensiveCleanGames,
-      defensiveOneGoalGames: current.defensiveOneGoalGames,
-      goalkeeperGames: current.goalkeeperGames,
-      cleanSheets: current.cleanSheets,
-      suppressGoalkeeperRewards: liveSettings.suppressGoalkeeperRewards,
-    });
-    const defensiveBonus = liveSettings.roleScoringActive === false ? 0 : defensivePosition.appliedBonus;
     const concededValue = liveSettings.roleScoringActive === false
       ? current.teamGoalsConceded * (liveSettings.teamGoalConcededPoints ?? 0)
       : current.goalsConceded * liveSettings.goalConcededPoints;
@@ -2024,7 +2010,6 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       { key: "losses", label: "Derrotas", count: current.losses, unitPoints: liveSettings.lossPoints, points: current.losses * liveSettings.lossPoints, icon: "❌" },
       { key: "goalkeeper_games", label: "Jogos no Gol (Rodízio)", count: current.goalkeeperGames, unitPoints: liveSettings.suppressGoalkeeperRewards ? 0 : liveSettings.goalkeeperAppearancePoints, points: current.goalkeeperGames * (liveSettings.suppressGoalkeeperRewards ? 0 : liveSettings.goalkeeperAppearancePoints), icon: "🧤" },
       { key: "goals_conceded", label: "Gols Sofridos no Gol", count: liveSettings.roleScoringActive === false ? current.teamGoalsConceded : current.goalsConceded, unitPoints: concededUnitValue, points: concededValue, icon: "🛡️" },
-      { key: "defensive_bonus", label: "Bônus DEF aplicado", count: current.defensiveCleanGames + current.defensiveOneGoalGames, unitPoints: 0, points: defensiveBonus, icon: "🔒" },
       { key: "own_goals", label: "Gols Contra", count: current.ownGoals, unitPoints: liveSettings.ownGoalPoints, points: current.ownGoals * liveSettings.ownGoalPoints, icon: "⚠️" },
     ].filter((item) => item.count > 0);
     const matchesBreakdown = (liveMatches || [])
@@ -2085,7 +2070,6 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       stats: current,
       basePoints: authoritativeBasePoints,
       breakdown,
-      positionBreakdown: defensivePosition,
       matchesBreakdown,
       rulesList,
     };
@@ -2364,7 +2348,11 @@ export async function getFantasyRanking(
       );
     }
 
-    const isTargetLive = Boolean(live && (!roundId || roundId === live.roundId));
+    const isTargetLive = shouldUseFantasyLiveRanking({
+      isLive: Boolean(live?.isLive),
+      projectionRoundId: live?.roundId,
+      requestedRoundId: roundId,
+    });
     if (isTargetLive) {
       // A projeção calcula os pontos lance a lance. Os registros persistidos
       // são um fallback para não deixar a tabela vazia caso uma escalação

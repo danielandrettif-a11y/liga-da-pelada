@@ -29,3 +29,19 @@ export function resolveFantasyLineupPlayerTotal({
   }
   return Number(storedPlayerPoints ?? storedTotalPoints ?? 0);
 }
+
+export function shouldUseFantasyLiveRanking({
+  isLive,
+  projectionRoundId,
+  requestedRoundId,
+}: {
+  isLive: boolean;
+  projectionRoundId?: string | null;
+  requestedRoundId?: string | null;
+}) {
+  return Boolean(
+    isLive
+    && projectionRoundId
+    && (!requestedRoundId || requestedRoundId === projectionRoundId),
+  );
+}
