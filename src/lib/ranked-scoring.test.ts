@@ -107,3 +107,39 @@ describe("TESTE 16: paridade Cartola BQ v5", () => {
     }, DEFAULT_FANTASY_SETTINGS)).toBe(0);
   });
 });
+
+describe("Pontuação Ranked — Coluna C v11", () => {
+  const columnCSnapshot = {
+    version: 11,
+    goal: 4,
+    assist: 2.5,
+    win: 0,
+    draw: 0,
+    loss: 0,
+    ownGoal: -3,
+    goalkeeperAppearance: 1,
+    goalkeeperGoalConceded: -0.5,
+  };
+
+  it("não explica uma rodada v11 com vitória, empate ou derrota", () => {
+    const points = buildRankedPointBreakdown({
+      goals: 6,
+      assists: 3,
+      wins: 6,
+      draws: 4,
+      losses: 4,
+      goalkeeperAppearances: 3,
+      goalkeeperGoalsConceded: 3,
+      teamGoalsConceded: 3,
+      lineRole: "ATA",
+    }, columnCSnapshot);
+
+    expect(points.map((item) => item.label)).toEqual([
+      "Gols como ATA",
+      "Assistências como ATA",
+      "Atuações no gol",
+      "Gols sofridos no gol",
+    ]);
+    expect(points.reduce((total, item) => total + item.points, 0)).toBe(33);
+  });
+});

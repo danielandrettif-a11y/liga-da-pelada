@@ -32,6 +32,9 @@ type RankingStatsRow = {
   assists: number;
   points: number;
   goalkeeper_games: number;
+  goalkeeper_goals: number;
+  goalkeeper_assists: number;
+  goalkeeper_own_goals: number;
   goals_conceded: number;
   clean_sheets: number;
   own_goals: number;
@@ -43,6 +46,7 @@ type RankingStatsRow = {
   ranking_role_weights: unknown;
   ranking_position_bonus: number;
   ranking_points: number;
+  player_profile_locked: "defensive" | "midfield" | "offensive" | null;
   player: Player;
 };
 
@@ -139,7 +143,7 @@ function sortRankingEntries<T extends Pick<RankingEntry, "points" | "wins" | "go
 
 function aggregateRankingRows(
   rows: RankingStatsRow[],
-  roundsMap?: Map<string, { id: string; number: number; date: string }>,
+  roundsMap?: Map<string, { id: string; number: number; date: string; scoringSnapshot?: Record<string, unknown> | null }>,
   maxBestRounds: number = 6,
 ) {
   const playerRowsMap = new Map<string, RankingStatsRow[]>();
@@ -188,6 +192,10 @@ function aggregateRankingRows(
 
     const mapRound = (r: RankingStatsRow, countedInTop6: boolean, legacy = false) => {
       const roundInfo = roundsMap?.get(r.round_id);
+      // Cada rodada guarda sua própria regra. Usar o padrão v5 aqui fazia a
+      // tela detalhada explicar uma rodada v11 com V/E/D e depois criar um
+      // "Ajuste da rodada" para alcançar o total já salvo.
+      const scoringSnapshot = normalizeBQScoringSnapshot(roundInfo?.scoringSnapshot);
       const pointBreakdown = buildRankedPointBreakdown({
         goals: r.goals,
         assists: r.assists,
@@ -196,8 +204,15 @@ function aggregateRankingRows(
         losses: r.losses,
         goalkeeperAppearances: r.goalkeeper_games,
         goalkeeperGoalsConceded: r.goals_conceded,
+        goalkeeperGoals: r.goalkeeper_goals,
+        goalkeeperAssists: r.goalkeeper_assists,
+        goalkeeperOwnGoals: r.goalkeeper_own_goals,
+        goalkeeperCleanSheets: r.clean_sheets,
+        teamGoalsConceded: r.team_goals_conceded,
+        defensiveCleanGames: r.ranking_defensive_clean_games,
+        lineRole: r.player_profile_locked === "defensive" ? "DEF" : "ATA",
         ownGoals: r.own_goals,
-      });
+      }, scoringSnapshot);
       const explainedPoints = roundRankingPoints(pointBreakdown.reduce((sum, item) => sum + item.points, 0));
       if (explainedPoints !== roundRankingPoints(r.points)) {
         pointBreakdown.push({ label: "Ajuste da rodada", count: 1, points: roundRankingPoints(r.points - explainedPoints) });
@@ -843,7 +858,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   const visibleSeasonsById = new Map(visibleSeasons.map((item) => [item.id, item]));
   const { data: rounds, error: roundsError } = await supabase
     .from("rounds")
-    .select("id, number, date, season_id, best_goalkeeper_player_id")
+    .select("id, number, date, season_id, best_goalkeeper_player_id, scoring_snapshot")
     .in("season_id", visibleSeasons.map((item) => item.id))
     .eq("status", "finished")
     .eq("round_type", "official")
@@ -869,6 +884,9 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       assists,
       points,
       goalkeeper_games,
+      goalkeeper_goals,
+      goalkeeper_assists,
+      goalkeeper_own_goals,
       goals_conceded,
       clean_sheets,
       own_goals,
@@ -880,6 +898,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       ranking_role_weights,
       ranking_position_bonus,
       ranking_points,
+      player_profile_locked,
       player:player_id (*)
     `)
     .in("round_id", (rounds || []).map((round) => round.id));
@@ -900,7 +919,12 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     (row) => currentRoundIds.has(row.round_id) && isCompetitiveProfileComplete(row.player),
   );
   const latestRound = currentRounds[0];
-  const roundsMap = new Map((rounds || []).map((round) => [round.id, { id: round.id, number: round.number, date: round.date }]));
+  const roundsMap = new Map((rounds || []).map((round) => [round.id, {
+    id: round.id,
+    number: round.number,
+    date: round.date,
+    scoringSnapshot: round.scoring_snapshot as Record<string, unknown> | null,
+  }]));
   const activePlayerIds = rankingActivePlayerIds(currentRounds.slice(0, 3).map((round) => round.id), eligibleCurrentStats);
   const previousActivePlayerIds = rankingActivePlayerIds(currentRounds.slice(1, 4).map((round) => round.id), eligibleCurrentStats);
   const currentStats = eligibleCurrentStats.filter((row) => activePlayerIds.has(row.player_id));
