@@ -42,6 +42,7 @@ import type { FantasyLineupSlot, FantasySlotRole } from "@/lib/fantasy/lineup-po
 import { calculatePositionBreakdown } from "@/lib/fantasy/position-breakdown";
 import {
   resolveFantasyBulletinTotal,
+  resolveFantasyFinishedPlayerScores,
   resolveFantasyLineupPlayerTotal,
   shouldUseFantasyRoundProjection,
 } from "@/lib/fantasy/lineup-player-total";
@@ -1457,13 +1458,20 @@ export async function getFantasyDashboard() {
   const adjustedBudget = isTest
     ? dynamicInitialBudget
     : Math.max(storedBudget, dynamicInitialBudget);
-  const latestLineupPlayerTotal = latestLineup
-    ? resolveFantasyLineupPlayerTotal({
+  const latestFinishedPlayerScores = latestLineup
+    ? resolveFantasyFinishedPlayerScores({
         projectedPlayers: latestFinishedProjection?.players,
         storedPlayers: latestLineup.fantasy_lineup_players || [],
-        storedPlayerPoints: latestLineup.player_points,
-        storedTotalPoints: latestLineup.total_points,
       })
+    : [];
+  const latestLineupPlayerTotal = latestLineup
+    ? latestFinishedPlayerScores.length
+      ? latestFinishedPlayerScores.reduce((total, player) => total + player.points, 0)
+      : resolveFantasyLineupPlayerTotal({
+          storedPlayers: latestLineup.fantasy_lineup_players || [],
+          storedPlayerPoints: latestLineup.player_points,
+          storedTotalPoints: latestLineup.total_points,
+        })
     : 0;
   const latestCardPoints = Number(
     latestCardActivation?.result_bonus
@@ -1515,16 +1523,7 @@ export async function getFantasyDashboard() {
             playerPoints: latestLineupPlayerTotal,
             cardPoints: latestCardPoints,
           }),
-          playerScores: latestFinishedProjection?.players?.length
-            ? latestFinishedProjection.players.map((player) => ({
-                playerId: player.playerId,
-                points: Number(player.totalPoints || 0),
-              }))
-            : (latestLineup?.fantasy_lineup_players || []).map((player: any) => ({
-                playerId: player.player_id as string,
-                // Fallback para bancos que ainda não aplicaram a reconciliação.
-                points: Number(player.total_points || 0),
-              })),
+          playerScores: latestFinishedPlayerScores,
         }
       : null,
     // V3: Pacotes, Inventário e Carta Ativa

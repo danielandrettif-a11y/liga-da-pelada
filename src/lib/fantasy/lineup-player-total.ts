@@ -1,8 +1,52 @@
 type ProjectedPlayerScore = { totalPoints?: number | string | null };
 type StoredPlayerScore = { total_points?: number | string | null };
 
+type ProjectedLineupPlayerScore = ProjectedPlayerScore & {
+  playerId: string;
+};
+
+type StoredLineupPlayerScore = StoredPlayerScore & {
+  player_id: string;
+  slot_role?: string | null;
+};
+
 function sumScores(values: Array<number | string | null | undefined>) {
   return values.reduce<number>((total, value) => total + Number(value || 0), 0);
+}
+
+/**
+ * Na rodada finalizada, a apuração persistida do goleiro é a fonte oficial.
+ * Ela já considera as partidas disputadas no gol e é reconciliada pelas
+ * migrations de fechamento. Os jogadores de linha continuam refletindo a
+ * reconstrução atual dos scouts.
+ */
+export function resolveFantasyFinishedPlayerScores({
+  projectedPlayers,
+  storedPlayers,
+}: {
+  projectedPlayers?: ProjectedLineupPlayerScore[] | null;
+  storedPlayers?: StoredLineupPlayerScore[] | null;
+}) {
+  const projectedByPlayerId = new Map(
+    (projectedPlayers || []).map((player) => [
+      player.playerId,
+      Number(player.totalPoints || 0),
+    ]),
+  );
+
+  if (storedPlayers?.length) {
+    return storedPlayers.map((player) => ({
+      playerId: player.player_id,
+      points: player.slot_role === "GOL"
+        ? Number(player.total_points || 0)
+        : (projectedByPlayerId.get(player.player_id) ?? Number(player.total_points || 0)),
+    }));
+  }
+
+  return (projectedPlayers || []).map((player) => ({
+    playerId: player.playerId,
+    points: Number(player.totalPoints || 0),
+  }));
 }
 
 /**

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   resolveFantasyBulletinTotal,
+  resolveFantasyFinishedPlayerScores,
   resolveFantasyLineupPlayerTotal,
   shouldUseFantasyRoundProjection,
 } from "./lineup-player-total";
@@ -34,6 +35,25 @@ describe("total dos jogadores escalados", () => {
     const total = resolveFantasyBulletinTotal({ playerPoints: 217.25, cardPoints: 3 });
     expect(total).toBe(220.25);
     expect(total.toFixed(1)).toBe("220.3");
+  });
+
+  it("usa a apuração oficial do goleiro na rodada finalizada", () => {
+    const scores = resolveFantasyFinishedPlayerScores({
+      projectedPlayers: [
+        { playerId: "ala", totalPoints: 74.25 },
+        { playerId: "goleiro", totalPoints: 0 },
+      ],
+      storedPlayers: [
+        { player_id: "ala", slot_role: "ALA", total_points: 78.75 },
+        { player_id: "goleiro", slot_role: "GOL", total_points: 16.5 },
+      ],
+    });
+
+    expect(scores).toEqual([
+      { playerId: "ala", points: 74.25 },
+      { playerId: "goleiro", points: 16.5 },
+    ]);
+    expect(scores.reduce((total, player) => total + player.points, 0)).toBe(90.75);
   });
 
   it("reconstrói também a rodada finalizada quando o alvo é o mesmo", () => {
