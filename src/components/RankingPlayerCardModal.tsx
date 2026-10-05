@@ -106,14 +106,12 @@ function drawCanvasName(
   context: CanvasRenderingContext2D,
   name: string,
   title: string | null | undefined,
-  profile: string,
   box: CanvasBox,
   color: string,
 ) {
   const showTitle = Boolean(title);
   const titleHeight = showTitle ? 19 : 0;
-  const profileHeight = 18;
-  const nameHeight = box.height - titleHeight - profileHeight;
+  const nameHeight = box.height - titleHeight;
   let fontSize = Math.min(46, nameHeight * .44);
   let lines: string[] = [];
   while (fontSize >= 22) {
@@ -138,9 +136,6 @@ function drawCanvasName(
     context.fillText(`✦ ${title!.toUpperCase()}`, box.x + box.width / 2, box.y + nameHeight + 12, box.width * .68);
     context.shadowColor = "transparent";
   }
-  context.font = "900 13px Arial";
-  context.fillStyle = "#ccff00";
-  context.fillText(`TAG FLUIDA · ${profile}`, box.x + box.width / 2, box.y + box.height - 4, box.width * .72);
   context.textBaseline = "alphabetic";
 }
 
@@ -266,6 +261,19 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
   tracePhotoShape(context, layout.photoShape, photoBox, 3.5);
   context.stroke();
 
+  const profileBox = rankingCardBoxPixels(layout.profile, card);
+  context.fillStyle = "rgba(2,12,8,.92)";
+  roundedRect(context, profileBox.x, profileBox.y, profileBox.width, profileBox.height, 12);
+  context.fill();
+  context.strokeStyle = theme.edge;
+  context.lineWidth = 2.5;
+  roundedRect(context, profileBox.x, profileBox.y, profileBox.width, profileBox.height, 12);
+  context.stroke();
+  context.fillStyle = theme.edge;
+  context.textAlign = "center";
+  context.font = "900 14px Arial";
+  context.fillText(`TAG · ${cardContent.profile}`, profileBox.x + profileBox.width / 2, profileBox.y + profileBox.height * .67, profileBox.width * .88);
+
   if (cardContent.speedStars) {
     const speedBox = rankingCardBoxPixels(layout.speed, card);
     context.save();
@@ -296,7 +304,7 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
     roundedRect(context, nameBox.x, nameBox.y, nameBox.width, nameBox.height, 18);
     context.fill();
   }
-  drawCanvasName(context, cardContent.name, cardContent.title, cardContent.profile, nameBox, theme.ink);
+  drawCanvasName(context, cardContent.name, cardContent.title, nameBox, theme.ink);
 
   const awardsBox = rankingCardBoxPixels(layout.awards, card);
   context.textAlign = "center";
@@ -491,6 +499,14 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
             />
           </div>
 
+          <div
+            aria-label={`Tag fluida ${cardContent.profile}`}
+            className="absolute z-20 flex items-center justify-center rounded-md border bg-[#020c08]/90 px-1 text-center text-[6px] font-black uppercase tracking-[.08em] shadow-[0_3px_10px_rgba(0,0,0,.85)]"
+            style={{ ...rankingCardBoxStyle(layout.profile), borderColor: theme.edge, color: theme.edge, textShadow: "0 1px 3px rgba(0,0,0,.95)" }}
+          >
+            TAG · {cardContent.profile}
+          </div>
+
           {cardContent.speedStars && (
             <div
               className="absolute z-20 flex items-center justify-center gap-1 rounded-md border-[1.5px] bg-[#020c08]/90 text-[8px] font-black tracking-[.08em] shadow-[0_3px_10px_rgba(0,0,0,.85)]"
@@ -507,7 +523,6 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
             >
               <h2 className={`ranking-card-player-name max-h-[1.9em] overflow-hidden font-athletic font-black uppercase text-white drop-shadow-[0_2px_4px_rgba(0,0,0,.9)] ${displayName.length > 22 ? "text-[11px] leading-[.92] tracking-normal" : displayName.length > 13 ? "text-[13px] leading-[.95] tracking-normal" : "text-[17px] leading-none tracking-[.04em]"}`}>{displayName}</h2>
               {cardContent.title && <p className="mt-0.5 max-w-full truncate text-[7px] font-black uppercase tracking-[.13em] drop-shadow-[0_1px_2px_rgba(0,0,0,.95)]" style={{ color: theme.ink }}>✦ {cardContent.title}</p>}
-              <p className="mt-0.5 max-w-full truncate text-[6px] font-black uppercase tracking-[.12em] drop-shadow-[0_1px_2px_rgba(0,0,0,.95)]" style={{ color: theme.edge }}>Tag fluida · {cardContent.profile}</p>
             </div>
           </div>
 

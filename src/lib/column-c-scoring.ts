@@ -1,12 +1,21 @@
-/** Regras posicionais da Coluna C com proteção regressiva, vigentes na v12. */
-export const COLUMN_C_SCORING_VERSION = 12;
+/** Regras posicionais da Coluna C com penalidade defensiva por faixa, vigentes na v13. */
+export const COLUMN_C_SCORING_VERSION = 13;
 
 export type ColumnCLineRole = "DEF" | "ATA";
 export type ColumnCSlotRole = ColumnCLineRole | "GOL";
 
 export const COLUMN_C_SCORING = {
   ATA: { goal: 4, assist: 2.5, conceded: -0.5, cleanSheet: 0, ownGoal: -3 },
-  DEF: { goal: 5, assist: 3, conceded: -0.5, cleanSheet: 2, oneGoal: 1, ownGoal: -3 },
+  DEF: {
+    goal: 5,
+    assist: 3,
+    conceded: -0.5,
+    cleanSheet: 2,
+    oneGoal: 1,
+    oneGoalConceded: -0.75,
+    twoGoalsConceded: -1.75,
+    ownGoal: -3,
+  },
   GOL: { goal: 5, assist: 3, conceded: -0.5, cleanSheet: 4, oneGoal: 2, appearance: 1, ownGoal: -3 },
 } as const;
 
@@ -25,6 +34,17 @@ export type ColumnCStats = {
   goalkeeperCleanSheets?: number;
 };
 
+export type ColumnCLineScoringOptions = {
+  goal?: number;
+  assist?: number;
+  conceded?: number;
+  cleanSheet?: number;
+  oneGoal?: number;
+  oneGoalConceded?: number;
+  twoGoalsConceded?: number;
+  ownGoal?: number;
+};
+
 const count = (value: number | null | undefined) => Number(value || 0);
 const cents = (value: number) => Math.round(value * 100);
 
@@ -37,20 +57,33 @@ export function inferOneGoalGames(games: number, cleanSheets: number, goalsConce
   return Math.max(0, Math.min(nonCleanGames, nonCleanGames * 2 - count(goalsConceded)));
 }
 
+/** Em partidas até dois gols: sofridos = jogos_de_1 + 2 × jogos_de_2. */
+export function inferTwoGoalGames(goalsConceded: number, oneGoalGames: number) {
+  return Math.max(0, (count(goalsConceded) - count(oneGoalGames)) / 2);
+}
+
 export function calculateColumnCLinePoints(
   role: ColumnCLineRole,
   stats: ColumnCStats,
   scoringVersion = COLUMN_C_SCORING_VERSION,
+  options: ColumnCLineScoringOptions = {},
 ) {
   const rule = COLUMN_C_SCORING[role];
   const progressiveDefense = role === "DEF" && scoringVersion >= 12;
+  const tieredDefensePenalty = role === "DEF" && scoringVersion >= 13;
+  const oneGoalGames = count(stats.defensiveOneGoalGames);
+  const twoGoalGames = inferTwoGoalGames(count(stats.teamGoalsConceded), oneGoalGames);
+  const concededPoints = tieredDefensePenalty
+    ? oneGoalGames * cents(options.oneGoalConceded ?? COLUMN_C_SCORING.DEF.oneGoalConceded)
+      + twoGoalGames * cents(options.twoGoalsConceded ?? COLUMN_C_SCORING.DEF.twoGoalsConceded)
+    : count(stats.teamGoalsConceded) * cents(options.conceded ?? rule.conceded);
   return (
-    count(stats.goals) * cents(rule.goal)
-    + count(stats.assists) * cents(rule.assist)
-    + count(stats.teamGoalsConceded) * cents(rule.conceded)
-    + count(stats.defensiveCleanGames) * cents(rule.cleanSheet)
-    + (progressiveDefense ? count(stats.defensiveOneGoalGames) * cents(COLUMN_C_SCORING.DEF.oneGoal) : 0)
-    + count(stats.ownGoals) * cents(rule.ownGoal)
+    count(stats.goals) * cents(options.goal ?? rule.goal)
+    + count(stats.assists) * cents(options.assist ?? rule.assist)
+    + concededPoints
+    + count(stats.defensiveCleanGames) * cents(role === "DEF" ? (options.cleanSheet ?? rule.cleanSheet) : rule.cleanSheet)
+    + (progressiveDefense && !tieredDefensePenalty ? oneGoalGames * cents(options.oneGoal ?? COLUMN_C_SCORING.DEF.oneGoal) : 0)
+    + count(stats.ownGoals) * cents(options.ownGoal ?? rule.ownGoal)
   ) / 100;
 }
 
@@ -88,6 +121,7 @@ export function calculateColumnCRankedPoints(
   role: ColumnCLineRole,
   stats: ColumnCStats,
   scoringVersion = COLUMN_C_SCORING_VERSION,
+  lineOptions: ColumnCLineScoringOptions = {},
 ) {
   const lineStats: ColumnCStats = {
     goals: Math.max(0, count(stats.goals) - count(stats.goalkeeperGoals)),
@@ -97,7 +131,7 @@ export function calculateColumnCRankedPoints(
     defensiveCleanGames: count(stats.defensiveCleanGames),
     defensiveOneGoalGames: count(stats.defensiveOneGoalGames),
   };
-  return calculateColumnCLinePoints(role, lineStats, scoringVersion)
+  return calculateColumnCLinePoints(role, lineStats, scoringVersion, lineOptions)
     + calculateColumnCGoalkeeperPoints(stats, scoringVersion);
 }
 

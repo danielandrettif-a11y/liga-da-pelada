@@ -15,6 +15,7 @@ export type RankingCardLayout = {
   header: RankingCardBox;
   score: RankingCardBox;
   photo: RankingCardBox;
+  profile: RankingCardBox;
   speed: RankingCardBox;
   name: RankingCardBox;
   awards: RankingCardBox;
@@ -57,6 +58,7 @@ export const RANKING_CARD_LAYOUT: RankingCardLayout = {
   header: { left: 29, top: 10.5, width: 42, height: 4.8 },
   score: { left: 12.5, top: 18, width: 38.5, height: 33 },
   photo: { left: 52, top: 17.8, width: 32, height: 29.2 },
+  profile: { left: 57.5, top: 43.1, width: 21, height: 3.4 },
   speed: { left: 55, top: 48.2, width: 26, height: 4.2 },
   name: { left: 8.5, top: 54.1, width: 83, height: 8.6 },
   awards: { left: 12.8, top: 64.4, width: 74.4, height: 12.3 },

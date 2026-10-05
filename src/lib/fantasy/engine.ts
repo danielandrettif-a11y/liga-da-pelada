@@ -218,6 +218,8 @@ export function calculateFantasySlotPoints(
       : calculateFantasyPlayerPoints({ wins: 0, ...stats }, settings);
   }
   if (slotRole === "GOL") return calculateFantasyGoalkeeperSlotPoints(stats, settings);
+  const scoringVersion = Number(settings.scoringVersion || 0);
+  const configurableColumnC = scoringVersion >= 13;
   return calculateColumnCLinePoints(slotRole === "DEF" ? "DEF" : "ATA", {
     goals: Math.max(0, stats.goals - Number(stats.goalkeeperGoals || 0)),
     assists: Math.max(0, stats.assists - Number(stats.goalkeeperAssists || 0)),
@@ -225,7 +227,16 @@ export function calculateFantasySlotPoints(
     teamGoalsConceded: Math.max(0, Number(stats.teamGoalsConceded || 0) - Number(stats.goalsConceded || 0)),
     defensiveCleanGames: stats.defensiveCleanGames || 0,
     defensiveOneGoalGames: stats.defensiveOneGoalGames || 0,
-  }, Number(settings.scoringVersion || 0));
+  }, scoringVersion, {
+    goal: configurableColumnC ? (slotRole === "DEF" ? settings.defenderGoalPoints : settings.attackerGoalPoints) : undefined,
+    assist: configurableColumnC ? (slotRole === "DEF" ? settings.defenderAssistPoints : settings.attackerAssistPoints) : undefined,
+    conceded: configurableColumnC ? settings.lineGoalConcededPoints : undefined,
+    cleanSheet: configurableColumnC ? settings.defenderCleanSheetPoints : undefined,
+    oneGoal: configurableColumnC ? settings.defenderOneGoalPoints : undefined,
+    oneGoalConceded: settings.defenderOneGoalConcededPoints,
+    twoGoalsConceded: settings.defenderTwoGoalsConcededPoints,
+    ownGoal: configurableColumnC ? settings.ownGoalPoints : undefined,
+  });
 }
 
 export function predictionIsCorrect<T>(choice: T | null | undefined, leaders: T[], leaderValue: number) {

@@ -20,6 +20,13 @@ export type BQBaseScoringSnapshot = {
   ownGoal: number;
   goalkeeperAppearance: number;
   goalkeeperGoalConceded: number;
+  defenderGoal?: number;
+  defenderAssist?: number;
+  defenderCleanSheet?: number;
+  defenderOneGoal?: number;
+  defenderOneGoalConceded?: number;
+  defenderTwoGoalsConceded?: number;
+  teamGoalConceded?: number;
 };
 
 /** Estatísticas brutas de um atleta na rodada. */
@@ -120,6 +127,13 @@ export function normalizeBQScoringSnapshot(
       "goal_conceded_points",
       BQ_SCORING_V5.goalkeeperGoalConceded,
     ),
+    defenderGoal: numeric("defenderGoal", "defender_goal_points", 5),
+    defenderAssist: numeric("defenderAssist", "defender_assist_points", 3),
+    defenderCleanSheet: numeric("defenderCleanSheet", "defender_clean_sheet_points", 2),
+    defenderOneGoal: numeric("defenderOneGoal", "defender_one_goal_points", 1),
+    defenderOneGoalConceded: numeric("defenderOneGoalConceded", "defender_one_goal_conceded_points", -0.75),
+    defenderTwoGoalsConceded: numeric("defenderTwoGoalsConceded", "defender_two_goals_conceded_points", -1.75),
+    teamGoalConceded: numeric("teamGoalConceded", "line_goal_conceded_points", -0.5),
   };
 }
 

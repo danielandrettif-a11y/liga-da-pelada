@@ -7,6 +7,7 @@ import { repairLegacySavedFantasyLineups, reprocessFantasyRound, reprocessFantas
 const fields = [
   ["initial_budget", "Orçamento inicial (próxima temporada)"], ["initial_player_price", "Preço inicial (próxima temporada)"],
   ["captain_multiplier", "Multiplicador do capitão"], ["top_scorer_prediction_points", "Bônus artilheiro"],
+  ["defender_one_goal_conceded_points", "DEF: total ao sofrer 1 gol"], ["defender_two_goals_conceded_points", "DEF: total ao sofrer 2 gols"],
   ["top_assist_prediction_points", "Bônus garçom"], ["king_of_wins_points", "Desafio: Rei das Vitórias"],
   ["mvp_prediction_points", "Desafio: Mito da Rodada"], ["bet_of_round_points", "Desafio: Aposta da Rodada"],
   ["bet_rank_band_1", "Aposta faixa 1: posição"], ["bet_rank_band_2", "Aposta faixa 2: posição"],
@@ -30,7 +31,7 @@ const fields = [
 export function FantasyAdminSettings({ settings, rounds }: { settings: any; rounds: any[] }) {
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(fields.map(([key]) => [key, String(settings?.[key] ?? "")])));
   const [message, setMessage] = useState(""); const [pending, startTransition] = useTransition();
-  function save() { startTransition(async () => { const raw = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, Number(value)])); const payload = { ...raw, ownGoalPoints: raw.own_goal_points, lossPoints: raw.loss_points, goalkeeperAppearancePoints: raw.goalkeeper_appearance_points, goalConcededPoints: raw.goal_conceded_points }; delete (payload as any).own_goal_points; delete (payload as any).loss_points; delete (payload as any).goalkeeper_appearance_points; delete (payload as any).goal_conceded_points; const result = await updateFantasySettings(payload as any); setMessage(result.success ? "Configurações salvas para as próximas rodadas." : result.error || "Erro ao salvar."); }); }
+  function save() { startTransition(async () => { const raw = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, Number(value)])); const payload = { ...raw, ownGoalPoints: raw.own_goal_points, lossPoints: raw.loss_points, goalkeeperAppearancePoints: raw.goalkeeper_appearance_points, goalConcededPoints: raw.goal_conceded_points, defenderOneGoalConcededPoints: raw.defender_one_goal_conceded_points, defenderTwoGoalsConcededPoints: raw.defender_two_goals_conceded_points }; delete (payload as any).own_goal_points; delete (payload as any).loss_points; delete (payload as any).goalkeeper_appearance_points; delete (payload as any).goal_conceded_points; delete (payload as any).defender_one_goal_conceded_points; delete (payload as any).defender_two_goals_conceded_points; const result = await updateFantasySettings(payload as any); setMessage(result.success ? "Configurações salvas para as próximas rodadas." : result.error || "Erro ao salvar."); }); }
   function reprocess(roundId: string) { if (!confirm("Reprocessar esta rodada e todas as posteriores?")) return; startTransition(async () => { const result = await reprocessFantasyRound(roundId); setMessage(result.success ? "Cartola reprocessado com auditoria." : result.error || "Erro ao reprocessar."); }); }
   function upgradeRules(roundId: string) {
     if (window.prompt("Isso mudará pontos, preços e patrimônios. Digite ATUALIZAR para confirmar.") !== "ATUALIZAR") return;

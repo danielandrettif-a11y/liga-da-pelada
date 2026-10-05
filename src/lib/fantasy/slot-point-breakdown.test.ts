@@ -18,6 +18,22 @@ const stats = {
 };
 
 describe("buildFantasyColumnCLineSlotBreakdown", () => {
+  it("preserva a pontuação ATA da V11 sem aplicar faixas defensivas", () => {
+    const v11Stats = {
+      goals: 6,
+      assists: 3,
+      ownGoals: 0,
+      teamGoalsConceded: 11,
+      defensiveCleanGames: 4,
+      defensiveOneGoalGames: 7,
+    };
+
+    expect(calculateFantasySlotPoints(v11Stats, "MEI", {
+      ...DEFAULT_FANTASY_SETTINGS,
+      scoringVersion: 11,
+    })).toBe(26);
+  });
+
   it("detalha como 25 pontos o exemplo que antes aparecia como 43,5", () => {
     const rows = buildFantasyColumnCLineSlotBreakdown("ATA", {
       goals: 6,
@@ -51,6 +67,22 @@ describe("buildFantasyColumnCLineSlotBreakdown", () => {
       "Gols como ATA",
       "Assistências como ATA",
       "Gols sofridos pelo time",
+    ]);
+  });
+
+  it("mostra as faixas configuráveis de um e dois gols para DEF", () => {
+    const rows = buildFantasyColumnCLineSlotBreakdown("DEF", {
+      teamGoalsConceded: 3,
+      defensiveOneGoalGames: 1,
+    }, 13, {
+      ...DEFAULT_FANTASY_SETTINGS,
+      defenderOneGoalConcededPoints: -0.75,
+      defenderTwoGoalsConcededPoints: -1.75,
+    });
+
+    expect(rows.map(({ label, count, points }) => ({ label, count, points }))).toEqual([
+      { label: "Faixa DEF · 1 gol sofrido", count: 1, points: -0.75 },
+      { label: "Faixa DEF · 2 gols sofridos", count: 1, points: -1.75 },
     ]);
   });
 });

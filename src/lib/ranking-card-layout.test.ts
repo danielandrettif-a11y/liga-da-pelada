@@ -31,7 +31,7 @@ describe("ranking card layout", () => {
 
   it("keeps every content box inside the card artwork", () => {
     const layout = getRankingCardLayout();
-    for (const box of [layout.header, layout.score, layout.photo, layout.speed, layout.name, layout.awards, layout.stats]) {
+    for (const box of [layout.header, layout.score, layout.photo, layout.profile, layout.speed, layout.name, layout.awards, layout.stats]) {
       expect(box.left).toBeGreaterThanOrEqual(0);
       expect(box.top).toBeGreaterThanOrEqual(0);
       expect(box.left + box.width).toBeLessThanOrEqual(100);
@@ -105,6 +105,15 @@ describe("ranking card layout", () => {
       { value: "6", label: "DER" },
       { value: "59%", label: "APR" },
     ]);
+  });
+
+  it("keeps the fluid-position tag over the portrait and outside the nameplate", () => {
+    const { photo, profile, name } = getRankingCardLayout();
+    expect(profile.left).toBeGreaterThanOrEqual(photo.left);
+    expect(profile.left + profile.width).toBeLessThanOrEqual(photo.left + photo.width);
+    expect(profile.top).toBeGreaterThan(photo.top);
+    expect(profile.top + profile.height).toBeLessThanOrEqual(photo.top + photo.height);
+    expect(profile.top + profile.height).toBeLessThan(name.top);
   });
 
   it("does not reuse ranking points when the player has no calculated OVR", () => {

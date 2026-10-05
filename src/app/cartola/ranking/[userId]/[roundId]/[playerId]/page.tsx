@@ -52,6 +52,8 @@ export default async function FantasyLineupPlayerDetailPage({ params }: { params
     drawPoints: snapshot.draw,
     lossPoints: snapshot.loss,
     ownGoalPoints: snapshot.ownGoal,
+    defenderOneGoalConcededPoints: value(settings, "defender_one_goal_conceded_points", DEFAULT_FANTASY_SETTINGS.defenderOneGoalConcededPoints),
+    defenderTwoGoalsConcededPoints: value(settings, "defender_two_goals_conceded_points", DEFAULT_FANTASY_SETTINGS.defenderTwoGoalsConcededPoints),
     goalkeeperSlotAppearancePoints: value(settings, "goalkeeper_slot_appearance_points", 4),
     goalkeeperSlotGoalConcededPoints: value(settings, "goalkeeper_slot_goal_conceded_points", -2.5),
     goalkeeperSlotCleanSheetPoints: value(settings, "goalkeeper_slot_clean_sheet_points", 4),
