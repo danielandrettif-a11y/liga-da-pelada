@@ -193,6 +193,12 @@ function aggregateRankingRows(
 
     const mapRound = (r: RankingStatsRow, countedInTop6: boolean, legacy = false) => {
       const roundInfo = roundsMap?.get(r.round_id);
+      const playerProfile: "defensive" | "offensive" | null =
+        r.player_profile_locked === "defensive"
+          ? "defensive"
+          : r.player_profile_locked === "offensive"
+            ? "offensive"
+            : null;
       // Cada rodada guarda sua própria regra. Usar o padrão v5 aqui fazia a
       // tela detalhada explicar uma rodada v11 com V/E/D e depois criar um
       // "Ajuste da rodada" para alcançar o total já salvo.
@@ -244,6 +250,7 @@ function aggregateRankingRows(
         games: r.games,
         pointBreakdown,
         countedInTop6,
+        playerProfile,
       };
     };
 

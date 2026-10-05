@@ -106,12 +106,14 @@ function drawCanvasName(
   context: CanvasRenderingContext2D,
   name: string,
   title: string | null | undefined,
+  profile: string,
   box: CanvasBox,
   color: string,
 ) {
   const showTitle = Boolean(title);
-  const titleHeight = showTitle ? 22 : 0;
-  const nameHeight = box.height - titleHeight;
+  const titleHeight = showTitle ? 19 : 0;
+  const profileHeight = 18;
+  const nameHeight = box.height - titleHeight - profileHeight;
   let fontSize = Math.min(46, nameHeight * .44);
   let lines: string[] = [];
   while (fontSize >= 22) {
@@ -128,14 +130,17 @@ function drawCanvasName(
   const firstY = box.y + (nameHeight - contentHeight) / 2 + lineHeight / 2;
   lines.slice(0, 2).forEach((line, index) => context.fillText(line, box.x + box.width / 2, firstY + index * lineHeight, box.width * .68));
   if (showTitle) {
-    context.font = "900 16px Arial";
+    context.font = "900 14px Arial";
     context.fillStyle = color;
     context.shadowColor = "rgba(0,0,0,.95)";
     context.shadowBlur = 4;
     context.shadowOffsetY = 1;
-    context.fillText(`✦ ${title!.toUpperCase()}`, box.x + box.width / 2, box.y + box.height - 13, box.width * .68);
+    context.fillText(`✦ ${title!.toUpperCase()}`, box.x + box.width / 2, box.y + nameHeight + 12, box.width * .68);
     context.shadowColor = "transparent";
   }
+  context.font = "900 13px Arial";
+  context.fillStyle = "#ccff00";
+  context.fillText(`TAG FLUIDA · ${profile}`, box.x + box.width / 2, box.y + box.height - 4, box.width * .72);
   context.textBaseline = "alphabetic";
 }
 
@@ -291,7 +296,7 @@ async function createPlayerStory(entry: RankingEntry, position: number) {
     roundedRect(context, nameBox.x, nameBox.y, nameBox.width, nameBox.height, 18);
     context.fill();
   }
-  drawCanvasName(context, cardContent.name, cardContent.title, nameBox, theme.ink);
+  drawCanvasName(context, cardContent.name, cardContent.title, cardContent.profile, nameBox, theme.ink);
 
   const awardsBox = rankingCardBoxPixels(layout.awards, card);
   context.textAlign = "center";
@@ -502,6 +507,7 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
             >
               <h2 className={`ranking-card-player-name max-h-[1.9em] overflow-hidden font-athletic font-black uppercase text-white drop-shadow-[0_2px_4px_rgba(0,0,0,.9)] ${displayName.length > 22 ? "text-[11px] leading-[.92] tracking-normal" : displayName.length > 13 ? "text-[13px] leading-[.95] tracking-normal" : "text-[17px] leading-none tracking-[.04em]"}`}>{displayName}</h2>
               {cardContent.title && <p className="mt-0.5 max-w-full truncate text-[7px] font-black uppercase tracking-[.13em] drop-shadow-[0_1px_2px_rgba(0,0,0,.95)]" style={{ color: theme.ink }}>✦ {cardContent.title}</p>}
+              <p className="mt-0.5 max-w-full truncate text-[6px] font-black uppercase tracking-[.12em] drop-shadow-[0_1px_2px_rgba(0,0,0,.95)]" style={{ color: theme.edge }}>Tag fluida · {cardContent.profile}</p>
             </div>
           </div>
 
@@ -728,6 +734,11 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                               </p>
                             </div>
                             <span className="font-athletic text-lg font-black text-accent">{signedPoints(r.points)} pts</span>
+                          </div>
+
+                          <div className="mb-2 rounded-lg border border-accent/20 bg-black/15 px-2.5 py-2 text-[9px] text-muted">
+                            Tag congelada na rodada: <strong className="text-accent">{r.playerProfile === "defensive" ? "DEF/VOL" : r.playerProfile === "offensive" ? "ATA/ALA" : "não registrada"}</strong>
+                            {r.playerProfile === "offensive" && <> · gols sofridos na linha descontam 0,5, mas não geram bônus defensivo.</>}
                           </div>
 
                           {r.pointBreakdown.length > 0 ? (

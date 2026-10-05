@@ -30,6 +30,7 @@ export type RankingBestRound = {
     points: number;
   }>;
   countedInTop6: boolean;
+  playerProfile: "defensive" | "offensive" | null;
 };
 
 export type RankingEntry = {

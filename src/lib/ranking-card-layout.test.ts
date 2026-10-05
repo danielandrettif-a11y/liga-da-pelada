@@ -141,4 +141,22 @@ describe("ranking card layout", () => {
 
     expect(buildRankingCardContent(entry, 4)).toMatchObject({ rating: "77.1", ratingTrend: "rising" });
   });
+
+  it("shows the current fluid line tag even when GOL is the player's best OVR", () => {
+    const entry = {
+      player: { name: "Goleiro e atacante", player_profile: "offensive", is_goalkeeper: true },
+      points: 40,
+      overall: 77.1,
+      overallPositions: { DEF: 70, ATA: 75, GOL: 82 },
+      goals: 0,
+      assists: 0,
+      wins: 0,
+      games: 0,
+      losses: 0,
+      winRate: 0,
+      awards: { roundMvp: 0, topScorer: 0, topAssister: 0, kingOfWins: 0 },
+    } as RankingEntry;
+
+    expect(buildRankingCardContent(entry, 4).profile).toBe("ATA/ALA");
+  });
 });

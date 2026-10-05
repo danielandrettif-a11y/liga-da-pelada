@@ -111,7 +111,7 @@ const CARD_THEMES: Record<RankingCardTier, RankingCardTheme> = {
 };
 
 const PROFILE_LABELS = {
-  offensive: "ATA",
+  offensive: "ATA/ALA",
   midfield: "ATA/ALA",
   defensive: "DEF/VOL",
 } as const;
@@ -138,7 +138,9 @@ export function getRankingCardTheme(position: number) {
 export function buildRankingCardContent(entry: RankingEntry, position: number): RankingCardContent {
   const theme = getRankingCardTheme(position);
   const speedStars = formatSpeedStars(entry.speedRating);
-  const profile = `${PROFILE_LABELS[entry.player.player_profile || "midfield"]}${entry.player.is_goalkeeper ? " / GOL" : ""}`;
+  // A tag fluida é sempre a função de linha atual. O OVR GOL permanece uma
+  // nota separada e nunca interfere na escolha entre DEF/VOL e ATA/ALA.
+  const profile = PROFILE_LABELS[entry.player.player_profile || "midfield"];
   const positionRatings = ([
     ["ATA", "ATA/ALA"],
     ["GOL", "GOL"],
