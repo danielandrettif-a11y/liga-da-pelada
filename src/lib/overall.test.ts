@@ -136,9 +136,9 @@ describe("motor adaptativo de OVR", () => {
     prioritizedTraitsAsEvidenceOnly: false,
     traitInfluenceFadeEnabled: false,
     positionWeights: {
-      DEF: { defense: 0.55, goals: 0.28, assists: 0.17, result: 0 },
-      ALA_MEI: { defense: 0.15, goals: 0.55, assists: 0.30, result: 0 },
-      ATA: { defense: 0.15, goals: 0.55, assists: 0.30, result: 0 },
+      DEF: { defense: 0.90, goals: 0.04, assists: 0.06, result: 0 },
+      ALA_MEI: { defense: 0.05, goals: 0.62, assists: 0.33, result: 0 },
+      ATA: { defense: 0.05, goals: 0.62, assists: 0.33, result: 0 },
     },
   });
 
@@ -805,6 +805,48 @@ describe("motor adaptativo de OVR", () => {
     expect(playerRounds.slice(0, 4).every((item) => item.playedProfile === "offensive")).toBe(true);
     expect(playerRounds[4].playedProfile).toBe("defensive");
     expect(playerRounds[4].profileDefOverall).toBeGreaterThan(playerRounds[4].profileAtaOverall);
+  });
+
+  it("separa um defensor consistente de um artilheiro que protege pouco", () => {
+    const defender: OverallPlayer = {
+      id: "defensive-specialist",
+      playerProfile: "defensive",
+      initialPlayerProfile: "defensive",
+      overallTraits: ["defensive"],
+      overallSeedMode: "observed",
+    };
+    const scorer: OverallPlayer = {
+      id: "attacking-specialist",
+      playerProfile: "offensive",
+      initialPlayerProfile: "offensive",
+      overallTraits: ["offensive"],
+      overallSeedMode: "observed",
+    };
+    const inputs = Array.from({ length: 6 }, (_, index) => round(index + 1, [
+      appearance(defender.id, {
+        matchId: `defensive-specialist-${index}`,
+        goals: index === 5 ? 1 : 0,
+        assists: index === 2 ? 1 : 0,
+        goalsConceded: index === 3 || index === 5 ? 1 : 0,
+        teamGoalsConceded: index === 3 || index === 5 ? 1 : 0,
+      }),
+      appearance(scorer.id, {
+        matchId: `attacking-specialist-${index}`,
+        goals: 2,
+        assists: index % 2,
+        goalsConceded: 2,
+        teamGoalsConceded: 2,
+        result: "loss",
+      }),
+    ]));
+    const result = calculatePlayerOveralls([defender, scorer], inputs, fluidProfileFormula);
+    const defenderSnapshot = result.snapshots.find((item) => item.playerId === defender.id)!;
+    const scorerSnapshot = result.snapshots.find((item) => item.playerId === scorer.id)!;
+
+    expect(defenderSnapshot.positions.DEF.value).toBeGreaterThan(scorerSnapshot.positions.DEF.value);
+    expect(scorerSnapshot.positions.ATA.value).toBeGreaterThan(defenderSnapshot.positions.ATA.value);
+    expect(defenderSnapshot.effectiveProfile).toBe("defensive");
+    expect(scorerSnapshot.effectiveProfile).toBe("offensive");
   });
 
   it("não conta ausências entre as quatro atuações iniciais", () => {
