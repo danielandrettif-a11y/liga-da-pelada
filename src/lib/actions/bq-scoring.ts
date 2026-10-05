@@ -102,7 +102,9 @@ export async function saveColumnCScoringRules(
     return { success: false, error: "Apenas administradores podem alterar as regras de pontuação." };
   }
 
+  const league = await getActiveLeague();
   const { error } = await account.client.rpc("update_column_c_scoring_settings", {
+    p_league_id: league.id,
     p_attacker_goal_points: values.attackerGoalPoints,
     p_attacker_assist_points: values.attackerAssistPoints,
     p_line_goal_conceded_points: values.lineGoalConcededPoints,

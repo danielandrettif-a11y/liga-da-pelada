@@ -314,14 +314,21 @@ export function ScoringRulesForm({
         ))}
 
         {isPositionEditing && (
-          <button
-            type="button"
-            onClick={handleSavePositions}
-            disabled={savingPositions}
-            className="w-full rounded-xl bg-accent px-4 py-3 text-xs font-bold text-background transition-transform active:scale-95 disabled:opacity-50"
-          >
-            {savingPositions ? "Salvando alterações..." : "Salvar regras por posição"}
-          </button>
+          <div className="space-y-2">
+            {message?.type === "error" && (
+              <p role="alert" className="rounded-xl bg-rose-500/20 p-3 text-xs font-semibold text-rose-400">
+                {message.text}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleSavePositions}
+              disabled={savingPositions}
+              className="w-full rounded-xl bg-accent px-4 py-3 text-xs font-bold text-background transition-transform active:scale-95 disabled:opacity-50"
+            >
+              {savingPositions ? "Salvando alterações..." : "Salvar regras por posição"}
+            </button>
+          </div>
         )}
       </section>
     </div>
