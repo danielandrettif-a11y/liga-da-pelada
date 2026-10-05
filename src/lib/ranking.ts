@@ -31,6 +31,10 @@ export type RankingBestRound = {
   }>;
   countedInTop6: boolean;
   playerProfile: "defensive" | "offensive" | null;
+  profileDecisionSource: "initial" | "overall" | null;
+  profileAppearanceNumber: number | null;
+  profileDefOverall: number | null;
+  profileAtaOverall: number | null;
 };
 
 export type RankingEntry = {

@@ -47,6 +47,10 @@ type RankingStatsRow = {
   ranking_position_bonus: number;
   ranking_points: number;
   player_profile_locked: "defensive" | "midfield" | "offensive" | null;
+  profile_decision_source: "initial" | "overall" | null;
+  profile_appearance_number: number | null;
+  profile_def_overall: number | null;
+  profile_ata_overall: number | null;
   player: Player;
 };
 
@@ -251,6 +255,10 @@ function aggregateRankingRows(
         pointBreakdown,
         countedInTop6,
         playerProfile,
+        profileDecisionSource: r.profile_decision_source,
+        profileAppearanceNumber: r.profile_appearance_number,
+        profileDefOverall: r.profile_def_overall !== null && Number.isFinite(Number(r.profile_def_overall)) ? Number(r.profile_def_overall) : null,
+        profileAtaOverall: r.profile_ata_overall !== null && Number.isFinite(Number(r.profile_ata_overall)) ? Number(r.profile_ata_overall) : null,
       };
     };
 
@@ -923,6 +931,10 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       ranking_position_bonus,
       ranking_points,
       player_profile_locked,
+      profile_decision_source,
+      profile_appearance_number,
+      profile_def_overall,
+      profile_ata_overall,
       player:player_id (*)
     `)
     .in("round_id", (rounds || []).map((round) => round.id));

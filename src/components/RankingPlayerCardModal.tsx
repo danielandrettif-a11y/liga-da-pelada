@@ -710,6 +710,12 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                             <p className="text-[9px] text-muted">
                               {r.games}J · {r.goals}G · {r.assists}A · {r.wins}V · {r.draws}E · {r.losses}D
                             </p>
+                            <p className="mt-0.5 text-[8px] font-bold text-accent/80">
+                              {r.playerProfile === "defensive" ? "DEF/VOL" : r.playerProfile === "offensive" ? "ATA/ALA" : "TAG —"}
+                              {r.profileDefOverall !== null && r.profileAtaOverall !== null && (
+                                <> · OVR DEF {r.profileDefOverall.toFixed(1)} · ATA {r.profileAtaOverall.toFixed(1)}</>
+                              )}
+                            </p>
                           </div>
                         </div>
 
@@ -737,7 +743,15 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                           </div>
 
                           <div className="mb-2 rounded-lg border border-accent/20 bg-black/15 px-2.5 py-2 text-[9px] text-muted">
-                            Tag congelada na rodada: <strong className="text-accent">{r.playerProfile === "defensive" ? "DEF/VOL" : r.playerProfile === "offensive" ? "ATA/ALA" : "não registrada"}</strong>
+                            Tag congelada na rodada: <strong className="text-accent">{r.playerProfile === "defensive" ? "DEF/VOL" : r.playerProfile === "offensive" ? "ATA/ALA" : "não registrada"}</strong>.
+                            {r.profileDefOverall !== null && r.profileAtaOverall !== null && (
+                              <> OVRs disponíveis antes dela: <strong className="text-foreground">DEF {r.profileDefOverall.toFixed(1)} · ATA {r.profileAtaOverall.toFixed(1)}</strong>.</>
+                            )}
+                            {r.profileDecisionSource === "initial"
+                              ? <> A tag inicial teve prioridade nesta {r.profileAppearanceNumber ? `${r.profileAppearanceNumber}ª` : ""} atuação.</>
+                              : r.profileDecisionSource === "overall"
+                                ? <> Escolha automática pelo maior OVR de linha.</>
+                                : null}
                             {r.playerProfile === "offensive" && <> · gols sofridos na linha descontam 0,5, mas não geram bônus defensivo.</>}
                           </div>
 
