@@ -609,13 +609,14 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                   )}
 
                   <div className="grid grid-cols-1 gap-1.5">
-                    <p><strong className="text-foreground">DEF/VOL:</strong> proteção defensiva durante o tempo em campo. Produção ofensiva alta direciona a evolução para ATA/ALA e reduz a especialização DEF/VOL.</p>
+                    <p><strong className="text-foreground">DEF/VOL:</strong> proteção defensiva durante o tempo em campo. O crédito coletivo de clean sheets e poucos gols sofridos diminui conforme o atleta participa de mais gols e assistências; essa produção é direcionada para ATA/ALA.</p>
                     <p><strong className="text-foreground">ATA/ALA:</strong> gols, assistências e proteção coletiva na mesma nota ofensiva.</p>
                     <p><strong className="text-foreground">GOL:</strong> desempenho defensivo nas partidas em que atuou no gol.</p>
                   </div>
 
                   <p>Gols e assistências são comparados por 7 minutos jogados. A defesa usa gols sofridos por tempo, participação, gols contra e os horários de todos os gols sofridos enquanto o atleta estava em campo.</p>
                   <p className="rounded-lg border border-blue-300/20 bg-blue-300/[0.06] p-2.5"><strong className="text-blue-200">Como o horário pesa:</strong> sem sofrer mantém proteção máxima; depois do primeiro gol a proteção do período cai pela metade; depois do segundo, zera. Por isso, dois gols no fim prejudicam menos o OVR defensivo do que dois gols logo no começo. Quando uma partida antiga não possui horários completos, o sistema usa uma estimativa conservadora.</p>
+                  <p className="rounded-lg border border-rose-300/20 bg-rose-300/[0.06] p-2.5"><strong className="text-rose-200">Como o sistema separa DEF e ATA:</strong> gols e assistências por tempo jogado aumentam ATA/ALA e retiram parte do crédito defensivo coletivo. Assim, um atacante não recebe DEF alto apenas porque seus gols ajudaram o time a vencer sem sofrer.</p>
                 </>
               ) : (
                 <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-warning">

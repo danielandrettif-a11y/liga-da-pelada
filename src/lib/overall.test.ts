@@ -128,7 +128,8 @@ describe("motor adaptativo de OVR", () => {
     fluidProfileEnabled: true,
     fluidProfileWarmupAppearances: 4,
     allConcededGoalTimingEnabled: true,
-    defensiveOffensePenalty: 0.9,
+    defensiveOffensePenalty: 0,
+    defensiveCollectiveCreditReduction: 0.6,
     oppositeRoleAcceleration: 1.5,
     playedRoleEvidenceEnabled: false,
     unselectedTraitEvidence: 1,
@@ -925,6 +926,7 @@ describe("motor adaptativo de OVR", () => {
     const equalFormula = parseOverallFormulaConfig({
       ...fluidProfileFormula,
       defensiveOffensePenalty: 0,
+      defensiveCollectiveCreditReduction: 0,
       positionWeights: {
         DEF: { defense: 0.5, goals: 0.3, assists: 0.2, result: 0 },
         ALA_MEI: { defense: 0.5, goals: 0.3, assists: 0.2, result: 0 },

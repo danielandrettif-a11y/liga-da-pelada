@@ -42,6 +42,8 @@ export type OverallFormulaConfig = {
   allConcededGoalTimingEnabled: boolean;
   /** Retira especialização DEF de quem mantém produção ofensiva alta. */
   defensiveOffensePenalty: number;
+  /** Retira crédito defensivo coletivo conforme a participação ofensiva cresce. */
+  defensiveCollectiveCreditReduction: number;
   assistValue: number;
   attackCurve: number;
   goalCurve: number;
@@ -141,6 +143,7 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   legacyTimingConfidence: 0.75,
   allConcededGoalTimingEnabled: false,
   defensiveOffensePenalty: 0,
+  defensiveCollectiveCreditReduction: 0,
   assistValue: 0.65,
   attackCurve: 0.32,
   positionWeights: {
@@ -319,6 +322,7 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     legacyTimingConfidence: number("legacyTimingConfidence", DEFAULT_OVERALL_FORMULA.legacyTimingConfidence),
     allConcededGoalTimingEnabled: candidate.allConcededGoalTimingEnabled === true,
     defensiveOffensePenalty: clamp(bounded(candidate.defensiveOffensePenalty, DEFAULT_OVERALL_FORMULA.defensiveOffensePenalty), 0, 1),
+    defensiveCollectiveCreditReduction: clamp(bounded(candidate.defensiveCollectiveCreditReduction, DEFAULT_OVERALL_FORMULA.defensiveCollectiveCreditReduction), 0, 1),
     assistValue: number("assistValue", DEFAULT_OVERALL_FORMULA.assistValue),
     attackCurve: number("attackCurve", DEFAULT_OVERALL_FORMULA.attackCurve),
     goalCurve: number("goalCurve", DEFAULT_OVERALL_FORMULA.goalCurve),
@@ -809,12 +813,21 @@ function calculateMatchScore(
   const weights = config.positionWeights[role];
   const roleQuality = defensiveQuality * weights.defense
     + weights.attack + weights.goals + weights.assists + weights.result;
+  // A curva ofensiva começa em 0,25 mesmo sem participação. Normalizamos essa
+  // faixa para que somente gols e assistências reais retirem crédito coletivo
+  // do DEF. Assim, um artilheiro de um time que vence por 2 a 0 recebe o valor
+  // principalmente no ATA, enquanto quem produz pouco e protege o placar fica
+  // com o crédito defensivo completo.
+  const offensiveActivity = clamp((attacking - 0.25) / 0.75, 0, 1);
+  const defensiveCredit = role === "DEF"
+    ? defensive * (1 - offensiveActivity * config.defensiveCollectiveCreditReduction)
+    : defensive;
   const specializationPenalty = role === "DEF"
     ? Math.max(0, attacking - 0.5) * config.defensiveOffensePenalty
     : 0;
   return {
     score: clamp(
-      defensive * weights.defense
+      defensiveCredit * weights.defense
         + attacking * weights.attack
         + roundScores.goalScore * weights.goals
         + roundScores.assistScore * weights.assists
