@@ -131,7 +131,7 @@ export function normalizeBQScoringSnapshot(
     ),
     defenderGoal: numeric("defenderGoal", "defender_goal_points", 5),
     defenderAssist: numeric("defenderAssist", "defender_assist_points", 3),
-    defenderCleanSheet: numeric("defenderCleanSheet", "defender_clean_sheet_points", 2),
+    defenderCleanSheet: numeric("defenderCleanSheet", "defender_clean_sheet_points", 3),
     defenderOneGoal: numeric("defenderOneGoal", "defender_one_goal_points", 1),
     defenderOneGoalConceded: numeric("defenderOneGoalConceded", "defender_one_goal_conceded_points", -0.75),
     defenderTwoGoalsConceded: numeric("defenderTwoGoalsConceded", "defender_two_goals_conceded_points", -1.75),

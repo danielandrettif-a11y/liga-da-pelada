@@ -67,13 +67,14 @@ export function ScoringRulesForm({
     },
     {
       title: "DEF/VOL",
-      description: "Faixas defensivas totais por partida, sem somar outra punição por gol.",
+      description: "Clean sheet regressivo: com 1 gol sofrido, soma o bônus reduzido e depois aplica a penalidade do gol.",
       rules: [
         { key: "defenderGoalPoints", icon: "⚽", label: "Gol", description: "Por gol atuando como DEF/VOL." },
         { key: "defenderAssistPoints", icon: "🎯", label: "Assistência", description: "Por assistência atuando como DEF/VOL." },
-        { key: "defenderCleanSheetPoints", icon: "🔒", label: "Sofreu 0 gols", description: "Total por partida de DEF sem sofrer gol." },
-        { key: "defenderOneGoalConcededPoints", icon: "🛡️", label: "Sofreu 1 gol", description: "Total por partida de DEF sofrendo exatamente um gol." },
-        { key: "defenderTwoGoalsConcededPoints", icon: "🥅", label: "Sofreu 2 gols", description: "Total por partida de DEF sofrendo exatamente dois gols." },
+        { key: "defenderCleanSheetPoints", icon: "🔒", label: "Clean sheet · 0 gols", description: "Bônus por partida de DEF sem sofrer gol." },
+        { key: "defenderOneGoalPoints", icon: "🛡️", label: "Clean sheet regressivo · 1 gol", description: "Bônus reduzido por partida de DEF sofrendo exatamente um gol." },
+        { key: "defenderOneGoalConcededPoints", icon: "📉", label: "Penalidade · 1 gol", description: "Penalidade somada ao clean sheet regressivo quando o DEF sofre um gol." },
+        { key: "defenderTwoGoalsConcededPoints", icon: "🥅", label: "Penalidade · 2 gols", description: "Penalidade total por partida de DEF sofrendo exatamente dois gols." },
       ],
     },
     {

@@ -14,6 +14,7 @@ export type ColumnCScoringSettings = Pick<
   | "defenderGoalPoints"
   | "defenderAssistPoints"
   | "defenderCleanSheetPoints"
+  | "defenderOneGoalPoints"
   | "defenderOneGoalConcededPoints"
   | "defenderTwoGoalsConcededPoints"
   | "goalkeeperSlotAppearancePoints"
@@ -30,6 +31,7 @@ function pickColumnCSettings(settings: FantasySettings): ColumnCScoringSettings 
     defenderGoalPoints: settings.defenderGoalPoints,
     defenderAssistPoints: settings.defenderAssistPoints,
     defenderCleanSheetPoints: settings.defenderCleanSheetPoints,
+    defenderOneGoalPoints: settings.defenderOneGoalPoints,
     defenderOneGoalConcededPoints: settings.defenderOneGoalConcededPoints,
     defenderTwoGoalsConcededPoints: settings.defenderTwoGoalsConcededPoints,
     goalkeeperSlotAppearancePoints: settings.goalkeeperSlotAppearancePoints,
@@ -111,6 +113,7 @@ export async function saveColumnCScoringRules(
     p_defender_goal_points: values.defenderGoalPoints,
     p_defender_assist_points: values.defenderAssistPoints,
     p_defender_clean_sheet_points: values.defenderCleanSheetPoints,
+    p_defender_one_goal_points: values.defenderOneGoalPoints,
     p_defender_one_goal_conceded_points: values.defenderOneGoalConcededPoints,
     p_defender_two_goals_conceded_points: values.defenderTwoGoalsConcededPoints,
     p_goalkeeper_appearance_points: values.goalkeeperSlotAppearancePoints,

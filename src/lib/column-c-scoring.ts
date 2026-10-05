@@ -10,7 +10,7 @@ export const COLUMN_C_SCORING = {
     goal: 5,
     assist: 3,
     conceded: -0.5,
-    cleanSheet: 2,
+    cleanSheet: 3,
     oneGoal: 1,
     oneGoalConceded: -0.75,
     twoGoalsConceded: -1.75,
@@ -92,7 +92,7 @@ export function calculateColumnCLinePoints(
     + count(stats.assists) * cents(options.assist ?? rule.assist)
     + concededPoints
     + count(stats.defensiveCleanGames) * cents(role === "DEF" ? (options.cleanSheet ?? rule.cleanSheet) : rule.cleanSheet)
-    + (progressiveDefense && !tieredDefensePenalty ? oneGoalGames * cents(options.oneGoal ?? COLUMN_C_SCORING.DEF.oneGoal) : 0)
+    + (progressiveDefense ? oneGoalGames * cents(options.oneGoal ?? COLUMN_C_SCORING.DEF.oneGoal) : 0)
     + count(stats.ownGoals) * cents(options.ownGoal ?? rule.ownGoal)
   ) / 100;
 }

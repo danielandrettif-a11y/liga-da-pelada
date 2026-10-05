@@ -129,6 +129,7 @@ export function buildRankedPointBreakdown(
       [`Assistências como ${role}`, lineAssists, lineAssistPoints],
       ["Gols sofridos pelo time", tieredDefensePenalty ? 0 : lineConceded, snapshot.teamGoalConceded ?? rule.conceded],
       ["Clean sheets como DEF", role === "DEF" ? amount(stats.defensiveCleanGames) : 0, snapshot.defenderCleanSheet ?? COLUMN_C_SCORING.DEF.cleanSheet],
+      ["Clean sheet regressivo com 1 gol sofrido como DEF", progressiveDefense && role === "DEF" ? defensiveOneGoalGames : 0, snapshot.defenderOneGoal ?? COLUMN_C_SCORING.DEF.oneGoal],
       ["Jogos com 1 gol sofrido como DEF", progressiveDefense && role === "DEF" ? defensiveOneGoalGames : 0, tieredDefensePenalty ? (snapshot.defenderOneGoalConceded ?? COLUMN_C_SCORING.DEF.oneGoalConceded) : (snapshot.defenderOneGoal ?? COLUMN_C_SCORING.DEF.oneGoal)],
       ["Jogos com 2 gols sofridos como DEF", defensiveTwoGoalGames, snapshot.defenderTwoGoalsConceded ?? COLUMN_C_SCORING.DEF.twoGoalsConceded],
       ["Gols contra na linha", lineOwnGoals, snapshot.ownGoal],
