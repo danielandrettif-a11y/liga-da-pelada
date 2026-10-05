@@ -38,6 +38,10 @@ export type OverallFormulaConfig = {
     discipline: number;
   };
   legacyTimingConfidence: number;
+  /** Usa toda a linha do tempo dos gols sofridos na proteção defensiva. */
+  allConcededGoalTimingEnabled: boolean;
+  /** Retira especialização DEF de quem mantém produção ofensiva alta. */
+  defensiveOffensePenalty: number;
   assistValue: number;
   attackCurve: number;
   goalCurve: number;
@@ -135,6 +139,8 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   maxChangePerRound: 2,
   defensiveWeights: { concededRate: 0.5, survival: 0.35, exposure: 0.1, discipline: 0.05 },
   legacyTimingConfidence: 0.75,
+  allConcededGoalTimingEnabled: false,
+  defensiveOffensePenalty: 0,
   assistValue: 0.65,
   attackCurve: 0.32,
   positionWeights: {
@@ -311,6 +317,8 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
       discipline: rawWeights.discipline / totalWeight,
     },
     legacyTimingConfidence: number("legacyTimingConfidence", DEFAULT_OVERALL_FORMULA.legacyTimingConfidence),
+    allConcededGoalTimingEnabled: candidate.allConcededGoalTimingEnabled === true,
+    defensiveOffensePenalty: clamp(bounded(candidate.defensiveOffensePenalty, DEFAULT_OVERALL_FORMULA.defensiveOffensePenalty), 0, 1),
     assistValue: number("assistValue", DEFAULT_OVERALL_FORMULA.assistValue),
     attackCurve: number("attackCurve", DEFAULT_OVERALL_FORMULA.attackCurve),
     goalCurve: number("goalCurve", DEFAULT_OVERALL_FORMULA.goalCurve),
@@ -718,6 +726,39 @@ function goalkeeperConcededScore(concededRate: number) {
   return Math.max(0, 0.2 - (concededRate - 2) * 0.2);
 }
 
+function defensiveSurvival(
+  appearance: OverallAppearance,
+  conceded: number,
+  seconds: number,
+  useAllGoalTimes: boolean,
+) {
+  if (conceded === 0) return 1;
+  const exactTimes = [...(appearance.concededGoalSeconds || [])]
+    .filter(Number.isFinite)
+    .map((value) => clamp(Number(value), 0, seconds))
+    .sort((left, right) => left - right)
+    .slice(0, conceded);
+  if (appearance.goalTimingQuality !== "exact" || exactTimes.length < conceded) {
+    return conceded === 1 ? 0.5 : 0;
+  }
+  if (!useAllGoalTimes) return clamp(exactTimes[0] / Math.max(seconds, 1), 0, 1);
+
+  // A proteção vale 100% enquanto o time está sem sofrer, 50% entre o
+  // primeiro e o segundo gol e 0% depois do segundo. A média por toda a
+  // aparição usa cada horário disponível e distingue derrotas rápidas de
+  // partidas que só foram decididas perto do fim.
+  let protectedSeconds = 0;
+  let previousSecond = 0;
+  for (const [goalIndex, goalSecond] of exactTimes.entries()) {
+    const protectionLevel = goalIndex === 0 ? 1 : goalIndex === 1 ? 0.5 : 0;
+    protectedSeconds += Math.max(0, goalSecond - previousSecond) * protectionLevel;
+    previousSecond = goalSecond;
+  }
+  const finalProtectionLevel = exactTimes.length === 1 ? 0.5 : 0;
+  protectedSeconds += Math.max(0, seconds - previousSecond) * finalProtectionLevel;
+  return clamp(protectedSeconds / Math.max(seconds, 1), 0, 1);
+}
+
 function calculateMatchScore(
   role: OverallRole,
   player: OverallPlayer,
@@ -737,12 +778,7 @@ function calculateMatchScore(
   const conceded = Number(appearance.goalsConceded || 0);
   const concededRate = perSevenMinuteRate(conceded, seconds);
   const rateImpact = clamp(0.5 + ((baselineConcededRate - concededRate) / Math.max(baselineConcededRate, 0.25)) * 0.25, 0, 1);
-  const firstConcededSecond = [...(appearance.concededGoalSeconds || [])].sort((left, right) => left - right)[0];
-  const survival = conceded === 0
-    ? 1
-    : appearance.goalTimingQuality === "exact" && Number.isFinite(firstConcededSecond)
-      ? clamp(Number(firstConcededSecond) / Math.max(seconds, 1), 0, 1)
-      : conceded === 1 ? 0.5 : 0;
+  const survival = defensiveSurvival(appearance, conceded, seconds, config.allConcededGoalTimingEnabled);
   const exposureScore = clamp(seconds / Math.max(appearance.matchSeconds || MAX_MATCH_SECONDS, 1), 0, 1);
   const defensiveQuality = appearance.goalTimingQuality === "exact" ? 1 : config.legacyTimingConfidence;
   if (role === "GOL" && config.goalkeeperOutcomeScoring) {
@@ -773,13 +809,17 @@ function calculateMatchScore(
   const weights = config.positionWeights[role];
   const roleQuality = defensiveQuality * weights.defense
     + weights.attack + weights.goals + weights.assists + weights.result;
+  const specializationPenalty = role === "DEF"
+    ? Math.max(0, attacking - 0.5) * config.defensiveOffensePenalty
+    : 0;
   return {
     score: clamp(
       defensive * weights.defense
         + attacking * weights.attack
         + roundScores.goalScore * weights.goals
         + roundScores.assistScore * weights.assists
-        + collectiveScore * weights.result,
+        + collectiveScore * weights.result
+        - specializationPenalty,
       0,
       1,
     ),

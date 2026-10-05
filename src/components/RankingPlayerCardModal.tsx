@@ -596,7 +596,7 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                         </div>
                       )}
                       <p className="mt-2">
-                        O OVR GOL só muda em rodadas realmente jogadas no gol: 60% controle absoluto de gols sofridos por tempo, 25% jogos sem sofrer, 10% resistência até o primeiro gol e 5% disciplina. A confiança leva 6 rodadas de goleiro para completar e a nota pode variar no máximo 0,8 por rodada.
+                        O OVR GOL só muda em rodadas realmente jogadas no gol: 60% controle de gols sofridos por tempo, 25% jogos sem sofrer, 10% proteção ao longo de todos os horários dos gols e 5% disciplina. A confiança leva 6 rodadas de goleiro para completar e a nota pode variar no máximo 0,8 por rodada.
                       </p>
                       <p className={`mt-1.5 font-bold ${goalkeeperIncluded ? "text-cyan-200" : "text-muted"}`}>
                         {!goalkeeperEligible
@@ -609,12 +609,13 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                   )}
 
                   <div className="grid grid-cols-1 gap-1.5">
-                    <p><strong className="text-foreground">DEF/VOL:</strong> defesa coletiva, gols e assistências, sem peso de vitória, empate ou derrota.</p>
+                    <p><strong className="text-foreground">DEF/VOL:</strong> proteção defensiva durante o tempo em campo. Produção ofensiva alta direciona a evolução para ATA/ALA e reduz a especialização DEF/VOL.</p>
                     <p><strong className="text-foreground">ATA/ALA:</strong> gols, assistências e proteção coletiva na mesma nota ofensiva.</p>
                     <p><strong className="text-foreground">GOL:</strong> desempenho defensivo nas partidas em que atuou no gol.</p>
                   </div>
 
-                  <p>Gols e assistências são comparados por 7 minutos jogados. A defesa usa gols sofridos por tempo, resistência até o primeiro gol, participação e gols contra. As características DEF/VOL e ATA/ALA aceleram a evolução da função escolhida; quando as duas são usadas, o bônus é dividido entre elas.</p>
+                  <p>Gols e assistências são comparados por 7 minutos jogados. A defesa usa gols sofridos por tempo, participação, gols contra e os horários de todos os gols sofridos enquanto o atleta estava em campo.</p>
+                  <p className="rounded-lg border border-blue-300/20 bg-blue-300/[0.06] p-2.5"><strong className="text-blue-200">Como o horário pesa:</strong> sem sofrer mantém proteção máxima; depois do primeiro gol a proteção do período cai pela metade; depois do segundo, zera. Por isso, dois gols no fim prejudicam menos o OVR defensivo do que dois gols logo no começo. Quando uma partida antiga não possui horários completos, o sistema usa uma estimativa conservadora.</p>
                 </>
               ) : (
                 <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-warning">

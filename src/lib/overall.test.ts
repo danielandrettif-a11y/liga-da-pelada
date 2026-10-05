@@ -127,6 +127,8 @@ describe("motor adaptativo de OVR", () => {
     threePositionModel: true,
     fluidProfileEnabled: true,
     fluidProfileWarmupAppearances: 4,
+    allConcededGoalTimingEnabled: true,
+    defensiveOffensePenalty: 0.9,
     oppositeRoleAcceleration: 1.5,
     playedRoleEvidenceEnabled: false,
     unselectedTraitEvidence: 1,
@@ -136,7 +138,7 @@ describe("motor adaptativo de OVR", () => {
     prioritizedTraitsAsEvidenceOnly: false,
     traitInfluenceFadeEnabled: false,
     positionWeights: {
-      DEF: { defense: 0.90, goals: 0.04, assists: 0.06, result: 0 },
+      DEF: { defense: 1, goals: 0, assists: 0, result: 0 },
       ALA_MEI: { defense: 0.05, goals: 0.62, assists: 0.33, result: 0 },
       ATA: { defense: 0.05, goals: 0.62, assists: 0.33, result: 0 },
     },
@@ -845,7 +847,46 @@ describe("motor adaptativo de OVR", () => {
 
     expect(defenderSnapshot.positions.DEF.value).toBeGreaterThan(scorerSnapshot.positions.DEF.value);
     expect(scorerSnapshot.positions.ATA.value).toBeGreaterThan(defenderSnapshot.positions.ATA.value);
+    expect(scorerSnapshot.positions.DEF.value).toBeLessThan(fluidProfileFormula.base);
     expect(defenderSnapshot.effectiveProfile).toBe("defensive");
+    expect(scorerSnapshot.effectiveProfile).toBe("offensive");
+  });
+
+  it("não deixa clean sheets coletivos inflarem o DEF de um artilheiro", () => {
+    const quietDefender: OverallPlayer = {
+      id: "quiet-clean-defender",
+      playerProfile: "defensive",
+      initialPlayerProfile: "defensive",
+      overallTraits: ["defensive"],
+      overallSeedMode: "observed",
+    };
+    const cleanScorer: OverallPlayer = {
+      id: "clean-scorer",
+      playerProfile: "defensive",
+      initialPlayerProfile: "defensive",
+      overallTraits: ["defensive"],
+      overallSeedMode: "observed",
+    };
+    const inputs = Array.from({ length: 6 }, (_, index) => round(index + 1, [
+      appearance(quietDefender.id, {
+        matchId: `quiet-clean-${index}`,
+        goalsConceded: 0,
+        teamGoalsConceded: 0,
+      }),
+      appearance(cleanScorer.id, {
+        matchId: `scorer-clean-${index}`,
+        goals: 2,
+        assists: 1,
+        goalsConceded: 0,
+        teamGoalsConceded: 0,
+      }),
+    ]));
+    const result = calculatePlayerOveralls([quietDefender, cleanScorer], inputs, fluidProfileFormula);
+    const defenderSnapshot = result.snapshots.find((item) => item.playerId === quietDefender.id)!;
+    const scorerSnapshot = result.snapshots.find((item) => item.playerId === cleanScorer.id)!;
+
+    expect(defenderSnapshot.positions.DEF.value - scorerSnapshot.positions.DEF.value).toBeGreaterThan(3);
+    expect(scorerSnapshot.positions.ATA.value).toBeGreaterThan(defenderSnapshot.positions.ATA.value);
     expect(scorerSnapshot.effectiveProfile).toBe("offensive");
   });
 
@@ -883,6 +924,7 @@ describe("motor adaptativo de OVR", () => {
     };
     const equalFormula = parseOverallFormulaConfig({
       ...fluidProfileFormula,
+      defensiveOffensePenalty: 0,
       positionWeights: {
         DEF: { defense: 0.5, goals: 0.3, assists: 0.2, result: 0 },
         ALA_MEI: { defense: 0.5, goals: 0.3, assists: 0.2, result: 0 },
@@ -1004,6 +1046,28 @@ describe("motor adaptativo de OVR", () => {
     expect(snapshot.positions.GOL.value).toBeGreaterThan(snapshot.positions.ATA.value);
     expect(snapshot.positions.DEF.value).toBeGreaterThan(snapshot.positions.ATA.value);
     expect(snapshot.effectiveProfile).toBe("defensive");
+  });
+
+  it("usa o horário de todos os gols para diferenciar derrotas rápidas e tardias", () => {
+    const player: OverallPlayer = {
+      id: "all-goal-times",
+      playerProfile: "defensive",
+      initialPlayerProfile: "defensive",
+      overallTraits: ["defensive"],
+      overallSeedMode: "observed",
+    };
+    const earlySecondGoal = calculatePlayerOveralls([player], [round(1, [appearance(player.id, {
+      goalsConceded: 2,
+      teamGoalsConceded: 2,
+      concededGoalSeconds: [30, 60],
+    })])], fluidProfileFormula).breakdowns[0];
+    const lateSecondGoal = calculatePlayerOveralls([player], [round(1, [appearance(player.id, {
+      goalsConceded: 2,
+      teamGoalsConceded: 2,
+      concededGoalSeconds: [30, 390],
+    })])], fluidProfileFormula).breakdowns[0];
+
+    expect(lateSecondGoal.defensiveScore).toBeGreaterThan(earlySecondGoal.defensiveScore);
   });
 
   it("mantém moderado o OVR de 10 jogos, 13 gols sofridos e só 2 jogos sem sofrer", () => {

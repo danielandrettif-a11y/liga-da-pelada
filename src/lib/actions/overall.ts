@@ -157,11 +157,12 @@ export async function recalculateOverallShadow() {
     const { data: run, error: runError } = await database.from("overall_calculation_runs").insert({ formula_version_id: formula.id, status: "processing", source_through_round_id: latestRound?.id || null, started_at: new Date().toISOString(), created_by: account.user.id }).select("id").single();
     if (runError || !run) throw new Error(runError?.code === "23505" ? "Já existe um cálculo de OVR em andamento. Aguarde ele terminar." : runError?.message || "Não foi possível criar a execução de OVR.");
     runId = run.id;
-    const calculation = calculatePlayerOveralls(source.players, source.rounds, parseOverallFormulaConfig(formula.config));
+    const parsedFormula = parseOverallFormulaConfig(formula.config);
+    const calculation = calculatePlayerOveralls(source.players, source.rounds, parsedFormula);
     const rows = calculation.snapshots.map((snapshot) => ({
       calculation_run_id: runId, player_id: snapshot.playerId, overall: snapshot.overall, def_overall: snapshot.positions.DEF.value, ala_mei_overall: snapshot.positions.ATA.value, ata_overall: snapshot.positions.ATA.value, gol_overall: snapshot.positions.GOL.value,
       confidence: Math.max(snapshot.positions.DEF.confidence, snapshot.positions.ALA_MEI.confidence, snapshot.positions.ATA.confidence), rounds_played: snapshot.roundsPlayed, goalkeeper_rounds: snapshot.goalkeeperRounds, goalkeeper_games: snapshot.goalkeeperGames, is_provisional: snapshot.isProvisional, is_stale: snapshot.isStale, last_round_id: snapshot.lastRoundId,
-      data_quality: { mode: "shadow", goal_timing: "first_conceded_goal_with_legacy_fallback", scoring_unit: "weekly_round_with_per_seven_minute_attack_rates", characteristics: "fluid_profile_by_largest_line_overall", seed_mode: "disabled_in_v5", effective_profile: snapshot.effectiveProfile, profile_source: snapshot.profileSource, scout_totals: snapshot.scoutTotals, position_confidence: Object.fromEntries(Object.entries(snapshot.positions).map(([role, position]) => [role, position.confidence])), overall_trend: snapshot.trend, position_trends: snapshot.positionTrends },
+      data_quality: { mode: "shadow", goal_timing: parsedFormula.allConcededGoalTimingEnabled ? "all_conceded_goals_with_legacy_fallback" : "first_conceded_goal_with_legacy_fallback", scoring_unit: "weekly_round_with_per_seven_minute_attack_rates", characteristics: "fluid_profile_by_largest_line_overall", seed_mode: "disabled_in_v5", effective_profile: snapshot.effectiveProfile, profile_source: snapshot.profileSource, scout_totals: snapshot.scoutTotals, position_confidence: Object.fromEntries(Object.entries(snapshot.positions).map(([role, position]) => [role, position.confidence])), overall_trend: snapshot.trend, position_trends: snapshot.positionTrends },
     }));
     if (rows.length) {
       const { error } = await database.from("player_overall_snapshots").insert(rows);
