@@ -87,6 +87,10 @@ export type OverallFormulaConfig = {
   topThreeOverall: boolean;
   /** V17: publica e compõe somente DEF/VOL, ATA/ALA e GOL. */
   threePositionModel: boolean;
+  /** V18: após a janela inicial, a maior nota entre DEF e ATA define a tag. */
+  fluidProfileEnabled: boolean;
+  fluidProfileWarmupAppearances: number;
+  oppositeRoleAcceleration: number;
   /** Bônus suave de variação proporcional à distância do alvo, sem degrau rígido. */
   performanceChangeBonus: number;
   /** Mantém os tetos rígidos das fórmulas antigas. */
@@ -165,6 +169,9 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   traitProgressionWeights: { primary: 1, secondary: 0.6, unselected: 0.2 },
   topThreeOverall: false,
   threePositionModel: false,
+  fluidProfileEnabled: false,
+  fluidProfileWarmupAppearances: 4,
+  oppositeRoleAcceleration: 1.5,
   performanceChangeBonus: 0,
   hardPositionCapsEnabled: true,
   provisionalAtConfidenceThreshold: true,
@@ -363,6 +370,9 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
       ? candidate.topThreeOverall
       : DEFAULT_OVERALL_FORMULA.topThreeOverall,
     threePositionModel: candidate.threePositionModel === true,
+    fluidProfileEnabled: candidate.fluidProfileEnabled === true,
+    fluidProfileWarmupAppearances: wholeNumber(candidate.fluidProfileWarmupAppearances, DEFAULT_OVERALL_FORMULA.fluidProfileWarmupAppearances, 1, 20),
+    oppositeRoleAcceleration: clamp(bounded(candidate.oppositeRoleAcceleration, DEFAULT_OVERALL_FORMULA.oppositeRoleAcceleration), 1, 3),
     performanceChangeBonus: clamp(bounded(candidate.performanceChangeBonus, DEFAULT_OVERALL_FORMULA.performanceChangeBonus), 0, 0.2),
     hardPositionCapsEnabled: typeof candidate.hardPositionCapsEnabled === "boolean"
       ? candidate.hardPositionCapsEnabled
@@ -387,6 +397,8 @@ export type OverallPlayer = {
   id: string;
   /** Tag histórica; só jogadores legados a usam como estimativa temporária. */
   playerProfile: PlayerProfile | null;
+  /** Identidade escolhida antes da primeira atuação; não muda com o OVR. */
+  initialPlayerProfile?: PlayerProfile | null;
   overallSeedMode?: OverallSeedMode;
   isGoalkeeper?: boolean;
   /** Características avaliadas pelo ADM. Não dependem da posição operacional do Cartola. */
@@ -444,6 +456,9 @@ export type PlayerOverallSnapshot = {
   isProvisional: boolean;
   isStale: boolean;
   lastRoundId: string | null;
+  /** Tag que deve valer na próxima atuação oficial. */
+  effectiveProfile: "defensive" | "offensive";
+  profileSource: "initial" | "overall";
   scoutTotals: {
     goals: number;
     assists: number;
@@ -472,6 +487,10 @@ export type OverallRoundBreakdown = {
   defensiveScore: number;
   timingQuality: GoalTimingQuality;
   playedProfile: PlayerProfile | null;
+  profileSource: "initial" | "overall";
+  appearanceNumber: number;
+  profileDefOverall: number;
+  profileAtaOverall: number;
   roleEvidence: Record<OverallRole, number>;
   traitEvidence: Record<OverallRole, number>;
   positions: Record<OverallRole, number>;
@@ -499,6 +518,7 @@ type MutablePlayerState = {
   goalkeeperMatchIds: Set<string>;
   lastRoundId: string | null;
   lastRoundIndex: number | null;
+  effectiveProfile: "defensive" | "offensive";
   scoutTotals: PlayerOverallSnapshot["scoutTotals"];
 };
 
@@ -629,7 +649,24 @@ function emptyPositions(config: OverallFormulaConfig): Record<OverallRole, numbe
   return Object.fromEntries(ROLES.map((role) => [role, config.base])) as Record<OverallRole, number>;
 }
 
-function createPlayerState(config: OverallFormulaConfig): MutablePlayerState {
+function initialLineProfile(player: OverallPlayer): "defensive" | "offensive" {
+  return (player.initialPlayerProfile || player.playerProfile) === "defensive" ? "defensive" : "offensive";
+}
+
+function resolveFluidLineProfile(
+  player: OverallPlayer,
+  state: MutablePlayerState,
+  config: OverallFormulaConfig,
+): "defensive" | "offensive" {
+  if (!config.fluidProfileEnabled || state.playedRoundIds.size < config.fluidProfileWarmupAppearances) {
+    return initialLineProfile(player);
+  }
+  if (state.values.ATA > state.values.DEF) return "offensive";
+  if (state.values.DEF > state.values.ATA) return "defensive";
+  return state.effectiveProfile;
+}
+
+function createPlayerState(player: OverallPlayer, config: OverallFormulaConfig): MutablePlayerState {
   return {
     values: emptyPositions(config),
     history: [],
@@ -638,6 +675,7 @@ function createPlayerState(config: OverallFormulaConfig): MutablePlayerState {
     goalkeeperMatchIds: new Set<string>(),
     lastRoundId: null,
     lastRoundIndex: null,
+    effectiveProfile: initialLineProfile(player),
     scoutTotals: { goals: 0, assists: 0, ownGoals: 0 },
   };
 }
@@ -683,6 +721,7 @@ function calculateMatchScore(
   traitInfluence: number,
 ): { score: number; defensiveScore: number; evidenceWeight: number } | null {
   if (role === "GOL" && !appearance.isGoalkeeper) return null;
+  if (config.fluidProfileEnabled && role !== "GOL" && appearance.isGoalkeeper) return null;
 
   const seconds = exposure(appearance.secondsPlayed);
   if (seconds === 0) return null;
@@ -975,6 +1014,8 @@ function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, current
       || (config.provisionalAtConfidenceThreshold && roundsPlayed === config.confidenceRounds),
     isStale: state.lastRoundIndex !== null && currentRoundIndex - state.lastRoundIndex >= config.staleAfterRounds,
     lastRoundId: state.lastRoundId,
+    effectiveProfile: state.effectiveProfile,
+    profileSource: config.fluidProfileEnabled && state.playedRoundIds.size >= config.fluidProfileWarmupAppearances ? "overall" : "initial",
     scoutTotals: { ...state.scoutTotals },
   };
 }
@@ -1012,7 +1053,7 @@ export function calculatePlayerOveralls(
   formula: OverallFormulaConfig = DEFAULT_OVERALL_FORMULA,
 ): OverallCalculationResult {
   const playerById = new Map(players.map((player) => [player.id, player]));
-  const stateByPlayerId = new Map<string, MutablePlayerState>(players.map((player) => [player.id, createPlayerState(formula)]));
+  const stateByPlayerId = new Map<string, MutablePlayerState>(players.map((player) => [player.id, createPlayerState(player, formula)]));
   const completedRounds = [...rounds]
     .filter((round) => round.roundType === "official" && round.status === "finished")
     .sort((left, right) => left.date.localeCompare(right.date)
@@ -1042,6 +1083,16 @@ export function calculatePlayerOveralls(
     for (const [playerId, appearances] of appearancesByPlayer) {
       const player = playerById.get(playerId)!;
       const state = stateByPlayerId.get(playerId)!;
+      const appearanceNumber = state.playedRoundIds.size + 1;
+      const profileSource = formula.fluidProfileEnabled && appearanceNumber > formula.fluidProfileWarmupAppearances
+        ? "overall" as const
+        : "initial" as const;
+      const profileDefOverall = roundOverall(state.values.DEF);
+      const profileAtaOverall = roundOverall(state.values.ATA);
+      const playedProfile = formula.fluidProfileEnabled
+        ? resolveFluidLineProfile(player, state, formula)
+        : appearances.find((appearance) => appearance.playerProfileLocked)?.playerProfileLocked || player.playerProfile;
+      const playedLineRole: "DEF" | "ATA" = playedProfile === "defensive" ? "DEF" : "ATA";
       const roundScores = calculateRoundScores(appearances, formula);
       const traitInfluence = traitInfluenceForRound(state.playedRoundIds.size + 1, formula);
       const playedGoalkeeperThisRound = appearances.some((appearance) => appearance.isGoalkeeper);
@@ -1049,6 +1100,8 @@ export function calculatePlayerOveralls(
       let defensiveWeight = 0;
       let timingQuality: GoalTimingQuality = "exact";
       let goalsConceded = 0;
+      const roleRoundScore = { DEF: 0, ATA: 0 };
+      const roleRoundWeight = { DEF: 0, ATA: 0 };
       for (const appearance of appearances) {
         goalsConceded += Number(appearance.goalsConceded || 0);
         if (appearance.goalTimingQuality === "fallback") timingQuality = "fallback";
@@ -1076,6 +1129,11 @@ export function calculatePlayerOveralls(
             const weight = exposure(appearance.secondsPlayed);
             defensiveTotal += outcome.defensiveScore * weight;
             defensiveWeight += weight;
+          }
+          if (role === "DEF" || role === "ATA") {
+            const weight = exposure(appearance.secondsPlayed);
+            roleRoundScore[role] += outcome.score * weight;
+            roleRoundWeight[role] += weight;
           }
         }
       }
@@ -1110,6 +1168,15 @@ export function calculatePlayerOveralls(
         if (role === "GOL" && formula.goalkeeperOutcomeScoring) {
           maximumChange = Math.min(maximumChange, formula.goalkeeperMaxChangePerRound);
         }
+        if (formula.fluidProfileEnabled && (role === "DEF" || role === "ATA") && role !== playedLineRole) {
+          const challengerScore = roleRoundWeight[role] > 0 ? roleRoundScore[role] / roleRoundWeight[role] : 0;
+          const currentScore = roleRoundWeight[playedLineRole] > 0
+            ? roleRoundScore[playedLineRole] / roleRoundWeight[playedLineRole]
+            : 0;
+          if (estimate.target > previous && challengerScore > currentScore) {
+            maximumChange *= formula.oppositeRoleAcceleration;
+          }
+        }
         const upperLimit = formula.hardPositionCapsEnabled
           ? provisionalPositionCap(estimate.validRounds, formula) - estimate.seedBonus
           : 99;
@@ -1119,8 +1186,8 @@ export function calculatePlayerOveralls(
           Math.min(previous + maximumChange, upperLimit),
         ));
       }
+      state.effectiveProfile = resolveFluidLineProfile(player, state, formula);
       const snapshot = cloneSnapshot(player, state, roundIndex, formula);
-      const playedProfile = appearances.find((appearance) => appearance.playerProfileLocked)?.playerProfileLocked || null;
       breakdowns.push({
         playerId,
         roundId: round.id,
@@ -1136,6 +1203,10 @@ export function calculatePlayerOveralls(
         defensiveScore: defensiveWeight ? defensiveTotal / defensiveWeight : 0.5,
         timingQuality,
         playedProfile,
+        profileSource,
+        appearanceNumber,
+        profileDefOverall,
+        profileAtaOverall,
         roleEvidence: Object.fromEntries(ROLES.map((role) => [role, roleEvidenceWeight(playedProfile, role, formula)])) as Record<OverallRole, number>,
         traitEvidence: Object.fromEntries(ROLES.map((role) => [role, traitEvidenceWeight(player, role, formula, traitInfluence)])) as Record<OverallRole, number>,
         positions: Object.fromEntries(ROLES.map((role) => [role, snapshot.positions[role].value])) as Record<OverallRole, number>,

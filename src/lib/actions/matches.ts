@@ -15,6 +15,7 @@ import { buildStructuralLoans } from "../underfilled-rounds";
 import { canTeamLendToMatch } from "../substitution-draw";
 import { suggestNextMatchRotation } from "../next-match";
 import { shouldExcludeReplacementScoring } from "../scoring-eligibility";
+import { refreshFluidOverallSafely } from "./overall";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 const FINISHED_CORRECTION_ERROR = "Digite EDITAR para liberar correções em partidas finalizadas.";
@@ -882,6 +883,7 @@ async function refreshFinishedGoalCorrection(
     const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: result.round_id });
     if (fantasyError) throw new Error(`Gol corrigido, mas o Cartola precisa ser reprocessado: ${fantasyError.message}`);
   }
+  await refreshFluidOverallSafely(`correção de gol na rodada ${result.round_id}`);
 
   revalidatePath(`/partidas/${result.match_id}`);
   revalidatePath(`/rodadas/${result.round_id}`);

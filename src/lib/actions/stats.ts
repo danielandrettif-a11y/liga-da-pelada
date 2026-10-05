@@ -86,6 +86,7 @@ export type PlayerCardOverall = {
   positionTrends: Record<"DEF" | "ALA_MEI" | "ATA" | "GOL", OverallTrend>;
   goalkeeperGames: number;
   goalkeeperRounds: number;
+  roundsPlayed: number;
 };
 
 function overallTrend(value: unknown): OverallTrend {
@@ -115,7 +116,7 @@ export async function getLatestPlayerCardOverallMap(client: any = supabase) {
       ATA: overallTrend(row.ata_trend),
       GOL: overallTrend(row.gol_trend),
     };
-    return row.player_id && Number.isFinite(overall) ? [[row.player_id, { overall, trend, positions, positionTrends, goalkeeperGames: Number(row.goalkeeper_games || 0), goalkeeperRounds: Number(row.goalkeeper_rounds || 0) }] as const] : [];
+    return row.player_id && Number.isFinite(overall) ? [[row.player_id, { overall, trend, positions, positionTrends, goalkeeperGames: Number(row.goalkeeper_games || 0), goalkeeperRounds: Number(row.goalkeeper_rounds || 0), roundsPlayed: Number(row.rounds_played || 0) }] as const] : [];
   }));
 }
 
@@ -338,7 +339,12 @@ export async function calculateRoundStats(roundId: string) {
           )
         ),
         round_players (
-          player_id
+          player_id,
+          player_profile_locked,
+          profile_decision_source,
+          profile_appearance_number,
+          profile_def_overall,
+          profile_ata_overall
         )
       `)
       .eq("id", roundId)
@@ -353,7 +359,12 @@ export async function calculateRoundStats(roundId: string) {
       ? await client.from("players").select("id, player_profile, overall_traits, member_category, is_selectable, is_competitive_profile_complete").in("id", roundPlayerIds)
       : { data: [], error: null };
     if (profileError) throw new Error(`Erro ao buscar posições dos atletas: ${profileError.message}`);
-    const profileByPlayerId = new Map((roundPlayerProfiles || []).map((player: any) => [player.id, player.player_profile]));
+    const currentProfileByPlayerId = new Map((roundPlayerProfiles || []).map((player: any) => [player.id, player.player_profile]));
+    const roundPlayerById = new Map((round.round_players || []).map((item: any) => [item.player_id, item]));
+    const profileByPlayerId = new Map(roundPlayerIds.map((playerId: string) => {
+      const locked = roundPlayerById.get(playerId) as any;
+      return [playerId, locked?.player_profile_locked || currentProfileByPlayerId.get(playerId)];
+    }));
     const playerById = new Map((roundPlayerProfiles || []).map((player: any) => [player.id, player]));
     const [{ data: frozenRankingRows, error: frozenRankingError }, { data: playedRankingRows, error: playedRankingError }, overallByPlayer] = await Promise.all([
       roundPlayerIds.length
@@ -421,6 +432,11 @@ export async function calculateRoundStats(roundId: string) {
           ranking_defensive_one_goal_games: 0,
           own_goals: 0,
           team_goals_conceded: 0,
+          player_profile_locked: roundPlayer.player_profile_locked || profileByPlayerId.get(roundPlayer.player_id) || null,
+          profile_decision_source: roundPlayer.profile_decision_source || null,
+          profile_appearance_number: roundPlayer.profile_appearance_number || null,
+          profile_def_overall: roundPlayer.profile_def_overall || null,
+          profile_ata_overall: roundPlayer.profile_ata_overall || null,
           points: 0,
         };
       }
@@ -532,12 +548,12 @@ export async function calculateRoundStats(roundId: string) {
       const primaryTrait = Array.isArray(player?.overall_traits) ? player.overall_traits[0] : null;
       const columnCActive = Number(scoringSnapshot.version || 0) >= 11;
       const suppressGoalkeeperRewardsForScoring = !columnCActive && suppressGoalkeeperRewards;
-      const currentProfile = profileByPlayerId.get(stats.player_id);
+      const lineRole = stats.player_profile_locked === "defensive" ? "DEF" : "ATA";
       const fallbackRole = primaryTrait === "defensive" ? "DEF" : primaryTrait === "midfield" ? "MEI" : "ATA";
       const roleWeights: RankingRoleWeight[] = !countsForRanking || stats.games <= 0 || !player?.is_competitive_profile_complete
         ? []
         : columnCActive
-          ? [{ role: currentProfile === "defensive" ? "DEF" : "ATA", overall: 0, weight: 1 }]
+          ? [{ role: lineRole, overall: 0, weight: 1 }]
         : frozen.length
           ? frozen
           : overallPositions
@@ -547,7 +563,6 @@ export async function calculateRoundStats(roundId: string) {
               !playersWithPriorOfficialRound.has(stats.player_id),
             )
             : [{ role: fallbackRole, overall: 0, weight: 1 }];
-      const lineRole = currentProfile === "defensive" ? "DEF" : "ATA";
       const rankingPositionBonus = columnCActive ? 0 : calculateRankingPositionBonus({
         roleWeights,
         goals: stats.goals,

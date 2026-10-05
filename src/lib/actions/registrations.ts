@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentAccount } from "@/lib/auth";
 import type { Player, PlayerRegistrationEvent, RosterUnreadState } from "@/lib/types";
 import { calculateRoundStats } from "./stats";
+import { refreshFluidOverallSafely } from "./overall";
 
 export async function getRegistrationHistory(): Promise<PlayerRegistrationEvent[]> {
   const account = await getCurrentAccount();
@@ -170,6 +171,7 @@ export async function mergeGuestWithRegistered(guestId: string, registeredId: st
         if (fantasyError) return { success: false, error: `Perfis unidos, mas o Cartola precisa ser reprocessado: ${fantasyError.message}` };
       }
     }
+    await refreshFluidOverallSafely(`união de perfis ${registeredId} em ${guestId}`);
   }
 
   revalidatePath("/");

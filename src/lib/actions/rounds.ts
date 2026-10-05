@@ -22,6 +22,7 @@ import { getLatestPlayerCardOverallMap } from "./stats";
 import { previewRoundReshuffle, type RoundReshuffleMode } from "../round-reshuffle";
 import { getPrivateBalanceTagsForDraw } from "../private-balance-tags";
 import { sortMatchesChronologically } from "../next-match";
+import { refreshFluidOverallSafely } from "./overall";
 
 const getActiveLeagueCached = unstable_cache(async () => {
   const { data, error } = await supabase
@@ -1082,6 +1083,10 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
       }
     }
 
+    if (!fantasyTest && originalRound.status !== "finished") {
+      await refreshFluidOverallSafely(`fechamento da rodada ${roundId}`);
+    }
+
     revalidatePath(`/rodadas/${roundId}`);
     revalidatePath("/rodadas");
     revalidatePath("/convocacao");
@@ -1116,6 +1121,7 @@ export async function transferRoundPlayerIdentity(roundId: string, sourcePlayerI
       const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: roundId });
       if (fantasyError) throw new Error(`Participação transferida, mas o Cartola precisa ser reprocessado: ${fantasyError.message}`);
     }
+    await refreshFluidOverallSafely(`transferência de participante na rodada ${roundId}`);
     revalidatePath(`/rodadas/${roundId}`);
     revalidatePath("/ranking");
     revalidatePath("/cartola", "layout");
@@ -1144,6 +1150,8 @@ export async function zeroPlayerRoundPoints(roundId: string, playerId: string, r
       const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: roundId });
       if (fantasyError) throw new Error(`Pontuação corrigida, mas o Cartola precisa ser reprocessado: ${fantasyError.message}`);
     }
+
+    await refreshFluidOverallSafely(`correção de pontuação na rodada ${roundId}`);
 
     revalidatePath(`/rodadas/${roundId}`);
     revalidatePath("/ranking");

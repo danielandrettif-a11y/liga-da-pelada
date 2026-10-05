@@ -78,6 +78,9 @@ export type Player = {
   /** Segunda foto guardada pelo perfil; avatar_url continua sendo a foto ativa. */
   avatar_alternate_url: string | null;
   player_profile: PlayerProfile | null;
+  initial_player_profile?: PlayerProfile | null;
+  profile_decision_source?: "initial" | "overall" | null;
+  profile_source_round_id?: string | null;
   overall_traits: PlayerProfile[];
   overall_seed_mode: OverallSeedMode;
   is_goalkeeper: boolean;
@@ -428,6 +431,10 @@ export type PlayerRoundStats = {
   ranking_position_bonus: number;
   ranking_points: number;
   player_profile_locked?: PlayerProfile | null;
+  profile_decision_source?: "initial" | "overall" | null;
+  profile_appearance_number?: number | null;
+  profile_def_overall?: number | null;
+  profile_ata_overall?: number | null;
 };
 
 // ============================================

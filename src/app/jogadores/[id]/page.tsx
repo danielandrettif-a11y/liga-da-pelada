@@ -17,6 +17,7 @@ import { CosmeticNameplate } from "@/components/fantasy/CosmeticNameplate";
 import { OfficialProfilePreviewNotice } from "@/components/fantasy/OfficialProfilePreviewNotice";
 import { buildRankedPointBreakdown } from "@/lib/ranked-scoring";
 import { MonthlyAwards } from "@/components/MonthlyAwards";
+import { getLatestPlayerCardOverallMap } from "@/lib/actions/stats";
 
 export const revalidate = 0;
 
@@ -98,7 +99,7 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
     showcase: readPreviewValue(query.showcase),
     pitch: readPreviewValue(query.pitch),
   } : {};
-  const [player, officialHistory, friendlyHistory, awardSeasons, monthlyAwards, fitness, clubGoals, fantasySummary, equippedCosmetics, previewCosmetics, playtime] = await Promise.all([
+  const [player, officialHistory, friendlyHistory, awardSeasons, monthlyAwards, fitness, clubGoals, fantasySummary, equippedCosmetics, previewCosmetics, playtime, overallMap] = await Promise.all([
     getPlayer(id),
     getPlayerRoundHistory(id, "official"),
     getPlayerRoundHistory(id, "friendly"),
@@ -110,6 +111,7 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
     getPlayerEquippedCosmetics(id),
     isPreviewRequested ? getAdminCosmeticsPreview(id, previewLoadout) : Promise.resolve(null),
     getPlayerPlaytime(id),
+    getLatestPlayerCardOverallMap(),
   ]);
   if (!player) notFound();
   const cosmetics = previewCosmetics || equippedCosmetics;
@@ -120,6 +122,9 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
   const officialGoalkeeper = aggregateGoalkeeperStats(officialHistory);
   const friendlyGoalkeeper = aggregateGoalkeeperStats(friendlyHistory);
   const categoryLabel = player.member_category === "player" ? "Jogador oficial" : player.member_category === "guest" ? "Convidado" : player.member_category === "wag" ? "WAG" : "Torcida";
+  const playerOverall = overallMap.get(player.id);
+  const officialAppearances = playerOverall?.roundsPlayed
+    ?? officialHistory.filter((row) => Number(row.games || 0) > 0).length;
 
   const cardGradient = cosmetics?.bannerAssetKey
     ? `bg-gradient-to-b ${cosmeticVisual(cosmetics.bannerAssetKey)}/30`
@@ -231,6 +236,15 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
               <span className="rounded-full border border-border bg-surface/50 backdrop-blur-xs px-2.5 py-1 text-[9px] font-black uppercase text-muted">{categoryLabel}</span>
               {isPlayable && <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />}
             </div>
+            {isPlayable && (
+              <p className="mt-2 rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[9px] font-bold text-muted">
+                {officialAppearances < 4
+                  ? `Tag inicial · ${officialAppearances}/4 atuações`
+                  : playerOverall?.positions
+                    ? `Tag automática por OVR · DEF ${playerOverall.positions.DEF.toFixed(1)} · ATA ${playerOverall.positions.ATA.toFixed(1)}`
+                    : "Tag automática por OVR"}
+              </p>
+            )}
             {player.profile_bio && <p className="mt-5 max-w-xl text-sm leading-6 text-muted">{player.profile_bio}</p>}
             {isPlayable && (
               <div className="mt-6 inline-flex items-center gap-4 rounded-2xl border border-border bg-surface/60 backdrop-blur-sm px-6 py-3 shadow-sm">

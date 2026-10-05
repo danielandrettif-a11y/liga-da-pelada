@@ -122,6 +122,25 @@ describe("motor adaptativo de OVR", () => {
     traitProgressionBonusBudget: 0.30,
     prioritizedTraitProgression: false,
   });
+  const fluidProfileFormula = parseOverallFormulaConfig({
+    ...distributedTraitBonusFormula,
+    threePositionModel: true,
+    fluidProfileEnabled: true,
+    fluidProfileWarmupAppearances: 4,
+    oppositeRoleAcceleration: 1.5,
+    playedRoleEvidenceEnabled: false,
+    unselectedTraitEvidence: 1,
+    unselectedTraitEvidenceEnabled: false,
+    traitsAsProgressionBonus: false,
+    prioritizedTraitProgression: false,
+    prioritizedTraitsAsEvidenceOnly: false,
+    traitInfluenceFadeEnabled: false,
+    positionWeights: {
+      DEF: { defense: 0.55, goals: 0.28, assists: 0.17, result: 0 },
+      ALA_MEI: { defense: 0.15, goals: 0.55, assists: 0.30, result: 0 },
+      ATA: { defense: 0.15, goals: 0.55, assists: 0.30, result: 0 },
+    },
+  });
 
   it("separa gols e assistências no OVR V10 sem transformar vitória em defesa", () => {
     const scorer = { id: "scorer", playerProfile: "offensive" as const, overallTraits: ["offensive" as const], overallSeedMode: "observed" as const };
@@ -733,6 +752,156 @@ describe("motor adaptativo de OVR", () => {
 
     const first = result.snapshotsByRound[0].snapshots[0].positions.GOL.value;
     expect(result.snapshots[0].positions.GOL.value).toBe(first);
+  });
+
+  it("preserva a tag DEF nas quatro primeiras atuações e usa ATA na quinta quando seu OVR é maior", () => {
+    const player: OverallPlayer = {
+      id: "fluid-def",
+      playerProfile: "defensive",
+      initialPlayerProfile: "defensive",
+      overallTraits: ["defensive"],
+      overallSeedMode: "observed",
+    };
+    const inputs = Array.from({ length: 5 }, (_, index) => round(index + 1, [appearance(player.id, {
+      matchId: `fluid-def-${index}`,
+      playerProfileLocked: "defensive",
+      goals: 4,
+      assists: 2,
+      goalsConceded: 2,
+      teamGoalsConceded: 2,
+    })]));
+    const result = calculatePlayerOveralls([player], inputs, fluidProfileFormula);
+    const playerRounds = result.breakdowns.filter((item) => item.playerId === player.id);
+
+    expect(playerRounds.slice(0, 4).map((item) => item.playedProfile)).toEqual([
+      "defensive", "defensive", "defensive", "defensive",
+    ]);
+    expect(playerRounds[4].playedProfile).toBe("offensive");
+    expect(playerRounds[4].profileSource).toBe("overall");
+    expect(playerRounds[4].profileAtaOverall).toBeGreaterThan(playerRounds[4].profileDefOverall);
+    expect(playerRounds[4].profileDefOverall).toBe(result.snapshotsByRound[3].snapshots[0].positions.DEF.value);
+    expect(playerRounds[4].profileAtaOverall).toBe(result.snapshotsByRound[3].snapshots[0].positions.ATA.value);
+  });
+
+  it("preserva a tag ATA nas quatro primeiras atuações e usa DEF na quinta com consistência defensiva superior", () => {
+    const player: OverallPlayer = {
+      id: "fluid-ata",
+      playerProfile: "offensive",
+      initialPlayerProfile: "offensive",
+      overallTraits: ["offensive"],
+      overallSeedMode: "observed",
+    };
+    const inputs = Array.from({ length: 5 }, (_, index) => round(index + 1, [appearance(player.id, {
+      matchId: `fluid-ata-${index}`,
+      playerProfileLocked: "offensive",
+      goals: 0,
+      assists: 0,
+      goalsConceded: 0,
+      teamGoalsConceded: 0,
+    })]));
+    const result = calculatePlayerOveralls([player], inputs, fluidProfileFormula);
+    const playerRounds = result.breakdowns.filter((item) => item.playerId === player.id);
+
+    expect(playerRounds.slice(0, 4).every((item) => item.playedProfile === "offensive")).toBe(true);
+    expect(playerRounds[4].playedProfile).toBe("defensive");
+    expect(playerRounds[4].profileDefOverall).toBeGreaterThan(playerRounds[4].profileAtaOverall);
+  });
+
+  it("não conta ausências entre as quatro atuações iniciais", () => {
+    const player: OverallPlayer = {
+      id: "fluid-absence",
+      playerProfile: "defensive",
+      initialPlayerProfile: "defensive",
+      overallTraits: ["defensive"],
+      overallSeedMode: "observed",
+    };
+    const inputs = [
+      round(1, [appearance(player.id, { goals: 4 })]),
+      round(2, []),
+      round(3, [appearance(player.id, { goals: 4 })]),
+      round(4, []),
+      round(5, [appearance(player.id, { goals: 4 })]),
+      round(6, [appearance(player.id, { goals: 4 })]),
+      round(7, [appearance(player.id, { goals: 4 })]),
+    ];
+    const appearances = calculatePlayerOveralls([player], inputs, fluidProfileFormula).breakdowns;
+
+    expect(appearances.map((item) => item.appearanceNumber)).toEqual([1, 2, 3, 4, 5]);
+    expect(appearances.slice(0, 4).every((item) => item.playedProfile === "defensive")).toBe(true);
+    expect(appearances[4].playedProfile).toBe("offensive");
+  });
+
+  it("mantém a tag anterior quando DEF e ATA empatam", () => {
+    const player: OverallPlayer = {
+      id: "fluid-tie",
+      playerProfile: "offensive",
+      initialPlayerProfile: "offensive",
+      overallTraits: ["offensive"],
+      overallSeedMode: "observed",
+    };
+    const equalFormula = parseOverallFormulaConfig({
+      ...fluidProfileFormula,
+      positionWeights: {
+        DEF: { defense: 0.5, goals: 0.3, assists: 0.2, result: 0 },
+        ALA_MEI: { defense: 0.5, goals: 0.3, assists: 0.2, result: 0 },
+        ATA: { defense: 0.5, goals: 0.3, assists: 0.2, result: 0 },
+      },
+    });
+    const inputs = Array.from({ length: 5 }, (_, index) => round(index + 1, [appearance(player.id, {
+      matchId: `fluid-tie-${index}`,
+      goals: 1,
+      assists: 1,
+      goalsConceded: 1,
+    })]));
+    const result = calculatePlayerOveralls([player], inputs, equalFormula);
+    const fifth = result.breakdowns.filter((item) => item.playerId === player.id)[4];
+
+    expect(fifth.profileDefOverall).toBe(fifth.profileAtaOverall);
+    expect(fifth.playedProfile).toBe("offensive");
+  });
+
+  it("acelera em 1,5x somente a subida da posição oposta com desempenho superior", () => {
+    const player: OverallPlayer = {
+      id: "fluid-boost",
+      playerProfile: "defensive",
+      initialPlayerProfile: "defensive",
+      overallTraits: ["defensive"],
+      overallSeedMode: "observed",
+    };
+    const input = [round(1, [appearance(player.id, {
+      goals: 5,
+      assists: 3,
+      goalsConceded: 2,
+      teamGoalsConceded: 2,
+    })])];
+    const accelerated = calculatePlayerOveralls([player], input, fluidProfileFormula).snapshots[0];
+    const regular = calculatePlayerOveralls([player], input, parseOverallFormulaConfig({
+      ...fluidProfileFormula,
+      oppositeRoleAcceleration: 1,
+    })).snapshots[0];
+
+    expect(accelerated.positions.ATA.value).toBeGreaterThan(regular.positions.ATA.value);
+    expect(accelerated.positions.DEF.value).toBe(regular.positions.DEF.value);
+  });
+
+  it("usa atuações no gol somente no OVR GOL na v18", () => {
+    const player: OverallPlayer = {
+      id: "fluid-keeper",
+      playerProfile: "defensive",
+      initialPlayerProfile: "defensive",
+      overallTraits: ["defensive"],
+      overallSeedMode: "observed",
+    };
+    const snapshot = calculatePlayerOveralls([player], [round(1, [appearance(player.id, {
+      isGoalkeeper: true,
+      goalsConceded: 0,
+      goals: 4,
+      assists: 3,
+    })])], fluidProfileFormula).snapshots[0];
+
+    expect(snapshot.positions.DEF.value).toBe(fluidProfileFormula.base);
+    expect(snapshot.positions.ATA.value).toBe(fluidProfileFormula.base);
+    expect(snapshot.positions.GOL.value).toBeGreaterThan(fluidProfileFormula.base);
   });
 
   it("mantém moderado o OVR de 10 jogos, 13 gols sofridos e só 2 jogos sem sofrer", () => {
