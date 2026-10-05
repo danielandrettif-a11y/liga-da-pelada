@@ -90,6 +90,8 @@ export type OverallFormulaConfig = {
   /** V18: após a janela inicial, a maior nota entre DEF e ATA define a tag. */
   fluidProfileEnabled: boolean;
   fluidProfileWarmupAppearances: number;
+  /** Facilita a subida do OVR escolhido pela ADM somente na fase inicial. */
+  initialProfileAcceleration: number;
   oppositeRoleAcceleration: number;
   /** Bônus suave de variação proporcional à distância do alvo, sem degrau rígido. */
   performanceChangeBonus: number;
@@ -171,6 +173,7 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   threePositionModel: false,
   fluidProfileEnabled: false,
   fluidProfileWarmupAppearances: 4,
+  initialProfileAcceleration: 1.25,
   oppositeRoleAcceleration: 1.5,
   performanceChangeBonus: 0,
   hardPositionCapsEnabled: true,
@@ -372,6 +375,7 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     threePositionModel: candidate.threePositionModel === true,
     fluidProfileEnabled: candidate.fluidProfileEnabled === true,
     fluidProfileWarmupAppearances: wholeNumber(candidate.fluidProfileWarmupAppearances, DEFAULT_OVERALL_FORMULA.fluidProfileWarmupAppearances, 1, 20),
+    initialProfileAcceleration: clamp(bounded(candidate.initialProfileAcceleration, DEFAULT_OVERALL_FORMULA.initialProfileAcceleration), 1, 2),
     oppositeRoleAcceleration: clamp(bounded(candidate.oppositeRoleAcceleration, DEFAULT_OVERALL_FORMULA.oppositeRoleAcceleration), 1, 3),
     performanceChangeBonus: clamp(bounded(candidate.performanceChangeBonus, DEFAULT_OVERALL_FORMULA.performanceChangeBonus), 0, 0.2),
     hardPositionCapsEnabled: typeof candidate.hardPositionCapsEnabled === "boolean"
@@ -661,8 +665,12 @@ function resolveFluidLineProfile(
   if (!config.fluidProfileEnabled || state.playedRoundIds.size < config.fluidProfileWarmupAppearances) {
     return initialLineProfile(player);
   }
-  if (state.values.ATA > state.values.DEF) return "offensive";
-  if (state.values.DEF > state.values.ATA) return "defensive";
+  // A decisão usa exclusivamente os OVRs de linha arredondados. O OVR GOL
+  // nunca participa da tag que libera os bônus da Ranked.
+  const attackOverall = roundOverall(state.values.ATA);
+  const defenseOverall = roundOverall(state.values.DEF);
+  if (attackOverall > defenseOverall) return "offensive";
+  if (defenseOverall > attackOverall) return "defensive";
   return state.effectiveProfile;
 }
 
@@ -1093,6 +1101,7 @@ export function calculatePlayerOveralls(
         ? resolveFluidLineProfile(player, state, formula)
         : appearances.find((appearance) => appearance.playerProfileLocked)?.playerProfileLocked || player.playerProfile;
       const playedLineRole: "DEF" | "ATA" = playedProfile === "defensive" ? "DEF" : "ATA";
+      const initialRole: "DEF" | "ATA" = initialLineProfile(player) === "defensive" ? "DEF" : "ATA";
       const roundScores = calculateRoundScores(appearances, formula);
       const traitInfluence = traitInfluenceForRound(state.playedRoundIds.size + 1, formula);
       const playedGoalkeeperThisRound = appearances.some((appearance) => appearance.isGoalkeeper);
@@ -1167,6 +1176,14 @@ export function calculatePlayerOveralls(
         }
         if (role === "GOL" && formula.goalkeeperOutcomeScoring) {
           maximumChange = Math.min(maximumChange, formula.goalkeeperMaxChangePerRound);
+        }
+        if (
+          formula.fluidProfileEnabled
+          && appearanceNumber <= formula.fluidProfileWarmupAppearances
+          && role === initialRole
+          && estimate.target > previous
+        ) {
+          maximumChange *= formula.initialProfileAcceleration;
         }
         if (formula.fluidProfileEnabled && (role === "DEF" || role === "ATA") && role !== playedLineRole) {
           const challengerScore = roleRoundWeight[role] > 0 ? roleRoundScore[role] / roleRoundWeight[role] : 0;

@@ -884,6 +884,34 @@ describe("motor adaptativo de OVR", () => {
     expect(accelerated.positions.DEF.value).toBe(regular.positions.DEF.value);
   });
 
+  it("facilita somente a subida da posição inicial durante as quatro primeiras atuações", () => {
+    const player: OverallPlayer = {
+      id: "fluid-initial-bias",
+      playerProfile: "defensive",
+      initialPlayerProfile: "defensive",
+      overallTraits: ["defensive"],
+      overallSeedMode: "observed",
+    };
+    const input = [round(1, [appearance(player.id, {
+      goalsConceded: 0,
+      teamGoalsConceded: 0,
+      goals: 1,
+    })])];
+    const favored = calculatePlayerOveralls([player], input, parseOverallFormulaConfig({
+      ...fluidProfileFormula,
+      initialProfileAcceleration: 1.25,
+      oppositeRoleAcceleration: 1,
+    })).snapshots[0];
+    const neutral = calculatePlayerOveralls([player], input, parseOverallFormulaConfig({
+      ...fluidProfileFormula,
+      initialProfileAcceleration: 1,
+      oppositeRoleAcceleration: 1,
+    })).snapshots[0];
+
+    expect(favored.positions.DEF.value).toBeGreaterThan(neutral.positions.DEF.value);
+    expect(favored.positions.ATA.value).toBe(neutral.positions.ATA.value);
+  });
+
   it("usa atuações no gol somente no OVR GOL na v18", () => {
     const player: OverallPlayer = {
       id: "fluid-keeper",
@@ -902,6 +930,38 @@ describe("motor adaptativo de OVR", () => {
     expect(snapshot.positions.DEF.value).toBe(fluidProfileFormula.base);
     expect(snapshot.positions.ATA.value).toBe(fluidProfileFormula.base);
     expect(snapshot.positions.GOL.value).toBeGreaterThan(fluidProfileFormula.base);
+  });
+
+  it("ignora o OVR GOL ao escolher a tag fluida da Ranked", () => {
+    const player: OverallPlayer = {
+      id: "fluid-high-keeper",
+      playerProfile: "offensive",
+      initialPlayerProfile: "offensive",
+      overallTraits: ["offensive"],
+      overallSeedMode: "observed",
+    };
+    const inputs = Array.from({ length: 6 }, (_, index) => round(index + 1, [
+      appearance(player.id, {
+        matchId: `fluid-line-${index}`,
+        goalsConceded: 0,
+        teamGoalsConceded: 0,
+        isGoalkeeper: false,
+      }),
+      appearance(player.id, {
+        matchId: `fluid-goal-${index}`,
+        goalsConceded: 0,
+        teamGoalsConceded: 0,
+        isGoalkeeper: true,
+      }),
+    ]));
+    const snapshot = calculatePlayerOveralls([player], inputs, parseOverallFormulaConfig({
+      ...fluidProfileFormula,
+      goalkeeperMaxChangePerRound: 3,
+    })).snapshots[0];
+
+    expect(snapshot.positions.GOL.value).toBeGreaterThan(snapshot.positions.ATA.value);
+    expect(snapshot.positions.DEF.value).toBeGreaterThan(snapshot.positions.ATA.value);
+    expect(snapshot.effectiveProfile).toBe("defensive");
   });
 
   it("mantém moderado o OVR de 10 jogos, 13 gols sofridos e só 2 jogos sem sofrer", () => {
