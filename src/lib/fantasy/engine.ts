@@ -142,6 +142,7 @@ export function buildFantasyGoalkeeperSlotBreakdown(
 ) {
   const scoringVersion = Number(settings.scoringVersion || 0);
   if (scoringVersion >= 11) {
+    const configurableColumnC = scoringVersion >= 13;
     const cleanSheetPoints = scoringVersion >= 12 ? settings.goalkeeperSlotCleanSheetPoints : 2;
     const oneGoalGames = scoringVersion >= 12
       ? inferOneGoalGames(
@@ -151,13 +152,13 @@ export function buildFantasyGoalkeeperSlotBreakdown(
         )
       : 0;
     const rows = [
-      ["goalkeeperGoals", "Gols enquanto estava no gol", stats.goalkeeperGoals, 5],
-      ["goalkeeperAssists", "Assistências enquanto estava no gol", stats.goalkeeperAssists, 3],
-      ["goalkeeperGames", "Atuações no gol", stats.goalkeeperGames, settings.suppressGoalkeeperRewards ? 0 : 1],
-      ["goalsConceded", "Gols sofridos enquanto estava no gol", stats.goalsConceded, -0.5],
+      ["goalkeeperGoals", "Gols enquanto estava no gol", stats.goalkeeperGoals, configurableColumnC ? settings.defenderGoalPoints : 5],
+      ["goalkeeperAssists", "Assistências enquanto estava no gol", stats.goalkeeperAssists, configurableColumnC ? settings.defenderAssistPoints : 3],
+      ["goalkeeperGames", "Atuações no gol", stats.goalkeeperGames, settings.suppressGoalkeeperRewards ? 0 : (configurableColumnC ? settings.goalkeeperSlotAppearancePoints : 1)],
+      ["goalsConceded", "Gols sofridos enquanto estava no gol", stats.goalsConceded, configurableColumnC ? settings.goalkeeperSlotGoalConcededPoints : -0.5],
       ["cleanSheets", "Faixa GOL · 0 gols sofridos", stats.cleanSheets, cleanSheetPoints],
       ["goalkeeperOneGoalGames", "Faixa GOL · 1 gol sofrido", oneGoalGames, settings.goalkeeperSlotOneGoalPoints],
-      ["goalkeeperOwnGoals", "Gols contra enquanto estava no gol", stats.goalkeeperOwnGoals, -3],
+      ["goalkeeperOwnGoals", "Gols contra enquanto estava no gol", stats.goalkeeperOwnGoals, configurableColumnC ? settings.ownGoalPoints : -3],
     ] as const;
     return rows.flatMap(([key, label, countValue, unitPoints]) => {
       const count = Number(countValue || 0);
@@ -193,7 +194,15 @@ export function calculateFantasyGoalkeeperSlotPoints(
       goalkeeperOwnGoals: stats.goalkeeperOwnGoals,
       goalkeeperGoalsConceded: stats.goalsConceded,
       goalkeeperCleanSheets: stats.cleanSheets,
-    }, Number(settings.scoringVersion || 0));
+    }, Number(settings.scoringVersion || 0), Number(settings.scoringVersion || 0) >= 13 ? {
+      appearance: settings.suppressGoalkeeperRewards ? 0 : settings.goalkeeperSlotAppearancePoints,
+      goal: settings.defenderGoalPoints,
+      assist: settings.defenderAssistPoints,
+      conceded: settings.goalkeeperSlotGoalConcededPoints,
+      cleanSheet: settings.goalkeeperSlotCleanSheetPoints,
+      oneGoal: settings.goalkeeperSlotOneGoalPoints,
+      ownGoal: settings.ownGoalPoints,
+    } : {});
   }
   return buildFantasyGoalkeeperSlotBreakdown(stats, settings)
     .reduce((total, item) => total + item.points, 0);

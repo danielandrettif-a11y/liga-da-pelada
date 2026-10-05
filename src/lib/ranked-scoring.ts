@@ -62,13 +62,21 @@ export function calculateRankedPoints(stats: RankedScoringStats, snapshot?: BQBa
       goalkeeperGoalsConceded: stats.goalkeeperGoalsConceded,
       goalkeeperCleanSheets: stats.goalkeeperCleanSheets,
     }, Number(scoring.version || 0), {
-      goal: stats.lineRole === "DEF" ? scoring.defenderGoal : COLUMN_C_SCORING.ATA.goal,
-      assist: stats.lineRole === "DEF" ? scoring.defenderAssist : COLUMN_C_SCORING.ATA.assist,
+      goal: stats.lineRole === "DEF" ? scoring.defenderGoal : scoring.goal,
+      assist: stats.lineRole === "DEF" ? scoring.defenderAssist : scoring.assist,
       conceded: scoring.teamGoalConceded,
       cleanSheet: scoring.defenderCleanSheet,
       oneGoal: scoring.defenderOneGoal,
       oneGoalConceded: scoring.defenderOneGoalConceded,
       twoGoalsConceded: scoring.defenderTwoGoalsConceded,
+      ownGoal: scoring.ownGoal,
+    }, {
+      appearance: scoring.goalkeeperAppearance,
+      goal: scoring.defenderGoal,
+      assist: scoring.defenderAssist,
+      conceded: scoring.goalkeeperGoalConceded,
+      cleanSheet: scoring.goalkeeperCleanSheet,
+      oneGoal: scoring.goalkeeperOneGoal,
       ownGoal: scoring.ownGoal,
     });
   }
@@ -93,6 +101,12 @@ export function buildRankedPointBreakdown(
   if (Number(snapshot.version || 0) >= 11) {
     const role = stats.lineRole || "ATA";
     const rule = COLUMN_C_SCORING[role];
+    const lineGoalPoints = role === "DEF"
+      ? (snapshot.defenderGoal ?? rule.goal)
+      : snapshot.goal;
+    const lineAssistPoints = role === "DEF"
+      ? (snapshot.defenderAssist ?? rule.assist)
+      : snapshot.assist;
     const lineGoals = Math.max(0, amount(stats.goals) - amount(stats.goalkeeperGoals));
     const lineAssists = Math.max(0, amount(stats.assists) - amount(stats.goalkeeperAssists));
     const lineOwnGoals = Math.max(0, amount(stats.ownGoals) - amount(stats.goalkeeperOwnGoals));
@@ -111,20 +125,20 @@ export function buildRankedPointBreakdown(
         )
       : 0;
     const rows: Array<[string, number, number]> = [
-      [`Gols como ${role}`, lineGoals, rule.goal],
-      [`Assistências como ${role}`, lineAssists, rule.assist],
+      [`Gols como ${role}`, lineGoals, lineGoalPoints],
+      [`Assistências como ${role}`, lineAssists, lineAssistPoints],
       ["Gols sofridos pelo time", tieredDefensePenalty ? 0 : lineConceded, snapshot.teamGoalConceded ?? rule.conceded],
       ["Clean sheets como DEF", role === "DEF" ? amount(stats.defensiveCleanGames) : 0, snapshot.defenderCleanSheet ?? COLUMN_C_SCORING.DEF.cleanSheet],
       ["Jogos com 1 gol sofrido como DEF", progressiveDefense && role === "DEF" ? defensiveOneGoalGames : 0, tieredDefensePenalty ? (snapshot.defenderOneGoalConceded ?? COLUMN_C_SCORING.DEF.oneGoalConceded) : (snapshot.defenderOneGoal ?? COLUMN_C_SCORING.DEF.oneGoal)],
       ["Jogos com 2 gols sofridos como DEF", defensiveTwoGoalGames, snapshot.defenderTwoGoalsConceded ?? COLUMN_C_SCORING.DEF.twoGoalsConceded],
-      ["Gols contra na linha", lineOwnGoals, rule.ownGoal],
-      ["Atuações no gol", amount(stats.goalkeeperAppearances), COLUMN_C_SCORING.GOL.appearance],
-      ["Gols feitos no gol", amount(stats.goalkeeperGoals), COLUMN_C_SCORING.GOL.goal],
-      ["Assistências no gol", amount(stats.goalkeeperAssists), COLUMN_C_SCORING.GOL.assist],
-      ["Gols sofridos no gol", amount(stats.goalkeeperGoalsConceded), COLUMN_C_SCORING.GOL.conceded],
-      ["Clean sheets no gol", amount(stats.goalkeeperCleanSheets), progressiveDefense ? COLUMN_C_SCORING.GOL.cleanSheet : 2],
-      ["Jogos com 1 gol sofrido no gol", goalkeeperOneGoalGames, COLUMN_C_SCORING.GOL.oneGoal],
-      ["Gols contra no gol", amount(stats.goalkeeperOwnGoals), COLUMN_C_SCORING.GOL.ownGoal],
+      ["Gols contra na linha", lineOwnGoals, snapshot.ownGoal],
+      ["Atuações no gol", amount(stats.goalkeeperAppearances), snapshot.goalkeeperAppearance],
+      ["Gols feitos no gol", amount(stats.goalkeeperGoals), snapshot.defenderGoal ?? COLUMN_C_SCORING.GOL.goal],
+      ["Assistências no gol", amount(stats.goalkeeperAssists), snapshot.defenderAssist ?? COLUMN_C_SCORING.GOL.assist],
+      ["Gols sofridos no gol", amount(stats.goalkeeperGoalsConceded), snapshot.goalkeeperGoalConceded],
+      ["Clean sheets no gol", amount(stats.goalkeeperCleanSheets), progressiveDefense ? (snapshot.goalkeeperCleanSheet ?? COLUMN_C_SCORING.GOL.cleanSheet) : 2],
+      ["Jogos com 1 gol sofrido no gol", goalkeeperOneGoalGames, snapshot.goalkeeperOneGoal ?? COLUMN_C_SCORING.GOL.oneGoal],
+      ["Gols contra no gol", amount(stats.goalkeeperOwnGoals), snapshot.ownGoal],
     ];
     return rows.filter(([, count]) => count > 0).map(([label, count, unit]) => ({ label, count, points: count * unit }));
   }

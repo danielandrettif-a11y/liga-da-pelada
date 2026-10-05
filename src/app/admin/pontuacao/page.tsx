@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { ArrowLeft } from "@/components/icons";
 import { ScoringRulesForm } from "@/components/ScoringRulesForm";
-import { getBQScoringRules } from "@/lib/actions/bq-scoring";
+import { getBQScoringRules, getColumnCScoringRules } from "@/lib/actions/bq-scoring";
 import { getCurrentAccount } from "@/lib/auth";
 
 export default async function PontuacaoPage() {
   const account = await getCurrentAccount();
-  const rules = await getBQScoringRules();
+  const [rules, columnCRules] = await Promise.all([
+    getBQScoringRules(),
+    getColumnCScoringRules(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -24,7 +27,11 @@ export default async function PontuacaoPage() {
         </div>
       </div>
 
-      <ScoringRulesForm initialValues={rules} isAdmin={account.isAdmin} />
+      <ScoringRulesForm
+        initialValues={rules}
+        initialColumnCValues={columnCRules}
+        isAdmin={account.isAdmin}
+      />
     </div>
   );
 }

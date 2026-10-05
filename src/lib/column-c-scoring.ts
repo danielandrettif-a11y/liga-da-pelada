@@ -45,6 +45,16 @@ export type ColumnCLineScoringOptions = {
   ownGoal?: number;
 };
 
+export type ColumnCGoalkeeperScoringOptions = {
+  appearance?: number;
+  goal?: number;
+  assist?: number;
+  conceded?: number;
+  cleanSheet?: number;
+  oneGoal?: number;
+  ownGoal?: number;
+};
+
 const count = (value: number | null | undefined) => Number(value || 0);
 const cents = (value: number) => Math.round(value * 100);
 
@@ -90,10 +100,11 @@ export function calculateColumnCLinePoints(
 export function calculateColumnCGoalkeeperPoints(
   stats: ColumnCStats,
   scoringVersion = COLUMN_C_SCORING_VERSION,
+  options: ColumnCGoalkeeperScoringOptions = {},
 ) {
   const rule = COLUMN_C_SCORING.GOL;
   const progressiveDefense = scoringVersion >= 12;
-  const cleanSheetPoints = progressiveDefense ? rule.cleanSheet : 2;
+  const cleanSheetPoints = progressiveDefense ? (options.cleanSheet ?? rule.cleanSheet) : 2;
   const oneGoalGames = progressiveDefense
     ? inferOneGoalGames(
         count(stats.goalkeeperGames),
@@ -102,13 +113,13 @@ export function calculateColumnCGoalkeeperPoints(
       )
     : 0;
   return (
-    count(stats.goalkeeperGames) * cents(rule.appearance)
-    + count(stats.goalkeeperGoals) * cents(rule.goal)
-    + count(stats.goalkeeperAssists) * cents(rule.assist)
-    + count(stats.goalkeeperGoalsConceded) * cents(rule.conceded)
+    count(stats.goalkeeperGames) * cents(options.appearance ?? rule.appearance)
+    + count(stats.goalkeeperGoals) * cents(options.goal ?? rule.goal)
+    + count(stats.goalkeeperAssists) * cents(options.assist ?? rule.assist)
+    + count(stats.goalkeeperGoalsConceded) * cents(options.conceded ?? rule.conceded)
     + count(stats.goalkeeperCleanSheets) * cents(cleanSheetPoints)
-    + oneGoalGames * cents(rule.oneGoal)
-    + count(stats.goalkeeperOwnGoals) * cents(rule.ownGoal)
+    + oneGoalGames * cents(options.oneGoal ?? rule.oneGoal)
+    + count(stats.goalkeeperOwnGoals) * cents(options.ownGoal ?? rule.ownGoal)
   ) / 100;
 }
 
@@ -122,6 +133,7 @@ export function calculateColumnCRankedPoints(
   stats: ColumnCStats,
   scoringVersion = COLUMN_C_SCORING_VERSION,
   lineOptions: ColumnCLineScoringOptions = {},
+  goalkeeperOptions: ColumnCGoalkeeperScoringOptions = {},
 ) {
   const lineStats: ColumnCStats = {
     goals: Math.max(0, count(stats.goals) - count(stats.goalkeeperGoals)),
@@ -132,7 +144,7 @@ export function calculateColumnCRankedPoints(
     defensiveOneGoalGames: count(stats.defensiveOneGoalGames),
   };
   return calculateColumnCLinePoints(role, lineStats, scoringVersion, lineOptions)
-    + calculateColumnCGoalkeeperPoints(stats, scoringVersion);
+    + calculateColumnCGoalkeeperPoints(stats, scoringVersion, goalkeeperOptions);
 }
 
 export function profileToColumnCRole(profile: string | null | undefined): ColumnCLineRole {

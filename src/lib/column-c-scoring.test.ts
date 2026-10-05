@@ -60,4 +60,22 @@ describe("pontuação Coluna C", () => {
       twoGoalsConceded: -2,
     })).toBe(-3);
   });
+
+  it("aceita os valores administrativos da atuação no gol", () => {
+    expect(calculateColumnCGoalkeeperPoints({
+      goalkeeperGames: 1,
+      goalkeeperGoals: 1,
+      goalkeeperAssists: 1,
+      goalkeeperGoalsConceded: 1,
+      goalkeeperCleanSheets: 0,
+    }, 13, {
+      appearance: 2,
+      goal: 6,
+      assist: 4,
+      conceded: -1,
+      cleanSheet: 5,
+      oneGoal: 3,
+      ownGoal: -4,
+    })).toBe(14);
+  });
 });
