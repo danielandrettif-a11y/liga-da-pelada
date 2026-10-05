@@ -26,9 +26,10 @@ export function ScoringRulesForm({
   const [isEditing, setIsEditing] = useState(false);
   const [isPositionEditing, setIsPositionEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [savingPositions, setSavingPositions] = useState(false);
+  const [savingPositions, setSavingPositions] = useState<"future" | "ranked" | null>(null);
   const [values, setValues] = useState<BQBaseScoringSnapshot>(initialValues);
   const [columnCValues, setColumnCValues] = useState<ColumnCScoringSettings>(initialColumnCValues);
+  const [savedColumnCValues, setSavedColumnCValues] = useState<ColumnCScoringSettings>(initialColumnCValues);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const rulesList = [
@@ -121,13 +122,19 @@ export function ScoringRulesForm({
     }
   }
 
-  async function handleSavePositions() {
-    setSavingPositions(true);
+  async function handleSavePositions(reprocessRanked = false) {
+    setSavingPositions(reprocessRanked ? "ranked" : "future");
     setMessage(null);
     try {
-      const res = await saveColumnCScoringRules(columnCValues);
+      const res = await saveColumnCScoringRules(columnCValues, { reprocessRanked });
       if (res.success) {
-        setMessage({ type: "success", text: "Regras por posição salvas para as próximas rodadas!" });
+        setSavedColumnCValues(columnCValues);
+        setMessage({
+          type: "success",
+          text: reprocessRanked
+            ? `Regras salvas e Ranked recalculado em ${res.roundsReprocessed || 0} rodadas.`
+            : "Regras por posição salvas para as próximas rodadas!",
+        });
         setIsPositionEditing(false);
       } else {
         setMessage({ type: "error", text: res.error || "Erro ao salvar as regras por posição." });
@@ -135,7 +142,7 @@ export function ScoringRulesForm({
     } catch (err: any) {
       setMessage({ type: "error", text: err.message });
     } finally {
-      setSavingPositions(false);
+      setSavingPositions(null);
     }
   }
 
@@ -258,14 +265,14 @@ export function ScoringRulesForm({
         <div className="glass-card flex items-center justify-between gap-3 p-4">
           <div>
             <p className="text-sm font-bold text-foreground">Regras por posição · Coluna C</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">Valores de ATA/ALA, DEF/VOL e GOL. As faixas de DEF são totais por partida.</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">Valores de ATA/ALA, DEF/VOL e GOL. Você pode aplicar apenas nas próximas rodadas ou recalcular somente a Ranked.</p>
           </div>
           {isAdmin && (
             <button
               type="button"
               onClick={() => {
                 if (isPositionEditing) {
-                  setColumnCValues(initialColumnCValues);
+                  setColumnCValues(savedColumnCValues);
                   setIsPositionEditing(false);
                 } else {
                   setIsPositionEditing(true);
@@ -323,12 +330,25 @@ export function ScoringRulesForm({
             )}
             <button
               type="button"
-              onClick={handleSavePositions}
-              disabled={savingPositions}
+              onClick={() => handleSavePositions(false)}
+              disabled={savingPositions !== null}
               className="w-full rounded-xl bg-accent px-4 py-3 text-xs font-bold text-background transition-transform active:scale-95 disabled:opacity-50"
             >
-              {savingPositions ? "Salvando alterações..." : "Salvar regras por posição"}
+              {savingPositions === "future" ? "Salvando alterações..." : "Salvar para próximas rodadas"}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("Isso recalcula somente os pontos da Ranked de toda a temporada ativa com estas regras. O Cartola, patrimônios e escalações não serão alterados. Deseja continuar?")) {
+                  void handleSavePositions(true);
+                }
+              }}
+              disabled={savingPositions !== null}
+              className="w-full rounded-xl border border-orange-400/50 bg-orange-500/10 px-4 py-3 text-xs font-bold text-orange-300 transition-transform active:scale-95 disabled:opacity-50"
+            >
+              {savingPositions === "ranked" ? "Reprocessando Ranked..." : "Salvar e reprocessar toda a Ranked"}
+            </button>
+            <p className="px-1 text-[10px] leading-relaxed text-muted">O segundo botão não altera Cartola, escalações nem patrimônio.</p>
           </div>
         )}
       </section>

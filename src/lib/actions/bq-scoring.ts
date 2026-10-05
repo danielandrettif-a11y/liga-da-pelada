@@ -98,14 +98,15 @@ export async function saveBQScoringRules(
 
 export async function saveColumnCScoringRules(
   values: ColumnCScoringSettings,
-): Promise<{ success: boolean; error?: string }> {
+  options: { reprocessRanked?: boolean } = {},
+): Promise<{ success: boolean; error?: string; roundsReprocessed?: number; playerRoundsReprocessed?: number }> {
   const account = await getCurrentAccount();
   if (!account.isAdmin) {
     return { success: false, error: "Apenas administradores podem alterar as regras de pontuação." };
   }
 
   const league = await getActiveLeague();
-  const { error } = await account.client.rpc("update_column_c_scoring_settings", {
+  const { data, error } = await account.client.rpc("save_column_c_scoring_settings", {
     p_league_id: league.id,
     p_attacker_goal_points: values.attackerGoalPoints,
     p_attacker_assist_points: values.attackerAssistPoints,
@@ -120,6 +121,7 @@ export async function saveColumnCScoringRules(
     p_goalkeeper_goal_conceded_points: values.goalkeeperSlotGoalConcededPoints,
     p_goalkeeper_clean_sheet_points: values.goalkeeperSlotCleanSheetPoints,
     p_goalkeeper_one_goal_points: values.goalkeeperSlotOneGoalPoints,
+    p_reprocess_ranked: Boolean(options.reprocessRanked),
   });
   if (error) {
     console.error("Erro ao salvar regras posicionais:", error);
@@ -129,5 +131,9 @@ export async function saveColumnCScoringRules(
   revalidatePath("/admin/pontuacao");
   revalidatePath("/ranking");
   revalidatePath("/cartola");
-  return { success: true };
+  return {
+    success: true,
+    roundsReprocessed: Number(data?.rounds_reprocessed || 0),
+    playerRoundsReprocessed: Number(data?.player_rounds_reprocessed || 0),
+  };
 }
