@@ -20,6 +20,14 @@ export type RankingBestRound = {
   roleWeights: Array<{ role: "DEF" | "MEI" | "ATA"; overall: number; weight: 1 | 0.5 }>;
   goals: number;
   assists: number;
+  teamGoalsConceded: number;
+  defensiveCleanGames: number;
+  defensiveOneGoalGames: number;
+  goalkeeperGames: number;
+  goalkeeperGoals: number;
+  goalkeeperAssists: number;
+  goalkeeperGoalsConceded: number;
+  goalkeeperCleanSheets: number;
   wins: number;
   draws: number;
   losses: number;

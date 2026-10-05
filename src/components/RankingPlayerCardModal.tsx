@@ -18,6 +18,7 @@ import {
 import { getInitials } from "@/lib/utils";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { getOverallComposition } from "@/lib/overall-explanation";
+import { inferOneGoalGames, inferTwoGoalGames } from "@/lib/column-c-scoring";
 
 type Props = {
   entry: RankingEntry;
@@ -28,6 +29,15 @@ type Props = {
 
 function signedPoints(points: number) {
   return points > 0 ? `+${points}` : String(points);
+}
+
+function RoundScout({ label, value, accent = false }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <div className="rounded-lg border border-white/[.07] bg-black/15 px-2 py-1.5 text-center">
+      <strong className={`block text-sm leading-none ${accent ? "text-accent" : "text-foreground"}`}>{value}</strong>
+      <span className="mt-1 block text-[7px] font-black uppercase leading-tight tracking-wide text-muted">{label}</span>
+    </div>
+  );
 }
 
 const CARD_TREND = {
@@ -723,7 +733,7 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                               Rodada {String(r.roundNumber).padStart(2, "0")}
                             </p>
                             <p className="text-[9px] text-muted">
-                              {r.games}J · {r.goals}G · {r.assists}A · {r.wins}V · {r.draws}E · {r.losses}D
+                              {r.games}J · {r.goals}G · {r.assists}A · {r.teamGoalsConceded} GS time
                             </p>
                             <p className="mt-0.5 text-[8px] font-bold text-accent/80">
                               {r.playerProfile === "defensive" ? "DEF/VOL" : r.playerProfile === "offensive" ? "ATA/ALA" : "TAG —"}
@@ -769,6 +779,51 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
                                 : null}
                             {r.playerProfile === "offensive" && <> · gols sofridos na linha descontam 0,5, mas não geram bônus defensivo.</>}
                           </div>
+
+                          <section className="mb-3 rounded-xl border border-white/[.08] bg-black/15 p-2.5">
+                            <p className="mb-2 text-[8px] font-black uppercase tracking-[.14em] text-muted">Scouts de linha</p>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              <RoundScout label="gols" value={r.goals} accent />
+                              <RoundScout label="assistências" value={r.assists} accent />
+                              <RoundScout label="sofridos pelo time" value={r.teamGoalsConceded} />
+                            </div>
+
+                            {r.playerProfile === "defensive" && (
+                              <div className="mt-2.5 border-t border-accent/15 pt-2.5">
+                                <p className="mb-2 text-[8px] font-black uppercase tracking-[.14em] text-accent/80">Faixas defensivas</p>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  <RoundScout label="jogos com 0 sofridos" value={r.defensiveCleanGames} accent />
+                                  <RoundScout label="jogos com 1 sofrido" value={r.defensiveOneGoalGames} />
+                                  <RoundScout
+                                    label="jogos com 2 sofridos"
+                                    value={inferTwoGoalGames(
+                                      Math.max(0, r.teamGoalsConceded - r.goalkeeperGoalsConceded),
+                                      r.defensiveOneGoalGames,
+                                    )}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="mt-2.5 border-t border-cyan-300/15 pt-2.5">
+                              <p className="mb-2 text-[8px] font-black uppercase tracking-[.14em] text-cyan-100/80">Scouts como goleiro</p>
+                              {r.goalkeeperGames > 0 ? (
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  <RoundScout label="atuações" value={r.goalkeeperGames} accent />
+                                  <RoundScout label="gols no gol" value={r.goalkeeperGoals} />
+                                  <RoundScout label="assistências no gol" value={r.goalkeeperAssists} />
+                                  <RoundScout label="sofridos no gol" value={r.goalkeeperGoalsConceded} />
+                                  <RoundScout label="clean sheets" value={r.goalkeeperCleanSheets} />
+                                  <RoundScout
+                                    label="jogos com 1 sofrido"
+                                    value={inferOneGoalGames(r.goalkeeperGames, r.goalkeeperCleanSheets, r.goalkeeperGoalsConceded)}
+                                  />
+                                </div>
+                              ) : (
+                                <p className="rounded-lg bg-black/15 px-2 py-2 text-[9px] text-muted">Não atuou como goleiro nesta rodada.</p>
+                              )}
+                            </div>
+                          </section>
 
                           {r.pointBreakdown.length > 0 ? (
                             <div className="space-y-1.5">

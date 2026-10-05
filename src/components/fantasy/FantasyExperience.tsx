@@ -1606,92 +1606,32 @@ export function FantasyExperience({
 
               {/* RENDERIZAÇÃO ADAPTÁVEL DO CAMPO (5 vs 6 JOGADORES) */}
               {playersPerTeam === 6 ? (
-                formation === "2-3" ? (
-                  <div className="relative z-10 flex min-h-[480px] flex-col justify-between py-2">
-                    {/* 1. Pontas Abertos (Ataque - 2 vagas) */}
-                    <div>
-                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                        Pontas Abertos (Ataque)
-                      </span>
-                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[0, 1].map((slot) => renderSlot(slot, "Ponta / ATA", "ATA"))}
-                      </div>
-                    </div>
-
-                    {/* 2. Ala/atacante (1 vaga) */}
-                    <div>
-                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                        Ala / Ataque
-                      </span>
-                      <div className="flex justify-center">
-                        {renderSlot(2, "Ala / ATA", "ATA")}
-                      </div>
-                    </div>
-
-                    {/* 3. Linha Defensiva (2 vagas) */}
-                    <div>
-                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                        Linha Defensiva
-                      </span>
-                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[3, 4].map((slot) => renderSlot(slot, defenseRoleLabel, "DEF"))}
-                      </div>
-                    </div>
-
-                    {/* 4. Goleiro (1 vaga) */}
-                    <div>
-                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                        Goleiro
-                      </span>
-                      <div className="flex justify-center">
-                        {renderSlot(5, "Goleiro / GOL", "GOL")}
-                      </div>
+                <div className="relative z-10 flex min-h-[480px] flex-col justify-between py-2">
+                  <div>
+                    <span className="mb-1 block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50">
+                      {formation === "2-3" ? "Trio de ataque · 3 ATA/ALA" : "Dupla de ataque · 2 ATA/ALA"}
+                    </span>
+                    <div className={`mx-auto grid gap-2 px-1 sm:px-4 ${formation === "2-3" ? "max-w-md grid-cols-3" : "max-w-sm grid-cols-2"}`}>
+                      {(formation === "2-3" ? [0, 1, 2] : [0, 1]).map((slot) => renderSlot(slot, "Atacante / ATA", "ATA"))}
                     </div>
                   </div>
-                ) : (
-                  <div className="relative z-10 flex min-h-[480px] flex-col justify-between py-2">
-                    {/* 1. Centroavante (Ataque - 1 vaga) */}
-                    <div>
-                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                        Centroavante (Ataque)
-                      </span>
-                      <div className="flex justify-center">
-                        {renderSlot(0, "Atacante / ATA", "ATA")}
-                      </div>
-                    </div>
 
-                    {/* 2. Segundo atacante e terceiro defensor */}
-                    <div>
-                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                        Ala e Volante
-                      </span>
-                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {renderSlot(1, "Ala / ATA", "ATA")}
-                        {renderSlot(2, "Volante / DEF", "DEF")}
-                      </div>
-                    </div>
-
-                    {/* 3. Linha Defensiva (2 vagas) */}
-                    <div>
-                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                        Linha Defensiva
-                      </span>
-                      <div className="grid grid-cols-2 gap-2 px-1 sm:px-4">
-                        {[3, 4].map((slot) => renderSlot(slot, defenseRoleLabel, "DEF"))}
-                      </div>
-                    </div>
-
-                    {/* 4. Goleiro (1 vaga) */}
-                    <div>
-                      <span className="block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50 mb-1">
-                        Goleiro
-                      </span>
-                      <div className="flex justify-center">
-                        {renderSlot(5, "Goleiro / GOL", "GOL")}
-                      </div>
+                  <div>
+                    <span className="mb-1 block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50">
+                      {formation === "3-2" ? "Linha defensiva · 3 DEF/VOL" : "Linha defensiva · 2 DEF/VOL"}
+                    </span>
+                    <div className={`mx-auto grid gap-2 px-1 sm:px-4 ${formation === "3-2" ? "max-w-md grid-cols-3" : "max-w-sm grid-cols-2"}`}>
+                      {(formation === "3-2" ? [2, 3, 4] : [3, 4]).map((slot) => renderSlot(slot, defenseRoleLabel, "DEF"))}
                     </div>
                   </div>
-                )
+
+                  <div>
+                    <span className="mb-1 block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50">Goleiro</span>
+                    <div className="flex justify-center">
+                      {renderSlot(5, "Goleiro / GOL", "GOL")}
+                    </div>
+                  </div>
+                </div>
               ) : (
                 formation === "3-2" ? (
                   <div className="relative z-10 flex min-h-[448px] flex-col justify-between py-2">

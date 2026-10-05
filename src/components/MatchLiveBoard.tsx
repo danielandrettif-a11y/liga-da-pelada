@@ -320,13 +320,14 @@ type MatchLiveBoardProps = {
 type GoalPickerPlayerOptionProps = {
   entry: any;
   cosmetics?: Record<string, { bannerAssetKey?: string | null; frameKey?: string | null; auraKey?: string | null }>;
+  isGoalkeeper?: boolean;
   onClick: () => void;
   disabled?: boolean;
   icon: ReactNode;
   tone?: "accent" | "danger";
 };
 
-function GoalPickerPlayerOption({ entry, cosmetics, onClick, disabled, icon, tone = "accent" }: GoalPickerPlayerOptionProps) {
+function GoalPickerPlayerOption({ entry, cosmetics, isGoalkeeper = false, onClick, disabled, icon, tone = "accent" }: GoalPickerPlayerOptionProps) {
   const cosmetic = cosmetics?.[entry.player_id];
   const bannerImage = cosmeticHighResolutionImage(cosmetic?.bannerAssetKey);
   const border = tone === "danger" ? "border-danger/30 hover:border-danger/60" : "border-border hover:border-accent/40";
@@ -360,7 +361,10 @@ function GoalPickerPlayerOption({ entry, cosmetics, onClick, disabled, icon, ton
         />
         <span className="min-w-0">
           <span className="block truncate font-bold text-foreground">{entry.player?.name}</span>
-          {bannerImage && <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-wide text-foreground/70">Capa equipada</span>}
+          <span className="mt-0.5 flex flex-wrap items-center gap-1">
+            {isGoalkeeper && <span className="rounded-full border border-cyan-300/35 bg-cyan-300/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-cyan-100">🧤 Goleiro desta partida</span>}
+            {bannerImage && <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/70">Capa equipada</span>}
+          </span>
         </span>
       </span>
       <span className={`relative z-10 shrink-0 ${tone === "danger" ? "text-danger" : "text-accent"}`}>{icon}</span>
@@ -556,6 +560,11 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
       (entry: any) => entry.team_id !== goalModal.teamId && entry.is_active,
     );
   }, [match.match_players, goalModal.teamId]);
+
+  const goalkeeperPlayerIds = useMemo(
+    () => new Set((match.match_goalkeepers || []).map((goalkeeper: any) => goalkeeper.player_id)),
+    [match.match_goalkeepers],
+  );
 
   const goalEditPlayers = useMemo(() => {
     if (!goalEdit) return [];
@@ -1161,6 +1170,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
                       key={tp.player_id}
                       entry={tp}
                       cosmetics={playerCosmetics}
+                      isGoalkeeper={goalkeeperPlayerIds.has(tp.player_id)}
                       disabled={loading}
                       onClick={() => handleRegisterOwnGoal(tp.player_id)}
                       icon={<Football className="h-5 w-5" strokeWidth={1.8} />}
@@ -1182,6 +1192,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
                       key={tp.player_id}
                       entry={tp}
                       cosmetics={playerCosmetics}
+                      isGoalkeeper={goalkeeperPlayerIds.has(tp.player_id)}
                       onClick={() => setGoalModal((p) => ({ ...p, scorerId: tp.player_id }))}
                       icon={<Football className="h-5 w-5" strokeWidth={1.8} />}
                     />
@@ -1207,6 +1218,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
                       key={tp.player_id}
                       entry={tp}
                       cosmetics={playerCosmetics}
+                      isGoalkeeper={goalkeeperPlayerIds.has(tp.player_id)}
                       disabled={loading}
                       onClick={() => handleRegisterGoal(tp.player_id)}
                       icon={<Target className="h-5 w-5" strokeWidth={1.8} />}
