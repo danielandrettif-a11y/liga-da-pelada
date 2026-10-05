@@ -9,7 +9,6 @@ ALTER TABLE public.fantasy_settings
   ADD COLUMN IF NOT EXISTS defender_two_goals_conceded_points NUMERIC NOT NULL DEFAULT -1.75;
 
 UPDATE public.fantasy_settings SET
-  scoring_version = 13,
   defender_one_goal_conceded_points = -0.75,
   defender_two_goals_conceded_points = -1.75;
 
@@ -33,7 +32,6 @@ BEGIN
   UPDATE public.fantasy_settings SET
     defender_one_goal_conceded_points=p_one_goal_points,
     defender_two_goals_conceded_points=p_two_goal_points,
-    scoring_version=13,
     updated_at=now()
   WHERE league_id=active_league_id;
   RETURN true;
