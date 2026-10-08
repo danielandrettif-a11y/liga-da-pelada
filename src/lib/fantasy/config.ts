@@ -102,7 +102,7 @@ export const CURRENT_FANTASY_SCORING_VERSION = COLUMN_C_SCORING_VERSION;
 
 export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   scoringVersion: COLUMN_C_SCORING_VERSION,
-  marketVersion: 13,
+  marketVersion: 14,
   roleScoringActive: true,
   suppressGoalkeeperRewards: false,
   currencyName: "C$",

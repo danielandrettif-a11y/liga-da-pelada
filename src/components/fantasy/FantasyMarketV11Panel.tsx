@@ -36,7 +36,7 @@ export function FantasyMarketV11Panel({ initialStatus }: { initialStatus: any })
     <section className="glass-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-black text-accent">Mercado V13 · desempenho por posição</p>
+          <p className="text-xs font-black text-accent">Mercado V14 · pontuação oficial por posição</p>
           <p className="mt-1 text-[10px] leading-relaxed text-muted">A prévia mede a economia real da liga antes de ativar qualquer mudança. Nenhum dado é gravado nesta ação.</p>
         </div>
         <span className="shrink-0 rounded-full border border-accent/25 bg-accent/10 px-2 py-1 text-[9px] font-black uppercase text-accent">{level}</span>
