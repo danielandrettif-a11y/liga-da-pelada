@@ -226,7 +226,7 @@ SECURITY DEFINER
 SET search_path=public AS $$
 DECLARE
   target_season public.fantasy_seasons%ROWTYPE;
-  item RECORD;
+  loop_item RECORD;
   processed_rounds INTEGER:=0;
   actor_user_id UUID:=auth.uid();
   processing_admin_id UUID;
@@ -298,7 +298,7 @@ BEGIN
   WHERE fantasy_round.round_id=round_item.id
     AND fantasy_round.fantasy_season_id=p_fantasy_season_id;
 
-  FOR item IN
+  FOR loop_item IN
     SELECT round_item.id
     FROM public.fantasy_rounds fantasy_round
     JOIN public.rounds round_item ON round_item.id=fantasy_round.round_id
@@ -306,11 +306,11 @@ BEGIN
       AND round_item.status='finished'
     ORDER BY round_item.date,round_item.number,round_item.created_at
   LOOP
-    PERFORM public.process_fantasy_round(item.id);
+    PERFORM public.process_fantasy_round(loop_item.id);
     processed_rounds:=processed_rounds+1;
   END LOOP;
 
-  FOR item IN
+  FOR loop_item IN
     SELECT DISTINCT ON (fantasy_round.fantasy_season_id,lineup.user_id) lineup.id
     FROM public.fantasy_lineups lineup
     JOIN public.fantasy_rounds fantasy_round ON fantasy_round.id=lineup.fantasy_round_id
@@ -319,7 +319,7 @@ BEGIN
     ORDER BY fantasy_round.fantasy_season_id,lineup.user_id,
       round_item.date DESC,round_item.number DESC,lineup.updated_at DESC
   LOOP
-    PERFORM public.sync_fantasy_portfolio_from_lineup(item.id);
+    PERFORM public.sync_fantasy_portfolio_from_lineup(loop_item.id);
   END LOOP;
 
   -- A rodada ainda aberta passa a usar os preços e o patrimônio reconstruídos.
