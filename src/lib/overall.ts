@@ -15,6 +15,10 @@ export type OverallFormulaConfig = {
   legacyInitialTagBonus: number;
   seedFadeRounds: number;
   confidenceRounds: number;
+  /** Aplica à nota pública uma confiança estatística separada da evidência técnica da posição. */
+  statisticalConfidenceEnabled: boolean;
+  /** Número de atuações oficiais necessário para confiança estatística de 100%. */
+  officialConfidenceRounds: number;
   goalkeeperEligibilityRounds: number;
   goalkeeperEligibilityGames: number;
   goalkeeperConfidenceRounds: number;
@@ -130,6 +134,8 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   legacyInitialTagBonus: 3,
   seedFadeRounds: 3,
   confidenceRounds: 3,
+  statisticalConfidenceEnabled: false,
+  officialConfidenceRounds: 10,
   goalkeeperEligibilityRounds: 3,
   goalkeeperEligibilityGames: 8,
   goalkeeperConfidenceRounds: 6,
@@ -296,6 +302,8 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     legacyInitialTagBonus: number("legacyInitialTagBonus", DEFAULT_OVERALL_FORMULA.legacyInitialTagBonus),
     seedFadeRounds: number("seedFadeRounds", DEFAULT_OVERALL_FORMULA.seedFadeRounds),
     confidenceRounds: number("confidenceRounds", DEFAULT_OVERALL_FORMULA.confidenceRounds),
+    statisticalConfidenceEnabled: candidate.statisticalConfidenceEnabled === true,
+    officialConfidenceRounds: wholeNumber(candidate.officialConfidenceRounds, DEFAULT_OVERALL_FORMULA.officialConfidenceRounds, 1, 50),
     goalkeeperEligibilityRounds: number("goalkeeperEligibilityRounds", DEFAULT_OVERALL_FORMULA.goalkeeperEligibilityRounds),
     goalkeeperEligibilityGames: number("goalkeeperEligibilityGames", DEFAULT_OVERALL_FORMULA.goalkeeperEligibilityGames),
     goalkeeperConfidenceRounds: number("goalkeeperConfidenceRounds", DEFAULT_OVERALL_FORMULA.goalkeeperConfidenceRounds),
@@ -1048,12 +1056,16 @@ function calculateGeneral(player: OverallPlayer, values: Record<OverallRole, num
 }
 
 function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, currentRoundIndex: number, config: OverallFormulaConfig): PlayerOverallSnapshot {
+  const roundsPlayed = state.playedRoundIds.size;
+  const statisticalConfidence = config.statisticalConfidenceEnabled
+    ? clamp(roundsPlayed / config.officialConfidenceRounds, 0, 1)
+    : 1;
   const positions = Object.fromEntries(ROLES.map((role) => {
     const estimate = positionEstimate(player, state, role, currentRoundIndex, config);
     return [role, {
       role,
       value: roundOverall(state.values[role] + estimate.seedBonus),
-      confidence: roundOverall(estimate.confidence),
+      confidence: roundOverall(Math.min(estimate.confidence, statisticalConfidence)),
       validRounds: estimate.validRounds,
     }];
   })) as Record<OverallRole, OverallPositionSnapshot>;
@@ -1062,7 +1074,6 @@ function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, current
   }
   const positionTrends = Object.fromEntries(ROLES.map((role) => [role, positionTrend(state, role, config)])) as Record<OverallRole, OverallTrend>;
   if (config.threePositionModel) positionTrends.ALA_MEI = positionTrends.ATA;
-  const roundsPlayed = state.playedRoundIds.size;
   const goalkeeperRounds = state.goalkeeperRoundIds.size;
   const goalkeeperGames = state.goalkeeperMatchIds.size;
   const effectiveValues = config.threePositionModel
@@ -1080,8 +1091,9 @@ function cloneSnapshot(player: OverallPlayer, state: MutablePlayerState, current
     roundsPlayed,
     goalkeeperRounds,
     goalkeeperGames,
-    isProvisional: roundsPlayed < config.confidenceRounds
-      || (config.provisionalAtConfidenceThreshold && roundsPlayed === config.confidenceRounds),
+    isProvisional: roundsPlayed < (config.statisticalConfidenceEnabled ? config.officialConfidenceRounds : config.confidenceRounds)
+      || (config.provisionalAtConfidenceThreshold
+        && roundsPlayed === (config.statisticalConfidenceEnabled ? config.officialConfidenceRounds : config.confidenceRounds)),
     isStale: state.lastRoundIndex !== null && currentRoundIndex - state.lastRoundIndex >= config.staleAfterRounds,
     lastRoundId: state.lastRoundId,
     effectiveProfile: state.effectiveProfile,

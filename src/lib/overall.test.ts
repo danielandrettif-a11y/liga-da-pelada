@@ -156,6 +156,13 @@ describe("motor adaptativo de OVR", () => {
     unselectedTraitEvidenceEnabled: false,
     traitInfluenceFadeEnabled: false,
   });
+  const statisticalConfidenceFormula = parseOverallFormulaConfig({
+    ...adminFixedProfileFormula,
+    statisticalConfidenceEnabled: true,
+    officialConfidenceRounds: 10,
+    overallConfidenceShrink: true,
+    provisionalAtConfidenceThreshold: false,
+  });
 
   it("separa gols e assistências no OVR V10 sem transformar vitória em defesa", () => {
     const scorer = { id: "scorer", playerProfile: "offensive" as const, overallTraits: ["offensive" as const], overallSeedMode: "observed" as const };
@@ -169,6 +176,48 @@ describe("motor adaptativo de OVR", () => {
     const creatorResult = result.snapshots.find((item) => item.playerId === "creator")!;
     expect(scorerResult.positions.ATA.value).toBeGreaterThan(scorerResult.positions.DEF.value);
     expect(creatorResult.positions.ALA_MEI.value).toBeGreaterThan(creatorResult.positions.ATA.value);
+  });
+
+  it.each([
+    [4, 0.4, true],
+    [6, 0.6, true],
+    [10, 1, false],
+    [15, 1, false],
+  ])("usa confiança estatística de 10 atuações: %i jogos", (roundCount, expectedConfidence, provisional) => {
+    const player: OverallPlayer = {
+      id: `confidence-${roundCount}`,
+      playerProfile: "offensive",
+      overallTraits: ["offensive"],
+      overallSeedMode: "observed",
+    };
+    const inputs = Array.from({ length: roundCount }, (_, index) => round(index + 1, [
+      appearance(player.id, { matchId: `confidence-${roundCount}-${index}`, goals: 1 }),
+    ]));
+    const snapshot = calculatePlayerOveralls([player], inputs, statisticalConfidenceFormula).snapshots[0];
+
+    expect(snapshot.positions.ATA.confidence).toBeCloseTo(expectedConfidence, 5);
+    expect(snapshot.isProvisional).toBe(provisional);
+  });
+
+  it("aproxima da média da liga um OVR com apenas quatro atuações", () => {
+    const player: OverallPlayer = {
+      id: "four-round-shrink",
+      playerProfile: "offensive",
+      overallTraits: ["offensive"],
+      overallSeedMode: "observed",
+    };
+    const inputs = Array.from({ length: 4 }, (_, index) => round(index + 1, [
+      appearance(player.id, { matchId: `four-round-shrink-${index}`, goals: 3, assists: 1 }),
+    ]));
+    const raw = calculatePlayerOveralls([player], inputs, adminFixedProfileFormula).snapshots[0];
+    const adjusted = calculatePlayerOveralls([player], inputs, statisticalConfidenceFormula).snapshots[0];
+
+    const expected = Math.round((
+      statisticalConfidenceFormula.base
+      + (raw.overall - statisticalConfidenceFormula.base) * 0.4
+    ) * 10) / 10;
+    expect(adjusted.overall).toBe(expected);
+    expect(adjusted.positions.ATA.confidence).toBeCloseTo(0.4, 5);
   });
 
   it("não deixa uma única característica superar histórico melhor por dupla aceleração", () => {
