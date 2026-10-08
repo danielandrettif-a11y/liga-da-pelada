@@ -107,7 +107,7 @@ describe("ranking card layout", () => {
     ]);
   });
 
-  it("keeps the fluid-position tag over the portrait and outside the nameplate", () => {
+  it("keeps the fixed-position tag over the portrait and outside the nameplate", () => {
     const { photo, profile, name } = getRankingCardLayout();
     expect(profile.left).toBeGreaterThanOrEqual(photo.left);
     expect(profile.left + profile.width).toBeLessThanOrEqual(photo.left + photo.width);
@@ -151,7 +151,7 @@ describe("ranking card layout", () => {
     expect(buildRankingCardContent(entry, 4)).toMatchObject({ rating: "77.1", ratingTrend: "rising" });
   });
 
-  it("shows the current fluid line tag even when GOL is the player's best OVR", () => {
+  it("shows the fixed line tag even when GOL is the player's best OVR", () => {
     const entry = {
       player: { name: "Goleiro e atacante", player_profile: "offensive", is_goalkeeper: true },
       points: 40,

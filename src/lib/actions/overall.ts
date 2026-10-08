@@ -5,8 +5,8 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import { calculatePlayerOveralls, parseOverallFormulaConfig, type OverallPlayer, type OverallRole } from "../overall";
 import { buildOverallHistoryInput } from "../overall-history";
 
-const FORMULA_KEY = "adaptive-v18-fluid-profile";
-const COMPARISON_FORMULA_KEY = "adaptive-v17-three-positions-column-c";
+const FORMULA_KEY = "adaptive-v19-admin-fixed-profile";
+const COMPARISON_FORMULA_KEY = "adaptive-v18-fluid-profile";
 
 function numberValue(value: unknown) {
   const result = Number(value || 0);
@@ -44,8 +44,8 @@ async function loadOverallHistory(client: any) {
     leaguePlayers.map((player: any) => [player.id, player]),
   ).values()]
     .map((player: any) => ({ id: player.id, name: player.name || "Jogador", playerProfile: player.player_profile, initialPlayerProfile: player.initial_player_profile || player.player_profile, overallTraits: Array.isArray(player.overall_traits) ? player.overall_traits : [], overallSeedMode: player.overall_seed_mode, isGoalkeeper: Boolean(player.is_goalkeeper) }));
-  // As características continuam obrigatórias como metadado do cadastro, mas
-  // na v18 não favorecem a evolução de nenhum OVR posicional.
+  // Uma ou duas características são obrigatórias: na v19 elas distribuem o
+  // orçamento de aceleração do OVR em 100% ou 60/40.
   const pendingPlayers = officialPlayers
     .filter((player) => (player.overallTraits || []).length < 1 || (player.overallTraits || []).length > 2)
     .map(({ id, name }) => ({ id, name }));
@@ -151,7 +151,7 @@ export async function recalculateOverallShadow() {
   let runId: string | null = null;
   try {
     const { data: formula, error: formulaError } = await database.from("overall_formula_versions").select("id, config").eq("key", FORMULA_KEY).single();
-    if (formulaError || !formula) throw new Error("A fórmula v18 não foi encontrada. Confirme a migration 224.");
+    if (formulaError || !formula) throw new Error("A fórmula v19 não foi encontrada. Confirme a migration 241.");
     const source = await loadOverallHistory(database);
     const latestRound = [...source.rounds].filter((round) => round.roundType === "official" && round.status === "finished").at(-1);
     const { data: run, error: runError } = await database.from("overall_calculation_runs").insert({ formula_version_id: formula.id, status: "processing", source_through_round_id: latestRound?.id || null, started_at: new Date().toISOString(), created_by: account.user.id }).select("id").single();
@@ -162,7 +162,7 @@ export async function recalculateOverallShadow() {
     const rows = calculation.snapshots.map((snapshot) => ({
       calculation_run_id: runId, player_id: snapshot.playerId, overall: snapshot.overall, def_overall: snapshot.positions.DEF.value, ala_mei_overall: snapshot.positions.ATA.value, ata_overall: snapshot.positions.ATA.value, gol_overall: snapshot.positions.GOL.value,
       confidence: Math.max(snapshot.positions.DEF.confidence, snapshot.positions.ALA_MEI.confidence, snapshot.positions.ATA.confidence), rounds_played: snapshot.roundsPlayed, goalkeeper_rounds: snapshot.goalkeeperRounds, goalkeeper_games: snapshot.goalkeeperGames, is_provisional: snapshot.isProvisional, is_stale: snapshot.isStale, last_round_id: snapshot.lastRoundId,
-      data_quality: { mode: "shadow", goal_timing: parsedFormula.allConcededGoalTimingEnabled ? "all_conceded_goals_with_legacy_fallback" : "first_conceded_goal_with_legacy_fallback", scoring_unit: "weekly_round_with_per_seven_minute_attack_rates", characteristics: "fluid_profile_by_largest_line_overall", seed_mode: "disabled_in_v5", effective_profile: snapshot.effectiveProfile, profile_source: snapshot.profileSource, scout_totals: snapshot.scoutTotals, position_confidence: Object.fromEntries(Object.entries(snapshot.positions).map(([role, position]) => [role, position.confidence])), overall_trend: snapshot.trend, position_trends: snapshot.positionTrends },
+      data_quality: { mode: "shadow", goal_timing: parsedFormula.allConcededGoalTimingEnabled ? "all_conceded_goals_with_legacy_fallback" : "first_conceded_goal_with_legacy_fallback", scoring_unit: "weekly_round_with_per_seven_minute_attack_rates", characteristics: "admin_fixed_profile_with_distributed_trait_boost", seed_mode: "disabled_in_v5", effective_profile: snapshot.effectiveProfile, profile_source: "admin_fixed", scout_totals: snapshot.scoutTotals, position_confidence: Object.fromEntries(Object.entries(snapshot.positions).map(([role, position]) => [role, position.confidence])), overall_trend: snapshot.trend, position_trends: snapshot.positionTrends },
     }));
     if (rows.length) {
       const { error } = await database.from("player_overall_snapshots").insert(rows);
@@ -188,15 +188,15 @@ export async function publishOverallShadow(runId: string) {
   if (!client || !account.user) return { success: false, error: "Somente administradores podem publicar o OVR." };
   const database = client as any;
   const { data: formula } = await database.from("overall_formula_versions").select("id").eq("key", FORMULA_KEY).maybeSingle();
-  if (!formula) return { success: false, error: "A fórmula v18 não foi encontrada." };
+  if (!formula) return { success: false, error: "A fórmula v19 não foi encontrada." };
   const { data: run } = await database.from("overall_calculation_runs").select("id, status, formula_version_id").eq("id", runId).maybeSingle();
-  if (!run || run.formula_version_id !== formula.id || run.status !== "succeeded") return { success: false, error: "Escolha um rascunho v18 concluído e ainda não publicado." };
+  if (!run || run.formula_version_id !== formula.id || run.status !== "succeeded") return { success: false, error: "Escolha um rascunho v19 concluído e ainda não publicado." };
   const { error } = await database.from("overall_calculation_runs").update({ status: "published", published_at: new Date().toISOString() }).eq("id", runId).eq("status", "succeeded");
   if (error) {
     await database.from("overall_calculation_runs").update({
       status: "failed",
       completed_at: new Date().toISOString(),
-      error_message: `Falha ao publicar a v18: ${error.message}`,
+      error_message: `Falha ao publicar a v19: ${error.message}`,
     }).eq("id", runId).eq("status", "succeeded");
     return { success: false, error: error.message };
   }
@@ -222,6 +222,6 @@ export async function recalculateAndPublishFluidOverall() {
 
 export async function refreshFluidOverallSafely(reason: string) {
   const result = await recalculateAndPublishFluidOverall();
-  if (!result.success) console.error(`Falha ao atualizar OVR e tags fluidas (${reason}):`, result.error);
+  if (!result.success) console.error(`Falha ao atualizar OVR com tags fixas (${reason}):`, result.error);
   return result;
 }

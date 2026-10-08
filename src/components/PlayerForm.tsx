@@ -498,6 +498,7 @@ export function PlayerForm({
                 name="player_profile"
                 value={option.value}
                 defaultChecked={(player?.player_profile === "defensive" ? "defensive" : "offensive") === option.value}
+                disabled={mode !== "admin"}
                 className="mt-0.5 h-4 w-4"
               />
               <span>
@@ -507,16 +508,14 @@ export function PlayerForm({
             </label>
           ))}
         </div>
-        {mode === "self" && (
-          <p className="text-[10px] leading-4 text-muted">
-            Esta é sua tag oficial no Cartola. Ela libera os bônus quando você for escalado na vaga correspondente. GOL não é tag de perfil: qualquer atleta pode ser escolhido para a vaga de goleiro.
-          </p>
-        )}
+        <p className="text-[10px] leading-4 text-muted">
+          Tag fixa definida pelo ADM. Ela determina a regra DEF/VOL ou ATA/ALA na Ranked e nas próximas rodadas do Cartola; rodadas encerradas permanecem congeladas. GOL continua sendo uma vaga livre.
+        </p>
       </fieldset>}
 
       {mode === "admin" && (memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2 rounded-2xl border border-accent/25 bg-accent/5 p-4">
         <legend className="px-1 text-xs font-bold uppercase tracking-wider text-accent">Características de jogo do OVR</legend>
-        <p className="text-[11px] leading-4 text-muted">Escolha até duas. O bônus de evolução é dividido entre a característica principal e a secundária. Ele vale integralmente por 8 rodadas, diminui nas 8 seguintes e então o OVR passa a evoluir somente pelas atuações.</p>
+        <p className="text-[11px] leading-4 text-muted">Escolha até duas. Com uma característica, ela recebe 100% do bônus de evolução. Com duas, a principal recebe 60% e a secundária 40%. O bônus acelera a reação do OVR, mas a atuação em campo continua determinando se ele sobe ou desce.</p>
         <div className="grid gap-2 pt-1">
           {PLAYER_PROFILE_OPTIONS.map((option) => {
             const trait = option.value as PlayerProfile;

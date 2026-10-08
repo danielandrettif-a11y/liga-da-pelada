@@ -126,7 +126,7 @@ export function FantasyRevealedLineupsModal({
           ) : data && !data.allowed ? (
             <div className="rounded-2xl border border-warning/30 bg-warning/10 p-6 text-center space-y-2">
               <Lock className="mx-auto h-8 w-8 text-warning" />
-              <h3 className="text-sm font-black text-foreground">Mercado Ainda Aberto</h3>
+              <h3 className="text-sm font-black text-foreground">{data.isMarketOpen ? "Mercado Ainda Aberto" : "Não foi possível carregar"}</h3>
               <p className="text-xs text-muted max-w-sm mx-auto">
                 {data.error || "As escalações individuais só são reveladas para todos após o fechamento do mercado."}
               </p>

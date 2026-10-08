@@ -143,3 +143,38 @@ describe("Pontuação Ranked — Coluna C v11", () => {
     expect(points.reduce((total, item) => total + item.points, 0)).toBe(33);
   });
 });
+
+describe("Auditoria de equilíbrio DEF/VOL × ATA/ALA — Coluna C v14", () => {
+  const scoring = {
+    version: 14,
+    goal: 4,
+    assist: 2.5,
+    win: 0,
+    draw: 0,
+    loss: 0,
+    defenderGoal: 5,
+    defenderAssist: 3,
+    defenderCleanSheet: 3,
+    defenderOneGoal: 1,
+    defenderOneGoalConceded: -0.75,
+    defenderTwoGoalsConceded: -1.75,
+    teamGoalConceded: -0.5,
+    ownGoal: -3,
+    goalkeeperAppearance: 1,
+    goalkeeperGoalConceded: -0.5,
+    goalkeeperCleanSheet: 4,
+    goalkeeperOneGoal: 2,
+  };
+
+  it.each([
+    ["sem scout e 0 sofridos", { teamGoalsConceded: 0, defensiveCleanGames: 1 }, 3, 0],
+    ["sem scout e 1 sofrido", { teamGoalsConceded: 1, defensiveOneGoalGames: 1 }, 0.25, -0.5],
+    ["sem scout e 2 sofridos", { teamGoalsConceded: 2 }, -1.75, -1],
+    ["um gol e clean sheet", { goals: 1, teamGoalsConceded: 0, defensiveCleanGames: 1 }, 8, 4],
+    ["uma assistência e 1 sofrido", { assists: 1, teamGoalsConceded: 1, defensiveOneGoalGames: 1 }, 3.25, 2],
+    ["um gol e 2 sofridos", { goals: 1, teamGoalsConceded: 2 }, 3.25, 3],
+  ])("simula %s", (_label, stats, expectedDef, expectedAta) => {
+    expect(calculateRankedPoints({ ...stats, lineRole: "DEF" }, scoring)).toBe(expectedDef);
+    expect(calculateRankedPoints({ ...stats, lineRole: "ATA" }, scoring)).toBe(expectedAta);
+  });
+});

@@ -144,6 +144,18 @@ describe("motor adaptativo de OVR", () => {
       ATA: { defense: 0.05, goals: 0.62, assists: 0.33, result: 0 },
     },
   });
+  const adminFixedProfileFormula = parseOverallFormulaConfig({
+    ...fluidProfileFormula,
+    fluidProfileEnabled: false,
+    adminFixedProfileEnabled: true,
+    initialProfileAcceleration: 1,
+    oppositeRoleAcceleration: 1,
+    traitsAsProgressionBonus: true,
+    traitProgressionBonusBudget: 0.30,
+    unselectedTraitEvidence: 1,
+    unselectedTraitEvidenceEnabled: false,
+    traitInfluenceFadeEnabled: false,
+  });
 
   it("separa gols e assistências no OVR V10 sem transformar vitória em defesa", () => {
     const scorer = { id: "scorer", playerProfile: "offensive" as const, overallTraits: ["offensive" as const], overallSeedMode: "observed" as const };
@@ -612,6 +624,53 @@ describe("motor adaptativo de OVR", () => {
     expect(ata.get("three-primary")).toBe(75.8);
     expect(ata.get("three-secondary")).toBe(75.5);
     expect(ata.get("three-tertiary")).toBe(75.3);
+  });
+
+  it("mantém a tag fixa do ADM mesmo quando o DEF supera o ATA", () => {
+    const player: OverallPlayer = {
+      id: "fixed-attacker",
+      playerProfile: "offensive",
+      initialPlayerProfile: "defensive",
+      overallTraits: ["offensive"],
+      overallSeedMode: "observed",
+    };
+    const result = calculatePlayerOveralls([player], Array.from({ length: 6 }, (_, index) => round(index + 1, [
+      appearance(player.id, {
+        matchId: `fixed-${index}`,
+        playerProfileLocked: "defensive",
+        goalsConceded: 0,
+        teamGoalsConceded: 0,
+      }),
+    ])), adminFixedProfileFormula);
+
+    expect(result.snapshots[0].positions.DEF.value).toBeGreaterThan(result.snapshots[0].positions.ATA.value);
+    expect(result.snapshots[0].effectiveProfile).toBe("offensive");
+    expect(result.breakdowns.every((item) => item.playedProfile === "offensive")).toBe(true);
+  });
+
+  it("divide o bônus permanente da v19 em 100% ou 60/40", () => {
+    const variants: OverallPlayer[] = [
+      { id: "fixed-none", playerProfile: "offensive", overallTraits: [], overallSeedMode: "observed" },
+      { id: "fixed-single", playerProfile: "offensive", overallTraits: ["offensive"], overallSeedMode: "observed" },
+      { id: "fixed-primary", playerProfile: "offensive", overallTraits: ["offensive", "defensive"], overallSeedMode: "observed" },
+      { id: "fixed-secondary", playerProfile: "offensive", overallTraits: ["defensive", "offensive"], overallSeedMode: "observed" },
+    ];
+    const formula = parseOverallFormulaConfig({
+      ...adminFixedProfileFormula,
+      maxChangePerRound: 5,
+      performanceChangeBonus: 0,
+    });
+    const result = calculatePlayerOveralls(variants, [round(1, variants.map((player) => appearance(player.id, {
+      matchId: `fixed-boost-${player.id}`,
+      goals: 5,
+      assists: 2,
+    })))], formula);
+    const attack = new Map(result.snapshots.map((snapshot) => [snapshot.playerId, snapshot.positions.ATA.value]));
+
+    expect(attack.get("fixed-single")).toBe(76.5);
+    expect(attack.get("fixed-primary")).toBe(75.9);
+    expect(attack.get("fixed-secondary")).toBe(75.6);
+    expect(attack.get("fixed-none")).toBe(75);
   });
 
   it("mantém posição não marcada perto da base usando somente 20% da evidência", () => {

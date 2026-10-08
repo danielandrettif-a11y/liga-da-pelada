@@ -657,7 +657,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     avatar_alternate_url: nextAlternateAvatarUrl,
     player_profile: memberCategory === "wag" || memberCategory === "supporter"
       ? null
-      : playerProfile,
+      : account.isAdmin ? playerProfile : currentPlayerProfile,
     overall_traits: overallTraits,
     // GOL deixou de ser uma tag de perfil. Mantemos o valor legado apenas para
     // o histórico operacional de partidas, sem expor ou editar pelo app.

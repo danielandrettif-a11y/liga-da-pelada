@@ -32,7 +32,7 @@ export function cardPositions(card: ManagerCard): Ratings {
 }
 
 export function composedOverall(source: AthleteSource, positions: Ratings): number {
-  if (["adaptive-v17-three-positions-column-c", "adaptive-v18-fluid-profile"].includes(source.formula)) {
+  if (["adaptive-v17-three-positions-column-c", "adaptive-v18-fluid-profile", "adaptive-v19-admin-fixed-profile"].includes(source.formula)) {
     const entries = [positions.DEF, positions.ATA];
     if (source.goalkeeperEligible) entries.push(positions.GOL);
     entries.sort((left, right) => right - left);

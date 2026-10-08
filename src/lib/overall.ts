@@ -96,6 +96,8 @@ export type OverallFormulaConfig = {
   /** V18: após a janela inicial, a maior nota entre DEF e ATA define a tag. */
   fluidProfileEnabled: boolean;
   fluidProfileWarmupAppearances: number;
+  /** V19: usa em todo o histórico a tag fixa atualmente escolhida pelo ADM. */
+  adminFixedProfileEnabled: boolean;
   /** Facilita a subida do OVR escolhido pela ADM somente na fase inicial. */
   initialProfileAcceleration: number;
   oppositeRoleAcceleration: number;
@@ -182,6 +184,7 @@ export const DEFAULT_OVERALL_FORMULA: OverallFormulaConfig = {
   threePositionModel: false,
   fluidProfileEnabled: false,
   fluidProfileWarmupAppearances: 4,
+  adminFixedProfileEnabled: false,
   initialProfileAcceleration: 1.25,
   oppositeRoleAcceleration: 1.5,
   performanceChangeBonus: 0,
@@ -387,6 +390,7 @@ export function parseOverallFormulaConfig(value: unknown): OverallFormulaConfig 
     threePositionModel: candidate.threePositionModel === true,
     fluidProfileEnabled: candidate.fluidProfileEnabled === true,
     fluidProfileWarmupAppearances: wholeNumber(candidate.fluidProfileWarmupAppearances, DEFAULT_OVERALL_FORMULA.fluidProfileWarmupAppearances, 1, 20),
+    adminFixedProfileEnabled: candidate.adminFixedProfileEnabled === true,
     initialProfileAcceleration: clamp(bounded(candidate.initialProfileAcceleration, DEFAULT_OVERALL_FORMULA.initialProfileAcceleration), 1, 2),
     oppositeRoleAcceleration: clamp(bounded(candidate.oppositeRoleAcceleration, DEFAULT_OVERALL_FORMULA.oppositeRoleAcceleration), 1, 3),
     performanceChangeBonus: clamp(bounded(candidate.performanceChangeBonus, DEFAULT_OVERALL_FORMULA.performanceChangeBonus), 0, 0.2),
@@ -669,11 +673,16 @@ function initialLineProfile(player: OverallPlayer): "defensive" | "offensive" {
   return (player.initialPlayerProfile || player.playerProfile) === "defensive" ? "defensive" : "offensive";
 }
 
+function currentLineProfile(player: OverallPlayer): "defensive" | "offensive" {
+  return player.playerProfile === "defensive" ? "defensive" : "offensive";
+}
+
 function resolveFluidLineProfile(
   player: OverallPlayer,
   state: MutablePlayerState,
   config: OverallFormulaConfig,
 ): "defensive" | "offensive" {
+  if (config.adminFixedProfileEnabled) return currentLineProfile(player);
   if (!config.fluidProfileEnabled || state.playedRoundIds.size < config.fluidProfileWarmupAppearances) {
     return initialLineProfile(player);
   }
@@ -695,7 +704,7 @@ function createPlayerState(player: OverallPlayer, config: OverallFormulaConfig):
     goalkeeperMatchIds: new Set<string>(),
     lastRoundId: null,
     lastRoundIndex: null,
-    effectiveProfile: initialLineProfile(player),
+    effectiveProfile: config.adminFixedProfileEnabled ? currentLineProfile(player) : initialLineProfile(player),
     scoutTotals: { goals: 0, assists: 0, ownGoals: 0 },
   };
 }
@@ -1150,9 +1159,11 @@ export function calculatePlayerOveralls(
         : "initial" as const;
       const profileDefOverall = roundOverall(state.values.DEF);
       const profileAtaOverall = roundOverall(state.values.ATA);
-      const playedProfile = formula.fluidProfileEnabled
-        ? resolveFluidLineProfile(player, state, formula)
-        : appearances.find((appearance) => appearance.playerProfileLocked)?.playerProfileLocked || player.playerProfile;
+      const playedProfile = formula.adminFixedProfileEnabled
+        ? currentLineProfile(player)
+        : formula.fluidProfileEnabled
+          ? resolveFluidLineProfile(player, state, formula)
+          : appearances.find((appearance) => appearance.playerProfileLocked)?.playerProfileLocked || player.playerProfile;
       const playedLineRole: "DEF" | "ATA" = playedProfile === "defensive" ? "DEF" : "ATA";
       const initialRole: "DEF" | "ATA" = initialLineProfile(player) === "defensive" ? "DEF" : "ATA";
       const roundScores = calculateRoundScores(appearances, formula);

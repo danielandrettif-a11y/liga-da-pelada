@@ -28,11 +28,11 @@ export function OverallShadowPanel({ initialData }: { initialData: OverallShadow
   }
 
   function publish() {
-    if (!initialData.latestRun || !window.confirm("Publicar o OVR v18, atualizar as tags atuais e reconstruir a Ranked histórica?")) return;
+    if (!initialData.latestRun || !window.confirm("Publicar o OVR v19 com as tags fixas do ADM e reconstruir somente a Ranked histórica? O Cartola encerrado não será alterado.")) return;
     setMessage(null);
     startTransition(async () => {
       const result = await publishOverallShadow(initialData.latestRun!.id);
-      setMessage(result.success ? "OVR v18 publicado. Tags atuais e Ranked histórica foram atualizadas." : result.error || "Não foi possível publicar.");
+      setMessage(result.success ? "OVR v19 publicado. Tags fixas e Ranked histórica foram atualizadas; o Cartola encerrado permaneceu congelado." : result.error || "Não foi possível publicar.");
       if (result.success) router.refresh();
     });
   }
@@ -43,13 +43,13 @@ export function OverallShadowPanel({ initialData }: { initialData: OverallShadow
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-black text-foreground">Modo sombra do OVR</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">Reconstrói cronologicamente DEF/VOL, ATA/ALA e GOL. Ao publicar, atualiza as tags atuais e a Ranked; escalações antigas do Cartola permanecem congeladas.</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">Reconstrói DEF/VOL, ATA/ALA e GOL usando a tag fixa escolhida pelo ADM. As características aceleram o OVR em 100% do bônus ou 60/40. Ao publicar, somente a Ranked é reconstruída; escalações antigas do Cartola permanecem congeladas.</p>
           </div>
           <button type="button" onClick={recalculate} disabled={pending} className="rounded-xl bg-accent px-4 py-3 text-xs font-black text-background disabled:opacity-50">
             {pending ? "Calculando..." : initialData.latestRun ? "Recalcular rascunho" : "Calcular histórico"}
           </button>
         </div>
-        {initialData.latestRun?.status === "succeeded" && <button type="button" onClick={publish} disabled={pending} className="mt-3 w-full rounded-xl border border-accent/40 px-4 py-3 text-xs font-black text-accent disabled:opacity-50">Publicar v18 e reconstruir as tags</button>}
+        {initialData.latestRun?.status === "succeeded" && <button type="button" onClick={publish} disabled={pending} className="mt-3 w-full rounded-xl border border-accent/40 px-4 py-3 text-xs font-black text-accent disabled:opacity-50">Publicar v19 e reconstruir a Ranked</button>}
         {message && <p className="mt-3 rounded-lg bg-surface px-3 py-2 text-xs font-semibold text-foreground">{message}</p>}
       </section>
 
@@ -60,7 +60,7 @@ export function OverallShadowPanel({ initialData }: { initialData: OverallShadow
       {initialData.pendingPlayers.length > 0 && (
         <section className="rounded-2xl border border-warning/30 bg-warning/5 p-4">
           <p className="text-sm font-black text-foreground">Estilo aguardando revisão ({initialData.pendingPlayers.length})</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">Cadastre uma ou duas características para completar o perfil. Na v18 elas não aceleram DEF nem ATA; os dois OVRs aprendem igualmente com as atuações.</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">Cadastre uma ou duas características. Uma recebe 100% do bônus de evolução; duas dividem o bônus em 60% para a principal e 40% para a secundária.</p>
           <p className="mt-2 text-xs font-bold text-warning">{initialData.pendingPlayers.map((player) => player.name).join(" · ")}</p>
         </section>
       )}
@@ -75,9 +75,9 @@ export function OverallShadowPanel({ initialData }: { initialData: OverallShadow
               <span className="rounded-lg bg-accent/15 px-3 py-1 text-lg font-black text-accent">OVR {item.overall.toFixed(1)}</span>
             </div>
             <p className="mt-3 text-[11px] font-bold tracking-wide text-muted">DEF/VOL {item.def.toFixed(1)} · ATA/ALA {item.ata.toFixed(1)} · GOL {item.gol.toFixed(1)} {item.provisional ? "· PROV" : ""}{item.stale ? " · DESATUALIZADO" : ""}</p>
-            <p className="mt-1 text-[10px] font-black text-accent">Tag para a próxima atuação: {item.effectiveProfile === "defensive" ? "DEF/VOL" : "ATA/ALA"} · {item.profileSource === "overall" ? "automática pelo maior OVR" : `fase inicial (${Math.min(item.roundsPlayed, 4)}/4)`}</p>
+            <p className="mt-1 text-[10px] font-black text-accent">Tag fixa do ADM: {item.effectiveProfile === "defensive" ? "DEF/VOL" : "ATA/ALA"} · não muda automaticamente pelo OVR</p>
             <p className={`mt-1 text-[10px] font-black ${item.trend === "rising" ? "text-accent" : item.trend === "falling" ? "text-danger" : "text-muted"}`}>Tendência geral: {TREND_LABELS[item.trend]} · DEF/VOL {TREND_LABELS[item.positionTrends.DEF]} · ATA/ALA {TREND_LABELS[item.positionTrends.ATA]} · GOL {TREND_LABELS[item.positionTrends.GOL]}</p>
-            {item.comparison && <p className="mt-1 text-[10px] font-bold text-accent">vs v17: OVR {item.comparison.overallDelta >= 0 ? "+" : ""}{item.comparison.overallDelta.toFixed(1)} · DEF/VOL {item.comparison.defDelta >= 0 ? "+" : ""}{item.comparison.defDelta.toFixed(1)} · ATA/ALA {item.comparison.ataDelta >= 0 ? "+" : ""}{item.comparison.ataDelta.toFixed(1)}</p>}
+            {item.comparison && <p className="mt-1 text-[10px] font-bold text-accent">vs v18 fluida: OVR {item.comparison.overallDelta >= 0 ? "+" : ""}{item.comparison.overallDelta.toFixed(1)} · DEF/VOL {item.comparison.defDelta >= 0 ? "+" : ""}{item.comparison.defDelta.toFixed(1)} · ATA/ALA {item.comparison.ataDelta >= 0 ? "+" : ""}{item.comparison.ataDelta.toFixed(1)}</p>}
             <p className="mt-1 text-[10px] text-muted">Confiança por posição: DEF/VOL {Math.round(item.positionConfidence.DEF * 100)}% · ATA/ALA {Math.round(item.positionConfidence.ATA * 100)}% · GOL {Math.round(item.positionConfidence.GOL * 100)}%</p>
             <button type="button" onClick={() => setOpenPlayer(openPlayer === item.playerId ? null : item.playerId)} className="mt-3 text-xs font-black text-accent">
               {openPlayer === item.playerId ? "Ocultar explicação" : "Ver por que a nota mudou"}

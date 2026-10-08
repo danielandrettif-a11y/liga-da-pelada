@@ -1730,11 +1730,15 @@ export async function getRevealedLineups(roundId?: string) {
     return { allowed: false, error: "Rodada não encontrada.", lineups: [] };
   }
 
+  const targetRound = Array.isArray(targetFantasyRound.round)
+    ? targetFantasyRound.round[0] || null
+    : targetFantasyRound.round;
+
   // REGRA DE SEGURANÇA: Se o mercado estiver aberto, BLOQUEAR revelação individual de terceiros!
   const isMarketClosed =
     targetFantasyRound.market_status === "in_progress" ||
     targetFantasyRound.market_status === "finished" ||
-    targetFantasyRound.round?.status === "finished";
+    targetRound?.status === "finished";
 
   if (!isMarketClosed) {
     return {
@@ -1753,7 +1757,7 @@ export async function getRevealedLineups(roundId?: string) {
   // Buscar todas as escalações com jogadores travados e snapshots. Também
   // aceitamos o estado legado `missed` quando há atletas salvos: a função de
   // fechamento antiga considerava apenas times de 5 e marcou times de 6 assim.
-  const { data: rawLineupRows } = await revealedReadClient
+  const { data: rawLineupRows, error: lineupRowsError } = await revealedReadClient
     .from("fantasy_lineups")
     .select(
       `
@@ -1770,6 +1774,16 @@ export async function getRevealedLineups(roundId?: string) {
     `
     )
     .eq("fantasy_round_id", targetFantasyRound.id);
+
+  if (lineupRowsError) {
+    console.error("Erro ao carregar escalações históricas do Cartola:", lineupRowsError);
+    return {
+      allowed: false,
+      isMarketOpen: false,
+      error: `Não foi possível carregar as escalações desta rodada: ${lineupRowsError.message}`,
+      lineups: [],
+    };
+  }
 
   const rawLineups = (rawLineupRows || []).filter(
     (lineup: any) => (lineup.fantasy_lineup_players || []).length > 0,
@@ -1795,9 +1809,6 @@ export async function getRevealedLineups(roundId?: string) {
 
   const predictedMap = new Map((predictedPlayers || []).map((p: any) => [p.id, p]));
 
-  const targetRound = Array.isArray(targetFantasyRound.round)
-    ? targetFantasyRound.round[0] || null
-    : targetFantasyRound.round;
   const { data: activations } = userIds.length && targetRound?.id
     ? await revealedReadClient
         .from("fantasy_card_activations")
@@ -1807,7 +1818,11 @@ export async function getRevealedLineups(roundId?: string) {
     : { data: [] as any[] };
   const activationMap = new Map((activations || []).map((activation: any) => [activation.user_id, activation]));
 
+  // Rodadas encerradas são históricas: os pontos, preços e capitão persistidos
+  // são autoritativos. Não dependemos da projeção ao vivo para abrir o banner.
   const roundProjection = targetRound?.id
+    && targetRound.status !== "finished"
+    && targetFantasyRound.market_status !== "finished"
     ? await getLiveRoundProjections(
         revealedReadClient,
         fs.id,
@@ -1940,8 +1955,8 @@ export async function getRevealedLineups(roundId?: string) {
   return {
     allowed: true,
     isMarketOpen: false,
-    roundNumber: targetFantasyRound.round?.number,
-    roundDate: targetFantasyRound.round?.date,
+    roundNumber: targetRound?.number,
+    roundDate: targetRound?.date,
     lineups: revealed,
   };
 }

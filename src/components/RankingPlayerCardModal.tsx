@@ -510,7 +510,7 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
           </div>
 
           <div
-            aria-label={`Tag fluida ${cardContent.profile}`}
+            aria-label={`Tag fixa ${cardContent.profile}`}
             className="absolute z-20 flex items-center justify-center rounded-md border bg-[#020c08]/90 px-1 text-center text-[6px] font-black uppercase tracking-[.08em] shadow-[0_3px_10px_rgba(0,0,0,.85)]"
             style={{ ...rankingCardBoxStyle(layout.profile), borderColor: theme.edge, color: theme.edge, textShadow: "0 1px 3px rgba(0,0,0,.95)" }}
           >

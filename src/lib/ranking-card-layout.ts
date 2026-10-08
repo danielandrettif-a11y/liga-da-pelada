@@ -140,7 +140,7 @@ export function getRankingCardTheme(position: number) {
 export function buildRankingCardContent(entry: RankingEntry, position: number): RankingCardContent {
   const theme = getRankingCardTheme(position);
   const speedStars = formatSpeedStars(entry.speedRating);
-  // A tag fluida é sempre a função de linha atual. O OVR GOL permanece uma
+  // A tag fixa é sempre a função de linha escolhida pelo ADM. O OVR GOL permanece uma
   // nota separada e nunca interfere na escolha entre DEF/VOL e ATA/ALA.
   const profile = PROFILE_LABELS[entry.player.player_profile || "midfield"];
   const positionRatings = ([

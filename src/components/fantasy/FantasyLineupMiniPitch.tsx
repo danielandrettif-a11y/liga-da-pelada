@@ -15,6 +15,10 @@ type PitchPlayer = {
   slot_role?: string | null;
   points?: number;
   total_points?: number;
+  priceLocked?: number;
+  price_locked?: number;
+  priceAfter?: number | null;
+  price_after?: number | null;
   isCaptain?: boolean;
 };
 
@@ -35,6 +39,8 @@ export function FantasyLineupMiniPitch({
     avatarUrl: player.avatarUrl || player.avatar_url_locked || player.players?.avatar_url || null,
     role: player.slotRole || player.slot_role || null,
     points: Number(player.points ?? player.total_points ?? 0),
+    priceLocked: Number(player.priceLocked ?? player.price_locked ?? 0),
+    priceAfter: player.priceAfter ?? player.price_after ?? null,
     captain: Boolean(player.isCaptain || (captainId && (player.playerId || player.player_id) === captainId)),
   }));
   const byRole = (role: string) => normalized.filter((player) => player.role === role);
@@ -61,6 +67,11 @@ export function FantasyLineupMiniPitch({
                 </div>
                 <span className="mt-1 max-w-28 truncate rounded-md bg-black/80 px-1.5 py-0.5 text-[9px] font-black text-white">{player.name}</span>
                 <span className="mt-0.5 text-[10px] font-black text-accent">{player.points.toFixed(1)} pts</span>
+                {player.priceAfter != null && (
+                  <span className={`text-[8px] font-black ${Number(player.priceAfter) - player.priceLocked > 0 ? "text-accent" : Number(player.priceAfter) - player.priceLocked < 0 ? "text-danger" : "text-white/55"}`}>
+                    {Number(player.priceAfter) - player.priceLocked > 0 ? "+" : ""}{(Number(player.priceAfter) - player.priceLocked).toFixed(2)} C$
+                  </span>
+                )}
                 {player.role && <span className="text-[7px] font-black uppercase text-emerald-200/65">{player.role}</span>}
               </>;
               const className = "flex w-28 flex-col items-center text-center transition-transform active:scale-95";
