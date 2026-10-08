@@ -932,7 +932,7 @@ export function FantasyExperience({
       ? resolveFantasyPitchPoints({
           status,
           marketRoundPoints: player.roundPoints,
-          lastRoundLineupPoints: Number(settings.scoringVersion || 0) >= 14
+          lastRoundLineupPoints: Number(settings.scoringVersion || 0) >= 14 && targetPos !== "GOL"
             ? undefined
             : lastRoundPointsByPlayerId.get(player.id),
           liveLineupPoints: livePlayerProjection?.totalPoints,

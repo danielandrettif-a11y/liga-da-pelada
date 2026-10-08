@@ -511,7 +511,9 @@ export function FantasyPlayerDrawer({
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
-                        {goalkeeperPreview.usesOfficialRankedPoints ? "🧤 Pontuação oficial da rodada" : "🧤 Se fosse escalado na vaga GOL"}
+                        {goalkeeperPreview.isGoalkeeperSlot
+                          ? "🧤 Pontuação da vaga GOL"
+                          : "🧤 Se fosse escalado na vaga GOL"}
                       </p>
                       <p className="mt-1 text-[10px] leading-4 text-muted">
                         {goalkeeperPreview.games} {goalkeeperPreview.games === 1 ? "atuação" : "atuações"} no gol
@@ -529,7 +531,7 @@ export function FantasyPlayerDrawer({
                       : goalkeeperPreview.games > 0
                       ? <>Base exclusiva da vaga GOL: {Number(goalkeeperPreview.basePoints).toFixed(1)} pts{Number(goalkeeperPreview.positionBonus) !== 0 ? ` · bônus de clean sheet: ${Number(goalkeeperPreview.positionBonus) > 0 ? "+" : ""}${Number(goalkeeperPreview.positionBonus).toFixed(1)} pts` : ""}.</>
                       : "Sem atuação registrada no gol nesta rodada, a vaga GOL renderia 0,0 ponto."}
-                    {!goalkeeperPreview.usesOfficialRankedPoints && <> {" "}Regra exclusiva da vaga GOL aplicada à rodada, sem capitão e sem carta; não altera o total oficial.</>}
+                    <> {" "}Somente os scouts registrados enquanto o atleta estava no gol entram nesta pontuação.</>
                   </p>
                 </div>
               )}

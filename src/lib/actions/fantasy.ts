@@ -2327,7 +2327,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     const storedRankedPoints = Number(
       consolidatedRoundStats?.ranking_points ?? consolidatedRoundStats?.points,
     );
-    const authoritativeBasePoints = rankedScoringActive && roundIsFinished && Number.isFinite(storedRankedPoints)
+    const authoritativeBasePoints = rankedScoringActive && slotRole !== "GOL" && roundIsFinished && Number.isFinite(storedRankedPoints)
       ? storedRankedPoints
       : slotRole && columnCActive
         ? calculateFantasySlotPoints(current, slotRole, liveSettings)
@@ -2401,7 +2401,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       icon: string;
       description?: string;
       hideCount?: boolean;
-    }> = rankedScoringActive ? rankedBreakdown : columnCActive && slotRole === "GOL" ? [
+    }> = rankedScoringActive && slotRole !== "GOL" ? rankedBreakdown : columnCActive && slotRole === "GOL" ? [
       { key: "goalkeeper_goals", label: "Gols enquanto estava no gol", count: current.goalkeeperGoals, unitPoints: liveSettings.defenderGoalPoints, points: current.goalkeeperGoals * liveSettings.defenderGoalPoints, icon: "⚽" },
       { key: "goalkeeper_assists", label: "Assistências enquanto estava no gol", count: current.goalkeeperAssists, unitPoints: liveSettings.defenderAssistPoints, points: current.goalkeeperAssists * liveSettings.defenderAssistPoints, icon: "👟" },
       { key: "goalkeeper_games", label: "Atuações no gol", count: current.goalkeeperGames, unitPoints: liveSettings.goalkeeperSlotAppearancePoints, points: current.goalkeeperGames * liveSettings.goalkeeperSlotAppearancePoints, icon: "🧤" },
@@ -2554,10 +2554,11 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
         games: goalkeeperSimulationStats.goalkeeperGames,
         goalsConceded: goalkeeperSimulationStats.goalsConceded,
         cleanSheets: goalkeeperSimulationStats.cleanSheets,
-        basePoints: rankedScoringActive ? authoritativeBasePoints : goalkeeperBasePoints,
-        positionBonus: rankedScoringActive ? 0 : goalkeeperPositionBonus,
-        totalPoints: rankedScoringActive ? authoritativeBasePoints : goalkeeperTotalPoints,
-        usesOfficialRankedPoints: rankedScoringActive,
+        basePoints: goalkeeperBasePoints,
+        positionBonus: goalkeeperPositionBonus,
+        totalPoints: goalkeeperTotalPoints,
+        usesOfficialRankedPoints: false,
+        isGoalkeeperSlot: slotRole === "GOL",
       },
       breakdown,
       matchesBreakdown,

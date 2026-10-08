@@ -106,6 +106,20 @@ describe("buildFantasyColumnCLineSlotBreakdown", () => {
 
     expect(calculateFantasySlotPoints(rankedStats, "ATA", settings)).toBe(13);
     expect(calculateFantasySlotPoints(rankedStats, "DEF", settings)).toBe(13);
-    expect(calculateFantasySlotPoints(rankedStats, "GOL", settings)).toBe(13);
+    expect(calculateFantasySlotPoints(rankedStats, "GOL", settings)).toBe(7.5);
+  });
+
+  it("ignora gols sofridos pelo time na vaga GOL da V14", () => {
+    const settings = { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 14 };
+    const goalkeeperStats = {
+      goals: 0,
+      assists: 0,
+      teamGoalsConceded: 8,
+      goalkeeperGames: 2,
+      goalsConceded: 2,
+      cleanSheets: 0,
+    };
+
+    expect(calculateFantasySlotPoints(goalkeeperStats, "GOL", settings)).toBe(5);
   });
 });

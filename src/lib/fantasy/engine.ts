@@ -281,7 +281,9 @@ export function calculateFantasySlotPoints(
   settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
 ) {
   if (Number(settings.scoringVersion || 0) >= 14) {
-    return calculateFantasyRankedPoints(stats, settings);
+    return slotRole === "GOL"
+      ? calculateFantasyGoalkeeperSlotPoints(stats, settings)
+      : calculateFantasyRankedPoints(stats, settings);
   }
   if (Number(settings.scoringVersion || 0) < 11) {
     return slotRole === "GOL" && Number(settings.scoringVersion || 0) >= 10
