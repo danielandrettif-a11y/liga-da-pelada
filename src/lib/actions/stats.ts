@@ -203,9 +203,7 @@ function aggregateRankingRows(
           : r.player_profile_locked === "offensive"
             ? "offensive"
             : null;
-      // Cada rodada guarda sua própria regra. Usar o padrão v5 aqui fazia a
-      // tela detalhada explicar uma rodada v11 com V/E/D e depois criar um
-      // "Ajuste da rodada" para alcançar o total já salvo.
+      // Cada rodada guarda sua própria regra, garantindo que o detalhamento use o mesmo snapshot do fechamento.
       const scoringSnapshot = normalizeBQScoringSnapshot(roundInfo?.scoringSnapshot);
       const pointBreakdown = buildRankedPointBreakdown({
         goals: r.goals,
@@ -225,10 +223,6 @@ function aggregateRankingRows(
         lineRole: r.player_profile_locked === "defensive" ? "DEF" : "ATA",
         ownGoals: r.own_goals,
       }, scoringSnapshot);
-      const explainedPoints = roundRankingPoints(pointBreakdown.reduce((sum, item) => sum + item.points, 0));
-      if (explainedPoints !== roundRankingPoints(r.points)) {
-        pointBreakdown.push({ label: "Ajuste da rodada", count: 1, points: roundRankingPoints(r.points - explainedPoints) });
-      }
       const roleWeights = parseRankingRoleWeights(r.ranking_role_weights);
       const positionBonus = roundRankingPoints(Number(r.ranking_position_bonus || 0));
       if (!legacy && positionBonus !== 0) {

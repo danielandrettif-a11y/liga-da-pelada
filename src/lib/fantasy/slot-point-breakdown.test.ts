@@ -85,4 +85,27 @@ describe("buildFantasyColumnCLineSlotBreakdown", () => {
       { label: "Faixa DEF · 2 gols sofridos", count: 1, points: -1.75 },
     ]);
   });
+
+  it("usa a mesma pontuação da Ranked em todas as vagas na V14", () => {
+    const rankedStats = {
+      goals: 2,
+      assists: 1,
+      ownGoals: 0,
+      teamGoalsConceded: 3,
+      defensiveCleanGames: 1,
+      defensiveOneGoalGames: 0,
+      goalkeeperGames: 1,
+      goalkeeperGoals: 1,
+      goalkeeperAssists: 0,
+      goalkeeperOwnGoals: 0,
+      goalsConceded: 1,
+      cleanSheets: 0,
+      playerProfile: "offensive" as const,
+    };
+    const settings = { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 14 };
+
+    expect(calculateFantasySlotPoints(rankedStats, "ATA", settings)).toBe(13);
+    expect(calculateFantasySlotPoints(rankedStats, "DEF", settings)).toBe(13);
+    expect(calculateFantasySlotPoints(rankedStats, "GOL", settings)).toBe(13);
+  });
 });

@@ -1,5 +1,7 @@
 import { DEFAULT_FANTASY_SETTINGS, type FantasySettings } from "./config";
 import { calculateColumnCGoalkeeperPoints, calculateColumnCLinePoints, inferOneGoalGames, profileToColumnCRole } from "../column-c-scoring";
+import { calculateRankedPoints } from "../ranked-scoring";
+import type { BQBaseScoringSnapshot } from "../bq-scoring";
 import type { FantasySlotRole } from "./lineup-positions";
 import { calculateMarketV11Price, percentileById, type MarketV11PriceResult } from "./market-v11";
 
@@ -208,6 +210,63 @@ export function calculateFantasyGoalkeeperSlotPoints(
     .reduce((total, item) => total + item.points, 0);
 }
 
+export function getFantasyRankedScoringSnapshot(
+  settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
+): BQBaseScoringSnapshot {
+  return {
+    version: Number(settings.scoringVersion || 0),
+    goal: settings.attackerGoalPoints,
+    assist: settings.attackerAssistPoints,
+    win: settings.winPoints,
+    draw: settings.drawPoints,
+    loss: settings.lossPoints,
+    ownGoal: settings.ownGoalPoints,
+    // A Ranked da Coluna C preserva os scouts de goleiro; a antiga exceção
+    // de supressão existia apenas antes desse motor.
+    goalkeeperAppearance: settings.goalkeeperSlotAppearancePoints,
+    goalkeeperGoalConceded: settings.goalkeeperSlotGoalConcededPoints,
+    defenderGoal: settings.defenderGoalPoints,
+    defenderAssist: settings.defenderAssistPoints,
+    defenderCleanSheet: settings.defenderCleanSheetPoints,
+    defenderOneGoal: settings.defenderOneGoalPoints,
+    defenderOneGoalConceded: settings.defenderOneGoalConcededPoints,
+    defenderTwoGoalsConceded: settings.defenderTwoGoalsConcededPoints,
+    teamGoalConceded: settings.lineGoalConcededPoints,
+    goalkeeperCleanSheet: settings.goalkeeperSlotCleanSheetPoints,
+    goalkeeperOneGoal: settings.goalkeeperSlotOneGoalPoints,
+  };
+}
+
+export function calculateFantasyRankedPoints(
+  stats: {
+    goals: number; assists: number; ownGoals?: number; teamGoalsConceded?: number;
+    defensiveCleanGames?: number; defensiveOneGoalGames?: number; goalkeeperGames?: number; goalsConceded?: number;
+    cleanSheets?: number; goalkeeperGoals?: number; goalkeeperAssists?: number;
+    goalkeeperOwnGoals?: number; wins?: number; draws?: number; losses?: number;
+    playerProfile?: "offensive" | "midfield" | "defensive" | null;
+  },
+  settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
+) {
+  return calculateRankedPoints({
+    goals: stats.goals,
+    assists: stats.assists,
+    wins: stats.wins,
+    draws: stats.draws,
+    losses: stats.losses,
+    ownGoals: stats.ownGoals,
+    goalkeeperAppearances: stats.goalkeeperGames,
+    goalkeeperGoalsConceded: stats.goalsConceded,
+    goalkeeperGoals: stats.goalkeeperGoals,
+    goalkeeperAssists: stats.goalkeeperAssists,
+    goalkeeperOwnGoals: stats.goalkeeperOwnGoals,
+    goalkeeperCleanSheets: stats.cleanSheets,
+    teamGoalsConceded: stats.teamGoalsConceded,
+    defensiveCleanGames: stats.defensiveCleanGames,
+    defensiveOneGoalGames: stats.defensiveOneGoalGames,
+    lineRole: stats.playerProfile === "defensive" ? "DEF" : "ATA",
+  }, getFantasyRankedScoringSnapshot(settings));
+}
+
 /** Pontuação oficial do atleta na vaga escolhida, sem bônus posicional legado. */
 export function calculateFantasySlotPoints(
   stats: {
@@ -221,6 +280,9 @@ export function calculateFantasySlotPoints(
   slotRole: FantasySlotRole,
   settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
 ) {
+  if (Number(settings.scoringVersion || 0) >= 14) {
+    return calculateFantasyRankedPoints(stats, settings);
+  }
   if (Number(settings.scoringVersion || 0) < 11) {
     return slotRole === "GOL" && Number(settings.scoringVersion || 0) >= 10
       ? calculateFantasyGoalkeeperSlotPoints(stats, settings)

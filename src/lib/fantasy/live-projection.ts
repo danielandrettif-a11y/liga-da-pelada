@@ -1,10 +1,11 @@
-import { calculateFantasyGoalkeeperSlotPoints, calculateFantasyPlayerPoints, calculateFantasySlotPoints } from "./engine";
+import { calculateFantasyGoalkeeperSlotPoints, calculateFantasyPlayerPoints, calculateFantasyRankedPoints, calculateFantasySlotPoints } from "./engine";
 import { applyCaptainMultiplier } from "../bq-scoring";
 import type { FantasySettings } from "./config";
 import {
   calculateFantasyPositionPackageBonus,
   type FantasySlotRole,
 } from "./lineup-positions";
+import { resolveFantasyReserveSubstitution, type FantasyReserveRole } from "./reserve";
 
 export type FantasyLiveEvent = { playerId: string; assistPlayerId?: string | null; teamId: string; isOwnGoal?: boolean };
 export type FantasyLiveMatchPlayer = {
@@ -67,6 +68,10 @@ export type FantasyLiveLineupInput = {
   topScorerReward?: number;
   topAssistReward?: number;
   cardBonus?: number;
+  reserve?: {
+    playerId: string;
+    slotRole: FantasyReserveRole;
+  } | null;
 };
 
 export type FantasyLiveLineupProjection = {
@@ -85,6 +90,20 @@ export type FantasyLiveLineupProjection = {
   captainBonus: number;
   predictionPoints: number;
   cardPoints: number;
+  reserve: {
+    playerId: string;
+    slotRole: FantasyReserveRole;
+    basePoints: number;
+    applied: boolean;
+    replacedPlayerId: string | null;
+    replacedPlayerPoints: number;
+    reservePoints: number;
+    reserveTotalPoints: number;
+    pointsGain: number;
+    playerPointsGain: number;
+    captainBonusGain: number;
+    captainInherited: boolean;
+  } | null;
   totalPoints: number;
   provisional: true;
 };
@@ -202,10 +221,15 @@ export function projectFantasyLiveStats(
       playerId,
       {
         ...value,
-        basePoints: calculateFantasyPlayerPoints(value, {
-          ...settings,
-          goalkeeperAppearancePoints: options.suppressGoalkeeperRewards ? 0 : settings.goalkeeperAppearancePoints,
-        }),
+        basePoints: Number(settings.scoringVersion || 0) >= 14
+          ? calculateFantasyRankedPoints(value, {
+              ...settings,
+              suppressGoalkeeperRewards: Boolean(options.suppressGoalkeeperRewards),
+            })
+          : calculateFantasyPlayerPoints(value, {
+              ...settings,
+              goalkeeperAppearancePoints: options.suppressGoalkeeperRewards ? 0 : settings.goalkeeperAppearancePoints,
+            }),
       },
     ]),
   );
@@ -267,7 +291,7 @@ export function projectFantasyLiveLineups(
       pointsByPlayer.set(playerId, basePoints + bonus);
     }
 
-    const playerPoints = [...pointsByPlayer.values()].reduce((sum, points) => sum + points, 0);
+    const starterPoints = [...pointsByPlayer.values()].reduce((sum, points) => sum + points, 0);
     const captainBase = lineup.captainPlayerId ? pointsByPlayer.get(lineup.captainPlayerId) || 0 : 0;
     const captainTotal = applyCaptainMultiplier(captainBase, settings.captainMultiplier);
     const captainBonus = captainTotal - captainBase;
@@ -288,6 +312,28 @@ export function projectFantasyLiveLineups(
         totalPoints: totalWithoutCaptain + playerCaptainBonus,
       };
     });
+    const reserveStats = lineup.reserve ? playerStats.get(lineup.reserve.playerId) : null;
+    const reserveBasePoints = reserveStats && lineup.reserve
+      ? calculateFantasySlotPoints(reserveStats, lineup.reserve.slotRole, settings)
+      : 0;
+    const reserveResolution = lineup.reserve
+      ? resolveFantasyReserveSubstitution({
+          reserveRole: lineup.reserve.slotRole,
+          reservePoints: reserveBasePoints,
+          starters: players.map((player, slotIndex) => ({
+            playerId: player.playerId,
+            slotRole: player.slotRole || "ATA",
+            basePoints: player.basePoints + player.positionBonus,
+            totalPoints: player.totalPoints,
+            captainBonus: player.captainBonus,
+            isCaptain: player.playerId === lineup.captainPlayerId,
+            slotIndex,
+          })),
+          captainMultiplier: settings.captainMultiplier,
+        })
+      : null;
+    const playerPoints = starterPoints + (reserveResolution?.playerPointsGain || 0);
+    const effectiveCaptainBonus = captainBonus + (reserveResolution?.captainBonusGain || 0);
     const scorerHit = Boolean(
       lineup.topScorerPlayerId &&
       (!eligiblePredictionPlayerIds || eligiblePredictionPlayerIds.has(lineup.topScorerPlayerId)) &&
@@ -308,10 +354,18 @@ export function projectFantasyLiveLineups(
       players,
       playerPoints,
       positionBonus,
-      captainBonus,
+      captainBonus: effectiveCaptainBonus,
       predictionPoints,
       cardPoints,
-      totalPoints: playerPoints + captainBonus + predictionPoints + cardPoints,
+      reserve: lineup.reserve && reserveResolution
+        ? {
+            playerId: lineup.reserve.playerId,
+            slotRole: lineup.reserve.slotRole,
+            basePoints: reserveBasePoints,
+            ...reserveResolution,
+          }
+        : null,
+      totalPoints: playerPoints + effectiveCaptainBonus + predictionPoints + cardPoints,
       provisional: true,
     };
   });

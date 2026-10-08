@@ -200,6 +200,25 @@ export function FantasyRevealedLineupsModal({
                   <FantasyLineupMiniPitch players={lineup.players} captainId={lineup.captainId} />
                 </div>
 
+                {lineup.reserve && (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-300/25 bg-amber-300/[.07] p-2.5">
+                    <PlayerAvatar
+                      name={lineup.reserve.name}
+                      avatarUrl={lineup.reserve.avatarUrl}
+                      clickable={false}
+                      className="h-9 w-9 rounded-full border border-amber-300/40 bg-background text-[9px] font-black text-amber-200"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[10px] font-black text-amber-100">Banco: {lineup.reserve.name} · {lineup.reserve.slotRole}</p>
+                      <p className={`text-[8px] font-bold ${lineup.reserve.applied ? "text-success" : "text-muted"}`}>
+                        {lineup.reserve.applied
+                          ? `Entrou automaticamente · +${lineup.reserve.pointsGain.toFixed(1)} pts recuperados`
+                          : `${lineup.reserve.basePoints.toFixed(1)} pts · não foi acionado`}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Desafio da rodada */}
                 {lineup.challengePlayer && (
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/5 pt-2 text-[9px] font-bold text-muted">

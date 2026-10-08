@@ -90,13 +90,24 @@ export function lineupFormationFromSlots(players: any[], playersPerTeam: number)
   return null;
 }
 
-export function lineupSignature({ ids, captain, scorer, assist, challenge, slotRoles }: {
+export function lineupSignature({ ids, captain, scorer, assist, challenge, slotRoles, reservePlayerId, reserveRole }: {
   ids: Array<string | null | undefined>;
   captain: string | null | undefined;
   scorer: string | null | undefined;
   assist: string | null | undefined;
   challenge: string | null | undefined;
   slotRoles?: string[];
+  reservePlayerId?: string | null;
+  reserveRole?: "ATA" | "DEF" | null;
 }) {
-  return JSON.stringify({ ids: ids.filter(Boolean).sort(), captain: captain || null, scorer: scorer || null, assist: assist || null, challenge: challenge || null, slotRoles: slotRoles || null });
+  return JSON.stringify({
+    ids: ids.filter(Boolean).sort(),
+    captain: captain || null,
+    scorer: scorer || null,
+    assist: assist || null,
+    challenge: challenge || null,
+    slotRoles: slotRoles || null,
+    reservePlayerId: reservePlayerId || null,
+    reserveRole: reserveRole || null,
+  });
 }

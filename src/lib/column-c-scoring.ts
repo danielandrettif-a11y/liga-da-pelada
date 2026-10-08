@@ -1,5 +1,9 @@
-/** Regras posicionais da Coluna C com penalidade defensiva por faixa, vigentes na v13. */
-export const COLUMN_C_SCORING_VERSION = 13;
+/**
+ * V14: o Cartola usa a mesma pontuação consolidada da Ranked. As regras
+ * abaixo continuam sendo a fonte dos scouts; a vaga da escalação não muda
+ * mais o valor produzido pelo atleta em campo.
+ */
+export const COLUMN_C_SCORING_VERSION = 14;
 
 export type ColumnCLineRole = "DEF" | "ATA";
 export type ColumnCSlotRole = ColumnCLineRole | "GOL";

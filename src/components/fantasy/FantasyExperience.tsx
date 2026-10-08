@@ -123,6 +123,7 @@ export function FantasyExperience({
 }: FantasyExperienceProps) {
   const router = useRouter();
   const persistedPlayers = lineupPlayersFromSource(lineup);
+  const persistedReserve = lineup?.fantasy_lineup_reserves?.[0] || null;
   const lastRoundPointsByPlayerId = useMemo(
     () => new Map((lastRound?.playerScores || []).map((item) => [item.playerId, item.points] as const)),
     [lastRound?.playerScores],
@@ -244,6 +245,9 @@ export function FantasyExperience({
     } catch {}
   }, [formation, fantasySeasonId]);
   const [targetSlot, setTargetSlot] = useState<number | null>(null);
+  const [reservePlayerId, setReservePlayerId] = useState<string | null>(persistedReserve?.player_id || null);
+  const [reserveRole, setReserveRole] = useState<"ATA" | "DEF" | null>(persistedReserve?.slot_role || null);
+  const [reserveTargetRole, setReserveTargetRole] = useState<"ATA" | "DEF" | null>(null);
   const [captainId, setCaptainId] = useState<string | null>(lineup?.captain_player_id || null);
   const [scorerId, setScorerId] = useState<string | null>(lineup?.top_scorer_player_id || null);
   const [assistId, setAssistId] = useState<string | null>(lineup?.top_assist_player_id || null);
@@ -328,6 +332,8 @@ export function FantasyExperience({
           assist: lineup?.top_assist_player_id,
           challenge: lineup?.challenge_player_id,
           slotRoles: getFantasySlotRoles(playersPerTeam, formation),
+          reservePlayerId: persistedReserve?.player_id,
+          reserveRole: persistedReserve?.slot_role,
         })
       : "",
   );
@@ -374,6 +380,8 @@ export function FantasyExperience({
   );
 
   const validSelectedPlayers = selectedPlayers.filter(Boolean) as FantasyMarketPlayer[];
+  const reservePlayer = reservePlayerId ? market.find((player) => player.id === reservePlayerId) || null : null;
+  const reservePrice = reservePlayer ? Math.round(reservePlayer.price * 50) / 100 : 0;
   const validSelectedCount = validSelectedPlayers.length;
   const livePlayerProjectionById = useMemo(
     () => new Map(
@@ -396,7 +404,7 @@ export function FantasyExperience({
     [liveProjection?.currentUser?.players],
   );
 
-  const cost = validSelectedPlayers.reduce((sum, player) => sum + playerPurchasePrice(player), 0);
+  const cost = validSelectedPlayers.reduce((sum, player) => sum + playerPurchasePrice(player), 0) + reservePrice;
 
   const remaining = effectiveBudget - cost;
 
@@ -429,6 +437,9 @@ export function FantasyExperience({
 
   // Filtros e ordenação no mercado
   const filtered = useMemo(() => {
+    const targetRole = reserveTargetRole || (targetSlot !== null
+      ? getFantasySlotRoles(playersPerTeam, formation)[targetSlot] || "ATA"
+      : positionFilter);
     return [...market]
       .filter((player) => {
         const matchesQuery = player.name.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR"));
@@ -437,6 +448,14 @@ export function FantasyExperience({
         // já escalados continuam no campo e podem ser removidos por lá, mas não
         // vazam para a lista do mercado quando não fazem parte da convocação.
         if (calledUpOnly && !player.isInCurrentRound) return false;
+        if (reserveTargetRole && selected.includes(player.id)) return false;
+        if (reserveTargetRole && reservePlayerId === player.id) return false;
+        if (!reserveTargetRole && reservePlayerId === player.id) return false;
+
+        // Ao comprar pelo campo, o mercado respeita a vaga escolhida. A vaga
+        // GOL é a única aberta a todos porque o goleiro é definido pelo
+        // rodízio real, não pela tag principal do atleta.
+        if (targetRole !== "ALL" && !isCorrectFantasySlot(targetRole, player.profile)) return false;
 
         if (filterTag === "ALL") return true;
         if (filterTag === "TREND_UP") return player.trend === "UP";
@@ -510,7 +529,7 @@ export function FantasyExperience({
         if (sort === "popularity") return b.popularityPercent - a.popularityPercent;
         return b.totalPoints - a.totalPoints;
       });
-  }, [market, query, sort, filterTag, positionFilter, calledUpOnly]);
+  }, [market, query, sort, filterTag, positionFilter, calledUpOnly, targetSlot, playersPerTeam, formation, reserveTargetRole, selected, reservePlayerId]);
 
   const scheduledAt =
     round?.date && round.start_time ? new Date(`${round.date}T${round.start_time}`).getTime() : null;
@@ -549,6 +568,8 @@ export function FantasyExperience({
     assist: assistId,
     challenge: challengeId,
     slotRoles: getFantasySlotRoles(playersPerTeam, formation),
+    reservePlayerId,
+    reserveRole,
   });
   const hasUnsavedChanges = open && savedSignature !== currentSignature;
   const serverStateKey = JSON.stringify({
@@ -560,6 +581,8 @@ export function FantasyExperience({
       role: item.slot_role,
     })),
     captain: lineup?.captain_player_id || null,
+    reservePlayerId: persistedReserve?.player_id || null,
+    reserveRole: persistedReserve?.slot_role || null,
   });
   const appliedServerStateRef = useRef(serverStateKey);
   const complete = validSelectedCount === playersPerTeam && Boolean(captainId) && remaining >= 0;
@@ -613,6 +636,8 @@ export function FantasyExperience({
     setScorerId(lineup?.top_scorer_player_id || null);
     setAssistId(lineup?.top_assist_player_id || null);
     setChallengeId(lineup?.challenge_player_id || null);
+    setReservePlayerId(persistedReserve?.player_id || null);
+    setReserveRole(persistedReserve?.slot_role || null);
     setSavedSignature(lineupSignature({
       ids: slots,
       captain: lineup?.captain_player_id,
@@ -620,9 +645,11 @@ export function FantasyExperience({
       assist: lineup?.top_assist_player_id,
       challenge: lineup?.challenge_player_id,
       slotRoles: getFantasySlotRoles(playersPerTeam, serverFormation),
+      reservePlayerId: persistedReserve?.player_id,
+      reserveRole: persistedReserve?.slot_role,
     }));
     appliedServerStateRef.current = serverStateKey;
-  }, [formation, hasUnsavedChanges, lineup, persistedPlayers, playersPerTeam, serverStateKey]);
+  }, [formation, hasUnsavedChanges, lineup, persistedPlayers, persistedReserve, playersPerTeam, serverStateKey]);
 
   useEffect(() => {
     if (status !== "in_progress" || !round) return;
@@ -717,6 +744,9 @@ export function FantasyExperience({
     setAssistId(null);
     setChallengeId(null);
     setTargetSlot(null);
+    setReservePlayerId(null);
+    setReserveRole(null);
+    setReserveTargetRole(null);
     setMessage("Elenco limpo. Salve para confirmar a venda de todos.");
   }
 
@@ -724,6 +754,28 @@ export function FantasyExperience({
     if (bargainPurchasePending) return;
     if (!open) {
       setSelectedDrawerPlayer(player);
+      return;
+    }
+    if (reserveTargetRole) {
+      if (selected.includes(player.id)) {
+        return setMessage("Escolha para o banco um jogador que não esteja entre os titulares.");
+      }
+      if (!isCorrectFantasySlot(reserveTargetRole, player.profile)) {
+        return setMessage(`Escolha um jogador de ${reserveTargetRole === "DEF" ? "DEF/VOL" : "ATA/ALA"} para o banco.`);
+      }
+      const halfPrice = Math.round(player.price * 50) / 100;
+      if (halfPrice > remaining + reservePrice) return setMessage("Patrimônio insuficiente para comprar este reserva.");
+      setReservePlayerId(player.id);
+      setReserveRole(reserveTargetRole);
+      setReserveTargetRole(null);
+      setMessage(`${player.name} foi escolhido para o banco por metade do preço.`);
+      setActiveTab("team");
+      return;
+    }
+    if (reservePlayerId === player.id) {
+      setReservePlayerId(null);
+      setReserveRole(null);
+      setMessage("Jogador removido do banco de reserva.");
       return;
     }
     // Se o jogador já está escalado, VENDER / REMOVER ele da vaga dele sem empurrar os demais:
@@ -735,6 +787,19 @@ export function FantasyExperience({
 
     const currentCount = selected.filter(Boolean).length;
     if (currentCount >= playersPerTeam) return setMessage(`Sua escalação já tem ${playersPerTeam} jogadores.`);
+    if (targetSlot !== null) {
+      const requiredRole = getFantasySlotRoles(playersPerTeam, formation)[targetSlot] || "ATA";
+      if (!isCorrectFantasySlot(requiredRole, player.profile)) {
+        return setMessage(
+          requiredRole === "DEF"
+            ? "Escolha um jogador com perfil DEF/VOL para esta vaga."
+            : "Escolha um jogador com perfil ATA/ALA para esta vaga.",
+        );
+      }
+    }
+    if (reservePlayerId === player.id) {
+      return setMessage("Remova este jogador do banco antes de colocá-lo entre os titulares.");
+    }
     const purchasePrice = marketPlayerPurchasePrice(player, false);
     if (purchasePrice > remaining) return setMessage("Patrimônio insuficiente para comprar este jogador.");
 
@@ -801,6 +866,8 @@ export function FantasyExperience({
           scorerId,
           assistId,
           challengeId: betweenRounds ? null : challengeId,
+          reservePlayerId,
+          reserveRole,
         });
         setMessage(
           result.success
@@ -865,7 +932,9 @@ export function FantasyExperience({
       ? resolveFantasyPitchPoints({
           status,
           marketRoundPoints: player.roundPoints,
-          lastRoundLineupPoints: lastRoundPointsByPlayerId.get(player.id),
+          lastRoundLineupPoints: Number(settings.scoringVersion || 0) >= 14
+            ? undefined
+            : lastRoundPointsByPlayerId.get(player.id),
           liveLineupPoints: livePlayerProjection?.totalPoints,
           isCaptain: captainId === player.id,
           captainMultiplier: settings.captainMultiplier,
@@ -1042,14 +1111,6 @@ export function FantasyExperience({
                       : "border-white/25 opacity-90"
                   }`}
                 />
-                {isCorrectPosition && (
-                  <span
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 whitespace-nowrap rounded-full border border-accent/80 bg-[#06180e] px-1.5 py-0.2 text-[7px] font-black uppercase tracking-wider text-accent shadow-[0_0_8px_rgba(204,255,0,0.6)] animate-fade-in"
-                    title="Posição ideal! Bônus tático ativado."
-                  >
-                    ⚡ BÔNUS
-                  </span>
-                )}
               </div>
               <span className="mt-1 max-w-32 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
                 {player.name}
@@ -1069,6 +1130,7 @@ export function FantasyExperience({
           <button
             type="button"
             onClick={() => {
+              setReserveTargetRole(null);
               setTargetSlot(slot);
               setPositionFilter(targetPos);
               setFilterTag("ALL");
@@ -1491,7 +1553,7 @@ export function FantasyExperience({
                   </button>
                   <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-right text-[9px] font-bold text-muted">
                   <span>Pontos-base</span><strong className="text-foreground">{liveBasePlayerPoints.toFixed(1)}</strong>
-                  <span>Bônus de posição</span><strong className="text-foreground">+{livePositionBonus.toFixed(1)}</strong>
+{Number(settings.scoringVersion || 0) < 14 && <><span>Bônus de posição</span><strong className="text-foreground">+{livePositionBonus.toFixed(1)}</strong></>}
                   <span>Capitão</span><strong className="text-foreground">+{(liveProjection?.currentUser?.captainBonus || 0).toFixed(1)}</strong>
                   <span>Carta</span><strong className="text-foreground">+{(liveProjection?.currentUser?.cardPoints || 0).toFixed(1)}</strong>
                   </div>
@@ -1542,7 +1604,7 @@ export function FantasyExperience({
                   onClick={() => setShowScoringModal(true)}
                   className="flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/15 px-2.5 py-1 text-[9px] font-black text-accent hover:bg-accent hover:text-background transition-all shadow-xs"
                 >
-                  <span>⚡ Guia de Pontuação & Bônus</span>
+                  <span>⚡ Guia de Pontuação</span>
                   <span className="rounded bg-accent/25 px-1 py-0.2 text-[8px] font-black">Ver Tabela</span>
                 </button>
                 {open && validSelectedCount > 1 && (
@@ -1701,6 +1763,105 @@ export function FantasyExperience({
               )}
             </div>
 
+            <section className="rounded-2xl border border-amber-300/30 bg-[linear-gradient(145deg,rgba(35,28,5,.92),rgba(5,25,14,.96))] p-3 shadow-[0_10px_30px_rgba(0,0,0,.2)]">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-200">
+                    <Users className="h-4 w-4" /> Banco de reserva
+                  </p>
+                  <p className="mt-1 text-[9px] leading-relaxed text-white/55">
+                    Custa 50% e substitui automaticamente a pior nota zerada ou negativa da mesma posição, somente se pontuar mais.
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-1 text-[8px] font-black uppercase text-amber-200">
+                  1 reserva
+                </span>
+              </div>
+
+              {reservePlayer ? (
+                <div className="mt-3 flex items-center gap-3 rounded-xl border border-amber-200/25 bg-black/25 p-2.5">
+                  <PlayerAvatar
+                    name={reservePlayer.name}
+                    playerId={reservePlayer.id}
+                    avatarUrl={reservePlayer.avatarUrl}
+                    frameKey={reservePlayer.cosmetics?.frameKey}
+                    auraKey={reservePlayer.cosmetics?.auraKey}
+                    className="h-11 w-11 rounded-full border border-amber-300/50 bg-background text-xs font-black text-amber-200"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-black text-white">{reservePlayer.name}</p>
+                    <p className="mt-0.5 text-[9px] font-bold text-amber-200">
+                      Reserva {reserveRole === "DEF" ? "DEF/VOL" : "ATA/ALA"} · {formatFantasyMoney(reservePrice, settings.currencyName)}
+                    </p>
+                    {liveProjection?.currentUser?.reserve && (
+                      <>
+                      <p className={`mt-1 text-[8px] font-bold ${liveProjection.currentUser.reserve.applied ? "text-success" : "text-white/50"}`}>
+                        {liveProjection.currentUser.reserve.applied
+                          ? `Entrando no lugar do pior titular · +${liveProjection.currentUser.reserve.pointsGain.toFixed(1)} pts recuperados${liveProjection.currentUser.reserve.captainInherited ? " · herdou a faixa de capitão" : ""}`
+                          : `Prévia: ${liveProjection.currentUser.reserve.basePoints.toFixed(1)} pts · ainda não acionado`}
+                      </p>
+                      {liveProjection.currentUser.reserve.captainInherited && (
+                        <span className="mt-1 inline-flex rounded-full border border-amber-300/50 bg-amber-300/15 px-1.5 py-0.5 text-[8px] font-black uppercase text-amber-100">👑 Capitão</span>
+                      )}
+                      </>
+                    )}
+                  </div>
+                  {open && (
+                    <div className="flex flex-col gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReserveTargetRole(reserveRole || "ATA");
+                          setTargetSlot(null);
+                          setPositionFilter(reserveRole || "ATA");
+                          setFilterTag("ALL");
+                          if (hasCurrentCallup) setCalledUpOnly(true);
+                          setActiveTab("market");
+                        }}
+                        className="rounded-lg border border-amber-300/30 px-2 py-1 text-[8px] font-black uppercase text-amber-200"
+                      >
+                        Trocar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReservePlayerId(null);
+                          setReserveRole(null);
+                        }}
+                        className="rounded-lg border border-danger/30 px-2 py-1 text-[8px] font-black uppercase text-danger"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : open && !isTest ? (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {(["ATA", "DEF"] as const).map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => {
+                        setReserveTargetRole(role);
+                        setTargetSlot(null);
+                        setPositionFilter(role);
+                        setFilterTag("ALL");
+                        if (hasCurrentCallup) setCalledUpOnly(true);
+                        setActiveTab("market");
+                      }}
+                      className="rounded-xl border border-dashed border-amber-300/35 bg-amber-300/[.06] px-3 py-2.5 text-[9px] font-black uppercase text-amber-100 transition hover:border-amber-200 hover:bg-amber-300/10"
+                    >
+                      + Reserva {role === "DEF" ? "DEF/VOL" : "ATA/ALA"}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-xl border border-white/10 bg-black/20 p-2.5 text-center text-[9px] font-bold text-white/45">
+                  Nenhum jogador foi escalado no banco nesta rodada.
+                </p>
+              )}
+            </section>
+
             {/* V3: SLOT DE CARTA ESPECIAL ATIVA */}
             {!betweenRounds && round && (
               <FantasyActiveCardSlot
@@ -1858,12 +2019,12 @@ export function FantasyExperience({
               <div className="flex items-center justify-between gap-2 rounded-xl border border-accent/30 bg-accent/10 px-3 py-1.5 text-[10px] text-accent">
                 <span className="font-bold">
                   {positionFilter === "GOL" ? (
-                    <>✨ <strong>Atletas com melhor histórico no gol</strong> no topo</>
+                    <>✨ <strong>Todos os atletas disponíveis</strong> · melhores no gol primeiro</>
                   ) : (
-                    <>✨ Atletas de <strong>{
+                    <>✨ Somente atletas de <strong>{
                       positionFilter === "DEF" ? (roleReframeActive ? "Defesa / Volância (DEF/VOL)" : "Defesa (DEF)") :
                       "Ataque / Ala (ATA/ALA)"
-                    }</strong> no topo primeiro</>
+                    }</strong></>
                   )}
                 </span>
                 <button
@@ -1955,9 +2116,14 @@ export function FantasyExperience({
             <div className="space-y-2.5 w-full">
               {filtered.map((player) => {
                 const bought = selected.includes(player.id);
-                const purchasePrice = marketPlayerPurchasePrice(player, bought);
-                const hasBargainDiscount = purchasePrice < player.price;
-                const simulatedRemaining = bought ? remaining + purchasePrice : remaining - purchasePrice;
+                const isReserveSelection = Boolean(reserveTargetRole);
+                const purchasePrice = isReserveSelection
+                  ? Math.round(player.price * 50) / 100
+                  : marketPlayerPurchasePrice(player, bought);
+                const hasBargainDiscount = !isReserveSelection && purchasePrice < player.price;
+                const simulatedRemaining = isReserveSelection
+                  ? remaining + reservePrice - purchasePrice
+                  : bought ? remaining + purchasePrice : remaining - purchasePrice;
                 const backgroundImage = cosmeticImage(player.cosmetics?.backgroundAssetKey);
                 const displayedPoints = sort === "lastRound" ? player.roundPoints : player.totalPoints;
                 const playerRoundTeam = roundTeamByPlayerId.get(player.id) || null;
@@ -2060,7 +2226,7 @@ export function FantasyExperience({
                         </div>
 
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px]">
-                          {hasBargainDiscount && (
+                          {(hasBargainDiscount || isReserveSelection) && (
                             <span className="font-bold text-muted line-through">
                               {formatFantasyMoney(player.price, settings.currencyName)}
                             </span>
@@ -2068,6 +2234,11 @@ export function FantasyExperience({
                           <span className="font-black text-accent">
                             {formatFantasyMoney(purchasePrice, settings.currencyName)}
                           </span>
+                          {isReserveSelection && (
+                            <span className="rounded bg-amber-300/15 px-1.5 py-0.5 font-black text-amber-200">
+                              Banco -50%
+                            </span>
+                          )}
                           {hasBargainDiscount && (
                             <span className="rounded bg-accent/15 px-1.5 py-0.5 font-black text-accent">
                               Barganha -{bargainDiscountPercent}%
@@ -2123,18 +2294,18 @@ export function FantasyExperience({
                           <button
                             type="button"
                             onClick={() => togglePlayer(player)}
-                            disabled={Boolean(bargainPurchasePending) || (!bought && purchasePrice > remaining)}
+                            disabled={Boolean(bargainPurchasePending) || (!bought && purchasePrice > remaining + (isReserveSelection ? reservePrice : 0))}
                             className={`mt-1.5 rounded-xl px-3 py-1 text-[9px] font-black uppercase transition-transform active:scale-90 ${
                               bargainPurchasePending
                                 ? "bg-white/5 text-muted cursor-wait opacity-60"
                                 : bought
                                 ? "bg-danger/20 text-danger border border-danger/30 hover:bg-danger/30"
-                                : purchasePrice > remaining
+                                : purchasePrice > remaining + (isReserveSelection ? reservePrice : 0)
                                 ? "bg-white/5 text-muted cursor-not-allowed opacity-50"
                                 : "bg-accent text-background hover:brightness-110 shadow-sm"
                             }`}
                           >
-                            {bargainPurchasePending === player.id ? "Aplicando..." : bought ? "Vender" : "Comprar"}
+                            {bargainPurchasePending === player.id ? "Aplicando..." : bought ? "Vender" : isReserveSelection ? "Escolher" : "Comprar"}
                           </button>
                         )}
                       </div>

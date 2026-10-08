@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LEGACY_FANTASY_SETTINGS as DEFAULT_FANTASY_SETTINGS } from "./config";
-import { calculateFantasyPositionPackageBonus, getFantasySlotRoles } from "./lineup-positions";
+import { calculateFantasyPositionPackageBonus, getFantasySlotRoles, isCorrectFantasySlot } from "./lineup-positions";
 import { calculatePositionBreakdown } from "./position-breakdown";
 
 describe("pacotes de bônus por posição — BQ v5", () => {
@@ -97,6 +97,17 @@ describe("formações da Coluna C", () => {
   it("oferece exatamente os dois esquemas de seis atletas", () => {
     expect(getFantasySlotRoles(6, "3-2")).toEqual(["ATA", "ATA", "DEF", "DEF", "DEF", "GOL"]);
     expect(getFantasySlotRoles(6, "2-3")).toEqual(["ATA", "ATA", "ATA", "DEF", "DEF", "GOL"]);
+  });
+
+  it("restringe o mercado pela vaga e deixa somente o GOL aberto a todos", () => {
+    expect(isCorrectFantasySlot("ATA", "offensive")).toBe(true);
+    expect(isCorrectFantasySlot("ATA", "midfield")).toBe(true);
+    expect(isCorrectFantasySlot("ATA", "defensive")).toBe(false);
+    expect(isCorrectFantasySlot("DEF", "defensive")).toBe(true);
+    expect(isCorrectFantasySlot("DEF", "offensive")).toBe(false);
+    expect(isCorrectFantasySlot("GOL", "offensive")).toBe(true);
+    expect(isCorrectFantasySlot("GOL", "midfield")).toBe(true);
+    expect(isCorrectFantasySlot("GOL", "defensive")).toBe(true);
   });
 });
 

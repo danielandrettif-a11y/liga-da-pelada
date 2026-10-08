@@ -24,7 +24,9 @@ import {
   calculateFantasyGoalkeeperSlotPoints,
   calculateFantasyPredictionIndex,
   calculateFantasyPlayerPoints,
+  calculateFantasyRankedPoints,
   calculateFantasySlotPoints,
+  getFantasyRankedScoringSnapshot,
   calculateFantasyTrend,
   calculateMarketPopularity,
   getFantasyPlayerTags,
@@ -32,6 +34,7 @@ import {
   type FantasyTagItem,
   type FantasyTrend,
 } from "@/lib/fantasy/engine";
+import { buildRankedPointBreakdown } from "@/lib/ranked-scoring";
 import type { FantasyChallengeType } from "@/lib/fantasy/challenges";
 import { getAllPlayersEquippedCosmeticsMap, type EquippedCosmeticsSummary } from "./cosmetics";
 import {
@@ -455,7 +458,7 @@ export async function getFantasyDashboard() {
     : activeOfficialRound
     ? account.client
         .from("fantasy_lineups")
-        .select("*, fantasy_lineup_players(*)")
+        .select("*, fantasy_lineup_players(*), fantasy_lineup_reserves(*)")
         .eq("fantasy_round_id", activeOfficialRound.id)
         .eq("user_id", account.user.id)
         .maybeSingle()
@@ -473,7 +476,7 @@ export async function getFantasyDashboard() {
   const latestLineupRequest = latestFinishedRound
     ? account.client
         .from("fantasy_lineups")
-        .select("*, fantasy_lineup_players(*)")
+        .select("*, fantasy_lineup_players(*), fantasy_lineup_reserves(*)")
         .eq("fantasy_round_id", latestFinishedRound.id)
         .eq("user_id", account.user.id)
         .maybeSingle()
@@ -497,7 +500,7 @@ export async function getFantasyDashboard() {
     ? liveReadClient
         .from("fantasy_lineups")
         .select(
-          "id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked)"
+          "id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked), fantasy_lineup_reserves(player_id, slot_role, base_points, applied, replaced_player_id, points_gain)"
         )
         .eq("fantasy_round_id", activeOfficialRound.id)
     : Promise.resolve({ data: [] as any[] });
@@ -543,7 +546,7 @@ export async function getFantasyDashboard() {
       : officialRoundIds.length
       ? account.client
           .from("player_round_stats")
-          .select("round_id, player_id, goals, assists, wins, draws, losses, own_goals, games, goalkeeper_games, goals_conceded, clean_sheets, defensive_clean_games, defensive_one_goal_games, team_goals_conceded")
+          .select("round_id, player_id, goals, assists, wins, draws, losses, own_goals, games, goalkeeper_games, goals_conceded, clean_sheets, defensive_clean_games, defensive_one_goal_games, team_goals_conceded, ranking_points")
           .in("round_id", officialRoundIds)
       : Promise.resolve({ data: [] as any[] }),
     displayRoundId
@@ -628,7 +631,7 @@ export async function getFantasyDashboard() {
     string,
     { goals: number; assists: number; ownGoals: number; wins: number; draws: number; losses: number; games: number; goalkeeperGames: number; goalsConceded: number; cleanSheets: number; defensiveCleanGames: number; defensiveOneGoalGames: number; teamGoalsConceded: number }
   >();
-  const currentStats = new Map<string, { goals: number; assists: number; ownGoals: number; wins: number; draws: number; losses: number; goalkeeperGames: number; goalsConceded: number; cleanSheets: number; defensiveCleanGames: number; defensiveOneGoalGames: number; teamGoalsConceded: number }>();
+  const currentStats = new Map<string, { goals: number; assists: number; ownGoals: number; wins: number; draws: number; losses: number; goalkeeperGames: number; goalsConceded: number; cleanSheets: number; defensiveCleanGames: number; defensiveOneGoalGames: number; teamGoalsConceded: number; rankingPoints?: number }>();
 
   for (const row of statRows || []) {
     const current = statsByPlayer.get(row.player_id) || {
@@ -675,6 +678,7 @@ export async function getFantasyDashboard() {
         defensiveCleanGames: Number(row.defensive_clean_games || 0),
         defensiveOneGoalGames: Number(row.defensive_one_goal_games || 0),
         teamGoalsConceded: Number(row.team_goals_conceded || 0),
+        rankingPoints: row.ranking_points == null ? undefined : Number(row.ranking_points),
       });
     }
   }
@@ -855,23 +859,47 @@ export async function getFantasyDashboard() {
       // A pontuação da última rodada vem diretamente das estatísticas daquela
       // rodada. O histórico de preços é só uma consequência da apuração e,
       // em bases migradas, pode ter o campo round_points zerado.
-      const roundPoints = calculateFantasyPlayerPoints(
-        {
-          goals: currentStats.get(player.id)?.goals || 0,
-          assists: currentStats.get(player.id)?.assists || 0,
-          ownGoals: currentStats.get(player.id)?.ownGoals || 0,
-          wins: currentStats.get(player.id)?.wins || 0,
-          draws: currentStats.get(player.id)?.draws || 0,
-          losses: currentStats.get(player.id)?.losses || 0,
-          goalkeeperGames: currentStats.get(player.id)?.goalkeeperGames || 0,
-          goalsConceded: currentStats.get(player.id)?.goalsConceded || 0,
-          defensiveCleanGames: currentStats.get(player.id)?.defensiveCleanGames || 0,
-          defensiveOneGoalGames: currentStats.get(player.id)?.defensiveOneGoalGames || 0,
-          teamGoalsConceded: currentStats.get(player.id)?.teamGoalsConceded || 0,
-          playerProfile: player.player_profile,
-        },
-        scoringSettings,
-      );
+      const currentRoundStats = currentStats.get(player.id);
+      const roundPoints = Number(scoringSettings.scoringVersion || 0) >= 14
+        ? fantasyRound?.market_status === "in_progress"
+          ? Number(liveStats.get(player.id)?.basePoints || 0)
+          : Number.isFinite(currentRoundStats?.rankingPoints)
+            ? Number(currentRoundStats?.rankingPoints)
+            : calculateFantasyRankedPoints(
+                {
+                  goals: currentRoundStats?.goals || 0,
+                  assists: currentRoundStats?.assists || 0,
+                  ownGoals: currentRoundStats?.ownGoals || 0,
+                  wins: currentRoundStats?.wins || 0,
+                  draws: currentRoundStats?.draws || 0,
+                  losses: currentRoundStats?.losses || 0,
+                  goalkeeperGames: currentRoundStats?.goalkeeperGames || 0,
+                  goalsConceded: currentRoundStats?.goalsConceded || 0,
+                  cleanSheets: currentRoundStats?.cleanSheets || 0,
+                  defensiveCleanGames: currentRoundStats?.defensiveCleanGames || 0,
+                  defensiveOneGoalGames: currentRoundStats?.defensiveOneGoalGames || 0,
+                  teamGoalsConceded: currentRoundStats?.teamGoalsConceded || 0,
+                  playerProfile: player.player_profile,
+                },
+                scoringSettings,
+              )
+        : calculateFantasyPlayerPoints(
+            {
+              goals: currentRoundStats?.goals || 0,
+              assists: currentRoundStats?.assists || 0,
+              ownGoals: currentRoundStats?.ownGoals || 0,
+              wins: currentRoundStats?.wins || 0,
+              draws: currentRoundStats?.draws || 0,
+              losses: currentRoundStats?.losses || 0,
+              goalkeeperGames: currentRoundStats?.goalkeeperGames || 0,
+              goalsConceded: currentRoundStats?.goalsConceded || 0,
+              defensiveCleanGames: currentRoundStats?.defensiveCleanGames || 0,
+              defensiveOneGoalGames: currentRoundStats?.defensiveOneGoalGames || 0,
+              teamGoalsConceded: currentRoundStats?.teamGoalsConceded || 0,
+              playerProfile: player.player_profile,
+            },
+            scoringSettings,
+          );
 
       const playerRecentPoints = recentPointsByPlayer.get(player.id) || [];
       const playerRecentVars = recentVariationsByPlayer.get(player.id) || [];
@@ -1416,6 +1444,7 @@ export async function getFantasyDashboard() {
       top_scorer_player_id: effectiveLineup.top_scorer_player_id,
       top_assist_player_id: effectiveLineup.top_assist_player_id,
       fantasy_lineup_players: effectiveLineup.fantasy_lineup_players,
+      fantasy_lineup_reserves: effectiveLineup.fantasy_lineup_reserves || [],
     });
   }
 
@@ -1441,6 +1470,12 @@ export async function getFantasyDashboard() {
             captainPlayerId: item.captain_player_id,
             topScorerPlayerId: item.top_scorer_player_id,
             topAssistPlayerId: item.top_assist_player_id,
+            reserve: item.fantasy_lineup_reserves?.[0]
+              ? {
+                  playerId: item.fantasy_lineup_reserves[0].player_id,
+                  slotRole: item.fantasy_lineup_reserves[0].slot_role,
+                }
+              : null,
           })),
         liveStats,
         scoringSettings,
@@ -1559,6 +1594,8 @@ export async function saveFantasyLineup(input: {
   scorerId: string | null;
   assistId: string | null;
   challengeId: string | null;
+  reservePlayerId: string | null;
+  reserveRole: "ATA" | "DEF" | null;
 }) {
   try {
     const account = await getCurrentAccount();
@@ -1576,6 +1613,12 @@ export async function saveFantasyLineup(input: {
         success: false,
         error: `A escalação enviada é inválida. Aceita no máximo ${maxPlayers} jogadores.`,
       };
+    }
+    if (Boolean(input.reservePlayerId) !== Boolean(input.reserveRole)) {
+      return { success: false, error: "Escolha o jogador e a posição do banco de reserva." };
+    }
+    if (input.reservePlayerId && input.playerIds.includes(input.reservePlayerId)) {
+      return { success: false, error: "O jogador do banco não pode estar entre os titulares." };
     }
     const slotAssignmentsAreValid =
       input.slotAssignments.length === input.playerIds.length &&
@@ -1604,6 +1647,9 @@ export async function saveFantasyLineup(input: {
           .maybeSingle()
       : { data: null };
     if (testSession && input.roundId) {
+      if (input.reservePlayerId) {
+        return { success: false, error: "O banco de reserva ainda não está disponível na rodada de testes." };
+      }
       const { error } = await account.client.rpc("save_fantasy_test_lineup", {
         p_round_id: input.roundId,
         p_player_ids: input.playerIds,
@@ -1615,7 +1661,7 @@ export async function saveFantasyLineup(input: {
       });
       if (error) return { success: false, error: error.message };
     } else {
-      const { error: lineupError } = await account.client.rpc("save_fantasy_lineup", {
+      const { error: lineupError } = await account.client.rpc("save_fantasy_lineup_with_reserve", {
         p_round_id: input.roundId,
         p_player_ids: input.playerIds,
         p_captain_player_id: input.captainId,
@@ -1623,6 +1669,8 @@ export async function saveFantasyLineup(input: {
         p_top_assist_player_id: input.assistId,
         p_challenge_player_id: input.challengeId,
         p_lineup_slots: dbSlots,
+        p_reserve_player_id: input.reservePlayerId,
+        p_reserve_slot_role: input.reserveRole,
       });
       if (lineupError) return { success: false, error: lineupError.message };
     }
@@ -1714,6 +1762,10 @@ export async function getRevealedLineups(roundId?: string) {
       fantasy_lineup_players (
         id, player_id, slot_index, slot_role, player_profile_locked, price_locked, price_after, base_points, position_bonus, captain_bonus, total_points,
         player_name_locked, avatar_url_locked
+      ),
+      fantasy_lineup_reserves (
+        id, player_id, slot_role, price_locked, price_after, base_points, applied,
+        replaced_player_id, replaced_player_points, points_gain
       )
     `
     )
@@ -1798,10 +1850,15 @@ export async function getRevealedLineups(roundId?: string) {
     const projectedPlayerById = new Map(
       (projection?.players || []).map((player) => [player.playerId, player]),
     );
+    const reserveRow = l.fantasy_lineup_reserves?.[0] || null;
+    const reserveProjection = projection?.reserve || null;
+    const reservePointsGain = Number(
+      reserveProjection?.pointsGain ?? reserveRow?.points_gain ?? 0,
+    );
     const playerPoints = resolvedPlayerScores.reduce(
       (total, player) => total + player.points,
       0,
-    );
+    ) + reservePointsGain;
     const cardPoints = activation
       ? resolveFantasyCardPointBonus({
           slug: activatedCard?.slug,
@@ -1826,6 +1883,18 @@ export async function getRevealedLineups(roundId?: string) {
       topScorer: scorer ? { id: scorer.id, name: scorer.name } : null,
       topAssist: assist ? { id: assist.id, name: assist.name } : null,
       challengePlayer: challenge ? { id: challenge.id, name: challenge.name } : null,
+      reserve: reserveRow
+        ? {
+            playerId: reserveRow.player_id,
+            name: reserveRow.player_name_locked || "Reserva",
+            avatarUrl: reserveRow.avatar_url_locked || null,
+            slotRole: reserveRow.slot_role,
+            basePoints: Number(reserveProjection?.basePoints ?? reserveRow.base_points ?? 0),
+            applied: Boolean(reserveProjection?.applied ?? reserveRow.applied),
+            replacedPlayerId: reserveProjection?.replacedPlayerId ?? reserveRow.replaced_player_id ?? null,
+            pointsGain: reservePointsGain,
+          }
+        : null,
       activeCard: activatedCard
         ? {
             name: activatedCard.name,
@@ -1920,7 +1989,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       .order("created_at", { ascending: true }),
     account.client
       .from("player_round_stats")
-      .select("round_id, goals, assists, wins, losses, games, goalkeeper_games, goalkeeper_goals, goalkeeper_assists, goalkeeper_own_goals, goalkeeper_wins, goalkeeper_draws, goalkeeper_losses, goals_conceded, clean_sheets")
+      .select("round_id, goals, assists, wins, draws, losses, games, own_goals, team_goals_conceded, defensive_clean_games, defensive_one_goal_games, ranking_defensive_clean_games, ranking_defensive_one_goal_games, goalkeeper_games, goalkeeper_goals, goalkeeper_assists, goalkeeper_own_goals, goalkeeper_wins, goalkeeper_draws, goalkeeper_losses, goals_conceded, clean_sheets, points, ranking_points, ranking_position_bonus, player_profile_locked")
       .eq("player_id", playerId),
     account.client
       .from("account_profiles")
@@ -2074,7 +2143,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       loadFantasyMatchSnapshots(liveReadClient, scoringRound.round_id, scoringRoundInfo?.number),
       liveReadClient
         .from("player_round_stats")
-        .select("goalkeeper_games, goalkeeper_goals, goalkeeper_assists, goalkeeper_own_goals, goalkeeper_wins, goalkeeper_draws, goalkeeper_losses, goals_conceded, clean_sheets")
+        .select("goals, assists, wins, draws, losses, own_goals, team_goals_conceded, defensive_clean_games, defensive_one_goal_games, ranking_defensive_clean_games, ranking_defensive_one_goal_games, goalkeeper_games, goalkeeper_goals, goalkeeper_assists, goalkeeper_own_goals, goalkeeper_wins, goalkeeper_draws, goalkeeper_losses, goals_conceded, clean_sheets, points, ranking_points, ranking_position_bonus, player_profile_locked")
         .eq("round_id", scoringRound.round_id)
         .eq("player_id", playerId)
         .maybeSingle(),
@@ -2138,6 +2207,8 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       { suppressGoalkeeperRewards: Boolean(scoringRoundInfo?.suppress_goalkeeper_rewards) },
     );
     const projectedCurrent = liveStats.get(playerId) || {
+      playerId,
+      playerProfile,
       goals: 0, assists: 0, ownGoals: 0, wins: 0, draws: 0, losses: 0,
       goalkeeperGames: 0, goalsConceded: 0, cleanSheets: 0, defensiveCleanGames: 0,
       goalkeeperGoals: 0, goalkeeperAssists: 0, goalkeeperOwnGoals: 0,
@@ -2155,6 +2226,24 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     const current = roundIsFinished && consolidatedRoundStats
       ? {
           ...projectedCurrent,
+          goals: Number(consolidatedRoundStats.goals || 0),
+          assists: Number(consolidatedRoundStats.assists || 0),
+          wins: Number(consolidatedRoundStats.wins || 0),
+          draws: Number(consolidatedRoundStats.draws || 0),
+          losses: Number(consolidatedRoundStats.losses || 0),
+          ownGoals: Number(consolidatedRoundStats.own_goals || 0),
+          teamGoalsConceded: Number(consolidatedRoundStats.team_goals_conceded || 0),
+          defensiveCleanGames: Number(
+            consolidatedRoundStats.ranking_defensive_clean_games
+              ?? consolidatedRoundStats.defensive_clean_games
+              ?? 0,
+          ),
+          defensiveOneGoalGames: Number(
+            consolidatedRoundStats.ranking_defensive_one_goal_games
+              ?? consolidatedRoundStats.defensive_one_goal_games
+              ?? 0,
+          ),
+          playerProfile: consolidatedRoundStats.player_profile_locked || projectedCurrent.playerProfile,
           goalkeeperGames: Number(consolidatedRoundStats.goalkeeper_games || 0),
           goalkeeperGoals: Number(consolidatedRoundStats.goalkeeper_goals || 0),
           goalkeeperAssists: Number(consolidatedRoundStats.goalkeeper_assists || 0),
@@ -2234,8 +2323,14 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     // rodada e com o snapshot das regras daquela própria rodada. Um total
     // persistido diferente não vira um scout artificial para completar a soma.
     const columnCActive = Number(liveSettings.scoringVersion || 5) >= 11;
-    const authoritativeBasePoints = slotRole && columnCActive
-      ? calculateFantasySlotPoints(current, slotRole, liveSettings)
+    const rankedScoringActive = Number(liveSettings.scoringVersion || 5) >= 14;
+    const storedRankedPoints = Number(
+      consolidatedRoundStats?.ranking_points ?? consolidatedRoundStats?.points,
+    );
+    const authoritativeBasePoints = rankedScoringActive && roundIsFinished && Number.isFinite(storedRankedPoints)
+      ? storedRankedPoints
+      : slotRole && columnCActive
+        ? calculateFantasySlotPoints(current, slotRole, liveSettings)
       : slotRole === "GOL" && Number(liveSettings.scoringVersion || 5) >= 10
         ? calculateFantasyGoalkeeperSlotPoints(current, liveSettings)
         : current.basePoints;
@@ -2267,6 +2362,36 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     const slotLabel = slotRole === "DEF"
         ? "DEF/VOL"
         : slotRole === "ATA" ? "ATA/ALA" : slotRole;
+    const rankedBreakdown = rankedScoringActive
+      ? buildRankedPointBreakdown({
+          goals: current.goals,
+          assists: current.assists,
+          wins: current.wins,
+          draws: current.draws,
+          losses: current.losses,
+          ownGoals: current.ownGoals,
+          goalkeeperAppearances: current.goalkeeperGames,
+          goalkeeperGoalsConceded: current.goalsConceded,
+          goalkeeperGoals: current.goalkeeperGoals,
+          goalkeeperAssists: current.goalkeeperAssists,
+          goalkeeperOwnGoals: current.goalkeeperOwnGoals,
+          goalkeeperCleanSheets: current.cleanSheets,
+          teamGoalsConceded: current.teamGoalsConceded,
+          defensiveCleanGames: current.defensiveCleanGames,
+          defensiveOneGoalGames: current.defensiveOneGoalGames,
+          lineRole: current.playerProfile === "defensive" ? "DEF" : "ATA",
+        }, getFantasyRankedScoringSnapshot(liveSettings)).map((item, index) => ({
+          key: `ranked_${index}`,
+          label: item.label,
+          count: item.count,
+          unitPoints: item.count ? item.points / item.count : item.points,
+          points: item.points,
+          icon: item.label.includes("Assist") ? "👟"
+            : item.label.includes("gol") || item.label.includes("Gol") ? "⚽"
+              : item.label.includes("Clean") ? "🔒"
+                : item.label.includes("Atuações") ? "🧤" : "🛡️",
+        }))
+      : [];
     const breakdown: Array<{
       key: string;
       label: string;
@@ -2276,7 +2401,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       icon: string;
       description?: string;
       hideCount?: boolean;
-    }> = columnCActive && slotRole === "GOL" ? [
+    }> = rankedScoringActive ? rankedBreakdown : columnCActive && slotRole === "GOL" ? [
       { key: "goalkeeper_goals", label: "Gols enquanto estava no gol", count: current.goalkeeperGoals, unitPoints: liveSettings.defenderGoalPoints, points: current.goalkeeperGoals * liveSettings.defenderGoalPoints, icon: "⚽" },
       { key: "goalkeeper_assists", label: "Assistências enquanto estava no gol", count: current.goalkeeperAssists, unitPoints: liveSettings.defenderAssistPoints, points: current.goalkeeperAssists * liveSettings.defenderAssistPoints, icon: "👟" },
       { key: "goalkeeper_games", label: "Atuações no gol", count: current.goalkeeperGames, unitPoints: liveSettings.goalkeeperSlotAppearancePoints, points: current.goalkeeperGames * liveSettings.goalkeeperSlotAppearancePoints, icon: "🧤" },
@@ -2302,7 +2427,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       { key: "goals_conceded", label: "Gols Sofridos no Gol", count: liveSettings.roleScoringActive === false ? current.teamGoalsConceded : current.goalsConceded, unitPoints: concededUnitValue, points: concededValue, icon: "🛡️" },
       { key: "own_goals", label: "Gols Contra", count: current.ownGoals, unitPoints: liveSettings.ownGoalPoints, points: current.ownGoals * liveSettings.ownGoalPoints, icon: "⚠️" },
     ].filter((item) => item.count > 0);
-    if (slotRole) {
+    if (slotRole && !rankedScoringActive) {
       const positionParts = [
         ...(calculatedPositionBreakdown?.events || []).map(
           (event) => `${event.label}: +${Number(event.value).toFixed(1)}`,
@@ -2379,7 +2504,9 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
         };
       });
 
-    const activeLineRole = slotRole === "DEF" || (!slotRole && playerProfile === "defensive") ? "DEF" : "ATA";
+    const activeLineRole = rankedScoringActive
+      ? (current.playerProfile === "defensive" ? "DEF" : "ATA")
+      : slotRole === "DEF" || (!slotRole && playerProfile === "defensive") ? "DEF" : "ATA";
     const rulesList = columnCActive ? [
       { label: `Gol como ${activeLineRole === "DEF" ? "DEF/VOL" : "ATA/ALA"}`, unitPoints: activeLineRole === "DEF" ? liveSettings.defenderGoalPoints : liveSettings.attackerGoalPoints, icon: "⚽", description: "Conta quando o atleta está na linha" },
       { label: `Assistência como ${activeLineRole === "DEF" ? "DEF/VOL" : "ATA/ALA"}`, unitPoints: activeLineRole === "DEF" ? liveSettings.defenderAssistPoints : liveSettings.attackerAssistPoints, icon: "👟", description: "Conta quando o atleta está na linha" },
@@ -2409,6 +2536,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     ];
 
     roundDetail = {
+      scoringVersion: liveSettings.scoringVersion,
       roundNumber: scoringRoundInfo?.number || null,
       roundDate: scoringRoundInfo?.date || null,
       status: scoringRoundIsCurrent ? (scoringRoundIsLive ? "live" : "open") : "finished",
@@ -2426,9 +2554,10 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
         games: goalkeeperSimulationStats.goalkeeperGames,
         goalsConceded: goalkeeperSimulationStats.goalsConceded,
         cleanSheets: goalkeeperSimulationStats.cleanSheets,
-        basePoints: goalkeeperBasePoints,
-        positionBonus: goalkeeperPositionBonus,
-        totalPoints: goalkeeperTotalPoints,
+        basePoints: rankedScoringActive ? authoritativeBasePoints : goalkeeperBasePoints,
+        positionBonus: rankedScoringActive ? 0 : goalkeeperPositionBonus,
+        totalPoints: rankedScoringActive ? authoritativeBasePoints : goalkeeperTotalPoints,
+        usesOfficialRankedPoints: rankedScoringActive,
       },
       breakdown,
       matchesBreakdown,
@@ -2554,7 +2683,7 @@ async function getLiveRoundProjections(
     loadFantasyMatchSnapshots(liveReadClient, activeRound.round_id, activeRoundInfo?.number),
     liveReadClient
       .from("fantasy_lineups")
-      .select("id, user_id, status, score_breakdown, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked)")
+      .select("id, user_id, status, score_breakdown, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked), fantasy_lineup_reserves(player_id, slot_role)")
       .eq("fantasy_round_id", activeRound.id),
     liveReadClient.from("players").select("id, player_profile, member_category, is_selectable"),
   ]);
@@ -2637,6 +2766,10 @@ async function getLiveRoundProjections(
         topScorerPlayerId: lineup.top_scorer_player_id,
         topAssistPlayerId: lineup.top_assist_player_id,
         cardBonus: Number(lineup.score_breakdown?.cardBonus || 0),
+        reserve: lineup.fantasy_lineup_reserves?.[0] ? {
+          playerId: lineup.fantasy_lineup_reserves[0].player_id,
+          slotRole: lineup.fantasy_lineup_reserves[0].slot_role,
+        } : null,
       })),
     stats,
     settings,

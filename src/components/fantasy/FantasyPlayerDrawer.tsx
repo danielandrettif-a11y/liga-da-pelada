@@ -473,7 +473,7 @@ export function FantasyPlayerDrawer({
                     {detailIsCaptain
                       ? `Total com capitão ×${Number(roundDetail?.captainMultiplier || 1.5).toLocaleString("pt-BR")}`
                       : positionLabel
-                        ? `Com posição ${positionLabel}`
+                        ? "Pontuação oficial"
                         : "Pontos-base"}
                   </span>
                 </div>
@@ -483,14 +483,14 @@ export function FantasyPlayerDrawer({
                   ? detailIsLive
                     ? positionLabel
                       ? detailIsCaptain
-                        ? `Scouts-base, bônus da posição ${positionLabel} e faixa de capitão calculados em tempo real. Cartas especiais ficam separadas.`
-                        : `Scouts-base e bônus da posição ${positionLabel}, calculados em tempo real. Cartas especiais aparecem separadamente.`
+                        ? "Scouts oficiais da Ranked e faixa de capitão calculados em tempo real. Cartas especiais ficam separadas."
+                        : "Scouts oficiais da Ranked calculados em tempo real. Cartas especiais aparecem separadamente."
                       : "Valores calculados em tempo real a partir dos scouts e eventos de jogo. O bônus de capitão e cartas especiais incidem no total da sua escalação."
                     : "A rodada ainda não começou. Os scouts e a pontuação serão atualizados assim que as partidas forem disputadas."
                   : positionLabel
                     ? detailIsCaptain
-                      ? `Total dos scouts-base com o bônus da posição ${positionLabel} e o adicional exato da faixa de capitão. Cartas especiais ficam separadas.`
-                      : `Total dos scouts-base com o bônus da posição ${positionLabel} usado na sua escalação. Cartas especiais ficam separadas.`
+                      ? "Total oficial da Ranked com o adicional exato da faixa de capitão. Cartas especiais ficam separadas."
+                      : "Total oficial da Ranked usado na sua escalação. Cartas especiais ficam separadas."
                     : "Pontuação-base da última rodada válida, reconstruída com as regras que estavam vigentes naquela rodada."}
               </p>
             </div>
@@ -511,7 +511,7 @@ export function FantasyPlayerDrawer({
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
-                        🧤 Se fosse escalado na vaga GOL
+                        {goalkeeperPreview.usesOfficialRankedPoints ? "🧤 Pontuação oficial da rodada" : "🧤 Se fosse escalado na vaga GOL"}
                       </p>
                       <p className="mt-1 text-[10px] leading-4 text-muted">
                         {goalkeeperPreview.games} {goalkeeperPreview.games === 1 ? "atuação" : "atuações"} no gol
@@ -524,10 +524,12 @@ export function FantasyPlayerDrawer({
                     </strong>
                   </div>
                   <p className="mt-2 border-t border-emerald-400/15 pt-2 text-[9px] leading-4 text-muted">
-                    {goalkeeperPreview.games > 0
+                    {goalkeeperPreview.usesOfficialRankedPoints
+                      ? "Na regra atual da Ranked, a vaga GOL não altera a pontuação: ela usa os scouts oficiais da rodada."
+                      : goalkeeperPreview.games > 0
                       ? <>Base exclusiva da vaga GOL: {Number(goalkeeperPreview.basePoints).toFixed(1)} pts{Number(goalkeeperPreview.positionBonus) !== 0 ? ` · bônus de clean sheet: ${Number(goalkeeperPreview.positionBonus) > 0 ? "+" : ""}${Number(goalkeeperPreview.positionBonus).toFixed(1)} pts` : ""}.</>
                       : "Sem atuação registrada no gol nesta rodada, a vaga GOL renderia 0,0 ponto."}
-                    {" "}Regra exclusiva da vaga GOL aplicada à rodada, sem capitão e sem carta; não altera o total oficial.
+                    {!goalkeeperPreview.usesOfficialRankedPoints && <> {" "}Regra exclusiva da vaga GOL aplicada à rodada, sem capitão e sem carta; não altera o total oficial.</>}
                   </p>
                 </div>
               )}
@@ -581,7 +583,7 @@ export function FantasyPlayerDrawer({
                   {detailIsCaptain
                     ? "Total final com capitão"
                     : positionLabel
-                      ? `Total com posição ${positionLabel}`
+                      ? "Total dos Scouts"
                       : "Total dos Scouts"}
                 </span>
                 <span className="text-sm text-accent font-black">

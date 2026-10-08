@@ -341,4 +341,34 @@ describe("live fantasy projection", () => {
     });
     expect(lineup.totalPoints).toBe(9);
   });
+
+  it("V14 aciona o reserva da mesma posição e transfere a faixa de capitão ao substituto", () => {
+    const emptyStats = {
+      assists: 0, wins: 0, draws: 0, losses: 0, games: 1,
+      goalkeeperGames: 0, goalsConceded: 0, goalkeeperGoals: 0,
+      goalkeeperAssists: 0, goalkeeperOwnGoals: 0, goalkeeperWins: 0,
+      goalkeeperDraws: 0, goalkeeperLosses: 0, cleanSheets: 0,
+      defensiveCleanGames: 0, defensiveOneGoalGames: 0, teamGoalsConceded: 0,
+    };
+    const stats = new Map([
+      ["titular", { ...emptyStats, playerId: "titular", playerProfile: "offensive" as const, goals: 0, ownGoals: 1, basePoints: -3 }],
+      ["reserva", { ...emptyStats, playerId: "reserva", playerProfile: "offensive" as const, goals: 1, ownGoals: 0, basePoints: 4 }],
+    ]);
+    const [lineup] = projectFantasyLiveLineups([{
+      id: "com-reserva",
+      userId: "user",
+      playerIds: ["titular"],
+      slots: [{ playerId: "titular", slotRole: "ATA", playerProfile: "offensive" }],
+      captainPlayerId: "titular",
+      reserve: { playerId: "reserva", slotRole: "ATA" },
+    }], stats, { ...DEFAULT_FANTASY_SETTINGS, scoringVersion: 14 });
+
+    expect(lineup.reserve).toMatchObject({
+      applied: true,
+      replacedPlayerId: "titular",
+      basePoints: 5,
+      pointsGain: 12,
+    });
+    expect(lineup.totalPoints).toBe(7.5);
+  });
 });
