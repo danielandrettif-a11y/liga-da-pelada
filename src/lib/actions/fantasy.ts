@@ -1515,7 +1515,9 @@ export async function getFantasyDashboard() {
       })
     : [];
   const latestLineupPlayerTotal = latestLineup
-    ? latestFinishedPlayerScores.length
+    ? latestFinishedProjection
+      ? latestFinishedProjection.playerPoints + latestFinishedProjection.captainBonus
+      : latestFinishedPlayerScores.length
       ? latestFinishedPlayerScores.reduce((total, player) => total + player.points, 0)
       : resolveFantasyLineupPlayerTotal({
           storedPlayers: latestLineup.fantasy_lineup_players || [],
@@ -1875,11 +1877,10 @@ export async function getRevealedLineups(roundId?: string) {
     : { data: [] as any[] };
   const activationMap = new Map((activations || []).map((activation: any) => [activation.user_id, activation]));
 
-  // Rodadas encerradas são históricas: os pontos, preços e capitão persistidos
-  // são autoritativos. Não dependemos da projeção ao vivo para abrir o banner.
+  // A mesma reconstrução usada no ranking da rodada também alimenta o banner
+  // histórico. Assim correções de scouts e de goleiro não deixam a escalação
+  // revelada presa a totais persistidos por uma versão anterior das regras.
   const roundProjection = targetRound?.id
-    && targetRound.status !== "finished"
-    && targetFantasyRound.market_status !== "finished"
     ? await getLiveRoundProjections(
         revealedReadClient,
         fs.id,
@@ -4024,7 +4025,10 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
         ...storedLineup,
         player_points: projection.playerPoints + projection.captainBonus,
         prediction_points: projection.predictionPoints,
-        total_points: projection.playerPoints + projection.captainBonus,
+        total_points: resolveFantasyBulletinTotal({
+          playerPoints: projection.playerPoints + projection.captainBonus,
+          cardPoints: projection.cardPoints,
+        }),
         score_breakdown: {
           ...(storedLineup.score_breakdown || {}),
           captainBonus: projection.captainBonus,
@@ -4044,7 +4048,11 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
           total_points: livePointsByPlayer.get(item.player_id)?.totalPoints || 0,
         })),
       }
-    : { ...storedLineup, total_points: officialTeamPoints };
+    : {
+        ...storedLineup,
+        player_points: officialTeamPoints,
+        total_points: Number(storedLineup.total_points ?? officialTeamPoints),
+      };
   const playerIds = (lineup.fantasy_lineup_players || []).map((item: any) => item.player_id);
   const [{ data: storedStats }, { data: roundPriceHistory }] = playerIds.length
     ? await Promise.all([

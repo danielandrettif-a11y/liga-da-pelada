@@ -15,10 +15,9 @@ function sumScores(values: Array<number | string | null | undefined>) {
 }
 
 /**
- * Na rodada finalizada, a apuração persistida do goleiro é a fonte oficial.
- * Ela já considera as partidas disputadas no gol e é reconciliada pelas
- * migrations de fechamento. Os jogadores de linha continuam refletindo a
- * reconstrução atual dos scouts.
+ * Quando a rodada pode ser reconstruída pelos scouts e pelo snapshot de
+ * regras, essa apuração é a fonte oficial para todas as posições. O valor
+ * persistido permanece apenas como fallback para atleta ausente da projeção.
  */
 export function resolveFantasyFinishedPlayerScores({
   projectedPlayers,
@@ -37,9 +36,7 @@ export function resolveFantasyFinishedPlayerScores({
   if (storedPlayers?.length) {
     return storedPlayers.map((player) => ({
       playerId: player.player_id,
-      points: player.slot_role === "GOL"
-        ? Number(player.total_points || 0)
-        : (projectedByPlayerId.get(player.player_id) ?? Number(player.total_points || 0)),
+      points: projectedByPlayerId.get(player.player_id) ?? Number(player.total_points || 0),
     }));
   }
 
