@@ -19,6 +19,8 @@ type PitchPlayer = {
   price_locked?: number;
   priceAfter?: number | null;
   price_after?: number | null;
+  priceChange?: number | null;
+  price_change?: number | null;
   isCaptain?: boolean;
 };
 
@@ -41,6 +43,11 @@ export function FantasyLineupMiniPitch({
     points: Number(player.points ?? player.total_points ?? 0),
     priceLocked: Number(player.priceLocked ?? player.price_locked ?? 0),
     priceAfter: player.priceAfter ?? player.price_after ?? null,
+    priceChange: player.priceChange ?? player.price_change ?? (
+      (player.priceAfter ?? player.price_after) != null
+        ? Number(player.priceAfter ?? player.price_after) - Number(player.priceLocked ?? player.price_locked ?? 0)
+        : null
+    ),
     captain: Boolean(player.isCaptain || (captainId && (player.playerId || player.player_id) === captainId)),
   }));
   const byRole = (role: string) => normalized.filter((player) => player.role === role);
@@ -67,9 +74,9 @@ export function FantasyLineupMiniPitch({
                 </div>
                 <span className="mt-1 max-w-28 truncate rounded-md bg-black/80 px-1.5 py-0.5 text-[9px] font-black text-white">{player.name}</span>
                 <span className="mt-0.5 text-[10px] font-black text-accent">{player.points.toFixed(1)} pts</span>
-                {player.priceAfter != null && (
-                  <span className={`text-[8px] font-black ${Number(player.priceAfter) - player.priceLocked > 0 ? "text-accent" : Number(player.priceAfter) - player.priceLocked < 0 ? "text-danger" : "text-white/55"}`}>
-                    {Number(player.priceAfter) - player.priceLocked > 0 ? "+" : ""}{(Number(player.priceAfter) - player.priceLocked).toFixed(2)} C$
+                {player.priceChange != null && (
+                  <span className={`text-[8px] font-black ${Number(player.priceChange) > 0 ? "text-accent" : Number(player.priceChange) < 0 ? "text-danger" : "text-white/55"}`}>
+                    {Number(player.priceChange) > 0 ? "+" : ""}{Number(player.priceChange).toFixed(2)} C$
                   </span>
                 )}
                 {player.role && <span className="text-[7px] font-black uppercase text-emerald-200/65">{player.role}</span>}

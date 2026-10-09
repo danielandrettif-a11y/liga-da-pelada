@@ -1825,6 +1825,18 @@ export async function getRevealedLineups(roundId?: string) {
     reservesByLineupId.set(reserve.lineup_id, list);
   }
 
+  const historicalPlayerIds = [...new Set((lockedPlayers || []).map((player: any) => player.player_id))];
+  const { data: roundPriceHistory } = historicalPlayerIds.length
+    ? await revealedReadClient
+        .from("fantasy_player_price_history")
+        .select("player_id, price_before, price_after, price_change")
+        .eq("fantasy_round_id", targetFantasyRound.id)
+        .in("player_id", historicalPlayerIds)
+    : { data: [] as any[] };
+  const priceHistoryByPlayerId = new Map(
+    (roundPriceHistory || []).map((history: any) => [history.player_id, history]),
+  );
+
   const rawLineups = (rawLineupRows || [])
     .map((lineup: any) => ({
       ...lineup,
@@ -1968,6 +1980,7 @@ export async function getRevealedLineups(roundId?: string) {
         : null,
       players: (l.fantasy_lineup_players || []).map((lp: any) => {
         const projectedPlayer = projectedPlayerById.get(lp.player_id);
+        const officialPriceHistory: any = priceHistoryByPlayerId.get(lp.player_id);
         const useProjectedBreakdown = Boolean(
           projectedPlayer
           && (roundProjection?.isLive || lp.slot_role !== "GOL"),
@@ -1979,7 +1992,12 @@ export async function getRevealedLineups(roundId?: string) {
           slotRole: lp.slot_role || null,
           isCaptain: lp.player_id === l.captain_player_id,
           priceLocked: Number(lp.price_locked || 0),
-          priceAfter: lp.price_after != null ? Number(lp.price_after) : null,
+          priceAfter: officialPriceHistory?.price_after != null
+            ? Number(officialPriceHistory.price_after)
+            : lp.price_after != null ? Number(lp.price_after) : null,
+          priceChange: officialPriceHistory?.price_change != null
+            ? Number(officialPriceHistory.price_change)
+            : lp.price_after != null ? Number(lp.price_after) - Number(lp.price_locked || 0) : null,
           basePoints: useProjectedBreakdown
             ? Number(projectedPlayer?.basePoints || 0)
             : Number(lp.base_points || 0),
@@ -4028,13 +4046,35 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
       }
     : { ...storedLineup, total_points: officialTeamPoints };
   const playerIds = (lineup.fantasy_lineup_players || []).map((item: any) => item.player_id);
-  const { data: storedStats } = playerIds.length
-    ? await account.client
-      .from("player_round_stats")
-      .select("player_id, games, goals, assists, wins, draws, losses, own_goals, goalkeeper_games, goalkeeper_goals, goalkeeper_assists, goalkeeper_own_goals, goalkeeper_wins, goalkeeper_draws, goalkeeper_losses, clean_sheets, goals_conceded, defensive_clean_games, defensive_one_goal_games, team_goals_conceded")
-      .eq("round_id", roundId)
-      .in("player_id", playerIds)
-    : { data: [] };
+  const [{ data: storedStats }, { data: roundPriceHistory }] = playerIds.length
+    ? await Promise.all([
+        account.client
+          .from("player_round_stats")
+          .select("player_id, games, goals, assists, wins, draws, losses, own_goals, goalkeeper_games, goalkeeper_goals, goalkeeper_assists, goalkeeper_own_goals, goalkeeper_wins, goalkeeper_draws, goalkeeper_losses, clean_sheets, goals_conceded, defensive_clean_games, defensive_one_goal_games, team_goals_conceded")
+          .eq("round_id", roundId)
+          .in("player_id", playerIds),
+        lineupReadClient
+          .from("fantasy_player_price_history")
+          .select("player_id, price_before, price_after, price_change")
+          .eq("fantasy_round_id", fantasyRound.id)
+          .in("player_id", playerIds),
+      ])
+    : [{ data: [] }, { data: [] }];
+  const roundPriceByPlayerId = new Map(
+    (roundPriceHistory || []).map((price: any) => [price.player_id, price]),
+  );
+  const lineupWithOfficialPrices = {
+    ...lineup,
+    fantasy_lineup_players: (lineup.fantasy_lineup_players || []).map((item: any) => {
+      const officialPrice: any = roundPriceByPlayerId.get(item.player_id);
+      return {
+        ...item,
+        price_after: officialPrice?.price_after ?? item.price_after,
+        price_change: officialPrice?.price_change
+          ?? (item.price_after == null ? null : Number(item.price_after) - Number(item.price_locked || 0)),
+      };
+    }),
+  };
   const predictionIds = [lineup.top_scorer_player_id, lineup.top_assist_player_id].filter(Boolean) as string[];
   const { data: predictionPlayers } = predictionIds.length
     ? await account.client.from("players").select("id, name, avatar_url").in("id", predictionIds)
@@ -4051,7 +4091,7 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
     : (directActivation as any)?.card;
   return {
     history: history || { player: profile?.players || null },
-    lineup,
+    lineup: lineupWithOfficialPrices,
     round: roundInfo,
     isLive: Boolean(projection && live?.isLive),
     scoringVersion: Number(
