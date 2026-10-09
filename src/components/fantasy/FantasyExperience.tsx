@@ -490,7 +490,17 @@ export function FantasyExperience({
       })
       .sort((a, b) => {
         if (sort === "lastRound") {
+          if (positionFilter === "GOL") {
+            return b.roundGoalkeeperPoints - a.roundGoalkeeperPoints
+              || b.roundGoalkeeperGames - a.roundGoalkeeperGames
+              || a.name.localeCompare(b.name, "pt-BR");
+          }
           return b.roundPoints - a.roundPoints || b.totalPoints - a.totalPoints;
+        }
+        if (positionFilter === "GOL" && sort === "points") {
+          return b.goalkeeperPoints - a.goalkeeperPoints
+            || b.goalkeeperGames - a.goalkeeperGames
+            || a.name.localeCompare(b.name, "pt-BR");
         }
         // Prioridade por posição: jogadores da posição selecionada vêm primeiro
         if (positionFilter !== "ALL") {
@@ -2200,7 +2210,26 @@ export function FantasyExperience({
                   ? remaining + reservePrice - purchasePrice
                   : bought ? remaining + purchasePrice : remaining - purchasePrice;
                 const backgroundImage = cosmeticImage(player.cosmetics?.backgroundAssetKey);
-                const displayedPoints = sort === "lastRound" ? player.roundPoints : player.totalPoints;
+                const goalkeeperView = positionFilter === "GOL";
+                const lastRoundGoalkeeperView = goalkeeperView && sort === "lastRound";
+                const displayedPoints = goalkeeperView
+                  ? lastRoundGoalkeeperView ? player.roundGoalkeeperPoints : player.goalkeeperPoints
+                  : sort === "lastRound" ? player.roundPoints : player.totalPoints;
+                const displayedGoalkeeperGames = lastRoundGoalkeeperView
+                  ? player.roundGoalkeeperGames
+                  : player.goalkeeperGames;
+                const displayedGoalkeeperGoals = lastRoundGoalkeeperView
+                  ? player.roundGoalkeeperGoals
+                  : player.goalkeeperGoals;
+                const displayedGoalkeeperAssists = lastRoundGoalkeeperView
+                  ? player.roundGoalkeeperAssists
+                  : player.goalkeeperAssists;
+                const displayedGoalkeeperConceded = lastRoundGoalkeeperView
+                  ? player.roundGoalkeeperGoalsConceded
+                  : player.goalsConceded;
+                const displayedGoalkeeperCleanSheets = lastRoundGoalkeeperView
+                  ? player.roundGoalkeeperCleanSheets
+                  : player.cleanSheets;
                 const playerRoundTeam = roundTeamByPlayerId.get(player.id) || null;
 
                 return (
@@ -2247,7 +2276,11 @@ export function FantasyExperience({
                             {player.name}
                           </p>
                           {/* Badge de Posição */}
-                          {player.profile === "defensive" ? (
+                          {goalkeeperView ? (
+                            <span className="rounded border border-emerald-400/30 bg-emerald-400/15 px-1.5 py-0.2 text-[8px] font-black uppercase text-emerald-200">
+                              GOL
+                            </span>
+                          ) : player.profile === "defensive" ? (
                             <span className="rounded bg-blue-500/20 px-1.5 py-0.2 text-[8px] font-black uppercase text-blue-300 border border-blue-500/30">
                               {roleReframeActive ? "DEF/VOL" : "DEF"}
                             </span>
@@ -2256,9 +2289,11 @@ export function FantasyExperience({
                               ATA/ALA
                             </span>
                           )}
-                          <span className="text-[8px] font-bold text-muted ml-auto">
-                            {player.formIcon} {player.formLabel}
-                          </span>
+                          {!goalkeeperView && (
+                            <span className="text-[8px] font-bold text-muted ml-auto">
+                              {player.formIcon} {player.formLabel}
+                            </span>
+                          )}
                           {player.price <= recoveryPriceLimit && (
                             <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[7px] font-black uppercase text-accent border border-accent/25">
                               Aposta de recuperação
@@ -2272,7 +2307,7 @@ export function FantasyExperience({
                         </div>
 
                         {/* Tags Compactas */}
-                        {player.compactTags.length > 0 && (
+                        {!goalkeeperView && player.compactTags.length > 0 && (
                           <div className="mt-1 flex flex-wrap gap-1">
                             {player.compactTags.map((t) => (
                               <span
@@ -2286,17 +2321,22 @@ export function FantasyExperience({
                         )}
 
                         <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-lg border border-emerald-400/15 bg-emerald-400/[0.06] px-2 py-1 text-[8px] font-semibold text-emerald-100/85">
-                          <span className="font-black text-emerald-300">🧤 No gol:</span>
-                          {player.goalkeeperGames > 0 ? (
+                          <span className="font-black text-emerald-300">
+                            🧤 {lastRoundGoalkeeperView ? "Última rodada no gol:" : "No gol:"}
+                          </span>
+                          {displayedGoalkeeperGames > 0 ? (
                             <>
-                              <span><strong className="text-foreground">{player.goalkeeperGames}</strong> {player.goalkeeperGames === 1 ? "partida" : "partidas"}</span>
+                              <span><strong className="text-foreground">{displayedGoalkeeperGames}</strong> {displayedGoalkeeperGames === 1 ? "partida" : "partidas"}</span>
                               <span className="text-emerald-200/45">·</span>
-                              <span><strong className="text-foreground">{player.goalsConceded}</strong> {player.goalsConceded === 1 ? "gol tomado" : "gols tomados"}</span>
+                              <span><strong className="text-foreground">{displayedGoalkeeperConceded}</strong> {displayedGoalkeeperConceded === 1 ? "gol tomado" : "gols tomados"}</span>
+                              {displayedGoalkeeperGoals > 0 && <><span className="text-emerald-200/45">·</span><span><strong className="text-foreground">{displayedGoalkeeperGoals}</strong> {displayedGoalkeeperGoals === 1 ? "gol" : "gols"}</span></>}
+                              {displayedGoalkeeperAssists > 0 && <><span className="text-emerald-200/45">·</span><span><strong className="text-foreground">{displayedGoalkeeperAssists}</strong> {displayedGoalkeeperAssists === 1 ? "assistência" : "assistências"}</span></>}
+                              {displayedGoalkeeperCleanSheets > 0 && <><span className="text-emerald-200/45">·</span><span><strong className="text-foreground">{displayedGoalkeeperCleanSheets}</strong> sem sofrer</span></>}
                               <span className="text-emerald-200/45">·</span>
-                              <span>média <strong className="text-accent">{player.goalkeeperConcededAverage?.toFixed(2)}</strong>/jogo</span>
+                              <span>média <strong className="text-accent">{(displayedGoalkeeperConceded / displayedGoalkeeperGames).toFixed(2)}</strong>/jogo</span>
                             </>
                           ) : (
-                            <span className="text-muted">sem partidas no rodízio</span>
+                            <span className="text-muted">{lastRoundGoalkeeperView ? "não atuou no gol nesta rodada" : "sem partidas no rodízio"}</span>
                           )}
                         </div>
 
@@ -2333,9 +2373,9 @@ export function FantasyExperience({
                               </span>
                             )}
                           </span>
-                          {player.roundPoints !== 0 && (
+                          {(goalkeeperView ? player.roundGoalkeeperPoints : player.roundPoints) !== 0 && (
                             <span className="text-muted font-semibold">
-                              · Última: <span className="font-bold text-foreground">{player.roundPoints.toFixed(1)} pts</span>
+                              · Última: <span className="font-bold text-foreground">{(goalkeeperView ? player.roundGoalkeeperPoints : player.roundPoints).toFixed(1)} pts</span>
                             </span>
                           )}
                           {player.popularityPercent > 0 && (
@@ -2363,7 +2403,11 @@ export function FantasyExperience({
                         <p className="text-sm font-black text-foreground">
                           {displayedPoints.toFixed(1)}
                         </p>
-                        <p className="text-[8px] uppercase text-muted">{sort === "lastRound" ? "últ. rodada" : "pontos"}</p>
+                        <p className="text-[8px] uppercase text-muted">
+                          {goalkeeperView
+                            ? sort === "lastRound" ? "últ. rodada no gol" : "pontos no gol"
+                            : sort === "lastRound" ? "últ. rodada" : "pontos"}
+                        </p>
 
                         {open && (
                           <button
