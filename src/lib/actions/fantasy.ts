@@ -1525,9 +1525,7 @@ export async function getFantasyDashboard() {
       })
     : [];
   const latestLineupPlayerTotal = latestLineup
-    ? latestFinishedProjection
-      ? latestFinishedProjection.playerPoints + latestFinishedProjection.captainBonus
-      : latestFinishedPlayerScores.length
+    ? latestFinishedPlayerScores.length
       ? latestFinishedPlayerScores.reduce((total, player) => total + player.points, 0)
       : resolveFantasyLineupPlayerTotal({
           storedPlayers: latestLineup.fantasy_lineup_players || [],
@@ -4017,14 +4015,24 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
     .maybeSingle();
   if (!storedLineup) return null;
 
-  // O histórico usa a mesma reconstrução do campo, da ficha e do ranking.
-  // Correções feitas nos eventos após o fechamento deixam de conviver com um
-  // total antigo salvo na escalação.
+  // O histórico usa a reconstrução para atletas de linha. Em rodada encerrada,
+  // a vaga GOL mantém a apuração consolidada no fechamento, pois ela contém os
+  // scouts do período exato em que o atleta atuou no gol.
   const live = await getLiveRoundProjections(account.client, fantasySeason.id, league.id, roundId);
   const projection = live?.roundId === roundId ? live.byUserId.get(userId) || null : null;
   const livePointsByPlayer = new Map(
     (projection?.players || []).map((item) => [item.playerId, item]),
   );
+  const finishedPlayerScores = projection && !live?.isLive
+    ? resolveFantasyFinishedPlayerScores({
+        projectedPlayers: projection.players,
+        storedPlayers: storedLineup.fantasy_lineup_players,
+      })
+    : [];
+  const finishedPlayerPoints = finishedPlayerScores.reduce(
+    (total, player) => total + player.points,
+    0,
+  ) + Number(projection?.reserve?.pointsGain || 0);
   const officialTeamPoints = resolveFantasyLineupPlayerTotal({
     storedPlayers: storedLineup.fantasy_lineup_players,
     storedPlayerPoints: storedLineup.player_points,
@@ -4033,10 +4041,14 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
   const lineup = projection
     ? {
         ...storedLineup,
-        player_points: projection.playerPoints + projection.captainBonus,
+        player_points: live?.isLive
+          ? projection.playerPoints + projection.captainBonus
+          : finishedPlayerPoints,
         prediction_points: projection.predictionPoints,
         total_points: resolveFantasyBulletinTotal({
-          playerPoints: projection.playerPoints + projection.captainBonus,
+          playerPoints: live?.isLive
+            ? projection.playerPoints + projection.captainBonus
+            : finishedPlayerPoints,
           cardPoints: projection.cardPoints,
         }),
         score_breakdown: {
@@ -4046,17 +4058,22 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
           cardBonus: projection.cardPoints,
           live: true,
         },
-        fantasy_lineup_players: (storedLineup.fantasy_lineup_players || []).map((item: any) => ({
-          ...item,
-          // Persisted base_points inclui o bônus da vaga desde a migration 073.
-          // Manter a mesma semântica na projeção evita que histórico e cartões
-          // subtraiam o bônus duas vezes.
-          base_points: (livePointsByPlayer.get(item.player_id)?.basePoints || 0)
-            + (livePointsByPlayer.get(item.player_id)?.positionBonus || 0),
-          position_bonus: livePointsByPlayer.get(item.player_id)?.positionBonus || 0,
-          captain_bonus: livePointsByPlayer.get(item.player_id)?.captainBonus || 0,
-          total_points: livePointsByPlayer.get(item.player_id)?.totalPoints || 0,
-        })),
+        fantasy_lineup_players: (storedLineup.fantasy_lineup_players || []).map((item: any) => {
+          const projectedPlayer = livePointsByPlayer.get(item.player_id);
+          const useProjection = Boolean(projectedPlayer && (live?.isLive || item.slot_role !== "GOL"));
+          if (!useProjection) return item;
+          return {
+            ...item,
+            // Persisted base_points inclui o bônus da vaga desde a migration 073.
+            // Manter a mesma semântica na projeção evita que histórico e cartões
+            // subtraiam o bônus duas vezes.
+            base_points: Number(projectedPlayer?.basePoints || 0)
+              + Number(projectedPlayer?.positionBonus || 0),
+            position_bonus: Number(projectedPlayer?.positionBonus || 0),
+            captain_bonus: Number(projectedPlayer?.captainBonus || 0),
+            total_points: Number(projectedPlayer?.totalPoints || 0),
+          };
+        }),
       }
     : {
         ...storedLineup,

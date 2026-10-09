@@ -37,7 +37,7 @@ describe("total dos jogadores escalados", () => {
     expect(total.toFixed(1)).toBe("220.3");
   });
 
-  it("usa a reconstrução oficial também para o goleiro na rodada finalizada", () => {
+  it("usa a apuração oficial persistida do goleiro na rodada finalizada", () => {
     const scores = resolveFantasyFinishedPlayerScores({
       projectedPlayers: [
         { playerId: "ala", totalPoints: 74.25 },
@@ -51,9 +51,9 @@ describe("total dos jogadores escalados", () => {
 
     expect(scores).toEqual([
       { playerId: "ala", points: 74.25 },
-      { playerId: "goleiro", points: 0 },
+      { playerId: "goleiro", points: 16.5 },
     ]);
-    expect(scores.reduce((total, player) => total + player.points, 0)).toBe(74.25);
+    expect(scores.reduce((total, player) => total + player.points, 0)).toBe(90.75);
   });
 
   it("corrige o total do ranking finalizado sem trocar os pontos dos jogadores de linha", () => {
@@ -76,7 +76,7 @@ describe("total dos jogadores escalados", () => {
       ],
     });
 
-    expect(scores.reduce((total, player) => total + player.points, 0)).toBe(200.75);
+    expect(scores.reduce((total, player) => total + player.points, 0)).toBe(217.25);
   });
 
   it("mantém o valor persistido somente quando um atleta não veio na reconstrução", () => {
