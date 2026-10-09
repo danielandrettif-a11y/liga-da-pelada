@@ -95,6 +95,7 @@ function preloadInventoryModal() {
 
 const MOBILE_DRAG_HOLD_MS = 320;
 const MOBILE_DRAG_CANCEL_DISTANCE_PX = 12;
+const RESERVE_DRAG_SLOT = -1;
 const FANTASY_TABS = ["team", "market"] as const;
 
 export function FantasyExperience({
@@ -442,6 +443,9 @@ export function FantasyExperience({
   } | null>(null);
   const activeTouchDragRef = useRef<number | null>(null);
   const suppressPlayerClickUntilRef = useRef(0);
+  const draggedPreviewPlayer = draggedSlot === RESERVE_DRAG_SLOT
+    ? reservePlayer
+    : draggedSlot !== null ? selectedPlayers[draggedSlot] || null : null;
 
   // React registra touchmove como passivo em alguns navegadores. Depois que a
   // pressão longa arma o arrasto, este listener nativo impede a página de rolar
@@ -961,6 +965,74 @@ export function FantasyExperience({
 
   function swapSlots(sourceIndex: number, targetIndex: number) {
     if (sourceIndex === targetIndex || isNaN(sourceIndex) || isNaN(targetIndex) || !open) return;
+
+    if (sourceIndex === RESERVE_DRAG_SLOT && targetIndex >= 0) {
+      if (!reservePlayer || !reserveRole) return;
+      const targetRole = currentSlotRoles[targetIndex];
+      if (targetRole === "GOL" || targetRole !== reserveRole) {
+        setMessage(`O reserva ${reserveRole === "DEF" ? "DEF/VOL" : "ATA/ALA"} só pode entrar em uma vaga da mesma posição.`);
+        return;
+      }
+      const replacedPlayer = selectedPlayers[targetIndex];
+      setSelected((current) => {
+        const next = [...current];
+        next[targetIndex] = reservePlayer.id;
+        return next;
+      });
+      if (replacedPlayer && captainId === replacedPlayer.id) {
+        setCaptainId(reservePlayer.id);
+      }
+      setReservePlayerId(null);
+      setReserveRole(null);
+      setMessage(
+        replacedPlayer
+          ? `${reservePlayer.name} foi promovido ao campo e herdou a vaga de ${replacedPlayer.name}, que voltou ao mercado.`
+          : `${reservePlayer.name} foi promovido do banco para o campo.`,
+      );
+      return;
+    }
+
+    if (targetIndex === RESERVE_DRAG_SLOT && sourceIndex >= 0) {
+      const player = selectedPlayers[sourceIndex];
+      const sourceRole = currentSlotRoles[sourceIndex];
+      if (!player) return;
+      if (sourceRole !== "ATA" && sourceRole !== "DEF") {
+        setMessage("A vaga de goleiro não pode ser movida para o banco de reserva.");
+        return;
+      }
+      const nextSelected = [...selected];
+      nextSelected[sourceIndex] = "";
+      const nextStarterPrices = nextSelected.flatMap((playerId, slotIndex) => {
+        const starter = playerId ? market.find((item) => item.id === playerId) : null;
+        return starter
+          ? [{ slotRole: currentSlotRoles[slotIndex] || "ATA", price: playerPurchasePrice(starter) }]
+          : [];
+      });
+      const nextPriceLimit = getFantasyReservePriceLimit(sourceRole, nextStarterPrices);
+      if (nextPriceLimit === null) {
+        setMessage(`Mantenha ao menos um titular ${sourceRole === "DEF" ? "DEF/VOL" : "ATA/ALA"} antes de mover alguém para o banco.`);
+        return;
+      }
+      if (player.price > nextPriceLimit + 0.001) {
+        setMessage(
+          `${player.name} não pode ir para o banco: o preço cheio máximo desta posição é ${formatFantasyMoney(nextPriceLimit, settings.currencyName)}.`,
+        );
+        return;
+      }
+      const previousReserveName = reservePlayer?.name || null;
+      setSelected(nextSelected);
+      setReservePlayerId(player.id);
+      setReserveRole(sourceRole);
+      if (captainId === player.id) setCaptainId(null);
+      setMessage(
+        previousReserveName
+          ? `${player.name} foi para o banco, ${previousReserveName} voltou ao mercado e a vaga no campo ficou livre.`
+          : `${player.name} foi para o banco e a vaga no campo ficou livre.`,
+      );
+      return;
+    }
+
+    if (sourceIndex < 0 || targetIndex < 0) return;
     setSelected((prev) => {
       const next = [...prev];
       while (next.length <= Math.max(sourceIndex, targetIndex)) {
@@ -1830,7 +1902,108 @@ export function FantasyExperience({
               )}
             </div>
 
-            <section className="rounded-2xl border border-amber-300/30 bg-[linear-gradient(145deg,rgba(35,28,5,.92),rgba(5,25,14,.96))] p-3 shadow-[0_10px_30px_rgba(0,0,0,.2)]">
+            <section
+              data-slot-index={RESERVE_DRAG_SLOT}
+              draggable={open && Boolean(reservePlayer)}
+              onDragStart={(event) => {
+                const target = event.target as HTMLElement;
+                if (target.closest("[data-no-drag]")) {
+                  event.preventDefault();
+                  return;
+                }
+                if (!open || !reservePlayer) return;
+                event.dataTransfer.setData("text/plain", String(RESERVE_DRAG_SLOT));
+                event.dataTransfer.effectAllowed = "move";
+                setDraggedSlot(RESERVE_DRAG_SLOT);
+              }}
+              onDragOver={(event) => {
+                if (!open) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                setDragOverSlot(RESERVE_DRAG_SLOT);
+              }}
+              onDragLeave={(event) => {
+                if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+                if (dragOverSlot === RESERVE_DRAG_SLOT) setDragOverSlot(null);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                const source = Number(event.dataTransfer.getData("text/plain"));
+                if (!isNaN(source)) swapSlots(source, RESERVE_DRAG_SLOT);
+                setDraggedSlot(null);
+                setDragOverSlot(null);
+              }}
+              onDragEnd={() => {
+                setDraggedSlot(null);
+                setDragOverSlot(null);
+              }}
+              onTouchStart={(event) => {
+                const target = event.target as HTMLElement;
+                if (target.closest("[data-no-drag]")) return;
+                if (!open || !reservePlayer) return;
+                const touch = event.touches[0];
+                clearPendingTouchDrag();
+                touchHoldRef.current = {
+                  slot: RESERVE_DRAG_SLOT,
+                  startX: touch.clientX,
+                  startY: touch.clientY,
+                  timerId: window.setTimeout(() => {
+                    const pending = touchHoldRef.current;
+                    if (!pending || pending.slot !== RESERVE_DRAG_SLOT) return;
+                    touchHoldRef.current = null;
+                    activeTouchDragRef.current = RESERVE_DRAG_SLOT;
+                    suppressPlayerClickUntilRef.current = Date.now() + 900;
+                    setDraggedSlot(RESERVE_DRAG_SLOT);
+                    setDragOverSlot(RESERVE_DRAG_SLOT);
+                    setTouchDragPosition({ x: pending.startX, y: pending.startY });
+                    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(25);
+                  }, MOBILE_DRAG_HOLD_MS),
+                };
+              }}
+              onTouchMove={(event) => {
+                const touch = event.touches[0];
+                const pending = touchHoldRef.current;
+                if (activeTouchDragRef.current === null) {
+                  if (pending) {
+                    const distance = Math.hypot(touch.clientX - pending.startX, touch.clientY - pending.startY);
+                    if (distance > MOBILE_DRAG_CANCEL_DISTANCE_PX) clearPendingTouchDrag();
+                  }
+                  return;
+                }
+                setTouchDragPosition({ x: touch.clientX, y: touch.clientY });
+                const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                const slotElement = element?.closest("[data-slot-index]");
+                if (slotElement) {
+                  const overIndex = Number(slotElement.getAttribute("data-slot-index"));
+                  if (!isNaN(overIndex) && dragOverSlot !== overIndex) {
+                    setDragOverSlot(overIndex);
+                    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(10);
+                  }
+                }
+              }}
+              onTouchEnd={(event) => {
+                const sourceSlot = activeTouchDragRef.current;
+                clearPendingTouchDrag();
+                const touch = event.changedTouches[0];
+                const element = touch ? document.elementFromPoint(touch.clientX, touch.clientY) : null;
+                const slotElement = element?.closest("[data-slot-index]");
+                const targetSlotIndex = Number(slotElement?.getAttribute("data-slot-index"));
+                if (sourceSlot !== null && !isNaN(targetSlotIndex) && sourceSlot !== targetSlotIndex) {
+                  swapSlots(sourceSlot, targetSlotIndex);
+                  if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([20, 30, 20]);
+                }
+                finishTouchDrag();
+              }}
+              onTouchCancel={finishTouchDrag}
+              style={{ touchAction: open && reservePlayer ? "pan-y" : "auto" }}
+              className={`rounded-2xl border bg-[linear-gradient(145deg,rgba(35,28,5,.92),rgba(5,25,14,.96))] p-3 shadow-[0_10px_30px_rgba(0,0,0,.2)] transition-all duration-200 ${
+                draggedSlot === RESERVE_DRAG_SLOT
+                  ? "scale-[.99] border-amber-300/40 opacity-55"
+                  : dragOverSlot === RESERVE_DRAG_SLOT
+                    ? "scale-[1.01] border-accent shadow-[0_0_30px_rgba(204,255,0,.28)]"
+                    : "border-amber-300/30"
+              }`}
+            >
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-200">
@@ -1846,17 +2019,143 @@ export function FantasyExperience({
               </div>
 
               {reservePlayer ? (
-                <div className="mt-3 flex items-center gap-3 rounded-xl border border-amber-200/25 bg-black/25 p-2.5">
-                  <PlayerAvatar
-                    name={reservePlayer.name}
-                    playerId={reservePlayer.id}
-                    avatarUrl={reservePlayer.avatarUrl}
-                    frameKey={reservePlayer.cosmetics?.frameKey}
-                    auraKey={reservePlayer.cosmetics?.auraKey}
-                    className="h-11 w-11 rounded-full border border-amber-300/50 bg-background text-xs font-black text-amber-200"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-black text-white">{reservePlayer.name}</p>
+                <div
+                  data-slot-index={RESERVE_DRAG_SLOT}
+                  draggable={open}
+                  onDragStart={(event) => {
+                    event.stopPropagation();
+                    if (!open) return;
+                    event.dataTransfer.setData("text/plain", String(RESERVE_DRAG_SLOT));
+                    event.dataTransfer.effectAllowed = "move";
+                    setDraggedSlot(RESERVE_DRAG_SLOT);
+                  }}
+                  onDragOver={(event) => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    setDragOverSlot(RESERVE_DRAG_SLOT);
+                  }}
+                  onDragLeave={(event) => {
+                    event.stopPropagation();
+                    if (dragOverSlot === RESERVE_DRAG_SLOT) setDragOverSlot(null);
+                  }}
+                  onDrop={(event) => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    const source = Number(event.dataTransfer.getData("text/plain"));
+                    if (!isNaN(source)) swapSlots(source, RESERVE_DRAG_SLOT);
+                    setDraggedSlot(null);
+                    setDragOverSlot(null);
+                  }}
+                  onDragEnd={(event) => {
+                    event.stopPropagation();
+                    setDraggedSlot(null);
+                    setDragOverSlot(null);
+                  }}
+                  onTouchStart={(event) => {
+                    event.stopPropagation();
+                    const target = event.target as HTMLElement;
+                    if (target.closest("[data-no-drag]")) return;
+                    if (!open) return;
+                    const touch = event.touches[0];
+                    clearPendingTouchDrag();
+                    touchHoldRef.current = {
+                      slot: RESERVE_DRAG_SLOT,
+                      startX: touch.clientX,
+                      startY: touch.clientY,
+                      timerId: window.setTimeout(() => {
+                        const pending = touchHoldRef.current;
+                        if (!pending || pending.slot !== RESERVE_DRAG_SLOT) return;
+                        touchHoldRef.current = null;
+                        activeTouchDragRef.current = RESERVE_DRAG_SLOT;
+                        suppressPlayerClickUntilRef.current = Date.now() + 900;
+                        setDraggedSlot(RESERVE_DRAG_SLOT);
+                        setDragOverSlot(RESERVE_DRAG_SLOT);
+                        setTouchDragPosition({ x: pending.startX, y: pending.startY });
+                        if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(25);
+                      }, MOBILE_DRAG_HOLD_MS),
+                    };
+                  }}
+                  onTouchMove={(event) => {
+                    event.stopPropagation();
+                    const touch = event.touches[0];
+                    const pending = touchHoldRef.current;
+                    if (activeTouchDragRef.current === null) {
+                      if (pending) {
+                        const distance = Math.hypot(touch.clientX - pending.startX, touch.clientY - pending.startY);
+                        if (distance > MOBILE_DRAG_CANCEL_DISTANCE_PX) clearPendingTouchDrag();
+                      }
+                      return;
+                    }
+                    setTouchDragPosition({ x: touch.clientX, y: touch.clientY });
+                    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                    const slotElement = element?.closest("[data-slot-index]");
+                    if (slotElement) {
+                      const overIndex = Number(slotElement.getAttribute("data-slot-index"));
+                      if (!isNaN(overIndex) && dragOverSlot !== overIndex) {
+                        setDragOverSlot(overIndex);
+                        if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(10);
+                      }
+                    }
+                  }}
+                  onTouchEnd={(event) => {
+                    event.stopPropagation();
+                    const sourceSlot = activeTouchDragRef.current;
+                    clearPendingTouchDrag();
+                    const touch = event.changedTouches[0];
+                    const element = touch ? document.elementFromPoint(touch.clientX, touch.clientY) : null;
+                    const slotElement = element?.closest("[data-slot-index]");
+                    const targetSlotIndex = Number(slotElement?.getAttribute("data-slot-index"));
+                    if (sourceSlot !== null && !isNaN(targetSlotIndex) && sourceSlot !== targetSlotIndex) {
+                      swapSlots(sourceSlot, targetSlotIndex);
+                      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([20, 30, 20]);
+                    }
+                    finishTouchDrag();
+                  }}
+                  onTouchCancel={(event) => {
+                    event.stopPropagation();
+                    finishTouchDrag();
+                  }}
+                  style={{ touchAction: open ? "pan-y" : "auto" }}
+                  className={`relative mt-3 overflow-hidden rounded-2xl border bg-[linear-gradient(145deg,rgba(53,38,5,.72),rgba(2,17,9,.92))] p-3 transition-all duration-200 select-none ${
+                    open ? "cursor-grab active:cursor-grabbing" : ""
+                  } ${
+                    draggedSlot === RESERVE_DRAG_SLOT
+                      ? "scale-[.98] border-amber-300/40 opacity-40"
+                      : dragOverSlot === RESERVE_DRAG_SLOT
+                        ? "scale-[1.02] border-accent bg-accent/15 shadow-[0_0_28px_rgba(204,255,0,.35)]"
+                        : "border-amber-200/25"
+                  }`}
+                >
+                  <div aria-hidden="true" className="absolute inset-x-5 bottom-2 h-2 rounded-full border border-amber-200/20 bg-amber-950/80 shadow-[0_4px_8px_rgba(0,0,0,.5)]" />
+                  <div className="relative flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        if (Date.now() < suppressPlayerClickUntilRef.current) {
+                          event.preventDefault();
+                          return;
+                        }
+                        setSelectedDrawerPlayer(reservePlayer);
+                      }}
+                      className="flex w-24 shrink-0 flex-col items-center"
+                    >
+                      <PlayerAvatar
+                        name={reservePlayer.name}
+                        playerId={reservePlayer.id}
+                        avatarUrl={reservePlayer.avatarUrl}
+                        frameKey={reservePlayer.cosmetics?.frameKey}
+                        auraKey={reservePlayer.cosmetics?.auraKey}
+                        className="h-14 w-14 rounded-full border-2 border-amber-300 bg-background text-sm font-black text-amber-100 ring-2 ring-amber-300/40 shadow-[0_0_14px_rgba(251,191,36,.32)]"
+                      />
+                      <span className="mt-1 max-w-24 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
+                        {reservePlayer.name}
+                      </span>
+                      <span className="mt-0.5 text-[8px] font-black uppercase tracking-wider text-amber-200">
+                        Banco {reserveRole === "DEF" ? "DEF" : "ATA"}
+                      </span>
+                    </button>
+                    <div className="min-w-0 flex-1">
                     <p className="mt-0.5 text-[9px] font-bold text-amber-200">
                       Reserva {reserveRole === "DEF" ? "DEF/VOL" : "ATA/ALA"} · {formatFantasyMoney(reservePrice, settings.currencyName)} pagos
                     </p>
@@ -1875,9 +2174,9 @@ export function FantasyExperience({
                       )}
                       </>
                     )}
-                  </div>
-                  {open && (
-                    <div className="flex flex-col gap-1.5">
+                    </div>
+                    {open && (
+                    <div data-no-drag="true" className="flex flex-col gap-1.5">
                       <button
                         type="button"
                         onClick={() => openReserveMarket(reserveRole || "ATA")}
@@ -1896,6 +2195,12 @@ export function FantasyExperience({
                         Remover
                       </button>
                     </div>
+                    )}
+                  </div>
+                  {open && (
+                    <p className="relative mt-2 text-center text-[8px] font-bold text-amber-100/60">
+                      Segure e arraste para o campo · ou arraste um titular para cá
+                    </p>
                   )}
                 </div>
               ) : open && !isTest ? (
@@ -2606,7 +2911,7 @@ export function FantasyExperience({
       {/* PREVIEW FLUTUANTE DE ARRASTAR NO CELULAR */}
       {touchDragPosition &&
         draggedSlot !== null &&
-        selectedPlayers[draggedSlot] &&
+        draggedPreviewPlayer &&
         mounted &&
         typeof document !== "undefined" &&
         createPortal(
@@ -2615,13 +2920,21 @@ export function FantasyExperience({
             style={{ left: touchDragPosition.x, top: touchDragPosition.y }}
           >
             <PlayerAvatar
-              name={selectedPlayers[draggedSlot]!.name}
-              avatarUrl={selectedPlayers[draggedSlot]!.avatarUrl}
+              name={draggedPreviewPlayer.name}
+              avatarUrl={draggedPreviewPlayer.avatarUrl}
               clickable={false}
-              className="h-16 w-16 rounded-full border-4 border-accent ring-4 ring-accent/40 shadow-2xl bg-background"
+              className={`h-16 w-16 rounded-full border-4 ring-4 shadow-2xl bg-background ${
+                draggedSlot === RESERVE_DRAG_SLOT
+                  ? "border-amber-300 ring-amber-300/40"
+                  : "border-accent ring-accent/40"
+              }`}
             />
-            <span className="mt-1 max-w-32 truncate rounded-lg bg-black/95 px-2.5 py-0.5 text-center text-[10px] font-black text-accent border border-accent/40 shadow-lg">
-              {selectedPlayers[draggedSlot]!.name}
+            <span className={`mt-1 max-w-32 truncate rounded-lg bg-black/95 px-2.5 py-0.5 text-center text-[10px] font-black shadow-lg ${
+              draggedSlot === RESERVE_DRAG_SLOT
+                ? "border border-amber-300/40 text-amber-200"
+                : "border border-accent/40 text-accent"
+            }`}>
+              {draggedPreviewPlayer.name}
             </span>
           </div>,
           document.body
