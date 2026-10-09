@@ -2127,8 +2127,12 @@ export function FantasyExperience({
                         : "border-amber-200/25"
                   }`}
                 >
-                  <div aria-hidden="true" className="absolute inset-x-5 bottom-2 h-2 rounded-full border border-amber-200/20 bg-amber-950/80 shadow-[0_4px_8px_rgba(0,0,0,.5)]" />
-                  <div className="relative flex items-center gap-3">
+                  <div className="relative mx-auto w-full max-w-xl" style={{ aspectRatio: "1712 / 872" }}>
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-0 bg-contain bg-center bg-no-repeat drop-shadow-[0_10px_18px_rgba(0,0,0,.5)]"
+                      style={{ backgroundImage: "url('/images/cartola/banco-reserva-premium-v1.png')" }}
+                    />
                     <button
                       type="button"
                       onClick={(event) => {
@@ -2138,7 +2142,7 @@ export function FantasyExperience({
                         }
                         setSelectedDrawerPlayer(reservePlayer);
                       }}
-                      className="flex w-24 shrink-0 flex-col items-center"
+                      className="absolute left-1/2 top-[38%] flex w-[16%] -translate-x-1/2 -translate-y-1/2 flex-col items-center"
                     >
                       <PlayerAvatar
                         name={reservePlayer.name}
@@ -2146,15 +2150,17 @@ export function FantasyExperience({
                         avatarUrl={reservePlayer.avatarUrl}
                         frameKey={reservePlayer.cosmetics?.frameKey}
                         auraKey={reservePlayer.cosmetics?.auraKey}
-                        className="h-14 w-14 rounded-full border-2 border-amber-300 bg-background text-sm font-black text-amber-100 ring-2 ring-amber-300/40 shadow-[0_0_14px_rgba(251,191,36,.32)]"
+                        className="aspect-square h-auto w-full rounded-full border-2 border-amber-300 bg-background text-sm font-black text-amber-100 ring-2 ring-black/70 shadow-[0_0_18px_rgba(251,191,36,.5)]"
                       />
-                      <span className="mt-1 max-w-24 truncate rounded-lg bg-black/85 px-2 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm">
+                      <span className="mt-1 w-max max-w-32 truncate rounded-lg border border-amber-200/20 bg-black/90 px-2.5 py-0.5 text-center text-[10px] font-black leading-tight text-white shadow-sm sm:text-xs">
                         {reservePlayer.name}
                       </span>
-                      <span className="mt-0.5 text-[8px] font-black uppercase tracking-wider text-amber-200">
+                      <span className="mt-0.5 rounded-full bg-amber-950/90 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-200">
                         Banco {reserveRole === "DEF" ? "DEF" : "ATA"}
                       </span>
                     </button>
+                  </div>
+                  <div className="relative mt-1 flex items-start gap-3 rounded-xl border border-amber-200/15 bg-black/30 p-2.5">
                     <div className="min-w-0 flex-1">
                     <p className="mt-0.5 text-[9px] font-bold text-amber-200">
                       Reserva {reserveRole === "DEF" ? "DEF/VOL" : "ATA/ALA"} · {formatFantasyMoney(reservePrice, settings.currencyName)} pagos
@@ -2209,13 +2215,19 @@ export function FantasyExperience({
                     ? "border-accent bg-accent/15 shadow-[0_0_24px_rgba(204,255,0,.25)]"
                     : "border-amber-300/30 bg-black/25"
                 }`}>
-                  <div aria-hidden="true" className="absolute inset-x-8 bottom-2 h-2 rounded-full border border-amber-200/20 bg-amber-950/80 shadow-[0_4px_8px_rgba(0,0,0,.5)]" />
-                  <div className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-amber-300/45 bg-amber-300/[.07] text-xl text-amber-200/70 ring-2 ring-amber-300/10">
-                    {open && !isTest ? "+" : <Lock className="h-5 w-5" />}
+                  <div className="relative mx-auto w-full max-w-xl" style={{ aspectRatio: "1712 / 872" }}>
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-0 bg-contain bg-center bg-no-repeat opacity-90 drop-shadow-[0_10px_18px_rgba(0,0,0,.5)]"
+                      style={{ backgroundImage: "url('/images/cartola/banco-reserva-premium-v1.png')" }}
+                    />
+                    <div className="absolute left-1/2 top-[38%] flex aspect-square w-[14%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/65 text-2xl font-black text-amber-200/80 shadow-[0_0_18px_rgba(251,191,36,.22)]">
+                      {open && !isTest ? "+" : <Lock className="h-5 w-5" />}
+                    </div>
+                    <span className="absolute left-1/2 top-[60%] -translate-x-1/2 whitespace-nowrap rounded-lg border border-amber-200/15 bg-black/90 px-2.5 py-0.5 text-[10px] font-black text-white/75 shadow-sm">
+                      Vaga do reserva
+                    </span>
                   </div>
-                  <span className="relative mt-1 inline-block rounded-lg bg-black/80 px-2 py-0.5 text-[10px] font-black text-white/70">
-                    Vaga do reserva
-                  </span>
                   {open && !isTest ? (
                     <>
                       <p className="relative mt-1 text-[8px] font-bold text-amber-100/55">
