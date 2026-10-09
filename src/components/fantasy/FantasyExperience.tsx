@@ -44,6 +44,7 @@ import { supabase } from "@/lib/supabase";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { getFantasySlotRoles, isCorrectFantasySlot, type FantasyFormation } from "@/lib/fantasy/lineup-positions";
 import { resolveFantasyPitchPoints } from "@/lib/fantasy/pitch-points";
+import { getFantasyReservePriceLimit } from "@/lib/fantasy/reserve";
 import { applyFantasyDiscount } from "@/lib/fantasy/cards/eligibility";
 import { useUrlState } from "@/lib/useUrlState";
 import { FantasyPackClaimBanner } from "./cards/FantasyPackClaimBanner";
@@ -380,8 +381,25 @@ export function FantasyExperience({
   );
 
   const validSelectedPlayers = selectedPlayers.filter(Boolean) as FantasyMarketPlayer[];
+  const currentSlotRoles = getFantasySlotRoles(playersPerTeam, formation);
+  const starterPricesForReserve = selectedPlayers.flatMap((player, slotIndex) =>
+    player
+      ? [{
+          slotRole: currentSlotRoles[slotIndex] || "ATA",
+          price: playerPurchasePrice(player),
+        }]
+      : [],
+  );
+  const attackReservePriceLimit = getFantasyReservePriceLimit("ATA", starterPricesForReserve);
+  const defenseReservePriceLimit = getFantasyReservePriceLimit("DEF", starterPricesForReserve);
+  const activeReservePriceLimit = reserveTargetRole === "ATA"
+    ? attackReservePriceLimit
+    : reserveTargetRole === "DEF"
+      ? defenseReservePriceLimit
+      : null;
   const reservePlayer = reservePlayerId ? market.find((player) => player.id === reservePlayerId) || null : null;
   const reservePrice = reservePlayer ? Math.round(reservePlayer.price * 50) / 100 : 0;
+  const selectedReservePriceLimit = reserveRole === "ATA" ? attackReservePriceLimit : defenseReservePriceLimit;
   const validSelectedCount = validSelectedPlayers.length;
   const livePlayerProjectionById = useMemo(
     () => new Map(
@@ -451,6 +469,10 @@ export function FantasyExperience({
         if (reserveTargetRole && selected.includes(player.id)) return false;
         if (reserveTargetRole && reservePlayerId === player.id) return false;
         if (!reserveTargetRole && reservePlayerId === player.id) return false;
+        if (
+          reserveTargetRole
+          && (activeReservePriceLimit === null || player.price > activeReservePriceLimit + 0.001)
+        ) return false;
 
         // Ao comprar pelo campo, o mercado respeita a vaga escolhida. A vaga
         // GOL é a única aberta a todos porque o goleiro é definido pelo
@@ -529,7 +551,7 @@ export function FantasyExperience({
         if (sort === "popularity") return b.popularityPercent - a.popularityPercent;
         return b.totalPoints - a.totalPoints;
       });
-  }, [market, query, sort, filterTag, positionFilter, calledUpOnly, targetSlot, playersPerTeam, formation, reserveTargetRole, selected, reservePlayerId]);
+  }, [market, query, sort, filterTag, positionFilter, calledUpOnly, targetSlot, playersPerTeam, formation, reserveTargetRole, selected, reservePlayerId, activeReservePriceLimit]);
 
   const scheduledAt =
     round?.date && round.start_time ? new Date(`${round.date}T${round.start_time}`).getTime() : null;
@@ -750,6 +772,21 @@ export function FantasyExperience({
     setMessage("Elenco limpo. Salve para confirmar a venda de todos.");
   }
 
+  function openReserveMarket(role: "ATA" | "DEF") {
+    const priceLimit = role === "ATA" ? attackReservePriceLimit : defenseReservePriceLimit;
+    if (priceLimit === null) {
+      setMessage(`Escolha primeiro pelo menos um titular de ${role === "DEF" ? "DEF/VOL" : "ATA/ALA"}.`);
+      return;
+    }
+    setReserveTargetRole(role);
+    setTargetSlot(null);
+    setPositionFilter(role);
+    setFilterTag("ALL");
+    if (hasCurrentCallup) setCalledUpOnly(true);
+    setActiveTab("market");
+    setMessage(`Reservas disponíveis até ${formatFantasyMoney(priceLimit, settings.currencyName)} no preço cheio.`);
+  }
+
   async function togglePlayer(player: FantasyMarketPlayer) {
     if (bargainPurchasePending) return;
     if (!open) {
@@ -762,6 +799,13 @@ export function FantasyExperience({
       }
       if (!isCorrectFantasySlot(reserveTargetRole, player.profile)) {
         return setMessage(`Escolha um jogador de ${reserveTargetRole === "DEF" ? "DEF/VOL" : "ATA/ALA"} para o banco.`);
+      }
+      if (activeReservePriceLimit === null || player.price > activeReservePriceLimit + 0.001) {
+        return setMessage(
+          activeReservePriceLimit === null
+            ? "Escolha primeiro um titular desta posição."
+            : `O preço cheio do reserva deve ser de até ${formatFantasyMoney(activeReservePriceLimit, settings.currencyName)}.`,
+        );
       }
       const halfPrice = Math.round(player.price * 50) / 100;
       if (halfPrice > remaining + reservePrice) return setMessage("Patrimônio insuficiente para comprar este reserva.");
@@ -855,6 +899,17 @@ export function FantasyExperience({
         ? [{ playerId, slotIndex, slotRole: slotRoles[slotIndex] || "ATA" }]
         : [],
     );
+    if (
+      reservePlayer
+      && (selectedReservePriceLimit === null || reservePlayer.price > selectedReservePriceLimit + 0.001)
+    ) {
+      setMessage(
+        selectedReservePriceLimit === null
+          ? "Escolha titulares da mesma posição antes de salvar o reserva."
+          : `Troque o reserva: o preço cheio máximo desta posição é ${formatFantasyMoney(selectedReservePriceLimit, settings.currencyName)}.`,
+      );
+      return;
+    }
     startTransition(async () => {
       try {
         const result = await saveFantasyLineup({
@@ -1770,7 +1825,7 @@ export function FantasyExperience({
                     <Users className="h-4 w-4" /> Banco de reserva
                   </p>
                   <p className="mt-1 text-[9px] leading-relaxed text-white/55">
-                    Custa 50% e substitui automaticamente a pior nota zerada ou negativa da mesma posição, somente se pontuar mais.
+                    Custa 50%, mas seu preço cheio deve ser ao menos {formatFantasyMoney(0.1, settings.currencyName)} menor que o titular mais barato da posição. Substitui a pior pontuação base zerada ou negativa somente se pontuar mais.
                   </p>
                 </div>
                 <span className="shrink-0 rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-1 text-[8px] font-black uppercase text-amber-200">
@@ -1791,7 +1846,10 @@ export function FantasyExperience({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-black text-white">{reservePlayer.name}</p>
                     <p className="mt-0.5 text-[9px] font-bold text-amber-200">
-                      Reserva {reserveRole === "DEF" ? "DEF/VOL" : "ATA/ALA"} · {formatFantasyMoney(reservePrice, settings.currencyName)}
+                      Reserva {reserveRole === "DEF" ? "DEF/VOL" : "ATA/ALA"} · {formatFantasyMoney(reservePrice, settings.currencyName)} pagos
+                    </p>
+                    <p className="mt-0.5 text-[8px] font-semibold text-white/45">
+                      Preço cheio {formatFantasyMoney(reservePlayer.price, settings.currencyName)} · teto {selectedReservePriceLimit === null ? "indisponível" : formatFantasyMoney(selectedReservePriceLimit, settings.currencyName)}
                     </p>
                     {liveProjection?.currentUser?.reserve && (
                       <>
@@ -1810,14 +1868,7 @@ export function FantasyExperience({
                     <div className="flex flex-col gap-1.5">
                       <button
                         type="button"
-                        onClick={() => {
-                          setReserveTargetRole(reserveRole || "ATA");
-                          setTargetSlot(null);
-                          setPositionFilter(reserveRole || "ATA");
-                          setFilterTag("ALL");
-                          if (hasCurrentCallup) setCalledUpOnly(true);
-                          setActiveTab("market");
-                        }}
+                        onClick={() => openReserveMarket(reserveRole || "ATA")}
                         className="rounded-lg border border-amber-300/30 px-2 py-1 text-[8px] font-black uppercase text-amber-200"
                       >
                         Trocar
@@ -1841,14 +1892,7 @@ export function FantasyExperience({
                     <button
                       key={role}
                       type="button"
-                      onClick={() => {
-                        setReserveTargetRole(role);
-                        setTargetSlot(null);
-                        setPositionFilter(role);
-                        setFilterTag("ALL");
-                        if (hasCurrentCallup) setCalledUpOnly(true);
-                        setActiveTab("market");
-                      }}
+                      onClick={() => openReserveMarket(role)}
                       className="rounded-xl border border-dashed border-amber-300/35 bg-amber-300/[.06] px-3 py-2.5 text-[9px] font-black uppercase text-amber-100 transition hover:border-amber-200 hover:bg-amber-300/10"
                     >
                       + Reserva {role === "DEF" ? "DEF/VOL" : "ATA/ALA"}
@@ -1989,6 +2033,12 @@ export function FantasyExperience({
                 </select>
               </div>
             </div>
+
+            {reserveTargetRole && activeReservePriceLimit !== null && (
+              <div className="rounded-xl border border-amber-300/35 bg-amber-300/[.08] px-3 py-2 text-[10px] font-bold leading-relaxed text-amber-100">
+                Escolhendo reserva {reserveTargetRole === "DEF" ? "DEF/VOL" : "ATA/ALA"}: somente atletas com preço cheio de até <strong>{formatFantasyMoney(activeReservePriceLimit, settings.currencyName)}</strong>. Na compra, você paga 50%.
+              </div>
+            )}
 
             {/* Chips de Filtros de Posição */}
             <div className="no-scrollbar -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5 text-[9px] font-black uppercase tracking-wider">
@@ -2325,6 +2375,16 @@ export function FantasyExperience({
                   </div>
                 );
               })}
+              {filtered.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-white/15 bg-surface/40 p-5 text-center">
+                  <p className="text-xs font-black text-foreground">Nenhum atleta elegível</p>
+                  <p className="mt-1 text-[10px] leading-relaxed text-muted">
+                    {reserveTargetRole && activeReservePriceLimit !== null
+                      ? `Não há jogador desta posição custando até ${formatFantasyMoney(activeReservePriceLimit, settings.currencyName)} com os filtros atuais.`
+                      : "Ajuste a busca ou os filtros do mercado."}
+                  </p>
+                </div>
+              )}
             </div>
           </aside>
         )}

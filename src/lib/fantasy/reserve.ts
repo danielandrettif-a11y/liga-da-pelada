@@ -24,6 +24,30 @@ export type FantasyReserveResolution = {
   captainInherited: boolean;
 };
 
+export const FANTASY_RESERVE_PRICE_GAP = 0.1;
+
+export type FantasyReserveStarterPrice = {
+  slotRole: FantasySlotRole;
+  price: number;
+};
+
+/**
+ * O preço cheio do reserva precisa ficar abaixo de todos os titulares da
+ * mesma posição. O desconto de 50% só é aplicado depois dessa validação.
+ */
+export function getFantasyReservePriceLimit(
+  reserveRole: FantasyReserveRole,
+  starters: FantasyReserveStarterPrice[],
+): number | null {
+  const matchingPrices = starters
+    .filter((starter) => starter.slotRole === reserveRole && Number.isFinite(starter.price))
+    .map((starter) => starter.price);
+
+  if (matchingPrices.length === 0) return null;
+  const cheapestStarter = Math.min(...matchingPrices);
+  return Math.max(0, Math.round((cheapestStarter - FANTASY_RESERVE_PRICE_GAP + Number.EPSILON) * 100) / 100);
+}
+
 /** Resolve a troca automática sem alterar os scouts dos titulares. */
 export function resolveFantasyReserveSubstitution(input: {
   reserveRole: FantasyReserveRole;
@@ -70,4 +94,4 @@ export function resolveFantasyReserveSubstitution(input: {
     captainBonusGain,
     captainInherited,
   };
-}
+}
