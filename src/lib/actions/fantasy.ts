@@ -54,6 +54,7 @@ import {
 import { isParticipantScoringEligible } from "@/lib/scoring-eligibility";
 import { resolveFantasyCardPointBonus } from "@/lib/fantasy/card-benefits";
 import { buildFantasyGoalkeeperSimulationStats } from "@/lib/fantasy/goalkeeper-simulation";
+import { rankingActivePlayerIds } from "@/lib/ranking";
 
 export type FantasyMarketPlayer = {
   id: string;
@@ -627,6 +628,14 @@ export async function getFantasyDashboard() {
     : Array.from(allPlayersById.values());
 
   const priceByPlayer = new Map((priceRows || []).map((row: any) => [row.player_id, row]));
+  const recentRankedRoundIds = officialFantasyRounds
+    .filter((item: any) => item.round?.status === "finished")
+    .sort(byRoundDateDesc)
+    .slice(0, 3)
+    .map((item: any) => item.round?.id)
+    .filter(Boolean);
+  const rankedActivePlayerIds = rankingActivePlayerIds(recentRankedRoundIds, statRows || []);
+  const enforceRankedActivity = !isTest && recentRankedRoundIds.length > 0;
   const statsByPlayer = new Map<
     string,
     { goals: number; assists: number; ownGoals: number; wins: number; draws: number; losses: number; games: number; goalkeeperGames: number; goalsConceded: number; cleanSheets: number; defensiveCleanGames: number; defensiveOneGoalGames: number; teamGoalsConceded: number }
@@ -832,6 +841,7 @@ export async function getFantasyDashboard() {
 
   const market: FantasyMarketPlayer[] = (players || [])
     .filter((player: any) => isCompetitiveProfileComplete(player))
+    .filter((player: any) => !enforceRankedActivity || rankedActivePlayerIds.has(player.id))
     .map((player: any) => {
       const priceRow = priceByPlayer.get(player.id) as any;
       const stats = statsByPlayer.get(player.id) || {
