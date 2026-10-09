@@ -489,6 +489,9 @@ export function FantasyExperience({
         return true;
       })
       .sort((a, b) => {
+        if (sort === "lastRound") {
+          return b.roundPoints - a.roundPoints || b.totalPoints - a.totalPoints;
+        }
         // Prioridade por posição: jogadores da posição selecionada vêm primeiro
         if (positionFilter !== "ALL") {
           if (positionFilter === "GOL") {
@@ -541,7 +544,6 @@ export function FantasyExperience({
         if (sort === "priceHigh") return b.price - a.price;
         if (sort === "name") return a.name.localeCompare(b.name, "pt-BR");
         if (sort === "variation") return b.priceChange - a.priceChange;
-        if (sort === "lastRound") return b.roundPoints - a.roundPoints;
         if (sort === "form") {
           const sumA = a.recentPointsList.slice(0, 3).reduce((x, y) => x + y, 0);
           const sumB = b.recentPointsList.slice(0, 3).reduce((x, y) => x + y, 0);
@@ -2022,7 +2024,7 @@ export function FantasyExperience({
                   className="w-full sm:w-auto rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-bold text-foreground"
                 >
                   <option value="points">Mais pontos</option>
-                  <option value="lastRound">Última rodada</option>
+                  <option value="lastRound">Maior pontuação na última rodada</option>
                   <option value="variation">Valorização</option>
                   <option value="form">Melhor forma</option>
                   <option value="costBenefit">Custo-benefício</option>
@@ -2063,6 +2065,29 @@ export function FantasyExperience({
                 </button>
               ))}
             </div>
+
+            <button
+              type="button"
+              aria-pressed={sort === "lastRound"}
+              onClick={() => setSort((current) => current === "lastRound" ? "points" : "lastRound")}
+              className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                sort === "lastRound"
+                  ? "border-accent bg-accent/15 text-accent"
+                  : "border-white/10 bg-surface/60 text-foreground hover:border-accent/35"
+              }`}
+            >
+              <span>
+                <span className="block text-[10px] font-black uppercase tracking-wider">🏆 Melhores da última rodada</span>
+                <span className="mt-0.5 block text-[9px] font-semibold text-muted">
+                  Combine com ATA/ALA, DEF/VOL ou GOL acima
+                </span>
+              </span>
+              <span className={`shrink-0 rounded-full px-2 py-1 text-[8px] font-black uppercase ${
+                sort === "lastRound" ? "bg-accent text-background" : "bg-white/10 text-muted"
+              }`}>
+                {sort === "lastRound" ? "Ativo" : "Ver ranking"}
+              </span>
+            </button>
 
             {/* Aviso de priorização da posição selecionada */}
             {positionFilter !== "ALL" && (
