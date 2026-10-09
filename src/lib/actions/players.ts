@@ -11,6 +11,7 @@ import { TEAM_PRESETS } from "../teamPresets";
 import { getMatchElapsedSeconds } from "../utils";
 import { parseMonthlyAwardWinners, parseMonthlyAwards, previousMonthStart } from "../monthly-awards";
 import { getLatestPlayerCardOverallMap } from "./stats";
+import type { PlayerAchievementBelt } from "@/components/PlayerBelts";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -427,6 +428,51 @@ export async function getPlayerMonthlyAwards(playerId: string) {
     return [];
   }
   return parseMonthlyAwards(data);
+}
+
+export async function getPlayerAchievementBelts(playerId: string): Promise<PlayerAchievementBelt[]> {
+  const season = await getActiveSeason();
+  if (!season) return [];
+
+  const { data, error } = await supabase.rpc("get_player_achievement_belts", {
+    p_player_id: playerId,
+    p_league_id: season.league_id,
+  });
+  if (error) {
+    // Compatibilidade entre o deploy do app e a aplicação da migration.
+    if (error.code !== "PGRST202" && error.code !== "42883") {
+      console.error("Erro ao buscar cinturões do jogador:", error);
+    }
+    return [];
+  }
+
+  const rows = Array.isArray(data) ? data : [];
+  return rows.flatMap((row: any) => {
+    if (!row || typeof row !== "object") return [];
+    const team = row.team && typeof row.team === "object" ? row.team : null;
+    return [{
+      slug: row.slug,
+      name: String(row.name || "Cinturão"),
+      description: String(row.description || ""),
+      recordValue: Number(row.recordValue || 0),
+      unit: String(row.unit || "recorde"),
+      scope: row.scope === "team" ? "team" : "player",
+      roundId: row.roundId || null,
+      roundNumber: row.roundNumber == null ? null : Number(row.roundNumber),
+      roundDate: row.roundDate || null,
+      team: team ? {
+        id: String(team.id),
+        name: String(team.name || "Time"),
+        color: String(team.color || "#d4af37"),
+        crestUrl: team.crestUrl || null,
+        members: Array.isArray(team.members) ? team.members.map((member: any) => ({
+          id: String(member.id),
+          name: String(member.name || "Jogador"),
+          avatarUrl: member.avatarUrl || null,
+        })) : [],
+      } : null,
+    } as PlayerAchievementBelt];
+  });
 }
 
 export async function getPreviousMonthAwardWinners() {

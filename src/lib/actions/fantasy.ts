@@ -1762,15 +1762,7 @@ export async function getRevealedLineups(roundId?: string) {
     .select(
       `
       id, user_id, status, captain_player_id, top_scorer_player_id, top_assist_player_id, challenge_player_id,
-      player_points, prediction_points, total_points, round_position, score_breakdown,
-      fantasy_lineup_players (
-        id, player_id, slot_index, slot_role, player_profile_locked, price_locked, price_after, base_points, position_bonus, captain_bonus, total_points,
-        player_name_locked, avatar_url_locked
-      ),
-      fantasy_lineup_reserves (
-        id, player_id, slot_role, price_locked, price_after, base_points, applied,
-        replaced_player_id, replaced_player_points, points_gain
-      )
+      player_points, prediction_points, total_points, round_position, score_breakdown
     `
     )
     .eq("fantasy_round_id", targetFantasyRound.id);
@@ -1785,9 +1777,56 @@ export async function getRevealedLineups(roundId?: string) {
     };
   }
 
-  const rawLineups = (rawLineupRows || []).filter(
-    (lineup: any) => (lineup.fantasy_lineup_players || []).length > 0,
-  );
+  // Os relacionamentos embutidos do PostgREST podem voltar vazios por RLS em
+  // rodadas históricas mesmo quando a escalação existe. Carregar as três
+  // tabelas separadamente também mantém o banner funcionando após mudanças de
+  // schema nos jogadores/reservas.
+  const lineupIds = (rawLineupRows || []).map((lineup: any) => lineup.id);
+  const [{ data: lockedPlayers, error: lockedPlayersError }, { data: lockedReserves, error: lockedReservesError }] = lineupIds.length
+    ? await Promise.all([
+        revealedReadClient
+          .from("fantasy_lineup_players")
+          .select("id, lineup_id, player_id, slot_index, slot_role, player_profile_locked, price_locked, price_after, base_points, position_bonus, captain_bonus, total_points, player_name_locked, avatar_url_locked")
+          .in("lineup_id", lineupIds),
+        revealedReadClient
+          .from("fantasy_lineup_reserves")
+          .select("id, lineup_id, player_id, slot_role, price_locked, price_after, base_points, applied, replaced_player_id, replaced_player_points, points_gain, player_name_locked, avatar_url_locked")
+          .in("lineup_id", lineupIds),
+      ])
+    : [{ data: [] as any[], error: null }, { data: [] as any[], error: null }];
+
+  if (lockedPlayersError || lockedReservesError) {
+    const historyError = lockedPlayersError || lockedReservesError;
+    console.error("Erro ao carregar atletas das escalações históricas do Cartola:", historyError);
+    return {
+      allowed: false,
+      isMarketOpen: false,
+      error: `Não foi possível carregar os atletas desta rodada: ${historyError?.message || "erro desconhecido"}`,
+      lineups: [],
+    };
+  }
+
+  const playersByLineupId = new Map<string, any[]>();
+  for (const player of lockedPlayers || []) {
+    const list = playersByLineupId.get(player.lineup_id) || [];
+    list.push(player);
+    playersByLineupId.set(player.lineup_id, list);
+  }
+  const reservesByLineupId = new Map<string, any[]>();
+  for (const reserve of lockedReserves || []) {
+    const list = reservesByLineupId.get(reserve.lineup_id) || [];
+    list.push(reserve);
+    reservesByLineupId.set(reserve.lineup_id, list);
+  }
+
+  const rawLineups = (rawLineupRows || [])
+    .map((lineup: any) => ({
+      ...lineup,
+      fantasy_lineup_players: (playersByLineupId.get(lineup.id) || [])
+        .sort((a, b) => Number(a.slot_index || 0) - Number(b.slot_index || 0)),
+      fantasy_lineup_reserves: reservesByLineupId.get(lineup.id) || [],
+    }))
+    .filter((lineup: any) => lineup.fantasy_lineup_players.length > 0);
 
   const userIds = (rawLineups || []).map((l: any) => l.user_id);
   const { data: profiles } = userIds.length
