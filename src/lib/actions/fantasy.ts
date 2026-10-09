@@ -1795,15 +1795,21 @@ export async function getRevealedLineups(roundId?: string) {
       ])
     : [{ data: [] as any[], error: null }, { data: [] as any[], error: null }];
 
-  if (lockedPlayersError || lockedReservesError) {
-    const historyError = lockedPlayersError || lockedReservesError;
-    console.error("Erro ao carregar atletas das escalações históricas do Cartola:", historyError);
+  if (lockedPlayersError) {
+    console.error("Erro ao carregar atletas das escalações históricas do Cartola:", lockedPlayersError);
     return {
       allowed: false,
       isMarketOpen: false,
-      error: `Não foi possível carregar os atletas desta rodada: ${historyError?.message || "erro desconhecido"}`,
+      error: `Não foi possível carregar os atletas desta rodada: ${lockedPlayersError.message || "erro desconhecido"}`,
       lineups: [],
     };
+  }
+
+  // A reserva é um complemento opcional. Bancos que ainda não receberam a
+  // migration de permissão não podem impedir a abertura dos seis titulares.
+  // Depois da migration 247, ela volta a aparecer normalmente no detalhamento.
+  if (lockedReservesError) {
+    console.warn("Reservas históricas indisponíveis; carregando somente titulares:", lockedReservesError);
   }
 
   const playersByLineupId = new Map<string, any[]>();
@@ -1813,7 +1819,7 @@ export async function getRevealedLineups(roundId?: string) {
     playersByLineupId.set(player.lineup_id, list);
   }
   const reservesByLineupId = new Map<string, any[]>();
-  for (const reserve of lockedReserves || []) {
+  for (const reserve of lockedReservesError ? [] : lockedReserves || []) {
     const list = reservesByLineupId.get(reserve.lineup_id) || [];
     list.push(reserve);
     reservesByLineupId.set(reserve.lineup_id, list);
