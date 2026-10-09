@@ -2203,23 +2203,45 @@ export function FantasyExperience({
                     </p>
                   )}
                 </div>
-              ) : open && !isTest ? (
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {(["ATA", "DEF"] as const).map((role) => (
-                    <button
-                      key={role}
-                      type="button"
-                      onClick={() => openReserveMarket(role)}
-                      className="rounded-xl border border-dashed border-amber-300/35 bg-amber-300/[.06] px-3 py-2.5 text-[9px] font-black uppercase text-amber-100 transition hover:border-amber-200 hover:bg-amber-300/10"
-                    >
-                      + Reserva {role === "DEF" ? "DEF/VOL" : "ATA/ALA"}
-                    </button>
-                  ))}
-                </div>
               ) : (
-                <p className="mt-3 rounded-xl border border-white/10 bg-black/20 p-2.5 text-center text-[9px] font-bold text-white/45">
-                  Nenhum jogador foi escalado no banco nesta rodada.
-                </p>
+                <div className={`relative mt-3 overflow-hidden rounded-2xl border border-dashed p-3 text-center transition ${
+                  dragOverSlot === RESERVE_DRAG_SLOT
+                    ? "border-accent bg-accent/15 shadow-[0_0_24px_rgba(204,255,0,.25)]"
+                    : "border-amber-300/30 bg-black/25"
+                }`}>
+                  <div aria-hidden="true" className="absolute inset-x-8 bottom-2 h-2 rounded-full border border-amber-200/20 bg-amber-950/80 shadow-[0_4px_8px_rgba(0,0,0,.5)]" />
+                  <div className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-amber-300/45 bg-amber-300/[.07] text-xl text-amber-200/70 ring-2 ring-amber-300/10">
+                    {open && !isTest ? "+" : <Lock className="h-5 w-5" />}
+                  </div>
+                  <span className="relative mt-1 inline-block rounded-lg bg-black/80 px-2 py-0.5 text-[10px] font-black text-white/70">
+                    Vaga do reserva
+                  </span>
+                  {open && !isTest ? (
+                    <>
+                      <p className="relative mt-1 text-[8px] font-bold text-amber-100/55">
+                        Arraste um titular elegível para cá ou escolha no mercado
+                      </p>
+                      <div data-no-drag="true" className="relative mt-2 grid grid-cols-2 gap-2">
+                        {(["ATA", "DEF"] as const).map((role) => (
+                          <button
+                            key={role}
+                            type="button"
+                            onClick={() => openReserveMarket(role)}
+                            className="rounded-xl border border-amber-300/35 bg-amber-300/[.06] px-3 py-2.5 text-[9px] font-black uppercase text-amber-100 transition hover:border-amber-200 hover:bg-amber-300/10"
+                          >
+                            + {role === "DEF" ? "DEF/VOL" : "ATA/ALA"}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="relative mt-2 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[9px] font-bold text-white/45">
+                      {isTest
+                        ? "O banco não está disponível na rodada de testes."
+                        : "Mercado fechado · escolha o reserva quando abrir a próxima Ranked."}
+                    </p>
+                  )}
+                </div>
               )}
             </section>
 
