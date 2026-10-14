@@ -467,15 +467,19 @@ export async function getFantasyDashboard() {
     }
   })();
 
+  // A consulta continua estritamente limitada à conta e à rodada selecionadas,
+  // mas o cliente de serviço evita que uma política antiga esconda somente a
+  // linha do reserva depois que o RPC já a gravou com sucesso.
+  const ownedLineupReadClient = createServiceClient() || account.client;
   const lineupRequest = isTest
-    ? account.client
+    ? ownedLineupReadClient
         .from("fantasy_test_lineups")
         .select("*, fantasy_test_lineup_players(*)")
         .eq("test_session_id", fantasyRound.id)
         .eq("user_id", account.user.id)
         .maybeSingle()
     : activeOfficialRound
-    ? account.client
+    ? ownedLineupReadClient
         .from("fantasy_lineups")
         .select("*, fantasy_lineup_players(*), fantasy_lineup_reserves(*)")
         .eq("fantasy_round_id", activeOfficialRound.id)
@@ -493,7 +497,7 @@ export async function getFantasyDashboard() {
     : Promise.resolve({ data: null as any });
 
   const latestLineupRequest = latestFinishedRound
-    ? account.client
+    ? ownedLineupReadClient
         .from("fantasy_lineups")
         .select("*, fantasy_lineup_players(*), fantasy_lineup_reserves(*)")
         .eq("fantasy_round_id", latestFinishedRound.id)
@@ -504,7 +508,7 @@ export async function getFantasyDashboard() {
   // O cliente de serviço permanece somente no servidor. Ele também recupera
   // as escalações quando uma partida começou mas o status do mercado ficou
   // indevidamente como `open` no banco.
-  const liveReadClient = createServiceClient() || account.client;
+  const liveReadClient = ownedLineupReadClient;
   const latestCardActivationRequest = latestFinishedRound
     ? liveReadClient
       .from("fantasy_card_activations")
@@ -1795,7 +1799,7 @@ export async function saveFantasyLineup(input: {
       });
       if (error) return { success: false, error: error.message };
     } else {
-      const { error: lineupError } = await account.client.rpc("save_fantasy_lineup_with_reserve", {
+      const { data: savedLineupId, error: lineupError } = await account.client.rpc("save_fantasy_lineup_with_reserve", {
         p_round_id: input.roundId,
         p_player_ids: input.playerIds,
         p_captain_player_id: input.captainId,
@@ -1807,6 +1811,19 @@ export async function saveFantasyLineup(input: {
         p_reserve_slot_role: input.reserveRole,
       });
       if (lineupError) return { success: false, error: lineupError.message };
+      if (input.reservePlayerId) {
+        const reserveReadClient = createServiceClient() || account.client;
+        const { data: savedReserve, error: reserveReadError } = await reserveReadClient
+          .from("fantasy_lineup_reserves")
+          .select("player_id, slot_role")
+          .eq("lineup_id", savedLineupId)
+          .eq("player_id", input.reservePlayerId)
+          .maybeSingle();
+        if (reserveReadError || !savedReserve || savedReserve.slot_role !== input.reserveRole) {
+          console.error("Reserva não confirmada após salvar a escalação:", reserveReadError);
+          return { success: false, error: "A escalação foi enviada, mas o banco de reserva não foi confirmado. Tente salvar novamente." };
+        }
+      }
     }
     revalidatePath("/cartola");
     revalidatePath("/");

@@ -2204,9 +2204,22 @@ export function FantasyExperience({
                     )}
                   </div>
                   {open && (
-                    <p className="relative mt-2 text-center text-[8px] font-bold text-amber-100/60">
-                      Segure e arraste para o campo · ou arraste um titular para cá
-                    </p>
+                    <div data-no-drag="true" className="relative mt-2 space-y-2">
+                      <p className="text-center text-[8px] font-bold text-amber-100/60">
+                        Segure e arraste para o campo · ou arraste um titular para cá
+                      </p>
+                      {!isSaved && (
+                        <button
+                          type="button"
+                          onClick={save}
+                          disabled={pending || remaining < 0 || !complete}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-300 px-3 py-2.5 text-[10px] font-black uppercase tracking-wide text-amber-950 shadow-lg shadow-amber-300/10 disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                          {pending ? "Salvando banco..." : "Salvar jogador no banco"}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               ) : (

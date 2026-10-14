@@ -479,6 +479,35 @@ export async function applyRoundTeamShuffle(input: {
   }
 }
 
+/** Salva de uma vez o rascunho montado pelo ADM no editor de troca permanente. */
+export async function applyPermanentRoundTeamFormation(input: {
+  roundId: string;
+  assignments: Array<{ teamId: string; playerIds: string[] }>;
+}) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem alterar os times." };
+    if (!input.roundId || !Array.isArray(input.assignments) || input.assignments.length < 2) {
+      return { success: false, error: "A formação precisa conter pelo menos dois times." };
+    }
+    const assignments = input.assignments.map((assignment) => ({
+      team_id: assignment.teamId,
+      player_ids: [...new Set(assignment.playerIds.filter(Boolean))],
+    }));
+    const { error } = await client.rpc("apply_round_team_shuffle", {
+      p_round_id: input.roundId,
+      p_assignments: assignments,
+      p_formation_mode: "adaptive",
+    });
+    if (error) throw new Error(error.message);
+
+    refreshRoundManagement(input.roundId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Não foi possível salvar a nova formação." };
+  }
+}
+
 export async function setRoundTeamCaptain(roundId: string, teamId: string, playerId: string | null) {
   try {
     const client = await getAdminClient();
