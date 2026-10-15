@@ -49,7 +49,14 @@ describe("Cartola V3 — Catálogo & Probabilidades", () => {
     const withoutLineup = FANTASY_CARDS_CATALOG
       .filter((card) => card.enabled && !fantasyCardRequiresSavedLineup(card))
       .map((card) => card.slug);
-    expect(withoutLineup).toEqual(["extra_credit", "double_prediction", "bargain", "all_in"]);
+    expect(withoutLineup).toEqual([
+      "super_captain",
+      "extra_credit",
+      "double_prediction",
+      "bargain",
+      "all_in",
+      "dream_team",
+    ]);
   });
 
   it("permite usar a Barganha durante a edição da escalação", () => {

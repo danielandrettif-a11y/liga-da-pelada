@@ -85,33 +85,10 @@ export const getCurrentAccountIdentity = cache(async function getCurrentAccountI
     };
   }
 
+  // Contas ainda não vinculadas não devem provocar uma varredura da tabela
+  // inteira de jogadores em toda navegação. Além de ser mais rápido, o nome do
+  // e-mail/Google é a fonte correta até o vínculo oficial ser concluído.
   const emailPrefix = account.user.email?.split("@")[0] || "";
-  const normalize = (value: string) => value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]/gi, "")
-    .toLowerCase();
-  const normalizedEmail = normalize(emailPrefix);
-
-  if (normalizedEmail.length >= 4) {
-    const { data: players } = await account.client
-      .from("players")
-      .select("name, nickname, avatar_url");
-    const matchedPlayer = players?.find((player) => {
-      const candidates = [player.name, player.nickname]
-        .filter(Boolean)
-        .map((name) => normalize(String(name)));
-      return candidates.some((candidate) => candidate.length >= 4
-        && (normalizedEmail.startsWith(candidate) || candidate.startsWith(normalizedEmail)));
-    });
-    if (matchedPlayer) {
-      return {
-        displayName: matchedPlayer.name.trim().split(/\s+/)[0],
-        avatarUrl: matchedPlayer.avatar_url || metadataAvatar,
-      };
-    }
-  }
-
   const emailName = emailPrefix.split(/[._-]/)[0] || "Jogador";
   return {
     displayName: emailName.charAt(0).toUpperCase() + emailName.slice(1),

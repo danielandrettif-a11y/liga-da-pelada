@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Sparkles } from "@/components/icons";
 
@@ -14,6 +14,21 @@ export function PackVideoOpening({ roundNumber, onStart, onComplete }: Props) {
   const [isPlaying, setIsPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hasTriggeredStart = useRef(false);
+  const hasCompleted = useRef(false);
+  const playbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const safetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (playbackTimer.current) clearTimeout(playbackTimer.current);
+    if (safetyTimer.current) clearTimeout(safetyTimer.current);
+  }, []);
+
+  function completeOnce(delay = 0) {
+    if (hasCompleted.current) return;
+    hasCompleted.current = true;
+    if (safetyTimer.current) clearTimeout(safetyTimer.current);
+    playbackTimer.current = setTimeout(onComplete, delay);
+  }
 
   function handleStartOpening() {
     if (isPlaying) return;
@@ -25,12 +40,15 @@ export function PackVideoOpening({ roundNumber, onStart, onComplete }: Props) {
     }
 
     // Tenta reproduzir o vídeo
-    setTimeout(() => {
+    // Se o vídeo ficar carregando indefinidamente em uma rede móvel ruim, o
+    // pacote continua abrindo. A animação nunca pode bloquear a recompensa.
+    safetyTimer.current = setTimeout(() => completeOnce(), 7000);
+    playbackTimer.current = setTimeout(() => {
       if (videoRef.current) {
         videoRef.current.currentTime = 0;
         videoRef.current.play().catch(() => {
           // Se o autoplay for bloqueado pelo navegador, avança suavemente
-          setTimeout(onComplete, 1200);
+          completeOnce(700);
         });
       }
     }, 50);
@@ -38,7 +56,7 @@ export function PackVideoOpening({ roundNumber, onStart, onComplete }: Props) {
 
   function handleVideoEnded() {
     // Pequeno delay suave de 200ms após o término do vídeo para as cartas surgirem
-    setTimeout(onComplete, 200);
+    completeOnce(200);
   }
 
   return (
@@ -107,8 +125,9 @@ export function PackVideoOpening({ roundNumber, onStart, onComplete }: Props) {
               playsInline
               autoPlay
               muted
+              preload="metadata"
               onEnded={handleVideoEnded}
-              onError={() => setTimeout(onComplete, 300)}
+              onError={() => completeOnce(300)}
               className="w-full h-full object-cover"
             />
 
@@ -126,7 +145,7 @@ export function PackVideoOpening({ roundNumber, onStart, onComplete }: Props) {
             {/* Botão Pular Animação */}
             <button
               type="button"
-              onClick={onComplete}
+              onClick={() => completeOnce()}
               className="absolute bottom-4 right-4 z-10 rounded-xl bg-black/60 border border-white/20 px-3 py-1.5 text-[10px] font-bold text-muted hover:text-white backdrop-blur-md active:scale-95 transition-all"
             >
               Pular ➔

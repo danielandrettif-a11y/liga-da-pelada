@@ -1,60 +1,335 @@
+import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
+import styles from "./inicio.module.css";
 
-const benefits = [
-  { number: "01", title: "Sua pelada, organizada", description: "Convocações, rodada, times e resultados em um só lugar — sem perder a resenha do grupo." },
-  { number: "02", title: "Ranking que acompanha o jogo", description: "Gols, assistências e scouts registrados viram histórico e classificação da sua pelada." },
-  { number: "03", title: "Do básico ao completo", description: "Comece com a organização e o ranking. Na versão completa, adicione Cartola e outras experiências." },
+export const metadata: Metadata = {
+  title: "Pelada BQ — transforme sua pelada em uma liga",
+  description:
+    "Organize convocações, registre a rodada, dispute o ranking e monte seu time no Cartola da pelada.",
+};
+
+const journey = [
+  {
+    number: "01",
+    title: "Chame a turma",
+    description: "Abra a convocação, compartilhe o convite e acompanhe quem confirmou.",
+  },
+  {
+    number: "02",
+    title: "Jogue a rodada",
+    description: "Monte os times, registre o placar e transforme os lances em scouts.",
+  },
+  {
+    number: "03",
+    title: "Crie uma história",
+    description: "Ranking, evolução e Cartola deixam cada semana com algo novo em disputa.",
+  },
 ];
 
+const basicFeatures = ["Convocações", "Montagem de times", "Resultados e ranking"];
+const completeFeatures = ["Tudo da Básica", "Cartola da pelada", "Cosméticos, cartas e cinturões"];
+
+function ArrowIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 12h14M14 7l5 5-5 5" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m5 12 4 4L19 6" />
+    </svg>
+  );
+}
+
+function BallIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="m9.5 9 2.5-2 2.5 2-1 3h-3zM6.3 15l4.2-3M17.7 15l-4.2-3M9 20l1.5-5h3l1.5 5M5.5 8l4 1M18.5 8l-4 1" />
+    </svg>
+  );
+}
+
 export default function PublicHomePage() {
-  return <div className="min-h-dvh bg-[#031008] text-white">
-    <header className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-5 sm:px-8">
-      <Link href="/inicio" className="font-athletic text-xl font-black uppercase italic tracking-wide text-[#ccff00]">Pelada BQ</Link>
-      <nav aria-label="Acessos" className="flex items-center gap-2 text-xs font-bold sm:text-sm">
-        <Link href="/login?next=/lobby" className="rounded-full border border-[#ccff00]/50 px-3 py-2 text-[#ccff00] hover:bg-[#ccff00]/10 sm:px-5">Login de jogador</Link>
-        <Link href="/estadio" className="rounded-full border border-white/20 px-3 py-2 text-white/80 hover:border-white/50 sm:px-5">Login de estádio</Link>
-      </nav>
-    </header>
+  return (
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <div className={styles.headerInner}>
+          <Link href="/inicio" className={styles.brand} aria-label="Pelada BQ — página inicial">
+            <span className={styles.brandMark}>
+              <Image
+                src="/icons/pelada-bq-v2-512.png"
+                width={48}
+                height={48}
+                priority
+                alt=""
+              />
+            </span>
+            <span className={styles.brandName}>
+              <strong>Pelada</strong>
+              <span>BQ</span>
+            </span>
+          </Link>
 
-    <main>
-      <section className="relative overflow-hidden border-y border-[#ccff00]/10 bg-[radial-gradient(circle_at_80%_10%,rgba(204,255,0,.16),transparent_40%),linear-gradient(140deg,#071d10,#031008_62%)]">
-        <div className="pointer-events-none absolute -right-28 top-20 h-80 w-80 rounded-full border border-[#ccff00]/10 sm:h-[30rem] sm:w-[30rem]" />
-        <div className="pointer-events-none absolute -right-10 top-32 h-64 w-64 rounded-full border border-[#ccff00]/10 sm:h-[25rem] sm:w-[25rem]" />
-        <div className="relative mx-auto max-w-6xl px-5 pb-20 pt-16 sm:px-8 sm:pb-28 sm:pt-24">
-          <p className="mb-5 inline-flex rounded-full border border-[#ccff00]/30 bg-[#ccff00]/10 px-4 py-2 text-xs font-black uppercase tracking-[.18em] text-[#ccff00]">Seu futebol tem história</p>
-          <h1 className="max-w-3xl font-athletic text-5xl font-black uppercase italic leading-[.95] tracking-tight sm:text-7xl lg:text-8xl">Toda pelada merece <span className="text-[#ccff00]">ser lembrada.</span></h1>
-          <p className="mt-7 max-w-xl text-base leading-7 text-white/70 sm:text-lg">Crie seu perfil, participe das peladas dos seus amigos e acompanhe cada rodada. Sua turma escolhe como jogar; o app Pelada BQ cuida da organização.</p>
-          <div className="mt-9 flex flex-wrap gap-3">
-            <Link href="/cadastro?next=/lobby" className="rounded-xl bg-[#ccff00] px-6 py-4 text-sm font-black text-[#071006] hover:bg-[#dfff59]">Criar conta de jogador →</Link>
-            <Link href="/login?next=/lobby" className="rounded-xl border border-white/25 px-6 py-4 text-sm font-black text-white hover:bg-white/10">Já tenho conta</Link>
+          <nav className={styles.headerNav} aria-label="Acessos">
+            <Link href="/login?next=/lobby" className={styles.playerLogin}>
+              Entrar
+            </Link>
+            <Link href="/estadio" className={styles.stadiumLogin}>
+              Estádio
+            </Link>
+          </nav>
+        </div>
+      </header>
+
+      <main>
+        <section className={styles.hero}>
+          <div className={styles.heroGlow} aria-hidden="true" />
+          <div className={styles.heroPitch} aria-hidden="true" />
+          <div className={styles.heroInner}>
+            <div className={styles.heroCopy}>
+              <div className={styles.eyebrow}>
+                <BallIcon />
+                Sua pelada virou campeonato
+              </div>
+              <h1>
+                Jogue com os amigos.
+                <span>Vire lenda na resenha.</span>
+              </h1>
+              <p className={styles.heroText}>
+                Convocação, times, scouts, ranking e Cartola em um só lugar. Tudo o que
+                acontece na sua pelada agora fica registrado.
+              </p>
+
+              <div className={styles.heroActions}>
+                <Link href="/cadastro?next=/lobby" className={styles.primaryCta}>
+                  Criar minha conta
+                  <ArrowIcon />
+                </Link>
+                <Link href="/login?next=/lobby" className={styles.secondaryCta}>
+                  Já participo de uma pelada
+                </Link>
+              </div>
+
+              <p className={styles.microcopy}>Grátis para começar · entre com Google ou e-mail</p>
+
+              <div className={styles.heroProof} aria-label="Principais recursos">
+                <span>Convocação</span>
+                <i />
+                <span>Ranking</span>
+                <i />
+                <span>Cartola</span>
+              </div>
+            </div>
+
+            <div className={styles.heroVisual} aria-label="Demonstração do Cartola da pelada">
+              <div className={styles.visualHalo} aria-hidden="true" />
+              <div className={styles.phone}>
+                <div className={styles.phoneTop}>
+                  <span />
+                  <b>PELADA BQ</b>
+                  <i />
+                </div>
+                <div className={styles.phoneImageWrap}>
+                  <Image
+                    src="/images/home/cartola-demo.webp"
+                    width={941}
+                    height={1672}
+                    sizes="(max-width: 767px) 78vw, 390px"
+                    className={styles.phoneImage}
+                    alt="Exemplo ilustrativo de uma escalação no Cartola da pelada"
+                    priority
+                  />
+                </div>
+              </div>
+              <div className={`${styles.floatCard} ${styles.floatScore}`}>
+                <small>Seu time</small>
+                <strong>128,4</strong>
+                <span>pontos</span>
+              </div>
+              <div className={`${styles.floatCard} ${styles.floatRank}`}>
+                <span className={styles.trend}>↗</span>
+                <div>
+                  <strong>+4 posições</strong>
+                  <small>na rodada</small>
+                </div>
+              </div>
+            </div>
           </div>
-          <p className="mt-5 text-xs text-white/45">Cadastro com Google ou e-mail e senha. Você escolhe sua pelada depois de entrar.</p>
-        </div>
-      </section>
+        </section>
 
-      <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-24" id="como-funciona">
-        <div className="max-w-xl">
-          <p className="text-xs font-black uppercase tracking-[.2em] text-[#ccff00]">Como funciona</p>
-          <h2 className="mt-3 font-athletic text-4xl font-black uppercase italic sm:text-5xl">Um lugar para todas as suas peladas.</h2>
-          <p className="mt-4 text-sm leading-6 text-white/60">Depois do cadastro, seu lobby reúne as peladas de que você participa. Favoritas ficam no topo. Você pode entrar por convite privado ou descobrir peladas abertas.</p>
-        </div>
-        <div className="mt-9 grid gap-4 md:grid-cols-3">
-          {benefits.map((benefit) => <article key={benefit.number} className="rounded-3xl border border-white/10 bg-white/[.035] p-6">
-            <span className="font-athletic text-3xl font-black text-[#ccff00]">{benefit.number}</span>
-            <h3 className="mt-5 text-lg font-black">{benefit.title}</h3>
-            <p className="mt-2 text-sm leading-6 text-white/60">{benefit.description}</p>
-          </article>)}
-        </div>
-      </section>
+        <section className={styles.quickBar} aria-label="O que a Pelada BQ organiza">
+          <div>
+            <span>Da lista no grupo</span>
+            <strong>para uma liga de verdade</strong>
+          </div>
+          <ul>
+            <li><CheckIcon /> Menos confusão</li>
+            <li><CheckIcon /> Mais disputa</li>
+            <li><CheckIcon /> Toda rodada conta</li>
+          </ul>
+        </section>
 
-      <section className="border-y border-white/10 bg-[#081a0d]">
-        <div className="mx-auto grid max-w-6xl gap-8 px-5 py-16 sm:px-8 md:grid-cols-2 md:py-20">
-          <div><p className="text-xs font-black uppercase tracking-[.2em] text-[#ccff00]">Para jogadores</p><h2 className="mt-3 font-athletic text-3xl font-black uppercase italic">Entre, descubra, jogue.</h2><p className="mt-3 text-sm leading-6 text-white/65">Encontre sua pelada no lobby, acompanhe sua evolução e veja as próximas partidas. Peladas privadas, como a BQ, exigem convite ou aprovação.</p><Link href="/cadastro?next=/lobby" className="mt-5 inline-block text-sm font-black text-[#ccff00]">Quero participar →</Link></div>
-          <div><p className="text-xs font-black uppercase tracking-[.2em] text-[#ccff00]">Para administradores</p><h2 className="mt-3 font-athletic text-3xl font-black uppercase italic">Comece simples. Cresça quando quiser.</h2><p className="mt-3 text-sm leading-6 text-white/65">A pelada Básica terá ranking e rodadas. A Completa reunirá Cartola, cosméticos e mais recursos. A criação de novas peladas será liberada após a validação do isolamento dos dados.</p><Link href="/login?next=/lobby" className="mt-5 inline-block text-sm font-black text-[#ccff00]">Acessar meu lobby →</Link></div>
-        </div>
-      </section>
-    </main>
+        <section className={styles.productSection} id="recursos">
+          <div className={styles.sectionHeading}>
+            <p>Veja o jogo ganhar vida</p>
+            <h2>Todo mundo entende.<br />Todo mundo quer jogar.</h2>
+            <span>
+              Uma experiência feita para a turma acompanhar pelo celular — antes, durante e
+              depois da bola rolar.
+            </span>
+          </div>
 
-    <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-8 text-xs text-white/45 sm:px-8"><span>Pelada BQ · futebol com história</span><Link href="/estadio" className="hover:text-white">Área de estádio (em preparação)</Link></footer>
-  </div>;
+          <article className={styles.demoCard}>
+            <div className={styles.demoCopy}>
+              <span className={styles.demoIndex}>01 · CARTOLA</span>
+              <h3>Monte seu time com quem você joga.</h3>
+              <p>
+                Escale os amigos, escolha o capitão e dispute cada rodada com scouts da pelada
+                de verdade.
+              </p>
+              <ul>
+                <li><CheckIcon /> Mercado e valorização</li>
+                <li><CheckIcon /> Pontuação por scouts</li>
+                <li><CheckIcon /> Cartas e banco de reserva</li>
+              </ul>
+            </div>
+            <div className={styles.demoVisual}>
+              <div className={styles.demoScreen}>
+                <Image
+                  src="/images/home/cartola-demo.webp"
+                  width={941}
+                  height={1672}
+                  sizes="(max-width: 767px) 86vw, 420px"
+                  alt="Tela demonstrativa do Cartola com jogadores escalados em campo"
+                />
+              </div>
+              <span className={styles.demoBadge}>Seu time. Suas escolhas.</span>
+            </div>
+          </article>
+
+          <article className={`${styles.demoCard} ${styles.demoCardReverse}`}>
+            <div className={styles.demoCopy}>
+              <span className={styles.demoIndex}>02 · RANKING</span>
+              <h3>O jogo termina. A disputa continua.</h3>
+              <p>
+                Veja quem brilhou, acompanhe sua evolução e tenha assunto para a resenha até a
+                próxima rodada.
+              </p>
+              <ul>
+                <li><CheckIcon /> Classificação por rodada</li>
+                <li><CheckIcon /> Histórico e evolução</li>
+                <li><CheckIcon /> Gols, assistências e defesas</li>
+              </ul>
+            </div>
+            <div className={styles.demoVisual}>
+              <div className={styles.demoScreen}>
+                <Image
+                  src="/images/home/ranking-demo.webp"
+                  width={941}
+                  height={1672}
+                  sizes="(max-width: 767px) 86vw, 420px"
+                  alt="Tela demonstrativa do ranking da rodada com pódio e classificação"
+                />
+              </div>
+              <span className={`${styles.demoBadge} ${styles.goldBadge}`}>Cada rodada deixa uma marca.</span>
+            </div>
+          </article>
+        </section>
+
+        <section className={styles.journeySection} id="como-funciona">
+          <div className={styles.sectionHeading}>
+            <p>Simples desde o primeiro jogo</p>
+            <h2>Da convocação ao pódio.</h2>
+          </div>
+          <div className={styles.journeyGrid}>
+            {journey.map((item) => (
+              <article key={item.number} className={styles.journeyCard}>
+                <span>{item.number}</span>
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className={styles.plansSection}>
+          <div className={styles.plansInner}>
+            <div className={styles.plansCopy}>
+              <p>Do seu jeito</p>
+              <h2>Comece simples.<br />Evolua quando quiser.</h2>
+              <span>
+                Cada pelada escolhe o nível ideal. O administrador configura a turma e os
+                jogadores só precisam entrar em campo.
+              </span>
+            </div>
+
+            <div className={styles.planCards}>
+              <article className={styles.basicPlan}>
+                <span>Básica</span>
+                <h3>Para organizar</h3>
+                <p>O essencial para reunir a turma e guardar a história.</p>
+                <ul>
+                  {basicFeatures.map((feature) => (
+                    <li key={feature}><CheckIcon /> {feature}</li>
+                  ))}
+                </ul>
+              </article>
+              <article className={styles.completePlan}>
+                <span>Completa</span>
+                <h3>Para competir</h3>
+                <p>A experiência completa para transformar a pelada em liga.</p>
+                <ul>
+                  {completeFeatures.map((feature) => (
+                    <li key={feature}><CheckIcon /> {feature}</li>
+                  ))}
+                </ul>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.finalCta}>
+          <div className={styles.finalBall} aria-hidden="true"><BallIcon /></div>
+          <p>Sua próxima rodada começa aqui</p>
+          <h2>A pelada passa.<br /><span>A história fica.</span></h2>
+          <div className={styles.finalActions}>
+            <Link href="/cadastro?next=/lobby" className={styles.primaryCta}>
+              Criar minha conta
+              <ArrowIcon />
+            </Link>
+            <Link href="/login?next=/lobby" className={styles.finalLogin}>Entrar na minha pelada</Link>
+          </div>
+        </section>
+
+        <section className={styles.stadiumTeaser}>
+          <div>
+            <span>Para donos de campo</span>
+            <h2>Gestão de estádio está chegando.</h2>
+          </div>
+          <Link href="/estadio">Conhecer a área de estádio <ArrowIcon /></Link>
+        </section>
+      </main>
+
+      <footer className={styles.footer}>
+        <Link href="/inicio" className={styles.footerBrand}>
+          <Image src="/icons/pelada-bq-v2-512.png" width={38} height={38} alt="" />
+          <span>Pelada BQ</span>
+        </Link>
+        <p>Futebol com história.</p>
+        <nav aria-label="Links do rodapé">
+          <Link href="/login?next=/lobby">Entrar</Link>
+          <Link href="/cadastro?next=/lobby">Criar conta</Link>
+          <Link href="/estadio">Estádio</Link>
+        </nav>
+      </footer>
+    </div>
+  );
 }

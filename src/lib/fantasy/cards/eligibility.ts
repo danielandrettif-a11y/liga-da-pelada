@@ -15,11 +15,15 @@ export function canSelectFantasyCardInstance(status: string, userCardId: string,
 }
 
 export function fantasyCardRequiresSavedLineup(
-  card: Pick<FantasyCardDefinition, "slug" | "effectType" | "targetFilter">,
+  card: Pick<FantasyCardDefinition, "slug" | "effectType" | "requiresTarget" | "targetFilter">,
 ) {
-  return card.effectType !== "BUDGET_BONUS"
-    && card.slug !== "double_prediction"
-    && card.targetFilter !== "ANY_IN_MARKET";
+  if (card.effectType === "BUDGET_BONUS" || card.targetFilter === "ANY_IN_MARKET") return false;
+  if (card.slug === "double_prediction") return false;
+
+  // Cartas sem alvo (Super Capitão, Seleção dos Sonhos etc.) podem ser
+  // reservadas antes de salvar o time. A escalação só é obrigatória quando a
+  // escolha da carta depende de um ou dois atletas já escalados.
+  return card.requiresTarget === "SINGLE_PLAYER" || card.requiresTarget === "DUO_PLAYERS";
 }
 
 function sortedPrices(players: PricedFantasyPlayer[]) {

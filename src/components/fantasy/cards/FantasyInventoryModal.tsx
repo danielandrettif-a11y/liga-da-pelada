@@ -100,6 +100,7 @@ export function FantasyInventoryModal({
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [inventoryData, setInventoryData] = useState<InventoryData | null>(() => cachedInventory);
   const [rarityFilter, setRarityFilter] = useState<string>("ALL");
   const [showCatalog, setShowCatalog] = useState(false);
@@ -123,9 +124,13 @@ export function FantasyInventoryModal({
   useEffect(() => {
     if (isOpen) {
       setLoading(!cachedInventory);
+      setLoadError(null);
       preloadFantasyInventory()
         .then((res) => setInventoryData(res))
-        .catch(() => setInventoryData(null))
+        .catch(() => {
+          setInventoryData(null);
+          setLoadError("Não foi possível carregar suas cartas. Confira a conexão e tente novamente.");
+        })
         .finally(() => setLoading(false));
     } else {
       setSelectedToUse(null);
@@ -134,6 +139,15 @@ export function FantasyInventoryModal({
       setError(null);
     }
   }, [isOpen]);
+
+  function retryInventory() {
+    setLoading(true);
+    setLoadError(null);
+    preloadFantasyInventory({ force: true })
+      .then((res) => setInventoryData(res))
+      .catch(() => setLoadError("A conexão ainda falhou. Tente novamente em alguns segundos."))
+      .finally(() => setLoading(false));
+  }
 
   if (!mounted || !isOpen || typeof document === "undefined") return null;
 
@@ -373,6 +387,17 @@ export function FantasyInventoryModal({
           ) : loading ? (
             <div className="py-12 text-center text-sm font-bold text-muted animate-pulse">
               Carregando inventário...
+            </div>
+          ) : loadError ? (
+            <div className="rounded-2xl border border-danger/30 bg-danger/10 px-5 py-8 text-center">
+              <p className="text-xs font-bold leading-5 text-danger">{loadError}</p>
+              <button
+                type="button"
+                onClick={retryInventory}
+                className="mt-4 rounded-xl bg-accent px-4 py-2.5 text-[10px] font-black uppercase text-background"
+              >
+                Tentar novamente
+              </button>
             </div>
           ) : selectedToUse ? (
             /* CONFIGURAÇÃO DE ALVO E ATIVAÇÃO */

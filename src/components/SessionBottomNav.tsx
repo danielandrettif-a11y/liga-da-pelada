@@ -13,11 +13,11 @@ export async function SessionBottomNav() {
   const account = await getCurrentAccount().catch(() => ({ client: null as any, user: null, profile: null, isAdmin: false }));
   const league = account.user ? await getSelectedLeague().catch(() => null) : null;
   const [hasOpenCallup, hasPendingPayment, rosterUnread, collective, linkedPlayer] = await Promise.all([
-    hasActiveCallup().catch(() => false),
-    account.user ? hasPendingPaymentRound().catch(() => false) : Promise.resolve(false),
-    account.isAdmin ? getRosterUnreadState().catch(() => ({ count: 0, lastSeenAt: null })) : Promise.resolve({ count: 0, lastSeenAt: null }),
+    account.user && league ? hasActiveCallup().catch(() => false) : Promise.resolve(false),
+    account.user && league ? hasPendingPaymentRound().catch(() => false) : Promise.resolve(false),
+    account.isAdmin && league ? getRosterUnreadState().catch(() => ({ count: 0, lastSeenAt: null })) : Promise.resolve({ count: 0, lastSeenAt: null }),
     account.user && league?.featureTier === "complete" ? getActiveCollectiveSummary().catch(() => null) : Promise.resolve(null),
-    account.profile?.player_id
+    account.profile?.player_id && league
       ? account.client.from("players").select("member_category").eq("id", account.profile.player_id).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);

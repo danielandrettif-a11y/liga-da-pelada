@@ -7,30 +7,39 @@ import { generatePackOffers } from "@/lib/fantasy/cards/pack-generator";
 import { MAX_SPECIAL_CARDS_PER_ROUND } from "@/lib/fantasy/cards/config";
 import { canSelectFantasyCardInstance, fantasyCardRequiresSavedLineup, isFantasyPriceEligible } from "@/lib/fantasy/cards/eligibility";
 import type { FantasyActiveCardDTO, FantasyPackDTO, FantasyUserCardDTO } from "@/lib/fantasy/cards/dtos";
+import { createServiceClient } from "@/lib/supabase/service";
 import { getActiveLeague } from "./rounds";
 
 export type { FantasyActiveCardDTO, FantasyPackDTO, FantasyUserCardDTO } from "@/lib/fantasy/cards/dtos";
 
-async function packBelongsToLeague(
-  client: Awaited<ReturnType<typeof getCurrentAccount>>["client"],
-  pack: { round_id: string | null; fantasy_season_pass_reward_id: string | null },
-  leagueId: string,
-): Promise<boolean> {
-  if (pack.round_id && !pack.fantasy_season_pass_reward_id) {
-    const { data } = await client.from("rounds").select("id")
-      .eq("id", pack.round_id).eq("league_id", leagueId).maybeSingle();
-    return Boolean(data);
-  }
-  if (!pack.round_id && pack.fantasy_season_pass_reward_id) {
-    const { data: seasons } = await client.from("fantasy_seasons").select("id")
-      .eq("league_id", leagueId);
-    const seasonIds = (seasons || []).map((season) => season.id);
-    if (!seasonIds.length) return false;
-    const { data: reward } = await client.from("fantasy_season_pass_rewards").select("id")
-      .eq("id", pack.fantasy_season_pass_reward_id).in("fantasy_season_id", seasonIds).maybeSingle();
-    return Boolean(reward);
-  }
-  return false;
+const PACK_SCOPE_SELECT = "round_scope:round_id(number,league_id), pass_reward:fantasy_season_pass_reward_id(fantasy_season_id, season:fantasy_seasons!fantasy_season_pass_rewards_fantasy_season_id_fkey(league_id))";
+
+function relationOne<T>(value: T | T[] | null | undefined): T | null {
+  return Array.isArray(value) ? value[0] || null : value || null;
+}
+
+function packLeagueId(pack: any): string | null {
+  const round = relationOne<any>(pack.round_scope);
+  if (round?.league_id) return round.league_id;
+  const reward = relationOne<any>(pack.pass_reward);
+  const season = relationOne<any>(reward?.season);
+  return season?.league_id || null;
+}
+
+function cardDefinitionFromRow(row: any): FantasyCardDefinition | null {
+  const card = relationOne<any>(row);
+  if (!card) return null;
+  return getCardBySlug(card.slug) || {
+    slug: card.slug || "unknown",
+    name: card.name || "Carta",
+    description: card.description || "",
+    rarity: card.rarity || "COMMON",
+    effectType: card.effect_type || "NONE",
+    effectConfig: card.effect_config || {},
+    enabled: card.enabled !== false,
+    icon: "🃏",
+    requiresTarget: "NONE",
+  };
 }
 
 /**
@@ -44,56 +53,36 @@ export async function getMyPacks(): Promise<{
   const account = await getCurrentAccount();
   if (!account.user) return { availablePacks: [], claimedCount: 0, totalPacks: 0 };
   const league = await getActiveLeague();
-  const [{ data: leagueRounds }, { data: leagueFantasySeasons }] = await Promise.all([
-    account.client.from("rounds").select("id").eq("league_id", league.id),
-    account.client.from("fantasy_seasons").select("id").eq("league_id", league.id),
-  ]);
-  const roundIds = new Set((leagueRounds || []).map((round) => round.id));
-  const seasonIds = (leagueFantasySeasons || []).map((season) => season.id);
-  const { data: leagueRewards } = seasonIds.length
-    ? await account.client.from("fantasy_season_pass_rewards").select("id").in("fantasy_season_id", seasonIds)
-    : { data: [] as { id: string }[] };
-  const rewardIds = new Set((leagueRewards || []).map((reward) => reward.id));
-
-  const { data: packs } = await account.client
+  // Uma única consulta substitui as quatro viagens anteriores ao Supabase.
+  // O cliente de serviço é usado somente no servidor e a conta continua presa
+  // por user_id + pelada ativa antes de qualquer dado ser devolvido.
+  const readClient = createServiceClient() || account.client;
+  const { data: packs, error } = await readClient
     .from("fantasy_round_packs")
     .select(
-      "id, round_id, fantasy_season_pass_reward_id, status, opened_at, chosen_card_id, created_at, source, card_tier, rounds:round_id(number), offers:fantasy_pack_offers(slot, card:fantasy_cards(*))"
+      `id, round_id, fantasy_season_pass_reward_id, status, opened_at, chosen_card_id, created_at, source, card_tier, ${PACK_SCOPE_SELECT}, offers:fantasy_pack_offers(slot, card:fantasy_cards(*))`
     )
     .eq("user_id", account.user.id)
     .order("created_at", { ascending: false });
 
-  if (!packs) return { availablePacks: [], claimedCount: 0, totalPacks: 0 };
+  if (error || !packs) {
+    console.error("Erro ao carregar pacotes do Cartola:", error?.message);
+    return { availablePacks: [], claimedCount: 0, totalPacks: 0 };
+  }
 
-  const formatted: FantasyPackDTO[] = packs.filter((p: any) =>
-    (p.round_id && roundIds.has(p.round_id))
-    || (p.fantasy_season_pass_reward_id && rewardIds.has(p.fantasy_season_pass_reward_id))
-  ).map((p: any) => ({
+  const formatted: FantasyPackDTO[] = packs.filter((p: any) => packLeagueId(p) === league.id).map((p: any) => ({
     id: p.id,
     roundId: p.round_id,
-    roundNumber: p.rounds?.number,
+    roundNumber: relationOne<any>(p.round_scope)?.number,
     source: p.source,
     cardTier: p.card_tier,
     status: p.status,
     openedAt: p.opened_at,
     chosenCardId: p.chosen_card_id,
     createdAt: p.created_at,
-    offers: (p.offers || []).map((off: any) => {
-      const cardDef = off.card ? getCardBySlug(off.card.slug) : null;
-      return {
-        slot: off.slot,
-        card: cardDef || {
-          slug: off.card?.slug || "unknown",
-          name: off.card?.name || "Carta",
-          description: off.card?.description || "",
-          rarity: off.card?.rarity || "COMMON",
-          effectType: off.card?.effect_type || "NONE",
-          effectConfig: off.card?.effect_config || {},
-          enabled: true,
-          icon: "🃏",
-          requiresTarget: "NONE",
-        },
-      };
+    offers: (p.offers || []).flatMap((off: any) => {
+      const card = cardDefinitionFromRow(off.card);
+      return card ? [{ slot: off.slot, card }] : [];
     }),
   }));
 
@@ -133,20 +122,21 @@ export async function openPack(packId: string): Promise<{
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Não autenticado." };
 
-  const client = account.client;
+  const mutationClient = createServiceClient() || account.client;
   const league = await getActiveLeague();
 
   // Buscar pacote
-  const { data: pack, error: packErr } = await client
+  const { data: pack, error: packErr } = await mutationClient
     .from("fantasy_round_packs")
-    .select("id, user_id, round_id, fantasy_season_pass_reward_id, status, card_tier, offers:fantasy_pack_offers(slot, card:fantasy_cards(*))")
+    .select(`id, user_id, round_id, fantasy_season_pass_reward_id, status, card_tier, ${PACK_SCOPE_SELECT}, offers:fantasy_pack_offers(slot, card:fantasy_cards(*))`)
     .eq("id", packId)
+    .eq("user_id", account.user.id)
     .single();
 
   if (packErr || !pack || pack.user_id !== account.user.id) {
     return { success: false, error: "Pacote não encontrado ou não pertence a você." };
   }
-  if (!(await packBelongsToLeague(client, pack, league.id)))
+  if (packLeagueId(pack) !== league.id)
     return { success: false, error: "Pacote não pertence à pelada selecionada." };
 
   if (pack.status === "claimed") {
@@ -156,10 +146,9 @@ export async function openPack(packId: string): Promise<{
   // Se já tiver ofertas salvas, retorna as mesmas (Idempotência estrita)
   if (pack.offers && pack.offers.length >= 2) {
     const sorted = [...pack.offers].sort((a: any, b: any) => a.slot - b.slot);
-    const card1Obj = Array.isArray(sorted[0].card) ? sorted[0].card[0] : sorted[0].card;
-    const card2Obj = Array.isArray(sorted[1].card) ? sorted[1].card[0] : sorted[1].card;
-    const c1 = getCardBySlug(card1Obj?.slug)!;
-    const c2 = getCardBySlug(card2Obj?.slug)!;
+    const c1 = cardDefinitionFromRow(sorted[0].card);
+    const c2 = cardDefinitionFromRow(sorted[1].card);
+    if (!c1 || !c2) return { success: false, error: "As opções deste pacote não puderam ser carregadas." };
     return { success: true, offers: [c1, c2] };
   }
 
@@ -167,7 +156,7 @@ export async function openPack(packId: string): Promise<{
   const [offer1, offer2] = generatePackOffers(undefined, Math.random, pack.card_tier as "bronze" | "gold" | null);
 
   // Buscar IDs no banco
-  const { data: dbCards } = await client
+  const { data: dbCards } = await mutationClient
     .from("fantasy_cards")
     .select("id, slug")
     .in("slug", [offer1.slug, offer2.slug]);
@@ -181,34 +170,42 @@ export async function openPack(packId: string): Promise<{
   }
 
   // Gravação atômica das 2 ofertas
-  const { error: insErr } = await client.from("fantasy_pack_offers").insert([
+  const { error: insErr } = await mutationClient.from("fantasy_pack_offers").insert([
     { pack_id: packId, slot: 1, card_id: id1 },
     { pack_id: packId, slot: 2, card_id: id2 },
   ]);
 
   if (insErr) {
     // Se falhou por conflito de concorrência, busca as que foram gravadas
-    const { data: existingOffers } = await client
+    const { data: existingOffers } = await mutationClient
       .from("fantasy_pack_offers")
       .select("slot, card:fantasy_cards(*)")
       .eq("pack_id", packId);
     if (existingOffers && existingOffers.length >= 2) {
       const sorted = [...existingOffers].sort((a: any, b: any) => a.slot - b.slot);
-      const ex1 = Array.isArray(sorted[0].card) ? sorted[0].card[0] : sorted[0].card;
-      const ex2 = Array.isArray(sorted[1].card) ? sorted[1].card[0] : sorted[1].card;
+      const ex1 = cardDefinitionFromRow(sorted[0].card);
+      const ex2 = cardDefinitionFromRow(sorted[1].card);
+      if (!ex1 || !ex2) return { success: false, error: "As opções deste pacote não puderam ser carregadas." };
       return {
         success: true,
-        offers: [getCardBySlug(ex1?.slug)!, getCardBySlug(ex2?.slug)!],
+        offers: [ex1, ex2],
       };
     }
     return { success: false, error: `Erro ao gerar ofertas: ${insErr.message}` };
   }
 
   // Marcar pacote como aberto
-  await client
+  const { error: openedError } = await mutationClient
     .from("fantasy_round_packs")
     .update({ status: "opened", opened_at: new Date().toISOString() })
-    .eq("id", packId);
+    .eq("id", packId)
+    .eq("user_id", account.user.id);
+
+  if (openedError) {
+    // As ofertas já foram persistidas e serão reutilizadas na próxima tentativa.
+    // Não escondemos o pacote do usuário por uma falha parcial de status.
+    console.error("Erro ao marcar pacote como aberto:", openedError.message);
+  }
 
   revalidatePath("/cartola");
   return { success: true, offers: [offer1, offer2] };
@@ -225,19 +222,21 @@ export async function claimPackCard(
   if (!account.user) return { success: false, error: "Não autenticado." };
 
   const client = account.client;
+  const mutationClient = createServiceClient() || client;
   const league = await getActiveLeague();
 
   // Buscar pacote e ofertas
-  const { data: pack, error: packErr } = await client
+  const { data: pack, error: packErr } = await mutationClient
     .from("fantasy_round_packs")
-    .select("id, user_id, round_id, fantasy_season_pass_reward_id, status, offers:fantasy_pack_offers(slot, card:fantasy_cards(*))")
+    .select(`id, user_id, round_id, fantasy_season_pass_reward_id, status, ${PACK_SCOPE_SELECT}, offers:fantasy_pack_offers(slot, card:fantasy_cards(*))`)
     .eq("id", packId)
+    .eq("user_id", account.user.id)
     .single();
 
   if (packErr || !pack || pack.user_id !== account.user.id) {
     return { success: false, error: "Pacote inválido." };
   }
-  if (!(await packBelongsToLeague(client, pack, league.id)))
+  if (packLeagueId(pack) !== league.id)
     return { success: false, error: "Pacote não pertence à pelada selecionada." };
 
   if (pack.status === "claimed") {
@@ -252,31 +251,83 @@ export async function claimPackCard(
     return { success: false, error: "A carta escolhida não pertence às opções sorteadas deste pacote." };
   }
 
-  const validCardObj = Array.isArray(validOffer.card) ? validOffer.card[0] : validOffer.card;
+  const validCardObj = relationOne<any>(validOffer.card);
   const cardId = validCardObj?.id;
-  const chosenDef = getCardBySlug(chosenSlug);
+  const chosenDef = cardDefinitionFromRow(validOffer.card) || undefined;
+
+  if (!cardId || !chosenDef) {
+    return { success: false, error: "A carta escolhida não está mais disponível no catálogo." };
+  }
+
+  // Duplo toque, perda de conexão e reenvio precisam devolver o mesmo
+  // resultado em vez de duplicar a carta ou travar o pacote.
+  const { data: existingInventoryCard } = await mutationClient
+    .from("fantasy_user_cards")
+    .select("id, card_id, card:fantasy_cards(*)")
+    .eq("user_id", account.user.id)
+    .eq("source_pack_id", packId)
+    .maybeSingle();
+
+  if (existingInventoryCard) {
+    const existingDefinition = cardDefinitionFromRow(existingInventoryCard.card) || chosenDef;
+    await mutationClient.from("fantasy_round_packs").update({
+      status: "claimed",
+      chosen_card_id: existingInventoryCard.card_id,
+    }).eq("id", packId).eq("user_id", account.user.id);
+    revalidatePath("/cartola");
+    return { success: true, chosenCard: existingDefinition };
+  }
 
   // Inserir no inventário pessoal do usuário
-  const { error: invErr } = await client.from("fantasy_user_cards").insert({
-    user_id: account.user.id,
-    league_id: league.id,
-    card_id: cardId,
-    source_pack_id: packId,
-    status: "OWNED",
-  });
+  const { data: insertedCard, error: invErr } = await mutationClient
+    .from("fantasy_user_cards")
+    .insert({
+      user_id: account.user.id,
+      league_id: league.id,
+      card_id: cardId,
+      source_pack_id: packId,
+      status: "OWNED",
+    })
+    .select("id")
+    .single();
 
   if (invErr) {
+    // Uma segunda requisição pode ter vencido a corrida protegida pelo índice
+    // único. Nesse caso o resgate já deu certo e deve ser tratado como sucesso.
+    const { data: concurrentCard } = await mutationClient
+      .from("fantasy_user_cards")
+      .select("id, card_id, card:fantasy_cards(*)")
+      .eq("user_id", account.user.id)
+      .eq("source_pack_id", packId)
+      .maybeSingle();
+    if (concurrentCard) {
+      const concurrentDefinition = cardDefinitionFromRow(concurrentCard.card) || chosenDef;
+      await mutationClient.from("fantasy_round_packs").update({
+        status: "claimed",
+        chosen_card_id: concurrentCard.card_id,
+      }).eq("id", packId).eq("user_id", account.user.id);
+      revalidatePath("/cartola");
+      return { success: true, chosenCard: concurrentDefinition };
+    }
     return { success: false, error: `Erro ao adicionar ao inventário: ${invErr.message}` };
   }
 
   // Marcar pacote como claimed
-  await client
+  const { error: claimedError } = await mutationClient
     .from("fantasy_round_packs")
     .update({
       status: "claimed",
       chosen_card_id: cardId,
     })
-    .eq("id", packId);
+    .eq("id", packId)
+    .eq("user_id", account.user.id);
+
+  if (claimedError) {
+    if (insertedCard?.id) {
+      await mutationClient.from("fantasy_user_cards").delete().eq("id", insertedCard.id);
+    }
+    return { success: false, error: "A carta não foi confirmada. Tente novamente; seu pacote continua disponível." };
+  }
 
   revalidatePath("/cartola");
   return { success: true, chosenCard: chosenDef };
@@ -293,8 +344,9 @@ export async function getMyInventory(): Promise<{
   const account = await getCurrentAccount();
   if (!account.user) return { cards: [], groupedBySlug: {}, availableCount: 0 };
   const league = await getActiveLeague();
+  const readClient = createServiceClient() || account.client;
 
-  const { data } = await account.client
+  const { data } = await readClient
     .from("fantasy_user_cards")
     .select("id, card_id, status, acquired_at, consumed_at, card:fantasy_cards(*)")
     .eq("user_id", account.user.id)
@@ -369,8 +421,9 @@ export async function getMyInventoryCount(): Promise<number> {
   const account = await getCurrentAccount();
   if (!account.user) return 0;
   const league = await getActiveLeague();
+  const readClient = createServiceClient() || account.client;
 
-  const { count } = await account.client
+  const { count } = await readClient
     .from("fantasy_user_cards")
     .select("id", { count: "exact", head: true })
     .eq("user_id", account.user.id)
@@ -387,11 +440,12 @@ export async function getActiveCardForRound(roundId: string): Promise<FantasyAct
   const account = await getCurrentAccount();
   if (!account.user) return null;
   const league = await getActiveLeague();
-  const { data: scopedRound } = await account.client.from("rounds").select("id")
+  const readClient = createServiceClient() || account.client;
+  const { data: scopedRound } = await readClient.from("rounds").select("id")
     .eq("id", roundId).eq("league_id", league.id).maybeSingle();
   if (!scopedRound) return null;
 
-  const { data: activation } = await account.client
+  const { data: activation } = await readClient
     .from("fantasy_card_activations")
     .select("id, round_id, user_card_id, status, target_snapshot, result_bonus, result_details, card:fantasy_cards(*)")
     .eq("round_id", roundId)
@@ -425,7 +479,7 @@ export async function getActiveCardForRound(roundId: string): Promise<FantasyAct
   if (targetSnap.targetPlayer2Id && !targetPlayer2Name) playerIdsToFetch.push(targetSnap.targetPlayer2Id);
 
   if (playerIdsToFetch.length > 0) {
-    const { data: fetchedPlayers } = await account.client
+    const { data: fetchedPlayers } = await readClient
       .from("players")
       .select("id, name")
       .in("id", playerIdsToFetch);
@@ -476,7 +530,7 @@ export async function activateCardForRound({
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Não autenticado." };
 
-  const client = account.client;
+  const client = createServiceClient() || account.client;
   const league = await getActiveLeague();
 
   // 1. Verificar status da rodada e mercado
@@ -499,6 +553,7 @@ export async function activateCardForRound({
     .from("fantasy_user_cards")
     .select("id, user_id, status, card_id, card:fantasy_cards(*)")
     .eq("id", userCardId)
+    .eq("user_id", account.user.id)
     .eq("league_id", league.id)
     .single();
 
@@ -667,13 +722,16 @@ export async function activateCardForRound({
     targetPrediction: targetPrediction || null,
   };
 
-  // Só agora a carta anteriormente reservada é devolvida ao inventário.
-  if (existingAct?.user_card_id && existingAct.user_card_id !== userCardId) {
-    await client
-      .from("fantasy_user_cards")
-      .update({ status: "OWNED" })
-      .eq("id", existingAct.user_card_id)
-      .eq("league_id", league.id);
+  // Reserva primeiro a nova instância. Se a ativação falhar, a alteração é
+  // desfeita e a carta antiga continua intacta.
+  const { error: reserveError } = await client
+    .from("fantasy_user_cards")
+    .update({ status: "RESERVED" })
+    .eq("id", userCardId)
+    .eq("user_id", account.user.id)
+    .eq("league_id", league.id);
+  if (reserveError) {
+    return { success: false, error: "Não foi possível reservar esta carta. Tente novamente." };
   }
 
   // Upsert da ativação (UNIQUE(round_id, user_id))
@@ -692,15 +750,25 @@ export async function activateCardForRound({
   );
 
   if (actErr) {
+    if (existingAct?.user_card_id !== userCardId) {
+      await client.from("fantasy_user_cards").update({ status: "OWNED" })
+        .eq("id", userCardId).eq("user_id", account.user.id).eq("league_id", league.id);
+    }
     return { success: false, error: `Erro ao ativar carta: ${actErr.message}` };
   }
 
-  // Marcar a carta no inventário como RESERVED
-  await client
-    .from("fantasy_user_cards")
-    .update({ status: "RESERVED" })
-    .eq("id", userCardId)
-    .eq("league_id", league.id);
+  // A nova ativação já está garantida; agora a carta substituída volta ao inventário.
+  if (existingAct?.user_card_id && existingAct.user_card_id !== userCardId) {
+    const { error: restorePreviousError } = await client
+      .from("fantasy_user_cards")
+      .update({ status: "OWNED" })
+      .eq("id", existingAct.user_card_id)
+      .eq("user_id", account.user.id)
+      .eq("league_id", league.id);
+    if (restorePreviousError) {
+      console.error("Erro ao devolver carta substituída ao inventário:", restorePreviousError.message);
+    }
+  }
 
   revalidatePath("/cartola");
   return { success: true };
@@ -715,7 +783,7 @@ export async function removeActiveCardForRound(
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Não autenticado." };
 
-  const client = account.client;
+  const client = createServiceClient() || account.client;
   const league = await getActiveLeague();
   const { data: scopedRound } = await client.from("rounds").select("id")
     .eq("id", roundId).eq("league_id", league.id).maybeSingle();
@@ -740,6 +808,7 @@ export async function removeActiveCardForRound(
       .from("fantasy_user_cards")
       .update({ status: "OWNED" })
       .eq("id", act.user_card_id)
+      .eq("user_id", account.user.id)
       .eq("league_id", league.id);
     if (restoreError) {
       return { success: false, error: "Não foi possível devolver a carta ao inventário." };

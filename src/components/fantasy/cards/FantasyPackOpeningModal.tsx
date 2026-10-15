@@ -19,7 +19,7 @@ type Props = {
   onSuccess: () => void;
 };
 
-type Stage = "SEALED" | "REVEALED" | "CONFIRMING" | "CLAIMED";
+type Stage = "SEALED" | "LOADING" | "REVEALED" | "CONFIRMING" | "CLAIMED";
 
 export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Props) {
   const [mounted, setMounted] = useState(false);
@@ -42,14 +42,25 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!isOpen || offers || serverOffersPromiseRef.current) return;
+    // O sorteio começa assim que o modal abre. Normalmente ele termina antes
+    // de o usuário tocar no pacote, eliminando a espera depois da animação.
+    void requestOffers();
+  // A função usa somente o pacote atual; o modal é remontado entre pacotes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, pack.id]);
+
   if (!mounted || !isOpen || typeof document === "undefined") return null;
 
   /**
    * Disparado no início da reprodução do vídeo de abertura do pacote.
    * Faz o fetch em background para que as cartas já estejam sorteadas e prontas quando o vídeo terminar.
    */
-  function handleOpeningStart() {
-    if (offers || serverOffersPromiseRef.current) return;
+  function requestOffers(force = false) {
+    if (offers && !force) return Promise.resolve(offers);
+    if (serverOffersPromiseRef.current && !force) return serverOffersPromiseRef.current;
+    if (force) serverOffersPromiseRef.current = null;
     setError(null);
 
     serverOffersPromiseRef.current = openPack(pack.id)
@@ -59,13 +70,22 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
           return res.offers;
         } else {
           setError(res.error || "Não foi possível abrir o pacote.");
+          serverOffersPromiseRef.current = null;
           return null;
         }
       })
       .catch((err: any) => {
         setError(err.message || "Erro de conexão ao abrir pacote.");
+        serverOffersPromiseRef.current = null;
         return null;
       });
+
+    return serverOffersPromiseRef.current;
+  }
+
+  function handleOpeningStart() {
+    if (offers || serverOffersPromiseRef.current) return;
+    void requestOffers();
   }
 
   /**
@@ -78,6 +98,7 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
     }
 
     if (serverOffersPromiseRef.current) {
+      setStage("LOADING");
       const fetched = await serverOffersPromiseRef.current;
       if (fetched) {
         setOffers(fetched);
@@ -87,17 +108,21 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
       }
     } else {
       // Fallback
-      handleOpeningStart();
-      if (serverOffersPromiseRef.current) {
-        const fetched = await serverOffersPromiseRef.current;
-        if (fetched) {
-          setOffers(fetched);
-          setStage("REVEALED");
-        } else {
-          setStage("SEALED");
-        }
+      setStage("LOADING");
+      const fetched = await requestOffers();
+      if (fetched) {
+        setOffers(fetched);
+        setStage("REVEALED");
+      } else {
+        setStage("SEALED");
       }
     }
+  }
+
+  async function handleRetry() {
+    setStage("LOADING");
+    const fetched = await requestOffers(true);
+    setStage(fetched ? "REVEALED" : "SEALED");
   }
 
   function handleSelectCard(card: FantasyCardDefinition) {
@@ -175,6 +200,27 @@ export function FantasyPackOpeningModal({ pack, isOpen, onClose, onSuccess }: Pr
               onStart={handleOpeningStart}
               onComplete={handleOpeningComplete}
             />
+          </div>
+        )}
+
+        {stage === "LOADING" && (
+          <div className="relative z-10 flex min-h-80 flex-col items-center justify-center px-5 py-10 text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-accent" />
+            <h2 className="mt-5 font-athletic text-xl font-black uppercase italic text-white">
+              Preparando suas cartas
+            </h2>
+            <p className="mt-2 max-w-xs text-xs leading-5 text-muted">
+              O pacote já está seguro. Estamos buscando as duas opções sorteadas.
+            </p>
+            {error && (
+              <button
+                type="button"
+                onClick={() => void handleRetry()}
+                className="mt-5 rounded-xl bg-accent px-5 py-3 text-xs font-black uppercase text-background"
+              >
+                Tentar novamente
+              </button>
+            )}
           </div>
         )}
 
