@@ -73,7 +73,8 @@ export function RoundCreator({
   const [changingPlayerId, setChangingPlayerId] = useState<string | null>(null);
   
   // Step 3: Times
-  const teamCount = Math.min(MAX_TEAMS_PER_ROUND, Math.max(MIN_TEAMS_PER_ROUND, Math.trunc(teamsPerRound)));
+  const selectedSourceCallup = availableCallups.find((item) => item.id === sourceCallupId) || null;
+  const teamCount = Math.min(MAX_TEAMS_PER_ROUND, Math.max(MIN_TEAMS_PER_ROUND, Math.trunc(selectedSourceCallup?.teamsPerRound || teamsPerRound)));
   const [teams, setTeams] = useState<DrawTeam[]>(() => createDefaultTeams(teamCount, teamPresetOffsets[roundType] || 0));
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [openVestPickerTeamId, setOpenVestPickerTeamId] = useState<string | null>(null);
@@ -90,9 +91,11 @@ export function RoundCreator({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const teamCapacity = Math.min(MAX_PLAYERS_PER_TEAM, Math.max(1, Math.trunc(playersPerTeam)));
+  const teamCapacity = Math.min(MAX_PLAYERS_PER_TEAM, Math.max(1, Math.trunc(selectedSourceCallup?.playersPerTeam || playersPerTeam)));
   const roundCapacity = teamCapacity * teamCount;
-  const minimumPlayersToMount = teamCount === 3 && teamCapacity === 6 ? MIN_UNDERFILLED_PLAYERS : 1;
+  const minimumPlayersToMount = teamCount === 2
+    ? Math.max(10, (teamCapacity - 1) * 2)
+    : teamCount === 3 ? Math.max(MIN_UNDERFILLED_PLAYERS, teamCapacity * 2) : teamCapacity * 2;
 
   function selectRoundType(type: RoundType) {
     if (sourceCallupId) return;
@@ -106,7 +109,6 @@ export function RoundCreator({
     if (!query) return allPlayers;
     return allPlayers.filter((player) => `${player.name} ${player.nickname || ""}`.toLocaleLowerCase("pt-BR").includes(query));
   }, [allPlayers, playerSearch]);
-  const selectedSourceCallup = availableCallups.find((item) => item.id === sourceCallupId) || null;
   const selectionCapacity = selectedSourceCallup?.capacity || roundCapacity;
   const sourceEntryIds = new Set(selectedSourceCallup?.entryIds || []);
   const synchronizedPlayerKey = (selectedSourceCallup?.playerIds || initialPlayerIds).join("|");
@@ -271,7 +273,7 @@ export function RoundCreator({
     setStartTime(selectedCallup.startTime);
     setSelectedRoundType(selectedCallup.roundType);
     setSelectedPlayerIds(new Set(selectedCallup.playerIds));
-    setTeams(createDefaultTeams(teamCount, teamPresetOffsets[selectedCallup.roundType] || 0));
+    setTeams(createDefaultTeams(selectedCallup.teamsPerRound, teamPresetOffsets[selectedCallup.roundType] || 0));
   }
 
   async function persistPrelist(destination: "list" | "teams") {
@@ -408,9 +410,15 @@ export function RoundCreator({
       return;
     }
 
-    if (teamCount === 3 && teamCapacity === 6 && selectedPlayers.length < roundCapacity) {
-      if (selectedPlayers.length < MIN_UNDERFILLED_PLAYERS) {
-        setError(`Selecione pelo menos ${MIN_UNDERFILLED_PLAYERS} jogadores para iniciar uma rodada incompleta.`);
+    if (selectedPlayers.length < roundCapacity) {
+      if (teamCount === 2 && selectedPlayers.length !== (teamCapacity - 1) * 2) {
+        setError(teamCapacity > 5
+          ? `Com 2 times, use ${roundCapacity} jogadores para ${teamCapacity}×${teamCapacity} ou ${(teamCapacity - 1) * 2} para ${(teamCapacity - 1)}×${(teamCapacity - 1)}. Ajuste a lista antes de continuar.`
+          : `Com 2 times, complete as ${roundCapacity} vagas antes de montar a rodada.`);
+        return;
+      }
+      if (selectedPlayers.length < minimumPlayersToMount) {
+        setError(`Selecione pelo menos ${minimumPlayersToMount} jogadores para iniciar uma rodada incompleta.`);
         return;
       }
       setError("");
@@ -422,14 +430,6 @@ export function RoundCreator({
   }
 
   async function confirmUnderfilledSize(targetPlayersPerTeam: RoundTeamSizeMode) {
-    if (sourceCallupId) {
-      const capacityResult = await setCallupMatchSize(sourceCallupId, targetPlayersPerTeam);
-      if (!capacityResult.success) {
-        setUnderfilledPrompt(null);
-        setError(capacityResult.error || "Não foi possível ajustar a capacidade da convocação.");
-        return;
-      }
-    }
     const teamsToSave = formationMode === "manual"
       ? teams
       : (() => {
@@ -444,11 +444,19 @@ export function RoundCreator({
     if (validationError) {
       setUnderfilledPrompt(null);
       setError(validationError);
-      if (targetPlayersPerTeam === 5 && selectedPlayers.length > 15) {
+      if (selectedPlayers.length > targetPlayersPerTeam * teamCount) {
         setStep(2);
         router.refresh();
       }
       return;
+    }
+    if (sourceCallupId) {
+      const capacityResult = await setCallupMatchSize(sourceCallupId, targetPlayersPerTeam, teamCount);
+      if (!capacityResult.success) {
+        setUnderfilledPrompt(null);
+        setError(capacityResult.error || "Não foi possível ajustar a capacidade da convocação.");
+        return;
+      }
     }
     setTeams(teamsToSave);
     setUnderfilledPrompt(null);
@@ -564,7 +572,9 @@ export function RoundCreator({
                 {underfilledPrompt === "count" ? (
                   <p className="mt-1 text-xs leading-relaxed text-muted">Há {selectedPlayers.length} de {roundCapacity} jogadores. Tem certeza de que deseja continuar com menos pessoas?</p>
                 ) : (
-                  <p className="mt-1 text-xs leading-relaxed text-muted">Deseja manter partidas 6x6? O time que estiver fora emprestará jogadores automaticamente para completar as vagas.</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">{teamCount === 2
+                    ? `Com dois times, a partida precisa de equipes completas. Reduza para ${teamCapacity - 1}×${teamCapacity - 1}.`
+                    : `Deseja manter partidas ${teamCapacity}×${teamCapacity}? Times de fora podem emprestar jogadores para completar as vagas. Você também pode reduzir para ${teamCapacity - 1}×${teamCapacity - 1}.`}</p>
                 )}
               </div>
             </div>
@@ -573,8 +583,8 @@ export function RoundCreator({
                 <button type="button" onClick={() => setUnderfilledPrompt("size")} className="rounded-xl bg-warning px-4 py-3 text-xs font-black uppercase text-background">Sim, continuar</button>
               ) : (
                 <>
-                  <button type="button" onClick={() => confirmUnderfilledSize(6)} className="rounded-xl bg-accent px-4 py-3 text-xs font-black uppercase text-background">Sim, manter 6x6</button>
-                  <button type="button" onClick={() => confirmUnderfilledSize(5)} className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-xs font-black uppercase text-warning">Não, usar 5x5</button>
+                  {teamCount > 2 && <button type="button" onClick={() => confirmUnderfilledSize(teamCapacity)} className="rounded-xl bg-accent px-4 py-3 text-xs font-black uppercase text-background">Manter {teamCapacity}×{teamCapacity}</button>}
+                  {teamCapacity > 5 && <button type="button" onClick={() => confirmUnderfilledSize(teamCapacity - 1)} className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-xs font-black uppercase text-warning">Usar {teamCapacity - 1}×{teamCapacity - 1}</button>}
                 </>
               )}
               <button type="button" onClick={() => setUnderfilledPrompt(null)} className="rounded-xl border border-border bg-surface px-4 py-3 text-xs font-bold text-muted">Cancelar</button>
@@ -972,7 +982,7 @@ export function RoundCreator({
               <p className="text-[10px] font-black uppercase tracking-wider text-muted">Como montar os times?</p>
               <span className="text-[9px] font-bold text-accent">Sorteio com 1 toque</span>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div className={`grid grid-cols-2 gap-2 ${teamCount === 3 ? "sm:grid-cols-3" : ""}`}>
               <button
                 type="button"
                 onClick={requestDraw}
@@ -992,15 +1002,16 @@ export function RoundCreator({
               >
                 ✋ Manual
               </button>
-              <button
+              {teamCount === 3 && <button
                 type="button"
                 onClick={() => void handleStartDraft()}
                 disabled={loading || !currentPrelistId}
                 className="rounded-xl border border-accent/45 bg-accent/10 px-2 py-3 text-[10px] font-black uppercase text-accent transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 👑 Draft de Capitães
-              </button>
+              </button>}
             </div>
+            {teamCount !== 3 && <p className="mt-2 text-[10px] text-muted">O Draft de Capitães está disponível somente para 3 times; para este formato use o sorteio equilibrado ou a montagem manual.</p>}
             <p className="mt-2 text-[10px] text-muted">
               {formationMode === "manual"
                 ? "Toque em cada jogador e escolha o time manualmente."

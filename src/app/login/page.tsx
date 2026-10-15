@@ -45,8 +45,8 @@ function LoginContent() {
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent to-accent-light flex items-center justify-center shadow-lg shadow-accent/20 mb-4">
             <Trophy className="w-8 h-8 text-black" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground text-center">Pelada de Baixa Qualidade</h1>
-          <p className="text-muted text-sm mt-1">Entre para acessar sua conta</p>
+          <h1 className="text-2xl font-bold text-foreground text-center">Pelada BQ</h1>
+          <p className="text-muted text-sm mt-1">Acesso de jogador · entre para escolher sua pelada</p>
         </div>
 
         {/* Login Card */}
@@ -139,9 +139,8 @@ function LoginContent() {
           </>}
         </div>
         
-        <p className="text-center text-xs text-muted mt-8">
-          Jogadores podem criar a própria conta. Administradores são cadastrados manualmente.
-        </p>
+        <p className="text-center text-xs text-muted mt-8">Novo por aqui? Crie sua conta com Google ou e-mail. O acesso de estádio ainda está em preparação.</p>
+        <div className="mt-3 flex justify-center gap-4 text-xs font-bold text-accent"><Link href="/inicio">Conhecer o projeto</Link><Link href="/estadio">Área de estádio</Link></div>
 
       </div>
     </div>

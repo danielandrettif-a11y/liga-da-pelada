@@ -114,7 +114,7 @@ export async function dispatchCartolaReminder(job: CartolaReminderJob) {
   if (!service) throw new Error("Cliente administrativo indisponível.");
   const { data: round, error: roundError } = await service
     .from("rounds")
-    .select("id, league_id, number, date, start_time, status, round_type, league:league_id(players_per_team, cartola_reminders_enabled), fantasy_rounds(id, market_status)")
+    .select("id, league_id, number, date, start_time, status, round_type, league:league_id(players_per_team, cartola_reminders_enabled), fantasy_rounds(id, market_status, settings_snapshot)")
     .eq("id", job.roundId)
     .maybeSingle();
   if (roundError) throw roundError;
@@ -152,7 +152,8 @@ export async function dispatchCartolaReminder(job: CartolaReminderJob) {
     allAuthUsers(),
   ]);
   const prefMap = new Map((preferences || []).map((pref) => [pref.user_id, pref]));
-  const complete = new Set((lineups || []).filter((lineup: any) => (lineup.fantasy_lineup_players || []).length >= Number(league.players_per_team || 5)).map((lineup) => lineup.user_id));
+  const lineupSize = Number(fantasyRound?.settings_snapshot?.players_per_team || league.players_per_team || 5);
+  const complete = new Set((lineups || []).filter((lineup: any) => (lineup.fantasy_lineup_players || []).length >= lineupSize).map((lineup) => lineup.user_id));
   const authMap = new Map(authUsers.map((user) => [user.id, user]));
   const profileByUser = new Map((profiles || []).map((profile) => [profile.user_id, profile]));
   let sent = 0;

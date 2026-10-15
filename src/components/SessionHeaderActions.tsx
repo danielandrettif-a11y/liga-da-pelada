@@ -6,13 +6,15 @@ import { InboxBell } from "./InboxBell";
 import { ShareAppButton } from "./ShareAppButton";
 import { ProfileQuickMenu } from "./ProfileQuickMenu";
 import { UserRound } from "@/components/icons";
+import { getSelectedLeague } from "@/lib/league-context";
 
 export async function SessionHeaderActions() {
   const account = await getCurrentAccount();
+  const selectedLeague = account.user ? await getSelectedLeague() : null;
   const [identity, inbox, cosmetics] = await Promise.all([
     getCurrentAccountIdentity(),
-    account.user ? getMyInboxPreview() : Promise.resolve([]),
-    account.user ? getMyEquippedCosmetics() : Promise.resolve(null),
+    selectedLeague ? getMyInboxPreview() : Promise.resolve([]),
+    selectedLeague ? getMyEquippedCosmetics() : Promise.resolve(null),
   ]);
 
   return (

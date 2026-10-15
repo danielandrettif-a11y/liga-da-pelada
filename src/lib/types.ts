@@ -145,6 +145,10 @@ export type LeagueMember = {
   player_id: string;
   role: 'admin' | 'player';
   is_active: boolean;
+  player_profile: PlayerProfile | null;
+  initial_player_profile: PlayerProfile | null;
+  overall_traits: PlayerProfile[];
+  overall_seed_mode: OverallSeedMode;
   joined_at: string;
 };
 
@@ -170,6 +174,7 @@ export type Round = {
   round_type: RoundType;
   formation_mode: TeamFormationMode;
   target_players_per_team?: number | null;
+  target_teams_per_round?: number | null;
   suppress_goalkeeper_rewards?: boolean;
   arrival_order_enabled: boolean;
   preparation_stage: RoundPreparationStage;
@@ -191,6 +196,8 @@ export type Callup = {
   round_type: RoundType;
   status: CallupStatus;
   capacity: number;
+  players_per_team?: number | null;
+  teams_per_round?: number | null;
   waitlist_capacity: number;
   stadium_id?: string | null;
   stadium_name?: string | null;

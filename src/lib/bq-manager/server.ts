@@ -10,9 +10,15 @@ export function createManagerClient() {
   return config ? createClient(config.url, config.key, { auth: { persistSession: false, autoRefreshToken: false } }) : null;
 }
 
+export async function readManagerSourceLeague(appClient: SupabaseClient): Promise<string | null> {
+  const { data, error } = await appClient.rpc("get_bq_manager_source_league");
+  if (error) throw new Error("manager_source_unavailable");
+  return typeof data === "string" ? data : null;
+}
+
 /** Fresh, authenticated, explicit allowlist. Never copies account/private fields. */
-export async function readCatalog(appClient: SupabaseClient): Promise<AthleteSource[]> {
-  const { data, error } = await appClient.rpc("get_manager_player_catalog");
+export async function readCatalog(appClient: SupabaseClient, leagueId: string): Promise<AthleteSource[]> {
+  const { data, error } = await appClient.rpc("get_manager_player_catalog_for_league", { p_league_id: leagueId });
   if (error) throw new Error("manager_catalog_unavailable");
   return (data || []).flatMap((row: Record<string, unknown>) => {
     const traits = Array.isArray(row.traits) ? row.traits.filter((trait): trait is "defensive" | "midfield" | "offensive" =>

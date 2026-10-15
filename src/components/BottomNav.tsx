@@ -16,6 +16,7 @@ const NAV_ITEMS = [
 
 export function BottomNav({
   isAuthenticated,
+  featureTier,
   hasOpenCallup,
   hasPendingPayment,
   canAccessCollective,
@@ -24,6 +25,7 @@ export function BottomNav({
   currentUserId,
 }: {
   isAuthenticated: boolean;
+  featureTier: "basic" | "complete";
   hasOpenCallup: boolean;
   hasPendingPayment: boolean;
   canAccessCollective: boolean;
@@ -77,9 +79,9 @@ export function BottomNav({
   const contextualItems = [
     NAV_ITEMS[0],
     ...(roundFlowItem ? [roundFlowItem] : []),
-    NAV_ITEMS[1],
+    ...(featureTier === "complete" ? [NAV_ITEMS[1]] : []),
     NAV_ITEMS[2],
-    ...(canAccessCollective ? [communityItem] : []),
+    ...(featureTier === "complete" && canAccessCollective ? [communityItem] : []),
     NAV_ITEMS[4],
   ];
   const visibleItems = isAuthenticated

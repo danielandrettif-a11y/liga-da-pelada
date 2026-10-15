@@ -25,7 +25,7 @@ test("herança mostra a prévia, exige ciência do consumo e conserva cinco cart
   const nav = page.getByRole("navigation", { name: "Áreas do BQ Manager" });
   await nav.getByRole("button", { name: "Evoluir", exact: true }).click();
   await page.getByRole("group", { name: /Cartas doadoras/ }).getByRole("checkbox").first().check();
-  await expect(page.getByText("74.0 → 77.0", { exact: true })).toBeVisible();
+  await expect(page.getByText("67.0 → 77.0", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Confirmar evolução" })).toBeDisabled();
   await page.getByLabel("Entendi que as doadoras serão consumidas e não poderão ser recuperadas.").check();
   await page.getByRole("button", { name: "Confirmar evolução" }).click();
@@ -43,7 +43,7 @@ test("fusão de quatro cópias aplica +2 e não deixa rolagem horizontal no celu
   await page.getByLabel("Tipo de evolução").selectOption("four");
   const donors = page.getByRole("group", { name: /Cartas doadoras/ }).getByRole("checkbox");
   for (let index = 1; index <= 4; index++) await donors.nth(index).check();
-  await expect(page.getByText("74.0 → 76.0", { exact: true })).toBeVisible();
+  await expect(page.getByText("67.0 → 69.0", { exact: true })).toBeVisible();
   await page.getByLabel("Entendi que as doadoras serão consumidas e não poderão ser recuperadas.").check();
   await page.getByRole("button", { name: "Confirmar evolução" }).click();
   await page.getByRole("navigation", { name: "Áreas do BQ Manager" }).getByRole("button", { name: "Cartas", exact: true }).click();

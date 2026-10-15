@@ -35,22 +35,57 @@ export default async function proxy(request: NextRequest) {
     pathname.startsWith('/admin') ||
     /^\/rodadas\/[^/]+\/nova-partida$/.test(pathname)
   const isAccountRoute = pathname.startsWith('/meu-perfil')
+  const isLeagueSelectionRoute = pathname === '/lobby' || pathname.startsWith('/lobby/') || pathname === '/peladas'
+  const isPublicRoute = pathname === '/inicio' || pathname === '/estadio'
+    || pathname === '/bq-manager/demo'
+    || pathname.startsWith('/login') || pathname.startsWith('/cadastro')
+    || pathname.startsWith('/auth/') || pathname.startsWith('/convite/')
+    || pathname.startsWith('/redefinir-senha') || pathname.startsWith('/api/')
+    || pathname.startsWith('/internal/')
   const loginUrl = new URL('/login', request.url)
   loginUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
   let isAdmin = false
+  let hasMembership = false
+  let needsLeagueChoice = false
+  let isBasicLeague = false
 
-  if (user && (isAdminRoute || pathname === '/login' || pathname === '/cadastro')) {
-    const { data: profile } = await supabase
-      .from('account_profiles')
-      .select('role')
+  if (pathname === '/' && !user) return NextResponse.redirect(new URL('/inicio', request.url))
+
+  if (user) {
+    const { data: memberships } = await supabase
+      .from('league_members')
+      .select('league_id, role')
       .eq('user_id', user.id)
-      .maybeSingle()
-    isAdmin = profile?.role === 'admin'
+      .eq('is_active', true)
+    hasMembership = Boolean(memberships?.length)
+    const selectedLeagueId = request.cookies.get('active_league_id')?.value
+    const selectedMembership = memberships?.find((item) => item.league_id === selectedLeagueId)
+      || (memberships?.length === 1 ? memberships[0] : null)
+    needsLeagueChoice = Boolean((memberships?.length || 0) > 1 && !selectedMembership)
+    isAdmin = selectedMembership?.role === 'admin'
+    if (selectedMembership) {
+      const { data: league } = await supabase.from('leagues').select('feature_tier').eq('id', selectedMembership.league_id).maybeSingle()
+      isBasicLeague = league?.feature_tier === 'basic'
+    }
   }
 
   if (isAdminRoute && !isAdmin) {
-    if (user) return NextResponse.redirect(new URL('/', request.url))
+    if (user) return NextResponse.redirect(new URL('/lobby', request.url))
     return NextResponse.redirect(loginUrl)
+  }
+
+  if (!isPublicRoute && !user) return NextResponse.redirect(loginUrl)
+  if (!isPublicRoute && !isLeagueSelectionRoute && user && !hasMembership) {
+    return NextResponse.redirect(new URL('/lobby', request.url))
+  }
+  if (!isPublicRoute && !isLeagueSelectionRoute && user && needsLeagueChoice) {
+    return NextResponse.redirect(new URL('/lobby', request.url))
+  }
+  const isFullFeatureRoute = pathname.startsWith('/cartola') || pathname.startsWith('/bq-manager')
+    || pathname.startsWith('/coletiva') || pathname.startsWith('/admin/cartola')
+    || pathname.startsWith('/mais/coletivas')
+  if (user && isBasicLeague && isFullFeatureRoute) {
+    return NextResponse.redirect(new URL('/mais?upgrade_required=1', request.url))
   }
 
   if (isAccountRoute && !user) {
@@ -58,7 +93,7 @@ export default async function proxy(request: NextRequest) {
   }
 
   if (user && (pathname === '/login' || pathname === '/cadastro')) {
-    return NextResponse.redirect(new URL(isAdmin ? '/' : '/meu-perfil', request.url))
+    return NextResponse.redirect(new URL('/lobby', request.url))
   }
 
   return supabaseResponse

@@ -36,14 +36,8 @@ export async function login(formData: FormData) {
     console.error("Erro ao concluir perfil após login:", profileRepairError);
   }
 
-  const { data: profile } = await supabase
-    .from("account_profiles")
-    .select("role")
-    .eq("user_id", data.user.id)
-    .maybeSingle();
-
   revalidatePath("/", "layout");
-  redirect(returnTo || (profile?.role === "admin" ? "/" : "/meu-perfil"));
+  redirect(returnTo || "/lobby");
 }
 
 export async function signInWithGoogle(returnPath?: string) {

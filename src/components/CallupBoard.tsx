@@ -57,6 +57,7 @@ import { useUrlState } from "@/lib/useUrlState";
 import { hasCallupClosingMatch } from "@/lib/callup-lifecycle";
 import { WeatherBadge } from "./WeatherBadge";
 import type { EventWeather } from "@/lib/weather";
+import { setCallupFormat } from "@/lib/actions/rounds";
 
 type Props = {
   callup: CallupWithEntries;
@@ -97,6 +98,9 @@ export function CallupBoard({
   const [editingCallup, setEditingCallup] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
+  const [formatPlayers, setFormatPlayers] = useState(callup.players_per_team || Math.round(callup.capacity / (callup.teams_per_round || 3)));
+  const [formatTeams, setFormatTeams] = useState(callup.teams_per_round || 3);
+  const [formatNotice, setFormatNotice] = useState("");
   const [activeTab, setActiveTab] = useUrlState({ key: "list", initialValue: initialListTab, defaultValue: "confirmed", allowedValues: CALLUP_LIST_TABS });
 
   // Estado para Contratação de Amigo (Convidado)
@@ -210,7 +214,7 @@ export function CallupBoard({
   async function copyWhatsAppList() {
     const date = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" })
       .format(new Date(`${callup.date}T12:00:00`));
-    const numberedPlayers = Array.from({ length: 18 }, (_, index) =>
+    const numberedPlayers = Array.from({ length: capacity }, (_, index) =>
       `${index + 1}. ${confirmed[index]?.player.name || ""}`,
     );
     const numberedWaitlist = Array.from({ length: callup.waitlist_capacity }, (_, index) =>
@@ -239,7 +243,24 @@ export function CallupBoard({
       setLoading("");
       return;
     }
-    router.push(`/admin/rodada?round=${result.roundId}`);
+    setLoading("");
+    router.refresh();
+  }
+
+  async function handleFormatChange() {
+    setLoading("format");
+    setError("");
+    setFormatNotice("");
+    const result = await setCallupFormat(callup.id, formatPlayers, formatTeams);
+    if (!result.success) {
+      setError(result.error || "Não foi possível alterar o formato da convocação.");
+    } else {
+      setFormatNotice(result.fantasySizePreserved
+        ? "Formato da pelada atualizado. Escalações já salvas no Cartola mantêm o formato anterior desta rodada."
+        : `Formato atualizado: ${formatTeams} times de ${formatPlayers} jogadores.`);
+      router.refresh();
+    }
+    setLoading("");
   }
 
   return (
@@ -410,6 +431,55 @@ export function CallupBoard({
           </div>
         </div>
       </section>
+
+      {isAdmin && callup.status === "open" && !hasDrawnTeams && (
+        <section className="rounded-2xl border border-accent/25 bg-surface p-4" aria-label="Formato da pelada">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-black text-foreground">Formato da pelada</h2>
+              <p className="mt-1 text-xs text-muted">Ajuste a lista antes de montar os times. Ex.: 7 por time ou 6 se houver menos jogadores.</p>
+            </div>
+            <span className="rounded-full bg-accent/15 px-3 py-1 text-xs font-black text-accent">{formatTeams} × {formatPlayers} = {formatTeams * formatPlayers} vagas</span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <label className="text-xs font-bold text-muted">
+              Jogadores por time
+              <select value={formatPlayers} onChange={(event) => setFormatPlayers(Number(event.target.value))} disabled={!!loading} className="mt-1 w-full rounded-xl border border-white/15 bg-background px-3 py-2.5 font-bold text-foreground">
+                {[5, 6, 7].map((size) => <option key={size} value={size}>{size} jogadores</option>)}
+              </select>
+            </label>
+            <label className="text-xs font-bold text-muted">
+              Quantidade de times
+              <select value={formatTeams} onChange={(event) => setFormatTeams(Number(event.target.value))} disabled={!!loading} className="mt-1 w-full rounded-xl border border-white/15 bg-background px-3 py-2.5 font-bold text-foreground">
+                {[2, 3, 4, 5, 6].map((count) => <option key={count} value={count}>{count} times</option>)}
+              </select>
+            </label>
+          </div>
+          <button type="button" onClick={handleFormatChange} disabled={!!loading || (formatPlayers === callup.players_per_team && formatTeams === callup.teams_per_round)} className="mt-3 w-full rounded-xl bg-accent px-4 py-2.5 text-xs font-black text-background disabled:opacity-50">
+            {loading === "format" ? "Salvando formato..." : "Aplicar formato"}
+          </button>
+          {formatNotice && <p role="status" className="mt-2 text-xs font-semibold text-accent">{formatNotice}</p>}
+        </section>
+      )}
+
+      {isAdmin && callup.status === "open" && !hasDrawnTeams && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-accent/25 bg-accent/[0.06] px-4 py-3 text-xs">
+          <span className="font-semibold text-muted">
+            {callup.round_id
+              ? "Pré-lista pronta: quem confirmar presença entra automaticamente. Agora você pode compartilhar o convite."
+              : "Esta convocação antiga ainda precisa de uma pré-lista para sincronizar os confirmados."}
+          </span>
+          {callup.round_id ? (
+            <Link href={`/admin/rodada?round=${callup.round_id}&mount=1`} className="shrink-0 font-black text-accent hover:underline">
+              Montar times depois
+            </Link>
+          ) : (
+            <button type="button" onClick={handlePrelist} disabled={!!loading} className="shrink-0 font-black text-accent hover:underline disabled:opacity-50">
+              {loading === "prelist" ? "Preparando..." : "Preparar pré-lista"}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 2. CTA DE AÇÃO / STATUS DO JOGADOR LOGADO */}
       <section className="space-y-2">

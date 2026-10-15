@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -9,4 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Os canais realtime precisam carregar a sessão do navegador. Um cliente
+// anônimo funcionava enquanto as tabelas eram públicas, mas não após o
+// isolamento por pelada no RLS.
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);

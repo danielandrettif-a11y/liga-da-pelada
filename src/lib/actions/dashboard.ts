@@ -1,6 +1,5 @@
 "use server";
 
-import { supabase } from "../supabase";
 import { getRanking } from "./stats";
 import { getActiveSeason } from "./seasons";
 import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
@@ -23,7 +22,7 @@ export async function getDashboardData() {
       : null;
 
     // 1. Próxima Rodada (draft ou active)
-    const nextRoundPromise = readModel ? Promise.resolve({ data: readModel.nextRound }) : supabase
+    const nextRoundPromise = readModel ? Promise.resolve({ data: readModel.nextRound }) : account.client
       .from("rounds")
       .select("*, round_players(count)")
       .in("status", ["draft", "active"])
@@ -35,7 +34,7 @@ export async function getDashboardData() {
       .single();
 
     // 2. Última Rodada (finished) com partidas e times
-    const lastRoundPromise = readModel ? Promise.resolve({ data: readModel.lastRound }) : supabase
+    const lastRoundPromise = readModel ? Promise.resolve({ data: readModel.lastRound }) : account.client
       .from("rounds")
       .select(`
         *,
@@ -56,7 +55,7 @@ export async function getDashboardData() {
       .limit(1)
       .single();
 
-    const nextFriendlyPromise = readModel ? Promise.resolve({ data: readModel.nextFriendly }) : supabase
+    const nextFriendlyPromise = readModel ? Promise.resolve({ data: readModel.nextFriendly }) : account.client
       .from("rounds")
       .select("*, round_players(count)")
       .in("status", ["draft", "active"])
@@ -66,7 +65,7 @@ export async function getDashboardData() {
       .limit(1)
       .maybeSingle();
 
-    const liveMatchPromise = readModel ? Promise.resolve({ data: readModel.liveMatch }) : supabase
+    const liveMatchPromise = readModel ? Promise.resolve({ data: readModel.liveMatch }) : account.client
       .from("matches")
       .select(`
         id,
@@ -85,7 +84,7 @@ export async function getDashboardData() {
       .limit(1)
       .maybeSingle();
 
-    const leaguePromise = readModel ? Promise.resolve({ data: readModel.league }) : supabase
+    const leaguePromise = readModel ? Promise.resolve({ data: readModel.league }) : account.client
       .from("leagues")
       .select("match_duration, preseason_enabled, stadium_name, stadium_map_url, event_duration_minutes")
       .eq("id", season.league_id)

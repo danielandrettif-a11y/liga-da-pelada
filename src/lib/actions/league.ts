@@ -1,29 +1,63 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabase } from "../supabase";
+import { createClient as createServerClient } from "../supabase/server";
 import { getAdminClient } from "../auth";
 import { MAX_PLAYERS_PER_TEAM, MAX_TEAMS_PER_ROUND, MIN_TEAMS_PER_ROUND } from "../constants";
+import { getSelectedLeague } from "../league-context";
+import { getCurrentAccount } from "../auth";
 
 export async function getLeagueConfig() {
-  const { data, error } = await supabase
+  const selectedLeague = await getSelectedLeague();
+  if (!selectedLeague) return null;
+  const client = await createServerClient();
+  const { data, error } = await client
     .from("leagues")
     .select("*")
-    .eq("is_active", true)
-    .limit(1)
+    .eq("id", selectedLeague.id)
     .single();
+  return error ? null : { ...data, can_manage: selectedLeague.role === "admin" };
+}
 
-  if (error || !data) {
-    const { data: fallback } = await supabase
-      .from("leagues")
-      .select("*")
-      .limit(1)
-      .single();
-    
-    return fallback;
+export async function updateLeagueName(leagueId: string, name: string) {
+  const selectedLeague = await getSelectedLeague();
+  if (!selectedLeague || selectedLeague.id !== leagueId || selectedLeague.role !== "admin") {
+    return { success: false as const, error: "Somente o ADM desta pelada pode alterar o nome." };
   }
+  const normalizedName = name.trim().replace(/\s+/g, " ");
+  if (normalizedName.length < 3 || normalizedName.length > 80) {
+    return { success: false as const, error: "O nome precisa ter entre 3 e 80 caracteres." };
+  }
+  const { client, user } = await getCurrentAccount();
+  if (!user) return { success: false as const, error: "Entre na sua conta novamente." };
+  const { data, error } = await client.from("leagues")
+    .update({ name: normalizedName })
+    .eq("id", leagueId)
+    .select("name")
+    .single();
+  if (error || !data) return { success: false as const, error: error?.message || "Não foi possível alterar o nome." };
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/liga");
+  revalidatePath("/lobby");
+  revalidatePath("/peladas");
+  return { success: true as const, name: data.name };
+}
 
-  return data;
+export async function updateLeagueVisibility(leagueId: string, visibility: "private" | "open") {
+  const selectedLeague = await getSelectedLeague();
+  if (!selectedLeague || selectedLeague.id !== leagueId || selectedLeague.role !== "admin") {
+    return { success: false, error: "Somente o ADM desta pelada pode alterar a visibilidade." };
+  }
+  const { client, user } = await getCurrentAccount();
+  if (!user) return { success: false, error: "Entre na sua conta novamente." };
+  const { error } = await client.rpc("set_league_visibility", {
+    p_league_id: leagueId, p_visibility: visibility,
+  });
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/liga");
+  revalidatePath("/peladas");
+  revalidatePath("/lobby");
+  return { success: true };
 }
 
 export async function updatePreSeasonEnabled(id: string, enabled: boolean) {
@@ -31,6 +65,7 @@ export async function updatePreSeasonEnabled(id: string, enabled: boolean) {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem alterar a pré-temporada." };
     if (!id) return { success: false, error: "Liga inválida." };
+    if ((await getSelectedLeague())?.id !== id) return { success: false, error: "Esta não é a pelada selecionada." };
 
     const { error } = await client
       .from("leagues")
@@ -62,6 +97,7 @@ export async function updateLeagueConfig(
     if (!client) return { success: false, error: "Somente administradores podem alterar a liga." };
 
     if (!id) return { success: false, error: "Liga inválida." };
+    if ((await getSelectedLeague())?.id !== id) return { success: false, error: "Esta não é a pelada selecionada." };
     if (!Number.isInteger(matchDuration) || matchDuration < 1 || matchDuration > 90) {
       return { success: false, error: "A duração deve ficar entre 1 e 90 minutos." };
     }

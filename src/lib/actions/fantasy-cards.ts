@@ -7,8 +7,31 @@ import { generatePackOffers } from "@/lib/fantasy/cards/pack-generator";
 import { MAX_SPECIAL_CARDS_PER_ROUND } from "@/lib/fantasy/cards/config";
 import { canSelectFantasyCardInstance, fantasyCardRequiresSavedLineup, isFantasyPriceEligible } from "@/lib/fantasy/cards/eligibility";
 import type { FantasyActiveCardDTO, FantasyPackDTO, FantasyUserCardDTO } from "@/lib/fantasy/cards/dtos";
+import { getActiveLeague } from "./rounds";
 
 export type { FantasyActiveCardDTO, FantasyPackDTO, FantasyUserCardDTO } from "@/lib/fantasy/cards/dtos";
+
+async function packBelongsToLeague(
+  client: Awaited<ReturnType<typeof getCurrentAccount>>["client"],
+  pack: { round_id: string | null; fantasy_season_pass_reward_id: string | null },
+  leagueId: string,
+): Promise<boolean> {
+  if (pack.round_id && !pack.fantasy_season_pass_reward_id) {
+    const { data } = await client.from("rounds").select("id")
+      .eq("id", pack.round_id).eq("league_id", leagueId).maybeSingle();
+    return Boolean(data);
+  }
+  if (!pack.round_id && pack.fantasy_season_pass_reward_id) {
+    const { data: seasons } = await client.from("fantasy_seasons").select("id")
+      .eq("league_id", leagueId);
+    const seasonIds = (seasons || []).map((season) => season.id);
+    if (!seasonIds.length) return false;
+    const { data: reward } = await client.from("fantasy_season_pass_rewards").select("id")
+      .eq("id", pack.fantasy_season_pass_reward_id).in("fantasy_season_id", seasonIds).maybeSingle();
+    return Boolean(reward);
+  }
+  return false;
+}
 
 /**
  * Busca todos os pacotes do usuário logado (pendentes e concluídos).
@@ -20,18 +43,32 @@ export async function getMyPacks(): Promise<{
 }> {
   const account = await getCurrentAccount();
   if (!account.user) return { availablePacks: [], claimedCount: 0, totalPacks: 0 };
+  const league = await getActiveLeague();
+  const [{ data: leagueRounds }, { data: leagueFantasySeasons }] = await Promise.all([
+    account.client.from("rounds").select("id").eq("league_id", league.id),
+    account.client.from("fantasy_seasons").select("id").eq("league_id", league.id),
+  ]);
+  const roundIds = new Set((leagueRounds || []).map((round) => round.id));
+  const seasonIds = (leagueFantasySeasons || []).map((season) => season.id);
+  const { data: leagueRewards } = seasonIds.length
+    ? await account.client.from("fantasy_season_pass_rewards").select("id").in("fantasy_season_id", seasonIds)
+    : { data: [] as { id: string }[] };
+  const rewardIds = new Set((leagueRewards || []).map((reward) => reward.id));
 
   const { data: packs } = await account.client
     .from("fantasy_round_packs")
     .select(
-      "id, round_id, status, opened_at, chosen_card_id, created_at, source, card_tier, rounds:round_id(number), offers:fantasy_pack_offers(slot, card:fantasy_cards(*))"
+      "id, round_id, fantasy_season_pass_reward_id, status, opened_at, chosen_card_id, created_at, source, card_tier, rounds:round_id(number), offers:fantasy_pack_offers(slot, card:fantasy_cards(*))"
     )
     .eq("user_id", account.user.id)
     .order("created_at", { ascending: false });
 
   if (!packs) return { availablePacks: [], claimedCount: 0, totalPacks: 0 };
 
-  const formatted: FantasyPackDTO[] = packs.map((p: any) => ({
+  const formatted: FantasyPackDTO[] = packs.filter((p: any) =>
+    (p.round_id && roundIds.has(p.round_id))
+    || (p.fantasy_season_pass_reward_id && rewardIds.has(p.fantasy_season_pass_reward_id))
+  ).map((p: any) => ({
     id: p.id,
     roundId: p.round_id,
     roundNumber: p.rounds?.number,
@@ -74,6 +111,10 @@ export async function restoreMyPassPacks(fantasySeasonId: string) {
   const account = await getCurrentAccount();
   if (!account.user || !account.isAdmin) return { success: false, error: "A reativação é exclusiva para administradores." };
   if (!fantasySeasonId) return { success: false, error: "Passe da temporada não encontrado." };
+  const league = await getActiveLeague();
+  const { data: season } = await account.client.from("fantasy_seasons").select("id")
+    .eq("id", fantasySeasonId).eq("league_id", league.id).maybeSingle();
+  if (!season) return { success: false, error: "Passe não pertence à pelada selecionada." };
   const { data, error } = await account.client.rpc("restore_my_pass_card_packs", { p_fantasy_season_id: fantasySeasonId });
   if (error) return { success: false, error: error.message };
   revalidatePath("/cartola");
@@ -93,17 +134,20 @@ export async function openPack(packId: string): Promise<{
   if (!account.user) return { success: false, error: "Não autenticado." };
 
   const client = account.client;
+  const league = await getActiveLeague();
 
   // Buscar pacote
   const { data: pack, error: packErr } = await client
     .from("fantasy_round_packs")
-    .select("id, user_id, status, card_tier, offers:fantasy_pack_offers(slot, card:fantasy_cards(*))")
+    .select("id, user_id, round_id, fantasy_season_pass_reward_id, status, card_tier, offers:fantasy_pack_offers(slot, card:fantasy_cards(*))")
     .eq("id", packId)
     .single();
 
   if (packErr || !pack || pack.user_id !== account.user.id) {
     return { success: false, error: "Pacote não encontrado ou não pertence a você." };
   }
+  if (!(await packBelongsToLeague(client, pack, league.id)))
+    return { success: false, error: "Pacote não pertence à pelada selecionada." };
 
   if (pack.status === "claimed") {
     return { success: false, error: "Este pacote já foi resgatado." };
@@ -181,17 +225,20 @@ export async function claimPackCard(
   if (!account.user) return { success: false, error: "Não autenticado." };
 
   const client = account.client;
+  const league = await getActiveLeague();
 
   // Buscar pacote e ofertas
   const { data: pack, error: packErr } = await client
     .from("fantasy_round_packs")
-    .select("id, user_id, status, offers:fantasy_pack_offers(slot, card:fantasy_cards(*))")
+    .select("id, user_id, round_id, fantasy_season_pass_reward_id, status, offers:fantasy_pack_offers(slot, card:fantasy_cards(*))")
     .eq("id", packId)
     .single();
 
   if (packErr || !pack || pack.user_id !== account.user.id) {
     return { success: false, error: "Pacote inválido." };
   }
+  if (!(await packBelongsToLeague(client, pack, league.id)))
+    return { success: false, error: "Pacote não pertence à pelada selecionada." };
 
   if (pack.status === "claimed") {
     return { success: false, error: "Este pacote já foi resgatado." };
@@ -212,6 +259,7 @@ export async function claimPackCard(
   // Inserir no inventário pessoal do usuário
   const { error: invErr } = await client.from("fantasy_user_cards").insert({
     user_id: account.user.id,
+    league_id: league.id,
     card_id: cardId,
     source_pack_id: packId,
     status: "OWNED",
@@ -244,11 +292,13 @@ export async function getMyInventory(): Promise<{
 }> {
   const account = await getCurrentAccount();
   if (!account.user) return { cards: [], groupedBySlug: {}, availableCount: 0 };
+  const league = await getActiveLeague();
 
   const { data } = await account.client
     .from("fantasy_user_cards")
     .select("id, card_id, status, acquired_at, consumed_at, card:fantasy_cards(*)")
     .eq("user_id", account.user.id)
+    .eq("league_id", league.id)
     .order("acquired_at", { ascending: false });
 
   if (!data) return { cards: [], groupedBySlug: {}, availableCount: 0 };
@@ -318,11 +368,13 @@ export async function getMyInventory(): Promise<{
 export async function getMyInventoryCount(): Promise<number> {
   const account = await getCurrentAccount();
   if (!account.user) return 0;
+  const league = await getActiveLeague();
 
   const { count } = await account.client
     .from("fantasy_user_cards")
     .select("id", { count: "exact", head: true })
     .eq("user_id", account.user.id)
+    .eq("league_id", league.id)
     .eq("status", "OWNED");
 
   return count || 0;
@@ -334,6 +386,10 @@ export async function getMyInventoryCount(): Promise<number> {
 export async function getActiveCardForRound(roundId: string): Promise<FantasyActiveCardDTO | null> {
   const account = await getCurrentAccount();
   if (!account.user) return null;
+  const league = await getActiveLeague();
+  const { data: scopedRound } = await account.client.from("rounds").select("id")
+    .eq("id", roundId).eq("league_id", league.id).maybeSingle();
+  if (!scopedRound) return null;
 
   const { data: activation } = await account.client
     .from("fantasy_card_activations")
@@ -421,12 +477,14 @@ export async function activateCardForRound({
   if (!account.user) return { success: false, error: "Não autenticado." };
 
   const client = account.client;
+  const league = await getActiveLeague();
 
   // 1. Verificar status da rodada e mercado
   const { data: round } = await client
     .from("rounds")
     .select("status, round_players(count), matches(id, status, started_at)")
     .eq("id", roundId)
+    .eq("league_id", league.id)
     .single();
 
   const isLive = (round?.matches || []).some((m: any) => m.started_at || m.status === "in_progress");
@@ -441,6 +499,7 @@ export async function activateCardForRound({
     .from("fantasy_user_cards")
     .select("id, user_id, status, card_id, card:fantasy_cards(*)")
     .eq("id", userCardId)
+    .eq("league_id", league.id)
     .single();
 
   if (!userCard || userCard.user_id !== account.user.id) {
@@ -613,7 +672,8 @@ export async function activateCardForRound({
     await client
       .from("fantasy_user_cards")
       .update({ status: "OWNED" })
-      .eq("id", existingAct.user_card_id);
+      .eq("id", existingAct.user_card_id)
+      .eq("league_id", league.id);
   }
 
   // Upsert da ativação (UNIQUE(round_id, user_id))
@@ -639,7 +699,8 @@ export async function activateCardForRound({
   await client
     .from("fantasy_user_cards")
     .update({ status: "RESERVED" })
-    .eq("id", userCardId);
+    .eq("id", userCardId)
+    .eq("league_id", league.id);
 
   revalidatePath("/cartola");
   return { success: true };
@@ -655,6 +716,10 @@ export async function removeActiveCardForRound(
   if (!account.user) return { success: false, error: "Não autenticado." };
 
   const client = account.client;
+  const league = await getActiveLeague();
+  const { data: scopedRound } = await client.from("rounds").select("id")
+    .eq("id", roundId).eq("league_id", league.id).maybeSingle();
+  if (!scopedRound) return { success: false, error: "Rodada não pertence à pelada selecionada." };
 
   const { data: act } = await client
     .from("fantasy_card_activations")
@@ -674,7 +739,8 @@ export async function removeActiveCardForRound(
     const { error: restoreError } = await client
       .from("fantasy_user_cards")
       .update({ status: "OWNED" })
-      .eq("id", act.user_card_id);
+      .eq("id", act.user_card_id)
+      .eq("league_id", league.id);
     if (restoreError) {
       return { success: false, error: "Não foi possível devolver a carta ao inventário." };
     }
@@ -684,7 +750,8 @@ export async function removeActiveCardForRound(
   const { error: deleteError } = await client.from("fantasy_card_activations").delete().eq("id", act.id);
   if (deleteError) {
     if (act.user_card_id) {
-      await client.from("fantasy_user_cards").update({ status: "RESERVED" }).eq("id", act.user_card_id);
+      await client.from("fantasy_user_cards").update({ status: "RESERVED" })
+        .eq("id", act.user_card_id).eq("league_id", league.id);
     }
     return { success: false, error: "Não foi possível cancelar o uso da carta." };
   }
@@ -702,6 +769,9 @@ export async function removeActiveCardForRound(
 export async function generatePacksForFinishedRound(roundId: string): Promise<number> {
   const client = await getAdminClient();
   if (!client) return 0;
+  const league = await getActiveLeague();
+  const { data: scopedRound } = await client.from("rounds").select("id").eq("id", roundId).eq("league_id", league.id).maybeSingle();
+  if (!scopedRound) return 0;
 
   const { data: ensured, error: ensuredError } = await client.rpc("ensure_fantasy_round_reward_packs", { p_round_id: roundId });
   if (!ensuredError) return Number(ensured || 0);
@@ -762,11 +832,13 @@ export async function giveMyAccountTestPack(): Promise<{ success: boolean; error
   if (!account.isAdmin) return { success: false, error: "Apenas administradores podem gerar pacotes de teste." };
 
   const client = account.client;
+  const league = await getActiveLeague();
 
   // Buscar uma rodada qualquer para associar o pacote
   const { data: round } = await client
     .from("rounds")
     .select("id, number")
+    .eq("league_id", league.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -817,57 +889,9 @@ export async function resetMyAccountCards(): Promise<{
   deletedPacksCount?: number;
   error?: string;
 }> {
-  const account = await getCurrentAccount();
-  if (!account.user) return { success: false, error: "Não autenticado." };
-
-  const client = account.client;
-  const userId = account.user.id;
-
-  try {
-    // 1. Deletar ativações de cartas do usuário
-    const { count: actCount, error: actErr } = await client
-      .from("fantasy_card_activations")
-      .delete({ count: "exact" })
-      .eq("user_id", userId);
-
-    if (actErr) {
-      return { success: false, error: `Erro ao remover ativações: ${actErr.message}` };
-    }
-
-    // 2. Deletar inventário de cartas do usuário
-    const { count: cardsCount, error: cardsErr } = await client
-      .from("fantasy_user_cards")
-      .delete({ count: "exact" })
-      .eq("user_id", userId);
-
-    if (cardsErr) {
-      return { success: false, error: `Erro ao zerar inventário: ${cardsErr.message}` };
-    }
-
-    // 3. Buscar pacotes do usuário para remover ofertas e pacotes
-    const { data: userPacks } = await client
-      .from("fantasy_round_packs")
-      .select("id")
-      .eq("user_id", userId);
-
-    const packIds = (userPacks || []).map((p: any) => p.id);
-    if (packIds.length > 0) {
-      await client.from("fantasy_pack_offers").delete().in("pack_id", packIds);
-      await client.from("fantasy_round_packs").delete().in("id", packIds);
-    }
-
-    revalidatePath("/cartola");
-    revalidatePath("/admin/cartola");
-
-    return {
-      success: true,
-      deletedCardsCount: cardsCount || 0,
-      deletedActivationsCount: actCount || 0,
-      deletedPacksCount: packIds.length,
-    };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Erro inesperado ao zerar cartas." };
-  }
+  // O inventário legado ainda não possui league_id. Impedir um reset global
+  // que apagaria também as cartas das outras peladas da mesma conta.
+  return { success: false, error: "Reset de cartas temporariamente indisponível até o inventário ser separado por pelada." };
 }
 
 /**
@@ -885,12 +909,14 @@ export async function distributePackToAllLineupUsers(): Promise<{
   if (!account.isAdmin) return { success: false, error: "Apenas administradores podem distribuir pacotes em massa." };
 
   const client = account.client;
+  const league = await getActiveLeague();
 
   try {
     // 1. Buscar a rodada mais recente ou ativa/draft
     const { data: rounds } = await client
       .from("rounds")
       .select("id, number, status, created_at")
+      .eq("league_id", league.id)
       .order("created_at", { ascending: false })
       .limit(5);
 
@@ -901,9 +927,12 @@ export async function distributePackToAllLineupUsers(): Promise<{
     const targetRound = rounds.find((r: any) => r.status === "draft" || r.status === "active") || rounds[0];
 
     // 2. Buscar todos os usuários únicos que já escalaram (em fantasy_lineups)
+    const { data: fantasyRound } = await client.from("fantasy_rounds").select("id").eq("round_id", targetRound.id).maybeSingle();
+    if (!fantasyRound) return { success: false, error: "Rodada do Cartola não encontrada nesta pelada." };
     const { data: lineups, error: lineupErr } = await client
       .from("fantasy_lineups")
-      .select("user_id");
+      .select("user_id")
+      .eq("fantasy_round_id", fantasyRound.id);
 
     if (lineupErr) {
       return { success: false, error: `Erro ao buscar escalações: ${lineupErr.message}` };
@@ -1002,6 +1031,7 @@ export async function grantFantasyPackToUser(targetUserId: string): Promise<{ su
     return { success: false, error: "Apenas administradores podem enviar pacotes." };
   }
   if (!targetUserId) return { success: false, error: "Escolha uma pessoa para receber o pacote." };
+  const league = await getActiveLeague();
 
   const { data: targetProfile } = await account.client
     .from("account_profiles")
@@ -1009,10 +1039,14 @@ export async function grantFantasyPackToUser(targetUserId: string): Promise<{ su
     .eq("user_id", targetUserId)
     .maybeSingle();
   if (!targetProfile) return { success: false, error: "A conta selecionada não foi encontrada." };
+  const { data: membership } = await account.client.from("league_members").select("league_id")
+    .eq("league_id", league.id).eq("user_id", targetUserId).eq("is_active", true).maybeSingle();
+  if (!membership) return { success: false, error: "A conta não pertence a esta pelada." };
 
   const { data: round } = await account.client
     .from("rounds")
     .select("id")
+    .eq("league_id", league.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

@@ -1,7 +1,8 @@
 "use server";
 
-import { unstable_cache } from "next/cache";
-import { supabase } from "../supabase";
+import { cache } from "react";
+import { createClient as createServerClient } from "../supabase/server";
+import { getSelectedLeague } from "../league-context";
 import { getActiveSeason, getActiveSeasonRoundIds } from "./seasons";
 import { getAdminClient, getCurrentAccount } from "../auth";
 import { buildRankedPointBreakdown, calculateRankedPoints } from "../ranked-scoring";
@@ -97,8 +98,16 @@ function overallTrend(value: unknown): OverallTrend {
   return value === "rising" || value === "falling" ? value : "steady";
 }
 
-export async function getLatestPlayerCardOverallMap(client: any = supabase) {
-  const { data, error } = await client.rpc("get_latest_player_card_overalls");
+export async function getLatestPlayerCardOverallMap(client?: any) {
+  client ||= await createServerClient();
+  const league = await getSelectedLeague();
+  if (!league) return new Map<string, PlayerCardOverall>();
+  const { data: members } = await client.from("league_members").select("player_id")
+    .eq("league_id", league.id).eq("is_active", true);
+  const memberIds = new Set((members || []).map((item: any) => item.player_id));
+  const { data, error } = await client.rpc("get_latest_player_card_overalls_for_league", {
+    p_league_id: league.id,
+  });
   if (error) {
     console.error("Erro ao buscar OVR para as cartas:", error);
     return new Map<string, PlayerCardOverall>();
@@ -120,18 +129,23 @@ export async function getLatestPlayerCardOverallMap(client: any = supabase) {
       ATA: overallTrend(row.ata_trend),
       GOL: overallTrend(row.gol_trend),
     };
-    return row.player_id && Number.isFinite(overall) ? [[row.player_id, { overall, trend, positions, positionTrends, goalkeeperGames: Number(row.goalkeeper_games || 0), goalkeeperRounds: Number(row.goalkeeper_rounds || 0), roundsPlayed: Number(row.rounds_played || 0) }] as const] : [];
+    return memberIds.has(row.player_id) && Number.isFinite(overall) ? [[row.player_id, { overall, trend, positions, positionTrends, goalkeeperGames: Number(row.goalkeeper_games || 0), goalkeeperRounds: Number(row.goalkeeper_rounds || 0), roundsPlayed: Number(row.rounds_played || 0) }] as const] : [];
   }));
 }
 
-async function getPublicSpeedRatingMap(client: any = supabase) {
-  const { data, error } = await client.rpc("get_public_player_speed_ratings");
+async function getPublicSpeedRatingMap(client?: any) {
+  client ||= await createServerClient();
+  const league = await getSelectedLeague();
+  if (!league) return new Map<string, 1 | 2 | 3>();
+  const { data, error } = await client.rpc("get_public_player_speed_ratings_for_league", {
+    p_league_id: league.id,
+  });
   if (error) {
     console.error("Erro ao buscar estrelas de velocidade para as cartas:", error);
     return new Map<string, 1 | 2 | 3>();
   }
   return new Map<string, 1 | 2 | 3>((data || []).flatMap((row: any) => (
-    row.player_id && [1, 2, 3].includes(Number(row.speed_rating))
+    [1, 2, 3].includes(Number(row.speed_rating))
       ? [[row.player_id, Number(row.speed_rating) as 1 | 2 | 3] as const]
       : []
   )));
@@ -314,6 +328,8 @@ export async function calculateRoundStats(roundId: string) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem recalcular estatisticas." };
+    const selectedLeague = await getSelectedLeague();
+    if (!selectedLeague) return { success: false, error: "Selecione uma pelada no lobby." };
 
     // 1. Buscar a rodada e todas as partidas finalizadas com colunas explícitas
     const { data: round, error } = await client
@@ -365,6 +381,7 @@ export async function calculateRoundStats(roundId: string) {
         )
       `)
       .eq("id", roundId)
+      .eq("league_id", selectedLeague.id)
       .single();
 
     if (error || !round) throw new Error("Erro ao buscar rodada para estatísticas");
@@ -372,10 +389,27 @@ export async function calculateRoundStats(roundId: string) {
     const suppressGoalkeeperRewards = Boolean(round.suppress_goalkeeper_rewards);
     const scoringSnapshot = normalizeBQScoringSnapshot(round.scoring_snapshot as Record<string, unknown> | null);
     const roundPlayerIds = (round.round_players || []).map((item: any) => item.player_id);
-    const { data: roundPlayerProfiles, error: profileError } = roundPlayerIds.length
-      ? await client.from("players").select("id, player_profile, overall_traits, member_category, is_selectable, is_competitive_profile_complete").in("id", roundPlayerIds)
+    const { data: roundPlayerMemberships, error: profileError } = roundPlayerIds.length
+      ? await client.from("league_members")
+        .select("player_id, player_profile, overall_traits, players!inner(id, name, avatar_url, member_category, is_selectable)")
+        .eq("league_id", selectedLeague.id).eq("is_active", true).in("player_id", roundPlayerIds)
       : { data: [], error: null };
     if (profileError) throw new Error(`Erro ao buscar posições dos atletas: ${profileError.message}`);
+    const roundPlayerProfiles = (roundPlayerMemberships || []).map((membership: any) => {
+      const player = Array.isArray(membership.players) ? membership.players[0] : membership.players;
+      const traits = Array.isArray(membership.overall_traits) ? membership.overall_traits : [];
+      return {
+        ...player,
+        player_profile: membership.player_profile,
+        overall_traits: traits,
+        is_competitive_profile_complete: player?.member_category === "player"
+          && player?.is_selectable === true
+          && Boolean(String(player?.name || "").trim())
+          && Boolean(String(player?.avatar_url || "").trim())
+          && ["defensive", "offensive"].includes(membership.player_profile)
+          && traits.length >= 1 && traits.length <= 2,
+      };
+    });
     const currentProfileByPlayerId = new Map((roundPlayerProfiles || []).map((player: any) => [player.id, player.player_profile]));
     const roundPlayerById = new Map((round.round_players || []).map((item: any) => [item.player_id, item]));
     const profileByPlayerId = new Map(roundPlayerIds.map((playerId: string) => {
@@ -651,9 +685,10 @@ export async function calculateRoundStats(roundId: string) {
   }
 }
 
-async function getRankingUncached() {
-  const season = await getActiveSeason();
-  if (!season) return [];
+async function getRankingUncached(seasonId: string, leagueId: string) {
+  const league = await getSelectedLeague();
+  if (!league || league.id !== leagueId) return [];
+  const supabase = await createServerClient();
 
   // 1. Tentar buscar direto da View SQL otimizada (PostgreSQL SUM + GROUP BY + ORDER BY)
   const { data: viewData, error: viewError } = await supabase
@@ -677,7 +712,7 @@ async function getRankingUncached() {
       ranking_points,
       win_rate
     `)
-    .eq("season_id", season.id)
+    .eq("season_id", seasonId)
     .eq("round_type", "official")
     .eq("player_is_selectable", true)
     .in("player_member_category", ["player", "guest"])
@@ -712,7 +747,7 @@ async function getRankingUncached() {
   }
 
   // Fallback seguro se a view ainda não estiver no banco
-  const roundIds = await getActiveSeasonRoundIds(season.league_id, "official");
+  const roundIds = await getActiveSeasonRoundIds(leagueId, "official");
   if (roundIds.length === 0) return [];
 
   const { data, error } = await supabase
@@ -793,20 +828,21 @@ async function getRankingUncached() {
   return ranking;
 }
 
-const getRankingCached = unstable_cache(getRankingUncached, ["official-ranking"], {
-  revalidate: 60,
-  tags: ["ranking"],
-});
+const getRankingCached = cache(getRankingUncached);
 
 export async function getRanking() {
-  return getRankingCached();
+  const season = await getActiveSeason();
+  return season ? getRankingCached(season.id, season.league_id) : [];
 }
 
 export async function getRoundStatistics(roundId: string): Promise<RoundStatistics | null> {
+  const league = await getSelectedLeague();
+  if (!league) return null;
+  const supabase = await createServerClient();
   const [{ data: round, error: roundError }, { data: rows, error: statsError }] = await Promise.all([
     supabase
       .from("rounds")
-      .select("id, status, round_type")
+      .select("id, status, round_type, league_id")
       .eq("id", roundId)
       .maybeSingle(),
     supabase
@@ -815,7 +851,7 @@ export async function getRoundStatistics(roundId: string): Promise<RoundStatisti
       .eq("round_id", roundId),
   ]);
 
-  if (roundError || statsError || !round || round.status !== "finished") {
+  if (roundError || statsError || !round || round.league_id !== league.id || round.status !== "finished") {
     if (roundError || statsError) console.error("Erro ao buscar estatísticas da rodada:", roundError || statsError);
     return null;
   }
@@ -863,6 +899,7 @@ export async function getRoundStatistics(roundId: string): Promise<RoundStatisti
 }
 
 export async function getRankingExperienceData(): Promise<RankingExperienceData> {
+  const supabase = await createServerClient();
   const season = await getActiveSeason();
   const emptyData: RankingExperienceData = {
     seasonLabel: "Temporada atual",
@@ -1117,6 +1154,9 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
 }
 
 export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: RankingEntry; position: number } | null> {
+  const league = await getSelectedLeague();
+  if (!league) return null;
+  const supabase = await createServerClient();
   const data = await getRankingExperienceData();
   const index = data.general.findIndex((item) => item.player.id === playerId);
   if (index >= 0) {
@@ -1126,6 +1166,9 @@ export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: 
     };
   }
 
+  const { data: membership } = await supabase.from("league_members").select("player_id")
+    .eq("league_id", league.id).eq("player_id", playerId).eq("is_active", true).maybeSingle();
+  if (!membership) return null;
   const { data: player } = await supabase.from("players").select("*").eq("id", playerId).maybeSingle();
   if (!player) return null;
 
@@ -1197,6 +1240,7 @@ export type FriendlyStatsEntry = {
 };
 
 export async function getFriendlyStats(): Promise<FriendlyStatsEntry[]> {
+  const supabase = await createServerClient();
   const season = await getActiveSeason();
   if (!season) return [];
 

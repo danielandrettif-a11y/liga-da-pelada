@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
+import { cookies } from "next/headers";
 
 export type AccountRole = "admin" | "player";
 
@@ -7,6 +8,7 @@ export type AccountProfile = {
   user_id: string;
   role: AccountRole;
   player_id: string | null;
+  account_tag?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -25,11 +27,20 @@ export const getCurrentAccount = cache(async function getCurrentAccount() {
     .eq("user_id", user.id)
     .maybeSingle();
 
+  const selectedLeagueId = (await cookies()).get("active_league_id")?.value;
+  const { data: memberships } = await client
+    .from("league_members")
+    .select("league_id, role")
+    .eq("user_id", user.id)
+    .eq("is_active", true);
+  const selectedMembership = memberships?.find((membership) => membership.league_id === selectedLeagueId)
+    || (memberships?.length === 1 ? memberships[0] : null);
+
   return {
     client,
     user,
     profile: profile as AccountProfile | null,
-    isAdmin: profile?.role === "admin",
+    isAdmin: selectedMembership?.role === "admin",
   };
 });
 

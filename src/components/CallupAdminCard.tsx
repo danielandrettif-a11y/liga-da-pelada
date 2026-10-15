@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CalendarPlus, CheckCircle2, ChevronRight, Clock, Copy, Lock, MapPin, PencilLine, Stadium as StadiumIcon, X } from "@/components/icons";
-import { closeCallup, openCallup, setCallupVisibility, updateCallup, type CallupWithEntries } from "@/lib/actions/callups";
+import { closeCallup, createCallupPrelist, openCallup, setCallupVisibility, updateCallup, type CallupWithEntries } from "@/lib/actions/callups";
+import { setCallupFormat } from "@/lib/actions/rounds";
 import type { Stadium } from "@/lib/types";
 
 export function CallupAdminCard({
@@ -23,6 +24,13 @@ export function CallupAdminCard({
   const router = useRouter();
   const [selectedCallupId, setSelectedCallupId] = useState(callups[0]?.id || "");
   const [showCreate, setShowCreate] = useState(initialShowCreate || callups.length === 0);
+  const [continueOpening, setContinueOpening] = useState(callups.length === 0);
+  const [newDate, setNewDate] = useState(new Date().toISOString().slice(0, 10));
+  const [newPlayersPerTeam, setNewPlayersPerTeam] = useState([5, 6, 7].includes(playersPerTeam) ? playersPerTeam : 5);
+  const [newTeamsPerRound, setNewTeamsPerRound] = useState(3);
+  const [formatPlayersPerTeam, setFormatPlayersPerTeam] = useState<number | null>(null);
+  const [formatTeamsPerRound, setFormatTeamsPerRound] = useState<number | null>(null);
+  const [formatNotice, setFormatNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
@@ -31,6 +39,10 @@ export function CallupAdminCard({
   const confirmed = callup?.entries.filter((entry) => entry.status === "confirmed").length || 0;
   const capacity = callup?.capacity || playersPerTeam * teamsPerRound;
   const waitlistCapacity = callup?.waitlist_capacity ?? 3;
+  const conflictingCallup = callups.find((item) => item.date === newDate);
+  const currentPlayersPerTeam = callup?.players_per_team || Math.max(1, Math.round(capacity / (callup?.teams_per_round || teamsPerRound)));
+  const currentTeamsPerRound = callup?.teams_per_round || teamsPerRound;
+  const canEditFormat = callup?.status === "open" && (!callup.round || (callup.round.status === "draft" && !callup.round.teams?.length));
 
   async function create(formData: FormData) {
     setLoading(true);
@@ -39,7 +51,7 @@ export function CallupAdminCard({
     if (!result.success) setError(result.error || "Erro ao abrir convocação.");
     else {
       setShowCreate(false);
-      router.refresh();
+      router.push(`/convocacao?callup=${result.id}`);
     }
     setLoading(false);
   }
@@ -53,6 +65,8 @@ export function CallupAdminCard({
     } else {
       setEditing(false);
       router.refresh();
+      setFormatPlayersPerTeam(null);
+      setFormatTeamsPerRound(null);
     }
     setLoading(false);
   }
@@ -76,9 +90,39 @@ export function CallupAdminCard({
     setLoading(false);
   }
 
+  async function saveFormat() {
+    if (!callup) return;
+    const nextPlayers = formatPlayersPerTeam ?? currentPlayersPerTeam;
+    const nextTeams = formatTeamsPerRound ?? currentTeamsPerRound;
+    setLoading(true);
+    setError("");
+    setFormatNotice("");
+    const result = await setCallupFormat(callup.id, nextPlayers, nextTeams);
+    if (!result.success) setError(result.error || "Não foi possível atualizar o formato.");
+    else {
+      setFormatNotice(result.fantasySizePreserved
+        ? `Partida alterada para ${nextPlayers}×${nextPlayers}, com ${nextTeams} times. O Cartola permanece com ${result.fantasyLineupSize} titulares porque já há escalações salvas.`
+        : `Formato atualizado: ${nextTeams} times de ${nextPlayers}. O Cartola desta rodada acompanha o novo tamanho.`);
+      router.refresh();
+    }
+    setLoading(false);
+  }
+
   async function buildRound() {
     if (!callup) return;
-    router.push(callup.round_id ? `/admin/rodada?round=${callup.round_id}&mount=1` : `/admin/rodada?callup=${callup.id}`);
+    if (callup.round_id) {
+      router.push(`/admin/rodada?round=${callup.round_id}&mount=1`);
+      return;
+    }
+    setLoading(true);
+    setError("");
+    const result = await createCallupPrelist(callup.id);
+    if (!result.success) {
+      setError(result.error || "Não foi possível preparar a pré-lista.");
+      setLoading(false);
+      return;
+    }
+    router.push(`/convocacao?callup=${callup.id}`);
   }
 
   async function copy() {
@@ -108,7 +152,7 @@ export function CallupAdminCard({
             </button>
           )}
           {!showCreate && (
-            <button type="button" onClick={() => { setEditing(false); setShowCreate(true); }} className="flex items-center gap-1 text-[10px] font-black uppercase text-accent hover:underline">
+            <button type="button" onClick={() => { setEditing(false); setContinueOpening(callups.length === 0); setShowCreate(true); }} className="flex items-center gap-1 text-[10px] font-black uppercase text-accent hover:underline">
               <CalendarPlus className="h-3 w-3" /> Nova
             </button>
           )}
@@ -116,7 +160,16 @@ export function CallupAdminCard({
       </div>
       <div className="glass-card min-w-0 overflow-hidden p-4">
         {error && <div className="mb-3 rounded-lg bg-danger/10 p-3 text-xs font-bold text-danger">{error}</div>}
-        {showCreate || !callup ? (
+        {(showCreate || !callup) && callups.length > 0 && !continueOpening ? (
+          <div className="space-y-3 rounded-xl border border-warning/40 bg-warning/10 p-4">
+            <p className="text-sm font-black text-warning">Já existe convocação aberta</p>
+            <p className="text-xs leading-5 text-muted">Você pode abrir outra convocação, mas precisa escolher um dia diferente. Datas ocupadas: {callups.map((item) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(new Date(`${item.date}T12:00:00`))).join(", ")}.</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setContinueOpening(true)} className="rounded-xl bg-accent px-4 py-2.5 text-xs font-black text-background">Continuar com outra data</button>
+              <button type="button" onClick={() => setShowCreate(false)} className="rounded-xl border border-border px-4 py-2.5 text-xs font-bold text-muted">Ver convocação atual</button>
+            </div>
+          </div>
+        ) : showCreate || !callup ? (
           <form action={create} className="min-w-0 space-y-3 overflow-hidden">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10">
@@ -124,9 +177,26 @@ export function CallupAdminCard({
               </div>
               <div>
                 <p className="text-sm font-black text-foreground">Abrir convocação</p>
-                <p className="text-xs text-muted">{capacity} vagas e {waitlistCapacity} na fila</p>
+                <p className="text-xs text-muted">{newPlayersPerTeam * newTeamsPerRound} vagas e {waitlistCapacity} na fila</p>
               </div>
             </div>
+
+            <fieldset className="rounded-xl border border-accent/25 bg-accent/5 p-3">
+              <legend className="px-1 text-[10px] font-black uppercase tracking-wider text-accent">Formato da pelada</legend>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-[10px] font-bold text-muted">Jogadores por time
+                  <select name="players_per_team" value={newPlayersPerTeam} onChange={(event) => setNewPlayersPerTeam(Number(event.target.value))} className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground">
+                    {[5, 6, 7].map((size) => <option key={size} value={size}>{size} × {size}</option>)}
+                  </select>
+                </label>
+                <label className="text-[10px] font-bold text-muted">Quantidade de times
+                  <select name="teams_per_round" value={newTeamsPerRound} onChange={(event) => setNewTeamsPerRound(Number(event.target.value))} className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground">
+                    {[2, 3, 4, 5, 6].map((count) => <option key={count} value={count}>{count} times</option>)}
+                  </select>
+                </label>
+              </div>
+              <p className="mt-2 text-[11px] text-muted">{newTeamsPerRound} times × {newPlayersPerTeam} jogadores = {newPlayersPerTeam * newTeamsPerRound} vagas. Você pode ajustar antes de montar os times.</p>
+            </fieldset>
 
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <div className="w-full min-w-0">
@@ -135,9 +205,11 @@ export function CallupAdminCard({
                   type="date"
                   name="date"
                   required
-                  defaultValue={new Date().toISOString().slice(0, 10)}
+                  value={newDate}
+                  onChange={(event) => { setNewDate(event.target.value); setError(""); }}
                   className="block w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground [appearance:none]"
                 />
+                {conflictingCallup && <p role="alert" className="mt-1 text-[11px] font-bold text-warning">Já há uma convocação neste dia. Escolha outra data.</p>}
               </div>
 
               <div className="w-full min-w-0">
@@ -183,10 +255,10 @@ export function CallupAdminCard({
             </div>
 
             <button
-              disabled={loading}
+              disabled={loading || Boolean(conflictingCallup)}
               className="w-full rounded-xl bg-accent py-3 text-sm font-black text-background transition-transform active:scale-[0.99] disabled:opacity-50"
             >
-              {loading ? "Abrindo..." : "Abrir convocação"}
+              {loading ? "Abrindo convocação..." : "Abrir convocação e começar a convidar"}
             </button>
             {callups.length > 0 && (
               <button type="button" onClick={() => setShowCreate(false)} className="w-full rounded-xl border border-border py-2.5 text-xs font-bold text-muted">
@@ -286,10 +358,11 @@ export function CallupAdminCard({
           </form>
         ) : (
           <div className="space-y-3">
+            {formatNotice && <p className="rounded-lg border border-accent/30 bg-accent/10 p-3 text-xs font-semibold text-accent">{formatNotice}</p>}
             {callups.length > 1 && (
               <select
                 value={callup?.id || ""}
-                onChange={(event) => { setSelectedCallupId(event.target.value); setEditing(false); setError(""); }}
+                onChange={(event) => { setSelectedCallupId(event.target.value); setEditing(false); setError(""); setFormatPlayersPerTeam(null); setFormatTeamsPerRound(null); setFormatNotice(""); }}
                 className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs font-bold text-foreground"
                 aria-label="Selecionar convocação"
               >
@@ -316,6 +389,26 @@ export function CallupAdminCard({
               </div>
               <ChevronRight className="h-4 w-4 text-muted shrink-0" />
             </Link>
+
+            <div className="rounded-xl border border-border bg-background/60 p-3">
+              <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-muted">Formato desta convocação</p>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-[10px] font-bold text-muted">Jogadores por time
+                  <select value={formatPlayersPerTeam ?? currentPlayersPerTeam} onChange={(event) => setFormatPlayersPerTeam(Number(event.target.value))} disabled={!canEditFormat || loading} className="mt-1 block w-full rounded-lg border border-border bg-background px-2 py-2 text-xs text-foreground disabled:opacity-60">
+                    {[5, 6, 7].map((size) => <option key={size} value={size}>{size} × {size}</option>)}
+                  </select>
+                </label>
+                <label className="text-[10px] font-bold text-muted">Times
+                  <select value={formatTeamsPerRound ?? currentTeamsPerRound} onChange={(event) => setFormatTeamsPerRound(Number(event.target.value))} disabled={!canEditFormat || loading} className="mt-1 block w-full rounded-lg border border-border bg-background px-2 py-2 text-xs text-foreground disabled:opacity-60">
+                    {[2, 3, 4, 5, 6].map((count) => <option key={count} value={count}>{count} times</option>)}
+                  </select>
+                </label>
+              </div>
+              <p className="mt-2 text-[11px] text-muted">{(formatPlayersPerTeam ?? currentPlayersPerTeam) * (formatTeamsPerRound ?? currentTeamsPerRound)} vagas no total. {canEditFormat ? "Se faltarem jogadores, escolha um formato menor antes de montar os times." : "Formato travado após montar os times."}</p>
+              {canEditFormat && (formatPlayersPerTeam !== null || formatTeamsPerRound !== null) && (
+                <button type="button" onClick={saveFormat} disabled={loading} className="mt-2 w-full rounded-lg bg-accent px-3 py-2 text-xs font-black text-background disabled:opacity-50">{loading ? "Salvando..." : "Aplicar formato"}</button>
+              )}
+            </div>
 
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -357,7 +450,7 @@ export function CallupAdminCard({
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-sm font-black text-background disabled:opacity-40"
             >
               <Lock className="h-4 w-4" />
-              {callup.round_id ? "Retomar pré-lista" : `Criar pré-lista (${confirmed}/${capacity})`}
+              {callup.round_id ? "Montar times" : "Preparar pré-lista"}
             </button>
           </div>
         )}

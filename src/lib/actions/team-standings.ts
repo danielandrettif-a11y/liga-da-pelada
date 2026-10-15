@@ -1,6 +1,6 @@
 "use server";
 
-import { supabase } from "../supabase";
+import { createClient as createServerClient } from "../supabase/server";
 import { buildSeasonTeamStandings, type SeasonTeamStanding } from "../season-team-standings";
 import { getActiveSeason } from "./seasons";
 
@@ -8,7 +8,8 @@ export async function getSeasonTeamStandings(): Promise<SeasonTeamStanding[]> {
   const season = await getActiveSeason();
   if (!season) return buildSeasonTeamStandings([]);
 
-  const { data, error } = await supabase
+  const client = await createServerClient();
+  const { data, error } = await client
     .from("rounds")
     .select(`
       id,

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentAccount } from "../auth";
+import { getSelectedLeague } from "../league-context";
 import type { PlayerAdminAttributes } from "../types";
 import { drawTeamsByAttendance } from "../round-draw";
 import { drawTeamsBySpeed, summarizeSpeedTeams, type SpeedTeamSummary } from "../speed-draw";
@@ -39,17 +40,12 @@ export async function drawTeamsBySpeedOnServer(input: {
     return { success: false, error: "Quantidade de jogadores inválida para o sorteio." };
   }
 
-  const { data: activeLeague, error: leagueError } = await account.client
-    .from("leagues")
-    .select("id")
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
-  if (leagueError || !activeLeague) return { success: false, error: "Liga ativa não encontrada." };
+  const activeLeague = await getSelectedLeague();
+  if (!activeLeague) return { success: false, error: "Escolha uma pelada no lobby." };
 
   const { data: members, error: membersError } = await account.client
     .from("league_members")
-    .select("player_id, players!inner(id, is_selectable, member_category)")
+    .select("player_id, speed_rating, players!inner(id, is_selectable, member_category)")
     .eq("league_id", activeLeague.id)
     .eq("is_active", true)
     .in("player_id", playerIds);
@@ -62,12 +58,7 @@ export async function drawTeamsBySpeedOnServer(input: {
     return { success: false, error: "A lista contém uma pessoa que não está elegível nesta liga." };
   }
 
-  const { data: attributes, error: attributesError } = await account.client
-    .from("player_admin_attributes")
-    .select("player_id, speed_rating")
-    .in("player_id", playerIds);
-  if (attributesError) return { success: false, error: attributesError.message };
-  const speedByPlayer = new Map<string, 1 | 2 | 3 | null>((attributes || []).map((row: any) => [
+  const speedByPlayer = new Map<string, 1 | 2 | 3 | null>((members || []).map((row: any) => [
     row.player_id,
     [1, 2, 3].includes(row.speed_rating) ? row.speed_rating : null,
   ]));
@@ -106,11 +97,13 @@ export async function drawTeamsBySpeedOnServer(input: {
 
 export async function getPlayerSpeedRatings(): Promise<Record<string, 1 | 2 | 3 | null>> {
   const account = await getCurrentAccount();
-  if (!account.isAdmin) return {};
+  const league = await getSelectedLeague();
+  if (!account.isAdmin || !league || league.role !== "admin") return {};
 
   const { data, error } = await account.client
-    .from("player_admin_attributes")
-    .select("player_id, speed_rating");
+    .from("league_members")
+    .select("player_id, speed_rating")
+    .eq("league_id", league.id).eq("is_active", true);
 
   if (error) {
     console.error("Erro ao buscar atributos de velocidade:", error);
@@ -129,7 +122,8 @@ export async function setPlayerSpeedRating(
   speedRating: 1 | 2 | 3 | null,
 ): Promise<{ success: boolean; error?: string }> {
   const account = await getCurrentAccount();
-  if (!account.isAdmin) {
+  const league = await getSelectedLeague();
+  if (!account.isAdmin || !league || league.role !== "admin") {
     return { success: false, error: "Apenas administradores podem definir atributos de velocidade." };
   }
 
@@ -137,21 +131,15 @@ export async function setPlayerSpeedRating(
     return { success: false, error: "Avaliação de velocidade inválida (deve ser 1, 2 ou 3 estrelas)." };
   }
 
-  const { error } = await account.client
-    .from("player_admin_attributes")
-    .upsert(
-      {
-        player_id: playerId,
-        speed_rating: speedRating,
-        updated_by: account.user?.id || null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "player_id" },
-    );
+  const { data: updated, error } = await account.client
+    .from("league_members")
+    .update({ speed_rating: speedRating })
+    .eq("league_id", league.id).eq("player_id", playerId).eq("is_active", true)
+    .select("id").maybeSingle();
 
-  if (error) {
+  if (error || !updated) {
     console.error("Erro ao salvar velocidade do jogador:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: error?.message || "Jogador não pertence a esta pelada." };
   }
 
   revalidatePath(`/jogadores/${playerId}`);

@@ -27,6 +27,7 @@ export function createDemoState(): ManagerState {
   const main = createCard(rafa, "demo-main", DEMO_DATE, false);
   const superior = structuredClone(rafa);
   superior.positions.ALA_MEI = 77;
+  superior.positions.ATA = 77;
   superior.overall = 77;
   superior.snapshotId = "demo-newer-snapshot";
   state.cards = [main, createCard(superior, "demo-superior", DEMO_DATE, false),

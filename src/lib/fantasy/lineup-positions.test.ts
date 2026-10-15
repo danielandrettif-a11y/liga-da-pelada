@@ -4,6 +4,9 @@ import { calculateFantasyPositionPackageBonus, getFantasySlotRoles, isCorrectFan
 import { calculatePositionBreakdown } from "./position-breakdown";
 
 describe("pacotes de bônus por posição — BQ v5", () => {
+  it("monta a formação 7 com 3 ATA, 3 DEF e 1 GOL", () => {
+    expect(getFantasySlotRoles(7, "2-3")).toEqual(["ATA", "ATA", "ATA", "DEF", "DEF", "DEF", "GOL"]);
+  });
   const baseInput = {
     goals: 0,
     assists: 0,

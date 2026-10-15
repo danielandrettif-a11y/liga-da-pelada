@@ -6,6 +6,7 @@ describe("banco de reserva do Cartola", () => {
     { playerId: "ata-1", slotRole: "ATA" as const, basePoints: 0, totalPoints: 0, slotIndex: 0 },
     { playerId: "ata-2", slotRole: "ATA" as const, basePoints: -3, totalPoints: -3, slotIndex: 1 },
     { playerId: "def-1", slotRole: "DEF" as const, basePoints: -4, totalPoints: -4, slotIndex: 3 },
+    { playerId: "gol-1", slotRole: "GOL" as const, basePoints: -2, totalPoints: -2, slotIndex: 4 },
   ];
 
   it("troca a pior nota não positiva da mesma posição", () => {
@@ -75,6 +76,14 @@ describe("banco de reserva do Cartola", () => {
     expect(resolveFantasyReserveSubstitution({ reserveRole: "DEF", reservePoints: -3, starters }).replacedPlayerId).toBe("def-1");
   });
 
+  it("permite reserva GOL e troca somente o titular da vaga de goleiro", () => {
+    expect(resolveFantasyReserveSubstitution({ reserveRole: "GOL", reservePoints: 4, starters })).toMatchObject({
+      applied: true,
+      replacedPlayerId: "gol-1",
+      pointsGain: 6,
+    });
+  });
+
   it("não entra se não superar o titular ou se todos forem positivos", () => {
     expect(resolveFantasyReserveSubstitution({ reserveRole: "ATA", reservePoints: -3, starters }).applied).toBe(false);
     expect(resolveFantasyReserveSubstitution({
@@ -89,10 +98,12 @@ describe("banco de reserva do Cartola", () => {
       { slotRole: "ATA" as const, price: 12 },
       { slotRole: "ATA" as const, price: 10 },
       { slotRole: "DEF" as const, price: 8 },
+      { slotRole: "GOL" as const, price: 7 },
     ];
 
     expect(getFantasyReservePriceLimit("ATA", starters)).toBe(9.9);
     expect(getFantasyReservePriceLimit("DEF", starters)).toBe(7.9);
+    expect(getFantasyReservePriceLimit("GOL", starters)).toBe(6.9);
     expect(getFantasyReservePriceLimit("ATA", [{ slotRole: "DEF", price: 10 }])).toBeNull();
   });
 });

@@ -60,11 +60,13 @@ export function CollectiveRoom({ room, compact = false }: { room: CollectiveRoom
     else if (latestMessageId) document.getElementById(`collective-${latestMessageId}`)?.scrollIntoView({ block: "end" });
   }, [firstUnreadMessageId, latestMessageId]);
   useEffect(() => {
-    const channel = supabase.channel("collective")
-      .on("postgres_changes", { event: "*", schema: "public", table: "collective_messages" }, () => startTransition(() => router.refresh()))
-      .subscribe();
+    const channel = supabase.channel(`collective-${room.summary.callupId}`);
+    for (const callupId of room.callupIds) {
+      channel.on("postgres_changes", { event: "*", schema: "public", table: "collective_messages", filter: `callup_id=eq.${callupId}` }, () => startTransition(() => router.refresh()));
+    }
+    channel.subscribe();
     return () => { void supabase.removeChannel(channel); };
-  }, [router]);
+    }, [router, room.summary.callupId, room.callupIds]);
   useEffect(() => {
     if (!recording) return;
     const timer = window.setInterval(() => setRecordingSeconds((value) => {

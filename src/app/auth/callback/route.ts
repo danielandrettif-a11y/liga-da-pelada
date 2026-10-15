@@ -14,13 +14,7 @@ export async function GET(request: Request) {
     if (!error && data.user) {
       const { error: profileRepairError } = await client.rpc("ensure_my_player_account");
       if (profileRepairError) console.error("Erro ao concluir perfil após autenticação:", profileRepairError);
-      const { data: profile } = await client
-        .from("account_profiles")
-        .select("player_id")
-        .eq("user_id", data.user.id)
-        .maybeSingle();
-
-      const destination = safeNext || (profile?.player_id ? "/" : "/meu-perfil");
+      const destination = safeNext || "/lobby";
       return NextResponse.redirect(new URL(destination, SITE_URL));
     }
   }

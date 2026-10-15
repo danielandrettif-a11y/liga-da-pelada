@@ -4,6 +4,7 @@ import { getCurrentAccount } from "../auth";
 import { drawTeamsAdaptive, type AdaptiveTeamSummary } from "../adaptive-draw";
 import type { PlayerProfile } from "../types";
 import { getPrivateBalanceTagsForDraw } from "../private-balance-tags";
+import { getSelectedLeague } from "../league-context";
 
 export type ServerAdaptiveDrawResult = {
   success: boolean;
@@ -23,7 +24,10 @@ export async function drawTeamsAdaptiveOnServer(input: {
   playersPerTeam: number;
 }): Promise<ServerAdaptiveDrawResult> {
   const account = await getCurrentAccount();
-  if (!account.isAdmin) return { success: false, error: "Apenas administradores podem usar o equilíbrio completo." };
+  const activeLeague = await getSelectedLeague();
+  if (!account.user || !activeLeague || activeLeague.role !== "admin") {
+    return { success: false, error: "Apenas administradores desta pelada podem usar o equilíbrio completo." };
+  }
 
   const playerIds = [...new Set(input.playerIds)];
   const teamCount = Math.trunc(input.teamCount);
@@ -35,17 +39,9 @@ export async function drawTeamsAdaptiveOnServer(input: {
     return { success: false, error: "Quantidade de jogadores inválida para o sorteio." };
   }
 
-  const { data: activeLeague, error: leagueError } = await account.client
-    .from("leagues")
-    .select("id")
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
-  if (leagueError || !activeLeague) return { success: false, error: "Liga ativa não encontrada." };
-
   const { data: members, error: membersError } = await account.client
     .from("league_members")
-    .select("player_id, players!inner(id, is_selectable, member_category, player_profile)")
+    .select("player_id, player_profile, speed_rating, players!inner(id, is_selectable, member_category)")
     .eq("league_id", activeLeague.id)
     .eq("is_active", true)
     .in("player_id", playerIds);
@@ -55,7 +51,7 @@ export async function drawTeamsAdaptiveOnServer(input: {
   const eligibleIds = new Set((members || []).filter((member: any) => {
     const player = Array.isArray(member.players) ? member.players[0] : member.players;
     if (player?.is_selectable && ["player", "guest"].includes(player.member_category)) {
-      profileByPlayer.set(member.player_id, player.player_profile || null);
+      profileByPlayer.set(member.player_id, member.player_profile || null);
       return true;
     }
     return false;
@@ -65,15 +61,15 @@ export async function drawTeamsAdaptiveOnServer(input: {
   }
 
   try {
-    const [{ data: attributes, error: attributesError }, { data: overalls, error: overallsError }, balanceTags] = await Promise.all([
-      account.client.from("player_admin_attributes").select("player_id, speed_rating").in("player_id", playerIds),
-      account.client.rpc("get_latest_player_card_overalls"),
+    const [{ data: overalls, error: overallsError }, balanceTags] = await Promise.all([
+      account.client.rpc("get_latest_player_card_overalls_for_league", {
+        p_league_id: activeLeague.id,
+      }),
       getPrivateBalanceTagsForDraw(playerIds, account.client),
     ]);
-    if (attributesError) return { success: false, error: attributesError.message };
     if (overallsError) return { success: false, error: `Não foi possível ler os OVRs: ${overallsError.message}` };
 
-  const speedByPlayer = new Map<string, 1 | 2 | 3 | null>((attributes || []).map((row: any) => [
+  const speedByPlayer = new Map<string, 1 | 2 | 3 | null>((members || []).map((row: any) => [
     row.player_id,
     [1, 2, 3].includes(row.speed_rating) ? row.speed_rating : null,
   ]));

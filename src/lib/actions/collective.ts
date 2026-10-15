@@ -6,6 +6,7 @@ import { getCurrentAccount } from "../auth";
 import { sendPushNotificationsToUsers } from "../push-notifications";
 import { createServiceClient } from "../supabase/service";
 import { canUseCollective } from "../collective-access";
+import { getSelectedLeague } from "../league-context";
 
 export type CollectiveSummary = {
   callupId: string;
@@ -37,6 +38,7 @@ export type CollectiveMessage = {
 
 export type CollectiveRoomData = {
   summary: CollectiveSummary;
+  callupIds: string[];
   messages: CollectiveMessage[];
   isAdmin: boolean;
   currentUserId: string;
@@ -74,6 +76,8 @@ async function collectiveUnreadState(client: any, callupIds: string[], userId: s
 async function listCollectiveCandidates() {
   const account = await getCurrentAccount();
   if (!account.user) return { account, callups: [] as any[] };
+  const league = await getSelectedLeague();
+  if (!league || league.featureTier !== "complete") return { account, callups: [] as any[] };
   const { data: player } = account.profile?.player_id
     ? await account.client.from("players").select("member_category").eq("id", account.profile.player_id).maybeSingle()
     : { data: null };
@@ -82,6 +86,7 @@ async function listCollectiveCandidates() {
     .from("callups")
     .select("id, date, created_at, round_id, status, round:round_id(id, number, status, payment_pix, payment_total, round_players(player_id), round_payments(player_id, paid)), team_drafts(id, status)")
     .eq("status", "converted")
+    .eq("league_id", league.id)
     .order("date", { ascending: false })
     .limit(12);
   return { account, callups: callups || [] };
@@ -129,11 +134,13 @@ export async function getActiveCollectiveSummary(): Promise<CollectiveSummary | 
   return collectiveSummary(callup, unreadCount);
 }
 
-export async function getCollectiveRoom(_callupId?: string): Promise<CollectiveRoomData | null> {
+export async function getCollectiveRoom(callupId?: string): Promise<CollectiveRoomData | null> {
   const { account, callups } = await listCollectiveCandidates();
   if (!account.user) return null;
   const visibleCallups = callups.filter(isCollectiveVisible);
-  const activeCallup = callups.find(isCollectiveOpen) || visibleCallups[0];
+  const activeCallup = callupId
+    ? visibleCallups.find((callup) => callup.id === callupId)
+    : callups.find(isCollectiveOpen) || visibleCallups[0];
   if (!activeCallup || !visibleCallups.length) return null;
   const summary = collectiveSummary(activeCallup, 0);
   const callupIds = visibleCallups.map((item) => item.id);
@@ -151,7 +158,7 @@ export async function getCollectiveRoom(_callupId?: string): Promise<CollectiveR
   const replyIds = [...new Set((rows || []).map((row: any) => row.reply_to_message_id).filter(Boolean))];
   const replyById = new Map<string, any>();
   if (replyIds.length) {
-    const { data: replies } = await account.client.from("collective_messages").select("id, kind, body, deleted_at, sender:sender_player_id(name)").in("id", replyIds);
+    const { data: replies } = await account.client.from("collective_messages").select("id, kind, body, deleted_at, sender:sender_player_id(name)").in("id", replyIds).in("callup_id", callupIds);
     (replies || []).forEach((reply: any) => replyById.set(reply.id, reply));
   }
   const mediaPaths = (rows || []).map((row: any) => row.media_path).filter(Boolean);
@@ -185,22 +192,22 @@ export async function getCollectiveRoom(_callupId?: string): Promise<CollectiveR
       replyTo: reply ? { id: reply.id, senderName: replySender?.name || "Usuário", kind: reply.kind, body: reply.deleted_at ? "Mensagem removida" : reply.body } : null,
     };
   });
-  return { summary, messages, isAdmin: account.isAdmin, currentUserId: account.user.id, firstUnreadMessageId: readState.firstUnreadMessageId, lastReadMessageId: readState.lastReadMessageId };
+  return { summary, callupIds, messages, isAdmin: (await getSelectedLeague())?.role === "admin", currentUserId: account.user.id, firstUnreadMessageId: readState.firstUnreadMessageId, lastReadMessageId: readState.lastReadMessageId };
 }
 
 async function pushCollectiveMessage(callupId: string, senderUserId: string, senderPlayerId: string, fallbackSenderName: string, kind: string, body: string | null) {
   const service = createServiceClient();
   if (!service) return;
-  const [{ data: officialPlayers }, { data: sender }] = await Promise.all([
-    service.from("players").select("id").eq("member_category", "player"),
+  const [{ data: callup }, { data: sender }] = await Promise.all([
+    service.from("callups").select("league_id").eq("id", callupId).maybeSingle(),
     service.from("players").select("name").eq("id", senderPlayerId).maybeSingle(),
   ]);
-  const playerIds = (officialPlayers || []).map((player: any) => player.id);
-  const [{ data: participants }, { data: admins }] = await Promise.all([
-    playerIds.length ? service.from("account_profiles").select("user_id").in("player_id", playerIds) : Promise.resolve({ data: [] as any[] }),
-    service.from("account_profiles").select("user_id").eq("role", "admin"),
-  ]);
-  const userIds = [...new Set([...(participants || []), ...(admins || [])].map((row: any) => row.user_id).filter((id) => id && id !== senderUserId))];
+  if (!callup?.league_id) return;
+  const { data: members } = await service.from("league_members")
+    .select("user_id")
+    .eq("league_id", callup.league_id)
+    .eq("is_active", true);
+  const userIds = [...new Set((members || []).map((member: any) => member.user_id).filter((id) => id && id !== senderUserId))];
   if (!userIds.length) return;
   const { data: preferences } = await service.from("user_notification_preferences").select("user_id, collective_push_enabled").in("user_id", userIds);
   const disabled = new Set((preferences || []).filter((item: any) => item.collective_push_enabled === false).map((item: any) => item.user_id));
@@ -215,6 +222,9 @@ export async function sendCollectiveMessage(formData: FormData) {
   const account = await getCurrentAccount();
   if (!account.user || !account.profile?.player_id) return { success: false, error: "Entre com um jogador vinculado para conversar." };
   const callupId = String(formData.get("callup_id") || "");
+  if (!(await isCallupInSelectedLeague(account.client, callupId))) {
+    return { success: false, error: "Esta Coletiva não pertence à pelada selecionada." };
+  }
   const body = String(formData.get("body") || "").trim();
   const file = formData.get("media");
   const duration = Math.trunc(Number(formData.get("duration") || 0));
@@ -275,6 +285,9 @@ export async function editCollectiveMessage(messageId: string, body: string) {
   if (!account.user) return { success: false, error: "Entre para editar." };
   const clean = body.trim();
   if (!clean || clean.length > 1000) return { success: false, error: "Use entre 1 e 1.000 caracteres." };
+  if (!(await isMessageInSelectedLeague(account.client, messageId))) {
+    return { success: false, error: "Mensagem fora da pelada selecionada." };
+  }
   const { error } = await account.client.from("collective_messages").update({ body: clean, edited_at: new Date().toISOString() }).eq("id", messageId).eq("sender_user_id", account.user.id).eq("kind", "text").is("deleted_at", null);
   if (error) return { success: false, error: error.message };
   revalidatePath("/coletiva");
@@ -284,8 +297,11 @@ export async function editCollectiveMessage(messageId: string, body: string) {
 export async function deleteCollectiveMessage(messageId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre para apagar." };
+  if (!(await isMessageInSelectedLeague(account.client, messageId))) {
+    return { success: false, error: "Mensagem fora da pelada selecionada." };
+  }
   let query = account.client.from("collective_messages").update({ body: "Mensagem removida", deleted_at: new Date().toISOString() }).eq("id", messageId);
-  if (!account.isAdmin) query = query.eq("sender_user_id", account.user.id);
+  if ((await getSelectedLeague())?.role !== "admin") query = query.eq("sender_user_id", account.user.id);
   const { error } = await query;
   if (error) return { success: false, error: error.message };
   revalidatePath("/coletiva");
@@ -295,10 +311,16 @@ export async function deleteCollectiveMessage(messageId: string) {
 export async function markCollectiveRead(readTargets: Array<{ callupId: string; messageId: string }>) {
   const account = await getCurrentAccount();
   if (!account.user || !readTargets.length) return { success: false };
+  const league = await getSelectedLeague();
+  if (!league) return { success: false };
+  const callupIds = [...new Set(readTargets.map((target) => target.callupId))];
+  const { data: selectedCallups } = await account.client.from("callups")
+    .select("id").eq("league_id", league.id).in("id", callupIds);
+  const allowedCallupIds = new Set((selectedCallups || []).map((callup) => callup.id));
   const targetByMessageId = new Map(readTargets.map((target) => [target.messageId, target.callupId]));
   const { data: messages } = await account.client.from("collective_messages").select("id, callup_id, created_at").in("id", [...targetByMessageId.keys()]);
   const reads = (messages || [])
-    .filter((message: any) => targetByMessageId.get(message.id) === message.callup_id)
+    .filter((message: any) => allowedCallupIds.has(message.callup_id) && targetByMessageId.get(message.id) === message.callup_id)
     .map((message: any) => ({ callup_id: message.callup_id, user_id: account.user!.id, read_at: message.created_at, last_read_message_id: message.id }));
   if (!reads.length) return { success: false };
   const { error } = await account.client.from("collective_reads").upsert(reads, { onConflict: "callup_id,user_id" });
@@ -307,13 +329,29 @@ export async function markCollectiveRead(readTargets: Array<{ callupId: string; 
 
 export async function getAdminPreviousCollective(): Promise<CollectiveRoomData | null> {
   const account = await getCurrentAccount();
-  if (!account.isAdmin) return null;
+  const league = await getSelectedLeague();
+  if (!account.isAdmin || !league || league.role !== "admin") return null;
   const { data } = await account.client
     .from("callups")
     .select("id, date, round:round_id!inner(id, status)")
     .eq("round.status", "finished")
+    .eq("league_id", league.id)
     .order("date", { ascending: false })
     .limit(1)
     .maybeSingle();
   return data?.id ? getCollectiveRoom(data.id) : null;
+}
+
+async function isCallupInSelectedLeague(client: any, callupId: string) {
+  const league = await getSelectedLeague();
+  if (!league || league.featureTier !== "complete") return false;
+  const { data } = await client.from("callups").select("id")
+    .eq("id", callupId).eq("league_id", league.id).maybeSingle();
+  return Boolean(data);
+}
+
+async function isMessageInSelectedLeague(client: any, messageId: string) {
+  const { data } = await client.from("collective_messages")
+    .select("callup_id").eq("id", messageId).maybeSingle();
+  return Boolean(data?.callup_id && await isCallupInSelectedLeague(client, data.callup_id));
 }

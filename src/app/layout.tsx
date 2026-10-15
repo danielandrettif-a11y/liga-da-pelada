@@ -7,6 +7,7 @@ import { SessionInstallAppPrompt } from "@/components/SessionInstallAppPrompt";
 import { Header } from "@/components/Header";
 import { PwaRegistration } from "@/components/PwaRegistration";
 import { WebVitalsReporter } from "@/components/WebVitalsReporter";
+import { AppChrome } from "@/components/AppChrome";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -24,11 +25,11 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL || "https://pelada-de-baixa-qualidade.179.197.75.220.sslip.io"
   ),
-  title: "Pelada de Baixa Qualidade",
-  description: "O Cartola da sua pelada. Acompanhe gols, assistências, rankings e muito mais.",
+  title: "Pelada BQ",
+  description: "Organize sua pelada, acompanhe rodadas e rankings e jogue com seus amigos.",
   keywords: ["pelada", "futebol", "ranking", "estatísticas", "liga"],
-  authors: [{ name: "Pelada de Baixa Qualidade" }],
-  applicationName: "Pelada de Baixa Qualidade",
+  authors: [{ name: "Pelada BQ" }],
+  applicationName: "Pelada BQ",
   icons: {
     icon: [
       { url: "/icons/pelada-bq-v2-192.png", sizes: "192x192", type: "image/png" },
@@ -41,9 +42,9 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "pt_BR",
-    siteName: "Pelada de Baixa Qualidade",
-    title: "Pelada de Baixa Qualidade - Convocação & Cartola",
-    description: "Confirme sua presença na pelada, acompanhe rankings e escale seu time!",
+    siteName: "Pelada BQ",
+    title: "Pelada BQ — sua liga de futebol em um só lugar",
+    description: "Organize convocações, acompanhe rankings e escale seu time no Cartola da pelada.",
     images: [
       {
         url: "/icons/pelada-bq-v2-512.png",
@@ -55,8 +56,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Pelada de Baixa Qualidade",
-    description: "O Cartola da sua pelada. Acompanhe gols, assistências, rankings e muito mais.",
+    title: "Pelada BQ",
+    description: "Organize sua pelada, acompanhe rodadas e rankings e jogue com seus amigos.",
     images: ["/icons/pelada-bq-v2-512.png"],
   },
   appleWebApp: {
@@ -83,16 +84,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-dvh flex flex-col font-sans">
         <WebVitalsReporter />
         <PwaRegistration />
-        <Header />
-        <main className="min-w-0 flex-1 px-4 pt-4 pb-[calc(5.5rem+env(safe-area-inset-bottom)+1.5rem)] max-w-lg mx-auto w-full">
-          {children}
-        </main>
-        <Suspense fallback={null}>
-          <SessionBottomNav />
-        </Suspense>
-        <Suspense fallback={null}>
-          <SessionInstallAppPrompt />
-        </Suspense>
+        <AppChrome
+          header={<Header />}
+          navigation={<Suspense fallback={null}><SessionBottomNav /></Suspense>}
+          installPrompt={<Suspense fallback={null}><SessionInstallAppPrompt /></Suspense>}
+        >{children}</AppChrome>
       </body>
     </html>
   );

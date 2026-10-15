@@ -3,14 +3,18 @@ import { createDemoState } from "@/lib/bq-manager/demo";
 
 const mocks = vi.hoisted(() => ({
   account: vi.fn(), client: vi.fn(), read: vi.fn(), catalog: vi.fn(), rpc: vi.fn(), insert: vi.fn(),
+  selectedLeague: vi.fn(), sourceLeague: vi.fn(),
 }));
 vi.mock("@/lib/auth", () => ({ getCurrentAccount: mocks.account }));
-vi.mock("@/lib/bq-manager/server", () => ({ createManagerClient: mocks.client, readCatalog: mocks.catalog, readManagerSave: mocks.read }));
+vi.mock("@/lib/league-context", () => ({ getSelectedLeague: mocks.selectedLeague }));
+vi.mock("@/lib/bq-manager/server", () => ({ createManagerClient: mocks.client, readCatalog: mocks.catalog, readManagerSave: mocks.read, readManagerSourceLeague: mocks.sourceLeague }));
 import { createManagerClub, runManagerCommand } from "./actions";
 
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.account.mockResolvedValue({ user: { id: "authenticated-owner" }, client: "authenticated-app-client" });
+  mocks.selectedLeague.mockResolvedValue({ id: "bq-league", featureTier: "complete" });
+  mocks.sourceLeague.mockResolvedValue("bq-league");
   mocks.client.mockReturnValue({ rpc: mocks.rpc, from: () => ({ insert: mocks.insert }) });
   mocks.read.mockResolvedValue({ version: 7, state: createDemoState() });
   mocks.rpc.mockResolvedValue({ data: 8, error: null });
@@ -23,6 +27,13 @@ describe("BQ Manager server authority", () => {
     expect((await runManagerCommand({ type: "open-pack", packId: "demo-choice" }, 7)).ok).toBe(false);
     expect((await createManagerClub(createDemoState().club)).ok).toBe(false);
     expect(mocks.client).not.toHaveBeenCalled();
+  });
+  it("rejects a different selected league before accessing the separate game database", async () => {
+    mocks.selectedLeague.mockResolvedValue({ id: "other-league", featureTier: "complete" });
+    expect((await runManagerCommand({ type: "open-pack", packId: "demo-choice" }, 7)).ok).toBe(false);
+    expect((await createManagerClub(createDemoState().club)).ok).toBe(false);
+    expect(mocks.client).not.toHaveBeenCalled();
+    expect(mocks.catalog).not.toHaveBeenCalled();
   });
   it("derives the owner from authentication and computes fusion from stored state", async () => {
     const result = await runManagerCommand({ type: "fuse", targetId: "demo-main", donorIds: ["demo-superior"], mode: "inherit", position: "ALA_MEI" }, 7);

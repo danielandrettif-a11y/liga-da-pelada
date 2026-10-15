@@ -43,7 +43,7 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
     const league = await getActiveLeague();
     const season = await getActiveSeason(league.id);
     if (!season) return [];
-    const maxPlayers = league.players_per_team || 5;
+    let maxPlayers = league.players_per_team || 5;
 
     const [{ data: testSession }, { data: fantasySeason }] = await Promise.all([
       account.client
@@ -63,7 +63,7 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
     const { data: officialRounds } = fantasySeason
       ? await account.client
           .from("fantasy_rounds")
-          .select("id, round_id, market_status, round:round_id(number, date, status)")
+          .select("id, round_id, market_status, settings_snapshot, round:round_id(number, date, status)")
           .eq("fantasy_season_id", fantasySeason.id)
           .in("market_status", ["open", "in_progress"])
           .order("created_at", { ascending: false })
@@ -86,6 +86,9 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
           status: officialRounds[0].market_status,
         }
       : null;
+    if (!testSession && officialRounds?.[0]?.settings_snapshot?.players_per_team) {
+      maxPlayers = Number(officialRounds[0].settings_snapshot.players_per_team);
+    }
 
     const desired: Array<{ type: string; key: string; title: string; body: string; href: string }> = [];
 
@@ -176,10 +179,14 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
         account.client.from("fantasy_round_packs").select("id, status, fantasy_season_pass_reward_id, card_tier").eq("user_id", account.user.id).eq("source", "season_pass").in("status", ["available", "opened"]),
       ]);
       const chosen = new Set((choices || []).map((choice: any) => choice.reward_id));
+      const currentRewardIds = new Set((rewards || []).map((reward: any) => reward.id));
       for (const reward of rewards || []) {
         if (reward.reward_type === "cosmetic_choice" && Number(reward.house) <= Number(pass?.progress || 0) && !chosen.has(reward.id)) desired.push({ type: "fantasy_pass_cosmetic_reward", key: `pass:reward:${reward.id}`, title: "✨ Recompensa do Passe liberada", body: `A casa ${reward.house} abriu uma escolha cosmética para o seu perfil.`, href: `/jogadores?tab=passe&reward=${reward.id}` });
       }
-      for (const pack of passPacks || []) desired.push({ type: "fantasy_pass_pack", key: `pass:pack:${pack.id}`, title: "🎴 Pacote do Passe disponível", body: `Seu pacote ${pack.card_tier === "gold" ? "Ouro" : "Bronze"} está pronto para abrir no Cartola.`, href: `/cartola?pack=${pack.id}` });
+      for (const pack of passPacks || []) {
+        if (!currentRewardIds.has(pack.fantasy_season_pass_reward_id)) continue;
+        desired.push({ type: "fantasy_pass_pack", key: `pass:pack:${pack.id}`, title: "🎴 Pacote do Passe disponível", body: `Seu pacote ${pack.card_tier === "gold" ? "Ouro" : "Bronze"} está pronto para abrir no Cartola.`, href: `/cartola?pack=${pack.id}` });
+      }
     }
 
     // Prêmios individuais da Ranked: o inbox registra uma mensagem permanente

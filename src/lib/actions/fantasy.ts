@@ -44,6 +44,7 @@ import {
   type FantasyLivePlayerStats,
 } from "@/lib/fantasy/live-projection";
 import type { FantasyLineupSlot, FantasySlotRole } from "@/lib/fantasy/lineup-positions";
+import type { FantasyReserveRole } from "@/lib/fantasy/reserve";
 import { calculatePositionBreakdown } from "@/lib/fantasy/position-breakdown";
 import {
   resolveFantasyBulletinTotal,
@@ -55,6 +56,7 @@ import { isParticipantScoringEligible } from "@/lib/scoring-eligibility";
 import { resolveFantasyCardPointBonus } from "@/lib/fantasy/card-benefits";
 import { buildFantasyGoalkeeperSimulationStats } from "@/lib/fantasy/goalkeeper-simulation";
 import { rankingActivePlayerIds } from "@/lib/ranking";
+import { compareFantasyRoundPriority } from "@/lib/fantasy-round-order";
 
 export type FantasyMarketPlayer = {
   id: string;
@@ -264,9 +266,13 @@ export async function getFantasyDashboard() {
   if (!account.user) return { authenticated: false as const };
 
   const league = await getActiveLeague();
+  if (league.feature_tier !== "complete") {
+    return { authenticated: true as const, available: false as const, unavailableReason: "basic" as const };
+  }
   const season = await getActiveSeason(league.id);
-  if (!season) return { authenticated: true as const, available: false as const };
-  const playersPerTeam = league.players_per_team || 5;
+  if (!season) {
+    return { authenticated: true as const, available: false as const, unavailableReason: "no-season" as const };
+  }
 
   // Estas leituras dependem apenas de liga/temporada. Iniciá-las juntas
   // remove um round-trip inteiro antes de montar o dashboard do Cartola.
@@ -293,6 +299,22 @@ export async function getFantasyDashboard() {
   ]);
 
   const settings = normalizeFantasySettingsRow(settingsRow);
+
+  if (!fantasySeason) {
+    const { count, error } = await account.client
+      .from("rounds")
+      .select("id", { count: "exact", head: true })
+      .eq("season_id", season.id)
+      .eq("round_type", "official")
+      .neq("status", "finished");
+    if (!error && count === 0) {
+      return {
+        authenticated: true as const,
+        available: false as const,
+        unavailableReason: "no-round" as const,
+      };
+    }
+  }
 
   if (
     !fantasySeason ||
@@ -321,7 +343,7 @@ export async function getFantasyDashboard() {
     account.client
       .from("fantasy_rounds")
       .select(
-        "*, round:round_id(id, number, date, start_time, status, round_type, preparation_stage, suppress_goalkeeper_rewards, round_players(player_id), round_payments(player_id, paid), teams(id, name, position, color, crest_url, team_players(player_id, goalkeeper_order, loan_order, players(id, name, nickname, avatar_url, player_profile, is_goalkeeper))), matches(id, status))"
+        "*, round:round_id(id, number, date, start_time, status, round_type, preparation_stage, suppress_goalkeeper_rewards, callups(id, status), round_players(player_id), round_payments(player_id, paid), teams(id, name, position, color, crest_url, team_players(player_id, goalkeeper_order, loan_order, players(id, name, nickname, avatar_url, player_profile, is_goalkeeper))), matches(id, status))"
       )
       .eq("fantasy_season_id", fantasySeason.id),
     account.client.rpc("get_fantasy_market_v11_public_health", {
@@ -363,11 +385,7 @@ export async function getFantasyDashboard() {
           item.round?.status !== "finished" &&
           (item.market_status === "in_progress" || item.market_status === "open")
       )
-      .sort((a: any, b: any) => {
-        if (a.market_status !== b.market_status)
-          return a.market_status === "in_progress" ? -1 : 1;
-        return byRoundDateDesc(a, b);
-      })[0] || null;
+      .sort(compareFantasyRoundPriority)[0] || null;
   const activeOfficialRound = selectedActiveOfficialRound &&
     selectedActiveOfficialRound.market_status === "open" &&
     (selectedActiveOfficialRound.round?.matches || []).some((match: any) =>
@@ -391,6 +409,12 @@ export async function getFantasyDashboard() {
   const fantasyRound: any = testSession
     ? { ...testSession, market_status: testSession.status }
     : activeOfficialRound;
+  const playersPerTeam = Number(
+    fantasyRound?.settings_snapshot?.players_per_team
+    ?? latestFinishedRound?.settings_snapshot?.players_per_team
+    ?? league.players_per_team
+    ?? 5,
+  );
   const betweenRounds = !isTest && !activeOfficialRound;
   const scoringSnapshot = fantasyRound?.settings_snapshot || null;
   const scoringSettings: FantasySettings = scoringSnapshot
@@ -590,10 +614,9 @@ export async function getFantasyDashboard() {
     marketReadModel
       ? Promise.resolve({ data: marketReadModel.players || [] })
       : account.client
-          .from("players")
-          .select("id, name, avatar_url, player_profile, overall_traits, is_goalkeeper, member_category, is_selectable, is_competitive_profile_complete")
-          .eq("is_selectable", true)
-          .eq("member_category", "player"),
+          .from("league_members")
+          .select("player_id, player_profile, overall_traits, players!inner(id, name, avatar_url, is_goalkeeper, member_category, is_selectable)")
+          .eq("league_id", season.league_id).eq("is_active", true),
     marketReadModel
       ? Promise.resolve({ data: marketReadModel.history || [] })
       : account.client
@@ -625,25 +648,50 @@ export async function getFantasyDashboard() {
       ? { ...rawLineup, fantasy_lineup_players: rawLineup.fantasy_test_lineup_players || [] }
       : rawLineup;
 
+  // A relação aninhada pode chegar vazia por cache de schema/RLS mesmo quando
+  // o RPC gravou a reserva. A leitura direta pelo ID da escalação é a fonte
+  // autoritativa do banco exibido ao próprio usuário.
+  if (!isTest && lineup?.id) {
+    const { data: persistedReserveRows, error: persistedReserveError } = await ownedLineupReadClient
+      .from("fantasy_lineup_reserves")
+      .select("*")
+      .eq("lineup_id", lineup.id)
+      .limit(1);
+    if (!persistedReserveError) {
+      lineup.fantasy_lineup_reserves = persistedReserveRows || [];
+    }
+  }
+
   const pricePlayerIds = (priceRows || []).map((row: any) => row.player_id);
   const participantIds = (roundParticipants || []).map((row: any) => row.player_id);
 
   // A consulta de jogadores selecionáveis já trouxe os dados completos do elenco.
   // Só buscamos separadamente os participantes/preços que não façam parte dela
   // (por exemplo, convidados da rodada), evitando ler o elenco inteiro duas vezes.
-  const selectableById = new Map((selectablePlayers || []).map((player: any) => [player.id, player]));
+  const normalizedSelectablePlayers = marketReadModel
+    ? (selectablePlayers || [])
+    : (selectablePlayers || []).flatMap((membership: any) => {
+      const player = Array.isArray(membership.players) ? membership.players[0] : membership.players;
+      if (!player?.is_selectable || player.member_category !== "player") return [];
+      return [{ ...player, player_profile: membership.player_profile, overall_traits: membership.overall_traits }];
+    });
+  const selectableById = new Map(normalizedSelectablePlayers.map((player: any) => [player.id, player]));
   const additionalPlayerIds = [...new Set([...pricePlayerIds, ...participantIds])].filter(
     (playerId) => !selectableById.has(playerId),
   );
   const { data: additionalPlayers } = additionalPlayerIds.length
     ? await account.client
-        .from("players")
-        .select("id, name, avatar_url, player_profile, overall_traits, is_goalkeeper, member_category, is_selectable, is_competitive_profile_complete")
-        .in("id", additionalPlayerIds)
+        .from("league_members")
+        .select("player_id, player_profile, overall_traits, players!inner(id, name, avatar_url, is_goalkeeper, member_category, is_selectable)")
+        .eq("league_id", season.league_id).in("player_id", additionalPlayerIds)
     : { data: [] as any[] };
+  const normalizedAdditionalPlayers = (additionalPlayers || []).map((membership: any) => {
+    const player = Array.isArray(membership.players) ? membership.players[0] : membership.players;
+    return { ...player, player_profile: membership.player_profile, overall_traits: membership.overall_traits };
+  });
   const allPlayersById = new Map([
-    ...(selectablePlayers || []).map((player: any) => [player.id, player] as const),
-    ...(additionalPlayers || []).map((player: any) => [player.id, player] as const),
+    ...normalizedSelectablePlayers.map((player: any) => [player.id, player] as const),
+    ...normalizedAdditionalPlayers.map((player: any) => [player.id, player] as const),
   ]);
   const players = isTest
     ? participantIds.map((playerId) => allPlayersById.get(playerId)).filter(Boolean)
@@ -1733,16 +1781,24 @@ export async function saveFantasyLineup(input: {
   assistId: string | null;
   challengeId: string | null;
   reservePlayerId: string | null;
-  reserveRole: "ATA" | "DEF" | null;
+  reserveRole: FantasyReserveRole | null;
 }) {
   try {
     const account = await getCurrentAccount();
     if (!account.user) return { success: false, error: "Entre na sua conta para escalar." };
     const league = await getActiveLeague();
-    const maxPlayers = league.players_per_team || 5;
     if (!input.roundId) {
       return { success: false, error: "A janela de transferências está fechada. Aguarde a abertura da próxima Ranked." };
     }
+    const { data: targetRound, error: targetRoundError } = await account.client
+      .from("fantasy_rounds")
+      .select("settings_snapshot, round:round_id(league_id)")
+      .eq("round_id", input.roundId)
+      .maybeSingle();
+    if (targetRoundError || !targetRound || (targetRound.round as { league_id?: string } | null)?.league_id !== league.id) {
+      return { success: false, error: "Rodada do Cartola não encontrada nesta pelada." };
+    }
+    const maxPlayers = Number((targetRound.settings_snapshot as Record<string, unknown> | null)?.players_per_team ?? league.players_per_team ?? 5);
     if (input.roundId && (input.playerIds.length !== maxPlayers || !input.captainId)) {
       return { success: false, error: `Para salvar a escalação, escolha exatamente ${maxPlayers} jogadores e um capitão.` };
     }
@@ -1754,6 +1810,9 @@ export async function saveFantasyLineup(input: {
     }
     if (Boolean(input.reservePlayerId) !== Boolean(input.reserveRole)) {
       return { success: false, error: "Escolha o jogador e a posição do banco de reserva." };
+    }
+    if (input.reserveRole && !(["GOL", "DEF", "ATA"] as const).includes(input.reserveRole)) {
+      return { success: false, error: "A posição do banco de reserva é inválida." };
     }
     if (input.reservePlayerId && input.playerIds.includes(input.reservePlayerId)) {
       return { success: false, error: "O jogador do banco não pode estar entre os titulares." };
@@ -1862,7 +1921,7 @@ export async function getRevealedLineups(roundId?: string) {
   if (roundId) {
     const { data } = await account.client
       .from("fantasy_rounds")
-      .select("id, market_status, round:round_id(id, number, date, status)")
+      .select("id, market_status, round:round_id(id, number, date, start_time, status, callups(id, status))")
       .eq("fantasy_season_id", fs.id)
       .eq("round_id", roundId)
       .maybeSingle();
@@ -1870,11 +1929,9 @@ export async function getRevealedLineups(roundId?: string) {
   } else {
     const { data } = await account.client
       .from("fantasy_rounds")
-      .select("id, market_status, round:round_id(id, number, date, status)")
+      .select("id, market_status, round:round_id(id, number, date, start_time, status, callups(id, status))")
       .eq("fantasy_season_id", fs.id)
-      .order("created_at", { ascending: false })
-      .limit(1);
-    targetFantasyRound = data?.[0] || null;
+    targetFantasyRound = [...(data || [])].sort(compareFantasyRoundPriority)[0] || null;
   }
 
   if (!targetFantasyRound) {
@@ -2190,16 +2247,16 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
   if (!fs) return null;
 
   const [
-    { data: playerRow },
+    { data: playerMembershipRow },
     { data: priceRow },
     { data: historyRows },
     { data: statRows },
     { data: cosmeticProfileRow },
   ] = await Promise.all([
     account.client
-      .from("players")
-      .select("id, name, avatar_url, player_profile, is_goalkeeper, member_category")
-      .eq("id", playerId)
+      .from("league_members")
+      .select("player_id, player_profile, players!inner(id, name, avatar_url, is_goalkeeper, member_category)")
+      .eq("league_id", league.id).eq("player_id", playerId).eq("is_active", true)
       .maybeSingle(),
     account.client
       .from("fantasy_player_prices")
@@ -2226,6 +2283,12 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       .maybeSingle(),
   ]);
 
+  const playerIdentity = Array.isArray(playerMembershipRow?.players)
+    ? playerMembershipRow.players[0]
+    : playerMembershipRow?.players;
+  const playerRow = playerIdentity
+    ? { ...playerIdentity, player_profile: playerMembershipRow?.player_profile }
+    : null;
   if (!playerRow) return null;
 
   const price = Number(priceRow?.current_price ?? DEFAULT_FANTASY_SETTINGS.initialPlayerPrice);
@@ -2295,7 +2358,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
   const [{ data: liveRoundRows }, { data: liveSettingsRow }, { data: cosmeticLoadout }] = await Promise.all([
     liveReadClient
       .from("fantasy_rounds")
-      .select("id, round_id, market_status, scoring_version, settings_snapshot, round:round_id(number, date, status, suppress_goalkeeper_rewards)")
+      .select("id, round_id, market_status, scoring_version, settings_snapshot, round:round_id(number, date, start_time, status, suppress_goalkeeper_rewards, callups(id, status))")
       .eq("fantasy_season_id", fs.id)
       .in("market_status", ["open", "in_progress"]),
     liveReadClient
@@ -2308,17 +2371,12 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
   const linkedRound = (item: any) => Array.isArray(item?.round) ? item.round[0] || null : item?.round || null;
   const currentRound = [...(liveRoundRows || [])]
     .filter((item: any) => linkedRound(item)?.status !== "finished")
-    .sort((a: any, b: any) => {
-      if (a.market_status !== b.market_status) return a.market_status === "in_progress" ? -1 : 1;
-      return `${linkedRound(b)?.date || ""}-${String(linkedRound(b)?.number || 0).padStart(4, "0")}`.localeCompare(
-        `${linkedRound(a)?.date || ""}-${String(linkedRound(a)?.number || 0).padStart(4, "0")}`,
-      );
-    })[0] || null;
+    .sort(compareFantasyRoundPriority)[0] || null;
   const historyRoundId = fantasyRoundId || (!currentRound ? latestValidHistory?.fantasyRoundId : null);
   const { data: historyRound } = historyRoundId
     ? await liveReadClient
       .from("fantasy_rounds")
-      .select("id, round_id, market_status, scoring_version, settings_snapshot, round:round_id(number, date, status, suppress_goalkeeper_rewards)")
+      .select("id, round_id, market_status, scoring_version, settings_snapshot, round:round_id(number, date, start_time, status, suppress_goalkeeper_rewards)")
       .eq("id", historyRoundId)
       .maybeSingle()
     : { data: null as any };
@@ -2870,7 +2928,7 @@ async function getLiveRoundProjections(
   const readActiveRounds = (readClient: any) => {
     let query = readClient
       .from("fantasy_rounds")
-      .select("id, round_id, market_status, scoring_version, settings_snapshot, round:round_id(status, suppress_goalkeeper_rewards, date, number)")
+      .select("id, round_id, market_status, scoring_version, settings_snapshot, round:round_id(status, suppress_goalkeeper_rewards, date, start_time, number, callups(id, status))")
       .eq("fantasy_season_id", fantasySeasonId);
     if (targetRoundId) {
       // Uma página histórica pode precisar reconstruir uma rodada já encerrada
@@ -2898,12 +2956,7 @@ async function getLiveRoundProjections(
   const linkedRound = (item: any) => Array.isArray(item?.round) ? item.round[0] || null : item?.round || null;
   const activeRound = (activeRoundRows || [])
     .filter((item: any) => Boolean(targetRoundId) || linkedRound(item)?.status !== "finished")
-    .sort((a: any, b: any) => {
-      if (a.market_status !== b.market_status) return a.market_status === "in_progress" ? -1 : 1;
-      return `${linkedRound(b)?.date || ""}-${String(linkedRound(b)?.number || 0).padStart(4, "0")}`.localeCompare(
-        `${linkedRound(a)?.date || ""}-${String(linkedRound(a)?.number || 0).padStart(4, "0")}`,
-      );
-    })[0] || null;
+    .sort(compareFantasyRoundPriority)[0] || null;
   if (!activeRound?.round_id) return null;
   const activeRoundInfo = linkedRound(activeRound);
 
@@ -2914,7 +2967,9 @@ async function getLiveRoundProjections(
       .from("fantasy_lineups")
       .select("id, user_id, status, score_breakdown, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked), fantasy_lineup_reserves(player_id, slot_role)")
       .eq("fantasy_round_id", activeRound.id),
-    liveReadClient.from("players").select("id, player_profile, member_category, is_selectable"),
+    liveReadClient.from("league_members")
+      .select("player_id, player_profile, players!inner(id, member_category, is_selectable)")
+      .eq("league_id", leagueId).eq("is_active", true),
   ]);
   // A prévia precisa usar as regras congeladas quando a rodada foi aberta.
   // As configurações da liga podem mudar depois, mas não podem alterar uma
@@ -2952,9 +3007,13 @@ async function getLiveRoundProjections(
     topScorerPredictionPoints: Number(snapshot.top_scorer_prediction_points ?? settingsRow?.top_scorer_prediction_points ?? DEFAULT_FANTASY_SETTINGS.topScorerPredictionPoints),
     topAssistPredictionPoints: Number(snapshot.top_assist_prediction_points ?? settingsRow?.top_assist_prediction_points ?? DEFAULT_FANTASY_SETTINGS.topAssistPredictionPoints),
   };
-  const playerProfileById = new Map((playerRows || []).map((player: any) => [player.id, player.player_profile]));
+  const normalizedPlayerRows = (playerRows || []).map((membership: any) => {
+    const player = Array.isArray(membership.players) ? membership.players[0] : membership.players;
+    return { ...player, id: membership.player_id, player_profile: membership.player_profile };
+  });
+  const playerProfileById = new Map(normalizedPlayerRows.map((player: any) => [player.id, player.player_profile]));
   const eligiblePredictionPlayerIds = new Set<string>(
-    (playerRows || [])
+    normalizedPlayerRows
       .filter((player: any) => player.member_category === "player" && player.is_selectable)
       .map((player: any) => String(player.id)),
   );
@@ -3056,18 +3115,9 @@ export async function getFantasyRanking(
     } else {
       const { data } = await rankingReadClient
         .from("fantasy_rounds")
-        .select("id, round_id, market_status, round:round_id(date, number, status)")
+        .select("id, round_id, market_status, round:round_id(date, number, start_time, status, callups(id, status))")
         .eq("fantasy_season_id", fs.id);
-      const ordered = [...(data || [])].sort((a: any, b: any) => {
-        // Uma rodada em jogo sempre vence uma rodada futura ainda aberta.
-        // Sem isso o ranking consultava a próxima rodada vazia.
-        if (a.market_status !== b.market_status) {
-          return a.market_status === "in_progress" ? -1 : b.market_status === "in_progress" ? 1 : 0;
-        }
-        return `${b.round?.date}-${b.round?.number}`.localeCompare(
-          `${a.round?.date}-${a.round?.number}`,
-        );
-      });
+      const ordered = [...(data || [])].sort(compareFantasyRoundPriority);
       // A aba de rodada sempre prioriza a rodada que está aberta ou em jogo,
       // mesmo se já houver uma rodada futura criada no calendário.
       const latest = ordered.find((item: any) =>
@@ -3481,23 +3531,14 @@ export async function getFantasyRoundLineupOverview(
 
   const { data: fantasyRounds } = await overviewReadClient
     .from("fantasy_rounds")
-    .select("id, market_status, round_id, round:round_id(id, number, date, status, round_type, matches(id, status, started_at))")
+    .select("id, market_status, round_id, round:round_id(id, number, date, start_time, status, round_type, callups(id, status), matches(id, status, started_at))")
     .eq("fantasy_season_id", fs.id);
 
   const officialFantasyRounds = (fantasyRounds || []).filter(
     (fr: any) => fr.round?.round_type === "official"
   );
 
-  const sortedRounds = [...officialFantasyRounds].sort((a: any, b: any) => {
-    // Uma rodada que já começou sempre é o alvo padrão, mesmo que já exista
-    // outra rodada futura aberta no calendário.
-    if (a.market_status !== b.market_status) {
-      return a.market_status === "in_progress" ? -1 : b.market_status === "in_progress" ? 1 : 0;
-    }
-    return `${b.round?.date || ""}-${String(b.round?.number || 0).padStart(4, "0")}`.localeCompare(
-      `${a.round?.date || ""}-${String(a.round?.number || 0).padStart(4, "0")}`
-    );
-  });
+  const sortedRounds = [...officialFantasyRounds].sort(compareFantasyRoundPriority);
 
   let targetFantasyRound: any = null;
   if (roundId) {
@@ -3646,74 +3687,58 @@ export async function updateFantasySettings(values: Partial<FantasySettings>) {
   if (changesCanonicalScout) {
     return { success: false, error: "Edite os oito scouts juntos na tela Pontuação BQ para manter Ranked e Cartola sincronizados." };
   }
-  const { attackerGoalPoints: _legacyAttackerGoalPoints, ownGoalPoints, lossPoints, goalkeeperLossPoints, goalkeeperAppearancePoints, goalConcededPoints, teamGoalConcededPoints, defenderOneGoalConcededPoints, defenderTwoGoalsConcededPoints, ...otherValues } = values;
-  const v11Keys = [
-    "market_difficulty_min", "market_difficulty_max", "market_difficulty_step", "market_target_elite_affordability",
-    "market_target_median_elite_ratio", "market_recovery_bonus_strength", "market_expensive_risk_strength",
-    "market_breakout_reprice_strength", "market_cheap_percentile", "market_elite_percentile",
-    "market_breakout_round_percentile", "market_bad_round_percentile",
-  ] as const;
-  const v11Values = Object.fromEntries(
-    v11Keys.filter((key) => (values as any)[key] !== undefined).map((key) => [key, (values as any)[key]]),
-  );
-  const { error } = await account.client.rpc("update_fantasy_settings", {
-    p_settings: otherValues,
+  const league = await getActiveLeague();
+  if (league.feature_tier !== "complete") return { success: false, error: "O Cartola só pode ser configurado em uma pelada Completa." };
+  const {
+    attackerGoalPoints: _legacyAttackerGoalPoints,
+    ownGoalPoints: _ownGoalPoints,
+    lossPoints: _lossPoints,
+    goalkeeperLossPoints: _goalkeeperLossPoints,
+    goalkeeperAppearancePoints: _goalkeeperAppearancePoints,
+    goalConcededPoints: _goalConcededPoints,
+    teamGoalConcededPoints: _teamGoalConcededPoints,
+    defenderOneGoalConcededPoints,
+    defenderTwoGoalsConcededPoints,
+    ...otherValues
+  } = values;
+  const settingsPayload = Object.fromEntries(
+    Object.entries(otherValues).filter(([, value]) => value !== undefined),
+  ) as Record<string, unknown>;
+  if (defenderOneGoalConcededPoints !== undefined) {
+    settingsPayload.defender_one_goal_conceded_points = defenderOneGoalConcededPoints;
+  }
+  if (defenderTwoGoalsConcededPoints !== undefined) {
+    settingsPayload.defender_two_goals_conceded_points = defenderTwoGoalsConcededPoints;
+  }
+  const { error } = await account.client.rpc("update_fantasy_settings_for_league", {
+    p_league_id: league.id,
+    p_settings: settingsPayload,
   });
   if (error) return { success: false, error: error.message };
-  if (Object.keys(v11Values).length) {
-    const { error: v11Error } = await account.client.rpc("update_fantasy_market_v11_settings", {
-      p_settings: v11Values,
-    });
-    if (v11Error) return { success: false, error: v11Error.message };
-  }
-  if (defenderOneGoalConcededPoints !== undefined || defenderTwoGoalsConcededPoints !== undefined) {
-    const { error: defenderError } = await account.client.rpc("update_fantasy_defender_conceded_points", {
-      p_one_goal_points: defenderOneGoalConcededPoints ?? DEFAULT_FANTASY_SETTINGS.defenderOneGoalConcededPoints,
-      p_two_goal_points: defenderTwoGoalsConcededPoints ?? DEFAULT_FANTASY_SETTINGS.defenderTwoGoalsConcededPoints,
-    });
-    if (defenderError) return { success: false, error: defenderError.message };
-  }
-  if (values.goalPoints !== undefined || ownGoalPoints !== undefined) {
-    const { error: positionError } = await account.client.rpc("update_fantasy_attack_and_own_goal_points", {
-      p_attacker_goal_points: values.goalPoints ?? DEFAULT_FANTASY_SETTINGS.goalPoints,
-      p_own_goal_points: ownGoalPoints ?? DEFAULT_FANTASY_SETTINGS.ownGoalPoints,
-    });
-    if (positionError) return { success: false, error: positionError.message };
-  }
-  if (lossPoints !== undefined) {
-    const { error: lossError } = await account.client.rpc("update_fantasy_loss_points", {
-      p_loss_points: lossPoints,
-    });
-    if (lossError) return { success: false, error: lossError.message };
-  }
-  if (goalkeeperLossPoints !== undefined) {
-    const { error: goalkeeperLossError } = await account.client.rpc("update_fantasy_goalkeeper_loss_points", {
-      p_goalkeeper_loss_points: goalkeeperLossPoints,
-    });
-    if (goalkeeperLossError) return { success: false, error: goalkeeperLossError.message };
-  }
-  if (
-    goalkeeperAppearancePoints !== undefined ||
-    goalConcededPoints !== undefined ||
-    teamGoalConcededPoints !== undefined
-  ) {
-    const { error: goalkeeperError } = await account.client.rpc("update_fantasy_goalkeeper_points", {
-      p_goalkeeper_appearance_points: goalkeeperAppearancePoints ?? DEFAULT_FANTASY_SETTINGS.goalkeeperAppearancePoints,
-      p_goal_conceded_points: goalConcededPoints ?? DEFAULT_FANTASY_SETTINGS.goalConcededPoints,
-      p_team_goal_conceded_points: teamGoalConcededPoints ?? DEFAULT_FANTASY_SETTINGS.teamGoalConcededPoints,
-    });
-    if (goalkeeperError) return { success: false, error: goalkeeperError.message };
-  }
   revalidatePath("/admin/cartola");
   revalidatePath("/cartola");
   return { success: true };
 }
 
+async function isRoundInSelectedLeague(roundId: string): Promise<boolean> {
+  if (!roundId) return false;
+  const [account, league] = await Promise.all([getCurrentAccount(), getActiveLeague()]);
+  const { data } = await account.client.from("rounds").select("id")
+    .eq("id", roundId).eq("league_id", league.id).maybeSingle();
+  return Boolean(data);
+}
+
 export async function previewFantasyMarketV11() {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false as const, error: "Somente administradores." };
+  const league = await getActiveLeague();
+  const season = await getActiveSeason(league.id);
+  if (!season) return { success: false as const, error: "Esta pelada ainda não tem temporada ativa." };
+  const { data: fantasySeason } = await account.client.from("fantasy_seasons")
+    .select("id").eq("season_id", season.id).eq("league_id", league.id).maybeSingle();
+  if (!fantasySeason) return { success: false as const, error: "O Cartola desta pelada ainda não foi iniciado." };
   const { data, error } = await account.client.rpc("preview_fantasy_market_v11", {
-    p_fantasy_season_id: undefined,
+    p_fantasy_season_id: fantasySeason.id,
   });
   if (error) return { success: false as const, error: error.message };
   return { success: true as const, preview: data };
@@ -3722,6 +3747,7 @@ export async function previewFantasyMarketV11() {
 export async function reprocessFantasyRound(roundId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
+  if (!(await isRoundInSelectedLeague(roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
   const { calculateRoundStats } = await import("./stats");
   const statsResult = await calculateRoundStats(roundId);
   if (!statsResult.success) {
@@ -3742,6 +3768,7 @@ export async function reprocessFantasyRound(roundId: string) {
 export async function reprocessFantasyRoundWithCurrentRules(roundId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
+  if (!(await isRoundInSelectedLeague(roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
 
   // Primeiro recompõe os dados esportivos. As correções manuais persistentes,
   // como um jogador zerado na rodada, são respeitadas por este cálculo.
@@ -3803,6 +3830,7 @@ export async function getFantasyAdminData() {
   const { data: rounds } = await account.client
     .from("fantasy_rounds")
     .select("id, market_status, processed_at, rules_version, scoring_version, round:round_id(id, number, date, status, round_type)")
+    .eq("fantasy_season_id", fantasySeasonRow?.id || "00000000-0000-0000-0000-000000000000")
     .order("created_at", { ascending: false })
     .limit(20);
   const [{ data: testSession }, { data: friendlyRounds }, marketStatusResult] = await Promise.all([
@@ -3890,6 +3918,7 @@ export async function getFantasyAdminData() {
 export async function createFantasyTestSession(roundId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
+  if (!(await isRoundInSelectedLeague(roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
   const { error } = await account.client.rpc("create_fantasy_test_session", {
     p_round_id: roundId,
   });
@@ -3902,6 +3931,7 @@ export async function createFantasyTestSession(roundId: string) {
 export async function processFantasyTestSession(roundId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
+  if (!(await isRoundInSelectedLeague(roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
   const { error } = await account.client.rpc("process_fantasy_test_round", {
     p_round_id: roundId,
   });
@@ -3914,6 +3944,7 @@ export async function processFantasyTestSession(roundId: string) {
 export async function resetFantasyTestSession(roundId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
+  if (!(await isRoundInSelectedLeague(roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
   const { error } = await account.client.rpc("reset_fantasy_test_session", {
     p_round_id: roundId,
   });

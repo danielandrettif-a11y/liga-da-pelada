@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getAdminClient } from "../auth";
-import { supabase } from "../supabase";
+import { createClient as createServerClient } from "../supabase/server";
 import { getActiveLeague } from "./rounds";
 import type { Stadium } from "../types";
 
@@ -11,7 +11,8 @@ export async function getStadiums(): Promise<Stadium[]> {
     const league = await getActiveLeague();
     if (!league) return [];
 
-    const { data, error } = await supabase
+    const client = await createServerClient();
+    const { data, error } = await client
       .from("stadiums")
       .select("*")
       .eq("league_id", league.id)

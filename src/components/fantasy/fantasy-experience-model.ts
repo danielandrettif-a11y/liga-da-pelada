@@ -9,6 +9,7 @@ import type {
 import type { FantasyChallengeType } from "@/lib/fantasy/challenges";
 import type { FantasySettings } from "@/lib/fantasy/config";
 import { getFantasySlotRoles, type FantasyFormation } from "@/lib/fantasy/lineup-positions";
+import type { FantasyReserveRole } from "@/lib/fantasy/reserve";
 
 export type FantasyExperienceProps = {
   round: {
@@ -98,7 +99,7 @@ export function lineupSignature({ ids, captain, scorer, assist, challenge, slotR
   challenge: string | null | undefined;
   slotRoles?: string[];
   reservePlayerId?: string | null;
-  reserveRole?: "ATA" | "DEF" | null;
+  reserveRole?: FantasyReserveRole | null;
 }) {
   return JSON.stringify({
     ids: ids.filter(Boolean).sort(),

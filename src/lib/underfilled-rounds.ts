@@ -1,6 +1,6 @@
 export const MIN_UNDERFILLED_PLAYERS = 12;
 
-export type RoundTeamSizeMode = 5 | 6;
+export type RoundTeamSizeMode = number;
 
 export function rebalanceTeamRosters<T>(rosters: T[][]): T[][] {
   if (rosters.length === 0) return [];
@@ -21,12 +21,13 @@ export function validateUnderfilledTeamSizes(
   selectedPlayers: number,
   targetPlayersPerTeam: RoundTeamSizeMode,
 ) {
-  if (teamSizes.length !== 3) return "A rodada incompleta precisa ter exatamente 3 times.";
-  if (selectedPlayers < MIN_UNDERFILLED_PLAYERS) return `Selecione pelo menos ${MIN_UNDERFILLED_PLAYERS} jogadores.`;
+  if (teamSizes.length < 2 || teamSizes.length > 6) return "Escolha de 2 a 6 times.";
+  const minimumPlayers = teamSizes.length === 3
+    ? Math.max(MIN_UNDERFILLED_PLAYERS, targetPlayersPerTeam * 2)
+    : targetPlayersPerTeam * 2;
+  if (selectedPlayers < minimumPlayers) return `Selecione pelo menos ${minimumPlayers} jogadores.`;
   if (selectedPlayers > targetPlayersPerTeam * teamSizes.length) {
-    return targetPlayersPerTeam === 5
-      ? "O modo 5x5 aceita no máximo 15 jogadores. Remova os excedentes manualmente."
-      : "O modo 6x6 aceita no máximo 18 jogadores.";
+    return `O modo ${targetPlayersPerTeam}x${targetPlayersPerTeam} aceita no máximo ${targetPlayersPerTeam * teamSizes.length} jogadores. Remova os excedentes manualmente.`;
   }
   if (teamSizes.some((size) => size > targetPlayersPerTeam)) {
     return `Cada time pode ter no máximo ${targetPlayersPerTeam} jogadores neste modo.`;
@@ -91,9 +92,9 @@ export function buildStructuralLoans({
     .filter((team) => selectedTeamIds.includes(team.id))
     .sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
   const lenders = teams.filter((team) => !selectedTeamIds.includes(team.id));
-  if (selected.length !== 2 || lenders.length !== 1) return [];
+  if (selected.length !== 2 || lenders.length < 1) return [];
 
-  const lender = lenders[0];
+  const lenderCandidates = lenders.flatMap((lender) => lender.players.map((player) => ({ ...player, originalTeamId: lender.id })));
   const used = new Set(reservedPlayerIds);
   const result: StructuralLoan[] = [];
 
@@ -106,7 +107,7 @@ export function buildStructuralLoans({
       // sem quebrar a sequência nas partidas seguintes.
       const rotationOrder = missing === 1 ? 1 : team.players.length + offset + 1;
       const slotKey = `${team.id}:${rotationOrder}`;
-      const availableCandidates = lender.players.filter((player) => player.eligible && !used.has(player.playerId));
+      const availableCandidates = lenderCandidates.filter((player) => player.eligible && !used.has(player.playerId));
       const preferredPlayerId = preferredPlayerBySlot.get(slotKey);
       const candidate = availableCandidates.find((player) => player.playerId === preferredPlayerId) || orderLoanQueue(
         availableCandidates,
@@ -117,7 +118,7 @@ export function buildStructuralLoans({
       used.add(candidate.playerId);
       result.push({
         targetTeamId: team.id,
-        originalTeamId: lender.id,
+        originalTeamId: candidate.originalTeamId,
         playerId: candidate.playerId,
         rotationOrder,
       });

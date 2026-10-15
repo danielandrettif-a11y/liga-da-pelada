@@ -44,7 +44,7 @@ import { supabase } from "@/lib/supabase";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { getFantasySlotRoles, isCorrectFantasySlot, type FantasyFormation } from "@/lib/fantasy/lineup-positions";
 import { resolveFantasyPitchPoints } from "@/lib/fantasy/pitch-points";
-import { getFantasyReservePriceLimit } from "@/lib/fantasy/reserve";
+import { getFantasyReservePriceLimit, type FantasyReserveRole } from "@/lib/fantasy/reserve";
 import { applyFantasyDiscount } from "@/lib/fantasy/cards/eligibility";
 import { useUrlState } from "@/lib/useUrlState";
 import { FantasyPackClaimBanner } from "./cards/FantasyPackClaimBanner";
@@ -97,6 +97,11 @@ const MOBILE_DRAG_HOLD_MS = 320;
 const MOBILE_DRAG_CANCEL_DISTANCE_PX = 12;
 const RESERVE_DRAG_SLOT = -1;
 const FANTASY_TABS = ["team", "market"] as const;
+const RESERVE_ROLE_LABELS: Record<FantasyReserveRole, string> = {
+  GOL: "GOL",
+  DEF: "DEF/VOL",
+  ATA: "ATA/ALA",
+};
 
 export function FantasyExperience({
   round,
@@ -248,8 +253,8 @@ export function FantasyExperience({
   }, [formation, fantasySeasonId]);
   const [targetSlot, setTargetSlot] = useState<number | null>(null);
   const [reservePlayerId, setReservePlayerId] = useState<string | null>(persistedReserve?.player_id || null);
-  const [reserveRole, setReserveRole] = useState<"ATA" | "DEF" | null>(persistedReserve?.slot_role || null);
-  const [reserveTargetRole, setReserveTargetRole] = useState<"ATA" | "DEF" | null>(null);
+  const [reserveRole, setReserveRole] = useState<FantasyReserveRole | null>(persistedReserve?.slot_role || null);
+  const [reserveTargetRole, setReserveTargetRole] = useState<FantasyReserveRole | null>(null);
   const [captainId, setCaptainId] = useState<string | null>(lineup?.captain_player_id || null);
   const [scorerId, setScorerId] = useState<string | null>(lineup?.top_scorer_player_id || null);
   const [assistId, setAssistId] = useState<string | null>(lineup?.top_assist_player_id || null);
@@ -393,14 +398,16 @@ export function FantasyExperience({
   );
   const attackReservePriceLimit = getFantasyReservePriceLimit("ATA", starterPricesForReserve);
   const defenseReservePriceLimit = getFantasyReservePriceLimit("DEF", starterPricesForReserve);
-  const activeReservePriceLimit = reserveTargetRole === "ATA"
-    ? attackReservePriceLimit
-    : reserveTargetRole === "DEF"
-      ? defenseReservePriceLimit
-      : null;
+  const goalkeeperReservePriceLimit = getFantasyReservePriceLimit("GOL", starterPricesForReserve);
+  const reservePriceLimitByRole: Record<FantasyReserveRole, number | null> = {
+    GOL: goalkeeperReservePriceLimit,
+    DEF: defenseReservePriceLimit,
+    ATA: attackReservePriceLimit,
+  };
+  const activeReservePriceLimit = reserveTargetRole ? reservePriceLimitByRole[reserveTargetRole] : null;
   const reservePlayer = reservePlayerId ? market.find((player) => player.id === reservePlayerId) || null : null;
   const reservePrice = reservePlayer ? Math.round(reservePlayer.price * 50) / 100 : 0;
-  const selectedReservePriceLimit = reserveRole === "ATA" ? attackReservePriceLimit : defenseReservePriceLimit;
+  const selectedReservePriceLimit = reserveRole ? reservePriceLimitByRole[reserveRole] : null;
   const validSelectedCount = validSelectedPlayers.length;
   const livePlayerProjectionById = useMemo(
     () => new Map(
@@ -788,10 +795,10 @@ export function FantasyExperience({
     setMessage("Elenco limpo. Salve para confirmar a venda de todos.");
   }
 
-  function openReserveMarket(role: "ATA" | "DEF") {
-    const priceLimit = role === "ATA" ? attackReservePriceLimit : defenseReservePriceLimit;
+  function openReserveMarket(role: FantasyReserveRole) {
+    const priceLimit = reservePriceLimitByRole[role];
     if (priceLimit === null) {
-      setMessage(`Escolha primeiro pelo menos um titular de ${role === "DEF" ? "DEF/VOL" : "ATA/ALA"}.`);
+      setMessage(`Escolha primeiro pelo menos um titular de ${RESERVE_ROLE_LABELS[role]}.`);
       return;
     }
     setReserveTargetRole(role);
@@ -814,7 +821,7 @@ export function FantasyExperience({
         return setMessage("Escolha para o banco um jogador que não esteja entre os titulares.");
       }
       if (!isCorrectFantasySlot(reserveTargetRole, player.profile)) {
-        return setMessage(`Escolha um jogador de ${reserveTargetRole === "DEF" ? "DEF/VOL" : "ATA/ALA"} para o banco.`);
+        return setMessage(`Escolha um jogador de ${RESERVE_ROLE_LABELS[reserveTargetRole]} para o banco.`);
       }
       if (activeReservePriceLimit === null || player.price > activeReservePriceLimit + 0.001) {
         return setMessage(
@@ -969,8 +976,8 @@ export function FantasyExperience({
     if (sourceIndex === RESERVE_DRAG_SLOT && targetIndex >= 0) {
       if (!reservePlayer || !reserveRole) return;
       const targetRole = currentSlotRoles[targetIndex];
-      if (targetRole === "GOL" || targetRole !== reserveRole) {
-        setMessage(`O reserva ${reserveRole === "DEF" ? "DEF/VOL" : "ATA/ALA"} só pode entrar em uma vaga da mesma posição.`);
+      if (targetRole !== reserveRole) {
+        setMessage(`O reserva ${RESERVE_ROLE_LABELS[reserveRole]} só pode entrar em uma vaga da mesma posição.`);
         return;
       }
       const replacedPlayer = selectedPlayers[targetIndex];
@@ -996,10 +1003,7 @@ export function FantasyExperience({
       const player = selectedPlayers[sourceIndex];
       const sourceRole = currentSlotRoles[sourceIndex];
       if (!player) return;
-      if (sourceRole !== "ATA" && sourceRole !== "DEF") {
-        setMessage("A vaga de goleiro não pode ser movida para o banco de reserva.");
-        return;
-      }
+      if (sourceRole !== "GOL" && sourceRole !== "ATA" && sourceRole !== "DEF") return;
       const nextSelected = [...selected];
       nextSelected[sourceIndex] = "";
       const nextStarterPrices = nextSelected.flatMap((playerId, slotIndex) => {
@@ -1010,7 +1014,7 @@ export function FantasyExperience({
       });
       const nextPriceLimit = getFantasyReservePriceLimit(sourceRole, nextStarterPrices);
       if (nextPriceLimit === null) {
-        setMessage(`Mantenha ao menos um titular ${sourceRole === "DEF" ? "DEF/VOL" : "ATA/ALA"} antes de mover alguém para o banco.`);
+        setMessage(`Mantenha ao menos um titular ${RESERVE_ROLE_LABELS[sourceRole]} antes de mover alguém para o banco.`);
         return;
       }
       if (player.price > nextPriceLimit + 0.001) {
@@ -1712,7 +1716,7 @@ export function FantasyExperience({
                     {formation}
                   </span>
                 </div>
-                <div className="flex rounded-xl bg-black/60 p-0.5 border border-white/10 shrink-0">
+                {playersPerTeam === 6 ? <div className="flex rounded-xl bg-black/60 p-0.5 border border-white/10 shrink-0">
                   <button
                     type="button"
                     onClick={() => setFormation("2-3")}
@@ -1735,7 +1739,7 @@ export function FantasyExperience({
                   >
                     3 DEF · 2 ATA
                   </button>
-                </div>
+                </div> : <span className="rounded-lg border border-accent/30 bg-accent/10 px-2 py-1 text-[9px] font-bold text-accent">{playersPerTeam === 7 ? "3 DEF · 3 ATA · 1 GOL" : "2 DEF · 2 ATA · 1 GOL"}</span>}
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 px-1 pt-0.5">
                 <button
@@ -1805,8 +1809,27 @@ export function FantasyExperience({
                 </>
               )}
 
-              {/* RENDERIZAÇÃO ADAPTÁVEL DO CAMPO (5 vs 6 JOGADORES) */}
-              {playersPerTeam === 6 ? (
+              {/* Campo de 7: três atletas em cada linha e goleiro. */}
+              {playersPerTeam === 7 ? (
+                <div className="relative z-10 flex min-h-[500px] flex-col justify-between py-2">
+                  <div>
+                    <span className="mb-1 block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50">Trio de ataque · 3 ATA/ALA</span>
+                    <div className="mx-auto grid max-w-md grid-cols-3 gap-1.5 px-0.5 sm:gap-2 sm:px-4">
+                      {[0, 1, 2].map((slot) => renderSlot(slot, "Atacante / ATA", "ATA"))}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="mb-1 block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50">Linha defensiva · 3 DEF/VOL</span>
+                    <div className="mx-auto grid max-w-md grid-cols-3 gap-1.5 px-0.5 sm:gap-2 sm:px-4">
+                      {[3, 4, 5].map((slot) => renderSlot(slot, defenseRoleLabel, "DEF"))}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="mb-1 block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50">Goleiro</span>
+                    <div className="flex justify-center">{renderSlot(6, "Goleiro / GOL", "GOL")}</div>
+                  </div>
+                </div>
+              ) : playersPerTeam === 6 ? (
                 <div className="relative z-10 flex min-h-[480px] flex-col justify-between py-2">
                   <div>
                     <span className="mb-1 block text-center font-athletic text-[8px] font-black uppercase italic tracking-[0.2em] text-emerald-200/50">
@@ -2156,14 +2179,14 @@ export function FantasyExperience({
                         {reservePlayer.name}
                       </span>
                       <span className="mt-0.5 rounded-full bg-amber-950/90 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-200">
-                        Banco {reserveRole === "DEF" ? "DEF" : "ATA"}
+                        Banco {reserveRole || "ATA"}
                       </span>
                     </button>
                   </div>
                   <div className="relative mt-1 flex items-start gap-3 rounded-xl border border-amber-200/15 bg-black/30 p-2.5">
                     <div className="min-w-0 flex-1">
                     <p className="mt-0.5 text-[9px] font-bold text-amber-200">
-                      Reserva {reserveRole === "DEF" ? "DEF/VOL" : "ATA/ALA"} · {formatFantasyMoney(reservePrice, settings.currencyName)} pagos
+                      Reserva {reserveRole ? RESERVE_ROLE_LABELS[reserveRole] : "ATA/ALA"} · {formatFantasyMoney(reservePrice, settings.currencyName)} pagos
                     </p>
                     <p className="mt-0.5 text-[8px] font-semibold text-white/45">
                       Preço cheio {formatFantasyMoney(reservePlayer.price, settings.currencyName)} · teto {selectedReservePriceLimit === null ? "indisponível" : formatFantasyMoney(selectedReservePriceLimit, settings.currencyName)}
@@ -2246,15 +2269,15 @@ export function FantasyExperience({
                       <p className="relative mt-1 text-[8px] font-bold text-amber-100/55">
                         Arraste um titular elegível para cá ou escolha no mercado
                       </p>
-                      <div data-no-drag="true" className="relative mt-2 grid grid-cols-2 gap-2">
-                        {(["ATA", "DEF"] as const).map((role) => (
+                      <div data-no-drag="true" className="relative mt-2 grid grid-cols-3 gap-2">
+                        {(["GOL", "DEF", "ATA"] as const).map((role) => (
                           <button
                             key={role}
                             type="button"
                             onClick={() => openReserveMarket(role)}
                             className="rounded-xl border border-amber-300/35 bg-amber-300/[.06] px-3 py-2.5 text-[9px] font-black uppercase text-amber-100 transition hover:border-amber-200 hover:bg-amber-300/10"
                           >
-                            + {role === "DEF" ? "DEF/VOL" : "ATA/ALA"}
+                            + {RESERVE_ROLE_LABELS[role]}
                           </button>
                         ))}
                       </div>
@@ -2400,7 +2423,7 @@ export function FantasyExperience({
 
             {reserveTargetRole && activeReservePriceLimit !== null && (
               <div className="rounded-xl border border-amber-300/35 bg-amber-300/[.08] px-3 py-2 text-[10px] font-bold leading-relaxed text-amber-100">
-                Escolhendo reserva {reserveTargetRole === "DEF" ? "DEF/VOL" : "ATA/ALA"}: somente atletas com preço cheio de até <strong>{formatFantasyMoney(activeReservePriceLimit, settings.currencyName)}</strong>. Na compra, você paga 50%.
+                Escolhendo reserva {RESERVE_ROLE_LABELS[reserveTargetRole]}: somente atletas com preço cheio de até <strong>{formatFantasyMoney(activeReservePriceLimit, settings.currencyName)}</strong>. Na compra, você paga 50%.
               </div>
             )}
 
@@ -2859,8 +2882,8 @@ export function FantasyExperience({
       )}
 
       {/* MODAL DE TUTORIAL & MODAL DE SISTEMA DE PONTUAÇÃO */}
-      {showTutorial && <FantasyTutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} scoringVersion={guideScoringVersion} />}
-      {showScoringModal && <FantasyScoringModal isOpen={showScoringModal} onClose={() => setShowScoringModal(false)} settings={scoringGuideSettings} />}
+      {showTutorial && <FantasyTutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} scoringVersion={guideScoringVersion} playersPerTeam={playersPerTeam} />}
+      {showScoringModal && <FantasyScoringModal isOpen={showScoringModal} onClose={() => setShowScoringModal(false)} settings={scoringGuideSettings} playersPerTeam={playersPerTeam} />}
 
       {mounted &&
         selectedRoundTeam &&
@@ -2905,7 +2928,7 @@ export function FantasyExperience({
         )}
 
       {/* MODAL DE ANÚNCIO DA REVOLUÇÃO TÁTICA (RODADA 02) */}
-      <FantasyTacticalAnnouncementModal scoringVersion={guideScoringVersion} />
+      <FantasyTacticalAnnouncementModal scoringVersion={guideScoringVersion} playersPerTeam={playersPerTeam} />
 
       {/* POPUP BÁSICO DE AJUDA DO DESAFIO */}
       {mounted &&

@@ -54,6 +54,8 @@ export function FantasyLineupMiniPitch({
   const hasRoles = normalized.some((player) => player.role);
   const rows = hasRoles
     ? [[...byRole("ATA"), ...byRole("MEI")], byRole("DEF"), byRole("GOL")].filter((row) => row.length)
+    : normalized.length >= 7
+      ? [normalized.slice(0, 3), normalized.slice(3, 6), normalized.slice(6, 7)]
     : normalized.length >= 6
       ? [normalized.slice(0, 2), normalized.slice(2, 3), normalized.slice(3, 5), normalized.slice(5, 6)]
       : [normalized.slice(0, 2), normalized.slice(2, 4), normalized.slice(4, 5)];

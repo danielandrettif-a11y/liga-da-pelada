@@ -3,13 +3,25 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { getCurrentAccount } from "@/lib/auth";
 import { executeCommand, ManagerRuleError, newManagerState } from "@/lib/bq-manager/engine";
-import { createManagerClient, readCatalog, readManagerSave } from "@/lib/bq-manager/server";
+import { createManagerClient, readCatalog, readManagerSave, readManagerSourceLeague } from "@/lib/bq-manager/server";
 import type { ClubIdentity, ManagerCommand, ManagerResult } from "@/lib/bq-manager/types";
+import { getSelectedLeague } from "@/lib/league-context";
+
+async function getAuthorizedManagerLeagueId(appClient: Awaited<ReturnType<typeof getCurrentAccount>>["client"]) {
+  const [selectedLeague, sourceLeagueId] = await Promise.all([
+    getSelectedLeague(), readManagerSourceLeague(appClient),
+  ]);
+  return sourceLeagueId && selectedLeague?.id === sourceLeagueId
+    && selectedLeague.featureTier === "complete" ? sourceLeagueId : null;
+}
 
 export async function createManagerClub(identity: ClubIdentity): Promise<ManagerResult> {
   try {
     const account = await getCurrentAccount();
     if (!account.user) return { ok: false, message: "Entre na sua conta para criar um clube." };
+    if (!await getAuthorizedManagerLeagueId(account.client)) {
+      return { ok: false, message: "Selecione a pelada BQ para acessar esta carreira." };
+    }
     const client = createManagerClient();
     if (!client) return { ok: false, message: "A carreira ainda está em preparação. Experimente a demonstração." };
     const state = newManagerState(identity);
@@ -27,6 +39,8 @@ export async function runManagerCommand(command: ManagerCommand, expectedVersion
   try {
     const account = await getCurrentAccount();
     if (!account.user) return { ok: false, message: "Sua sessão expirou. Entre novamente." };
+    const managerLeagueId = await getAuthorizedManagerLeagueId(account.client);
+    if (!managerLeagueId) return { ok: false, message: "Selecione a pelada BQ para acessar esta carreira." };
     const client = createManagerClient();
     if (!client) return { ok: false, message: "A carreira ainda está em preparação." };
     const save = await readManagerSave(client, account.user.id);
@@ -34,7 +48,7 @@ export async function runManagerCommand(command: ManagerCommand, expectedVersion
     if (!Number.isSafeInteger(expectedVersion) || save.version !== expectedVersion) {
       return { ok: true, save, message: "Seu clube foi atualizado em outra aba. Confira os dados e tente novamente." };
     }
-    const catalog = command?.type === "open-pack" ? await readCatalog(account.client) : [];
+    const catalog = command?.type === "open-pack" ? await readCatalog(account.client, managerLeagueId) : [];
     const next = executeCommand(save.state, command, {
       catalog, now: new Date().toISOString(), newId: randomUUID, random: () => randomInt(0, 2 ** 48 - 1) / (2 ** 48 - 1),
     });

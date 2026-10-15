@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:multi-league": "node scripts/verify-multi-league-isolation.mjs",
     "check": "npm run typecheck && npm test && npm run build",
     "audit:security": "npm audit --omit=dev --audit-level=high",
     "types:supabase": "node scripts/generate-database-types.mjs",

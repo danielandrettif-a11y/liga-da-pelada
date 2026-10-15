@@ -2,7 +2,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { cache } from "react";
-import { supabase } from "../supabase";
+import { createClient as createServerClient } from "../supabase/server";
 import { buildAwardSeasonsByPlayer } from "../awards";
 import type { Player, CreatePlayerInput, MemberCategory, PlayerProfile, RoundType, SeasonStatus } from "../types";
 import { getActiveSeason, getActiveSeasonRoundIds } from "./seasons";
@@ -12,6 +12,7 @@ import { getMatchElapsedSeconds } from "../utils";
 import { parseMonthlyAwardWinners, parseMonthlyAwards, previousMonthStart } from "../monthly-awards";
 import { getLatestPlayerCardOverallMap } from "./stats";
 import type { PlayerAchievementBelt } from "@/components/PlayerBelts";
+import { getSelectedLeague } from "../league-context";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -35,6 +36,28 @@ function normalizeOverallTraits(value: unknown) {
       : [];
   }))];
   return traits.slice(0, 2);
+}
+
+function playerWithLeagueProfile(member: any): Player | null {
+  const player = Array.isArray(member?.players) ? member.players[0] : member?.players;
+  if (!player) return null;
+  const playerProfile = member.player_profile ?? player.player_profile;
+  const overallTraits = Array.isArray(member.overall_traits) ? member.overall_traits : player.overall_traits;
+  return {
+    ...player,
+    player_profile: playerProfile,
+    initial_player_profile: member.initial_player_profile ?? playerProfile ?? player.initial_player_profile ?? player.player_profile,
+    overall_traits: overallTraits,
+    overall_seed_mode: member.overall_seed_mode ?? player.overall_seed_mode,
+    is_competitive_profile_complete: player.member_category === "player"
+      && player.is_selectable === true
+      && Boolean(String(player.name || "").trim())
+      && Boolean(String(player.avatar_url || "").trim())
+      && ["defensive", "offensive"].includes(playerProfile)
+      && Array.isArray(overallTraits)
+      && overallTraits.length >= 1
+      && overallTraits.length <= 2,
+  } as Player;
 }
 
 function revalidatePlayerPaths(id?: string) {
@@ -68,27 +91,46 @@ function avatarPathFromUrl(avatarUrl: string | null) {
   }
 }
 
+async function playerBelongsToSelectedLeague(playerId: string, client: Awaited<ReturnType<typeof createServerClient>>) {
+  const league = await getSelectedLeague();
+  if (!league) return false;
+  const { data } = await client.from("league_members").select("player_id")
+    .eq("league_id", league.id).eq("player_id", playerId).eq("is_active", true).maybeSingle();
+  return Boolean(data);
+}
+
 export async function getPlayers(selectableOnly = false) {
-  let query = supabase
-    .from("players")
-    .select("*")
-    .order("name");
-  if (selectableOnly) query = query.eq("is_selectable", true).in("member_category", ["player", "guest"]);
-  const { data, error } = await query;
+  const league = await getSelectedLeague();
+  if (!league) return [];
+  const client = await createServerClient();
+  const { data, error } = await client
+    .from("league_members")
+    .select("player_profile, initial_player_profile, overall_traits, overall_seed_mode, players(*)")
+    .eq("league_id", league.id)
+    .eq("is_active", true);
 
   if (error) {
     console.error("Erro ao buscar jogadores:", error);
     return [];
   }
 
-  return data as Player[];
+  return (data || [])
+    .map(playerWithLeagueProfile)
+    .filter((player): player is Player => {
+      if (!player) return false;
+      return !selectableOnly || (player.is_selectable && ["player", "guest"].includes(player.member_category));
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
 /** Atletas que pertencem à liga da convocação e podem ocupar uma vaga. */
 export async function getSelectableLeaguePlayers(leagueId: string) {
-  const { data, error } = await supabase
+  const league = await getSelectedLeague();
+  if (!league || league.id !== leagueId) return [] as Player[];
+  const client = await createServerClient();
+  const { data, error } = await client
     .from("league_members")
-    .select("players(*)")
+    .select("player_profile, initial_player_profile, overall_traits, overall_seed_mode, players(*)")
     .eq("league_id", leagueId)
     .eq("is_active", true)
     .order("joined_at");
@@ -99,13 +141,23 @@ export async function getSelectableLeaguePlayers(leagueId: string) {
   }
 
   return (data || [])
-    .map((member: any) => member.players)
-    .filter((player: any) => player?.is_selectable && ["player", "guest"].includes(player.member_category))
-    .sort((a: Player, b: Player) => a.name.localeCompare(b.name, "pt-BR"));
+    .map(playerWithLeagueProfile)
+    .filter((player): player is Player => {
+      if (!player) return false;
+      return player.is_selectable && ["player", "guest"].includes(player.member_category);
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
 export async function getPlayer(id: string) {
-  const { data, error } = await supabase
+  const league = await getSelectedLeague();
+  if (!league) return null;
+  const client = await createServerClient();
+  const { data: membership } = await client.from("league_members")
+    .select("player_id, player_profile, initial_player_profile, overall_traits, overall_seed_mode")
+    .eq("league_id", league.id).eq("player_id", id).eq("is_active", true).maybeSingle();
+  if (!membership) return null;
+  const { data, error } = await client
     .from("players")
     .select(`
       id,
@@ -134,24 +186,22 @@ export async function getPlayer(id: string) {
     return null;
   }
 
-  return data as Player;
+  return playerWithLeagueProfile({ ...membership, players: data });
 }
 
 const getPlayersForStatsCached = cache(async (selectableOnly: boolean) => {
-  const query = supabase.from("players").select("*").order("name");
-  return selectableOnly
-    ? query.eq("is_selectable", true).in("member_category", ["player", "guest"])
-    : query;
+  return { data: await getPlayers(selectableOnly), error: null };
 });
 
 export async function getPlayersWithStats(roundType: RoundType = "official", selectableOnly = false) {
   const season = await getActiveSeason();
+  const client = await createServerClient();
 
   // 1. Tentar buscar jogadores e stats agregados via View SQL
   if (season) {
     const playersQuery = getPlayersForStatsCached(selectableOnly);
 
-    const statsQuery = supabase
+    const statsQuery = client
       .from("player_season_stats")
       .select(`
         player_id,
@@ -208,15 +258,15 @@ export async function getPlayersWithStats(roundType: RoundType = "official", sel
 
   const [statsResult, finishedRoundsResult] = roundIds.length > 0
     ? await Promise.all([
-      supabase.from("player_round_stats").select("*").in("round_id", roundIds),
-      supabase.from("rounds").select("id").in("id", roundIds).eq("status", "finished"),
+      client.from("player_round_stats").select("*").in("round_id", roundIds),
+      client.from("rounds").select("id").in("id", roundIds).eq("status", "finished"),
     ])
     : [{ data: [], error: null }, { data: [], error: null }];
   const { data: stats, error: statsError } = statsResult;
 
   const finishedRoundIds = finishedRoundsResult.data?.map((round) => round.id) || [];
   const attendanceResult = finishedRoundIds.length > 0
-    ? await supabase.from("round_players").select("player_id, round_id").in("round_id", finishedRoundIds)
+    ? await client.from("round_players").select("player_id, round_id").in("round_id", finishedRoundIds)
     : { data: [], error: null };
   const { data: attendance, error: attendanceError } = attendanceResult;
 
@@ -267,8 +317,8 @@ export async function getPlayersWithStats(roundType: RoundType = "official", sel
 export async function getPlayerRoundHistory(playerId: string, roundType: RoundType = "official") {
   const roundIds = await getActiveSeasonRoundIds(undefined, roundType);
   if (roundIds.length === 0) return [];
-
-  const { data, error } = await supabase
+  const client = await createServerClient();
+  const { data, error } = await client
     .from("player_round_stats")
     .select(`
       *,
@@ -290,10 +340,14 @@ export async function getPlayerRoundHistory(playerId: string, roundType: RoundTy
 }
 
 export async function getPlayerPlaytime(playerId: string) {
-  const { data, error } = await supabase
+  const league = await getSelectedLeague();
+  if (!league) return { totalSeconds: 0, officialSeconds: 0, friendlySeconds: 0 };
+  const client = await createServerClient();
+  const { data, error } = await client
     .from("match_players")
-    .select("entered_elapsed_seconds, left_elapsed_seconds, matches!inner(started_at, finished_at, timer_started_at, timer_accumulated_seconds, rounds!inner(round_type))")
-    .eq("player_id", playerId);
+    .select("entered_elapsed_seconds, left_elapsed_seconds, matches!inner(started_at, finished_at, timer_started_at, timer_accumulated_seconds, rounds!inner(round_type, league_id))")
+    .eq("player_id", playerId)
+    .eq("matches.rounds.league_id", league.id);
 
   if (error) {
     console.error("Erro ao buscar tempo de jogo do jogador:", error);
@@ -327,16 +381,20 @@ export type PlayerClubGoals = {
 };
 
 export async function getPlayerGoalsByClub(playerId: string): Promise<PlayerClubGoals[]> {
-  const { data, error } = await supabase
+  const league = await getSelectedLeague();
+  if (!league) return [];
+  const client = await createServerClient();
+  const { data, error } = await client
     .from("match_events")
     .select(`
       team:team_id (id, name, color, crest_url),
       match:match_id!inner (
-        round:round_id!inner (round_type)
+        round:round_id!inner (round_type, league_id)
       )
     `)
     .eq("player_id", playerId)
-    .eq("event_type", "goal");
+    .eq("event_type", "goal")
+    .eq("match.round.league_id", league.id);
 
   if (error) {
     console.error("Erro ao buscar gols por clube:", error);
@@ -369,13 +427,17 @@ export async function getPlayerGoalsByClub(playerId: string): Promise<PlayerClub
 }
 
 export async function getPlayerAwardSeasons(playerId: string) {
+  const league = await getSelectedLeague();
+  if (!league) return [];
+  const client = await createServerClient();
   const [seasonsResult, roundsResult] = await Promise.all([
-    supabase.from("seasons").select("id, number, status"),
-    supabase
+    client.from("seasons").select("id, number, status").eq("league_id", league.id),
+    client
       .from("rounds")
       .select("id, number, date, season_id, best_goalkeeper_player_id, round_type")
       .eq("status", "finished")
       .eq("round_type", "official")
+      .eq("league_id", league.id)
       .order("date", { ascending: false }),
   ]);
 
@@ -387,7 +449,7 @@ export async function getPlayerAwardSeasons(playerId: string) {
   const rounds = roundsResult.data || [];
   if (rounds.length === 0) return [];
 
-  const { data: stats, error: statsError } = await supabase
+  const { data: stats, error: statsError } = await client
     .from("player_round_stats")
     .select("round_id, player_id, goals, assists, games, defensive_clean_games, defensive_one_goal_games, team_goals_conceded, player:player_id(player_profile, member_category, is_selectable)")
     .in("round_id", rounds.map((round) => round.id));
@@ -421,7 +483,13 @@ export async function getPlayerAwardSeasons(playerId: string) {
 }
 
 export async function getPlayerMonthlyAwards(playerId: string) {
-  const { data, error } = await supabase.rpc("get_monthly_awards_for_player", { p_player_id: playerId });
+  const league = await getSelectedLeague();
+  if (!league) return [];
+  const client = await createServerClient();
+  const { data, error } = await client.rpc("get_monthly_awards_for_player_in_league", {
+    p_league_id: league.id,
+    p_player_id: playerId,
+  });
   if (error) {
     // Compatibilidade durante o intervalo entre o deploy do app e a migration.
     if (error.code !== "PGRST202" && error.code !== "42883") console.error("Erro ao buscar prêmios mensais:", error);
@@ -434,7 +502,8 @@ export async function getPlayerAchievementBelts(playerId: string): Promise<Playe
   const season = await getActiveSeason();
   if (!season) return [];
 
-  const { data, error } = await supabase.rpc("get_player_achievement_belts", {
+  const client = await createServerClient();
+  const { data, error } = await client.rpc("get_player_achievement_belts", {
     p_player_id: playerId,
     p_league_id: season.league_id,
   });
@@ -477,7 +546,11 @@ export async function getPlayerAchievementBelts(playerId: string): Promise<Playe
 
 export async function getPreviousMonthAwardWinners() {
   const periodStart = previousMonthStart();
-  const { data, error } = await supabase.rpc("get_monthly_award_winners", {
+  const league = await getSelectedLeague();
+  if (!league) return { periodStart, winners: [] };
+  const client = await createServerClient();
+  const { data, error } = await client.rpc("get_monthly_award_winners_for_league", {
+    p_league_id: league.id,
     p_period_start: periodStart,
   });
 
@@ -491,8 +564,11 @@ export async function getPreviousMonthAwardWinners() {
 
 export async function createPlayer(input: CreatePlayerInput) {
   const account = await getCurrentAccount();
-  const client = account.isAdmin ? account.client : null;
-  if (!client || !account.user) return { success: false, error: "Somente administradores podem criar jogadores." };
+  const league = await getSelectedLeague();
+  if (!account.user || !league || league.role !== "admin") {
+    return { success: false, error: "Escolha uma pelada que você administra." };
+  }
+  const client = account.client;
 
   const { data, error } = await client
     .from("players")
@@ -520,52 +596,92 @@ export async function createPlayer(input: CreatePlayerInput) {
     return { success: false, error: error.message };
   }
 
+  const { error: membershipError } = await client.from("league_members").insert({
+    league_id: league.id,
+    player_id: data.id,
+    role: "player",
+    is_active: true,
+    player_profile: normalizeLineProfile(input.player_profile),
+    initial_player_profile: normalizeLineProfile(input.player_profile),
+    overall_traits: normalizeOverallTraits(input.overall_traits),
+    overall_seed_mode: "observed",
+  });
+  if (membershipError) {
+    await client.from("players").delete().eq("id", data.id);
+    return { success: false, error: membershipError.message };
+  }
+
   revalidatePlayerPaths(data.id);
   return { success: true, data };
 }
 
 export async function updatePlayer(id: string, input: Partial<CreatePlayerInput>) {
-  const client = await getAdminClient();
-  if (!client) return { success: false, error: "Somente administradores podem editar outros jogadores." };
+  const account = await getCurrentAccount();
+  const league = await getSelectedLeague();
+  if (!account.user || !league || league.role !== "admin") {
+    return { success: false, error: "Somente administradores desta pelada podem editar jogadores." };
+  }
+  const client = account.client;
+  if (!(await playerBelongsToSelectedLeague(id, client))) {
+    return { success: false, error: "Jogador não pertence à pelada selecionada." };
+  }
 
-  const safeInput = {
+  const playerInput = {
     ...(input.name !== undefined ? { name: input.name.trim() } : {}),
     ...(input.nickname !== undefined ? { nickname: input.nickname.trim() || null } : {}),
     ...(input.avatar_url !== undefined ? { avatar_url: input.avatar_url || null } : {}),
-    ...(input.player_profile !== undefined ? { player_profile: normalizeLineProfile(input.player_profile) } : {}),
-    ...(input.overall_traits !== undefined ? { overall_traits: normalizeOverallTraits(input.overall_traits) } : {}),
     ...(input.member_category !== undefined ? { member_category: input.member_category } : {}),
     ...(input.is_selectable !== undefined ? { is_selectable: input.is_selectable } : {}),
   };
+  const membershipInput = {
+    ...(input.player_profile !== undefined ? {
+      player_profile: normalizeLineProfile(input.player_profile),
+      initial_player_profile: normalizeLineProfile(input.player_profile),
+    } : {}),
+    ...(input.overall_traits !== undefined ? { overall_traits: normalizeOverallTraits(input.overall_traits) } : {}),
+  };
 
-  const { data, error } = await client
-    .from("players")
-    .update(safeInput)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Erro ao atualizar jogador:", error);
-    return { success: false, error: error.message };
+  const playerKeys = Object.keys(playerInput);
+  if (playerKeys.length) {
+    const { error } = await client.from("players").update(playerInput).eq("id", id);
+    if (error) {
+      console.error("Erro ao atualizar jogador:", error);
+      return { success: false, error: error.message };
+    }
+  }
+  if (Object.keys(membershipInput).length) {
+    const { error } = await client.from("league_members").update(membershipInput)
+      .eq("league_id", league.id).eq("player_id", id).eq("is_active", true);
+    if (error) {
+      console.error("Erro ao atualizar perfil do jogador na pelada:", error);
+      return { success: false, error: error.message };
+    }
   }
 
   revalidatePlayerPaths(id);
-  return { success: true, data };
+  return { success: true, data: await getPlayer(id) };
 }
 
 export async function savePlayer(playerId: string | null, formData: FormData) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Sessão expirada. Entre novamente." };
 
+  const selectedLeague = await getSelectedLeague();
+  const isLeagueAdmin = selectedLeague?.role === "admin";
   const ownsPlayer = !!playerId && account.profile?.player_id === playerId;
-  if (!account.isAdmin && !ownsPlayer) {
+  if (!isLeagueAdmin && !ownsPlayer) {
     return { success: false, error: "Você só pode editar o seu próprio perfil." };
   }
-  if (!playerId && !account.isAdmin) {
+  if (!playerId && !isLeagueAdmin) {
     return { success: false, error: "Somente administradores podem criar jogadores." };
   }
   const client = account.client;
+  if (playerId && !(await playerBelongsToSelectedLeague(playerId, client))) {
+    return { success: false, error: "Jogador não pertence à pelada selecionada." };
+  }
+  if (!playerId && !selectedLeague) {
+    return { success: false, error: "Selecione uma pelada antes de criar jogadores." };
+  }
 
   const name = String(formData.get("name") || "").trim();
   const nickname = String(formData.get("nickname") || "").trim();
@@ -597,7 +713,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   if (!["offensive", "defensive"].includes(playerProfile)) {
     return { success: false, error: "Escolha um perfil de jogo valido." };
   }
-  if (account.isAdmin && requestedOverallTraits.length > 2) {
+  if (isLeagueAdmin && requestedOverallTraits.length > 2) {
     return { success: false, error: "Escolha no máximo duas características: principal e secundária." };
   }
 
@@ -625,21 +741,24 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   const id = playerId || crypto.randomUUID();
 
   if (playerId) {
-    const { data: currentPlayer, error: currentPlayerError } = await client
-      .from("players")
-      .select("avatar_url, avatar_alternate_url, member_category, is_selectable, player_profile, overall_traits, is_goalkeeper")
-      .eq("id", playerId)
-      .single();
+    const [{ data: currentPlayer, error: currentPlayerError }, { data: currentMembership, error: membershipError }] = await Promise.all([
+      client.from("players")
+        .select("avatar_url, avatar_alternate_url, member_category, is_selectable, player_profile, overall_traits, is_goalkeeper")
+        .eq("id", playerId).single(),
+      client.from("league_members")
+        .select("player_profile, overall_traits")
+        .eq("league_id", selectedLeague!.id).eq("player_id", playerId).eq("is_active", true).single(),
+    ]);
 
-    if (currentPlayerError) {
+    if (currentPlayerError || membershipError) {
       return { success: false, error: "Jogador não encontrado." };
     }
     currentAvatarUrl = currentPlayer.avatar_url;
     currentAlternateAvatarUrl = currentPlayer.avatar_alternate_url || null;
     currentCategory = currentPlayer.member_category as MemberCategory;
     currentSelectable = currentPlayer.is_selectable;
-    currentPlayerProfile = currentPlayer.player_profile as PlayerProfile | null;
-    currentOverallTraits = normalizeOverallTraits(currentPlayer.overall_traits);
+    currentPlayerProfile = (currentMembership.player_profile ?? currentPlayer.player_profile) as PlayerProfile | null;
+    currentOverallTraits = normalizeOverallTraits(currentMembership.overall_traits ?? currentPlayer.overall_traits);
     currentIsGoalkeeper = Boolean(currentPlayer.is_goalkeeper);
   }
 
@@ -687,23 +806,23 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   }
   if (nextAvatarUrl && nextAvatarUrl === nextAlternateAvatarUrl) nextAlternateAvatarUrl = null;
 
-  const memberCategory = account.isAdmin ? requestedCategory : currentCategory;
-  const isSelectable = account.isAdmin
+  const memberCategory = isLeagueAdmin ? requestedCategory : currentCategory;
+  const isSelectable = isLeagueAdmin
     ? (memberCategory === "wag" || memberCategory === "supporter" ? false : memberCategory === "guest" ? true : requestedSelectable)
     : currentSelectable;
   const overallTraits = memberCategory === "wag" || memberCategory === "supporter"
     ? []
-    : account.isAdmin ? requestedOverallTraits : currentOverallTraits;
+    : isLeagueAdmin ? requestedOverallTraits : currentOverallTraits;
   const playerData = {
     id,
     name,
     nickname: nickname || null,
-    ...(account.isAdmin ? { profile_bio: profileBio || null } : {}),
+    ...(isLeagueAdmin ? { profile_bio: profileBio || null } : {}),
     avatar_url: nextAvatarUrl,
     avatar_alternate_url: nextAlternateAvatarUrl,
     player_profile: memberCategory === "wag" || memberCategory === "supporter"
       ? null
-      : account.isAdmin ? playerProfile : currentPlayerProfile,
+      : isLeagueAdmin ? playerProfile : currentPlayerProfile,
     overall_traits: overallTraits,
     // GOL deixou de ser uma tag de perfil. Mantemos o valor legado apenas para
     // o histórico operacional de partidas, sem expor ou editar pelo app.
@@ -719,11 +838,9 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     ? client.from("players").update({
         name: playerData.name,
         nickname: playerData.nickname,
-        ...(account.isAdmin ? { profile_bio: playerData.profile_bio } : {}),
+        ...(isLeagueAdmin ? { profile_bio: playerData.profile_bio } : {}),
         avatar_url: playerData.avatar_url,
         avatar_alternate_url: playerData.avatar_alternate_url,
-        player_profile: playerData.player_profile,
-        ...(account.isAdmin ? { overall_traits: playerData.overall_traits } : {}),
         is_goalkeeper: playerData.is_goalkeeper,
         member_category: playerData.member_category,
         is_selectable: playerData.is_selectable,
@@ -736,6 +853,34 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     if (uploadedPaths.length) await client.storage.from(AVATAR_BUCKET).remove(uploadedPaths);
     console.error("Erro ao salvar jogador:", saveError);
     return { success: false, error: saveError.message };
+  }
+
+  if (!playerId) {
+    const league = selectedLeague;
+    if (!league || league.role !== "admin") return { success: false, error: "Escolha uma pelada que você administra." };
+    const { error: membershipError } = await client.from("league_members").insert({
+      league_id: league.id,
+      player_id: id,
+      role: "player",
+      is_active: true,
+      player_profile: playerData.player_profile,
+      initial_player_profile: playerData.player_profile,
+      overall_traits: playerData.overall_traits,
+      overall_seed_mode: "observed",
+    });
+    if (membershipError) {
+      await client.from("players").delete().eq("id", id);
+      return { success: false, error: membershipError.message };
+    }
+  } else if (isLeagueAdmin) {
+    const { error: membershipError } = await client.from("league_members").update({
+      player_profile: playerData.player_profile,
+      initial_player_profile: playerData.player_profile,
+      overall_traits: playerData.overall_traits,
+    }).eq("league_id", selectedLeague!.id).eq("player_id", id).eq("is_active", true);
+    if (membershipError) {
+      return { success: false, error: membershipError.message };
+    }
   }
 
   const retainedAvatarUrls = new Set([nextAvatarUrl, nextAlternateAvatarUrl].filter((url): url is string => Boolean(url)));
@@ -763,6 +908,9 @@ export async function swapPlayerAvatars(playerId: string) {
   const ownsPlayer = account.profile?.player_id === playerId;
   if (!account.isAdmin && !ownsPlayer) {
     return { success: false, error: "Você só pode trocar a foto do seu próprio perfil." };
+  }
+  if (!(await playerBelongsToSelectedLeague(playerId, account.client))) {
+    return { success: false, error: "Jogador não pertence à pelada selecionada." };
   }
 
   const { data: player, error: playerError } = await account.client
@@ -812,6 +960,9 @@ export async function getRosterGroups(roundType: RoundType = "official") {
 export async function deletePlayer(id: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem excluir jogadores." };
+  if (!(await playerBelongsToSelectedLeague(id, client))) {
+    return { success: false, error: "Jogador não pertence à pelada selecionada." };
+  }
 
   const { data: player } = await client
     .from("players")

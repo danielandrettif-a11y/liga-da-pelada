@@ -41,6 +41,8 @@ export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin
       startTime: item.start_time?.slice(0, 5) || "08:00",
       roundType: item.round_type,
       capacity: item.capacity,
+      playersPerTeam: item.players_per_team || leagueConfig?.players_per_team || 5,
+      teamsPerRound: item.teams_per_round || leagueConfig?.teams_per_round || 3,
       playerIds: item.entries.filter((entry) => entry.status === "confirmed").map((entry) => entry.player_id),
       entryIds: item.entries.map((entry) => entry.player_id),
     }));
@@ -75,8 +77,8 @@ export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin
         availableCallups={availableCallups}
         mountTeams={params.mount === "1"}
         prelistNumber={prelist?.number || null}
-        playersPerTeam={leagueConfig?.players_per_team || 5}
-        teamsPerRound={leagueConfig?.teams_per_round || 3}
+        playersPerTeam={callup?.players_per_team || prelist?.target_players_per_team || leagueConfig?.players_per_team || 5}
+        teamsPerRound={callup?.teams_per_round || prelist?.target_teams_per_round || leagueConfig?.teams_per_round || 3}
         teamPresetOffsets={{ official: officialPresetOffset, friendly: friendlyPresetOffset }}
       />
     </div>

@@ -1,6 +1,6 @@
 import type { FantasySlotRole } from "./lineup-positions";
 
-export type FantasyReserveRole = Extract<FantasySlotRole, "ATA" | "DEF">;
+export type FantasyReserveRole = Extract<FantasySlotRole, "GOL" | "ATA" | "DEF">;
 
 export type FantasyReserveStarterScore = {
   playerId: string;

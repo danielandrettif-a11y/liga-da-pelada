@@ -1,49 +1,42 @@
 "use server";
 
-import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
-import { supabase } from "../supabase";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { cache } from "react";
 import { createClient as createServerClient } from "../supabase/server";
 import type { RoundType, Season, SeasonPlayerSummary, SeasonSummary } from "../types";
 import { getAdminClient } from "../auth";
+import { getSelectedLeague } from "../league-context";
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerClient>>;
 
-const getActiveSeasonCached = unstable_cache(async (leagueId?: string) => {
-  let resolvedLeagueId = leagueId;
-
-  if (!resolvedLeagueId) {
-    const { data: league } = await supabase
-      .from("leagues")
-      .select("id")
-      .eq("is_active", true)
-      .limit(1)
-      .single();
-    resolvedLeagueId = league?.id;
-  }
-
-  if (!resolvedLeagueId) return null;
-
-  const { data, error } = await supabase
+const getActiveSeasonCached = cache(async (leagueId: string) => {
+  const client = await createServerClient();
+  const { data, error } = await client
     .from("seasons")
     .select("*")
-    .eq("league_id", resolvedLeagueId)
+    .eq("league_id", leagueId)
     .eq("status", "active")
     .limit(1)
     .single();
 
   if (error || !data) return null;
   return data as Season;
-}, ["active-season"], { revalidate: 300, tags: ["season"] });
+});
 
 export async function getActiveSeason(leagueId?: string) {
-  return getActiveSeasonCached(leagueId);
+  const selectedLeague = await getSelectedLeague();
+  if (leagueId && leagueId !== selectedLeague?.id) return null;
+  const resolvedLeagueId = selectedLeague?.id;
+  if (!resolvedLeagueId) return null;
+  return getActiveSeasonCached(resolvedLeagueId);
 }
 
-const getActiveSeasonRoundIdsCached = unstable_cache(async (leagueId: string | undefined, roundType: RoundType) => {
+const getActiveSeasonRoundIdsCached = cache(async (leagueId: string, roundType: RoundType) => {
   const season = await getActiveSeason(leagueId);
   if (!season) return [];
 
-  const { data, error } = await supabase
+  const client = await createServerClient();
+  const { data, error } = await client
     .from("rounds")
     .select("id")
     .eq("season_id", season.id)
@@ -51,26 +44,22 @@ const getActiveSeasonRoundIdsCached = unstable_cache(async (leagueId: string | u
 
   if (error) return [];
   return data.map((round) => round.id as string);
-}, ["active-season-round-ids"], { revalidate: 60, tags: ["rounds"] });
+});
 
 export async function getActiveSeasonRoundIds(leagueId?: string, roundType: RoundType = "official") {
-  return getActiveSeasonRoundIdsCached(leagueId, roundType);
+  const selectedLeague = await getSelectedLeague();
+  if (leagueId && leagueId !== selectedLeague?.id) return [];
+  const resolvedLeagueId = selectedLeague?.id;
+  if (!resolvedLeagueId) return [];
+  return getActiveSeasonRoundIdsCached(resolvedLeagueId, roundType);
 }
 
-const getLatestFinishedSeasonCached = unstable_cache(async () => {
-  const { data: league } = await supabase
-    .from("leagues")
-    .select("id")
-    .eq("is_active", true)
-    .limit(1)
-    .single();
-
-  if (!league) return null;
-
-  const { data, error } = await supabase
+const getLatestFinishedSeasonCached = cache(async (leagueId: string) => {
+  const client = await createServerClient();
+  const { data, error } = await client
     .from("seasons")
     .select("stats_snapshot")
-    .eq("league_id", league.id)
+    .eq("league_id", leagueId)
     .eq("status", "finished")
     .not("stats_snapshot", "is", null)
     .order("number", { ascending: false })
@@ -79,10 +68,11 @@ const getLatestFinishedSeasonCached = unstable_cache(async () => {
 
   if (error || !data?.stats_snapshot) return null;
   return data.stats_snapshot as unknown as SeasonSummary;
-}, ["latest-finished-season"], { revalidate: 300, tags: ["season-history"] });
+});
 
 export async function getLatestFinishedSeason() {
-  return getLatestFinishedSeasonCached();
+  const league = await getSelectedLeague();
+  return league ? getLatestFinishedSeasonCached(league.id) : null;
 }
 
 async function buildSeasonSummary(
@@ -196,11 +186,12 @@ export async function finishSeason(confirmation: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem terminar temporadas." };
 
+  const selectedLeague = await getSelectedLeague();
+  if (!selectedLeague) return { success: false, error: "Escolha uma pelada no lobby." };
   const { data: league, error: leagueError } = await client
     .from("leagues")
     .select("id, name")
-    .eq("is_active", true)
-    .limit(1)
+    .eq("id", selectedLeague.id)
     .single();
 
   if (leagueError || !league) return { success: false, error: "Liga ativa não encontrada." };

@@ -35,7 +35,7 @@ function CadastroContent() {
       return;
     }
 
-    router.replace(returnTo || "/meu-perfil");
+    router.replace(returnTo || "/lobby");
     router.refresh();
   }
 

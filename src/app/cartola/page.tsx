@@ -12,7 +12,13 @@ export default async function CartolaPage({ searchParams }: PageProps<"/cartola"
   const { pack, tab } = await searchParams;
   const [data, cosmetics] = await Promise.all([getFantasyDashboard(), getMyEquippedCosmetics()]);
   if (!data.authenticated) return <Empty title="Entre para jogar o Cartola" description="Monte seu time, use cartas e dispute com seus amigos." login />;
-  if (!data.available) return <Empty title="Atualização do Cartola pendente" description="Execute as migrations do Cartola até a 039 para liberar a V1 desta temporada." />;
+  if (!data.available) {
+    const reason = "unavailableReason" in data ? data.unavailableReason : null;
+    if (reason === "basic") return <Empty title="Cartola indisponível nesta pelada" description="O Cartola faz parte do modo Completo. Um ADM pode liberar esse modo nas configurações da pelada." />;
+    if (reason === "no-season") return <Empty title="Aguardando temporada" description="Crie uma temporada ativa para começar a organizar o Cartola desta pelada." />;
+    if (reason === "no-round") return <Empty title="Aguardando a primeira rodada" description="O Cartola será preparado automaticamente quando uma rodada oficial for criada nesta pelada." />;
+    return <Empty title="Configuração do Cartola pendente" description="Não foi possível encontrar todos os dados necessários do Cartola nesta temporada. Confira a configuração do banco." />;
+  }
   return (
     <div>
       <FantasyExperience

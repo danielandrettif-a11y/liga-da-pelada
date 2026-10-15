@@ -5,16 +5,18 @@ import { hasPendingPaymentRound } from "@/lib/actions/payments";
 import { getRosterUnreadState } from "@/lib/actions/registrations";
 import { getActiveCollectiveSummary } from "@/lib/actions/collective";
 import { canUseCollective } from "@/lib/collective-access";
+import { getSelectedLeague } from "@/lib/league-context";
 
 export async function SessionBottomNav() {
   // A leitura da sessão acontece primeiro para sinalizar renderização dinâmica
   // ao Next. O cache do React compartilha esta mesma consulta com o cabeçalho.
   const account = await getCurrentAccount().catch(() => ({ client: null as any, user: null, profile: null, isAdmin: false }));
+  const league = account.user ? await getSelectedLeague().catch(() => null) : null;
   const [hasOpenCallup, hasPendingPayment, rosterUnread, collective, linkedPlayer] = await Promise.all([
     hasActiveCallup().catch(() => false),
     account.user ? hasPendingPaymentRound().catch(() => false) : Promise.resolve(false),
     account.isAdmin ? getRosterUnreadState().catch(() => ({ count: 0, lastSeenAt: null })) : Promise.resolve({ count: 0, lastSeenAt: null }),
-    account.user ? getActiveCollectiveSummary().catch(() => null) : Promise.resolve(null),
+    account.user && league?.featureTier === "complete" ? getActiveCollectiveSummary().catch(() => null) : Promise.resolve(null),
     account.profile?.player_id
       ? account.client.from("players").select("member_category").eq("id", account.profile.player_id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -23,6 +25,7 @@ export async function SessionBottomNav() {
   return (
     <BottomNav
       isAuthenticated={Boolean(account.user)}
+      featureTier={league?.featureTier || "basic"}
       hasOpenCallup={hasOpenCallup}
       hasPendingPayment={hasPendingPayment}
       canAccessCollective={canUseCollective(account.isAdmin, linkedPlayer.data?.member_category)}

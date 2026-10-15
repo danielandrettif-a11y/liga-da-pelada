@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { supabase } from "../supabase";
+import { createClient as createServerClient } from "../supabase/server";
+import { getSelectedLeague } from "../league-context";
 import type { CreateMatchInput, RegisterGoalInput, SubstituteMatchPlayerInput } from "../types";
 import { calculateRoundStats } from "./stats";
 import { getAdminClient, getCurrentAccount } from "../auth";
@@ -31,7 +32,19 @@ async function getMatchState(
     .single();
 
   if (error || !data) throw new Error("Partida não encontrada");
+  const league = await getSelectedLeague();
+  if (!league) throw new Error("Selecione uma pelada no lobby.");
+  const { data: round } = await client.from("rounds").select("league_id")
+    .eq("id", data.round_id).eq("league_id", league.id).maybeSingle();
+  if (!round) throw new Error("Partida fora da pelada selecionada.");
   return data;
+}
+
+async function getEventMatchState(client: SupabaseClient, eventId: string) {
+  const { data: event } = await client.from("match_events").select("match_id")
+    .eq("id", eventId).maybeSingle();
+  if (!event) throw new Error("Gol não encontrado.");
+  return getMatchState(client, event.match_id);
 }
 
 async function buildQuickStartSuggestion(client: SupabaseClient, roundId: string, matchId: string) {
@@ -112,6 +125,10 @@ export async function createMatch(input: CreateMatchInput) {
     ]);
 
     if (roundError || !round) throw new Error("Rodada nao encontrada.");
+    const selectedLeague = await getSelectedLeague();
+    if (!selectedLeague || round.league_id !== selectedLeague.id) {
+      return { success: false, error: "Rodada fora da pelada selecionada." };
+    }
     if (teamsError || !teams) throw new Error("Nao foi possivel carregar os times.");
     if (roundPlayersError || !roundPlayers) throw new Error("Nao foi possivel carregar os jogadores da rodada.");
     if (round.status === "finished") return { success: false, error: "A rodada ja foi encerrada." };
@@ -333,9 +350,9 @@ export async function createMatch(input: CreateMatchInput) {
     // O trigger do banco é a primeira proteção. A chamada explícita é
     // idempotente e cobre instalações onde o trigger tenha ficado ausente ou
     // desatualizado, evitando partida ao vivo com o Cartola ainda aberto.
-    const { error: fantasyLockError } = await client.rpc("lock_fantasy_market", {
-      p_round_id: input.round_id,
-    });
+    const { error: fantasyLockError } = selectedLeague.featureTier === "complete"
+      ? await client.rpc("lock_fantasy_market", { p_round_id: input.round_id })
+      : { error: null };
     if (fantasyLockError) {
       await client.from("matches").delete().eq("id", data.id);
       throw new Error(`Não foi possível fechar o Cartola antes da partida: ${fantasyLockError.message}`);
@@ -449,7 +466,12 @@ export async function createMatch(input: CreateMatchInput) {
 }
 
 export async function getMatch(matchId: string) {
-  const { data, error } = await supabase
+  const league = await getSelectedLeague();
+  if (!league) return null;
+  const client = await createServerClient();
+  const { data: matchScope } = await client.from("matches").select("round:round_id!inner(league_id)").eq("id", matchId).eq("round.league_id", league.id).maybeSingle();
+  if (!matchScope) return null;
+  const { data, error } = await client
     .from("matches")
     .select(`
       id,
@@ -589,7 +611,7 @@ export async function getMatch(matchId: string) {
   // jogador. Eles só completam lacunas e nunca sobrescrevem a escolha atual.
   const missingPlayerIds = playerIds.filter((playerId) => !player_cosmetics[playerId]);
   if (missingPlayerIds.length > 0) {
-    const { data: equippedCosmetics, error: cosmeticsError } = await supabase
+    const { data: equippedCosmetics, error: cosmeticsError } = await client
       .from("player_equipped_cosmetics")
       .select("player_id, slot, cosmetic:cosmetic_id(asset_key)")
       .in("player_id", missingPlayerIds)
@@ -629,6 +651,7 @@ export type MatchAdminAuditEntry = {
 export async function getFinishedMatchAudit(matchId: string): Promise<MatchAdminAuditEntry[]> {
   const account = await getCurrentAccount();
   if (!account.isAdmin || !matchId) return [];
+  try { await getMatchState(account.client, matchId); } catch { return []; }
 
   const { data: rows, error } = await (account.client as any)
     .from("sports_admin_audit")
@@ -669,6 +692,7 @@ export async function registerGoal(input: RegisterGoalInput) {
     if (!input.match_id || !input.team_id || !input.player_id) {
       return { success: false, error: "Dados do gol incompletos." };
     }
+    await getMatchState(client, input.match_id);
 
     const { data, error } = await client.rpc("register_goal", {
       p_match_id: input.match_id,
@@ -718,6 +742,7 @@ export async function substituteMatchPlayer(input: SubstituteMatchPlayerInput) {
     if (!input.match_id || !input.team_id || !input.player_out_id) {
       return { success: false, error: "Preencha os dados da substituicao." };
     }
+    await getMatchState(client, input.match_id);
     if (input.player_in_id) {
       const { data: incoming, error: incomingError } = await client
         .from("matches")
@@ -764,6 +789,7 @@ export async function deleteMatch(matchId: string) {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
     if (!matchId) return { success: false, error: "Partida inválida para exclusão." };
+    await getMatchState(client, matchId);
 
     const { data: match, error: matchError } = await client
       .from("matches")
@@ -813,6 +839,10 @@ export async function undoLastMatchSubstitution(substitutionId: string, matchId:
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
     if (!substitutionId || !matchId) return { success: false, error: "Substituicao invalida." };
+    await getMatchState(client, matchId);
+    const { data: substitution } = await client.from("match_substitutions").select("match_id")
+      .eq("id", substitutionId).eq("match_id", matchId).maybeSingle();
+    if (!substitution) return { success: false, error: "Substituição fora da partida selecionada." };
 
     const { error } = await client.rpc("undo_last_match_substitution", {
       p_substitution_id: substitutionId,
@@ -837,6 +867,10 @@ export async function deleteEvent(eventId: string, matchId: string, teamId?: str
     if (!eventId || !matchId) {
       return { success: false, error: "Identificadores inválidos para exclusão do evento." };
     }
+    await getMatchState(client, matchId);
+    const { data: event } = await client.from("match_events").select("match_id")
+      .eq("id", eventId).eq("match_id", matchId).maybeSingle();
+    if (!event) return { success: false, error: "Gol fora da partida selecionada." };
 
     const { data, error } = await client.rpc("delete_match_event", {
       p_event_id: eventId,
@@ -896,6 +930,7 @@ export async function correctFinishedGoal(eventId: string, confirmation: string)
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
     if (confirmation !== "EDITAR") return { success: false, error: FINISHED_CORRECTION_ERROR };
+    await getEventMatchState(client, eventId);
     const { data, error } = await client.rpc("correct_finished_goal", { p_event_id: eventId });
     if (error) throw new Error(error.message);
     const result = data as { round_id?: string; match_id?: string } | null;
@@ -913,6 +948,7 @@ export async function correctFinishedGoalEvent(eventId: string, playerId: string
     if (!client) return { success: false, error: ADMIN_ERROR };
     if (confirmation !== "EDITAR") return { success: false, error: FINISHED_CORRECTION_ERROR };
     if (!eventId || !playerId) return { success: false, error: "Escolha o autor do gol." };
+    await getEventMatchState(client, eventId);
     const { data, error } = await (client as any).rpc("correct_finished_goal_event", {
       p_event_id: eventId,
       p_player_id: playerId,
@@ -941,6 +977,7 @@ export async function addFinishedGoalEvent(
     if (!client) return { success: false, error: ADMIN_ERROR };
     if (confirmation !== "EDITAR") return { success: false, error: FINISHED_CORRECTION_ERROR };
     if (!matchId || !teamId || !playerId) return { success: false, error: "Escolha o time e o autor do gol." };
+    await getMatchState(client, matchId);
     const { data, error } = await (client as any).rpc("add_finished_goal_event", {
       p_match_id: matchId,
       p_team_id: teamId,

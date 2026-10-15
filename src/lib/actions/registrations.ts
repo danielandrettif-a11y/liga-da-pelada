@@ -5,14 +5,27 @@ import { getCurrentAccount } from "@/lib/auth";
 import type { Player, PlayerRegistrationEvent, RosterUnreadState } from "@/lib/types";
 import { calculateRoundStats } from "./stats";
 import { refreshFluidOverallSafely } from "./overall";
+import { getSelectedLeague } from "@/lib/league-context";
+
+async function getSelectedRosterPlayerIds() {
+  const league = await getSelectedLeague();
+  if (!league) return [];
+  const account = await getCurrentAccount();
+  const { data } = await account.client.from("league_members").select("player_id")
+    .eq("league_id", league.id).eq("is_active", true);
+  return (data || []).map((member) => member.player_id);
+}
 
 export async function getRegistrationHistory(): Promise<PlayerRegistrationEvent[]> {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return [];
+  const rosterPlayerIds = await getSelectedRosterPlayerIds();
+  if (!rosterPlayerIds.length) return [];
 
   const { data, error } = await account.client
     .from("player_registration_events")
     .select("id, player_id, player_name, avatar_url, member_category, source, created_by_user_id, created_at")
+    .in("player_id", rosterPlayerIds)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(1000);
@@ -42,12 +55,16 @@ export async function getRegistrationHistory(): Promise<PlayerRegistrationEvent[
 
 export async function getRosterUnreadState(): Promise<RosterUnreadState> {
   const account = await getCurrentAccount();
-  if (!account.isAdmin || !account.user) return { count: 0, lastSeenAt: null };
+  const league = await getSelectedLeague();
+  if (!account.isAdmin || !account.user || !league || league.role !== "admin") return { count: 0, lastSeenAt: null };
+  const rosterPlayerIds = await getSelectedRosterPlayerIds();
+  if (!rosterPlayerIds.length) return { count: 0, lastSeenAt: null };
 
   const { data: readState } = await account.client
     .from("admin_roster_reads")
     .select("last_seen_at")
     .eq("user_id", account.user.id)
+    .eq("league_id", league.id)
     .maybeSingle();
 
   if (!readState?.last_seen_at) return { count: 0, lastSeenAt: null };
@@ -55,6 +72,7 @@ export async function getRosterUnreadState(): Promise<RosterUnreadState> {
   const { count, error } = await account.client
     .from("player_registration_events")
     .select("id", { count: "exact", head: true })
+    .in("player_id", rosterPlayerIds)
     .gt("created_at", readState.last_seen_at);
 
   if (error) {
@@ -66,18 +84,23 @@ export async function getRosterUnreadState(): Promise<RosterUnreadState> {
 
 export async function getUnreadRosterPlayers(): Promise<{ playerIds: string[]; seenThrough: string | null }> {
   const account = await getCurrentAccount();
-  if (!account.isAdmin || !account.user) return { playerIds: [], seenThrough: null };
+  const league = await getSelectedLeague();
+  if (!account.isAdmin || !account.user || !league || league.role !== "admin") return { playerIds: [], seenThrough: null };
+  const rosterPlayerIds = await getSelectedRosterPlayerIds();
+  if (!rosterPlayerIds.length) return { playerIds: [], seenThrough: null };
 
   const { data: readState } = await account.client
     .from("admin_roster_reads")
     .select("last_seen_at")
     .eq("user_id", account.user.id)
+    .eq("league_id", league.id)
     .maybeSingle();
   if (!readState?.last_seen_at) return { playerIds: [], seenThrough: null };
 
   const { data, error } = await account.client
     .from("player_registration_events")
     .select("player_id, created_at")
+    .in("player_id", rosterPlayerIds)
     .gt("created_at", readState.last_seen_at)
     .not("player_id", "is", null)
     .order("created_at", { ascending: true });
@@ -94,24 +117,17 @@ export async function getUnreadRosterPlayers(): Promise<{ playerIds: string[]; s
 
 export async function markRosterActivitySeenThrough(seenThrough: string) {
   const account = await getCurrentAccount();
-  if (!account.isAdmin || !account.user) return { success: false, error: "Somente administradores podem atualizar esta leitura." };
+  const league = await getSelectedLeague();
+  if (!account.isAdmin || !account.user || !league || league.role !== "admin") return { success: false, error: "Somente administradores podem atualizar esta leitura." };
 
   const parsed = new Date(seenThrough);
   if (Number.isNaN(parsed.getTime())) return { success: false, error: "Data de leitura inválida." };
   const safeSeenThrough = new Date(Math.min(parsed.getTime(), Date.now())).toISOString();
 
-  const { data: current } = await account.client
-    .from("admin_roster_reads")
-    .select("last_seen_at")
-    .eq("user_id", account.user.id)
-    .maybeSingle();
-  if (current?.last_seen_at && new Date(current.last_seen_at).getTime() >= new Date(safeSeenThrough).getTime()) {
-    return { success: true };
-  }
-
-  const { error } = await account.client
-    .from("admin_roster_reads")
-    .upsert({ user_id: account.user.id, last_seen_at: safeSeenThrough }, { onConflict: "user_id" });
+  const { error } = await account.client.rpc("mark_roster_activity_seen_through", {
+    p_league_id: league.id,
+    p_seen_through: safeSeenThrough,
+  });
   if (error) return { success: false, error: error.message };
 
   revalidatePath("/", "layout");
@@ -121,8 +137,9 @@ export async function markRosterActivitySeenThrough(seenThrough: string) {
 
 export async function markRosterActivitySeen() {
   const account = await getCurrentAccount();
-  if (!account.isAdmin) return { success: false, error: "Somente administradores podem atualizar esta leitura." };
-  const { error } = await account.client.rpc("mark_roster_activity_seen");
+  const league = await getSelectedLeague();
+  if (!account.isAdmin || !league || league.role !== "admin") return { success: false, error: "Somente administradores podem atualizar esta leitura." };
+  const { error } = await account.client.rpc("mark_roster_activity_seen", { p_league_id: league.id });
   if (error) return { success: false, error: error.message };
   revalidatePath("/", "layout");
   revalidatePath("/jogadores");
@@ -132,11 +149,14 @@ export async function markRosterActivitySeen() {
 export async function getRegisteredMergeCandidates(guestId: string): Promise<Player[]> {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return [];
+  const rosterPlayerIds = await getSelectedRosterPlayerIds();
+  if (!rosterPlayerIds.includes(guestId)) return [];
 
   const { data, error } = await account.client
     .from("players")
     .select("*")
     .neq("id", guestId)
+    .in("id", rosterPlayerIds)
     .eq("is_selectable", true)
     .in("member_category", ["player", "guest"])
     .order("name");
@@ -150,6 +170,19 @@ export async function getRegisteredMergeCandidates(guestId: string): Promise<Pla
 export async function mergeGuestWithRegistered(guestId: string, registeredId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores podem unir perfis." };
+  const league = await getSelectedLeague();
+  const rosterPlayerIds = await getSelectedRosterPlayerIds();
+  if (!league || !rosterPlayerIds.includes(guestId) || !rosterPlayerIds.includes(registeredId)) {
+    return { success: false, error: "Os dois perfis precisam pertencer à pelada selecionada." };
+  }
+  const { data: canMerge, error: mergeCheckError } = await account.client.rpc("can_merge_profiles_in_league", {
+    p_league_id: league.id,
+    p_guest_id: guestId,
+    p_registered_id: registeredId,
+  });
+  if (mergeCheckError || !canMerge) {
+    return { success: false, error: "A união de perfis usados em outra pelada exige uma rotina de migração própria." };
+  }
   const { data, error } = await account.client.rpc("merge_selectable_player_profiles", {
     p_target_id: guestId,
     p_source_id: registeredId,

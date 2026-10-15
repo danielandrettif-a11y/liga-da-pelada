@@ -6,7 +6,7 @@ import { X } from "@/components/icons";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import type { FantasySettings } from "@/lib/fantasy/config";
 
-type Props = { isOpen: boolean; onClose: () => void; settings: FantasySettings };
+type Props = { isOpen: boolean; onClose: () => void; settings: FantasySettings; playersPerTeam?: number };
 type Tab = "positions" | "base" | "extras";
 
 function points(value: number) {
@@ -14,7 +14,7 @@ function points(value: number) {
   return `${value > 0 ? "+" : value < 0 ? "−" : ""}${formatted}`;
 }
 
-export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
+export function FantasyScoringModal({ isOpen, onClose, settings, playersPerTeam = 6 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState<Tab>("positions");
   useDialogViewport(isOpen, onClose);
@@ -43,7 +43,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
         </header>
         <div className="mobile-dialog-scroll flex-1 space-y-4 overflow-y-auto p-5">
           {tab === "positions" && <>
-            <div className="rounded-2xl border border-accent/30 bg-accent/10 p-4 text-xs leading-5 text-foreground"><strong>Escolha um dos dois esquemas:</strong><br />1 GOL + 3 DEF/VOL + 2 ATA/ALA<br />1 GOL + 2 DEF/VOL + 3 ATA/ALA</div>
+            <div className="rounded-2xl border border-accent/30 bg-accent/10 p-4 text-xs leading-5 text-foreground"><strong>Formação da rodada:</strong><br />{playersPerTeam === 7 ? "1 GOL + 3 DEF/VOL + 3 ATA/ALA" : playersPerTeam === 5 ? "1 GOL + 2 DEF/VOL + 2 ATA/ALA" : <>1 GOL + 3 DEF/VOL + 2 ATA/ALA<br />1 GOL + 2 DEF/VOL + 3 ATA/ALA</>}</div>
             <div className="grid gap-3">
               <article className="rounded-2xl border border-blue-500/25 bg-blue-950/20 p-4"><strong className="text-blue-300">DEF/VOL</strong><p className="mt-1 text-xs text-muted">Gol e assistência valem mais. Para 0/1/2 gols sofridos, recebe respectivamente {points(settings.defenderCleanSheetPoints)}, {points(settings.defenderOneGoalConcededPoints)} e {points(settings.defenderTwoGoalsConcededPoints)}.</p></article>
               <article className="rounded-2xl border border-danger/25 bg-red-950/20 p-4"><strong className="text-danger">ATA/ALA</strong><p className="mt-1 text-xs text-muted">Une atacantes e antigos alas. Pontua por gol e assistência e perde 0,5 por gol sofrido pelo time.</p></article>
@@ -56,7 +56,7 @@ export function FantasyScoringModal({ isOpen, onClose, settings }: Props) {
           </div>}
           {tab === "extras" && <div className="space-y-3 text-xs leading-5 text-muted">
             <p className="rounded-2xl border border-warning/25 bg-warning/10 p-4"><strong className="text-warning">Capitão ×{settings.captainMultiplier.toFixed(1)}</strong><br />O adicional do capitão é aplicado sobre a pontuação final da vaga.</p>
-            <p className="rounded-2xl border border-accent/25 bg-accent/10 p-4"><strong className="text-accent">Cartas e palpites continuam</strong><br />Os efeitos especiais são calculados separadamente e somados depois dos seis atletas.</p>
+            <p className="rounded-2xl border border-accent/25 bg-accent/10 p-4"><strong className="text-accent">Cartas e palpites continuam</strong><br />Os efeitos especiais são calculados separadamente e somados depois dos {playersPerTeam} atletas.</p>
             <p className="rounded-2xl border border-white/10 p-4">Exemplo: um goleiro que perde por 0×2 recebe +1 pela atuação e −1 pelos gols sofridos, terminando com 0 ponto.</p>
           </div>}
         </div>

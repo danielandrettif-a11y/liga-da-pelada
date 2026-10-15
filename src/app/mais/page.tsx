@@ -8,6 +8,7 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { getActiveCallups } from "@/lib/actions/callups";
 import { getLeagueConfig } from "@/lib/actions/league";
 import { PreSeasonToggle } from "@/components/PreSeasonToggle";
+import { LeagueModeCard } from "@/components/LeagueModeCard";
 import {
   UserPlus,
   CalendarPlus,
@@ -27,6 +28,8 @@ import {
   Microphone,
 } from "@/components/icons";
 import { getStadiums } from "@/lib/actions/stadiums";
+import { getSelectedLeague } from "@/lib/league-context";
+import { readManagerSourceLeague } from "@/lib/bq-manager/server";
 
 const ADMIN_SECTIONS = [
   {
@@ -113,26 +116,30 @@ const ADMIN_SECTIONS = [
         href: "/admin/liga",
         icon: Shield,
         label: "Liga",
-        description: "Configurações da liga",
+        description: "Configurar ou excluir esta pelada",
       },
     ],
   },
 ];
 
 type MaisPageProps = {
-  searchParams: Promise<{ aba?: string | string[] }>;
+  searchParams: Promise<{ aba?: string | string[]; upgrade_required?: string; upgraded?: string }>;
 };
 
 export default async function MaisPage({ searchParams }: MaisPageProps) {
   const account = await getCurrentAccount();
   const params = await searchParams;
+  const selectedLeague = await getSelectedLeague();
   const requestedTab = Array.isArray(params.aba) ? params.aba[0] : params.aba;
   const activeTab = account.isAdmin && requestedTab === "admin" ? "admin" : "geral";
-  const [identity, activeCallups, leagueConfig, stadiums] = await Promise.all([
+  const [identity, activeCallups, leagueConfig, stadiums, managerSourceLeagueId] = await Promise.all([
     getCurrentAccountIdentity(),
     account.isAdmin ? getActiveCallups() : Promise.resolve([]),
     account.isAdmin ? getLeagueConfig() : Promise.resolve(null),
     account.isAdmin ? getStadiums() : Promise.resolve([]),
+    account.user && selectedLeague?.featureTier === "complete"
+      ? readManagerSourceLeague(account.client).catch(() => null)
+      : Promise.resolve(null),
   ]);
   const accountName = identity.displayName;
   const playerAvatarUrl = identity.avatarUrl;
@@ -145,6 +152,8 @@ export default async function MaisPage({ searchParams }: MaisPageProps) {
           {activeTab === "admin" ? "Ferramentas de organização e configuração da pelada." : "Sua conta, preferências e outros recursos do app."}
         </p>
       </div>
+      {params.upgrade_required && <p role="status" className="rounded-xl border border-accent/25 bg-accent/10 p-3 text-sm text-accent">Este recurso está disponível na pelada Completa.</p>}
+      {params.upgraded && <p role="status" className="rounded-xl border border-accent/25 bg-accent/10 p-3 text-sm text-accent">Pelada atualizada para Completa. Os recursos extras já estão liberados.</p>}
 
       {account.isAdmin && (
         <nav className="grid grid-cols-2 gap-1 rounded-2xl border border-border bg-surface/80 p-1.5 shadow-lg shadow-black/10" aria-label="Áreas da aba Mais">
@@ -171,14 +180,15 @@ export default async function MaisPage({ searchParams }: MaisPageProps) {
 
       {activeTab === "geral" ? (
         <>
-          <Link href="/bq-manager" className="glass-card flex items-center gap-3 border border-accent/25 p-4 hover:bg-surface-hover">
+          {selectedLeague?.featureTier === "basic" && <LeagueModeCard />}
+          {selectedLeague?.id === managerSourceLeagueId && <Link href="/bq-manager" className="glass-card flex items-center gap-3 border border-accent/25 p-4 hover:bg-surface-hover">
             <Football className="h-8 w-8 shrink-0 text-accent" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-black text-foreground">BQ Manager <span className="ml-1 text-[10px] text-accent">PRÉVIA</span></p>
               <p className="mt-1 text-xs text-muted">Seu clube, cartas BQ e uma nova carreira de técnico</p>
             </div>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted" />
-          </Link>
+          </Link>}
 
           {account.user && (
             <div className="glass-card flex items-center gap-3 p-4">
@@ -257,12 +267,25 @@ export default async function MaisPage({ searchParams }: MaisPageProps) {
             </div>
           </div>
 
+          <Link href="/admin/liga#excluir-pelada" className="flex items-center gap-3 rounded-2xl border border-danger/35 bg-danger/5 p-4 hover:bg-danger/10">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-danger/10">
+              <Shield className="h-5 w-5 text-danger" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black text-foreground">Configurar ou excluir pelada</p>
+              <p className="mt-1 text-xs text-muted">A exclusão fica no fim das configurações da liga e exige confirmação pelo nome.</p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-danger" />
+          </Link>
+
           <CallupAdminCard
             callups={activeCallups}
             stadiums={stadiums}
             playersPerTeam={leagueConfig?.players_per_team || 5}
             teamsPerRound={leagueConfig?.teams_per_round || 3}
           />
+
+          <LeagueModeCard />
 
           {leagueConfig && (
             <PreSeasonToggle
@@ -277,7 +300,7 @@ export default async function MaisPage({ searchParams }: MaisPageProps) {
                 {section.title}
               </h2>
               <div className="glass-card overflow-hidden">
-                {section.items.map((item, index) => (
+                {section.items.filter((item) => selectedLeague?.featureTier === "complete" || !["/mais/coletivas", "/admin/cartola", "/admin/reprocessar"].includes(item.href)).map((item, index) => (
                   <Link key={item.href} href={item.href} className={`flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-hover ${index < section.items.length - 1 ? "border-b border-border" : ""}`}>
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface">
                       <item.icon className="h-5 w-5 text-accent" />

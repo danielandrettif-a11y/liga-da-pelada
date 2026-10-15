@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getAdminClient, getCurrentAccount } from "../auth";
 import { calculatePlayerOveralls, parseOverallFormulaConfig, type OverallPlayer, type OverallRole } from "../overall";
 import { buildOverallHistoryInput } from "../overall-history";
+import { getSelectedLeague } from "../league-context";
 
 const FORMULA_KEY = "adaptive-v20-statistical-confidence";
 const COMPARISON_FORMULA_KEY = "adaptive-v19-admin-fixed-profile";
@@ -14,12 +15,12 @@ function numberValue(value: unknown) {
 }
 
 async function loadOverallHistory(client: any) {
-  const { data: league, error: leagueError } = await client.from("leagues").select("id").eq("is_active", true).limit(1).single();
-  if (leagueError || !league) throw new Error("Não existe uma liga ativa para calcular o OVR.");
+  const league = await getSelectedLeague();
+  if (!league) throw new Error("Escolha uma pelada para calcular o OVR.");
 
   const [{ data: members, error: membersError }, { data: rounds, error: roundsError }] = await Promise.all([
     client.from("league_members")
-      .select("players!inner(id, name, player_profile, initial_player_profile, overall_traits, overall_seed_mode, is_goalkeeper, is_selectable, member_category)")
+      .select("player_profile, initial_player_profile, overall_traits, overall_seed_mode, players!inner(id, name, player_profile, initial_player_profile, overall_traits, overall_seed_mode, is_goalkeeper, is_selectable, member_category)")
       .eq("league_id", league.id),
     client.from("rounds").select(`
       id, number, date, created_at, round_type, status,
@@ -38,7 +39,16 @@ async function loadOverallHistory(client: any) {
   if (roundsError) throw new Error(`Não foi possível carregar o histórico: ${roundsError.message}`);
 
   const leaguePlayers = (members || [])
-    .map((member: any) => Array.isArray(member.players) ? member.players[0] : member.players)
+    .map((member: any) => {
+      const player = Array.isArray(member.players) ? member.players[0] : member.players;
+      return player ? {
+        ...player,
+        player_profile: member.player_profile ?? player.player_profile,
+        initial_player_profile: member.initial_player_profile ?? member.player_profile ?? player.initial_player_profile ?? player.player_profile,
+        overall_traits: Array.isArray(member.overall_traits) ? member.overall_traits : player.overall_traits,
+        overall_seed_mode: member.overall_seed_mode ?? player.overall_seed_mode,
+      } : null;
+    })
     .filter((player: any) => player?.member_category === "player");
   const officialPlayers: Array<OverallPlayer & { name: string }> = [...new Map(
     leaguePlayers.map((player: any) => [player.id, player]),
@@ -80,7 +90,8 @@ export type OverallShadowAdminData = {
 
 export async function getOverallShadowAdminData(): Promise<OverallShadowAdminData | null> {
   const client = await getAdminClient();
-  if (!client) return null;
+  const league = await getSelectedLeague();
+  if (!client || !league || league.role !== "admin") return null;
   const database = client as any;
   const { data: formula, error: formulaError } = await database.from("overall_formula_versions").select("id, label").eq("key", FORMULA_KEY).maybeSingle();
   if (formulaError) throw new Error(`Não foi possível carregar a fórmula: ${formulaError.message}`);
@@ -88,6 +99,7 @@ export async function getOverallShadowAdminData(): Promise<OverallShadowAdminDat
   const source = await loadOverallHistory(database);
   const { data: latestRun, error: runError } = await database.from("overall_calculation_runs")
     .select("id, status, created_at, completed_at, error_message").eq("formula_version_id", formula.id)
+    .eq("league_id", league.id)
     .in("status", ["succeeded", "published", "failed"]).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (runError) throw new Error(`Não foi possível carregar o modo sombra: ${runError.message}`);
   if (!latestRun) return { latestRun: null, snapshots: [], pendingPlayers: source.pendingPlayers };
@@ -99,6 +111,7 @@ export async function getOverallShadowAdminData(): Promise<OverallShadowAdminDat
   const { data: comparisonRun } = comparisonFormula
     ? await database.from("overall_calculation_runs").select("id")
       .eq("formula_version_id", comparisonFormula.id).in("status", ["succeeded", "published"])
+      .eq("league_id", league.id)
       .order("created_at", { ascending: false }).limit(1).maybeSingle()
     : { data: null };
   const [{ data: rows, error: snapshotsError }, { data: breakdownRows, error: breakdownError }, { data: comparisonRows }] = await Promise.all([
@@ -146,7 +159,8 @@ export async function getOverallShadowAdminData(): Promise<OverallShadowAdminDat
 export async function recalculateOverallShadow() {
   const account = await getCurrentAccount();
   const client = await getAdminClient();
-  if (!client || !account.user) return { success: false, error: "Somente administradores podem recalcular o OVR." };
+  const league = await getSelectedLeague();
+  if (!client || !account.user || !league || league.role !== "admin") return { success: false, error: "Somente administradores podem recalcular o OVR." };
   const database = client as any;
   let runId: string | null = null;
   try {
@@ -154,7 +168,7 @@ export async function recalculateOverallShadow() {
     if (formulaError || !formula) throw new Error("A fórmula v20 não foi encontrada. Confirme a migration 242.");
     const source = await loadOverallHistory(database);
     const latestRound = [...source.rounds].filter((round) => round.roundType === "official" && round.status === "finished").at(-1);
-    const { data: run, error: runError } = await database.from("overall_calculation_runs").insert({ formula_version_id: formula.id, status: "processing", source_through_round_id: latestRound?.id || null, started_at: new Date().toISOString(), created_by: account.user.id }).select("id").single();
+    const { data: run, error: runError } = await database.from("overall_calculation_runs").insert({ league_id: league.id, formula_version_id: formula.id, status: "processing", source_through_round_id: latestRound?.id || null, started_at: new Date().toISOString(), created_by: account.user.id }).select("id").single();
     if (runError || !run) throw new Error(runError?.code === "23505" ? "Já existe um cálculo de OVR em andamento. Aguarde ele terminar." : runError?.message || "Não foi possível criar a execução de OVR.");
     runId = run.id;
     const parsedFormula = parseOverallFormulaConfig(formula.config);
@@ -172,12 +186,12 @@ export async function recalculateOverallShadow() {
       const { error } = await database.from("player_overall_round_breakdowns").insert(calculation.breakdowns.map((item) => ({ calculation_run_id: runId, player_id: item.playerId, round_id: item.roundId, round_date: item.roundDate, round_index: item.roundIndex, goals: item.goals, assists: item.assists, own_goals: item.ownGoals, goals_conceded: item.goalsConceded, attacking_score: item.attackingScore, goal_score: item.goalScore, assist_score: item.assistScore, defensive_score: item.defensiveScore, timing_quality: item.timingQuality, played_profile: item.playedProfile, profile_decision_source: item.profileSource, profile_appearance_number: item.appearanceNumber, profile_def_overall: item.profileDefOverall, profile_ata_overall: item.profileAtaOverall, role_evidence: item.roleEvidence, trait_evidence: item.traitEvidence, positions: item.positions, position_confidence: item.confidence })));
       if (error) throw new Error(`Não foi possível gravar a auditoria das rodadas: ${error.message}`);
     }
-    const { error: finishError } = await database.from("overall_calculation_runs").update({ status: "succeeded", completed_at: new Date().toISOString() }).eq("id", runId);
+    const { error: finishError } = await database.from("overall_calculation_runs").update({ status: "succeeded", completed_at: new Date().toISOString() }).eq("id", runId).eq("league_id", league.id);
     if (finishError) throw new Error(`OVRs calculados, mas a execução não foi concluída: ${finishError.message}`);
     revalidatePath("/admin/overall");
     return { success: true, runId, players: rows.length, pendingPlayers: source.pendingPlayers.length, rounds: source.rounds.length };
   } catch (error: any) {
-    if (runId) await database.from("overall_calculation_runs").update({ status: "failed", completed_at: new Date().toISOString(), error_message: error.message || "Erro desconhecido" }).eq("id", runId);
+    if (runId) await database.from("overall_calculation_runs").update({ status: "failed", completed_at: new Date().toISOString(), error_message: error.message || "Erro desconhecido" }).eq("id", runId).eq("league_id", league.id);
     return { success: false, error: error.message || "Não foi possível calcular os OVRs." };
   }
 }
@@ -185,19 +199,20 @@ export async function recalculateOverallShadow() {
 export async function publishOverallShadow(runId: string) {
   const account = await getCurrentAccount();
   const client = await getAdminClient();
-  if (!client || !account.user) return { success: false, error: "Somente administradores podem publicar o OVR." };
+  const league = await getSelectedLeague();
+  if (!client || !account.user || !league || league.role !== "admin") return { success: false, error: "Somente administradores podem publicar o OVR." };
   const database = client as any;
   const { data: formula } = await database.from("overall_formula_versions").select("id").eq("key", FORMULA_KEY).maybeSingle();
   if (!formula) return { success: false, error: "A fórmula v20 não foi encontrada." };
-  const { data: run } = await database.from("overall_calculation_runs").select("id, status, formula_version_id").eq("id", runId).maybeSingle();
+  const { data: run } = await database.from("overall_calculation_runs").select("id, status, formula_version_id").eq("id", runId).eq("league_id", league.id).maybeSingle();
   if (!run || run.formula_version_id !== formula.id || run.status !== "succeeded") return { success: false, error: "Escolha um rascunho v20 concluído e ainda não publicado." };
-  const { error } = await database.from("overall_calculation_runs").update({ status: "published", published_at: new Date().toISOString() }).eq("id", runId).eq("status", "succeeded");
+  const { error } = await database.from("overall_calculation_runs").update({ status: "published", published_at: new Date().toISOString() }).eq("id", runId).eq("league_id", league.id).eq("status", "succeeded");
   if (error) {
     await database.from("overall_calculation_runs").update({
       status: "failed",
       completed_at: new Date().toISOString(),
       error_message: `Falha ao publicar a v20: ${error.message}`,
-    }).eq("id", runId).eq("status", "succeeded");
+    }).eq("id", runId).eq("league_id", league.id).eq("status", "succeeded");
     return { success: false, error: error.message };
   }
   revalidatePath("/admin/overall");

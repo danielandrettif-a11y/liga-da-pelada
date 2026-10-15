@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabase } from "../supabase";
+import { createClient as createServerClient } from "../supabase/server";
 import { getAdminClient, getCurrentAccount } from "../auth";
 import type { Player, RoundStatus, RoundType } from "../types";
 import { getActiveSeason } from "./seasons";
@@ -83,7 +83,8 @@ export async function getPaymentRounds(): Promise<PaymentRound[]> {
   const season = await getActiveSeason(league.id);
   if (!season) return [];
 
-  const { data, error } = await supabase
+  const client = await createServerClient();
+  const { data, error } = await client
     .from("rounds")
     .select("id, number, date, status, round_type, payment_pix, payment_total, payment_recipient_name, payment_extra_time_total, payment_extra_time_player_ids, payment_ball_fund_total, payment_ball_fund_player_ids, created_at")
     .eq("season_id", season.id)
@@ -102,7 +103,8 @@ export async function hasPendingPaymentRound(): Promise<boolean> {
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
   if (!season) return false;
-  const { data: finishedRounds, error: roundError } = await supabase
+  const client = await createServerClient();
+  const { data: finishedRounds, error: roundError } = await client
     .from("rounds")
     .select("id")
     .eq("season_id", season.id)
@@ -118,8 +120,8 @@ export async function hasPendingPaymentRound(): Promise<boolean> {
   if (!round) return false;
 
   const [{ data: participants, error: participantError }, { data: payments, error: paymentError }] = await Promise.all([
-    supabase.from("round_players").select("player_id").eq("round_id", round.id),
-    supabase.from("round_payments").select("player_id, paid").eq("round_id", round.id),
+    client.from("round_players").select("player_id").eq("round_id", round.id),
+    client.from("round_payments").select("player_id, paid").eq("round_id", round.id),
   ]);
   if (participantError || paymentError) {
     console.error("Erro ao verificar pagamentos pendentes:", participantError || paymentError);
@@ -130,9 +132,13 @@ export async function hasPendingPaymentRound(): Promise<boolean> {
 }
 
 export async function getRoundPaymentPlayers(roundId: string): Promise<PaymentPlayer[]> {
+  const league = await getActiveLeague();
+  const client = await createServerClient();
+  const { data: round } = await client.from("rounds").select("id").eq("id", roundId).eq("league_id", league.id).maybeSingle();
+  if (!round) return [];
   const [{ data: participants, error: participantError }, { data: payments, error: paymentError }] = await Promise.all([
-    supabase.from("round_players").select("player_id").eq("round_id", roundId),
-    supabase.from("round_payments").select("player_id, paid, paid_at").eq("round_id", roundId),
+    client.from("round_players").select("player_id").eq("round_id", roundId),
+    client.from("round_payments").select("player_id, paid, paid_at").eq("round_id", roundId),
   ]);
 
   if (participantError || paymentError) {
@@ -143,7 +149,7 @@ export async function getRoundPaymentPlayers(roundId: string): Promise<PaymentPl
   const playerIds = participants.map((participant) => participant.player_id);
   if (playerIds.length === 0) return [];
 
-  const { data: players, error: playersError } = await supabase
+  const { data: players, error: playersError } = await client
     .from("players")
     .select("*")
     .in("id", playerIds)
@@ -165,6 +171,13 @@ export async function getRoundPaymentPlayers(roundId: string): Promise<PaymentPl
 export async function getPaymentAuditLog(): Promise<PaymentAuditLogEntry[]> {
   const client = await getAdminClient();
   if (!client) return [];
+  const league = await getActiveLeague();
+
+  const { data: rounds, error: roundsError } = await client
+    .from("rounds")
+    .select("id")
+    .eq("league_id", league.id);
+  if (roundsError || !rounds?.length) return [];
 
   const { data, error } = await client
     .from("round_payment_audit")
@@ -179,6 +192,7 @@ export async function getPaymentAuditLog(): Promise<PaymentAuditLogEntry[]> {
       created_at,
       round:round_id (id, number, date, round_type)
     `)
+    .in("round_id", rounds.map((round) => round.id))
     .order("id", { ascending: false })
     .limit(1000);
 
@@ -194,11 +208,13 @@ export async function setPlayerPayment(roundId: string, playerId: string, paid: 
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre na sua conta para confirmar pagamentos." };
   const client = account.client;
+  const league = await getActiveLeague();
 
   const { data: round } = await client
     .from("rounds")
     .select("status")
     .eq("id", roundId)
+    .eq("league_id", league.id)
     .maybeSingle();
 
   if (round?.status !== "finished") {
@@ -250,6 +266,10 @@ export async function updateRoundPaymentDetails(input: {
 }) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem editar os dados do PIX." };
+  const league = await getActiveLeague();
+  const { data: round } = await client.from("rounds").select("id")
+    .eq("id", input.roundId).eq("league_id", league.id).maybeSingle();
+  if (!round) return { success: false, error: "Rodada fora da pelada selecionada." };
 
   const pix = input.paymentPix.trim();
   const total = Number(input.paymentTotal);

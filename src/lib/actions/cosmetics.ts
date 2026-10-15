@@ -45,6 +45,15 @@ const emptyShop: SeasonPassShop = {
 const empty: CosmeticsDashboard = { available: false, seasonId: null, cosmetics: [], previewCatalog: [], rewards: [], equipped: {}, canPreviewAll: false, shop: emptyShop };
 const mapCosmetic = (row: any): CosmeticItem => ({ id: row.id, slug: row.slug, slot: row.slot, rarity: row.rarity, name: row.name, description: row.description, assetKey: row.asset_key });
 
+async function getSelectedFantasySeasonId(client: any): Promise<string | null> {
+  const league = await getActiveLeague();
+  const season = await getActiveSeason(league.id);
+  if (!season) return null;
+  const { data } = await client.from("fantasy_seasons").select("id")
+    .eq("season_id", season.id).eq("league_id", league.id).maybeSingle();
+  return data?.id || null;
+}
+
 const CURRENT_LOADOUT_RELATIONS = `
   user_id,
   frame:frame_cosmetic_id(asset_key),
@@ -94,7 +103,7 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
     // Keep the provenance so older/test claims can still be matched to the
     // reward even if the choice row was removed or was created by an older
     // version of the claim function.
-    client.from("fantasy_user_cosmetics").select("cosmetic_id, source_reward_id, cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id),
+    client.from("fantasy_user_cosmetics").select("cosmetic_id, source_reward_id, cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id).eq("league_id", league.id),
     client.from("fantasy_cosmetics").select("*").order("created_at"),
     client.from("fantasy_season_pass_rewards").select("id, house, reward_key, reward_type, card_tier, bonus:bonus_cosmetic_id(*), options:fantasy_season_pass_reward_options(cosmetic:fantasy_cosmetics(*))").eq("fantasy_season_id", fantasySeason.id).order("house"),
     client.from("fantasy_user_cosmetic_reward_choices").select("reward_id, cosmetic_id").eq("user_id", account.user.id),
@@ -171,7 +180,9 @@ export async function cleanupMyLegacyCosmeticsPreview() {
   const account = await getCurrentAccount();
   if (!account.user || !account.isAdmin) return { success: false, error: "A prévia é exclusiva para administradores." };
   const client: any = account.client;
-  const { data, error } = await client.rpc("cleanup_my_cosmetics_preview");
+  const fantasySeasonId = await getSelectedFantasySeasonId(client);
+  if (!fantasySeasonId) return { success: false, error: "Passe da pelada selecionada não encontrado." };
+  const { data, error } = await client.rpc("cleanup_my_cosmetics_preview", { p_fantasy_season_id: fantasySeasonId });
   if (error) return { success: false, error: error.message };
   revalidatePath("/meu-perfil");
   revalidatePath("/jogadores");
@@ -183,7 +194,9 @@ export async function dismissMyUnopenedBronzePassPack() {
   const account = await getCurrentAccount();
   if (!account.user || !account.isAdmin) return { success: false, error: "A limpeza é exclusiva para administradores." };
   const client: any = account.client;
-  const { data, error } = await client.rpc("dismiss_my_unopened_bronze_pass_pack");
+  const fantasySeasonId = await getSelectedFantasySeasonId(client);
+  if (!fantasySeasonId) return { success: false, error: "Passe da pelada selecionada não encontrado." };
+  const { data, error } = await client.rpc("dismiss_my_unopened_bronze_pass_pack", { p_fantasy_season_id: fantasySeasonId });
   if (error) return { success: false, error: error.message };
   revalidatePath("/cartola");
   revalidatePath("/meu-perfil");
@@ -195,6 +208,8 @@ export async function resetMyTestPassRewardClaims(fantasySeasonId: string) {
   if (!account.user || !account.isAdmin) return { success: false, error: "A limpeza é exclusiva para administradores." };
   if (!fantasySeasonId) return { success: false, error: "Temporada do Passe não encontrada." };
   const client: any = account.client;
+  if (fantasySeasonId !== await getSelectedFantasySeasonId(client))
+    return { success: false, error: "Passe não pertence à pelada selecionada." };
   const { data, error } = await client.rpc("reset_my_test_pass_cosmetic_claims", { p_fantasy_season_id: fantasySeasonId });
   if (error) return { success: false, error: error.message };
   revalidatePath("/meu-perfil");
@@ -207,6 +222,11 @@ export async function claimPassCosmetic(rewardId: string, cosmeticId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre para resgatar sua recompensa." };
   const client: any = account.client;
+  const fantasySeasonId = await getSelectedFantasySeasonId(client);
+  if (!fantasySeasonId) return { success: false, error: "Passe da pelada selecionada não encontrado." };
+  const { data: reward } = await client.from("fantasy_season_pass_rewards").select("id")
+    .eq("id", rewardId).eq("fantasy_season_id", fantasySeasonId).maybeSingle();
+  if (!reward) return { success: false, error: "Recompensa não pertence à pelada selecionada." };
   const { error } = await client.rpc("claim_fantasy_pass_cosmetic", { p_reward_id: rewardId, p_cosmetic_id: cosmeticId });
   if (error) return { success: false, error: error.message };
   revalidatePath("/jogadores"); revalidatePath("/meu-perfil");
@@ -217,6 +237,11 @@ export async function purchaseSeasonPassShopItem(shopItemId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre para comprar um item da loja." };
   if (!shopItemId) return { success: false, error: "Item da loja inválido." };
+  const fantasySeasonId = await getSelectedFantasySeasonId(account.client);
+  if (!fantasySeasonId) return { success: false, error: "Passe da pelada selecionada não encontrado." };
+  const { data: shopItem } = await account.client.from("fantasy_season_pass_shop_items").select("id")
+    .eq("id", shopItemId).eq("fantasy_season_id", fantasySeasonId).eq("user_id", account.user.id).maybeSingle();
+  if (!shopItem) return { success: false, error: "Item não pertence à pelada selecionada." };
   const { error } = await account.client.rpc("purchase_fantasy_pass_shop_item", { p_shop_item_id: shopItemId });
   if (error) return { success: false, error: error.message };
   revalidatePath("/jogadores");

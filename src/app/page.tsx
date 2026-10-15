@@ -28,6 +28,7 @@ import { getSeasonPassDashboard } from "@/lib/actions/fantasy";
 import { SeasonPassBanner } from "@/components/fantasy/SeasonPassBanner";
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
 import { getPreviousMonthAwardWinners } from "@/lib/actions/players";
+import { LeagueInviteCard } from "@/components/LeagueInviteCard";
 
 export const dynamic = "force-dynamic";
 
@@ -148,6 +149,7 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-5">
+      <LeagueInviteCard />
       {!account.user && <JoinSelectionButton />}
       {hasIncompleteProfile && <IncompleteProfileBanner />}
 

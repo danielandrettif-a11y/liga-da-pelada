@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentAccount } from "../auth";
-import { supabase } from "../supabase";
 import type { PlayerRoundFitness, RoundType } from "../types";
 import { getActiveSeason } from "./seasons";
 
@@ -100,15 +99,13 @@ export async function setFitnessVisibility(visible: boolean) {
 }
 
 export async function getPlayerFitnessSummaries(playerId: string): Promise<{ official: FitnessSummary; friendly: FitnessSummary } | null> {
-  const [playerResult, account] = await Promise.all([
-    supabase.from("players").select("show_fitness_stats").eq("id", playerId).maybeSingle(),
-    getCurrentAccount(),
-  ]);
+  const account = await getCurrentAccount();
+  const playerResult = await account.client.from("players").select("show_fitness_stats").eq("id", playerId).maybeSingle();
   const owns = account.profile?.player_id === playerId;
   if (!playerResult.data?.show_fitness_stats && !owns) return null;
   const season = await getActiveSeason();
   if (!season) return null;
-  const client = account.user ? account.client : supabase;
+  const client = account.client;
   const { data, error } = await client.from("player_round_fitness").select(`
     distance_km, average_speed_kmh,
     round:round_id!inner (round_type, season_id)

@@ -5,6 +5,7 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import type { PlayerProfile } from "../types";
 import { calculateDraftBalanceScore, findBestDraftSwap, summarizeDraftTeams, type DraftBalancePlayer } from "../draft-balance";
 import { TEAM_PRESETS } from "../teamPresets";
+import { getSelectedLeague } from "../league-context";
 
 export type DraftPlayer = {
   id: string;
@@ -53,11 +54,28 @@ function refreshDraft(roundId?: string) {
   if (roundId) revalidatePath(`/rodadas/${roundId}`);
 }
 
+async function getScopedDraft(client: Awaited<ReturnType<typeof getCurrentAccount>>["client"], draftId: string) {
+  const league = await getSelectedLeague();
+  if (!league) return null;
+  const { data } = await client.from("team_drafts").select("id, round_id")
+    .eq("id", draftId).eq("league_id", league.id).maybeSingle();
+  return data;
+}
+
 export async function createTeamDraft(input: { callupId?: string | null; roundId: string }) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem iniciar o Draft." };
-  const { data: round } = await client.from("rounds").select("season_id").eq("id", input.roundId).maybeSingle();
+  const league = await getSelectedLeague();
+  if (!league || league.role !== "admin") return { success: false, error: "Selecione a pelada que voce administra." };
+  const { data: round } = await client.from("rounds").select("season_id")
+    .eq("id", input.roundId).eq("league_id", league.id).maybeSingle();
   if (!round) return { success: false, error: "Pré-rodada não encontrada." };
+  if (input.callupId) {
+    const { data: callup } = await client.from("callups").select("id")
+      .eq("id", input.callupId).eq("league_id", league.id)
+      .eq("round_id", input.roundId).maybeSingle();
+    if (!callup) return { success: false, error: "Convocacao fora da pelada selecionada." };
+  }
   const { data: sourceRows, error: sourceError } = input.callupId
     ? await client
         .from("callup_entries")
@@ -98,7 +116,10 @@ export async function createTeamDraft(input: { callupId?: string | null; roundId
 async function getDraftWorkspaceBy(column: "callup_id" | "round_id", value: string): Promise<DraftWorkspace | null> {
   const account = await getCurrentAccount();
   if (!account.user) return null;
-  const { data: draft } = await account.client.from("team_drafts").select("*").eq(column, value).maybeSingle();
+  const league = await getSelectedLeague();
+  if (!league) return null;
+  const { data: draft } = await account.client.from("team_drafts").select("*")
+    .eq(column, value).eq("league_id", league.id).maybeSingle();
   if (!draft) return null;
   const [{ data: captainRows }, { data: pickRows }, { data: poolRows }] = await Promise.all([
     account.client.from("team_draft_captains").select("*").eq("draft_id", draft.id).order("team_slot"),
@@ -110,9 +131,15 @@ async function getDraftWorkspaceBy(column: "callup_id" | "round_id", value: stri
     ...(captainRows || []).map((row: any) => row.captain_player_id),
     ...(pickRows || []).map((row: any) => row.player_id),
   ])];
-  const { data: playerRows } = rosterIds.length
-    ? await account.client.from("players").select("id, name, nickname, avatar_url, player_profile").in("id", rosterIds)
+  const { data: memberRows } = rosterIds.length
+    ? await account.client.from("league_members")
+      .select("player_id, player_profile, players!inner(id, name, nickname, avatar_url)")
+      .eq("league_id", league.id).eq("is_active", true).in("player_id", rosterIds)
     : { data: [] as any[] };
+  const playerRows = (memberRows || []).map((member: any) => {
+    const player = Array.isArray(member.players) ? member.players[0] : member.players;
+    return { ...player, player_profile: member.player_profile };
+  });
   const captainsByPlayer = new Map((captainRows || []).map((row: any) => [row.captain_player_id, row]));
   const picksByPlayer = new Map((pickRows || []).map((row: any) => [row.player_id, row]));
   const poolByPlayer = new Map((poolRows || []).map((row: any) => [row.player_id, row]));
@@ -158,7 +185,7 @@ async function getDraftWorkspaceBy(column: "callup_id" | "round_id", value: stri
     status: draft.status,
     currentPick: draft.current_pick,
     pauseReason: draft.pause_reason,
-    isAdmin: account.isAdmin,
+    isAdmin: league.role === "admin",
     currentPlayerId: account.profile?.player_id || null,
     captains,
     players,
@@ -179,6 +206,7 @@ export async function getDraftWorkspaceByRound(roundId: string) {
 export async function startTeamDraft(draftId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem iniciar o Draft." };
+  if (!(await getScopedDraft(client, draftId))) return { success: false, error: "Draft fora da pelada selecionada." };
   const { error } = await client.rpc("start_team_draft", { p_draft_id: draftId });
   if (error) return { success: false, error: error.message };
   refreshDraft();
@@ -188,6 +216,7 @@ export async function startTeamDraft(draftId: string) {
 export async function replaceTeamDraftCaptain(draftId: string, teamSlot: number, playerId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem trocar capitães." };
+  if (!(await getScopedDraft(client, draftId))) return { success: false, error: "Draft fora da pelada selecionada." };
   const { error } = await client.rpc("replace_team_draft_captain", { p_draft_id: draftId, p_team_slot: teamSlot, p_player_id: playerId });
   if (error) return { success: false, error: error.message };
   refreshDraft();
@@ -197,6 +226,7 @@ export async function replaceTeamDraftCaptain(draftId: string, teamSlot: number,
 export async function makeTeamDraftPick(draftId: string, playerId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre para escolher." };
+  if (!(await getScopedDraft(account.client, draftId))) return { success: false, error: "Draft fora da pelada selecionada." };
   const { error } = await account.client.rpc("make_team_draft_pick", { p_draft_id: draftId, p_player_id: playerId });
   if (error) return { success: false, error: error.message };
   refreshDraft();
@@ -206,6 +236,7 @@ export async function makeTeamDraftPick(draftId: string, playerId: string) {
 export async function restartTeamDraft(draftId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem reiniciar o Draft." };
+  if (!(await getScopedDraft(client, draftId))) return { success: false, error: "Draft fora da pelada selecionada." };
   const { error } = await client.rpc("restart_team_draft", { p_draft_id: draftId });
   if (error) return { success: false, error: error.message };
   refreshDraft();
@@ -215,6 +246,7 @@ export async function restartTeamDraft(draftId: string) {
 export async function applyDraftSwap(draftId: string, playerAId: string, playerBId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem aplicar a sugestão." };
+  if (!(await getScopedDraft(client, draftId))) return { success: false, error: "Draft fora da pelada selecionada." };
   const { error } = await client.rpc("swap_team_draft_picks", { p_draft_id: draftId, p_player_a: playerAId, p_player_b: playerBId });
   if (error) return { success: false, error: error.message };
   refreshDraft();
@@ -224,6 +256,7 @@ export async function applyDraftSwap(draftId: string, playerAId: string, playerB
 export async function finalizeTeamDraft(draftId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem confirmar o Draft." };
+  if (!(await getScopedDraft(client, draftId))) return { success: false, error: "Draft fora da pelada selecionada." };
   const { data: roundId, error } = await client.rpc("finalize_team_draft", { p_draft_id: draftId });
   if (error) return { success: false, error: error.message };
   const { data: teams } = await client.from("teams").select("id, position").eq("round_id", roundId).order("position");

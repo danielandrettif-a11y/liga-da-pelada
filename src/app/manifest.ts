@@ -4,10 +4,10 @@ import { SITE_URL } from "@/lib/siteUrl";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "Pelada de Baixa Qualidade",
+    name: "Pelada BQ",
     short_name: "Pelada BQ",
-    description: "O Cartola da sua pelada: rodadas, ranking, gols e resenha.",
-    start_url: "/",
+    description: "Suas peladas, convocações, ranking e Cartola em um lugar.",
+    start_url: "/inicio",
     scope: "/",
     display: "standalone",
     orientation: "portrait",

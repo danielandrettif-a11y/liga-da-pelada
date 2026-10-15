@@ -1,11 +1,11 @@
 "use server";
 
-import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
-import { supabase } from "../supabase";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { cache } from "react";
 import { getActiveSeason } from "./seasons";
 import { createClient as createServerClient } from "../supabase/server";
 import { getAdminClient, getCurrentAccount } from "../auth";
-import type { RoundType, TeamFormationMode } from "../types";
+import type { PlayerProfile, RoundType, TeamFormationMode } from "../types";
 import { VEST_COLORS } from "../vest-colors";
 import {
   DEFAULT_PLAYERS_PER_TEAM,
@@ -23,36 +23,41 @@ import { previewRoundReshuffle, type RoundReshuffleMode } from "../round-reshuff
 import { getPrivateBalanceTagsForDraw } from "../private-balance-tags";
 import { sortMatchesChronologically } from "../next-match";
 import { refreshFluidOverallSafely } from "./overall";
+import { getSelectedLeague } from "../league-context";
 
-const getActiveLeagueCached = unstable_cache(async () => {
-  const { data, error } = await supabase
+const getActiveLeagueCached = cache(async (leagueId: string) => {
+  const client = await createServerClient();
+  const { data, error } = await client
     .from("leagues")
-    .select("id, players_per_team, teams_per_round, match_duration, stadium_name, stadium_map_url, event_duration_minutes, preseason_enabled")
-    .eq("is_active", true)
-    .limit(1)
+    .select("id, players_per_team, teams_per_round, match_duration, stadium_name, stadium_map_url, event_duration_minutes, preseason_enabled, feature_tier")
+    .eq("id", leagueId)
     .single();
 
-  if (error || !data) {
-    // Para o MVP, se não tiver liga ativa, pegamos a primeira que existir
-    const { data: fallback, error: err2 } = await supabase
-      .from("leagues")
-      .select("id, players_per_team, teams_per_round, match_duration, stadium_name, stadium_map_url, event_duration_minutes, preseason_enabled")
-      .limit(1)
-      .single();
-    
-    if (err2 || !fallback) throw new Error("Nenhuma liga encontrada. Execute as migrations.");
-    return fallback;
-  }
+  if (error || !data) throw new Error("Pelada selecionada não encontrada.");
 
   return data;
-}, ["active-league"], { revalidate: 300, tags: ["league"] });
+});
 
 export async function getActiveLeague() {
-  return getActiveLeagueCached();
+  const league = await getSelectedLeague();
+  if (!league) throw new Error("Escolha uma pelada no lobby.");
+  return getActiveLeagueCached(league.id);
 }
 
-const getRoundsCached = unstable_cache(async (seasonId: string) => {
-  const query = supabase
+async function isRoundInSelectedLeague(
+  client: Awaited<ReturnType<typeof getCurrentAccount>>["client"],
+  roundId: string,
+) {
+  const league = await getSelectedLeague();
+  if (!league || league.role !== "admin") return false;
+  const { data } = await client.from("rounds").select("id")
+    .eq("id", roundId).eq("league_id", league.id).maybeSingle();
+  return Boolean(data);
+}
+
+const getRoundsCached = cache(async (seasonId: string) => {
+  const client = await createServerClient();
+  const query = client
     .from("rounds")
     .select(`
       id,
@@ -88,7 +93,7 @@ const getRoundsCached = unstable_cache(async (seasonId: string) => {
     playersCount: round.round_players?.[0]?.count || 0,
     matchesCount: round.matches?.[0]?.count || 0,
   }));
-}, ["round-history"], { revalidate: 60, tags: ["rounds"] });
+});
 
 export async function getRounds() {
   const season = await getActiveSeason();
@@ -97,7 +102,10 @@ export async function getRounds() {
 }
 
 export async function getRound(id: string) {
-  const { data, error } = await supabase
+  const league = await getSelectedLeague();
+  if (!league) return null;
+  const client = await createServerClient();
+  const { data, error } = await client
     .from("rounds")
     .select(`
       *,
@@ -132,6 +140,7 @@ export async function getRound(id: string) {
       league:league_id (stadium_name, stadium_map_url, event_duration_minutes, players_per_team)
     `)
     .eq("id", id)
+    .eq("league_id", league.id)
     .single();
 
   if (error) {
@@ -188,6 +197,8 @@ export async function getAdminRoundPrelists() {
 export async function getAdminRoundPrelist(id: string) {
   const client = await getAdminClient();
   if (!client || !id) return null;
+  const league = await getSelectedLeague();
+  if (!league) return null;
   const { data, error } = await client
     .from("rounds")
     .select(`
@@ -195,6 +206,7 @@ export async function getAdminRoundPrelist(id: string) {
       round_players (player_id, players (*))
     `)
     .eq("id", id)
+    .eq("league_id", league.id)
     .eq("status", "draft")
     .eq("preparation_stage", "prelist")
     .maybeSingle();
@@ -213,7 +225,8 @@ export async function getNextTeamPresetOffset(roundType: RoundType = "official")
   const season = await getActiveSeason(league.id);
   if (!season) return 0;
 
-  const { data, error } = await supabase
+  const client = await createServerClient();
+  const { data, error } = await client
     .from("rounds")
     .select("number")
     .eq("league_id", league.id)
@@ -276,6 +289,7 @@ export async function setRoundPlayerAttendance(roundId: string, playerId: string
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem alterar a presenca." };
+    if (!(await isRoundInSelectedLeague(client, roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
     const { error } = await client.rpc("set_round_player_attendance", {
       p_round_id: roundId,
       p_player_id: playerId,
@@ -293,6 +307,7 @@ export async function setRoundAttendanceBulk(roundId: string, presentPlayerIds: 
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem alterar a presenca." };
+    if (!(await isRoundInSelectedLeague(client, roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
     const { error } = await client.rpc("set_round_attendance_bulk", {
       p_round_id: roundId,
       p_present_player_ids: [...new Set(presentPlayerIds)],
@@ -309,6 +324,7 @@ export async function markRoundTeamArrived(roundId: string, teamId: string) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem alterar a presenca." };
+    if (!(await isRoundInSelectedLeague(client, roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
     const { error } = await client.rpc("mark_round_team_arrived", { p_round_id: roundId, p_team_id: teamId });
     if (error) throw new Error(error.message);
     refreshRoundManagement(roundId);
@@ -322,6 +338,7 @@ export async function swapRoundTeamPlayers(roundId: string, playerAId: string, p
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem trocar jogadores." };
+    if (!(await isRoundInSelectedLeague(client, roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
     const { error } = await client.rpc("swap_round_team_players", {
       p_round_id: roundId,
       p_player_a_id: playerAId,
@@ -345,6 +362,7 @@ export async function shuffleRoundTeams(roundId: string) {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem misturar os times." };
     if (!roundId) return { success: false, error: "Rodada inválida." };
+    if (!(await isRoundInSelectedLeague(client, roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
 
     const { error } = await client.rpc("shuffle_round_teams", { p_round_id: roundId });
     if (error) throw new Error(error.message);
@@ -374,9 +392,14 @@ const ROUND_RESHUFFLE_MODES: RoundReshuffleMode[] = ["random", "balanced", "spee
 /** Gera uma formação de teste. Não grava nada enquanto o ADM estiver comparando os times. */
 export async function previewRoundTeamShuffle(roundId: string, mode: RoundReshuffleMode): Promise<RoundTeamShufflePreview> {
   try {
-    const client = await getAdminClient();
-    if (!client) return { success: false, error: "Somente administradores podem sortear os times." };
+    const account = await getCurrentAccount();
+    const selectedLeague = await getSelectedLeague();
+    if (!account.user || !selectedLeague || selectedLeague.role !== "admin") {
+      return { success: false, error: "Somente administradores desta pelada podem sortear os times." };
+    }
+    const client = account.client;
     if (!roundId || !ROUND_RESHUFFLE_MODES.includes(mode)) return { success: false, error: "Tipo de sorteio inválido." };
+    if (!(await isRoundInSelectedLeague(client, roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
 
     const { data: round, error: roundError } = await client
       .from("rounds")
@@ -389,7 +412,7 @@ export async function previewRoundTeamShuffle(roundId: string, mode: RoundReshuf
           position,
           team_players (
             player_id,
-            players (id, player_profile, is_goalkeeper)
+            players (id, is_goalkeeper)
           )
         )
       `)
@@ -407,18 +430,20 @@ export async function previewRoundTeamShuffle(roundId: string, mode: RoundReshuf
       return { success: false, error: "São necessários pelo menos dois times completos para criar uma nova formação." };
     }
 
-    const [{ data: attributes, error: attributesError }, overallByPlayer, balanceTags] = await Promise.all([
-      client.from("player_admin_attributes").select("player_id, speed_rating").in("player_id", playerIds),
+    const [{ data: profileRows, error: profileError }, overallByPlayer, balanceTags] = await Promise.all([
+      client.from("league_members").select("player_id, player_profile, speed_rating")
+        .eq("league_id", selectedLeague.id).eq("is_active", true).in("player_id", playerIds),
       getLatestPlayerCardOverallMap(client),
       mode === "adaptive" ? getPrivateBalanceTagsForDraw(playerIds, client) : Promise.resolve(new Map()),
     ]);
-    if (attributesError) throw new Error(attributesError.message);
+    if (profileError) throw new Error(profileError.message);
 
-    const speedByPlayer = new Map<string, 1 | 2 | 3 | null>((attributes || []).map((attribute: any) => [
+    const speedByPlayer = new Map<string, 1 | 2 | 3 | null>((profileRows || []).map((attribute: any) => [
       attribute.player_id,
       [1, 2, 3].includes(attribute.speed_rating) ? attribute.speed_rating : null,
     ]));
     const playerById = new Map<string, any>(teams.flatMap((team: any) => (team.team_players || []).map((entry: any) => [entry.player_id, entry.players])));
+    const profileByPlayerId = new Map<string, PlayerProfile | null>((profileRows || []).map((row: any) => [row.player_id, row.player_profile]));
     const preview = previewRoundReshuffle({
       players: playerIds.map((playerId) => {
         const player = playerById.get(playerId);
@@ -426,7 +451,7 @@ export async function previewRoundTeamShuffle(roundId: string, mode: RoundReshuf
           id: playerId,
           overall: overallByPlayer.get(playerId)?.overall ?? null,
           speedRating: speedByPlayer.get(playerId) ?? null,
-          playerProfile: player?.player_profile || null,
+          playerProfile: profileByPlayerId.get(playerId) || null,
           isGoalkeeper: player?.is_goalkeeper === true,
           balanceTag: balanceTags.get(playerId) ?? null,
         };
@@ -460,6 +485,7 @@ export async function applyRoundTeamShuffle(input: {
     if (input.confirmation.trim().toUpperCase() !== "MISTURAR") return { success: false, error: "Digite MISTURAR para confirmar a nova formação." };
     if (!input.roundId || !ROUND_RESHUFFLE_MODES.includes(input.mode)) return { success: false, error: "Dados do sorteio inválidos." };
     if (!Array.isArray(input.assignments) || input.assignments.length < 2) return { success: false, error: "A formação precisa conter pelo menos dois times." };
+    if (!(await isRoundInSelectedLeague(client, input.roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
 
     const assignments = input.assignments.map((assignment) => ({
       team_id: assignment.teamId,
@@ -512,6 +538,7 @@ export async function setRoundTeamCaptain(roundId: string, teamId: string, playe
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem definir capitaes." };
+    if (!(await isRoundInSelectedLeague(client, roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
     const { error } = await client.rpc("set_round_team_captain", {
       p_round_id: roundId,
       p_team_id: teamId,
@@ -529,6 +556,7 @@ export async function setRoundTeamVestColor(roundId: string, teamId: string, col
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem definir os coletes." };
+    if (!(await isRoundInSelectedLeague(client, roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
     if (!VEST_COLORS.some((item) => item.color === color)) return { success: false, error: "Cor de colete inválida." };
     const { error } = await client.from("teams").update({ color }).eq("id", teamId).eq("round_id", roundId);
     if (error) throw new Error(error.message);
@@ -544,6 +572,7 @@ export async function deleteRound(roundId: string, confirmation: string) {
     if (confirmation.trim().toUpperCase() !== "EXCLUIR") return { success: false, error: "Digite EXCLUIR para confirmar." };
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem excluir rodadas." };
+    if (!(await isRoundInSelectedLeague(client, roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
     const { error } = await client.rpc("delete_round_cascade", { p_round_id: roundId });
     if (error) throw new Error(error.message);
     for (const path of ["/rodadas", "/ranking", "/pagamentos", "/cartola", "/cartola/ranking", "/cartola/historico", "/admin/cartola", "/admin/transfermarket", "/admin/prelistas", "/convocacao", "/mais"]) {
@@ -583,9 +612,15 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
       .eq("id", league.id)
       .single();
     if (configError) throw new Error(configError.message);
-    const capacity = Math.min(MAX_PLAYERS_PER_TEAM, Math.max(1, leagueConfig?.players_per_team || DEFAULT_PLAYERS_PER_TEAM))
+    let capacity = Math.min(MAX_PLAYERS_PER_TEAM, Math.max(1, leagueConfig?.players_per_team || DEFAULT_PLAYERS_PER_TEAM))
       * Math.min(MAX_TEAMS_PER_ROUND, Math.max(MIN_TEAMS_PER_ROUND, leagueConfig?.teams_per_round || TEAMS_PER_ROUND));
-    if (playerIds.length > capacity) return { success: false, error: `A pre-lista aceita no maximo ${capacity} jogadores.` };
+    if (input.roundId) {
+      const { data: scopedRound } = await client.from("rounds").select("id, target_players_per_team, target_teams_per_round")
+        .eq("id", input.roundId).eq("league_id", league.id).maybeSingle();
+      if (!scopedRound) return { success: false, error: "Rodada fora da pelada selecionada." };
+      capacity = (scopedRound.target_players_per_team || leagueConfig?.players_per_team || DEFAULT_PLAYERS_PER_TEAM)
+        * (scopedRound.target_teams_per_round || leagueConfig?.teams_per_round || TEAMS_PER_ROUND);
+    }
 
     let effectivePlayerIds = playerIds;
     let effectiveDate = input.date;
@@ -597,35 +632,47 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
     if (input.callupId) {
       const { data: callup, error: callupError } = await client
         .from("callups")
-        .select("date, round_type, start_time, stadium_id, stadium_name, stadium_map_url, callup_entries(player_id, status)")
+        .select("date, round_type, start_time, stadium_id, stadium_name, stadium_map_url, capacity, callup_entries(player_id, status)")
         .eq("id", input.callupId)
+        .eq("league_id", league.id)
         .eq("status", "open")
         .single();
       if (callupError || !callup) throw new Error(callupError?.message || "Convocacao aberta nao encontrada.");
       effectivePlayerIds = (callup.callup_entries || [])
         .filter((entry: any) => entry.status === "confirmed")
         .map((entry: any) => entry.player_id);
+      capacity = callup.capacity;
       effectiveDate = callup.date;
       effectiveRoundType = callup.round_type as RoundType;
       effectiveStadiumId = effectiveStadiumId || callup.stadium_id;
       effectiveStadiumName = effectiveStadiumName || callup.stadium_name;
       effectiveStadiumMapUrl = effectiveStadiumMapUrl || callup.stadium_map_url;
     }
+    if (effectivePlayerIds.length > capacity) return { success: false, error: `A pré-lista aceita no máximo ${capacity} jogadores.` };
 
-    if (effectiveStadiumId && (!effectiveStadiumName || !effectiveStadiumMapUrl)) {
+    if (effectiveStadiumId) {
       const { data: stadiumData } = await client
         .from("stadiums")
         .select("name, google_maps_url")
         .eq("id", effectiveStadiumId)
+        .eq("league_id", league.id)
         .maybeSingle();
+      if (!stadiumData) return { success: false, error: "Estádio fora da pelada selecionada." };
+      effectiveStadiumName = stadiumData.name;
+      effectiveStadiumMapUrl = stadiumData.google_maps_url;
+    }
 
-      if (stadiumData) {
-        effectiveStadiumName = stadiumData.name;
-        effectiveStadiumMapUrl = stadiumData.google_maps_url;
+    if (effectivePlayerIds.length) {
+      const { data: memberships, error: membershipError } = await client.from("league_members")
+        .select("player_id").eq("league_id", league.id).eq("is_active", true)
+        .in("player_id", effectivePlayerIds);
+      if (membershipError || (memberships || []).length !== new Set(effectivePlayerIds).size) {
+        return { success: false, error: "A pré-lista contém jogador fora da pelada selecionada." };
       }
     }
 
     const { data: roundId, error } = await client.rpc("save_round_prelist", {
+      p_league_id: league.id,
       p_round_id: input.roundId || null,
       p_date: effectiveDate,
       p_start_time: input.startTime,
@@ -641,7 +688,7 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
       throw new Error(error.message);
     }
 
-    if (effectiveRoundType === "official") {
+    if (effectiveRoundType === "official" && league.feature_tier === "complete") {
       try {
         await scheduleCartolaRoundReminders({ roundId: String(roundId), date: effectiveDate, startTime: input.startTime, includeOpening: !input.roundId });
       } catch (scheduleError) {
@@ -676,40 +723,44 @@ export type CreateRoundOptions = {
   confirmUnderfilled?: boolean;
 };
 
-export async function setCallupMatchSize(callupId: string, targetPlayersPerTeam: 5 | 6) {
+export async function setCallupFormat(callupId: string, playersPerTeam: number, teamsPerRound: number) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem alterar a capacidade da convocação." };
-    if (!callupId || ![5, 6].includes(targetPlayersPerTeam)) return { success: false, error: "Formato de partida inválido." };
-
-    const league = await getActiveLeague();
-    const { data: config, error: configError } = await client
-      .from("leagues")
-      .select("players_per_team, teams_per_round")
-      .eq("id", league.id)
-      .single();
-    if (configError || config?.players_per_team !== 6 || config?.teams_per_round !== 3) {
-      return { success: false, error: "O ajuste 5x5/6x6 exige uma liga configurada com 3 times de 6." };
+    if (!callupId || !Number.isInteger(playersPerTeam) || !Number.isInteger(teamsPerRound)
+      || playersPerTeam < 5 || playersPerTeam > 7 || teamsPerRound < 2 || teamsPerRound > 6) {
+      return { success: false, error: "Escolha de 5 a 7 jogadores e de 2 a 6 times." };
     }
-
-    const { data: updatedCallup, error } = await client
+    const league = await getActiveLeague();
+    const { data: callup, error: callupError } = await client
       .from("callups")
-      .update({ capacity: targetPlayersPerTeam * 3, updated_at: new Date().toISOString() })
+      .select("id")
       .eq("id", callupId)
       .eq("league_id", league.id)
       .eq("status", "open")
-      .select("id")
       .maybeSingle();
+    if (callupError) throw new Error(callupError.message);
+    if (!callup) return { success: false, error: "Convocação aberta não encontrada nesta pelada." };
+    const { data, error } = await client.rpc("set_callup_format", {
+      p_callup_id: callupId,
+      p_players_per_team: playersPerTeam,
+      p_teams_per_round: teamsPerRound,
+    });
     if (error) throw new Error(error.message);
-    if (!updatedCallup) return { success: false, error: "Convocação aberta não encontrada." };
 
     revalidatePath("/admin/rodada");
     revalidatePath("/admin/prelistas");
     revalidatePath("/convocacao");
-    return { success: true };
+    revalidatePath("/cartola");
+    revalidatePath("/rodadas");
+    return { success: true, fantasySizePreserved: Boolean(data?.[0]?.fantasy_size_preserved), fantasyLineupSize: Number(data?.[0]?.fantasy_lineup_size || playersPerTeam) };
   } catch (err: any) {
     return { success: false, error: err.message || "Não foi possível ajustar a capacidade." };
   }
+}
+
+export async function setCallupMatchSize(callupId: string, targetPlayersPerTeam: number, teamsPerRound: number) {
+  return setCallupFormat(callupId, targetPlayersPerTeam, teamsPerRound);
 }
 
 export async function createRoundWithTeams(
@@ -753,38 +804,53 @@ export async function createRoundWithTeams(
       .eq("id", league.id)
       .single();
     if (leagueConfigError) throw new Error(`Erro ao consultar configurações da liga: ${leagueConfigError.message}`);
-    const playersPerTeam = Math.min(
+    let playersPerTeam = Math.min(
       MAX_PLAYERS_PER_TEAM,
       Math.max(1, leagueConfig?.players_per_team || DEFAULT_PLAYERS_PER_TEAM),
     );
-    const teamsPerRound = Math.min(
+    let teamsPerRound = Math.min(
       MAX_TEAMS_PER_ROUND,
       Math.max(MIN_TEAMS_PER_ROUND, leagueConfig?.teams_per_round || TEAMS_PER_ROUND),
     );
-    if (normalizedTeams.length !== teamsPerRound) {
-      return { success: false, error: `Esta liga usa ${teamsPerRound} times por rodada.` };
+    if (options.callupId) {
+      const { data: formatCallup, error: formatError } = await client.from("callups")
+        .select("players_per_team, teams_per_round")
+        .eq("id", options.callupId).eq("league_id", league.id).maybeSingle();
+      if (formatError || !formatCallup) return { success: false, error: "Convocação desta pelada não encontrada." };
+      playersPerTeam = formatCallup.players_per_team || playersPerTeam;
+      teamsPerRound = formatCallup.teams_per_round || teamsPerRound;
+    } else if (options.prelistRoundId) {
+      const { data: formatRound, error: formatError } = await client.from("rounds")
+        .select("target_players_per_team, target_teams_per_round")
+        .eq("id", options.prelistRoundId).eq("league_id", league.id).maybeSingle();
+      if (formatError || !formatRound) return { success: false, error: "Pré-lista desta pelada não encontrada." };
+      playersPerTeam = formatRound.target_players_per_team || playersPerTeam;
+      teamsPerRound = formatRound.target_teams_per_round || teamsPerRound;
     }
-    const leagueCapacity = playersPerTeam * teamsPerRound;
-    const targetPlayersPerTeam = options.targetPlayersPerTeam === 5 ? 5 : playersPerTeam;
-    const isUnderfilledChoice = allPlayerIds.length < leagueCapacity;
-    if (isUnderfilledChoice || targetPlayersPerTeam === 5) {
+    if (normalizedTeams.length !== teamsPerRound) {
+      return { success: false, error: `Esta convocação usa ${teamsPerRound} times.` };
+    }
+    const configuredCapacity = playersPerTeam * teamsPerRound;
+    const targetPlayersPerTeam = options.targetPlayersPerTeam || playersPerTeam;
+    if (!Number.isInteger(targetPlayersPerTeam) || targetPlayersPerTeam < 5 || targetPlayersPerTeam > playersPerTeam) {
+      return { success: false, error: "O formato da partida é incompatível com a convocação." };
+    }
+    const isUnderfilledChoice = allPlayerIds.length < configuredCapacity;
+    if (isUnderfilledChoice || targetPlayersPerTeam < playersPerTeam) {
       if (!options.confirmUnderfilled) {
         return { success: false, error: "Confirme a criação da rodada com menos jogadores." };
-      }
-      if (teamsPerRound !== 3 || playersPerTeam !== 6 || ![5, 6].includes(targetPlayersPerTeam)) {
-        return { success: false, error: "A rodada incompleta está disponível para a configuração de 3 times com 6 jogadores." };
       }
       const sizeError = validateUnderfilledTeamSizes(
         normalizedTeams.map((team) => team.playerIds.length),
         allPlayerIds.length,
-        targetPlayersPerTeam as 5 | 6,
+        targetPlayersPerTeam,
       );
       if (sizeError) return { success: false, error: sizeError };
     } else if (normalizedTeams.some((team) => team.playerIds.length > playersPerTeam)) {
       return { success: false, error: `Cada time pode ter no máximo ${playersPerTeam} jogadores.` };
     }
     const attendanceOrder = [...new Set(options.attendanceOrder || [])];
-    const minimumPresent = playersPerTeam * 2;
+    const minimumPresent = targetPlayersPerTeam * 2;
     if (attendanceOrder.length > 0) {
       if (allPlayerIds.length < minimumPresent) {
         return { success: false, error: `Selecione pelo menos ${minimumPresent} jogadores para sortear por ordem de chegada.` };
@@ -878,11 +944,12 @@ export async function createRoundWithTeams(
           stadium_id: stadiumId || existingRound.stadium_id,
           stadium_name: stadiumName || existingRound.stadium_name,
           stadium_map_url: stadiumMapUrl || existingRound.stadium_map_url,
-          ...(isUnderfilledChoice ? { target_players_per_team: targetPlayersPerTeam } : {}),
+          target_players_per_team: targetPlayersPerTeam,
+          target_teams_per_round: teamsPerRound,
         }).eq("id", existingRound.id);
         if (updateRoundError) throw new Error(`Erro ao atualizar a pre-lista: ${updateRoundError.message}`);
-      } else if (isUnderfilledChoice) {
-        const { error: updateTargetError } = await client.from("rounds").update({ target_players_per_team: targetPlayersPerTeam }).eq("id", existingRound.id);
+      } else {
+        const { error: updateTargetError } = await client.from("rounds").update({ target_players_per_team: targetPlayersPerTeam, target_teams_per_round: teamsPerRound }).eq("id", existingRound.id);
         if (updateTargetError) throw new Error(`Erro ao salvar o formato da rodada: ${updateTargetError.message}`);
       }
       round = existingRound;
@@ -915,7 +982,8 @@ export async function createRoundWithTeams(
         round_type: roundType,
         formation_mode: formationMode,
         preparation_stage: "teams_ready",
-        ...(isUnderfilledChoice ? { target_players_per_team: targetPlayersPerTeam } : {}),
+        target_players_per_team: targetPlayersPerTeam,
+        target_teams_per_round: teamsPerRound,
       })
       .select()
       .single();
@@ -983,14 +1051,6 @@ export async function createRoundWithTeams(
     if (readyError) throw new Error(`Erro ao concluir a rodada: ${readyError.message}`);
 
     if (options.callupId) {
-      if (targetPlayersPerTeam === 5) {
-        const { error: capacityError } = await client
-          .from("callups")
-          .update({ capacity: 15, updated_at: new Date().toISOString() })
-          .eq("id", options.callupId)
-          .eq("league_id", league.id);
-        if (capacityError) throw new Error(`Erro ao ajustar a capacidade da convocacao: ${capacityError.message}`);
-      }
       const { error: lockError } = await client
         .from("callups")
         .update({ status: "locked", updated_at: new Date().toISOString() })
@@ -1031,11 +1091,17 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
 
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem encerrar rodadas." };
+    const selectedLeague = await getSelectedLeague();
+    if (!selectedLeague) return { success: false, error: "Selecione uma pelada no lobby." };
+    const { data: scopedRound } = await client.from("rounds").select("id")
+      .eq("id", roundId).eq("league_id", selectedLeague.id).maybeSingle();
+    if (!scopedRound) return { success: false, error: "Rodada fora da pelada selecionada." };
 
     let recipientId: string | null = null;
     let recipientName = recipient?.name?.trim() || null;
     if (recipient?.id) {
-      const { data: preset } = await client.from("payment_recipients").select("id, name, pix_key, is_active").eq("id", recipient.id).eq("is_active", true).maybeSingle();
+      const { data: preset } = await client.from("payment_recipients").select("id, name, pix_key, is_active")
+        .eq("id", recipient.id).eq("league_id", selectedLeague.id).eq("is_active", true).maybeSingle();
       if (!preset) return { success: false, error: "O PIX escolhido não está disponível." };
       recipientId = preset.id;
       recipientName = preset.name;
@@ -1046,11 +1112,20 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
 
     const { data: originalRound, error: originalRoundError } = await client
       .from("rounds")
-      .select("status, payment_pix, payment_total, payment_recipient_id, payment_recipient_name")
+      .select("status, created_at, payment_pix, payment_total, payment_recipient_id, payment_recipient_name")
       .eq("id", roundId)
       .single();
     if (originalRoundError || !originalRound) {
       throw new Error(originalRoundError?.message || "Rodada não encontrada.");
+    }
+    const { data: fantasyRoundForClose } = await client.from("fantasy_rounds")
+      .select("id").eq("round_id", roundId).maybeSingle();
+    if (selectedLeague.featureTier === "complete" && !fantasyRoundForClose) {
+      const { data: leagueMode } = await client.from("leagues").select("full_enabled_at")
+        .eq("id", selectedLeague.id).single();
+      const createdAfterUpgrade = !leagueMode?.full_enabled_at
+        || new Date(originalRound.created_at).getTime() >= new Date(leagueMode.full_enabled_at).getTime();
+      if (createdAfterUpgrade) throw new Error("O Cartola desta rodada não foi criado. Corrija antes de encerrá-la.");
     }
 
     // Consolida as estatísticas antes de encerrar. Se esta etapa falhar, a rodada
@@ -1074,15 +1149,12 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
 
     if (error) throw new Error(error.message);
 
-    const { data: fantasyTest } = await client
-      .from("fantasy_test_sessions")
-      .select("id")
-      .eq("round_id", roundId)
-      .maybeSingle();
-    const { error: fantasyError } = await client.rpc(
-      fantasyTest ? "process_fantasy_test_round" : "process_fantasy_round",
-      { p_round_id: roundId },
-    );
+    const { data: fantasyTest } = fantasyRoundForClose
+      ? await client.from("fantasy_test_sessions").select("id").eq("round_id", roundId).maybeSingle()
+      : { data: null };
+    const { error: fantasyError } = fantasyRoundForClose
+      ? await client.rpc(fantasyTest ? "process_fantasy_test_round" : "process_fantasy_round", { p_round_id: roundId })
+      : { error: null };
     if (fantasyError) {
       // A atualização da rodada e o RPC são requisições diferentes. Se o Cartola
       // falhar, restaura o estado anterior para o ADM poder corrigir e tentar de novo.
@@ -1103,7 +1175,7 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     }
 
     // Gerar pacotes de recompensa V3 para participantes da rodada oficial finalizada
-    if (!fantasyTest) {
+    if (fantasyRoundForClose && !fantasyTest) {
       try {
         const { generatePacksForFinishedRound } = await import("./fantasy-cards");
         await generatePacksForFinishedRound(roundId);
@@ -1136,6 +1208,7 @@ export async function transferRoundPlayerIdentity(roundId: string, sourcePlayerI
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem corrigir participantes." };
+    if (!(await isRoundInSelectedLeague(client, roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
     const { error } = await client.rpc("transfer_round_player_identity", {
       p_round_id: roundId,
       p_source_player_id: sourcePlayerId,
@@ -1164,6 +1237,7 @@ export async function zeroPlayerRoundPoints(roundId: string, playerId: string, r
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem corrigir pontuação." };
+    if (!(await isRoundInSelectedLeague(client, roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
     const { error } = await client.rpc("zero_player_round_points", {
       p_round_id: roundId,
       p_player_id: playerId,
@@ -1198,6 +1272,7 @@ export async function addRoundEmergencySubstitute(roundId: string, outPlayerId: 
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem incluir substitutos." };
+    if (!(await isRoundInSelectedLeague(client, roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
     const { error } = await client.rpc("add_round_emergency_substitute", {
       p_round_id: roundId,
       p_out_player_id: outPlayerId,
@@ -1219,6 +1294,7 @@ export async function openCallupReplacementVacancy(roundId: string, outPlayerId:
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem abrir vagas na convocação." };
+    if (!(await isRoundInSelectedLeague(client, roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
     const { error } = await client.rpc("open_callup_replacement_vacancy", {
       p_round_id: roundId,
       p_out_player_id: outPlayerId,

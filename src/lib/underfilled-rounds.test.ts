@@ -12,6 +12,33 @@ describe("rodadas incompletas", () => {
     expect(validateUnderfilledTeamSizes([5, 5, 5], 16, 5)).toContain("no máximo 15");
   });
 
+  it("permite três times de 7 e conversão equilibrada para 6x6", () => {
+    expect(validateUnderfilledTeamSizes([7, 7, 7], 21, 7)).toBeNull();
+    expect(validateUnderfilledTeamSizes([6, 6, 6], 18, 6)).toBeNull();
+    expect(validateUnderfilledTeamSizes([6, 6, 6], 18, 7)).toBeNull();
+    expect(validateUnderfilledTeamSizes([7, 6, 5], 18, 6)).toContain("máximo 6");
+  });
+
+  it("exige dois times completos quando não existe equipe para emprestar jogadores", () => {
+    expect(validateUnderfilledTeamSizes([7, 7], 14, 7)).toBeNull();
+    expect(validateUnderfilledTeamSizes([6, 6], 12, 6)).toBeNull();
+    expect(validateUnderfilledTeamSizes([7, 6], 13, 7)).toContain("pelo menos 14");
+  });
+
+  it("aceita quatro times e pode emprestar de mais de um time de fora", () => {
+    expect(validateUnderfilledTeamSizes([6, 6, 6, 6], 24, 6)).toBeNull();
+    const loans = buildStructuralLoans({
+      teams: [
+        { id: "a", position: 1, players: Array.from({ length: 5 }, (_, i) => ({ playerId: `a${i}`, loanOrder: i + 1, eligible: true })) },
+        { id: "b", position: 2, players: Array.from({ length: 5 }, (_, i) => ({ playerId: `b${i}`, loanOrder: i + 1, eligible: true })) },
+        { id: "c", position: 3, players: [{ playerId: "c1", loanOrder: 1, eligible: true }] },
+        { id: "d", position: 4, players: [{ playerId: "d1", loanOrder: 2, eligible: true }] },
+      ],
+      selectedTeamIds: ["a", "b"], targetPlayersPerTeam: 6, previousLoanCount: new Map(),
+    });
+    expect(loans.map((loan) => loan.originalTeamId)).toEqual(["c", "d"]);
+  });
+
   it("reequilibra o sorteio por chegada sem perder jogadores", () => {
     expect(rebalanceTeamRosters([[1, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12], [13, 14, 15]]))
       .toEqual([[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]]);
