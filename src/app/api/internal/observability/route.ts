@@ -3,8 +3,9 @@ import { reportServerEvent } from "@/lib/observability";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_KINDS = new Set(["client_error", "web_vital"]);
+const ALLOWED_KINDS = new Set(["client_error", "web_vital", "client_action"]);
 const ALLOWED_VITALS = new Set(["CLS", "FCP", "INP", "LCP", "TTFB"]);
+const ALLOWED_ACTIONS = new Set(["register_goal", "finish_match", "change_goalkeeper"]);
 
 export async function POST(request: NextRequest) {
   const contentLength = Number(request.headers.get("content-length") || 0);
@@ -24,12 +25,14 @@ export async function POST(request: NextRequest) {
 
   const kind = String(body.kind || "");
   const name = String(body.name || "");
-  if (!ALLOWED_KINDS.has(kind) || !name || (kind === "web_vital" && !ALLOWED_VITALS.has(name))) {
+  if (!ALLOWED_KINDS.has(kind) || !name
+    || (kind === "web_vital" && !ALLOWED_VITALS.has(name))
+    || (kind === "client_action" && !ALLOWED_ACTIONS.has(name))) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
   await reportServerEvent({
-    kind: kind as "client_error" | "web_vital",
+    kind: kind as "client_error" | "web_vital" | "client_action",
     name,
     message: typeof body.message === "string" ? body.message : undefined,
     path: typeof body.path === "string" ? body.path : undefined,

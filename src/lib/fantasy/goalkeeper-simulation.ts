@@ -1,3 +1,5 @@
+import { calculateGoalkeeperMatchScouts, type GoalkeeperTimelineStint } from "../goalkeeper-timeline";
+
 export type FantasyGoalkeeperSimulationMatch = {
   status: "pending" | "live" | "finished";
   teamAId: string;
@@ -6,10 +8,16 @@ export type FantasyGoalkeeperSimulationMatch = {
   scoreB: number;
   players: Array<{ playerId: string; scoringEligible?: boolean }>;
   goalkeepers: Array<{ playerId: string; teamId: string }>;
+  goalkeeperStints?: GoalkeeperTimelineStint[];
+  officialElapsedSeconds?: number;
+  durationSeconds?: number;
   events: Array<{
     playerId: string;
     assistPlayerId?: string | null;
+    teamId: string;
     isOwnGoal?: boolean;
+    goalkeeperAPlayerId?: string | null;
+    goalkeeperBPlayerId?: string | null;
   }>;
 };
 
@@ -47,35 +55,19 @@ export function buildFantasyGoalkeeperSimulationStats(
 
   for (const match of matches) {
     if (match.status === "pending") continue;
-    const goalkeeper = match.goalkeepers.find((item) => item.playerId === playerId);
+    const goalkeeper = calculateGoalkeeperMatchScouts(match).get(playerId);
     if (!goalkeeper) continue;
     const participant = match.players.find((item) => item.playerId === playerId);
     if (participant?.scoringEligible === false) continue;
-
-    const isTeamA = goalkeeper.teamId === match.teamAId;
-    const isTeamB = goalkeeper.teamId === match.teamBId;
-    if (!isTeamA && !isTeamB) continue;
-
-    const goalsFor = isTeamA ? match.scoreA : match.scoreB;
-    const goalsAgainst = isTeamA ? match.scoreB : match.scoreA;
-    stats.goalkeeperGames += 1;
-    stats.goalsConceded += goalsAgainst;
-
-    for (const event of match.events) {
-      if (event.playerId === playerId) {
-        if (event.isOwnGoal) stats.goalkeeperOwnGoals += 1;
-        else stats.goalkeeperGoals += 1;
-      }
-      if (event.assistPlayerId === playerId && !event.isOwnGoal) {
-        stats.goalkeeperAssists += 1;
-      }
-    }
-
-    if (match.status !== "finished") continue;
-    if (goalsAgainst === 0) stats.cleanSheets += 1;
-    if (goalsFor > goalsAgainst) stats.goalkeeperWins += 1;
-    else if (goalsFor === goalsAgainst) stats.goalkeeperDraws += 1;
-    else stats.goalkeeperLosses += 1;
+    stats.goalkeeperGames += goalkeeper.goalkeeperGames;
+    stats.goalsConceded += goalkeeper.goalsConceded;
+    stats.cleanSheets += goalkeeper.cleanSheets;
+    stats.goalkeeperGoals += goalkeeper.goalkeeperGoals;
+    stats.goalkeeperAssists += goalkeeper.goalkeeperAssists;
+    stats.goalkeeperOwnGoals += goalkeeper.goalkeeperOwnGoals;
+    stats.goalkeeperWins += goalkeeper.goalkeeperWins;
+    stats.goalkeeperDraws += goalkeeper.goalkeeperDraws;
+    stats.goalkeeperLosses += goalkeeper.goalkeeperLosses;
   }
 
   return stats;

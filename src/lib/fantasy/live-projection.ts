@@ -6,8 +6,16 @@ import {
   type FantasySlotRole,
 } from "./lineup-positions";
 import { resolveFantasyReserveSubstitution, type FantasyReserveRole } from "./reserve";
+import { calculateGoalkeeperMatchScouts, type GoalkeeperTimelineStint } from "../goalkeeper-timeline";
 
-export type FantasyLiveEvent = { playerId: string; assistPlayerId?: string | null; teamId: string; isOwnGoal?: boolean };
+export type FantasyLiveEvent = {
+  playerId: string;
+  assistPlayerId?: string | null;
+  teamId: string;
+  isOwnGoal?: boolean;
+  goalkeeperAPlayerId?: string | null;
+  goalkeeperBPlayerId?: string | null;
+};
 export type FantasyLiveMatchPlayer = {
   playerId: string;
   teamId: string;
@@ -25,6 +33,9 @@ export type FantasyLiveMatch = {
   scoreB: number;
   players: readonly FantasyLiveMatchPlayer[];
   goalkeepers: readonly FantasyLiveGoalkeeper[];
+  goalkeeperStints?: readonly GoalkeeperTimelineStint[];
+  officialElapsedSeconds?: number;
+  durationSeconds?: number;
   events: readonly FantasyLiveEvent[];
 };
 
@@ -154,7 +165,8 @@ export function projectFantasyLiveStats(
     const isFinished = match.status === "finished";
     const isDraw = match.scoreA === match.scoreB;
     const winner = isDraw ? null : match.scoreA > match.scoreB ? match.teamAId : match.teamBId;
-    const goalkeeperIds = new Set(match.goalkeepers.map((goalkeeper) => goalkeeper.playerId));
+    const goalkeeperScouts = calculateGoalkeeperMatchScouts(match);
+    const goalkeeperIds = new Set(goalkeeperScouts.keys());
     const scoringEligibleByPlayerId = new Map(
       match.players.map((participant) => [participant.playerId, participant.scoringEligible !== false] as const),
     );
@@ -178,20 +190,20 @@ export function projectFantasyLiveStats(
       }
     }
 
-    for (const goalkeeper of match.goalkeepers) {
+    for (const goalkeeper of goalkeeperScouts.values()) {
       if (scoringEligibleByPlayerId.get(goalkeeper.playerId) === false) continue;
       const current = ensure(goalkeeper.playerId);
-      const conceded = goalkeeper.teamId === match.teamAId ? match.scoreB : match.scoreA;
-      current.goalsConceded += conceded;
+      current.goalsConceded += goalkeeper.goalsConceded;
       // Os scouts brutos permanecem para auditoria mesmo quando a rodada suprime
       // somente as recompensas positivas de goleiro.
-      current.goalkeeperGames += 1;
-      if (conceded === 0) current.cleanSheets += 1;
-      if (isFinished) {
-        if (isDraw) current.goalkeeperDraws += 1;
-        else if (winner === goalkeeper.teamId) current.goalkeeperWins += 1;
-        else current.goalkeeperLosses += 1;
-      }
+      current.goalkeeperGames += goalkeeper.goalkeeperGames;
+      current.cleanSheets += goalkeeper.cleanSheets;
+      current.goalkeeperWins += goalkeeper.goalkeeperWins;
+      current.goalkeeperDraws += goalkeeper.goalkeeperDraws;
+      current.goalkeeperLosses += goalkeeper.goalkeeperLosses;
+      current.goalkeeperGoals += goalkeeper.goalkeeperGoals;
+      current.goalkeeperAssists += goalkeeper.goalkeeperAssists;
+      current.goalkeeperOwnGoals += goalkeeper.goalkeeperOwnGoals;
     }
 
     for (const event of match.events) {
@@ -199,18 +211,15 @@ export function projectFantasyLiveStats(
         if (scoringEligibleByPlayerId.get(event.playerId) !== false) {
           const scorer = ensure(event.playerId);
           scorer.ownGoals += 1;
-          if (goalkeeperIds.has(event.playerId)) scorer.goalkeeperOwnGoals += 1;
         }
       } else {
         if (scoringEligibleByPlayerId.get(event.playerId) !== false) {
           const scorer = ensure(event.playerId);
           scorer.goals += 1;
-          if (goalkeeperIds.has(event.playerId)) scorer.goalkeeperGoals += 1;
         }
         if (event.assistPlayerId && scoringEligibleByPlayerId.get(event.assistPlayerId) !== false) {
           const assister = ensure(event.assistPlayerId);
           assister.assists += 1;
-          if (goalkeeperIds.has(event.assistPlayerId)) assister.goalkeeperAssists += 1;
         }
       }
     }

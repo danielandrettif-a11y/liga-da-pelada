@@ -51,32 +51,27 @@ async function buildQuickStartSuggestion(client: SupabaseClient, roundId: string
   const { data: round, error } = await client
     .from("rounds")
     .select(`
-      *,
+      id, number, formation_mode, arrival_order_enabled, target_players_per_team,
       round_players (
         player_id,
         availability_status,
-        availability_updated_at,
-        attendance_status,
-        attendance_order,
-        attendance_marked_at,
-        players (*)
+        attendance_status
       ),
       teams (
-        *,
+        id, name, color, crest_url, position, captain_player_id, fixed_goalkeeper_player_id,
         team_players (
           player_id,
           goalkeeper_order,
           loan_order,
-          players (*)
+          players (id, name, is_goalkeeper)
         )
       ),
       matches (
-        *,
-        match_events (*),
+        id, team_a_id, team_b_id, score_a, score_b, match_order, created_at, started_at,
         match_players (player_id, team_id, original_team_id),
-        match_goalkeepers (*)
+        match_goalkeepers (player_id, team_id, rotation_order)
       ),
-      league:league_id (stadium_name, stadium_map_url, event_duration_minutes, players_per_team, match_duration)
+      league:league_id (players_per_team)
     `)
     .eq("id", roundId)
     .single();
@@ -120,7 +115,7 @@ export async function createMatch(input: CreateMatchInput) {
 
     const [{ data: round, error: roundError }, { data: teams, error: teamsError }, { data: roundPlayers, error: roundPlayersError }] = await Promise.all([
       client.from("rounds").select("*, league:league_id (match_duration, players_per_team)").eq("id", input.round_id).single(),
-      client.from("teams").select("id, position, team_players (*)").eq("round_id", input.round_id),
+      client.from("teams").select("id, position, name, fixed_goalkeeper_player_id, team_players (*)").eq("round_id", input.round_id),
       client.from("round_players").select("player_id, availability_status, attendance_status, attendance_order").eq("round_id", input.round_id),
     ]);
 
@@ -298,6 +293,14 @@ export async function createMatch(input: CreateMatchInput) {
       || effectiveTeamByPlayer.get(input.goalkeeper_b_id) !== input.team_b_id) {
       return { success: false, error: "O goleiro precisa estar escalado pelo time nesta partida." };
     }
+    for (const team of selectedTeams as any[]) {
+      const fixedPlayerId = team.fixed_goalkeeper_player_id;
+      if (!fixedPlayerId || effectiveTeamByPlayer.get(fixedPlayerId) !== team.id) continue;
+      const selectedGoalkeeperId = team.id === input.team_a_id ? input.goalkeeper_a_id : input.goalkeeper_b_id;
+      if (selectedGoalkeeperId !== fixedPlayerId) {
+        return { success: false, error: `O goleiro fixo do ${team.name} está disponível e deve iniciar no gol.` };
+      }
+    }
     for (const [teamId, replacementPlayerId] of forcedGoalkeeperByTeam) {
       const selectedGoalkeeperId = teamId === input.team_a_id ? input.goalkeeper_a_id : input.goalkeeper_b_id;
       if (selectedGoalkeeperId !== replacementPlayerId) {
@@ -433,6 +436,14 @@ export async function createMatch(input: CreateMatchInput) {
       await client.from("matches").delete().eq("id", data.id);
       throw new Error(`Erro ao salvar os goleiros: ${goalkeeperError.message}`);
     }
+    const { error: goalkeeperStintError } = await client.from("match_goalkeeper_stints").insert([
+      { match_id: data.id, team_id: input.team_a_id, player_id: input.goalkeeper_a_id, entered_elapsed_seconds: 0 },
+      { match_id: data.id, team_id: input.team_b_id, player_id: input.goalkeeper_b_id, entered_elapsed_seconds: 0 },
+    ]);
+    if (goalkeeperStintError) {
+      await client.from("matches").delete().eq("id", data.id);
+      throw new Error(`Erro ao iniciar os períodos no gol: ${goalkeeperStintError.message}`);
+    }
 
     // A partida já nasce com o cronômetro iniciado. Portanto, o agendamento
     // precisa ser criado aqui também; esperar o botão "Iniciar" faria o jogo
@@ -469,8 +480,6 @@ export async function getMatch(matchId: string) {
   const league = await getSelectedLeague();
   if (!league) return null;
   const client = await createServerClient();
-  const { data: matchScope } = await client.from("matches").select("round:round_id!inner(league_id)").eq("id", matchId).eq("round.league_id", league.id).maybeSingle();
-  if (!matchScope) return null;
   const { data, error } = await client
     .from("matches")
     .select(`
@@ -531,6 +540,9 @@ export async function getMatch(matchId: string) {
         player:player_id (id, name, nickname, avatar_url),
         assist_player:assist_player_id (id, name, nickname, avatar_url)
       ),
+      match_goalkeeper_stints (
+        id, match_id, team_id, player_id, entered_elapsed_seconds, left_elapsed_seconds, selected_at
+      ),
       match_substitutions (
         id,
         match_id,
@@ -544,8 +556,9 @@ export async function getMatch(matchId: string) {
         player_in:player_in_id (id, name, nickname, avatar_url),
         player_in_original_team:player_in_original_team_id (id, name, color, crest_url)
       ),
-      round:round_id (
+      round:round_id!inner(
         id,
+        league_id,
         number,
         date,
         formation_mode,
@@ -565,9 +578,10 @@ export async function getMatch(matchId: string) {
       )
     `)
     .eq("id", matchId)
-    .single();
+    .eq("round.league_id", league.id)
+    .maybeSingle();
 
-  if (error) {
+  if (error || !data) {
     console.error("Erro ao buscar partida:", error);
     return null;
   }
@@ -596,7 +610,7 @@ export async function getMatch(matchId: string) {
 
   // Fonte principal: a seleção atual feita pelo usuário no perfil/Cartola,
   // vinculada à conta e à temporada ativa.
-  const selectedCosmetics = await getAllPlayersEquippedCosmeticsMap();
+  const selectedCosmetics = await getAllPlayersEquippedCosmeticsMap(playerIds);
   for (const playerId of playerIds) {
     const selected = selectedCosmetics.get(playerId);
     if (!selected) continue;
@@ -714,7 +728,9 @@ export async function registerGoal(input: RegisterGoalInput) {
       round_id?: string;
     } | null;
 
-    revalidatePath(`/partidas/${input.match_id}`);
+    // A tela ao vivo aplica o placar e o evento pelo resultado da ação e
+    // pelo Realtime. Invalidar a própria rota embutiria outro render pesado
+    // na resposta de cada gol.
     if (result?.round_id) {
       revalidatePath(`/rodadas/${result.round_id}`);
     }
@@ -732,6 +748,67 @@ export async function registerGoal(input: RegisterGoalInput) {
   } catch (err: any) {
     console.error("Erro ao registrar gol:", err);
     return { success: false, error: err.message };
+  }
+}
+
+export async function setRoundTeamFixedGoalkeeper(roundId: string, teamId: string, playerId: string | null) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    if (!league || !roundId || !teamId) return { success: false, error: "Time inválido." };
+    const { data: team, error: teamError } = await client.from("teams")
+      .select("id, round_id, round:round_id!inner(league_id)")
+      .eq("id", teamId).eq("round_id", roundId).eq("round.league_id", league.id).maybeSingle();
+    if (teamError || !team) return { success: false, error: "Time fora da pelada selecionada." };
+    if (playerId) {
+      const { data: member } = await client.from("team_players")
+        .select("player_id").eq("team_id", teamId).eq("player_id", playerId).maybeSingle();
+      if (!member) return { success: false, error: "Escolha um jogador deste time para ser o goleiro fixo." };
+    }
+    const { error } = await client.from("teams")
+      .update({ fixed_goalkeeper_player_id: playerId })
+      .eq("id", teamId);
+    if (error) throw new Error(error.message);
+    revalidatePath(`/rodadas/${team.round_id}`);
+    revalidatePath(`/rodadas/${team.round_id}/nova-partida`);
+    return { success: true };
+  } catch (err: any) {
+    console.error("Erro ao definir goleiro fixo:", err);
+    return { success: false, error: err.message || "Não foi possível definir o goleiro fixo." };
+  }
+}
+
+export async function changeMatchGoalkeeper(
+  matchId: string,
+  teamId: string,
+  playerId: string,
+  elapsedSeconds?: number,
+) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: ADMIN_ERROR };
+    if (!matchId || !teamId || !playerId) return { success: false, error: "Escolha um jogador para entrar no gol." };
+    const match = await getMatchState(client, matchId);
+    if (match.status !== "live") return { success: false, error: "A partida não está em andamento." };
+    if (teamId !== match.team_a_id && teamId !== match.team_b_id) {
+      return { success: false, error: "Time fora desta partida." };
+    }
+    // O valor do navegador nunca define o tempo oficial. A RPC calcula com o
+    // relógio do servidor sob o mesmo lock usado para registrar gols.
+    const { data, error } = await client.rpc("change_match_goalkeeper", {
+      p_match_id: matchId,
+      p_team_id: teamId,
+      p_player_id: playerId,
+      p_elapsed_seconds: Number.isFinite(elapsedSeconds) ? Math.max(0, Math.floor(elapsedSeconds!)) : null,
+    });
+    if (error) throw new Error(error.message);
+    revalidatePath(`/rodadas/${match.round_id}`);
+    revalidatePath("/cartola");
+    return { success: true, ...(data as Record<string, unknown> || {}) };
+  } catch (err: any) {
+    console.error("Erro ao trocar goleiro:", err);
+    return { success: false, error: err.message || "Não foi possível trocar o goleiro." };
   }
 }
 
@@ -1009,6 +1086,7 @@ export async function finishMatch(matchId: string) {
           ? Math.floor((Date.now() - new Date(currentState.timer_started_at).getTime()) / 1000)
           : 0),
     );
+    const officialElapsedAtFinish = elapsedAtFinish + Number(currentState.eligibility_elapsed_offset_seconds || 0);
     const { data: match, error } = await client
       .from("matches")
       .update({
@@ -1034,6 +1112,12 @@ export async function finishMatch(matchId: string) {
       const existingMatch = await getMatchState(client, matchId);
       if (existingMatch.status !== "finished") return { success: false, error: "Nao foi possivel encerrar a partida." };
 
+      const { error: recoveryTimeError } = await client
+        .from("match_players")
+        .update({ left_elapsed_seconds: officialElapsedAtFinish })
+        .eq("match_id", matchId)
+        .is("left_elapsed_seconds", null);
+      if (recoveryTimeError) throw new Error(recoveryTimeError.message);
       const { error: recoveryError } = await client
         .from("match_players")
         .update({ is_active: false })
@@ -1046,11 +1130,14 @@ export async function finishMatch(matchId: string) {
       return { success: true, alreadyFinished: true, roundId: existingMatch.round_id, quickStart };
     }
 
+    // O trigger de fechamento já desativa os participantes quando matches
+    // muda para finished. Filtrar por is_active aqui deixava o tempo final
+    // vazio para todos eles. Quem saiu antes já tem left_elapsed_seconds.
     const { error: lineupTimeError } = await client
       .from("match_players")
-      .update({ left_elapsed_seconds: elapsedAtFinish })
+      .update({ left_elapsed_seconds: officialElapsedAtFinish })
       .eq("match_id", matchId)
-      .eq("is_active", true);
+      .is("left_elapsed_seconds", null);
     if (lineupTimeError) throw new Error(lineupTimeError.message);
 
     revalidatePath(`/partidas/${matchId}`);

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createMatch } from "@/lib/actions/matches";
+import { createMatch, setRoundTeamFixedGoalkeeper } from "@/lib/actions/matches";
 import { Swords, ArrowLeft, ChevronRight, AlertTriangle, Check, ArrowLeftRight, Crown, Users } from "@/components/icons";
 import Link from "next/link";
 import { TeamCrest } from "./TeamCrest";
@@ -35,6 +35,9 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
   ));
   const [goalkeeperByTeam, setGoalkeeperByTeam] = useState<Record<string, string>>({});
   const [goalkeeperModeByTeam, setGoalkeeperModeByTeam] = useState<Record<string, "bq" | "manual">>({});
+  const [fixedGoalkeeperByTeam, setFixedGoalkeeperByTeam] = useState<Record<string, string>>(() => Object.fromEntries(
+    (round?.teams || []).map((team: any) => [team.id, team.fixed_goalkeeper_player_id || ""]),
+  ));
   const [colorByTeam, setColorByTeam] = useState<Record<string, string>>(() => Object.fromEntries(
     (round?.teams || []).map((team: any) => [team.id, team.color || "#22c55e"]),
   ));
@@ -255,8 +258,10 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
         const currentPlayerId = current[teamId];
         const currentMode = goalkeeperModeByTeam[teamId];
         const forcedReplacementId = forcedAbsenceGoalkeeperByTeam.get(teamId);
-        const keepsManualChoice = !forcedReplacementId && currentMode === "manual" && eligible.some((player: any) => player.id === currentPlayerId);
-        const nextPlayerId = forcedReplacementId || (keepsManualChoice ? currentPlayerId : suggested?.id || currentPlayerId || "");
+        const fixedPlayerId = fixedGoalkeeperByTeam[teamId];
+        const validFixedPlayerId = eligible.some((player: any) => player.id === fixedPlayerId) ? fixedPlayerId : "";
+        const keepsManualChoice = !forcedReplacementId && !validFixedPlayerId && currentMode === "manual" && eligible.some((player: any) => player.id === currentPlayerId);
+        const nextPlayerId = forcedReplacementId || validFixedPlayerId || (keepsManualChoice ? currentPlayerId : suggested?.id || currentPlayerId || "");
         next[teamId] = nextPlayerId;
         if (nextPlayerId !== currentPlayerId) changed = true;
       }
@@ -272,7 +277,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
       }
       return changed ? next : current;
     });
-  }, [selectedTeamIds, bqGoalkeeperSuggestionByTeam, eligibleGoalkeepersByTeam, goalkeeperModeByTeam, forcedAbsenceGoalkeeperByTeam]);
+  }, [selectedTeamIds, bqGoalkeeperSuggestionByTeam, eligibleGoalkeepersByTeam, goalkeeperModeByTeam, forcedAbsenceGoalkeeperByTeam, fixedGoalkeeperByTeam]);
 
   useEffect(() => {
     setCaptainByTeam(Object.fromEntries(
@@ -376,6 +381,85 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
       setError(result.error || "Nao foi possivel definir a cor do colete.");
     } else router.refresh();
     setManagementLoading(false);
+  }
+
+  async function handleFixedGoalkeeperChange(teamId: string) {
+    const previous = fixedGoalkeeperByTeam[teamId] || "";
+    const nextPlayerId = previous ? "" : goalkeeperByTeam[teamId] || "";
+    if (!previous && !nextPlayerId) {
+      setError("Escolha um goleiro antes de fixá-lo.");
+      return;
+    }
+    setFixedGoalkeeperByTeam((current) => ({ ...current, [teamId]: nextPlayerId }));
+    setManagementLoading(true);
+    setError("");
+    const result = await setRoundTeamFixedGoalkeeper(round.id, teamId, nextPlayerId || null);
+    if (!result.success) {
+      setFixedGoalkeeperByTeam((current) => ({ ...current, [teamId]: previous }));
+      setError(result.error || "Não foi possível atualizar o goleiro fixo.");
+    } else {
+      router.refresh();
+    }
+    setManagementLoading(false);
+  }
+
+  function renderGoalkeeperChoice(teamId: string, index: number) {
+    const team = teams.find((item: any) => item.id === teamId);
+    if (!team) return null;
+    const suggested = bqGoalkeeperSuggestionByTeam[teamId];
+    const fixedPlayerId = fixedGoalkeeperByTeam[teamId];
+    const fixedEligible = (eligibleGoalkeepersByTeam[teamId] || []).some((player: any) => player.id === fixedPlayerId);
+    const forced = forcedAbsenceGoalkeeperByTeam.has(teamId);
+    const selectedId = goalkeeperByTeam[teamId] || "";
+    const borrowedGoalkeeper = Boolean(selectedId && playerTeamById.get(selectedId) !== teamId);
+    return (
+      <div key={`goalkeeper-${teamId}`} className="rounded-2xl border border-accent/25 bg-accent/[.055] p-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="flex min-w-0 items-center gap-2 text-[10px] font-black uppercase tracking-wide text-foreground">
+            <TeamReferenceBadge position={team.position} fallbackIndex={index} color={team.color} className="h-7 w-7 text-sm" />
+            <span className="truncate">Goleiro · {team.name}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => void handleFixedGoalkeeperChange(teamId)}
+            disabled={managementLoading || forced || (!fixedPlayerId && (!selectedId || borrowedGoalkeeper))}
+            aria-pressed={Boolean(fixedPlayerId)}
+            aria-label={fixedPlayerId ? `Desfixar goleiro do ${team.name}` : `Fixar goleiro do ${team.name} para esta rodada`}
+            title={fixedPlayerId ? "Toque para voltar ao rodízio" : "Manter este goleiro nas próximas partidas da rodada"}
+            className={`shrink-0 rounded-lg border px-2.5 py-1.5 text-[10px] font-black transition-colors disabled:opacity-40 ${fixedPlayerId ? "border-cyan-300/60 bg-cyan-300/20 text-cyan-100" : "border-border bg-background text-muted"}`}
+          >
+            🧤 {fixedPlayerId ? "Fixo" : "Fixar"}
+          </button>
+        </div>
+        <select
+          value={fixedEligible && !forced ? fixedPlayerId : goalkeeperModeByTeam[teamId] === "bq" && suggested ? "__bq_rotation__" : selectedId}
+          onChange={(event) => {
+            const useRotation = event.target.value === "__bq_rotation__";
+            setGoalkeeperByTeam((current) => ({ ...current, [teamId]: useRotation ? suggested?.id || "" : event.target.value }));
+            setGoalkeeperModeByTeam((current) => ({ ...current, [teamId]: useRotation ? "bq" : "manual" }));
+          }}
+          disabled={forced || fixedEligible}
+          aria-label={`Escolher goleiro do ${team.name}`}
+          className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-foreground outline-none focus:border-accent disabled:opacity-75"
+        >
+          {suggested && !fixedEligible && (
+            <option value="__bq_rotation__">{forced ? "Substituto" : "Rodízio"} · {suggested.name}</option>
+          )}
+          {!suggested && !selectedId && <option value="">Escolha o goleiro</option>}
+          {[...(eligibleGoalkeepersByTeam[teamId] || [])]
+            .sort((a: any, b: any) => a.goalkeeperOrder - b.goalkeeperOrder || a.name.localeCompare(b.name, "pt-BR"))
+            .map((player: any) => <option key={player.id} value={player.id}>{player.id === fixedPlayerId ? "🧤 " : ""}{player.name}</option>)}
+        </select>
+        <p className="mt-2 text-[10px] leading-relaxed text-muted">
+          {forced ? `Substituto no gol por ausência do titular. ${replacementsDoNotScore ? "Não recebe pontos nem scouts nesta partida." : "Recebe pontos e scouts normalmente."}` : borrowedGoalkeeper && !fixedPlayerId
+            ? "Jogador emprestado não pode ser fixado neste time."
+            : fixedPlayerId && !fixedEligible
+            ? "Goleiro fixo indisponível; escolha válida da fila aplicada nesta partida."
+            : fixedEligible ? "Luva ativa: este jogador permanece no gol nas próximas partidas desta rodada. Desfixe para trocar."
+            : "A fila sugere o próximo goleiro. Toque na luva para manter o escolhido nesta rodada."}
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -512,6 +596,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
               );
             })}
           </div>
+          {teamAId && renderGoalkeeperChoice(teamAId, 0)}
         </div>
 
         <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center ring-4 ring-background z-10 -my-3">
@@ -568,6 +653,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
               );
             })}
           </div>
+          {teamBId && renderGoalkeeperChoice(teamBId, 1)}
         </div>
 
       </div> : (
@@ -597,6 +683,10 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
               })}
             </div>
           </section>
+          {selectedTeamIds.length === 2 && <div className="grid gap-3 sm:grid-cols-2">
+            {renderGoalkeeperChoice(teamAId, 0)}
+            {renderGoalkeeperChoice(teamBId, 1)}
+          </div>}
         </div>
       )}
 
@@ -699,63 +789,6 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
               </div>;
             })}
             {structuralLoans.length !== structuralShortage && <p className="rounded-xl bg-danger/10 p-3 text-xs font-semibold text-danger">Não há jogadores disponíveis suficientes no time de fora.</p>}
-          </div>
-        </section>
-      )}
-
-      {selectedTeamIds.length === 2 && (
-        <section className="glass-card overflow-hidden animate-fade-in-up">
-          <div className="border-b border-border bg-surface px-4 py-3">
-            <h2 className="text-sm font-black text-foreground">🧤 Goleiros da partida</h2>
-            <p className="mt-1 text-[10px] font-semibold text-muted">Cada goleiro recebe +3 por atuar e −1 por gol sofrido.</p>
-          </div>
-          <div className="grid gap-3 p-4 sm:grid-cols-2">
-            {selectedTeams.map((team: any, index: number) => (
-              <label key={team.id} className="block">
-                <span className="mb-2 flex items-center gap-2 text-xs font-black text-foreground">
-                  <TeamReferenceBadge position={team.position} fallbackIndex={index} color={team.color} className="h-8 w-8 text-base" />
-                  <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-6 w-6" />
-                  <span className="truncate text-[10px] font-bold text-muted">{team.name}</span>
-                </span>
-                <select
-                  value={goalkeeperModeByTeam[team.id] === "bq" && bqGoalkeeperSuggestionByTeam[team.id]
-                    ? "__bq_rotation__"
-                    : goalkeeperByTeam[team.id] || ""}
-                  onChange={(event) => {
-                    const useBqRotation = event.target.value === "__bq_rotation__";
-                    const suggested = bqGoalkeeperSuggestionByTeam[team.id];
-                    setGoalkeeperByTeam((current) => ({
-                      ...current,
-                      [team.id]: useBqRotation ? suggested?.id || "" : event.target.value,
-                    }));
-                    setGoalkeeperModeByTeam((current) => ({ ...current, [team.id]: useBqRotation ? "bq" : "manual" }));
-                  }}
-                  disabled={forcedAbsenceGoalkeeperByTeam.has(team.id)}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-semibold text-foreground outline-none focus:border-accent disabled:cursor-not-allowed disabled:opacity-75"
-                >
-                  {bqGoalkeeperSuggestionByTeam[team.id] && (
-                    <option value="__bq_rotation__">
-                      {forcedAbsenceGoalkeeperByTeam.has(team.id)
-                        ? `Substituto no gol · ${bqGoalkeeperSuggestionByTeam[team.id].name}`
-                        : `Seguir ordem BQ · ${bqGoalkeeperSuggestionByTeam[team.id].name} · fila ${bqGoalkeeperSuggestionByTeam[team.id].order}`}
-                    </option>
-                  )}
-                  {!bqGoalkeeperSuggestionByTeam[team.id] && <option value="">Quem começa no gol?</option>}
-                  {(eligibleGoalkeepersByTeam[team.id] || [])
-                    .sort((a: any, b: any) => a.goalkeeperOrder - b.goalkeeperOrder || a.name.localeCompare(b.name, "pt-BR"))
-                    .map((player: any) => <option key={player.id} value={player.id}>{player.name}{Number.isFinite(player.goalkeeperOrder) ? ` · fila ${player.goalkeeperOrder}` : ""}</option>)}
-                </select>
-                {bqGoalkeeperSuggestionByTeam[team.id] && (
-                  <span className="mt-1.5 block text-[9px] font-semibold leading-relaxed text-muted">
-                    {forcedAbsenceGoalkeeperByTeam.has(team.id)
-                      ? replacementsDoNotScore
-                        ? "O substituto cobre a ausência no gol e não recebe nenhum ponto ou scout desta partida."
-                        : "O substituto cobre a ausência no gol e recebe normalmente os pontos e scouts desta partida."
-                      : "A sugestão usa o próximo da fila após o último goleiro deste time. Você pode escolher outro nome na lista."}
-                  </span>
-                )}
-              </label>
-            ))}
           </div>
         </section>
       )}

@@ -14,6 +14,7 @@ import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
 import { normalizeBQScoringSnapshot } from "../bq-scoring";
 import { isCompetitiveProfileComplete } from "../player-eligibility";
 import { isParticipantScoringEligible } from "../scoring-eligibility";
+import { calculateGoalkeeperMatchScouts } from "../goalkeeper-timeline";
 import {
   calculateRankingPositionBonus,
   parseRankingRoleWeights,
@@ -353,11 +354,17 @@ export async function calculateRoundStats(roundId: string) {
           team_b_id,
           score_a,
           score_b,
+          duration_seconds,
+          timer_accumulated_seconds,
+          eligibility_elapsed_offset_seconds,
           match_events (
             id,
             event_type,
             player_id,
             assist_player_id,
+            team_id,
+            goalkeeper_a_player_id,
+            goalkeeper_b_player_id,
             is_own_goal
           ),
           match_players (
@@ -369,6 +376,13 @@ export async function calculateRoundStats(roundId: string) {
           match_goalkeepers (
             player_id,
             team_id
+          ),
+          match_goalkeeper_stints (
+            player_id,
+            team_id,
+            entered_elapsed_seconds,
+            left_elapsed_seconds,
+            selected_at
           )
         ),
         round_players (
@@ -388,6 +402,7 @@ export async function calculateRoundStats(roundId: string) {
     const countsForRanking = round.round_type !== "friendly";
     const suppressGoalkeeperRewards = Boolean(round.suppress_goalkeeper_rewards);
     const scoringSnapshot = normalizeBQScoringSnapshot(round.scoring_snapshot as Record<string, unknown> | null);
+    const columnCActive = Number(scoringSnapshot.version || 0) >= 11;
     const roundPlayerIds = (round.round_players || []).map((item: any) => item.player_id);
     const { data: roundPlayerMemberships, error: profileError } = roundPlayerIds.length
       ? await client.from("league_members")
@@ -418,15 +433,15 @@ export async function calculateRoundStats(roundId: string) {
     }));
     const playerById = new Map((roundPlayerProfiles || []).map((player: any) => [player.id, player]));
     const [{ data: frozenRankingRows, error: frozenRankingError }, { data: playedRankingRows, error: playedRankingError }, overallByPlayer] = await Promise.all([
-      roundPlayerIds.length
+      !columnCActive && roundPlayerIds.length
         ? client.from("player_round_stats").select("player_id, ranking_role_weights").eq("round_id", roundId).in("player_id", roundPlayerIds)
         : Promise.resolve({ data: [], error: null }),
-      roundPlayerIds.length
+      !columnCActive && roundPlayerIds.length
         ? client.from("player_round_stats")
           .select("player_id, games, round:round_id(id, date, created_at, round_type, status)")
           .eq("league_id", round.league_id).in("player_id", roundPlayerIds).gt("games", 0)
         : Promise.resolve({ data: [], error: null }),
-      getLatestPlayerCardOverallMap(client),
+      columnCActive ? Promise.resolve(new Map<string, PlayerCardOverall>()) : getLatestPlayerCardOverallMap(client),
     ]);
     if (frozenRankingError) throw new Error(`Erro ao buscar posições congeladas do ranking: ${frozenRankingError.message}`);
     if (playedRankingError) throw new Error(`Erro ao buscar histórico do ranking: ${playedRankingError.message}`);
@@ -498,7 +513,35 @@ export async function calculateRoundStats(roundId: string) {
       const isDraw = match.score_a === match.score_b;
       const winnerId = isDraw ? null : (match.score_a > match.score_b ? match.team_a_id : match.team_b_id);
 
-      const goalkeeperIds = new Set((match.match_goalkeepers || []).map((goalkeeper: any) => goalkeeper.player_id));
+      const goalkeeperScouts = calculateGoalkeeperMatchScouts({
+        status: match.status,
+        teamAId: match.team_a_id,
+        teamBId: match.team_b_id,
+        scoreA: Number(match.score_a || 0),
+        scoreB: Number(match.score_b || 0),
+        officialElapsedSeconds: Number(match.timer_accumulated_seconds || 0)
+          + Number(match.eligibility_elapsed_offset_seconds || 0),
+        durationSeconds: Number(match.duration_seconds || 0),
+        goalkeepers: (match.match_goalkeepers || []).map((item: any) => ({ playerId: item.player_id, teamId: item.team_id })),
+        goalkeeperStints: (match.match_goalkeeper_stints || []).map((item: any) => ({
+          playerId: item.player_id,
+          teamId: item.team_id,
+          enteredElapsedSeconds: Number(item.entered_elapsed_seconds || 0),
+          leftElapsedSeconds: item.left_elapsed_seconds,
+          selectedAt: item.selected_at,
+        })),
+        events: (match.match_events || [])
+          .filter((item: any) => item.event_type === "goal")
+          .map((item: any) => ({
+            playerId: item.player_id,
+            assistPlayerId: item.assist_player_id,
+            teamId: item.team_id,
+            isOwnGoal: Boolean(item.is_own_goal),
+            goalkeeperAPlayerId: item.goalkeeper_a_player_id,
+            goalkeeperBPlayerId: item.goalkeeper_b_player_id,
+          })),
+      });
+      const goalkeeperIds = new Set(goalkeeperScouts.keys());
       const scoringEligiblePlayerIds = new Set(
         (match.match_players || [])
           .filter((participant: any) => isParticipantScoringEligible(round.number, participant.scoring_eligible))
@@ -549,17 +592,19 @@ export async function calculateRoundStats(roundId: string) {
       processTeamMatch(match.team_a_id, isDraw ? 'draw' : (winnerId === match.team_a_id ? 'win' : 'loss'));
       processTeamMatch(match.team_b_id, isDraw ? 'draw' : (winnerId === match.team_b_id ? 'win' : 'loss'));
 
-      for (const goalkeeper of match.match_goalkeepers || []) {
-        if (voidedPlayerIds.has(goalkeeper.player_id) || !scoringEligiblePlayerIds.has(goalkeeper.player_id)) continue;
-        const s = statsMap[goalkeeper.player_id];
+      for (const goalkeeper of goalkeeperScouts.values()) {
+        if (voidedPlayerIds.has(goalkeeper.playerId) || !scoringEligiblePlayerIds.has(goalkeeper.playerId)) continue;
+        const s = statsMap[goalkeeper.playerId];
         if (!s) continue;
-        const conceded = goalkeeper.team_id === match.team_a_id ? match.score_b : match.score_a;
-        s.goalkeeper_games += 1;
-        s.goals_conceded += conceded;
-        if (conceded === 0) s.clean_sheets += 1;
-        if (isDraw) s.goalkeeper_draws += 1;
-        else if (winnerId === goalkeeper.team_id) s.goalkeeper_wins += 1;
-        else s.goalkeeper_losses += 1;
+        s.goalkeeper_games += goalkeeper.goalkeeperGames;
+        s.goals_conceded += goalkeeper.goalsConceded;
+        s.clean_sheets += goalkeeper.cleanSheets;
+        s.goalkeeper_wins += goalkeeper.goalkeeperWins;
+        s.goalkeeper_draws += goalkeeper.goalkeeperDraws;
+        s.goalkeeper_losses += goalkeeper.goalkeeperLosses;
+        s.goalkeeper_goals += goalkeeper.goalkeeperGoals;
+        s.goalkeeper_assists += goalkeeper.goalkeeperAssists;
+        s.goalkeeper_own_goals += goalkeeper.goalkeeperOwnGoals;
       }
 
       // Processar eventos (gols e assistências)
@@ -569,7 +614,6 @@ export async function calculateRoundStats(roundId: string) {
             const offender = statsMap[ev.player_id];
             if (offender && scoringEligiblePlayerIds.has(ev.player_id) && !voidedPlayerIds.has(ev.player_id)) {
               offender.own_goals += 1;
-              if (goalkeeperIds.has(ev.player_id)) offender.goalkeeper_own_goals += 1;
             }
             continue;
           }
@@ -577,14 +621,12 @@ export async function calculateRoundStats(roundId: string) {
           const scorer = statsMap[ev.player_id];
           if (scorer && scoringEligiblePlayerIds.has(ev.player_id) && !voidedPlayerIds.has(ev.player_id)) {
             scorer.goals += 1;
-            if (goalkeeperIds.has(ev.player_id)) scorer.goalkeeper_goals += 1;
           }
           // Assistências
           if (ev.assist_player_id) {
             const assister = statsMap[ev.assist_player_id];
             if (assister && scoringEligiblePlayerIds.has(ev.assist_player_id) && !voidedPlayerIds.has(ev.assist_player_id)) {
               assister.assists += 1;
-              if (goalkeeperIds.has(ev.assist_player_id)) assister.goalkeeper_assists += 1;
             }
           }
         }
@@ -597,7 +639,6 @@ export async function calculateRoundStats(roundId: string) {
       const overallPositions = overallByPlayer.get(stats.player_id)?.positions;
       const player = playerById.get(stats.player_id);
       const primaryTrait = Array.isArray(player?.overall_traits) ? player.overall_traits[0] : null;
-      const columnCActive = Number(scoringSnapshot.version || 0) >= 11;
       const suppressGoalkeeperRewardsForScoring = !columnCActive && suppressGoalkeeperRewards;
       const lineRole = stats.player_profile_locked === "defensive" ? "DEF" : "ATA";
       const fallbackRole = primaryTrait === "defensive" ? "DEF" : primaryTrait === "midfield" ? "MEI" : "ATA";

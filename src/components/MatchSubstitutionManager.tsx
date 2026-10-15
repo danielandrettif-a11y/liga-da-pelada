@@ -50,6 +50,11 @@ export function MatchSubstitutionManager({
   const selectedOutgoing = (match.match_players || []).find(
     (entry: any) => entry.player_id === playerOutId && entry.is_active,
   );
+  const activeGoalkeeperId = teamId
+    ? (match.match_goalkeeper_stints || []).find((entry: any) => entry.team_id === teamId && entry.left_elapsed_seconds == null)?.player_id
+      || (match.match_goalkeepers || []).find((entry: any) => entry.team_id === teamId)?.player_id
+    : null;
+  const outgoingIsGoalkeeper = Boolean(playerOutId && playerOutId === activeGoalkeeperId);
 
   function resetSelection() {
     setTeamId("");
@@ -76,6 +81,10 @@ export function MatchSubstitutionManager({
   async function submit() {
     if (!teamId || !playerOutId) {
       setError("Toque no jogador que vai sair.");
+      return;
+    }
+    if (outgoingIsGoalkeeper) {
+      setError("Antes de substituí-lo, toque em ‘Trocar’ ao lado da luva no placar e escolha quem assume o gol.");
       return;
     }
     if (!playerInId && !confirm("Nenhum substituto foi escolhido. O time ficará com um jogador a menos. Continuar?")) return;
@@ -130,6 +139,11 @@ export function MatchSubstitutionManager({
 
             <div className="flex-1 space-y-5 overflow-y-auto p-3 sm:p-4">
               {error && <p className="rounded-xl bg-danger/10 p-3 text-xs font-semibold text-danger" role="alert">{error}</p>}
+              {outgoingIsGoalkeeper && (
+                <p className="rounded-xl border border-warning/35 bg-warning/10 p-3 text-xs font-semibold text-warning">
+                  Este jogador está no gol. Feche esta janela e use “Trocar” ao lado da luva no placar antes da substituição.
+                </p>
+              )}
 
               <section>
                 <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-muted">1. Toque em quem vai sair</p>

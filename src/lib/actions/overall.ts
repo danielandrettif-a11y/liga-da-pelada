@@ -28,9 +28,10 @@ async function loadOverallHistory(client: any) {
       matches (
         id, status, team_a_id, team_b_id, score_a, score_b,
         duration_seconds, timer_accumulated_seconds, eligibility_elapsed_offset_seconds,
-        match_events (player_id, assist_player_id, team_id, is_own_goal, elapsed_seconds, minute),
+        match_events (player_id, assist_player_id, team_id, is_own_goal, elapsed_seconds, minute, goalkeeper_a_player_id, goalkeeper_b_player_id),
         match_players (player_id, team_id, entered_elapsed_seconds, left_elapsed_seconds),
-        match_goalkeepers (player_id, team_id)
+        match_goalkeepers (player_id, team_id),
+        match_goalkeeper_stints (player_id, team_id, entered_elapsed_seconds, left_elapsed_seconds, selected_at)
       )
     `).eq("league_id", league.id).eq("round_type", "official").eq("status", "finished")
       .order("date", { ascending: true }).order("created_at", { ascending: true }),

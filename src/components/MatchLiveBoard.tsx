@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef, useMemo, memo, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   registerGoal,
+  changeMatchGoalkeeper,
   finishMatch,
   deleteEvent,
   addFinishedGoalEvent,
@@ -46,8 +48,21 @@ import { TeamCrest } from "./TeamCrest";
 import { TeamReferenceBadge } from "./TeamReferenceBadge";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { formatGoalTime } from "@/lib/goal-time";
-import { QuickNextMatchModal } from "./QuickNextMatchModal";
-import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
+import { cosmeticBackgroundPosition, cosmeticImage } from "@/lib/fantasy/cosmetics";
+
+const QuickNextMatchModal = dynamic(() => import("./QuickNextMatchModal").then((module) => module.QuickNextMatchModal));
+
+function reportMatchAction(name: "register_goal" | "finish_match" | "change_goalkeeper", startedAt: number, success: boolean) {
+  if (typeof navigator === "undefined" || !navigator.sendBeacon) return;
+  const payload = JSON.stringify({
+    kind: "client_action",
+    name,
+    value: Math.round(performance.now() - startedAt),
+    path: window.location.pathname,
+    metadata: { success },
+  });
+  navigator.sendBeacon("/api/internal/observability", new Blob([payload], { type: "application/json" }));
+}
 
 // ============================================
 // MatchTimer: Isolado com memo para evitar re-render global da tela a cada segundo
@@ -329,7 +344,7 @@ type GoalPickerPlayerOptionProps = {
 
 function GoalPickerPlayerOption({ entry, cosmetics, isGoalkeeper = false, onClick, disabled, icon, tone = "accent" }: GoalPickerPlayerOptionProps) {
   const cosmetic = cosmetics?.[entry.player_id];
-  const bannerImage = cosmeticHighResolutionImage(cosmetic?.bannerAssetKey);
+  const bannerImage = cosmeticImage(cosmetic?.bannerAssetKey);
   const border = tone === "danger" ? "border-danger/30 hover:border-danger/60" : "border-border hover:border-accent/40";
 
   return (
@@ -379,10 +394,17 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
   const deletingEventRef = useRef<Set<string>>(new Set());
 
   const [loading, setLoading] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState("");
   const [quickStart, setQuickStart] = useState<any | null>(null);
+  const [finishPrompt, setFinishPrompt] = useState<string | null>(null);
+  const [goalkeeperChangeTeamId, setGoalkeeperChangeTeamId] = useState<string | null>(null);
+  const [goalkeeperSaving, setGoalkeeperSaving] = useState(false);
+  const [goalkeeperOverrideByTeam, setGoalkeeperOverrideByTeam] = useState<Record<string, string>>({});
   const playerCosmetics = match.player_cosmetics as GoalPickerPlayerOptionProps["cosmetics"] | undefined;
   useDialogViewport(Boolean(quickStart), () => !loading && setQuickStart(null));
+  useDialogViewport(Boolean(finishPrompt), () => !loading && setFinishPrompt(null));
+  useDialogViewport(Boolean(goalkeeperChangeTeamId), () => !goalkeeperSaving && setGoalkeeperChangeTeamId(null));
 
   // Placar e Eventos locais para Optimistic UI
   const [displayScore, setDisplayScore] = useState({
@@ -442,25 +464,60 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
     setEligibilityOffset(Number(match.eligibility_elapsed_offset_seconds || 0));
   }, [match.eligibility_elapsed_offset_seconds]);
 
-  // Escuta mudanças em tempo real no Supabase Realtime
+  // Atualizações pequenas de placar/eventos não devem remontar a página inteira.
+  // Substituições, troca de goleiro e encerramento ainda exigem os dados completos.
   useEffect(() => {
     const scheduleRefresh = () => {
       if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
-      refreshTimeout.current = setTimeout(() => router.refresh(), 120);
+      refreshTimeout.current = setTimeout(() => router.refresh(), 350);
+    };
+
+    const playerById = new Map((match.match_players || []).map((entry: any) => [entry.player_id, entry.player]));
+    const applyGoalEvent = (payload: any) => {
+      const row = payload.new || payload.old;
+      if (!row?.id) return;
+      if (payload.eventType === "DELETE") {
+        setEvents((current) => current.filter((event) => event.id !== row.id));
+        return;
+      }
+      if (row.event_type !== "goal") return;
+      const enriched = {
+        ...row,
+        player: playerById.get(row.player_id) || { name: "Jogador" },
+        assist_player: row.assist_player_id ? playerById.get(row.assist_player_id) || { name: "Jogador" } : null,
+      };
+      setEvents((current) => {
+        const prior = current.find((event) => event.id === row.id || (row.idempotency_key && event.idempotency_key === row.idempotency_key));
+        if (prior) return current.map((event) => event === prior ? enriched : event);
+        return [enriched, ...current];
+      });
     };
 
     const channel = supabase
       .channel(`match-${match.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${match.id}` }, () => {
-        scheduleRefresh();
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "matches", filter: `id=eq.${match.id}` }, (payload: any) => {
+        const row = payload.new;
+        if (!row) return;
+        if (row.status === "finished" || row.team_a_id !== match.team_a_id || row.team_b_id !== match.team_b_id) {
+          scheduleRefresh();
+          return;
+        }
+        setDisplayScore({ a: Number(row.score_a || 0), b: Number(row.score_b || 0) });
+        setTimerState({ startedAt: row.timer_started_at || null, accumulated: Number(row.timer_accumulated_seconds || 0) });
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "match_events", filter: `match_id=eq.${match.id}` }, () => {
-        scheduleRefresh();
+      .on("postgres_changes", { event: "*", schema: "public", table: "match_events", filter: `match_id=eq.${match.id}` }, (payload) => {
+        applyGoalEvent(payload);
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "match_players", filter: `match_id=eq.${match.id}` }, () => {
         scheduleRefresh();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "match_substitutions", filter: `match_id=eq.${match.id}` }, () => {
+        scheduleRefresh();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "match_goalkeepers", filter: `match_id=eq.${match.id}` }, () => {
+        scheduleRefresh();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "match_goalkeeper_stints", filter: `match_id=eq.${match.id}` }, () => {
         scheduleRefresh();
       })
       .subscribe();
@@ -469,7 +526,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
       if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
       supabase.removeChannel(channel);
     };
-  }, [match.id, router]);
+  }, [match.id, match.team_a_id, match.team_b_id, match.match_players, router]);
 
   // Controles do cronômetro
   const toggleTimer = useCallback(async () => {
@@ -562,9 +619,22 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
   }, [match.match_players, goalModal.teamId]);
 
   const goalkeeperPlayerIds = useMemo(
-    () => new Set((match.match_goalkeepers || []).map((goalkeeper: any) => goalkeeper.player_id)),
-    [match.match_goalkeepers],
+    () => new Set([match.team_a_id, match.team_b_id].map((teamId) => {
+      const stints = (match.match_goalkeeper_stints || []).filter((item: any) => item.team_id === teamId);
+      const current = stints.find((item: any) => item.left_elapsed_seconds == null)
+        || [...stints].sort((a: any, b: any) => Number(b.entered_elapsed_seconds || 0) - Number(a.entered_elapsed_seconds || 0))[0];
+      return goalkeeperOverrideByTeam[teamId] || current?.player_id
+        || (match.match_goalkeepers || []).find((item: any) => item.team_id === teamId)?.player_id;
+    }).filter(Boolean)),
+    [match.match_goalkeepers, match.match_goalkeeper_stints, match.team_a_id, match.team_b_id, goalkeeperOverrideByTeam],
   );
+  const goalkeeperByTeam = useMemo(() => Object.fromEntries([match.team_a_id, match.team_b_id].map((teamId) => {
+    const stints = (match.match_goalkeeper_stints || []).filter((item: any) => item.team_id === teamId);
+    const current = stints.find((item: any) => item.left_elapsed_seconds == null)
+      || [...stints].sort((a: any, b: any) => Number(b.entered_elapsed_seconds || 0) - Number(a.entered_elapsed_seconds || 0))[0];
+    return [teamId, goalkeeperOverrideByTeam[teamId] || current?.player_id
+      || (match.match_goalkeepers || []).find((item: any) => item.team_id === teamId)?.player_id || ""];
+  })), [match.match_goalkeepers, match.match_goalkeeper_stints, match.team_a_id, match.team_b_id, goalkeeperOverrideByTeam]);
 
   const goalEditPlayers = useMemo(() => {
     if (!goalEdit) return [];
@@ -574,8 +644,8 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
         .map((entry: any) => [entry.player_id, entry]),
     ).values()] as any[];
   }, [goalEdit, match.match_players]);
-  const playerNameById = useMemo(() => new Map(
-    (match.match_players || []).map((entry: any) => [entry.player_id, entry.player?.name || "Jogador"]),
+  const playerNameById = useMemo(() => new Map<string, string>(
+    (match.match_players || []).map((entry: any) => [String(entry.player_id), String(entry.player?.name || "Jogador")] as [string, string]),
   ), [match.match_players]);
 
   // Timeline unificada e ordenada
@@ -588,22 +658,55 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
 
   // Encerramento da partida
   async function finishCurrentMatch() {
+    const startedAt = performance.now();
+    let succeeded = false;
     setLoading(true);
-    const res = await finishMatch(match.id);
-    if (!res.success) {
-      setError(res.error || "Erro ao finalizar a partida.");
+    setFinishing(true);
+    try {
+      const res = await finishMatch(match.id);
+      if (!res.success) {
+        setError(res.error || "Erro ao finalizar a partida.");
+        return;
+      }
+      succeeded = true;
+      if (res.quickStart) setQuickStart(res.quickStart);
+      else router.replace(`/rodadas/${res.roundId || match.round_id}`);
+    } catch (cause: any) {
+      setError(cause?.message || "Não foi possível encerrar a partida. Tente novamente.");
+    } finally {
+      reportMatchAction("finish_match", startedAt, succeeded);
       setLoading(false);
-      return;
+      setFinishing(false);
     }
-    if (res.quickStart) setQuickStart(res.quickStart);
-    else router.replace(`/rodadas/${res.roundId || match.round_id}`);
-    setLoading(false);
   }
 
-  async function handleFinish() {
+  function handleFinish() {
     if (!canManage) return;
-    if (!confirm("Tem certeza que deseja encerrar esta partida? O placar não poderá mais ser alterado.")) return;
-    await finishCurrentMatch();
+    setFinishPrompt("Encerrar esta partida e preparar a próxima?");
+  }
+
+  async function handleChangeGoalkeeper(teamId: string, playerId: string) {
+    if (!canManage || isFinished || goalkeeperSaving || playerId === goalkeeperByTeam[teamId]) return;
+    const startedAt = performance.now();
+    setGoalkeeperSaving(true);
+    setError("");
+    let succeeded = false;
+    try {
+      const result = await changeMatchGoalkeeper(match.id, teamId, playerId);
+      if (!result.success) {
+        setError(result.error || "Não foi possível trocar o goleiro.");
+      } else {
+        succeeded = true;
+        setGoalkeeperOverrideByTeam((current) => ({ ...current, [teamId]: playerId }));
+        setGoalkeeperChangeTeamId(null);
+        router.refresh();
+      }
+    } catch (cause: any) {
+      setError(cause?.message || "Não foi possível trocar o goleiro. Tente novamente.");
+    } finally {
+      reportMatchAction("change_goalkeeper", startedAt, succeeded);
+      setGoalkeeperSaving(false);
+    }
   }
 
   // Registro de gol (Optimistic UI com proteção double-tap e RPC transacional)
@@ -633,6 +736,8 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
     }
 
     const previousScore = displayScore;
+    const startedAt = performance.now();
+    let succeeded = false;
     const previousEvents = events;
     const isTeamA = match.team_a_id === request.teamId;
 
@@ -660,6 +765,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
       minute,
       elapsed_seconds: officialElapsedSeconds,
       created_at: new Date().toISOString(),
+      idempotency_key: idempotencyKey,
       player: scorerEntry?.player || { name: "Jogador" },
       assist_player: assistEntry?.player || null,
       isOptimistic: true,
@@ -692,14 +798,20 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
         setEvents(previousEvents);
         setGoalModal(request);
         setError(res.error || "Erro ao registrar gol.");
+        router.refresh();
       } else {
+        succeeded = true;
+        if (res.eventId) {
+          setEvents((current) => current.map((event) => event.id === optimisticEvent.id
+            ? { ...event, id: res.eventId, isOptimistic: false }
+            : event));
+        }
+        setDisplayScore({ a: Number(res.scoreA ?? displayScore.a), b: Number(res.scoreB ?? displayScore.b) });
         const previousTeamScore = isTeamA ? previousScore.a : previousScore.b;
         const currentTeamScore = Number(isTeamA ? res.scoreA : res.scoreB);
         if (!res.idempotent && shouldOfferMatchFinishAfterGoal(previousTeamScore, currentTeamScore)) {
           const teamName = isTeamA ? match.team_a.name : match.team_b.name;
-          if (confirm(`${teamName} chegou a 2 gols. Deseja encerrar a partida?`)) {
-            await finishCurrentMatch();
-          }
+          setFinishPrompt(`${teamName} chegou a 2 gols. Encerrar a partida e preparar a próxima?`);
         }
       }
     } catch (err: any) {
@@ -708,7 +820,9 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
       setEvents(previousEvents);
       setGoalModal(request);
       setError(err?.message || "Erro inesperado ao registrar gol.");
+      router.refresh();
     } finally {
+      reportMatchAction("register_goal", startedAt, succeeded);
       setLoading(false);
       submittingGoalRef.current = false;
     }
@@ -803,6 +917,29 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
     setLoading(false);
   }
 
+  function renderGoalkeeperControl(teamId: string) {
+    const goalkeeperId = goalkeeperByTeam[teamId];
+    const label = goalkeeperId ? playerNameById.get(goalkeeperId) || "Jogador" : "Não definido";
+    const teamName = teamId === match.team_a_id ? match.team_a.name : match.team_b.name;
+    return (
+      <div className="flex max-w-full items-center gap-1 rounded-2xl border border-cyan-300/25 bg-cyan-300/[.07] pl-2 pr-1 text-[11px] font-bold text-cyan-100">
+        <span aria-hidden="true">🧤</span>
+        <span className="max-w-16 truncate py-2 sm:max-w-24" title={label}>{label}</span>
+        {canManage && !isFinished && (
+          <button
+            type="button"
+            onClick={() => setGoalkeeperChangeTeamId(teamId)}
+            disabled={loading || goalkeeperSaving}
+            aria-label={`Trocar goleiro do ${teamName}`}
+            className="min-h-9 shrink-0 rounded-r-2xl border-l border-cyan-300/25 px-2 text-accent underline underline-offset-2 disabled:opacity-50"
+          >
+            Trocar
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Top bar */}
@@ -827,6 +964,11 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
       {error && (
         <div className="w-full p-3 rounded-lg bg-danger/10 text-danger text-xs font-semibold text-center animate-fade-in">
           {error}
+        </div>
+      )}
+      {finishing && (
+        <div role="status" aria-live="polite" className="rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-xs font-bold text-accent">
+          Encerrando partida e preparando a próxima… Os scouts estão sendo atualizados.
         </div>
       )}
 
@@ -860,6 +1002,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
               {match.team_a.name}
             </span>
             <span className="stat-number text-5xl text-foreground">{displayScore.a}</span>
+            {renderGoalkeeperControl(match.team_a_id)}
 
             {canManage && (!isFinished || correctionsUnlocked) && (
               <button
@@ -889,6 +1032,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
               {match.team_b.name}
             </span>
             <span className="stat-number text-5xl text-foreground">{displayScore.b}</span>
+            {renderGoalkeeperControl(match.team_b_id)}
 
             {canManage && (!isFinished || correctionsUnlocked) && (
               <button
@@ -1110,6 +1254,57 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
             <Trophy className="w-5 h-5" />
             Encerrar Partida
           </button>
+        </div>
+      )}
+
+      {finishPrompt && canManage && !isFinished && (
+        <div className="mobile-dialog-backdrop bg-background/85 animate-fade-in" role="dialog" aria-modal="true" aria-label="Encerrar partida">
+          <div className="glass-card w-full max-w-sm space-y-4 p-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent"><Trophy className="h-5 w-5" /></span>
+              <div>
+                <h3 className="text-base font-black text-foreground">Fim de jogo?</h3>
+                <p className="mt-1 text-xs leading-relaxed text-muted">{finishPrompt}</p>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted">O placar deixa de aceitar gols ao encerrar. Você ainda poderá fazer correções como ADM.</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setFinishPrompt(null)} disabled={loading} className="rounded-xl border border-border bg-surface px-3 py-3 text-xs font-black text-foreground disabled:opacity-50">Continuar jogo</button>
+              <button type="button" onClick={() => { setFinishPrompt(null); void finishCurrentMatch(); }} disabled={loading} className="rounded-xl bg-accent px-3 py-3 text-xs font-black text-background disabled:opacity-50">Encerrar e avançar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {goalkeeperChangeTeamId && canManage && !isFinished && (
+        <div className="mobile-dialog-backdrop bg-background/85 animate-fade-in" role="dialog" aria-modal="true" aria-label="Trocar goleiro">
+          <div className="glass-card flex max-h-[85dvh] w-full max-w-sm flex-col overflow-hidden">
+            <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
+              <div>
+                <h3 className="text-sm font-black text-foreground">🧤 Trocar goleiro</h3>
+                <p className="mt-1 text-[10px] text-muted">Quem entra no gol agora? Os scouts seguem o período de cada goleiro.</p>
+              </div>
+              <button type="button" onClick={() => setGoalkeeperChangeTeamId(null)} disabled={goalkeeperSaving} aria-label="Fechar troca de goleiro" className="rounded-lg p-2 text-muted disabled:opacity-50"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="mobile-dialog-scroll min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4 pb-6">
+              {(match.match_players || [])
+                .filter((entry: any) => entry.team_id === goalkeeperChangeTeamId && entry.is_active)
+                .map((entry: any) => {
+                  const current = entry.player_id === goalkeeperByTeam[goalkeeperChangeTeamId];
+                  return <button
+                    key={entry.player_id}
+                    type="button"
+                    onClick={() => void handleChangeGoalkeeper(goalkeeperChangeTeamId, entry.player_id)}
+                    disabled={current || goalkeeperSaving}
+                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left disabled:opacity-70 ${current ? "border-cyan-300/40 bg-cyan-300/10" : "border-border bg-surface hover:border-accent/50"}`}
+                  >
+                    <PlayerAvatar name={entry.player?.name || "Jogador"} avatarUrl={entry.player?.avatar_url} clickable={false} className="h-10 w-10 shrink-0 rounded-full bg-background text-xs font-bold" />
+                    <span className="min-w-0 flex-1 truncate text-sm font-bold text-foreground">{entry.player?.name || "Jogador"}</span>
+                    <span className="shrink-0 text-[10px] font-black text-accent">{current ? "🧤 No gol" : goalkeeperSaving ? "Salvando..." : "Colocar no gol"}</span>
+                  </button>;
+                })}
+            </div>
+          </div>
         </div>
       )}
 

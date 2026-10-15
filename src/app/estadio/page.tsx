@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function StadiumEntryPage() {
   return <div className="flex min-h-dvh flex-col bg-[#031008] text-white">
-    <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
+    <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8">
       <Link href="/inicio" className="font-athletic text-xl font-black uppercase italic text-[#ccff00]">Pelada BQ</Link>
       <Link href="/login?next=/lobby" className="rounded-full border border-white/20 px-4 py-2 text-xs font-bold">Login de jogador</Link>
     </header>

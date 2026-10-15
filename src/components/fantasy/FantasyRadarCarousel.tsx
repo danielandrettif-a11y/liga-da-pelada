@@ -131,6 +131,7 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
 
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let frameId = 0;
+    let isVisible = false;
 
     const sectionWidth = () => track.scrollWidth / 3;
     const prepareLoop = () => {
@@ -142,12 +143,18 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
     };
     prepareLoop();
 
+    const stop = () => {
+      if (frameId) window.cancelAnimationFrame(frameId);
+      frameId = 0;
+      lastFrameRef.current = null;
+    };
     const move = (timestamp: number) => {
+      frameId = 0;
       const previous = lastFrameRef.current ?? timestamp;
       const elapsed = Math.min(timestamp - previous, 40);
       lastFrameRef.current = timestamp;
 
-      if (!prefersReducedMotion && !interactingRef.current && !allStoriesExpandedRef.current) {
+      if (!interactingRef.current && !allStoriesExpandedRef.current) {
         const width = sectionWidth();
         if (width > 0 && track.scrollWidth > track.clientWidth) {
           // Velocidade intencionalmente perceptível, mas sem competir com o gesto manual.
@@ -156,17 +163,39 @@ export function FantasyRadarCarousel({ radar, onSelectPlayer }: Props) {
           if (track.scrollLeft <= 0) track.scrollLeft += width;
         }
       }
+      if (isVisible && document.visibilityState === "visible") {
+        frameId = window.requestAnimationFrame(move);
+      }
+    };
+    const start = () => {
+      if (prefersReducedMotion || frameId || !isVisible || document.visibilityState !== "visible") return;
+      lastFrameRef.current = null;
       frameId = window.requestAnimationFrame(move);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") start();
+      else stop();
     };
 
     const observer = new ResizeObserver(prepareLoop);
     observer.observe(track);
-    frameId = window.requestAnimationFrame(move);
+    const viewportObserver = typeof IntersectionObserver === "undefined" ? null : new IntersectionObserver(([entry]) => {
+      isVisible = entry.isIntersecting;
+      if (isVisible) start();
+      else stop();
+    });
+    if (viewportObserver) viewportObserver.observe(track);
+    else {
+      isVisible = true;
+      start();
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
-      window.cancelAnimationFrame(frameId);
+      stop();
       observer.disconnect();
+      viewportObserver?.disconnect();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (resumeTimerRef.current !== null) window.clearTimeout(resumeTimerRef.current);
-      lastFrameRef.current = null;
       initializedRef.current = false;
     };
   }, [storySignature, stories.length]);

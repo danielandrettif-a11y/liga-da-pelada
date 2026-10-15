@@ -4,6 +4,7 @@ import {
   type OverallRoundInput,
   type OverallResult,
 } from "./overall";
+import { calculateGoalkeeperMatchScouts, goalkeeperAtEvent } from "./goalkeeper-timeline";
 
 type HistoryEvent = {
   player_id: string;
@@ -12,6 +13,8 @@ type HistoryEvent = {
   is_own_goal?: boolean | null;
   elapsed_seconds?: number | null;
   minute?: number | null;
+  goalkeeper_a_player_id?: string | null;
+  goalkeeper_b_player_id?: string | null;
 };
 
 type HistoryMatchPlayer = {
@@ -34,6 +37,13 @@ type HistoryMatch = {
   match_events?: HistoryEvent[] | null;
   match_players?: HistoryMatchPlayer[] | null;
   match_goalkeepers?: Array<{ player_id: string; team_id: string }> | null;
+  match_goalkeeper_stints?: Array<{
+    player_id: string;
+    team_id: string;
+    entered_elapsed_seconds: number;
+    left_elapsed_seconds?: number | null;
+    selected_at?: string;
+  }> | null;
 };
 
 type HistoryRound = {
@@ -121,7 +131,35 @@ export function buildOverallHistoryInput(source: OverallHistorySource): {
 
     for (const match of (round.matches || []).filter((item) => item.status === "finished")) {
       const end = matchEndSeconds(match);
-      const goalkeeperIds = new Set((match.match_goalkeepers || []).map((goalkeeper) => goalkeeper.player_id));
+      const goalkeepers = (match.match_goalkeepers || []).map((goalkeeper) => ({ playerId: goalkeeper.player_id, teamId: goalkeeper.team_id }));
+      const goalkeeperStints = (match.match_goalkeeper_stints || []).map((stint) => ({
+        playerId: stint.player_id,
+        teamId: stint.team_id,
+        enteredElapsedSeconds: Number(stint.entered_elapsed_seconds || 0),
+        leftElapsedSeconds: stint.left_elapsed_seconds,
+        selectedAt: stint.selected_at,
+      }));
+      const goalkeeperIds = new Set((goalkeeperStints.length ? goalkeeperStints : goalkeepers).map((goalkeeper) => goalkeeper.playerId));
+      const goalEvents = (match.match_events || []).map((event) => ({
+        playerId: event.player_id,
+        assistPlayerId: event.assist_player_id,
+        teamId: event.team_id,
+        isOwnGoal: event.is_own_goal || false,
+        goalkeeperAPlayerId: event.goalkeeper_a_player_id,
+        goalkeeperBPlayerId: event.goalkeeper_b_player_id,
+      }));
+      const goalkeeperScouts = calculateGoalkeeperMatchScouts({
+        status: match.status,
+        teamAId: match.team_a_id,
+        teamBId: match.team_b_id,
+        scoreA: Number(match.score_a || 0),
+        scoreB: Number(match.score_b || 0),
+        officialElapsedSeconds: Number(match.timer_accumulated_seconds || 0) + Number(match.eligibility_elapsed_offset_seconds || 0),
+        durationSeconds: Number(match.duration_seconds || 0),
+        goalkeepers,
+        goalkeeperStints,
+        events: goalEvents,
+      });
       const useGoalEvents = completedGoalEvents(match);
 
       for (const participant of match.match_players || []) {
@@ -134,6 +172,17 @@ export function buildOverallHistoryInput(source: OverallHistorySource): {
         if (secondsPlayed === 0) continue;
         const eventsDuringAppearance = (match.match_events || []).filter((event) => duringAppearance(event, start, leave, end));
         const opponentGoalEvents = eventsDuringAppearance.filter((event) => event.team_id !== participant.team_id);
+        const goalkeeperOpponentGoals = opponentGoalEvents.filter((event) =>
+          goalkeeperAtEvent({ teamAId: match.team_a_id, teamBId: match.team_b_id, goalkeepers }, {
+            playerId: event.player_id,
+            teamId: event.team_id,
+            goalkeeperAPlayerId: event.goalkeeper_a_player_id,
+            goalkeeperBPlayerId: event.goalkeeper_b_player_id,
+          }, participant.team_id) === participant.player_id,
+        );
+        const creditedOpponentGoals = goalkeeperIds.has(participant.player_id)
+          ? goalkeeperOpponentGoals
+          : opponentGoalEvents;
         const ownGoals = eventsDuringAppearance.filter((event) => event.player_id === participant.player_id && event.is_own_goal).length;
         const goals = eventsDuringAppearance.filter((event) => event.player_id === participant.player_id && !event.is_own_goal).length;
         const assists = eventsDuringAppearance.filter((event) => event.assist_player_id === participant.player_id && !event.is_own_goal).length;
@@ -152,10 +201,12 @@ export function buildOverallHistoryInput(source: OverallHistorySource): {
           teamId: participant.team_id,
           secondsPlayed,
           matchSeconds: end,
-          goalsConceded: useGoalEvents ? opponentGoalEvents.length : teamConceded(match, participant.team_id),
+          goalsConceded: goalkeeperIds.has(participant.player_id)
+            ? Number(goalkeeperScouts.get(participant.player_id)?.goalsConceded || 0)
+            : useGoalEvents ? creditedOpponentGoals.length : teamConceded(match, participant.team_id),
           teamGoalsConceded: teamConceded(match, participant.team_id),
           concededGoalSeconds: useGoalEvents
-            ? opponentGoalEvents.map((event) => Math.max(0, Number(eventSeconds(event) || 0) - start))
+            ? creditedOpponentGoals.map((event) => Math.max(0, Number(eventSeconds(event) || 0) - start))
             : [],
           goalTimingQuality: useGoalEvents ? "exact" : "fallback",
           goals,

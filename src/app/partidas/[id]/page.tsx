@@ -12,16 +12,21 @@ export default async function PartidaAoVivoPage({
   params: { id: string };
 }) {
   const { id } = await params;
-  const [match, league, account, auditLog] = await Promise.all([
+  const [match, league, account] = await Promise.all([
     getMatch(id),
     getLeagueConfig(),
     getCurrentAccount(),
-    getFinishedMatchAudit(id),
   ]);
 
   if (!match) {
     notFound();
   }
+
+  // O histórico de correções só aparece para ADM após o encerramento.
+  // Evita consultar auditoria em toda atualização do placar ao vivo.
+  const auditLog = match.status === "finished" && account.isAdmin
+    ? await getFinishedMatchAudit(id)
+    : [];
 
   const duration = league?.match_duration || 7;
 

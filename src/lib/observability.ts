@@ -1,5 +1,5 @@
 type ObservabilityEvent = {
-  kind: "server_error" | "client_error" | "web_vital";
+  kind: "server_error" | "client_error" | "web_vital" | "client_action";
   name: string;
   message?: string;
   path?: string;

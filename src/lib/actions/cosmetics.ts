@@ -76,10 +76,11 @@ const LEGACY_LOADOUT_RELATIONS = `
   background:background_cosmetic_id(asset_key)
 `;
 
-async function loadCosmeticRelations(client: any, fantasySeasonId: string, userId?: string) {
+async function loadCosmeticRelations(client: any, fantasySeasonId: string, userId?: string, userIds?: string[]) {
   const buildQuery = (selection: string) => {
     let query = client.from("fantasy_user_cosmetic_loadouts").select(selection).eq("fantasy_season_id", fantasySeasonId);
     if (userId) query = query.eq("user_id", userId);
+    else if (userIds) query = query.in("user_id", userIds);
     return userId ? query.maybeSingle() : query;
   };
   const current = await buildQuery(CURRENT_LOADOUT_RELATIONS);
@@ -402,7 +403,8 @@ export async function getPlayerEquippedCosmetics(playerId: string): Promise<Equi
   };
 }
 
-export async function getAllPlayersEquippedCosmeticsMap(): Promise<Map<string, EquippedCosmeticsSummary>> {
+export async function getAllPlayersEquippedCosmeticsMap(playerIds?: string[]): Promise<Map<string, EquippedCosmeticsSummary>> {
+  if (playerIds && playerIds.length === 0) return new Map();
   const account = await getCurrentAccount();
   const client: any = account.user ? account.client : account.client;
 
@@ -418,10 +420,23 @@ export async function getAllPlayersEquippedCosmeticsMap(): Promise<Map<string, E
 
   if (!fantasySeason) return new Map();
 
-  const [{ data: profiles }, loadouts] = await Promise.all([
-    client.from("account_profiles").select("user_id, player_id").not("player_id", "is", null),
-    loadCosmeticRelations(client, fantasySeason.id),
-  ]);
+  let profiles: Array<{ user_id: string; player_id: string }> | null = null;
+  let loadouts: any[] | null = null;
+  if (playerIds) {
+    const { data } = await client.from("account_profiles")
+      .select("user_id, player_id").in("player_id", [...new Set(playerIds)]);
+    profiles = data;
+    const userIds = [...new Set((profiles || []).map((profile) => profile.user_id))];
+    if (userIds.length === 0) return new Map();
+    loadouts = await loadCosmeticRelations(client, fantasySeason.id, undefined, userIds);
+  } else {
+    const [profilesResult, allLoadouts] = await Promise.all([
+      client.from("account_profiles").select("user_id, player_id").not("player_id", "is", null),
+      loadCosmeticRelations(client, fantasySeason.id),
+    ]);
+    profiles = profilesResult.data;
+    loadouts = allLoadouts;
+  }
 
   const userToPlayer = new Map<string, string>((profiles || []).map((p: any) => [p.user_id, p.player_id]));
   const map = new Map<string, EquippedCosmeticsSummary>();

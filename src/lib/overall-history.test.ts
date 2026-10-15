@@ -77,4 +77,36 @@ describe("adaptação do histórico para OVR", () => {
     expect(attacker.goals).toBe(4);
     expect(attacker.assists).toBe(3);
   });
+
+  it("atribui gols sofridos do OVR somente ao período real de cada goleiro", () => {
+    const result = buildOverallHistoryInput({
+      players: [
+        { id: "old", playerProfile: "defensive" },
+        { id: "new", playerProfile: "defensive" },
+      ],
+      zeroPointOverrides: [],
+      rounds: [{
+        id: "r-gk", number: 1, date: "2026-09-01", round_type: "official", status: "finished",
+        matches: [{
+          status: "finished", team_a_id: "a", team_b_id: "b", score_a: 0, score_b: 2,
+          duration_seconds: 420, timer_accumulated_seconds: 420,
+          match_players: [
+            { player_id: "old", team_id: "a", entered_elapsed_seconds: 0 },
+            { player_id: "new", team_id: "a", entered_elapsed_seconds: 0 },
+          ],
+          match_goalkeepers: [{ player_id: "old", team_id: "a" }],
+          match_goalkeeper_stints: [
+            { player_id: "old", team_id: "a", entered_elapsed_seconds: 0, left_elapsed_seconds: 210 },
+            { player_id: "new", team_id: "a", entered_elapsed_seconds: 210, left_elapsed_seconds: 420 },
+          ],
+          match_events: [
+            { player_id: "scorer", team_id: "b", elapsed_seconds: 100, goalkeeper_a_player_id: "old" },
+            { player_id: "scorer", team_id: "b", elapsed_seconds: 300, goalkeeper_a_player_id: "new" },
+          ],
+        }],
+      }],
+    });
+    expect(result.rounds[0].appearances.find((item) => item.playerId === "old")?.goalsConceded).toBe(1);
+    expect(result.rounds[0].appearances.find((item) => item.playerId === "new")?.goalsConceded).toBe(1);
+  });
 });

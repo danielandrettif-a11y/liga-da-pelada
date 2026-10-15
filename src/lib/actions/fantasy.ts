@@ -55,6 +55,7 @@ import {
 import { isParticipantScoringEligible } from "@/lib/scoring-eligibility";
 import { resolveFantasyCardPointBonus } from "@/lib/fantasy/card-benefits";
 import { buildFantasyGoalkeeperSimulationStats } from "@/lib/fantasy/goalkeeper-simulation";
+import { calculateGoalkeeperMatchScouts } from "@/lib/goalkeeper-timeline";
 import { rankingActivePlayerIds } from "@/lib/ranking";
 import { compareFantasyRoundPriority } from "@/lib/fantasy-round-order";
 
@@ -207,7 +208,7 @@ async function loadFantasyMatchSnapshots(
 
   const { data: matches, error: matchesError } = await client
     .from("matches")
-    .select("id, status, team_a_id, team_b_id, score_a, score_b")
+    .select("id, status, team_a_id, team_b_id, score_a, score_b, duration_seconds, timer_started_at, timer_accumulated_seconds, eligibility_elapsed_offset_seconds, match_goalkeeper_stints(player_id, team_id, entered_elapsed_seconds, left_elapsed_seconds, selected_at)")
     .eq("round_id", roundId);
   if (matchesError) {
     console.error("Erro ao buscar partidas para a prévia do Cartola:", matchesError);
@@ -220,7 +221,7 @@ async function loadFantasyMatchSnapshots(
   const [eventsResult, playersResult, goalkeepersResult] = await Promise.all([
     client
       .from("match_events")
-      .select("match_id, event_type, player_id, assist_player_id, team_id, is_own_goal")
+      .select("match_id, event_type, player_id, assist_player_id, team_id, is_own_goal, goalkeeper_a_player_id, goalkeeper_b_player_id")
       .in("match_id", matchIds)
       .eq("event_type", "goal"),
     client
@@ -259,6 +260,32 @@ async function loadFantasyMatchSnapshots(
     })),
     match_goalkeepers: goalkeepersByMatch.get(match.id) || [],
   }));
+}
+
+function fantasyGoalkeeperTimeline(match: any) {
+  return {
+    goalkeeperStints: (match.match_goalkeeper_stints || []).map((item: any) => ({
+      playerId: item.player_id,
+      teamId: item.team_id,
+      enteredElapsedSeconds: Number(item.entered_elapsed_seconds || 0),
+      leftElapsedSeconds: item.left_elapsed_seconds,
+      selectedAt: item.selected_at,
+    })),
+    officialElapsedSeconds: Number(match.eligibility_elapsed_offset_seconds || 0)
+      + Number(match.timer_accumulated_seconds || 0)
+      + (match.timer_started_at
+        ? Math.max(0, Math.floor((Date.now() - new Date(match.timer_started_at).getTime()) / 1000))
+        : 0),
+    durationSeconds: Number(match.duration_seconds || 0),
+    events: (match.match_events || []).map((item: any) => ({
+      playerId: item.player_id,
+      assistPlayerId: item.assist_player_id,
+      teamId: item.team_id,
+      isOwnGoal: Boolean(item.is_own_goal),
+      goalkeeperAPlayerId: item.goalkeeper_a_player_id,
+      goalkeeperBPlayerId: item.goalkeeper_b_player_id,
+    })),
+  };
 }
 
 export async function getFantasyDashboard() {
@@ -882,12 +909,7 @@ export async function getFantasyDashboard() {
         playerId: item.player_id,
         teamId: item.team_id,
       })),
-      events: (match.match_events || []).map((item: any) => ({
-        playerId: item.player_id,
-        assistPlayerId: item.assist_player_id,
-        teamId: item.team_id,
-        isOwnGoal: Boolean(item.is_own_goal),
-      })),
+      ...fantasyGoalkeeperTimeline(match),
     })),
     scoringSettings,
     { suppressGoalkeeperRewards: Boolean(displayRound?.suppress_goalkeeper_rewards) },
@@ -2482,12 +2504,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
           playerId: item.player_id,
           teamId: item.team_id,
         })),
-        events: (match.match_events || []).map((item: any) => ({
-          playerId: item.player_id,
-          assistPlayerId: item.assist_player_id,
-          teamId: item.team_id,
-          isOwnGoal: Boolean(item.is_own_goal),
-        })),
+        ...fantasyGoalkeeperTimeline(match),
       })),
       liveSettings,
       { suppressGoalkeeperRewards: Boolean(scoringRoundInfo?.suppress_goalkeeper_rewards) },
@@ -2561,11 +2578,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
           playerId: item.player_id,
           teamId: item.team_id,
         })),
-        events: (match.match_events || []).map((item: any) => ({
-          playerId: item.player_id,
-          assistPlayerId: item.assist_player_id,
-          isOwnGoal: Boolean(item.is_own_goal),
-        })),
+        ...fantasyGoalkeeperTimeline(match),
       })),
       playerId,
     );
@@ -2756,14 +2769,24 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     const matchesBreakdown = (liveMatches || [])
       .filter((match: any) => {
         const inPlayers = (match.match_players || []).some((p: any) => p.player_id === playerId);
-        const inGk = (match.match_goalkeepers || []).some((g: any) => g.player_id === playerId);
+        const inGk = (match.match_goalkeeper_stints || match.match_goalkeepers || [])
+          .some((g: any) => g.player_id === playerId);
         return inPlayers || inGk;
       })
       .map((match: any, index: number) => {
         const isFinished = match.status === "finished";
         const playerInMatch = (match.match_players || []).find((p: any) => p.player_id === playerId);
-        const isGk = (match.match_goalkeepers || []).some((g: any) => g.player_id === playerId);
-        const teamId = playerInMatch?.team_id || (match.match_goalkeepers || []).find((g: any) => g.player_id === playerId)?.team_id;
+        const goalkeeperScout = calculateGoalkeeperMatchScouts({
+          status: match.status,
+          teamAId: match.team_a_id,
+          teamBId: match.team_b_id,
+          scoreA: Number(match.score_a || 0),
+          scoreB: Number(match.score_b || 0),
+          goalkeepers: (match.match_goalkeepers || []).map((g: any) => ({ playerId: g.player_id, teamId: g.team_id })),
+          ...fantasyGoalkeeperTimeline(match),
+        }).get(playerId);
+        const isGk = Boolean(goalkeeperScout);
+        const teamId = playerInMatch?.team_id || goalkeeperScout?.teamId;
         const myTeam = teamId === match.team_a_id ? "A" : teamId === match.team_b_id ? "B" : null;
         const myScore = myTeam === "A" ? Number(match.score_a || 0) : Number(match.score_b || 0);
         const oppScore = myTeam === "A" ? Number(match.score_b || 0) : Number(match.score_a || 0);
@@ -2786,7 +2809,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
           assists: matchAssists,
           ownGoals: matchOwnGoals,
           isGoalkeeper: isGk,
-          goalsConcededInMatch: isGk ? oppScore : 0,
+          goalsConcededInMatch: goalkeeperScout?.goalsConceded || 0,
         };
       });
 
@@ -3027,7 +3050,7 @@ async function getLiveRoundProjections(
       scoreB: Number(match.score_b || 0),
       players: (match.match_players || []).map((item: any) => ({ playerId: item.player_id, teamId: item.team_id, resultEligible: Boolean(item.result_eligible), scoringEligible: item.scoring_eligible !== false, playerProfile: playerProfileById.get(item.player_id) || null })),
       goalkeepers: (match.match_goalkeepers || []).map((item: any) => ({ playerId: item.player_id, teamId: item.team_id })),
-      events: (match.match_events || []).map((item: any) => ({ playerId: item.player_id, assistPlayerId: item.assist_player_id, teamId: item.team_id, isOwnGoal: Boolean(item.is_own_goal) })),
+      ...fantasyGoalkeeperTimeline(match),
     })),
     settings,
     { suppressGoalkeeperRewards: Boolean(activeRoundInfo?.suppress_goalkeeper_rewards) },

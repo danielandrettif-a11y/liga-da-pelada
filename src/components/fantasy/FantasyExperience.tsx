@@ -700,7 +700,8 @@ export function FantasyExperience({
     if (status !== "in_progress" || !round) return;
     const channel = supabase
       .channel(`fantasy-${round.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "match_events" }, () => requestRefresh())
+      // Registrar um gol atualiza o placar em matches. Escutar match_events sem
+      // filtro atualizava o Cartola desta pelada a cada gol de qualquer liga.
       .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `round_id=eq.${round.id}` }, () => requestRefresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "player_round_stats", filter: `round_id=eq.${round.id}` }, () => requestRefresh())
       .subscribe();
@@ -2154,7 +2155,7 @@ export function FantasyExperience({
                     <div
                       aria-hidden="true"
                       className="absolute inset-0 bg-contain bg-center bg-no-repeat drop-shadow-[0_10px_18px_rgba(0,0,0,.5)]"
-                      style={{ backgroundImage: "url('/images/cartola/banco-reserva-premium-v1.png')" }}
+                      style={{ backgroundImage: "url('/images/cartola/banco-reserva-premium-v1.webp')" }}
                     />
                     <button
                       type="button"
@@ -2255,7 +2256,7 @@ export function FantasyExperience({
                     <div
                       aria-hidden="true"
                       className="absolute inset-0 bg-contain bg-center bg-no-repeat opacity-90 drop-shadow-[0_10px_18px_rgba(0,0,0,.5)]"
-                      style={{ backgroundImage: "url('/images/cartola/banco-reserva-premium-v1.png')" }}
+                      style={{ backgroundImage: "url('/images/cartola/banco-reserva-premium-v1.webp')" }}
                     />
                     <div className="absolute left-1/2 top-[38%] flex aspect-square w-[14%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/65 text-2xl font-black text-amber-200/80 shadow-[0_0_18px_rgba(251,191,36,.22)]">
                       {open && !isTest ? "+" : <Lock className="h-5 w-5" />}
