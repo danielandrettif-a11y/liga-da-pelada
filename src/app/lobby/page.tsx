@@ -37,8 +37,8 @@ export default async function LobbyPage({ searchParams }: { searchParams: Promis
 
       <div className="grid gap-2 sm:grid-cols-3">
         <a href="#minhas-peladas" className="rounded-xl border border-accent/30 bg-accent/10 p-3 text-sm font-black text-accent">Entrar na minha pelada <span className="mt-1 block text-[11px] font-normal text-muted">Escolha uma da sua lista</span></a>
-        <Link href="/peladas" className="rounded-xl border border-border bg-surface p-3 text-sm font-black text-white">Procurar pelada <span className="mt-1 block text-[11px] font-normal text-muted">Descubra as abertas</span></Link>
-        {adminLeagueIds.length > 0 && <Link href="/lobby/criar" className="rounded-xl border border-border bg-surface p-3 text-sm font-black text-white">Criar pelada <span className="mt-1 block text-[11px] font-normal text-muted">Básica ou Completa</span></Link>}
+        <Link href="/peladas" className="rounded-xl border border-border bg-surface p-3 text-sm font-black text-white">Procurar pelada <span className="mt-1 block text-[11px] font-normal text-muted">Veja todas e peça para entrar</span></Link>
+        <Link href="/lobby/criar" className="rounded-xl border border-border bg-surface p-3 text-sm font-black text-white">Criar nova pelada <span className="mt-1 block text-[11px] font-normal text-muted">Você será o administrador</span></Link>
       </div>
 
       {error && <p role="alert" className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">A operação não foi concluída. Atualize a página e tente novamente.</p>}
@@ -62,7 +62,7 @@ export default async function LobbyPage({ searchParams }: { searchParams: Promis
             <button type="submit" className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-black text-black">Entrar na pelada</button>
           </form>
         </div>)}
-      </div> : <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-muted">Você ainda não participa de nenhuma pelada. <Link href="/peladas" className="font-bold text-accent">Procure uma aberta</Link> ou peça um convite ao administrador.</div>}
+      </div> : <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-muted">Você ainda não participa de nenhuma pelada. <Link href="/peladas" className="font-bold text-accent">Procure uma pelada</Link> ou <Link href="/lobby/criar" className="font-bold text-accent">crie a sua</Link>.</div>}
 
       {(myRequests || []).length > 0 && <section className="rounded-2xl border border-border bg-surface p-4">
         <h2 className="font-athletic text-lg font-bold text-white">Aguardando aprovação</h2>

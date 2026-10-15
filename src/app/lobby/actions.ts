@@ -66,19 +66,28 @@ export async function joinOpenLeague(formData: FormData) {
   (await cookies()).set(ACTIVE_LEAGUE_COOKIE, leagueId, {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365,
   });
+  revalidatePath("/peladas");
+  revalidatePath("/lobby");
   revalidatePath("/", "layout");
   redirect("/");
 }
 
+export async function requestClosedLeague(formData: FormData) {
+  const leagueId = String(formData.get("league_id") || "");
+  const { client, user } = await getCurrentAccount();
+  if (!user) redirect("/login?next=/peladas");
+  const { error } = await client.rpc("request_league_membership_by_id", {
+    p_league_id: leagueId,
+  });
+  if (error) redirect("/peladas?error=request");
+  revalidatePath("/peladas");
+  revalidatePath("/lobby");
+  redirect("/peladas?requested=1");
+}
+
 export async function createLeague(formData: FormData) {
-  if (process.env.MULTI_LEAGUE_CREATION_ENABLED !== "true") {
-    redirect("/lobby/criar?error=unavailable");
-  }
   const { client, user } = await getCurrentAccount();
   if (!user) redirect("/login?next=/lobby/criar");
-  if (!(await getMyLeagues()).some((league) => league.role === "admin")) {
-    redirect("/lobby/criar?error=access");
-  }
   const name = String(formData.get("name") || "").trim().replace(/\s+/g, " ");
   const tier = String(formData.get("tier") || "");
   const visibility = String(formData.get("visibility") || "");
@@ -86,7 +95,7 @@ export async function createLeague(formData: FormData) {
     || !["private", "open"].includes(visibility)) {
     redirect("/lobby/criar?error=invalid");
   }
-  const { data: leagueId, error } = await client.rpc("create_league_for_admin", {
+  const { data: leagueId, error } = await client.rpc("create_league_for_user", {
     p_name: name,
     p_tier: tier,
     p_visibility: visibility,

@@ -105,7 +105,7 @@ export default function LigaConfigPage() {
     const result = await updateLeagueVisibility(leagueId, nextVisibility);
     if (result.success) {
       setVisibility(nextVisibility);
-      setVisibilityMessage(nextVisibility === "open" ? "Pelada aberta para descoberta e entrada." : "Pelada privada: acesso somente por convite ou ADM.");
+      setVisibilityMessage(nextVisibility === "open" ? "Pelada aberta: qualquer jogador cadastrado pode entrar." : "Pelada fechada: novos jogadores precisam da aprovação de um ADM.");
     } else setVisibilityMessage(result.error || "Não foi possível atualizar a visibilidade.");
     setSavingVisibility(false);
   }
@@ -138,7 +138,7 @@ export default function LigaConfigPage() {
           <ArrowLeft className="w-5 h-5 text-muted" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-foreground">Configurações da Liga</h1>
+          <h1 className="text-xl font-bold text-foreground">Configurações da pelada</h1>
           <p className="text-xs text-muted mt-0.5">
             Ajuste as regras gerais do jogo
           </p>
@@ -162,9 +162,9 @@ export default function LigaConfigPage() {
 
       {canManage && <section className="glass-card space-y-3 p-5">
         <h2 className="font-athletic text-lg font-black uppercase text-foreground">Quem pode encontrar esta pelada?</h2>
-        <p className="text-xs leading-5 text-muted">Privada: somente convite ou inclusão pelo ADM. Aberta: aparece na busca e jogadores cadastrados podem entrar.</p>
+        <p className="text-xs leading-5 text-muted">Fechada: aparece no catálogo, mas um ADM precisa aprovar cada pedido. Aberta: qualquer jogador cadastrado pode entrar imediatamente.</p>
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" disabled={savingVisibility} onClick={() => handleVisibility("private")} className={`rounded-xl border px-3 py-3 text-xs font-black ${visibility === "private" ? "border-accent bg-accent/10 text-accent" : "border-border text-muted"}`}>Privada</button>
+          <button type="button" disabled={savingVisibility} onClick={() => handleVisibility("private")} className={`rounded-xl border px-3 py-3 text-xs font-black ${visibility === "private" ? "border-accent bg-accent/10 text-accent" : "border-border text-muted"}`}>Fechada</button>
           <button type="button" disabled={savingVisibility} onClick={() => handleVisibility("open")} className={`rounded-xl border px-3 py-3 text-xs font-black ${visibility === "open" ? "border-accent bg-accent/10 text-accent" : "border-border text-muted"}`}>Aberta</button>
         </div>
         {visibilityMessage && <p role="status" className="text-xs text-muted">{visibilityMessage}</p>}

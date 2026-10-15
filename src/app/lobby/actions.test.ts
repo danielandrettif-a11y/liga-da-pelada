@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   account: vi.fn(), leagues: vi.fn(), rpc: vi.fn(), cookieSet: vi.fn(),
@@ -12,16 +12,10 @@ vi.mock("@/lib/league-context", () => ({
   ACTIVE_LEAGUE_COOKIE: "active_league_id", getMyLeagues: mocks.leagues,
 }));
 
-import { createLeague } from "./actions";
+import { createLeague, requestClosedLeague } from "./actions";
 
-const previousFlag = process.env.MULTI_LEAGUE_CREATION_ENABLED;
-afterAll(() => {
-  if (previousFlag === undefined) delete process.env.MULTI_LEAGUE_CREATION_ENABLED;
-  else process.env.MULTI_LEAGUE_CREATION_ENABLED = previousFlag;
-});
 beforeEach(() => {
   vi.resetAllMocks();
-  process.env.MULTI_LEAGUE_CREATION_ENABLED = "true";
   mocks.redirect.mockImplementation((url: string) => { throw new Error(`redirect:${url}`); });
   mocks.account.mockResolvedValue({ user: { id: "owner" }, client: { rpc: mocks.rpc } });
   mocks.leagues.mockResolvedValue([{ id: "old-league", role: "admin" }]);
@@ -35,15 +29,15 @@ function form(name = "Pelada HG", tier = "basic", visibility = "private") {
 }
 
 describe("criação de pelada", () => {
-  it("mantém a criação fechada até o ensaio de isolamento", async () => {
-    delete process.env.MULTI_LEAGUE_CREATION_ENABLED;
-    await expect(createLeague(form())).rejects.toThrow("redirect:/lobby/criar?error=unavailable");
-    expect(mocks.rpc).not.toHaveBeenCalled();
+  it("permite que um jogador comum crie a própria pelada", async () => {
+    mocks.leagues.mockResolvedValue([{ id: "old-league", role: "player" }]);
+    await expect(createLeague(form())).rejects.toThrow("redirect:/");
+    expect(mocks.rpc).toHaveBeenCalledWith("create_league_for_user", expect.any(Object));
   });
 
-  it("recusa contas sem ADM antes de chamar o banco", async () => {
-    mocks.leagues.mockResolvedValue([{ id: "old-league", role: "player" }]);
-    await expect(createLeague(form())).rejects.toThrow("redirect:/lobby/criar?error=access");
+  it("exige uma conta autenticada", async () => {
+    mocks.account.mockResolvedValue({ user: null, client: { rpc: mocks.rpc } });
+    await expect(createLeague(form())).rejects.toThrow("redirect:/login?next=/lobby/criar");
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
@@ -56,10 +50,23 @@ describe("criação de pelada", () => {
   it("envia apenas os dados escolhidos e seleciona a nova pelada", async () => {
     await expect(createLeague(form("  Pelada   HG  ", "complete", "open")))
       .rejects.toThrow("redirect:/");
-    expect(mocks.rpc).toHaveBeenCalledWith("create_league_for_admin", {
+    expect(mocks.rpc).toHaveBeenCalledWith("create_league_for_user", {
       p_name: "Pelada HG", p_tier: "complete", p_visibility: "open",
     });
     expect(mocks.cookieSet).toHaveBeenCalledWith("active_league_id", "new-league", expect.any(Object));
     expect(mocks.revalidate).toHaveBeenCalledWith("/", "layout");
+  });
+});
+
+describe("pedido para pelada fechada", () => {
+  it("solicita acesso pelo id e atualiza lobby e catálogo", async () => {
+    const data = new FormData();
+    data.set("league_id", "closed-league");
+    await expect(requestClosedLeague(data)).rejects.toThrow("redirect:/peladas?requested=1");
+    expect(mocks.rpc).toHaveBeenCalledWith("request_league_membership_by_id", {
+      p_league_id: "closed-league",
+    });
+    expect(mocks.revalidate).toHaveBeenCalledWith("/peladas");
+    expect(mocks.revalidate).toHaveBeenCalledWith("/lobby");
   });
 });
