@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, CartolaHat, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag, Microphone } from "@/components/icons";
+import { Home, CartolaHat, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag } from "@/components/icons";
 import { supabase } from "@/lib/supabase";
 
 const NAV_ITEMS = [
@@ -34,6 +34,7 @@ export function BottomNav({
   currentUserId: string | null;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [unreadRoster, setUnreadRoster] = useState(newRosterCount);
   const [collectiveUnread, setCollectiveUnread] = useState(collective?.unreadCount || 0);
@@ -61,27 +62,22 @@ export function BottomNav({
   }, []);
   useEffect(() => {
     if (pathname.startsWith("/admin/jogadores")) setUnreadRoster(0);
-    if (pathname.startsWith("/coletiva")) setCollectiveUnread(0);
+    if (pathname.startsWith("/coletiva") || (pathname.startsWith("/jogadores") && searchParams.get("view") === "collective")) setCollectiveUnread(0);
     // Limpa o estado pendente quando a rota realmente terminar de navegar
     setPendingHref(null);
-  }, [pathname]);
+  }, [pathname, searchParams]);
 
   const roundFlowItem = hasOpenCallup
     ? { href: "/convocacao", label: "Convocação", icon: Flag, notification: true }
     : hasPendingPayment
       ? { href: "/pagamentos", label: "Transfermarket", icon: ArrowLeftRight, notification: true }
       : null;
-  const communityItem = {
-    href: "/coletiva",
-    label: "Coletiva de imprensa",
-    icon: Microphone,
-  };
   const contextualItems = [
     NAV_ITEMS[0],
     ...(roundFlowItem ? [roundFlowItem] : []),
     ...(featureTier === "complete" ? [NAV_ITEMS[1]] : []),
     NAV_ITEMS[2],
-    ...(featureTier === "complete" && canAccessCollective ? [communityItem] : []),
+    NAV_ITEMS[3],
     NAV_ITEMS[4],
   ];
   const visibleItems = isAuthenticated
@@ -140,14 +136,9 @@ export function BottomNav({
                   }`}
                   strokeWidth={isActive ? 2.1 : 1.8}
                 />
-                {item.href === "/jogadores" && unreadRoster > 0 && (
+                {item.href === "/jogadores" && unreadRoster + (canAccessCollective ? collectiveUnread : 0) > 0 && (
                   <span className="absolute -right-2.5 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full border border-background bg-danger px-1 text-[8px] font-black leading-none text-white shadow-lg">
-                    {unreadRoster > 99 ? "99+" : unreadRoster}
-                  </span>
-                )}
-                {item.href.startsWith("/coletiva") && collective && collectiveUnread > 0 && (
-                  <span className="absolute -right-2.5 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full border border-background bg-danger px-1 text-[8px] font-black leading-none text-white shadow-lg">
-                    {collectiveUnread > 99 ? "99+" : collectiveUnread}
+                    {unreadRoster + (canAccessCollective ? collectiveUnread : 0) > 99 ? "99+" : unreadRoster + (canAccessCollective ? collectiveUnread : 0)}
                   </span>
                 )}
                 {"notification" in item && Boolean(item.notification) && (
@@ -158,9 +149,7 @@ export function BottomNav({
                 className={`block w-full text-center font-semibold tracking-tight transition-colors duration-150 ${
                   item.label === "Transfermarket" || item.label === "Convocação"
                     ? "text-[7px] min-[360px]:text-[8px] min-[430px]:text-[9px]"
-                    : item.label === "Coletiva de imprensa"
-                      ? "whitespace-normal text-[8px] leading-[.72rem] min-[390px]:text-[9px]"
-                      : "truncate whitespace-nowrap text-[9px] leading-none min-[390px]:text-[10px]"
+                    : "truncate whitespace-nowrap text-[9px] leading-none min-[390px]:text-[10px]"
                 } ${
                   isActive ? "text-accent" : ""
                 }`}

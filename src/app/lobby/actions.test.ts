@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  account: vi.fn(), leagues: vi.fn(), rpc: vi.fn(), cookieSet: vi.fn(),
+  account: vi.fn(), leagues: vi.fn(), rpc: vi.fn(), cookieGet: vi.fn(), cookieSet: vi.fn(), cookieDelete: vi.fn(),
   revalidate: vi.fn(), redirect: vi.fn(),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
-vi.mock("next/headers", () => ({ cookies: async () => ({ set: mocks.cookieSet }) }));
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: mocks.cookieGet, set: mocks.cookieSet, delete: mocks.cookieDelete }),
+}));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/lib/auth", () => ({ getCurrentAccount: mocks.account }));
 vi.mock("@/lib/league-context", () => ({

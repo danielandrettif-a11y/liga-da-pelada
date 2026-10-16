@@ -127,10 +127,15 @@ export function FantasyExperience({
   initialPackId,
   initialTab = "team",
   pitchAssetKey = null,
+  withdrawnPlayerId,
 }: FantasyExperienceProps) {
   const router = useRouter();
   const persistedPlayers = lineupPlayersFromSource(lineup);
   const persistedReserve = lineup?.fantasy_lineup_reserves?.[0] || null;
+  const withdrawnLineupPlayer = withdrawnPlayerId
+    ? persistedPlayers.find((item: any) => item.player_id === withdrawnPlayerId)
+      || (persistedReserve?.player_id === withdrawnPlayerId ? persistedReserve : null)
+    : null;
   const lastRoundPointsByPlayerId = useMemo(
     () => new Map((lastRound?.playerScores || []).map((item) => [item.playerId, item.points] as const)),
     [lastRound?.playerScores],
@@ -1293,6 +1298,7 @@ export function FantasyExperience({
 
   return (
     <div className="w-full space-y-4">
+      {withdrawnPlayerId && withdrawnLineupPlayer && <section className="rounded-2xl border border-danger/40 bg-danger/10 p-4" role="alert"><p className="text-sm font-black text-foreground">Sua escalação precisa de uma troca</p><p className="mt-1 text-pretty text-xs leading-5 text-muted">{withdrawnLineupPlayer.player_name_locked || withdrawnLineupPlayer.players?.name || "Um atleta escalado"} saiu da convocação. Escolha outro jogador antes do mercado fechar.</p></section>}
       {/* Radar independente no topo da experiência. */}
       {radar && (
         <FantasyRadarCarousel

@@ -28,18 +28,21 @@ export type PaymentRecipient = { id: string; name: string; pix_key: string; pix_
 export type ExpenseItem = {
   id: string; name: string; description: string | null; total_amount: number; installment_count: number;
   status: "active" | "completed" | "archived"; recipient_id: string; created_at: string;
-  recipient: { name: string; pix_key: string } | null; paid_installments: number;
+  recipient: { name: string; pix_key: string } | null; paid_installments: number; paid_installments_before_app: number;
 };
 
 export async function getExpenseItems(includeArchived = false): Promise<ExpenseItem[]> {
   const account = await getCurrentAccount();
   if (!account.user) return [];
   const league = await getActiveLeague();
-  let query = account.client.from("league_expense_items").select("id, name, description, total_amount, installment_count, status, recipient_id, created_at, recipient:payment_recipients!league_expense_items_recipient_id_fkey(name,pix_key), installments:round_expense_installments(id,status)").eq("league_id", league.id).order("created_at", { ascending: false });
+  let query = account.client.from("league_expense_items").select("id, name, description, total_amount, installment_count, status, recipient_id, created_at, paid_installments_before_app, recipient:payment_recipients!league_expense_items_recipient_id_fkey(name,pix_key), installments:round_expense_installments(id,status)").eq("league_id", league.id).order("created_at", { ascending: false });
   if (!includeArchived) query = query.eq("status", "active");
   const { data, error } = await query;
   if (error) return [];
-  return (data || []).map((row: any) => ({ ...row, total_amount: Number(row.total_amount), recipient: Array.isArray(row.recipient) ? row.recipient[0] || null : row.recipient, paid_installments: (row.installments || []).filter((item: any) => item.status === "active").length }));
+  return (data || []).map((row: any) => {
+    const paidBefore = Number(row.paid_installments_before_app || 0);
+    return { ...row, total_amount: Number(row.total_amount), paid_installments_before_app: paidBefore, recipient: Array.isArray(row.recipient) ? row.recipient[0] || null : row.recipient, paid_installments: paidBefore + (row.installments || []).filter((item: any) => item.status === "active").length };
+  });
 }
 
 export async function saveExpenseItem(input: { name: string; description?: string; totalAmount: number; installmentCount: number; recipientId: string }) {
@@ -62,6 +65,56 @@ export async function setExpenseItemStatus(id: string, status: "active" | "archi
   const league = await getActiveLeague();
   const { error } = await client.from("league_expense_items").update({ status, updated_at: new Date().toISOString() }).eq("id", id).eq("league_id", league.id);
   revalidatePath("/mais/caixinha"); revalidatePath("/rodadas/[id]", "page");
+  return { success: !error, error: error?.message };
+}
+
+export async function setExpenseItemPaidInstallments(id: string, paidInstallments: number) {
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem editar parcelas." };
+  const league = await getActiveLeague();
+  const nextValue = Number(paidInstallments);
+  if (!Number.isInteger(nextValue) || nextValue < 0) return { success: false, error: "Informe uma quantidade inteira de parcelas." };
+  const [{ data: item }, { count: registeredCount }] = await Promise.all([
+    client.from("league_expense_items").select("id, installment_count").eq("id", id).eq("league_id", league.id).maybeSingle(),
+    client.from("round_expense_installments").select("id", { count: "exact", head: true }).eq("expense_item_id", id).eq("status", "active"),
+  ]);
+  if (!item) return { success: false, error: "Item não pertence a esta pelada." };
+  if (nextValue + Number(registeredCount || 0) > Number(item.installment_count)) return { success: false, error: "A quantidade informada ultrapassa o total ao considerar as parcelas já lançadas." };
+  const { error } = await client.from("league_expense_items").update({ paid_installments_before_app: nextValue, updated_at: new Date().toISOString() }).eq("id", id).eq("league_id", league.id);
+  revalidatePath("/mais/caixinha"); revalidatePath("/pagamentos"); revalidatePath("/admin/transfermarket");
+  return { success: !error, error: error?.message };
+}
+
+export type RoundExpenseSelection = { expense_item_id: string; installment_number: number };
+export type PaymentChargeLine = { id: number; player_id: string; recipient_name: string; recipient_pix: string; label: string; amount: number; charge_type: string };
+
+export async function getRoundExpenseSelections(roundId: string): Promise<RoundExpenseSelection[]> {
+  const account = await getCurrentAccount(); if (!account.user) return [];
+  const league = await getActiveLeague();
+  const { data: round } = await account.client.from("rounds").select("id").eq("id", roundId).eq("league_id", league.id).maybeSingle();
+  if (!round) return [];
+  const { data } = await account.client.from("round_expense_installments").select("expense_item_id, installment_number").eq("round_id", roundId).eq("status", "active");
+  return (data || []).map((item: any) => ({ expense_item_id: item.expense_item_id, installment_number: Number(item.installment_number) }));
+}
+
+export async function getRoundPaymentChargeLines(roundId: string): Promise<PaymentChargeLine[]> {
+  const account = await getCurrentAccount(); if (!account.user) return [];
+  const league = await getActiveLeague();
+  const { data: round } = await account.client.from("rounds").select("id").eq("id", roundId).eq("league_id", league.id).maybeSingle();
+  if (!round) return [];
+  const { data } = await account.client.from("round_payment_charge_lines").select("id,player_id,recipient_name,recipient_pix,label,amount,charge_type").eq("round_id", roundId).order("id");
+  return (data || []).map((line: any) => ({ ...line, amount: Number(line.amount) }));
+}
+
+export async function syncRoundExpenseItems(roundId: string, expenseItemIds: string[]) {
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem editar a cobrança." };
+  const league = await getActiveLeague();
+  const { data: round } = await client.from("rounds").select("id, status").eq("id", roundId).eq("league_id", league.id).maybeSingle();
+  if (!round || round.status !== "finished") return { success: false, error: "A cobrança só pode ser alterada em uma rodada finalizada." };
+  const ids = [...new Set(expenseItemIds.filter((id) => /^[0-9a-f-]{36}$/i.test(id)))];
+  const { error } = await client.rpc("sync_round_payment_plan", { p_round_id: roundId, p_expense_item_ids: ids });
+  revalidatePath("/pagamentos"); revalidatePath("/admin/transfermarket"); revalidatePath(`/rodadas/${roundId}`);
   return { success: !error, error: error?.message };
 }
 

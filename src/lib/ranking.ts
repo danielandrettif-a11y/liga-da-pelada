@@ -1,5 +1,6 @@
 import type { Player } from "./types";
 import type { PlayerAwardSeason } from "./awards";
+import type { PlayerAchievementBelt } from "./achievement-belts";
 
 export type RankingAwards = {
   roundMvp: number;
@@ -79,6 +80,7 @@ export type RankingEntry = {
   seasonPosition: number;
   positionChange: number | null;
   fitness?: { distanceKm: number; averageSpeedKmh: number; entries: number } | null;
+  achievementBelts?: PlayerAchievementBelt[];
   cosmetics?: {
     frameKey: string | null;
     auraKey: string | null;

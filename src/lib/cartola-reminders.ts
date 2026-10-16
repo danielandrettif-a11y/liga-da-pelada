@@ -15,7 +15,7 @@ function env(name: string) {
 }
 
 function milestoneLabel(milestone: CartolaReminderMilestone) {
-  return milestone === "opening" ? "O mercado abriu" : milestone === "24h" ? "Falta 1 dia" : milestone === "12h" ? "Faltam 12 horas" : "Falta 1 hora";
+  return milestone === "24h" ? "Falta 1 dia" : "Faltam 2 horas";
 }
 
 function unsubscribeSignature(userId: string) {
@@ -203,7 +203,7 @@ export async function sendCartolaReminderTest(input: { userId: string; email: st
     roundNumber: 0,
     date: new Date().toISOString().slice(0, 10),
     startTime: "20:00",
-    milestone: "opening",
+    milestone: "24h",
   });
   return { providerMessageId };
 }

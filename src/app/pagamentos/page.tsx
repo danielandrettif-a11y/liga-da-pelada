@@ -1,7 +1,7 @@
 import { ArrowLeftRight, Clock3 } from "@/components/icons";
 import { PaymentChecklist } from "@/components/PaymentChecklist";
 import { PaymentObligationsPanel } from "@/components/PaymentObligationsPanel";
-import { getPaymentRounds, getRoundPaymentPlayers, getRoundPaymentObligations } from "@/lib/actions/payments";
+import { getExpenseItems, getPaymentRounds, getRoundExpenseSelections, getRoundPaymentChargeLines, getRoundPaymentPlayers, getRoundPaymentObligations } from "@/lib/actions/payments";
 import { getCurrentAccount } from "@/lib/auth";
 import { findLatestReleasedPaymentRound } from "@/lib/paymentStatus";
 
@@ -14,11 +14,18 @@ export default async function PagamentosPage() {
     return round ? getRoundPaymentPlayers(round.id) : [];
   });
   const obligationsPromise = roundsPromise.then((availableRounds) => { const round = findLatestReleasedPaymentRound(availableRounds); return round ? getRoundPaymentObligations(round.id) : []; });
-  const [rounds, account, players, obligations] = await Promise.all([
+  const expenseSelectionsPromise = roundsPromise.then((availableRounds) => { const round = findLatestReleasedPaymentRound(availableRounds); return round ? getRoundExpenseSelections(round.id) : []; });
+  const chargeLinesPromise = roundsPromise.then((availableRounds) => { const round = findLatestReleasedPaymentRound(availableRounds); return round ? getRoundPaymentChargeLines(round.id) : []; });
+  const accountPromise = getCurrentAccount();
+  const expenseItemsPromise = accountPromise.then((account) => account.isAdmin ? getExpenseItems(true) : []);
+  const [rounds, account, players, obligations, expenseSelections, chargeLines, expenseItems] = await Promise.all([
     roundsPromise,
-    getCurrentAccount(),
+    accountPromise,
     playersPromise,
     obligationsPromise,
+    expenseSelectionsPromise,
+    chargeLinesPromise,
+    expenseItemsPromise,
   ]);
   const currentRound = findLatestReleasedPaymentRound(rounds);
   const latestScheduledRound = rounds[0] || null;
@@ -50,7 +57,7 @@ export default async function PagamentosPage() {
           </p>
         </div>
       ) : (
-        obligations.length > 0 ? <PaymentObligationsPanel initialObligations={obligations} players={players} canManage={account.isAdmin} currentPlayerId={account.profile?.player_id || null} /> : <PaymentChecklist
+        obligations.length > 0 ? <PaymentObligationsPanel initialObligations={obligations} players={players} canManage={account.isAdmin} currentPlayerId={account.profile?.player_id || null} roundId={currentRound.id} expenseItems={expenseItems} initialExpenseSelections={expenseSelections} chargeLines={chargeLines} /> : <PaymentChecklist
           round={currentRound}
           initialPlayers={players}
           canEdit={!!account.user}

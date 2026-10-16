@@ -1,24 +1,6 @@
 import Link from "next/link";
 import { Trophy } from "@/components/icons";
-
-export type PlayerAchievementBelt = {
-  slug: "top_scorer" | "top_assister" | "team_win_streak";
-  name: string;
-  description: string;
-  recordValue: number;
-  unit: string;
-  scope: "player" | "team";
-  roundId: string | null;
-  roundNumber: number | null;
-  roundDate: string | null;
-  team: {
-    id: string;
-    name: string;
-    color: string;
-    crestUrl: string | null;
-    members: Array<{ id: string; name: string; avatarUrl: string | null }>;
-  } | null;
-};
+import type { PlayerAchievementBelt } from "@/lib/achievement-belts";
 
 export function PlayerBelts({ belts }: { belts: PlayerAchievementBelt[] }) {
   if (belts.length === 0) return null;

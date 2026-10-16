@@ -15,10 +15,10 @@ import { getAdminCosmeticsPreview, getPlayerEquippedCosmetics, type CosmeticPrev
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticImage, cosmeticMobileBackgroundImage, cosmeticProfileCoverImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
 import { CosmeticNameplate } from "@/components/fantasy/CosmeticNameplate";
 import { OfficialProfilePreviewNotice } from "@/components/fantasy/OfficialProfilePreviewNotice";
-import { buildRankedPointBreakdown } from "@/lib/ranked-scoring";
 import { MonthlyAwards } from "@/components/MonthlyAwards";
 import { getLatestPlayerCardOverallMap } from "@/lib/actions/stats";
 import { PlayerBelts } from "@/components/PlayerBelts";
+import type { RankedPointBreakdownItem } from "@/lib/ranked-scoring";
 
 export const revalidate = 0;
 
@@ -46,18 +46,9 @@ function formatBreakdownLabel(label: string, count: number) {
 }
 
 function rankedPointDescription(row: HistoryRow) {
-  const breakdown = buildRankedPointBreakdown({
-    goals: row.goals,
-    assists: row.assists,
-    wins: row.wins,
-    draws: row.draws,
-    losses: row.losses,
-    goalkeeperAppearances: row.goalkeeper_games,
-    goalkeeperGoalsConceded: row.goals_conceded,
-    ownGoals: row.own_goals,
-  });
-  const parts = breakdown.map((item) => `${item.count} ${formatBreakdownLabel(item.label, item.count)} (${formatPointValue(item.points)})`);
-  const total = Number(row.points || 0);
+  const breakdown = row.point_breakdown || [];
+  const parts = breakdown.map((item: RankedPointBreakdownItem) => `${item.count} ${formatBreakdownLabel(item.label, item.count)} (${formatPointValue(item.points)})`);
+  const total = Number(row.ranking_points ?? row.points ?? 0);
 
   return parts.length > 0
     ? `${parts.join(" · ")} · total registrado: ${formatPointValue(total)} pts`
@@ -80,7 +71,7 @@ function History({ rows, friendly = false }: { rows: HistoryRow[]; friendly?: bo
             </div>
             {!friendly && <p className="mt-2 text-[10px] leading-4 text-muted">{rankedPointDescription(row)}</p>}
           </div>
-          {!friendly && <div className="text-right"><span className="stat-number text-lg text-accent">{formatPointValue(Number(row.points || 0))}</span><p className="text-[9px] text-muted">PTS</p></div>}
+          {!friendly && <div className="text-right"><span className="stat-number text-lg text-accent">{formatPointValue(Number(row.ranking_points ?? row.points ?? 0))}</span><p className="text-[9px] text-muted">PTS</p></div>}
           <ChevronRight className="h-4 w-4 text-muted" />
         </Link>
       ))}

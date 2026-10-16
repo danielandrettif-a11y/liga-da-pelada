@@ -62,6 +62,7 @@ export type FantasyExperienceProps = {
   initialPackId?: string;
   initialTab?: "team" | "market";
   pitchAssetKey?: string | null;
+  withdrawnPlayerId?: string;
 };
 
 export const positionLabel: Record<string, string> = {

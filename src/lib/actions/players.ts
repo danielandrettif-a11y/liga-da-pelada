@@ -11,8 +11,11 @@ import { TEAM_PRESETS } from "../teamPresets";
 import { getMatchElapsedSeconds } from "../utils";
 import { parseMonthlyAwardWinners, parseMonthlyAwards, previousMonthStart } from "../monthly-awards";
 import { getLatestPlayerCardOverallMap } from "./stats";
-import type { PlayerAchievementBelt } from "@/components/PlayerBelts";
+import { parseAchievementBelts, type PlayerAchievementBelt } from "../achievement-belts";
 import { getSelectedLeague } from "../league-context";
+import { buildRankedPointBreakdown } from "../ranked-scoring";
+import { normalizeBQScoringSnapshot } from "../bq-scoring";
+import { roundRankingPoints } from "../ranking";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -324,7 +327,8 @@ export async function getPlayerRoundHistory(playerId: string, roundType: RoundTy
       *,
       rounds (
         number,
-        date
+        date,
+        scoring_snapshot
       )
     `)
     .eq("player_id", playerId)
@@ -336,7 +340,35 @@ export async function getPlayerRoundHistory(playerId: string, roundType: RoundTy
     return [];
   }
 
-  return data;
+  return (data || []).map((row: any) => {
+    const round = Array.isArray(row.rounds) ? row.rounds[0] : row.rounds;
+    const pointBreakdown = buildRankedPointBreakdown({
+      goals: row.goals,
+      assists: row.assists,
+      wins: row.wins,
+      draws: row.draws,
+      losses: row.losses,
+      goalkeeperAppearances: row.goalkeeper_games,
+      goalkeeperGoalsConceded: row.goals_conceded,
+      goalkeeperGoals: row.goalkeeper_goals,
+      goalkeeperAssists: row.goalkeeper_assists,
+      goalkeeperOwnGoals: row.goalkeeper_own_goals,
+      goalkeeperCleanSheets: row.clean_sheets,
+      teamGoalsConceded: row.team_goals_conceded,
+      defensiveCleanGames: row.ranking_defensive_clean_games,
+      defensiveOneGoalGames: row.ranking_defensive_one_goal_games,
+      lineRole: row.player_profile_locked === "defensive" ? "DEF" : "ATA",
+      ownGoals: row.own_goals,
+    }, normalizeBQScoringSnapshot(round?.scoring_snapshot));
+    const positionBonus = roundRankingPoints(Number(row.ranking_position_bonus || 0));
+    if (positionBonus !== 0) pointBreakdown.push({ label: "Bônus posicional", count: 1, points: positionBonus });
+    return {
+      ...row,
+      rounds: round,
+      ranking_points: roundRankingPoints(Number(row.ranking_points ?? row.points ?? 0)),
+      point_breakdown: pointBreakdown,
+    };
+  });
 }
 
 export async function getPlayerPlaytime(playerId: string) {
@@ -515,33 +547,7 @@ export async function getPlayerAchievementBelts(playerId: string): Promise<Playe
     return [];
   }
 
-  const rows = Array.isArray(data) ? data : [];
-  return rows.flatMap((row: any) => {
-    if (!row || typeof row !== "object") return [];
-    const team = row.team && typeof row.team === "object" ? row.team : null;
-    return [{
-      slug: row.slug,
-      name: String(row.name || "Cinturão"),
-      description: String(row.description || ""),
-      recordValue: Number(row.recordValue || 0),
-      unit: String(row.unit || "recorde"),
-      scope: row.scope === "team" ? "team" : "player",
-      roundId: row.roundId || null,
-      roundNumber: row.roundNumber == null ? null : Number(row.roundNumber),
-      roundDate: row.roundDate || null,
-      team: team ? {
-        id: String(team.id),
-        name: String(team.name || "Time"),
-        color: String(team.color || "#d4af37"),
-        crestUrl: team.crestUrl || null,
-        members: Array.isArray(team.members) ? team.members.map((member: any) => ({
-          id: String(member.id),
-          name: String(member.name || "Jogador"),
-          avatarUrl: member.avatarUrl || null,
-        })) : [],
-      } : null,
-    } as PlayerAchievementBelt];
-  });
+  return parseAchievementBelts(data);
 }
 
 export async function getPreviousMonthAwardWinners() {

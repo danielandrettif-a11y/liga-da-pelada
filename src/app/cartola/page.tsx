@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function CartolaPage({ searchParams }: PageProps<"/cartola">) {
-  const { pack, tab } = await searchParams;
+  const { pack, tab, substituir } = await searchParams;
   const [data, cosmetics] = await Promise.all([getFantasyDashboard(), getMyEquippedCosmetics()]);
   if (!data.authenticated) return <Empty title="Entre para jogar o Cartola" description="Monte seu time, use cartas e dispute com seus amigos." login />;
   if (!data.available) {
@@ -44,8 +44,9 @@ export default async function CartolaPage({ searchParams }: PageProps<"/cartola"
       inventoryCount={data.inventoryCount}
       liveProjection={data.liveProjection}
       initialPackId={typeof pack === "string" ? pack : undefined}
-      initialTab={tab === "market" ? "market" : "team"}
+      initialTab={tab === "market" || typeof substituir === "string" ? "market" : "team"}
       pitchAssetKey={cosmetics?.pitchAssetKey || null}
+      withdrawnPlayerId={typeof substituir === "string" ? substituir : undefined}
       />
     </div>
   );

@@ -1,11 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { ChevronRight, Crown, Plus, Search, Shield, Trophy, Users } from "@/components/icons";
 import { getCurrentAccount } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { getMyLeagues, type MyLeague } from "@/lib/league-context";
-import { enterLeague, reviewAccess, toggleFavorite } from "./actions";
+import { continueEntryFlow, enterLeague, reviewAccess, toggleFavorite } from "./actions";
+import { ENTRY_FLOW_PENDING_COOKIE } from "@/lib/entry-flow";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,7 @@ export default async function LobbyPage({ searchParams }: { searchParams: Promis
   const { user, profile, client } = await getCurrentAccount();
   if (!user) redirect("/login?next=/lobby");
   const leagues = await getMyLeagues();
+  const entryDestination = (await cookies()).get(ENTRY_FLOW_PENDING_COOKIE)?.value || null;
   const { error, added, deleted } = await searchParams;
   const adminLeagueIds = leagues.filter((league) => league.role === "admin").map((league) => league.id);
   const [{ data: requests }, { data: myRequests }] = await Promise.all([
@@ -46,6 +49,8 @@ export default async function LobbyPage({ searchParams }: { searchParams: Promis
     <header className="relative overflow-hidden rounded-3xl border border-accent/25 bg-surface p-5"><div className="absolute right-[-30px] top-[-40px] h-36 w-36 rounded-full border border-accent/20" /><p className="text-xs font-black uppercase tracking-[.22em] text-accent">Central das peladas</p><h1 className="mt-2 max-w-md text-balance font-athletic text-4xl font-black uppercase leading-none text-white">Escolha seu próximo jogo</h1><p className="mt-3 max-w-lg text-pretty text-sm leading-6 text-muted">Entre nos seus clubes, encontre uma nova turma ou organize sua própria pelada.</p>{profile?.account_tag && <p className="mt-4 inline-flex rounded-full border border-border bg-background/70 px-3 py-1.5 text-[11px] text-muted">Seu perfil: <strong className="ml-1 text-white">{profile.account_tag}</strong></p>}</header>
 
     <nav className="grid grid-cols-2 gap-3" aria-label="Ações do lobby"><Link href="/peladas" className="flex min-h-28 flex-col justify-between rounded-2xl border border-accent/30 bg-accent/10 p-4"><Search className="h-6 w-6 text-accent" /><span><strong className="block text-sm text-white">Procurar pelada</strong><small className="mt-1 block text-xs leading-4 text-muted">Explore clubes abertos e privados</small></span></Link><Link href="/lobby/criar" className="flex min-h-28 flex-col justify-between rounded-2xl border border-border bg-surface p-4"><Plus className="h-6 w-6 text-accent" /><span><strong className="block text-sm text-white">Criar uma pelada</strong><small className="mt-1 block text-xs leading-4 text-muted">Comece seu próprio clube</small></span></Link></nav>
+
+    {entryDestination && <section className="rounded-2xl border border-accent/35 bg-accent/10 p-4" aria-labelledby="entry-flow-title"><p className="text-[10px] font-black uppercase text-accent">Apresentação concluída</p><h2 id="entry-flow-title" className="mt-1 text-balance font-athletic text-xl font-black uppercase text-white">Agora escolha sua pelada</h2><p className="mt-2 text-pretty text-xs leading-5 text-muted">Ao entrar em um clube, os próximos acessos voltarão a abrir diretamente na última pelada usada.</p>{entryDestination.startsWith("/convite/") && <form action={continueEntryFlow} className="mt-3"><button type="submit" className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-black text-background">Continuar convite</button></form>}</section>}
 
     {error && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-sm text-danger">A operação não foi concluída. Atualize a página e tente novamente.</p>}{added && <p role="status" className="rounded-xl border border-accent/30 bg-accent/10 p-3 text-sm text-accent">Conta adicionada à pelada.</p>}{deleted && <p role="status" className="rounded-xl border border-accent/30 bg-accent/10 p-3 text-sm text-accent">Pelada excluída.</p>}
 

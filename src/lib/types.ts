@@ -236,6 +236,7 @@ export type AccountProfile = {
   player_id: string | null;
   created_at: string;
   updated_at: string;
+  entry_flow_version?: number;
 };
 
 export type RoundPayment = {

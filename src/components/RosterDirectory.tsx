@@ -15,7 +15,7 @@ import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticVisual
 import { useUrlState } from "@/lib/useUrlState";
 
 type RosterFilter = "all" | "players" | "wags" | "supporters";
-type RosterView = "roster" | "pass";
+type RosterView = "roster" | "collective" | "pass";
 type StatsMode = "ranked" | "friendly";
 
 type Props = {
@@ -30,6 +30,10 @@ type Props = {
   initialFilter?: RosterFilter;
   initialStatsMode?: StatsMode;
   seasonPass?: ReactNode;
+  collective?: ReactNode;
+  collectiveLoaded?: boolean;
+  showCollective?: boolean;
+  showPass?: boolean;
   seasonPassProgress?: number;
   seasonPassMaxProgress?: number;
 };
@@ -40,7 +44,7 @@ const FILTERS: Array<{ value: RosterFilter; label: string }> = [
   { value: "wags", label: "WAGs" },
   { value: "supporters", label: "Torcida" },
 ];
-const ROSTER_VIEWS: readonly RosterView[] = ["roster", "pass"];
+const ROSTER_VIEWS: readonly RosterView[] = ["roster", "collective", "pass"];
 const ROSTER_FILTERS: readonly RosterFilter[] = ["all", "players", "wags", "supporters"];
 const STATS_MODES: readonly StatsMode[] = ["ranked", "friendly"];
 
@@ -100,7 +104,7 @@ function CommunityGrid({ players, label, unreadPlayerIds, playerCosmetics }: { p
   );
 }
 
-export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters, playerCosmetics, unreadPlayerIds = [], unreadSeenThrough = null, initialView = "roster", initialFilter = "all", initialStatsMode = "ranked", seasonPass, seasonPassProgress, seasonPassMaxProgress = 40 }: Props) {
+export function RosterDirectory({ officialPlayers, activeGuests, wags, supporters, playerCosmetics, unreadPlayerIds = [], unreadSeenThrough = null, initialView = "roster", initialFilter = "all", initialStatsMode = "ranked", seasonPass, collective, collectiveLoaded = false, showCollective = false, showPass = true, seasonPassProgress, seasonPassMaxProgress = 40 }: Props) {
   const router = useRouter();
   const [view, setView] = useUrlState({ key: "view", initialValue: initialView, defaultValue: "roster", allowedValues: ROSTER_VIEWS });
   const [passPending, startPassTransition] = useTransition();
@@ -155,19 +159,28 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
     startPassTransition(() => router.push("/jogadores?view=pass"));
   }
 
+  function openCollective() {
+    if (collectiveLoaded) {
+      setView("collective");
+      return;
+    }
+    startPassTransition(() => router.push("/jogadores?view=collective"));
+  }
+
   return (
     <div className="space-y-7">
       <div className="sticky top-20 z-30 -mx-1 rounded-2xl border border-border bg-background/95 p-1.5 shadow-xl shadow-black/20 backdrop-blur-xl">
-        <div className="grid grid-cols-2 gap-1" role="tablist" aria-label="Alternar entre elenco e passe de temporada">
+        <div className={`grid gap-1 ${showCollective && showPass ? "grid-cols-3" : "grid-cols-2"}`} role="tablist" aria-label="Alternar entre elenco, coletiva e passe de temporada">
           <button type="button" role="tab" aria-selected={view === "roster"} onClick={() => setView("roster")} className={`rounded-xl py-3 text-xs font-black transition-colors ${view === "roster" ? "bg-accent text-background shadow-[0_0_18px_rgba(204,255,0,.16)]" : "text-muted hover:bg-surface hover:text-foreground"}`}>Elenco</button>
-          <button type="button" role="tab" aria-selected={view === "pass"} disabled={passPending} onClick={openSeasonPass} className={`relative overflow-hidden rounded-xl border px-2 py-1.5 text-left transition-all disabled:opacity-70 ${view === "pass" ? "border-[#cd91ff] bg-gradient-to-r from-[#7734bb] to-[#a35bea] text-white shadow-[0_0_20px_rgba(159,92,255,.42)]" : "border-[#a761e8]/65 bg-gradient-to-r from-[#27103f] to-[#3f1a63] text-[#f0dfff] shadow-[0_0_16px_rgba(159,92,255,.16)] hover:brightness-110"}`}>
+          {showCollective && <button type="button" role="tab" aria-selected={view === "collective"} disabled={passPending} onClick={openCollective} className={`rounded-xl py-3 text-xs font-black transition-colors disabled:opacity-70 ${view === "collective" ? "bg-accent text-background" : "text-muted hover:bg-surface hover:text-foreground"}`}>Coletiva</button>}
+          {showPass && <button type="button" role="tab" aria-selected={view === "pass"} disabled={passPending} onClick={openSeasonPass} className={`relative overflow-hidden rounded-xl border px-2 py-1.5 text-left transition-all disabled:opacity-70 ${view === "pass" ? "border-[#cd91ff] bg-gradient-to-r from-[#7734bb] to-[#a35bea] text-white shadow-[0_0_20px_rgba(159,92,255,.42)]" : "border-[#a761e8]/65 bg-gradient-to-r from-[#27103f] to-[#3f1a63] text-[#f0dfff] shadow-[0_0_16px_rgba(159,92,255,.16)] hover:brightness-110"}`}>
             <span className="pointer-events-none absolute -right-3 -top-5 h-16 w-16 rounded-full bg-[#d5ff37]/15 blur-xl" />
             <span className="relative flex items-center gap-2">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/20 bg-black/15 text-[#e7c8ff]"><Crown className="h-4 w-4" /></span>
               <span className="min-w-0 flex-1"><span className="block text-[11px] font-black leading-none">Passe BQ</span><span className="mt-1 block text-[8px] font-bold uppercase tracking-[0.12em] text-white/70">Sua trilha</span></span>
               <span className="shrink-0 rounded-lg bg-black/20 px-1.5 py-1 text-[9px] font-black text-[#d5ff37]">{passPending ? "..." : seasonPassProgress == null ? "Abrir" : `${seasonPassProgress}/${seasonPassMaxProgress}`}</span>
             </span>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -225,6 +238,7 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
       )}
       </>}
 
+      {view === "collective" && <section className="scroll-mt-36">{collective || <div className="rounded-2xl border border-border bg-surface p-6 text-center"><p className="font-black text-foreground">Nenhuma coletiva recente</p><p className="mt-2 text-pretty text-xs leading-5 text-muted">A conversa aparece aqui quando os times da próxima rodada forem definidos.</p></div>}</section>}
       {view === "pass" && <section ref={passPanelRef} className="scroll-mt-36">{seasonPass}</section>}
     </div>
   );

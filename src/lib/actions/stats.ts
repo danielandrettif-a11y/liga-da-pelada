@@ -15,6 +15,7 @@ import { normalizeBQScoringSnapshot } from "../bq-scoring";
 import { isCompetitiveProfileComplete } from "../player-eligibility";
 import { isParticipantScoringEligible } from "../scoring-eligibility";
 import { calculateGoalkeeperMatchScouts } from "../goalkeeper-timeline";
+import { parseAchievementBelts, type PlayerAchievementBelt } from "../achievement-belts";
 import {
   calculateRankingPositionBonus,
   parseRankingRoleWeights,
@@ -150,6 +151,22 @@ async function getPublicSpeedRatingMap(client?: any) {
       ? [[row.player_id, Number(row.speed_rating) as 1 | 2 | 3] as const]
       : []
   )));
+}
+
+async function getAchievementBeltsByPlayer(client: any, leagueId: string) {
+  const { data, error } = await client.rpc("get_league_achievement_belt_holders", {
+    p_league_id: leagueId,
+  });
+  if (error) {
+    if (error.code !== "PGRST202" && error.code !== "42883") {
+      console.error("Erro ao buscar cinturões do ranking:", error);
+    }
+    return new Map<string, PlayerAchievementBelt[]>();
+  }
+  return new Map<string, PlayerAchievementBelt[]>((data || []).map((row: any) => [
+    String(row.player_id),
+    parseAchievementBelts(row.belts),
+  ]));
 }
 
 function sortRankingEntries<T extends Pick<RankingEntry, "points" | "wins" | "goals" | "assists">>(entries: T[]) {
@@ -1083,7 +1100,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   );
   const rankingAccount = await getCurrentAccount();
   const fitnessClient = rankingAccount.user ? rankingAccount.client : supabase;
-  const [{ data: fitnessRows }, cosmeticsByPlayer, overallByPlayer, speedByPlayer] = await Promise.all([
+  const [{ data: fitnessRows }, cosmeticsByPlayer, overallByPlayer, speedByPlayer, achievementBeltsByPlayer] = await Promise.all([
     fitnessClient
       .from("player_round_fitness")
       .select("player_id, distance_km, average_speed_kmh")
@@ -1091,6 +1108,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     getAllPlayersEquippedCosmeticsMap(),
     getLatestPlayerCardOverallMap(fitnessClient),
     getPublicSpeedRatingMap(fitnessClient),
+    getAchievementBeltsByPlayer(fitnessClient, season.league_id),
   ]);
   const fitnessByPlayer = new Map<string, { distanceKm: number; speedTotal: number; entries: number }>();
   for (const row of fitnessRows || []) {
@@ -1132,6 +1150,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       overallGoalkeeperRounds: overallByPlayer.get(entry.player.id)?.goalkeeperRounds ?? 0,
       speedRating: speedByPlayer.get(entry.player.id) ?? null,
       fitness: getFitness(entry.player.id),
+      achievementBelts: achievementBeltsByPlayer.get(entry.player.id) || [],
       cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
     };
   });
@@ -1151,6 +1170,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     overallGoalkeeperRounds: overallByPlayer.get(entry.player.id)?.goalkeeperRounds ?? 0,
     speedRating: speedByPlayer.get(entry.player.id) ?? null,
     fitness: getFitness(entry.player.id),
+    achievementBelts: achievementBeltsByPlayer.get(entry.player.id) || [],
     cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
   }));
 
@@ -1168,6 +1188,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     overallGoalkeeperRounds: overallByPlayer.get(entry.player.id)?.goalkeeperRounds ?? 0,
     speedRating: speedByPlayer.get(entry.player.id) ?? null,
     fitness: getFitness(entry.player.id),
+    achievementBelts: achievementBeltsByPlayer.get(entry.player.id) || [],
     cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
   }));
   const [monthlyYear, monthlyMonth] = monthlyKey.split("-").map(Number);

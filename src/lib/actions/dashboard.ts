@@ -1,8 +1,7 @@
 "use server";
 
-import { getRanking } from "./stats";
+import { getRankingExperienceData } from "./stats";
 import { getActiveSeason } from "./seasons";
-import { getAllPlayersEquippedCosmeticsMap } from "./cosmetics";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getCurrentAccount } from "../auth";
 import { getEventWeather } from "../weather";
@@ -106,8 +105,7 @@ export async function getDashboardData() {
       { data: liveMatchData },
       { data: leagueData },
       { data: activeCallupsData },
-      ranking,
-      cosmeticsByPlayer,
+      rankingExperience,
     ] = await Promise.all([
       nextRoundPromise,
       nextFriendlyPromise,
@@ -115,14 +113,12 @@ export async function getDashboardData() {
       liveMatchPromise,
       leaguePromise,
       activeCallupsPromise,
-      getRanking(),
-      getAllPlayersEquippedCosmeticsMap(),
+      getRankingExperienceData(),
     ]);
 
-    const rankingWithCosmetics = ranking.map((entry) => ({
-      ...entry,
-      cosmetics: cosmeticsByPlayer.get(entry.player.id) || null,
-    }));
+    // A home usa exatamente a mesma fonte, filtro de atividade e regra das
+    // seis melhores atuações exibida na página completa do ranking.
+    const rankingWithCosmetics = rankingExperience.general;
 
     // Convocacoes ligadas a rodadas iniciadas/finalizadas deixam de ser destaque.
     const visibleCallups = (activeCallupsData || []).filter((callup: any) => {

@@ -1,6 +1,6 @@
 import { SITE_URL } from "@/lib/siteUrl";
 
-export type CartolaReminderMilestone = "opening" | "24h" | "12h" | "1h";
+export type CartolaReminderMilestone = "24h" | "2h";
 
 export type CartolaReminderJob = {
   roundId: string;
@@ -26,6 +26,27 @@ function qstashPublishUrl() {
 export function roundStartIso(date: string, startTime: string) {
   const cleanTime = (startTime || "08:00").slice(0, 5);
   return new Date(`${date}T${cleanTime}:00-03:00`).toISOString();
+}
+
+export function buildCartolaReminderJobs(input: {
+  roundId: string;
+  date: string;
+  startTime: string;
+  nowMs?: number;
+}) {
+  const roundStartAt = roundStartIso(input.date, input.startTime);
+  const startMs = new Date(roundStartAt).getTime();
+  const nowMs = input.nowMs ?? Date.now();
+  const targets: Array<[CartolaReminderMilestone, number]> = [
+    ["24h", startMs - 24 * 60 * 60 * 1000],
+    ["2h", startMs - 2 * 60 * 60 * 1000],
+  ];
+
+  return targets.flatMap(([milestone, targetMs]) => (
+    targetMs > nowMs
+      ? [{ roundId: input.roundId, milestone, targetAt: new Date(targetMs).toISOString(), roundStartAt }]
+      : []
+  ));
 }
 
 export async function scheduleCartolaReminderJob(job: CartolaReminderJob) {
@@ -68,22 +89,7 @@ export async function scheduleCartolaRoundReminders(input: {
   startTime: string;
   includeOpening?: boolean;
 }) {
-  const roundStartAt = roundStartIso(input.date, input.startTime);
-  const startMs = new Date(roundStartAt).getTime();
-  const targets: Array<[CartolaReminderMilestone, number]> = [
-    ["24h", startMs - 24 * 60 * 60 * 1000],
-    ["12h", startMs - 12 * 60 * 60 * 1000],
-    ["1h", startMs - 60 * 60 * 1000],
-  ];
-  const jobs: CartolaReminderJob[] = [];
-  if (input.includeOpening !== false) {
-    jobs.push({ roundId: input.roundId, milestone: "opening", targetAt: new Date().toISOString(), roundStartAt });
-  }
-  for (const [milestone, targetMs] of targets) {
-    if (targetMs > Date.now()) {
-      jobs.push({ roundId: input.roundId, milestone, targetAt: new Date(targetMs).toISOString(), roundStartAt });
-    }
-  }
+  const jobs = buildCartolaReminderJobs(input);
   const results = await Promise.allSettled(jobs.map(scheduleCartolaReminderJob));
   const rejected = results.find((item) => item.status === "rejected");
   if (rejected?.status === "rejected") throw rejected.reason;

@@ -25,6 +25,7 @@ import { PlayerAvatar } from "./PlayerAvatar";
 import { CosmeticNameplate } from "./fantasy/CosmeticNameplate";
 import { RANKED_GOALKEEPER_SCORING_RULES, RANKED_SCORING_RULES } from "@/lib/ranked-scoring";
 import { useUrlState } from "@/lib/useUrlState";
+import { CombatBeltBadges } from "./CombatBeltBadges";
 
 const RankingPlayerCardModal = dynamic(() =>
   import("./RankingPlayerCardModal").then((module) => module.RankingPlayerCardModal),
@@ -401,6 +402,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
                     <p className="mt-1 truncate text-[8px] font-bold text-muted">
                       {entry.wins}V · {entry.draws}E · {entry.losses}D · {entry.goals}G · {entry.assists}A
                     </p>
+                    <CombatBeltBadges belts={entry.achievementBelts} compact centered />
                     <p className={`mt-0.5 text-xs font-black ${style.label}`}>{metricDisplay(entry, filter)} <span className="text-[8px] uppercase opacity-70">{FILTER_LABELS[filter]}</span></p>
                   </div>
                   <div className={`flex w-full flex-col items-center rounded-t-2xl border-x border-t bg-gradient-to-b px-1 pt-3 ${height} ${style.base}`}>
@@ -467,6 +469,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
                     )}
                   </div>
                   <AwardBadges entry={entry} />
+                  <CombatBeltBadges belts={entry.achievementBelts} compact />
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="stat-number text-xl text-foreground">{metricDisplay(entry, filter)}</p>
@@ -505,6 +508,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
             {pinnedEntry.cosmetics?.nameplateKey ? (
               <CosmeticNameplate assetKey={pinnedEntry.cosmetics.nameplateKey} playerName={pinnedEntry.player.name} titleName={pinnedEntry.cosmetics.titleName} compact className="ranking-row-nameplate" />
             ) : <p className="truncate text-xs font-black text-foreground">Sua posição · {pinnedEntry.player.name}</p>}
+            <CombatBeltBadges belts={pinnedEntry.achievementBelts} compact />
             <p className="text-[9px] text-muted">Toque para abrir sua carta</p>
           </div>
           <span className="stat-number text-xl text-accent">{metricDisplay(pinnedEntry, filter)}</span>

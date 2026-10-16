@@ -29,6 +29,8 @@ import { SeasonPassBanner } from "@/components/fantasy/SeasonPassBanner";
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
 import { getPreviousMonthAwardWinners } from "@/lib/actions/players";
 import { LeagueInviteCard } from "@/components/LeagueInviteCard";
+import { CombatBeltBadges } from "@/components/CombatBeltBadges";
+import { formatRankingPoints } from "@/lib/ranking";
 
 export const dynamic = "force-dynamic";
 
@@ -52,8 +54,8 @@ function StatHighlightCard({
 }: {
   Icon: ComponentType<SportIconProps>;
   label: string;
-  playerName: string;
-  value: number;
+  playerName?: string;
+  value?: number;
   unit: string;
   delay: string;
 }) {
@@ -327,6 +329,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                     <p className="text-sm font-semibold text-foreground truncate">
                       {name}
                     </p>
+                    <CombatBeltBadges belts={stats.achievementBelts} compact />
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="flex items-center gap-1 text-[10px] text-muted">
                         <Football className="h-3 w-3" /> {stats.goals}
@@ -340,7 +343,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                   {/* Points */}
                   <div className="text-right">
                     <p className="stat-number text-lg gradient-text">
-                      {stats.points}
+                      {formatRankingPoints(stats.points)}
                     </p>
                     <p className="text-[10px] text-muted font-medium">pts</p>
                   </div>

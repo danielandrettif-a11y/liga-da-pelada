@@ -5,16 +5,47 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentAccount } from "@/lib/auth";
 import { ACTIVE_LEAGUE_COOKIE, getMyLeagues } from "@/lib/league-context";
+import {
+  ENTRY_FLOW_DONE_COOKIE,
+  ENTRY_FLOW_PENDING_COOKIE,
+  ENTRY_FLOW_VERSION,
+  safeEntryDestination,
+} from "@/lib/entry-flow";
+
+async function completePendingEntryFlow(client: any) {
+  const cookieStore = await cookies();
+  const pending = cookieStore.get(ENTRY_FLOW_PENDING_COOKIE)?.value;
+  if (!pending) return null;
+  const { error } = await client.rpc("complete_my_entry_flow", { p_version: ENTRY_FLOW_VERSION });
+  if (error) throw new Error(error.message);
+  cookieStore.set(ENTRY_FLOW_DONE_COOKIE, String(ENTRY_FLOW_VERSION), {
+    httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax",
+    path: "/", maxAge: 60 * 60 * 24 * 365,
+  });
+  cookieStore.delete(ENTRY_FLOW_PENDING_COOKIE);
+  return safeEntryDestination(pending);
+}
+
+export async function continueEntryFlow() {
+  const { client, user } = await getCurrentAccount();
+  if (!user) redirect("/login?next=/lobby");
+  const destination = await completePendingEntryFlow(client);
+  revalidatePath("/", "layout");
+  redirect(destination || "/");
+}
 
 export async function enterLeague(formData: FormData) {
   const leagueId = String(formData.get("league_id") || "");
+  const { client, user } = await getCurrentAccount();
+  if (!user) redirect("/login?next=/lobby");
   const league = (await getMyLeagues()).find((item) => item.id === leagueId);
   if (!league) redirect("/lobby?error=access");
   (await cookies()).set(ACTIVE_LEAGUE_COOKIE, league.id, {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365,
   });
+  const destination = await completePendingEntryFlow(client);
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(destination || "/");
 }
 
 export async function toggleFavorite(formData: FormData) {
@@ -75,10 +106,11 @@ export async function joinOpenLeague(formData: FormData) {
   (await cookies()).set(ACTIVE_LEAGUE_COOKIE, leagueId, {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365,
   });
+  const destination = await completePendingEntryFlow(client);
   revalidatePath("/peladas");
   revalidatePath("/lobby");
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(destination || "/");
 }
 
 export async function requestClosedLeague(formData: FormData) {
@@ -89,6 +121,7 @@ export async function requestClosedLeague(formData: FormData) {
     p_league_id: leagueId,
   });
   if (error) redirect("/peladas?error=request");
+  await completePendingEntryFlow(client);
   revalidatePath("/peladas");
   revalidatePath("/lobby");
   redirect("/peladas?requested=1");
@@ -114,6 +147,7 @@ export async function createLeague(formData: FormData) {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax",
     path: "/", maxAge: 60 * 60 * 24 * 365,
   });
+  const destination = await completePendingEntryFlow(client);
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(destination || "/");
 }

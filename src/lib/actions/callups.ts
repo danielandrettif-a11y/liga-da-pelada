@@ -14,6 +14,7 @@ import {
 } from "../constants";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getSelectedLeague } from "../league-context";
+import { notifyCartolaLineupsAboutWithdrawal } from "../cartola-withdrawal-notifications";
 
 export type CallupEntryWithPlayer = CallupEntry & {
   player: Player;
@@ -326,6 +327,8 @@ export async function leaveActiveCallup(callupId: string) {
     .maybeSingle();
   const { error } = await account.client.rpc("leave_callup", { p_callup_id: callupId });
   if (error) return { success: false, error: error.message };
+  const { data: profile } = await account.client.from("account_profiles").select("player_id").eq("user_id", account.user.id).maybeSingle();
+  if (profile?.player_id) await notifyCartolaLineupsAboutWithdrawal(account.client, callupId, profile.player_id);
   refreshCallups();
   revalidatePath("/rodadas");
   if (callup?.round_id) {
@@ -390,6 +393,7 @@ export async function adminRemoveCallupPlayer(callupId: string, playerId: string
     p_player_id: playerId,
   });
   if (error) return { success: false, error: error.message };
+  await notifyCartolaLineupsAboutWithdrawal(client, callupId, playerId);
   refreshCallups();
   return { success: true };
 }
@@ -472,6 +476,7 @@ export async function removeCallupEntry(callupId: string, playerId: string) {
       p_player_id: playerId,
     });
     if (error) return { success: false, error: error.message };
+    await notifyCartolaLineupsAboutWithdrawal(client, callupId, playerId);
     refreshCallups();
     if (callup.round_id) {
       revalidatePath(`/rodadas/${callup.round_id}`);
@@ -512,6 +517,7 @@ export async function removeCallupEntry(callupId: string, playerId: string) {
   if (deleteError) {
     return { success: false, error: deleteError.message };
   }
+  await notifyCartolaLineupsAboutWithdrawal(client, callupId, playerId);
 
   // 4. Normalizar posições e promover da fila se necessário
   try {

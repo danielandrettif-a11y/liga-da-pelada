@@ -4,24 +4,31 @@ import { getUnreadRosterPlayers } from "@/lib/actions/registrations";
 import { getSeasonPassDashboard } from "@/lib/actions/fantasy";
 import { getAllPlayersEquippedCosmeticsMap, getMyCosmeticsDashboard, type EquippedCosmeticsSummary } from "@/lib/actions/cosmetics";
 import { SeasonPassExperience } from "@/components/fantasy/SeasonPassExperience";
+import { CollectiveRoom } from "@/components/CollectiveRoom";
+import { getCollectiveRoom } from "@/lib/actions/collective";
+import { getSelectedLeague } from "@/lib/league-context";
 
 export const revalidate = 0;
 
 export default async function JogadoresPage({ searchParams }: PageProps<"/jogadores">) {
   const { tab, view, filter, stats, reward } = await searchParams;
+  const shouldLoadCollective = view === "collective" || tab === "coletiva";
   const shouldLoadPass = view === "pass" || tab === "passe" || typeof reward === "string";
   const initialFilter = filter === "players" || filter === "wags" || filter === "supporters" ? filter : "all";
   const initialStatsMode = stats === "friendly" ? "friendly" : "ranked";
   const passDataRequest = shouldLoadPass
     ? Promise.all([getSeasonPassDashboard(), getMyCosmeticsDashboard()]).then(([pass, cosmetics]) => ({ pass, cosmetics }))
     : Promise.resolve(null);
-  const [rankedRoster, friendlyRoster, unreadRoster, passData, cosmeticsMap] = await Promise.all([
+  const [rankedRoster, friendlyRoster, unreadRoster, passData, cosmeticsMap, collectiveRoom, selectedLeague] = await Promise.all([
     getRosterGroups("official"),
     getRosterGroups("friendly"),
     getUnreadRosterPlayers(),
     passDataRequest,
     getAllPlayersEquippedCosmeticsMap(),
+    shouldLoadCollective ? getCollectiveRoom() : Promise.resolve(null),
+    getSelectedLeague(),
   ]);
+  const isCompleteLeague = selectedLeague?.featureTier === "complete";
 
   const playerCosmetics: Record<string, EquippedCosmeticsSummary> = Object.fromEntries(cosmeticsMap.entries());
 
@@ -40,12 +47,16 @@ export default async function JogadoresPage({ searchParams }: PageProps<"/jogado
         playerCosmetics={playerCosmetics}
         unreadPlayerIds={unreadRoster.playerIds}
         unreadSeenThrough={unreadRoster.seenThrough}
-        initialView={shouldLoadPass ? "pass" : "roster"}
+        initialView={shouldLoadCollective && isCompleteLeague ? "collective" : shouldLoadPass && isCompleteLeague ? "pass" : "roster"}
         initialFilter={initialFilter}
         initialStatsMode={initialStatsMode}
         seasonPassProgress={passData?.pass.progress}
         seasonPassMaxProgress={passData?.pass.maxProgress}
         seasonPass={passData ? <SeasonPassExperience pass={passData.pass} cosmetics={passData.cosmetics} rewardId={typeof reward === "string" ? reward : undefined} /> : undefined}
+        collective={collectiveRoom ? <CollectiveRoom room={collectiveRoom} /> : undefined}
+        collectiveLoaded={shouldLoadCollective}
+        showCollective={isCompleteLeague}
+        showPass={isCompleteLeague}
       />
     </div>
   );

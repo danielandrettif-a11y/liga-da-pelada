@@ -13,7 +13,7 @@ function validJob(value: unknown): value is CartolaReminderJob {
   if (!value || typeof value !== "object") return false;
   const job = value as Partial<CartolaReminderJob>;
   return typeof job.roundId === "string"
-    && ["opening", "24h", "12h", "1h"].includes(String(job.milestone))
+    && ["24h", "2h"].includes(String(job.milestone))
     && typeof job.targetAt === "string"
     && Number.isFinite(new Date(job.targetAt).getTime())
     && typeof job.roundStartAt === "string"
@@ -23,6 +23,9 @@ function validJob(value: unknown): value is CartolaReminderJob {
 export async function POST(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   const body: unknown = await request.json().catch(() => null);
+  if (body && typeof body === "object" && ["opening", "12h", "1h"].includes(String((body as { milestone?: unknown }).milestone))) {
+    return NextResponse.json({ skipped: "obsolete-milestone" });
+  }
   if (!validJob(body)) return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
 
   const remainingMs = new Date(body.targetAt).getTime() - Date.now();
