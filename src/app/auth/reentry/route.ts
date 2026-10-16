@@ -5,6 +5,7 @@ import {
   ENTRY_FLOW_PENDING_COOKIE,
   safeEntryDestination,
 } from "@/lib/entry-flow";
+import { requestOrigin } from "@/lib/siteUrl";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
   const client = await createClient();
   await client.auth.signOut({ scope: "local" });
 
-  const response = NextResponse.redirect(new URL("/inicio?apresentacao=1", request.url));
+  const response = NextResponse.redirect(new URL("/inicio?apresentacao=1", requestOrigin(request)));
   response.cookies.set(ENTRY_FLOW_PENDING_COOKIE, destination, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

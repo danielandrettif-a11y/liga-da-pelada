@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { ENTRY_FLOW_DONE_COOKIE, ENTRY_FLOW_VERSION } from '@/lib/entry-flow'
+import { requestOrigin } from '@/lib/siteUrl'
 
 export default async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -32,6 +33,7 @@ export default async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   const pathname = request.nextUrl.pathname
+  const origin = requestOrigin(request)
   const isAdminRoute =
     pathname.startsWith('/admin') ||
     /^\/rodadas\/[^/]+\/nova-partida$/.test(pathname)
@@ -43,14 +45,14 @@ export default async function proxy(request: NextRequest) {
     || pathname.startsWith('/auth/') || pathname.startsWith('/convite/')
     || pathname.startsWith('/redefinir-senha') || pathname.startsWith('/api/')
     || pathname.startsWith('/internal/')
-  const loginUrl = new URL('/login', request.url)
+  const loginUrl = new URL('/login', origin)
   loginUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
   let isAdmin = false
   let hasMembership = false
   let needsLeagueChoice = false
   let isBasicLeague = false
 
-  if (pathname === '/' && !user) return NextResponse.redirect(new URL('/inicio', request.url))
+  if (pathname === '/' && !user) return NextResponse.redirect(new URL('/inicio', origin))
 
   if (user) {
     const { data: memberships } = await supabase
@@ -82,7 +84,7 @@ export default async function proxy(request: NextRequest) {
       // Permite implantação sem interrupção caso o código chegue poucos
       // segundos antes da migration que adiciona a campanha versionada.
       if (!entryFlowError && Number(accountProfile?.entry_flow_version || 0) < ENTRY_FLOW_VERSION && canRedirectToPresentation) {
-        const reentryUrl = new URL('/auth/reentry', request.url)
+        const reentryUrl = new URL('/auth/reentry', origin)
         reentryUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
         return NextResponse.redirect(reentryUrl)
       }
@@ -95,22 +97,22 @@ export default async function proxy(request: NextRequest) {
   }
 
   if (isAdminRoute && !isAdmin) {
-    if (user) return NextResponse.redirect(new URL('/lobby', request.url))
+    if (user) return NextResponse.redirect(new URL('/lobby', origin))
     return NextResponse.redirect(loginUrl)
   }
 
   if (!isPublicRoute && !user) return NextResponse.redirect(loginUrl)
   if (!isPublicRoute && !isLeagueSelectionRoute && user && !hasMembership) {
-    return NextResponse.redirect(new URL('/lobby', request.url))
+    return NextResponse.redirect(new URL('/lobby', origin))
   }
   if (!isPublicRoute && !isLeagueSelectionRoute && user && needsLeagueChoice) {
-    return NextResponse.redirect(new URL('/lobby', request.url))
+    return NextResponse.redirect(new URL('/lobby', origin))
   }
   const isFullFeatureRoute = pathname.startsWith('/cartola') || pathname.startsWith('/bq-manager')
     || pathname.startsWith('/coletiva') || pathname.startsWith('/admin/cartola')
     || pathname.startsWith('/mais/coletivas')
   if (user && isBasicLeague && isFullFeatureRoute) {
-    return NextResponse.redirect(new URL('/mais?upgrade_required=1', request.url))
+    return NextResponse.redirect(new URL('/mais?upgrade_required=1', origin))
   }
 
   if (isAccountRoute && !user) {
@@ -118,7 +120,7 @@ export default async function proxy(request: NextRequest) {
   }
 
   if (user && (pathname === '/login' || pathname === '/cadastro')) {
-    return NextResponse.redirect(new URL('/lobby', request.url))
+    return NextResponse.redirect(new URL('/lobby', origin))
   }
 
   return supabaseResponse
