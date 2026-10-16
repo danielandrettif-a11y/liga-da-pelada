@@ -82,6 +82,8 @@ CREATE POLICY fantasy_user_cosmetics_shared_account_read
   );
 
 ALTER TABLE public.account_cosmetic_loadouts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS account_cosmetic_loadouts_shared_read
+  ON public.account_cosmetic_loadouts;
 CREATE POLICY account_cosmetic_loadouts_shared_read
   ON public.account_cosmetic_loadouts FOR SELECT TO authenticated USING (
     user_id = auth.uid() OR EXISTS (
