@@ -97,6 +97,13 @@ ALTER TABLE public.round_payment_charge_lines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.round_payment_obligations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.round_payment_events ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS league_expense_items_member_read ON public.league_expense_items;
+DROP POLICY IF EXISTS league_expense_items_admin_manage ON public.league_expense_items;
+DROP POLICY IF EXISTS round_expense_member_read ON public.round_expense_installments;
+DROP POLICY IF EXISTS round_charge_member_read ON public.round_payment_charge_lines;
+DROP POLICY IF EXISTS round_obligation_member_read ON public.round_payment_obligations;
+DROP POLICY IF EXISTS round_events_admin_read ON public.round_payment_events;
+
 CREATE POLICY league_expense_items_member_read ON public.league_expense_items
   FOR SELECT TO authenticated USING (public.is_league_member(league_id));
 CREATE POLICY league_expense_items_admin_manage ON public.league_expense_items
