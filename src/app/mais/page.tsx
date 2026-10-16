@@ -77,6 +77,12 @@ const ADMIN_SECTIONS = [
         label: "PIX de recebimento",
         description: "Cadastrar chaves para encerrar a rodada",
       },
+      {
+        href: "/mais/caixinha",
+        icon: ClipboardList,
+        label: "Caixinha e despesas",
+        description: "Parcelar compras e ratear por rodada",
+      },
     ],
   },
   {

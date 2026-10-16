@@ -1079,7 +1079,7 @@ export async function createRoundWithTeams(
   }
 }
 
-export async function finishRound(roundId: string, paymentPix: string, paymentTotal: number, recipient?: { id?: string | null; name?: string | null }) {
+export async function finishRound(roundId: string, paymentPix: string, paymentTotal: number, recipient?: { id?: string | null; name?: string | null }, options?: { expenseItemIds?: string[] }) {
   try {
     let pix = paymentPix.trim();
     const total = Number(paymentTotal);
@@ -1148,6 +1148,21 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
       .eq("id", roundId);
 
     if (error) throw new Error(error.message);
+
+    const { error: paymentPlanError } = await client.rpc("sync_round_payment_plan", {
+      p_round_id: roundId,
+      p_expense_item_ids: [...new Set(options?.expenseItemIds || [])],
+    });
+    if (paymentPlanError) {
+      await client.from("rounds").update({
+        status: originalRound.status,
+        payment_pix: originalRound.payment_pix,
+        payment_total: originalRound.payment_total,
+        payment_recipient_id: originalRound.payment_recipient_id,
+        payment_recipient_name: originalRound.payment_recipient_name,
+      }).eq("id", roundId);
+      throw new Error(`Não foi possível montar a cobrança da rodada: ${paymentPlanError.message}`);
+    }
 
     const { data: fantasyTest } = fantasyRoundForClose
       ? await client.from("fantasy_test_sessions").select("id").eq("round_id", roundId).maybeSingle()

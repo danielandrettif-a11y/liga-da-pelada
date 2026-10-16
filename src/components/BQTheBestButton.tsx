@@ -15,7 +15,6 @@ import {
 
 const AWARD_ORDER: MonthlyAwardType[] = [
   "bestDefenderMonth",
-  "bestMidfielderMonth",
   "bestAttackerMonth",
   "bestGoalkeeperMonth",
   "goldenBootMonth",
@@ -30,12 +29,6 @@ const AWARD_VISUALS: Record<MonthlyAwardType, { code: string; card: string; icon
     card: "border-sky-300/30 bg-gradient-to-r from-sky-400/15 via-[#0a1d1b] to-[#07130c]",
     icon: "border-sky-300/35 bg-sky-400/15 text-sky-300",
     eyebrow: "text-sky-300",
-  },
-  bestMidfielderMonth: {
-    code: "ALA",
-    card: "border-violet-300/30 bg-gradient-to-r from-violet-400/15 via-[#151522] to-[#07130c]",
-    icon: "border-violet-300/35 bg-violet-400/15 text-violet-300",
-    eyebrow: "text-violet-300",
   },
   bestAttackerMonth: {
     code: "ATA",
@@ -77,7 +70,6 @@ const AWARD_VISUALS: Record<MonthlyAwardType, { code: string; card: string; icon
 
 const AWARD_EXPLANATIONS: Record<MonthlyAwardType, string> = {
   bestDefenderMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag Defensor/Volante.",
-  bestMidfielderMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag Ala.",
   bestAttackerMonth: "Teve a maior soma de pontos nas rodadas em que atuou com a tag Atacante.",
   bestGoalkeeperMonth: "Teve a menor média de gols sofridos entre quem fez pelo menos 4 partidas no gol. Em caso de empate, vencem o melhor percentual de clean sheets e a maior amostra.",
   goldenBootMonth: "Foi o jogador que marcou mais gols nas rodadas oficiais do mês.",

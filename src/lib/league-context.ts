@@ -13,6 +13,10 @@ export type MyLeague = {
   role: "admin" | "player";
   isFavorite: boolean;
   featureTier: "basic" | "complete";
+  visibility: "private" | "open";
+  logoUrl: string | null;
+  coverUrl: string | null;
+  accentColor: string;
 };
 
 export const getMyLeagues = cache(async (): Promise<MyLeague[]> => {
@@ -21,7 +25,7 @@ export const getMyLeagues = cache(async (): Promise<MyLeague[]> => {
 
   const { data: memberships, error } = await client
     .from("league_members")
-    .select("league_id, role, is_favorite, leagues!inner(id, name, slug, is_active, feature_tier)")
+    .select("league_id, role, is_favorite, leagues!inner(id, name, slug, is_active, feature_tier, visibility, logo_url, cover_url, accent_color)")
     .eq("user_id", user.id)
     .eq("is_active", true);
   if (error) throw new Error(`Não foi possível carregar suas peladas: ${error.message}`);
@@ -36,6 +40,10 @@ export const getMyLeagues = cache(async (): Promise<MyLeague[]> => {
       role: membership.role === "admin" ? "admin" as const : "player" as const,
       isFavorite: Boolean(membership.is_favorite),
       featureTier: league.feature_tier === "basic" ? "basic" as const : "complete" as const,
+      visibility: league.visibility === "open" ? "open" as const : "private" as const,
+      logoUrl: league.logo_url || null,
+      coverUrl: league.cover_url || null,
+      accentColor: /^#[0-9a-f]{6}$/i.test(league.accent_color || "") ? league.accent_color : "#ccff00",
     }];
   }).sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite) || a.name.localeCompare(b.name, "pt-BR"));
 });

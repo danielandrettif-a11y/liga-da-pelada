@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, ArrowLeftRight, CheckCircle2, Clock, RotateCcw } from "@/components/icons";
-import { getPaymentAuditLog, type PaymentAuditLogEntry } from "@/lib/actions/payments";
+import { getExpenseItems, getPaymentAuditLog, type PaymentAuditLogEntry } from "@/lib/actions/payments";
 import { getCurrentAccount } from "@/lib/auth";
 import { formatDateShort } from "@/lib/utils";
 
@@ -27,7 +27,7 @@ export default async function TransfermarketHistoryPage() {
   if (!account.user) redirect("/login?next=/admin/transfermarket");
   if (!account.isAdmin) redirect("/mais");
 
-  const auditEntries = await getPaymentAuditLog();
+  const [auditEntries, expenseItems] = await Promise.all([getPaymentAuditLog(), getExpenseItems(true)]);
   const groups = new Map<string, AuditGroup>();
 
   for (const entry of auditEntries) {
@@ -62,6 +62,8 @@ export default async function TransfermarketHistoryPage() {
           A ordem abaixo mostra quem marcou ou desmarcou cada pagamento. O registro não pode ser editado pelos usuários.
         </p>
       </div>
+
+      {expenseItems.length > 0 && <section className="space-y-3"><div className="flex items-end justify-between"><div><p className="text-[10px] font-black uppercase tracking-widest text-accent">Caixinha transparente</p><h2 className="font-athletic text-xl font-black uppercase text-white">Compras parceladas</h2></div><Link href="/mais/caixinha" className="text-xs font-bold text-accent">Gerenciar</Link></div>{expenseItems.map((item) => <article key={item.id} className="rounded-2xl border border-border bg-surface p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-black text-white">{item.name}</h3><p className="mt-1 text-xs text-muted">R$ {item.total_amount.toFixed(2).replace(".", ",")} · PIX de {item.recipient?.name || "destinatário"}</p></div><strong className="text-xs text-accent">{item.paid_installments}/{item.installment_count}</strong></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-background"><div className="h-full bg-accent" style={{ width: `${Math.min(100, item.paid_installments / item.installment_count * 100)}%` }} /></div><p className="mt-2 text-[10px] text-muted">{Math.max(0, item.installment_count - item.paid_installments)} parcelas restantes</p></article>)}</section>}
 
       {roundGroups.length === 0 ? (
         <div className="glass-card flex min-h-64 flex-col items-center justify-center p-8 text-center">

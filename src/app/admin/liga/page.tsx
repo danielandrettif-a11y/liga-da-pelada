@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save } from "@/components/icons";
-import { getLeagueConfig, updateLeagueConfig, updateLeagueName, updateLeagueVisibility } from "@/lib/actions/league";
+import Image from "next/image";
+import { ArrowLeft, ImagePlus, Save } from "@/components/icons";
+import { getLeagueConfig, updateLeagueBranding, updateLeagueConfig, updateLeagueName, updateLeagueVisibility } from "@/lib/actions/league";
 import { deleteCurrentLeague } from "@/app/mais/league-mode-actions";
 
 export default function LigaConfigPage() {
@@ -34,6 +35,15 @@ export default function LigaConfigPage() {
   const [visibility, setVisibility] = useState<"private" | "open">("private");
   const [savingVisibility, setSavingVisibility] = useState(false);
   const [visibilityMessage, setVisibilityMessage] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [accentColor, setAccentColor] = useState("#ccff00");
+  const [brandingFiles, setBrandingFiles] = useState<{ logo?: File; cover?: File }>({});
+  const [removeLogo, setRemoveLogo] = useState(false);
+  const [removeCover, setRemoveCover] = useState(false);
+  const [savingBranding, setSavingBranding] = useState(false);
+  const [brandingMessage, setBrandingMessage] = useState("");
+  const [brandingError, setBrandingError] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -50,6 +60,9 @@ export default function LigaConfigPage() {
         setStadiumMapUrl(config.stadium_map_url || "");
         setEventDurationMinutes(config.event_duration_minutes || 120);
         setVisibility(config.visibility === "open" ? "open" : "private");
+        setLogoUrl(config.logo_url || null);
+        setCoverUrl(config.cover_url || null);
+        setAccentColor(config.accent_color || "#ccff00");
       }
       setLoading(false);
     }
@@ -126,6 +139,30 @@ export default function LigaConfigPage() {
     setSavingName(false);
   }
 
+  async function handleBrandingSave() {
+    if (!canManage || savingBranding) return;
+    setSavingBranding(true);
+    setBrandingMessage("");
+    const formData = new FormData();
+    formData.set("accent_color", accentColor);
+    if (brandingFiles.logo) formData.set("logo", brandingFiles.logo);
+    if (brandingFiles.cover) formData.set("cover", brandingFiles.cover);
+    if (removeLogo) formData.set("remove_logo", "1");
+    if (removeCover) formData.set("remove_cover", "1");
+    const result = await updateLeagueBranding(leagueId, formData);
+    setBrandingError(!result.success);
+    if (result.success) {
+      if (result.logoUrl !== undefined) setLogoUrl(result.logoUrl);
+      if (result.coverUrl !== undefined) setCoverUrl(result.coverUrl);
+      setBrandingFiles({});
+      setRemoveLogo(false);
+      setRemoveCover(false);
+      setBrandingMessage("Identidade visual atualizada.");
+      router.refresh();
+    } else setBrandingMessage(result.error);
+    setSavingBranding(false);
+  }
+
   if (loading) return <div className="p-8 text-center text-muted">Carregando...</div>;
 
   return (
@@ -158,6 +195,43 @@ export default function LigaConfigPage() {
           {savingName ? "Salvando..." : "Salvar nome"}
         </button>
         {nameMessage && <p role={nameError ? "alert" : "status"} className={`text-xs ${nameError ? "text-danger" : "text-success"}`}>{nameMessage}</p>}
+      </section>}
+
+      {canManage && <section className="glass-card space-y-4 overflow-hidden p-5">
+        <div>
+          <h2 className="font-athletic text-lg font-black uppercase text-foreground">Identidade da pelada</h2>
+          <p className="mt-1 text-xs leading-5 text-muted">Personalize o escudo, a capa e a cor que aparecem no lobby. JPG, PNG ou WebP.</p>
+        </div>
+        <div className="relative h-32 overflow-hidden rounded-2xl border border-border bg-surface-hover" style={{ borderColor: `${accentColor}66` }}>
+          {coverUrl && !removeCover ? <Image src={coverUrl} alt={`Capa de ${leagueName}`} fill sizes="(max-width: 768px) 100vw, 640px" className="object-cover" /> : <div className="flex h-full items-center justify-center text-xs font-bold uppercase tracking-widest text-muted">Prévia da capa</div>}
+          <div className="absolute inset-0 bg-black/35" />
+          <div className="absolute inset-x-4 bottom-3 flex items-end gap-3">
+            <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 bg-background text-xl font-black" style={{ borderColor: accentColor, color: accentColor }}>
+              {logoUrl && !removeLogo ? <Image src={logoUrl} alt={`Escudo de ${leagueName}`} fill sizes="64px" className="object-cover" /> : leagueName.slice(0, 2).toUpperCase()}
+            </div>
+            <p className="truncate pb-1 text-lg font-black text-white">{leagueName}</p>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="rounded-xl border border-border p-3 text-xs font-bold text-foreground">
+            <span className="flex items-center gap-2"><ImagePlus className="h-4 w-4 text-accent" /> Escudo</span>
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="mt-2 block w-full text-xs text-muted file:mr-2 file:rounded-lg file:border-0 file:bg-accent file:px-3 file:py-2 file:font-bold file:text-background" onChange={(event) => { setBrandingFiles((current) => ({ ...current, logo: event.target.files?.[0] })); setRemoveLogo(false); }} />
+          </label>
+          <label className="rounded-xl border border-border p-3 text-xs font-bold text-foreground">
+            <span className="flex items-center gap-2"><ImagePlus className="h-4 w-4 text-accent" /> Capa</span>
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="mt-2 block w-full text-xs text-muted file:mr-2 file:rounded-lg file:border-0 file:bg-accent file:px-3 file:py-2 file:font-bold file:text-background" onChange={(event) => { setBrandingFiles((current) => ({ ...current, cover: event.target.files?.[0] })); setRemoveCover(false); }} />
+          </label>
+        </div>
+        <label className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 text-xs font-bold text-foreground">
+          Cor da pelada
+          <span className="flex items-center gap-2"><input aria-label="Cor da pelada" type="color" value={accentColor} onChange={(event) => setAccentColor(event.target.value)} className="h-9 w-12 cursor-pointer rounded border-0 bg-transparent" /><input aria-label="Código hexadecimal da cor" value={accentColor} onChange={(event) => setAccentColor(event.target.value)} maxLength={7} className="w-24 rounded-lg border border-border bg-background px-2 py-2 font-mono uppercase text-foreground" /></span>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {logoUrl && <button type="button" onClick={() => setRemoveLogo((value) => !value)} className="rounded-lg border border-border px-3 py-2 text-xs font-bold text-muted">{removeLogo ? "Manter escudo" : "Remover escudo"}</button>}
+          {coverUrl && <button type="button" onClick={() => setRemoveCover((value) => !value)} className="rounded-lg border border-border px-3 py-2 text-xs font-bold text-muted">{removeCover ? "Manter capa" : "Remover capa"}</button>}
+        </div>
+        <button type="button" onClick={handleBrandingSave} disabled={savingBranding || !/^#[0-9a-f]{6}$/i.test(accentColor)} className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-black text-background disabled:opacity-40">{savingBranding ? "Salvando..." : "Salvar identidade"}</button>
+        {brandingMessage && <p role={brandingError ? "alert" : "status"} className={`text-xs ${brandingError ? "text-danger" : "text-success"}`}>{brandingMessage}</p>}
       </section>}
 
       {canManage && <section className="glass-card space-y-3 p-5">

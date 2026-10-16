@@ -2371,10 +2371,9 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
   const liveReadClient = createServiceClient() || account.client;
   const cosmeticLoadoutPromise = cosmeticProfileRow?.user_id
     ? account.client
-      .from("fantasy_user_cosmetic_loadouts")
+      .from("account_cosmetic_loadouts")
       .select("banner:banner_cosmetic_id(asset_key), frame:frame_cosmetic_id(asset_key)")
       .eq("user_id", cosmeticProfileRow.user_id)
-      .eq("fantasy_season_id", fs.id)
       .maybeSingle()
     : Promise.resolve({ data: null });
   const [{ data: liveRoundRows }, { data: liveSettingsRow }, { data: cosmeticLoadout }] = await Promise.all([
@@ -3404,9 +3403,8 @@ export async function getFantasyRanking(
           .select("user_id, players(name, avatar_url)")
           .in("user_id", userIds),
         rankingReadClient
-          .from("fantasy_user_cosmetic_loadouts")
+          .from("account_cosmetic_loadouts")
           .select("user_id, frame:frame_cosmetic_id(asset_key), aura:aura_cosmetic_id(asset_key), nameplate:nameplate_cosmetic_id(asset_key), title:title_cosmetic_id(name), background:background_cosmetic_id(asset_key)")
-          .eq("fantasy_season_id", fs.id)
           .in("user_id", userIds),
         periodScope === "round" && rankingRoundId
           ? rankingReadClient
@@ -3623,9 +3621,8 @@ export async function getFantasyRoundLineupOverview(
         .select("id, user_id, status, updated_at, created_at")
         .eq("fantasy_round_id", targetFantasyRound.id),
       overviewReadClient
-        .from("fantasy_user_cosmetic_loadouts")
-        .select("user_id, frame:frame_cosmetic_id(asset_key), aura:aura_cosmetic_id(asset_key), background:background_cosmetic_id(asset_key)")
-        .eq("fantasy_season_id", fs.id),
+        .from("account_cosmetic_loadouts")
+        .select("user_id, frame:frame_cosmetic_id(asset_key), aura:aura_cosmetic_id(asset_key), background:background_cosmetic_id(asset_key)"),
     ]);
 
   const lineupByUser = new Map((lineups || []).map((l: any) => [l.user_id, l]));

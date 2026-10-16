@@ -28,6 +28,23 @@ function formatPointValue(value: number) {
   return value > 0 ? `+${value}` : String(value);
 }
 
+function formatBreakdownLabel(label: string, count: number) {
+  if (count !== 1) return label.toLocaleLowerCase("pt-BR");
+  return label
+    .replace(/^Gols sofridos/, "Gol sofrido")
+    .replace(/^Gols feitos/, "Gol feito")
+    .replace(/^Gols contra/, "Gol contra")
+    .replace(/^Gols/, "Gol")
+    .replace(/^Assistências/, "Assistência")
+    .replace(/^Vitórias/, "Vitória")
+    .replace(/^Empates/, "Empate")
+    .replace(/^Derrotas/, "Derrota")
+    .replace(/^Jogos/, "Jogo")
+    .replace(/^Atuações/, "Atuação")
+    .replace(/^Clean sheets/, "Clean sheet")
+    .toLocaleLowerCase("pt-BR");
+}
+
 function rankedPointDescription(row: HistoryRow) {
   const breakdown = buildRankedPointBreakdown({
     goals: row.goals,
@@ -39,15 +56,12 @@ function rankedPointDescription(row: HistoryRow) {
     goalkeeperGoalsConceded: row.goals_conceded,
     ownGoals: row.own_goals,
   });
-  const parts = breakdown.map((item) => `${item.count} ${item.label.toLocaleLowerCase("pt-BR")} (${formatPointValue(item.points)})`);
-  const explainedPoints = breakdown.reduce((sum, item) => sum + item.points, 0);
+  const parts = breakdown.map((item) => `${item.count} ${formatBreakdownLabel(item.label, item.count)} (${formatPointValue(item.points)})`);
   const total = Number(row.points || 0);
-  const adjustment = total - explainedPoints;
-  if (adjustment !== 0) parts.push(`ajuste da rodada (${formatPointValue(adjustment)})`);
 
   return parts.length > 0
-    ? `${parts.join(" · ")} = ${formatPointValue(total)} pts`
-    : `Sem eventos pontuáveis = ${formatPointValue(total)} pts`;
+    ? `${parts.join(" · ")} · total registrado: ${formatPointValue(total)} pts`
+    : `Pontuação registrada: ${formatPointValue(total)} pts`;
 }
 
 function History({ rows, friendly = false }: { rows: HistoryRow[]; friendly?: boolean }) {

@@ -7,6 +7,22 @@ import { MAX_PLAYERS_PER_TEAM, MAX_TEAMS_PER_ROUND, MIN_TEAMS_PER_ROUND } from "
 import { getSelectedLeague } from "../league-context";
 import { getCurrentAccount } from "../auth";
 
+const BRANDING_BUCKET = "league-branding";
+const BRANDING_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+function extensionForBranding(file: File) {
+  if (file.type === "image/png") return "png";
+  if (file.type === "image/webp") return "webp";
+  return "jpg";
+}
+
+function storagePathFromPublicUrl(url: string | null | undefined) {
+  if (!url) return null;
+  const marker = `/storage/v1/object/public/${BRANDING_BUCKET}/`;
+  const index = url.indexOf(marker);
+  return index >= 0 ? decodeURIComponent(url.slice(index + marker.length)) : null;
+}
+
 export async function getLeagueConfig() {
   const selectedLeague = await getSelectedLeague();
   if (!selectedLeague) return null;
@@ -58,6 +74,69 @@ export async function updateLeagueVisibility(leagueId: string, visibility: "priv
   revalidatePath("/peladas");
   revalidatePath("/lobby");
   return { success: true };
+}
+
+export async function updateLeagueBranding(leagueId: string, formData: FormData) {
+  const selectedLeague = await getSelectedLeague();
+  if (!selectedLeague || selectedLeague.id !== leagueId || selectedLeague.role !== "admin") {
+    return { success: false as const, error: "Somente o ADM desta pelada pode alterar a identidade visual." };
+  }
+  const account = await getCurrentAccount();
+  if (!account.user) return { success: false as const, error: "Entre na sua conta novamente." };
+  const accentColor = String(formData.get("accent_color") || "").trim();
+  if (!/^#[0-9a-f]{6}$/i.test(accentColor)) {
+    return { success: false as const, error: "Escolha uma cor válida no formato hexadecimal." };
+  }
+  const logo = formData.get("logo");
+  const cover = formData.get("cover");
+  const files = [
+    { key: "logo_url", kind: "logo", file: logo instanceof File && logo.size ? logo : null, limit: 4 * 1024 * 1024 },
+    { key: "cover_url", kind: "cover", file: cover instanceof File && cover.size ? cover : null, limit: 8 * 1024 * 1024 },
+  ] as const;
+  for (const item of files) {
+    if (item.file && (!BRANDING_TYPES.has(item.file.type) || item.file.size > item.limit)) {
+      return { success: false as const, error: `${item.kind === "logo" ? "O escudo" : "A capa"} deve ser JPG, PNG ou WebP e respeitar o limite de tamanho.` };
+    }
+  }
+  const { data: current, error: currentError } = await account.client.from("leagues")
+    .select("logo_url, cover_url").eq("id", leagueId).maybeSingle();
+  if (currentError || !current) return { success: false as const, error: "Pelada não encontrada." };
+
+  const updates: Record<string, string | null> = { accent_color: accentColor.toLowerCase() };
+  const uploadedPaths: string[] = [];
+  for (const item of files) {
+    if (!item.file) continue;
+    const path = `${leagueId}/${item.kind}-${Date.now()}.${extensionForBranding(item.file)}`;
+    const bytes = new Uint8Array(await item.file.arrayBuffer());
+    const { error } = await account.client.storage.from(BRANDING_BUCKET).upload(path, bytes, {
+      contentType: item.file.type,
+      cacheControl: "31536000",
+      upsert: false,
+    });
+    if (error) {
+      if (uploadedPaths.length) await account.client.storage.from(BRANDING_BUCKET).remove(uploadedPaths);
+      return { success: false as const, error: error.message };
+    }
+    uploadedPaths.push(path);
+    updates[item.key] = account.client.storage.from(BRANDING_BUCKET).getPublicUrl(path).data.publicUrl;
+  }
+  if (formData.get("remove_logo") === "1") updates.logo_url = null;
+  if (formData.get("remove_cover") === "1") updates.cover_url = null;
+  const { error } = await account.client.from("leagues").update(updates).eq("id", leagueId);
+  if (error) {
+    if (uploadedPaths.length) await account.client.storage.from(BRANDING_BUCKET).remove(uploadedPaths);
+    return { success: false as const, error: error.message };
+  }
+  const previousPaths = [
+    updates.logo_url !== undefined ? storagePathFromPublicUrl(current.logo_url) : null,
+    updates.cover_url !== undefined ? storagePathFromPublicUrl(current.cover_url) : null,
+  ].filter((path): path is string => Boolean(path) && !uploadedPaths.includes(path!));
+  if (previousPaths.length) await account.client.storage.from(BRANDING_BUCKET).remove(previousPaths);
+  revalidatePath("/admin/liga");
+  revalidatePath("/lobby");
+  revalidatePath("/peladas");
+  revalidatePath("/", "layout");
+  return { success: true as const, logoUrl: updates.logo_url, coverUrl: updates.cover_url, accentColor: updates.accent_color };
 }
 
 export async function updatePreSeasonEnabled(id: string, enabled: boolean) {

@@ -16,7 +16,7 @@ import { RoundHistoryTabs } from "@/components/RoundHistoryTabs";
 import { RoundAdminPlayerTools } from "@/components/RoundAdminPlayerTools";
 import { getPlayers } from "@/lib/actions/players";
 import { RoundTeamShuffleCard } from "@/components/RoundTeamShuffleCard";
-import { getPaymentRecipients } from "@/lib/actions/payments";
+import { getExpenseItems, getPaymentRecipients } from "@/lib/actions/payments";
 import { DeleteMatchButton } from "@/components/DeleteMatchButton";
 import { RoundLiveStats } from "@/components/RoundLiveStats";
 
@@ -35,8 +35,9 @@ export default async function RodadaDetalhePage({
   const accountPromise = getCurrentAccount();
   const allSelectablePlayersPromise = accountPromise.then((acc) => acc.isAdmin ? getPlayers(true) : []);
   const paymentRecipientsPromise = accountPromise.then((acc) => acc.isAdmin ? getPaymentRecipients() : []);
+  const expenseItemsPromise = accountPromise.then((acc) => acc.isAdmin ? getExpenseItems() : []);
 
-  const [round, account, roundStatistics, allSelectablePlayers, paymentRecipients] = await Promise.all([
+  const [round, account, roundStatistics, allSelectablePlayers, paymentRecipients, expenseItems] = await Promise.all([
     roundPromise,
     accountPromise,
     roundPromise.then((currentRound) => currentRound?.status === "finished"
@@ -44,6 +45,7 @@ export default async function RodadaDetalhePage({
       : null),
     allSelectablePlayersPromise,
     paymentRecipientsPromise,
+    expenseItemsPromise,
   ]);
 
   if (!round) {
@@ -211,7 +213,7 @@ export default async function RodadaDetalhePage({
         </div>
       </section>
       
-      <FinishRoundButton roundId={round.id} status={round.status} canManage={account.isAdmin} recipients={paymentRecipients} />
+      <FinishRoundButton roundId={round.id} status={round.status} canManage={account.isAdmin} recipients={paymentRecipients} expenseItems={expenseItems} participantCount={participants.length} />
 
       {account.isAdmin && (
         <RoundAdminPlayerTools

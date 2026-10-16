@@ -1,111 +1,62 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ChevronRight, Crown, Plus, Search, Shield, Trophy, Users } from "@/components/icons";
 import { getCurrentAccount } from "@/lib/auth";
-import { getMyLeagues } from "@/lib/league-context";
-import { addExistingAccount, enterLeague, reviewAccess, toggleFavorite } from "./actions";
+import { cn } from "@/lib/cn";
+import { getMyLeagues, type MyLeague } from "@/lib/league-context";
+import { enterLeague, reviewAccess, toggleFavorite } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function LobbyPage({ searchParams }: { searchParams: Promise<{ error?: string; lookup?: string; league?: string; added?: string; deleted?: string }> }) {
+function ClubMark({ league, large = false }: { league: MyLeague; large?: boolean }) {
+  return <div className={cn("relative grid shrink-0 place-items-center overflow-hidden border-2 bg-background font-athletic font-black", large ? "h-20 w-20 rounded-3xl text-2xl" : "h-14 w-14 rounded-2xl text-base")} style={{ borderColor: league.accentColor, color: league.accentColor }}>
+    {league.logoUrl ? <Image src={league.logoUrl} alt="" fill sizes={large ? "80px" : "56px"} className="object-cover" /> : league.name.slice(0, 2).toUpperCase()}
+  </div>;
+}
+
+function LeagueCard({ league, featured = false }: { league: MyLeague; featured?: boolean }) {
+  return <article className={cn("relative isolate overflow-hidden border bg-surface", featured ? "min-w-[84vw] snap-center rounded-3xl sm:min-w-[380px]" : "rounded-2xl")} style={{ borderColor: `${league.accentColor}55` }}>
+    <div className={cn("relative overflow-hidden", featured ? "h-44" : "h-28")}>
+      {league.coverUrl ? <Image src={league.coverUrl} alt="" fill sizes={featured ? "(max-width: 640px) 84vw, 380px" : "(max-width: 640px) 100vw, 320px"} className="object-cover" /> : <div className="h-full w-full bg-surface-hover" />}
+      <div className="absolute inset-0 bg-black/55" />
+      <div className="absolute left-4 top-4 flex gap-2"><span className="rounded-full border border-white/15 bg-black/55 px-2.5 py-1 text-[10px] font-black uppercase text-white">{league.role === "admin" ? "Administrador" : "Jogador"}</span><span className="rounded-full border border-white/15 bg-black/55 px-2.5 py-1 text-[10px] font-black uppercase text-white">{league.featureTier === "complete" ? "Completa" : "Básica"}</span></div>
+      <form action={toggleFavorite} className="absolute right-4 top-4"><input type="hidden" name="league_id" value={league.id} /><button type="submit" aria-label={league.isFavorite ? `Desfavoritar ${league.name}` : `Favoritar ${league.name}`} className="grid h-10 w-10 place-items-center rounded-full border border-white/20 bg-black/55 text-2xl" style={{ color: league.isFavorite ? league.accentColor : "white" }}>{league.isFavorite ? "★" : "☆"}</button></form>
+      <div className="absolute inset-x-4 bottom-4 flex items-end gap-3"><ClubMark league={league} large={featured} /><div className="min-w-0 pb-1"><h2 className={cn("truncate font-athletic font-black uppercase text-white", featured ? "text-2xl" : "text-lg")}>{league.name}</h2><p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-white/70"><Shield className="h-3.5 w-3.5" /> {league.visibility === "open" ? "Pelada aberta" : "Pelada privada"}</p></div></div>
+    </div>
+    <form action={enterLeague} className="p-3"><input type="hidden" name="league_id" value={league.id} /><button type="submit" className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-black text-background" style={{ backgroundColor: league.accentColor }}>Entrar no clube <ChevronRight className="h-4 w-4" /></button></form>
+  </article>;
+}
+
+export default async function LobbyPage({ searchParams }: { searchParams: Promise<{ error?: string; added?: string; deleted?: string }> }) {
   const { user, profile, client } = await getCurrentAccount();
   if (!user) redirect("/login?next=/lobby");
   const leagues = await getMyLeagues();
-  const { error, lookup, league: lookupLeagueId, added, deleted } = await searchParams;
+  const { error, added, deleted } = await searchParams;
   const adminLeagueIds = leagues.filter((league) => league.role === "admin").map((league) => league.id);
   const [{ data: requests }, { data: myRequests }] = await Promise.all([
-    adminLeagueIds.length
-      ? client.from("league_join_requests").select("id, league_id, user_id, requested_at").in("league_id", adminLeagueIds).eq("status", "pending").order("requested_at")
-      : Promise.resolve({ data: [] }),
+    adminLeagueIds.length ? client.from("league_join_requests").select("id, league_id, user_id, requested_at").in("league_id", adminLeagueIds).eq("status", "pending").order("requested_at") : Promise.resolve({ data: [] }),
     client.from("league_join_requests").select("league_id, status, leagues(name)").eq("user_id", user.id).eq("status", "pending"),
   ]);
-  const { data: applicants } = requests?.length
-    ? await client.from("account_profiles").select("user_id, account_tag").in("user_id", requests.map((request) => request.user_id))
-    : { data: [] };
-  const lookupLeague = leagues.find((league) => league.id === lookupLeagueId && league.role === "admin");
-  const { data: searchResults } = lookupLeague && lookup?.trim()
-    ? await client.rpc("find_account_for_league", { p_league_id: lookupLeague.id, p_account_tag: lookup.trim() })
-    : { data: [] };
+  const { data: applicants } = requests?.length ? await client.from("account_profiles").select("user_id, account_tag").in("user_id", requests.map((request) => request.user_id)) : { data: [] };
+  const favorites = leagues.filter((league) => league.isFavorite);
+  const others = leagues.filter((league) => !league.isFavorite);
 
-  return (
-    <div className="space-y-6 py-5">
-      <div>
-        <p className="text-xs font-black uppercase tracking-[.2em] text-accent">Lobby</p>
-        <h1 className="mt-1 font-athletic text-3xl font-black uppercase text-white">Suas peladas</h1>
-        <p className="mt-2 text-sm text-muted">Escolha onde quer jogar. As favoritas ficam primeiro.</p>
-        {profile?.account_tag && <p className="mt-2 text-xs text-muted">Seu identificador: <span className="font-bold text-white">{profile.account_tag}</span></p>}
-      </div>
+  return <main className="space-y-8 pb-8 pt-5">
+    <header className="relative overflow-hidden rounded-3xl border border-accent/25 bg-surface p-5"><div className="absolute right-[-30px] top-[-40px] h-36 w-36 rounded-full border border-accent/20" /><p className="text-xs font-black uppercase tracking-[.22em] text-accent">Central das peladas</p><h1 className="mt-2 max-w-md text-balance font-athletic text-4xl font-black uppercase leading-none text-white">Escolha seu próximo jogo</h1><p className="mt-3 max-w-lg text-pretty text-sm leading-6 text-muted">Entre nos seus clubes, encontre uma nova turma ou organize sua própria pelada.</p>{profile?.account_tag && <p className="mt-4 inline-flex rounded-full border border-border bg-background/70 px-3 py-1.5 text-[11px] text-muted">Seu perfil: <strong className="ml-1 text-white">{profile.account_tag}</strong></p>}</header>
 
-      <div className="grid gap-2 sm:grid-cols-3">
-        <a href="#minhas-peladas" className="rounded-xl border border-accent/30 bg-accent/10 p-3 text-sm font-black text-accent">Entrar na minha pelada <span className="mt-1 block text-[11px] font-normal text-muted">Escolha uma da sua lista</span></a>
-        <Link href="/peladas" className="rounded-xl border border-border bg-surface p-3 text-sm font-black text-white">Procurar pelada <span className="mt-1 block text-[11px] font-normal text-muted">Veja todas e peça para entrar</span></Link>
-        <Link href="/lobby/criar" className="rounded-xl border border-border bg-surface p-3 text-sm font-black text-white">Criar nova pelada <span className="mt-1 block text-[11px] font-normal text-muted">Você será o administrador</span></Link>
-      </div>
+    <nav className="grid grid-cols-2 gap-3" aria-label="Ações do lobby"><Link href="/peladas" className="flex min-h-28 flex-col justify-between rounded-2xl border border-accent/30 bg-accent/10 p-4"><Search className="h-6 w-6 text-accent" /><span><strong className="block text-sm text-white">Procurar pelada</strong><small className="mt-1 block text-xs leading-4 text-muted">Explore clubes abertos e privados</small></span></Link><Link href="/lobby/criar" className="flex min-h-28 flex-col justify-between rounded-2xl border border-border bg-surface p-4"><Plus className="h-6 w-6 text-accent" /><span><strong className="block text-sm text-white">Criar uma pelada</strong><small className="mt-1 block text-xs leading-4 text-muted">Comece seu próprio clube</small></span></Link></nav>
 
-      {error && <p role="alert" className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">A operação não foi concluída. Atualize a página e tente novamente.</p>}
-      {added && <p role="status" className="rounded-xl border border-accent/30 bg-accent/10 p-3 text-sm text-accent">Conta adicionada à pelada.</p>}
-      {deleted && <p role="status" className="rounded-xl border border-accent/30 bg-accent/10 p-3 text-sm text-accent">Pelada excluída. Seus dados não aparecem mais no lobby.</p>}
+    {error && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-sm text-danger">A operação não foi concluída. Atualize a página e tente novamente.</p>}{added && <p role="status" className="rounded-xl border border-accent/30 bg-accent/10 p-3 text-sm text-accent">Conta adicionada à pelada.</p>}{deleted && <p role="status" className="rounded-xl border border-accent/30 bg-accent/10 p-3 text-sm text-accent">Pelada excluída.</p>}
 
-      {leagues.length ? <div id="minhas-peladas" className="space-y-3">
-        {leagues.map((league) => <div key={league.id} className="rounded-2xl border border-accent/25 bg-surface p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="font-athletic text-xl font-bold text-white">{league.name}</h2>
-              <p className="text-xs uppercase tracking-wide text-muted">{league.role === "admin" ? "Administrador" : "Jogador"} · {league.featureTier === "basic" ? "Básica" : "Completa"}</p>
-            </div>
-            <form action={toggleFavorite}>
-              <input type="hidden" name="league_id" value={league.id} />
-              <button type="submit" aria-label={league.isFavorite ? `Desfavoritar ${league.name}` : `Favoritar ${league.name}`} className={`text-2xl ${league.isFavorite ? "text-accent" : "text-muted"}`}>{league.isFavorite ? "★" : "☆"}</button>
-            </form>
-          </div>
-          <form action={enterLeague} className="mt-4">
-            <input type="hidden" name="league_id" value={league.id} />
-            <button type="submit" className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-black text-black">Entrar na pelada</button>
-          </form>
-        </div>)}
-      </div> : <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-muted">Você ainda não participa de nenhuma pelada. <Link href="/peladas" className="font-bold text-accent">Procure uma pelada</Link> ou <Link href="/lobby/criar" className="font-bold text-accent">crie a sua</Link>.</div>}
+    {favorites.length > 0 && <section aria-labelledby="favorite-clubs"><div className="mb-3 flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[.2em] text-accent">Seus favoritos</p><h2 id="favorite-clubs" className="font-athletic text-2xl font-black uppercase text-white">Clubes em destaque</h2></div><Trophy className="h-7 w-7 text-accent" /></div><div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">{favorites.map((league) => <LeagueCard key={league.id} league={league} featured />)}</div></section>}
 
-      {(myRequests || []).length > 0 && <section className="rounded-2xl border border-border bg-surface p-4">
-        <h2 className="font-athletic text-lg font-bold text-white">Aguardando aprovação</h2>
-        <ul className="mt-2 space-y-1 text-sm text-muted">{(myRequests || []).map((request) => <li key={request.league_id}>{request.leagues?.[0]?.name || "Pelada"}</li>)}</ul>
-      </section>}
+    <section aria-labelledby="all-clubs"><div className="mb-3 flex items-end justify-between"><div><p className="text-[10px] font-black uppercase tracking-[.2em] text-muted">Vestiários</p><h2 id="all-clubs" className="font-athletic text-2xl font-black uppercase text-white">{favorites.length ? "Outras peladas" : "Suas peladas"}</h2></div><span className="flex items-center gap-1 text-xs font-bold text-muted"><Users className="h-4 w-4" /> {leagues.length}</span></div>{others.length ? <div className="grid gap-3 sm:grid-cols-2">{others.map((league) => <LeagueCard key={league.id} league={league} />)}</div> : favorites.length ? <p className="rounded-2xl border border-border bg-surface p-4 text-sm text-muted">Todas as suas peladas estão nos favoritos.</p> : <div className="rounded-2xl border border-border bg-surface p-5 text-sm leading-6 text-muted">Você ainda não participa de nenhuma pelada. <Link href="/peladas" className="font-bold text-accent">Encontre uma turma</Link> ou <Link href="/lobby/criar" className="font-bold text-accent">crie a sua</Link>.</div>}</section>
 
-      {(requests || []).length > 0 && <section className="rounded-2xl border border-border bg-surface p-4">
-        <h2 className="font-athletic text-lg font-bold text-white">Pedidos de entrada</h2>
-        <div className="mt-3 space-y-3">{(requests || []).map((request) => {
-          const account = applicants?.find((item) => item.user_id === request.user_id);
-          return <div key={request.id} className="rounded-xl border border-border p-3">
-            <p className="text-sm font-bold text-white">{account?.account_tag || "Conta"}</p>
-            <p className="text-xs text-muted">{leagues.find((league) => league.id === request.league_id)?.name}</p>
-            <div className="mt-2 flex gap-2">{["approve", "reject"].map((decision) => <form action={reviewAccess} key={decision}>
-              <input type="hidden" name="request_id" value={request.id} /><input type="hidden" name="decision" value={decision} />
-              <button type="submit" className="rounded-lg border border-accent/30 px-3 py-1.5 text-xs font-bold text-accent">{decision === "approve" ? "Aprovar" : "Recusar"}</button>
-            </form>)}</div>
-          </div>;
-        })}</div>
-      </section>}
+    {(myRequests || []).length > 0 && <section className="rounded-2xl border border-warning/30 bg-warning/5 p-4"><h2 className="flex items-center gap-2 font-athletic text-lg font-black uppercase text-white"><Shield className="h-5 w-5 text-warning" /> Aguardando aprovação</h2><ul className="mt-3 space-y-2 text-sm text-muted">{(myRequests || []).map((request) => <li key={request.league_id} className="rounded-xl bg-background/60 px-3 py-2">{request.leagues?.[0]?.name || "Pelada"}</li>)}</ul></section>}
 
-      {adminLeagueIds.length > 0 && <section className="rounded-2xl border border-border bg-surface p-4">
-        <h2 className="font-athletic text-lg font-bold text-white">Adicionar conta cadastrada</h2>
-        <p className="mt-1 text-xs text-muted">Peça o identificador completo, por exemplo usuario#123456.</p>
-        <form method="GET" action="/lobby" className="mt-3 space-y-2">
-          <select name="league" defaultValue={lookupLeague?.id || adminLeagueIds[0]} className="w-full rounded-xl border border-border bg-background p-3 text-sm text-white">
-            {leagues.filter((league) => league.role === "admin").map((league) => <option key={league.id} value={league.id}>{league.name}</option>)}
-          </select>
-          <input name="lookup" defaultValue={lookup || ""} placeholder="usuario#123456" className="w-full rounded-xl border border-border bg-background p-3 text-sm text-white" />
-          <button type="submit" className="rounded-xl border border-accent/40 px-4 py-2 text-sm font-bold text-accent">Buscar conta</button>
-        </form>
-        {lookup && lookupLeague && <div className="mt-3">
-          {(searchResults || []).length ? searchResults!.map((result: { user_id: string; player_name: string; account_tag: string; already_member: boolean }) => <div key={result.user_id} className="rounded-xl border border-border p-3 text-sm">
-            <p className="font-bold text-white">{result.player_name} · {result.account_tag}</p>
-            {result.already_member ? <p className="mt-1 text-muted">Já participa desta pelada.</p> : <form action={addExistingAccount} className="mt-2">
-              <input type="hidden" name="league_id" value={lookupLeague.id} /><input type="hidden" name="user_id" value={result.user_id} />
-              <button type="submit" className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-black">Adicionar à pelada</button>
-            </form>}
-          </div>) : <p className="text-xs text-muted">Nenhuma conta com esse identificador exato.</p>}
-        </div>}
-      </section>}
+    {(requests || []).length > 0 && <section className="rounded-2xl border border-accent/30 bg-surface p-4"><div className="flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-widest text-accent">Área do ADM</p><h2 className="font-athletic text-xl font-black uppercase text-white">Pedidos de entrada</h2></div><Crown className="h-6 w-6 text-accent" /></div><div className="mt-3 space-y-2">{requests!.map((request) => { const account = applicants?.find((item) => item.user_id === request.user_id); return <div key={request.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/50 p-3"><div className="min-w-0"><p className="truncate text-sm font-bold text-white">{account?.account_tag || "Conta"}</p><p className="truncate text-xs text-muted">{leagues.find((league) => league.id === request.league_id)?.name}</p></div><div className="flex gap-1">{["approve", "reject"].map((decision) => <form action={reviewAccess} key={decision}><input type="hidden" name="request_id" value={request.id} /><input type="hidden" name="decision" value={decision} /><button type="submit" className={cn("rounded-lg px-3 py-2 text-xs font-black", decision === "approve" ? "bg-accent text-background" : "border border-border text-muted")}>{decision === "approve" ? "Aceitar" : "Recusar"}</button></form>)}</div></div>; })}</div></section>}
 
-      <p className="text-center text-xs text-muted">Recebeu um convite? Abra o link enviado pelo administrador. <Link href="/meu-perfil" className="text-accent underline">Meu perfil</Link></p>
-    </div>
-  );
+    <p className="text-center text-xs text-muted">Os visuais e cosméticos acompanham sua conta em todas as peladas. <Link href="/meu-perfil?aba=cosmeticos" className="font-bold text-accent">Ver meu perfil</Link></p>
+  </main>;
 }

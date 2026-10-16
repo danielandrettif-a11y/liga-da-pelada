@@ -94,7 +94,16 @@ describe("monthly awards", () => {
 
   it("exibe as posições dos prêmios por extenso", () => {
     expect(MONTHLY_AWARD_LABELS.bestDefenderMonth).toBe("Melhor Defensor/Volante do mês");
-    expect(MONTHLY_AWARD_LABELS.bestMidfielderMonth).toBe("Melhor Ala do mês");
     expect(MONTHLY_AWARD_LABELS.bestAttackerMonth).toBe("Melhor Atacante do mês");
+  });
+
+  it("ignora o antigo prêmio de ala", () => {
+    expect(parseMonthlyAwards([{
+      award_type: "bestMidfielderMonth",
+      period_start: "2026-09-01",
+      points: 20,
+      rounds_played: 4,
+      is_final: true,
+    }])).toEqual([]);
   });
 });

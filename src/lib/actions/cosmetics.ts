@@ -76,17 +76,17 @@ const LEGACY_LOADOUT_RELATIONS = `
   background:background_cosmetic_id(asset_key)
 `;
 
-async function loadCosmeticRelations(client: any, fantasySeasonId: string, userId?: string, userIds?: string[]) {
+async function loadCosmeticRelations(client: any, userId?: string, userIds?: string[]) {
   const buildQuery = (selection: string) => {
-    let query = client.from("fantasy_user_cosmetic_loadouts").select(selection).eq("fantasy_season_id", fantasySeasonId);
+    let query = client.from("account_cosmetic_loadouts").select(selection);
     if (userId) query = query.eq("user_id", userId);
     else if (userIds) query = query.in("user_id", userIds);
     return userId ? query.maybeSingle() : query;
   };
   const current = await buildQuery(CURRENT_LOADOUT_RELATIONS);
   if (!current.error) return current.data;
-  // Permite publicar a interface antes da migration 128 sem esconder os
-  // cosmeticos que ja estavam equipados nos seis slots antigos.
+  // Mantém leitura dos seis slots antigos caso o banco ainda esteja no meio
+  // da atualização da coleção global da conta.
   const legacy = await buildQuery(LEGACY_LOADOUT_RELATIONS);
   return legacy.data;
 }
@@ -96,21 +96,21 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
   if (!account.user) return empty;
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
-  if (!season) return empty;
   const client: any = account.client;
-  const { data: fantasySeason } = await client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle();
-  if (!fantasySeason) return empty;
+  const { data: fantasySeason } = season
+    ? await client.from("fantasy_seasons").select("id").eq("season_id", season.id).eq("league_id", league.id).maybeSingle()
+    : { data: null };
   const [ownedResult, catalogResult, rewardResult, choiceResult, loadoutResult, passResult, shopResult] = await Promise.all([
     // Keep the provenance so older/test claims can still be matched to the
     // reward even if the choice row was removed or was created by an older
     // version of the claim function.
-    client.from("fantasy_user_cosmetics").select("cosmetic_id, source_reward_id, cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id).eq("league_id", league.id),
+    client.from("fantasy_user_cosmetics").select("cosmetic_id, source_reward_id, cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id),
     client.from("fantasy_cosmetics").select("*").order("created_at"),
-    client.from("fantasy_season_pass_rewards").select("id, house, reward_key, reward_type, card_tier, bonus:bonus_cosmetic_id(*), options:fantasy_season_pass_reward_options(cosmetic:fantasy_cosmetics(*))").eq("fantasy_season_id", fantasySeason.id).order("house"),
-    client.from("fantasy_user_cosmetic_reward_choices").select("reward_id, cosmetic_id").eq("user_id", account.user.id),
-    client.from("fantasy_user_cosmetic_loadouts").select("*").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).maybeSingle(),
-    client.from("fantasy_season_passes").select("progress, total_progress_points, shop_bonus_points").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).maybeSingle(),
-    client.from("fantasy_season_pass_shop_items").select("id, price_points, purchased_at, source_reward_id, cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).order("listed_at"),
+    fantasySeason ? client.from("fantasy_season_pass_rewards").select("id, house, reward_key, reward_type, card_tier, bonus:bonus_cosmetic_id(*), options:fantasy_season_pass_reward_options(cosmetic:fantasy_cosmetics(*))").eq("fantasy_season_id", fantasySeason.id).order("house") : Promise.resolve({ data: [], error: null }),
+    fantasySeason ? client.from("fantasy_user_cosmetic_reward_choices").select("reward_id, cosmetic_id").eq("user_id", account.user.id) : Promise.resolve({ data: [], error: null }),
+    client.from("account_cosmetic_loadouts").select("*").eq("user_id", account.user.id).maybeSingle(),
+    fantasySeason ? client.from("fantasy_season_passes").select("progress, total_progress_points, shop_bonus_points").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    fantasySeason ? client.from("fantasy_season_pass_shop_items").select("id, price_points, purchased_at, source_reward_id, cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).order("listed_at") : Promise.resolve({ data: [], error: null }),
   ]);
   // Loja e saldo são complementos. Se uma migration de permissão ainda não
   // chegou ao banco, a coleção e as recompensas do Passe continuam visíveis.
@@ -142,7 +142,7 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
       sourceHouse: rewardHouseById.get(row.source_reward_id) || 0,
     }));
   return {
-    available: true, seasonId: fantasySeason.id, canPreviewAll: account.isAdmin,
+    available: true, seasonId: fantasySeason?.id || null, canPreviewAll: account.isAdmin,
     cosmetics: (ownedResult.data || []).map((row: any) => row.cosmetic).filter(Boolean).map(mapCosmetic),
     previewCatalog: account.isAdmin
       ? (catalogResult.data || []).map(mapCosmetic).filter((item: CosmeticItem) => !isLegacyFrameAsset(item.slot === "frame" ? item.assetKey : null))
@@ -254,12 +254,8 @@ export async function purchaseSeasonPassShopItem(shopItemId: string) {
 export async function equipCosmetic(slot: CosmeticSlot, cosmeticId: string | null) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre para personalizar o perfil." };
-  const league = await getActiveLeague(); const season = await getActiveSeason(league.id);
-  if (!season) return { success: false, error: "Temporada não encontrada." };
   const client: any = account.client;
-  const { data: fantasySeason } = await client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle();
-  if (!fantasySeason) return { success: false, error: "Passe indisponível." };
-  const { error } = await client.rpc("equip_fantasy_cosmetic", { p_fantasy_season_id: fantasySeason.id, p_slot: slot, p_cosmetic_id: cosmeticId });
+  const { error } = await client.rpc("equip_account_cosmetic", { p_slot: slot, p_cosmetic_id: cosmeticId });
   // Não mascarar uma falha do banco como se o item tivesse sido equipado.
   // Antes deste retorno a interface mostrava sucesso mesmo com RLS/migration ausente.
   if (error) return { success: false, error: error.message };
@@ -336,14 +332,8 @@ export async function getAdminCosmeticsPreview(playerId: string, requested: Cosm
 const getMyEquippedCosmeticsCached = cache(async (): Promise<EquippedCosmeticsSummary | null> => {
   const account = await getCurrentAccount();
   if (!account.user) return null;
-  const league = await getActiveLeague();
-  const season = await getActiveSeason(league.id);
-  if (!season) return null;
   const client: any = account.client;
-  const { data: fantasySeason } = await client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle();
-  if (!fantasySeason) return null;
-
-  const loadout = await loadCosmeticRelations(client, fantasySeason.id, account.user.id);
+  const loadout = await loadCosmeticRelations(client, account.user.id);
 
   if (!loadout) return null;
 
@@ -375,19 +365,7 @@ export async function getPlayerEquippedCosmetics(playerId: string): Promise<Equi
 
   if (!profile?.user_id) return null;
 
-  const league = await getActiveLeague();
-  const season = await getActiveSeason(league.id);
-  if (!season) return null;
-
-  const { data: fantasySeason } = await client
-    .from("fantasy_seasons")
-    .select("id")
-    .eq("season_id", season.id)
-    .maybeSingle();
-
-  if (!fantasySeason) return null;
-
-  const loadout = await loadCosmeticRelations(client, fantasySeason.id, profile.user_id);
+  const loadout = await loadCosmeticRelations(client, profile.user_id);
 
   if (!loadout) return null;
 
@@ -408,18 +386,6 @@ export async function getAllPlayersEquippedCosmeticsMap(playerIds?: string[]): P
   const account = await getCurrentAccount();
   const client: any = account.user ? account.client : account.client;
 
-  const league = await getActiveLeague();
-  const season = await getActiveSeason(league.id);
-  if (!season) return new Map();
-
-  const { data: fantasySeason } = await client
-    .from("fantasy_seasons")
-    .select("id")
-    .eq("season_id", season.id)
-    .maybeSingle();
-
-  if (!fantasySeason) return new Map();
-
   let profiles: Array<{ user_id: string; player_id: string }> | null = null;
   let loadouts: any[] | null = null;
   if (playerIds) {
@@ -428,11 +394,11 @@ export async function getAllPlayersEquippedCosmeticsMap(playerIds?: string[]): P
     profiles = data;
     const userIds = [...new Set((profiles || []).map((profile) => profile.user_id))];
     if (userIds.length === 0) return new Map();
-    loadouts = await loadCosmeticRelations(client, fantasySeason.id, undefined, userIds);
+    loadouts = await loadCosmeticRelations(client, undefined, userIds);
   } else {
     const [profilesResult, allLoadouts] = await Promise.all([
       client.from("account_profiles").select("user_id, player_id").not("player_id", "is", null),
-      loadCosmeticRelations(client, fantasySeason.id),
+      loadCosmeticRelations(client),
     ]);
     profiles = profilesResult.data;
     loadouts = allLoadouts;

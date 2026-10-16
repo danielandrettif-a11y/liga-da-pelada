@@ -102,7 +102,8 @@ function IncompleteProfileBanner() {
   );
 }
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ inviteError?: string }> }) {
+  const query = await searchParams;
   const accountPromise = getCurrentAccount();
   const [{ data }, previousSeason, account, identity, seasonPass, monthlyAwards] = await Promise.all([
     getDashboardData(),
@@ -149,7 +150,6 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-5">
-      <LeagueInviteCard />
       {!account.user && <JoinSelectionButton />}
       {hasIncompleteProfile && <IncompleteProfileBanner />}
 
@@ -162,7 +162,7 @@ export default async function HomePage() {
       <section className="space-y-3">
         <div className="px-1">
           <h2 className="font-athletic text-sm font-black uppercase italic tracking-wider text-foreground">
-            {activeCallups.length > 0 ? "Agenda da Pelada" : "Próxima Rodada"}
+            {activeCallups.length > 0 || account.isAdmin ? "Agenda e gestão" : "Próxima Rodada"}
           </h2>
         </div>
 
@@ -195,11 +195,14 @@ export default async function HomePage() {
           const hasConfirmedPresence = callupSlides.some(
             ({ userEntry }: { userEntry: any }) => userEntry?.status === "confirmed",
           );
+          const inviteSlide = account.isAdmin
+            ? <LeagueInviteCard key="league-invite" variant="hero" returnTo="/" error={query.inviteError === "review"} />
+            : null;
           // A convocação exige ação enquanto a presença ainda estiver pendente.
           // Depois da confirmação, a temporada/rodada vira a informação principal.
           const slides = (hasConfirmedPresence
-            ? [roundSlide, ...callupSlides.map(({ slide }: { slide: React.ReactNode }) => slide)]
-            : [...callupSlides.map(({ slide }: { slide: React.ReactNode }) => slide), roundSlide]
+            ? [roundSlide, ...callupSlides.map(({ slide }: { slide: React.ReactNode }) => slide), inviteSlide]
+            : [...callupSlides.map(({ slide }: { slide: React.ReactNode }) => slide), roundSlide, inviteSlide]
           ).filter(Boolean);
 
           if (slides.length > 1) {

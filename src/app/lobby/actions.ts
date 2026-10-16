@@ -39,11 +39,20 @@ export async function requestAccess(formData: FormData) {
 export async function reviewAccess(formData: FormData) {
   const requestId = String(formData.get("request_id") || "");
   const approve = formData.get("decision") === "approve";
+  const requestedReturnTo = String(formData.get("return_to") || "/lobby");
+  const returnTo = ["/", "/convocacao", "/lobby"].includes(requestedReturnTo)
+    ? requestedReturnTo
+    : "/lobby";
   const { client, user } = await getCurrentAccount();
   if (!user) redirect("/login?next=/lobby");
   const { error } = await client.rpc("review_league_membership", { p_request_id: requestId, p_approve: approve });
-  if (error) redirect("/lobby?error=review");
+  if (error) {
+    const separator = returnTo.includes("?") ? "&" : "?";
+    redirect(`${returnTo}${separator}${returnTo === "/lobby" ? "error" : "inviteError"}=review`);
+  }
   revalidatePath("/lobby");
+  revalidatePath("/");
+  revalidatePath("/convocacao");
 }
 
 export async function addExistingAccount(formData: FormData) {

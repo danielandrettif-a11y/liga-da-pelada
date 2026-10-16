@@ -1,6 +1,7 @@
 import { ArrowLeftRight, Clock3 } from "@/components/icons";
 import { PaymentChecklist } from "@/components/PaymentChecklist";
-import { getPaymentRounds, getRoundPaymentPlayers } from "@/lib/actions/payments";
+import { PaymentObligationsPanel } from "@/components/PaymentObligationsPanel";
+import { getPaymentRounds, getRoundPaymentPlayers, getRoundPaymentObligations } from "@/lib/actions/payments";
 import { getCurrentAccount } from "@/lib/auth";
 import { findLatestReleasedPaymentRound } from "@/lib/paymentStatus";
 
@@ -12,10 +13,12 @@ export default async function PagamentosPage() {
     const round = findLatestReleasedPaymentRound(availableRounds);
     return round ? getRoundPaymentPlayers(round.id) : [];
   });
-  const [rounds, account, players] = await Promise.all([
+  const obligationsPromise = roundsPromise.then((availableRounds) => { const round = findLatestReleasedPaymentRound(availableRounds); return round ? getRoundPaymentObligations(round.id) : []; });
+  const [rounds, account, players, obligations] = await Promise.all([
     roundsPromise,
     getCurrentAccount(),
     playersPromise,
+    obligationsPromise,
   ]);
   const currentRound = findLatestReleasedPaymentRound(rounds);
   const latestScheduledRound = rounds[0] || null;
@@ -47,7 +50,7 @@ export default async function PagamentosPage() {
           </p>
         </div>
       ) : (
-        <PaymentChecklist
+        obligations.length > 0 ? <PaymentObligationsPanel initialObligations={obligations} players={players} canManage={account.isAdmin} currentPlayerId={account.profile?.player_id || null} /> : <PaymentChecklist
           round={currentRound}
           initialPlayers={players}
           canEdit={!!account.user}

@@ -25,6 +25,64 @@ export type PaymentRound = {
 
 export type PaymentRecipient = { id: string; name: string; pix_key: string; pix_type: string | null; is_active: boolean };
 
+export type ExpenseItem = {
+  id: string; name: string; description: string | null; total_amount: number; installment_count: number;
+  status: "active" | "completed" | "archived"; recipient_id: string; created_at: string;
+  recipient: { name: string; pix_key: string } | null; paid_installments: number;
+};
+
+export async function getExpenseItems(includeArchived = false): Promise<ExpenseItem[]> {
+  const account = await getCurrentAccount();
+  if (!account.user) return [];
+  const league = await getActiveLeague();
+  let query = account.client.from("league_expense_items").select("id, name, description, total_amount, installment_count, status, recipient_id, created_at, recipient:payment_recipients!league_expense_items_recipient_id_fkey(name,pix_key), installments:round_expense_installments(id,status)").eq("league_id", league.id).order("created_at", { ascending: false });
+  if (!includeArchived) query = query.eq("status", "active");
+  const { data, error } = await query;
+  if (error) return [];
+  return (data || []).map((row: any) => ({ ...row, total_amount: Number(row.total_amount), recipient: Array.isArray(row.recipient) ? row.recipient[0] || null : row.recipient, paid_installments: (row.installments || []).filter((item: any) => item.status === "active").length }));
+}
+
+export async function saveExpenseItem(input: { name: string; description?: string; totalAmount: number; installmentCount: number; recipientId: string }) {
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem cadastrar itens." };
+  const league = await getActiveLeague();
+  const total = Number(input.totalAmount); const installments = Number(input.installmentCount);
+  if (input.name.trim().length < 2) return { success: false, error: "Informe o nome do item." };
+  if (!Number.isFinite(total) || total <= 0) return { success: false, error: "Informe um valor válido." };
+  if (!Number.isInteger(installments) || installments < 1 || installments > 120) return { success: false, error: "Escolha entre 1 e 120 parcelas." };
+  const { data: recipient } = await client.from("payment_recipients").select("id").eq("id", input.recipientId).eq("league_id", league.id).eq("is_active", true).maybeSingle();
+  if (!recipient) return { success: false, error: "Escolha um PIX ativo desta pelada." };
+  const { error } = await client.from("league_expense_items").insert({ league_id: league.id, name: input.name.trim(), description: input.description?.trim() || null, total_amount: total, installment_count: installments, recipient_id: input.recipientId, created_by: (await getCurrentAccount()).user?.id });
+  revalidatePath("/mais/caixinha"); revalidatePath("/rodadas/[id]", "page");
+  return { success: !error, error: error?.message };
+}
+
+export async function setExpenseItemStatus(id: string, status: "active" | "archived") {
+  const client = await getAdminClient(); if (!client) return { success: false, error: "Acesso negado." };
+  const league = await getActiveLeague();
+  const { error } = await client.from("league_expense_items").update({ status, updated_at: new Date().toISOString() }).eq("id", id).eq("league_id", league.id);
+  revalidatePath("/mais/caixinha"); revalidatePath("/rodadas/[id]", "page");
+  return { success: !error, error: error?.message };
+}
+
+export type PaymentObligation = { id: string; round_id: string; player_id: string; recipient_name: string; recipient_pix: string; amount_due: number; amount_paid: number; status: "pending" | "partial" | "paid" | "credit" };
+
+export async function getRoundPaymentObligations(roundId: string): Promise<PaymentObligation[]> {
+  const account = await getCurrentAccount(); if (!account.user) return [];
+  const league = await getActiveLeague();
+  const { data: round } = await account.client.from("rounds").select("id").eq("id", roundId).eq("league_id", league.id).maybeSingle();
+  if (!round) return [];
+  const { data } = await account.client.from("round_payment_obligations").select("id,round_id,player_id,recipient_name,recipient_pix,amount_due,amount_paid,status").eq("round_id", roundId).order("recipient_name");
+  return (data || []).map((row: any) => ({ ...row, amount_due: Number(row.amount_due), amount_paid: Number(row.amount_paid) }));
+}
+
+export async function setPaymentObligationPaid(id: string, amountPaid: number) {
+  const account = await getCurrentAccount(); if (!account.user) return { success: false, error: "Entre novamente." };
+  const { error } = await account.client.rpc("set_round_payment_obligation_paid", { p_obligation_id: id, p_amount_paid: Number(amountPaid) });
+  revalidatePath("/pagamentos"); revalidatePath("/admin/transfermarket");
+  return { success: !error, error: error?.message };
+}
+
 export async function getPaymentRecipients(includeInactive = false): Promise<PaymentRecipient[]> {
   const client = await getAdminClient();
   if (!client) return [];
@@ -299,6 +357,14 @@ export async function updateRoundPaymentDetails(input: {
 
   if (error) return { success: false, error: error.message };
   if (!data) return { success: false, error: "Rodada finalizada nao encontrada." };
+
+  const { data: installments } = await client.from("round_expense_installments")
+    .select("expense_item_id").eq("round_id", input.roundId).eq("status", "active");
+  const { error: refreshError } = await client.rpc("sync_round_payment_plan", {
+    p_round_id: input.roundId,
+    p_expense_item_ids: [...new Set((installments || []).map((item) => item.expense_item_id))],
+  });
+  if (refreshError) return { success: false, error: `Os dados principais foram salvos, mas o rateio não foi atualizado: ${refreshError.message}` };
 
   revalidatePath("/pagamentos");
   revalidatePath("/coletiva");
