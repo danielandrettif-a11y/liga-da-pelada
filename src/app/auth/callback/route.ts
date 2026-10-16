@@ -17,7 +17,7 @@ export async function GET(request: Request) {
       const { error: profileRepairError } = await client.rpc("ensure_my_player_account");
       if (profileRepairError) console.error("Erro ao concluir perfil após autenticação:", profileRepairError);
       const entryFlowPending = Boolean((await cookies()).get(ENTRY_FLOW_PENDING_COOKIE)?.value);
-      const destination = entryFlowPending ? "/lobby?apresentacao=1" : safeNext || "/lobby";
+      const destination = entryFlowPending ? "/inicio?apresentacao=1" : safeNext || "/lobby";
       return NextResponse.redirect(new URL(destination, SITE_URL));
     }
   }

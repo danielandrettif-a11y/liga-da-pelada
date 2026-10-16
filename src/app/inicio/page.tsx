@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { getCurrentAccount, getCurrentAccountIdentity } from "@/lib/auth";
 import styles from "./inicio.module.css";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Pelada BQ — transforme sua pelada em uma liga",
@@ -55,7 +58,14 @@ function BallIcon() {
   );
 }
 
-export default function PublicHomePage() {
+export default async function PublicHomePage() {
+  const [account, identity] = await Promise.all([
+    getCurrentAccount(),
+    getCurrentAccountIdentity(),
+  ]);
+  const isAuthenticated = Boolean(account.user);
+  const displayName = identity.displayName || "Jogador";
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -77,9 +87,28 @@ export default function PublicHomePage() {
           </Link>
 
           <nav className={styles.headerNav} aria-label="Acessos">
-            <Link href="/login?next=/lobby" className={styles.playerLogin}>
-              Entrar
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                href="/meu-perfil"
+                className={styles.accountLink}
+                aria-label={`Abrir perfil de ${displayName}`}
+              >
+                <span className={styles.accountName}>{displayName}</span>
+                <span className={styles.accountAvatar}>
+                  {identity.avatarUrl ? (
+                    // A foto do Google pode vir de um host externo não controlado pelo app.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={identity.avatarUrl} alt={`Foto de ${displayName}`} />
+                  ) : (
+                    <span aria-hidden="true">{displayName.slice(0, 2).toUpperCase()}</span>
+                  )}
+                </span>
+              </Link>
+            ) : (
+              <Link href="/login?next=/lobby" className={styles.playerLogin}>
+                Entrar
+              </Link>
+            )}
             <Link href="/estadio" className={styles.stadiumLogin}>
               Estádio
             </Link>
@@ -107,16 +136,26 @@ export default function PublicHomePage() {
               </p>
 
               <div className={styles.heroActions}>
-                <Link href="/cadastro?next=/lobby" className={styles.primaryCta}>
-                  Criar minha conta
+                <Link
+                  href={isAuthenticated ? "/lobby" : "/cadastro?next=/lobby"}
+                  className={styles.primaryCta}
+                >
+                  {isAuthenticated ? "Lista de peladas" : "Criar minha conta"}
                   <ArrowIcon />
                 </Link>
-                <Link href="/login?next=/lobby" className={styles.secondaryCta}>
-                  Já participo de uma pelada
+                <Link
+                  href={isAuthenticated ? "/meu-perfil" : "/login?next=/lobby"}
+                  className={styles.secondaryCta}
+                >
+                  {isAuthenticated ? "Ver meu perfil" : "Já participo de uma pelada"}
                 </Link>
               </div>
 
-              <p className={styles.microcopy}>Grátis para começar · entre com Google ou e-mail</p>
+              <p className={styles.microcopy}>
+                {isAuthenticated
+                  ? `Você entrou como ${displayName} · escolha onde quer jogar`
+                  : "Grátis para começar · entre com Google ou e-mail"}
+              </p>
 
               <div className={styles.heroProof} aria-label="Principais recursos">
                 <span>Convocação</span>
@@ -301,11 +340,19 @@ export default function PublicHomePage() {
           <p>Sua próxima rodada começa aqui</p>
           <h2>A pelada passa.<br /><span>A história fica.</span></h2>
           <div className={styles.finalActions}>
-            <Link href="/cadastro?next=/lobby" className={styles.primaryCta}>
-              Criar minha conta
+            <Link
+              href={isAuthenticated ? "/lobby" : "/cadastro?next=/lobby"}
+              className={styles.primaryCta}
+            >
+              {isAuthenticated ? "Ver minhas peladas" : "Criar minha conta"}
               <ArrowIcon />
             </Link>
-            <Link href="/login?next=/lobby" className={styles.finalLogin}>Entrar na minha pelada</Link>
+            <Link
+              href={isAuthenticated ? "/meu-perfil" : "/login?next=/lobby"}
+              className={styles.finalLogin}
+            >
+              {isAuthenticated ? "Abrir meu perfil" : "Entrar na minha pelada"}
+            </Link>
           </div>
         </section>
 
@@ -325,8 +372,17 @@ export default function PublicHomePage() {
         </Link>
         <p>Futebol com história.</p>
         <nav aria-label="Links do rodapé">
-          <Link href="/login?next=/lobby">Entrar</Link>
-          <Link href="/cadastro?next=/lobby">Criar conta</Link>
+          {isAuthenticated ? (
+            <>
+              <Link href="/lobby">Lista de peladas</Link>
+              <Link href="/meu-perfil">Meu perfil</Link>
+            </>
+          ) : (
+            <>
+              <Link href="/login?next=/lobby">Entrar</Link>
+              <Link href="/cadastro?next=/lobby">Criar conta</Link>
+            </>
+          )}
           <Link href="/estadio">Estádio</Link>
         </nav>
       </footer>

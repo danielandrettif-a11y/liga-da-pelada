@@ -96,7 +96,8 @@
 }
 
 .playerLogin,
-.stadiumLogin {
+.stadiumLogin,
+.accountLink {
   display: inline-flex;
   min-height: 38px;
   padding-inline: 14px;
@@ -116,8 +117,43 @@
   color: rgba(255, 255, 255, 0.72);
 }
 
+.accountLink {
+  padding: 3px 3px 3px 11px;
+  gap: 8px;
+  border: 1px solid rgba(201, 255, 0, 0.52);
+  color: var(--lime);
+}
+
+.accountName {
+  max-width: 74px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountAvatar {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border: 1px solid rgba(201, 255, 0, 0.5);
+  border-radius: 50%;
+  place-items: center;
+  background: rgba(201, 255, 0, 0.12);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.accountAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .playerLogin:hover,
-.stadiumLogin:hover {
+.stadiumLogin:hover,
+.accountLink:hover {
   border-color: var(--lime);
   background: rgba(201, 255, 0, 0.08);
   color: var(--lime);
@@ -995,6 +1031,8 @@
   .headerNav { font-size: 13px; gap: 9px; }
   .playerLogin,
   .stadiumLogin { min-height: 42px; padding-inline: 20px; }
+  .accountLink { min-height: 42px; padding-left: 14px; }
+  .accountAvatar { width: 34px; height: 34px; }
 
   .hero {
     background:
@@ -1106,6 +1144,8 @@
   .headerNav { gap: 5px; }
   .playerLogin,
   .stadiumLogin { padding-inline: 12px; }
+  .accountName { display: none; }
+  .accountLink { padding: 2px; }
   .heroInner { padding-inline: 16px; }
   .hero h1 { font-size: 43px; }
   .heroProof { gap: 7px; font-size: 9px; }

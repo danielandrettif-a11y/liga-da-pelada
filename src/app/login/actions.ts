@@ -40,7 +40,7 @@ export async function login(formData: FormData) {
 
   revalidatePath("/", "layout");
   const entryFlowPending = Boolean((await cookies()).get(ENTRY_FLOW_PENDING_COOKIE)?.value);
-  redirect(entryFlowPending ? "/lobby?apresentacao=1" : returnTo || "/lobby");
+  redirect(entryFlowPending ? "/inicio?apresentacao=1" : returnTo || "/lobby");
 }
 
 export async function signInWithGoogle(returnPath?: string) {

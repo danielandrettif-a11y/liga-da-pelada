@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { ENTRY_FLOW_DONE_COOKIE, ENTRY_FLOW_VERSION } from '@/lib/entry-flow'
+import { ENTRY_FLOW_DONE_COOKIE, ENTRY_FLOW_PENDING_COOKIE, ENTRY_FLOW_VERSION, isEntryFlowScreen } from '@/lib/entry-flow'
 import { requestOrigin } from '@/lib/siteUrl'
 
 export default async function proxy(request: NextRequest) {
@@ -72,26 +72,33 @@ export default async function proxy(request: NextRequest) {
     }
 
     const entryFlowDone = request.cookies.get(ENTRY_FLOW_DONE_COOKIE)?.value === String(ENTRY_FLOW_VERSION)
+    const entryFlowPending = Boolean(request.cookies.get(ENTRY_FLOW_PENDING_COOKIE)?.value)
     const canRedirectToPresentation = !pathname.startsWith('/api/')
       && !pathname.startsWith('/internal/')
       && !pathname.startsWith('/auth/')
     if (!entryFlowDone) {
-      const { data: accountProfile, error: entryFlowError } = await supabase
-        .from('account_profiles')
-        .select('entry_flow_version')
-        .eq('user_id', user.id)
-        .maybeSingle()
-      // Permite implantação sem interrupção caso o código chegue poucos
-      // segundos antes da migration que adiciona a campanha versionada.
-      if (!entryFlowError && Number(accountProfile?.entry_flow_version || 0) < ENTRY_FLOW_VERSION && canRedirectToPresentation) {
-        const reentryUrl = new URL('/auth/reentry', origin)
-        reentryUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
-        return NextResponse.redirect(reentryUrl)
-      }
-      if (!entryFlowError && Number(accountProfile?.entry_flow_version || 0) >= ENTRY_FLOW_VERSION) {
-        supabaseResponse.cookies.set(ENTRY_FLOW_DONE_COOKIE, String(ENTRY_FLOW_VERSION), {
-          httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365,
-        })
+      if (entryFlowPending) {
+        if (canRedirectToPresentation && !isEntryFlowScreen(pathname)) {
+          return NextResponse.redirect(new URL('/inicio?apresentacao=1', origin))
+        }
+      } else {
+        const { data: accountProfile, error: entryFlowError } = await supabase
+          .from('account_profiles')
+          .select('entry_flow_version')
+          .eq('user_id', user.id)
+          .maybeSingle()
+        // Permite implantação sem interrupção caso o código chegue poucos
+        // segundos antes da migration que adiciona a campanha versionada.
+        if (!entryFlowError && Number(accountProfile?.entry_flow_version || 0) < ENTRY_FLOW_VERSION && canRedirectToPresentation) {
+          const reentryUrl = new URL('/auth/reentry', origin)
+          reentryUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
+          return NextResponse.redirect(reentryUrl)
+        }
+        if (!entryFlowError && Number(accountProfile?.entry_flow_version || 0) >= ENTRY_FLOW_VERSION) {
+          supabaseResponse.cookies.set(ENTRY_FLOW_DONE_COOKIE, String(ENTRY_FLOW_VERSION), {
+            httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365,
+          })
+        }
       }
     }
   }
