@@ -13,6 +13,8 @@ import { supabaseCallupPrelistGateway } from "@/modules/callups/infrastructure/s
 import { parseEditCallupRequest } from "@/modules/callups/domain/edit-callup";
 import { editCallup } from "@/modules/callups/application/edit-callup";
 import { supabaseCallupEditingGateway } from "@/modules/callups/infrastructure/supabase-callup-editing-gateway";
+import { changeCallupVisibility, closeSelectedCallup, lockSelectedCallup } from "@/modules/callups/application/manage-callup";
+import { supabaseCallupManagementGateway } from "@/modules/callups/infrastructure/supabase-callup-management-gateway";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getSelectedLeague } from "../league-context";
 import { notifyCartolaLineupsAboutWithdrawal } from "../cartola-withdrawal-notifications";
@@ -467,51 +469,31 @@ async function prepareSelectedCallupPrelist(
 export async function closeCallup(callupId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem fechar convocacoes." };
-  if (!(await selectedCallup(callupId, client))) return { success: false, error: "Convocação fora da pelada selecionada." };
-  const { error } = await client.from("callups").update({ status: "closed", updated_at: new Date().toISOString() }).eq("id", callupId);
-  if (error) return { success: false, error: error.message };
-  refreshCallups();
-  return { success: true };
+  const callup = await selectedCallup(callupId, client);
+  if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
+  const result = await closeSelectedCallup(callupId, callup.league_id, supabaseCallupManagementGateway(client));
+  if (result.success) refreshCallups();
+  return result;
 }
 
 export async function setCallupVisibility(callupId: string, isPublic: boolean) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem alterar a visibilidade da convocação." };
-  if (!(await selectedCallup(callupId, client))) return { success: false, error: "Convocação fora da pelada selecionada." };
-
-  const { error } = await client
-    .from("callups")
-    .update({ is_public: isPublic, updated_at: new Date().toISOString() })
-    .eq("id", callupId);
-  if (error) return { success: false, error: error.message };
-
-  refreshCallups();
-  return { success: true };
+  const callup = await selectedCallup(callupId, client);
+  if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
+  const result = await changeCallupVisibility(callupId, callup.league_id, isPublic, supabaseCallupManagementGateway(client));
+  if (result.success) refreshCallups();
+  return result;
 }
 
 export async function lockCallupForRound(callupId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem montar a rodada." };
-  if (!(await selectedCallup(callupId, client))) return { success: false, error: "Convocação fora da pelada selecionada." };
-  const { data: callup, error: callupError } = await client
-    .from("callups")
-    .select("capacity")
-    .eq("id", callupId)
-    .single();
-  if (callupError || !callup) return { success: false, error: callupError?.message || "Convocacao nao encontrada." };
-  const { data: entries, error: entriesError } = await client
-    .from("callup_entries")
-    .select("id")
-    .eq("callup_id", callupId)
-    .eq("status", "confirmed");
-  if (entriesError) return { success: false, error: entriesError.message };
-  if ((entries?.length || 0) !== callup.capacity) {
-    return { success: false, error: `A lista precisa ter ${callup.capacity} confirmados para montar a rodada.` };
-  }
-  const { error } = await client.from("callups").update({ status: "locked", updated_at: new Date().toISOString() }).eq("id", callupId).eq("status", "open");
-  if (error) return { success: false, error: error.message };
-  refreshCallups();
-  return { success: true };
+  const callup = await selectedCallup(callupId, client);
+  if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
+  const result = await lockSelectedCallup(callupId, callup.league_id, supabaseCallupManagementGateway(client));
+  if (result.success) refreshCallups();
+  return result;
 }
 
 export async function updateCallup(formData: FormData) {

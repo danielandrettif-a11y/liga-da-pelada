@@ -15,7 +15,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | --- | --- | --- |
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
-| Convocação e rodadas | Em andamento | Formato, abertura, pré-lista e edição da convocação extraídos; próximo recorte: fechamento/visibilidade ou testes integrados com duas peladas. |
+| Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição e gerenciamento de estado da convocação extraídos; próximo recorte: participação/retirada da lista e testes integrados com duas peladas. |
 | Partidas e pontuação | Pendente | Preservar cálculo e correções de scouts/goleiros; testar reprocessamento. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
@@ -23,6 +23,14 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — fechamento, visibilidade e bloqueio da convocação
+
+- Extraídas as três operações de gerenciamento para um caso de uso e gateway Supabase compartilhados. A regra de lotação exata da lista ficou em domínio. As Server Actions mantêm as checagens de ADM, pelada selecionada, mensagens públicas e revalidação no sucesso.
+- As gravações e a leitura da capacidade agora incluem explicitamente `league_id`; o bloqueio ainda exige status `open` e mantém os mesmos filtros de jogadores confirmados.
+- Testes novos cobrem fechamento, visibilidade, lotação incompleta/completa, erros de leitura/gravação e escopo dos filtros do gateway. `npm run check` aprovado: tipagem, 557 testes em 85 arquivos e build.
+- Migrations: nenhuma. Banco e dados de produção não foram alterados. Risco preexistente: a contagem e o bloqueio da lista são operações separadas, sujeitas a alterações concorrentes; uma operação transacional no banco seria necessária para fechar essa janela. Falta testar os fluxos integrados com duas peladas em ambiente de teste.
+- Commit: consultar o registro Git deste lote; nenhuma implantação efetuada.
 
 ### 2026-10-17 — edição da convocação
 
