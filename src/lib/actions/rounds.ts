@@ -24,6 +24,9 @@ import { getPrivateBalanceTagsForDraw } from "../private-balance-tags";
 import { sortMatchesChronologically } from "../next-match";
 import { refreshFluidOverallSafely } from "./overall";
 import { getSelectedLeague } from "../league-context";
+import { parseCallupFormat } from "@/modules/callups/domain/callup-format";
+import { changeCallupFormat } from "@/modules/callups/application/change-callup-format";
+import { supabaseCallupFormatGateway } from "@/modules/callups/infrastructure/supabase-callup-format-gateway";
 
 const getActiveLeagueCached = cache(async (leagueId: string) => {
   const client = await createServerClient();
@@ -726,36 +729,21 @@ export type CreateRoundOptions = {
 export async function setCallupFormat(callupId: string, playersPerTeam: number, teamsPerRound: number) {
   try {
     const client = await getAdminClient();
-    if (!client) return { success: false, error: "Somente administradores podem alterar a capacidade da convocação." };
-    if (!callupId || !Number.isInteger(playersPerTeam) || !Number.isInteger(teamsPerRound)
-      || playersPerTeam < 5 || playersPerTeam > 7 || teamsPerRound < 2 || teamsPerRound > 6) {
-      return { success: false, error: "Escolha de 5 a 7 jogadores e de 2 a 6 times." };
-    }
+    if (!client) return { success: false as const, error: "Somente administradores podem alterar a capacidade da convocação." };
+    const format = parseCallupFormat(callupId, playersPerTeam, teamsPerRound);
+    if (!format) return { success: false as const, error: "Escolha de 5 a 7 jogadores e de 2 a 6 times." };
     const league = await getActiveLeague();
-    const { data: callup, error: callupError } = await client
-      .from("callups")
-      .select("id")
-      .eq("id", callupId)
-      .eq("league_id", league.id)
-      .eq("status", "open")
-      .maybeSingle();
-    if (callupError) throw new Error(callupError.message);
-    if (!callup) return { success: false, error: "Convocação aberta não encontrada nesta pelada." };
-    const { data, error } = await client.rpc("set_callup_format", {
-      p_callup_id: callupId,
-      p_players_per_team: playersPerTeam,
-      p_teams_per_round: teamsPerRound,
-    });
-    if (error) throw new Error(error.message);
+    const result = await changeCallupFormat(format, league.id, supabaseCallupFormatGateway(client));
+    if (!result.success) return result;
 
     revalidatePath("/admin/rodada");
     revalidatePath("/admin/prelistas");
     revalidatePath("/convocacao");
     revalidatePath("/cartola");
     revalidatePath("/rodadas");
-    return { success: true, fantasySizePreserved: Boolean(data?.[0]?.fantasy_size_preserved), fantasyLineupSize: Number(data?.[0]?.fantasy_lineup_size || playersPerTeam) };
+    return result;
   } catch (err: any) {
-    return { success: false, error: err.message || "Não foi possível ajustar a capacidade." };
+    return { success: false as const, error: err.message || "Não foi possível ajustar a capacidade." };
   }
 }
 

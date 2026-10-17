@@ -15,7 +15,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | --- | --- | --- |
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
-| Convocação e rodadas | Pendente | Congelar contratos e cenários de duas peladas antes da extração. |
+| Convocação e rodadas | Em andamento | Formato da convocação extraído e coberto por testes; próximo recorte: abertura, data única e pré-lista automática, seguido de testes integrados com duas peladas. |
 | Partidas e pontuação | Pendente | Preservar cálculo e correções de scouts/goleiros; testar reprocessamento. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
@@ -23,6 +23,14 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — capacidade da convocação
+
+- Extraído `setCallupFormat` para `src/modules/callups/{domain,application,infrastructure}`. A validação de 5–7 jogadores e 2–6 times, a consulta restrita à convocação aberta da pelada ativa e o RPC `set_callup_format` mantêm o contrato anterior. `setCallupMatchSize` continua delegando à mesma ação.
+- A Server Action ainda verifica ADM e pelada ativa, e continua responsável pelas mesmas revalidações e mensagens públicas. O RPC permanece como autoridade para o ajuste do Cartola.
+- Testes novos: limites de formato, bloqueio de convocação de outra pelada/fechada, filtros do gateway e retorno do tamanho do Cartola. Tipagem, 511 testes em 73 arquivos e build aprovados.
+- Migrations: nenhuma. Banco e dados de produção não foram alterados. Não foram executados testes integrados contra duas peladas reais neste lote.
+- Commit: consultar o registro Git deste lote; nenhuma implantação efetuada.
 
 ### 2026-10-17 — piloto e diagnóstico das estatísticas
 
