@@ -15,7 +15,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | --- | --- | --- |
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
-| Convocação e rodadas | Em andamento | Formato da convocação extraído e coberto por testes; próximo recorte: abertura, data única e pré-lista automática, seguido de testes integrados com duas peladas. |
+| Convocação e rodadas | Em andamento | Formato e abertura da convocação extraídos; próximo recorte: preparação da pré-lista e edição da convocação, seguidas de testes integrados com duas peladas. |
 | Partidas e pontuação | Pendente | Preservar cálculo e correções de scouts/goleiros; testar reprocessamento. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
@@ -23,6 +23,14 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — abertura da convocação
+
+- Extraído `openCallup` para domínio (entrada e capacidade), aplicação (data única, estádio, criação, pré-lista e reversão) e gateway Supabase. A Server Action ainda exige ADM, obtém a pelada selecionada, chama a pré-lista existente e revalida as páginas no sucesso.
+- Preservados: filtro de data por pelada e status `open`/`locked`/`converted`; proteção da restrição única do banco (`23505`); estádio da pelada; formato 5–7 jogadores e 2–6 times; pré-lista imediata; exclusão da convocação se a pré-lista falhar; mensagem de recuperação se também falhar a reversão.
+- Testes novos cobrem padrões do formulário, limites, isolamento lógico por `league_id`, estádio inválido, sucesso, falha da pré-lista, falha da reversão e corrida de data duplicada. Tipagem, 529 testes em 76 arquivos e build aprovados.
+- Migrations: nenhuma. Banco e dados de produção não foram alterados. O fluxo completo ainda precisa de teste integrado com duas peladas em ambiente de teste.
+- Commit: consultar o registro Git deste lote; nenhuma implantação efetuada.
 
 ### 2026-10-17 — capacidade da convocação
 

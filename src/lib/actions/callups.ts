@@ -5,13 +5,9 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import type { Callup, CallupEntry, Player, RoundType } from "../types";
 import { scheduleCartolaRoundReminders } from "../cartola-reminder-scheduler";
 import { getActiveLeague } from "./rounds";
-import {
-  DEFAULT_PLAYERS_PER_TEAM,
-  MAX_PLAYERS_PER_TEAM,
-  MAX_TEAMS_PER_ROUND,
-  MIN_TEAMS_PER_ROUND,
-  TEAMS_PER_ROUND,
-} from "../constants";
+import { parseOpenCallupRequest } from "@/modules/callups/domain/open-callup";
+import { DUPLICATE_CALLUP_DATE_ERROR, openCallupWithPrelist } from "@/modules/callups/application/open-callup";
+import { supabaseCallupOpeningGateway } from "@/modules/callups/infrastructure/supabase-callup-opening-gateway";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getSelectedLeague } from "../league-context";
 import { notifyCartolaLineupsAboutWithdrawal } from "../cartola-withdrawal-notifications";
@@ -198,110 +194,27 @@ async function hasCallupOnDate(
   return Boolean(data?.length);
 }
 
-const DUPLICATE_CALLUP_DATE_ERROR = "Já existe uma convocação nesta pelada para essa data. Escolha outro dia.";
-
 export async function openCallup(formData: FormData) {
   const client = await getAdminClient();
-  if (!client) return { success: false, error: "Somente administradores podem abrir convocacoes." };
-  const date = String(formData.get("date") || "");
-  const startTime = String(formData.get("start_time") || "08:00").slice(0, 5) || "08:00";
-  const stadiumId = formData.get("stadium_id") ? String(formData.get("stadium_id")) : null;
-  const roundType: RoundType = formData.get("round_type") === "friendly" ? "friendly" : "official";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { success: false, error: "Informe uma data valida." };
-
+  if (!client) return { success: false as const, error: "Somente administradores podem abrir convocacoes." };
+  const request = parseOpenCallupRequest({
+    date: String(formData.get("date") || ""),
+    startTime: formData.get("start_time") ? String(formData.get("start_time")) : null,
+    stadiumId: formData.get("stadium_id") ? String(formData.get("stadium_id")) : null,
+    roundType: formData.get("round_type") ? String(formData.get("round_type")) : null,
+    playersPerTeam: formData.get("players_per_team") ? String(formData.get("players_per_team")) : null,
+    teamsPerRound: formData.get("teams_per_round") ? String(formData.get("teams_per_round")) : null,
+  });
+  if (!request) return { success: false as const, error: "Informe uma data valida." };
   const league = await getActiveLeague();
-  try {
-    if (await hasCallupOnDate(client, league.id, date)) {
-      return { success: false, error: DUPLICATE_CALLUP_DATE_ERROR };
-    }
-  } catch (checkError) {
-    return { success: false, error: checkError instanceof Error ? checkError.message : "Não foi possível verificar a data." };
-  }
-  const { data: leagueConfig, error: configError } = await client
-    .from("leagues")
-    .select("players_per_team, teams_per_round, stadium_name, stadium_map_url")
-    .eq("id", league.id)
-    .single();
-  if (configError) return { success: false, error: configError.message };
-
-  let stadiumName: string | null = leagueConfig?.stadium_name || null;
-  let stadiumMapUrl: string | null = leagueConfig?.stadium_map_url || null;
-
-  if (stadiumId) {
-    const { data: stadiumData } = await client
-      .from("stadiums")
-      .select("name, google_maps_url")
-      .eq("id", stadiumId)
-      .eq("league_id", league.id)
-      .maybeSingle();
-    if (!stadiumData) return { success: false, error: "Estádio fora da pelada selecionada." };
-    stadiumName = stadiumData.name;
-    stadiumMapUrl = stadiumData.google_maps_url;
-  }
-
-  const defaultPlayersPerTeam = Math.min(
-    MAX_PLAYERS_PER_TEAM,
-    Math.max(1, leagueConfig?.players_per_team || DEFAULT_PLAYERS_PER_TEAM),
+  const result = await openCallupWithPrelist(
+    request,
+    league.id,
+    supabaseCallupOpeningGateway(client),
+    createCallupPrelist,
   );
-  const defaultTeamsPerRound = Math.min(
-    MAX_TEAMS_PER_ROUND,
-    Math.max(MIN_TEAMS_PER_ROUND, leagueConfig?.teams_per_round || TEAMS_PER_ROUND),
-  );
-  const playersPerTeam = Number(formData.get("players_per_team") || defaultPlayersPerTeam);
-  const teamsPerRound = Number(formData.get("teams_per_round") || defaultTeamsPerRound);
-  if (!Number.isInteger(playersPerTeam) || playersPerTeam < 5 || playersPerTeam > 7) {
-    return { success: false, error: "Escolha 5, 6 ou 7 jogadores por time." };
-  }
-  if (!Number.isInteger(teamsPerRound) || teamsPerRound < MIN_TEAMS_PER_ROUND || teamsPerRound > MAX_TEAMS_PER_ROUND) {
-    return { success: false, error: "Escolha de 2 a 6 times." };
-  }
-  const capacity = playersPerTeam * teamsPerRound;
-  const { data, error } = await client
-    .from("callups")
-    .insert({
-      league_id: league.id,
-      date,
-      start_time: startTime,
-      stadium_id: stadiumId,
-      stadium_name: stadiumName,
-      stadium_map_url: stadiumMapUrl,
-      round_type: roundType,
-      status: "open",
-      capacity,
-      players_per_team: playersPerTeam,
-      teams_per_round: teamsPerRound,
-    })
-    .select("id")
-    .single();
-  if (error) {
-    return { success: false, error: error.code === "23505" ? DUPLICATE_CALLUP_DATE_ERROR : error.message };
-  }
-
-  // A convocação já nasce com uma pré-lista vazia. As confirmações entram
-  // nela pelo trigger de sincronização, sem exigir uma segunda ação do ADM.
-  let prelist: Awaited<ReturnType<typeof createCallupPrelist>>;
-  try {
-    prelist = await createCallupPrelist(data.id);
-  } catch (prelistError) {
-    prelist = {
-      success: false,
-      error: prelistError instanceof Error ? prelistError.message : "Erro ao preparar a pré-lista.",
-    };
-  }
-  if (!prelist.success) {
-    const { error: rollbackError } = await client.from("callups")
-      .delete().eq("id", data.id).eq("league_id", league.id);
-    if (rollbackError) {
-      return {
-        success: false,
-        error: `A convocação foi aberta, mas a pré-lista falhou: ${prelist.error || "erro desconhecido"}. Feche a convocação antes de tentar novamente.`,
-      };
-    }
-    return { success: false, error: prelist.error || "Não foi possível preparar a pré-lista." };
-  }
-
-  refreshCallups();
-  return { success: true, id: data.id, roundId: prelist.roundId };
+  if (result.success) refreshCallups();
+  return result;
 }
 
 export async function joinActiveCallup(callupId: string) {
