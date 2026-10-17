@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isEntryFlowScreen, safeEntryDestination } from "./entry-flow";
+import { isEntryFlowScreen, resolveLoginDestination, safeEntryDestination } from "./entry-flow";
 
 describe("safeEntryDestination", () => {
   it("preserva um convite e seus parâmetros", () => {
@@ -25,5 +25,22 @@ describe("isEntryFlowScreen", () => {
     expect(isEntryFlowScreen("/")).toBe(false);
     expect(isEntryFlowScreen("/cartola")).toBe(false);
     expect(isEntryFlowScreen("/meu-perfil")).toBe(false);
+  });
+});
+
+describe("resolveLoginDestination", () => {
+  it("volta para a homepage quando o login foi aberto para acessar o lobby", () => {
+    expect(resolveLoginDestination("/lobby", false)).toBe("/inicio");
+    expect(resolveLoginDestination("/lobby?origem=home", false)).toBe("/inicio");
+    expect(resolveLoginDestination(null, false)).toBe("/inicio");
+  });
+
+  it("preserva retornos específicos e bloqueia URLs externas", () => {
+    expect(resolveLoginDestination("/convite/abc", false)).toBe("/convite/abc");
+    expect(resolveLoginDestination("//site-malicioso.test", false)).toBe("/inicio");
+  });
+
+  it("mantém a apresentação inicial quando ela está pendente", () => {
+    expect(resolveLoginDestination("/convite/abc", true)).toBe("/inicio?apresentacao=1");
   });
 });

@@ -5,9 +5,10 @@ import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlayerAvatar } from "./PlayerAvatar";
-import { Loader2, Sliders, Sparkles, UserRound, X } from "./icons";
+import { Loader2, LogOut, Sliders, Sparkles, UserRound, X } from "./icons";
 import { getPlayerRankingEntry } from "@/lib/actions/stats";
 import type { RankingEntry } from "@/lib/ranking";
+import { logout } from "@/app/login/actions";
 
 const RankingPlayerCardModal = dynamic(
   () => import("./RankingPlayerCardModal").then((module) => module.RankingPlayerCardModal),
@@ -102,6 +103,13 @@ export function ProfileQuickMenu({ playerId, name, avatarUrl, frameKey, auraKey 
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white/70"><Sliders className="h-3.5 w-3.5" /></span>
                 <div className="min-w-0 flex-1"><p className="truncate text-[11px] font-bold">Configurações da conta</p></div>
               </Link>
+
+              <form action={logout}>
+                <button type="submit" className="flex w-full items-center gap-3 rounded-2xl border border-red-400/20 bg-red-400/5 px-4 py-2.5 text-left text-xs font-bold text-red-200 transition-colors hover:bg-red-400/10 active:scale-[0.98]">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-red-400/10 text-red-300"><LogOut className="h-3.5 w-3.5" /></span>
+                  <span className="min-w-0 flex-1 truncate text-[11px] font-bold">Sair da conta</span>
+                </button>
+              </form>
             </div>
           </div>
         </div>

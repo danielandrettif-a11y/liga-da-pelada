@@ -5,7 +5,7 @@ import { AUTH_CALLBACK_URL } from "@/lib/siteUrl";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { ENTRY_FLOW_PENDING_COOKIE } from "@/lib/entry-flow";
+import { ENTRY_FLOW_PENDING_COOKIE, resolveLoginDestination } from "@/lib/entry-flow";
 
 function safeReturnPath(value: FormDataEntryValue | string | null | undefined) {
   const path = String(value || "");
@@ -40,7 +40,7 @@ export async function login(formData: FormData) {
 
   revalidatePath("/", "layout");
   const entryFlowPending = Boolean((await cookies()).get(ENTRY_FLOW_PENDING_COOKIE)?.value);
-  redirect(entryFlowPending ? "/inicio?apresentacao=1" : returnTo || "/lobby");
+  redirect(resolveLoginDestination(returnTo, entryFlowPending));
 }
 
 export async function signInWithGoogle(returnPath?: string) {
@@ -103,5 +103,5 @@ export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
-  redirect("/login");
+  redirect("/inicio");
 }

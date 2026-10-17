@@ -9,6 +9,24 @@ export function isEntryFlowScreen(pathname: string) {
     || pathname === "/peladas";
 }
 
+export function resolveLoginDestination(
+  requestedNext: string | null | undefined,
+  entryFlowPending: boolean,
+) {
+  if (entryFlowPending) return "/inicio?apresentacao=1";
+
+  const path = String(requestedNext || "");
+  const safeNext = path.startsWith("/") && !path.startsWith("//") ? path : null;
+  // O login aberto pela homepage usa /lobby como destino técnico. Depois de
+  // autenticar, mostramos a própria apresentação já no estado conectado; o
+  // usuário entra no lobby somente pelo botão "Lista de peladas".
+  if (!safeNext || safeNext === "/lobby" || safeNext.startsWith("/lobby?")) {
+    return "/inicio";
+  }
+
+  return safeNext;
+}
+
 export function safeEntryDestination(value: string | null | undefined) {
   const path = String(value || "");
   if (!path.startsWith("/") || path.startsWith("//")) return "/";
