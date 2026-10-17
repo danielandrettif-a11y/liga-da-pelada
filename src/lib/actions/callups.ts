@@ -15,6 +15,8 @@ import { editCallup } from "@/modules/callups/application/edit-callup";
 import { supabaseCallupEditingGateway } from "@/modules/callups/infrastructure/supabase-callup-editing-gateway";
 import { changeCallupVisibility, closeSelectedCallup, lockSelectedCallup } from "@/modules/callups/application/manage-callup";
 import { supabaseCallupManagementGateway } from "@/modules/callups/infrastructure/supabase-callup-management-gateway";
+import { joinSelectedCallup, leaveSelectedCallup } from "@/modules/callups/application/participate-in-callup";
+import { supabaseCallupParticipationGateway } from "@/modules/callups/infrastructure/supabase-callup-participation-gateway";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getSelectedLeague } from "../league-context";
 import { notifyCartolaLineupsAboutWithdrawal } from "../cartola-withdrawal-notifications";
@@ -213,32 +215,25 @@ export async function joinActiveCallup(callupId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre na sua conta para participar." };
   if (!(await selectedCallup(callupId, account.client))) return { success: false, error: "Convocação fora da pelada selecionada." };
-  const { error: profileError } = await account.client.rpc("ensure_my_player_account");
-  if (profileError) return { success: false, error: profileError.message };
-  const { data, error } = await account.client.rpc("join_callup", { p_callup_id: callupId });
-  if (error) return { success: false, error: error.message };
-  refreshCallups();
-  return { success: true, status: (data as { status?: "confirmed" | "waitlist" } | null)?.status };
+  const result = await joinSelectedCallup(callupId, supabaseCallupParticipationGateway(account.client));
+  if (result.success) refreshCallups();
+  return result;
 }
 
 export async function leaveActiveCallup(callupId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre na sua conta para sair." };
-  if (!(await selectedCallup(callupId, account.client))) return { success: false, error: "Convocação fora da pelada selecionada." };
-  const { data: callup } = await account.client
-    .from("callups")
-    .select("round_id")
-    .eq("id", callupId)
-    .maybeSingle();
-  const { error } = await account.client.rpc("leave_callup", { p_callup_id: callupId });
-  if (error) return { success: false, error: error.message };
-  const { data: profile } = await account.client.from("account_profiles").select("player_id").eq("user_id", account.user.id).maybeSingle();
-  if (profile?.player_id) await notifyCartolaLineupsAboutWithdrawal(account.client, callupId, profile.player_id);
+  const callup = await selectedCallup(callupId, account.client);
+  if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
+  const result = await leaveSelectedCallup(
+    callupId, callup.league_id, account.user.id, supabaseCallupParticipationGateway(account.client),
+  );
+  if (!result.success) return result;
   refreshCallups();
   revalidatePath("/rodadas");
-  if (callup?.round_id) {
-    revalidatePath(`/rodadas/${callup.round_id}`);
-    revalidatePath(`/rodadas/${callup.round_id}/nova-partida`);
+  if (result.roundId) {
+    revalidatePath(`/rodadas/${result.roundId}`);
+    revalidatePath(`/rodadas/${result.roundId}/nova-partida`);
   }
   return { success: true };
 }

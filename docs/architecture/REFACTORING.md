@@ -15,7 +15,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | --- | --- | --- |
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
-| Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição e gerenciamento de estado da convocação extraídos; próximo recorte: participação/retirada da lista e testes integrados com duas peladas. |
+| Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação da própria conta extraídos; próximo recorte: adição/retirada de outros jogadores e testes integrados com duas peladas. |
 | Partidas e pontuação | Pendente | Preservar cálculo e correções de scouts/goleiros; testar reprocessamento. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
@@ -23,6 +23,14 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — entrada e saída do próprio jogador
+
+- Extraídos `joinActiveCallup` e `leaveActiveCallup` para um caso de uso e gateway Supabase. As Server Actions continuam responsáveis por autenticação, confirmação de que a convocação pertence à pelada ativa e revalidação das telas. A entrada preserva a criação/reparação do perfil antes do RPC `join_callup`; a saída preserva a leitura da rodada, o RPC `leave_callup` e o aviso aos usuários afetados no Cartola.
+- O banco continua responsável por vagas, fila, elegibilidade e permissões. Não foi criada uma regra de domínio redundante em TypeScript. A leitura da rodada agora também filtra explicitamente por `league_id`.
+- Testes novos verificam ordem das operações, retorno `confirmed`/`waitlist`, erros, ausência de aviso após falha, parâmetros dos RPCs e filtro de pelada. `npm run check` aprovado: tipagem, 565 testes em 87 arquivos e build.
+- Migrations: nenhuma. Banco e dados de produção não foram alterados. O fluxo completo entre duas peladas ainda precisa de teste integrado em ambiente de teste; a suíte deste lote usa gateways simulados.
+- Commit: consultar o registro Git deste lote; nenhuma implantação efetuada.
 
 ### 2026-10-17 — fechamento, visibilidade e bloqueio da convocação
 
