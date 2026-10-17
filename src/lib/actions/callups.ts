@@ -8,6 +8,8 @@ import { getActiveLeague } from "./rounds";
 import { parseOpenCallupRequest } from "@/modules/callups/domain/open-callup";
 import { DUPLICATE_CALLUP_DATE_ERROR, openCallupWithPrelist } from "@/modules/callups/application/open-callup";
 import { supabaseCallupOpeningGateway } from "@/modules/callups/infrastructure/supabase-callup-opening-gateway";
+import { prepareCallupPrelist } from "@/modules/callups/application/prepare-callup-prelist";
+import { supabaseCallupPrelistGateway } from "@/modules/callups/infrastructure/supabase-callup-prelist-gateway";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getSelectedLeague } from "../league-context";
 import { notifyCartolaLineupsAboutWithdrawal } from "../cartola-withdrawal-notifications";
@@ -211,7 +213,7 @@ export async function openCallup(formData: FormData) {
     request,
     league.id,
     supabaseCallupOpeningGateway(client),
-    createCallupPrelist,
+    (callupId) => prepareSelectedCallupPrelist(callupId, client),
   );
   if (result.success) refreshCallups();
   return result;
@@ -443,71 +445,35 @@ export async function removeCallupEntry(callupId: string, playerId: string) {
   return { success: true };
 }
 
-export async function createCallupPrelist(callupId: string) {
+type PublicPrelistResult =
+  | { success: true; roundId: string; error?: undefined }
+  | { success: false; error: string; roundId?: undefined };
+
+export async function createCallupPrelist(callupId: string): Promise<PublicPrelistResult> {
   const client = await getAdminClient();
-  if (!client) return { success: false, error: "Somente administradores podem criar a pre-lista." };
-  if (!(await selectedCallup(callupId, client))) return { success: false, error: "Convocação fora da pelada selecionada." };
+  if (!client) return { success: false as const, error: "Somente administradores podem criar a pre-lista." };
+  return prepareSelectedCallupPrelist(callupId, client);
+}
+
+async function prepareSelectedCallupPrelist(
+  callupId: string,
+  client: Awaited<ReturnType<typeof getCurrentAccount>>["client"],
+): Promise<PublicPrelistResult> {
+  if (!(await selectedCallup(callupId, client))) return { success: false as const, error: "Convocação fora da pelada selecionada." };
   const selectedLeague = await getSelectedLeague();
-  if (!selectedLeague) return { success: false, error: "Selecione uma pelada antes de criar a pré-lista." };
-
-  const { data: callup, error: callupError } = await client
-    .from("callups")
-    .select("id, date, start_time, stadium_id, stadium_name, stadium_map_url, round_type, status, round_id, callup_entries(player_id, status)")
-    .eq("id", callupId)
-    .maybeSingle();
-
-  if (callupError || !callup) {
-    return { success: false, error: callupError?.message || "Convocacao nao encontrada." };
+  if (!selectedLeague) return { success: false as const, error: "Selecione uma pelada antes de criar a pré-lista." };
+  const result = await prepareCallupPrelist(
+    callupId,
+    selectedLeague,
+    supabaseCallupPrelistGateway(client),
+    (input) => scheduleCartolaRoundReminders({ ...input, includeOpening: true }),
+  );
+  if (!result.success) return result;
+  if (result.created) {
+    refreshCallups();
+    revalidatePath("/cartola");
   }
-
-  if (callup.round_id) {
-    const { data: linkedRound, error: linkedRoundError } = await client
-      .from("rounds")
-      .select("id, status, preparation_stage")
-      .eq("id", callup.round_id)
-      .maybeSingle();
-
-    if (linkedRoundError) return { success: false, error: linkedRoundError.message };
-    if (linkedRound?.status === "draft" && linkedRound.preparation_stage === "prelist") {
-      return { success: true, roundId: linkedRound.id };
-    }
-    return { success: false, error: "Esta convocacao ja foi convertida em rodada." };
-  }
-
-  if (callup.status !== "open") {
-    return { success: false, error: "A convocacao precisa estar aberta para criar a pre-lista." };
-  }
-
-  const confirmedPlayerIds = (callup.callup_entries || [])
-    .filter((entry) => entry.status === "confirmed")
-    .map((entry) => entry.player_id);
-
-  const { data: roundId, error } = await client.rpc("save_round_prelist", {
-    p_league_id: selectedLeague.id,
-    p_round_id: null,
-    p_date: callup.date,
-    p_start_time: callup.start_time || "08:00",
-    p_round_type: callup.round_type === "friendly" ? "friendly" : "official",
-    p_player_ids: confirmedPlayerIds,
-    p_callup_id: callup.id,
-    p_stadium_id: callup.stadium_id || null,
-    p_stadium_name: callup.stadium_name || null,
-    p_stadium_map_url: callup.stadium_map_url || null,
-  });
-
-  if (error) return { success: false, error: error.message };
-
-  if (callup.round_type !== "friendly" && selectedLeague?.featureTier === "complete") {
-    try {
-      await scheduleCartolaRoundReminders({ roundId: String(roundId), date: callup.date, startTime: callup.start_time || "08:00", includeOpening: true });
-    } catch (scheduleError) {
-      console.error("Pré-lista criada, mas os lembretes do Cartola não foram agendados:", scheduleError);
-    }
-  }
-
-  refreshCallups();
-  revalidatePath("/cartola");
-  return { success: true, roundId: String(roundId) };
+  return { success: true as const, roundId: result.roundId };
 }
 
 export async function closeCallup(callupId: string) {
