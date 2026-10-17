@@ -1,0 +1,49 @@
+# Refatoração do app — acompanhamento
+
+Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no mesmo commit de cada lote, incluindo o que mudou, testes, migrations, riscos e próximo passo. Não marcar uma área como concluída só por mover arquivos: a ação deve ficar fina e os contratos e fluxos críticos devem estar verificados.
+
+## Decisões vigentes
+
+- Monólito modular e DDD pragmático; regras puras em domínio, orquestração em aplicação e Supabase na infraestrutura. Ver [ADR 001](./adr-001-modular-monolith.md).
+- Manter RPCs SQL e RLS como autoridade para transações, consistência e isolamento entre peladas. Não duplicar essas regras em TypeScript.
+- Preservar assinaturas e respostas públicas das Server Actions durante a migração; converter uma fatia vertical por vez.
+- Não criar agora tabela de estatísticas acumuladas: a view `player_season_stats` já agrega `player_round_stats`. Medir antes de alterar esquema.
+
+## Etapas
+
+| Etapa | Estado | Evidência / próximo passo |
+| --- | --- | --- |
+| Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
+| Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
+| Convocação e rodadas | Pendente | Congelar contratos e cenários de duas peladas antes da extração. |
+| Partidas e pontuação | Pendente | Preservar cálculo e correções de scouts/goleiros; testar reprocessamento. |
+| Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
+| Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
+| Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
+| Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
+
+## Registro de lotes
+
+### 2026-10-17 — piloto e diagnóstico das estatísticas
+
+- Antes da mudança: testes de criação de pelada e ranking, 10 testes aprovados.
+- Extraído o fluxo `createLeague` para `src/modules/leagues/{domain,application,infrastructure}`. O RPC `create_league_for_user`, o cookie de pelada ativa, os redirecionamentos e a revalidação continuam com o mesmo comportamento.
+- Adicionados testes de domínio e caso de uso, incluindo entrada inválida, normalização e falha do repositório.
+- Adicionado diagnóstico opcional (`STATS_QUERY_DIAGNOSTICS=1`) para duração e quantidade de linhas das leituras de ranking da temporada, histórico do ranking e totais do elenco. Logs não incluem IDs nem dados pessoais. Sem a variável, o diagnóstico não emite logs.
+- Migrations: nenhuma. Banco e dados de produção não foram alterados.
+- Verificação: `npm run typecheck` aprovado; `npm test` aprovado (70 arquivos, 497 testes); `npm run build` aprovado após permitir o download das fontes Inter/Oswald. A primeira tentativa em rede restrita falhou apenas ao buscar essas fontes.
+- Commit: consultar o registro Git deste lote; nenhuma implantação efetuada.
+
+## Medição de estatísticas antes de uma nova tabela
+
+1. Em ambiente de teste representativo, ativar `STATS_QUERY_DIAGNOSTICS=1` temporariamente e carregar ranking, elenco e histórico repetidas vezes, com temporada curta e longa. Registrar p50/p95 de `durationMs`, `rowCount` e erros por operação. Essa métrica mede a consulta/agregação, não todo o carregamento da página.
+2. Examinar com `EXPLAIN (ANALYZE, BUFFERS)` as consultas lentas em cópia de dados ou ambiente seguro; conferir índices e filtros de temporada/pelada antes de mudar o esquema. Não executar explicações pesadas no banco oficial sem janela apropriada.
+3. Medir a página no navegador separadamente (rede, JavaScript e renderização). Um gargalo de interface não justifica tabela de totais.
+4. Primeiro otimizar consulta, seleção de colunas, índices e leituras redundantes. Somente considerar acumulados se a consulta ainda dominar a latência de forma consistente.
+5. Se houver tabela: chave por pelada, temporada, tipo de rodada e jogador; reconstrução dos dados antigos; atualização após finalização, edição ou reprocessamento; teste de paridade com `player_round_stats`; RLS e rollback próprios. A fonte original permanece autoritativa até a paridade ser comprovada.
+
+## Critério de conclusão de cada lote
+
+- Tipagem, testes e build aprovados; cenários de segurança e isolamento pertinentes executados.
+- Nenhuma regra nova dependente do cliente; autorização preservada dentro do caminho da ação e do banco.
+- Registrar migrations, resultados, riscos e commit neste arquivo antes de iniciar o lote seguinte.

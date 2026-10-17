@@ -16,6 +16,7 @@ import { getSelectedLeague } from "../league-context";
 import { buildRankedPointBreakdown } from "../ranked-scoring";
 import { normalizeBQScoringSnapshot } from "../bq-scoring";
 import { roundRankingPoints } from "../ranking";
+import { logStatsQuery } from "../stats-query-diagnostics";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -202,6 +203,7 @@ export async function getPlayersWithStats(roundType: RoundType = "official", sel
 
   // 1. Tentar buscar jogadores e stats agregados via View SQL
   if (season) {
+    const viewStartedAt = performance.now();
     const playersQuery = getPlayersForStatsCached(selectableOnly);
 
     const statsQuery = client
@@ -221,6 +223,7 @@ export async function getPlayersWithStats(roundType: RoundType = "official", sel
       .eq("round_type", roundType);
 
     const [playersResult, statsResult] = await Promise.all([playersQuery, statsQuery]);
+    logStatsQuery("roster_totals", "season_view", viewStartedAt, statsResult.data?.length || 0, Boolean(playersResult.error || statsResult.error));
 
     if (!playersResult.error && !statsResult.error && playersResult.data) {
       const statsMap = new Map<string, any>();
@@ -259,12 +262,14 @@ export async function getPlayersWithStats(roundType: RoundType = "official", sel
     return [];
   }
 
+  const fallbackStartedAt = performance.now();
   const [statsResult, finishedRoundsResult] = roundIds.length > 0
     ? await Promise.all([
       client.from("player_round_stats").select("*").in("round_id", roundIds),
       client.from("rounds").select("id").in("id", roundIds).eq("status", "finished"),
     ])
     : [{ data: [], error: null }, { data: [], error: null }];
+  logStatsQuery("roster_totals", "round_stats", fallbackStartedAt, statsResult.data?.length || 0, Boolean(statsResult.error || finishedRoundsResult.error));
   const { data: stats, error: statsError } = statsResult;
 
   const finishedRoundIds = finishedRoundsResult.data?.map((round) => round.id) || [];

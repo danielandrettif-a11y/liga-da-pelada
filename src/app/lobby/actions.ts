@@ -11,6 +11,8 @@ import {
   ENTRY_FLOW_VERSION,
   safeEntryDestination,
 } from "@/lib/entry-flow";
+import { createLeagueForUser } from "@/modules/leagues/application/create-league";
+import { supabaseLeagueCreator } from "@/modules/leagues/infrastructure/supabase-league-creator";
 
 async function completePendingEntryFlow(client: any) {
   const cookieStore = await cookies();
@@ -130,20 +132,14 @@ export async function requestClosedLeague(formData: FormData) {
 export async function createLeague(formData: FormData) {
   const { client, user } = await getCurrentAccount();
   if (!user) redirect("/login?next=/lobby/criar");
-  const name = String(formData.get("name") || "").trim().replace(/\s+/g, " ");
-  const tier = String(formData.get("tier") || "");
-  const visibility = String(formData.get("visibility") || "");
-  if (name.length < 3 || name.length > 80 || !["basic", "complete"].includes(tier)
-    || !["private", "open"].includes(visibility)) {
-    redirect("/lobby/criar?error=invalid");
-  }
-  const { data: leagueId, error } = await client.rpc("create_league_for_user", {
-    p_name: name,
-    p_tier: tier,
-    p_visibility: visibility,
-  });
-  if (error || !leagueId) redirect("/lobby/criar?error=create");
-  (await cookies()).set(ACTIVE_LEAGUE_COOKIE, String(leagueId), {
+  const result = await createLeagueForUser({
+    name: String(formData.get("name") || ""),
+    tier: String(formData.get("tier") || ""),
+    visibility: String(formData.get("visibility") || ""),
+  }, supabaseLeagueCreator(client));
+  if (result.status === "invalid") redirect("/lobby/criar?error=invalid");
+  if (result.status === "failed") redirect("/lobby/criar?error=create");
+  (await cookies()).set(ACTIVE_LEAGUE_COOKIE, result.leagueId, {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax",
     path: "/", maxAge: 60 * 60 * 24 * 365,
   });

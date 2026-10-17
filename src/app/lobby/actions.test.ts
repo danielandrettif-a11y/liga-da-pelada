@@ -58,6 +58,12 @@ describe("criação de pelada", () => {
     expect(mocks.cookieSet).toHaveBeenCalledWith("active_league_id", "new-league", expect.any(Object));
     expect(mocks.revalidate).toHaveBeenCalledWith("/", "layout");
   });
+
+  it("mantém o erro de criação e não altera a pelada ativa quando o RPC falha", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: "falha" } });
+    await expect(createLeague(form())).rejects.toThrow("redirect:/lobby/criar?error=create");
+    expect(mocks.cookieSet).not.toHaveBeenCalled();
+  });
 });
 
 describe("pedido para pelada fechada", () => {

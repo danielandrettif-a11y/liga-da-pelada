@@ -16,6 +16,7 @@ import { isCompetitiveProfileComplete } from "../player-eligibility";
 import { isParticipantScoringEligible } from "../scoring-eligibility";
 import { calculateGoalkeeperMatchScouts } from "../goalkeeper-timeline";
 import { parseAchievementBelts, type PlayerAchievementBelt } from "../achievement-belts";
+import { logStatsQuery } from "../stats-query-diagnostics";
 import {
   calculateRankingPositionBonus,
   parseRankingRoleWeights,
@@ -749,6 +750,7 @@ async function getRankingUncached(seasonId: string, leagueId: string) {
   const supabase = await createServerClient();
 
   // 1. Tentar buscar direto da View SQL otimizada (PostgreSQL SUM + GROUP BY + ORDER BY)
+  const viewStartedAt = performance.now();
   const { data: viewData, error: viewError } = await supabase
     .from("player_season_stats")
     .select(`
@@ -778,6 +780,7 @@ async function getRankingUncached(seasonId: string, leagueId: string) {
     .order("wins", { ascending: false })
     .order("goals", { ascending: false })
     .order("assists", { ascending: false });
+  logStatsQuery("season_ranking", "season_view", viewStartedAt, viewData?.length || 0, Boolean(viewError));
 
   if (!viewError && viewData) {
     return viewData.map((row: any) => ({
@@ -808,6 +811,7 @@ async function getRankingUncached(seasonId: string, leagueId: string) {
   const roundIds = await getActiveSeasonRoundIds(leagueId, "official");
   if (roundIds.length === 0) return [];
 
+  const fallbackStartedAt = performance.now();
   const { data, error } = await supabase
     .from("player_round_stats")
     .select(`
@@ -833,6 +837,7 @@ async function getRankingUncached(seasonId: string, leagueId: string) {
       )
     `)
     .in("round_id", roundIds);
+  logStatsQuery("season_ranking", "round_stats", fallbackStartedAt, data?.length || 0, Boolean(error));
 
   if (error || !data) {
     if (error) console.error("Erro ao buscar ranking:", error);
@@ -1000,6 +1005,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
     return { ...emptyData, seasonLabel };
   }
 
+  const historyStartedAt = performance.now();
   const { data: rawStats, error: statsError } = await supabase
     .from("player_round_stats")
     .select(`
@@ -1035,6 +1041,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       player:player_id (*)
     `)
     .in("round_id", (rounds || []).map((round) => round.id));
+  logStatsQuery("ranking_history", "round_stats", historyStartedAt, rawStats?.length || 0, Boolean(statsError));
 
   if (statsError || !rawStats) {
     if (statsError) console.error("Erro ao buscar dados detalhados do ranking:", statsError);
