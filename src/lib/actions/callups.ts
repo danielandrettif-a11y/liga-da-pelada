@@ -2,14 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { getAdminClient, getCurrentAccount } from "../auth";
-import type { Callup, CallupEntry, Player, RoundType } from "../types";
+import type { Callup, CallupEntry, Player } from "../types";
 import { scheduleCartolaRoundReminders } from "../cartola-reminder-scheduler";
 import { getActiveLeague } from "./rounds";
 import { parseOpenCallupRequest } from "@/modules/callups/domain/open-callup";
-import { DUPLICATE_CALLUP_DATE_ERROR, openCallupWithPrelist } from "@/modules/callups/application/open-callup";
+import { openCallupWithPrelist } from "@/modules/callups/application/open-callup";
 import { supabaseCallupOpeningGateway } from "@/modules/callups/infrastructure/supabase-callup-opening-gateway";
 import { prepareCallupPrelist } from "@/modules/callups/application/prepare-callup-prelist";
 import { supabaseCallupPrelistGateway } from "@/modules/callups/infrastructure/supabase-callup-prelist-gateway";
+import { parseEditCallupRequest } from "@/modules/callups/domain/edit-callup";
+import { editCallup } from "@/modules/callups/application/edit-callup";
+import { supabaseCallupEditingGateway } from "@/modules/callups/infrastructure/supabase-callup-editing-gateway";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getSelectedLeague } from "../league-context";
 import { notifyCartolaLineupsAboutWithdrawal } from "../cartola-withdrawal-notifications";
@@ -179,21 +182,6 @@ export async function getAgendaCallups() {
     ...callup,
     playersCount: callup.callup_entries?.[0]?.count || 0,
   }));
-}
-
-async function hasCallupOnDate(
-  client: Awaited<ReturnType<typeof getCurrentAccount>>["client"],
-  leagueId: string,
-  date: string,
-  excludeId?: string,
-) {
-  let query = client.from("callups").select("id")
-    .eq("league_id", leagueId).eq("date", date)
-    .in("status", ["open", "locked", "converted"]);
-  if (excludeId) query = query.neq("id", excludeId);
-  const { data, error } = await query.limit(1);
-  if (error) throw new Error(error.message);
-  return Boolean(data?.length);
 }
 
 export async function openCallup(formData: FormData) {
@@ -531,81 +519,17 @@ export async function updateCallup(formData: FormData) {
   if (!client) return { success: false, error: "Somente administradores podem editar convocações." };
   const callupId = String(formData.get("callup_id") || "");
   if (!(await selectedCallup(callupId, client))) return { success: false, error: "Convocação fora da pelada selecionada." };
-  const date = String(formData.get("date") || "");
-  const startTime = String(formData.get("start_time") || "08:00").slice(0, 5) || "08:00";
-  const stadiumId = formData.get("stadium_id") ? String(formData.get("stadium_id")) : null;
-  const roundType: RoundType = formData.get("round_type") === "friendly" ? "friendly" : "official";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { success: false, error: "Informe uma data válida." };
-
+  const request = parseEditCallupRequest({
+    callupId,
+    date: String(formData.get("date") || ""),
+    startTime: formData.get("start_time") ? String(formData.get("start_time")) : null,
+    stadiumId: formData.get("stadium_id") ? String(formData.get("stadium_id")) : null,
+    roundType: formData.get("round_type") ? String(formData.get("round_type")) : null,
+  });
+  if (!request) return { success: false, error: "Informe uma data válida." };
   const league = await getActiveLeague();
-  try {
-    if (await hasCallupOnDate(client, league.id, date, callupId)) {
-      return { success: false, error: DUPLICATE_CALLUP_DATE_ERROR };
-    }
-  } catch (checkError) {
-    return { success: false, error: checkError instanceof Error ? checkError.message : "Não foi possível verificar a data." };
-  }
-  let stadiumName: string | null = null;
-  let stadiumMapUrl: string | null = null;
-
-  if (stadiumId) {
-    const { data: stadiumData } = await client
-      .from("stadiums")
-      .select("name, google_maps_url")
-      .eq("id", stadiumId)
-      .eq("league_id", league.id)
-      .maybeSingle();
-    if (!stadiumData) return { success: false, error: "Estádio fora da pelada selecionada." };
-    stadiumName = stadiumData.name;
-    stadiumMapUrl = stadiumData.google_maps_url;
-  } else {
-    const { data: leagueConfig } = await client
-      .from("leagues")
-      .select("stadium_name, stadium_map_url")
-      .eq("id", league.id)
-      .single();
-    stadiumName = leagueConfig?.stadium_name || null;
-    stadiumMapUrl = leagueConfig?.stadium_map_url || null;
-  }
-
-  const { error } = await client
-    .from("callups")
-    .update({
-      date,
-      start_time: startTime,
-      stadium_id: stadiumId,
-      stadium_name: stadiumName,
-      stadium_map_url: stadiumMapUrl,
-      round_type: roundType,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", callupId);
-
-  if (error) return { success: false, error: error.code === "23505" ? DUPLICATE_CALLUP_DATE_ERROR : error.message };
-
-  const { data: callup } = await client
-    .from("callups")
-    .select("round_id")
-    .eq("id", callupId)
-    .maybeSingle();
-
-  if (callup?.round_id) {
-    await client
-      .from("rounds")
-      .update({
-        date,
-        start_time: startTime,
-        stadium_id: stadiumId,
-        stadium_name: stadiumName,
-        stadium_map_url: stadiumMapUrl,
-        round_type: roundType,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", callup.round_id)
-      .eq("status", "draft");
-  }
-
-  refreshCallups();
-  return { success: true };
+  const result = await editCallup(request, league.id, supabaseCallupEditingGateway(client));
+  if (result.success) refreshCallups();
+  return result;
 }
 
