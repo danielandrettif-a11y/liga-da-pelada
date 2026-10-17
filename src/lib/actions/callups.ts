@@ -19,9 +19,10 @@ import { joinSelectedCallup, leaveSelectedCallup } from "@/modules/callups/appli
 import { supabaseCallupParticipationGateway } from "@/modules/callups/infrastructure/supabase-callup-participation-gateway";
 import { addOtherCallupPlayer, removeOtherCallupPlayerAsAdmin } from "@/modules/callups/application/manage-callup-players";
 import { supabaseCallupPlayersGateway } from "@/modules/callups/infrastructure/supabase-callup-players-gateway";
+import { inviteCallupGuest, removeCallupEntryForAccount } from "@/modules/callups/application/manage-callup-guests";
+import { supabaseCallupGuestsGateway } from "@/modules/callups/infrastructure/supabase-callup-guests-gateway";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getSelectedLeague } from "../league-context";
-import { notifyCartolaLineupsAboutWithdrawal } from "../cartola-withdrawal-notifications";
 
 export type CallupEntryWithPlayer = CallupEntry & {
   player: Player;
@@ -306,32 +307,12 @@ export async function inviteGuestToCallup({
     return { success: false, error: "Entre na sua conta para contratar um amigo." };
   }
   if (!(await selectedCallup(callupId, account.client))) return { success: false, error: "Convocação fora da pelada selecionada." };
-
-  const cleanName = name.trim();
-  if (cleanName.length < 2) {
-    return { success: false, error: "Informe o nome do seu amigo (pelo menos 2 letras)." };
-  }
-
-  // A criação do convidado, seu vínculo com a liga e a reserva na fila
-  // acontecem em uma única transação no banco. Assim não há convidado órfão
-  // nem duas pessoas ocupando a última vaga ao mesmo tempo.
-  const { data: createdEntry, error: entryError } = await (account.client as any).rpc(
-    "create_callup_guest",
-    {
-      p_callup_id: callupId,
-      p_name: cleanName,
-      p_player_profile: playerProfile,
-      p_is_goalkeeper: isGoalkeeper,
-    },
+  const result = await inviteCallupGuest(
+    { callupId, name, playerProfile, isGoalkeeper },
+    supabaseCallupGuestsGateway(account.client),
   );
-
-  if (entryError) {
-    return { success: false, error: entryError.message };
-  }
-
-  refreshCallups();
-  const entry = Array.isArray(createdEntry) ? createdEntry[0] : createdEntry;
-  return { success: true, isConfirmed: entry?.status === "confirmed", playerId: entry?.player_id };
+  if (result.success) refreshCallups();
+  return result;
 }
 
 /**
@@ -344,73 +325,19 @@ export async function removeCallupEntry(callupId: string, playerId: string) {
   }
 
   const client = account.client;
-  if (!(await selectedCallup(callupId, client))) return { success: false, error: "Convocação fora da pelada selecionada." };
-
-  const { data: callup, error: callupError } = await client
-    .from("callups")
-    .select("status, round_id")
-    .eq("id", callupId)
-    .maybeSingle();
-  if (callupError || !callup) {
-    return { success: false, error: callupError?.message || "Convocação não encontrada." };
-  }
-
-  // O administrador pode retirar qualquer pessoa até o primeiro jogo, inclusive
-  // depois do sorteio. A RPC preserva o time da vaga e promove a fila quando
-  // houver alguém esperando.
-  if (account.isAdmin) {
-    const result = await removeOtherCallupPlayerAsAdmin(callupId, playerId, supabaseCallupPlayersGateway(client));
-    if (!result.success) return result;
-    refreshCallups();
-    if (callup.round_id) {
-      revalidatePath(`/rodadas/${callup.round_id}`);
-      revalidatePath(`/rodadas/${callup.round_id}/nova-partida`);
-    }
-    return { success: true };
-  }
-
-  if (callup.status !== "open") {
-    return { success: false, error: "Depois do sorteio, somente o administrador pode retirar outro jogador." };
-  }
-
-  // 1. Buscar a entrada
-  const { data: entry, error: entryError } = await client
-    .from("callup_entries")
-    .select("id, joined_by, player_id, player:players(created_by_user_id)")
-    .eq("callup_id", callupId)
-    .eq("player_id", playerId)
-    .maybeSingle();
-
-  if (entryError || !entry) {
-    return { success: false, error: "Jogador não encontrado na convocação." };
-  }
-
-  // 2. Verificar permissão: Admin ou usuário que cadastrou
-  const isCreator = entry.joined_by === account.user.id || (entry.player as any)?.created_by_user_id === account.user.id;
-  if (!account.isAdmin && !isCreator) {
-    return { success: false, error: "Você só pode remover convidados cadastrados por você." };
-  }
-
-  // 3. Remover a entrada
-  const { error: deleteError } = await client
-    .from("callup_entries")
-    .delete()
-    .eq("callup_id", callupId)
-    .eq("player_id", playerId);
-
-  if (deleteError) {
-    return { success: false, error: deleteError.message };
-  }
-  await notifyCartolaLineupsAboutWithdrawal(client, callupId, playerId);
-
-  // 4. Normalizar posições e promover da fila se necessário
-  try {
-    await client.rpc("normalize_callup_positions", { p_callup_id: callupId });
-  } catch {
-    // Ignora se não existir ou se a RPC falhar
-  }
-
+  const callup = await selectedCallup(callupId, client);
+  if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
+  const result = await removeCallupEntryForAccount(
+    { callupId, playerId, leagueId: callup.league_id, userId: account.user.id, isAdmin: account.isAdmin },
+    supabaseCallupGuestsGateway(client),
+    supabaseCallupPlayersGateway(client),
+  );
+  if (!result.success) return result;
   refreshCallups();
+  if (result.revalidateRoundId) {
+    revalidatePath(`/rodadas/${result.revalidateRoundId}`);
+    revalidatePath(`/rodadas/${result.revalidateRoundId}/nova-partida`);
+  }
   return { success: true };
 }
 

@@ -15,7 +15,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | --- | --- | --- |
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
-| Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado, participação própria e gestão administrativa/colaborativa do elenco extraídos; próximo recorte: convidados e remoção pelo criador, seguidos de testes integrados com duas peladas. |
+| Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos, incluindo convidados e remoção pelo criador; próximo recorte: corrigir/validar promoção da fila após remoção pelo criador e testar com duas peladas. |
 | Partidas e pontuação | Pendente | Preservar cálculo e correções de scouts/goleiros; testar reprocessamento. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
@@ -23,6 +23,14 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — convidados e remoção pelo criador
+
+- Extraídos `inviteGuestToCallup` e `removeCallupEntry` para regras puras (nome e autoria), caso de uso e gateway Supabase. As Server Actions continuam verificando autenticação e pelada selecionada, revalidando após sucesso e devolvendo o mesmo contrato à UI. A via administrativa reutiliza o caso de uso de retirada do lote anterior.
+- Mantido o RPC `create_callup_guest`, que cria perfil, vínculo e entrada em uma transação; na retirada pelo criador, mantidos estado `open`, checagem de autoria, DELETE protegido por RLS, aviso ao Cartola e tentativa não bloqueante de normalização. A leitura da convocação agora também filtra `league_id`.
+- Testes novos cobrem nome inválido, status confirmado/fila, erro do RPC, autorização por autoria, bloqueio após sorteio, via administrativa, erro de DELETE, ordem do aviso e filtros do gateway. `npm run check` aprovado: tipagem, 582 testes em 92 arquivos e build.
+- Migrations: nenhuma. Banco e dados de produção não foram alterados. **Pendência de correção:** a migration 017 revoga EXECUTE de `normalize_callup_positions` para autenticados e não foi localizado GRANT posterior. A chamada feita após o DELETE do criador já era não bloqueante; portanto a promoção da fila pode não ocorrer nesse caminho. Confirmar em ambiente de teste e substituir por RPC transacional autorizada, sem expor a função interna de normalização. Teste integrado entre duas peladas também pendente.
+- Commit: consultar o registro Git deste lote; nenhuma implantação efetuada.
 
 ### 2026-10-17 — adicionar e retirar outros jogadores
 
