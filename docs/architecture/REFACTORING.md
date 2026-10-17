@@ -6,6 +6,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 - Monólito modular e DDD pragmático; regras puras em domínio, orquestração em aplicação e Supabase na infraestrutura. Ver [ADR 001](./adr-001-modular-monolith.md).
 - Manter RPCs SQL e RLS como autoridade para transações, consistência e isolamento entre peladas. Não duplicar essas regras em TypeScript.
+- A retirada de convidado pelo criador usa RPC específica e atômica, sem conceder acesso direto à normalização interna. Ver [ADR 002](./adr-002-atomic-callup-creator-removal.md).
 - Preservar assinaturas e respostas públicas das Server Actions durante a migração; converter uma fatia vertical por vez.
 - Não criar agora tabela de estatísticas acumuladas: a view `player_season_stats` já agrega `player_round_stats`. Medir antes de alterar esquema.
 
@@ -15,7 +16,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | --- | --- | --- |
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
-| Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos, incluindo convidados e remoção pelo criador; próximo recorte: corrigir/validar promoção da fila após remoção pelo criador e testar com duas peladas. |
+| Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Próximo recorte: validação integrada com duas peladas, depois partidas. |
 | Partidas e pontuação | Pendente | Preservar cálculo e correções de scouts/goleiros; testar reprocessamento. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
@@ -24,12 +25,19 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-17 — retirada atômica de convidado pelo criador
+
+- Corrigida a retirada pelo criador que fazia `DELETE` e depois tentava chamar `normalize_callup_positions` sem permissão. A Server Action preserva autenticação, seleção da pelada e resposta pública; o caso de uso mantém o aviso ao Cartola somente depois do sucesso.
+- Nova RPC `remove_my_added_callup_player` verifica a conta, a participação na pelada, o estado aberto da convocação e a autoria da entrada. Sob bloqueio da convocação e da entrada, ela reutiliza a função interna de retirada que remove o jogador, promove a fila e sincroniza vínculos em uma transação. Não concede `EXECUTE` da normalização interna ao cliente.
+- Testes de unidade e gateway atualizados para a chamada atômica, inclusive falhas de estado/autoria e ausência de aviso quando a retirada falha. `npm run check` aprovado: tipagem, 581 testes em 92 arquivos e build.
+- Migration: `325_atomic_creator_callup_removal.sql`. **Não aplicada ao banco neste lote. Aplicar e validar no Supabase de teste antes de publicar o código; publicar a migration antes do aplicativo.** Verificação integrada real com duas peladas e confirmação da promoção da fila seguem pendentes.
+
 ### 2026-10-17 — convidados e remoção pelo criador
 
 - Extraídos `inviteGuestToCallup` e `removeCallupEntry` para regras puras (nome e autoria), caso de uso e gateway Supabase. As Server Actions continuam verificando autenticação e pelada selecionada, revalidando após sucesso e devolvendo o mesmo contrato à UI. A via administrativa reutiliza o caso de uso de retirada do lote anterior.
 - Mantido o RPC `create_callup_guest`, que cria perfil, vínculo e entrada em uma transação; na retirada pelo criador, mantidos estado `open`, checagem de autoria, DELETE protegido por RLS, aviso ao Cartola e tentativa não bloqueante de normalização. A leitura da convocação agora também filtra `league_id`.
 - Testes novos cobrem nome inválido, status confirmado/fila, erro do RPC, autorização por autoria, bloqueio após sorteio, via administrativa, erro de DELETE, ordem do aviso e filtros do gateway. `npm run check` aprovado: tipagem, 582 testes em 92 arquivos e build.
-- Migrations: nenhuma. Banco e dados de produção não foram alterados. **Pendência de correção:** a migration 017 revoga EXECUTE de `normalize_callup_positions` para autenticados e não foi localizado GRANT posterior. A chamada feita após o DELETE do criador já era não bloqueante; portanto a promoção da fila pode não ocorrer nesse caminho. Confirmar em ambiente de teste e substituir por RPC transacional autorizada, sem expor a função interna de normalização. Teste integrado entre duas peladas também pendente.
+- Migrations: nenhuma neste lote. Banco e dados de produção não foram alterados. **Pendência identificada neste lote e tratada no lote posterior com a migration 325:** a migration 017 revoga EXECUTE de `normalize_callup_positions` para autenticados, logo a promoção da fila no caminho anterior não estava garantida. Teste integrado entre duas peladas ainda pendente.
 - Commit: consultar o registro Git deste lote; nenhuma implantação efetuada.
 
 ### 2026-10-17 — adicionar e retirar outros jogadores

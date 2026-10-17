@@ -328,7 +328,7 @@ export async function removeCallupEntry(callupId: string, playerId: string) {
   const callup = await selectedCallup(callupId, client);
   if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
   const result = await removeCallupEntryForAccount(
-    { callupId, playerId, leagueId: callup.league_id, userId: account.user.id, isAdmin: account.isAdmin },
+    { callupId, playerId, leagueId: callup.league_id, isAdmin: account.isAdmin },
     supabaseCallupGuestsGateway(client),
     supabaseCallupPlayersGateway(client),
   );

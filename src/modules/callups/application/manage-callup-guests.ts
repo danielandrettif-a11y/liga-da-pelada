@@ -1,4 +1,4 @@
-import { canRemoveCreatedCallupEntry, cleanCallupGuestName } from "../domain/callup-guests";
+import { cleanCallupGuestName } from "../domain/callup-guests";
 import { removeOtherCallupPlayerAsAdmin, type CallupPlayersGateway } from "./manage-callup-players";
 
 export type GuestProfile = "offensive" | "midfield" | "defensive";
@@ -14,13 +14,8 @@ export type CallupGuestGateway = {
     callup: { status: string; roundId: string | null } | null;
     error: string | null;
   }>;
-  loadEntry(callupId: string, playerId: string): Promise<{
-    entry: { joinedBy: string | null; createdByUserId: string | null } | null;
-    error: string | null;
-  }>;
-  deleteEntry(callupId: string, playerId: string): Promise<string | null>;
+  removeCreatedEntry(callupId: string, playerId: string): Promise<string | null>;
   notifyWithdrawal(callupId: string, playerId: string): Promise<void>;
-  normalizePositions(callupId: string): Promise<void>;
 };
 
 export type InviteGuestResult =
@@ -44,7 +39,7 @@ export async function inviteCallupGuest(
 }
 
 export async function removeCallupEntryForAccount(
-  input: { callupId: string; playerId: string; leagueId: string; userId: string; isAdmin: boolean },
+  input: { callupId: string; playerId: string; leagueId: string; isAdmin: boolean },
   guestGateway: CallupGuestGateway,
   playersGateway: CallupPlayersGateway,
 ): Promise<RemoveEntryResult> {
@@ -59,25 +54,8 @@ export async function removeCallupEntryForAccount(
     return { success: true, revalidateRoundId: callup.roundId };
   }
 
-  if (callup.status !== "open") {
-    return { success: false, error: "Depois do sorteio, somente o administrador pode retirar outro jogador." };
-  }
-
-  const { entry, error: entryError } = await guestGateway.loadEntry(input.callupId, input.playerId);
-  if (entryError || !entry) {
-    return { success: false, error: "Jogador não encontrado na convocação." };
-  }
-  if (!canRemoveCreatedCallupEntry(input.userId, entry)) {
-    return { success: false, error: "Você só pode remover convidados cadastrados por você." };
-  }
-
-  const deleteError = await guestGateway.deleteEntry(input.callupId, input.playerId);
-  if (deleteError) return { success: false, error: deleteError };
+  const removalError = await guestGateway.removeCreatedEntry(input.callupId, input.playerId);
+  if (removalError) return { success: false, error: removalError };
   await guestGateway.notifyWithdrawal(input.callupId, input.playerId);
-  try {
-    await guestGateway.normalizePositions(input.callupId);
-  } catch {
-    // A normalização era não bloqueante neste fluxo; a autorização final fica no banco.
-  }
   return { success: true, revalidateRoundId: null };
 }

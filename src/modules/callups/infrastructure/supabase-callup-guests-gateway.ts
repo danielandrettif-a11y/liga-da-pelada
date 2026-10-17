@@ -26,26 +26,15 @@ export function supabaseCallupGuestsGateway(client: AccountClient): CallupGuestG
         error: error?.message || null,
       };
     },
-    async loadEntry(callupId, playerId) {
-      const { data, error } = await client.from("callup_entries")
-        .select("id, joined_by, player_id, player:players(created_by_user_id)")
-        .eq("callup_id", callupId).eq("player_id", playerId).maybeSingle();
-      const player = data?.player as { created_by_user_id?: string | null } | null | undefined;
-      return {
-        entry: data ? { joinedBy: data.joined_by, createdByUserId: player?.created_by_user_id || null } : null,
-        error: error?.message || null,
-      };
-    },
-    async deleteEntry(callupId, playerId) {
-      const { error } = await client.from("callup_entries")
-        .delete().eq("callup_id", callupId).eq("player_id", playerId);
+    async removeCreatedEntry(callupId, playerId) {
+      const { error } = await (client as any).rpc("remove_my_added_callup_player", {
+        p_callup_id: callupId,
+        p_player_id: playerId,
+      });
       return error?.message || null;
     },
     async notifyWithdrawal(callupId, playerId) {
       await notifyCartolaLineupsAboutWithdrawal(client, callupId, playerId);
-    },
-    async normalizePositions(callupId) {
-      await client.rpc("normalize_callup_positions", { p_callup_id: callupId });
     },
   };
 }
