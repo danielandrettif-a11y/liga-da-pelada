@@ -15,7 +15,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | --- | --- | --- |
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
-| Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação da própria conta extraídos; próximo recorte: adição/retirada de outros jogadores e testes integrados com duas peladas. |
+| Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado, participação própria e gestão administrativa/colaborativa do elenco extraídos; próximo recorte: convidados e remoção pelo criador, seguidos de testes integrados com duas peladas. |
 | Partidas e pontuação | Pendente | Preservar cálculo e correções de scouts/goleiros; testar reprocessamento. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
@@ -23,6 +23,14 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — adicionar e retirar outros jogadores
+
+- Extraídas `adminAddCallupPlayer`, `addRosterPlayerToCallup` e `adminRemoveCallupPlayer` para um caso de uso e gateway Supabase. A retirada administrativa da tela de convocação (`removeCallupEntry`) reutiliza o mesmo caso de uso. Autenticação, checagem de convocação/jogador na pelada ativa e revalidação permanecem nas Server Actions.
+- Preservadas as RPCs diferentes para ADM e membro (`admin_add_callup_player` e `add_player_to_callup`), o retorno `confirmed`/`waitlist` da via administrativa, e o aviso ao Cartola somente após remoção bem-sucedida. Elegibilidade, fila, reposição e autorização final continuam no SQL/RLS, sem regras duplicadas no domínio TypeScript.
+- Testes novos cobrem seleção da via administrativa/colaborativa, status, falhas e ordem do aviso, além dos parâmetros enviados a cada RPC. `npm run check` aprovado: tipagem, 571 testes em 89 arquivos e build.
+- Migrations: nenhuma. Banco e dados de produção não foram alterados. A remoção pelo criador do convidado e o teste integrado entre duas peladas permanecem pendentes.
+- Commit: consultar o registro Git deste lote; nenhuma implantação efetuada.
 
 ### 2026-10-17 — entrada e saída do próprio jogador
 

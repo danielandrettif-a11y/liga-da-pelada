@@ -17,6 +17,8 @@ import { changeCallupVisibility, closeSelectedCallup, lockSelectedCallup } from 
 import { supabaseCallupManagementGateway } from "@/modules/callups/infrastructure/supabase-callup-management-gateway";
 import { joinSelectedCallup, leaveSelectedCallup } from "@/modules/callups/application/participate-in-callup";
 import { supabaseCallupParticipationGateway } from "@/modules/callups/infrastructure/supabase-callup-participation-gateway";
+import { addOtherCallupPlayer, removeOtherCallupPlayerAsAdmin } from "@/modules/callups/application/manage-callup-players";
+import { supabaseCallupPlayersGateway } from "@/modules/callups/infrastructure/supabase-callup-players-gateway";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getSelectedLeague } from "../league-context";
 import { notifyCartolaLineupsAboutWithdrawal } from "../cartola-withdrawal-notifications";
@@ -240,17 +242,13 @@ export async function leaveActiveCallup(callupId: string) {
 
 export async function adminAddCallupPlayer(callupId: string, playerId: string) {
   const client = await getAdminClient();
-  if (!client) return { success: false, error: "Somente administradores podem alterar a lista." };
+  if (!client) return { success: false as const, error: "Somente administradores podem alterar a lista." };
   if (!(await selectedCallup(callupId, client)) || !(await selectedRosterPlayer(playerId, client))) {
-    return { success: false, error: "Convocação ou jogador fora da pelada selecionada." };
+    return { success: false as const, error: "Convocação ou jogador fora da pelada selecionada." };
   }
-  const { data, error } = await client.rpc("admin_add_callup_player", {
-    p_callup_id: callupId,
-    p_player_id: playerId,
-  });
-  if (error) return { success: false, error: error.message };
-  refreshCallups();
-  return { success: true, status: data?.status as "confirmed" | "waitlist" | undefined };
+  const result = await addOtherCallupPlayer(callupId, playerId, "admin", supabaseCallupPlayersGateway(client));
+  if (result.success) refreshCallups();
+  return result;
 }
 
 export async function repairMyPlayerAccount() {
@@ -274,28 +272,18 @@ export async function addRosterPlayerToCallup(callupId: string, playerId: string
     return { success: false, error: "Convocação ou jogador fora da pelada selecionada." };
   }
 
-  const { error } = await account.client.rpc("add_player_to_callup", {
-    p_callup_id: callupId,
-    p_player_id: playerId,
-    p_admin_only: false,
-  });
-  if (error) return { success: false, error: error.message };
-  refreshCallups();
-  return { success: true };
+  const result = await addOtherCallupPlayer(callupId, playerId, "member", supabaseCallupPlayersGateway(account.client));
+  if (result.success) refreshCallups();
+  return result;
 }
 
 export async function adminRemoveCallupPlayer(callupId: string, playerId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem alterar a lista." };
   if (!(await selectedCallup(callupId, client))) return { success: false, error: "Convocação fora da pelada selecionada." };
-  const { error } = await client.rpc("admin_remove_callup_player", {
-    p_callup_id: callupId,
-    p_player_id: playerId,
-  });
-  if (error) return { success: false, error: error.message };
-  await notifyCartolaLineupsAboutWithdrawal(client, callupId, playerId);
-  refreshCallups();
-  return { success: true };
+  const result = await removeOtherCallupPlayerAsAdmin(callupId, playerId, supabaseCallupPlayersGateway(client));
+  if (result.success) refreshCallups();
+  return result;
 }
 
 /**
@@ -371,12 +359,8 @@ export async function removeCallupEntry(callupId: string, playerId: string) {
   // depois do sorteio. A RPC preserva o time da vaga e promove a fila quando
   // houver alguém esperando.
   if (account.isAdmin) {
-    const { error } = await client.rpc("admin_remove_callup_player", {
-      p_callup_id: callupId,
-      p_player_id: playerId,
-    });
-    if (error) return { success: false, error: error.message };
-    await notifyCartolaLineupsAboutWithdrawal(client, callupId, playerId);
+    const result = await removeOtherCallupPlayerAsAdmin(callupId, playerId, supabaseCallupPlayersGateway(client));
+    if (!result.success) return result;
     refreshCallups();
     if (callup.round_id) {
       revalidatePath(`/rodadas/${callup.round_id}`);
