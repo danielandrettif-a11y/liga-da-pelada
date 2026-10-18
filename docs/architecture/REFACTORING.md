@@ -16,14 +16,21 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | --- | --- | --- |
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
-| Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Próximo recorte: validação integrada com duas peladas, depois partidas. |
-| Partidas e pontuação | Em andamento | Registro de gol ao vivo extraído; preservar cálculo, goleiros, correções e reprocessamento nos próximos recortes. |
+| Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
+| Partidas e pontuação | Em andamento | Registro de gol e encerramento da partida extraídos; preservar goleiros, correções e reprocessamento nos próximos recortes. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — encerramento da partida e recálculo
+
+- Extraído `finishMatch` para cálculo puro do tempo em `domain`, sequência de encerramento/recuperação em `application` e gravações e início rápido em `infrastructure`. A Server Action mantém autorização de ADM, revalidação, recálculo já existente e agendamento de notificação via `after`.
+- Preservada a ordem: consulta da partida na pelada ativa; atualização condicional; gravação de `left_elapsed_seconds` sem filtro `is_active` (o trigger pode desativar jogadores); revalidação; desativação; recálculo; aviso só após sucesso; sugestão da próxima partida. Uma partida já encerrada refaz tempos/estatísticas sem reenviar aviso.
+- Testes novos cobrem tempo corrido/pausado, deslocamento oficial, ordem das operações, recuperação idempotente, ausência de novo aviso, falha de atualização, falha dos participantes/estatísticas, parâmetros enviados ao Supabase e sugestão da próxima partida. `npm run check` aprovado: tipagem, 603 testes em 100 arquivos e build.
+- Nenhuma migration foi criada ou aplicada. **Risco preexistente:** a atualização da partida, dos participantes e das estatísticas ainda atravessa chamadas separadas; falha intermediária pode deixar estado parcial até nova tentativa. Não mudar a transação sem teste integrado no Supabase de teste. Este lote é estrutural; ainda não há medição de ganho de desempenho.
 
 ### 2026-10-17 — registro de gol ao vivo
 

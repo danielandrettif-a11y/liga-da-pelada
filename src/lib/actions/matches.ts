@@ -14,12 +14,13 @@ import { sendMatchFinishedNotifications, sendMatchTimerNotifications } from "../
 import { scheduleMatchTimerAlerts } from "../match-timer-scheduler";
 import { buildStructuralLoans } from "../underfilled-rounds";
 import { canTeamLendToMatch } from "../substitution-draw";
-import { suggestNextMatchRotation } from "../next-match";
 import { shouldExcludeReplacementScoring } from "../scoring-eligibility";
 import { refreshFluidOverallSafely } from "./overall";
 import { registerLiveGoal } from "@/modules/matches/application/register-live-goal";
+import { finishSelectedMatch } from "@/modules/matches/application/finish-match";
 import { getMatchState } from "@/modules/matches/infrastructure/match-scope";
 import { supabaseGoalGateway } from "@/modules/matches/infrastructure/supabase-goal-gateway";
+import { supabaseFinishMatchGateway } from "@/modules/matches/infrastructure/supabase-finish-match-gateway";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 const FINISHED_CORRECTION_ERROR = "Digite EDITAR para liberar correções em partidas finalizadas.";
@@ -29,51 +30,6 @@ async function getEventMatchState(client: SupabaseClient, eventId: string) {
     .eq("id", eventId).maybeSingle();
   if (!event) throw new Error("Gol não encontrado.");
   return getMatchState(client, event.match_id);
-}
-
-async function buildQuickStartSuggestion(client: SupabaseClient, roundId: string, matchId: string) {
-  const { data: round, error } = await client
-    .from("rounds")
-    .select(`
-      id, number, formation_mode, arrival_order_enabled, target_players_per_team,
-      round_players (
-        player_id,
-        availability_status,
-        attendance_status
-      ),
-      teams (
-        id, name, color, crest_url, position, captain_player_id, fixed_goalkeeper_player_id,
-        team_players (
-          player_id,
-          goalkeeper_order,
-          loan_order,
-          players (id, name, is_goalkeeper)
-        )
-      ),
-      matches (
-        id, team_a_id, team_b_id, score_a, score_b, match_order, created_at, started_at,
-        match_players (player_id, team_id, original_team_id),
-        match_goalkeepers (player_id, team_id, rotation_order)
-      ),
-      league:league_id (players_per_team)
-    `)
-    .eq("id", roundId)
-    .single();
-
-  if (error || !round) {
-    console.error("Erro ao preparar início rápido:", error);
-    return null;
-  }
-
-  const teams = [...(round.teams || [])].sort((a: any, b: any) => Number(a.position || 0) - Number(b.position || 0));
-  const matches = [...(round.matches || [])].sort((a: any, b: any) =>
-    Number(a.match_order || 0) - Number(b.match_order || 0)
-      || String(a.created_at || "").localeCompare(String(b.created_at || "")),
-  );
-  const rotation = suggestNextMatchRotation(teams, matches, matchId);
-  if (!rotation) return null;
-
-  return { round: { ...round, teams, matches }, rotation };
 }
 
 export async function createMatch(input: CreateMatchInput) {
@@ -1038,101 +994,29 @@ export async function addFinishedGoalEvent(
 export async function finishMatch(matchId: string) {
   try {
     const client = await getAdminClient();
-    if (!client) return { success: false, error: ADMIN_ERROR };
-
-    const currentState = await getMatchState(client, matchId);
-    const elapsedAtFinish = Math.max(
-      0,
-      Number(currentState.timer_accumulated_seconds || 0)
-        + (currentState.timer_started_at
-          ? Math.floor((Date.now() - new Date(currentState.timer_started_at).getTime()) / 1000)
-          : 0),
-    );
-    const officialElapsedAtFinish = elapsedAtFinish + Number(currentState.eligibility_elapsed_offset_seconds || 0);
-    const { data: match, error } = await client
-      .from("matches")
-      .update({
-        status: "finished",
-        finished_at: new Date().toISOString(),
-        timer_started_at: null,
-        timer_accumulated_seconds: elapsedAtFinish,
-      })
-      .eq("id", matchId)
-      .neq("status", "finished")
-      .select(`
-        id,
-        round_id,
-        score_a,
-        score_b,
-        team_a:team_a_id (name),
-        team_b:team_b_id (name)
-      `)
-      .maybeSingle();
-
-    if (error) throw new Error(error.message);
-    if (!match) {
-      const existingMatch = await getMatchState(client, matchId);
-      if (existingMatch.status !== "finished") return { success: false, error: "Nao foi possivel encerrar a partida." };
-
-      const { error: recoveryTimeError } = await client
-        .from("match_players")
-        .update({ left_elapsed_seconds: officialElapsedAtFinish })
-        .eq("match_id", matchId)
-        .is("left_elapsed_seconds", null);
-      if (recoveryTimeError) throw new Error(recoveryTimeError.message);
-      const { error: recoveryError } = await client
-        .from("match_players")
-        .update({ is_active: false })
-        .eq("match_id", matchId)
-        .eq("is_active", true);
-      if (recoveryError) throw new Error(recoveryError.message);
-      const recoveryStats = await calculateRoundStats(existingMatch.round_id);
-      if (!recoveryStats.success) throw new Error(recoveryStats.error || "Erro ao recalcular estatisticas.");
-      const quickStart = await buildQuickStartSuggestion(client, existingMatch.round_id, matchId);
-      return { success: true, alreadyFinished: true, roundId: existingMatch.round_id, quickStart };
-    }
-
-    // O trigger de fechamento já desativa os participantes quando matches
-    // muda para finished. Filtrar por is_active aqui deixava o tempo final
-    // vazio para todos eles. Quem saiu antes já tem left_elapsed_seconds.
-    const { error: lineupTimeError } = await client
-      .from("match_players")
-      .update({ left_elapsed_seconds: officialElapsedAtFinish })
-      .eq("match_id", matchId)
-      .is("left_elapsed_seconds", null);
-    if (lineupTimeError) throw new Error(lineupTimeError.message);
-
-    revalidatePath(`/partidas/${matchId}`);
-    revalidatePath(`/rodadas/${match.round_id}`);
-    revalidatePath("/ranking");
-    revalidatePath("/cartola");
-
-    const { error: participantsFinishError } = await client
-      .from("match_players")
-      .update({ is_active: false })
-      .eq("match_id", matchId)
-      .eq("is_active", true);
-    if (participantsFinishError) throw new Error(participantsFinishError.message);
-    
-    // Atualiza as estatísticas de todos os jogadores da rodada
-    const statsResult = await calculateRoundStats(match.round_id);
-    if (!statsResult.success) throw new Error(statsResult.error || "Erro ao recalcular estatisticas.");
-
-    // Envia depois da resposta para não atrasar o encerramento da partida.
-    // Os destinatários são as contas vinculadas aos jogadores inscritos na rodada.
-    after(async () => {
-      try {
-        await sendMatchFinishedNotifications(client, match);
-      } catch (notificationError) {
-        console.error("Erro ao notificar fim de partida:", notificationError);
-      }
+    if (!client) return { success: false as const, error: ADMIN_ERROR };
+    return await finishSelectedMatch(matchId, supabaseFinishMatchGateway(client), {
+      revalidate(id, roundId) {
+        revalidatePath(`/partidas/${id}`);
+        revalidatePath(`/rodadas/${roundId}`);
+        revalidatePath("/ranking");
+        revalidatePath("/cartola");
+      },
+      recalculate: calculateRoundStats,
+      notifyAfterResponse(match) {
+        // O envio continua fora do caminho crítico da resposta.
+        after(async () => {
+          try {
+            await sendMatchFinishedNotifications(client, match);
+          } catch (notificationError) {
+            console.error("Erro ao notificar fim de partida:", notificationError);
+          }
+        });
+      },
     });
-    
-    const quickStart = await buildQuickStartSuggestion(client, match.round_id, matchId);
-    return { success: true, roundId: match.round_id, quickStart };
   } catch (err: any) {
     console.error("Erro ao finalizar partida:", err);
-    return { success: false, error: err.message };
+    return { success: false as const, error: err.message };
   }
 }
 
