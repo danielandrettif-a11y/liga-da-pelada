@@ -2,6 +2,59 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendPushNotificationsToUsers } from "@/lib/push-notifications";
 
+export async function notifyCallupAdminsAboutWithdrawal(
+  fallbackClient: SupabaseClient,
+  callupId: string,
+  playerId: string,
+) {
+  try {
+    const client = createServiceClient() || fallbackClient;
+    const { data: callup } = await client.from("callups")
+      .select("league_id")
+      .eq("id", callupId)
+      .maybeSingle();
+    if (!callup?.league_id) return { sent: 0 };
+
+    const [{ data: player }, { data: admins }, { data: playerAccount }, actorResult] = await Promise.all([
+      client.from("players").select("name").eq("id", playerId).maybeSingle(),
+      client.from("league_members")
+        .select("user_id")
+        .eq("league_id", callup.league_id)
+        .eq("role", "admin")
+        .eq("is_active", true),
+      client.from("account_profiles").select("user_id").eq("player_id", playerId).maybeSingle(),
+      fallbackClient.auth.getUser().catch(() => ({ data: { user: null } })),
+    ]);
+
+    const excludedUserIds = new Set([
+      playerAccount?.user_id,
+      actorResult.data.user?.id,
+    ].filter((userId): userId is string => Boolean(userId)));
+    const adminUserIds = [...new Set((admins || [])
+      .map((admin) => admin.user_id)
+      .filter((userId): userId is string => Boolean(userId) && !excludedUserIds.has(userId)))];
+    if (!adminUserIds.length) return { sent: 0 };
+
+    const { data: preferences } = await client.from("user_notification_preferences")
+      .select("user_id, callup_push_enabled")
+      .in("user_id", adminUserIds);
+    const disabled = new Set((preferences || [])
+      .filter((item) => item.callup_push_enabled === false)
+      .map((item) => item.user_id));
+    const recipients = adminUserIds.filter((userId) => !disabled.has(userId));
+
+    return sendPushNotificationsToUsers(client, recipients, {
+      title: "Saída da convocação",
+      body: `${player?.name || "Um jogador"} saiu da convocação. Confira a lista atualizada.`,
+      tag: `callup-withdrawal-admin-${callupId}-${playerId}`,
+      url: `/convocacao?callup=${encodeURIComponent(callupId)}`,
+    }, "/convocacao");
+  } catch (error) {
+    console.error("Falha ao avisar os ADMs sobre a saída da convocação:", error);
+    return { sent: 0, failed: 1 };
+  }
+}
+
 export async function notifyCartolaLineupsAboutWithdrawal(
   fallbackClient: SupabaseClient,
   callupId: string,
@@ -40,4 +93,16 @@ export async function notifyCartolaLineupsAboutWithdrawal(
     console.error("Falha ao avisar escalações afetadas pela saída:", error);
     return { sent: 0, failed: 1 };
   }
+}
+
+export async function notifyCallupWithdrawal(
+  fallbackClient: SupabaseClient,
+  callupId: string,
+  playerId: string,
+) {
+  const [admins, cartola] = await Promise.all([
+    notifyCallupAdminsAboutWithdrawal(fallbackClient, callupId, playerId),
+    notifyCartolaLineupsAboutWithdrawal(fallbackClient, callupId, playerId),
+  ]);
+  return { admins, cartola };
 }

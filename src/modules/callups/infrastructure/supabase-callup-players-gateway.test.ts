@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { notifyCartolaLineupsAboutWithdrawal } from "@/lib/cartola-withdrawal-notifications";
+import { notifyCallupWithdrawal } from "@/lib/cartola-withdrawal-notifications";
 import { supabaseCallupPlayersGateway } from "./supabase-callup-players-gateway";
 
 vi.mock("@/lib/cartola-withdrawal-notifications", () => ({
-  notifyCartolaLineupsAboutWithdrawal: vi.fn().mockResolvedValue({ sent: 0 }),
+  notifyCallupWithdrawal: vi.fn().mockResolvedValue({ admins: { sent: 0 }, cartola: { sent: 0 } }),
 }));
 
 function client() {
@@ -33,10 +33,10 @@ describe("gateway de outros jogadores na convocação", () => {
     });
   });
 
-  it("mantém o aviso de desistência para escalações do Cartola", async () => {
+  it("envia os avisos de desistência para ADM e Cartola", async () => {
     const db = client();
     const gateway = supabaseCallupPlayersGateway(db as unknown as Parameters<typeof supabaseCallupPlayersGateway>[0]);
     await gateway.notifyWithdrawal("callup-1", "player-1");
-    expect(notifyCartolaLineupsAboutWithdrawal).toHaveBeenCalledWith(db, "callup-1", "player-1");
+    expect(notifyCallupWithdrawal).toHaveBeenCalledWith(db, "callup-1", "player-1");
   });
 });

@@ -137,6 +137,7 @@ export async function sendPushTest() {
 
 export type NotificationPreferences = {
   matchPushEnabled: boolean;
+  callupPushEnabled: boolean;
   cartolaPushEnabled: boolean;
   cartolaEmailEnabled: boolean;
   collectivePushEnabled: boolean;
@@ -150,11 +151,12 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
   if (!account.user) return null;
   const league = await getActiveLeague();
   const [{ data: preference }, { data: leagueSettings }] = await Promise.all([
-    account.client.from("user_notification_preferences").select("match_push_enabled, cartola_push_enabled, cartola_email_enabled, collective_push_enabled").eq("user_id", account.user.id).maybeSingle(),
+    account.client.from("user_notification_preferences").select("match_push_enabled, callup_push_enabled, cartola_push_enabled, cartola_email_enabled, collective_push_enabled").eq("user_id", account.user.id).maybeSingle(),
     account.client.from("leagues").select("cartola_reminders_enabled, cartola_email_tested_at").eq("id", league.id).maybeSingle(),
   ]);
   return {
     matchPushEnabled: preference?.match_push_enabled !== false,
+    callupPushEnabled: preference?.callup_push_enabled !== false,
     cartolaPushEnabled: preference?.cartola_push_enabled !== false,
     cartolaEmailEnabled: preference?.cartola_email_enabled !== false,
     collectivePushEnabled: preference?.collective_push_enabled !== false,
@@ -166,6 +168,7 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
 
 export async function updateNotificationPreferences(input: {
   matchPushEnabled: boolean;
+  callupPushEnabled: boolean;
   cartolaPushEnabled: boolean;
   cartolaEmailEnabled: boolean;
   collectivePushEnabled: boolean;
@@ -175,6 +178,7 @@ export async function updateNotificationPreferences(input: {
   const { error } = await account.client.from("user_notification_preferences").upsert({
     user_id: account.user.id,
     match_push_enabled: input.matchPushEnabled,
+    callup_push_enabled: input.callupPushEnabled,
     cartola_push_enabled: input.cartolaPushEnabled,
     cartola_email_enabled: input.cartolaEmailEnabled,
     collective_push_enabled: input.collectivePushEnabled,

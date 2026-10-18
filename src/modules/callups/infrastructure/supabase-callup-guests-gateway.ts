@@ -1,5 +1,5 @@
 import type { getCurrentAccount } from "@/lib/auth";
-import { notifyCartolaLineupsAboutWithdrawal } from "@/lib/cartola-withdrawal-notifications";
+import { notifyCallupWithdrawal } from "@/lib/cartola-withdrawal-notifications";
 import type { CallupGuestGateway } from "../application/manage-callup-guests";
 
 type AccountClient = Awaited<ReturnType<typeof getCurrentAccount>>["client"];
@@ -34,7 +34,7 @@ export function supabaseCallupGuestsGateway(client: AccountClient): CallupGuestG
       return error?.message || null;
     },
     async notifyWithdrawal(callupId, playerId) {
-      await notifyCartolaLineupsAboutWithdrawal(client, callupId, playerId);
+      await notifyCallupWithdrawal(client, callupId, playerId);
     },
   };
 }

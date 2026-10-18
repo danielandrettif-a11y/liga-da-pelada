@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { notifyCartolaLineupsAboutWithdrawal } from "@/lib/cartola-withdrawal-notifications";
+import { notifyCallupWithdrawal } from "@/lib/cartola-withdrawal-notifications";
 import { supabaseCallupGuestsGateway } from "./supabase-callup-guests-gateway";
 
 vi.mock("@/lib/cartola-withdrawal-notifications", () => ({
-  notifyCartolaLineupsAboutWithdrawal: vi.fn().mockResolvedValue({ sent: 0 }),
+  notifyCallupWithdrawal: vi.fn().mockResolvedValue({ admins: { sent: 0 }, cartola: { sent: 0 } }),
 }));
 
 function client() {
@@ -47,7 +47,7 @@ describe("gateway de convidados da convocação", () => {
     expect(db.rpc).toHaveBeenCalledWith("remove_my_added_callup_player", {
       p_callup_id: "callup-1", p_player_id: "player-1",
     });
-    expect(notifyCartolaLineupsAboutWithdrawal).toHaveBeenCalledWith(db, "callup-1", "player-1");
+    expect(notifyCallupWithdrawal).toHaveBeenCalledWith(db, "callup-1", "player-1");
     expect(db.from).not.toHaveBeenCalled();
   });
 });
