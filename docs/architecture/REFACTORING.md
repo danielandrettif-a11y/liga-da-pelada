@@ -9,6 +9,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - A retirada de convidado pelo criador usa RPC específica e atômica, sem conceder acesso direto à normalização interna. Ver [ADR 002](./adr-002-atomic-callup-creator-removal.md).
 - As RPCs de substituição, desfazer substituição e disponibilidade conferem o ADM da pelada do alvo, além da RLS. Ver [ADR 003](./adr-003-match-rpc-league-authorization.md).
 - A exclusão de gol ao vivo exige autorização de ADM dentro da RPC `SECURITY DEFINER`, não apenas na Server Action. Ver [ADR 004](./adr-004-live-goal-deletion-authorization.md).
+- Em correções finalizadas, a RPC concluída é sucesso mesmo se uma projeção posterior falhar; a pendência volta como aviso. Ver [ADR 005](./adr-005-postcommit-finished-goal-corrections.md).
 - Preservar assinaturas e respostas públicas das Server Actions durante a migração; converter uma fatia vertical por vez.
 - Não criar agora tabela de estatísticas acumuladas: a view `player_season_stats` já agrega `player_round_stats`. Medir antes de alterar esquema.
 
@@ -19,13 +20,20 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
-| Partidas e pontuação | Em andamento | Registro/exclusão de gol ao vivo, encerramento, goleiros e substituições extraídos; migrations 326–327 corrigem autorização SQL (não aplicadas); falta teste integrado, correções finalizadas e reprocessamento. |
+| Partidas e pontuação | Em andamento | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; migrations 326–327 corrigem autorização SQL (não aplicadas); falta teste integrado e recuperação de projeções. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — correção de gols em partidas finalizadas
+
+- Remover, editar autor/assistência e adicionar gol passaram a compartilhar validação de domínio, caso de uso e gateway Supabase. A Server Action mantém autenticação, a confirmação `EDITAR`, mensagens públicas e revalidação. As RPCs da migration 280 continuam autoridade para elegibilidade, placar, auditoria e autorização pela pelada.
+- O recálculo de Ranking, Cartola e Overall continua sequencial e fora da transação da RPC. Após a RPC confirmar a mutação, falhas nessas etapas agora devolvem `success: true` com `warning`, inclusive nos fluxos de remoção e edição. A tela mostra o aviso e atualiza os dados, reduzindo o risco de repetição de uma correção já salva. Ver [ADR 005](./adr-005-postcommit-finished-goal-corrections.md).
+- Verificação local: `npm run check` passou (typecheck, 653 testes em 113 arquivos e build de produção). Os testes novos cobrem os três comandos, escopo da pelada, resposta incompleta da RPC e falhas antes/depois da gravação.
+- Nenhuma migration nova ou aplicação no banco neste lote. Permanecem pendentes testes integrados com duas peladas e um caminho de recuperação quando as projeções falharem; erro de rede depois do commit da RPC ainda exige inspeção antes de repetir.
 
 ### 2026-10-17 — exclusão de gol ao vivo e autorização da RPC
 

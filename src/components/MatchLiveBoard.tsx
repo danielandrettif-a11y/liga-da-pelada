@@ -843,8 +843,13 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
       );
       if (confirmation !== "CORRIGIR") return;
       setLoading(true);
+      setError("");
       const result = await correctFinishedGoal(eventId, "EDITAR");
       if (!result.success) setError(result.error || "Não foi possível corrigir o gol.");
+      else {
+        if (result.warning) setError(`Gol removido. ${result.warning}`);
+        router.refresh();
+      }
       setLoading(false);
       return;
     }
@@ -903,6 +908,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
           }
         : event));
       setGoalEdit(null);
+      if (result.warning) setError(`Gol corrigido. ${result.warning}`);
       router.refresh();
     }
     setLoading(false);

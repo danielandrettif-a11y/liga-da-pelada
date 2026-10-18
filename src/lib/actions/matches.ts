@@ -29,16 +29,11 @@ import { undoMatchSubstitution } from "@/modules/matches/application/undo-match-
 import { supabaseUndoMatchSubstitutionGateway } from "@/modules/matches/infrastructure/supabase-undo-match-substitution-gateway";
 import { deleteLiveGoal } from "@/modules/matches/application/delete-live-goal";
 import { supabaseDeleteGoalGateway } from "@/modules/matches/infrastructure/supabase-delete-goal-gateway";
+import { correctFinishedGoalInMatch } from "@/modules/matches/application/correct-finished-goal";
+import { supabaseFinishedGoalCorrectionGateway } from "@/modules/matches/infrastructure/supabase-finished-goal-correction-gateway";
+import type { FinishedGoalCorrectionInput } from "@/modules/matches/domain/finished-goal-correction";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
-const FINISHED_CORRECTION_ERROR = "Digite EDITAR para liberar correções em partidas finalizadas.";
-
-async function getEventMatchState(client: SupabaseClient, eventId: string) {
-  const { data: event } = await client.from("match_events").select("match_id")
-    .eq("id", eventId).maybeSingle();
-  if (!event) throw new Error("Gol não encontrado.");
-  return getMatchState(client, event.match_id);
-}
 
 export async function createMatch(input: CreateMatchInput) {
   try {
@@ -832,64 +827,51 @@ export async function deleteEvent(eventId: string, matchId: string, teamId?: str
   }
 }
 
-async function refreshFinishedGoalCorrection(
-  client: SupabaseClient,
-  result: { round_id?: string; match_id?: string } | null,
-) {
-  if (!result?.round_id || !result.match_id) throw new Error("A correção não retornou a rodada afetada.");
+async function runFinishedGoalCorrection(client: SupabaseClient, input: FinishedGoalCorrectionInput) {
+  const result = await correctFinishedGoalInMatch(input, supabaseFinishedGoalCorrectionGateway(client), {
+    recalculateStats: calculateRoundStats,
+    async refreshOverall(roundId) {
+      const overall = await refreshFluidOverallSafely(`correção de gol na rodada ${roundId}`);
+      if (!overall.success) throw new Error(overall.error || "Não foi possível atualizar o Overall.");
+    },
+  });
+  if (!result.success) return result;
 
-  const statsResult = await calculateRoundStats(result.round_id);
-  if (!statsResult.success) throw new Error(statsResult.error || "Não foi possível recalcular as estatísticas.");
-
-  const { data: fantasyRound } = await client.from("fantasy_rounds").select("id").eq("round_id", result.round_id).maybeSingle();
-  if (fantasyRound) {
-    const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: result.round_id });
-    if (fantasyError) throw new Error(`Gol corrigido, mas o Cartola precisa ser reprocessado: ${fantasyError.message}`);
+  let warning = result.warning;
+  try {
+    revalidatePath(`/partidas/${result.matchId}`);
+    revalidatePath(`/rodadas/${result.roundId}`);
+    revalidatePath("/ranking");
+    revalidatePath("/cartola", "layout");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Atualize a página para ver os dados.";
+    warning = [warning, `A correção foi salva, mas a atualização das telas falhou: ${message}`]
+      .filter(Boolean).join(" ");
   }
-  await refreshFluidOverallSafely(`correção de gol na rodada ${result.round_id}`);
-
-  revalidatePath(`/partidas/${result.match_id}`);
-  revalidatePath(`/rodadas/${result.round_id}`);
-  revalidatePath("/ranking");
-  revalidatePath("/cartola", "layout");
+  return { success: true as const, warning };
 }
 
 export async function correctFinishedGoal(eventId: string, confirmation: string) {
   try {
     const client = await getAdminClient();
-    if (!client) return { success: false, error: ADMIN_ERROR };
-    if (confirmation !== "EDITAR") return { success: false, error: FINISHED_CORRECTION_ERROR };
-    await getEventMatchState(client, eventId);
-    const { data, error } = await client.rpc("correct_finished_goal", { p_event_id: eventId });
-    if (error) throw new Error(error.message);
-    const result = data as { round_id?: string; match_id?: string } | null;
-    await refreshFinishedGoalCorrection(client, result);
-    return { success: true };
+    if (!client) return { success: false as const, error: ADMIN_ERROR };
+    return await runFinishedGoalCorrection(client, { kind: "remove", eventId, confirmation });
   } catch (err: any) {
     console.error("Erro ao corrigir gol finalizado:", err);
-    return { success: false, error: err.message };
+    return { success: false as const, error: err.message };
   }
 }
 
 export async function correctFinishedGoalEvent(eventId: string, playerId: string, assistPlayerId: string | null, confirmation: string) {
   try {
     const client = await getAdminClient();
-    if (!client) return { success: false, error: ADMIN_ERROR };
-    if (confirmation !== "EDITAR") return { success: false, error: FINISHED_CORRECTION_ERROR };
-    if (!eventId || !playerId) return { success: false, error: "Escolha o autor do gol." };
-    await getEventMatchState(client, eventId);
-    const { data, error } = await (client as any).rpc("correct_finished_goal_event", {
-      p_event_id: eventId,
-      p_player_id: playerId,
-      p_assist_player_id: assistPlayerId,
+    if (!client) return { success: false as const, error: ADMIN_ERROR };
+    return await runFinishedGoalCorrection(client, {
+      kind: "edit", eventId, playerId, assistPlayerId, confirmation,
     });
-    if (error) throw new Error(error.message);
-    const result = data as { round_id?: string; match_id?: string } | null;
-    await refreshFinishedGoalCorrection(client, result);
-    return { success: true };
   } catch (err: any) {
     console.error("Erro ao corrigir gol finalizado:", err);
-    return { success: false, error: err.message };
+    return { success: false as const, error: err.message };
   }
 }
 
@@ -900,28 +882,15 @@ export async function addFinishedGoalEvent(
   assistPlayerId: string | null,
   confirmation: string,
 ) {
-  let goalAdded = false;
   try {
     const client = await getAdminClient();
-    if (!client) return { success: false, error: ADMIN_ERROR };
-    if (confirmation !== "EDITAR") return { success: false, error: FINISHED_CORRECTION_ERROR };
-    if (!matchId || !teamId || !playerId) return { success: false, error: "Escolha o time e o autor do gol." };
-    await getMatchState(client, matchId);
-    const { data, error } = await (client as any).rpc("add_finished_goal_event", {
-      p_match_id: matchId,
-      p_team_id: teamId,
-      p_player_id: playerId,
-      p_assist_player_id: assistPlayerId,
+    if (!client) return { success: false as const, error: ADMIN_ERROR };
+    return await runFinishedGoalCorrection(client, {
+      kind: "add", matchId, teamId, playerId, assistPlayerId, confirmation,
     });
-    if (error) throw new Error(error.message);
-    goalAdded = true;
-    const result = data as { round_id?: string; match_id?: string } | null;
-    await refreshFinishedGoalCorrection(client, result);
-    return { success: true };
   } catch (err: any) {
     console.error("Erro ao adicionar gol em partida finalizada:", err);
-    if (goalAdded) return { success: true, warning: err.message };
-    return { success: false, error: err.message };
+    return { success: false as const, error: err.message };
   }
 }
 
