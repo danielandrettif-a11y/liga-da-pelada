@@ -22,12 +22,19 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
 | Partidas e pontuação | Em andamento | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; migrations 326–327 corrigem autorização SQL (não aplicadas); falta teste integrado e recuperação de projeções. |
-| Cartola e cosméticos | Em andamento | Salvamento de escalação, mutações do Passe, equipamento da conta, montagem e leitura do painel de cosméticos extraídos; preservar as demais RPCs, inventário e isolamento por pelada/conta. |
+| Cartola e cosméticos | Em andamento | Salvamento de escalação, mutações do Passe, equipamento da conta, painel e leitura de loadouts extraídos; preservar as demais RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-18 — leitura dos cosméticos equipados
+
+- Extraídas as leituras de `getMyEquippedCosmetics`, `getPlayerEquippedCosmetics` e `getAllPlayersEquippedCosmeticsMap` para `src/modules/cosmetics/infrastructure/supabase-loadout-reader.ts`; o mapeamento de slots e perfis fica em `application/build-equipped-summary.ts`. As Server Actions preservam assinaturas, uso do cliente de sessão e `React.cache` somente por requisição para o próprio perfil.
+- Mantidos os filtros por `user_id` e `player_id`, a deduplicação dos IDs pedidos, o caminho sem filtro já existente e o fallback para as seis relações antigas caso a seleção de `showcase`/`pitch` falhe. Não foi introduzido cache global ou consulta de serviço. O preview administrativo continua com sua checagem própria na Action e será tratado separadamente.
+- `npm run check` aprovado: tipagem, 698 testes em 126 arquivos e build de produção. Doze testes novos cobrem slots atuais/legados, associação conta–jogador, filtros, lista vazia e fallback nas leituras individual e coletiva.
+- Nenhuma migration criada ou aplicada e nenhum banco alterado. A mudança é estrutural, sem ganho de desempenho medido. Pendente: validar as relações reais no Supabase de teste com duas peladas e conferir visualmente perfil e elenco após troca de pelada.
 
 ### 2026-10-18 — leitura do painel de cosméticos no adaptador Supabase
 

@@ -11,10 +11,14 @@ import { supabaseSeasonPassMutationGateway } from "@/modules/cosmetics/infrastru
 import { equipAccountCosmetic } from "@/modules/cosmetics/application/equip-account-cosmetic";
 import { supabaseAccountCosmeticEquipmentGateway } from "@/modules/cosmetics/infrastructure/supabase-equipment-gateway";
 import { buildCosmeticsDashboard, emptyCosmeticsDashboard } from "@/modules/cosmetics/application/build-dashboard";
+import { buildEquippedCosmeticsSummary, buildPlayersEquippedCosmeticsMap } from "@/modules/cosmetics/application/build-equipped-summary";
 import { readCosmeticsDashboardRows } from "@/modules/cosmetics/infrastructure/supabase-dashboard-reader";
+import { readAccountCosmeticLoadout, readPlayerCosmeticLoadout, readPlayersCosmeticLoadouts } from "@/modules/cosmetics/infrastructure/supabase-loadout-reader";
 import type { CosmeticsDashboard } from "@/modules/cosmetics/domain/dashboard-types";
+import type { EquippedCosmeticsSummary } from "@/modules/cosmetics/domain/equipped-summary";
 
 export type { CosmeticPassReward, SeasonPassShopItem, SeasonPassShop, CosmeticsDashboard } from "@/modules/cosmetics/domain/dashboard-types";
+export type { EquippedCosmeticsSummary } from "@/modules/cosmetics/domain/equipped-summary";
 
 async function getSelectedFantasySeasonId(client: any): Promise<string | null> {
   const league = await getActiveLeague();
@@ -23,43 +27,6 @@ async function getSelectedFantasySeasonId(client: any): Promise<string | null> {
   const { data } = await client.from("fantasy_seasons").select("id")
     .eq("season_id", season.id).eq("league_id", league.id).maybeSingle();
   return data?.id || null;
-}
-
-const CURRENT_LOADOUT_RELATIONS = `
-  user_id,
-  frame:frame_cosmetic_id(asset_key),
-  aura:aura_cosmetic_id(asset_key),
-  title:title_cosmetic_id(name),
-  banner:banner_cosmetic_id(asset_key),
-  nameplate:nameplate_cosmetic_id(asset_key),
-  background:background_cosmetic_id(asset_key),
-  showcase:showcase_cosmetic_id(asset_key),
-  pitch:pitch_cosmetic_id(asset_key)
-`;
-
-const LEGACY_LOADOUT_RELATIONS = `
-  user_id,
-  frame:frame_cosmetic_id(asset_key),
-  aura:aura_cosmetic_id(asset_key),
-  title:title_cosmetic_id(name),
-  banner:banner_cosmetic_id(asset_key),
-  nameplate:nameplate_cosmetic_id(asset_key),
-  background:background_cosmetic_id(asset_key)
-`;
-
-async function loadCosmeticRelations(client: any, userId?: string, userIds?: string[]) {
-  const buildQuery = (selection: string) => {
-    let query = client.from("account_cosmetic_loadouts").select(selection);
-    if (userId) query = query.eq("user_id", userId);
-    else if (userIds) query = query.in("user_id", userIds);
-    return userId ? query.maybeSingle() : query;
-  };
-  const current = await buildQuery(CURRENT_LOADOUT_RELATIONS);
-  if (!current.error) return current.data;
-  // Mantém leitura dos seis slots antigos caso o banco ainda esteja no meio
-  // da atualização da coleção global da conta.
-  const legacy = await buildQuery(LEGACY_LOADOUT_RELATIONS);
-  return legacy.data;
 }
 
 export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
@@ -161,17 +128,6 @@ export async function equipCosmetic(slot: CosmeticSlot, cosmeticId: string | nul
   return result;
 }
 
-export type EquippedCosmeticsSummary = {
-  frameKey: string | null;
-  auraKey: string | null;
-  titleName: string | null;
-  bannerAssetKey: string | null;
-  nameplateKey: string | null;
-  backgroundAssetKey: string | null;
-  showcaseAssetKey: string | null;
-  pitchAssetKey: string | null;
-};
-
 export type CosmeticPreviewLoadout = Partial<Record<CosmeticSlot, string | null>>;
 
 /**
@@ -224,21 +180,8 @@ export async function getAdminCosmeticsPreview(playerId: string, requested: Cosm
 const getMyEquippedCosmeticsCached = cache(async (): Promise<EquippedCosmeticsSummary | null> => {
   const account = await getCurrentAccount();
   if (!account.user) return null;
-  const client: any = account.client;
-  const loadout = await loadCosmeticRelations(client, account.user.id);
-
-  if (!loadout) return null;
-
-  return {
-    frameKey: loadout.frame?.asset_key || null,
-    auraKey: loadout.aura?.asset_key || null,
-    titleName: loadout.title?.name || null,
-    bannerAssetKey: loadout.banner?.asset_key || null,
-    nameplateKey: loadout.nameplate?.asset_key || null,
-    backgroundAssetKey: loadout.background?.asset_key || null,
-    showcaseAssetKey: loadout.showcase?.asset_key || null,
-    pitchAssetKey: loadout.pitch?.asset_key || null,
-  };
+  const loadout = await readAccountCosmeticLoadout(account.client, account.user.id);
+  return buildEquippedCosmeticsSummary(loadout);
 });
 
 export async function getMyEquippedCosmetics(): Promise<EquippedCosmeticsSummary | null> {
@@ -247,73 +190,13 @@ export async function getMyEquippedCosmetics(): Promise<EquippedCosmeticsSummary
 
 export async function getPlayerEquippedCosmetics(playerId: string): Promise<EquippedCosmeticsSummary | null> {
   const account = await getCurrentAccount();
-  const client: any = account.user ? account.client : account.client;
-
-  const { data: profile } = await client
-    .from("account_profiles")
-    .select("user_id")
-    .eq("player_id", playerId)
-    .maybeSingle();
-
-  if (!profile?.user_id) return null;
-
-  const loadout = await loadCosmeticRelations(client, profile.user_id);
-
-  if (!loadout) return null;
-
-  return {
-    frameKey: loadout.frame?.asset_key || null,
-    auraKey: loadout.aura?.asset_key || null,
-    titleName: loadout.title?.name || null,
-    bannerAssetKey: loadout.banner?.asset_key || null,
-    nameplateKey: loadout.nameplate?.asset_key || null,
-    backgroundAssetKey: loadout.background?.asset_key || null,
-    showcaseAssetKey: loadout.showcase?.asset_key || null,
-    pitchAssetKey: loadout.pitch?.asset_key || null,
-  };
+  const loadout = await readPlayerCosmeticLoadout(account.client, playerId);
+  return buildEquippedCosmeticsSummary(loadout);
 }
 
 export async function getAllPlayersEquippedCosmeticsMap(playerIds?: string[]): Promise<Map<string, EquippedCosmeticsSummary>> {
   if (playerIds && playerIds.length === 0) return new Map();
   const account = await getCurrentAccount();
-  const client: any = account.user ? account.client : account.client;
-
-  let profiles: Array<{ user_id: string; player_id: string }> | null = null;
-  let loadouts: any[] | null = null;
-  if (playerIds) {
-    const { data } = await client.from("account_profiles")
-      .select("user_id, player_id").in("player_id", [...new Set(playerIds)]);
-    profiles = data;
-    const userIds = [...new Set((profiles || []).map((profile) => profile.user_id))];
-    if (userIds.length === 0) return new Map();
-    loadouts = await loadCosmeticRelations(client, undefined, userIds);
-  } else {
-    const [profilesResult, allLoadouts] = await Promise.all([
-      client.from("account_profiles").select("user_id, player_id").not("player_id", "is", null),
-      loadCosmeticRelations(client),
-    ]);
-    profiles = profilesResult.data;
-    loadouts = allLoadouts;
-  }
-
-  const userToPlayer = new Map<string, string>((profiles || []).map((p: any) => [p.user_id, p.player_id]));
-  const map = new Map<string, EquippedCosmeticsSummary>();
-
-  for (const loadout of loadouts || []) {
-    const playerId = userToPlayer.get(loadout.user_id);
-    if (playerId) {
-      map.set(playerId, {
-        frameKey: (loadout.frame as any)?.asset_key || null,
-        auraKey: (loadout.aura as any)?.asset_key || null,
-        titleName: (loadout.title as any)?.name || null,
-        bannerAssetKey: (loadout.banner as any)?.asset_key || null,
-        nameplateKey: (loadout.nameplate as any)?.asset_key || null,
-        backgroundAssetKey: (loadout.background as any)?.asset_key || null,
-        showcaseAssetKey: (loadout.showcase as any)?.asset_key || null,
-        pitchAssetKey: (loadout.pitch as any)?.asset_key || null,
-      });
-    }
-  }
-
-  return map;
+  const { profiles, loadouts } = await readPlayersCosmeticLoadouts(account.client, playerIds);
+  return buildPlayersEquippedCosmeticsMap(profiles, loadouts);
 }
