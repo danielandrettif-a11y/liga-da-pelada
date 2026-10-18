@@ -17,13 +17,20 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Próximo recorte: validação integrada com duas peladas, depois partidas. |
-| Partidas e pontuação | Pendente | Preservar cálculo e correções de scouts/goleiros; testar reprocessamento. |
+| Partidas e pontuação | Em andamento | Registro de gol ao vivo extraído; preservar cálculo, goleiros, correções e reprocessamento nos próximos recortes. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — registro de gol ao vivo
+
+- Extraído o registro de gol para `src/modules/matches/{domain,application,infrastructure}`. A validação mínima dos IDs fica em domínio, o caso de uso confere a partida antes de gravar e o gateway preserva todos os parâmetros da RPC `register_goal`, inclusive chave de idempotência e gol contra.
+- A consulta compartilhada da partida foi movida para infraestrutura sem mudar os filtros por rodada e pelada selecionada. A Server Action continua exigindo ADM, devolvendo placar/evento para a atualização otimista da tela ao vivo e revalidando rodada e Cartola; não revalida a própria tela da partida a cada gol.
+- A RPC SQL permanece autoridade para autorização final, escalação, tempo oficial, placar e atomicidade. Nenhuma migration foi criada ou aplicada. Testes novos cobrem validação, ordem da checagem de pelada, idempotência, parâmetros da RPC, escopo entre peladas e falhas. `npm run check` aprovado: tipagem, 592 testes em 96 arquivos e build.
+- Pendente: teste integrado com Supabase de teste e medição da latência do fluxo ao vivo. Este lote é estrutural e **não comprova melhora de desempenho**. Os demais fluxos de partidas e pontuação ainda não foram migrados.
 
 ### 2026-10-17 — retirada atômica de convidado pelo criador
 

@@ -17,28 +17,12 @@ import { canTeamLendToMatch } from "../substitution-draw";
 import { suggestNextMatchRotation } from "../next-match";
 import { shouldExcludeReplacementScoring } from "../scoring-eligibility";
 import { refreshFluidOverallSafely } from "./overall";
+import { registerLiveGoal } from "@/modules/matches/application/register-live-goal";
+import { getMatchState } from "@/modules/matches/infrastructure/match-scope";
+import { supabaseGoalGateway } from "@/modules/matches/infrastructure/supabase-goal-gateway";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 const FINISHED_CORRECTION_ERROR = "Digite EDITAR para liberar correções em partidas finalizadas.";
-
-async function getMatchState(
-  client: SupabaseClient,
-  matchId: string,
-) {
-  const { data, error } = await client
-    .from("matches")
-      .select("id, round_id, team_a_id, team_b_id, score_a, score_b, status, timer_started_at, timer_accumulated_seconds, eligibility_elapsed_offset_seconds, duration_seconds, timer_one_minute_alerted_at, timer_thirty_seconds_alerted_at, timer_finished_alerted_at")
-    .eq("id", matchId)
-    .single();
-
-  if (error || !data) throw new Error("Partida não encontrada");
-  const league = await getSelectedLeague();
-  if (!league) throw new Error("Selecione uma pelada no lobby.");
-  const { data: round } = await client.from("rounds").select("league_id")
-    .eq("id", data.round_id).eq("league_id", league.id).maybeSingle();
-  if (!round) throw new Error("Partida fora da pelada selecionada.");
-  return data;
-}
 
 async function getEventMatchState(client: SupabaseClient, eventId: string) {
   const { data: event } = await client.from("match_events").select("match_id")
@@ -703,36 +687,14 @@ export async function registerGoal(input: RegisterGoalInput) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
-    if (!input.match_id || !input.team_id || !input.player_id) {
-      return { success: false, error: "Dados do gol incompletos." };
-    }
-    await getMatchState(client, input.match_id);
-
-    const { data, error } = await client.rpc("register_goal", {
-      p_match_id: input.match_id,
-      p_player_id: input.player_id,
-      p_team_id: input.team_id,
-      p_assist_player_id: input.assist_player_id || null,
-      p_minute: input.minute ?? null,
-      p_idempotency_key: input.idempotency_key || null,
-      p_is_own_goal: Boolean(input.is_own_goal),
-    });
-
-    if (error) throw new Error(error.message);
-
-    const result = data as {
-      event_id: string;
-      idempotent: boolean;
-      score_a: number;
-      score_b: number;
-      round_id?: string;
-    } | null;
+    const result = await registerLiveGoal(input, supabaseGoalGateway(client));
+    if (!result.success) return result;
 
     // A tela ao vivo aplica o placar e o evento pelo resultado da ação e
     // pelo Realtime. Invalidar a própria rota embutiria outro render pesado
     // na resposta de cada gol.
-    if (result?.round_id) {
-      revalidatePath(`/rodadas/${result.round_id}`);
+    if (result.roundId) {
+      revalidatePath(`/rodadas/${result.roundId}`);
     }
     // A prévia do Cartola usa estes eventos diretamente. Invalidar a rota
     // garante que a atualização manual e o realtime recebam o novo gol.
@@ -740,10 +702,10 @@ export async function registerGoal(input: RegisterGoalInput) {
 
     return {
       success: true,
-      eventId: result?.event_id,
-      idempotent: result?.idempotent,
-      scoreA: result?.score_a,
-      scoreB: result?.score_b,
+      eventId: result.eventId,
+      idempotent: result.idempotent,
+      scoreA: result.scoreA,
+      scoreB: result.scoreB,
     };
   } catch (err: any) {
     console.error("Erro ao registrar gol:", err);
