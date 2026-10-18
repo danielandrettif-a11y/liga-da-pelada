@@ -1,10 +1,11 @@
-import { SITE_URL } from "@/lib/siteUrl";
-
 /**
- * Mantém o convite curto o bastante para os mensageiros não separarem os
- * parâmetros da URL. O token é aleatório e único por convocação; o servidor
- * resolve a convocação ao receber o link.
+ * Aponta diretamente para a convocação e preserva a origem em que o usuário
+ * instalou o PWA. Assim o sistema operacional pode associar o link ao app
+ * instalado, sem depender de um redirecionamento intermediário.
  */
-export function buildCallupInviteUrl(inviteToken: string) {
-  return `${SITE_URL}/c/${encodeURIComponent(inviteToken)}`;
+export function buildCallupInviteUrl(origin: string, callupId: string, inviteToken: string) {
+  const url = new URL("/convocacao", origin);
+  url.searchParams.set("callup", callupId);
+  url.searchParams.set("invite", inviteToken);
+  return url.toString();
 }
