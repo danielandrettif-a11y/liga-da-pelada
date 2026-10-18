@@ -57,7 +57,7 @@ import { hasCallupClosingMatch } from "@/lib/callup-lifecycle";
 import { WeatherBadge } from "./WeatherBadge";
 import type { EventWeather } from "@/lib/weather";
 import { setCallupFormat } from "@/lib/actions/rounds";
-import { buildCallupInviteUrl, shareCallupInvite } from "@/lib/callup-invite";
+import { buildCallupInviteMessage, buildCallupInviteUrl, shareCallupInvite } from "@/lib/callup-invite";
 
 type Props = {
   callup: CallupWithEntries;
@@ -200,15 +200,18 @@ export function CallupBoard({
     const type = callup.round_type === "friendly" ? "Amistoso" : "Pelada Oficial (Ranked)";
     const dateFormatted = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })
       .format(new Date(`${callup.date}T12:00:00`));
-    const venueText = stadiumName ? `\n📍 *Local:* ${stadiumName}` : "";
-    const mapText = stadiumMapUrl ? `\n🗺️ ${stadiumMapUrl}` : "";
-
     const inviteUrl = buildCallupInviteUrl(window.location.origin, callup.invite_token);
-    const text = `⚽ *CONVOCAÇÃO ABERTA*\n\n🏆 *${type}*\n📅 *Data:* ${dateFormatted}\n⏰ *Horário:* ${startTime}${venueText}${mapText}\n\n👉 Toque no link para confirmar sua presença e ver a lista!`;
+    const text = buildCallupInviteMessage({
+      url: inviteUrl,
+      heading: "CONVOCAÇÃO ABERTA",
+      roundLabel: type,
+      date: dateFormatted,
+      time: startTime,
+      stadiumName,
+    });
     const result = await shareCallupInvite({
       title: `Convocação aberta · ${type}`,
       text,
-      url: inviteUrl,
     });
     if (result === "cancelled") return;
     setLoading("shared");

@@ -7,7 +7,7 @@ import { CalendarPlus, CheckCircle2, ChevronRight, Clock, Lock, MapPin, PencilLi
 import { closeCallup, createCallupPrelist, openCallup, setCallupVisibility, updateCallup, type CallupWithEntries } from "@/lib/actions/callups";
 import { setCallupFormat } from "@/lib/actions/rounds";
 import type { Stadium } from "@/lib/types";
-import { buildCallupInviteUrl, shareCallupInvite } from "@/lib/callup-invite";
+import { buildCallupInviteMessage, buildCallupInviteUrl, shareCallupInvite } from "@/lib/callup-invite";
 
 export function CallupAdminCard({
   callups,
@@ -132,15 +132,19 @@ export function CallupAdminCard({
     const dateFormatted = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })
       .format(new Date(`${callup.date}T12:00:00`));
     const time = callup.start_time ? callup.start_time.slice(0, 5) : "08:00";
-    const venueText = callup.stadium_name ? `\n📍 Local: ${callup.stadium_name}` : "";
-    const mapText = callup.stadium_map_url ? `\n🗺️ ${callup.stadium_map_url}` : "";
 
     const inviteUrl = buildCallupInviteUrl(window.location.origin, callup.invite_token);
-    const text = `⚽ Convocação aberta para ${type}!\n\n📅 Data: ${dateFormatted}\n⏰ Horário: ${time}${venueText}${mapText}\n\n👉 Toque no link para confirmar sua presença e ver a lista!`;
+    const text = buildCallupInviteMessage({
+      url: inviteUrl,
+      heading: "CONVOCAÇÃO ABERTA",
+      roundLabel: type,
+      date: dateFormatted,
+      time,
+      stadiumName: callup.stadium_name,
+    });
     const result = await shareCallupInvite({
       title: `Convocação aberta · ${type}`,
       text,
-      url: inviteUrl,
     });
     if (result === "cancelled") return;
     setCopied(true);

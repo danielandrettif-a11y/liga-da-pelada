@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildCallupInviteUrl, shareCallupInvite } from "./callup-invite";
+import { buildCallupInviteMessage, buildCallupInviteUrl, shareCallupInvite } from "./callup-invite";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -16,32 +16,44 @@ describe("buildCallupInviteUrl", () => {
     );
   });
 
-  it("entrega a URL como campo estruturado ao compartilhamento nativo", async () => {
+  it("mantém o convite do app como primeiro e único link da mensagem", () => {
+    const message = buildCallupInviteMessage({
+      url: "https://pelada.example/c/invite-456",
+      heading: "CONVOCAÇÃO ABERTA",
+      roundLabel: "Pelada Oficial (Ranked)",
+      date: "sábado, 24/10",
+      time: "16:00",
+      stadiumName: "Bola Cheia Campo Society",
+    });
+
+    expect(message.startsWith("https://pelada.example/c/invite-456\n\n")).toBe(true);
+    expect(message.match(/https?:\/\//g)).toHaveLength(1);
+    expect(message).toContain("📍 *Local:* Bola Cheia Campo Society");
+  });
+
+  it("compartilha a mensagem inteira sem separar a URL no WhatsApp", async () => {
     const share = vi.fn().mockResolvedValue(undefined);
     const writeText = vi.fn();
     vi.stubGlobal("navigator", { share, clipboard: { writeText } });
 
     await expect(shareCallupInvite({
       title: "Convocação",
-      text: "Confirme sua presença",
-      url: "https://pelada.example/c/invite-456",
+      text: "https://pelada.example/c/invite-456\n\nConfirme sua presença",
     })).resolves.toBe("shared");
     expect(share).toHaveBeenCalledWith({
       title: "Convocação",
-      text: "Confirme sua presença",
-      url: "https://pelada.example/c/invite-456",
+      text: "https://pelada.example/c/invite-456\n\nConfirme sua presença",
     });
     expect(writeText).not.toHaveBeenCalled();
   });
 
-  it("coloca o link na primeira linha quando precisa copiar", async () => {
+  it("copia a mesma mensagem sem remontar ou duplicar o link", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("navigator", { clipboard: { writeText } });
 
     await expect(shareCallupInvite({
       title: "Convocação",
-      text: "Confirme sua presença",
-      url: "https://pelada.example/c/invite-456",
+      text: "https://pelada.example/c/invite-456\n\nConfirme sua presença",
     })).resolves.toBe("copied");
     expect(writeText).toHaveBeenCalledWith(
       "https://pelada.example/c/invite-456\n\nConfirme sua presença",
