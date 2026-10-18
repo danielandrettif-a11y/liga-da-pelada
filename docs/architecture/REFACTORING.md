@@ -22,12 +22,19 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
 | Partidas e pontuação | Em andamento | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; migrations 326–327 corrigem autorização SQL (não aplicadas); falta teste integrado e recuperação de projeções. |
-| Cartola e cosméticos | Em andamento | Salvamento de escalação, mutações do Passe, equipamento da conta e montagem do painel de cosméticos extraídos; preservar as demais RPCs, inventário e isolamento por pelada/conta. |
+| Cartola e cosméticos | Em andamento | Salvamento de escalação, mutações do Passe, equipamento da conta, montagem e leitura do painel de cosméticos extraídos; preservar as demais RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-18 — leitura do painel de cosméticos no adaptador Supabase
+
+- As consultas de `getMyCosmeticsDashboard` foram movidas para `src/modules/cosmetics/infrastructure/supabase-dashboard-reader.ts`. A Server Action mantém autenticação e seleção da pelada/temporada; o adaptador retorna as linhas tipadas para o modelo de leitura extraído no lote anterior. O cliente da sessão e a RLS continuam sendo usados, sem acesso de serviço.
+- Preservados os filtros de `league_id` na descoberta da temporada do Cartola, `user_id` na coleção, escolhas, loadout, Passe e loja, e `fantasy_season_id` nas leituras sazonais. Coleção, catálogo e loadout seguem disponíveis mesmo quando a pelada não tem temporada do Passe. As sete leituras continuam paralelas; erros de coleção, catálogo ou recompensas tornam o painel indisponível, enquanto erros de Passe/loja permanecem não bloqueantes.
+- `npm run check` aprovado: tipagem, 686 testes em 124 arquivos e build de produção. Sete testes novos verificam os filtros, ausência de temporada, falhas obrigatórias e falhas complementares. Não há schema TypeScript gerado para os embeds do PostgREST: o adaptador faz casts explícitos nos relacionamentos singulares; a forma real da resposta ainda precisa de teste integrado.
+- Nenhuma migration criada ou aplicada e nenhum banco alterado. O lote não muda a quantidade de consultas nem comprova ganho de velocidade. Pendente: teste integrado no Supabase de teste com duas peladas e medição da tela antes de qualquer cache ou otimização de consulta.
 
 ### 2026-10-18 — modelo de leitura do painel de cosméticos
 

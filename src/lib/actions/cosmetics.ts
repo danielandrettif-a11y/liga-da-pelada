@@ -11,7 +11,8 @@ import { supabaseSeasonPassMutationGateway } from "@/modules/cosmetics/infrastru
 import { equipAccountCosmetic } from "@/modules/cosmetics/application/equip-account-cosmetic";
 import { supabaseAccountCosmeticEquipmentGateway } from "@/modules/cosmetics/infrastructure/supabase-equipment-gateway";
 import { buildCosmeticsDashboard, emptyCosmeticsDashboard } from "@/modules/cosmetics/application/build-dashboard";
-import type { CosmeticsDashboard, CosmeticsDashboardRows } from "@/modules/cosmetics/domain/dashboard-types";
+import { readCosmeticsDashboardRows } from "@/modules/cosmetics/infrastructure/supabase-dashboard-reader";
+import type { CosmeticsDashboard } from "@/modules/cosmetics/domain/dashboard-types";
 
 export type { CosmeticPassReward, SeasonPassShopItem, SeasonPassShop, CosmeticsDashboard } from "@/modules/cosmetics/domain/dashboard-types";
 
@@ -66,36 +67,13 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
   if (!account.user) return emptyCosmeticsDashboard;
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
-  const client: any = account.client;
-  const { data: fantasySeason } = season
-    ? await client.from("fantasy_seasons").select("id").eq("season_id", season.id).eq("league_id", league.id).maybeSingle()
-    : { data: null };
-  const [ownedResult, catalogResult, rewardResult, choiceResult, loadoutResult, passResult, shopResult] = await Promise.all([
-    // Keep the provenance so older/test claims can still be matched to the
-    // reward even if the choice row was removed or was created by an older
-    // version of the claim function.
-    client.from("fantasy_user_cosmetics").select("cosmetic_id, source_reward_id, cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id),
-    client.from("fantasy_cosmetics").select("*").order("created_at"),
-    fantasySeason ? client.from("fantasy_season_pass_rewards").select("id, house, reward_key, reward_type, card_tier, bonus:bonus_cosmetic_id(*), options:fantasy_season_pass_reward_options(cosmetic:fantasy_cosmetics(*))").eq("fantasy_season_id", fantasySeason.id).order("house") : Promise.resolve({ data: [], error: null }),
-    fantasySeason ? client.from("fantasy_user_cosmetic_reward_choices").select("reward_id, cosmetic_id").eq("user_id", account.user.id) : Promise.resolve({ data: [], error: null }),
-    client.from("account_cosmetic_loadouts").select("*").eq("user_id", account.user.id).maybeSingle(),
-    fantasySeason ? client.from("fantasy_season_passes").select("progress, total_progress_points, shop_bonus_points").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
-    fantasySeason ? client.from("fantasy_season_pass_shop_items").select("id, price_points, purchased_at, source_reward_id, cosmetic:fantasy_cosmetics(*)").eq("user_id", account.user.id).eq("fantasy_season_id", fantasySeason.id).order("listed_at") : Promise.resolve({ data: [], error: null }),
-  ]);
-  // Loja e saldo são complementos. Se uma migration de permissão ainda não
-  // chegou ao banco, a coleção e as recompensas do Passe continuam visíveis.
-  if (ownedResult.error || rewardResult.error || catalogResult.error) return emptyCosmeticsDashboard;
-  return buildCosmeticsDashboard({
-    fantasySeasonId: fantasySeason?.id || null,
+  const rows = await readCosmeticsDashboardRows(account.client, {
+    userId: account.user.id,
+    leagueId: league.id,
+    seasonId: season?.id || null,
     isAdmin: account.isAdmin,
-    owned: ownedResult.data || [],
-    catalog: catalogResult.data || [],
-    rewards: rewardResult.data || [],
-    choices: choiceResult.data || [],
-    loadout: loadoutResult.data || null,
-    pass: passResult.error ? null : passResult.data,
-    shop: shopResult.error ? [] : (shopResult.data || []),
-  } satisfies CosmeticsDashboardRows);
+  });
+  return rows ? buildCosmeticsDashboard(rows) : emptyCosmeticsDashboard;
 }
 
 export async function cleanupMyLegacyCosmeticsPreview() {
