@@ -10,7 +10,6 @@ import {
   ChevronRight,
   ClipboardList,
   Clock,
-  Copy,
   Crown,
   ExternalLink,
   Loader2,
@@ -18,6 +17,7 @@ import {
   MapPin,
   PencilLine,
   Shield,
+  Share2,
   Shirt,
   Sparkles,
   Stadium as StadiumIcon,
@@ -58,7 +58,7 @@ import { hasCallupClosingMatch } from "@/lib/callup-lifecycle";
 import { WeatherBadge } from "./WeatherBadge";
 import type { EventWeather } from "@/lib/weather";
 import { setCallupFormat } from "@/lib/actions/rounds";
-import { buildCallupInviteUrl } from "@/lib/callup-invite";
+import { buildCallupInviteUrl, shareCallupInvite } from "@/lib/callup-invite";
 
 type Props = {
   callup: CallupWithEntries;
@@ -73,6 +73,7 @@ type Props = {
   fantasyHighlights?: FantasyQuickHighlight | null;
   playerCosmetics?: Record<string, EquippedCosmeticsSummary>;
   initialListTab?: "confirmed" | "waitlist";
+  loginReturnTo?: string;
   weather?: EventWeather | null;
 };
 const CALLUP_LIST_TABS = ["confirmed", "waitlist"] as const;
@@ -90,6 +91,7 @@ export function CallupBoard({
   fantasyHighlights,
   playerCosmetics = {},
   initialListTab = "confirmed",
+  loginReturnTo = "/convocacao",
   weather,
 }: Props) {
   const router = useRouter();
@@ -199,17 +201,17 @@ export function CallupBoard({
     const type = callup.round_type === "friendly" ? "Amistoso" : "Pelada Oficial (Ranked)";
     const dateFormatted = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })
       .format(new Date(`${callup.date}T12:00:00`));
-    const venueText = stadiumName
-      ? `\n📍 *Local:* ${stadiumName}${stadiumMapUrl ? `\n🗺️ ${stadiumMapUrl}` : ""}`
-      : stadiumMapUrl
-      ? `\n📍 *Localização:*\n🗺️ ${stadiumMapUrl}`
-      : "";
+    const venueText = stadiumName ? `\n📍 *Local:* ${stadiumName}` : "";
 
     const inviteUrl = buildCallupInviteUrl(window.location.origin, callup.invite_token);
-    const text = `⚽ *CONVOCAÇÃO ABERTA*\n${inviteUrl}\n\n🏆 *${type}*\n📅 *Data:* ${dateFormatted}\n⏰ *Horário:* ${startTime}${venueText}\n\n👉 Toque no primeiro link para confirmar sua presença e ver a lista!`;
-
-    await navigator.clipboard.writeText(text);
-    setLoading("copied");
+    const text = `⚽ *CONVOCAÇÃO ABERTA*\n\n🏆 *${type}*\n📅 *Data:* ${dateFormatted}\n⏰ *Horário:* ${startTime}${venueText}\n\n👉 Toque no link para confirmar sua presença e ver a lista!`;
+    const result = await shareCallupInvite({
+      title: `Convocação aberta · ${type}`,
+      text,
+      url: inviteUrl,
+    });
+    if (result === "cancelled") return;
+    setLoading("shared");
     setTimeout(() => setLoading(""), 1600);
   }
 
@@ -340,10 +342,10 @@ export function CallupBoard({
             <button
               onClick={copyInvite}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent/40 bg-accent/15 text-accent hover:bg-accent/25 transition-colors shadow-sm"
-              title="Copiar convite"
-              aria-label="Copiar convite"
+              title="Compartilhar convite"
+              aria-label="Compartilhar convite"
             >
-              {loading === "copied" ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {loading === "shared" ? <CheckCircle2 className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
             </button>
           </div>
         </div>
@@ -497,7 +499,7 @@ export function CallupBoard({
           </div>
         ) : !isAuthenticated ? (
           <Link
-            href="/login?next=/convocacao"
+            href={`/login?next=${encodeURIComponent(loginReturnTo)}`}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-accent py-4 text-sm font-black uppercase tracking-wider text-background shadow-[0_0_25px_rgba(204,255,0,0.25)] transition-transform active:scale-[0.98]"
           >
             <LogIn className="h-5 w-5" /> Entrar para confirmar presença
@@ -698,7 +700,7 @@ export function CallupBoard({
                 </form>
               ) : (
                 <div className="text-center pt-3 text-[11px] text-muted">
-                  <Link href="/login?next=/convocacao" className="text-accent font-bold hover:underline">
+                  <Link href={`/login?next=${encodeURIComponent(loginReturnTo)}`} className="text-accent font-bold hover:underline">
                     Faça login
                   </Link>{" "}
                   para cadastrar e convidar amigos para a pelada.

@@ -22,6 +22,14 @@ import { LeagueInviteCard } from "@/components/LeagueInviteCard";
 
 export const revalidate = 0;
 
+async function safely<T>(value: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await value;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   const callup = await getActiveCallup();
   const dateFormatted = callup?.date
@@ -69,13 +77,9 @@ export default async function ConvocacaoPage({
   searchParams: Promise<{ callup?: string; invite?: string; list?: string; section?: string }>;
 }) {
   const params = await searchParams;
-  const [callups, account, leagueConfig, fantasyHighlights, stadiums, cosmeticsMap] = await Promise.all([
+  const [callups, account] = await Promise.all([
     getActiveCallups({ callupId: params.callup, inviteToken: params.invite }),
     getCurrentAccount(),
-    getLeagueConfig(),
-    getFantasyQuickHighlights(),
-    getStadiums(),
-    getAllPlayersEquippedCosmeticsMap(),
   ]);
   if (callups.length === 0) {
     return (
@@ -95,9 +99,13 @@ export default async function ConvocacaoPage({
 
   const callup = callups.find((item) => item.id === params.callup) || callups[0];
   const labeledCallups = labelCallupTabs(callups);
-  const [draftWorkspace, collectiveRoom] = await Promise.all([
-    getDraftWorkspace(callup.id),
-    getCollectiveRoom(callup.id),
+  const [leagueConfig, fantasyHighlights, stadiums, cosmeticsMap, draftWorkspace, collectiveRoom] = await Promise.all([
+    safely(getLeagueConfig(), null),
+    safely(getFantasyQuickHighlights(), null),
+    safely(getStadiums(), []),
+    safely(getAllPlayersEquippedCosmeticsMap(), new Map()),
+    account.user ? safely(getDraftWorkspace(callup.id), null) : Promise.resolve(null),
+    account.user ? safely(getCollectiveRoom(callup.id), null) : Promise.resolve(null),
   ]);
   const section = params.section === "draft" && draftWorkspace
     ? "draft"
@@ -108,17 +116,19 @@ export default async function ConvocacaoPage({
 
   // A convocação é colaborativa: qualquer pessoa logada pode escolher um
   // atleta elegível do elenco. A RPC ainda valida a liga, a abertura e a vaga.
-  const selectablePlayers = account.user ? await getSelectableLeaguePlayers(callup.league_id) : [];
+  const selectablePlayers = account.user
+    ? await safely(getSelectableLeaguePlayers(callup.league_id), [])
+    : [];
   const stadiumName = callup.stadium_name || leagueConfig?.stadium_name || null;
   const stadiumMapUrl = callup.stadium_map_url || leagueConfig?.stadium_map_url || null;
   const stadium = stadiums.find((item) => item.id === callup.stadium_id);
-  const weather = await getEventWeather({
+  const weather = await safely(getEventWeather({
     latitude: stadium?.latitude,
     longitude: stadium?.longitude,
     date: callup.date,
     startTime: callup.start_time || "08:00",
     durationMinutes: leagueConfig?.event_duration_minutes || 120,
-  });
+  }), null);
 
   return (
     <div className="min-w-0 overflow-x-clip">
@@ -164,6 +174,7 @@ export default async function ConvocacaoPage({
         fantasyHighlights={fantasyHighlights}
         playerCosmetics={Object.fromEntries(cosmeticsMap)}
         initialListTab={params.list === "waitlist" ? "waitlist" : "confirmed"}
+        loginReturnTo={params.invite ? `/c/${encodeURIComponent(params.invite)}` : "/convocacao"}
         weather={weather}
       />
       )}

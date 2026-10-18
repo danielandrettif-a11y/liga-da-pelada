@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CalendarPlus, CheckCircle2, ChevronRight, Clock, Copy, Lock, MapPin, PencilLine, Stadium as StadiumIcon, X } from "@/components/icons";
+import { CalendarPlus, CheckCircle2, ChevronRight, Clock, Lock, MapPin, PencilLine, Share2, Stadium as StadiumIcon, X } from "@/components/icons";
 import { closeCallup, createCallupPrelist, openCallup, setCallupVisibility, updateCallup, type CallupWithEntries } from "@/lib/actions/callups";
 import { setCallupFormat } from "@/lib/actions/rounds";
 import type { Stadium } from "@/lib/types";
-import { buildCallupInviteUrl } from "@/lib/callup-invite";
+import { buildCallupInviteUrl, shareCallupInvite } from "@/lib/callup-invite";
 
 export function CallupAdminCard({
   callups,
@@ -133,12 +133,15 @@ export function CallupAdminCard({
       .format(new Date(`${callup.date}T12:00:00`));
     const time = callup.start_time ? callup.start_time.slice(0, 5) : "08:00";
     const venueText = callup.stadium_name ? `\n📍 Local: ${callup.stadium_name}` : "";
-    const mapText = callup.stadium_map_url ? `\n🗺️ Como chegar: ${callup.stadium_map_url}` : "";
 
     const inviteUrl = buildCallupInviteUrl(window.location.origin, callup.invite_token);
-    const text = `⚽ Convocação aberta para ${type}!\n${inviteUrl}\n\n📅 Data: ${dateFormatted}\n⏰ Horário: ${time}${venueText}${mapText}\n\n👉 Toque no primeiro link para confirmar sua presença e ver a lista!`;
-
-    await navigator.clipboard.writeText(text);
+    const text = `⚽ Convocação aberta para ${type}!\n\n📅 Data: ${dateFormatted}\n⏰ Horário: ${time}${venueText}\n\n👉 Toque no link para confirmar sua presença e ver a lista!`;
+    const result = await shareCallupInvite({
+      title: `Convocação aberta · ${type}`,
+      text,
+      url: inviteUrl,
+    });
+    if (result === "cancelled") return;
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
@@ -418,8 +421,8 @@ export function CallupAdminCard({
                 onClick={copy}
                 className="flex items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-xs font-bold text-foreground hover:bg-surface-hover"
               >
-                {copied ? <CheckCircle2 className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4" />}
-                {copied ? "Copiado p/ WhatsApp!" : "Copiar convite"}
+                {copied ? <CheckCircle2 className="h-4 w-4 text-accent" /> : <Share2 className="h-4 w-4" />}
+                {copied ? "Compartilhado!" : "Compartilhar convite"}
               </button>
               <button
                 type="button"

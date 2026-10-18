@@ -23,6 +23,8 @@ import { inviteCallupGuest, removeCallupEntryForAccount } from "@/modules/callup
 import { supabaseCallupGuestsGateway } from "@/modules/callups/infrastructure/supabase-callup-guests-gateway";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getSelectedLeague } from "../league-context";
+import { createServiceClient } from "../supabase/service";
+import { resolveCallupInvite } from "../callup-invite-server";
 
 export type CallupEntryWithPlayer = CallupEntry & {
   player: Player;
@@ -94,28 +96,38 @@ async function selectedRosterPlayer(playerId: string, client: Awaited<ReturnType
 export async function getActiveCallups(invite?: { callupId?: string; inviteToken?: string }): Promise<CallupWithEntries[]> {
   const account = await getCurrentAccount();
   const client = account.client;
+  let readClient = client;
   let invitedCallupId: string | null = null;
 
   // A rota curta resolve o ID antes de chegar aqui e reutiliza a RPC antiga,
   // permitindo que o convite funcione mesmo antes da migration 312 ser
   // aplicada. O fluxo apenas por token permanece como fallback compatível.
-  if (invite?.inviteToken && account.user) {
-    const { data, error } = invite.callupId
-      ? await client.rpc("claim_callup_invite", {
-        p_callup_id: invite.callupId,
-        p_invite_token: invite.inviteToken,
-      })
-      : await client.rpc("claim_callup_invite_by_token", {
-        p_invite_token: invite.inviteToken,
-      });
-    if (error || !data) return [];
-    invitedCallupId = invite.callupId || String(data);
+  if (invite?.inviteToken) {
+    if (account.user) {
+      const { data, error } = invite.callupId
+        ? await client.rpc("claim_callup_invite", {
+          p_callup_id: invite.callupId,
+          p_invite_token: invite.inviteToken,
+        })
+        : await client.rpc("claim_callup_invite_by_token", {
+          p_invite_token: invite.inviteToken,
+        });
+      if (error || !data) return [];
+      invitedCallupId = invite.callupId || String(data);
+    } else {
+      const target = await resolveCallupInvite(invite.inviteToken);
+      if (!target || (invite.callupId && target.id !== invite.callupId)) return [];
+      const service = createServiceClient();
+      if (!service) return [];
+      invitedCallupId = target.id;
+      readClient = service;
+    }
   }
 
   const league = await getSelectedLeague();
   if (!league && !invitedCallupId) return [];
 
-  let query = client
+  let query = readClient
     .from("callups")
     .select(`
       *,
@@ -147,7 +159,7 @@ export async function getActiveCallups(invite?: { callupId?: string; inviteToken
   const callups = (data || []).map(normalizeCallup).filter((callup): callup is CallupWithEntries => Boolean(callup));
   if (callups.length === 0) return callups;
 
-  const { data: joiners, error: joinersError } = await client.rpc("get_callup_entry_joiners", {
+  const { data: joiners, error: joinersError } = await readClient.rpc("get_callup_entry_joiners", {
     p_callup_ids: callups.map((callup) => callup.id),
   });
   if (joinersError) {
