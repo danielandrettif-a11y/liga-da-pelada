@@ -18,7 +18,6 @@ import { CollectiveRoom } from "@/components/CollectiveRoom";
 import { CollectiveNavLink } from "@/components/CollectiveNavLink";
 import { Flag, Sparkles } from "@/components/icons";
 import { getEventWeather } from "@/lib/weather";
-import { LeagueInviteCard } from "@/components/LeagueInviteCard";
 
 export const revalidate = 0;
 
@@ -132,7 +131,6 @@ export default async function ConvocacaoPage({
 
   return (
     <div className="min-w-0 overflow-x-clip">
-      <div className="mb-4"><LeagueInviteCard /></div>
       {labeledCallups.length > 1 && (
         <nav className="mb-4 flex snap-x gap-2 overflow-x-auto pb-1 hide-scrollbar" aria-label="Convocações abertas">
           {labeledCallups.map((item) => {

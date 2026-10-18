@@ -133,9 +133,10 @@ export function CallupAdminCard({
       .format(new Date(`${callup.date}T12:00:00`));
     const time = callup.start_time ? callup.start_time.slice(0, 5) : "08:00";
     const venueText = callup.stadium_name ? `\n📍 Local: ${callup.stadium_name}` : "";
+    const mapText = callup.stadium_map_url ? `\n🗺️ ${callup.stadium_map_url}` : "";
 
     const inviteUrl = buildCallupInviteUrl(window.location.origin, callup.invite_token);
-    const text = `⚽ Convocação aberta para ${type}!\n\n📅 Data: ${dateFormatted}\n⏰ Horário: ${time}${venueText}\n\n👉 Toque no link para confirmar sua presença e ver a lista!`;
+    const text = `⚽ Convocação aberta para ${type}!\n\n📅 Data: ${dateFormatted}\n⏰ Horário: ${time}${venueText}${mapText}\n\n👉 Toque no link para confirmar sua presença e ver a lista!`;
     const result = await shareCallupInvite({
       title: `Convocação aberta · ${type}`,
       text,
