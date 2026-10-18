@@ -22,12 +22,19 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
 | Partidas e pontuação | Em andamento | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; migrations 326–327 corrigem autorização SQL (não aplicadas); falta teste integrado e recuperação de projeções. |
-| Cartola e cosméticos | Em andamento | Salvamento de escalação extraído; preservar as demais RPCs, inventário e isolamento por pelada/conta. |
+| Cartola e cosméticos | Em andamento | Salvamento de escalação e mutações do Passe extraídos; preservar as demais RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-18 — resgate e compra de cosméticos do Passe
+
+- `claimPassCosmetic` e `purchaseSeasonPassShopItem` agora usam domínio para validação e mensagens, aplicação para a sequência de vínculo/compra, e gateway Supabase para consultas e RPCs. As Server Actions mantêm autenticação, temporada da pelada selecionada, revalidação e o contrato de retorno usado pela interface.
+- Preservados os filtros da recompensa por temporada e do item da loja por temporada e usuário. As RPCs `claim_fantasy_pass_cosmetic` e `purchase_fantasy_pass_shop_item` continuam autoridade transacional para desbloqueio, saldo, inventário global e autorização. Nenhuma política foi enfraquecida nem substituída por checagem do cliente.
+- `npm run check` aprovado: typecheck, 670 testes em 119 arquivos e build de produção. Testes novos cobrem mensagens, bloqueio antes da RPC, vínculos e payloads de ambas as RPCs.
+- Nenhuma migration criada ou aplicada. Falta teste integrado com duas peladas e compras/resgates reais no Supabase de teste. A leitura prévia de vínculo ainda trata erro de consulta como ausência, preservando o contrato atual; diagnósticos mais explícitos ficam para outro lote.
 
 ### 2026-10-17 — confirmação do banco de reserva do Cartola
 

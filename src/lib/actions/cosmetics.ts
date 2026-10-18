@@ -6,6 +6,8 @@ import { getCurrentAccount } from "@/lib/auth";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
 import { isLegacyFrameAsset, type CosmeticItem, type CosmeticSlot } from "@/lib/fantasy/cosmetics";
+import { claimSeasonPassCosmetic, purchaseSeasonPassItem } from "@/modules/cosmetics/application/mutate-season-pass";
+import { supabaseSeasonPassMutationGateway } from "@/modules/cosmetics/infrastructure/supabase-season-pass-gateway";
 
 export type CosmeticPassReward = {
   id: string; house: number; rewardType: "cosmetic_choice" | "card_pack"; cardTier: "bronze" | "gold" | null;
@@ -222,22 +224,13 @@ export async function resetMyTestPassRewardClaims(fantasySeasonId: string) {
 export async function claimPassCosmetic(rewardId: string, cosmeticId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre para resgatar sua recompensa." };
-  const client: any = account.client;
-  const fantasySeasonId = await getSelectedFantasySeasonId(client);
+  const fantasySeasonId = await getSelectedFantasySeasonId(account.client);
   if (!fantasySeasonId) return { success: false, error: "Passe da pelada selecionada não encontrado." };
-  const { data: reward } = await client.from("fantasy_season_pass_rewards").select("id")
-    .eq("id", rewardId).eq("fantasy_season_id", fantasySeasonId).maybeSingle();
-  if (!reward) return { success: false, error: "Recompensa não pertence à pelada selecionada." };
-  const { error } = await client.rpc("claim_fantasy_pass_cosmetic", { p_reward_id: rewardId, p_cosmetic_id: cosmeticId });
-  if (error) {
-    console.error("Erro ao resgatar recompensa do Passe:", error.message);
-    const normalized = error.message.toLocaleLowerCase("pt-BR");
-    if (normalized.includes("nao desbloqueada")) return { success: false, error: "Esta recompensa ainda não foi desbloqueada." };
-    if (normalized.includes("escolha permanente")) return { success: false, error: "Você já escolheu a recompensa desta casa." };
-    return { success: false, error: "Não foi possível guardar o item agora. Atualize a página e tente novamente." };
-  }
+  const result = await claimSeasonPassCosmetic({ rewardId, cosmeticId, fantasySeasonId },
+    supabaseSeasonPassMutationGateway(account.client));
+  if (!result.success) return result;
   revalidatePath("/jogadores"); revalidatePath("/meu-perfil");
-  return { success: true };
+  return result;
 }
 
 export async function purchaseSeasonPassShopItem(shopItemId: string) {
@@ -246,18 +239,13 @@ export async function purchaseSeasonPassShopItem(shopItemId: string) {
   if (!shopItemId) return { success: false, error: "Item da loja inválido." };
   const fantasySeasonId = await getSelectedFantasySeasonId(account.client);
   if (!fantasySeasonId) return { success: false, error: "Passe da pelada selecionada não encontrado." };
-  const { data: shopItem } = await account.client.from("fantasy_season_pass_shop_items").select("id")
-    .eq("id", shopItemId).eq("fantasy_season_id", fantasySeasonId).eq("user_id", account.user.id).maybeSingle();
-  if (!shopItem) return { success: false, error: "Item não pertence à pelada selecionada." };
-  const { error } = await account.client.rpc("purchase_fantasy_pass_shop_item", { p_shop_item_id: shopItemId });
-  if (error) {
-    console.error("Erro ao comprar item do Passe:", error.message);
-    return { success: false, error: error.message.toLocaleLowerCase("pt-BR").includes("pontos extras") ? "Você ainda não tem pontos extras suficientes." : "Não foi possível guardar o item agora. Tente novamente." };
-  }
+  const result = await purchaseSeasonPassItem({ shopItemId, fantasySeasonId, userId: account.user.id },
+    supabaseSeasonPassMutationGateway(account.client));
+  if (!result.success) return result;
   revalidatePath("/jogadores");
   revalidatePath("/meu-perfil");
   revalidatePath("/ranking");
-  return { success: true };
+  return result;
 }
 
 export async function equipCosmetic(slot: CosmeticSlot, cosmeticId: string | null) {
