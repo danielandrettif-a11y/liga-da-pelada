@@ -17,13 +17,19 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
-| Partidas e pontuação | Em andamento | Registro de gol e encerramento da partida extraídos; preservar goleiros, correções e reprocessamento nos próximos recortes. |
+| Partidas e pontuação | Em andamento | Registro de gol, encerramento e gestão de goleiros extraídos; preservar substituições, correções e reprocessamento nos próximos recortes. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — goleiro fixo e troca durante a partida
+
+- Extraídas `setRoundTeamFixedGoalkeeper` e `changeMatchGoalkeeper` para domínio (validação e saneamento da dica de tempo), aplicação (escopo, estado e elegibilidade) e infraestrutura Supabase. A Server Action ainda exige ADM, obtém a pelada selecionada e revalida as mesmas telas após sucesso.
+- Preservados o filtro da equipe por rodada/pelada, a exigência de jogador do time para a fixação, a remoção da fixação com `null`, a exigência de partida `live` e time participante na troca. A RPC `change_match_goalkeeper` continua autoridade pelo relógio oficial e pela autorização final; o valor vindo do navegador é apenas dica saneada.
+- Testes novos cobrem entradas inválidas, time de outra pelada/partida, jogador externo ao time, remoção da fixação, estado da partida, parâmetros da RPC e erros. `npm run check` aprovado: tipagem, 614 testes em 103 arquivos e build. Nenhuma migration foi criada ou aplicada. Falta validar os dois fluxos em Supabase de teste.
 
 ### 2026-10-17 — encerramento da partida e recálculo
 

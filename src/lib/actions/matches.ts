@@ -21,6 +21,8 @@ import { finishSelectedMatch } from "@/modules/matches/application/finish-match"
 import { getMatchState } from "@/modules/matches/infrastructure/match-scope";
 import { supabaseGoalGateway } from "@/modules/matches/infrastructure/supabase-goal-gateway";
 import { supabaseFinishMatchGateway } from "@/modules/matches/infrastructure/supabase-finish-match-gateway";
+import { chooseFixedGoalkeeper, switchMatchGoalkeeper } from "@/modules/matches/application/manage-goalkeepers";
+import { supabaseGoalkeeperGateway } from "@/modules/matches/infrastructure/supabase-goalkeeper-gateway";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 const FINISHED_CORRECTION_ERROR = "Digite EDITAR para liberar correções em partidas finalizadas.";
@@ -674,22 +676,13 @@ export async function setRoundTeamFixedGoalkeeper(roundId: string, teamId: strin
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
     const league = await getSelectedLeague();
-    if (!league || !roundId || !teamId) return { success: false, error: "Time inválido." };
-    const { data: team, error: teamError } = await client.from("teams")
-      .select("id, round_id, round:round_id!inner(league_id)")
-      .eq("id", teamId).eq("round_id", roundId).eq("round.league_id", league.id).maybeSingle();
-    if (teamError || !team) return { success: false, error: "Time fora da pelada selecionada." };
-    if (playerId) {
-      const { data: member } = await client.from("team_players")
-        .select("player_id").eq("team_id", teamId).eq("player_id", playerId).maybeSingle();
-      if (!member) return { success: false, error: "Escolha um jogador deste time para ser o goleiro fixo." };
-    }
-    const { error } = await client.from("teams")
-      .update({ fixed_goalkeeper_player_id: playerId })
-      .eq("id", teamId);
-    if (error) throw new Error(error.message);
-    revalidatePath(`/rodadas/${team.round_id}`);
-    revalidatePath(`/rodadas/${team.round_id}/nova-partida`);
+    const result = await chooseFixedGoalkeeper(
+      { roundId, teamId, playerId, leagueId: league?.id || null },
+      supabaseGoalkeeperGateway(client),
+    );
+    if (!result.success) return result;
+    revalidatePath(`/rodadas/${result.roundId}`);
+    revalidatePath(`/rodadas/${result.roundId}/nova-partida`);
     return { success: true };
   } catch (err: any) {
     console.error("Erro ao definir goleiro fixo:", err);
@@ -706,24 +699,14 @@ export async function changeMatchGoalkeeper(
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
-    if (!matchId || !teamId || !playerId) return { success: false, error: "Escolha um jogador para entrar no gol." };
-    const match = await getMatchState(client, matchId);
-    if (match.status !== "live") return { success: false, error: "A partida não está em andamento." };
-    if (teamId !== match.team_a_id && teamId !== match.team_b_id) {
-      return { success: false, error: "Time fora desta partida." };
-    }
-    // O valor do navegador nunca define o tempo oficial. A RPC calcula com o
-    // relógio do servidor sob o mesmo lock usado para registrar gols.
-    const { data, error } = await client.rpc("change_match_goalkeeper", {
-      p_match_id: matchId,
-      p_team_id: teamId,
-      p_player_id: playerId,
-      p_elapsed_seconds: Number.isFinite(elapsedSeconds) ? Math.max(0, Math.floor(elapsedSeconds!)) : null,
-    });
-    if (error) throw new Error(error.message);
-    revalidatePath(`/rodadas/${match.round_id}`);
+    const result = await switchMatchGoalkeeper(
+      { matchId, teamId, playerId, elapsedSeconds },
+      supabaseGoalkeeperGateway(client),
+    );
+    if (!result.success) return result;
+    revalidatePath(`/rodadas/${result.roundId}`);
     revalidatePath("/cartola");
-    return { success: true, ...(data as Record<string, unknown> || {}) };
+    return { success: true, ...(result.data || {}) };
   } catch (err: any) {
     console.error("Erro ao trocar goleiro:", err);
     return { success: false, error: err.message || "Não foi possível trocar o goleiro." };
