@@ -1,3 +1,5 @@
+import type { CosmeticSlot } from "@/lib/fantasy/cosmetics";
+
 export type EquippedCosmeticsSummary = {
   frameKey: string | null;
   auraKey: string | null;
@@ -22,3 +24,12 @@ export type CosmeticLoadoutRelations = {
 };
 
 export type PlayerCosmeticProfile = { user_id: string; player_id: string };
+
+export type CosmeticPreviewLoadout = Partial<Record<CosmeticSlot, string | null>>;
+
+export type PreviewCosmeticRow = {
+  id: string;
+  slot: CosmeticSlot;
+  asset_key: string | null;
+  name: string | null;
+};

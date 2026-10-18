@@ -12,13 +12,15 @@ import { equipAccountCosmetic } from "@/modules/cosmetics/application/equip-acco
 import { supabaseAccountCosmeticEquipmentGateway } from "@/modules/cosmetics/infrastructure/supabase-equipment-gateway";
 import { buildCosmeticsDashboard, emptyCosmeticsDashboard } from "@/modules/cosmetics/application/build-dashboard";
 import { buildEquippedCosmeticsSummary, buildPlayersEquippedCosmeticsMap } from "@/modules/cosmetics/application/build-equipped-summary";
+import { resolveAdminCosmeticsPreview } from "@/modules/cosmetics/application/admin-preview";
 import { readCosmeticsDashboardRows } from "@/modules/cosmetics/infrastructure/supabase-dashboard-reader";
 import { readAccountCosmeticLoadout, readPlayerCosmeticLoadout, readPlayersCosmeticLoadouts } from "@/modules/cosmetics/infrastructure/supabase-loadout-reader";
+import { supabaseAdminPreviewGateway } from "@/modules/cosmetics/infrastructure/supabase-admin-preview-gateway";
 import type { CosmeticsDashboard } from "@/modules/cosmetics/domain/dashboard-types";
-import type { EquippedCosmeticsSummary } from "@/modules/cosmetics/domain/equipped-summary";
+import type { CosmeticPreviewLoadout, EquippedCosmeticsSummary } from "@/modules/cosmetics/domain/equipped-summary";
 
 export type { CosmeticPassReward, SeasonPassShopItem, SeasonPassShop, CosmeticsDashboard } from "@/modules/cosmetics/domain/dashboard-types";
-export type { EquippedCosmeticsSummary } from "@/modules/cosmetics/domain/equipped-summary";
+export type { CosmeticPreviewLoadout, EquippedCosmeticsSummary } from "@/modules/cosmetics/domain/equipped-summary";
 
 async function getSelectedFantasySeasonId(client: any): Promise<string | null> {
   const league = await getActiveLeague();
@@ -128,8 +130,6 @@ export async function equipCosmetic(slot: CosmeticSlot, cosmeticId: string | nul
   return result;
 }
 
-export type CosmeticPreviewLoadout = Partial<Record<CosmeticSlot, string | null>>;
-
 /**
  * Resolve a combinação temporária enviada pelo provador para a página pública
  * do próprio administrador. Os IDs da URL nunca são aceitos cegamente: cada
@@ -137,44 +137,12 @@ export type CosmeticPreviewLoadout = Partial<Record<CosmeticSlot, string | null>
  */
 export async function getAdminCosmeticsPreview(playerId: string, requested: CosmeticPreviewLoadout): Promise<EquippedCosmeticsSummary | null> {
   const account = await getCurrentAccount();
-  if (!account.isAdmin || !account.profile?.player_id || account.profile.player_id !== playerId) return null;
-
-  const selections = (Object.entries(requested) as Array<[CosmeticSlot, string | null | undefined]>)
-    .filter(([, cosmeticId]) => Boolean(cosmeticId));
-  if (!selections.length) return null;
-
-  const { data, error } = await account.client
-    .from("fantasy_cosmetics")
-    .select("id, slot, asset_key, name")
-    .in("id", selections.map(([, cosmeticId]) => cosmeticId as string));
-  if (error) return null;
-
-  const itemsById = new Map((data || []).map((item: any) => [item.id, item]));
-  const preview: EquippedCosmeticsSummary = {
-    frameKey: null,
-    auraKey: null,
-    titleName: null,
-    bannerAssetKey: null,
-    nameplateKey: null,
-    backgroundAssetKey: null,
-    showcaseAssetKey: null,
-    pitchAssetKey: null,
-  };
-
-  for (const [slot, cosmeticId] of selections) {
-    const item = itemsById.get(cosmeticId);
-    if (!item || item.slot !== slot) continue;
-    if (slot === "frame") preview.frameKey = item.asset_key;
-    if (slot === "aura") preview.auraKey = item.asset_key;
-    if (slot === "title") preview.titleName = item.name;
-    if (slot === "banner") preview.bannerAssetKey = item.asset_key;
-    if (slot === "nameplate") preview.nameplateKey = item.asset_key;
-    if (slot === "background") preview.backgroundAssetKey = item.asset_key;
-    if (slot === "showcase") preview.showcaseAssetKey = item.asset_key;
-    if (slot === "pitch") preview.pitchAssetKey = item.asset_key;
-  }
-
-  return preview;
+  return resolveAdminCosmeticsPreview({
+    isAdmin: account.isAdmin,
+    ownPlayerId: account.profile?.player_id || null,
+    playerId,
+    requested,
+  }, supabaseAdminPreviewGateway(account.client));
 }
 
 const getMyEquippedCosmeticsCached = cache(async (): Promise<EquippedCosmeticsSummary | null> => {
