@@ -205,7 +205,7 @@ export function CallupBoard({
       ? `\n📍 *Localização:*\n🗺️ ${stadiumMapUrl}`
       : "";
 
-    const inviteUrl = buildCallupInviteUrl(window.location.origin, callup.id, callup.invite_token);
+    const inviteUrl = buildCallupInviteUrl(window.location.origin, callup.invite_token);
     const text = `⚽ *CONVOCAÇÃO ABERTA*\n${inviteUrl}\n\n🏆 *${type}*\n📅 *Data:* ${dateFormatted}\n⏰ *Horário:* ${startTime}${venueText}\n\n👉 Toque no primeiro link para confirmar sua presença e ver a lista!`;
 
     await navigator.clipboard.writeText(text);

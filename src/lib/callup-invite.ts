@@ -1,11 +1,9 @@
 /**
- * Aponta diretamente para a convocação e preserva a origem em que o usuário
- * instalou o PWA. Assim o sistema operacional pode associar o link ao app
- * instalado, sem depender de um redirecionamento intermediário.
+ * Mantém o convite curto para o WhatsApp reconhecer a URL inteira. A rota
+ * curta entrega a própria convocação por rewrite, sem trocar o endereço no
+ * navegador e sem sair do escopo do PWA instalado.
  */
-export function buildCallupInviteUrl(origin: string, callupId: string, inviteToken: string) {
-  const url = new URL("/convocacao", origin);
-  url.searchParams.set("callup", callupId);
-  url.searchParams.set("invite", inviteToken);
+export function buildCallupInviteUrl(origin: string, inviteToken: string) {
+  const url = new URL(`/c/${encodeURIComponent(inviteToken)}`, origin);
   return url.toString();
 }
