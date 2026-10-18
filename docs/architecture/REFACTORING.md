@@ -17,13 +17,20 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
-| Partidas e pontuação | Em andamento | Registro de gol, encerramento e gestão de goleiros extraídos; preservar substituições, correções e reprocessamento nos próximos recortes. |
+| Partidas e pontuação | Em andamento | Registro de gol, encerramento, goleiros e substituição extraídos; auditar autorização SQL legada, depois correções e reprocessamento. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — substituição durante a partida
+
+- Extraída `substituteMatchPlayer` para domínio (dados obrigatórios e presença do substituto), aplicação (ordem da checagem/execução) e gateway Supabase. A Server Action mantém autorização de ADM, mensagens públicas e revalidação da partida e rodada somente após sucesso.
+- Preservados o filtro da partida pela pelada ativa, a checagem do substituto na rodada, a exceção do modo de formação manual e os parâmetros da RPC `substitute_match_player`. A rodada para revalidação agora vem da primeira leitura da partida, eliminando uma segunda consulta depois da gravação e o falso erro que ela poderia provocar.
+- Testes novos cobrem entrada inválida, substituto ausente/sem presença, saída sem substituto, escopo da pelada, ordem de operações, payload da RPC e falhas. `npm run check` aprovado: tipagem, 624 testes em 106 arquivos e build. Nenhuma migration foi criada ou aplicada.
+- **Risco de autorização preexistente:** a RPC SQL em `015_match_substitutions_and_availability.sql` ainda usa `is_app_admin()` global, enquanto a ação usa ADM da pelada selecionada. Outras RPCs da mesma migration também usam essa checagem antiga. Auditar e corrigir no banco, além de validar com ADMs de duas peladas, antes de considerar esse fluxo seguro para implantação. Este lote estrutural não substitui teste integrado nem mede ganho real de latência.
 
 ### 2026-10-17 — goleiro fixo e troca durante a partida
 

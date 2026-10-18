@@ -23,6 +23,8 @@ import { supabaseGoalGateway } from "@/modules/matches/infrastructure/supabase-g
 import { supabaseFinishMatchGateway } from "@/modules/matches/infrastructure/supabase-finish-match-gateway";
 import { chooseFixedGoalkeeper, switchMatchGoalkeeper } from "@/modules/matches/application/manage-goalkeepers";
 import { supabaseGoalkeeperGateway } from "@/modules/matches/infrastructure/supabase-goalkeeper-gateway";
+import { substitutePlayerInMatch } from "@/modules/matches/application/substitute-match-player";
+import { supabaseMatchSubstitutionGateway } from "@/modules/matches/infrastructure/supabase-match-substitution-gateway";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 const FINISHED_CORRECTION_ERROR = "Digite EDITAR para liberar correções em partidas finalizadas.";
@@ -717,40 +719,12 @@ export async function substituteMatchPlayer(input: SubstituteMatchPlayerInput) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
-    if (!input.match_id || !input.team_id || !input.player_out_id) {
-      return { success: false, error: "Preencha os dados da substituicao." };
-    }
-    await getMatchState(client, input.match_id);
-    if (input.player_in_id) {
-      const { data: incoming, error: incomingError } = await client
-        .from("matches")
-        .select("round:round_id (formation_mode, round_players!inner(player_id, attendance_status))")
-        .eq("id", input.match_id)
-        .eq("round.round_players.player_id", input.player_in_id)
-        .single();
-      if (incomingError || !incoming) return { success: false, error: "Substituto nao encontrado nesta rodada." };
-      const incomingRound = Array.isArray(incoming.round) ? incoming.round[0] : incoming.round;
-      const incomingEntry = (incomingRound as any)?.round_players?.find((entry: any) => entry.player_id === input.player_in_id);
-      if ((incomingRound as any)?.formation_mode !== "manual" && incomingEntry?.attendance_status !== "present") {
-        return { success: false, error: "O substituto ainda nao foi marcado como presente." };
-      }
-    }
-
-    const { data, error } = await client.rpc("substitute_match_player", {
-      p_match_id: input.match_id,
-      p_team_id: input.team_id,
-      p_player_out_id: input.player_out_id,
-      p_player_in_id: input.player_in_id || null,
-      p_reason: input.reason,
-      p_mark_injured: Boolean(input.mark_injured),
-    });
-
-    if (error) throw new Error(error.message);
-    const match = await getMatchState(client, input.match_id);
+    const result = await substitutePlayerInMatch(input, supabaseMatchSubstitutionGateway(client));
+    if (!result.success) return result;
     revalidatePath(`/partidas/${input.match_id}`);
-    revalidatePath(`/rodadas/${match.round_id}`);
-    revalidatePath(`/rodadas/${match.round_id}/nova-partida`);
-    return { success: true, substitutionId: data };
+    revalidatePath(`/rodadas/${result.roundId}`);
+    revalidatePath(`/rodadas/${result.roundId}/nova-partida`);
+    return { success: true, substitutionId: result.substitutionId };
   } catch (err: any) {
     console.error("Erro ao substituir jogador:", err);
     return { success: false, error: err.message };
