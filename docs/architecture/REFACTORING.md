@@ -18,13 +18,19 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
-| Partidas e pontuação | Em andamento | Registro de gol, encerramento, goleiros e substituição extraídos; migration 326 corrige três RPCs legadas (não aplicada); falta teste integrado, correções e reprocessamento. |
+| Partidas e pontuação | Em andamento | Registro de gol, encerramento, goleiros, substituição e desfazer substituição extraídos; migration 326 corrige três RPCs legadas (não aplicada); falta teste integrado, demais correções e reprocessamento. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — desfazer a última substituição
+
+- Extraída `undoLastMatchSubstitution` para validação em domínio, sequência de checagem/execução em aplicação e gateway Supabase. A Server Action mantém autenticação de ADM, resposta pública, tratamento de erros e revalidação após sucesso.
+- Preservados o escopo da partida na pelada selecionada, o vínculo da substituição à partida e os parâmetros da RPC `undo_last_match_substitution`. A rodada para revalidação vem da primeira leitura da partida, evitando a segunda consulta depois da gravação e uma falha tardia que poderia relatar erro apesar do desfazer ter ocorrido.
+- Testes novos cobrem entradas ausentes, ordem das checagens, substituição de outra partida, filtro do gateway, payload da RPC e erros. `npm run check` aprovado: tipagem, 632 testes em 108 arquivos e build. Não houve migration neste lote; a autorização final continua na RPC e depende da migration 326 para ADMs sem papel global. Falta ensaio integrado em Supabase de teste com duas peladas e uma partida real.
 
 ### 2026-10-17 — autorização das RPCs legadas de substituição
 

@@ -25,6 +25,8 @@ import { chooseFixedGoalkeeper, switchMatchGoalkeeper } from "@/modules/matches/
 import { supabaseGoalkeeperGateway } from "@/modules/matches/infrastructure/supabase-goalkeeper-gateway";
 import { substitutePlayerInMatch } from "@/modules/matches/application/substitute-match-player";
 import { supabaseMatchSubstitutionGateway } from "@/modules/matches/infrastructure/supabase-match-substitution-gateway";
+import { undoMatchSubstitution } from "@/modules/matches/application/undo-match-substitution";
+import { supabaseUndoMatchSubstitutionGateway } from "@/modules/matches/infrastructure/supabase-undo-match-substitution-gateway";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 const FINISHED_CORRECTION_ERROR = "Digite EDITAR para liberar correções em partidas finalizadas.";
@@ -790,21 +792,13 @@ export async function undoLastMatchSubstitution(substitutionId: string, matchId:
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
-    if (!substitutionId || !matchId) return { success: false, error: "Substituicao invalida." };
-    await getMatchState(client, matchId);
-    const { data: substitution } = await client.from("match_substitutions").select("match_id")
-      .eq("id", substitutionId).eq("match_id", matchId).maybeSingle();
-    if (!substitution) return { success: false, error: "Substituição fora da partida selecionada." };
-
-    const { error } = await client.rpc("undo_last_match_substitution", {
-      p_substitution_id: substitutionId,
-    });
-    if (error) throw new Error(error.message);
-
-    const match = await getMatchState(client, matchId);
+    const result = await undoMatchSubstitution(
+      substitutionId, matchId, supabaseUndoMatchSubstitutionGateway(client),
+    );
+    if (!result.success) return result;
     revalidatePath(`/partidas/${matchId}`);
-    revalidatePath(`/rodadas/${match.round_id}`);
-    revalidatePath(`/rodadas/${match.round_id}/nova-partida`);
+    revalidatePath(`/rodadas/${result.roundId}`);
+    revalidatePath(`/rodadas/${result.roundId}/nova-partida`);
     return { success: true };
   } catch (err: any) {
     console.error("Erro ao desfazer substituicao:", err);

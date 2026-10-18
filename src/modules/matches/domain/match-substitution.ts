@@ -6,6 +6,10 @@ export function validateMatchSubstitutionInput(input: SubstituteMatchPlayerInput
     : null;
 }
 
+export function validateUndoMatchSubstitutionInput(substitutionId: string, matchId: string): string | null {
+  return !substitutionId || !matchId ? "Substituicao invalida." : null;
+}
+
 export function checkIncomingSubstitute(
   incoming: { found: boolean; formationMode: string | null; attendanceStatus: string | null },
 ): string | null {

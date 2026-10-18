@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { checkIncomingSubstitute, validateMatchSubstitutionInput } from "./match-substitution";
+import {
+  checkIncomingSubstitute,
+  validateMatchSubstitutionInput,
+  validateUndoMatchSubstitutionInput,
+} from "./match-substitution";
 
 describe("pré-validação da substituição", () => {
   const valid = { match_id: "match-1", team_id: "team-1", player_out_id: "player-1", reason: "tired" as const };
@@ -21,5 +25,11 @@ describe("pré-validação da substituição", () => {
       .toBeNull();
     expect(checkIncomingSubstitute({ found: true, formationMode: "manual", attendanceStatus: null }))
       .toBeNull();
+  });
+
+  it("exige os dois identificadores para desfazer", () => {
+    expect(validateUndoMatchSubstitutionInput("substitution-1", "match-1")).toBeNull();
+    expect(validateUndoMatchSubstitutionInput("", "match-1")).toBe("Substituicao invalida.");
+    expect(validateUndoMatchSubstitutionInput("substitution-1", "")).toBe("Substituicao invalida.");
   });
 });
