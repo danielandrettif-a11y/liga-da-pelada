@@ -8,6 +8,8 @@ import { getActiveSeason } from "./seasons";
 import { isLegacyFrameAsset, type CosmeticItem, type CosmeticSlot } from "@/lib/fantasy/cosmetics";
 import { claimSeasonPassCosmetic, purchaseSeasonPassItem } from "@/modules/cosmetics/application/mutate-season-pass";
 import { supabaseSeasonPassMutationGateway } from "@/modules/cosmetics/infrastructure/supabase-season-pass-gateway";
+import { equipAccountCosmetic } from "@/modules/cosmetics/application/equip-account-cosmetic";
+import { supabaseAccountCosmeticEquipmentGateway } from "@/modules/cosmetics/infrastructure/supabase-equipment-gateway";
 
 export type CosmeticPassReward = {
   id: string; house: number; rewardType: "cosmetic_choice" | "card_pack"; cardTier: "bronze" | "gold" | null;
@@ -251,11 +253,9 @@ export async function purchaseSeasonPassShopItem(shopItemId: string) {
 export async function equipCosmetic(slot: CosmeticSlot, cosmeticId: string | null) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre para personalizar o perfil." };
-  const client: any = account.client;
-  const { error } = await client.rpc("equip_account_cosmetic", { p_slot: slot, p_cosmetic_id: cosmeticId });
-  // Não mascarar uma falha do banco como se o item tivesse sido equipado.
-  // Antes deste retorno a interface mostrava sucesso mesmo com RLS/migration ausente.
-  if (error) return { success: false, error: error.message };
+  const result = await equipAccountCosmetic(slot, cosmeticId,
+    supabaseAccountCosmeticEquipmentGateway(account.client));
+  if (!result.success) return result;
   revalidatePath("/meu-perfil");
   revalidatePath("/jogadores");
   revalidatePath("/jogadores/[id]", "page");
@@ -263,7 +263,7 @@ export async function equipCosmetic(slot: CosmeticSlot, cosmeticId: string | nul
   revalidatePath("/ranking");
   revalidatePath("/elenco");
   revalidatePath("/cartola");
-  return { success: true };
+  return result;
 }
 
 export type EquippedCosmeticsSummary = {

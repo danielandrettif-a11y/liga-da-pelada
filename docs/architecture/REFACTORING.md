@@ -22,12 +22,19 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
 | Partidas e pontuação | Em andamento | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; migrations 326–327 corrigem autorização SQL (não aplicadas); falta teste integrado e recuperação de projeções. |
-| Cartola e cosméticos | Em andamento | Salvamento de escalação e mutações do Passe extraídos; preservar as demais RPCs, inventário e isolamento por pelada/conta. |
+| Cartola e cosméticos | Em andamento | Salvamento de escalação, mutações do Passe e equipamento da conta extraídos; preservar as demais RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-18 — equipar cosméticos globais da conta
+
+- `equipCosmetic` agora usa validação de slot em domínio, caso de uso para execução e gateway Supabase para a RPC `equip_account_cosmetic`. A Server Action continua exigindo sessão e revalidando as mesmas telas; equipar e desequipar (`null`) mantêm o contrato público.
+- O slot é conferido em runtime antes de chamar o banco, pois uma Server Action recebe dados não confiáveis. A RPC da migration 317 permanece autoridade para posse global do item, correspondência entre item e slot e gravação do loadout da conta. Não foi feita uma segunda consulta ou regra de posse em TypeScript.
+- `npm run check` aprovado: typecheck, 674 testes em 122 arquivos e build de produção. Testes novos cobrem todos os slots, entrada adulterada, equipar/desequipar, parâmetros e erro da RPC.
+- Nenhuma migration criada ou aplicada. Ainda falta teste integrado em Supabase de teste com duas peladas que compartilham a mesma conta, inclusive visibilidade após a troca de pelada.
 
 ### 2026-10-18 — resgate e compra de cosméticos do Passe
 
