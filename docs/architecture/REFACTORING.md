@@ -21,12 +21,19 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
 | Partidas e pontuação | Em andamento | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; migrations 326–327 corrigem autorização SQL (não aplicadas); falta teste integrado e recuperação de projeções. |
-| Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
+| Cartola e cosméticos | Em andamento | Salvamento de escalação extraído; preservar as demais RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — salvamento da escalação do Cartola
+
+- Extraído `saveFantasyLineup` para validações e mapeamento dos slots em domínio, escolha entre rodada de teste/oficial e verificação da reserva em aplicação, e chamadas Supabase em infraestrutura. A Server Action mantém autenticação, pelada ativa, revalidação e contrato público. As RPCs SQL seguem responsáveis por elegibilidade, mercado, preços e autorização final.
+- O tamanho exigido continua vindo do snapshot da rodada, com fallback para a configuração da pelada. Preservadas as mensagens de validação, os parâmetros das duas RPCs e a confirmação de reserva após salvar. Uma falha na consulta de sessão de teste agora interrompe o salvamento, evitando enviar por engano à rotina oficial.
+- `npm run check` aprovado: typecheck, 663 testes em 116 arquivos e build de produção. Testes novos cobrem validação, isolamento por pelada, caminhos oficial/de teste, falhas das RPCs, parâmetros e verificação do banco de reserva.
+- Nenhuma migration criada ou aplicada. Falta teste integrado em Supabase de teste com duas peladas e rodadas oficiais/de teste. A confirmação da reserva ainda ocorre depois da RPC; uma falha nessa leitura pode deixar a escalação salva com resposta de erro. Tratar esse estado ambíguo em lote próprio antes de considerar o fluxo totalmente confiável.
 
 ### 2026-10-17 — correção de gols em partidas finalizadas
 

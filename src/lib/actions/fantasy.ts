@@ -43,8 +43,7 @@ import {
   type FantasyLiveLineupProjection,
   type FantasyLivePlayerStats,
 } from "@/lib/fantasy/live-projection";
-import type { FantasyLineupSlot, FantasySlotRole } from "@/lib/fantasy/lineup-positions";
-import type { FantasyReserveRole } from "@/lib/fantasy/reserve";
+import type { FantasySlotRole } from "@/lib/fantasy/lineup-positions";
 import { calculatePositionBreakdown } from "@/lib/fantasy/position-breakdown";
 import {
   resolveFantasyBulletinTotal,
@@ -58,6 +57,9 @@ import { buildFantasyGoalkeeperSimulationStats } from "@/lib/fantasy/goalkeeper-
 import { calculateGoalkeeperMatchScouts } from "@/lib/goalkeeper-timeline";
 import { rankingActivePlayerIds } from "@/lib/ranking";
 import { compareFantasyRoundPriority } from "@/lib/fantasy-round-order";
+import { saveFantasyLineupForLeague } from "@/modules/fantasy/application/save-lineup";
+import { supabaseFantasyLineupGateway } from "@/modules/fantasy/infrastructure/supabase-lineup-gateway";
+import type { FantasyLineupSubmission } from "@/modules/fantasy/domain/lineup-submission";
 
 export type FantasyMarketPlayer = {
   id: string;
@@ -1793,123 +1795,20 @@ export async function getFantasyDashboard() {
   };
 }
 
-export async function saveFantasyLineup(input: {
-  fantasySeasonId: string;
-  roundId: string | null;
-  playerIds: string[];
-  slotAssignments: FantasyLineupSlot[];
-  captainId: string | null;
-  scorerId: string | null;
-  assistId: string | null;
-  challengeId: string | null;
-  reservePlayerId: string | null;
-  reserveRole: FantasyReserveRole | null;
-}) {
+export async function saveFantasyLineup(input: FantasyLineupSubmission) {
   try {
     const account = await getCurrentAccount();
     if (!account.user) return { success: false, error: "Entre na sua conta para escalar." };
     const league = await getActiveLeague();
-    if (!input.roundId) {
-      return { success: false, error: "A janela de transferências está fechada. Aguarde a abertura da próxima Ranked." };
-    }
-    const { data: targetRound, error: targetRoundError } = await account.client
-      .from("fantasy_rounds")
-      .select("settings_snapshot, round:round_id(league_id)")
-      .eq("round_id", input.roundId)
-      .maybeSingle();
-    if (targetRoundError || !targetRound || (targetRound.round as { league_id?: string } | null)?.league_id !== league.id) {
-      return { success: false, error: "Rodada do Cartola não encontrada nesta pelada." };
-    }
-    const maxPlayers = Number((targetRound.settings_snapshot as Record<string, unknown> | null)?.players_per_team ?? league.players_per_team ?? 5);
-    if (input.roundId && (input.playerIds.length !== maxPlayers || !input.captainId)) {
-      return { success: false, error: `Para salvar a escalação, escolha exatamente ${maxPlayers} jogadores e um capitão.` };
-    }
-    if (input.playerIds.length > maxPlayers || new Set(input.playerIds).size !== input.playerIds.length) {
-      return {
-        success: false,
-        error: `A escalação enviada é inválida. Aceita no máximo ${maxPlayers} jogadores.`,
-      };
-    }
-    if (Boolean(input.reservePlayerId) !== Boolean(input.reserveRole)) {
-      return { success: false, error: "Escolha o jogador e a posição do banco de reserva." };
-    }
-    if (input.reserveRole && !(["GOL", "DEF", "ATA"] as const).includes(input.reserveRole)) {
-      return { success: false, error: "A posição do banco de reserva é inválida." };
-    }
-    if (input.reservePlayerId && input.playerIds.includes(input.reservePlayerId)) {
-      return { success: false, error: "O jogador do banco não pode estar entre os titulares." };
-    }
-    const slotAssignmentsAreValid =
-      input.slotAssignments.length === input.playerIds.length &&
-      new Set(input.slotAssignments.map((slot) => slot.playerId)).size === input.playerIds.length &&
-      new Set(input.slotAssignments.map((slot) => slot.slotIndex)).size === input.playerIds.length &&
-      input.slotAssignments.every(
-        (slot) =>
-          input.playerIds.includes(slot.playerId) &&
-          Number.isInteger(slot.slotIndex) &&
-          slot.slotIndex >= 0 &&
-          ["GOL", "DEF", "ATA"].includes(slot.slotRole),
-      );
-    if (!slotAssignmentsAreValid) {
-      return { success: false, error: "As posições da escalação são inválidas. Ajuste o time e tente novamente." };
-    }
-    const dbSlots = input.slotAssignments.map((slot) => ({
-      player_id: slot.playerId,
-      slot_index: slot.slotIndex,
-      slot_role: slot.slotRole,
-    }));
-    const { data: testSession } = input.roundId
-      ? await account.client
-          .from("fantasy_test_sessions")
-          .select("id")
-          .eq("round_id", input.roundId)
-          .maybeSingle()
-      : { data: null };
-    if (testSession && input.roundId) {
-      if (input.reservePlayerId) {
-        return { success: false, error: "O banco de reserva ainda não está disponível na rodada de testes." };
-      }
-      const { error } = await account.client.rpc("save_fantasy_test_lineup", {
-        p_round_id: input.roundId,
-        p_player_ids: input.playerIds,
-        p_captain_player_id: input.captainId,
-        p_top_scorer_player_id: input.scorerId,
-        p_top_assist_player_id: input.assistId,
-        p_challenge_player_id: input.challengeId,
-        p_lineup_slots: dbSlots,
-      });
-      if (error) return { success: false, error: error.message };
-    } else {
-      const { data: savedLineupId, error: lineupError } = await account.client.rpc("save_fantasy_lineup_with_reserve", {
-        p_round_id: input.roundId,
-        p_player_ids: input.playerIds,
-        p_captain_player_id: input.captainId,
-        p_top_scorer_player_id: input.scorerId,
-        p_top_assist_player_id: input.assistId,
-        p_challenge_player_id: input.challengeId,
-        p_lineup_slots: dbSlots,
-        p_reserve_player_id: input.reservePlayerId,
-        p_reserve_slot_role: input.reserveRole,
-      });
-      if (lineupError) return { success: false, error: lineupError.message };
-      if (input.reservePlayerId) {
-        const reserveReadClient = createServiceClient() || account.client;
-        const { data: savedReserve, error: reserveReadError } = await reserveReadClient
-          .from("fantasy_lineup_reserves")
-          .select("player_id, slot_role")
-          .eq("lineup_id", savedLineupId)
-          .eq("player_id", input.reservePlayerId)
-          .maybeSingle();
-        if (reserveReadError || !savedReserve || savedReserve.slot_role !== input.reserveRole) {
-          console.error("Reserva não confirmada após salvar a escalação:", reserveReadError);
-          return { success: false, error: "A escalação foi enviada, mas o banco de reserva não foi confirmado. Tente salvar novamente." };
-        }
-      }
-    }
+    const result = await saveFantasyLineupForLeague(input, {
+      id: league.id,
+      playersPerTeam: league.players_per_team,
+    }, supabaseFantasyLineupGateway(account.client));
+    if (!result.success) return result;
     revalidatePath("/cartola");
     revalidatePath("/");
     revalidatePath("/notificacoes");
-    return { success: true };
+    return result;
   } catch (error) {
     console.error("Erro inesperado ao salvar escalação do Cartola:", error);
     return {
