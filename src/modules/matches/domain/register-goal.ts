@@ -6,3 +6,7 @@ export function validateRegisterGoalInput(input: RegisterGoalInput): string | nu
   }
   return null;
 }
+
+export function validateDeleteGoalInput(eventId: string, matchId: string): string | null {
+  return !eventId || !matchId ? "Identificadores inválidos para exclusão do evento." : null;
+}

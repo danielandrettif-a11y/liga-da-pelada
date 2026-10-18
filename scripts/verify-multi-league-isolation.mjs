@@ -54,6 +54,26 @@ async function createLeague(name, tier, visibility) {
   return String(data);
 }
 
+async function createPendingMatch(roundId) {
+  const { data: teams, error: teamsError } = await admin.from("teams").insert([
+    { round_id: roundId, position: 1, name: "E2E Verde", color: "#00AA66" },
+    { round_id: roundId, position: 2, name: "E2E Azul", color: "#2277EE" },
+  ]).select("id,position");
+  if (teamsError || teams?.length !== 2) {
+    throw new Error("Times da autorizacao: " + (teamsError?.message || "incompletos"));
+  }
+  const { data: match, error: matchError } = await admin.from("matches").insert({
+    round_id: roundId,
+    team_a_id: teams.find((item) => item.position === 1).id,
+    team_b_id: teams.find((item) => item.position === 2).id,
+    status: "pending",
+  }).select("id").single();
+  if (matchError || !match) {
+    throw new Error("Partida da autorizacao: " + (matchError?.message || "sem ID"));
+  }
+  return match.id;
+}
+
 async function cleanup() {
   const failures = [];
   for (const roundId of [...createdRounds].reverse()) {
@@ -183,6 +203,17 @@ try {
     && playerAvailability.error.message.includes("Somente administradores desta pelada"),
   "Jogador comum conseguiu passar pela autorizacao da RPC de disponibilidade.");
 
+  const basicMatchId = await createPendingMatch(authRound.id);
+  const missingEventId = randomUUID();
+  const basicGoalDeletion = {
+    p_event_id: missingEventId,
+    p_match_id: basicMatchId,
+  };
+  const regularGoalDeletion = await player.rpc("delete_match_event", basicGoalDeletion);
+  check(Boolean(regularGoalDeletion.error)
+    && regularGoalDeletion.error.message.includes("Acesso restrito ao ADM desta pelada"),
+  "Jogador comum passou pela autorizacao de exclusao de gol.");
+
   const promote = await admin.from("league_members").update({ role: "admin" })
     .eq("league_id", basicId).eq("player_id", playerId).select("id");
   if (promote.error || promote.data?.length !== 1) {
@@ -195,6 +226,10 @@ try {
   check(Boolean(leagueAdminAvailability.error)
     && leagueAdminAvailability.error.message.includes("Jogador nao encontrado nesta rodada"),
   "ADM da pelada sem papel global nao passou pela autorizacao da RPC.");
+  const leagueAdminGoalDeletion = await player.rpc("delete_match_event", basicGoalDeletion);
+  check(Boolean(leagueAdminGoalDeletion.error)
+    && leagueAdminGoalDeletion.error.message.includes("A partida não está em andamento"),
+  "ADM da pelada sem papel global nao passou pela autorizacao de exclusao de gol.");
 
   const completeSeason = seasons.find((item) => item.league_id === completeId);
   const { data: otherRound, error: otherRoundError } = await admin.from("rounds").insert({
@@ -216,6 +251,14 @@ try {
   check(Boolean(crossLeagueAvailability.error)
     && crossLeagueAvailability.error.message.includes("Somente administradores desta pelada"),
     "ADM de uma pelada passou pela autorizacao de outra pelada.");
+  const otherMatchId = await createPendingMatch(otherRound.id);
+  const crossLeagueGoalDeletion = await player.rpc("delete_match_event", {
+    p_event_id: missingEventId,
+    p_match_id: otherMatchId,
+  });
+  check(Boolean(crossLeagueGoalDeletion.error)
+    && crossLeagueGoalDeletion.error.message.includes("Acesso restrito ao ADM desta pelada"),
+  "ADM de outra pelada passou pela autorizacao de exclusao de gol.");
 
   const crossFavorite = await player.rpc("toggle_league_favorite", {
     p_league_id: completeId,
@@ -234,4 +277,4 @@ if (testError) throw testError;
 if (cleanupFailures.length) {
   throw new Error("O ensaio passou, mas a limpeza falhou: " + cleanupFailures.join(" | "));
 }
-console.log("OK: peladas isoladas, reentrada e autorizacao da RPC por pelada.");
+console.log("OK: peladas isoladas, reentrada e autorizacao das RPCs por pelada.");

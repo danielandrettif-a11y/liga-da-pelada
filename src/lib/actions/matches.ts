@@ -27,6 +27,8 @@ import { substitutePlayerInMatch } from "@/modules/matches/application/substitut
 import { supabaseMatchSubstitutionGateway } from "@/modules/matches/infrastructure/supabase-match-substitution-gateway";
 import { undoMatchSubstitution } from "@/modules/matches/application/undo-match-substitution";
 import { supabaseUndoMatchSubstitutionGateway } from "@/modules/matches/infrastructure/supabase-undo-match-substitution-gateway";
+import { deleteLiveGoal } from "@/modules/matches/application/delete-live-goal";
+import { supabaseDeleteGoalGateway } from "@/modules/matches/infrastructure/supabase-delete-goal-gateway";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 const FINISHED_CORRECTION_ERROR = "Digite EDITAR para liberar correções em partidas finalizadas.";
@@ -810,38 +812,19 @@ export async function deleteEvent(eventId: string, matchId: string, teamId?: str
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
-    if (!eventId || !matchId) {
-      return { success: false, error: "Identificadores inválidos para exclusão do evento." };
-    }
-    await getMatchState(client, matchId);
-    const { data: event } = await client.from("match_events").select("match_id")
-      .eq("id", eventId).eq("match_id", matchId).maybeSingle();
-    if (!event) return { success: false, error: "Gol fora da partida selecionada." };
-
-    const { data, error } = await client.rpc("delete_match_event", {
-      p_event_id: eventId,
-      p_match_id: matchId,
-    });
-
-    if (error) throw new Error(error.message);
-
-    const result = data as {
-      deleted: boolean;
-      score_a: number;
-      score_b: number;
-      round_id?: string;
-    } | null;
+    const result = await deleteLiveGoal(eventId, matchId, supabaseDeleteGoalGateway(client));
+    if (!result.success) return result;
 
     revalidatePath(`/partidas/${matchId}`);
-    if (result?.round_id) {
-      revalidatePath(`/rodadas/${result.round_id}`);
+    if (result.roundId) {
+      revalidatePath(`/rodadas/${result.roundId}`);
     }
     revalidatePath("/cartola");
 
     return {
       success: true,
-      scoreA: result?.score_a,
-      scoreB: result?.score_b,
+      scoreA: result.scoreA,
+      scoreB: result.scoreB,
     };
   } catch (err: any) {
     console.error("Erro ao deletar evento:", err);

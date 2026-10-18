@@ -8,6 +8,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - Manter RPCs SQL e RLS como autoridade para transações, consistência e isolamento entre peladas. Não duplicar essas regras em TypeScript.
 - A retirada de convidado pelo criador usa RPC específica e atômica, sem conceder acesso direto à normalização interna. Ver [ADR 002](./adr-002-atomic-callup-creator-removal.md).
 - As RPCs de substituição, desfazer substituição e disponibilidade conferem o ADM da pelada do alvo, além da RLS. Ver [ADR 003](./adr-003-match-rpc-league-authorization.md).
+- A exclusão de gol ao vivo exige autorização de ADM dentro da RPC `SECURITY DEFINER`, não apenas na Server Action. Ver [ADR 004](./adr-004-live-goal-deletion-authorization.md).
 - Preservar assinaturas e respostas públicas das Server Actions durante a migração; converter uma fatia vertical por vez.
 - Não criar agora tabela de estatísticas acumuladas: a view `player_season_stats` já agrega `player_round_stats`. Medir antes de alterar esquema.
 
@@ -18,13 +19,21 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
-| Partidas e pontuação | Em andamento | Registro de gol, encerramento, goleiros, substituição e desfazer substituição extraídos; migration 326 corrige três RPCs legadas (não aplicada); falta teste integrado, demais correções e reprocessamento. |
+| Partidas e pontuação | Em andamento | Registro/exclusão de gol ao vivo, encerramento, goleiros e substituições extraídos; migrations 326–327 corrigem autorização SQL (não aplicadas); falta teste integrado, correções finalizadas e reprocessamento. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — exclusão de gol ao vivo e autorização da RPC
+
+- Extraída `deleteEvent` para validação em domínio, sequência de checagens em aplicação e gateway Supabase. A Server Action preserva a exigência de ADM, o contrato do placar, os erros e as revalidações de partida, rodada e Cartola após sucesso. A RPC permanece responsável pela exclusão e ajuste atômico do placar.
+- Identificada lacuna preexistente: `delete_match_event` era `SECURITY DEFINER` e não verificava a conta chamadora. A migration `327_scope_live_goal_deletion_to_league.sql` exige `is_league_admin()` da liga da partida antes da mutação e revoga `EXECUTE` anônimo; ver [ADR 004](./adr-004-live-goal-deletion-authorization.md).
+- O ensaio descartável entre duas peladas foi ampliado para chamadas diretas à RPC com partida pendente: jogador comum e ADM de outra pelada devem falhar na autorização; ADM da pelada sem papel global deve chegar à validação do estado. Esse ensaio **não foi executado** neste lote e não cobre exclusão real em partida ao vivo.
+- Testes novos cobrem entrada inválida, ordem das checagens, evento de outra partida/pelada, payload da RPC, placar retornado e falhas. `node --check` no ensaio e `npm run check` aprovados: tipagem, 639 testes em 110 arquivos e build.
+- Migrations 325–327 ainda não aplicadas. Aplicar em ordem e validar no Supabase de teste antes de publicar. Testar também a exclusão real do gol, placar, eventos e reprocessamento posterior em duas peladas.
 
 ### 2026-10-17 — desfazer a última substituição
 
