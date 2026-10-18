@@ -5,49 +5,15 @@ import { cache } from "react";
 import { getCurrentAccount } from "@/lib/auth";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
-import { isLegacyFrameAsset, type CosmeticItem, type CosmeticSlot } from "@/lib/fantasy/cosmetics";
+import type { CosmeticSlot } from "@/lib/fantasy/cosmetics";
 import { claimSeasonPassCosmetic, purchaseSeasonPassItem } from "@/modules/cosmetics/application/mutate-season-pass";
 import { supabaseSeasonPassMutationGateway } from "@/modules/cosmetics/infrastructure/supabase-season-pass-gateway";
 import { equipAccountCosmetic } from "@/modules/cosmetics/application/equip-account-cosmetic";
 import { supabaseAccountCosmeticEquipmentGateway } from "@/modules/cosmetics/infrastructure/supabase-equipment-gateway";
+import { buildCosmeticsDashboard, emptyCosmeticsDashboard } from "@/modules/cosmetics/application/build-dashboard";
+import type { CosmeticsDashboard, CosmeticsDashboardRows } from "@/modules/cosmetics/domain/dashboard-types";
 
-export type CosmeticPassReward = {
-  id: string; house: number; rewardType: "cosmetic_choice" | "card_pack"; cardTier: "bronze" | "gold" | null;
-  selectedCosmeticId: string | null; options: CosmeticItem[]; bonusCosmetic: CosmeticItem | null;
-};
-
-export type SeasonPassShopItem = {
-  id: string;
-  pricePoints: number;
-  cosmetic: CosmeticItem;
-  sourceHouse: number;
-};
-
-export type SeasonPassShop = {
-  totalProgressPoints: number;
-  bonusPoints: number;
-  extraPointsEarned: number;
-  spentPoints: number;
-  balancePoints: number;
-  isUnlocked: boolean;
-  hasStarted: boolean;
-  purchasedItems: number;
-  items: SeasonPassShopItem[];
-};
-
-export type CosmeticsDashboard = {
-  available: boolean; seasonId: string | null; cosmetics: CosmeticItem[]; rewards: CosmeticPassReward[];
-  previewCatalog: CosmeticItem[];
-  equipped: Partial<Record<CosmeticSlot, string | null>>; canPreviewAll: boolean;
-  shop: SeasonPassShop;
-};
-
-const emptyShop: SeasonPassShop = {
-  totalProgressPoints: 0, bonusPoints: 0, extraPointsEarned: 0, spentPoints: 0, balancePoints: 0,
-  isUnlocked: false, hasStarted: false, purchasedItems: 0, items: [],
-};
-const empty: CosmeticsDashboard = { available: false, seasonId: null, cosmetics: [], previewCatalog: [], rewards: [], equipped: {}, canPreviewAll: false, shop: emptyShop };
-const mapCosmetic = (row: any): CosmeticItem => ({ id: row.id, slug: row.slug, slot: row.slot, rarity: row.rarity, name: row.name, description: row.description, assetKey: row.asset_key });
+export type { CosmeticPassReward, SeasonPassShopItem, SeasonPassShop, CosmeticsDashboard } from "@/modules/cosmetics/domain/dashboard-types";
 
 async function getSelectedFantasySeasonId(client: any): Promise<string | null> {
   const league = await getActiveLeague();
@@ -97,7 +63,7 @@ async function loadCosmeticRelations(client: any, userId?: string, userIds?: str
 
 export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
   const account = await getCurrentAccount();
-  if (!account.user) return empty;
+  if (!account.user) return emptyCosmeticsDashboard;
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
   const client: any = account.client;
@@ -118,67 +84,18 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
   ]);
   // Loja e saldo são complementos. Se uma migration de permissão ainda não
   // chegou ao banco, a coleção e as recompensas do Passe continuam visíveis.
-  if (ownedResult.error || rewardResult.error || catalogResult.error) return empty;
-  const choices = new Map((choiceResult.data || []).map((row: any) => [row.reward_id, row.cosmetic_id]));
-  const ownedByReward = new Map<string, Set<string>>();
-  for (const row of ownedResult.data || []) {
-    if (!row.source_reward_id || !row.cosmetic_id) continue;
-    const cosmetics = ownedByReward.get(row.source_reward_id) || new Set<string>();
-    cosmetics.add(row.cosmetic_id);
-    ownedByReward.set(row.source_reward_id, cosmetics);
-  }
-  const loadout = loadoutResult.data || {};
-  const rewardHouseById = new Map((rewardResult.data || []).map((row: any) => [row.id, Number(row.house || 0)]));
-  const passRow = passResult.error ? null : passResult.data;
-  const totalProgressPoints = Number(passRow?.total_progress_points || passRow?.progress || 0);
-  const bonusPoints = Number(passRow?.shop_bonus_points || 0);
-  const extraPointsEarned = Math.max(0, totalProgressPoints - 40) + bonusPoints;
-  const shopRows = shopResult.error ? [] : (shopResult.data || []);
-  const spentPoints = shopRows
-    .filter((row: any) => Boolean(row.purchased_at))
-    .reduce((total: number, row: any) => total + Number(row.price_points || 0), 0);
-  const shopItems = shopRows
-    .filter((row: any) => !row.purchased_at && row.cosmetic)
-    .map((row: any) => ({
-      id: row.id,
-      pricePoints: Number(row.price_points || 0),
-      cosmetic: mapCosmetic(row.cosmetic),
-      sourceHouse: rewardHouseById.get(row.source_reward_id) || 0,
-    }));
-  return {
-    available: true, seasonId: fantasySeason?.id || null, canPreviewAll: account.isAdmin,
-    cosmetics: (ownedResult.data || []).map((row: any) => row.cosmetic).filter(Boolean).map(mapCosmetic),
-    previewCatalog: account.isAdmin
-      ? (catalogResult.data || []).map(mapCosmetic).filter((item: CosmeticItem) => !isLegacyFrameAsset(item.slot === "frame" ? item.assetKey : null))
-      : [],
-    rewards: (rewardResult.data || []).filter((row: any) => row.reward_key !== "pass-shop-pitch-40").map((row: any) => ({
-      id: row.id, house: Number(row.house), rewardType: row.reward_type, cardTier: row.card_tier,
-      // The choice table is authoritative. The provenance fallback keeps the
-      // UI honest for claims made before the idempotent choice migration: if
-      // one of this reward's options is already owned, show it as selected.
-      selectedCosmeticId: choices.get(row.id) || ((row.options || [])
-        .map((option: any) => option.cosmetic?.id)
-        .find((id: string | undefined) => id && ownedByReward.get(row.id)?.has(id)) || null),
-      bonusCosmetic: row.bonus ? mapCosmetic(row.bonus) : null,
-      options: (row.options || []).map((option: any) => option.cosmetic).filter(Boolean).map(mapCosmetic),
-    })),
-    equipped: {
-      banner: loadout.banner_cosmetic_id || null, frame: loadout.frame_cosmetic_id || null, title: loadout.title_cosmetic_id || null,
-      aura: loadout.aura_cosmetic_id || null, nameplate: loadout.nameplate_cosmetic_id || null, background: loadout.background_cosmetic_id || null,
-      showcase: loadout.showcase_cosmetic_id || null, pitch: loadout.pitch_cosmetic_id || null,
-    },
-    shop: {
-      totalProgressPoints,
-      bonusPoints,
-      extraPointsEarned,
-      spentPoints,
-      balancePoints: Math.max(0, extraPointsEarned - spentPoints),
-      isUnlocked: Number(passRow?.progress || 0) >= 40,
-      hasStarted: shopRows.length > 0,
-      purchasedItems: shopRows.filter((row: any) => Boolean(row.purchased_at)).length,
-      items: shopItems,
-    },
-  };
+  if (ownedResult.error || rewardResult.error || catalogResult.error) return emptyCosmeticsDashboard;
+  return buildCosmeticsDashboard({
+    fantasySeasonId: fantasySeason?.id || null,
+    isAdmin: account.isAdmin,
+    owned: ownedResult.data || [],
+    catalog: catalogResult.data || [],
+    rewards: rewardResult.data || [],
+    choices: choiceResult.data || [],
+    loadout: loadoutResult.data || null,
+    pass: passResult.error ? null : passResult.data,
+    shop: shopResult.error ? [] : (shopResult.data || []),
+  } satisfies CosmeticsDashboardRows);
 }
 
 export async function cleanupMyLegacyCosmeticsPreview() {

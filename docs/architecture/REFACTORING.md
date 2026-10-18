@@ -22,12 +22,19 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
 | Partidas e pontuação | Em andamento | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; migrations 326–327 corrigem autorização SQL (não aplicadas); falta teste integrado e recuperação de projeções. |
-| Cartola e cosméticos | Em andamento | Salvamento de escalação, mutações do Passe e equipamento da conta extraídos; preservar as demais RPCs, inventário e isolamento por pelada/conta. |
+| Cartola e cosméticos | Em andamento | Salvamento de escalação, mutações do Passe, equipamento da conta e montagem do painel de cosméticos extraídos; preservar as demais RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-18 — modelo de leitura do painel de cosméticos
+
+- Extraído de `getMyCosmeticsDashboard` o mapeamento da coleção, recompensas, equipamento e loja para `src/modules/cosmetics/application/build-dashboard.ts`, com tipos de entrada/saída em `domain/dashboard-types.ts`. A Server Action continua responsável por sessão, pelada/temporada ativa e consultas; as sete leituras paralelas e o formato público da resposta foram preservados.
+- O modelo mantém a coleção e o equipamento globais da conta mesmo sem temporada do Cartola na pelada atual. A escolha explícita da recompensa prevalece, com fallback pela proveniência de resgates antigos; a prévia do catálogo continua restrita a ADM e omite molduras legadas. Opções nulas de uma recompensa são tratadas como lista vazia, como antes.
+- `npm run check` aprovado: typecheck, 679 testes em 123 arquivos e build de produção. Os cinco testes novos cobrem retorno vazio, coleção global, catálogo de ADM, escolha/proveniência e saldo/itens da loja.
+- Nenhuma migration criada ou aplicada; banco e produção não foram alterados. Este lote é estrutural e **não demonstra melhora de desempenho**. Continuam pendentes a separação das consultas em gateway tipado, teste integrado com duas peladas no Supabase de teste e medição da carga da tela antes de otimizar consultas.
 
 ### 2026-10-18 — equipar cosméticos globais da conta
 
