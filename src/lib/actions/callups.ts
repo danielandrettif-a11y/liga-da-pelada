@@ -96,15 +96,20 @@ export async function getActiveCallups(invite?: { callupId?: string; inviteToken
   const client = account.client;
   let invitedCallupId: string | null = null;
 
-  // O convite atual leva somente o token. Mantemos o parâmetro callupId na
-  // assinatura para que links antigos continuem abrindo, mas a fonte
-  // autoritativa sempre é o token validado pelo RPC.
+  // A rota curta resolve o ID antes de chegar aqui e reutiliza a RPC antiga,
+  // permitindo que o convite funcione mesmo antes da migration 312 ser
+  // aplicada. O fluxo apenas por token permanece como fallback compatível.
   if (invite?.inviteToken && account.user) {
-    const { data, error } = await client.rpc("claim_callup_invite_by_token", {
-      p_invite_token: invite.inviteToken,
-    });
+    const { data, error } = invite.callupId
+      ? await client.rpc("claim_callup_invite", {
+        p_callup_id: invite.callupId,
+        p_invite_token: invite.inviteToken,
+      })
+      : await client.rpc("claim_callup_invite_by_token", {
+        p_invite_token: invite.inviteToken,
+      });
     if (error || !data) return [];
-    invitedCallupId = data;
+    invitedCallupId = invite.callupId || String(data);
   }
 
   const league = await getSelectedLeague();

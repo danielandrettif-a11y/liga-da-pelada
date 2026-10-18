@@ -42,6 +42,7 @@ export default async function proxy(request: NextRequest) {
   const isPublicRoute = pathname === '/inicio' || pathname === '/estadio'
     || pathname === '/bq-manager/demo'
     || pathname.startsWith('/login') || pathname.startsWith('/cadastro')
+    || pathname.startsWith('/c/')
     || pathname.startsWith('/auth/') || pathname.startsWith('/convite/')
     || pathname.startsWith('/redefinir-senha') || pathname.startsWith('/api/')
     || pathname.startsWith('/internal/')

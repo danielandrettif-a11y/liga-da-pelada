@@ -135,7 +135,8 @@ export function CallupAdminCard({
     const venueText = callup.stadium_name ? `\n📍 Local: ${callup.stadium_name}` : "";
     const mapText = callup.stadium_map_url ? `\n🗺️ Como chegar: ${callup.stadium_map_url}` : "";
 
-    const text = `⚽ Convocação aberta para ${type}!\n📅 Data: ${dateFormatted}\n⏰ Horário: ${time}${venueText}${mapText}\n\n👉 Confirme sua presença:\n${buildCallupInviteUrl(callup.invite_token)}`;
+    const inviteUrl = buildCallupInviteUrl(callup.invite_token);
+    const text = `⚽ Convocação aberta para ${type}!\n${inviteUrl}\n\n📅 Data: ${dateFormatted}\n⏰ Horário: ${time}${venueText}${mapText}\n\n👉 Toque no primeiro link para confirmar sua presença e ver a lista!`;
 
     await navigator.clipboard.writeText(text);
     setCopied(true);
