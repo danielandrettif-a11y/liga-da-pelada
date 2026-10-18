@@ -58,6 +58,7 @@ import { hasCallupClosingMatch } from "@/lib/callup-lifecycle";
 import { WeatherBadge } from "./WeatherBadge";
 import type { EventWeather } from "@/lib/weather";
 import { setCallupFormat } from "@/lib/actions/rounds";
+import { buildCallupInviteUrl } from "@/lib/callup-invite";
 
 type Props = {
   callup: CallupWithEntries;
@@ -204,7 +205,7 @@ export function CallupBoard({
       ? `\n📍 *Localização:*\n🗺️ ${stadiumMapUrl}`
       : "";
 
-    const text = `⚽ *CONVOCAÇÃO ABERTA*\n${window.location.origin}/convocacao?callup=${callup.id}&invite=${callup.invite_token}\n\n🏆 *${type}*\n📅 *Data:* ${dateFormatted}\n⏰ *Horário:* ${startTime}${venueText}\n\n👉 Toque no link acima para confirmar sua presença e ver a lista!`;
+    const text = `⚽ *CONVOCAÇÃO ABERTA*\n\n🏆 *${type}*\n📅 *Data:* ${dateFormatted}\n⏰ *Horário:* ${startTime}${venueText}\n\n👉 Confirme sua presença e veja a lista:\n${buildCallupInviteUrl(callup.invite_token)}`;
 
     await navigator.clipboard.writeText(text);
     setLoading("copied");

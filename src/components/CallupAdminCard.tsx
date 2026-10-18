@@ -7,6 +7,7 @@ import { CalendarPlus, CheckCircle2, ChevronRight, Clock, Copy, Lock, MapPin, Pe
 import { closeCallup, createCallupPrelist, openCallup, setCallupVisibility, updateCallup, type CallupWithEntries } from "@/lib/actions/callups";
 import { setCallupFormat } from "@/lib/actions/rounds";
 import type { Stadium } from "@/lib/types";
+import { buildCallupInviteUrl } from "@/lib/callup-invite";
 
 export function CallupAdminCard({
   callups,
@@ -134,7 +135,7 @@ export function CallupAdminCard({
     const venueText = callup.stadium_name ? `\n📍 Local: ${callup.stadium_name}` : "";
     const mapText = callup.stadium_map_url ? `\n🗺️ Como chegar: ${callup.stadium_map_url}` : "";
 
-    const text = `⚽ Convocação aberta para ${type}!\n📅 Data: ${dateFormatted}\n⏰ Horário: ${time}${venueText}${mapText}\n\n👉 Confirme sua presença: ${window.location.origin}/convocacao?callup=${callup.id}&invite=${callup.invite_token}`;
+    const text = `⚽ Convocação aberta para ${type}!\n📅 Data: ${dateFormatted}\n⏰ Horário: ${time}${venueText}${mapText}\n\n👉 Confirme sua presença:\n${buildCallupInviteUrl(callup.invite_token)}`;
 
     await navigator.clipboard.writeText(text);
     setCopied(true);

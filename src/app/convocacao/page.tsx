@@ -86,7 +86,7 @@ export default async function ConvocacaoPage({
           {params.invite && !account.user ? "Entre na sua conta para abrir o convite da lista." : "Quando o ADM abrir a próxima lista, ela aparecerá aqui."}
         </p>
         {params.invite && !account.user && (
-          <Link href={`/login?next=${encodeURIComponent(`/convocacao?callup=${params.callup || ""}&invite=${params.invite}`)}`} className="mt-6 rounded-xl bg-accent px-5 py-3 text-sm font-black text-background">Entrar para abrir convite</Link>
+          <Link href={`/login?next=${encodeURIComponent(`/convocacao?invite=${params.invite}`)}`} className="mt-6 rounded-xl bg-accent px-5 py-3 text-sm font-black text-background">Entrar para abrir convite</Link>
         )}
         <Link href="/" className={params.invite && !account.user ? "mt-3 rounded-xl border border-border px-5 py-3 text-sm font-bold text-foreground" : "mt-6 rounded-xl border border-border px-5 py-3 text-sm font-bold text-foreground"}>Voltar ao início</Link>
       </div>

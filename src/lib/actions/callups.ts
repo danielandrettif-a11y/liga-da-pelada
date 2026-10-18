@@ -94,17 +94,23 @@ async function selectedRosterPlayer(playerId: string, client: Awaited<ReturnType
 export async function getActiveCallups(invite?: { callupId?: string; inviteToken?: string }): Promise<CallupWithEntries[]> {
   const account = await getCurrentAccount();
   const client = account.client;
-  const league = await getSelectedLeague();
-  if (!league) return [];
+  let invitedCallupId: string | null = null;
 
-  if (invite?.callupId && invite.inviteToken && account.user && await selectedCallup(invite.callupId, client)) {
-    await client.rpc("claim_callup_invite", {
-      p_callup_id: invite.callupId,
+  // O convite atual leva somente o token. Mantemos o parâmetro callupId na
+  // assinatura para que links antigos continuem abrindo, mas a fonte
+  // autoritativa sempre é o token validado pelo RPC.
+  if (invite?.inviteToken && account.user) {
+    const { data, error } = await client.rpc("claim_callup_invite_by_token", {
       p_invite_token: invite.inviteToken,
     });
+    if (error || !data) return [];
+    invitedCallupId = data;
   }
 
-  const { data, error } = await client
+  const league = await getSelectedLeague();
+  if (!league && !invitedCallupId) return [];
+
+  let query = client
     .from("callups")
     .select(`
       *,
@@ -119,11 +125,14 @@ export async function getActiveCallups(invite?: { callupId?: string; inviteToken
         teams (id, name, position, color, crest_url, team_players (player_id))
       )
     `)
-    .eq("league_id", league.id)
     .in("status", ["open", "locked", "converted"])
     .order("date", { ascending: true })
     .order("start_time", { ascending: true })
     .order("created_at", { ascending: true });
+  query = invitedCallupId
+    ? query.eq("id", invitedCallupId)
+    : query.eq("league_id", league!.id);
+  const { data, error } = await query;
 
   if (error) {
     if (error) console.error("Erro ao buscar convocacao:", error);
