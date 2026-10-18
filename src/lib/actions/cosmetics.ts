@@ -13,22 +13,22 @@ import { supabaseAccountCosmeticEquipmentGateway } from "@/modules/cosmetics/inf
 import { buildCosmeticsDashboard, emptyCosmeticsDashboard } from "@/modules/cosmetics/application/build-dashboard";
 import { buildEquippedCosmeticsSummary, buildPlayersEquippedCosmeticsMap } from "@/modules/cosmetics/application/build-equipped-summary";
 import { resolveAdminCosmeticsPreview } from "@/modules/cosmetics/application/admin-preview";
+import { cleanupLegacyCosmeticsPreview, dismissUnopenedBronzePassPack, resetTestPassRewardClaims } from "@/modules/cosmetics/application/admin-cleanup";
 import { readCosmeticsDashboardRows } from "@/modules/cosmetics/infrastructure/supabase-dashboard-reader";
 import { readAccountCosmeticLoadout, readPlayerCosmeticLoadout, readPlayersCosmeticLoadouts } from "@/modules/cosmetics/infrastructure/supabase-loadout-reader";
 import { supabaseAdminPreviewGateway } from "@/modules/cosmetics/infrastructure/supabase-admin-preview-gateway";
+import { readFantasySeasonId, supabaseAdminCosmeticsCleanupGateway } from "@/modules/cosmetics/infrastructure/supabase-admin-cleanup-gateway";
 import type { CosmeticsDashboard } from "@/modules/cosmetics/domain/dashboard-types";
 import type { CosmeticPreviewLoadout, EquippedCosmeticsSummary } from "@/modules/cosmetics/domain/equipped-summary";
 
 export type { CosmeticPassReward, SeasonPassShopItem, SeasonPassShop, CosmeticsDashboard } from "@/modules/cosmetics/domain/dashboard-types";
 export type { CosmeticPreviewLoadout, EquippedCosmeticsSummary } from "@/modules/cosmetics/domain/equipped-summary";
 
-async function getSelectedFantasySeasonId(client: any): Promise<string | null> {
+async function getSelectedFantasySeasonId(client: Parameters<typeof readFantasySeasonId>[0]): Promise<string | null> {
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
   if (!season) return null;
-  const { data } = await client.from("fantasy_seasons").select("id")
-    .eq("season_id", season.id).eq("league_id", league.id).maybeSingle();
-  return data?.id || null;
+  return readFantasySeasonId(client, league.id, season.id);
 }
 
 export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
@@ -47,44 +47,41 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
 
 export async function cleanupMyLegacyCosmeticsPreview() {
   const account = await getCurrentAccount();
-  if (!account.user || !account.isAdmin) return { success: false, error: "A prévia é exclusiva para administradores." };
-  const client: any = account.client;
-  const fantasySeasonId = await getSelectedFantasySeasonId(client);
-  if (!fantasySeasonId) return { success: false, error: "Passe da pelada selecionada não encontrado." };
-  const { data, error } = await client.rpc("cleanup_my_cosmetics_preview", { p_fantasy_season_id: fantasySeasonId });
-  if (error) return { success: false, error: error.message };
+  if (!account.user || !account.isAdmin) return { success: false as const, error: "A prévia é exclusiva para administradores." };
+  const fantasySeasonId = await getSelectedFantasySeasonId(account.client);
+  const result = await cleanupLegacyCosmeticsPreview(fantasySeasonId,
+    supabaseAdminCosmeticsCleanupGateway(account.client));
+  if (!result.success) return result;
   revalidatePath("/meu-perfil");
   revalidatePath("/jogadores");
   revalidatePath("/ranking");
-  return { success: true, removed: Number(data || 0) };
+  return result;
 }
 
 export async function dismissMyUnopenedBronzePassPack() {
   const account = await getCurrentAccount();
-  if (!account.user || !account.isAdmin) return { success: false, error: "A limpeza é exclusiva para administradores." };
-  const client: any = account.client;
-  const fantasySeasonId = await getSelectedFantasySeasonId(client);
-  if (!fantasySeasonId) return { success: false, error: "Passe da pelada selecionada não encontrado." };
-  const { data, error } = await client.rpc("dismiss_my_unopened_bronze_pass_pack", { p_fantasy_season_id: fantasySeasonId });
-  if (error) return { success: false, error: error.message };
+  if (!account.user || !account.isAdmin) return { success: false as const, error: "A limpeza é exclusiva para administradores." };
+  const fantasySeasonId = await getSelectedFantasySeasonId(account.client);
+  const result = await dismissUnopenedBronzePassPack(fantasySeasonId,
+    supabaseAdminCosmeticsCleanupGateway(account.client));
+  if (!result.success) return result;
   revalidatePath("/cartola");
   revalidatePath("/meu-perfil");
-  return { success: true, dismissed: Number(data || 0) };
+  return result;
 }
 
 export async function resetMyTestPassRewardClaims(fantasySeasonId: string) {
   const account = await getCurrentAccount();
-  if (!account.user || !account.isAdmin) return { success: false, error: "A limpeza é exclusiva para administradores." };
-  if (!fantasySeasonId) return { success: false, error: "Temporada do Passe não encontrada." };
-  const client: any = account.client;
-  if (fantasySeasonId !== await getSelectedFantasySeasonId(client))
-    return { success: false, error: "Passe não pertence à pelada selecionada." };
-  const { data, error } = await client.rpc("reset_my_test_pass_cosmetic_claims", { p_fantasy_season_id: fantasySeasonId });
-  if (error) return { success: false, error: error.message };
+  if (!account.user || !account.isAdmin) return { success: false as const, error: "A limpeza é exclusiva para administradores." };
+  if (!fantasySeasonId) return { success: false as const, error: "Temporada do Passe não encontrada." };
+  const selectedFantasySeasonId = await getSelectedFantasySeasonId(account.client);
+  const result = await resetTestPassRewardClaims(fantasySeasonId, selectedFantasySeasonId,
+    supabaseAdminCosmeticsCleanupGateway(account.client));
+  if (!result.success) return result;
   revalidatePath("/meu-perfil");
   revalidatePath("/jogadores");
   revalidatePath("/passe");
-  return { success: true, removed: Number(data || 0) };
+  return result;
 }
 
 export async function claimPassCosmetic(rewardId: string, cosmeticId: string) {

@@ -22,19 +22,26 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
 | Partidas e pontuação | Em andamento | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; migrations 326–327 corrigem autorização SQL (não aplicadas); falta teste integrado e recuperação de projeções. |
-| Cartola e cosméticos | Em andamento | Salvamento de escalação, mutações do Passe, equipamento da conta, painel, loadouts e prévia administrativa extraídos; preservar as demais RPCs, inventário e isolamento por pelada/conta. |
+| Cartola e cosméticos | Em andamento | Salvamento de escalação, mutações/limpezas do Passe, equipamento da conta, painel, loadouts e prévia administrativa extraídos; preservar as demais RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
 
+### 2026-10-18 — limpezas administrativas do Passe
+
+- Extraídas `cleanupMyLegacyCosmeticsPreview`, `dismissMyUnopenedBronzePassPack` e `resetMyTestPassRewardClaims` para `application/admin-cleanup.ts` e `infrastructure/supabase-admin-cleanup-gateway.ts`. A consulta da temporada do Cartola, compartilhada com resgate e compra, agora fica no gateway e continua filtrada por `season_id` e `league_id`.
+- As Server Actions continuam exigindo sessão e papel ADM da pelada selecionada antes de consultar a temporada. O reset confere o ID enviado contra a temporada selecionada antes da RPC. As três RPCs recebem `p_fantasy_season_id`; a migration 263 já impõe `is_league_admin` no banco e limita a alteração à própria conta. Mensagens públicas, contagens e caminhos revalidados após sucesso foram preservados.
+- `npm run check` aprovado: tipagem, 717 testes em 131 arquivos e build de produção. Doze testes novos cobrem ausência/troca de temporada, negação antes da consulta, parâmetros das RPCs, erros, contagens e revalidação somente após sucesso.
+- Nenhuma migration criada ou aplicada; nenhuma limpeza foi executada contra banco real neste lote. Pendente: validar as três RPCs no Supabase de teste com duas peladas e confirmar o comportamento visual da coleção após cada operação. O lote é estrutural, sem ganho de velocidade medido.
+
 ### 2026-10-18 — prévia administrativa dos cosméticos
 
 - A prévia de `getAdminCosmeticsPreview` foi extraída para `application/admin-preview.ts` e `infrastructure/supabase-admin-preview-gateway.ts`. A Server Action mantém a identidade da sessão; o caso de uso exige ADM da pelada selecionada e que o jogador solicitado seja o perfil vinculado à própria conta **antes** de consultar o catálogo.
 - Os IDs recebidos por URL continuam sendo conferidos com o catálogo e com o slot de cada item. Entradas adulteradas com slots desconhecidos ou IDs que não sejam strings são descartadas; IDs repetidos geram uma só consulta. O retorno público continua limitado às oito chaves visuais, nunca às linhas brutas do catálogo.
 - `npm run check` aprovado: tipagem, 705 testes em 128 arquivos e build de produção. Sete testes novos cobrem negação pré-consulta, entrada adulterada, correspondência do slot, erro/catálogo vazio e filtros enviados ao Supabase.
-- Nenhuma migration criada ou aplicada e nenhum banco alterado. Não há ganho de desempenho medido. Pendente: teste integrado da prévia no Supabase de teste e revisão das operações administrativas de limpeza de cosméticos ainda presentes na Action.
+- Nenhuma migration criada ou aplicada e nenhum banco alterado. Não há ganho de desempenho medido. Pendente: teste integrado da prévia no Supabase de teste. As operações administrativas de limpeza foram extraídas no lote seguinte.
 
 ### 2026-10-18 — leitura dos cosméticos equipados
 
