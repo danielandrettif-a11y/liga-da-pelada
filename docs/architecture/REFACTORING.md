@@ -10,6 +10,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - As RPCs de substituição, desfazer substituição e disponibilidade conferem o ADM da pelada do alvo, além da RLS. Ver [ADR 003](./adr-003-match-rpc-league-authorization.md).
 - A exclusão de gol ao vivo exige autorização de ADM dentro da RPC `SECURITY DEFINER`, não apenas na Server Action. Ver [ADR 004](./adr-004-live-goal-deletion-authorization.md).
 - Em correções finalizadas, a RPC concluída é sucesso mesmo se uma projeção posterior falhar; a pendência volta como aviso. Ver [ADR 005](./adr-005-postcommit-finished-goal-corrections.md).
+- O Cartola confirma titulares e reserva pelo recibo da RPC transacional, sem uma segunda leitura de reserva; resposta sem ID exige conferência posterior. Ver [ADR 006](./adr-006-fantasy-lineup-atomic-receipt.md).
 - Preservar assinaturas e respostas públicas das Server Actions durante a migração; converter uma fatia vertical por vez.
 - Não criar agora tabela de estatísticas acumuladas: a view `player_season_stats` já agrega `player_round_stats`. Medir antes de alterar esquema.
 
@@ -28,12 +29,19 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-17 — confirmação do banco de reserva do Cartola
+
+- A RPC `save_fantasy_lineup_with_reserve` já grava escalação e reserva na mesma transação. Removida a consulta posterior de `fantasy_lineup_reserves`, que podia falhar após o commit e induzir o usuário a repetir o salvamento. O ID retornado pela RPC agora é o recibo da gravação; sem ID e sem erro, o resultado pede conferência e mantém o rascunho local. Ver [ADR 006](./adr-006-fantasy-lineup-atomic-receipt.md).
+- Falha ao revalidar as telas depois da gravação passa a ser aviso, não falha de salvamento. A interface prioriza o aviso e só limpa o rascunho quando o recibo confirma a escalação; sempre solicita atualização dos dados após sucesso.
+- `npm run check` aprovado: typecheck, 663 testes em 116 arquivos e build de produção. Os testes do caso de uso cobrem recibo confirmado, resposta sem ID e erro da RPC; o gateway garante que não há leitura pós-gravação.
+- Nenhuma migration criada ou aplicada. Falta validação integrada em Supabase de teste da resposta com reserva e da leitura posterior. Erro de rede entre o commit e a resposta da RPC segue ambíguo.
+
 ### 2026-10-17 — salvamento da escalação do Cartola
 
 - Extraído `saveFantasyLineup` para validações e mapeamento dos slots em domínio, escolha entre rodada de teste/oficial e verificação da reserva em aplicação, e chamadas Supabase em infraestrutura. A Server Action mantém autenticação, pelada ativa, revalidação e contrato público. As RPCs SQL seguem responsáveis por elegibilidade, mercado, preços e autorização final.
 - O tamanho exigido continua vindo do snapshot da rodada, com fallback para a configuração da pelada. Preservadas as mensagens de validação, os parâmetros das duas RPCs e a confirmação de reserva após salvar. Uma falha na consulta de sessão de teste agora interrompe o salvamento, evitando enviar por engano à rotina oficial.
 - `npm run check` aprovado: typecheck, 663 testes em 116 arquivos e build de produção. Testes novos cobrem validação, isolamento por pelada, caminhos oficial/de teste, falhas das RPCs, parâmetros e verificação do banco de reserva.
-- Nenhuma migration criada ou aplicada. Falta teste integrado em Supabase de teste com duas peladas e rodadas oficiais/de teste. A confirmação da reserva ainda ocorre depois da RPC; uma falha nessa leitura pode deixar a escalação salva com resposta de erro. Tratar esse estado ambíguo em lote próprio antes de considerar o fluxo totalmente confiável.
+- Nenhuma migration criada ou aplicada. Falta teste integrado em Supabase de teste com duas peladas e rodadas oficiais/de teste. A confirmação posterior da reserva foi eliminada no lote seguinte, com base na atomicidade da RPC.
 
 ### 2026-10-17 — correção de gols em partidas finalizadas
 

@@ -19,7 +19,6 @@ function setup() {
     hasTestSession: vi.fn().mockResolvedValue(false),
     saveTest: vi.fn().mockResolvedValue(null),
     saveRegular: vi.fn().mockResolvedValue({ lineupId: "lineup-1", error: null }),
-    verifyReserve: vi.fn().mockResolvedValue(true),
   } satisfies FantasyLineupGateway;
   return gateway;
 }
@@ -37,25 +36,25 @@ describe("salvar escalação na pelada", () => {
     expect(gateway.saveRegular).not.toHaveBeenCalled();
   });
 
-  it("salva rodada oficial com slots, reserva e checagem posterior", async () => {
+  it("confia no commit atômico da RPC oficial para titulares e reserva", async () => {
     const gateway = setup();
     const withReserve = { ...input, reservePlayerId: "three", reserveRole: "ATA" as const };
-    expect(await saveFantasyLineupForLeague(withReserve, league, gateway)).toEqual({ success: true });
+    expect(await saveFantasyLineupForLeague(withReserve, league, gateway)).toEqual({ success: true, confirmed: true, warning: undefined });
     expect(gateway.saveRegular).toHaveBeenCalledWith(withReserve, [
       { player_id: "one", slot_index: 0, slot_role: "ATA" },
       { player_id: "two", slot_index: 1, slot_role: "GOL" },
     ]);
-    expect(gateway.verifyReserve).toHaveBeenCalledWith("lineup-1", "three", "ATA");
-    gateway.verifyReserve.mockResolvedValueOnce(false);
+    expect(gateway.saveRegular).toHaveBeenCalledOnce();
+    gateway.saveRegular.mockResolvedValueOnce({ lineupId: null, error: null });
     expect(await saveFantasyLineupForLeague(withReserve, league, gateway)).toMatchObject({
-      success: false, error: expect.stringContaining("banco de reserva não foi confirmado"),
+      success: true, confirmed: false, warning: expect.stringContaining("confira o time"),
     });
   });
 
   it("usa a RPC de teste sem reserva e propaga os erros das RPCs", async () => {
     const gateway = setup();
     gateway.hasTestSession.mockResolvedValue(true);
-    expect(await saveFantasyLineupForLeague(input, league, gateway)).toEqual({ success: true });
+    expect(await saveFantasyLineupForLeague(input, league, gateway)).toEqual({ success: true, confirmed: true, warning: undefined });
     expect(gateway.saveTest).toHaveBeenCalledOnce();
     expect(gateway.saveRegular).not.toHaveBeenCalled();
     expect(await saveFantasyLineupForLeague({

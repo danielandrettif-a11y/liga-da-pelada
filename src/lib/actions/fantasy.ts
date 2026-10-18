@@ -1798,21 +1798,29 @@ export async function getFantasyDashboard() {
 export async function saveFantasyLineup(input: FantasyLineupSubmission) {
   try {
     const account = await getCurrentAccount();
-    if (!account.user) return { success: false, error: "Entre na sua conta para escalar." };
+    if (!account.user) return { success: false as const, error: "Entre na sua conta para escalar." };
     const league = await getActiveLeague();
     const result = await saveFantasyLineupForLeague(input, {
       id: league.id,
       playersPerTeam: league.players_per_team,
     }, supabaseFantasyLineupGateway(account.client));
     if (!result.success) return result;
-    revalidatePath("/cartola");
-    revalidatePath("/");
-    revalidatePath("/notificacoes");
-    return result;
+    try {
+      revalidatePath("/cartola");
+      revalidatePath("/");
+      revalidatePath("/notificacoes");
+      return result;
+    } catch (error) {
+      console.error("Escalação salva, mas a atualização das telas falhou:", error);
+      return {
+        ...result,
+        warning: [result.warning, "A tela não atualizou. Reabra o Cartola para ver o time."].filter(Boolean).join(" "),
+      };
+    }
   } catch (error) {
     console.error("Erro inesperado ao salvar escalação do Cartola:", error);
     return {
-      success: false,
+      success: false as const,
       error: "Não foi possível salvar agora. Atualize a página e tente novamente.",
     };
   }

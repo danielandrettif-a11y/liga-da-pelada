@@ -2,8 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import { supabaseFantasyLineupGateway } from "./supabase-lineup-gateway";
 import type { FantasyLineupSubmission } from "../domain/lineup-submission";
 
-vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => null }));
-
 const input: FantasyLineupSubmission = {
   fantasySeasonId: "season-1", roundId: "round-1", playerIds: ["one"],
   slotAssignments: [{ playerId: "one", slotIndex: 0, slotRole: "GOL" }],
@@ -22,17 +20,13 @@ function setup() {
     select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
   };
-  const reserveQuery = {
-    select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
-    maybeSingle: vi.fn().mockResolvedValue({ data: { player_id: "two", slot_role: "ATA" }, error: null }),
-  };
   const db = {
     from: vi.fn((table: string) => table === "fantasy_rounds" ? roundQuery
-      : table === "fantasy_test_sessions" ? testQuery : reserveQuery),
+      : table === "fantasy_test_sessions" ? testQuery : null),
     rpc: vi.fn().mockResolvedValue({ data: "lineup-1", error: null }),
   };
   const gateway = supabaseFantasyLineupGateway(db as unknown as Parameters<typeof supabaseFantasyLineupGateway>[0]);
-  return { gateway, db, roundQuery, testQuery, reserveQuery };
+  return { gateway, db, roundQuery, testQuery };
 }
 
 describe("gateway de escalação do Cartola", () => {
@@ -64,12 +58,10 @@ describe("gateway de escalação do Cartola", () => {
     });
   });
 
-  it("confere reserva salva pelo mesmo lineup e jogador", async () => {
-    const { gateway, reserveQuery } = setup();
-    expect(await gateway.verifyReserve("lineup-1", "two", "ATA")).toBe(true);
-    expect(reserveQuery.eq).toHaveBeenCalledWith("lineup_id", "lineup-1");
-    expect(reserveQuery.eq).toHaveBeenCalledWith("player_id", "two");
-    reserveQuery.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
-    expect(await gateway.verifyReserve("lineup-1", "two", "ATA")).toBe(false);
+  it("não faz leitura separada depois da RPC e preserva erros de gravação", async () => {
+    const { gateway, db } = setup();
+    db.rpc.mockResolvedValueOnce({ data: null, error: { message: "Mercado fechado" } });
+    expect(await gateway.saveRegular(input, [])).toEqual({ lineupId: null, error: "Mercado fechado" });
+    expect(db.from).not.toHaveBeenCalled();
   });
 });

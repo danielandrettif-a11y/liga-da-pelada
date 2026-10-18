@@ -955,21 +955,21 @@ export function FantasyExperience({
         });
         setMessage(
           result.success
-            ? betweenRounds
+            ? result.warning || (betweenRounds
               ? "Elenco permanente salvo para a próxima Ranked!"
               : validPlayerIds.length === playersPerTeam && captainId
               ? "Escalação salva e pronta!"
-              : "Rascunho salvo. Complete antes do primeiro jogo."
+              : "Rascunho salvo. Complete antes do primeiro jogo.")
             : result.error || "Não foi possível salvar."
         );
-        if (result.success) {
+        if (result.success && result.confirmed) {
           setSavedSignature(currentSignature);
           try {
             localStorage.removeItem(draftStorageKey);
             localStorage.removeItem(legacyStorageKey);
           } catch {}
-          requestRefresh(0);
         }
+        if (result.success) requestRefresh(0);
       } catch {
         setMessage("A conexão falhou ao salvar. Sua tela foi mantida; tente novamente.");
       }

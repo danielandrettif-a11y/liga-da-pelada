@@ -17,7 +17,6 @@ export type FantasyLineupGateway = {
     lineupId: string | null;
     error: string | null;
   }>;
-  verifyReserve(lineupId: string | null, playerId: string, role: string): Promise<boolean>;
 };
 
 export async function saveFantasyLineupForLeague(
@@ -46,12 +45,15 @@ export async function saveFantasyLineupForLeague(
   } else {
     const result = await gateway.saveRegular(input, slots);
     if (result.error) return { success: false as const, error: result.error };
-    if (input.reservePlayerId && !await gateway.verifyReserve(result.lineupId, input.reservePlayerId, input.reserveRole!)) {
+    // A RPC grava titulares e reserva na mesma transação. A resposta sem erro
+    // confirma ambos; uma leitura separada não faz parte do commit.
+    if (!result.lineupId) {
       return {
-        success: false as const,
-        error: "A escalação foi enviada, mas o banco de reserva não foi confirmado. Tente salvar novamente.",
+        success: true as const,
+        confirmed: false,
+        warning: "Escalação enviada, mas o banco não confirmou o identificador. Reabra o Cartola e confira o time antes de jogar.",
       };
     }
   }
-  return { success: true as const };
+  return { success: true as const, confirmed: true, warning: undefined as string | undefined };
 }

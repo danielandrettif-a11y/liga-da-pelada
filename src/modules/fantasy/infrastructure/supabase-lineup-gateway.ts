@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createServiceClient } from "@/lib/supabase/service";
 import type { FantasyLineupGateway } from "../application/save-lineup";
 
 export function supabaseFantasyLineupGateway(client: SupabaseClient): FantasyLineupGateway {
@@ -45,17 +44,6 @@ export function supabaseFantasyLineupGateway(client: SupabaseClient): FantasyLin
         p_reserve_slot_role: input.reserveRole,
       });
       return { lineupId: data as string | null, error: error?.message ?? null };
-    },
-    async verifyReserve(lineupId, playerId, role) {
-      const readClient = createServiceClient() || client;
-      const { data, error } = await readClient.from("fantasy_lineup_reserves")
-        .select("player_id, slot_role").eq("lineup_id", lineupId)
-        .eq("player_id", playerId).maybeSingle();
-      if (error || !data || data.slot_role !== role) {
-        console.error("Reserva não confirmada após salvar a escalação:", error);
-        return false;
-      }
-      return true;
     },
   };
 }
