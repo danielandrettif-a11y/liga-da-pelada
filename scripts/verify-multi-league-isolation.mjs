@@ -28,6 +28,7 @@ const admin = createClient(url, anonKey, options);
 const player = createClient(url, anonKey, options);
 const suffix = randomUUID().slice(0, 8);
 const created = [];
+const createdRounds = [];
 
 function check(condition, message) {
   if (!condition) throw new Error(message);
@@ -55,6 +56,10 @@ async function createLeague(name, tier, visibility) {
 
 async function cleanup() {
   const failures = [];
+  for (const roundId of [...createdRounds].reverse()) {
+    const { error } = await admin.from("rounds").delete().eq("id", roundId);
+    if (error) failures.push("Rodada " + roundId + ": " + error.message);
+  }
   for (const league of [...created].reverse()) {
     const { error } = await admin.rpc("delete_league_permanently", {
       p_league_id: league.id, p_confirm_name: league.name,
@@ -153,6 +158,65 @@ try {
     && membership[0].is_active === true && membership[0].is_favorite === false,
   "A reentrada restaurou papel ou favorito antigos.");
 
+  // A RPC de disponibilidade usa a liga da rodada, nao o antigo papel global.
+  // Um jogador inexistente faz a chamada parar antes de qualquer UPDATE.
+  const basicSeason = seasons.find((item) => item.league_id === basicId);
+  const { data: authRound, error: roundError } = await admin.from("rounds").insert({
+    league_id: basicId,
+    season_id: basicSeason.id,
+    number: 1,
+    date: "2099-01-01",
+    round_type: "friendly",
+  }).select("id").single();
+  if (roundError || !authRound) {
+    throw new Error("Rodada de autorizacao: " + (roundError?.message || "sem ID"));
+  }
+  createdRounds.push(authRound.id);
+  const missingPlayerId = randomUUID();
+  const availabilityArgs = {
+    p_round_id: authRound.id,
+    p_player_id: missingPlayerId,
+    p_status: "available",
+  };
+  const playerAvailability = await player.rpc("set_round_player_availability", availabilityArgs);
+  check(Boolean(playerAvailability.error)
+    && playerAvailability.error.message.includes("Somente administradores desta pelada"),
+  "Jogador comum conseguiu passar pela autorizacao da RPC de disponibilidade.");
+
+  const promote = await admin.from("league_members").update({ role: "admin" })
+    .eq("league_id", basicId).eq("player_id", playerId).select("id");
+  if (promote.error || promote.data?.length !== 1) {
+    throw new Error("Promocao do ADM da pelada: "
+      + (promote.error?.message || "vinculo ausente"));
+  }
+  const leagueAdminAvailability = await player.rpc(
+    "set_round_player_availability", availabilityArgs,
+  );
+  check(Boolean(leagueAdminAvailability.error)
+    && leagueAdminAvailability.error.message.includes("Jogador nao encontrado nesta rodada"),
+  "ADM da pelada sem papel global nao passou pela autorizacao da RPC.");
+
+  const completeSeason = seasons.find((item) => item.league_id === completeId);
+  const { data: otherRound, error: otherRoundError } = await admin.from("rounds").insert({
+    league_id: completeId,
+    season_id: completeSeason.id,
+    number: 1,
+    date: "2099-01-02",
+    round_type: "friendly",
+  }).select("id").single();
+  if (otherRoundError || !otherRound) {
+    throw new Error("Rodada da outra pelada: "
+      + (otherRoundError?.message || "sem ID"));
+  }
+  createdRounds.push(otherRound.id);
+  const crossLeagueAvailability = await player.rpc("set_round_player_availability", {
+    ...availabilityArgs,
+    p_round_id: otherRound.id,
+  });
+  check(Boolean(crossLeagueAvailability.error)
+    && crossLeagueAvailability.error.message.includes("Somente administradores desta pelada"),
+    "ADM de uma pelada passou pela autorizacao de outra pelada.");
+
   const crossFavorite = await player.rpc("toggle_league_favorite", {
     p_league_id: completeId,
   });
@@ -170,4 +234,4 @@ if (testError) throw testError;
 if (cleanupFailures.length) {
   throw new Error("O ensaio passou, mas a limpeza falhou: " + cleanupFailures.join(" | "));
 }
-console.log("OK: duas peladas isoladas, modos corretos, reentrada e exclusao seguras.");
+console.log("OK: peladas isoladas, reentrada e autorizacao da RPC por pelada.");

@@ -7,6 +7,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - Monólito modular e DDD pragmático; regras puras em domínio, orquestração em aplicação e Supabase na infraestrutura. Ver [ADR 001](./adr-001-modular-monolith.md).
 - Manter RPCs SQL e RLS como autoridade para transações, consistência e isolamento entre peladas. Não duplicar essas regras em TypeScript.
 - A retirada de convidado pelo criador usa RPC específica e atômica, sem conceder acesso direto à normalização interna. Ver [ADR 002](./adr-002-atomic-callup-creator-removal.md).
+- As RPCs de substituição, desfazer substituição e disponibilidade conferem o ADM da pelada do alvo, além da RLS. Ver [ADR 003](./adr-003-match-rpc-league-authorization.md).
 - Preservar assinaturas e respostas públicas das Server Actions durante a migração; converter uma fatia vertical por vez.
 - Não criar agora tabela de estatísticas acumuladas: a view `player_season_stats` já agrega `player_round_stats`. Medir antes de alterar esquema.
 
@@ -17,13 +18,21 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
-| Partidas e pontuação | Em andamento | Registro de gol, encerramento, goleiros e substituição extraídos; auditar autorização SQL legada, depois correções e reprocessamento. |
+| Partidas e pontuação | Em andamento | Registro de gol, encerramento, goleiros e substituição extraídos; migration 326 corrige três RPCs legadas (não aplicada); falta teste integrado, correções e reprocessamento. |
 | Cartola e cosméticos | Pendente | Preservar RPCs, inventário e isolamento por pelada/conta. |
 | Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-17 — autorização das RPCs legadas de substituição
+
+- A migration `326_scope_match_substitution_rpcs_to_league.sql` troca `is_app_admin()` por `is_league_admin()` nas RPCs `substitute_match_player`, `undo_last_match_substitution` e `set_round_player_availability`. A liga é derivada da partida ou rodada persistida, nunca de um parâmetro enviado pelo cliente. A RLS da migration 255 continua como segunda barreira; assinaturas, regras de elegibilidade e `SECURITY INVOKER` foram preservados.
+- A migration revoga `EXECUTE` de `PUBLIC` e `anon` e concede somente a `authenticated`. Ela não atualiza linhas. Ver [ADR 003](./adr-003-match-rpc-league-authorization.md) para alternativas e riscos.
+- O ensaio `test:multi-league` foi ampliado com rodadas amistosas descartáveis e verifica que um jogador comum e um ADM de outra pelada não passam pela autorização de disponibilidade, enquanto um ADM local sem papel global passa e chega à validação do jogador. As rodadas são apagadas antes das peladas na limpeza.
+- `node --check scripts/verify-multi-league-isolation.mjs` e `npm run check` aprovados: tipagem, 624 testes em 106 arquivos e build. O ensaio de banco não foi executado nesta etapa.
+- **Ainda não aplicada nem testada contra banco.** A migration 325 também segue pendente. Aplicar 325 e depois 326 no Supabase de teste antes do aplicativo; executar o ensaio somente em base marcada como descartável. Testar manualmente substituição e desfazer com ADMs de duas peladas, pois o ensaio automatizado ainda não cobre esses dois caminhos. A auditoria das demais RPCs legadas com `is_app_admin()` segue pendente por área.
 
 ### 2026-10-17 — substituição durante a partida
 
