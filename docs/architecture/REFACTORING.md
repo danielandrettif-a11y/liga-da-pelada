@@ -22,14 +22,21 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | --- | --- | --- |
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
-| Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
-| Partidas e pontuação | Em andamento | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; migrations 326–327 corrigem autorização SQL (não aplicadas); falta teste integrado e recuperação de projeções. |
+| Convocação e rodadas | Concluído nesta fase | Formato, abertura, pré-lista, edição, estado e participação extraídos; migrations 325 e 328 aplicadas e validadas em teste e oficial; isolamento entre duas peladas aprovado. |
+| Partidas e pontuação | Em andamento | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; migrations 326–327 aplicadas e autorização por pelada aprovada. Recuperação automática de projeções permanece como evolução separada. |
 | Cartola e cosméticos | Concluído nesta fase | Mutações e leitores principais extraídos; ranking, históricos, ficha e destaques usam modelos analíticos e filtros sazonais. |
 | Pagamentos | Concluído nesta fase | Itens, parcelas, PIX, rateio, obrigações, checklist e auditoria separados em domínio, aplicação e infraestrutura, mantendo RPCs e escopo por pelada. |
 | Estatísticas e demais áreas | Concluído nesta fase | Pontuação canônica e modelos analíticos extraídos; leitores sazonais separados; rankings duplicados removidos; cache limitado à requisição. |
 | Avaliação de tabela de acumulados | Medida; sem justificativa para criar | Benchmark no Supabase de teste teve paridade total e p95 abaixo de 1 s nas três leituras. Reavaliar somente após crescimento representativo. |
 
 ## Registro de lotes
+
+### 2026-10-19 — implantação e validação das migrations 325–328
+
+- A inspeção direta do catálogo confirmou que teste e oficial ainda tinham as funções legadas: a RPC da migration 325 não existia, as três RPCs da 326 usavam `is_app_admin()`, a exclusão de gol da 327 não verificava a pelada internamente e a preferência da 328 não existia. O histórico automático do Supabase não era utilizável porque as migrations anteriores foram executadas manualmente no SQL Editor.
+- Aplicadas, em ordem, as migrations 325, 326, 327 e 328 primeiro no projeto de teste e depois no oficial. A validação pós-aplicação confirmou em ambos: retirada atômica do convidado, autorização via `is_league_admin`, remoção de `EXECUTE` do papel `anon`, verificação interna na exclusão de gol, coluna de preferência e trigger de saída da convocação.
+- Executado no Supabase de teste o ensaio mutável `verify-multi-league-isolation.mjs` com duas contas e peladas temporárias. Foram aprovados criação básica/completa, descoberta aberta/privada, RLS, reentrada, disponibilidade e exclusão de gol por ADM local, bloqueio de jogador comum e de ADM de outra pelada, e proteção de favorito entre ligas.
+- O ensaio não foi executado no banco oficial. A limpeza do teste foi verificada por consulta ao final: 0 peladas E2E e 0 contas E2E restantes. Nenhum dado de usuário do oficial foi modificado; somente as quatro alterações de esquema/funções previstas foram aplicadas.
 
 ### 2026-10-19 — conclusão dos modelos analíticos e benchmark
 
