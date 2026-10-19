@@ -744,158 +744,10 @@ export async function calculateRoundStats(roundId: string) {
   }
 }
 
-async function getRankingUncached(seasonId: string, leagueId: string) {
-  const league = await getSelectedLeague();
-  if (!league || league.id !== leagueId) return [];
-  const supabase = await createServerClient();
-
-  // 1. Tentar buscar direto da View SQL otimizada (PostgreSQL SUM + GROUP BY + ORDER BY)
-  const viewStartedAt = performance.now();
-  const { data: viewData, error: viewError } = await supabase
-    .from("player_season_stats")
-    .select(`
-      player_id,
-      player_name,
-      player_nickname,
-      player_avatar_url,
-      player_profile,
-      player_is_goalkeeper,
-      player_member_category,
-      player_is_selectable,
-      games,
-      wins,
-      draws,
-      losses,
-      goals,
-      assists,
-      points,
-      ranking_points,
-      win_rate
-    `)
-    .eq("season_id", seasonId)
-    .eq("round_type", "official")
-    .eq("player_is_selectable", true)
-    .in("player_member_category", ["player", "guest"])
-    .order("points", { ascending: false })
-    .order("wins", { ascending: false })
-    .order("goals", { ascending: false })
-    .order("assists", { ascending: false });
-  logStatsQuery("season_ranking", "season_view", viewStartedAt, viewData?.length || 0, Boolean(viewError));
-
-  if (!viewError && viewData) {
-    return viewData.map((row: any) => ({
-      player: {
-        id: row.player_id,
-        name: row.player_name,
-        nickname: row.player_nickname,
-        avatar_url: row.player_avatar_url,
-        player_profile: row.player_profile,
-        is_goalkeeper: row.player_is_goalkeeper,
-        member_category: row.player_member_category,
-        is_selectable: row.player_is_selectable,
-      } as Player,
-      games: Number(row.games || 0),
-      wins: Number(row.wins || 0),
-      draws: Number(row.draws || 0),
-      losses: Number(row.losses || 0),
-      goals: Number(row.goals || 0),
-      assists: Number(row.assists || 0),
-      points: roundRankingPoints(Number(row.ranking_points ?? row.points ?? 0)),
-      legacyPoints: roundRankingPoints(Number(row.points || 0)),
-      positionBonus: roundRankingPoints(Number(row.ranking_points ?? row.points ?? 0) - Number(row.points || 0)),
-      winRate: Number(row.win_rate || 0),
-    }));
-  }
-
-  // Fallback seguro se a view ainda não estiver no banco
-  const roundIds = await getActiveSeasonRoundIds(leagueId, "official");
-  if (roundIds.length === 0) return [];
-
-  const fallbackStartedAt = performance.now();
-  const { data, error } = await supabase
-    .from("player_round_stats")
-    .select(`
-      player_id,
-      round_id,
-      games,
-      wins,
-      draws,
-      losses,
-      goals,
-      assists,
-      points,
-      ranking_points,
-      player:player_id (
-        id,
-        name,
-        nickname,
-        avatar_url,
-        player_profile,
-        is_goalkeeper,
-        member_category,
-        is_selectable
-      )
-    `)
-    .in("round_id", roundIds);
-  logStatsQuery("season_ranking", "round_stats", fallbackStartedAt, data?.length || 0, Boolean(error));
-
-  if (error || !data) {
-    if (error) console.error("Erro ao buscar ranking:", error);
-    return [];
-  }
-
-  const map = new Map<string, any>();
-
-  for (const row of data) {
-    if (!isSelectableAthlete(row.player as unknown as Player | null)) continue;
-    const pid = row.player_id;
-    if (!map.has(pid)) {
-      map.set(pid, {
-        player: row.player as unknown as Player,
-        games: 0,
-        wins: 0,
-        draws: 0,
-        losses: 0,
-        goals: 0,
-        assists: 0,
-        points: 0,
-        legacyPoints: 0,
-        positionBonus: 0,
-      });
-    }
-
-    const s = map.get(pid);
-    s.games += row.games;
-    s.wins += row.wins;
-    s.draws += row.draws;
-    s.losses += row.losses;
-    s.goals += row.goals;
-    s.assists += row.assists;
-    s.points += Number(row.ranking_points ?? row.points ?? 0);
-    s.legacyPoints += Number(row.points || 0);
-    s.positionBonus += Number(row.ranking_points ?? row.points ?? 0) - Number(row.points || 0);
-  }
-
-  const ranking = Array.from(map.values()).map((entry) => ({
-    ...entry,
-    points: roundRankingPoints(entry.points),
-    legacyPoints: roundRankingPoints(entry.legacyPoints),
-    positionBonus: roundRankingPoints(entry.positionBonus),
-  }));
-  ranking.sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points;
-    if (b.wins !== a.wins) return b.wins - a.wins;
-    return b.goals - a.goals;
-  });
-
-  return ranking;
-}
-
-const getRankingCached = cache(getRankingUncached);
-
 export async function getRanking() {
-  const season = await getActiveSeason();
-  return season ? getRankingCached(season.id, season.league_id) : [];
+  // Todas as superfícies de ranking usam o mesmo read model (atividade,
+  // elegibilidade e seis melhores rodadas), evitando totais divergentes.
+  return (await getRankingExperienceData()).general;
 }
 
 export async function getRoundStatistics(roundId: string): Promise<RoundStatistics | null> {
@@ -961,7 +813,7 @@ export async function getRoundStatistics(roundId: string): Promise<RoundStatisti
   };
 }
 
-export async function getRankingExperienceData(): Promise<RankingExperienceData> {
+async function getRankingExperienceDataUncached(): Promise<RankingExperienceData> {
   const supabase = await createServerClient();
   const season = await getActiveSeason();
   const emptyData: RankingExperienceData = {
@@ -1220,6 +1072,15 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
       entries: latestEntries,
     },
   };
+}
+
+const getRankingExperienceDataCached = cache(getRankingExperienceDataUncached);
+
+export async function getRankingExperienceData(): Promise<RankingExperienceData> {
+  // React.cache compartilha o resultado somente dentro da requisição atual.
+  // Pelada e sessão continuam resolvidas pelo contexto autenticado dessa
+  // requisição; nenhum dado é persistido entre usuários.
+  return getRankingExperienceDataCached();
 }
 
 export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: RankingEntry; position: number } | null> {

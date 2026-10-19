@@ -11,6 +11,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - A exclusão de gol ao vivo exige autorização de ADM dentro da RPC `SECURITY DEFINER`, não apenas na Server Action. Ver [ADR 004](./adr-004-live-goal-deletion-authorization.md).
 - Em correções finalizadas, a RPC concluída é sucesso mesmo se uma projeção posterior falhar; a pendência volta como aviso. Ver [ADR 005](./adr-005-postcommit-finished-goal-corrections.md).
 - O Cartola confirma titulares e reserva pelo recibo da RPC transacional, sem uma segunda leitura de reserva; resposta sem ID exige conferência posterior. Ver [ADR 006](./adr-006-fantasy-lineup-atomic-receipt.md).
+- Ranking, perfil e elenco interpretam a pontuação pela mesma regra de domínio; o read model detalhado pode ser reutilizado apenas na requisição atual. Ver [ADR 007](./adr-007-canonical-statistics-read-model.md).
 - Preservar assinaturas e respostas públicas das Server Actions durante a migração; converter uma fatia vertical por vez.
 - Não criar agora tabela de estatísticas acumuladas: a view `player_season_stats` já agrega `player_round_stats`. Medir antes de alterar esquema.
 
@@ -24,10 +25,19 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Partidas e pontuação | Em andamento | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; migrations 326–327 corrigem autorização SQL (não aplicadas); falta teste integrado e recuperação de projeções. |
 | Cartola e cosméticos | Concluído nesta fase | Salvamento de escalação, comandos administrativos, mutações/limpezas do Passe, equipamento da conta, painel, loadouts, prévia e inventário extraídos. As projeções analíticas extensas ficam na etapa de estatísticas. |
 | Pagamentos | Concluído nesta fase | Itens, parcelas, PIX, rateio, obrigações, checklist e auditoria separados em domínio, aplicação e infraestrutura, mantendo RPCs e escopo por pelada. |
-| Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
-| Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
+| Estatísticas e demais áreas | Concluído nesta fase | Pontuação canônica extraída; leitores de temporada/histórico separados; ranking duplicado removido; cache limitado à requisição. Projeções analíticas do Cartola continuam como trabalho futuro separado. |
+| Avaliação de tabela de acumulados | Instrumentada; sem justificativa para criar | Logs opcionais agora agregam p50/p95. Coletar amostra no Supabase de teste e analisar plano SQL antes de reconsiderar uma tabela. |
 
 ## Registro de lotes
+
+### 2026-10-19 — consolidação e medição das estatísticas
+
+- Criado `modules/statistics` com regra de pontuação em domínio, composição do modelo do elenco em aplicação e leitores Supabase em infraestrutura. `ranking_points` passa a ser a fonte oficial, com fallback legado; amistosos continuam fora do ranking. O perfil calcula os pontos Ranked pelas seis melhores participações, como a classificação.
+- Removido o segundo leitor de ranking que somava toda a temporada. `getRanking`, página completa, home e cartões agora convergem para `getRankingExperienceData`. A projeção detalhada usa `React.cache` somente dentro da requisição atual, sem compartilhar sessão, temporada ou pelada entre usuários.
+- O histórico do jogador deixou de usar `select(*)` e solicita somente os campos usados. O fallback do elenco também reduziu o payload. A view `player_season_stats` continua sendo o agregado leve; não foi criada tabela nova.
+- `STATS_QUERY_DIAGNOSTICS=1` registra cada consulta sem IDs ou dados pessoais. A cada 20 amostras por operação/fonte (ajustável por `STATS_QUERY_SUMMARY_EVERY`) também registra contagem, falhas, linhas médias, p50, p95 e máximo. A memória é limitada às 200 amostras mais recentes por chave e existe somente no processo atual.
+- Auditoria estática confirmou os índices existentes para os filtros usados. `npm run check` aprovado: tipagem, 762 testes em 143 arquivos e build de produção. Nenhuma migration foi criada ou aplicada; nenhum dado foi alterado.
+- Pendente operacional: no Supabase de teste representativo, coletar ao menos 20 amostras de ranking, elenco e histórico; registrar p50/p95 e executar `EXPLAIN (ANALYZE, BUFFERS)` somente nas consultas cujo p95 permanecer alto. Sem essa evidência não há justificativa para tabela acumulada ou novo índice.
 
 ### 2026-10-19 — conclusão estrutural de pagamentos
 
@@ -247,7 +257,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Medição de estatísticas antes de uma nova tabela
 
-1. Em ambiente de teste representativo, ativar `STATS_QUERY_DIAGNOSTICS=1` temporariamente e carregar ranking, elenco e histórico repetidas vezes, com temporada curta e longa. Registrar p50/p95 de `durationMs`, `rowCount` e erros por operação. Essa métrica mede a consulta/agregação, não todo o carregamento da página.
+1. Em ambiente de teste representativo, ativar `STATS_QUERY_DIAGNOSTICS=1` temporariamente e carregar ranking, elenco e histórico repetidas vezes, com temporada curta e longa. O evento `stats_query_summary` já informa p50/p95, linhas médias e erros por operação a cada 20 amostras; `STATS_QUERY_SUMMARY_EVERY` altera o intervalo. Essa métrica mede a consulta/agregação, não todo o carregamento da página.
 2. Examinar com `EXPLAIN (ANALYZE, BUFFERS)` as consultas lentas em cópia de dados ou ambiente seguro; conferir índices e filtros de temporada/pelada antes de mudar o esquema. Não executar explicações pesadas no banco oficial sem janela apropriada.
 3. Medir a página no navegador separadamente (rede, JavaScript e renderização). Um gargalo de interface não justifica tabela de totais.
 4. Primeiro otimizar consulta, seleção de colunas, índices e leituras redundantes. Somente considerar acumulados se a consulta ainda dominar a latência de forma consistente.

@@ -19,6 +19,7 @@ import { MonthlyAwards } from "@/components/MonthlyAwards";
 import { getLatestPlayerCardOverallMap } from "@/lib/actions/stats";
 import { PlayerBelts } from "@/components/PlayerBelts";
 import type { RankedPointBreakdownItem } from "@/lib/ranked-scoring";
+import { canonicalSeasonPoints } from "@/modules/statistics/domain/player-statistics";
 
 export const revalidate = 0;
 
@@ -124,7 +125,10 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
   const cosmetics = previewCosmetics || equippedCosmetics;
   const isAdministrativePreview = Boolean(previewCosmetics);
   const isPlayable = player.is_selectable && (player.member_category === "player" || player.member_category === "guest");
-  const official = aggregatePlayerStats(officialHistory);
+  const official = {
+    ...aggregatePlayerStats(officialHistory),
+    points: canonicalSeasonPoints(officialHistory, "official"),
+  };
   const friendly = aggregatePlayerStats(friendlyHistory);
   const officialGoalkeeper = aggregateGoalkeeperStats(officialHistory);
   const friendlyGoalkeeper = aggregateGoalkeeperStats(friendlyHistory);

@@ -17,6 +17,14 @@ import { buildRankedPointBreakdown } from "../ranked-scoring";
 import { normalizeBQScoringSnapshot } from "../bq-scoring";
 import { roundRankingPoints } from "../ranking";
 import { logStatsQuery } from "../stats-query-diagnostics";
+import {
+  canonicalRoundPoints,
+} from "@/modules/statistics/domain/player-statistics";
+import { buildPlayerSeasonStatistics } from "@/modules/statistics/application/build-player-season-statistics";
+import {
+  readPlayerRoundHistoryRows,
+  readSeasonPlayerTotals,
+} from "@/modules/statistics/infrastructure/supabase-statistics-reader";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -206,45 +214,19 @@ export async function getPlayersWithStats(roundType: RoundType = "official", sel
     const viewStartedAt = performance.now();
     const playersQuery = getPlayersForStatsCached(selectableOnly);
 
-    const statsQuery = client
-      .from("player_season_stats")
-      .select(`
-        player_id,
-        rounds_count,
-        games,
-        goals,
-        assists,
-        wins,
-        draws,
-        losses,
-        points
-      `)
-      .eq("season_id", season.id)
-      .eq("round_type", roundType);
+    const statsQuery = readSeasonPlayerTotals(client, season.id, roundType);
 
     const [playersResult, statsResult] = await Promise.all([playersQuery, statsQuery]);
-    logStatsQuery("roster_totals", "season_view", viewStartedAt, statsResult.data?.length || 0, Boolean(playersResult.error || statsResult.error));
+    if (playersResult.error) {
+      logStatsQuery("roster_totals", "season_view", viewStartedAt, statsResult.data?.length || 0, true);
+    }
 
     if (!playersResult.error && !statsResult.error && playersResult.data) {
-      const statsMap = new Map<string, any>();
-      for (const stat of statsResult.data || []) {
-        statsMap.set(stat.player_id, stat);
-      }
-
-      const playersWithStats = (playersResult.data as Player[]).map((player) => {
-        const stat = statsMap.get(player.id);
-        return {
-          ...player,
-          rounds: Number(stat?.rounds_count || 0),
-          games: Number(stat?.games || 0),
-          goals: Number(stat?.goals || 0),
-          assists: Number(stat?.assists || 0),
-          wins: Number(stat?.wins || 0),
-          draws: Number(stat?.draws || 0),
-          losses: Number(stat?.losses || 0),
-          points: Number(stat?.points || 0),
-        };
-      });
+      const playersWithStats = buildPlayerSeasonStatistics(
+        playersResult.data as Player[],
+        statsResult.data || [],
+        roundType,
+      );
 
       return playersWithStats.sort((a, b) => b.points - a.points);
     }
@@ -265,7 +247,9 @@ export async function getPlayersWithStats(roundType: RoundType = "official", sel
   const fallbackStartedAt = performance.now();
   const [statsResult, finishedRoundsResult] = roundIds.length > 0
     ? await Promise.all([
-      client.from("player_round_stats").select("*").in("round_id", roundIds),
+      client.from("player_round_stats")
+        .select("player_id, round_id, games, goals, assists, wins, draws, losses, points, ranking_points")
+        .in("round_id", roundIds),
       client.from("rounds").select("id").in("id", roundIds).eq("status", "finished"),
     ])
     : [{ data: [], error: null }, { data: [], error: null }];
@@ -307,9 +291,10 @@ export async function getPlayersWithStats(roundType: RoundType = "official", sel
         wins: acc.wins + curr.wins,
         draws: acc.draws + curr.draws,
         losses: acc.losses + curr.losses,
-        points: acc.points + curr.points,
+        points: acc.points + canonicalRoundPoints(curr, roundType),
+        legacyPoints: acc.legacyPoints + Number(curr.points || 0),
       }),
-      { games: 0, goals: 0, assists: 0, wins: 0, draws: 0, losses: 0, points: 0 }
+      { games: 0, goals: 0, assists: 0, wins: 0, draws: 0, losses: 0, points: 0, legacyPoints: 0 }
     );
 
     return {
@@ -326,19 +311,7 @@ export async function getPlayerRoundHistory(playerId: string, roundType: RoundTy
   const roundIds = await getActiveSeasonRoundIds(undefined, roundType);
   if (roundIds.length === 0) return [];
   const client = await createServerClient();
-  const { data, error } = await client
-    .from("player_round_stats")
-    .select(`
-      *,
-      rounds (
-        number,
-        date,
-        scoring_snapshot
-      )
-    `)
-    .eq("player_id", playerId)
-    .in("round_id", roundIds)
-    .order("rounds(number)", { ascending: false });
+  const { data, error } = await readPlayerRoundHistoryRows(client, playerId, roundIds);
 
   if (error) {
     console.error("Erro ao buscar histórico do jogador:", error);
@@ -367,10 +340,14 @@ export async function getPlayerRoundHistory(playerId: string, roundType: RoundTy
     }, normalizeBQScoringSnapshot(round?.scoring_snapshot));
     const positionBonus = roundRankingPoints(Number(row.ranking_position_bonus || 0));
     if (positionBonus !== 0) pointBreakdown.push({ label: "Bônus posicional", count: 1, points: positionBonus });
+    const legacyPoints = Number(row.points || 0);
+    const canonicalPoints = canonicalRoundPoints(row, roundType);
     return {
       ...row,
       rounds: round,
-      ranking_points: roundRankingPoints(Number(row.ranking_points ?? row.points ?? 0)),
+      legacy_points: roundRankingPoints(legacyPoints),
+      points: roundRankingPoints(canonicalPoints),
+      ranking_points: roundRankingPoints(canonicalPoints),
       point_breakdown: pointBreakdown,
     };
   });
