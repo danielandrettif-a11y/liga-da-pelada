@@ -12,6 +12,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - Em correções finalizadas, a RPC concluída é sucesso mesmo se uma projeção posterior falhar; a pendência volta como aviso. Ver [ADR 005](./adr-005-postcommit-finished-goal-corrections.md).
 - O Cartola confirma titulares e reserva pelo recibo da RPC transacional, sem uma segunda leitura de reserva; resposta sem ID exige conferência posterior. Ver [ADR 006](./adr-006-fantasy-lineup-atomic-receipt.md).
 - Ranking, perfil e elenco interpretam a pontuação pela mesma regra de domínio; o read model detalhado pode ser reutilizado apenas na requisição atual. Ver [ADR 007](./adr-007-canonical-statistics-read-model.md).
+- Ranking, históricos, ficha e destaques do Cartola usam leitores sazonais e modelos analíticos testáveis; cache permanece restrito à requisição. Ver [ADR 008](./adr-008-fantasy-analytical-read-models.md).
 - Preservar assinaturas e respostas públicas das Server Actions durante a migração; converter uma fatia vertical por vez.
 - Não criar agora tabela de estatísticas acumuladas: a view `player_season_stats` já agrega `player_round_stats`. Medir antes de alterar esquema.
 
@@ -23,12 +24,21 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
 | Partidas e pontuação | Em andamento | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; migrations 326–327 corrigem autorização SQL (não aplicadas); falta teste integrado e recuperação de projeções. |
-| Cartola e cosméticos | Concluído nesta fase | Salvamento de escalação, comandos administrativos, mutações/limpezas do Passe, equipamento da conta, painel, loadouts, prévia e inventário extraídos. As projeções analíticas extensas ficam na etapa de estatísticas. |
+| Cartola e cosméticos | Concluído nesta fase | Mutações e leitores principais extraídos; ranking, históricos, ficha e destaques usam modelos analíticos e filtros sazonais. |
 | Pagamentos | Concluído nesta fase | Itens, parcelas, PIX, rateio, obrigações, checklist e auditoria separados em domínio, aplicação e infraestrutura, mantendo RPCs e escopo por pelada. |
-| Estatísticas e demais áreas | Concluído nesta fase | Pontuação canônica extraída; leitores de temporada/histórico separados; ranking duplicado removido; cache limitado à requisição. Projeções analíticas do Cartola continuam como trabalho futuro separado. |
-| Avaliação de tabela de acumulados | Instrumentada; sem justificativa para criar | Logs opcionais agora agregam p50/p95. Coletar amostra no Supabase de teste e analisar plano SQL antes de reconsiderar uma tabela. |
+| Estatísticas e demais áreas | Concluído nesta fase | Pontuação canônica e modelos analíticos extraídos; leitores sazonais separados; rankings duplicados removidos; cache limitado à requisição. |
+| Avaliação de tabela de acumulados | Medida; sem justificativa para criar | Benchmark no Supabase de teste teve paridade total e p95 abaixo de 1 s nas três leituras. Reavaliar somente após crescimento representativo. |
 
 ## Registro de lotes
+
+### 2026-10-19 — conclusão dos modelos analíticos e benchmark
+
+- Ranking do Cartola foi separado em leitor Supabase e modelo puro para histórico, projeção ao vivo, empates e posições. Perfis, cosméticos e cartões usam seleção explícita de colunas; `React.cache` reaproveita o resultado somente dentro da requisição atual.
+- Ficha, histórico pessoal e destaques rápidos passaram a leitores próprios. A ficha agora limita `player_round_stats` à temporada ativa, e “Meu histórico” limita escalações à temporada do Cartola selecionada, eliminando mistura entre peladas. A consulta redundante de perfil no detalhe da rodada foi removida.
+- Criado `npm run benchmark:stats`, estritamente de leitura. No Supabase de teste foram executadas 20 amostras com 3 temporadas, 7 rodadas oficiais finalizadas, 37 jogadores e 125 linhas de scouts. Paridade da view: 0 divergências; rodadas de liga incorreta: 0; scouts vazados: 0. P95 observado: 339,63 ms na view sazonal, 648,97 ms no histórico do ranking e 197,52 ms no histórico individual; todas abaixo do orçamento de transporte de 1 s. Esses tempos incluem rede/PostgREST, não apenas SQL.
+- A medição não justifica uma nova tabela acumulada neste volume. A fonte atual permanece autoritativa; `EXPLAIN (ANALYZE, BUFFERS)` só será necessário se novas medições mostrarem regressão consistente.
+- `npm run check` aprovado: tipagem, 769 testes em 146 arquivos e build de produção. Sete testes novos cobrem ranking histórico/ao vivo, empates, destaques e filtros de pelada/temporada. Nenhuma migration foi criada ou aplicada e nenhum dado foi alterado pelo benchmark.
+- O ensaio mutável `test:multi-league` não foi executado: ele permanece corretamente bloqueado sem contas E2E e sem `E2E_DATABASE_LABEL=DISPOSABLE`. A cobertura local e o benchmark validam lógica e leitura; não substituem a futura prova de RLS com duas sessões reais.
 
 ### 2026-10-19 — consolidação e medição das estatísticas
 
