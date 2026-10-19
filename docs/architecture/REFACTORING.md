@@ -22,12 +22,28 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Em andamento | Formato, abertura, pré-lista, edição, estado e participação extraídos; retirada pelo criador corrigida no código com migration 325 ainda não aplicada. Falta validação integrada com duas peladas. |
 | Partidas e pontuação | Em andamento | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; migrations 326–327 corrigem autorização SQL (não aplicadas); falta teste integrado e recuperação de projeções. |
-| Cartola e cosméticos | Em andamento | Salvamento de escalação, mutações/limpezas do Passe, equipamento da conta, painel, loadouts e prévia administrativa extraídos; preservar as demais RPCs, inventário e isolamento por pelada/conta. |
-| Pagamentos | Pendente | Cobrir parcelas, correções e autorizações administrativas. |
+| Cartola e cosméticos | Concluído nesta fase | Salvamento de escalação, comandos administrativos, mutações/limpezas do Passe, equipamento da conta, painel, loadouts, prévia e inventário extraídos. As projeções analíticas extensas ficam na etapa de estatísticas. |
+| Pagamentos | Concluído nesta fase | Itens, parcelas, PIX, rateio, obrigações, checklist e auditoria separados em domínio, aplicação e infraestrutura, mantendo RPCs e escopo por pelada. |
 | Estatísticas e demais áreas | Pendente | Consolidar leitores, reduzir consultas repetidas, remover dependências entre actions. |
 | Avaliação de tabela de acumulados | Aguardando medições | Decidir somente com dados de latência, linhas retornadas, plano SQL e consistência após correções. |
 
 ## Registro de lotes
+
+### 2026-10-19 — conclusão estrutural de pagamentos
+
+- `src/lib/actions/payments.ts` passou a concentrar somente autenticação/autorização de entrada, seleção da pelada/temporada, revalidação e contratos públicos. Tipos e validações de itens, parcelas, destinatários PIX e detalhes da cobrança foram movidos para `modules/payments/domain`; a ordem das operações ficou em `application/payment-commands.ts`; consultas e RPCs foram isoladas em dois adaptadores Supabase.
+- Preservados os filtros de `league_id` para itens, destinatários, rodadas e auditoria. A cobrança só pode ser sincronizada em rodada finalizada; o destinatário precisa estar ativo na pelada; parcelas anteriores mais parcelas lançadas não podem exceder o total; a limpeza da Coletiva só ocorre depois da confirmação do pagamento. Revalidações agora são executadas somente após sucesso.
+- O rateio continua autoritativo nas RPCs `update_round_payment_details_v2`, `sync_round_payment_plan` e `set_round_payment_obligation_paid`. Se os dados principais forem gravados e a recomposição do rateio falhar, o contrato continua informando explicitamente o sucesso parcial para evitar repetição cega da primeira gravação.
+- `npm run check` aprovado: tipagem, 754 testes em 141 arquivos e build de produção. Os testes novos cobrem validações, isolamento, limite de parcelas, ordem de gravação, pagamento, falha parcial e parâmetros das RPCs.
+- Nenhuma migration criada ou aplicada; nenhum pagamento real foi alterado. Pendente de implantação: teste integrado no Supabase de teste com duas peladas, incluindo item parcelado, edição de parcelas anteriores, múltiplos destinatários e correção do rateio.
+
+### 2026-10-19 — conclusão da fase Cartola e cosméticos
+
+- As operações administrativas restantes de `fantasy.ts` foram separadas: configuração, prévia de mercado, reprocessamento com regras salvas/atuais, reparo legado e sessões de teste agora usam domínio, casos de uso e gateway Supabase. A reconstrução dos scouts continua obrigatoriamente antes do reprocessamento e a rodada é conferida na pelada selecionada antes de qualquer RPC.
+- As leituras de pacotes, inventário, contagem leve e carta ativa saíram de `fantasy-cards.ts`. O adaptador mantém `user_id + league_id` no inventário e na ativação; pacotes oriundos de rodada ou Passe são filtrados pela pelada derivada das relações persistidas. O mapeamento de relações e agrupamento de cartas ficou no domínio.
+- A parte já extraída de cosméticos permanece global por conta onde previsto, enquanto temporada, Passe e prévia continuam escopados pela pelada. As grandes projeções de dashboard, ranking e histórico ainda presentes em `fantasy.ts` são modelos de leitura analíticos e serão tratadas junto da consolidação de estatísticas, não como mutações desta fase.
+- `npm run check` aprovado: tipagem, 754 testes em 141 arquivos e build de produção. Testes novos cobrem payload de configurações, pelada básica, escopo de temporada/rodada, ordem do recálculo, roteamento das RPCs, relações do Passe e isolamento do inventário.
+- Nenhuma migration criada ou aplicada; nenhum reprocessamento, reparo ou alteração de inventário foi executado em banco. Pendente de implantação: validar as RPCs e os leitores no Supabase de teste com duas peladas e conferir visualmente Cartola, Passe, inventário e painel administrativo.
 
 ### 2026-10-18 — limpezas administrativas do Passe
 

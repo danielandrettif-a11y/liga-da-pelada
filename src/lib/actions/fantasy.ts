@@ -60,6 +60,14 @@ import { compareFantasyRoundPriority } from "@/lib/fantasy-round-order";
 import { saveFantasyLineupForLeague } from "@/modules/fantasy/application/save-lineup";
 import { supabaseFantasyLineupGateway } from "@/modules/fantasy/infrastructure/supabase-lineup-gateway";
 import type { FantasyLineupSubmission } from "@/modules/fantasy/domain/lineup-submission";
+import {
+  changeFantasyTestSession,
+  previewFantasyMarket,
+  repairLegacyFantasyLineups,
+  reprocessFantasyRoundForLeague,
+  updateFantasyConfiguration,
+} from "@/modules/fantasy/application/admin-commands";
+import { supabaseFantasyAdminCommandGateway } from "@/modules/fantasy/infrastructure/supabase-admin-command-gateway";
 
 export type FantasyMarketPlayer = {
   id: string;
@@ -3606,53 +3614,20 @@ export async function getFantasyRoundLineupOverview(
 export async function updateFantasySettings(values: Partial<FantasySettings>) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
-  const changesCanonicalScout = [
-    values.goalPoints, values.assistPoints, values.winPoints, values.drawPoints,
-    values.lossPoints, values.ownGoalPoints, values.goalkeeperAppearancePoints,
-    values.goalConcededPoints,
-  ].some((value) => value !== undefined);
-  if (changesCanonicalScout) {
-    return { success: false, error: "Edite os oito scouts juntos na tela Pontuação BQ para manter Ranked e Cartola sincronizados." };
-  }
   const league = await getActiveLeague();
-  if (league.feature_tier !== "complete") return { success: false, error: "O Cartola só pode ser configurado em uma pelada Completa." };
-  const {
-    attackerGoalPoints: _legacyAttackerGoalPoints,
-    ownGoalPoints: _ownGoalPoints,
-    lossPoints: _lossPoints,
-    goalkeeperLossPoints: _goalkeeperLossPoints,
-    goalkeeperAppearancePoints: _goalkeeperAppearancePoints,
-    goalConcededPoints: _goalConcededPoints,
-    teamGoalConcededPoints: _teamGoalConcededPoints,
-    defenderOneGoalConcededPoints,
-    defenderTwoGoalsConcededPoints,
-    ...otherValues
-  } = values;
-  const settingsPayload = Object.fromEntries(
-    Object.entries(otherValues).filter(([, value]) => value !== undefined),
-  ) as Record<string, unknown>;
-  if (defenderOneGoalConcededPoints !== undefined) {
-    settingsPayload.defender_one_goal_conceded_points = defenderOneGoalConcededPoints;
-  }
-  if (defenderTwoGoalsConcededPoints !== undefined) {
-    settingsPayload.defender_two_goals_conceded_points = defenderTwoGoalsConcededPoints;
-  }
-  const { error } = await account.client.rpc("update_fantasy_settings_for_league", {
-    p_league_id: league.id,
-    p_settings: settingsPayload,
+  const gateway = supabaseFantasyAdminCommandGateway(account.client, async (roundId) => {
+    const { calculateRoundStats } = await import("./stats");
+    return calculateRoundStats(roundId);
   });
-  if (error) return { success: false, error: error.message };
-  revalidatePath("/admin/cartola");
-  revalidatePath("/cartola");
-  return { success: true };
-}
-
-async function isRoundInSelectedLeague(roundId: string): Promise<boolean> {
-  if (!roundId) return false;
-  const [account, league] = await Promise.all([getCurrentAccount(), getActiveLeague()]);
-  const { data } = await account.client.from("rounds").select("id")
-    .eq("id", roundId).eq("league_id", league.id).maybeSingle();
-  return Boolean(data);
+  const result = await updateFantasyConfiguration(values, {
+    id: league.id,
+    featureTier: league.feature_tier,
+  }, gateway);
+  if (result.success) {
+    revalidatePath("/admin/cartola");
+    revalidatePath("/cartola");
+  }
+  return result;
 }
 
 export async function previewFantasyMarketV11() {
@@ -3660,85 +3635,56 @@ export async function previewFantasyMarketV11() {
   if (!account.isAdmin) return { success: false as const, error: "Somente administradores." };
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
-  if (!season) return { success: false as const, error: "Esta pelada ainda não tem temporada ativa." };
-  const { data: fantasySeason } = await account.client.from("fantasy_seasons")
-    .select("id").eq("season_id", season.id).eq("league_id", league.id).maybeSingle();
-  if (!fantasySeason) return { success: false as const, error: "O Cartola desta pelada ainda não foi iniciado." };
-  const { data, error } = await account.client.rpc("preview_fantasy_market_v11", {
-    p_fantasy_season_id: fantasySeason.id,
-  });
-  if (error) return { success: false as const, error: error.message };
-  return { success: true as const, preview: data };
+  const gateway = supabaseFantasyAdminCommandGateway(account.client, async () => ({ success: true }));
+  return previewFantasyMarket(season?.id || null, league.id, gateway);
 }
 
 export async function reprocessFantasyRound(roundId: string) {
   const account = await getCurrentAccount();
-  if (!account.isAdmin) return { success: false, error: "Somente administradores." };
-  if (!(await isRoundInSelectedLeague(roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
-  const { calculateRoundStats } = await import("./stats");
-  const statsResult = await calculateRoundStats(roundId);
-  if (!statsResult.success) {
-    return {
-      success: false,
-      error: `Não foi possível reconstruir os scouts antes do reprocessamento: ${statsResult.error || "erro desconhecido"}`,
-    };
-  }
-  const { error } = await account.client.rpc("reprocess_fantasy_from_round", {
-    p_round_id: roundId,
+  if (!account.isAdmin) return { success: false as const, error: "Somente administradores." };
+  const league = await getActiveLeague();
+  const gateway = supabaseFantasyAdminCommandGateway(account.client, async (targetRoundId) => {
+    const { calculateRoundStats } = await import("./stats");
+    return calculateRoundStats(targetRoundId);
   });
-  if (error) return { success: false, error: error.message };
-  revalidatePath("/cartola", "layout");
-  revalidatePath("/ranking");
-  return { success: true };
+  const result = await reprocessFantasyRoundForLeague(roundId, league.id, "stored", gateway);
+  if (result.success) {
+    revalidatePath("/cartola", "layout");
+    revalidatePath("/ranking");
+  }
+  return result;
 }
 
 export async function reprocessFantasyRoundWithCurrentRules(roundId: string) {
   const account = await getCurrentAccount();
-  if (!account.isAdmin) return { success: false, error: "Somente administradores." };
-  if (!(await isRoundInSelectedLeague(roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
-
-  // Primeiro recompõe os dados esportivos. As correções manuais persistentes,
-  // como um jogador zerado na rodada, são respeitadas por este cálculo.
-  const { calculateRoundStats } = await import("./stats");
-  const statsResult = await calculateRoundStats(roundId);
-  if (!statsResult.success) {
-    return {
-      success: false,
-      error: `Não foi possível recalcular as estatísticas: ${statsResult.error || "erro desconhecido"}`,
-    };
-  }
-
-  const { data, error } = await account.client.rpc("reprocess_fantasy_with_current_rules", {
-    p_round_id: roundId,
+  if (!account.isAdmin) return { success: false as const, error: "Somente administradores." };
+  const league = await getActiveLeague();
+  const gateway = supabaseFantasyAdminCommandGateway(account.client, async (targetRoundId) => {
+    const { calculateRoundStats } = await import("./stats");
+    return calculateRoundStats(targetRoundId);
   });
-  if (error) return { success: false, error: error.message };
-
-  revalidatePath("/admin/cartola");
-  revalidatePath("/cartola", "layout");
-  revalidatePath("/ranking");
-  revalidatePath(`/rodadas/${roundId}`);
-  revalidatePath("/jogadores", "layout");
-  revalidatePath("/");
-
-  const result = data as { affected_finished_rounds?: number } | null;
-  return {
-    success: true,
-    affectedRounds: Number(result?.affected_finished_rounds || 1),
-  };
+  const result = await reprocessFantasyRoundForLeague(roundId, league.id, "current", gateway);
+  if (result.success) {
+    revalidatePath("/admin/cartola");
+    revalidatePath("/cartola", "layout");
+    revalidatePath("/ranking");
+    revalidatePath(`/rodadas/${roundId}`);
+    revalidatePath("/jogadores", "layout");
+    revalidatePath("/");
+  }
+  return result;
 }
 
 export async function repairLegacySavedFantasyLineups() {
   const account = await getCurrentAccount();
-  if (!account.isAdmin) return { success: false, error: "Sem permissão." };
-  const { data, error } = await account.client.rpc("repair_legacy_saved_fantasy_lineups");
-  if (error) return { success: false, error: error.message };
-  revalidatePath("/cartola/ranking");
-  revalidatePath("/admin/cartola");
-  return {
-    success: true,
-    repaired: Number(data?.repaired || 0),
-    lineups: Array.isArray(data?.lineups) ? data.lineups : [],
-  };
+  if (!account.isAdmin) return { success: false as const, error: "Sem permissão." };
+  const gateway = supabaseFantasyAdminCommandGateway(account.client, async () => ({ success: true }));
+  const result = await repairLegacyFantasyLineups(gateway);
+  if (result.success) {
+    revalidatePath("/cartola/ranking");
+    revalidatePath("/admin/cartola");
+  }
+  return result;
 }
 
 export async function getFantasyAdminData() {
@@ -3845,40 +3791,40 @@ export async function getFantasyAdminData() {
 export async function createFantasyTestSession(roundId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
-  if (!(await isRoundInSelectedLeague(roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
-  const { error } = await account.client.rpc("create_fantasy_test_session", {
-    p_round_id: roundId,
-  });
-  if (error) return { success: false, error: error.message };
-  revalidatePath("/admin/cartola");
-  revalidatePath("/cartola", "layout");
-  return { success: true };
+  const league = await getActiveLeague();
+  const gateway = supabaseFantasyAdminCommandGateway(account.client, async () => ({ success: true }));
+  const result = await changeFantasyTestSession(roundId, league.id, "create", gateway);
+  if (result.success) {
+    revalidatePath("/admin/cartola");
+    revalidatePath("/cartola", "layout");
+  }
+  return result;
 }
 
 export async function processFantasyTestSession(roundId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
-  if (!(await isRoundInSelectedLeague(roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
-  const { error } = await account.client.rpc("process_fantasy_test_round", {
-    p_round_id: roundId,
-  });
-  if (error) return { success: false, error: error.message };
-  revalidatePath("/admin/cartola");
-  revalidatePath("/cartola", "layout");
-  return { success: true };
+  const league = await getActiveLeague();
+  const gateway = supabaseFantasyAdminCommandGateway(account.client, async () => ({ success: true }));
+  const result = await changeFantasyTestSession(roundId, league.id, "process", gateway);
+  if (result.success) {
+    revalidatePath("/admin/cartola");
+    revalidatePath("/cartola", "layout");
+  }
+  return result;
 }
 
 export async function resetFantasyTestSession(roundId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
-  if (!(await isRoundInSelectedLeague(roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
-  const { error } = await account.client.rpc("reset_fantasy_test_session", {
-    p_round_id: roundId,
-  });
-  if (error) return { success: false, error: error.message };
-  revalidatePath("/admin/cartola");
-  revalidatePath("/cartola", "layout");
-  return { success: true };
+  const league = await getActiveLeague();
+  const gateway = supabaseFantasyAdminCommandGateway(account.client, async () => ({ success: true }));
+  const result = await changeFantasyTestSession(roundId, league.id, "reset", gateway);
+  if (result.success) {
+    revalidatePath("/admin/cartola");
+    revalidatePath("/cartola", "layout");
+  }
+  return result;
 }
 
 export async function getFantasyPlayerSummary(playerId: string) {

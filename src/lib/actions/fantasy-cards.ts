@@ -9,38 +9,17 @@ import { canSelectFantasyCardInstance, fantasyCardRequiresSavedLineup, isFantasy
 import type { FantasyActiveCardDTO, FantasyPackDTO, FantasyUserCardDTO } from "@/lib/fantasy/cards/dtos";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getActiveLeague } from "./rounds";
+import { cardDefinitionFromRow, packLeagueId, relationOne } from "@/modules/fantasy/domain/card-inventory";
+import {
+  readActiveFantasyCard,
+  readMyFantasyInventory,
+  readMyFantasyInventoryCount,
+  readMyFantasyPacks,
+} from "@/modules/fantasy/infrastructure/supabase-card-inventory-reader";
 
 export type { FantasyActiveCardDTO, FantasyPackDTO, FantasyUserCardDTO } from "@/lib/fantasy/cards/dtos";
 
 const PACK_SCOPE_SELECT = "round_scope:round_id(number,league_id), pass_reward:fantasy_season_pass_reward_id(fantasy_season_id, season:fantasy_seasons!fantasy_season_pass_rewards_fantasy_season_id_fkey(league_id))";
-
-function relationOne<T>(value: T | T[] | null | undefined): T | null {
-  return Array.isArray(value) ? value[0] || null : value || null;
-}
-
-function packLeagueId(pack: any): string | null {
-  const round = relationOne<any>(pack.round_scope);
-  if (round?.league_id) return round.league_id;
-  const reward = relationOne<any>(pack.pass_reward);
-  const season = relationOne<any>(reward?.season);
-  return season?.league_id || null;
-}
-
-function cardDefinitionFromRow(row: any): FantasyCardDefinition | null {
-  const card = relationOne<any>(row);
-  if (!card) return null;
-  return getCardBySlug(card.slug) || {
-    slug: card.slug || "unknown",
-    name: card.name || "Carta",
-    description: card.description || "",
-    rarity: card.rarity || "COMMON",
-    effectType: card.effect_type || "NONE",
-    effectConfig: card.effect_config || {},
-    enabled: card.enabled !== false,
-    icon: "🃏",
-    requiresTarget: "NONE",
-  };
-}
 
 /**
  * Busca todos os pacotes do usuário logado (pendentes e concluídos).
@@ -53,47 +32,8 @@ export async function getMyPacks(): Promise<{
   const account = await getCurrentAccount();
   if (!account.user) return { availablePacks: [], claimedCount: 0, totalPacks: 0 };
   const league = await getActiveLeague();
-  // Uma única consulta substitui as quatro viagens anteriores ao Supabase.
-  // O cliente de serviço é usado somente no servidor e a conta continua presa
-  // por user_id + pelada ativa antes de qualquer dado ser devolvido.
   const readClient = createServiceClient() || account.client;
-  const { data: packs, error } = await readClient
-    .from("fantasy_round_packs")
-    .select(
-      `id, round_id, fantasy_season_pass_reward_id, status, opened_at, chosen_card_id, created_at, source, card_tier, ${PACK_SCOPE_SELECT}, offers:fantasy_pack_offers(slot, card:fantasy_cards(*))`
-    )
-    .eq("user_id", account.user.id)
-    .order("created_at", { ascending: false });
-
-  if (error || !packs) {
-    console.error("Erro ao carregar pacotes do Cartola:", error?.message);
-    return { availablePacks: [], claimedCount: 0, totalPacks: 0 };
-  }
-
-  const formatted: FantasyPackDTO[] = packs.filter((p: any) => packLeagueId(p) === league.id).map((p: any) => ({
-    id: p.id,
-    roundId: p.round_id,
-    roundNumber: relationOne<any>(p.round_scope)?.number,
-    source: p.source,
-    cardTier: p.card_tier,
-    status: p.status,
-    openedAt: p.opened_at,
-    chosenCardId: p.chosen_card_id,
-    createdAt: p.created_at,
-    offers: (p.offers || []).flatMap((off: any) => {
-      const card = cardDefinitionFromRow(off.card);
-      return card ? [{ slot: off.slot, card }] : [];
-    }),
-  }));
-
-  const availablePacks = formatted.filter((p) => p.status === "available" || p.status === "opened");
-  const claimedCount = formatted.filter((p) => p.status === "claimed").length;
-
-  return {
-    availablePacks,
-    claimedCount,
-    totalPacks: formatted.filter((p) => p.status !== "dismissed").length,
-  };
+  return readMyFantasyPacks(readClient, account.user.id, league.id);
 }
 
 export async function restoreMyPassPacks(fantasySeasonId: string) {
@@ -345,72 +285,7 @@ export async function getMyInventory(): Promise<{
   if (!account.user) return { cards: [], groupedBySlug: {}, availableCount: 0 };
   const league = await getActiveLeague();
   const readClient = createServiceClient() || account.client;
-
-  const { data } = await readClient
-    .from("fantasy_user_cards")
-    .select("id, card_id, status, acquired_at, consumed_at, card:fantasy_cards(*)")
-    .eq("user_id", account.user.id)
-    .eq("league_id", league.id)
-    .order("acquired_at", { ascending: false });
-
-  if (!data) return { cards: [], groupedBySlug: {}, availableCount: 0 };
-
-  const cards: FantasyUserCardDTO[] = data.map((item: any) => {
-    const cardObj = Array.isArray(item.card) ? item.card[0] : item.card;
-    const cardDef = getCardBySlug(cardObj?.slug);
-    return {
-      id: item.id,
-      cardId: item.card_id,
-      slug: cardObj?.slug || "unknown",
-      name: cardObj?.name || "Carta",
-      description: cardObj?.description || "",
-      rarity: cardObj?.rarity || "COMMON",
-      effectType: cardObj?.effect_type || "NONE",
-      effectConfig: cardObj?.effect_config || {},
-      status: item.status,
-      acquiredAt: item.acquired_at,
-      consumedAt: item.consumed_at,
-      icon: cardDef?.icon || "🃏",
-    };
-  });
-
-  const groupedBySlug: Record<
-    string,
-    { count: number; card: FantasyCardDefinition; instances: FantasyUserCardDTO[] }
-  > = {};
-
-  for (const c of cards) {
-    if (!groupedBySlug[c.slug]) {
-      const cardDef = getCardBySlug(c.slug) || {
-        slug: c.slug,
-        name: c.name,
-        description: c.description,
-        rarity: c.rarity,
-        effectType: c.effectType as any,
-        effectConfig: c.effectConfig,
-        enabled: true,
-        icon: c.icon,
-        requiresTarget: "NONE",
-      };
-      groupedBySlug[c.slug] = {
-        count: 0,
-        card: cardDef,
-        instances: [],
-      };
-    }
-    if (c.status === "OWNED") {
-      groupedBySlug[c.slug].count += 1;
-    }
-    groupedBySlug[c.slug].instances.push(c);
-  }
-
-  const availableCount = cards.filter((c) => c.status === "OWNED").length;
-
-  return {
-    cards,
-    groupedBySlug,
-    availableCount,
-  };
+  return readMyFantasyInventory(readClient, account.user.id, league.id);
 }
 
 /**
@@ -422,15 +297,7 @@ export async function getMyInventoryCount(): Promise<number> {
   if (!account.user) return 0;
   const league = await getActiveLeague();
   const readClient = createServiceClient() || account.client;
-
-  const { count } = await readClient
-    .from("fantasy_user_cards")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", account.user.id)
-    .eq("league_id", league.id)
-    .eq("status", "OWNED");
-
-  return count || 0;
+  return readMyFantasyInventoryCount(readClient, account.user.id, league.id);
 }
 
 /**
@@ -441,74 +308,7 @@ export async function getActiveCardForRound(roundId: string): Promise<FantasyAct
   if (!account.user) return null;
   const league = await getActiveLeague();
   const readClient = createServiceClient() || account.client;
-  const { data: scopedRound } = await readClient.from("rounds").select("id")
-    .eq("id", roundId).eq("league_id", league.id).maybeSingle();
-  if (!scopedRound) return null;
-
-  const { data: activation } = await readClient
-    .from("fantasy_card_activations")
-    .select("id, round_id, user_card_id, status, target_snapshot, result_bonus, result_details, card:fantasy_cards(*)")
-    .eq("round_id", roundId)
-    .eq("user_id", account.user.id)
-    .maybeSingle();
-
-  if (!activation || !activation.card) return null;
-
-  const cardObj = Array.isArray(activation.card) ? activation.card[0] : activation.card;
-  if (!cardObj) return null;
-
-  const cardDef = getCardBySlug(cardObj.slug) || {
-    slug: cardObj.slug,
-    name: cardObj.name,
-    description: cardObj.description,
-    rarity: cardObj.rarity,
-    effectType: cardObj.effect_type,
-    effectConfig: cardObj.effect_config || {},
-    enabled: true,
-    icon: "🃏",
-    requiresTarget: "NONE",
-  };
-
-  const targetSnap = (activation.target_snapshot || {}) as any;
-  let targetPlayerName = targetSnap.targetPlayerName || null;
-  let targetPlayer2Name = targetSnap.targetPlayer2Name || null;
-
-  // Se não estiver no snapshot, busca os nomes dos jogadores
-  const playerIdsToFetch: string[] = [];
-  if (targetSnap.targetPlayerId && !targetPlayerName) playerIdsToFetch.push(targetSnap.targetPlayerId);
-  if (targetSnap.targetPlayer2Id && !targetPlayer2Name) playerIdsToFetch.push(targetSnap.targetPlayer2Id);
-
-  if (playerIdsToFetch.length > 0) {
-    const { data: fetchedPlayers } = await readClient
-      .from("players")
-      .select("id, name")
-      .in("id", playerIdsToFetch);
-
-    if (fetchedPlayers) {
-      const nameMap = new Map(fetchedPlayers.map((p) => [p.id, p.name]));
-      if (targetSnap.targetPlayerId && !targetPlayerName) {
-        targetPlayerName = nameMap.get(targetSnap.targetPlayerId) || null;
-      }
-      if (targetSnap.targetPlayer2Id && !targetPlayer2Name) {
-        targetPlayer2Name = nameMap.get(targetSnap.targetPlayer2Id) || null;
-      }
-    }
-  }
-
-  return {
-    id: activation.id,
-    roundId: activation.round_id,
-    userCardId: activation.user_card_id,
-    card: cardDef,
-    status: activation.status,
-    targetPlayerId: targetSnap.targetPlayerId || null,
-    targetPlayerName,
-    targetPlayer2Id: targetSnap.targetPlayer2Id || null,
-    targetPlayer2Name,
-    targetPrediction: targetSnap.targetPrediction || null,
-    resultBonus: Number(activation.result_bonus || 0),
-    resultDetails: activation.result_details,
-  };
+  return readActiveFantasyCard(readClient, { userId: account.user.id, leagueId: league.id, roundId });
 }
 
 /**
