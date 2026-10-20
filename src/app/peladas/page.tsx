@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentAccount } from "@/lib/auth";
@@ -7,6 +8,7 @@ import {
   joinOpenLeague,
   requestClosedLeague,
 } from "@/app/lobby/actions";
+import { colorWithOpacity } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +18,21 @@ type DiscoverableLeague = {
   league_slug: string;
   feature_tier: "basic" | "complete";
   visibility: "private" | "open";
+  logo_url: string | null;
+  cover_url: string | null;
+  accent_color: string | null;
 };
+
+function leagueAccent(color: string | null) {
+  return /^#[0-9a-f]{6}$/i.test(color || "") ? color! : "#ccff00";
+}
+
+function accentForeground(color: string) {
+  const red = Number.parseInt(color.slice(1, 3), 16);
+  const green = Number.parseInt(color.slice(3, 5), 16);
+  const blue = Number.parseInt(color.slice(5, 7), 16);
+  return red * 0.299 + green * 0.587 + blue * 0.114 > 150 ? "#06120b" : "#ffffff";
+}
 
 export default async function DiscoverLeaguesPage({ searchParams }: {
   searchParams: Promise<{ q?: string; error?: string; requested?: string }>;
@@ -69,33 +85,44 @@ export default async function DiscoverLeaguesPage({ searchParams }: {
       {error === "request" ? "Não foi possível enviar o pedido. Verifique se ele já está pendente e tente novamente." : "Não foi possível entrar nessa pelada. Atualize a lista e tente novamente."}
     </p>}
 
-    {discoveryError ? <p role="alert" className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">O catálogo completo estará disponível depois de aplicar a migration 313.</p>
+    {discoveryError ? <p role="alert" className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">O catálogo completo estará disponível depois de aplicar a migration 330.</p>
       : catalog.length ? <div className="space-y-3">{catalog.map((league) => {
         const joined = joinedIds.has(league.league_id);
         const pending = pendingIds.has(league.league_id);
         const isOpen = league.visibility === "open";
-        return <article key={league.league_id} className={`rounded-2xl border p-4 ${isOpen ? "border-accent/30 bg-accent/5" : "border-border bg-surface"}`}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="truncate font-athletic text-xl font-black text-white">{league.league_name}</h2>
-              <p className="mt-1 text-xs text-muted">{league.feature_tier === "basic" ? "Modo básico · ranking e organização" : "Modo completo · ranking, Cartola e extras"}</p>
-            </div>
-            <span className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-black uppercase ${isOpen ? "bg-accent/15 text-accent" : "bg-white/5 text-muted"}`}>
+        const accentColor = leagueAccent(league.accent_color);
+        const buttonTextColor = accentForeground(accentColor);
+        return <article key={league.league_id} className="overflow-hidden rounded-2xl border bg-surface" style={{ borderColor: colorWithOpacity(accentColor, isOpen ? 0.45 : 0.25) }}>
+          <div className="relative h-32 overflow-hidden border-b border-white/10" style={{ backgroundColor: colorWithOpacity(accentColor, 0.08) }}>
+            {league.cover_url && <Image src={league.cover_url} alt="" fill sizes="(max-width: 640px) 100vw, 640px" className="object-cover" />}
+            <div className="absolute inset-0 bg-black/55" />
+            <span className="absolute right-3 top-3 shrink-0 rounded-full border border-white/15 bg-black/60 px-3 py-1 text-[10px] font-black uppercase" style={{ color: isOpen ? accentColor : "white" }}>
               {isOpen ? "Aberta" : "Fechada"}
             </span>
+            <div className="absolute inset-x-4 bottom-3 flex items-end gap-3">
+              <div className="relative grid size-16 shrink-0 place-items-center overflow-hidden rounded-2xl border-2 bg-background font-athletic text-lg font-black" style={{ borderColor: accentColor, color: accentColor }}>
+                {league.logo_url ? <Image src={league.logo_url} alt="" fill sizes="64px" className="object-cover" /> : league.league_name.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="min-w-0 pb-1">
+                <h2 className="truncate text-balance font-athletic text-xl font-black text-white">{league.league_name}</h2>
+                <p className="mt-1 text-pretty text-xs text-white/70">{league.feature_tier === "basic" ? "Modo básico · ranking e organização" : "Modo completo · ranking, Cartola e extras"}</p>
+              </div>
+            </div>
           </div>
 
-          {joined ? <form action={enterLeague} className="mt-4">
-            <input type="hidden" name="league_id" value={league.league_id} />
-            <button className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-black text-black">Abrir esta pelada</button>
-          </form> : pending ? <div className="mt-4 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-center text-xs font-black text-warning">Pedido aguardando aprovação</div>
-            : isOpen ? <form action={joinOpenLeague} className="mt-4">
+          <div className="p-4">
+            {joined ? <form action={enterLeague}>
               <input type="hidden" name="league_id" value={league.league_id} />
-              <button className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-black text-black">Entrar agora</button>
-            </form> : <form action={requestClosedLeague} className="mt-4">
-              <input type="hidden" name="league_id" value={league.league_id} />
-              <button className="w-full rounded-xl border border-accent/40 px-4 py-3 text-sm font-black text-accent">Solicitar entrada</button>
-            </form>}
+              <button className="w-full rounded-xl px-4 py-3 text-sm font-black" style={{ backgroundColor: accentColor, color: buttonTextColor }}>Abrir esta pelada</button>
+            </form> : pending ? <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-center text-xs font-black text-warning">Pedido aguardando aprovação</div>
+              : isOpen ? <form action={joinOpenLeague}>
+                <input type="hidden" name="league_id" value={league.league_id} />
+                <button className="w-full rounded-xl px-4 py-3 text-sm font-black" style={{ backgroundColor: accentColor, color: buttonTextColor }}>Entrar agora</button>
+              </form> : <form action={requestClosedLeague}>
+                <input type="hidden" name="league_id" value={league.league_id} />
+                <button className="w-full rounded-xl border px-4 py-3 text-sm font-black" style={{ borderColor: colorWithOpacity(accentColor, 0.55), color: accentColor }}>Solicitar entrada</button>
+              </form>}
+          </div>
         </article>;
       })}</div> : <div className="rounded-2xl border border-border bg-surface p-6 text-center text-sm text-muted">Nenhuma pelada encontrada com esse nome.</div>}
 

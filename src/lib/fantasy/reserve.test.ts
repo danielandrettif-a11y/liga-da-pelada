@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { getFantasyReservePriceLimit, resolveFantasyReserveSubstitution } from "./reserve";
+import {
+  getFantasyReserveCost,
+  getFantasyReservePriceLimit,
+  getFantasyReserveRefund,
+  resolveFantasyReserveSubstitution,
+} from "./reserve";
 
 describe("banco de reserva do Cartola", () => {
   const starters = [
@@ -105,5 +110,11 @@ describe("banco de reserva do Cartola", () => {
     expect(getFantasyReservePriceLimit("DEF", starters)).toBe(7.9);
     expect(getFantasyReservePriceLimit("GOL", starters)).toBe(6.9);
     expect(getFantasyReservePriceLimit("ATA", [{ slotRole: "DEF", price: 10 }])).toBeNull();
+  });
+
+  it("cobra o preço cheio e devolve exatamente o valor pago", () => {
+    expect(getFantasyReserveCost(9.876)).toBe(9.88);
+    expect(getFantasyReserveRefund(9.876)).toBe(9.88);
+    expect(getFantasyReserveCost(Number.NaN)).toBe(0);
   });
 });

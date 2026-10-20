@@ -22,3 +22,12 @@ export function isPlayerVisibleInPrelistTab(
   if (tab === "selected") return selectedPlayerIds.has(playerId);
   return !selectedPlayerIds.has(playerId) && !callupEntryIds.has(playerId);
 }
+
+export function isStandaloneCallupVisible(
+  callup: { status: string; round_id: string | null },
+  listedRoundIds: ReadonlySet<string>,
+) {
+  return callup.status !== "closed" && (
+    !callup.round_id || !listedRoundIds.has(callup.round_id)
+  );
+}

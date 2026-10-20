@@ -1,11 +1,16 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import {
+  CalendarPlus,
   CalendarDays,
   Clock,
   Football,
   MapPin,
   Trophy,
   Users,
+  X,
 } from "@/components/icons";
 import { BQTheBestButton } from "@/components/BQTheBestButton";
 import { WeatherBadge } from "@/components/WeatherBadge";
@@ -39,6 +44,7 @@ export function NextRoundBanner({
   awardsPeriodStart: string;
   awardWinners?: MonthlyAwardWinner[];
 }) {
+  const [showAdminActions, setShowAdminActions] = useState(false);
   const isPrelist = round?.preparation_stage === "prelist";
   const confirmedCount = round?.confirmedPlayers || 0;
 
@@ -56,11 +62,17 @@ export function NextRoundBanner({
   return (
     <article className="group relative isolate flex h-full min-h-[360px] sm:min-h-[380px] flex-col justify-between overflow-hidden rounded-[2rem] border border-amber-500/30 bg-[#040f08] p-5 sm:p-6 shadow-[0_25px_65px_rgba(0,0,0,.65),0_0_35px_rgba(245,158,11,.12)]">
       {/* Link de cobertura em todo o banner */}
-      <Link
-        href={href}
-        className="absolute inset-0 z-10"
-        aria-label="Abrir agenda da pelada"
-      />
+      {isAdmin ? (
+        <button
+          type="button"
+          onClick={() => setShowAdminActions(true)}
+          className="absolute inset-0 z-10"
+          aria-label="Abrir ações para organizar a pelada"
+          aria-expanded={showAdminActions}
+        />
+      ) : (
+        <Link href={href} className="absolute inset-0 z-10" aria-label="Abrir agenda da pelada" />
+      )}
 
       {/* Imagem de Fundo com Troféu e Estádio */}
       <div
@@ -169,10 +181,29 @@ export function NextRoundBanner({
         <div className="mt-auto space-y-2.5">
           <BQTheBestButton periodStart={awardsPeriodStart} winners={awardWinners} />
           <div className="border-t border-white/10 pt-2 text-right">
-            <span className="text-[9px] font-black uppercase tracking-[0.14em] text-accent">Toque fora do prêmio para ver a agenda</span>
+            <span className="text-[9px] font-black uppercase tracking-[0.14em] text-accent">{isAdmin ? "Toque no banner para organizar a próxima pelada" : "Toque fora do prêmio para ver a agenda"}</span>
           </div>
         </div>
       </div>
+
+      {isAdmin && showAdminActions && (
+        <div className="absolute inset-4 z-40 flex flex-col justify-center rounded-3xl border border-accent/35 bg-[#07150d] p-5 shadow-2xl sm:inset-6" role="region" aria-label="Ações da rodada">
+          <button type="button" onClick={() => setShowAdminActions(false)} className="absolute right-3 top-3 rounded-full border border-border bg-surface p-2 text-muted hover:text-foreground" aria-label="Fechar ações">
+            <X className="size-4" />
+          </button>
+          <p className="text-[10px] font-black uppercase text-accent">Área do ADM</p>
+          <h3 className="mt-1 text-balance font-athletic text-2xl font-black uppercase text-white">O que você quer fazer?</h3>
+          <p className="mt-2 text-pretty text-xs leading-5 text-muted">Abra a lista do próximo jogo ou consulte tudo o que já aconteceu.</p>
+          <div className="mt-5 grid gap-2">
+            <Link href="/rodadas?create=1" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-black text-background">
+              <CalendarPlus className="size-5" /> Abrir nova rodada
+            </Link>
+            <Link href="/rodadas#historico" className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 text-sm font-bold text-foreground">
+              <CalendarDays className="size-5" /> Ver histórico de rodadas
+            </Link>
+          </div>
+        </div>
+      )}
     </article>
   );
 }

@@ -52,7 +52,7 @@ export function CallupAdminCard({
     if (!result.success) setError(result.error || "Erro ao abrir convocação.");
     else {
       setShowCreate(false);
-      router.push(`/convocacao?callup=${result.id}`);
+      router.push(`/convocacao?callup=${result.id}&setup=players`);
     }
     setLoading(false);
   }

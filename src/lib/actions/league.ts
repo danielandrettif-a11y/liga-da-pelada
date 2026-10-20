@@ -6,6 +6,11 @@ import { getAdminClient } from "../auth";
 import { MAX_PLAYERS_PER_TEAM, MAX_TEAMS_PER_ROUND, MIN_TEAMS_PER_ROUND } from "../constants";
 import { getSelectedLeague } from "../league-context";
 import { getCurrentAccount } from "../auth";
+import {
+  DUPLICATE_LEAGUE_NAME_MESSAGE,
+  isDuplicateLeagueNameError,
+  normalizeLeagueName,
+} from "@/modules/leagues/domain/league-name";
 
 const BRANDING_BUCKET = "league-branding";
 const BRANDING_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -40,7 +45,7 @@ export async function updateLeagueName(leagueId: string, name: string) {
   if (!selectedLeague || selectedLeague.id !== leagueId || selectedLeague.role !== "admin") {
     return { success: false as const, error: "Somente o ADM desta pelada pode alterar o nome." };
   }
-  const normalizedName = name.trim().replace(/\s+/g, " ");
+  const normalizedName = normalizeLeagueName(name);
   if (normalizedName.length < 3 || normalizedName.length > 80) {
     return { success: false as const, error: "O nome precisa ter entre 3 e 80 caracteres." };
   }
@@ -51,6 +56,9 @@ export async function updateLeagueName(leagueId: string, name: string) {
     .eq("id", leagueId)
     .select("name")
     .single();
+  if (isDuplicateLeagueNameError(error)) {
+    return { success: false as const, error: DUPLICATE_LEAGUE_NAME_MESSAGE };
+  }
   if (error || !data) return { success: false as const, error: error?.message || "Não foi possível alterar o nome." };
   revalidatePath("/", "layout");
   revalidatePath("/admin/liga");

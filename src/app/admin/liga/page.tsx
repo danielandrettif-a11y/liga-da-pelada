@@ -184,7 +184,7 @@ export default function LigaConfigPage() {
 
       {canManage && <section className="glass-card space-y-3 p-5">
         <h2 className="font-athletic text-lg font-black uppercase text-foreground">Nome da pelada</h2>
-        <p className="text-xs text-muted">Este nome aparece no cabeçalho, lobby e convites. O link de convite permanece o mesmo.</p>
+        <p className="text-pretty text-xs text-muted">Este nome aparece no cabeçalho, lobby e convites, e precisa ser único. O link de convite permanece o mesmo.</p>
         <label htmlFor="league-name" className="sr-only">Nome da pelada</label>
         <input id="league-name" type="text" maxLength={80} value={nameDraft}
           onChange={(event) => setNameDraft(event.target.value)}

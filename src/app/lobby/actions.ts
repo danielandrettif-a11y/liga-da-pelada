@@ -138,6 +138,7 @@ export async function createLeague(formData: FormData) {
     visibility: String(formData.get("visibility") || ""),
   }, supabaseLeagueCreator(client));
   if (result.status === "invalid") redirect("/lobby/criar?error=invalid");
+  if (result.status === "duplicate") redirect("/lobby/criar?error=duplicate");
   if (result.status === "failed") redirect("/lobby/criar?error=create");
   (await cookies()).set(ACTIVE_LEAGUE_COOKIE, result.leagueId, {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax",

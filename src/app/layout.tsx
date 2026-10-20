@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Oswald } from "next/font/google";
+import { Bebas_Neue, Inter, Oswald } from "next/font/google";
 import { Suspense } from "react";
 import "./globals.css";
 import { SessionBottomNav } from "@/components/SessionBottomNav";
@@ -17,6 +17,13 @@ const inter = Inter({
 
 const oswald = Oswald({
   variable: "--font-oswald",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const bebasNeue = Bebas_Neue({
+  variable: "--font-club-display",
+  weight: "400",
   subsets: ["latin"],
   display: "swap",
 });
@@ -80,7 +87,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="pt-BR" className={`${inter.variable} ${oswald.variable} h-full antialiased`}>
+    <html lang="pt-BR" className={`${inter.variable} ${oswald.variable} ${bebasNeue.variable} h-full antialiased`}>
       <body className="min-h-dvh flex flex-col font-sans">
         <WebVitalsReporter />
         <PwaRegistration />

@@ -64,6 +64,12 @@ describe("criação de pelada", () => {
     await expect(createLeague(form())).rejects.toThrow("redirect:/lobby/criar?error=create");
     expect(mocks.cookieSet).not.toHaveBeenCalled();
   });
+
+  it("informa quando já existe uma pelada com o mesmo nome", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: "23505", message: "duplicate" } });
+    await expect(createLeague(form())).rejects.toThrow("redirect:/lobby/criar?error=duplicate");
+    expect(mocks.cookieSet).not.toHaveBeenCalled();
+  });
 });
 
 describe("pedido para pelada fechada", () => {

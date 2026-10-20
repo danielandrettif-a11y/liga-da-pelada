@@ -576,8 +576,18 @@ export async function deleteRound(roundId: string, confirmation: string) {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem excluir rodadas." };
     if (!(await isRoundInSelectedLeague(client, roundId))) return { success: false, error: "Rodada fora da pelada selecionada." };
+    const { data: linkedCallup } = await client.from("callups")
+      .select("id").eq("round_id", roundId).maybeSingle();
     const { error } = await client.rpc("delete_round_cascade", { p_round_id: roundId });
     if (error) throw new Error(error.message);
+    // Compatibilidade com bancos ainda sem a migration 329. Com a migration,
+    // esta escrita é idempotente e apenas confirma o estado transacional.
+    if (linkedCallup?.id) {
+      const { error: callupError } = await client.from("callups")
+        .update({ status: "closed", round_id: null, updated_at: new Date().toISOString() })
+        .eq("id", linkedCallup.id);
+      if (callupError) throw new Error(`A rodada foi excluída, mas não foi possível encerrar a convocação: ${callupError.message}`);
+    }
     for (const path of ["/rodadas", "/ranking", "/pagamentos", "/cartola", "/cartola/ranking", "/cartola/historico", "/admin/cartola", "/admin/transfermarket", "/admin/prelistas", "/convocacao", "/mais"]) {
       revalidatePath(path);
     }

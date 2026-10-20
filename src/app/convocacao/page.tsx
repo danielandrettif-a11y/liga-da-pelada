@@ -18,6 +18,7 @@ import { CollectiveRoom } from "@/components/CollectiveRoom";
 import { CollectiveNavLink } from "@/components/CollectiveNavLink";
 import { Flag, Sparkles } from "@/components/icons";
 import { getEventWeather } from "@/lib/weather";
+import { getSelectedLeague } from "@/lib/league-context";
 
 export const revalidate = 0;
 
@@ -73,12 +74,13 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ConvocacaoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callup?: string; invite?: string; list?: string; section?: string }>;
+  searchParams: Promise<{ callup?: string; invite?: string; list?: string; section?: string; setup?: string }>;
 }) {
   const params = await searchParams;
-  const [callups, account] = await Promise.all([
+  const [callups, account, selectedLeague] = await Promise.all([
     getActiveCallups({ callupId: params.callup, inviteToken: params.invite }),
     getCurrentAccount(),
+    getSelectedLeague(),
   ]);
   if (callups.length === 0) {
     return (
@@ -100,7 +102,7 @@ export default async function ConvocacaoPage({
   const labeledCallups = labelCallupTabs(callups);
   const [leagueConfig, fantasyHighlights, stadiums, cosmeticsMap, draftWorkspace, collectiveRoom] = await Promise.all([
     safely(getLeagueConfig(), null),
-    safely(getFantasyQuickHighlights(), null),
+    selectedLeague?.featureTier === "complete" ? safely(getFantasyQuickHighlights(), null) : Promise.resolve(null),
     safely(getStadiums(), []),
     safely(getAllPlayersEquippedCosmeticsMap(), new Map()),
     account.user ? safely(getDraftWorkspace(callup.id), null) : Promise.resolve(null),
@@ -172,6 +174,8 @@ export default async function ConvocacaoPage({
         fantasyHighlights={fantasyHighlights}
         playerCosmetics={Object.fromEntries(cosmeticsMap)}
         initialListTab={params.list === "waitlist" ? "waitlist" : "confirmed"}
+        initialPlayerSetupOpen={account.isAdmin && params.setup === "players"}
+        cartolaEnabled={selectedLeague?.featureTier === "complete"}
         loginReturnTo={params.invite ? `/c/${encodeURIComponent(params.invite)}` : "/convocacao"}
         weather={weather}
       />

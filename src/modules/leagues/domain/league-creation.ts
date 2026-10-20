@@ -1,3 +1,5 @@
+import { normalizeLeagueName } from "./league-name";
+
 export type LeagueTier = "basic" | "complete";
 export type LeagueVisibility = "private" | "open";
 
@@ -12,7 +14,7 @@ export function parseNewLeague(input: {
   tier: string;
   visibility: string;
 }): NewLeague | null {
-  const name = input.name.trim().replace(/\s+/g, " ");
+  const name = normalizeLeagueName(input.name);
   if (name.length < 3 || name.length > 80) return null;
   if (input.tier !== "basic" && input.tier !== "complete") return null;
   if (input.visibility !== "private" && input.visibility !== "open") return null;

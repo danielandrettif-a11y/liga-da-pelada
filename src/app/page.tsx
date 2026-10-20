@@ -31,6 +31,7 @@ import { getPreviousMonthAwardWinners } from "@/lib/actions/players";
 import { LeagueInviteCard } from "@/components/LeagueInviteCard";
 import { CombatBeltBadges } from "@/components/CombatBeltBadges";
 import { formatRankingPoints } from "@/lib/ranking";
+import { getSelectedLeague } from "@/lib/league-context";
 
 export const dynamic = "force-dynamic";
 
@@ -107,13 +108,15 @@ function IncompleteProfileBanner() {
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ inviteError?: string }> }) {
   const query = await searchParams;
   const accountPromise = getCurrentAccount();
-  const [{ data }, previousSeason, account, identity, seasonPass, monthlyAwards] = await Promise.all([
+  const selectedLeaguePromise = getSelectedLeague();
+  const [{ data }, previousSeason, account, identity, seasonPass, monthlyAwards, selectedLeague] = await Promise.all([
     getDashboardData(),
     getLatestFinishedSeason(),
     accountPromise,
     getCurrentAccountIdentity(),
-    getSeasonPassDashboard(),
+    selectedLeaguePromise.then((league) => league?.featureTier === "complete" ? getSeasonPassDashboard() : null),
     getPreviousMonthAwardWinners(),
+    selectedLeaguePromise,
   ]);
   const inheritedGoogleAvatars = [
     account.user?.user_metadata?.avatar_url,
@@ -215,7 +218,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         })()}
       </section>
 
-      <SeasonPassBanner pass={seasonPass} compact />
+      {selectedLeague?.featureTier === "complete" && <SeasonPassBanner pass={seasonPass || undefined} compact />}
 
       {previousSeason && <PreviousSeasonBanner summary={previousSeason} />}
 

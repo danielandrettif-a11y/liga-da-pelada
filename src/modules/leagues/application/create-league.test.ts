@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createLeagueForUser } from "./create-league";
+import { createLeagueForUser, DuplicateLeagueNameError } from "./create-league";
 
 describe("criação de pelada", () => {
   const input = { name: "  Pelada   HG ", tier: "basic", visibility: "private" };
@@ -19,5 +19,10 @@ describe("criação de pelada", () => {
   it("mantém o erro público existente se o banco falhar", async () => {
     const create = vi.fn().mockRejectedValue(new Error("database error"));
     expect(await createLeagueForUser(input, { create })).toEqual({ status: "failed" });
+  });
+
+  it("distingue nome repetido de uma falha genérica", async () => {
+    const create = vi.fn().mockRejectedValue(new DuplicateLeagueNameError());
+    expect(await createLeagueForUser(input, { create })).toEqual({ status: "duplicate" });
   });
 });

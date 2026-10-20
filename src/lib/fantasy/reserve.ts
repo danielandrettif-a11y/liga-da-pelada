@@ -32,8 +32,21 @@ export type FantasyReserveStarterPrice = {
 };
 
 /**
+ * O banco usa o preco cheio durante a montagem do time. Esse valor funciona
+ * como uma caução e volta integralmente ao patrimônio ao encerrar a rodada.
+ */
+export function getFantasyReserveCost(marketPrice: number): number {
+  if (!Number.isFinite(marketPrice) || marketPrice <= 0) return 0;
+  return Math.round((marketPrice + Number.EPSILON) * 100) / 100;
+}
+
+export function getFantasyReserveRefund(pricePaid: number): number {
+  return getFantasyReserveCost(pricePaid);
+}
+
+/**
  * O preço cheio do reserva precisa ficar abaixo de todos os titulares da
- * mesma posição. O desconto de 50% só é aplicado depois dessa validação.
+ * mesma posição. O preço é devolvido integralmente ao fim da rodada.
  */
 export function getFantasyReservePriceLimit(
   reserveRole: FantasyReserveRole,

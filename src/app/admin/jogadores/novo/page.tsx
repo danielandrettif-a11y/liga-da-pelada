@@ -13,9 +13,9 @@ export default function NovoJogadorPage() {
           <ArrowLeft className="w-5 h-5 text-muted" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-foreground">Novo Jogador</h1>
+          <h1 className="text-xl font-bold text-foreground">Novo convidado</h1>
           <p className="text-xs text-muted mt-0.5">
-            Cadastrar um novo membro na liga
+            Cadastre uma participação temporária; jogadores oficiais entram pela própria conta
           </p>
         </div>
       </div>

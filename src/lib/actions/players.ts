@@ -557,6 +557,9 @@ export async function createPlayer(input: CreatePlayerInput) {
     return { success: false, error: "Escolha uma pelada que você administra." };
   }
   const client = account.client;
+  if (!input.member_category || input.member_category === "player") {
+    return { success: false, error: "Jogadores oficiais precisam criar o próprio perfil ao entrar no app." };
+  }
 
   const { data, error } = await client
     .from("players")
@@ -568,7 +571,7 @@ export async function createPlayer(input: CreatePlayerInput) {
         player_profile: normalizeLineProfile(input.player_profile),
         overall_traits: normalizeOverallTraits(input.overall_traits),
         is_goalkeeper: false,
-        member_category: input.member_category || "player",
+        member_category: input.member_category,
         is_selectable: input.member_category === "wag" || input.member_category === "supporter"
           ? false
           : true,
@@ -748,6 +751,10 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     currentPlayerProfile = (currentMembership.player_profile ?? currentPlayer.player_profile) as PlayerProfile | null;
     currentOverallTraits = normalizeOverallTraits(currentMembership.overall_traits ?? currentPlayer.overall_traits);
     currentIsGoalkeeper = Boolean(currentPlayer.is_goalkeeper);
+  }
+
+  if (isLeagueAdmin && requestedCategory === "player" && (!playerId || currentCategory !== "player")) {
+    return { success: false, error: "Jogadores oficiais precisam criar o próprio perfil ao entrar no app." };
   }
 
   const uploadedPaths: string[] = [];

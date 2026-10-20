@@ -72,6 +72,8 @@ type Props = {
   fantasyHighlights?: FantasyQuickHighlight | null;
   playerCosmetics?: Record<string, EquippedCosmeticsSummary>;
   initialListTab?: "confirmed" | "waitlist";
+  initialPlayerSetupOpen?: boolean;
+  cartolaEnabled?: boolean;
   loginReturnTo?: string;
   weather?: EventWeather | null;
 };
@@ -90,6 +92,8 @@ export function CallupBoard({
   fantasyHighlights,
   playerCosmetics = {},
   initialListTab = "confirmed",
+  initialPlayerSetupOpen = false,
+  cartolaEnabled = true,
   loginReturnTo = "/convocacao",
   weather,
 }: Props) {
@@ -106,7 +110,7 @@ export function CallupBoard({
   const [activeTab, setActiveTab] = useUrlState({ key: "list", initialValue: initialListTab, defaultValue: "confirmed", allowedValues: CALLUP_LIST_TABS });
 
   // Estado para Contratação de Amigo (Convidado)
-  const [isHireGuestOpen, setIsHireGuestOpen] = useState(false);
+  const [isHireGuestOpen, setIsHireGuestOpen] = useState(initialPlayerSetupOpen);
   const [guestName, setGuestName] = useState("");
   const [guestProfile, setGuestProfile] = useState<PlayerProfile>("offensive");
   const [isGuestGk, setIsGuestGk] = useState(false);
@@ -167,7 +171,7 @@ export function CallupBoard({
     if (!result.success) {
       setError(result.error || "Não foi possível atualizar a lista.");
     } else {
-      if (key === "join" && result.status === "confirmed") {
+      if (cartolaEnabled && key === "join" && result.status === "confirmed") {
         setShowCartolaPopup(true);
       }
       router.refresh();
@@ -532,7 +536,7 @@ export function CallupBoard({
               )}
             </div>
 
-            {myEntry.status === "confirmed" && (
+            {cartolaEnabled && myEntry.status === "confirmed" && (
               <div className="mt-3 flex items-center justify-between border-t border-accent/20 pt-2.5 text-xs">
                 <span className="text-[11px] text-muted flex items-center gap-1">
                   <Sparkles className="h-3.5 w-3.5 text-accent" /> Já escalou seu Cartola?
@@ -592,7 +596,7 @@ export function CallupBoard({
         )}
       </section>
 
-      {/* 3. PAINEL DE CONTRATAÇÃO DE AMIGO (CONVIDADO) & ADMIN */}
+      {/* 3. FLUXO SIMPLES PARA ADICIONAR JOGADORES */}
       {canJoinCallup && (
         <section className="overflow-hidden rounded-2xl border border-accent/25 bg-accent/[0.04]">
           <button
@@ -605,14 +609,14 @@ export function CallupBoard({
                 <UserPlus className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-xs font-black text-foreground">Contratar Amigo (Convidado)</p>
-                <p className="text-[10px] text-muted">Adicione um amigo para entrar na lista ou na fila de espera</p>
+                <p className="text-xs font-black text-foreground">Adicionar jogador à convocação</p>
+                <p className="text-pretty text-[10px] text-muted">Escolha alguém do elenco ou crie um convidado temporário</p>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5 text-accent">
               <span className="text-[10px] font-bold hidden sm:inline">
-                {isHireGuestOpen ? "Recolher" : "Contratar"}
+                {isHireGuestOpen ? "Fechar" : "Adicionar"}
               </span>
               <ChevronDown
                 className={`h-4 w-4 transition-transform duration-200 ${
@@ -624,15 +628,50 @@ export function CallupBoard({
 
           {isHireGuestOpen && (
             <div className="p-4 pt-0 space-y-3 animate-fade-in border-t border-accent/15">
-              {/* Formulário de criação de perfil de convidado */}
               {isAuthenticated ? (
-                <form onSubmit={handleInviteGuest} className="space-y-2 pt-3">
+                <div className="space-y-4 pt-3">
+                  {availablePlayers.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-[10px] font-black uppercase text-accent">1. Já está no elenco?</p>
+                      <div className="flex gap-2">
+                        <select
+                          id="callup-player"
+                          defaultValue=""
+                          className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground"
+                        >
+                          <option value="" disabled>Escolha o jogador</option>
+                          {availablePlayers.map((player) => (
+                            <option key={player.id} value={player.id}>
+                              {player.name}{player.member_category === "guest" ? " (convidado)" : ""}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const select = document.getElementById("callup-player") as HTMLSelectElement;
+                            if (select?.value) run("add", () => addRosterPlayerToCallup(callup.id, select.value));
+                          }}
+                          disabled={!!loading}
+                          className="flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-accent px-3 text-xs font-black text-background disabled:opacity-50"
+                        >
+                          <UserPlus className="size-3.5" /> Adicionar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleInviteGuest} className="space-y-2 border-t border-accent/15 pt-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-accent">{availablePlayers.length > 0 ? "2." : "1."} Não está no elenco?</p>
+                      <p className="mt-1 text-pretty text-[10px] leading-4 text-muted">Crie um perfil de convidado só com o necessário. Jogadores oficiais criam o próprio perfil ao entrar no app.</p>
+                    </div>
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
                     <input
                       type="text"
                       value={guestName}
                       onChange={(e) => setGuestName(e.target.value)}
-                      placeholder="Nome do amigo / convidado..."
+                      placeholder="Nome do convidado"
                       required
                       className="sm:col-span-6 rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted/60 focus:border-accent outline-none"
                     />
@@ -654,7 +693,7 @@ export function CallupBoard({
                       ) : (
                         <UserPlus className="h-3.5 w-3.5" />
                       )}
-                      Contratar Amigo
+                      Criar e adicionar
                     </button>
                   </div>
 
@@ -672,7 +711,8 @@ export function CallupBoard({
                       {!isQueueOnlyAfterDraw && confirmed.length < capacity ? "Entrará como Titular" : "Entrará na Fila de Espera"}
                     </span>
                   </div>
-                </form>
+                  </form>
+                </div>
               ) : (
                 <div className="text-center pt-3 text-[11px] text-muted">
                   <Link href={`/login?next=${encodeURIComponent(loginReturnTo)}`} className="text-accent font-bold hover:underline">
@@ -682,37 +722,6 @@ export function CallupBoard({
                 </div>
               )}
 
-              {/* Qualquer conta logada pode incluir alguém do elenco jogável. */}
-            {isAuthenticated && availablePlayers.length > 0 && (
-                <div className="pt-3 border-t border-accent/15 flex gap-2">
-                  <select
-                    id="callup-player"
-                    defaultValue=""
-                    className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-xs text-foreground"
-                  >
-                    <option value="" disabled>
-                      Adicionar alguém do elenco...
-                    </option>
-                    {availablePlayers.map((player) => (
-                      <option key={player.id} value={player.id}>
-                        {player.name}
-                        {player.member_category === "guest" ? " (convidado)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => {
-                      const select = document.getElementById("callup-player") as HTMLSelectElement;
-                      if (select?.value) run("add", () => addRosterPlayerToCallup(callup.id, select.value));
-                    }}
-                    disabled={!!loading}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/20 text-accent hover:bg-accent hover:text-background transition-colors"
-                    title="Adicionar à convocação"
-                  >
-                    <UserPlus className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </section>
@@ -956,7 +965,7 @@ export function CallupBoard({
       </section>
 
       {/* POPUP PÓS-CONFIRMAÇÃO: CHAMADA PARA O CARTOLA */}
-      {showCartolaPopup && (
+      {cartolaEnabled && showCartolaPopup && (
         <div
           className="mobile-dialog-backdrop fixed inset-0 z-[300] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in"
           onClick={() => setShowCartolaPopup(false)}

@@ -8,6 +8,7 @@ import { CallupAdminCard } from "@/components/CallupAdminCard";
 import { getActiveCallups, getAgendaCallups } from "@/lib/actions/callups";
 import { getLeagueConfig } from "@/lib/actions/league";
 import { getStadiums } from "@/lib/actions/stadiums";
+import { isStandaloneCallupVisible } from "@/lib/callup-ui";
 
 export const revalidate = 0;
 
@@ -29,7 +30,12 @@ const STATUS_STYLES = {
   },
 };
 
-export default async function RodadasPage() {
+export default async function RodadasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ create?: string }>;
+}) {
+  const params = await searchParams;
   const [rounds, account, agendaCallups] = await Promise.all([
     getRounds(),
     getCurrentAccount(),
@@ -39,25 +45,12 @@ export default async function RodadasPage() {
     ? await Promise.all([getActiveCallups(), getLeagueConfig(), getStadiums(), getAdminRoundPrelists()])
     : [[], null, [], []];
   const visiblePrelists = adminPrelists || [];
-  // Convocações encerradas sem participantes e sem rodada podem sobrar de
-  // tentativas antigas. Se já existe outra convocação na mesma data, não as
-  // apresente como uma segunda pelada no histórico.
-  const relevantCallups = agendaCallups.filter((callup) => !(
-    callup.status === "closed" &&
-    !callup.round_id &&
-    callup.playersCount === 0 &&
-    agendaCallups.some((other) =>
-      other.id !== callup.id &&
-      other.date === callup.date &&
-      (Boolean(other.round_id) || other.status !== "closed"),
-    )
-  ));
   const listedRoundIds = new Set([
     ...rounds.map((round: any) => round.id),
     ...visiblePrelists.map((prelist: any) => prelist.id),
   ]);
-  const standaloneCallups = relevantCallups.filter((callup) =>
-    !callup.round_id || !listedRoundIds.has(callup.round_id),
+  const standaloneCallups = agendaCallups.filter((callup) =>
+    isStandaloneCallupVisible(callup, listedRoundIds),
   );
   const agendaItems = [
     ...rounds.map((round: any) => ({ ...round, agendaKind: "round" as const })),
@@ -98,7 +91,7 @@ export default async function RodadasPage() {
       </div>
 
       {account.isAdmin && (
-        <details className="group overflow-hidden rounded-2xl border border-accent/30 bg-accent/[0.06]">
+        <details id="abrir-convocacao" open={params.create === "1"} className="group overflow-hidden rounded-2xl border border-accent/30 bg-accent/[0.06]">
           <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 [&::-webkit-details-marker]:hidden">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/15">
               <CalendarPlus className="h-5 w-5 text-accent" />
@@ -122,7 +115,7 @@ export default async function RodadasPage() {
       )}
 
       {/* Rounds List */}
-      <div className="space-y-3">
+      <div id="historico" className="scroll-mt-4 space-y-3">
         {agendaItems.map((round, index) => {
           const isPrelist = round.agendaKind === "prelist";
           const isCallup = round.agendaKind === "callup";

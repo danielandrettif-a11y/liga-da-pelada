@@ -31,7 +31,9 @@ export default async function CreateLeaguePage({ searchParams }: {
               <option value="open">Aberta — qualquer jogador pode entrar</option>
             </select>
           </label>
-          {error && <p role="alert" className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">Não foi possível criar a pelada. Confira os dados e tente novamente.</p>}
+          {error && <p role="alert" className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-pretty text-sm text-red-200">
+            {error === "duplicate" ? "Já existe uma pelada com esse nome. Escolha um nome diferente." : "Não foi possível criar a pelada. Confira os dados e tente novamente."}
+          </p>}
           <button type="submit" className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-black text-black">Criar minha pelada</button>
         </form>
   </div>;

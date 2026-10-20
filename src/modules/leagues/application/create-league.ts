@@ -1,5 +1,12 @@
 import { parseNewLeague, type NewLeague } from "../domain/league-creation";
 
+export class DuplicateLeagueNameError extends Error {
+  constructor() {
+    super("duplicate_league_name");
+    this.name = "DuplicateLeagueNameError";
+  }
+}
+
 export type LeagueCreator = {
   create(league: NewLeague): Promise<string | null>;
 };
@@ -7,6 +14,7 @@ export type LeagueCreator = {
 export type CreateLeagueResult =
   | { status: "created"; leagueId: string }
   | { status: "invalid" }
+  | { status: "duplicate" }
   | { status: "failed" };
 
 export async function createLeagueForUser(
@@ -18,7 +26,8 @@ export async function createLeagueForUser(
   try {
     const leagueId = await creator.create(league);
     return leagueId ? { status: "created", leagueId } : { status: "failed" };
-  } catch {
+  } catch (error) {
+    if (error instanceof DuplicateLeagueNameError) return { status: "duplicate" };
     return { status: "failed" };
   }
 }

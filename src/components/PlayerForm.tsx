@@ -59,7 +59,9 @@ export function PlayerForm({
   const [cropTarget, setCropTarget] = useState<AvatarSlot>("active");
   const [useAlternateAsActive, setUseAlternateAsActive] = useState(false);
   const [cropSourceUrl, setCropSourceUrl] = useState("");
-  const [memberCategory, setMemberCategory] = useState<MemberCategory>(player?.member_category || "player");
+  const [memberCategory, setMemberCategory] = useState<MemberCategory>(
+    player?.member_category || (mode === "admin" ? "guest" : "player"),
+  );
   const [speedRating, setSpeedRating] = useState<1 | 2 | 3 | null>(initialSpeedRating);
   const [privateBalanceTag, setPrivateBalanceTag] = useState<PrivateBalanceTag | null>(initialPrivateBalanceTag);
   const initialOverallTraits = [...new Set((player?.overall_traits || []).map((trait) => trait === "midfield" ? "offensive" : trait))].slice(0, 2) as PlayerProfile[];
@@ -262,7 +264,7 @@ export function PlayerForm({
     }
   }
 
-  const previewName = player?.name || "Novo jogador";
+  const previewName = player?.name || "Novo convidado";
   const currentAvatarSlot: AvatarSlot = useAlternateAsActive ? "alternate" : "active";
   const extraAvatarSlot: AvatarSlot = useAlternateAsActive ? "active" : "alternate";
   const currentPreviewUrl = previewFor(currentAvatarSlot);
@@ -409,11 +411,12 @@ export function PlayerForm({
         <div className="space-y-1.5">
           <label htmlFor="member_category" className="text-xs font-bold uppercase tracking-wider text-muted">Categoria no elenco</label>
           <select id="member_category" name="member_category" value={memberCategory} onChange={(event) => setMemberCategory(event.target.value as MemberCategory)} className="w-full rounded-xl border border-border bg-surface-hover px-4 py-3 text-sm text-foreground outline-none focus:border-accent">
-            <option value="player">Jogador oficial</option>
+            {player?.member_category === "player" && <option value="player">Jogador oficial</option>}
             <option value="guest">Convidado</option>
             <option value="wag">WAG</option>
             <option value="supporter">Torcedor</option>
           </select>
+          <p className="text-pretty text-[10px] leading-4 text-muted">O ADM cria convidados, WAGs e torcedores. Jogadores oficiais criam o próprio perfil ao entrar com a conta pessoal.</p>
           <p className="text-[10px] text-muted">WAGs e torcedores aparecem no Elenco, mas nunca entram em convocações, sorteios ou partidas. Se já houver estatísticas, elas serão preservadas e ficarão ocultas.</p>
           {memberCategory === "guest" && <p className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-[11px] leading-4 text-muted">Convidados permanecem ativos no elenco e disponíveis para futuras rodadas.</p>}
         </div>
@@ -593,7 +596,7 @@ export function PlayerForm({
           disabled={loading}
           className="w-full bg-accent hover:bg-accent-light text-background font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
         >
-          {loading ? "Salvando..." : isEditing ? "Salvar alterações" : "Cadastrar jogador"}
+          {loading ? "Salvando..." : isEditing ? "Salvar alterações" : "Cadastrar convidado"}
         </button>
 
         {isEditing && mode === "admin" && (
