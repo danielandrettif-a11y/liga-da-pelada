@@ -1,0 +1,57 @@
+name: Auditar devolucao do banco de reservas
+
+on:
+  workflow_dispatch:
+    inputs:
+      round_number:
+        description: Numero da rodada a auditar
+        required: true
+        default: "8"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Auditar rodada no banco de producao
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: ${{ secrets.OLD_DB_URL }}
+      ROUND_NUMBER: ${{ inputs.round_number }}
+
+    steps:
+      - name: Baixar o repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar cliente PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Validar entrada e conexao
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$ROUND_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Numero da rodada invalido."
+            exit 1
+          fi
+          if [[ -z "${DATABASE_URL:-}" ]]; then
+            echo "O secret OLD_DB_URL nao foi configurado."
+            exit 1
+          fi
+          psql "$DATABASE_URL" --no-psqlrc --set ON_ERROR_STOP=1 --command "select 1" >/dev/null
+
+      - name: Auditar perdas do banco de reservas
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" \
+            --no-psqlrc \
+            --set ON_ERROR_STOP=1 \
+            --set round_number="$ROUND_NUMBER" \
+            --file scripts/audit-reserve-refund.sql
