@@ -24,7 +24,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Concluído nesta fase | Formato, abertura, pré-lista, edição, estado e participação extraídos; migrations 325 e 328 aplicadas e validadas em teste e oficial; isolamento entre duas peladas aprovado. |
-| Partidas e pontuação | Código concluído; rollout pendente | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; abertura transacional e outbox de gols implementadas. Migrations 326–327 aplicadas; migration 334 ainda precisa de teste integrado antes do oficial. |
+| Partidas e pontuação | Banco implantado; código pronto para publicação | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; abertura transacional e outbox de gols implementadas. Migrations 326–327 e 334 aplicadas; catálogo e permissões da 334 conferidos no teste e no oficial. Ainda faltam publicar o commit e executar o ensaio móvel integrado com falhas de rede e dois ADMs. |
 | Cartola e cosméticos | Concluído nesta fase | Mutações e leitores principais extraídos; ranking, históricos, ficha e destaques usam modelos analíticos e filtros sazonais. |
 | Pagamentos | Concluído nesta fase | Itens, parcelas, PIX, rateio, obrigações, checklist e auditoria separados em domínio, aplicação e infraestrutura, mantendo RPCs e escopo por pelada. |
 | Estatísticas e demais áreas | Concluído nesta fase | Pontuação canônica e modelos analíticos extraídos; leitores sazonais separados; rankings duplicados removidos; cache limitado à requisição. |
@@ -32,9 +32,16 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-21 — rollout das migrations de performance e Ao Vivo
+
+- A migration `333_set_based_achievement_belt_holders.sql` foi aplicada primeiro no teste e depois no projeto oficial `qffxktwxsqyiijboeftr` (`sa-east-1`). O teste precisou ser alinhado antes com a migration 322, que já estava no oficial; depois disso a paridade ficou em 38/38 jogadores no teste e 37/37 no oficial, sem divergências.
+- A migration `334_transactional_idempotent_match_creation.sql` foi aplicada no teste e no oficial. Foram confirmados: função `create_live_match`, três colunas de recibo/idempotência, índice único parcial, `EXECUTE` para `authenticated` e ausência de `EXECUTE` para `anon`.
+- O rollout usou a CLI oficial via Management API, sem armazenar senha ou token no repositório. Não foi executado teste de carga em produção.
+- O ensaio integrado de criação real permanece propositalmente pendente porque exigiria alterar partidas oficiais. Deve ser feito em uma rodada descartável no teste, com repetição da mesma chave, payload conflitante, dois ADMs, rollback e rede limitada.
+
 ### 2026-10-21 — fluxo Ao Vivo resiliente e caminho crítico menor
 
-- Preparada a migration `334_transactional_idempotent_match_creation.sql`. Ela cria partida, escalação, goleiros, períodos no gol, cronômetro e ativação da rodada em uma única transação; a chave de intenção devolve o mesmo recibo em retry e o bloqueio da rodada impede duas aberturas concorrentes. **Ainda não aplicada no Supabase de teste ou oficial.**
+- Preparada a migration `334_transactional_idempotent_match_creation.sql`. Ela cria partida, escalação, goleiros, períodos no gol, cronômetro e ativação da rodada em uma única transação; a chave de intenção devolve o mesmo recibo em retry e o bloqueio da rodada impede duas aberturas concorrentes. **Aplicada e conferida no Supabase de teste e oficial em 2026-10-21.**
 - A tela de nova partida passou a carregar um modelo mínimo em vez do objeto completo da rodada. Na gravação, as leituras independentes são paralelas; alertas externos e invalidações saíram do caminho da resposta.
 - O registro de gol eliminou uma consulta de escopo redundante: a RPC da migration 279 já autoriza o ADM da pelada, bloqueia a partida, insere evento e placar e trata idempotência na mesma transação. Invalidações de Ranking/Cartola são posteriores à resposta.
 - Gols/assistências agora usam outbox persistente por conta + partida. Queda, recarga e retry preservam a mesma chave; falha de transporte recebe backoff, falha de regra é exibida para descarte, o Realtime concilia a confirmação e o encerramento fica bloqueado enquanto houver pendências.
