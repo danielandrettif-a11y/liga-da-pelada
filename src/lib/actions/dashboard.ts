@@ -1,6 +1,5 @@
 "use server";
 
-import { getRankingExperienceData } from "./stats";
 import { getActiveSeason } from "./seasons";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getCurrentAccount } from "../auth";
@@ -97,7 +96,6 @@ export async function getDashboardData() {
       .order("date", { ascending: true })
       .order("start_time", { ascending: true });
 
-    // 3. Ranking e Destaques
     const [
       { data: nextRoundData },
       { data: nextFriendlyData },
@@ -105,7 +103,6 @@ export async function getDashboardData() {
       { data: liveMatchData },
       { data: leagueData },
       { data: activeCallupsData },
-      rankingExperience,
     ] = await Promise.all([
       nextRoundPromise,
       nextFriendlyPromise,
@@ -113,12 +110,7 @@ export async function getDashboardData() {
       liveMatchPromise,
       leaguePromise,
       activeCallupsPromise,
-      getRankingExperienceData(),
     ]);
-
-    // A home usa exatamente a mesma fonte, filtro de atividade e regra das
-    // seis melhores atuações exibida na página completa do ranking.
-    const rankingWithCosmetics = rankingExperience.general;
 
     // Convocacoes ligadas a rodadas iniciadas/finalizadas deixam de ser destaque.
     const visibleCallups = (activeCallupsData || []).filter((callup: any) => {
@@ -192,17 +184,6 @@ export async function getDashboardData() {
       };
     }
     
-    let topScorer = null;
-    let topAssists = null;
-    let topWins = null;
-
-    if (rankingWithCosmetics.length > 0) {
-      // Cria cópias para ordenar independentemente sem mutar a array original
-      topScorer = [...rankingWithCosmetics].sort((a, b) => b.goals - a.goals)[0];
-      topAssists = [...rankingWithCosmetics].sort((a, b) => b.assists - a.assists)[0];
-      topWins = [...rankingWithCosmetics].sort((a, b) => b.wins - a.wins)[0];
-    }
-
     // Processamento da Última Rodada (mapear os times nas partidas)
     let processedLastRound = null;
     if (lastRoundData) {
@@ -256,12 +237,6 @@ export async function getDashboardData() {
         activeCallup: mappedCallups[0] || null,
         activeCallups: mappedCallups,
         lastRound: processedLastRound,
-        rankingPreview: rankingWithCosmetics.slice(0, 5),
-        highlights: {
-          topScorer: topScorer && topScorer.goals > 0 ? topScorer : null,
-          topAssists: topAssists && topAssists.assists > 0 ? topAssists : null,
-          topWins: topWins && topWins.wins > 0 ? topWins : null
-        }
       }
     };
   } catch (err: any) {

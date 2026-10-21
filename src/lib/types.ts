@@ -533,6 +533,7 @@ export type CreateTeamInput = {
 };
 
 export type CreateMatchInput = {
+  idempotency_key?: string;
   round_id: string;
   team_a_id: string;
   team_b_id: string;

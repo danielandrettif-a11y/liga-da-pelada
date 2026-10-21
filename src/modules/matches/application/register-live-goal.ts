@@ -1,5 +1,6 @@
 import type { RegisterGoalInput } from "@/lib/types";
 import { validateRegisterGoalInput } from "../domain/register-goal";
+import { measureMatchStep } from "@/lib/match-performance";
 
 export type SavedGoal = {
   event_id?: string;
@@ -10,7 +11,6 @@ export type SavedGoal = {
 } | null;
 
 export type RegisterGoalGateway = {
-  ensureMatchSelected(matchId: string): Promise<void>;
   saveGoal(input: RegisterGoalInput): Promise<SavedGoal>;
 };
 
@@ -32,8 +32,7 @@ export async function registerLiveGoal(
   const validationError = validateRegisterGoalInput(input);
   if (validationError) return { success: false, error: validationError };
 
-  await gateway.ensureMatchSelected(input.match_id);
-  const result = await gateway.saveGoal(input);
+  const result = await measureMatchStep("register_goal", "save_goal_rpc", () => gateway.saveGoal(input));
   return {
     success: true,
     roundId: result?.round_id,

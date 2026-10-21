@@ -27,6 +27,7 @@ import { getSelectedLeague } from "../league-context";
 import { parseCallupFormat } from "@/modules/callups/domain/callup-format";
 import { changeCallupFormat } from "@/modules/callups/application/change-callup-format";
 import { supabaseCallupFormatGateway } from "@/modules/callups/infrastructure/supabase-callup-format-gateway";
+import { readMatchSetupRound } from "@/modules/matches/infrastructure/supabase-match-setup-reader";
 
 const getActiveLeagueCached = cache(async (leagueId: string) => {
   const client = await createServerClient();
@@ -154,6 +155,19 @@ export async function getRound(id: string) {
   if (data.teams) data.teams.sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
   if (data.matches) data.matches = sortMatchesChronologically(data.matches);
   return data;
+}
+
+export async function getRoundMatchSetup(id: string) {
+  const league = await getSelectedLeague();
+  if (!league) return null;
+
+  const client = await createServerClient();
+  try {
+    return await readMatchSetupRound(client, { roundId: id, leagueId: league.id });
+  } catch (error) {
+    console.error("Erro ao buscar dados para criar partida:", error);
+    return null;
+  }
 }
 
 export async function getAdminRoundPrelists() {

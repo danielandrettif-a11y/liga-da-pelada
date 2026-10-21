@@ -2,11 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { registerLiveGoal, type RegisterGoalGateway } from "./register-live-goal";
 
 function gateway(): RegisterGoalGateway & {
-  ensureMatchSelected: ReturnType<typeof vi.fn>;
   saveGoal: ReturnType<typeof vi.fn>;
 } {
   return {
-    ensureMatchSelected: vi.fn().mockResolvedValue(undefined),
     saveGoal: vi.fn().mockResolvedValue({
       event_id: "event-1", idempotent: false, score_a: 2, score_b: 1, round_id: "round-1",
     }),
@@ -20,25 +18,15 @@ describe("registro de gol ao vivo", () => {
     const db = gateway();
     expect(await registerLiveGoal({ ...input, player_id: "" }, db))
       .toEqual({ success: false, error: "Dados do gol incompletos." });
-    expect(db.ensureMatchSelected).not.toHaveBeenCalled();
     expect(db.saveGoal).not.toHaveBeenCalled();
   });
 
-  it("confere a pelada antes de gravar e devolve placar e idempotência", async () => {
+  it("usa uma única RPC autorizada e devolve placar e idempotência", async () => {
     const db = gateway();
     expect(await registerLiveGoal(input, db)).toEqual({
       success: true, roundId: "round-1", eventId: "event-1", idempotent: false, scoreA: 2, scoreB: 1,
     });
-    expect(db.ensureMatchSelected).toHaveBeenCalledWith("match-1");
     expect(db.saveGoal).toHaveBeenCalledWith(input);
-    expect(db.ensureMatchSelected.mock.invocationCallOrder[0]).toBeLessThan(db.saveGoal.mock.invocationCallOrder[0]);
-  });
-
-  it("não grava quando a partida está fora da pelada selecionada", async () => {
-    const db = gateway();
-    db.ensureMatchSelected.mockRejectedValue(new Error("Partida fora da pelada selecionada."));
-    await expect(registerLiveGoal(input, db)).rejects.toThrow("Partida fora da pelada selecionada.");
-    expect(db.saveGoal).not.toHaveBeenCalled();
   });
 
   it("preserva o resultado idempotente retornado pela RPC", async () => {

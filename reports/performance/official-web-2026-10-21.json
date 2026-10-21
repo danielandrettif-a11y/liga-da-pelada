@@ -1,0 +1,542 @@
+{
+  "generatedAt": "2026-10-21T15:35:42.531Z",
+  "baseUrl": "https://pelada-de-baixa-qualidade.179.197.75.220.sslip.io",
+  "profile": "mobile 390x844, sem throttling artificial",
+  "iterations": 7,
+  "routes": [
+    {
+      "route": "/",
+      "finalUrl": "https://pelada-de-baixa-qualidade.179.197.75.220.sslip.io/inicio",
+      "status": 200,
+      "cold": {
+        "wallMs": {
+          "p50": 1467.08,
+          "p95": 6562.34,
+          "max": 6562.34
+        },
+        "ttfbMs": {
+          "p50": 166.6,
+          "p95": 4227.2,
+          "max": 4227.2
+        },
+        "fcpMs": {
+          "p50": 524,
+          "p95": 5112,
+          "max": 5112
+        },
+        "lcpMs": {
+          "p50": 584,
+          "p95": 5164,
+          "max": 5164
+        },
+        "cls": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "longTaskMs": {
+          "p50": 89,
+          "p95": 209,
+          "max": 209
+        },
+        "longTaskCount": {
+          "p50": 1,
+          "p95": 2,
+          "max": 2
+        },
+        "loadMs": {
+          "p50": 437.4,
+          "p95": 4702.1,
+          "max": 4702.1
+        },
+        "transferKb": {
+          "p50": 690.04,
+          "p95": 690.05,
+          "max": 690.05
+        },
+        "requests": {
+          "p50": 34,
+          "p95": 34,
+          "max": 34
+        },
+        "sampleResourcesByType": {
+          "link": {
+            "requests": 9,
+            "transferBytes": 200090,
+            "decodedBytes": 518325
+          },
+          "script": {
+            "requests": 12,
+            "transferBytes": 234871,
+            "decodedBytes": 798762
+          },
+          "beacon": {
+            "requests": 2,
+            "transferBytes": 656,
+            "decodedBytes": 24
+          },
+          "css": {
+            "requests": 1,
+            "transferBytes": 191477,
+            "decodedBytes": 191158
+          },
+          "img": {
+            "requests": 1,
+            "transferBytes": 70026,
+            "decodedBytes": 69710
+          },
+          "fetch": {
+            "requests": 9,
+            "transferBytes": 9485,
+            "decodedBytes": 17374
+          }
+        }
+      },
+      "warm": {
+        "wallMs": {
+          "p50": 1354.07,
+          "p95": 1645.74,
+          "max": 1645.74
+        },
+        "ttfbMs": {
+          "p50": 120.1,
+          "p95": 265.1,
+          "max": 265.1
+        },
+        "fcpMs": {
+          "p50": 272,
+          "p95": 420,
+          "max": 420
+        },
+        "lcpMs": {
+          "p50": 272,
+          "p95": 420,
+          "max": 420
+        },
+        "cls": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "longTaskMs": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "longTaskCount": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "loadMs": {
+          "p50": 199.4,
+          "p95": 334.8,
+          "max": 334.8
+        },
+        "transferKb": {
+          "p50": 9.91,
+          "p95": 9.91,
+          "max": 9.91
+        },
+        "requests": {
+          "p50": 34,
+          "p95": 34,
+          "max": 34
+        }
+      }
+    },
+    {
+      "route": "/login",
+      "finalUrl": "https://pelada-de-baixa-qualidade.179.197.75.220.sslip.io/login",
+      "status": 200,
+      "cold": {
+        "wallMs": {
+          "p50": 1332.54,
+          "p95": 1379.18,
+          "max": 1379.18
+        },
+        "ttfbMs": {
+          "p50": 120.8,
+          "p95": 124.2,
+          "max": 124.2
+        },
+        "fcpMs": {
+          "p50": 320,
+          "p95": 420,
+          "max": 420
+        },
+        "lcpMs": {
+          "p50": 320,
+          "p95": 420,
+          "max": 420
+        },
+        "cls": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "longTaskMs": {
+          "p50": 0,
+          "p95": 50,
+          "max": 50
+        },
+        "longTaskCount": {
+          "p50": 0,
+          "p95": 1,
+          "max": 1
+        },
+        "loadMs": {
+          "p50": 349.7,
+          "p95": 441.9,
+          "max": 441.9
+        },
+        "transferKb": {
+          "p50": 375.24,
+          "p95": 375.25,
+          "max": 375.25
+        },
+        "requests": {
+          "p50": 31,
+          "p95": 31,
+          "max": 31
+        },
+        "sampleResourcesByType": {
+          "link": {
+            "requests": 7,
+            "transferBytes": 135035,
+            "decodedBytes": 435779
+          },
+          "script": {
+            "requests": 13,
+            "transferBytes": 237832,
+            "decodedBytes": 805871
+          },
+          "beacon": {
+            "requests": 2,
+            "transferBytes": 656,
+            "decodedBytes": 24
+          },
+          "fetch": {
+            "requests": 8,
+            "transferBytes": 8944,
+            "decodedBytes": 17021
+          }
+        }
+      },
+      "warm": {
+        "wallMs": {
+          "p50": 1045.73,
+          "p95": 1092.89,
+          "max": 1092.89
+        },
+        "ttfbMs": {
+          "p50": 51.7,
+          "p95": 70.1,
+          "max": 70.1
+        },
+        "fcpMs": {
+          "p50": 140,
+          "p95": 156,
+          "max": 156
+        },
+        "lcpMs": {
+          "p50": 140,
+          "p95": 156,
+          "max": 156
+        },
+        "cls": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "longTaskMs": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "longTaskCount": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "loadMs": {
+          "p50": 127,
+          "p95": 149.8,
+          "max": 149.8
+        },
+        "transferKb": {
+          "p50": 9.38,
+          "p95": 11.12,
+          "max": 11.12
+        },
+        "requests": {
+          "p50": 30,
+          "p95": 31,
+          "max": 31
+        }
+      }
+    },
+    {
+      "route": "/cadastro",
+      "finalUrl": "https://pelada-de-baixa-qualidade.179.197.75.220.sslip.io/cadastro",
+      "status": 200,
+      "cold": {
+        "wallMs": {
+          "p50": 1255.72,
+          "p95": 1260.37,
+          "max": 1260.37
+        },
+        "ttfbMs": {
+          "p50": 113.2,
+          "p95": 132,
+          "max": 132
+        },
+        "fcpMs": {
+          "p50": 308,
+          "p95": 336,
+          "max": 336
+        },
+        "lcpMs": {
+          "p50": 308,
+          "p95": 336,
+          "max": 336
+        },
+        "cls": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "longTaskMs": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "longTaskCount": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "loadMs": {
+          "p50": 334.9,
+          "p95": 370.3,
+          "max": 370.3
+        },
+        "transferKb": {
+          "p50": 367.68,
+          "p95": 367.68,
+          "max": 367.68
+        },
+        "requests": {
+          "p50": 25,
+          "p95": 25,
+          "max": 25
+        },
+        "sampleResourcesByType": {
+          "link": {
+            "requests": 7,
+            "transferBytes": 135035,
+            "decodedBytes": 435779
+          },
+          "script": {
+            "requests": 13,
+            "transferBytes": 238113,
+            "decodedBytes": 807664
+          },
+          "beacon": {
+            "requests": 2,
+            "transferBytes": 656,
+            "decodedBytes": 24
+          },
+          "fetch": {
+            "requests": 3,
+            "transferBytes": 2701,
+            "decodedBytes": 4512
+          }
+        }
+      },
+      "warm": {
+        "wallMs": {
+          "p50": 996.14,
+          "p95": 1027.66,
+          "max": 1027.66
+        },
+        "ttfbMs": {
+          "p50": 49.6,
+          "p95": 60.5,
+          "max": 60.5
+        },
+        "fcpMs": {
+          "p50": 120,
+          "p95": 132,
+          "max": 132
+        },
+        "lcpMs": {
+          "p50": 120,
+          "p95": 132,
+          "max": 132
+        },
+        "cls": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "longTaskMs": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "longTaskCount": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "loadMs": {
+          "p50": 109.4,
+          "p95": 120.3,
+          "max": 120.3
+        },
+        "transferKb": {
+          "p50": 3.28,
+          "p95": 3.28,
+          "max": 3.28
+        },
+        "requests": {
+          "p50": 25,
+          "p95": 25,
+          "max": 25
+        }
+      }
+    },
+    {
+      "route": "/lobby",
+      "finalUrl": "https://pelada-de-baixa-qualidade.179.197.75.220.sslip.io/login?next=%2Flobby",
+      "status": 200,
+      "cold": {
+        "wallMs": {
+          "p50": 1331.69,
+          "p95": 1566.12,
+          "max": 1566.12
+        },
+        "ttfbMs": {
+          "p50": 149.7,
+          "p95": 161.9,
+          "max": 161.9
+        },
+        "fcpMs": {
+          "p50": 348,
+          "p95": 556,
+          "max": 556
+        },
+        "lcpMs": {
+          "p50": 348,
+          "p95": 556,
+          "max": 556
+        },
+        "cls": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "longTaskMs": {
+          "p50": 0,
+          "p95": 50,
+          "max": 50
+        },
+        "longTaskCount": {
+          "p50": 0,
+          "p95": 1,
+          "max": 1
+        },
+        "loadMs": {
+          "p50": 379.5,
+          "p95": 628.1,
+          "max": 628.1
+        },
+        "transferKb": {
+          "p50": 374,
+          "p95": 375.75,
+          "max": 375.75
+        },
+        "requests": {
+          "p50": 31,
+          "p95": 32,
+          "max": 32
+        },
+        "sampleResourcesByType": {
+          "link": {
+            "requests": 7,
+            "transferBytes": 135035,
+            "decodedBytes": 435779
+          },
+          "script": {
+            "requests": 13,
+            "transferBytes": 237832,
+            "decodedBytes": 805871
+          },
+          "beacon": {
+            "requests": 2,
+            "transferBytes": 656,
+            "decodedBytes": 24
+          },
+          "fetch": {
+            "requests": 9,
+            "transferBytes": 9449,
+            "decodedBytes": 17339
+          }
+        }
+      },
+      "warm": {
+        "wallMs": {
+          "p50": 1212.96,
+          "p95": 1396.36,
+          "max": 1396.36
+        },
+        "ttfbMs": {
+          "p50": 124.3,
+          "p95": 238.6,
+          "max": 238.6
+        },
+        "fcpMs": {
+          "p50": 196,
+          "p95": 316,
+          "max": 316
+        },
+        "lcpMs": {
+          "p50": 196,
+          "p95": 316,
+          "max": 316
+        },
+        "cls": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "longTaskMs": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "longTaskCount": {
+          "p50": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "loadMs": {
+          "p50": 181.8,
+          "p95": 305,
+          "max": 305
+        },
+        "transferKb": {
+          "p50": 11.62,
+          "p95": 11.62,
+          "max": 11.62
+        },
+        "requests": {
+          "p50": 32,
+          "p95": 32,
+          "max": 32
+        }
+      }
+    }
+  ]
+}

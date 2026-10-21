@@ -19,7 +19,7 @@ import { refreshFluidOverallSafely } from "./overall";
 import { registerLiveGoal } from "@/modules/matches/application/register-live-goal";
 import { finishSelectedMatch } from "@/modules/matches/application/finish-match";
 import { getMatchState } from "@/modules/matches/infrastructure/match-scope";
-import { supabaseGoalGateway } from "@/modules/matches/infrastructure/supabase-goal-gateway";
+import { GoalWriteError, supabaseGoalGateway } from "@/modules/matches/infrastructure/supabase-goal-gateway";
 import { supabaseFinishMatchGateway } from "@/modules/matches/infrastructure/supabase-finish-match-gateway";
 import { chooseFixedGoalkeeper, switchMatchGoalkeeper } from "@/modules/matches/application/manage-goalkeepers";
 import { supabaseGoalkeeperGateway } from "@/modules/matches/infrastructure/supabase-goalkeeper-gateway";
@@ -32,8 +32,29 @@ import { supabaseDeleteGoalGateway } from "@/modules/matches/infrastructure/supa
 import { correctFinishedGoalInMatch } from "@/modules/matches/application/correct-finished-goal";
 import { supabaseFinishedGoalCorrectionGateway } from "@/modules/matches/infrastructure/supabase-finished-goal-correction-gateway";
 import type { FinishedGoalCorrectionInput } from "@/modules/matches/domain/finished-goal-correction";
+import { supabaseCreateMatchGateway, type MatchLineupCommand } from "@/modules/matches/infrastructure/supabase-create-match-gateway";
+import { measureMatchStep } from "../match-performance";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
+
+export async function findLiveMatchForTeams(roundId: string, teamAId: string, teamBId: string) {
+  const league = await getSelectedLeague();
+  if (!league || !roundId || !teamAId || !teamBId || teamAId === teamBId) return null;
+  const client = await createServerClient();
+  const { data: round, error: roundError } = await client.from("rounds")
+    .select("league_id").eq("id", roundId).single();
+  if (roundError || round?.league_id !== league.id) return null;
+  const { data, error } = await client.from("matches")
+    .select("id, team_a_id, team_b_id, timer_started_at, match_players(player_id), match_goalkeepers(player_id)")
+    .eq("round_id", roundId).eq("status", "live");
+  if (error) throw new Error(error.message);
+  return (data || []).find((item) =>
+    item.timer_started_at
+    && item.match_players.length > 0
+    && item.match_goalkeepers.length === 2
+    && ((item.team_a_id === teamAId && item.team_b_id === teamBId)
+      || (item.team_a_id === teamBId && item.team_b_id === teamAId)))?.id || null;
+}
 
 export async function createMatch(input: CreateMatchInput) {
   try {
@@ -56,19 +77,37 @@ export async function createMatch(input: CreateMatchInput) {
       return { success: false, error: "Quantidade de trocas de empréstimo inválida." };
     }
 
-    const [{ data: round, error: roundError }, { data: teams, error: teamsError }, { data: roundPlayers, error: roundPlayersError }] = await Promise.all([
+    const [
+      { data: round, error: roundError },
+      { data: teams, error: teamsError },
+      { data: roundPlayers, error: roundPlayersError },
+      { data: previousMatches, error: previousMatchesError },
+      { data: liveMatches, error: liveMatchesError },
+      selectedLeague,
+    ] = await Promise.all([
       client.from("rounds").select("*, league:league_id (match_duration, players_per_team)").eq("id", input.round_id).single(),
       client.from("teams").select("id, position, name, fixed_goalkeeper_player_id, team_players (*)").eq("round_id", input.round_id),
       client.from("round_players").select("player_id, availability_status, attendance_status, attendance_order").eq("round_id", input.round_id),
+      client.from("matches")
+        .select("team_a_id, team_b_id, status, match_order, created_at, match_players(player_id, team_id, original_team_id)")
+        .eq("round_id", input.round_id)
+        .order("match_order", { ascending: false })
+        .order("created_at", { ascending: false }),
+      client.from("matches")
+        .select("id, team_a_id, team_b_id")
+        .eq("round_id", input.round_id)
+        .eq("status", "live"),
+      getSelectedLeague(),
     ]);
 
     if (roundError || !round) throw new Error("Rodada nao encontrada.");
-    const selectedLeague = await getSelectedLeague();
     if (!selectedLeague || round.league_id !== selectedLeague.id) {
       return { success: false, error: "Rodada fora da pelada selecionada." };
     }
     if (teamsError || !teams) throw new Error("Nao foi possivel carregar os times.");
     if (roundPlayersError || !roundPlayers) throw new Error("Nao foi possivel carregar os jogadores da rodada.");
+    if (previousMatchesError) throw new Error(previousMatchesError.message);
+    if (liveMatchesError) throw new Error(liveMatchesError.message);
     if (round.status === "finished") return { success: false, error: "A rodada ja foi encerrada." };
     const replacementsDoNotScore = shouldExcludeReplacementScoring(round.number);
 
@@ -81,13 +120,6 @@ export async function createMatch(input: CreateMatchInput) {
     // uma regra separada e exclusiva do sorteio por ordem de chegada.
     const tracksAttendance = round.formation_mode !== "manual";
     const usesArrivalOrder = round.arrival_order_enabled === true;
-    const { data: previousMatches, error: previousMatchesError } = await client
-      .from("matches")
-      .select("team_a_id, team_b_id, status, match_order, created_at, match_players(player_id, team_id, original_team_id)")
-      .eq("round_id", input.round_id)
-      .order("match_order", { ascending: false })
-      .order("created_at", { ascending: false });
-    if (previousMatchesError) throw new Error(previousMatchesError.message);
     const previousMatch = previousMatches?.[0];
     if (!previousMatch && usesArrivalOrder) {
       const firstTeamIds = teams.filter((team: any) => team.position <= 2).map((team: any) => team.id);
@@ -203,12 +235,6 @@ export async function createMatch(input: CreateMatchInput) {
       return { success: false, error: "O jogador escolhido não está disponível para este empréstimo." };
     }
 
-    const { data: liveMatches, error: liveMatchesError } = await client
-      .from("matches")
-      .select("id, team_a_id, team_b_id")
-      .eq("round_id", input.round_id)
-      .eq("status", "live");
-    if (liveMatchesError) throw new Error(liveMatchesError.message);
     if ((liveMatches || []).some((match: any) =>
       selectedTeamIds.includes(match.team_a_id) || selectedTeamIds.includes(match.team_b_id)
     )) {
@@ -269,92 +295,37 @@ export async function createMatch(input: CreateMatchInput) {
       }
     }
 
-    const durationMinutes = Number((leagueConfig as any)?.match_duration || 7);
-    const durationSeconds = Math.max(60, Math.round(durationMinutes * 60));
-
-    const kickoffAt = new Date().toISOString();
-    const { data, error } = await client
-      .from("matches")
-      .insert({
-        round_id: input.round_id,
-        team_a_id: input.team_a_id,
-        team_b_id: input.team_b_id,
-        match_order: input.match_order || 1,
-        status: "live",
-        score_a: 0,
-        score_b: 0,
-        started_at: kickoffAt,
-        timer_started_at: kickoffAt,
-        timer_accumulated_seconds: 0,
-        duration_seconds: durationSeconds,
-      })
-      .select()
-      .single();
-
-    if (error) throw new Error(error.message);
-
-    // O trigger do banco é a primeira proteção. A chamada explícita é
-    // idempotente e cobre instalações onde o trigger tenha ficado ausente ou
-    // desatualizado, evitando partida ao vivo com o Cartola ainda aberto.
-    const { error: fantasyLockError } = selectedLeague.featureTier === "complete"
-      ? await client.rpc("lock_fantasy_market", { p_round_id: input.round_id })
-      : { error: null };
-    if (fantasyLockError) {
-      await client.from("matches").delete().eq("id", data.id);
-      throw new Error(`Não foi possível fechar o Cartola antes da partida: ${fantasyLockError.message}`);
-    }
-
-    const lineupRows: Array<Record<string, unknown>> = [];
+    const lineupRows: MatchLineupCommand[] = [];
     for (const team of selectedTeams as any[]) {
       for (const teamPlayer of team.team_players || []) {
         if (availability.get(teamPlayer.player_id) !== "injured" && (!tracksAttendance || attendance.get(teamPlayer.player_id) === "present")) {
           lineupRows.push({
-            match_id: data.id,
             player_id: teamPlayer.player_id,
             team_id: team.id,
             original_team_id: team.id,
-            is_starter: true,
-            is_active: true,
-            result_eligible: true,
-            scoring_eligible: true,
-            entered_elapsed_seconds: 0,
+            participation_kind: "roster",
+            absent_player_id: null,
           });
         }
       }
     }
     for (const replacement of replacements) {
       lineupRows.push({
-        match_id: data.id,
         player_id: replacement.replacement_player_id,
         team_id: replacement.team_id,
-        original_team_id: originalTeamByPlayer.get(replacement.replacement_player_id),
-        is_starter: true,
-        is_active: true,
-        result_eligible: false,
-        scoring_eligible: !replacementsDoNotScore,
-        entered_elapsed_seconds: 0,
+        original_team_id: originalTeamByPlayer.get(replacement.replacement_player_id)!,
+        participation_kind: "replacement",
+        absent_player_id: replacement.absent_player_id,
       });
     }
     for (const loan of structuralLoans) {
       lineupRows.push({
-        match_id: data.id,
         player_id: loan.playerId,
         team_id: loan.targetTeamId,
         original_team_id: loan.originalTeamId,
-        is_starter: true,
-        is_active: true,
-        result_eligible: true,
-        scoring_eligible: true,
-        entered_elapsed_seconds: 0,
+        participation_kind: "structural",
+        absent_player_id: null,
       });
-    }
-
-    if (lineupRows.length > 0) {
-      const { error: lineupError } = await client.from("match_players").insert(lineupRows);
-      if (lineupError) {
-        await client.from("matches").delete().eq("id", data.id);
-        throw new Error(`Erro ao salvar a escalacao: ${lineupError.message}`);
-      }
     }
 
     const goalkeeperRotationOrder = (teamId: string, playerId: string) => {
@@ -371,48 +342,56 @@ export async function createMatch(input: CreateMatchInput) {
       return rotationOrder > 0 ? rotationOrder + (loanStartsGoalkeeperQueue ? 1 : 0) : null;
     };
     const supportsLogicalRotation = Object.prototype.hasOwnProperty.call(round, "target_players_per_team");
-    const { error: goalkeeperError } = await client.from("match_goalkeepers").insert([
-      { match_id: data.id, team_id: input.team_a_id, player_id: input.goalkeeper_a_id, ...(supportsLogicalRotation ? { rotation_order: goalkeeperRotationOrder(input.team_a_id, input.goalkeeper_a_id) } : {}) },
-      { match_id: data.id, team_id: input.team_b_id, player_id: input.goalkeeper_b_id, ...(supportsLogicalRotation ? { rotation_order: goalkeeperRotationOrder(input.team_b_id, input.goalkeeper_b_id) } : {}) },
-    ]);
-    if (goalkeeperError) {
-      await client.from("matches").delete().eq("id", data.id);
-      throw new Error(`Erro ao salvar os goleiros: ${goalkeeperError.message}`);
-    }
-    const { error: goalkeeperStintError } = await client.from("match_goalkeeper_stints").insert([
-      { match_id: data.id, team_id: input.team_a_id, player_id: input.goalkeeper_a_id, entered_elapsed_seconds: 0 },
-      { match_id: data.id, team_id: input.team_b_id, player_id: input.goalkeeper_b_id, entered_elapsed_seconds: 0 },
-    ]);
-    if (goalkeeperStintError) {
-      await client.from("matches").delete().eq("id", data.id);
-      throw new Error(`Erro ao iniciar os períodos no gol: ${goalkeeperStintError.message}`);
-    }
+    const idempotencyKey = input.idempotency_key?.trim() || crypto.randomUUID();
+    const receipt = await measureMatchStep("create_match", "transactional_rpc", () =>
+      supabaseCreateMatchGateway(client).create({
+        roundId: input.round_id,
+        teamAId: input.team_a_id,
+        teamBId: input.team_b_id,
+        goalkeeperAId: input.goalkeeper_a_id,
+        goalkeeperBId: input.goalkeeper_b_id,
+        goalkeeperARotationOrder: supportsLogicalRotation
+          ? goalkeeperRotationOrder(input.team_a_id, input.goalkeeper_a_id)
+          : null,
+        goalkeeperBRotationOrder: supportsLogicalRotation
+          ? goalkeeperRotationOrder(input.team_b_id, input.goalkeeper_b_id)
+          : null,
+        lineup: lineupRows,
+        idempotencyKey,
+      }),
+    );
 
-    // A partida já nasce com o cronômetro iniciado. Portanto, o agendamento
-    // precisa ser criado aqui também; esperar o botão "Iniciar" faria o jogo
-    // contar no app, mas deixaria o celular bloqueado sem os dois alertas.
-    const scheduling = await scheduleMatchTimerAlerts({
-      matchId: data.id,
-      durationSeconds,
-      accumulatedSeconds: 0,
-      startedAt: kickoffAt,
+    // Alertas externos e invalidações não fazem parte do commit esportivo e
+    // não atrasam a abertura da tela ao vivo. Uma repetição idempotente também
+    // agenda novamente: os webhooks possuem trava de entrega por partida/marco.
+    after(async () => {
+      try {
+        const scheduling = await measureMatchStep("create_match", "schedule_timer_alerts", () =>
+          scheduleMatchTimerAlerts({
+            matchId: receipt.match_id,
+            durationSeconds: receipt.duration_seconds,
+            accumulatedSeconds: 0,
+            startedAt: receipt.kickoff_at,
+          }),
+        );
+        if (!scheduling.scheduled) {
+          console.error("Alertas da partida não foram agendados; a partida continua disponível no app.");
+        }
+      } catch (schedulingError) {
+        console.error("Erro ao agendar alertas da partida:", schedulingError);
+      }
+      revalidatePath(`/rodadas/${input.round_id}`);
+      // O primeiro apito encerra a janela de desistência da convocação.
+      revalidatePath("/", "layout");
+      revalidatePath("/convocacao");
+      revalidatePath("/mais");
     });
-    if (!scheduling.scheduled) {
-      await client.from("matches").update({ timer_started_at: null }).eq("id", data.id);
-      throw new Error("O agendador da tela bloqueada não está configurado no servidor.");
-    }
-
-    if (round.status === "draft") {
-      await client.from("rounds").update({ status: "active" }).eq("id", input.round_id);
-    }
-
-    revalidatePath(`/rodadas/${input.round_id}`);
-    // O primeiro apito encerra a janela de desistência da convocação. Força
-    // menu, início e página da lista a esconderem a aba imediatamente.
-    revalidatePath("/", "layout");
-    revalidatePath("/convocacao");
-    revalidatePath("/mais");
-    return { success: true, matchId: data.id };
+    return {
+      success: true,
+      matchId: receipt.match_id,
+      idempotent: receipt.idempotent,
+      receipt,
+    };
   } catch (err: any) {
     console.error("Erro ao criar partida:", err);
     return { success: false, error: err.message };
@@ -652,12 +631,14 @@ export async function registerGoal(input: RegisterGoalInput) {
     // A tela ao vivo aplica o placar e o evento pelo resultado da ação e
     // pelo Realtime. Invalidar a própria rota embutiria outro render pesado
     // na resposta de cada gol.
-    if (result.roundId) {
-      revalidatePath(`/rodadas/${result.roundId}`);
-    }
-    // A prévia do Cartola usa estes eventos diretamente. Invalidar a rota
-    // garante que a atualização manual e o realtime recebam o novo gol.
-    revalidatePath("/cartola");
+    after(() => {
+      if (result.roundId) revalidatePath(`/rodadas/${result.roundId}`);
+      // Ranking e Cartola não fazem parte da confirmação do toque. As telas
+      // ao vivo recebem o evento via resposta + Realtime; estes caches podem
+      // ser invalidados depois que o recibo já voltou ao celular.
+      revalidatePath("/cartola");
+      revalidatePath("/ranking");
+    });
 
     return {
       success: true,
@@ -668,7 +649,13 @@ export async function registerGoal(input: RegisterGoalInput) {
     };
   } catch (err: any) {
     console.error("Erro ao registrar gol:", err);
-    return { success: false, error: err.message };
+    // A gravação pode ter sido concluída antes de a resposta se perder.
+    // O cliente não deve criar uma nova chave para esse mesmo lance.
+    return {
+      success: false,
+      error: err.message,
+      uncertain: err instanceof GoalWriteError ? err.uncertain : true,
+    };
   }
 }
 
@@ -900,10 +887,12 @@ export async function finishMatch(matchId: string) {
     if (!client) return { success: false as const, error: ADMIN_ERROR };
     return await finishSelectedMatch(matchId, supabaseFinishMatchGateway(client), {
       revalidate(id, roundId) {
-        revalidatePath(`/partidas/${id}`);
-        revalidatePath(`/rodadas/${roundId}`);
-        revalidatePath("/ranking");
-        revalidatePath("/cartola");
+        after(() => {
+          revalidatePath(`/partidas/${id}`);
+          revalidatePath(`/rodadas/${roundId}`);
+          revalidatePath("/ranking");
+          revalidatePath("/cartola");
+        });
       },
       recalculate: calculateRoundStats,
       notifyAfterResponse(match) {

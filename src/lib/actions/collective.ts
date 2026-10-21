@@ -7,6 +7,7 @@ import { sendPushNotificationsToUsers } from "../push-notifications";
 import { createServiceClient } from "../supabase/service";
 import { canUseCollective } from "../collective-access";
 import { getSelectedLeague } from "../league-context";
+import { collectiveUnreadFromRows } from "../collective-unread";
 
 export type CollectiveSummary = {
   callupId: string;
@@ -52,25 +53,13 @@ function collectiveMessageCutoff() {
   return new Date(Date.now() - COLLECTIVE_MESSAGE_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
 }
 
-function unreadMessages(rows: any[], userId: string, lastReadMessageId: string | null) {
-  const markerIndex = lastReadMessageId ? rows.findIndex((row) => row.id === lastReadMessageId) : -1;
-  const candidates = markerIndex >= 0 ? rows.slice(markerIndex + 1) : rows;
-  return candidates.filter((row) => row.sender_user_id !== userId && row.kind !== "system" && !row.deleted_at);
-}
-
 async function collectiveUnreadState(client: any, callupIds: string[], userId: string) {
   if (!callupIds.length) return { count: 0, firstUnreadMessageId: null, lastReadMessageId: null };
   const [{ data: reads }, { data: rows }] = await Promise.all([
     client.from("collective_reads").select("callup_id, last_read_message_id").eq("user_id", userId).in("callup_id", callupIds),
     client.from("collective_messages").select("id, callup_id, sender_user_id, kind, deleted_at, created_at").in("callup_id", callupIds).gte("created_at", collectiveMessageCutoff()).order("created_at", { ascending: true }).order("id", { ascending: true }),
   ]);
-  const readByCallupId = new Map<string, string | null>((reads || []).map((read: any) => [String(read.callup_id), typeof read.last_read_message_id === "string" ? read.last_read_message_id : null]));
-  const rowsByCallupId = new Map<string, any[]>();
-  for (const row of rows || []) rowsByCallupId.set(row.callup_id, [...(rowsByCallupId.get(row.callup_id) || []), row]);
-  const unread = [...rowsByCallupId.entries()]
-    .flatMap(([callupId, callupRows]) => unreadMessages(callupRows, userId, readByCallupId.get(callupId) || null))
-    .sort((a, b) => `${a.created_at}-${a.id}`.localeCompare(`${b.created_at}-${b.id}`));
-  return { count: unread.length, firstUnreadMessageId: unread[0]?.id || null, lastReadMessageId: null };
+  return collectiveUnreadFromRows(rows || [], reads || [], userId);
 }
 
 async function listCollectiveCandidates() {
@@ -144,16 +133,23 @@ export async function getCollectiveRoom(callupId?: string): Promise<CollectiveRo
   if (!activeCallup || !visibleCallups.length) return null;
   const summary = collectiveSummary(activeCallup, 0);
   const callupIds = visibleCallups.map((item) => item.id);
-  const [{ data: descendingRows, error }, readState] = await Promise.all([account.client
+  const [{ data: descendingRows, error }, { data: reads }] = await Promise.all([account.client
     .from("collective_messages")
     .select("*, sender:sender_player_id(name, avatar_url)")
     .in("callup_id", callupIds)
     .gte("created_at", collectiveMessageCutoff())
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
-    .limit(300), collectiveUnreadState(account.client, callupIds, account.user.id)]);
+    .limit(300), account.client.from("collective_reads")
+      .select("callup_id, last_read_message_id")
+      .eq("user_id", account.user.id).in("callup_id", callupIds)]);
   if (error) return null;
   const rows = [...(descendingRows || [])].reverse();
+  // Se a janela chegou ao limite, pode haver mensagens anteriores. Nesse caso,
+  // a contagem continua usando a consulta completa para não perder não lidas.
+  const readState = rows.length < 300
+    ? collectiveUnreadFromRows(rows, reads || [], account.user.id)
+    : await collectiveUnreadState(account.client, callupIds, account.user.id);
   summary.unreadCount = readState.count;
   const replyIds = [...new Set((rows || []).map((row: any) => row.reply_to_message_id).filter(Boolean))];
   const replyById = new Map<string, any>();

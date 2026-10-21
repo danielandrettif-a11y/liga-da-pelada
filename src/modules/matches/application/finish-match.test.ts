@@ -38,7 +38,7 @@ function setup() {
 const nowMs = Date.parse("2026-10-17T10:00:05.000Z");
 
 describe("encerramento da partida", () => {
-  it("grava tempos, desativa participantes, recalcula e só então agenda aviso", async () => {
+  it("grava tempos, desativa participantes e prepara scouts/próximo jogo em paralelo", async () => {
     const { gateway, effects } = setup();
     expect(await finishSelectedMatch("match-1", gateway, effects, nowMs)).toEqual({
       success: true, roundId: "round-1", quickStart: { next: "match-2" },
@@ -51,8 +51,8 @@ describe("encerramento da partida", () => {
     expect(gateway.setExitTimes.mock.invocationCallOrder[0]).toBeLessThan(effects.revalidate.mock.invocationCallOrder[0]);
     expect(effects.revalidate.mock.invocationCallOrder[0]).toBeLessThan(gateway.deactivateParticipants.mock.invocationCallOrder[0]);
     expect(gateway.deactivateParticipants.mock.invocationCallOrder[0]).toBeLessThan(effects.recalculate.mock.invocationCallOrder[0]);
+    expect(gateway.deactivateParticipants.mock.invocationCallOrder[0]).toBeLessThan(gateway.buildQuickStart.mock.invocationCallOrder[0]);
     expect(effects.recalculate.mock.invocationCallOrder[0]).toBeLessThan(effects.notifyAfterResponse.mock.invocationCallOrder[0]);
-    expect(effects.notifyAfterResponse.mock.invocationCallOrder[0]).toBeLessThan(gateway.buildQuickStart.mock.invocationCallOrder[0]);
   });
 
   it("repara uma partida já encerrada sem notificar de novo", async () => {
@@ -80,12 +80,12 @@ describe("encerramento da partida", () => {
     expect(effects.recalculate).not.toHaveBeenCalled();
   });
 
-  it("não notifica nem prepara próximo jogo quando o recálculo falha", async () => {
+  it("não notifica quando o recálculo falha", async () => {
     const { gateway, effects } = setup();
     effects.recalculate.mockResolvedValue({ success: false, error: "falha nos scouts" });
     await expect(finishSelectedMatch("match-1", gateway, effects, nowMs)).rejects.toThrow("falha nos scouts");
     expect(effects.notifyAfterResponse).not.toHaveBeenCalled();
-    expect(gateway.buildQuickStart).not.toHaveBeenCalled();
+    expect(gateway.buildQuickStart).toHaveBeenCalledWith("round-1", "match-1");
   });
 
   it("não recalcula nem notifica se a desativação dos participantes falhar", async () => {

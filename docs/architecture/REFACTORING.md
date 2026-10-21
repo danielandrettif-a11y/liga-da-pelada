@@ -13,6 +13,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - O Cartola confirma titulares e reserva pelo recibo da RPC transacional, sem uma segunda leitura de reserva; resposta sem ID exige conferência posterior. Ver [ADR 006](./adr-006-fantasy-lineup-atomic-receipt.md).
 - Ranking, perfil e elenco interpretam a pontuação pela mesma regra de domínio; o read model detalhado pode ser reutilizado apenas na requisição atual. Ver [ADR 007](./adr-007-canonical-statistics-read-model.md).
 - Ranking, históricos, ficha e destaques do Cartola usam leitores sazonais e modelos analíticos testáveis; cache permanece restrito à requisição. Ver [ADR 008](./adr-008-fantasy-analytical-read-models.md).
+- Abertura da partida é uma intenção transacional/idempotente e gols usam outbox local com confirmação explícita. Ver [ADR 009](./adr-009-resilient-live-match-flow.md).
 - Preservar assinaturas e respostas públicas das Server Actions durante a migração; converter uma fatia vertical por vez.
 - Não criar agora tabela de estatísticas acumuladas: a view `player_season_stats` já agrega `player_round_stats`. Medir antes de alterar esquema.
 
@@ -23,13 +24,41 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Concluído nesta fase | Formato, abertura, pré-lista, edição, estado e participação extraídos; migrations 325 e 328 aplicadas e validadas em teste e oficial; isolamento entre duas peladas aprovado. |
-| Partidas e pontuação | Em andamento | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; migrations 326–327 aplicadas e autorização por pelada aprovada. Recuperação automática de projeções permanece como evolução separada. |
+| Partidas e pontuação | Código concluído; rollout pendente | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; abertura transacional e outbox de gols implementadas. Migrations 326–327 aplicadas; migration 334 ainda precisa de teste integrado antes do oficial. |
 | Cartola e cosméticos | Concluído nesta fase | Mutações e leitores principais extraídos; ranking, históricos, ficha e destaques usam modelos analíticos e filtros sazonais. |
 | Pagamentos | Concluído nesta fase | Itens, parcelas, PIX, rateio, obrigações, checklist e auditoria separados em domínio, aplicação e infraestrutura, mantendo RPCs e escopo por pelada. |
 | Estatísticas e demais áreas | Concluído nesta fase | Pontuação canônica e modelos analíticos extraídos; leitores sazonais separados; rankings duplicados removidos; cache limitado à requisição. |
-| Avaliação de tabela de acumulados | Medida; sem justificativa para criar | Benchmark no Supabase de teste teve paridade total e p95 abaixo de 1 s nas três leituras. Reavaliar somente após crescimento representativo. |
+| Avaliação de tabela de acumulados | Medida no oficial; sem justificativa para criar | No banco oficial, `seasonStats`, `rankingHistory` e `playerHistory` ficaram em 128,51 ms, 119,62 ms e 99,64 ms no p95. Os gargalos estão nos enriquecimentos/RPCs compostas. Ver `reports/performance/BASELINE-2026-10-21.md`. |
 
 ## Registro de lotes
+
+### 2026-10-21 — fluxo Ao Vivo resiliente e caminho crítico menor
+
+- Preparada a migration `334_transactional_idempotent_match_creation.sql`. Ela cria partida, escalação, goleiros, períodos no gol, cronômetro e ativação da rodada em uma única transação; a chave de intenção devolve o mesmo recibo em retry e o bloqueio da rodada impede duas aberturas concorrentes. **Ainda não aplicada no Supabase de teste ou oficial.**
+- A tela de nova partida passou a carregar um modelo mínimo em vez do objeto completo da rodada. Na gravação, as leituras independentes são paralelas; alertas externos e invalidações saíram do caminho da resposta.
+- O registro de gol eliminou uma consulta de escopo redundante: a RPC da migration 279 já autoriza o ADM da pelada, bloqueia a partida, insere evento e placar e trata idempotência na mesma transação. Invalidações de Ranking/Cartola são posteriores à resposta.
+- Gols/assistências agora usam outbox persistente por conta + partida. Queda, recarga e retry preservam a mesma chave; falha de transporte recebe backoff, falha de regra é exibida para descarte, o Realtime concilia a confirmação e o encerramento fica bloqueado enquanto houver pendências.
+- O encerramento paraleliza recálculo de scouts e preparo da próxima partida depois de desativar os participantes. A instrumentação opt-in registra p50/p95/máximo/falhas por etapa sem IDs.
+- ADR 009 e `docs/performance/AO-VIVO-2026-10-21.md` registram limites, riscos e rollout. `npm run check` aprovado: tipagem, 800 testes em 154 arquivos e build de produção. A navegação Playwright móvel pública também passou (4/4); o ensaio autenticado e mutável do Ao Vivo continua reservado para uma partida descartável no Supabase de teste.
+- Consulta de catálogo no projeto `pelada-bq-testes` confirmou a função da 322 com as regras `member_category` e `is_selectable`. As funções 333/334 e a coluna `matches.creation_idempotency_key` ainda não existem no teste; nenhuma alteração foi aplicada pelo diagnóstico.
+
+### 2026-10-21 — primeiro lote de otimização guiado pelo baseline oficial
+
+- Preparada a migration `333_set_based_achievement_belt_holders.sql`: elimina o N+1 SQL dos cinturões, preservando recordes individuais, sequência do time, elegibilidade oficial, desempates e formato JSON. **Ainda não aplicada no Supabase de teste ou oficial.**
+- A migration 333 foi executada numa instância PostgreSQL local temporária, restaurada de backup oficial de 15/10 e atualizada com a regra individual da 322. Comparação de 35 jogadores oficiais e 7 detentores: **zero divergências**. Uma execução local do cálculo individual levou 242 ms; a chamada em lote levou 38 ms. O restore teve erros em objetos Supabase não disponíveis localmente, portanto isso não substitui teste no Supabase de teste nem mede produção atual. A instância temporária foi removida e o backup original preservado.
+- O ranking agora busca só a aba aberta; sua classificação essencial chega antes dos detalhes de OVR, velocidade, condicionamento, cosméticos e cinturões. A carga posterior recebe somente IDs validados da pelada e não recalcula a pontuação. A home mostra agenda/rodada antes da prévia enriquecida do ranking por `Suspense`.
+- A Coletiva reutiliza a janela de mensagens para contar não lidas, mantendo a consulta completa quando a janela atinge 300 linhas. Instrumentação opt-in `MATCH_PERF_DIAGNOSTICS=1` separa escopo, RPC de gol, encerramento, recálculo e preparo da próxima partida; a coleta no navegador inclui criação de partida.
+- A arte móvel do fundo de vestiário passou de PNG de 2,05 MB para WebP de 138 KB. As demais mídias maiores já possuem variantes WebP em uso; manter PNGs originais no repositório por enquanto.
+- Verificação final: `npm run check` aprovado (tipagem, 782 testes em 149 arquivos e build). Consulta somente de leitura no projeto `pelada-bq-testes` confirmou 66 vínculos, função individual presente, mas a função individual ainda é anterior à 322 e a função em lote da 320 inexiste. A 333 substitui a 320, porém **a 322 deve ser aplicada no teste antes da 333** para comparar a mesma regra do oficial. Nenhuma migration foi aplicada no Supabase neste lote. Depois de testar paridade e p95 autenticado, fazer backup atual e implantação oficial. Não introduzir cache compartilhado de ranking/perfil enquanto a invalidação por pelada, temporada e mudanças de scouts não estiver coberta.
+
+### 2026-10-21 — baseline completo no banco e site oficiais
+
+- Criados benchmarks reproduzíveis e estritamente de leitura para estruturas Supabase e navegação móvel. O banco medido foi confirmado como `qffxktwxsqyiijboeftr.supabase.co`, projeto Pelada BQ Oficial em `sa-east-1`; foram usadas 20 amostras e 3 aquecimentos por operação, sem migrations ou alterações de dados.
+- O ranking bruto permaneceu rápido, mas a composição ficou lenta: `rankingHistory` marcou 119,62 ms no p95, enquanto `rankingEnrichment`, `rankingComposite` e `homeComposite` marcaram 2.265,25 ms, 1.470,94 ms e 1.789,07 ms. A Coletiva atingiu 2.985,81 ms, o núcleo do Cartola 1.238,08 ms e o pagamento da última rodada 1.037,35 ms.
+- `pg_stat_statements` confirmou gargalos no servidor: `get_league_achievement_belt_holders` teve média histórica de 1.074,99 ms e máximo de 5.146,90 ms; a implementação atual chama o cálculo completo uma vez por membro. Também apareceram consultas aninhadas de rodadas, prêmios mensais, OVR, Cartola e convocações entre 149 e 505 ms de média.
+- A navegação móvel pública teve CLS zero e LCP mediano de 584 ms na homepage fria, porém uma cauda de 5.164 ms causada principalmente por TTFB de 4.227 ms. O diretório público soma 96,76 MB e contém vários PNGs acima de 2 MB.
+- O plano foi reordenado: primeiro cinturões set-based, ranking essencial separado, leitura única da Coletiva e instrumentação; depois Cartola/OVR/prêmios, consultas aninhadas, cache seguro por pelada/temporada e mídia. Tabela acumulada continua adiada porque as leituras estatísticas base estão rápidas no oficial.
+- Evidência completa e metas em `reports/performance/BASELINE-2026-10-21.md`; dados brutos em `reports/performance/official-structures-2026-10-21.json` e `reports/performance/official-web-2026-10-21.json`.
 
 ### 2026-10-19 — implantação e validação das migrations 325–328
 

@@ -813,7 +813,7 @@ export async function getRoundStatistics(roundId: string): Promise<RoundStatisti
   };
 }
 
-async function getRankingExperienceDataUncached(): Promise<RankingExperienceData> {
+async function getRankingExperienceDataUncached(includeEnrichment = true): Promise<RankingExperienceData> {
   const supabase = await createServerClient();
   const season = await getActiveSeason();
   const emptyData: RankingExperienceData = {
@@ -959,7 +959,7 @@ async function getRankingExperienceDataUncached(): Promise<RankingExperienceData
   );
   const rankingAccount = await getCurrentAccount();
   const fitnessClient = rankingAccount.user ? rankingAccount.client : supabase;
-  const [{ data: fitnessRows }, cosmeticsByPlayer, overallByPlayer, speedByPlayer, achievementBeltsByPlayer] = await Promise.all([
+  const [{ data: fitnessRows }, cosmeticsByPlayer, overallByPlayer, speedByPlayer, achievementBeltsByPlayer] = includeEnrichment ? await Promise.all([
     fitnessClient
       .from("player_round_fitness")
       .select("player_id, distance_km, average_speed_kmh")
@@ -968,7 +968,13 @@ async function getRankingExperienceDataUncached(): Promise<RankingExperienceData
     getLatestPlayerCardOverallMap(fitnessClient),
     getPublicSpeedRatingMap(fitnessClient),
     getAchievementBeltsByPlayer(fitnessClient, season.league_id),
-  ]);
+  ]) : [
+    { data: [] },
+    new Map(),
+    new Map(),
+    new Map(),
+    new Map(),
+  ] as const;
   const fitnessByPlayer = new Map<string, { distanceKm: number; speedTotal: number; entries: number }>();
   for (const row of fitnessRows || []) {
     const current = fitnessByPlayer.get(row.player_id) || { distanceKm: 0, speedTotal: 0, entries: 0 };
@@ -1075,6 +1081,73 @@ async function getRankingExperienceDataUncached(): Promise<RankingExperienceData
 }
 
 const getRankingExperienceDataCached = cache(getRankingExperienceDataUncached);
+const getRankingEssentialDataCached = cache(() => getRankingExperienceDataUncached(false));
+
+export async function getRankingEssentialData(): Promise<RankingExperienceData> {
+  return getRankingEssentialDataCached();
+}
+
+type RankingEnrichment = Pick<RankingEntry,
+  "overall" | "overallTrend" | "overallPositions" | "overallPositionTrends" |
+  "overallGoalkeeperGames" | "overallGoalkeeperRounds" | "speedRating" |
+  "fitness" | "achievementBelts" | "cosmetics"
+>;
+
+/** Carrega só os detalhes dos jogadores visíveis, sem recalcular a classificação. */
+export async function getRankingEnrichmentForPlayers(playerIds: string[]): Promise<Record<string, RankingEnrichment>> {
+  const requested = [...new Set(playerIds)].filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)).slice(0, 150);
+  if (!requested.length) return {};
+  const [league, season, account] = await Promise.all([getSelectedLeague(), getActiveSeason(), getCurrentAccount()]);
+  if (!league || !season || season.league_id !== league.id || !account.user) return {};
+  const client = account.client;
+  const [{ data: members, error: membersError }, { data: rounds, error: roundsError }] = await Promise.all([
+    client.from("league_members").select("player_id")
+      .eq("league_id", league.id).eq("is_active", true).in("player_id", requested),
+    client.from("rounds").select("id")
+      .eq("season_id", season.id).eq("status", "finished").eq("round_type", "official"),
+  ]);
+  if (membersError || roundsError) return {};
+  const allowed = (members || []).map((member) => member.player_id);
+  if (!allowed.length) return {};
+  const roundIds = (rounds || []).map((round) => round.id);
+  const [{ data: fitnessRows }, cosmetics, overalls, speeds, belts] = await Promise.all([
+    roundIds.length ? client.from("player_round_fitness")
+      .select("player_id, distance_km, average_speed_kmh")
+      .in("round_id", roundIds).in("player_id", allowed) : Promise.resolve({ data: [] }),
+    getAllPlayersEquippedCosmeticsMap(allowed),
+    getLatestPlayerCardOverallMap(client),
+    getPublicSpeedRatingMap(client),
+    getAchievementBeltsByPlayer(client, league.id),
+  ]);
+  const fitnessByPlayer = new Map<string, { distanceKm: number; speedTotal: number; entries: number }>();
+  for (const row of fitnessRows || []) {
+    const current = fitnessByPlayer.get(row.player_id) || { distanceKm: 0, speedTotal: 0, entries: 0 };
+    current.distanceKm += Number(row.distance_km);
+    current.speedTotal += Number(row.average_speed_kmh);
+    current.entries += 1;
+    fitnessByPlayer.set(row.player_id, current);
+  }
+  return Object.fromEntries(allowed.map((id) => {
+    const overall = overalls.get(id);
+    const fitness = fitnessByPlayer.get(id);
+    return [id, {
+      overall: overall?.overall ?? null,
+      overallTrend: overall?.trend ?? null,
+      overallPositions: overall?.positions ?? null,
+      overallPositionTrends: overall?.positionTrends ?? null,
+      overallGoalkeeperGames: overall?.goalkeeperGames ?? 0,
+      overallGoalkeeperRounds: overall?.goalkeeperRounds ?? 0,
+      speedRating: speeds.get(id) ?? null,
+      fitness: fitness ? {
+        distanceKm: Math.round(fitness.distanceKm * 100) / 100,
+        averageSpeedKmh: Math.round(fitness.speedTotal / fitness.entries * 100) / 100,
+        entries: fitness.entries,
+      } : null,
+      achievementBelts: belts.get(id) || [],
+      cosmetics: cosmetics.get(id) || null,
+    } satisfies RankingEnrichment];
+  }));
+}
 
 export async function getRankingExperienceData(): Promise<RankingExperienceData> {
   // React.cache compartilha o resultado somente dentro da requisição atual.

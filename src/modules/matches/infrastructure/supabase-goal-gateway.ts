@@ -1,12 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RegisterGoalGateway, SavedGoal } from "../application/register-live-goal";
-import { getMatchState } from "./match-scope";
+
+export class GoalWriteError extends Error {
+  constructor(message: string, public readonly uncertain: boolean) {
+    super(message);
+    this.name = "GoalWriteError";
+  }
+}
 
 export function supabaseGoalGateway(client: SupabaseClient): RegisterGoalGateway {
   return {
-    async ensureMatchSelected(matchId) {
-      await getMatchState(client, matchId);
-    },
     async saveGoal(input) {
       const { data, error } = await client.rpc("register_goal", {
         p_match_id: input.match_id,
@@ -17,7 +20,12 @@ export function supabaseGoalGateway(client: SupabaseClient): RegisterGoalGateway
         p_idempotency_key: input.idempotency_key || null,
         p_is_own_goal: Boolean(input.is_own_goal),
       });
-      if (error) throw new Error(error.message);
+      if (error) {
+        const message = error.message || "Não foi possível registrar o gol.";
+        const uncertain = /^PGRST00[0-2]$/.test(error.code || "")
+          || (!error.code && /fetch|network|timeout|connection|socket|aborted/i.test(message));
+        throw new GoalWriteError(message, uncertain);
+      }
       return data as SavedGoal;
     },
   };

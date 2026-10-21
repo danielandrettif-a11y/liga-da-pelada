@@ -1,4 +1,4 @@
-import { getRound } from "@/lib/actions/rounds";
+import { getRoundMatchSetup } from "@/lib/actions/rounds";
 import { notFound } from "next/navigation";
 import { MatchCreator } from "@/components/MatchCreator";
 import { getCurrentAccount } from "@/lib/auth";
@@ -14,7 +14,7 @@ export default async function NovaPartidaPage({
   const account = await getCurrentAccount();
   if (!account.isAdmin) notFound();
 
-  const round = await getRound(id);
+  const round = await getRoundMatchSetup(id);
 
   if (!round) {
     notFound();

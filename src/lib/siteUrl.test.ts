@@ -15,4 +15,10 @@ describe("requestOrigin", () => {
     vi.stubEnv("NODE_ENV", "production");
     expect(requestOrigin({ url: "http://localhost:3000/auth/reentry" })).toBe(SITE_URL);
   });
+
+  it("permite origem local somente no servidor E2E explicitamente isolado", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("E2E_LOCAL_ORIGIN", "http://127.0.0.1:3100");
+    expect(requestOrigin({ url: "http://localhost:3000/rodadas" })).toBe("http://127.0.0.1:3100");
+  });
 });

@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 const ALLOWED_KINDS = new Set(["client_error", "web_vital", "client_action"]);
 const ALLOWED_VITALS = new Set(["CLS", "FCP", "INP", "LCP", "TTFB"]);
-const ALLOWED_ACTIONS = new Set(["register_goal", "finish_match", "change_goalkeeper"]);
+const ALLOWED_ACTIONS = new Set(["register_goal", "finish_match", "create_match", "change_goalkeeper"]);
 
 export async function POST(request: NextRequest) {
   const contentLength = Number(request.headers.get("content-length") || 0);

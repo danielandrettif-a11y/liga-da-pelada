@@ -49,6 +49,18 @@ import { TeamReferenceBadge } from "./TeamReferenceBadge";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { formatGoalTime } from "@/lib/goal-time";
 import { cosmeticBackgroundPosition, cosmeticImage } from "@/lib/fantasy/cosmetics";
+import {
+  createLiveGoalOutboxItem,
+  enqueueLiveGoal,
+  getLiveGoalOutboxScoreDelta,
+  liveGoalOutboxItemToOptimisticEvent,
+  loadLiveGoalOutbox,
+  reconcileLiveGoalOutbox,
+  removeLiveGoalOutboxItem,
+  saveLiveGoalOutbox,
+  updateLiveGoalOutboxItem,
+  type LiveGoalOutboxItem,
+} from "@/lib/live-goal-outbox";
 
 const QuickNextMatchModal = dynamic(() => import("./QuickNextMatchModal").then((module) => module.QuickNextMatchModal));
 
@@ -391,9 +403,17 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
   const router = useRouter();
   const refreshTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submittingGoalRef = useRef(false);
+  const processingGoalOutboxRef = useRef(false);
+  const goalOutboxItemsRef = useRef<LiveGoalOutboxItem[]>([]);
+  const goalOutboxUserIdRef = useRef<string | null>(null);
+  const flushGoalOutboxRef = useRef<() => Promise<void>>(async () => undefined);
+  const goalOutboxRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deletingEventRef = useRef<Set<string>>(new Set());
 
   const [loading, setLoading] = useState(false);
+  const [goalRetrying, setGoalRetrying] = useState(false);
+  const [networkOnline, setNetworkOnline] = useState(true);
+  const [goalOutboxItems, setGoalOutboxItems] = useState<LiveGoalOutboxItem[]>([]);
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState("");
   const [quickStart, setQuickStart] = useState<any | null>(null);
@@ -413,6 +433,55 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
   });
   const [events, setEvents] = useState<any[]>(() => match.match_events || []);
 
+  const commitGoalOutbox = useCallback((update: (current: LiveGoalOutboxItem[]) => LiveGoalOutboxItem[]) => {
+    const next = update(goalOutboxItemsRef.current);
+    goalOutboxItemsRef.current = next;
+    setGoalOutboxItems(next);
+    const userId = goalOutboxUserIdRef.current;
+    if (userId && typeof window !== "undefined") {
+      saveLiveGoalOutbox(window.localStorage, userId, match.id, next);
+    }
+    return next;
+  }, [match.id]);
+
+  const reconcileConfirmedGoal = useCallback((idempotencyKey: string) => {
+    if (!idempotencyKey) return;
+    commitGoalOutbox((current) => removeLiveGoalOutboxItem(current, idempotencyKey));
+  }, [commitGoalOutbox]);
+
+  const activateGoalOutboxScope = useCallback((userId: string | null) => {
+    goalOutboxUserIdRef.current = userId;
+    goalOutboxItemsRef.current = [];
+    setGoalOutboxItems([]);
+    setEvents((current) => current.filter((event) => !event.outboxStatus));
+    setDisplayScore({ a: Number(match.score_a || 0), b: Number(match.score_b || 0) });
+    if (!userId || typeof window === "undefined") return;
+
+    const confirmedKeys = new Set<string>((match.match_events || [])
+      .map((event: any) => event.idempotency_key)
+      .filter(Boolean));
+    const stored = loadLiveGoalOutbox(window.localStorage, userId, match.id);
+    const unresolved = reconcileLiveGoalOutbox(stored, confirmedKeys);
+    saveLiveGoalOutbox(window.localStorage, userId, match.id, unresolved);
+    goalOutboxItemsRef.current = unresolved;
+    setGoalOutboxItems(unresolved);
+
+    if (unresolved.length > 0) {
+      const delta = getLiveGoalOutboxScoreDelta(unresolved, match.team_a_id);
+      setDisplayScore({
+        a: Number(match.score_a || 0) + delta.a,
+        b: Number(match.score_b || 0) + delta.b,
+      });
+      setEvents((current) => {
+        const knownKeys = new Set(current.map((event) => event.idempotency_key).filter(Boolean));
+        const restored = unresolved
+          .filter((item) => !knownKeys.has(item.idempotencyKey))
+          .map(liveGoalOutboxItemToOptimisticEvent);
+        return [...restored, ...current];
+      });
+    }
+  }, [match.id, match.match_events, match.score_a, match.score_b, match.team_a_id]);
+
   // Timer State
   const initialSeconds = match.duration_seconds || matchDuration * 60;
   const [durationSeconds, setDurationSeconds] = useState(initialSeconds);
@@ -427,6 +496,38 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
 
   const isFinished = match.status === "finished";
   const [correctionsUnlocked, setCorrectionsUnlocked] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!cancelled) activateGoalOutboxScope(data.session?.user.id || null);
+    });
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!cancelled && session?.user.id !== goalOutboxUserIdRef.current) {
+        activateGoalOutboxScope(session?.user.id || null);
+      }
+    });
+    return () => {
+      cancelled = true;
+      authListener.subscription.unsubscribe();
+    };
+  }, [activateGoalOutboxScope]);
+
+  useEffect(() => {
+    const updateNetworkState = () => {
+      const online = navigator.onLine;
+      setNetworkOnline(online);
+      if (online) void flushGoalOutboxRef.current();
+    };
+    updateNetworkState();
+    window.addEventListener("online", updateNetworkState);
+    window.addEventListener("offline", updateNetworkState);
+    return () => {
+      window.removeEventListener("online", updateNetworkState);
+      window.removeEventListener("offline", updateNetworkState);
+      if (goalOutboxRetryTimeoutRef.current) clearTimeout(goalOutboxRetryTimeoutRef.current);
+    };
+  }, []);
 
   function unlockFinishedCorrections() {
     const confirmation = window.prompt("Digite EDITAR para liberar a alteração de gols e assistências desta partida.");
@@ -453,12 +554,23 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
   }, [match.timer_started_at, match.timer_accumulated_seconds]);
 
   useEffect(() => {
-    setDisplayScore({ a: Number(match.score_a || 0), b: Number(match.score_b || 0) });
-  }, [match.score_a, match.score_b]);
+    const delta = getLiveGoalOutboxScoreDelta(goalOutboxItemsRef.current, match.team_a_id);
+    setDisplayScore({
+      a: Number(match.score_a || 0) + delta.a,
+      b: Number(match.score_b || 0) + delta.b,
+    });
+  }, [match.score_a, match.score_b, match.team_a_id]);
 
   useEffect(() => {
-    setEvents(match.match_events || []);
-  }, [match.match_events]);
+    const serverEvents = match.match_events || [];
+    const confirmedKeys = new Set<string>(serverEvents.map((event: any) => event.idempotency_key).filter(Boolean));
+    const unresolved = reconcileLiveGoalOutbox(goalOutboxItemsRef.current, confirmedKeys);
+    if (unresolved.length !== goalOutboxItemsRef.current.length) {
+      commitGoalOutbox(() => unresolved);
+    }
+    const pendingEvents = unresolved.map(liveGoalOutboxItemToOptimisticEvent);
+    setEvents([...pendingEvents, ...serverEvents]);
+  }, [commitGoalOutbox, match.match_events]);
 
   useEffect(() => {
     setEligibilityOffset(Number(match.eligibility_elapsed_offset_seconds || 0));
@@ -476,8 +588,10 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
     const applyGoalEvent = (payload: any) => {
       const row = payload.new || payload.old;
       if (!row?.id) return;
+      if (row.idempotency_key) reconcileConfirmedGoal(row.idempotency_key);
       if (payload.eventType === "DELETE") {
-        setEvents((current) => current.filter((event) => event.id !== row.id));
+        setEvents((current) => current.filter((event) =>
+          event.id !== row.id && (!row.idempotency_key || event.idempotency_key !== row.idempotency_key)));
         return;
       }
       if (row.event_type !== "goal") return;
@@ -502,7 +616,11 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
           scheduleRefresh();
           return;
         }
-        setDisplayScore({ a: Number(row.score_a || 0), b: Number(row.score_b || 0) });
+        const pendingDelta = getLiveGoalOutboxScoreDelta(goalOutboxItemsRef.current, match.team_a_id);
+        setDisplayScore((current) => ({
+          a: pendingDelta.a > 0 ? Math.max(current.a, Number(row.score_a || 0)) : Number(row.score_a || 0),
+          b: pendingDelta.b > 0 ? Math.max(current.b, Number(row.score_b || 0)) : Number(row.score_b || 0),
+        }));
         setTimerState({ startedAt: row.timer_started_at || null, accumulated: Number(row.timer_accumulated_seconds || 0) });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "match_events", filter: `match_id=eq.${match.id}` }, (payload) => {
@@ -526,7 +644,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
       if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
       supabase.removeChannel(channel);
     };
-  }, [match.id, match.team_a_id, match.team_b_id, match.match_players, router]);
+  }, [match.id, match.team_a_id, match.team_b_id, match.match_players, reconcileConfirmedGoal, router]);
 
   // Controles do cronômetro
   const toggleTimer = useCallback(async () => {
@@ -656,8 +774,148 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
     ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [events, match.match_substitutions]);
 
+  const goalOutboxFailedCount = goalOutboxItems.filter((item) => item.status === "failed").length;
+  const goalOutboxRetryingCount = goalOutboxItems.filter((item) => item.status === "retrying").length;
+
+  async function ensureGoalOutboxUser() {
+    if (goalOutboxUserIdRef.current) return goalOutboxUserIdRef.current;
+    try {
+      const { data } = await supabase.auth.getSession();
+      const userId = data.session?.user.id || null;
+      if (userId) activateGoalOutboxScope(userId);
+      return userId;
+    } catch {
+      return null;
+    }
+  }
+
+  function updateOptimisticEventStatus(item: LiveGoalOutboxItem) {
+    setEvents((current) => current.map((event) => event.isOptimistic && event.idempotency_key === item.idempotencyKey
+      ? { ...event, outboxStatus: item.status, outboxRetryable: item.retryable, isOptimistic: true }
+      : event));
+  }
+
+  async function flushGoalOutbox() {
+    if (processingGoalOutboxRef.current || typeof navigator === "undefined" || !navigator.onLine) return;
+    if (!goalOutboxUserIdRef.current) return;
+    if (goalOutboxRetryTimeoutRef.current) {
+      clearTimeout(goalOutboxRetryTimeoutRef.current);
+      goalOutboxRetryTimeoutRef.current = null;
+    }
+    processingGoalOutboxRef.current = true;
+    const attempted = new Set<string>();
+
+    try {
+      while (navigator.onLine) {
+        const item = goalOutboxItemsRef.current.find((candidate) =>
+          candidate.retryable && !attempted.has(candidate.idempotencyKey));
+        if (!item) break;
+        attempted.add(item.idempotencyKey);
+        const startedAt = performance.now();
+        let result: Awaited<ReturnType<typeof registerGoal>> | null = null;
+        let attemptsMade = 0;
+
+        for (let attempt = 0; attempt < 3 && navigator.onLine; attempt += 1) {
+          attemptsMade = attempt + 1;
+          const retryingItem = {
+            ...item,
+            status: "retrying" as const,
+            attempts: item.attempts + attempt + 1,
+            updatedAt: new Date().toISOString(),
+          };
+          commitGoalOutbox((current) => updateLiveGoalOutboxItem(current, item.idempotencyKey, retryingItem));
+          updateOptimisticEventStatus(retryingItem);
+          setGoalRetrying(attempt > 0 || item.attempts > 0);
+
+          try {
+            result = await registerGoal(item.input);
+          } catch (cause: any) {
+            result = { success: false, error: cause?.message || "Falha de conexão", uncertain: true };
+          }
+          if (result.success || !("uncertain" in result && result.uncertain)) break;
+          if (attempt < 2 && navigator.onLine) {
+            await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 600 : 1400));
+          }
+        }
+
+        // O Realtime pode confirmar e retirar a entrada enquanto a resposta da
+        // Server Action ainda está em trânsito.
+        if (!goalOutboxItemsRef.current.some((entry) => entry.idempotencyKey === item.idempotencyKey)) {
+          reportMatchAction("register_goal", startedAt, true);
+          continue;
+        }
+
+        if (result?.success) {
+          const remaining = commitGoalOutbox((current) => removeLiveGoalOutboxItem(current, item.idempotencyKey));
+          const remainingDelta = getLiveGoalOutboxScoreDelta(remaining, match.team_a_id);
+          setEvents((current) => current.map((event) => event.isOptimistic && event.idempotency_key === item.idempotencyKey
+            ? { ...event, id: result.eventId || event.id, isOptimistic: false, outboxStatus: undefined, outboxRetryable: undefined }
+            : event));
+          setDisplayScore({
+            a: Number(result.scoreA || 0) + remainingDelta.a,
+            b: Number(result.scoreB || 0) + remainingDelta.b,
+          });
+          setError("");
+
+          const isTeamA = item.input.team_id === match.team_a_id;
+          const currentTeamScore = Number(isTeamA ? result.scoreA : result.scoreB);
+          if (!result.idempotent && shouldOfferMatchFinishAfterGoal(currentTeamScore - 1, currentTeamScore)) {
+            const teamName = isTeamA ? match.team_a.name : match.team_b.name;
+            setFinishPrompt(`${teamName} chegou a 2 gols. Encerrar a partida e preparar a próxima?`);
+          }
+          reportMatchAction("register_goal", startedAt, true);
+          continue;
+        }
+
+        const uncertain = result === null || Boolean("uncertain" in result && result.uncertain);
+        const failedItem = {
+          ...item,
+          status: "failed" as const,
+          attempts: Math.max(item.attempts + attemptsMade, 1),
+          retryable: uncertain,
+          lastError: result?.error || "Não foi possível confirmar o gol.",
+          updatedAt: new Date().toISOString(),
+        };
+        commitGoalOutbox((current) => updateLiveGoalOutboxItem(current, item.idempotencyKey, failedItem));
+        updateOptimisticEventStatus(failedItem);
+        if (!uncertain) {
+          const isTeamA = item.input.team_id === match.team_a_id;
+          setDisplayScore((current) => isTeamA
+            ? { ...current, a: Math.max(0, current.a - 1) }
+            : { ...current, b: Math.max(0, current.b - 1) });
+        }
+        setError(uncertain
+          ? "O lance segue pendente e será reenviado com a mesma chave quando a conexão melhorar."
+          : result?.error || "O servidor recusou o lance. Revise ou remova a falha antes de encerrar.");
+        if (uncertain) {
+          const retryDelay = Math.min(30_000, 2_000 * (2 ** Math.min(4, failedItem.attempts - 1)));
+          goalOutboxRetryTimeoutRef.current = setTimeout(() => {
+            goalOutboxRetryTimeoutRef.current = null;
+            void flushGoalOutboxRef.current();
+          }, retryDelay);
+        }
+        reportMatchAction("register_goal", startedAt, false);
+      }
+    } finally {
+      processingGoalOutboxRef.current = false;
+      setGoalRetrying(false);
+    }
+  }
+
+  flushGoalOutboxRef.current = flushGoalOutbox;
+
+  function discardRejectedGoal(item: LiveGoalOutboxItem) {
+    if (item.retryable) return;
+    commitGoalOutbox((current) => removeLiveGoalOutboxItem(current, item.idempotencyKey));
+    setEvents((current) => current.filter((event) => event.idempotency_key !== item.idempotencyKey));
+  }
+
   // Encerramento da partida
   async function finishCurrentMatch() {
+    if (goalOutboxItemsRef.current.length > 0) {
+      setError("Confirme ou resolva os gols pendentes antes de encerrar a partida.");
+      return;
+    }
     const startedAt = performance.now();
     let succeeded = false;
     setLoading(true);
@@ -682,6 +940,10 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
 
   function handleFinish() {
     if (!canManage) return;
+    if (goalOutboxItemsRef.current.length > 0) {
+      setError("A partida só pode ser encerrada depois que todos os gols forem confirmados pelo servidor.");
+      return;
+    }
     setFinishPrompt("Encerrar esta partida e preparar a próxima?");
   }
 
@@ -735,11 +997,14 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
       return;
     }
 
-    const previousScore = displayScore;
-    const startedAt = performance.now();
-    let succeeded = false;
-    const previousEvents = events;
     const isTeamA = match.team_a_id === request.teamId;
+
+    const outboxUserId = await ensureGoalOutboxUser();
+    if (!outboxUserId) {
+      setError("Não foi possível preparar a sincronização segura. Entre novamente na conta e tente de novo.");
+      submittingGoalRef.current = false;
+      return;
+    }
 
     // Idempotency Key única para esta submissão
     const idempotencyKey = `goal-${match.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -754,6 +1019,21 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
     const scorerEntry = scorerPool.find((p: any) => p.player_id === request.scorerId);
     const assistEntry = assistPlayerId ? activePlayers.find((p: any) => p.player_id === assistPlayerId) : null;
 
+    const goalInput = {
+      match_id: match.id,
+      player_id: request.scorerId!,
+      assist_player_id: assistPlayerId || undefined,
+      team_id: request.teamId,
+      minute,
+      idempotency_key: idempotencyKey,
+      is_own_goal: request.isOwnGoal,
+    };
+    const queuedGoal = createLiveGoalOutboxItem(goalInput, {
+      scorerName: scorerEntry?.player?.name || "Jogador",
+      assistName: assistEntry?.player?.name || null,
+      createdAt: new Date().toISOString(),
+    });
+
     const optimisticEvent = {
       id: `opt-${idempotencyKey}`,
       match_id: match.id,
@@ -764,68 +1044,30 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
       is_own_goal: request.isOwnGoal,
       minute,
       elapsed_seconds: officialElapsedSeconds,
-      created_at: new Date().toISOString(),
+      created_at: queuedGoal.createdAt,
       idempotency_key: idempotencyKey,
       player: scorerEntry?.player || { name: "Jogador" },
       assist_player: assistEntry?.player || null,
       isOptimistic: true,
+      outboxStatus: "pending",
+      outboxRetryable: true,
     };
 
-    // 1. Atualização otimista imediata (< 10ms)
+    // Persiste antes de enviar. Uma queda de conexão ou recarga não perde o lance.
+    commitGoalOutbox((current) => enqueueLiveGoal(current, queuedGoal));
     setDisplayScore((current) =>
       isTeamA ? { ...current, a: current.a + 1 } : { ...current, b: current.b + 1 }
     );
     setEvents((prev) => [optimisticEvent, ...prev]);
     setGoalModal({ open: false, teamId: "", scorerId: null, isOwnGoal: false });
     setError("");
-    setLoading(true);
-
-    try {
-      // 2. Chamada atômica ao Supabase via RPC
-      const res = await registerGoal({
-        match_id: match.id,
-        player_id: request.scorerId!,
-        assist_player_id: assistPlayerId || undefined,
-        team_id: request.teamId,
-        minute,
-        idempotency_key: idempotencyKey,
-        is_own_goal: request.isOwnGoal,
-      });
-
-      if (!res.success) {
-        // Rollback consistente se a RPC falhar
-        setDisplayScore(previousScore);
-        setEvents(previousEvents);
-        setGoalModal(request);
-        setError(res.error || "Erro ao registrar gol.");
-        router.refresh();
-      } else {
-        succeeded = true;
-        if (res.eventId) {
-          setEvents((current) => current.map((event) => event.id === optimisticEvent.id
-            ? { ...event, id: res.eventId, isOptimistic: false }
-            : event));
-        }
-        setDisplayScore({ a: Number(res.scoreA ?? displayScore.a), b: Number(res.scoreB ?? displayScore.b) });
-        const previousTeamScore = isTeamA ? previousScore.a : previousScore.b;
-        const currentTeamScore = Number(isTeamA ? res.scoreA : res.scoreB);
-        if (!res.idempotent && shouldOfferMatchFinishAfterGoal(previousTeamScore, currentTeamScore)) {
-          const teamName = isTeamA ? match.team_a.name : match.team_b.name;
-          setFinishPrompt(`${teamName} chegou a 2 gols. Encerrar a partida e preparar a próxima?`);
-        }
-      }
-    } catch (err: any) {
-      // Rollback em caso de erro de rede
-      setDisplayScore(previousScore);
-      setEvents(previousEvents);
-      setGoalModal(request);
-      setError(err?.message || "Erro inesperado ao registrar gol.");
-      router.refresh();
-    } finally {
-      reportMatchAction("register_goal", startedAt, succeeded);
-      setLoading(false);
-      submittingGoalRef.current = false;
+    submittingGoalRef.current = false;
+    if (!navigator.onLine) {
+      setNetworkOnline(false);
+      setError("Sem internet. O gol ficou salvo neste aparelho e será enviado quando a conexão voltar.");
+      return;
     }
+    void flushGoalOutbox();
   }
 
   async function handleRegisterOwnGoal(playerId: string) {
@@ -970,6 +1212,39 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
       {error && (
         <div className="w-full p-3 rounded-lg bg-danger/10 text-danger text-xs font-semibold text-center animate-fade-in">
           {error}
+        </div>
+      )}
+      {goalOutboxItems.length > 0 && (
+        <div role="status" aria-live="polite" className="w-full rounded-xl border border-warning/40 bg-warning/10 p-3 text-warning">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-black">
+                {!networkOnline
+                  ? `${goalOutboxItems.length} lance${goalOutboxItems.length > 1 ? "s" : ""} salvo${goalOutboxItems.length > 1 ? "s" : ""} neste aparelho`
+                  : goalRetrying || goalOutboxRetryingCount > 0
+                    ? "Sincronizando sem duplicar o lance…"
+                    : `${goalOutboxItems.length} lance${goalOutboxItems.length > 1 ? "s" : ""} aguardando confirmação`}
+              </p>
+              <p className="mt-0.5 text-[10px] font-semibold text-warning/80">
+                {networkOnline ? "Só serão confirmados depois da resposta do servidor." : "O envio recomeça automaticamente quando a internet voltar."}
+              </p>
+            </div>
+            {networkOnline && !goalRetrying && (
+              <button type="button" onClick={() => void flushGoalOutbox()} className="shrink-0 rounded-lg border border-warning/40 px-2.5 py-2 text-[9px] font-black uppercase">
+                Tentar agora
+              </button>
+            )}
+          </div>
+          {goalOutboxFailedCount > 0 && goalOutboxItems.some((item) => item.status === "failed" && !item.retryable) && (
+            <div className="mt-2 space-y-1 border-t border-warning/20 pt-2">
+              {goalOutboxItems.filter((item) => item.status === "failed" && !item.retryable).map((item) => (
+                <div key={item.idempotencyKey} className="flex items-center justify-between gap-2 text-[10px] font-semibold">
+                  <span className="truncate">Falhou: {item.presentation.scorerName} · {item.lastError}</span>
+                  <button type="button" onClick={() => discardRejectedGoal(item)} className="shrink-0 underline underline-offset-2">Remover</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {finishing && (
@@ -1170,6 +1445,19 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
                           </span>
                         </p>
                       )}
+                      {ev.outboxStatus && (
+                        <p className={`mt-1 text-[9px] font-black uppercase tracking-wide ${
+                          ev.outboxStatus === "failed" ? "text-warning" : "text-accent"
+                        }`}>
+                          {ev.outboxStatus === "retrying"
+                            ? "Sincronizando…"
+                            : ev.outboxStatus === "failed" && ev.outboxRetryable
+                              ? "Sem confirmação · salvo neste aparelho"
+                              : ev.outboxStatus === "failed"
+                                ? "Lance recusado"
+                                : "Pendente de confirmação"}
+                        </p>
+                      )}
                     </div>
 
                     {canManage && (!isFinished || correctionsUnlocked) && <div className="flex shrink-0 items-center gap-1">
@@ -1254,11 +1542,11 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
         <div className="pt-6 animate-fade-in-up stagger-2">
           <button
             onClick={handleFinish}
-            disabled={loading}
+            disabled={loading || goalOutboxItems.length > 0}
             className="w-full bg-surface border border-danger/30 hover:bg-danger/10 text-danger font-bold py-4 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <Trophy className="w-5 h-5" />
-            Encerrar Partida
+            {goalOutboxItems.length > 0 ? "Aguardando gols pendentes" : "Encerrar Partida"}
           </button>
         </div>
       )}
@@ -1276,7 +1564,7 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
             <p className="text-[11px] text-muted">O placar deixa de aceitar gols ao encerrar. Você ainda poderá fazer correções como ADM.</p>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => setFinishPrompt(null)} disabled={loading} className="rounded-xl border border-border bg-surface px-3 py-3 text-xs font-black text-foreground disabled:opacity-50">Continuar jogo</button>
-              <button type="button" onClick={() => { setFinishPrompt(null); void finishCurrentMatch(); }} disabled={loading} className="rounded-xl bg-accent px-3 py-3 text-xs font-black text-background disabled:opacity-50">Encerrar e avançar</button>
+              <button type="button" onClick={() => { setFinishPrompt(null); void finishCurrentMatch(); }} disabled={loading || goalOutboxItems.length > 0} className="rounded-xl bg-accent px-3 py-3 text-xs font-black text-background disabled:opacity-50">Encerrar e avançar</button>
             </div>
           </div>
         </div>

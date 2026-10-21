@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createMatch, setRoundTeamFixedGoalkeeper } from "@/lib/actions/matches";
+import { createMatch, findLiveMatchForTeams, setRoundTeamFixedGoalkeeper } from "@/lib/actions/matches";
 import { Swords, ArrowLeft, ChevronRight, AlertTriangle, Check, ArrowLeftRight, Crown, Users } from "@/components/icons";
 import Link from "next/link";
 import { TeamCrest } from "./TeamCrest";
@@ -25,6 +25,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
   const [teamAId, setTeamAId] = useState<string>(initialTeamIds?.[0] || "");
   const [teamBId, setTeamBId] = useState<string>(initialTeamIds?.[1] || "");
   const [loading, setLoading] = useState(false);
+  const [creationUncertain, setCreationUncertain] = useState(false);
   const [error, setError] = useState("");
   const [replacementByAbsent, setReplacementByAbsent] = useState<Record<string, string>>({});
   const [structuralLoanOverrideBySlot, setStructuralLoanOverrideBySlot] = useState<Record<string, string>>({});
@@ -42,6 +43,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
     (round?.teams || []).map((team: any) => [team.id, team.color || "#22c55e"]),
   ));
   const [substitutionNotice, setSubstitutionNotice] = useState<Array<{ absent: string; replacement: string }> | null>(null);
+  const creationIntentRef = useRef<{ fingerprint: string; key: string } | null>(null);
 
   const teams = useMemo(() => round?.teams || [], [round?.teams]);
   const leagueConfig = Array.isArray(round?.league) ? round.league[0] : round?.league;
@@ -311,11 +313,11 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
 
     setLoading(true);
     setError("");
+    const actionStartedAt = performance.now();
 
     // O match_order seria a quantidade de matches + 1
     const order = (round?.matches?.length || 0) + 1;
-
-    const res = await createMatch({
+    const createInput = {
       round_id: round.id,
       team_a_id: teamAId,
       team_b_id: teamBId,
@@ -335,14 +337,63 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
         player_id: loan.playerId,
       })),
       structural_loan_excluded_player_ids: declinedStructuralPlayerIds,
-    });
+    };
+    const creationFingerprint = JSON.stringify(createInput);
+    const existingIntent = creationIntentRef.current?.fingerprint === creationFingerprint
+      ? creationIntentRef.current
+      : null;
+    const creationIntentKey = existingIntent?.key || crypto.randomUUID();
+    creationIntentRef.current = { fingerprint: creationFingerprint, key: creationIntentKey };
 
-    if (!res.success) {
-      setError(res.error || "Erro ao criar partida");
+    let res: Awaited<ReturnType<typeof createMatch>> | null = null;
+    try {
+      res = await createMatch({
+        idempotency_key: creationIntentKey,
+        ...createInput,
+      });
+    } catch {
+      // A resposta pode se perder depois de o banco criar a partida.
+      // A próxima confirmação reutiliza a mesma chave enquanto a seleção não mudar.
+    }
+
+    if (navigator.sendBeacon) {
+      const payload = JSON.stringify({
+        kind: "client_action",
+        name: "create_match",
+        value: Math.round(performance.now() - actionStartedAt),
+        path: window.location.pathname,
+        metadata: { success: res?.success === true },
+      });
+      navigator.sendBeacon("/api/internal/observability", new Blob([payload], { type: "application/json" }));
+    }
+
+    if (!res?.success) {
+      try {
+        const existingId = await findLiveMatchForTeams(round.id, teamAId, teamBId);
+        if (existingId) {
+          router.replace(`/partidas/${existingId}`);
+          return;
+        }
+      } catch {
+        setCreationUncertain(true);
+        setError("Conexão instável. Não sabemos se a partida foi criada. Verifique a rodada antes de tentar novamente.");
+        setLoading(false);
+        return;
+      }
+      if (!res) {
+        setCreationUncertain(true);
+        setError("Não foi possível confirmar o início. Verifique a rodada antes de tentar novamente.");
+      } else {
+        // O servidor respondeu com uma rejeição definitiva: uma nova tentativa
+        // explícita pode representar uma nova intenção.
+        creationIntentRef.current = null;
+        setError(res.error || "Erro ao criar partida");
+      }
       setLoading(false);
       return;
     }
 
+    creationIntentRef.current = null;
     router.replace(`/partidas/${res.matchId}`);
   }
 
@@ -798,9 +849,15 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
         disabled={loading || !teamAId || !teamBId || !goalkeeperByTeam[teamAId] || !goalkeeperByTeam[teamBId]}
         className="w-full bg-accent hover:bg-accent-light text-background font-bold py-4 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-accent/20"
       >
-        {loading ? "Criando..." : quickStart ? "Iniciar próxima partida" : "Apita o Árbitro!"}
+        {loading ? "Criando..." : creationUncertain ? "Tentar confirmar novamente" : quickStart ? "Iniciar próxima partida" : "Apita o Árbitro!"}
         <ChevronRight className="w-5 h-5" />
       </button>
+
+      {creationUncertain && (
+        <Link href={`/rodadas/${round.id}`} className="block w-full rounded-xl border border-warning/50 bg-warning/10 px-4 py-3 text-center text-xs font-black text-warning">
+          Verificar partida na rodada
+        </Link>
+      )}
 
       {quickStart && onCancel && (
         <button type="button" onClick={onCancel} disabled={loading} className="w-full rounded-xl border border-border bg-surface py-3 text-xs font-black text-muted disabled:opacity-50">

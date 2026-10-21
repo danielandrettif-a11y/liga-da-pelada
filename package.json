@@ -20,7 +20,9 @@
     "audit:cartola:self-test": "node scripts/analyze-cartola-balance.mjs --self-test",
     "audit:market:v11": "node scripts/analyze-market-v11.mjs",
     "audit:market:v11:self-test": "node scripts/analyze-market-v11.mjs --self-test",
-    "benchmark:stats": "node scripts/benchmark-statistics.mjs"
+    "benchmark:stats": "node scripts/benchmark-statistics.mjs",
+    "benchmark:structures": "node scripts/benchmark-app-structures.mjs",
+    "benchmark:web": "node scripts/benchmark-web.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
