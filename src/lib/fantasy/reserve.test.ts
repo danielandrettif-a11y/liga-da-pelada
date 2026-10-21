@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  getFantasyReserveCost,
+  getFantasyReserveBudgetAdjustment,
   getFantasyReservePriceLimit,
-  getFantasyReserveRefund,
+  getFantasyReserveUpfrontCost,
   resolveFantasyReserveSubstitution,
 } from "./reserve";
 
@@ -112,9 +112,29 @@ describe("banco de reserva do Cartola", () => {
     expect(getFantasyReservePriceLimit("ATA", [{ slotRole: "DEF", price: 10 }])).toBeNull();
   });
 
-  it("cobra o preço cheio e devolve exatamente o valor pago", () => {
-    expect(getFantasyReserveCost(9.876)).toBe(9.88);
-    expect(getFantasyReserveRefund(9.876)).toBe(9.88);
-    expect(getFantasyReserveCost(Number.NaN)).toBe(0);
+  it("não consome patrimônio durante a escalação", () => {
+    expect(getFantasyReserveUpfrontCost()).toBe(0);
+  });
+
+  it("só troca a valorização quando o reserva realmente entra", () => {
+    const prices = {
+      starterPriceLocked: 10,
+      starterPriceAfter: 11,
+      reservePriceLocked: 8,
+      reservePriceAfter: 8.5,
+    };
+
+    expect(getFantasyReserveBudgetAdjustment({ applied: false, ...prices })).toBe(0);
+    expect(getFantasyReserveBudgetAdjustment({ applied: true, ...prices })).toBe(-0.5);
+  });
+
+  it("devolve a diferença de entrada sem criar ou destruir patrimônio", () => {
+    expect(getFantasyReserveBudgetAdjustment({
+      applied: true,
+      starterPriceLocked: 10,
+      starterPriceAfter: 10,
+      reservePriceLocked: 8,
+      reservePriceAfter: 8,
+    })).toBe(0);
   });
 });

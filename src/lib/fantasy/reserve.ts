@@ -31,22 +31,32 @@ export type FantasyReserveStarterPrice = {
   price: number;
 };
 
-/**
- * O banco usa o preco cheio durante a montagem do time. Esse valor funciona
- * como uma caução e volta integralmente ao patrimônio ao encerrar a rodada.
- */
-export function getFantasyReserveCost(marketPrice: number): number {
-  if (!Number.isFinite(marketPrice) || marketPrice <= 0) return 0;
-  return Math.round((marketPrice + Number.EPSILON) * 100) / 100;
+/** O banco não consome patrimônio enquanto a escalação é montada. */
+export function getFantasyReserveUpfrontCost(): number {
+  return 0;
 }
 
-export function getFantasyReserveRefund(pricePaid: number): number {
-  return getFantasyReserveCost(pricePaid);
+/**
+ * Quando o reserva entra, o titular é vendido pelo preço travado e o reserva
+ * assume a vaga. A diferença entre os preços de entrada volta como saldo.
+ */
+export function getFantasyReserveBudgetAdjustment(input: {
+  applied: boolean;
+  starterPriceLocked: number;
+  starterPriceAfter: number;
+  reservePriceLocked: number;
+  reservePriceAfter: number;
+}): number {
+  if (!input.applied) return 0;
+  const returnedDifference = Math.max(0, input.starterPriceLocked - input.reservePriceLocked);
+  return Math.round((
+    input.reservePriceAfter - input.starterPriceAfter + returnedDifference + Number.EPSILON
+  ) * 100) / 100;
 }
 
 /**
  * O preço cheio do reserva precisa ficar abaixo de todos os titulares da
- * mesma posição. O preço é devolvido integralmente ao fim da rodada.
+ * mesma posição, mas não é descontado durante a escalação.
  */
 export function getFantasyReservePriceLimit(
   reserveRole: FantasyReserveRole,

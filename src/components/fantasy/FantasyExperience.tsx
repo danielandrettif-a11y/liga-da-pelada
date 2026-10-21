@@ -44,7 +44,7 @@ import { supabase } from "@/lib/supabase";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { getFantasySlotRoles, isCorrectFantasySlot, type FantasyFormation } from "@/lib/fantasy/lineup-positions";
 import { resolveFantasyPitchPoints } from "@/lib/fantasy/pitch-points";
-import { getFantasyReserveCost, getFantasyReservePriceLimit, type FantasyReserveRole } from "@/lib/fantasy/reserve";
+import { getFantasyReservePriceLimit, getFantasyReserveUpfrontCost, type FantasyReserveRole } from "@/lib/fantasy/reserve";
 import { applyFantasyDiscount } from "@/lib/fantasy/cards/eligibility";
 import { useUrlState } from "@/lib/useUrlState";
 import { FantasyPackClaimBanner } from "./cards/FantasyPackClaimBanner";
@@ -411,7 +411,7 @@ export function FantasyExperience({
   };
   const activeReservePriceLimit = reserveTargetRole ? reservePriceLimitByRole[reserveTargetRole] : null;
   const reservePlayer = reservePlayerId ? market.find((player) => player.id === reservePlayerId) || null : null;
-  const reservePrice = reservePlayer ? getFantasyReserveCost(reservePlayer.price) : 0;
+  const reservePrice = reservePlayer?.price || 0;
   const selectedReservePriceLimit = reserveRole ? reservePriceLimitByRole[reserveRole] : null;
   const validSelectedCount = validSelectedPlayers.length;
   const livePlayerProjectionById = useMemo(
@@ -435,7 +435,8 @@ export function FantasyExperience({
     [liveProjection?.currentUser?.players],
   );
 
-  const cost = validSelectedPlayers.reduce((sum, player) => sum + playerPurchasePrice(player), 0) + reservePrice;
+  const cost = validSelectedPlayers.reduce((sum, player) => sum + playerPurchasePrice(player), 0)
+    + getFantasyReserveUpfrontCost();
 
   const remaining = effectiveBudget - cost;
 
@@ -836,12 +837,10 @@ export function FantasyExperience({
             : `O preço cheio do reserva deve ser de até ${formatFantasyMoney(activeReservePriceLimit, settings.currencyName)}.`,
         );
       }
-      const reserveCost = getFantasyReserveCost(player.price);
-      if (reserveCost > remaining + reservePrice) return setMessage("Patrimônio insuficiente para reservar este jogador.");
       setReservePlayerId(player.id);
       setReserveRole(reserveTargetRole);
       setReserveTargetRole(null);
-      setMessage(`${player.name} foi escolhido para o banco. O valor será devolvido ao fim da rodada.`);
+      setMessage(`${player.name} foi escolhido para o banco sem consumir cartoletas da escalação.`);
       setActiveTab("team");
       return;
     }
@@ -2040,7 +2039,7 @@ export function FantasyExperience({
                     <Users className="h-4 w-4" /> Banco de reserva
                   </p>
                   <p className="mt-1 text-[9px] leading-relaxed text-white/55">
-                    O valor cheio fica reservado durante a rodada e volta integralmente ao seu patrimônio no fechamento. O atleta deve custar ao menos {formatFantasyMoney(0.1, settings.currencyName)} menos que o titular mais barato da posição e só substitui uma pontuação base zerada ou negativa se pontuar mais.
+                    O banco não consome cartoletas na escalação. Se o reserva entrar, a diferença de preço para o titular substituído volta ao patrimônio e passa a valer a valorização do reserva. O atleta deve custar ao menos {formatFantasyMoney(0.1, settings.currencyName)} menos que o titular mais barato da posição.
                   </p>
                 </div>
                 <span className="shrink-0 rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-1 text-[8px] font-black uppercase text-amber-200">
@@ -2193,10 +2192,10 @@ export function FantasyExperience({
                   <div className="relative mt-1 flex items-start gap-3 rounded-xl border border-amber-200/15 bg-black/30 p-2.5">
                     <div className="min-w-0 flex-1">
                     <p className="mt-0.5 text-[9px] font-bold text-amber-200">
-                      Reserva {reserveRole ? RESERVE_ROLE_LABELS[reserveRole] : "ATA/ALA"} · {formatFantasyMoney(reservePrice, settings.currencyName)} reservados
+                      Reserva {reserveRole ? RESERVE_ROLE_LABELS[reserveRole] : "ATA/ALA"} · não consome saldo
                     </p>
                     <p className="mt-0.5 text-[8px] font-semibold text-white/45">
-                      Preço cheio {formatFantasyMoney(reservePlayer.price, settings.currencyName)} · teto {selectedReservePriceLimit === null ? "indisponível" : formatFantasyMoney(selectedReservePriceLimit, settings.currencyName)}
+                      Preço de referência {formatFantasyMoney(reservePlayer.price, settings.currencyName)} · teto {selectedReservePriceLimit === null ? "indisponível" : formatFantasyMoney(selectedReservePriceLimit, settings.currencyName)}
                     </p>
                     {liveProjection?.currentUser?.reserve && (
                       <>
@@ -2430,7 +2429,7 @@ export function FantasyExperience({
 
             {reserveTargetRole && activeReservePriceLimit !== null && (
               <div className="rounded-xl border border-amber-300/35 bg-amber-300/[.08] px-3 py-2 text-[10px] font-bold leading-relaxed text-amber-100">
-                Escolhendo reserva {RESERVE_ROLE_LABELS[reserveTargetRole]}: somente atletas com preço cheio de até <strong>{formatFantasyMoney(activeReservePriceLimit, settings.currencyName)}</strong>. Na compra, você paga 50%.
+                Escolhendo reserva {RESERVE_ROLE_LABELS[reserveTargetRole]}: somente atletas com preço de até <strong>{formatFantasyMoney(activeReservePriceLimit, settings.currencyName)}</strong>. O banco não consome cartoletas na escalação.
               </div>
             )}
 
@@ -2584,12 +2583,10 @@ export function FantasyExperience({
               {filtered.map((player) => {
                 const bought = selected.includes(player.id);
                 const isReserveSelection = Boolean(reserveTargetRole);
-                const purchasePrice = isReserveSelection
-                  ? getFantasyReserveCost(player.price)
-                  : marketPlayerPurchasePrice(player, bought);
+                const purchasePrice = marketPlayerPurchasePrice(player, bought);
                 const hasBargainDiscount = !isReserveSelection && purchasePrice < player.price;
                 const simulatedRemaining = isReserveSelection
-                  ? remaining + reservePrice - purchasePrice
+                  ? remaining
                   : bought ? remaining + purchasePrice : remaining - purchasePrice;
                 const backgroundImage = cosmeticImage(player.cosmetics?.backgroundAssetKey);
                 const goalkeeperView = positionFilter === "GOL";
@@ -2723,7 +2720,7 @@ export function FantasyExperience({
                         </div>
 
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px]">
-                          {(hasBargainDiscount || isReserveSelection) && (
+                          {hasBargainDiscount && (
                             <span className="font-bold text-muted line-through">
                               {formatFantasyMoney(player.price, settings.currencyName)}
                             </span>
@@ -2733,7 +2730,7 @@ export function FantasyExperience({
                           </span>
                           {isReserveSelection && (
                             <span className="rounded bg-amber-300/15 px-1.5 py-0.5 font-black text-amber-200">
-                              Banco -50%
+                              Não consome saldo
                             </span>
                           )}
                           {hasBargainDiscount && (
@@ -2795,13 +2792,13 @@ export function FantasyExperience({
                           <button
                             type="button"
                             onClick={() => togglePlayer(player)}
-                            disabled={Boolean(bargainPurchasePending) || (!bought && purchasePrice > remaining + (isReserveSelection ? reservePrice : 0))}
+                            disabled={Boolean(bargainPurchasePending) || (!isReserveSelection && !bought && purchasePrice > remaining)}
                             className={`mt-1.5 rounded-xl px-3 py-1 text-[9px] font-black uppercase transition-transform active:scale-90 ${
                               bargainPurchasePending
                                 ? "bg-white/5 text-muted cursor-wait opacity-60"
                                 : bought
                                 ? "bg-danger/20 text-danger border border-danger/30 hover:bg-danger/30"
-                                : purchasePrice > remaining + (isReserveSelection ? reservePrice : 0)
+                                : !isReserveSelection && purchasePrice > remaining
                                 ? "bg-white/5 text-muted cursor-not-allowed opacity-50"
                                 : "bg-accent text-background hover:brightness-110 shadow-sm"
                             }`}
@@ -2818,7 +2815,9 @@ export function FantasyExperience({
                         <span className="truncate">
                           {bought
                             ? `Saldo após venda: ${formatFantasyMoney(simulatedRemaining, settings.currencyName)}`
-                            : `Saldo após compra: ${formatFantasyMoney(simulatedRemaining, settings.currencyName)}`}
+                            : isReserveSelection
+                              ? `Saldo mantido: ${formatFantasyMoney(simulatedRemaining, settings.currencyName)}`
+                              : `Saldo após compra: ${formatFantasyMoney(simulatedRemaining, settings.currencyName)}`}
                         </span>
                         <span className="shrink-0 font-bold text-accent">Toque no atleta para ver a ficha</span>
                       </div>
