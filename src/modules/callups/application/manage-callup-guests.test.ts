@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { inviteCallupGuest, removeCallupEntryForAccount, type CallupGuestGateway } from "./manage-callup-guests";
+import { inviteCallupGuest, inviteCallupGuestList, removeCallupEntryForAccount, type CallupGuestGateway } from "./manage-callup-guests";
 import type { CallupPlayersGateway } from "./manage-callup-players";
 
 function guestGateway(): CallupGuestGateway & {
@@ -48,6 +48,42 @@ describe("gestão de convidados na convocação", () => {
     gateway.createGuest.mockResolvedValue({ status: undefined, playerId: undefined, error: "lista fechada" });
     expect(await inviteCallupGuest({ callupId: "callup-1", name: "Ana", playerProfile: "midfield", isGoalkeeper: false }, gateway))
       .toEqual({ success: false, error: "lista fechada" });
+  });
+
+  it("cria a lista na ordem e resume titulares, fila e falhas", async () => {
+    const gateway = guestGateway();
+    gateway.createGuest
+      .mockResolvedValueOnce({ status: "confirmed", playerId: "guest-1", error: null })
+      .mockResolvedValueOnce({ status: "waitlist", playerId: "guest-2", error: null })
+      .mockResolvedValueOnce({ status: undefined, playerId: undefined, error: "lista cheia" });
+
+    expect(await inviteCallupGuestList({
+      callupId: "callup-1",
+      playerProfile: "offensive",
+      guests: [
+        { name: "Ana", isGoalkeeper: false },
+        { name: "Bia", isGoalkeeper: true },
+        { name: "Caio", isGoalkeeper: false },
+      ],
+    }, gateway)).toEqual({
+      success: true,
+      created: 2,
+      confirmed: 1,
+      waitlisted: 1,
+      failed: [{ name: "Caio", error: "lista cheia" }],
+      error: undefined,
+    });
+    expect(gateway.createGuest.mock.calls.map((call) => call[0].name)).toEqual(["Ana", "Bia", "Caio"]);
+    expect(gateway.createGuest.mock.calls[1][0].isGoalkeeper).toBe(true);
+  });
+
+  it("limita o tamanho da importação em lote", async () => {
+    const gateway = guestGateway();
+    const guests = Array.from({ length: 41 }, (_, index) => ({ name: `Convidado ${index}`, isGoalkeeper: false }));
+    const result = await inviteCallupGuestList({ callupId: "callup-1", playerProfile: "midfield", guests }, gateway);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("no máximo 40");
+    expect(gateway.createGuest).not.toHaveBeenCalled();
   });
 
   it("usa a RPC administrativa para remover inclusive após sorteio", async () => {

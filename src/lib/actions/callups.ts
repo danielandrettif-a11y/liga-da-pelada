@@ -19,8 +19,13 @@ import { joinSelectedCallup, leaveSelectedCallup } from "@/modules/callups/appli
 import { supabaseCallupParticipationGateway } from "@/modules/callups/infrastructure/supabase-callup-participation-gateway";
 import { addOtherCallupPlayer, removeOtherCallupPlayerAsAdmin } from "@/modules/callups/application/manage-callup-players";
 import { supabaseCallupPlayersGateway } from "@/modules/callups/infrastructure/supabase-callup-players-gateway";
-import { inviteCallupGuest, removeCallupEntryForAccount } from "@/modules/callups/application/manage-callup-guests";
+import { inviteCallupGuest, inviteCallupGuestList, removeCallupEntryForAccount } from "@/modules/callups/application/manage-callup-guests";
 import { supabaseCallupGuestsGateway } from "@/modules/callups/infrastructure/supabase-callup-guests-gateway";
+import {
+  MAX_CALLUP_GUEST_LIST_SIZE,
+  normalizeCallupGuestName,
+  parseWhatsAppGuestList,
+} from "@/modules/callups/domain/callup-guest-list";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getSelectedLeague } from "../league-context";
 import { createServiceClient } from "../supabase/service";
@@ -339,6 +344,92 @@ export async function inviteGuestToCallup({
   );
   if (result.success) refreshCallups();
   return result;
+}
+
+/**
+ * Cola uma lista do WhatsApp e cria os novos nomes como convidados na ordem
+ * recebida. A ação em lote é administrativa para evitar criação abusiva de
+ * perfis; cada item reutiliza o RPC transacional do fluxo individual.
+ */
+export async function inviteGuestListToCallup({
+  callupId,
+  text,
+  playerProfile = "midfield",
+}: {
+  callupId: string;
+  text: string;
+  playerProfile?: "offensive" | "midfield" | "defensive";
+}) {
+  const client = await getAdminClient();
+  if (!client) {
+    return {
+      success: false,
+      created: 0,
+      confirmed: 0,
+      waitlisted: 0,
+      ignoredExisting: [] as string[],
+      failed: [] as Array<{ name: string; error: string }>,
+      error: "Somente administradores podem importar uma lista completa.",
+    };
+  }
+
+  const callup = await selectedCallup(callupId, client);
+  if (!callup) {
+    return {
+      success: false,
+      created: 0,
+      confirmed: 0,
+      waitlisted: 0,
+      ignoredExisting: [] as string[],
+      failed: [] as Array<{ name: string; error: string }>,
+      error: "Convocação fora da pelada selecionada.",
+    };
+  }
+
+  const parsed = parseWhatsAppGuestList(text);
+  if (parsed.length > MAX_CALLUP_GUEST_LIST_SIZE) {
+    return {
+      success: false,
+      created: 0,
+      confirmed: 0,
+      waitlisted: 0,
+      ignoredExisting: [] as string[],
+      failed: [] as Array<{ name: string; error: string }>,
+      error: `Importe no máximo ${MAX_CALLUP_GUEST_LIST_SIZE} nomes por vez.`,
+    };
+  }
+
+  const { data: memberRows, error: membersError } = await client
+    .from("league_members")
+    .select("players(name)")
+    .eq("league_id", callup.league_id)
+    .eq("is_active", true);
+  if (membersError) {
+    return {
+      success: false,
+      created: 0,
+      confirmed: 0,
+      waitlisted: 0,
+      ignoredExisting: [] as string[],
+      failed: [] as Array<{ name: string; error: string }>,
+      error: "Não foi possível conferir os nomes que já existem no elenco.",
+    };
+  }
+
+  const existingNames = new Set((memberRows || []).flatMap((row) => {
+    const relation = (row as unknown as { players?: { name?: string | null } | Array<{ name?: string | null }> | null }).players;
+    const players = Array.isArray(relation) ? relation : relation ? [relation] : [];
+    return players.flatMap((player) => player.name ? [normalizeCallupGuestName(player.name)] : []);
+  }));
+  const ignoredExisting = parsed.filter((guest) => existingNames.has(normalizeCallupGuestName(guest.name))).map((guest) => guest.name);
+  const guests = parsed.filter((guest) => !existingNames.has(normalizeCallupGuestName(guest.name)));
+
+  const result = await inviteCallupGuestList(
+    { callupId, guests, playerProfile },
+    supabaseCallupGuestsGateway(client),
+  );
+  if (result.created > 0) refreshCallups();
+  return { ...result, ignoredExisting };
 }
 
 /**

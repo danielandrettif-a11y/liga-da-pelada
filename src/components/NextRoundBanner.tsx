@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   CalendarPlus,
   CalendarDays,
@@ -15,6 +16,7 @@ import {
 import { BQTheBestButton } from "@/components/BQTheBestButton";
 import { WeatherBadge } from "@/components/WeatherBadge";
 import type { MonthlyAwardWinner } from "@/lib/monthly-awards";
+import { useDialogViewport } from "@/lib/useDialogViewport";
 import type { EventWeather } from "@/lib/weather";
 
 type NextRound = {
@@ -45,7 +47,17 @@ export function NextRoundBanner({
   awardWinners?: MonthlyAwardWinner[];
 }) {
   const [showAdminActions, setShowAdminActions] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useDialogViewport(showAdminActions, () => setShowAdminActions(false));
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const isPrelist = round?.preparation_stage === "prelist";
+  // O dashboard só entrega rodadas ainda não concluídas (rascunho ou ativa).
+  // Portanto, qualquer rodada presente aqui já é a rodada atual do usuário.
+  const hasCurrentRound = Boolean(round);
   const confirmedCount = round?.confirmedPlayers || 0;
 
   const href = "/rodadas";
@@ -60,6 +72,7 @@ export function NextRoundBanner({
   const formattedTime = round?.start_time?.slice(0, 5) || null;
 
   return (
+    <>
     <article className="group relative isolate flex h-full min-h-[360px] sm:min-h-[380px] flex-col justify-between overflow-hidden rounded-[2rem] border border-amber-500/30 bg-[#040f08] p-5 sm:p-6 shadow-[0_25px_65px_rgba(0,0,0,.65),0_0_35px_rgba(245,158,11,.12)]">
       {/* Link de cobertura em todo o banner */}
       {isAdmin ? (
@@ -69,6 +82,8 @@ export function NextRoundBanner({
           className="absolute inset-0 z-10"
           aria-label="Abrir ações para organizar a pelada"
           aria-expanded={showAdminActions}
+          aria-haspopup="dialog"
+          aria-controls="round-admin-actions"
         />
       ) : (
         <Link href={href} className="absolute inset-0 z-10" aria-label="Abrir agenda da pelada" />
@@ -186,24 +201,58 @@ export function NextRoundBanner({
         </div>
       </div>
 
-      {isAdmin && showAdminActions && (
-        <div className="absolute inset-4 z-40 flex flex-col justify-center rounded-3xl border border-accent/35 bg-[#07150d] p-5 shadow-2xl sm:inset-6" role="region" aria-label="Ações da rodada">
-          <button type="button" onClick={() => setShowAdminActions(false)} className="absolute right-3 top-3 rounded-full border border-border bg-surface p-2 text-muted hover:text-foreground" aria-label="Fechar ações">
+    </article>
+
+    {mounted && isAdmin && showAdminActions && typeof document !== "undefined" && createPortal(
+      <div
+        className="mobile-dialog-backdrop z-[99999] bg-black/80 backdrop-blur-md animate-fade-in"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="round-admin-actions-title"
+        onMouseDown={(event) => event.target === event.currentTarget && setShowAdminActions(false)}
+      >
+        <section
+          id="round-admin-actions"
+          className="mobile-dialog-panel relative my-auto flex max-w-sm flex-col justify-center rounded-3xl border border-accent/35 bg-[#07150d] p-6 shadow-[0_24px_80px_rgba(0,0,0,.9),0_0_35px_rgba(204,255,0,.08)] animate-fade-in-up"
+        >
+          <button
+            type="button"
+            onClick={() => setShowAdminActions(false)}
+            className="absolute right-4 top-4 rounded-full border border-border bg-surface p-2.5 text-muted transition-colors hover:text-foreground"
+            aria-label="Fechar ações"
+          >
             <X className="size-4" />
           </button>
-          <p className="text-[10px] font-black uppercase text-accent">Área do ADM</p>
-          <h3 className="mt-1 text-balance font-athletic text-2xl font-black uppercase text-white">O que você quer fazer?</h3>
-          <p className="mt-2 text-pretty text-xs leading-5 text-muted">Abra a lista do próximo jogo ou consulte tudo o que já aconteceu.</p>
-          <div className="mt-5 grid gap-2">
-            <Link href="/rodadas?create=1" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-black text-background">
-              <CalendarPlus className="size-5" /> Abrir nova rodada
+          <p className="pr-12 text-[10px] font-black uppercase tracking-[0.12em] text-accent">Área do ADM</p>
+          <h3 id="round-admin-actions-title" className="mt-1 pr-12 text-balance font-athletic text-2xl font-black uppercase text-white">
+            O que você quer fazer?
+          </h3>
+          <p className="mt-2 text-pretty text-xs leading-5 text-muted">
+            {hasCurrentRound
+              ? "Acesse a rodada em andamento ou consulte tudo o que já aconteceu."
+              : "Abra a lista do próximo jogo ou consulte tudo o que já aconteceu."}
+          </p>
+          <div className="mt-5 grid gap-2.5">
+            <Link
+              href={round ? `/rodadas/${round.id}` : "/rodadas?create=1"}
+              onClick={() => setShowAdminActions(false)}
+              className="flex min-h-13 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-black text-background transition-transform active:scale-[.98]"
+            >
+              {hasCurrentRound ? <CalendarDays className="size-5" /> : <CalendarPlus className="size-5" />}
+              {hasCurrentRound ? "Ver rodada atual" : "Abrir nova rodada"}
             </Link>
-            <Link href="/rodadas#historico" className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 text-sm font-bold text-foreground">
+            <Link
+              href="/rodadas#historico"
+              onClick={() => setShowAdminActions(false)}
+              className="flex min-h-13 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 text-sm font-bold text-foreground transition-colors hover:border-accent/30"
+            >
               <CalendarDays className="size-5" /> Ver histórico de rodadas
             </Link>
           </div>
-        </div>
-      )}
-    </article>
+        </section>
+      </div>,
+      document.body,
+    )}
+    </>
   );
 }

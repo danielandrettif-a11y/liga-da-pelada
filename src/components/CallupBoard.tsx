@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
@@ -32,6 +32,7 @@ import {
   addRosterPlayerToCallup,
   adminRemoveCallupPlayer,
   inviteGuestToCallup,
+  inviteGuestListToCallup,
   joinActiveCallup,
   leaveActiveCallup,
   removeCallupEntry,
@@ -58,6 +59,11 @@ import { WeatherBadge } from "./WeatherBadge";
 import type { EventWeather } from "@/lib/weather";
 import { setCallupFormat } from "@/lib/actions/rounds";
 import { buildCallupInviteMessage, buildCallupInviteUrl, shareCallupInvite } from "@/lib/callup-invite";
+import {
+  MAX_CALLUP_GUEST_LIST_SIZE,
+  normalizeCallupGuestName,
+  parseWhatsAppGuestList,
+} from "@/modules/callups/domain/callup-guest-list";
 
 type Props = {
   callup: CallupWithEntries;
@@ -114,6 +120,9 @@ export function CallupBoard({
   const [guestName, setGuestName] = useState("");
   const [guestProfile, setGuestProfile] = useState<PlayerProfile>("offensive");
   const [isGuestGk, setIsGuestGk] = useState(false);
+  const [isGuestListOpen, setIsGuestListOpen] = useState(false);
+  const [guestListText, setGuestListText] = useState("");
+  const [guestListNotice, setGuestListNotice] = useState("");
 
   useDialogViewport(editingCallup, () => !editLoading && setEditingCallup(false));
 
@@ -129,6 +138,19 @@ export function CallupBoard({
 
   const availablePlayers = selectablePlayers.filter(
     (player) => !callup.entries.some((entry) => entry.player_id === player.id)
+  );
+  const existingPlayerNameKeys = useMemo(() => new Set(
+    [...selectablePlayers, ...callup.entries.map((entry) => entry.player)]
+      .map((player) => normalizeCallupGuestName(player.name)),
+  ), [callup.entries, selectablePlayers]);
+  const parsedGuestList = useMemo(() => parseWhatsAppGuestList(guestListText), [guestListText]);
+  const readyGuestList = useMemo(
+    () => parsedGuestList.filter((guest) => !existingPlayerNameKeys.has(normalizeCallupGuestName(guest.name))),
+    [existingPlayerNameKeys, parsedGuestList],
+  );
+  const existingGuestList = useMemo(
+    () => parsedGuestList.filter((guest) => existingPlayerNameKeys.has(normalizeCallupGuestName(guest.name))),
+    [existingPlayerNameKeys, parsedGuestList],
   );
 
   const startTime = callup.start_time ? callup.start_time.slice(0, 5) : "08:00";
@@ -195,6 +217,33 @@ export function CallupBoard({
     } else {
       setGuestName("");
       setIsGuestGk(false);
+      router.refresh();
+    }
+    setLoading("");
+  }
+
+  async function handleInviteGuestList() {
+    if (readyGuestList.length === 0 || readyGuestList.length > MAX_CALLUP_GUEST_LIST_SIZE) return;
+    setLoading("guest-list");
+    setError("");
+    setGuestListNotice("");
+    const result = await inviteGuestListToCallup({
+      callupId: callup.id,
+      text: guestListText,
+      playerProfile: guestProfile,
+    });
+    if (!result.success) {
+      setError(result.error || "Não foi possível importar a lista.");
+    } else {
+      const summary = [
+        `${result.created} ${result.created === 1 ? "convidado criado" : "convidados criados"}`,
+        result.confirmed > 0 ? `${result.confirmed} na lista principal` : "",
+        result.waitlisted > 0 ? `${result.waitlisted} na fila` : "",
+        result.ignoredExisting.length > 0 ? `${result.ignoredExisting.length} já existiam no elenco` : "",
+        result.failed.length > 0 ? `${result.failed.length} não adicionados` : "",
+      ].filter(Boolean).join(" · ");
+      setGuestListNotice(summary);
+      setGuestListText(result.failed.map((item) => item.name).join("\n"));
       router.refresh();
     }
     setLoading("");
@@ -712,6 +761,114 @@ export function CallupBoard({
                     </span>
                   </div>
                   </form>
+
+                  {isAdmin && (
+                    <div className="border-t border-accent/15 pt-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsGuestListOpen((open) => !open);
+                          setGuestListNotice("");
+                        }}
+                        className="flex w-full items-center justify-between gap-3 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-3 text-left transition-colors hover:border-accent/35 hover:bg-accent/[0.08]"
+                        aria-expanded={isGuestListOpen}
+                        aria-controls="whatsapp-guest-list"
+                      >
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-400/15 text-emerald-300">
+                            <ClipboardList className="h-4.5 w-4.5" />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-xs font-black text-foreground">Colar lista do WhatsApp</span>
+                            <span className="mt-0.5 block text-[10px] leading-4 text-muted">Crie todos os convidados de uma vez</span>
+                          </span>
+                        </span>
+                        <ChevronDown className={`h-4 w-4 shrink-0 text-accent transition-transform ${isGuestListOpen ? "rotate-180" : ""}`} />
+                      </button>
+
+                      {isGuestListOpen && (
+                        <div id="whatsapp-guest-list" className="mt-3 space-y-3 rounded-2xl border border-emerald-400/20 bg-black/20 p-3 animate-fade-in">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.08em] text-emerald-300">Importação rápida</p>
+                            <p className="mt-1 text-[10px] leading-4 text-muted">
+                              Cole a lista como veio do WhatsApp. Numeração, marcadores, títulos e nomes repetidos serão tratados automaticamente. Use 🧤 ao lado do nome para marcar um goleiro.
+                            </p>
+                          </div>
+
+                          <label className="block text-[10px] font-bold text-muted">
+                            Posição inicial dos novos convidados
+                            <select
+                              value={guestProfile}
+                              onChange={(event) => setGuestProfile(event.target.value as PlayerProfile)}
+                              className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground outline-none focus:border-accent"
+                            >
+                              <option value="offensive">Ataque / Ala</option>
+                              <option value="defensive">Defesa / Volante</option>
+                            </select>
+                          </label>
+
+                          <textarea
+                            value={guestListText}
+                            onChange={(event) => {
+                              setGuestListText(event.target.value);
+                              setGuestListNotice("");
+                            }}
+                            rows={7}
+                            placeholder={"⚽ *Pelada BQ – 24/10 - 08:00*\n\n1. João Silva\n2. Pedro Santos\n3. Lucas 🧤"}
+                            className="mobile-dialog-scroll w-full resize-y rounded-xl border border-border bg-background px-3 py-2.5 text-xs leading-5 text-foreground outline-none placeholder:text-muted/50 focus:border-accent"
+                            aria-label="Lista de convidados copiada do WhatsApp"
+                          />
+
+                          {parsedGuestList.length > 0 && (
+                            <div className="rounded-xl border border-white/10 bg-surface/70 p-3">
+                              <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold">
+                                <span className="rounded-full bg-accent/15 px-2 py-1 text-accent">{readyGuestList.length} novos</span>
+                                {existingGuestList.length > 0 && (
+                                  <span className="rounded-full bg-warning/15 px-2 py-1 text-warning">{existingGuestList.length} já existem</span>
+                                )}
+                                {parsedGuestList.filter((guest) => guest.isGoalkeeper).length > 0 && (
+                                  <span className="rounded-full bg-sky-400/15 px-2 py-1 text-sky-300">🧤 {parsedGuestList.filter((guest) => guest.isGoalkeeper).length} goleiro(s)</span>
+                                )}
+                              </div>
+                              <ul className="mobile-dialog-scroll mt-2 max-h-36 space-y-1 text-[10px] leading-4">
+                                {parsedGuestList.map((guest) => {
+                                  const exists = existingPlayerNameKeys.has(normalizeCallupGuestName(guest.name));
+                                  return (
+                                    <li key={normalizeCallupGuestName(guest.name)} className={exists ? "text-warning" : "text-foreground"}>
+                                      {guest.isGoalkeeper ? "🧤 " : ""}{guest.name}{exists ? " · já está no elenco" : " · novo convidado"}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                              {existingGuestList.length > 0 && (
+                                <p className="mt-2 border-t border-white/10 pt-2 text-[9px] leading-4 text-muted">
+                                  Quem já está no elenco não será duplicado. Use “Escolha o jogador” acima para adicionar esse perfil.
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {guestListNotice && (
+                            <p className="rounded-xl border border-accent/25 bg-accent/10 px-3 py-2 text-[10px] font-bold leading-4 text-accent" role="status">
+                              {guestListNotice}
+                            </p>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={handleInviteGuestList}
+                            disabled={loading === "guest-list" || readyGuestList.length === 0 || readyGuestList.length > MAX_CALLUP_GUEST_LIST_SIZE}
+                            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 text-xs font-black text-background transition-transform active:scale-[.98] disabled:opacity-40"
+                          >
+                            {loading === "guest-list" ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                            {readyGuestList.length > MAX_CALLUP_GUEST_LIST_SIZE
+                              ? `Máximo de ${MAX_CALLUP_GUEST_LIST_SIZE} nomes`
+                              : `Criar e adicionar ${readyGuestList.length} ${readyGuestList.length === 1 ? "convidado" : "convidados"}`}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center pt-3 text-[11px] text-muted">
