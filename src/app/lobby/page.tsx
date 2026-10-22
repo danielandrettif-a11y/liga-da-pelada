@@ -2,11 +2,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { ChevronRight, Crown, Plus, Search, Shield, Trophy, Users } from "@/components/icons";
+import { Crown, Plus, Search, Shield, Trophy, Users } from "@/components/icons";
+import { LeagueEntryForm } from "@/components/LeagueEntryForm";
 import { getCurrentAccount } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { getMyLeagues, type MyLeague } from "@/lib/league-context";
-import { continueEntryFlow, enterLeague, reviewAccess, toggleFavorite } from "./actions";
+import { continueEntryFlow, reviewAccess, toggleFavorite } from "./actions";
 import { ENTRY_FLOW_PENDING_COOKIE } from "@/lib/entry-flow";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ function LeagueCard({ league, featured = false }: { league: MyLeague; featured?:
       <form action={toggleFavorite} className="absolute right-4 top-4"><input type="hidden" name="league_id" value={league.id} /><button type="submit" aria-label={league.isFavorite ? `Desfavoritar ${league.name}` : `Favoritar ${league.name}`} className="grid h-10 w-10 place-items-center rounded-full border border-white/20 bg-black/55 text-2xl" style={{ color: league.isFavorite ? league.accentColor : "white" }}>{league.isFavorite ? "★" : "☆"}</button></form>
       <div className="absolute inset-x-4 bottom-4 flex items-end gap-3"><ClubMark league={league} large={featured} /><div className="min-w-0 pb-1"><h2 className={cn("truncate font-athletic font-black uppercase text-white", featured ? "text-2xl" : "text-lg")}>{league.name}</h2><p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-white/70"><Shield className="h-3.5 w-3.5" /> {league.visibility === "open" ? "Pelada aberta" : "Pelada privada"}</p></div></div>
     </div>
-    <form action={enterLeague} className="p-3"><input type="hidden" name="league_id" value={league.id} /><button type="submit" className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-black text-background" style={{ backgroundColor: league.accentColor }}>Entrar no clube <ChevronRight className="h-4 w-4" /></button></form>
+    <LeagueEntryForm leagueId={league.id} leagueName={league.name} accentColor={league.accentColor} />
   </article>;
 }
 

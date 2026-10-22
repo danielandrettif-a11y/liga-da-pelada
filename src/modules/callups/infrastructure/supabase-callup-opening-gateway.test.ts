@@ -9,7 +9,8 @@ function callupsClient(insertError: { code: string; message: string } | null = n
   const select = vi.fn().mockReturnValue({ eq, in: inFilter, limit, single });
   const insert = vi.fn().mockReturnValue({ select });
   const from = vi.fn().mockReturnValue({ select, insert });
-  return { from, select, eq, inFilter, limit, insert, single };
+  const rpc = vi.fn().mockResolvedValue({ data: "callup-1", error: insertError });
+  return { from, select, eq, inFilter, limit, insert, single, rpc };
 }
 
 describe("gateway de abertura da convocação", () => {
@@ -31,6 +32,24 @@ describe("gateway de abertura da convocação", () => {
       stadiumId: null, stadiumName: null, stadiumMapUrl: null,
       roundType: "official", capacity: 21, playersPerTeam: 7, teamsPerRound: 3,
     })).toEqual({ status: "duplicate" });
-    expect(client.insert).toHaveBeenCalledWith(expect.objectContaining({ league_id: "league-1", capacity: 21 }));
+    expect(client.rpc).toHaveBeenCalledWith("create_league_callup", expect.objectContaining({
+      p_league_id: "league-1",
+      p_capacity: 21,
+    }));
+  });
+
+  it("cria a convocação pela RPC isolada à pelada", async () => {
+    const client = callupsClient();
+    const gateway = supabaseCallupOpeningGateway(client as unknown as Parameters<typeof supabaseCallupOpeningGateway>[0]);
+    expect(await gateway.insert({
+      leagueId: "league-1", date: "2026-10-17", startTime: "08:00",
+      stadiumId: null, stadiumName: "Arena", stadiumMapUrl: null,
+      roundType: "official", capacity: 21, playersPerTeam: 7, teamsPerRound: 3,
+    })).toEqual({ status: "created", id: "callup-1" });
+    expect(client.rpc).toHaveBeenCalledWith("create_league_callup", expect.objectContaining({
+      p_stadium_name: "Arena",
+      p_players_per_team: 7,
+      p_teams_per_round: 3,
+    }));
   });
 });

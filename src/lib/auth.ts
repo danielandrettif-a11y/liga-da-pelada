@@ -18,21 +18,25 @@ export const getCurrentAccount = cache(async function getCurrentAccount() {
   const { data: { user } } = await client.auth.getUser();
 
   if (!user) {
-    return { client, user: null, profile: null, isAdmin: false };
+    return { client, user: null, profile: null, memberships: [], isAdmin: false };
   }
 
-  const { data: profile } = await client
-    .from("account_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const selectedLeagueId = (await cookies()).get("active_league_id")?.value;
-  const { data: memberships } = await client
-    .from("league_members")
-    .select("league_id, role")
-    .eq("user_id", user.id)
-    .eq("is_active", true);
+  // Perfil, vínculos e cookie não dependem uns dos outros. Executá-los em
+  // paralelo evita duas esperas de rede consecutivas em toda navegação.
+  const [{ data: profile }, { data: memberships }, cookieStore] = await Promise.all([
+    client
+      .from("account_profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    client
+      .from("league_members")
+      .select("league_id, role")
+      .eq("user_id", user.id)
+      .eq("is_active", true),
+    cookies(),
+  ]);
+  const selectedLeagueId = cookieStore.get("active_league_id")?.value;
   const selectedMembership = memberships?.find((membership) => membership.league_id === selectedLeagueId)
     || (memberships?.length === 1 ? memberships[0] : null);
 
@@ -40,6 +44,7 @@ export const getCurrentAccount = cache(async function getCurrentAccount() {
     client,
     user,
     profile: profile as AccountProfile | null,
+    memberships: memberships || [],
     isAdmin: selectedMembership?.role === "admin",
   };
 });

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentAccount } from "@/lib/auth";
-import { ACTIVE_LEAGUE_COOKIE, getMyLeagues } from "@/lib/league-context";
+import { ACTIVE_LEAGUE_COOKIE } from "@/lib/league-context";
 import {
   ENTRY_FLOW_DONE_COOKIE,
   ENTRY_FLOW_PENDING_COOKIE,
@@ -38,15 +38,15 @@ export async function continueEntryFlow() {
 
 export async function enterLeague(formData: FormData) {
   const leagueId = String(formData.get("league_id") || "");
-  const { client, user } = await getCurrentAccount();
+  const { client, user, memberships } = await getCurrentAccount();
   if (!user) redirect("/login?next=/lobby");
-  const league = (await getMyLeagues()).find((item) => item.id === leagueId);
-  if (!league) redirect("/lobby?error=access");
-  (await cookies()).set(ACTIVE_LEAGUE_COOKIE, league.id, {
+  if (!memberships.some((membership) => membership.league_id === leagueId)) {
+    redirect("/lobby?error=access");
+  }
+  (await cookies()).set(ACTIVE_LEAGUE_COOKIE, leagueId, {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365,
   });
   const destination = await completePendingEntryFlow(client);
-  revalidatePath("/", "layout");
   redirect(destination || "/");
 }
 

@@ -1369,6 +1369,77 @@ textarea {
   }
 }
 
+/* Feedback imediato ao trocar de pelada. A animação usa apenas transform e
+   opacity para permanecer fluida mesmo em celulares modestos. */
+.league-entry-pitch {
+  position: relative;
+  width: min(76vw, 280px);
+  aspect-ratio: 1.55;
+  overflow: hidden;
+  border: 2px solid rgba(204, 255, 0, 0.74);
+  border-radius: 1.5rem;
+  background:
+    linear-gradient(90deg, transparent 49.5%, rgba(255,255,255,.32) 50%, transparent 50.5%),
+    repeating-linear-gradient(90deg, #123f27 0 16.66%, #0e3521 16.66% 33.33%);
+  box-shadow: 0 0 36px rgba(204, 255, 0, 0.2);
+}
+
+.league-entry-pitch::before,
+.league-entry-pitch::after {
+  content: "";
+  position: absolute;
+  top: 27%;
+  width: 13%;
+  height: 46%;
+  border: 1px solid rgba(255,255,255,.42);
+}
+
+.league-entry-pitch::before { left: -1px; border-left: 0; }
+.league-entry-pitch::after { right: -1px; border-right: 0; }
+
+.league-entry-pitch__circle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255,255,255,.42);
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+}
+
+.league-entry-pitch__player {
+  position: absolute;
+  width: 12px;
+  aspect-ratio: 1;
+  border: 2px solid rgba(255,255,255,.8);
+  border-radius: 999px;
+  background: #ccff00;
+  box-shadow: 0 0 12px rgba(204, 255, 0, .7);
+  animation: league-player-run 1.6s ease-in-out infinite alternate;
+}
+
+.league-entry-pitch__player--one { left: 20%; top: 25%; }
+.league-entry-pitch__player--two { left: 68%; top: 58%; animation-delay: -.45s; }
+.league-entry-pitch__player--three { left: 35%; top: 70%; animation-delay: -.9s; }
+
+.league-entry-pitch__ball {
+  position: absolute;
+  left: 47%;
+  top: 43%;
+  font-size: 1.25rem;
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,.5));
+  animation: league-ball-dribble 1.25s ease-in-out infinite alternate;
+}
+
+@keyframes league-player-run {
+  to { transform: translate3d(22px, -9px, 0); }
+}
+
+@keyframes league-ball-dribble {
+  to { transform: translate3d(28px, 19px, 0) rotate(180deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cosmetic-card-shimmer::after,
   .cosmetic-title-preview::before,
@@ -1380,7 +1451,9 @@ textarea {
   .cosmetic-aura-inside__detail,
   .animate-pack-levitate,
   .animate-card-float-1,
-  .animate-card-float-2 {
+  .animate-card-float-2,
+  .league-entry-pitch__player,
+  .league-entry-pitch__ball {
     animation: none !important;
   }
 }
