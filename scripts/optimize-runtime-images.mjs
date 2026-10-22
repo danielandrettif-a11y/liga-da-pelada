@@ -6,6 +6,14 @@ const projectRoot = process.cwd();
 const explicitImages = [
   "public/images/cartola/campo-de-bairro-metade.png",
   "public/images/season-pass-journey-banner.png",
+  "public/images/cards/emergency_sub.png",
+  "public/images/cards/safe_prediction.png",
+  "public/images/cards/extra_credit.png",
+  "public/images/cards/bargain.png",
+  "public/team-crests/inter-de-meiao.png",
+  "public/team-crests/meia-boca-juniors.png",
+  "public/team-crests/patetico-de-madrid.png",
+  "public/team-crests/milamb.png",
 ];
 
 async function listPngs(directory) {
@@ -18,7 +26,10 @@ async function listPngs(directory) {
   return files.flat();
 }
 
-const cosmeticImages = await listPngs(path.join(projectRoot, "public/images/cosmetics"));
+// Os frames pequenos dependem de transparência muito precisa e já têm WebP
+// dedicado. Convertemos apenas os fundos/capas pesados.
+const cosmeticImages = (await listPngs(path.join(projectRoot, "public/images/cosmetics")))
+  .filter((file) => !file.includes(`${path.sep}frames${path.sep}`));
 const inputs = [
   ...explicitImages.map((file) => path.join(projectRoot, file)),
   ...cosmeticImages,

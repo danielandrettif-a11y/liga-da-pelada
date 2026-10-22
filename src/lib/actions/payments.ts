@@ -24,6 +24,7 @@ import {
   readPaymentAuditLog,
   readPaymentRecipients,
   readPaymentRounds,
+  readRoundPaymentWorkspace,
   readRoundExpenseSelections,
   readRoundPaymentChargeLines,
   readRoundPaymentObligations,
@@ -197,6 +198,12 @@ export async function hasPendingPaymentRound(): Promise<boolean> {
 export async function getRoundPaymentPlayers(roundId: string): Promise<PaymentPlayer[]> {
   const league = await getActiveLeague();
   return readRoundPaymentPlayers(await createServerClient(), league.id, roundId);
+}
+
+export async function getRoundPaymentWorkspace(roundId: string) {
+  const account = await getCurrentAccount();
+  if (!account.user) return null;
+  return readRoundPaymentWorkspace(account.client, roundId);
 }
 
 export async function getPaymentAuditLog(): Promise<PaymentAuditLogEntry[]> {

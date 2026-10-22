@@ -7,7 +7,11 @@ import { sendPushNotificationsToUsers } from "../push-notifications";
 import { createServiceClient } from "../supabase/service";
 import { canUseCollective } from "../collective-access";
 import { getSelectedLeague } from "../league-context";
-import { collectiveUnreadFromRows } from "../collective-unread";
+import {
+  readCollectivePage,
+  type CollectivePageCursor,
+  type CollectivePageMessage,
+} from "@/modules/collective/infrastructure/supabase-collective-reader";
 
 export type CollectiveSummary = {
   callupId: string;
@@ -18,24 +22,7 @@ export type CollectiveSummary = {
   unreadCount: number;
 };
 
-export type CollectiveMessage = {
-  id: string;
-  callupId: string;
-  senderUserId: string | null;
-  senderPlayerId: string | null;
-  senderName: string;
-  senderAvatarUrl: string | null;
-  kind: "text" | "image" | "audio" | "system";
-  body: string | null;
-  mediaUrl: string | null;
-  mediaMime: string | null;
-  duration: number | null;
-  editedAt: string | null;
-  deletedAt: string | null;
-  createdAt: string;
-  own: boolean;
-  replyTo: { id: string; senderName: string; kind: string; body: string | null } | null;
-};
+export type CollectiveMessage = CollectivePageMessage;
 
 export type CollectiveRoomData = {
   summary: CollectiveSummary;
@@ -45,22 +32,9 @@ export type CollectiveRoomData = {
   currentUserId: string;
   firstUnreadMessageId: string | null;
   lastReadMessageId: string | null;
+  hasOlderMessages: boolean;
+  nextCursor: CollectivePageCursor | null;
 };
-
-const COLLECTIVE_MESSAGE_WINDOW_DAYS = 14;
-
-function collectiveMessageCutoff() {
-  return new Date(Date.now() - COLLECTIVE_MESSAGE_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
-}
-
-async function collectiveUnreadState(client: any, callupIds: string[], userId: string) {
-  if (!callupIds.length) return { count: 0, firstUnreadMessageId: null, lastReadMessageId: null };
-  const [{ data: reads }, { data: rows }] = await Promise.all([
-    client.from("collective_reads").select("callup_id, last_read_message_id").eq("user_id", userId).in("callup_id", callupIds),
-    client.from("collective_messages").select("id, callup_id, sender_user_id, kind, deleted_at, created_at").in("callup_id", callupIds).gte("created_at", collectiveMessageCutoff()).order("created_at", { ascending: true }).order("id", { ascending: true }),
-  ]);
-  return collectiveUnreadFromRows(rows || [], reads || [], userId);
-}
 
 async function listCollectiveCandidates() {
   const account = await getCurrentAccount();
@@ -119,8 +93,8 @@ export async function getActiveCollectiveSummary(): Promise<CollectiveSummary | 
   const visibleCallups = callups.filter(isCollectiveVisible);
   const callup = callups.find(isCollectiveOpen) || visibleCallups[0];
   if (!callup) return null;
-  const unreadCount = (await collectiveUnreadState(account.client, visibleCallups.map((item) => item.id), account.user.id)).count;
-  return collectiveSummary(callup, unreadCount);
+  const page = await readCollectivePage(account.client, account.user.id, visibleCallups.map((item) => item.id), null, 1);
+  return collectiveSummary(callup, page?.unreadCount || 0);
 }
 
 export async function getCollectiveRoom(callupId?: string): Promise<CollectiveRoomData | null> {
@@ -133,62 +107,40 @@ export async function getCollectiveRoom(callupId?: string): Promise<CollectiveRo
   if (!activeCallup || !visibleCallups.length) return null;
   const summary = collectiveSummary(activeCallup, 0);
   const callupIds = visibleCallups.map((item) => item.id);
-  const [{ data: descendingRows, error }, { data: reads }] = await Promise.all([account.client
-    .from("collective_messages")
-    .select("*, sender:sender_player_id(name, avatar_url)")
-    .in("callup_id", callupIds)
-    .gte("created_at", collectiveMessageCutoff())
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(300), account.client.from("collective_reads")
-      .select("callup_id, last_read_message_id")
-      .eq("user_id", account.user.id).in("callup_id", callupIds)]);
-  if (error) return null;
-  const rows = [...(descendingRows || [])].reverse();
-  // Se a janela chegou ao limite, pode haver mensagens anteriores. Nesse caso,
-  // a contagem continua usando a consulta completa para não perder não lidas.
-  const readState = rows.length < 300
-    ? collectiveUnreadFromRows(rows, reads || [], account.user.id)
-    : await collectiveUnreadState(account.client, callupIds, account.user.id);
-  summary.unreadCount = readState.count;
-  const replyIds = [...new Set((rows || []).map((row: any) => row.reply_to_message_id).filter(Boolean))];
-  const replyById = new Map<string, any>();
-  if (replyIds.length) {
-    const { data: replies } = await account.client.from("collective_messages").select("id, kind, body, deleted_at, sender:sender_player_id(name)").in("id", replyIds).in("callup_id", callupIds);
-    (replies || []).forEach((reply: any) => replyById.set(reply.id, reply));
+  const page = await readCollectivePage(account.client, account.user.id, callupIds);
+  if (!page) return null;
+  summary.unreadCount = page.unreadCount;
+  return {
+    summary,
+    callupIds,
+    messages: page.messages,
+    isAdmin: (await getSelectedLeague())?.role === "admin",
+    currentUserId: account.user.id,
+    firstUnreadMessageId: page.firstUnreadMessageId,
+    lastReadMessageId: null,
+    hasOlderMessages: page.hasMore,
+    nextCursor: page.nextCursor,
+  };
+}
+
+export async function getOlderCollectiveMessages(
+  callupId: string,
+  cursor: CollectivePageCursor,
+) {
+  const { account, callups } = await listCollectiveCandidates();
+  if (!account.user) return { success: false as const, messages: [], error: "Entre para carregar a conversa." };
+  const visibleCallups = callups.filter(isCollectiveVisible);
+  if (!visibleCallups.some((callup) => callup.id === callupId)) {
+    return { success: false as const, messages: [], error: "Coletiva fora da pelada selecionada." };
   }
-  const mediaPaths = (rows || []).map((row: any) => row.media_path).filter(Boolean);
-  const signedByPath = new Map<string, string>();
-  if (mediaPaths.length) {
-    const { data: signed } = await account.client.storage.from("collective-media").createSignedUrls(mediaPaths, 3600);
-    (signed || []).forEach((item: any, index: number) => {
-      if (item.signedUrl) signedByPath.set(mediaPaths[index], item.signedUrl);
-    });
-  }
-  const messages: CollectiveMessage[] = (rows || []).map((row: any) => {
-    const sender = Array.isArray(row.sender) ? row.sender[0] : row.sender;
-    const reply = row.reply_to_message_id ? replyById.get(row.reply_to_message_id) : null;
-    const replySender = Array.isArray(reply?.sender) ? reply.sender[0] : reply?.sender;
-    return {
-      id: row.id,
-      callupId: row.callup_id,
-      senderUserId: row.sender_user_id,
-      senderPlayerId: row.sender_player_id,
-      senderName: row.kind === "system" ? "Draft BQ" : sender?.name || "Usuário",
-      senderAvatarUrl: sender?.avatar_url || null,
-      kind: row.kind,
-      body: row.body,
-      mediaUrl: row.media_path ? signedByPath.get(row.media_path) || null : null,
-      mediaMime: row.media_mime,
-      duration: row.audio_duration_seconds,
-      editedAt: row.edited_at,
-      deletedAt: row.deleted_at,
-      createdAt: row.created_at,
-      own: row.sender_user_id === account.user!.id,
-      replyTo: reply ? { id: reply.id, senderName: replySender?.name || "Usuário", kind: reply.kind, body: reply.deleted_at ? "Mensagem removida" : reply.body } : null,
-    };
-  });
-  return { summary, callupIds, messages, isAdmin: (await getSelectedLeague())?.role === "admin", currentUserId: account.user.id, firstUnreadMessageId: readState.firstUnreadMessageId, lastReadMessageId: readState.lastReadMessageId };
+  const page = await readCollectivePage(account.client, account.user.id, visibleCallups.map((item) => item.id), cursor);
+  if (!page) return { success: false as const, messages: [], error: "Não foi possível carregar mensagens anteriores." };
+  return {
+    success: true as const,
+    messages: page.messages,
+    hasOlderMessages: page.hasMore,
+    nextCursor: page.nextCursor,
+  };
 }
 
 async function pushCollectiveMessage(callupId: string, senderUserId: string, senderPlayerId: string, fallbackSenderName: string, kind: string, body: string | null) {

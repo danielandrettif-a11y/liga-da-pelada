@@ -69,6 +69,7 @@ import {
   updateFantasyConfiguration,
 } from "@/modules/fantasy/application/admin-commands";
 import { supabaseFantasyAdminCommandGateway } from "@/modules/fantasy/infrastructure/supabase-admin-command-gateway";
+import { getCachedFantasyMarketReadModel } from "@/modules/fantasy/infrastructure/cached-market-read-model";
 import {
   assignFantasyRankingPositions,
   buildSeasonFantasyRanking,
@@ -392,7 +393,7 @@ export async function getFantasyDashboard() {
   const [
     { data: fantasyRoundRows },
     { data: marketHealthRow, error: marketHealthError },
-    { data: marketReadModelData, error: marketReadModelError },
+    { data: marketCacheVersion },
   ] = await Promise.all([
     account.client
       .from("fantasy_rounds")
@@ -403,11 +404,25 @@ export async function getFantasyDashboard() {
     account.client.rpc("get_fantasy_market_v11_public_health", {
       p_fantasy_season_id: fantasySeason.id,
     }),
-    account.client.rpc("get_fantasy_market_read_model", {
+    account.client.rpc("get_fantasy_market_cache_version", {
       p_fantasy_season_id: fantasySeason.id,
     }),
   ]);
-  const marketReadModel = parseFantasyMarketReadModel(marketReadModelData, Boolean(marketReadModelError));
+  const cachedMarket = await getCachedFantasyMarketReadModel(
+    fantasySeason.id,
+    String(marketCacheVersion || "missing-version"),
+  );
+  // Ambientes locais sem service role e falhas temporárias no cache não podem
+  // deixar o mercado vazio. A leitura autenticada continua sendo o fallback.
+  const fallbackMarket = cachedMarket.error
+    ? await account.client.rpc("get_fantasy_market_read_model", {
+        p_fantasy_season_id: fantasySeason.id,
+      })
+    : null;
+  const marketReadModel = parseFantasyMarketReadModel(
+    fallbackMarket?.data ?? cachedMarket.data,
+    Boolean(fallbackMarket ? fallbackMarket.error : cachedMarket.error),
+  );
   const marketHealth: FantasyPublicMarketHealth | null = marketHealthError || !marketHealthRow
     ? null
     : {

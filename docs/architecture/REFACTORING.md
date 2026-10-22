@@ -32,6 +32,18 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-22 — RLS, read models, cache, mídia e observabilidade
+
+- A migration 335 passou a envolver `auth.uid/role/jwt` em initplans, separar policies `ALL` conflitantes e consolidar policies permissivas equivalentes com OR. Teste e oficial terminaram com **0 chamadas auth por linha** e **0 pares permissivos sobrepostos**.
+- A Coletiva ganhou read model paginado por cursor (migration 336) e deixou de baixar/varrer até 300 mensagens e respostas em memória. Pagamentos usam um read model único e o fechamento financeiro/rollback foi movido para RPCs transacionais (337).
+- O mercado do Cartola ganhou fonte server-only e cache versionado de 5 minutos, com fallback autenticado. A versão muda junto de preços, histórico ou scouts; cache indisponível nunca esvazia o mercado.
+- Web Vitals e etapas críticas da partida agora são persistidos com retenção de 30 dias. O painel `/admin/performance` mostra amostras, falhas, p50, p95 e máximo; eventos lentos ou falhos geram alerta (338).
+- O ensaio transacional do financeiro revelou três defeitos antigos em `sync_round_payment_plan` (ordenação por coluna inexistente, alias ambíguo e `max(uuid)`) e uma ordem inválida no rollback. As migrations 340–341 corrigem esses pontos; fechamento + restauração foram aprovados no teste dentro de transação revertida e as correções foram aplicadas no oficial.
+- Coletiva, cache do Cartola e gateway financeiro foram extraídos de Server Actions para infraestrutura modular. `fantasy.ts` e `rounds.ts` ainda são grandes, mas os novos fluxos não ampliam o acoplamento e ficam testáveis separadamente.
+- No banco de teste, 20 amostras autenticadas marcaram p95 de 13,032 ms (Coletiva), 5,616 ms (pagamentos), 16,550 ms (fonte do Cartola) e 40,437 ms (versão do cache). Não houve teste de carga em produção.
+- O lote de imagens tratado caiu de 52,68 MB para 4,30 MB (92%); o diretório `public` caiu de 96,9 MB para 37,7 MB e ficou sem imagens acima de 1 MB. A migration 339, que troca URLs persistidas para WebP, deve ser aplicada no mesmo rollout do código/assets para evitar referências quebradas.
+- Verificação: tipagem, **801 testes em 154 arquivos** e build Next.js 16 de produção aprovados. Detalhes e nota em `docs/performance/POST-OPTIMIZATION-2026-10-22.md`.
+
 ### 2026-10-21 — rollout das migrations de performance e Ao Vivo
 
 - A migration `333_set_based_achievement_belt_holders.sql` foi aplicada primeiro no teste e depois no projeto oficial `qffxktwxsqyiijboeftr` (`sa-east-1`). O teste precisou ser alinhado antes com a migration 322, que já estava no oficial; depois disso a paridade ficou em 38/38 jogadores no teste e 37/37 no oficial, sem divergências.

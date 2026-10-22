@@ -1,3 +1,5 @@
+import { reportServerEvent } from "@/lib/observability";
+
 export type MatchOperation = "create_match" | "register_goal" | "finish_match";
 
 type MatchStepSample = { durationMs: number; failed: boolean };
@@ -14,11 +16,17 @@ const samplesByStep = new Map<string, MatchStepSample[]>();
 
 function percentile(sorted: number[], ratio: number) {
   if (sorted.length === 0) return 0;
-  return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * ratio) - 1)];
+  return sorted[
+    Math.min(sorted.length - 1, Math.ceil(sorted.length * ratio) - 1)
+  ];
 }
 
-export function summarizeMatchStepSamples(samples: MatchStepSample[]): MatchStepSummary {
-  const durations = samples.map((sample) => sample.durationMs).sort((a, b) => a - b);
+export function summarizeMatchStepSamples(
+  samples: MatchStepSample[],
+): MatchStepSummary {
+  const durations = samples
+    .map((sample) => sample.durationMs)
+    .sort((a, b) => a - b);
   return {
     count: samples.length,
     failures: samples.filter((sample) => sample.failed).length,
@@ -32,33 +40,66 @@ export function resetMatchPerformanceDiagnostics() {
   samplesByStep.clear();
 }
 
-function recordMatchStep(operation: MatchOperation, step: string, durationMs: number, success: boolean) {
-  console.info(JSON.stringify({ event: "match_step", operation, step, durationMs, success }));
+function recordMatchStep(
+  operation: MatchOperation,
+  step: string,
+  durationMs: number,
+  success: boolean,
+) {
+  console.info(
+    JSON.stringify({
+      event: "match_step",
+      operation,
+      step,
+      durationMs,
+      success,
+    }),
+  );
   const key = `${operation}:${step}`;
   const samples = samplesByStep.get(key) || [];
   samples.push({ durationMs, failed: !success });
   if (samples.length > MAX_SAMPLES_PER_STEP) samples.shift();
   samplesByStep.set(key, samples);
+  void reportServerEvent({
+    kind: "match_step",
+    name: step,
+    value: durationMs,
+    success,
+    metadata: { operation },
+  });
 
   const configured = Number(process.env.MATCH_PERF_SUMMARY_EVERY || 20);
-  const summaryEvery = Number.isInteger(configured) && configured > 0 ? configured : 20;
+  const summaryEvery =
+    Number.isInteger(configured) && configured > 0 ? configured : 20;
   if (samples.length % summaryEvery === 0) {
-    console.info(JSON.stringify({
-      event: "match_step_summary",
-      operation,
-      step,
-      ...summarizeMatchStepSamples(samples),
-    }));
+    console.info(
+      JSON.stringify({
+        event: "match_step_summary",
+        operation,
+        step,
+        ...summarizeMatchStepSamples(samples),
+      }),
+    );
   }
 }
-
 /** Diagnóstico opt-in das etapas críticas; nunca registra IDs ou dados pessoais. */
 export async function measureMatchStep<T>(
   operation: MatchOperation,
   step: string,
   run: () => Promise<T>,
 ): Promise<T> {
-  if (process.env.MATCH_PERF_DIAGNOSTICS !== "1") return run();
+  const diagnosticsEnabled =
+    process.env.MATCH_PERF_DIAGNOSTICS === "1" ||
+    (process.env.NODE_ENV === "production" &&
+      process.env.MATCH_PERF_DIAGNOSTICS !== "0");
+  const defaultRate = process.env.MATCH_PERF_DIAGNOSTICS === "1" ? 1 : 0.25;
+  const configuredRate = Number(
+    process.env.MATCH_PERF_SAMPLE_RATE || defaultRate,
+  );
+  const sampleRate = Number.isFinite(configuredRate)
+    ? Math.min(1, Math.max(0, configuredRate))
+    : 0.25;
+  if (!diagnosticsEnabled || Math.random() > sampleRate) return run();
   const startedAt = performance.now();
   let success = false;
   try {
@@ -66,6 +107,11 @@ export async function measureMatchStep<T>(
     success = true;
     return value;
   } finally {
-    recordMatchStep(operation, step, Math.round(performance.now() - startedAt), success);
+    recordMatchStep(
+      operation,
+      step,
+      Math.round(performance.now() - startedAt),
+      success,
+    );
   }
 }

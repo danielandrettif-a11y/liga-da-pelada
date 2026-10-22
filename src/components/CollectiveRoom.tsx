@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, Edit3, ImagePlus, Loader2, Microphone, Send, Trash2, X } from "@/components/icons";
 import { PlayerAvatar } from "./PlayerAvatar";
-import { deleteCollectiveMessage, editCollectiveMessage, markCollectiveRead, sendCollectiveMessage, type CollectiveRoomData } from "@/lib/actions/collective";
+import { deleteCollectiveMessage, editCollectiveMessage, getOlderCollectiveMessages, markCollectiveRead, sendCollectiveMessage, type CollectiveRoomData } from "@/lib/actions/collective";
 import { supabase } from "@/lib/supabase";
 
 function audioExtension(mime: string) {
@@ -39,17 +39,26 @@ export function CollectiveRoom({ room, compact = false }: { room: CollectiveRoom
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [replyingTo, setReplyingTo] = useState<CollectiveRoomData["messages"][number] | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [messages, setMessages] = useState(room.messages);
+  const [hasOlderMessages, setHasOlderMessages] = useState(room.hasOlderMessages);
+  const [nextCursor, setNextCursor] = useState(room.nextCursor);
   const firstUnreadMessageId = room.firstUnreadMessageId;
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const messageList = useRef<HTMLDivElement | null>(null);
   const composer = useRef<HTMLTextAreaElement | null>(null);
-  const latestMessageId = room.messages.at(-1)?.id || null;
-  const readTargets = [...room.messages.reduce((targets, message) => {
+  const latestMessageId = messages.at(-1)?.id || null;
+  const readTargets = [...messages.reduce((targets, message) => {
     targets.set(message.callupId, { callupId: message.callupId, messageId: message.id });
     return targets;
   }, new Map<string, { callupId: string; messageId: string }>()).values()];
+
+  useEffect(() => {
+    setMessages(room.messages);
+    setHasOlderMessages(room.hasOlderMessages);
+    setNextCursor(room.nextCursor);
+  }, [room.messages, room.hasOlderMessages, room.nextCursor]);
 
   useEffect(() => {
     if (readTargets.length) void markCollectiveRead(readTargets);
@@ -138,6 +147,24 @@ export function CollectiveRoom({ room, compact = false }: { room: CollectiveRoom
     }, 0);
   }
 
+  function loadOlderMessages() {
+    if (!nextCursor || pending) return;
+    setError("");
+    startTransition(async () => {
+      const result = await getOlderCollectiveMessages(room.summary.callupId, nextCursor);
+      if (!result.success) {
+        setError(result.error || "Não foi possível carregar mensagens anteriores.");
+        return;
+      }
+      setMessages((current) => {
+        const existing = new Set(current.map((message) => message.id));
+        return [...result.messages.filter((message) => !existing.has(message.id)), ...current];
+      });
+      setHasOlderMessages(result.hasOlderMessages);
+      setNextCursor(result.nextCursor);
+    });
+  }
+
   return (
     <div className={`flex min-h-0 flex-col ${compact ? "h-[72vh]" : "min-h-[72vh]"}`}>
       <header className="rounded-t-3xl border border-accent/30 bg-[radial-gradient(circle_at_top_right,rgba(204,255,0,.16),transparent_45%),#071b11] p-5">
@@ -145,8 +172,9 @@ export function CollectiveRoom({ room, compact = false }: { room: CollectiveRoom
       </header>
 
       <div ref={messageList} className="min-h-0 flex-1 space-y-3 overflow-y-auto border-x border-border bg-black/15 p-3 sm:p-4">
-        {room.messages.length === 0 && <div className="py-16 text-center"><Microphone className="mx-auto h-9 w-9 text-muted" /><p className="mt-3 text-sm font-black text-foreground">A coletiva está aberta</p><p className="mt-1 text-xs text-muted">Mande a primeira mensagem da conversa.</p></div>}
-        {room.messages.map((message) => {
+        {hasOlderMessages && <div className="flex justify-center pb-2"><button type="button" disabled={pending || !nextCursor} onClick={loadOlderMessages} className="rounded-full border border-border bg-surface px-4 py-2 text-[10px] font-black uppercase text-muted disabled:opacity-50">{pending ? "Carregando..." : "Carregar anteriores"}</button></div>}
+        {messages.length === 0 && <div className="py-16 text-center"><Microphone className="mx-auto h-9 w-9 text-muted" /><p className="mt-3 text-sm font-black text-foreground">A coletiva está aberta</p><p className="mt-1 text-xs text-muted">Mande a primeira mensagem da conversa.</p></div>}
+        {messages.map((message) => {
           const unreadMarker = message.id === firstUnreadMessageId ? <div className="my-4 flex items-center gap-2" aria-label="Mensagens não lidas"><span className="h-px flex-1 bg-accent/35" /><span className="rounded-full bg-accent px-3 py-1 text-[9px] font-black uppercase text-background">Novas mensagens</span><span className="h-px flex-1 bg-accent/35" /></div> : null;
           if (message.kind === "system") return <div key={message.id} id={`collective-${message.id}`}>{unreadMarker}<div className="mx-auto max-w-sm rounded-full border border-accent/20 bg-accent/8 px-4 py-2 text-center text-[10px] font-bold text-accent">{message.body}</div></div>;
           const canManage = message.own || room.isAdmin;

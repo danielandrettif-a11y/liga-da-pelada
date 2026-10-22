@@ -16,7 +16,7 @@ export const CARD_ART_MAP: Record<string, string> = {
   triple_crown: "/images/cards/triple_crown.jpg",
   bagre_or_craque: "/images/cards/bagre_or_craque.jpg",
   vice_captain: "/images/cards/vice_captain.jpg",
-  emergency_sub: "/images/cards/emergency_sub.png",
+  emergency_sub: "/images/cards/emergency_sub.webp",
 
   // RARAS 🔵
   double_prediction: "/images/cards/double_prediction.jpg",
@@ -25,11 +25,11 @@ export const CARD_ART_MAP: Record<string, string> = {
   head_to_head: "/images/cards/head_to_head.jpg",
   bagre_insurance: "/images/cards/bagre_insurance.jpg",
   bagre_value_shield: "/images/cards/bagre_value_shield.jpg",
-  safe_prediction: "/images/cards/safe_prediction.png",
+  safe_prediction: "/images/cards/safe_prediction.webp",
 
   // COMUNS ⚪
-  extra_credit: "/images/cards/extra_credit.png",
-  bargain: "/images/cards/bargain.png",
+  extra_credit: "/images/cards/extra_credit.webp",
+  bargain: "/images/cards/bargain.webp",
   golden_goal: "/images/cards/golden_goal.jpg",
   golden_assist: "/images/cards/golden_assist.jpg",
   so_vim_pela_resenha: "/images/cards/so_vim_pela_resenha.jpg",

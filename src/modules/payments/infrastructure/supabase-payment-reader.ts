@@ -16,6 +16,34 @@ async function roundExists(client: SupabaseClient, roundId: string, leagueId: st
   return Boolean(data);
 }
 
+export async function readRoundPaymentWorkspace(client: SupabaseClient, roundId: string) {
+  const { data, error } = await client.rpc("get_round_payment_read_model", { p_round_id: roundId });
+  if (error || !data || typeof data !== "object") {
+    if (error) console.error("Erro ao buscar painel consolidado de pagamentos:", error);
+    return null;
+  }
+  const model = data as Record<string, any>;
+  const players = (model.players || []).map((entry: any) => ({
+    ...(entry.player || {}),
+    paid: Boolean(entry.paid),
+    paid_at: entry.paid_at || null,
+  })) as PaymentPlayer[];
+  const obligations = (model.obligations || []).map((row: any) => ({
+    ...row,
+    amount_due: Number(row.amount_due),
+    amount_paid: Number(row.amount_paid),
+  })) as PaymentObligation[];
+  const chargeLines = (model.charge_lines || []).map((row: any) => ({
+    ...row,
+    amount: Number(row.amount),
+  })) as PaymentChargeLine[];
+  const expenseSelections = (model.expense_installments || []).map((row: any) => ({
+    expense_item_id: row.expense_item_id,
+    installment_number: Number(row.installment_number),
+  })) as RoundExpenseSelection[];
+  return { players, obligations, chargeLines, expenseSelections };
+}
+
 export async function readExpenseItems(client: SupabaseClient, leagueId: string, includeArchived = false): Promise<ExpenseItem[]> {
   let query = client.from("league_expense_items")
     .select("id, name, description, total_amount, installment_count, status, recipient_id, created_at, paid_installments_before_app, recipient:payment_recipients!league_expense_items_recipient_id_fkey(name,pix_key), installments:round_expense_installments(id,status)")

@@ -122,9 +122,7 @@ export function cosmeticNameplateImage(assetKey?: string | null) {
  * original inteiro no navegador.
  */
 export function cosmeticHighResolutionImage(assetKey?: string | null) {
-  const image = cosmeticImage(assetKey);
-  if (image?.endsWith("-v2.webp")) return image;
-  return image?.endsWith(".webp") ? image.replace(/\.webp$/, ".png") : image;
+  return cosmeticImage(assetKey);
 }
 
 /** Arte quadrada criada para preencher o card de perfil sem comprimir ou

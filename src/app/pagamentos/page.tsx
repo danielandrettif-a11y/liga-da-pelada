@@ -1,7 +1,7 @@
 import { ArrowLeftRight, Clock3 } from "@/components/icons";
 import { PaymentChecklist } from "@/components/PaymentChecklist";
 import { PaymentObligationsPanel } from "@/components/PaymentObligationsPanel";
-import { getExpenseItems, getPaymentRounds, getRoundExpenseSelections, getRoundPaymentChargeLines, getRoundPaymentPlayers, getRoundPaymentObligations } from "@/lib/actions/payments";
+import { getExpenseItems, getPaymentRounds, getRoundPaymentWorkspace } from "@/lib/actions/payments";
 import { getCurrentAccount } from "@/lib/auth";
 import { findLatestReleasedPaymentRound } from "@/lib/paymentStatus";
 
@@ -9,24 +9,22 @@ export const revalidate = 0;
 
 export default async function PagamentosPage() {
   const roundsPromise = getPaymentRounds();
-  const playersPromise = roundsPromise.then((availableRounds) => {
+  const workspacePromise = roundsPromise.then((availableRounds) => {
     const round = findLatestReleasedPaymentRound(availableRounds);
-    return round ? getRoundPaymentPlayers(round.id) : [];
+    return round ? getRoundPaymentWorkspace(round.id) : null;
   });
-  const obligationsPromise = roundsPromise.then((availableRounds) => { const round = findLatestReleasedPaymentRound(availableRounds); return round ? getRoundPaymentObligations(round.id) : []; });
-  const expenseSelectionsPromise = roundsPromise.then((availableRounds) => { const round = findLatestReleasedPaymentRound(availableRounds); return round ? getRoundExpenseSelections(round.id) : []; });
-  const chargeLinesPromise = roundsPromise.then((availableRounds) => { const round = findLatestReleasedPaymentRound(availableRounds); return round ? getRoundPaymentChargeLines(round.id) : []; });
   const accountPromise = getCurrentAccount();
   const expenseItemsPromise = accountPromise.then((account) => account.isAdmin ? getExpenseItems(true) : []);
-  const [rounds, account, players, obligations, expenseSelections, chargeLines, expenseItems] = await Promise.all([
+  const [rounds, account, workspace, expenseItems] = await Promise.all([
     roundsPromise,
     accountPromise,
-    playersPromise,
-    obligationsPromise,
-    expenseSelectionsPromise,
-    chargeLinesPromise,
+    workspacePromise,
     expenseItemsPromise,
   ]);
+  const players = workspace?.players || [];
+  const obligations = workspace?.obligations || [];
+  const expenseSelections = workspace?.expenseSelections || [];
+  const chargeLines = workspace?.chargeLines || [];
   const currentRound = findLatestReleasedPaymentRound(rounds);
   const latestScheduledRound = rounds[0] || null;
   const paymentsReleased = Boolean(currentRound);

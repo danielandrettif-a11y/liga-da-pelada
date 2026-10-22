@@ -28,6 +28,10 @@ import { parseCallupFormat } from "@/modules/callups/domain/callup-format";
 import { changeCallupFormat } from "@/modules/callups/application/change-callup-format";
 import { supabaseCallupFormatGateway } from "@/modules/callups/infrastructure/supabase-callup-format-gateway";
 import { readMatchSetupRound } from "@/modules/matches/infrastructure/supabase-match-setup-reader";
+import {
+  finalizeRoundFinancials,
+  restoreRoundFinancials,
+} from "@/modules/rounds/infrastructure/supabase-round-financial-gateway";
 
 const getActiveLeagueCached = cache(async (leagueId: string) => {
   const client = await createServerClient();
@@ -1148,32 +1152,17 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
       throw new Error(`Não foi possível consolidar as estatísticas da rodada: ${statsResult.error || "erro desconhecido"}`);
     }
 
-    const { error } = await client
-      .from("rounds")
-      .update({
-        status: "finished",
-        payment_pix: pix,
-        payment_total: Math.round(total * 100) / 100,
-        payment_recipient_id: recipientId,
-        payment_recipient_name: recipientName,
-      })
-      .eq("id", roundId);
-
-    if (error) throw new Error(error.message);
-
-    const { error: paymentPlanError } = await client.rpc("sync_round_payment_plan", {
-      p_round_id: roundId,
-      p_expense_item_ids: [...new Set(options?.expenseItemIds || [])],
+    const { data: financialSnapshot, error: financialError } = await finalizeRoundFinancials(client, {
+      roundId,
+      leagueId: selectedLeague.id,
+      paymentPix: pix,
+      paymentTotal: total,
+      recipientId,
+      recipientName,
+      expenseItemIds: options?.expenseItemIds || [],
     });
-    if (paymentPlanError) {
-      await client.from("rounds").update({
-        status: originalRound.status,
-        payment_pix: originalRound.payment_pix,
-        payment_total: originalRound.payment_total,
-        payment_recipient_id: originalRound.payment_recipient_id,
-        payment_recipient_name: originalRound.payment_recipient_name,
-      }).eq("id", roundId);
-      throw new Error(`Não foi possível montar a cobrança da rodada: ${paymentPlanError.message}`);
+    if (financialError || !financialSnapshot) {
+      throw new Error(`Não foi possível encerrar a cobrança da rodada: ${financialError?.message || "estado financeiro indisponível"}`);
     }
 
     const { data: fantasyTest } = fantasyRoundForClose
@@ -1185,16 +1174,11 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     if (fantasyError) {
       // A atualização da rodada e o RPC são requisições diferentes. Se o Cartola
       // falhar, restaura o estado anterior para o ADM poder corrigir e tentar de novo.
-      const { error: rollbackError } = await client
-        .from("rounds")
-        .update({
-          status: originalRound.status,
-          payment_pix: originalRound.payment_pix,
-          payment_total: originalRound.payment_total,
-          payment_recipient_id: originalRound.payment_recipient_id,
-          payment_recipient_name: originalRound.payment_recipient_name,
-        })
-        .eq("id", roundId);
+      const { error: rollbackError } = await restoreRoundFinancials(client, {
+        roundId,
+        leagueId: selectedLeague.id,
+        originalState: financialSnapshot,
+      });
       if (rollbackError) {
         throw new Error(`O Cartola não foi processado (${fantasyError.message}) e não foi possível restaurar a rodada (${rollbackError.message}).`);
       }
