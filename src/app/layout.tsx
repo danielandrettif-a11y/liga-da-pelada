@@ -8,6 +8,7 @@ import { Header } from "@/components/Header";
 import { PwaRegistration } from "@/components/PwaRegistration";
 import { WebVitalsReporter } from "@/components/WebVitalsReporter";
 import { AppChrome } from "@/components/AppChrome";
+import { SlowNavigationFeedback } from "@/components/SlowNavigationFeedback";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -91,6 +92,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-dvh flex flex-col font-sans">
         <WebVitalsReporter />
         <PwaRegistration />
+        <Suspense fallback={null}><SlowNavigationFeedback /></Suspense>
         <AppChrome
           header={<Header />}
           navigation={<Suspense fallback={null}><SessionBottomNav /></Suspense>}

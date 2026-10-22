@@ -45,9 +45,13 @@ function IncompleteProfileBanner() {
       className="block overflow-hidden rounded-xl border border-warning/50 bg-warning/10 py-3 text-warning"
       aria-label="Cadastro incompleto. Adicione uma foto ao seu perfil."
     >
-      <span className="profile-reminder-track flex w-max items-center gap-2 whitespace-nowrap px-4 text-xs font-black uppercase tracking-wide">
-        <Camera className="h-4 w-4" />
-        Cadastro incompleto: falta adicionar sua foto — toque aqui
+      <span className="profile-reminder-track flex w-max items-center whitespace-nowrap text-xs font-black uppercase tracking-wide">
+        {[false, true].map((duplicate) => (
+          <span key={String(duplicate)} aria-hidden={duplicate || undefined} className="flex shrink-0 items-center gap-2 px-4 pr-12">
+            <Camera className="h-4 w-4" />
+            Cadastro incompleto: falta adicionar sua foto — toque aqui
+          </span>
+        ))}
       </span>
     </Link>
   );

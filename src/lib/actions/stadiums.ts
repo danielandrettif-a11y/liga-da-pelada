@@ -32,7 +32,9 @@ export async function getStadiums(): Promise<Stadium[]> {
   }
 }
 
-export async function saveStadium(formData: FormData) {
+export async function saveStadium(formData: FormData): Promise<
+  { success: true; stadium: Stadium } | { success: false; error: string }
+> {
   const client = await getAdminClient();
   if (!client) {
     return { success: false, error: "Somente administradores podem gerenciar estádios." };
@@ -73,8 +75,9 @@ export async function saveStadium(formData: FormData) {
   }
 
   try {
+    let savedStadium: Stadium;
     if (id) {
-      const { error } = await client
+      const { data, error } = await client
         .from("stadiums")
         .update({
           name,
@@ -85,9 +88,12 @@ export async function saveStadium(formData: FormData) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", id)
-        .eq("league_id", league.id);
+        .eq("league_id", league.id)
+        .select("*")
+        .single();
 
       if (error) throw error;
+      savedStadium = data as Stadium;
     } else {
       // Obter proxima ordem
       const { data: lastStadium } = await client
@@ -100,25 +106,30 @@ export async function saveStadium(formData: FormData) {
 
       const nextOrder = (lastStadium?.display_order || 0) + 1;
 
-      const { error } = await client.from("stadiums").insert({
-        league_id: league.id,
-        name,
-        address,
-        google_maps_url: googleMapsUrl,
-        latitude,
-        longitude,
-        display_order: nextOrder,
-        is_active: true,
-      });
+      const { data, error } = await client
+        .from("stadiums")
+        .insert({
+          league_id: league.id,
+          name,
+          address,
+          google_maps_url: googleMapsUrl,
+          latitude,
+          longitude,
+          display_order: nextOrder,
+          is_active: true,
+        })
+        .select("*")
+        .single();
 
       if (error) throw error;
+      savedStadium = data as Stadium;
     }
 
     revalidatePath("/mais");
     revalidatePath("/mais/estadios");
     revalidatePath("/convocacao");
     revalidatePath("/admin/rodada");
-    return { success: true };
+    return { success: true, stadium: savedStadium };
   } catch (err: any) {
     console.error("Erro ao salvar estádio:", err);
     return { success: false, error: err.message || "Erro ao salvar estádio." };

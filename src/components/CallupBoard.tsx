@@ -107,6 +107,7 @@ export function CallupBoard({
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
   const [showCartolaPopup, setShowCartolaPopup] = useState(false);
+  const [showWaitlistPopup, setShowWaitlistPopup] = useState(false);
   const [editingCallup, setEditingCallup] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
@@ -125,6 +126,7 @@ export function CallupBoard({
   const [guestListNotice, setGuestListNotice] = useState("");
 
   useDialogViewport(editingCallup, () => !editLoading && setEditingCallup(false));
+  useDialogViewport(showWaitlistPopup, () => setShowWaitlistPopup(false));
 
   const confirmed = callup.entries.filter((entry) => entry.status === "confirmed");
   const waitlist = callup.entries.filter((entry) => entry.status === "waitlist");
@@ -195,6 +197,10 @@ export function CallupBoard({
     } else {
       if (cartolaEnabled && key === "join" && result.status === "confirmed") {
         setShowCartolaPopup(true);
+      }
+      if (key === "join" && result.status === "waitlist" && callup.round_type === "official") {
+        setShowWaitlistPopup(true);
+        setActiveTab("waitlist");
       }
       router.refresh();
     }
@@ -1120,6 +1126,46 @@ export function CallupBoard({
           </div>
         )}
       </section>
+
+      {showWaitlistPopup && (
+        <div
+          className="mobile-dialog-backdrop fixed inset-0 z-[300] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in"
+          onMouseDown={(event) => event.target === event.currentTarget && setShowWaitlistPopup(false)}
+        >
+          <section
+            className="relative w-full max-w-sm rounded-3xl border border-warning/40 bg-[#07150d] p-6 text-center shadow-[0_0_50px_rgba(0,0,0,.8)] animate-fade-in-up"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="waitlist-confirmation-title"
+          >
+            <button
+              type="button"
+              onClick={() => setShowWaitlistPopup(false)}
+              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+              aria-label="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-warning/40 bg-warning/15 text-warning shadow-[0_0_28px_rgba(250,204,21,.16)]">
+              <Clock className="h-9 w-9" />
+            </div>
+            <p className="mt-4 font-athletic text-[10px] font-black uppercase italic tracking-[0.2em] text-warning">Entrada registrada</p>
+            <h2 id="waitlist-confirmation-title" className="mt-1 font-athletic text-2xl font-black uppercase italic leading-tight text-white">
+              Você está na lista de espera
+            </h2>
+            <p className="mt-2 text-xs leading-5 text-muted">
+              Sua posição atual é <strong className="text-warning">{waitlist.length + 1}ª</strong>. Se alguém sair da lista principal, sua vaga será promovida automaticamente.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowWaitlistPopup(false)}
+              className="mt-5 w-full rounded-xl bg-warning py-3 text-xs font-black uppercase tracking-wider text-background transition-transform active:scale-[.98]"
+            >
+              Entendi
+            </button>
+          </section>
+        </div>
+      )}
 
       {/* POPUP PÓS-CONFIRMAÇÃO: CHAMADA PARA O CARTOLA */}
       {cartolaEnabled && showCartolaPopup && (

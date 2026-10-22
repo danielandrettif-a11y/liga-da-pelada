@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CalendarPlus, CheckCircle2, ChevronRight, Clock, Lock, MapPin, PencilLine, Share2, Stadium as StadiumIcon, X } from "@/components/icons";
+import { CalendarPlus, CheckCircle2, ChevronRight, Clock, Loader2, Lock, MapPin, PencilLine, Plus, Share2, Stadium as StadiumIcon, X } from "@/components/icons";
 import { closeCallup, createCallupPrelist, openCallup, setCallupVisibility, updateCallup, type CallupWithEntries } from "@/lib/actions/callups";
 import { setCallupFormat } from "@/lib/actions/rounds";
 import type { Stadium } from "@/lib/types";
 import { buildCallupInviteMessage, buildCallupInviteUrl, shareCallupInvite } from "@/lib/callup-invite";
+import { saveStadium } from "@/lib/actions/stadiums";
+import { DelayedPitchLoadingOverlay } from "@/components/DelayedPitchLoadingOverlay";
 
 export function CallupAdminCard({
   callups,
@@ -36,6 +38,14 @@ export function CallupAdminCard({
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [availableStadiums, setAvailableStadiums] = useState(stadiums);
+  const [selectedStadiumId, setSelectedStadiumId] = useState(stadiums[0]?.id || "");
+  const [showQuickStadium, setShowQuickStadium] = useState(stadiums.length === 0);
+  const [quickStadiumName, setQuickStadiumName] = useState("");
+  const [quickStadiumAddress, setQuickStadiumAddress] = useState("");
+  const [quickStadiumMapsUrl, setQuickStadiumMapsUrl] = useState("");
+  const [quickStadiumLoading, setQuickStadiumLoading] = useState(false);
+  const [quickStadiumError, setQuickStadiumError] = useState("");
   const callup = callups.find((item) => item.id === selectedCallupId) || callups[0] || null;
   const confirmed = callup?.entries.filter((entry) => entry.status === "confirmed").length || 0;
   const capacity = callup?.capacity || playersPerTeam * teamsPerRound;
@@ -55,6 +65,27 @@ export function CallupAdminCard({
       router.push(`/convocacao?callup=${result.id}&setup=players`);
     }
     setLoading(false);
+  }
+
+  async function createQuickStadium() {
+    setQuickStadiumLoading(true);
+    setQuickStadiumError("");
+    const formData = new FormData();
+    formData.set("name", quickStadiumName);
+    formData.set("address", quickStadiumAddress);
+    formData.set("google_maps_url", quickStadiumMapsUrl);
+    const result = await saveStadium(formData);
+    if (!result.success) {
+      setQuickStadiumError(result.error || "Não foi possível cadastrar o campo.");
+    } else {
+      setAvailableStadiums((current) => [...current, result.stadium]);
+      setSelectedStadiumId(result.stadium.id);
+      setShowQuickStadium(false);
+      setQuickStadiumName("");
+      setQuickStadiumAddress("");
+      setQuickStadiumMapsUrl("");
+    }
+    setQuickStadiumLoading(false);
   }
 
   async function handleEdit(formData: FormData) {
@@ -153,6 +184,12 @@ export function CallupAdminCard({
 
   return (
     <section>
+      <DelayedPitchLoadingOverlay
+        active={loading}
+        delayMs={650}
+        title="Organizando a rodada"
+        description="Preparando a convocação e o campo…"
+      />
       <div className="mb-2 flex items-center justify-between px-1">
         <h2 className="text-xs font-bold uppercase tracking-wider text-muted">Convocação</h2>
         <div className="flex items-center gap-3">
@@ -238,19 +275,80 @@ export function CallupAdminCard({
               <label className="mb-1 block text-[10px] font-bold uppercase text-muted">Campo / Estádio</label>
               <select
                 name="stadium_id"
-                defaultValue={stadiums[0]?.id || ""}
+                value={selectedStadiumId}
+                onChange={(event) => {
+                  if (event.target.value === "__new__") {
+                    setShowQuickStadium(true);
+                    return;
+                  }
+                  setSelectedStadiumId(event.target.value);
+                }}
                 className="block w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground"
               >
-                {stadiums.length > 0 ? (
-                  stadiums.map((stadium) => (
+                {availableStadiums.length > 0 ? (
+                  availableStadiums.map((stadium) => (
                     <option key={stadium.id} value={stadium.id}>
                       {stadium.name} {stadium.address ? `(${stadium.address})` : ""}
                     </option>
                   ))
                 ) : (
-                  <option value="">Estádio Padrão da Liga</option>
+                  <option value="">Nenhum campo cadastrado</option>
                 )}
+                <option value="__new__">＋ Adicionar um novo campo</option>
               </select>
+              {!showQuickStadium && (
+                <button
+                  type="button"
+                  onClick={() => setShowQuickStadium(true)}
+                  className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-black text-accent"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Cadastrar outro campo
+                </button>
+              )}
+              {showQuickStadium && (
+                <div className="mt-2 space-y-2 rounded-xl border border-accent/30 bg-accent/5 p-3 animate-fade-in">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black text-foreground">Novo campo</p>
+                      <p className="text-[10px] text-muted">Cadastre sem sair da criação da rodada.</p>
+                    </div>
+                    {availableStadiums.length > 0 && (
+                      <button type="button" onClick={() => setShowQuickStadium(false)} className="rounded-full p-1 text-muted" aria-label="Fechar cadastro do campo">
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    value={quickStadiumName}
+                    onChange={(event) => setQuickStadiumName(event.target.value)}
+                    placeholder="Nome do campo"
+                    className="block w-full rounded-lg border border-border bg-background px-3 py-2.5 text-xs text-foreground"
+                  />
+                  <input
+                    value={quickStadiumAddress}
+                    onChange={(event) => setQuickStadiumAddress(event.target.value)}
+                    placeholder="Endereço (opcional)"
+                    className="block w-full rounded-lg border border-border bg-background px-3 py-2.5 text-xs text-foreground"
+                  />
+                  <input
+                    type="url"
+                    value={quickStadiumMapsUrl}
+                    onChange={(event) => setQuickStadiumMapsUrl(event.target.value)}
+                    placeholder="Link do Google Maps"
+                    className="block w-full rounded-lg border border-border bg-background px-3 py-2.5 text-xs text-foreground"
+                  />
+                  {quickStadiumError && <p role="alert" className="text-[11px] font-bold text-danger">{quickStadiumError}</p>}
+                  <button
+                    type="button"
+                    onClick={createQuickStadium}
+                    disabled={quickStadiumLoading || !quickStadiumName.trim() || !quickStadiumMapsUrl.trim()}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 py-2.5 text-xs font-black text-background disabled:opacity-50"
+                  >
+                    {quickStadiumLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    {quickStadiumLoading ? "Cadastrando..." : "Cadastrar e selecionar campo"}
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1">

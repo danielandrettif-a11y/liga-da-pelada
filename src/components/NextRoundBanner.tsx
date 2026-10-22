@@ -75,7 +75,7 @@ export function NextRoundBanner({
 
   return (
     <>
-    <article className="group relative isolate flex h-full min-h-[360px] sm:min-h-[380px] flex-col justify-between overflow-hidden rounded-[2rem] border border-amber-500/30 bg-[#040f08] p-5 sm:p-6 shadow-[0_25px_65px_rgba(0,0,0,.65),0_0_35px_rgba(245,158,11,.12)]">
+    <article className="group relative isolate flex h-full min-h-[430px] sm:min-h-[440px] flex-col justify-between overflow-hidden rounded-[2rem] border border-amber-500/30 bg-[#040f08] p-5 sm:p-6 shadow-[0_25px_65px_rgba(0,0,0,.65),0_0_35px_rgba(245,158,11,.12)]">
       {/* Link de cobertura em todo o banner */}
       {isAdmin ? (
         <button
@@ -122,7 +122,7 @@ export function NextRoundBanner({
         </div>
 
         {/* Informações Centrais: Título Boleiro e Convocados */}
-        <div className="mt-5 w-full space-y-1.5 sm:mt-7">
+        <div className={`w-full space-y-1.5 ${canOpenNewRound ? "mt-9 sm:mt-11" : "mt-5 sm:mt-7"}`}>
           <div className="flex items-center gap-2">
             <span className="flex h-2 w-2 rounded-full bg-accent shadow-[0_0_8px_rgba(204,255,0,0.8)]" />
             <p className="font-athletic text-xs font-black uppercase italic tracking-[0.25em] text-amber-300">
@@ -156,7 +156,7 @@ export function NextRoundBanner({
           </h2>
 
           {canOpenNewRound && (
-            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-accent/70 bg-accent px-4 py-3 text-[#07160d] shadow-[0_0_0_1px_rgba(255,255,255,.12),0_0_28px_rgba(204,255,0,.32)] transition-transform group-hover:scale-[1.015]">
+            <div className="mt-7 flex items-center gap-3 rounded-2xl border border-accent/70 bg-accent px-4 py-3 text-[#07160d] shadow-[0_0_0_1px_rgba(255,255,255,.12),0_0_28px_rgba(204,255,0,.32)] transition-transform group-hover:scale-[1.015] sm:mt-9">
               <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#07160d] text-accent shadow-[0_8px_20px_rgba(0,0,0,.24)]">
                 <span className="absolute inset-0 animate-ping rounded-xl border border-accent/60 opacity-35" />
                 <CalendarPlus className="relative h-6 w-6" />
@@ -215,16 +215,7 @@ export function NextRoundBanner({
         {/* Mantém o prêmio no fluxo do banner. Em telas estreitas os chips podem
             quebrar em mais de uma linha, então uma posição absoluta acabava
             cobrindo o último ícone/convocado. */}
-        <div className="mt-auto space-y-2.5">
-          <div className="border-t border-white/10 pt-2 text-center">
-            <span className="text-[9px] font-black uppercase tracking-[0.14em] text-accent">
-              {canOpenNewRound
-                ? "O banner inteiro abre as opções da nova rodada"
-                : isAdmin
-                  ? "Toque no banner para gerenciar a rodada atual"
-                  : "Toque no banner para ver a agenda"}
-            </span>
-          </div>
+        <div className="mt-auto pt-2">
           <BQTheBestButton periodStart={awardsPeriodStart} winners={awardWinners} />
         </div>
       </div>
