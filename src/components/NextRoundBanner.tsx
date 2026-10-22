@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import {
   CalendarPlus,
   CalendarDays,
+  ChevronRight,
   Clock,
   Football,
   MapPin,
@@ -58,6 +59,7 @@ export function NextRoundBanner({
   // O dashboard só entrega rodadas ainda não concluídas (rascunho ou ativa).
   // Portanto, qualquer rodada presente aqui já é a rodada atual do usuário.
   const hasCurrentRound = Boolean(round);
+  const canOpenNewRound = isAdmin && !hasCurrentRound;
   const confirmedCount = round?.confirmedPlayers || 0;
 
   const href = "/rodadas";
@@ -80,7 +82,7 @@ export function NextRoundBanner({
           type="button"
           onClick={() => setShowAdminActions(true)}
           className="absolute inset-0 z-10"
-          aria-label="Abrir ações para organizar a pelada"
+          aria-label={hasCurrentRound ? "Abrir ações da rodada atual" : "Abrir opções para criar uma nova rodada"}
           aria-expanded={showAdminActions}
           aria-haspopup="dialog"
           aria-controls="round-admin-actions"
@@ -124,7 +126,9 @@ export function NextRoundBanner({
           <div className="flex items-center gap-2">
             <span className="flex h-2 w-2 rounded-full bg-accent shadow-[0_0_8px_rgba(204,255,0,0.8)]" />
             <p className="font-athletic text-xs font-black uppercase italic tracking-[0.25em] text-amber-300">
-              {isPrelist
+              {canOpenNewRound
+                ? "Comece por aqui"
+                : isPrelist
                 ? "Pré-lista em Montagem"
                 : round?.status === "active"
                 ? "Bola Rolando ao Vivo"
@@ -133,7 +137,11 @@ export function NextRoundBanner({
           </div>
 
           <h2 className="font-athletic text-[30px] xs:text-[34px] sm:text-5xl font-black uppercase italic leading-[1.05] sm:leading-none tracking-tight text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
-            {round ? (
+            {canOpenNewRound ? (
+              <>
+                Abra a <span className="inline-block pr-1.5 text-accent">próxima rodada</span>
+              </>
+            ) : round ? (
               <>
                 Rodada{" "}
                 <span className="inline-block pr-1.5 pb-0.5 bg-gradient-to-r from-accent via-emerald-300 to-amber-300 bg-clip-text text-transparent">
@@ -147,8 +155,22 @@ export function NextRoundBanner({
             )}
           </h2>
 
+          {canOpenNewRound && (
+            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-accent/70 bg-accent px-4 py-3 text-[#07160d] shadow-[0_0_0_1px_rgba(255,255,255,.12),0_0_28px_rgba(204,255,0,.32)] transition-transform group-hover:scale-[1.015]">
+              <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#07160d] text-accent shadow-[0_8px_20px_rgba(0,0,0,.24)]">
+                <span className="absolute inset-0 animate-ping rounded-xl border border-accent/60 opacity-35" />
+                <CalendarPlus className="relative h-6 w-6" />
+              </span>
+              <span className="min-w-0 flex-1 text-left">
+                <strong className="block text-sm font-black uppercase">Toque para abrir</strong>
+                <span className="mt-0.5 block text-[10px] font-bold leading-4 text-[#17351d]">Crie a convocação e chame os jogadores</span>
+              </span>
+              <ChevronRight className="h-5 w-5 shrink-0" />
+            </div>
+          )}
+
           {/* Chips Esportivos com Data, Horário e Local */}
-          <div className="mt-3 flex flex-wrap items-center gap-2 pt-1">
+          {!canOpenNewRound && <div className="mt-3 flex flex-wrap items-center gap-2 pt-1">
             {round && formattedDate && (
               <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-black/50 px-2.5 py-1 text-[11px] font-bold text-gray-200 backdrop-blur-md">
                 <CalendarDays className="h-3.5 w-3.5 text-accent" />
@@ -187,17 +209,23 @@ export function NextRoundBanner({
             )}
 
             <WeatherBadge weather={weather} locationName={venue?.name} />
-          </div>
+          </div>}
         </div>
 
         {/* Mantém o prêmio no fluxo do banner. Em telas estreitas os chips podem
             quebrar em mais de uma linha, então uma posição absoluta acabava
             cobrindo o último ícone/convocado. */}
         <div className="mt-auto space-y-2.5">
-          <BQTheBestButton periodStart={awardsPeriodStart} winners={awardWinners} />
-          <div className="border-t border-white/10 pt-2 text-right">
-            <span className="text-[9px] font-black uppercase tracking-[0.14em] text-accent">{isAdmin ? "Toque no banner para organizar a próxima pelada" : "Toque fora do prêmio para ver a agenda"}</span>
+          <div className="border-t border-white/10 pt-2 text-center">
+            <span className="text-[9px] font-black uppercase tracking-[0.14em] text-accent">
+              {canOpenNewRound
+                ? "O banner inteiro abre as opções da nova rodada"
+                : isAdmin
+                  ? "Toque no banner para gerenciar a rodada atual"
+                  : "Toque no banner para ver a agenda"}
+            </span>
           </div>
+          <BQTheBestButton periodStart={awardsPeriodStart} winners={awardWinners} />
         </div>
       </div>
 
