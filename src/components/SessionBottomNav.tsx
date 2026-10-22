@@ -5,23 +5,19 @@ import { hasPendingPaymentRound } from "@/lib/actions/payments";
 import { getRosterUnreadState } from "@/lib/actions/registrations";
 import { getActiveCollectiveSummary } from "@/lib/actions/collective";
 import { canUseCollective } from "@/lib/collective-access";
-import { ACTIVE_LEAGUE_COOKIE, getSelectedLeague } from "@/lib/league-context";
-import { cookies } from "next/headers";
+import { getSelectedLeague } from "@/lib/league-context";
 
 export async function SessionBottomNav() {
   // A leitura da sessão acontece primeiro para sinalizar renderização dinâmica
   // ao Next. O cache do React compartilha esta mesma consulta com o cabeçalho.
   const account = await getCurrentAccount().catch(() => ({ client: null as any, user: null, profile: null, isAdmin: false }));
-  const selectedLeagueId = account.user
-    ? (await cookies()).get(ACTIVE_LEAGUE_COOKIE)?.value
-    : null;
-  const selectedLeague = account.user && selectedLeagueId
+  const league = account.user
     ? await getSelectedLeague().catch(() => null)
     : null;
-  const league = selectedLeague?.id === selectedLeagueId ? selectedLeague : null;
 
-  // A barra representa ações internas de uma pelada. Sem uma escolha explícita
-  // no lobby, não existe contexto suficiente para exibi-la.
+  // Use a mesma resolução do cabeçalho: quando a conta só possui uma pelada,
+  // ela é selecionada mesmo que o cookie ainda não exista ou tenha expirado.
+  // O AppChrome continua ocultando esta barra no lobby e nas páginas públicas.
   if (!account.user || !league) return null;
 
   const [hasOpenCallup, hasPendingPayment, rosterUnread, collective, linkedPlayer] = await Promise.all([

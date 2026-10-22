@@ -8,7 +8,7 @@ import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayersStatsGrid, type PlayerStats } from "./PlayersStatsGrid";
 import { RosterUnreadLink } from "./RosterUnreadLink";
 import { markRosterActivitySeen } from "@/lib/actions/registrations";
-import { Crown } from "@/components/icons";
+import { Crown, Loader2, Microphone, Users } from "@/components/icons";
 
 import type { EquippedCosmeticsSummary } from "@/lib/actions/cosmetics";
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
@@ -169,18 +169,56 @@ export function RosterDirectory({ officialPlayers, activeGuests, wags, supporter
 
   return (
     <div className="space-y-7">
-      <div className="sticky top-20 z-30 -mx-1 rounded-2xl border border-border bg-background/95 p-1.5 shadow-xl shadow-black/20 backdrop-blur-xl">
-        <div className={`grid gap-1 ${showCollective && showPass ? "grid-cols-3" : "grid-cols-2"}`} role="tablist" aria-label="Alternar entre elenco, coletiva e passe de temporada">
-          <button type="button" role="tab" aria-selected={view === "roster"} onClick={() => setView("roster")} className={`rounded-xl py-3 text-xs font-black transition-colors ${view === "roster" ? "bg-accent text-background shadow-[0_0_18px_rgba(204,255,0,.16)]" : "text-muted hover:bg-surface hover:text-foreground"}`}>Elenco</button>
-          {showCollective && <button type="button" role="tab" aria-selected={view === "collective"} disabled={passPending} onClick={openCollective} className={`rounded-xl py-3 text-xs font-black transition-colors disabled:opacity-70 ${view === "collective" ? "bg-accent text-background" : "text-muted hover:bg-surface hover:text-foreground"}`}>Coletiva</button>}
-          {showPass && <button type="button" role="tab" aria-selected={view === "pass"} disabled={passPending} onClick={openSeasonPass} className={`relative overflow-hidden rounded-xl border px-2 py-1.5 text-left transition-all disabled:opacity-70 ${view === "pass" ? "border-[#cd91ff] bg-gradient-to-r from-[#7734bb] to-[#a35bea] text-white shadow-[0_0_20px_rgba(159,92,255,.42)]" : "border-[#a761e8]/65 bg-gradient-to-r from-[#27103f] to-[#3f1a63] text-[#f0dfff] shadow-[0_0_16px_rgba(159,92,255,.16)] hover:brightness-110"}`}>
-            <span className="pointer-events-none absolute -right-3 -top-5 h-16 w-16 rounded-full bg-[#d5ff37]/15 blur-xl" />
-            <span className="relative flex items-center gap-2">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/20 bg-black/15 text-[#e7c8ff]"><Crown className="h-4 w-4" /></span>
-              <span className="min-w-0 flex-1"><span className="block text-[11px] font-black leading-none">Passe BQ</span><span className="mt-1 block text-[8px] font-bold uppercase tracking-[0.12em] text-white/70">Sua trilha</span></span>
-              <span className="shrink-0 rounded-lg bg-black/20 px-1.5 py-1 text-[9px] font-black text-[#d5ff37]">{passPending ? "..." : seasonPassProgress == null ? "Abrir" : `${seasonPassProgress}/${seasonPassMaxProgress}`}</span>
+      <div className="sticky top-20 z-30 -mx-1 rounded-[1.4rem] border border-border bg-background/95 p-1.5 shadow-xl shadow-black/20 backdrop-blur-xl">
+        <div className={`grid gap-1.5 ${showCollective && showPass ? "grid-cols-3" : "grid-cols-2"}`} role="tablist" aria-label="Alternar entre elenco, coletiva e passe de temporada">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "roster"}
+            onClick={() => setView("roster")}
+            className={`flex min-h-16 min-w-0 flex-col items-center justify-center rounded-[1.05rem] border px-1.5 py-2 text-center transition-all ${view === "roster" ? "border-accent bg-accent text-background shadow-[0_0_18px_rgba(204,255,0,.16)]" : "border-transparent text-muted hover:border-border hover:bg-surface hover:text-foreground"}`}
+          >
+            <span className="flex items-center justify-center gap-1.5 text-[11px] font-black leading-none min-[390px]:text-xs">
+              <Users className="h-4 w-4 shrink-0" /> Elenco
             </span>
-          </button>}
+            <span className={`mt-1 text-[8px] font-bold uppercase tracking-[0.1em] ${view === "roster" ? "text-background/65" : "text-muted/70"}`}>Jogadores</span>
+          </button>
+
+          {showCollective && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "collective"}
+              disabled={passPending}
+              onClick={openCollective}
+              className={`flex min-h-16 min-w-0 flex-col items-center justify-center rounded-[1.05rem] border px-1.5 py-2 text-center transition-all disabled:opacity-70 ${view === "collective" ? "border-accent bg-accent text-background shadow-[0_0_18px_rgba(204,255,0,.16)]" : "border-transparent text-muted hover:border-border hover:bg-surface hover:text-foreground"}`}
+            >
+              <span className="flex items-center justify-center gap-1.5 text-[11px] font-black leading-none min-[390px]:text-xs">
+                <Microphone className="h-4 w-4 shrink-0" /> Coletiva
+              </span>
+              <span className={`mt-1 text-[8px] font-bold uppercase tracking-[0.1em] ${view === "collective" ? "text-background/65" : "text-muted/70"}`}>Resenha</span>
+            </button>
+          )}
+
+          {showPass && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "pass"}
+              disabled={passPending}
+              onClick={openSeasonPass}
+              className={`relative flex min-h-16 min-w-0 flex-col items-center justify-center overflow-hidden rounded-[1.05rem] border px-1.5 py-2 text-center transition-all disabled:opacity-70 ${view === "pass" ? "border-[#cb8cff] bg-gradient-to-b from-[#7135a5] to-[#4a226e] text-white shadow-[0_0_18px_rgba(159,92,255,.32)]" : "border-[#8249aa]/45 bg-[#24122f]/65 text-[#ead8f8] hover:border-[#a761e8]/70 hover:bg-[#321844]"}`}
+            >
+              <span className="pointer-events-none absolute -right-5 -top-7 h-16 w-16 rounded-full bg-[#d5ff37]/10 blur-xl" />
+              <span className="relative flex items-center justify-center gap-1.5 text-[11px] font-black leading-none min-[390px]:text-xs">
+                {passPending ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Crown className="h-4 w-4 shrink-0" />}
+                <span className="whitespace-nowrap">Passe BQ</span>
+              </span>
+              <span className={`relative mt-1 rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.08em] ${view === "pass" ? "bg-black/20 text-[#e7ff76]" : "bg-[#a761e8]/15 text-[#d9b6f5]"}`}>
+                {passPending ? "Carregando" : seasonPassProgress == null ? "Abrir trilha" : `${seasonPassProgress}/${seasonPassMaxProgress} casas`}
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
