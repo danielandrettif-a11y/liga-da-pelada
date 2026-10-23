@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { CalendarDays, Crown, Plus, Search, Shield, Trophy, Users } from "@/components/icons";
+import { CalendarDays, ChevronRight, Crown, Plus, Search, Shield, Trophy, Users } from "@/components/icons";
 import { LeagueEntryForm } from "@/components/LeagueEntryForm";
 import { getCurrentAccount } from "@/lib/auth";
 import { cn } from "@/lib/cn";
@@ -49,9 +49,36 @@ export default async function LobbyPage({ searchParams }: { searchParams: Promis
   const others = activeLeagues.filter((league) => !league.isFavorite);
 
   return <main className="space-y-8 pb-8 pt-5">
-    <header className="relative overflow-hidden rounded-3xl border border-accent/25 bg-surface p-5"><div className="absolute right-[-30px] top-[-40px] h-36 w-36 rounded-full border border-accent/20" /><p className="text-xs font-black uppercase tracking-[.22em] text-accent">Central das peladas</p><h1 className="mt-2 max-w-md text-balance font-athletic text-4xl font-black uppercase leading-none text-white">Escolha seu próximo jogo</h1><p className="mt-3 max-w-lg text-pretty text-sm leading-6 text-muted">Entre nos seus clubes, encontre uma nova turma ou organize sua própria pelada.</p>{profile?.account_tag && <p className="mt-4 inline-flex rounded-full border border-border bg-background/70 px-3 py-1.5 text-[11px] text-muted">Seu perfil: <strong className="ml-1 text-white">{profile.account_tag}</strong></p>}</header>
+    <header className="relative isolate overflow-hidden rounded-[2rem] border border-accent/30 bg-[linear-gradient(135deg,#102719_0%,#07160e_58%,#06110b_100%)] p-5 shadow-[0_22px_70px_rgba(0,0,0,.28)]">
+      <div aria-hidden="true" className="absolute -right-12 -top-14 h-48 w-48 rounded-full border border-accent/20 bg-accent/[.025]" />
+      <div aria-hidden="true" className="absolute -right-1 top-0 h-full w-px rotate-[24deg] bg-accent/10" />
+      <div className="relative flex items-center justify-between gap-3">
+        <p className="text-[10px] font-black uppercase tracking-[.24em] text-accent">Central das peladas</p>
+        {profile?.account_tag && <span title={profile.account_tag} className="max-w-36 truncate rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[9px] font-bold text-white/55">{profile.account_tag}</span>}
+      </div>
+      <div className="relative mt-6 flex items-end justify-between gap-4">
+        <div>
+          <h1 className="font-athletic text-5xl font-black uppercase leading-[.88] text-white">Bora<br /><span className="text-accent">jogar?</span></h1>
+          <p className="mt-3 text-xs font-bold text-white/55">Escolha como entrar em campo.</p>
+        </div>
+        <span aria-hidden="true" className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-accent/25 bg-accent/10 text-accent shadow-[0_0_28px_rgba(204,255,0,.08)]">
+          <Trophy className="h-7 w-7" />
+        </span>
+      </div>
+    </header>
 
-    <nav className="grid grid-cols-2 gap-3" aria-label="Ações do lobby"><Link href="/peladas" className="flex min-h-28 flex-col justify-between rounded-2xl border border-accent/30 bg-accent/10 p-4"><Search className="h-6 w-6 text-accent" /><span><strong className="block text-sm text-white">Procurar pelada</strong><small className="mt-1 block text-xs leading-4 text-muted">Explore clubes abertos e privados</small></span></Link><Link href="/lobby/criar" className="flex min-h-28 flex-col justify-between rounded-2xl border border-border bg-surface p-4"><Plus className="h-6 w-6 text-accent" /><span><strong className="block text-sm text-white">Criar uma pelada</strong><small className="mt-1 block text-xs leading-4 text-muted">Comece seu próprio clube</small></span></Link></nav>
+    <nav className="grid grid-cols-2 gap-3" aria-label="Ações do lobby">
+      <Link href="/peladas" className="group relative flex min-h-40 flex-col overflow-hidden rounded-3xl border border-accent/25 bg-[linear-gradient(145deg,rgba(204,255,0,.12),rgba(12,30,20,.96)_62%)] p-4 shadow-[0_16px_40px_rgba(0,0,0,.2)] transition-all hover:border-accent/55 hover:-translate-y-0.5 active:scale-[.98]">
+        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-accent text-background shadow-[0_8px_24px_rgba(204,255,0,.16)]"><Search className="h-5 w-5" strokeWidth={2.4} /></span>
+        <strong className="mt-5 block text-balance font-athletic text-xl font-black uppercase leading-[1.05] text-white">Encontrar<br />pelada</strong>
+        <span className="mt-auto flex items-center gap-1 pt-3 text-[10px] font-black uppercase tracking-[.16em] text-accent">Entrar <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" /></span>
+      </Link>
+      <Link href="/lobby/criar" className="group relative flex min-h-40 flex-col overflow-hidden rounded-3xl border border-accent/25 bg-[linear-gradient(145deg,rgba(204,255,0,.08),rgba(12,30,20,.96)_62%)] p-4 shadow-[0_16px_40px_rgba(0,0,0,.2)] transition-all hover:border-accent/55 hover:-translate-y-0.5 active:scale-[.98]">
+        <span className="grid h-11 w-11 place-items-center rounded-2xl border border-accent/35 bg-accent/10 text-accent"><Plus className="h-6 w-6" strokeWidth={2.4} /></span>
+        <strong className="mt-5 block text-balance font-athletic text-xl font-black uppercase leading-[1.05] text-white">Criar<br />pelada</strong>
+        <span className="mt-auto flex items-center gap-1 pt-3 text-[10px] font-black uppercase tracking-[.16em] text-accent">Começar <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" /></span>
+      </Link>
+    </nav>
 
     {entryDestination && <section className="rounded-2xl border border-accent/35 bg-accent/10 p-4" aria-labelledby="entry-flow-title"><p className="text-[10px] font-black uppercase text-accent">Apresentação concluída</p><h2 id="entry-flow-title" className="mt-1 text-balance font-athletic text-xl font-black uppercase text-white">Agora escolha sua pelada</h2><p className="mt-2 text-pretty text-xs leading-5 text-muted">Ao entrar em um clube, os próximos acessos voltarão a abrir diretamente na última pelada usada.</p>{entryDestination.startsWith("/convite/") && <form action={continueEntryFlow} className="mt-3"><button type="submit" className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-black text-background">Continuar convite</button></form>}</section>}
 
