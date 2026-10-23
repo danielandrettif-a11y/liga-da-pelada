@@ -488,36 +488,13 @@ export function CallupBoard({
           </Link>
         )}
 
-        {/* Barra de Progresso de Vagas */}
-        <div className="mt-4 rounded-2xl border border-white/10 bg-black/40 p-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-muted">Preenchimento das Vagas</span>
-            <span className="font-black text-foreground">
-              <strong className="text-accent text-sm">{confirmed.length}</strong> / {capacity} Titulares
-            </span>
+        {(!myEntry || soloMode) && <div className="mt-3 flex items-center gap-3 rounded-xl border border-white/10 bg-black/35 px-3 py-2">
+          <span className="shrink-0 text-xs font-black text-foreground"><strong className="text-accent">{confirmed.length}</strong>/{capacity}</span>
+          <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${progressPercent}%` }} />
           </div>
-
-          {/* Barra Visual */}
-          <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-accent/80 to-accent shadow-[0_0_12px_rgba(204,255,0,0.5)] transition-all duration-500"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-
-          <div className="mt-2 flex items-center justify-between text-[11px]">
-            <span className={remainingSlots > 0 ? "font-bold text-accent" : "font-bold text-warning"}>
-              {remainingSlots > 0
-                ? `${remainingSlots} vaga(s) titular(es) restante(s)`
-                : "Vagas titulares esgotadas"}
-            </span>
-            {waitlist.length > 0 && (
-              <span className="font-bold text-warning">
-                {waitlist.length} na fila de espera
-              </span>
-            )}
-          </div>
-        </div>
+          <span className="shrink-0 text-[10px] font-bold text-muted">{waitlist.length > 0 ? `${waitlist.length} na fila` : `${remainingSlots} vagas`}</span>
+        </div>}
       </section>
 
       {/* 2. CTA DE AÇÃO / STATUS DO JOGADOR LOGADO */}
@@ -590,6 +567,14 @@ export function CallupBoard({
               ) : (
                 <span className="text-right text-[10px] font-bold text-muted">Lista encerrada<br />após o início do jogo</span>
               )}
+            </div>
+
+            <div className="mt-3 flex items-center gap-3 border-t border-accent/20 pt-2.5">
+              <span className="shrink-0 text-[11px] font-black text-foreground"><strong className="text-accent">{confirmed.length}</strong>/{capacity}</span>
+              <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-white/10">
+                <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${progressPercent}%` }} />
+              </div>
+              <span className="shrink-0 text-[10px] font-bold text-muted">{waitlist.length > 0 ? `${waitlist.length} na fila` : `${remainingSlots} vagas`}</span>
             </div>
 
             {cartolaEnabled && myEntry.status === "confirmed" && (
@@ -671,7 +656,6 @@ export function CallupBoard({
               </div>
               <div>
                 <p className="text-xs font-black text-foreground">{soloMode ? "Adicionar quem vai jogar" : "Adicionar jogador à convocação"}</p>
-                <p className="text-pretty text-[10px] text-muted">{soloMode ? "Crie convidados individuais ou cole a lista do WhatsApp" : "Escolha alguém do elenco ou crie um convidado temporário"}</p>
               </div>
             </div>
 
@@ -693,7 +677,7 @@ export function CallupBoard({
                 <div className="space-y-4 pt-3">
                   {availablePlayers.length > 0 && (
                     <div>
-                      <p className="mb-2 text-[10px] font-black uppercase text-accent">1. Já está no elenco?</p>
+                      <p className="mb-2 text-[10px] font-black uppercase text-accent">Do elenco</p>
                       <div className="overflow-hidden rounded-xl border border-border bg-background/60">
                         <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
                           <span className="text-[10px] font-bold text-muted">Marque um ou vários jogadores</span>
@@ -739,8 +723,7 @@ export function CallupBoard({
 
                   <form onSubmit={handleInviteGuest} className="space-y-2 border-t border-accent/15 pt-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase text-accent">{availablePlayers.length > 0 ? "2." : "1."} Não está no elenco?</p>
-                      <p className="mt-1 text-pretty text-[10px] leading-4 text-muted">Crie um perfil de convidado só com o necessário. Jogadores oficiais criam o próprio perfil ao entrar no app.</p>
+                      <p className="text-[10px] font-black uppercase text-accent">Novo convidado</p>
                     </div>
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
                     <input

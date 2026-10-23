@@ -525,6 +525,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
               const isSelected = teamAId === t.id;
               const isDisabled = teamBId === t.id || (!previousMatch && usesArrivalOrder && !firstMatchAllowedIds.has(t.id));
               const vestColor = colorByTeam[t.id] || t.color || "#CCFF00";
+              const captainName = (t.team_players || []).find((entry: any) => entry.player_id === captainByTeam[t.id])?.players?.name || "Sem capitão";
 
               return (
                 <button
@@ -536,7 +537,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
                     boxShadow: isSelected ? `0 0 16px ${vestColor}45` : undefined,
                   }}
                   className={`
-                    min-w-0 p-2 sm:p-3 rounded-2xl border flex flex-col items-center gap-1.5 sm:gap-2 transition-all duration-200
+                    min-w-0 overflow-hidden p-2 sm:p-3 rounded-2xl border flex flex-col items-center gap-1.5 sm:gap-2 transition-all duration-200
                     ${isSelected ? "scale-[1.03] ring-1 ring-white/20" : "hover:border-white/30 hover:bg-surface-hover"}
                     ${teamBId === t.id ? "opacity-40 cursor-not-allowed" : ""}
                     ${!previousMatch && usesArrivalOrder && !firstMatchAllowedIds.has(t.id) ? "opacity-35 cursor-not-allowed" : ""}
@@ -557,9 +558,9 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
                     <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: vestColor }} />
                     Colete
                   </span>
-                  <span className="flex min-w-0 items-center gap-1 text-[8px] font-black uppercase text-accent">
-                    <Crown className="h-2.5 w-2.5 shrink-0" />
-                    <span className="truncate">{(t.team_players || []).find((entry: any) => entry.player_id === captainByTeam[t.id])?.players?.name || "Sem capitão"}</span>
+                  <span className="flex min-h-11 w-full min-w-0 flex-col items-center overflow-hidden px-1 text-[7px] font-black uppercase text-accent sm:text-[8px]">
+                    <Crown className="mb-0.5 h-2.5 w-2.5 shrink-0" />
+                    <span className="line-clamp-3 w-full whitespace-normal break-normal text-center leading-[1.1] [overflow-wrap:normal] [word-break:normal]" title={captainName}>{captainName}</span>
                   </span>
                 </button>
               );
@@ -582,6 +583,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
               const isSelected = teamBId === t.id;
               const isDisabled = teamAId === t.id || (!previousMatch && usesArrivalOrder && !firstMatchAllowedIds.has(t.id));
               const vestColor = colorByTeam[t.id] || t.color || "#CCFF00";
+              const captainName = (t.team_players || []).find((entry: any) => entry.player_id === captainByTeam[t.id])?.players?.name || "Sem capitão";
 
               return (
                 <button
@@ -593,7 +595,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
                     boxShadow: isSelected ? `0 0 16px ${vestColor}45` : undefined,
                   }}
                   className={`
-                    min-w-0 p-2 sm:p-3 rounded-2xl border flex flex-col items-center gap-1.5 sm:gap-2 transition-all duration-200
+                    min-w-0 overflow-hidden p-2 sm:p-3 rounded-2xl border flex flex-col items-center gap-1.5 sm:gap-2 transition-all duration-200
                     ${isSelected ? "scale-[1.03] ring-1 ring-white/20" : "hover:border-white/30 hover:bg-surface-hover"}
                     ${teamAId === t.id ? "opacity-40 cursor-not-allowed" : ""}
                     ${!previousMatch && usesArrivalOrder && !firstMatchAllowedIds.has(t.id) ? "opacity-35 cursor-not-allowed" : ""}
@@ -614,9 +616,9 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
                     <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: vestColor }} />
                     Colete
                   </span>
-                  <span className="flex min-w-0 items-center gap-1 text-[8px] font-black uppercase text-accent">
-                    <Crown className="h-2.5 w-2.5 shrink-0" />
-                    <span className="truncate">{(t.team_players || []).find((entry: any) => entry.player_id === captainByTeam[t.id])?.players?.name || "Sem capitão"}</span>
+                  <span className="flex min-h-11 w-full min-w-0 flex-col items-center overflow-hidden px-1 text-[7px] font-black uppercase text-accent sm:text-[8px]">
+                    <Crown className="mb-0.5 h-2.5 w-2.5 shrink-0" />
+                    <span className="line-clamp-3 w-full whitespace-normal break-normal text-center leading-[1.1] [overflow-wrap:normal] [word-break:normal]" title={captainName}>{captainName}</span>
                   </span>
                 </button>
               );

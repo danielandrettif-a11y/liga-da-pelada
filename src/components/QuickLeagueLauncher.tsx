@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { CalendarPlus, Clock, Football, Loader2, MapPin, X } from "@/components/icons";
+import { CalendarPlus, Clock, Football, HelpCircle, Loader2, MapPin, X } from "@/components/icons";
 import { createQuickLeague } from "@/app/lobby/actions";
 
 function localDefaults() {
@@ -28,6 +28,7 @@ function SubmitButton() {
 
 export function QuickLeagueLauncher({ error = false, cardClassName = "" }: { error?: boolean; cardClassName?: string }) {
   const [open, setOpen] = useState(error);
+  const [showInfo, setShowInfo] = useState(false);
   const [defaults, setDefaults] = useState({ date: "", time: "" });
 
   function show() {
@@ -57,8 +58,25 @@ export function QuickLeagueLauncher({ error = false, cardClassName = "" }: { err
     >
       <span className="grid h-12 w-12 place-items-center rounded-2xl bg-accent text-background"><Football className="h-6 w-6" /></span>
       <span className="mt-4 block text-[9px] font-black uppercase tracking-[.16em] text-accent">Só o jogo de hoje</span>
-      <strong className="mt-1 block font-athletic text-xl font-black uppercase leading-tight text-white">Partida rápida</strong>
-      <span className="mt-3 block text-[11px] leading-[1.55] text-muted">Cadastre os amigos, divida os times, use o placar ao vivo e organize os pagamentos.</span>
+      <span className="mt-1 flex items-start justify-between gap-2">
+        <strong className="block font-athletic text-xl font-black uppercase leading-tight text-white">Partida rápida</strong>
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label="Sobre a partida rápida"
+          aria-expanded={showInfo}
+          onClick={(event) => { event.stopPropagation(); setShowInfo((current) => !current); }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              event.stopPropagation();
+              setShowInfo((current) => !current);
+            }
+          }}
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-white/20 text-muted"
+        ><HelpCircle className="h-4 w-4" /></span>
+      </span>
+      {showInfo && <span className="mt-3 block rounded-xl border border-white/10 bg-black/25 p-2.5 text-[10px] leading-[1.5] text-muted">Convidados temporários, divisão de times, placar ao vivo e pagamentos.</span>}
       <span className="mt-auto flex min-h-10 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 px-2 text-center text-[10px] font-black uppercase tracking-wide text-accent">Configurar partida</span>
     </button>
 

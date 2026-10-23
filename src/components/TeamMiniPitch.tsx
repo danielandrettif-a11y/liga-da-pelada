@@ -217,7 +217,7 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
               disabled={!onPlayerClick && !showPositionDetails && !canManageIdentity}
               onClick={() => onPlayerClick ? onPlayerClick(player as Player) : void chooseCaptain(player.id)}
               aria-pressed={canManageIdentity ? captainId === player.id : onPlayerClick ? selectedPlayerId === player.id : undefined}
-              className={`absolute flex ${widthClass} -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-md transition-transform enabled:active:scale-95 ${(selectedPlayerId === player.id || captainId === player.id) ? "z-10 bg-warning/20 ring-2 ring-warning" : ""}`}
+              className={`absolute flex ${widthClass} -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-md transition-transform enabled:active:scale-95 ${selectedPlayerId === player.id ? "z-10 ring-2 ring-accent" : ""}`}
               style={{ left: `${left}%`, top: `${top}%` }}
               title={`${player.name}${goalkeeperOrder ? ` · G${goalkeeperOrder}` : ""}${loanOrder ? ` · E${loanOrder}` : ""}`}
             >
@@ -251,7 +251,7 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
                   </span>
                 )}
               </div>
-              <span className={`mt-0.5 line-clamp-2 w-full rounded bg-black/75 px-0.5 py-0.5 text-center font-black leading-[1.05] text-white shadow-sm ${isCrowded ? "text-[6px]" : "text-[8px]"}`}>
+              <span className={`mt-0.5 block w-full truncate whitespace-nowrap rounded bg-black/75 px-0.5 py-0.5 text-center font-black leading-tight text-white shadow-sm ${isCrowded ? "text-[6px]" : "text-[8px]"}`}>
                 {player.name}
               </span>
               {showPositionDetails && (
