@@ -75,7 +75,7 @@ export function NextRoundBanner({
 
   return (
     <>
-    <article className="group relative isolate flex h-full min-h-[430px] sm:min-h-[440px] flex-col justify-between overflow-hidden rounded-[2rem] border border-amber-500/30 bg-[#040f08] p-5 sm:p-6 shadow-[0_25px_65px_rgba(0,0,0,.65),0_0_35px_rgba(245,158,11,.12)]">
+    <article className="group relative isolate flex h-full min-h-[370px] sm:min-h-[440px] flex-col justify-between overflow-hidden rounded-[2rem] border border-amber-500/30 bg-[#040f08] p-5 sm:p-6 shadow-[0_25px_65px_rgba(0,0,0,.65),0_0_35px_rgba(245,158,11,.12)]">
       {/* Link de cobertura em todo o banner */}
       {isAdmin ? (
         <button
@@ -122,7 +122,7 @@ export function NextRoundBanner({
         </div>
 
         {/* Informações Centrais: Título Boleiro e Convocados */}
-        <div className={`w-full space-y-1.5 ${canOpenNewRound ? "mt-9 sm:mt-11" : "mt-5 sm:mt-7"}`}>
+        <div className={`w-full space-y-1.5 ${canOpenNewRound ? "mt-7 sm:mt-11" : "mt-3 sm:mt-7"}`}>
           <div className="flex items-center gap-2">
             <span className="flex h-2 w-2 rounded-full bg-accent shadow-[0_0_8px_rgba(204,255,0,0.8)]" />
             <p className="font-athletic text-xs font-black uppercase italic tracking-[0.25em] text-amber-300">

@@ -106,7 +106,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const currentPlayerId = account.profile?.player_id || null;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pt-1 sm:pt-0">
       {!account.user && <JoinSelectionButton />}
       {hasIncompleteProfile && <IncompleteProfileBanner />}
       {selectedLeague?.featureTier === "quick" && <section className="rounded-2xl border border-accent/30 bg-accent/[.07] p-4"><p className="text-[10px] font-black uppercase tracking-[.18em] text-accent">Pelada descartável</p><h1 className="mt-1 font-athletic text-2xl font-black uppercase text-white">Você está no controle</h1><p className="mt-2 text-xs leading-5 text-muted">Cadastre apenas os convidados, monte os times e use o placar ao vivo. Esta sessão não gera ranking.</p><div className="mt-3 grid grid-cols-2 gap-2"><Link href="/rodadas" className="rounded-xl bg-accent px-3 py-2.5 text-center text-xs font-black text-background">Partidas e histórico</Link><Link href="/pagamentos" className="rounded-xl border border-accent/35 px-3 py-2.5 text-center text-xs font-black text-accent">Transfermarket</Link></div></section>}

@@ -9,7 +9,7 @@ export async function LeagueHeaderBrand() {
       <Image src="/brand-logo.png" alt="" width={203} height={255} priority className="absolute -left-[6px] -top-[9px] h-[62px] w-[50px] max-w-none" />
     </div>
     <span className="min-w-0 flex-1">
-      <span className="line-clamp-2 break-words text-balance font-club text-lg uppercase leading-[0.95] text-accent sm:line-clamp-1">
+      <span className="line-clamp-2 break-words py-0.5 font-club text-lg uppercase leading-[1.08] text-accent sm:line-clamp-1">
         {league?.name || "Pelada BQ"}
       </span>
       <span className="mt-1 block text-[10px] font-normal uppercase leading-none text-muted">Toque para trocar</span>
