@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Copy, PencilLine, Save } from "@/components/icons";
+import { Check, ClipboardList, Copy, PencilLine, Save } from "@/components/icons";
+import { buildDetailedPaymentWhatsAppMessage } from "@/lib/payment-whatsapp";
 import {
   setPaymentObligationPaid,
   syncRoundExpenseItems,
@@ -10,6 +11,7 @@ import {
   type PaymentChargeLine,
   type PaymentObligation,
   type PaymentPlayer,
+  type PaymentRound,
   type RoundExpenseSelection,
 } from "@/lib/actions/payments";
 
@@ -25,15 +27,17 @@ type Props = {
   expenseItems: ExpenseItem[];
   initialExpenseSelections: RoundExpenseSelection[];
   chargeLines: PaymentChargeLine[];
+  round: PaymentRound;
 };
 
-export function PaymentObligationsPanel({ initialObligations, players, currentPlayerId, canManage, roundId, expenseItems, initialExpenseSelections, chargeLines }: Props) {
+export function PaymentObligationsPanel({ initialObligations, players, currentPlayerId, canManage, roundId, expenseItems, initialExpenseSelections, chargeLines, round }: Props) {
   const router = useRouter();
   const [obligations, setObligations] = useState(initialObligations);
   const [message, setMessage] = useState("");
   const [corrections, setCorrections] = useState<Record<string, string>>({});
   const [editingItems, setEditingItems] = useState(false);
   const [selectedExpenseIds, setSelectedExpenseIds] = useState(initialExpenseSelections.map((item) => item.expense_item_id));
+  const [copiedList, setCopiedList] = useState(false);
   const [pending, start] = useTransition();
   const names = new Map(players.map((player) => [player.id, player.name]));
   const visible = canManage ? obligations : obligations.filter((item) => item.player_id === currentPlayerId);
@@ -70,8 +74,29 @@ export function PaymentObligationsPanel({ initialObligations, players, currentPl
     });
   }
 
+  async function copyPaymentList() {
+    const text = buildDetailedPaymentWhatsAppMessage({ round, players, obligations });
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const input = document.createElement("textarea");
+      input.value = text;
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+    }
+    setCopiedList(true);
+    window.setTimeout(() => setCopiedList(false), 2000);
+  }
+
   return <section className="space-y-3">
-    <div><p className="text-[10px] font-black uppercase tracking-[.2em] text-accent">Cobrança detalhada</p><h2 className="font-athletic text-xl font-black uppercase text-white">PIX por destinatário</h2><p className="mt-1 text-xs leading-5 text-muted">Cada compra vai direto para quem deve receber. Correções mostram saldo ou crédito sem apagar o histórico.</p></div>
+    <div className="flex items-start justify-between gap-3">
+      <div><p className="text-[10px] font-black uppercase tracking-[.2em] text-accent">Cobrança detalhada</p><h2 className="font-athletic text-xl font-black uppercase text-white">PIX por destinatário</h2><p className="mt-1 text-xs leading-5 text-muted">Cada compra vai direto para quem deve receber. Correções mostram saldo ou crédito sem apagar o histórico.</p></div>
+      {canManage && <button type="button" onClick={copyPaymentList} className="flex shrink-0 items-center gap-1.5 rounded-xl border border-accent/35 bg-accent/10 px-3 py-2 text-[10px] font-black text-accent"><ClipboardList className="h-4 w-4" />{copiedList ? "Lista copiada" : "Copiar para WhatsApp"}</button>}
+    </div>
 
     {canManage && <article className="rounded-2xl border border-accent/30 bg-accent/5 p-4">
       <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.18em] text-accent">Caixinha desta rodada</p><h3 className="mt-1 font-black text-white">Itens que entram no rateio</h3><p className="mt-1 text-xs leading-5 text-muted">Adicione ou retire itens mesmo depois de finalizar a rodada. Os valores e saldos de cada jogador são recalculados.</p></div><button type="button" onClick={() => setEditingItems((value) => !value)} className="flex shrink-0 items-center gap-1 rounded-lg border border-accent/40 px-3 py-2 text-xs font-black text-accent"><PencilLine className="h-3.5 w-3.5" /> {editingItems ? "Fechar" : "Editar"}</button></div>

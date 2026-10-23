@@ -55,7 +55,7 @@ export default async function PagamentosPage() {
           </p>
         </div>
       ) : (
-        obligations.length > 0 ? <PaymentObligationsPanel initialObligations={obligations} players={players} canManage={account.isAdmin} currentPlayerId={account.profile?.player_id || null} roundId={currentRound.id} expenseItems={expenseItems} initialExpenseSelections={expenseSelections} chargeLines={chargeLines} /> : <PaymentChecklist
+        obligations.length > 0 ? <PaymentObligationsPanel initialObligations={obligations} players={players} canManage={account.isAdmin} currentPlayerId={account.profile?.player_id || null} roundId={currentRound.id} expenseItems={expenseItems} initialExpenseSelections={expenseSelections} chargeLines={chargeLines} round={currentRound} /> : <PaymentChecklist
           round={currentRound}
           initialPlayers={players}
           canEdit={!!account.user}

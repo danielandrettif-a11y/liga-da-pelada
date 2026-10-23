@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Check, CheckCircle2, ClipboardList, Copy, LockKeyhole, PencilLine, X } from "@/components/icons";
 import { setPlayerPayment, updateRoundPaymentDetails, type PaymentPlayer, type PaymentRound } from "@/lib/actions/payments";
 import { calculateRoundPaymentAmounts } from "@/lib/paymentStatus";
+import { buildSimplePaymentWhatsAppMessage } from "@/lib/payment-whatsapp";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PlayerProfileBadge } from "./PlayerProfileBadge";
 
@@ -128,13 +129,7 @@ export function PaymentChecklist({
   }
 
   async function copyPaymentList() {
-    const date = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" })
-      .format(new Date(`${round.date}T12:00:00`));
-    const text = [
-      `⚽ *Pelada BQ – ${date}*`,
-      "",
-      ...players.map((player, index) => `${player.paid ? "✅" : "❌"} ${index + 1}. ${player.name} — ${currency.format(breakdown.amountByPlayer[player.id] || 0)}`),
-    ].join("\n");
+    const text = buildSimplePaymentWhatsAppMessage({ round, players, amountByPlayer: breakdown.amountByPlayer });
 
     try {
       await navigator.clipboard.writeText(text);
@@ -280,10 +275,10 @@ export function PaymentChecklist({
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             {copied ? "PIX copiado" : "Copiar PIX"}
           </button>
-          <button onClick={copyPaymentList} className="flex shrink-0 items-center gap-1.5 rounded-xl border border-accent/35 bg-background/60 px-3 py-2 text-xs font-black text-accent hover:bg-accent/10">
+          {canManagePayment && <button onClick={copyPaymentList} className="flex shrink-0 items-center gap-1.5 rounded-xl border border-accent/35 bg-background/60 px-3 py-2 text-xs font-black text-accent hover:bg-accent/10">
             {copiedPaymentList ? <Check className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}
-            {copiedPaymentList ? "Lista copiada" : "Copiar lista"}
-          </button>
+            {copiedPaymentList ? "Lista copiada" : "Copiar lista para WhatsApp"}
+          </button>}
         </div>
       </div>
 
