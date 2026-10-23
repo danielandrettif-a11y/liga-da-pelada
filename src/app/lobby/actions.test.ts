@@ -91,6 +91,23 @@ describe("criação de pelada", () => {
     expect(mocks.cookieSet).toHaveBeenCalledWith("active_league_id", "quick-league", expect.any(Object));
   });
 
+  it("permite criar partida rápida sem informar estádio ou mapa", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: { league_id: "quick-league", callup_id: "quick-callup", round_id: "quick-round" },
+      error: null,
+    });
+    const data = new FormData();
+    data.set("date", "2026-10-24");
+    data.set("start_time", "20:30");
+
+    await expect(createQuickLeague(data))
+      .rejects.toThrow("redirect:/convocacao?callup=quick-callup&setup=players");
+    expect(mocks.rpc).toHaveBeenCalledWith("create_quick_match_session", expect.objectContaining({
+      p_field_name: "",
+      p_map_url: "",
+    }));
+  });
+
   it("mantém o erro de criação e não altera a pelada ativa quando o RPC falha", async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: "falha" } });
     await expect(createLeague(form())).rejects.toThrow("redirect:/lobby/criar?error=create");

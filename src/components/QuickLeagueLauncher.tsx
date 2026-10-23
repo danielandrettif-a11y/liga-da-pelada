@@ -26,7 +26,7 @@ function SubmitButton() {
   </button>;
 }
 
-export function QuickLeagueLauncher({ error = false }: { error?: boolean }) {
+export function QuickLeagueLauncher({ error = false, cardClassName = "" }: { error?: boolean; cardClassName?: string }) {
   const [open, setOpen] = useState(error);
   const [defaults, setDefaults] = useState({ date: "", time: "" });
 
@@ -53,17 +53,13 @@ export function QuickLeagueLauncher({ error = false }: { error?: boolean }) {
     <button
       type="button"
       onClick={show}
-      className="group w-full overflow-hidden rounded-3xl border border-accent/45 bg-[linear-gradient(135deg,rgba(204,255,0,.18),rgba(4,34,18,.94)_58%,rgba(3,20,12,.98))] p-5 text-left shadow-[0_18px_50px_rgba(0,0,0,.28)] transition-transform active:scale-[.99]"
+      className={cardClassName || "flex min-h-[270px] w-full flex-col rounded-3xl border border-accent/35 bg-[linear-gradient(145deg,rgba(204,255,0,.12),rgba(4,34,18,.94)_58%,rgba(3,20,12,.98))] p-4 text-left shadow-[0_18px_45px_rgba(0,0,0,.24)] transition-transform active:scale-[.98]"}
     >
-      <span className="flex items-start gap-4">
-        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-accent text-background shadow-[0_0_25px_rgba(204,255,0,.25)]"><Football className="h-7 w-7" /></span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[10px] font-black uppercase tracking-[.18em] text-accent">Sem criar um clube</span>
-          <strong className="mt-1 block font-athletic text-2xl font-black uppercase text-white">Partida rápida</strong>
-          <span className="mt-2 block text-xs leading-5 text-muted">Informe quando e onde, cole a lista dos amigos e vá direto para a divisão dos times.</span>
-        </span>
-      </span>
-      <span className="mt-4 flex min-h-11 items-center justify-center rounded-xl border border-accent/35 bg-accent/10 text-xs font-black uppercase tracking-wider text-accent">Configurar partida</span>
+      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-accent text-background"><Football className="h-6 w-6" /></span>
+      <span className="mt-4 block text-[9px] font-black uppercase tracking-[.16em] text-accent">Só o jogo de hoje</span>
+      <strong className="mt-1 block font-athletic text-xl font-black uppercase leading-tight text-white">Partida rápida</strong>
+      <span className="mt-3 block text-[11px] leading-[1.55] text-muted">Cadastre os amigos, divida os times, use o placar ao vivo e organize os pagamentos.</span>
+      <span className="mt-auto flex min-h-10 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 px-2 text-center text-[10px] font-black uppercase tracking-wide text-accent">Configurar partida</span>
     </button>
 
     {open && <div className="mobile-dialog-backdrop fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md" onMouseDown={(event) => {
@@ -88,11 +84,11 @@ export function QuickLeagueLauncher({ error = false }: { error?: boolean }) {
               <input name="start_time" type="time" required defaultValue={defaults.time} className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm text-white" />
             </label>
           </div>
-          <label className="block text-xs font-bold text-white"><span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-accent" /> Nome do campo</span>
-            <input name="field_name" required minLength={2} maxLength={80} placeholder="Ex.: Arena do bairro" className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm text-white placeholder:text-muted/60" />
+          <label className="block text-xs font-bold text-white"><span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-accent" /> Nome do campo <span className="font-normal text-muted">(opcional)</span></span>
+            <input name="field_name" maxLength={80} placeholder="Ex.: Arena do bairro" className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm text-white placeholder:text-muted/60" />
           </label>
-          <label className="block text-xs font-bold text-white">Link do campo no mapa
-            <input name="map_url" type="url" required placeholder="https://maps.app.goo.gl/..." className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm text-white placeholder:text-muted/60" />
+          <label className="block text-xs font-bold text-white">Link do campo no mapa <span className="font-normal text-muted">(opcional)</span>
+            <input name="map_url" type="url" placeholder="https://maps.app.goo.gl/..." className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm text-white placeholder:text-muted/60" />
           </label>
           {error && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs font-bold text-danger">Não foi possível preparar a partida. Confira os dados e confirme se as migrations 343 e 344 já foram aplicadas.</p>}
           <div className="rounded-2xl border border-white/10 bg-black/20 p-3 text-[10px] leading-5 text-muted">

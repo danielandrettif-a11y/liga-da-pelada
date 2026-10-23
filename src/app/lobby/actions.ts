@@ -171,15 +171,17 @@ export async function createQuickLeague(formData: FormData) {
   const fieldName = String(formData.get("field_name") || "").trim().replace(/\s+/g, " ");
   let mapUrl = String(formData.get("map_url") || "").trim();
   if (mapUrl && !/^https?:\/\//i.test(mapUrl)) mapUrl = `https://${mapUrl}`;
-  let validUrl = false;
-  try {
-    const parsed = new URL(mapUrl);
-    validUrl = parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    validUrl = false;
+  let validUrl = true;
+  if (mapUrl) {
+    try {
+      const parsed = new URL(mapUrl);
+      validUrl = parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      validUrl = false;
+    }
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(startTime)
-    || fieldName.length < 2 || fieldName.length > 80 || !validUrl) {
+    || (fieldName.length > 0 && (fieldName.length < 2 || fieldName.length > 80)) || !validUrl) {
     redirect("/lobby/criar?quickError=invalid");
   }
 
