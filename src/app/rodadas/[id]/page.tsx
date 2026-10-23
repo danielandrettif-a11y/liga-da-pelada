@@ -19,6 +19,7 @@ import { RoundTeamShuffleCard } from "@/components/RoundTeamShuffleCard";
 import { getExpenseItems, getPaymentRecipients } from "@/lib/actions/payments";
 import { DeleteMatchButton } from "@/components/DeleteMatchButton";
 import { RoundLiveStats } from "@/components/RoundLiveStats";
+import { getSelectedLeague } from "@/lib/league-context";
 
 export const revalidate = 0;
 
@@ -36,8 +37,9 @@ export default async function RodadaDetalhePage({
   const allSelectablePlayersPromise = accountPromise.then((acc) => acc.isAdmin ? getPlayers(true) : []);
   const paymentRecipientsPromise = accountPromise.then((acc) => acc.isAdmin ? getPaymentRecipients() : []);
   const expenseItemsPromise = accountPromise.then((acc) => acc.isAdmin ? getExpenseItems() : []);
+  const selectedLeaguePromise = getSelectedLeague();
 
-  const [round, account, roundStatistics, allSelectablePlayers, paymentRecipients, expenseItems] = await Promise.all([
+  const [round, account, roundStatistics, allSelectablePlayers, paymentRecipients, expenseItems, selectedLeague] = await Promise.all([
     roundPromise,
     accountPromise,
     roundPromise.then((currentRound) => currentRound?.status === "finished"
@@ -46,6 +48,7 @@ export default async function RodadaDetalhePage({
     allSelectablePlayersPromise,
     paymentRecipientsPromise,
     expenseItemsPromise,
+    selectedLeaguePromise,
   ]);
 
   if (!round) {
@@ -74,13 +77,13 @@ export default async function RodadaDetalhePage({
           </Link>
           <div>
             <h1 className="text-xl font-bold text-foreground">
-              {round.round_type === "friendly" ? "Amistoso" : "Rodada"} {String(round.number).padStart(2, "0")}
+              {selectedLeague?.featureTier === "quick" ? "Pelada descartável" : round.round_type === "friendly" ? "Amistoso" : "Rodada"} {String(round.number).padStart(2, "0")}
             </h1>
             <p className="text-xs text-muted flex items-center gap-1 mt-0.5">
               <CalendarDays className="w-3 h-3" />
               {formatDateShort(round.date)}{round.start_time ? ` · ${round.start_time.slice(0, 5)}` : ""}
             </p>
-            {round.round_type === "friendly" && <p className="mt-1 text-[9px] font-black uppercase text-warning">Estatísticas fora do Ranked</p>}
+            {round.round_type === "friendly" && <p className="mt-1 text-[9px] font-black uppercase text-warning">{selectedLeague?.featureTier === "quick" ? "Histórico privado · sem ranking" : "Estatísticas fora do Ranked"}</p>}
             {roundElapsedSeconds > 0 && <p className="mt-1 text-[10px] font-bold text-accent">Tempo total da rodada: {formatDuration(roundElapsedSeconds)}</p>}
           </div>
         </div>
@@ -213,7 +216,7 @@ export default async function RodadaDetalhePage({
         </div>
       </section>
       
-      <FinishRoundButton roundId={round.id} status={round.status} canManage={account.isAdmin} recipients={paymentRecipients} expenseItems={expenseItems} participantCount={participants.length} />
+      <FinishRoundButton roundId={round.id} status={round.status} canManage={account.isAdmin} recipients={paymentRecipients} expenseItems={expenseItems} participantCount={participants.length} quickMode={selectedLeague?.featureTier === "quick"} />
 
       {account.isAdmin && (
         <RoundAdminPlayerTools

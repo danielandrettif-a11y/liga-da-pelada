@@ -6,6 +6,7 @@ import { getActiveCallups } from "@/lib/actions/callups";
 import { getLeagueConfig } from "@/lib/actions/league";
 import { getAdminRoundPrelist, getNextTeamPresetOffset } from "@/lib/actions/rounds";
 import { getStadiums } from "@/lib/actions/stadiums";
+import { getSelectedLeague } from "@/lib/league-context";
 
 export const revalidate = 0;
 
@@ -13,7 +14,7 @@ export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin
   const params = await searchParams;
   const requestedType = params.type === "friendly" ? "friendly" : "official";
   const requestedRoundId = typeof params.round === "string" ? params.round : null;
-  const [players, activeCallups, leagueConfig, officialPresetOffset, friendlyPresetOffset, prelist, stadiums] = await Promise.all([
+  const [allPlayers, activeCallups, leagueConfig, officialPresetOffset, friendlyPresetOffset, prelist, stadiums, selectedLeague] = await Promise.all([
     getPlayersWithStats("official", true),
     getActiveCallups(),
     getLeagueConfig(),
@@ -21,7 +22,11 @@ export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin
     getNextTeamPresetOffset("friendly"),
     requestedRoundId ? getAdminRoundPrelist(requestedRoundId) : Promise.resolve(null),
     getStadiums(),
+    getSelectedLeague(),
   ]);
+  const players = selectedLeague?.featureTier === "quick"
+    ? allPlayers.filter((player) => player.member_category === "guest")
+    : allPlayers;
   const requestedCallup = typeof params.callup === "string"
     ? activeCallups.find((item) => item.id === params.callup) || null
     : null;

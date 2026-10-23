@@ -52,6 +52,7 @@ export default async function proxy(request: NextRequest) {
   let hasMembership = false
   let needsLeagueChoice = false
   let isBasicLeague = false
+  let isQuickLeague = false
 
   if (pathname === '/' && !user) return NextResponse.redirect(new URL('/inicio', origin))
 
@@ -70,6 +71,7 @@ export default async function proxy(request: NextRequest) {
     if (selectedMembership) {
       const { data: league } = await supabase.from('leagues').select('feature_tier').eq('id', selectedMembership.league_id).maybeSingle()
       isBasicLeague = league?.feature_tier === 'basic'
+      isQuickLeague = league?.feature_tier === 'quick'
     }
 
     const entryFlowDone = request.cookies.get(ENTRY_FLOW_DONE_COOKIE)?.value === String(ENTRY_FLOW_VERSION)
@@ -121,6 +123,17 @@ export default async function proxy(request: NextRequest) {
     || pathname.startsWith('/mais/coletivas')
   if (user && isBasicLeague && isFullFeatureRoute) {
     return NextResponse.redirect(new URL('/mais?upgrade_required=1', origin))
+  }
+  const isQuickRestrictedRoute = isFullFeatureRoute
+    || pathname.startsWith('/ranking')
+    || pathname.startsWith('/jogadores')
+    || pathname.startsWith('/admin/jogadores')
+    || pathname.startsWith('/admin/pontuacao')
+    || pathname.startsWith('/admin/overall')
+    || pathname.startsWith('/admin/administradores')
+    || pathname.startsWith('/admin/cadastros')
+  if (user && isQuickLeague && isQuickRestrictedRoute) {
+    return NextResponse.redirect(new URL('/rodadas', origin))
   }
 
   if (isAccountRoute && !user) {

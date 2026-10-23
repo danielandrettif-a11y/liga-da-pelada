@@ -28,7 +28,8 @@ const tiers: Array<{
 export function LeagueTierSelector() {
   const [selected, setSelected] = useState<LeagueTier>("basic");
 
-  return <fieldset>
+  return <>
+  <fieldset>
     <legend className="text-sm font-bold text-white">Modo da pelada</legend>
     <p className="mt-1 text-xs leading-5 text-muted">Toque no modelo que deseja usar.</p>
     <div className="mt-3 space-y-3">
@@ -62,5 +63,12 @@ export function LeagueTierSelector() {
         </label>;
       })}
     </div>
-  </fieldset>;
+  </fieldset>
+  <label className="block text-sm font-bold text-white">Acesso
+    <select name="visibility" defaultValue="private" className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-white">
+      <option value="private">Fechada — jogadores solicitam entrada</option>
+      <option value="open">Aberta — qualquer jogador pode entrar</option>
+    </select>
+  </label>
+  </>;
 }

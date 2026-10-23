@@ -14,7 +14,7 @@ vi.mock("@/lib/league-context", () => ({
   ACTIVE_LEAGUE_COOKIE: "active_league_id", getMyLeagues: mocks.leagues,
 }));
 
-import { createLeague, requestClosedLeague } from "./actions";
+import { createLeague, createQuickLeague, requestClosedLeague } from "./actions";
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -57,6 +57,38 @@ describe("criação de pelada", () => {
     });
     expect(mocks.cookieSet).toHaveBeenCalledWith("active_league_id", "new-league", expect.any(Object));
     expect(mocks.revalidate).toHaveBeenCalledWith("/", "layout");
+  });
+
+  it("abre a configuração da sessão ao criar uma pelada descartável", async () => {
+    await expect(createLeague(form("Jogo de hoje", "quick", "private")))
+      .rejects.toThrow("redirect:/rodadas?create=1");
+    expect(mocks.rpc).toHaveBeenCalledWith("create_league_for_user", {
+      p_name: "Jogo de hoje", p_tier: "quick", p_visibility: "private",
+    });
+  });
+
+  it("cria a partida rápida completa e abre direto a lista de jogadores", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: { league_id: "quick-league", callup_id: "quick-callup", round_id: "quick-round" },
+      error: null,
+    });
+    const data = new FormData();
+    data.set("date", "2026-10-24");
+    data.set("start_time", "20:30");
+    data.set("field_name", "Arena do bairro");
+    data.set("map_url", "https://maps.app.goo.gl/campo");
+
+    await expect(createQuickLeague(data))
+      .rejects.toThrow("redirect:/convocacao?callup=quick-callup&setup=players");
+    expect(mocks.rpc).toHaveBeenCalledWith("create_quick_match_session", {
+      p_date: "2026-10-24",
+      p_start_time: "20:30",
+      p_field_name: "Arena do bairro",
+      p_map_url: "https://maps.app.goo.gl/campo",
+      p_players_per_team: 5,
+      p_teams_per_round: 3,
+    });
+    expect(mocks.cookieSet).toHaveBeenCalledWith("active_league_id", "quick-league", expect.any(Object));
   });
 
   it("mantém o erro de criação e não altera a pelada ativa quando o RPC falha", async () => {

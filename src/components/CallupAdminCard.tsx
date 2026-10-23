@@ -17,12 +17,14 @@ export function CallupAdminCard({
   playersPerTeam = 5,
   teamsPerRound = 3,
   initialShowCreate = false,
+  featureTier = "basic",
 }: {
   callups: CallupWithEntries[];
   stadiums?: Stadium[];
   playersPerTeam?: number;
   teamsPerRound?: number;
   initialShowCreate?: boolean;
+  featureTier?: "quick" | "basic" | "complete";
 }) {
   const router = useRouter();
   const [selectedCallupId, setSelectedCallupId] = useState(callups[0]?.id || "");
@@ -30,7 +32,7 @@ export function CallupAdminCard({
   const [continueOpening, setContinueOpening] = useState(callups.length === 0);
   const [newDate, setNewDate] = useState(new Date().toISOString().slice(0, 10));
   const [newPlayersPerTeam, setNewPlayersPerTeam] = useState([5, 6, 7].includes(playersPerTeam) ? playersPerTeam : 5);
-  const [newTeamsPerRound, setNewTeamsPerRound] = useState(3);
+  const [newTeamsPerRound, setNewTeamsPerRound] = useState(teamsPerRound);
   const [formatPlayersPerTeam, setFormatPlayersPerTeam] = useState<number | null>(null);
   const [formatTeamsPerRound, setFormatTeamsPerRound] = useState<number | null>(null);
   const [formatNotice, setFormatNotice] = useState("");
@@ -54,6 +56,7 @@ export function CallupAdminCard({
   const currentPlayersPerTeam = callup?.players_per_team || Math.max(1, Math.round(capacity / (callup?.teams_per_round || teamsPerRound)));
   const currentTeamsPerRound = callup?.teams_per_round || teamsPerRound;
   const canEditFormat = callup?.status === "open" && (!callup.round || (callup.round.status === "draft" && !callup.round.teams?.length));
+  const isQuickLeague = featureTier === "quick";
 
   async function create(formData: FormData) {
     setLoading(true);
@@ -223,8 +226,8 @@ export function CallupAdminCard({
                 <CalendarPlus className="h-5 w-5 text-accent" />
               </div>
               <div>
-                <p className="text-sm font-black text-foreground">Abrir convocação</p>
-                <p className="text-xs text-muted">{newPlayersPerTeam * newTeamsPerRound} vagas e {waitlistCapacity} na fila</p>
+                <p className="text-sm font-black text-foreground">{isQuickLeague ? "Preparar pelada descartável" : "Abrir convocação"}</p>
+                <p className="text-xs text-muted">{isQuickLeague ? "Cadastre convidados e controle tudo neste aparelho" : `${newPlayersPerTeam * newTeamsPerRound} vagas e ${waitlistCapacity} na fila`}</p>
               </div>
             </div>
 
@@ -351,22 +354,19 @@ export function CallupAdminCard({
               )}
             </div>
 
-            <div className="space-y-1">
+            {isQuickLeague ? <><input type="hidden" name="round_type" value="friendly" /><p className="rounded-xl border border-accent/25 bg-accent/5 p-3 text-[11px] leading-5 text-muted"><strong className="text-accent">Modo descartável:</strong> esta sessão não gera ranking. Partidas, gols, assistências e pagamentos ficam no seu histórico privado.</p></> : <div className="space-y-1">
               <label className="mb-1 block text-[10px] font-bold uppercase text-muted">Tipo de Rodada</label>
-              <select
-                name="round_type"
-                className="block w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground"
-              >
+              <select name="round_type" className="block w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground">
                 <option value="official">Oficial (Ranked)</option>
                 <option value="friendly">Amistoso</option>
               </select>
-            </div>
+            </div>}
 
             <button
               disabled={loading || Boolean(conflictingCallup)}
               className="w-full rounded-xl bg-accent py-3 text-sm font-black text-background transition-transform active:scale-[0.99] disabled:opacity-50"
             >
-              {loading ? "Abrindo convocação..." : "Abrir convocação e começar a convidar"}
+              {loading ? "Preparando..." : isQuickLeague ? "Criar lista e adicionar convidados" : "Abrir convocação e começar a convidar"}
             </button>
             {callups.length > 0 && (
               <button type="button" onClick={() => setShowCreate(false)} className="w-full rounded-xl border border-border py-2.5 text-xs font-bold text-muted">
@@ -435,7 +435,7 @@ export function CallupAdminCard({
               </select>
             </div>
 
-            <div className="space-y-1">
+            {isQuickLeague ? <input type="hidden" name="round_type" value="friendly" /> : <div className="space-y-1">
               <label className="mb-1 block text-[10px] font-bold uppercase text-muted">Tipo de Rodada</label>
               <select
                 name="round_type"
@@ -445,7 +445,7 @@ export function CallupAdminCard({
                 <option value="official">Oficial (Ranked)</option>
                 <option value="friendly">Amistoso</option>
               </select>
-            </div>
+            </div>}
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
@@ -487,7 +487,7 @@ export function CallupAdminCard({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-black text-foreground">
-                  {callup.round_type === "friendly" ? "Amistoso" : "Rodada oficial"} · {confirmed}/{capacity}
+                  {isQuickLeague ? "Pelada descartável" : callup.round_type === "friendly" ? "Amistoso" : "Rodada oficial"} · {confirmed}/{capacity}
                 </p>
                 <p className="flex items-center gap-1 text-xs text-muted">
                   <Clock className="h-3.5 w-3.5 text-accent shrink-0" />
@@ -518,7 +518,7 @@ export function CallupAdminCard({
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            {!isQuickLeague && <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={copy}
@@ -535,9 +535,9 @@ export function CallupAdminCard({
               >
                 <X className="h-4 w-4" /> Fechar
               </button>
-            </div>
+            </div>}
 
-            <button
+            {!isQuickLeague && <button
               type="button"
               role="switch"
               aria-checked={callup.is_public}
@@ -549,7 +549,7 @@ export function CallupAdminCard({
               <span className={`h-5 w-9 rounded-full p-0.5 transition-colors ${callup.is_public ? "bg-accent" : "bg-warning/50"}`}>
                 <span className={`block h-4 w-4 rounded-full bg-background transition-transform ${callup.is_public ? "translate-x-4" : "translate-x-0"}`} />
               </span>
-            </button>
+            </button>}
 
             <button
               type="button"

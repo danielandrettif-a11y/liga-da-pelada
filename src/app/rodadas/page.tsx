@@ -9,6 +9,7 @@ import { getActiveCallups, getAgendaCallups } from "@/lib/actions/callups";
 import { getLeagueConfig } from "@/lib/actions/league";
 import { getStadiums } from "@/lib/actions/stadiums";
 import { isStandaloneCallupVisible } from "@/lib/callup-ui";
+import { getSelectedLeague } from "@/lib/league-context";
 
 export const revalidate = 0;
 
@@ -36,10 +37,11 @@ export default async function RodadasPage({
   searchParams: Promise<{ create?: string }>;
 }) {
   const params = await searchParams;
-  const [rounds, account, agendaCallups] = await Promise.all([
+  const [rounds, account, agendaCallups, selectedLeague] = await Promise.all([
     getRounds(),
     getCurrentAccount(),
     getAgendaCallups(),
+    getSelectedLeague(),
   ]);
   const [activeCallups, leagueConfig, stadiums, adminPrelists] = account.isAdmin
     ? await Promise.all([getActiveCallups(), getLeagueConfig(), getStadiums(), getAdminRoundPrelists()])
@@ -84,7 +86,7 @@ export default async function RodadasPage({
             {standaloneCallups.length > 0 ? ` · ${standaloneCallups.length} convocação${standaloneCallups.length === 1 ? "" : "ões"}` : ""}
           </p>
         </div>
-        {account.isAdmin && <Link href="/admin/rodada?new=1" className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-accent hover:bg-accent-light text-background text-xs font-bold transition-all active:scale-95">
+        {account.isAdmin && selectedLeague?.featureTier !== "quick" && <Link href="/admin/rodada?new=1" className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-accent hover:bg-accent-light text-background text-xs font-bold transition-all active:scale-95">
           <Plus className="w-4 h-4" />
           Nova pré-lista
         </Link>}
@@ -109,6 +111,7 @@ export default async function RodadasPage({
               playersPerTeam={leagueConfig?.players_per_team || 5}
               teamsPerRound={leagueConfig?.teams_per_round || 3}
               initialShowCreate
+              featureTier={selectedLeague?.featureTier}
             />
           </div>
         </details>
@@ -164,7 +167,7 @@ export default async function RodadasPage({
                       <span className="text-sm font-bold text-foreground">
                         {isCallup ? "Convocação" : round.round_type === "friendly" ? "Amistoso" : "Rodada"} {!isCallup && String(round.number).padStart(2, "0")}
                       </span>
-                      {round.round_type === "friendly" && <span className="rounded-full bg-warning/10 px-2 py-0.5 text-[9px] font-black text-warning">FORA DO RANKED</span>}
+                      {round.round_type === "friendly" && <span className="rounded-full bg-warning/10 px-2 py-0.5 text-[9px] font-black text-warning">{selectedLeague?.featureTier === "quick" ? "SESSÃO PRIVADA" : "FORA DO RANKED"}</span>}
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusStyle.bg} ${statusStyle.text}`}>
                         {statusStyle.label}
                       </span>

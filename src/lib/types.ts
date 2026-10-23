@@ -90,6 +90,8 @@ export type Player = {
   is_competitive_profile_complete?: boolean;
   show_fitness_stats: boolean;
   registration_source: RegistrationSource;
+  /** Persistente nas peladas normais; efêmero e isolado nas partidas rápidas. */
+  profile_scope?: "persistent" | "quick_session";
   created_by_user_id: string | null;
   created_at: string;
 };

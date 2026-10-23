@@ -19,7 +19,7 @@ export type PrelistResult =
 
 export async function prepareCallupPrelist(
   callupId: string,
-  league: { id: string; featureTier: "basic" | "complete" },
+  league: { id: string; featureTier: "quick" | "basic" | "complete" },
   gateway: PrelistGateway,
   scheduleReminders: (input: { roundId: string; date: string; startTime: string }) => Promise<unknown>,
 ): Promise<PrelistResult> {

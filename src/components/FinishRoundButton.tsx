@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, X } from "@/components/icons";
 import { finishRound } from "@/lib/actions/rounds";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import type { ExpenseItem, PaymentRecipient } from "@/lib/actions/payments";
 
-export function FinishRoundButton({ roundId, status, canManage, recipients = [], expenseItems = [], participantCount = 0 }: { roundId: string; status: string; canManage: boolean; recipients?: PaymentRecipient[]; expenseItems?: ExpenseItem[]; participantCount?: number }) {
+export function FinishRoundButton({ roundId, status, canManage, recipients = [], expenseItems = [], participantCount = 0, quickMode = false }: { roundId: string; status: string; canManage: boolean; recipients?: PaymentRecipient[]; expenseItems?: ExpenseItem[]; participantCount?: number; quickMode?: boolean }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pix, setPix] = useState("");
   const [paymentTotal, setPaymentTotal] = useState("");
@@ -58,6 +60,8 @@ export function FinishRoundButton({ roundId, status, canManage, recipients = [],
     }
     setOpen(false);
     setLoading(false);
+    if (result.archived) router.push("/lobby?archived=1");
+    else router.refresh();
   }
 
   return (
@@ -77,7 +81,9 @@ export function FinishRoundButton({ roundId, status, canManage, recipients = [],
               <div>
                 <h2 id="finish-round-title" className="text-lg font-black text-foreground">Encerrar a rodada?</h2>
                 <p className="mt-1 text-xs leading-5 text-muted">
-                  Os pontos serao consolidados. Informe o PIX de quem vai receber o valor da pelada.
+                  {quickMode
+                    ? "O placar e os scouts ficarão no histórico temporário. Informe o PIX para organizar os pagamentos; a sessão será excluída em até 7 dias, ou 3 dias após todos pagarem."
+                    : "Os pontos serao consolidados. Informe o PIX de quem vai receber o valor da pelada."}
                 </p>
               </div>
               <button onClick={() => setOpen(false)} disabled={loading} aria-label="Fechar" className="rounded-full p-2 text-muted hover:bg-surface-hover">

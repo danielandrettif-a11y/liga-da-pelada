@@ -289,12 +289,13 @@ export default async function MaisPage({ searchParams }: MaisPageProps) {
             stadiums={stadiums}
             playersPerTeam={leagueConfig?.players_per_team || 5}
             teamsPerRound={leagueConfig?.teams_per_round || 3}
+            featureTier={selectedLeague?.featureTier}
           />
 
           <LeagueModeCard />
 
           {leagueConfig && (
-            <PreSeasonToggle
+            selectedLeague?.featureTier !== "quick" && <PreSeasonToggle
               leagueId={leagueConfig.id}
               initialEnabled={leagueConfig.preseason_enabled === true}
             />
@@ -306,7 +307,12 @@ export default async function MaisPage({ searchParams }: MaisPageProps) {
                 {section.title}
               </h2>
               <div className="glass-card overflow-hidden">
-                {section.items.filter((item) => selectedLeague?.featureTier === "complete" || !["/mais/coletivas", "/admin/cartola", "/admin/reprocessar"].includes(item.href)).map((item, index) => (
+                {section.items.filter((item) => {
+                  if (selectedLeague?.featureTier === "quick") {
+                    return ["/mais/estadios", "/admin/transfermarket", "/mais/pix", "/mais/caixinha", "/admin/liga"].includes(item.href);
+                  }
+                  return selectedLeague?.featureTier === "complete" || !["/mais/coletivas", "/admin/cartola", "/admin/reprocessar"].includes(item.href);
+                }).map((item, index) => (
                   <Link key={item.href} href={item.href} className={`flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-hover ${index < section.items.length - 1 ? "border-b border-border" : ""}`}>
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface">
                       <item.icon className="h-5 w-5 text-accent" />
@@ -322,7 +328,7 @@ export default async function MaisPage({ searchParams }: MaisPageProps) {
             </div>
           ))}
 
-          <FinishSeasonCard />
+          {selectedLeague?.featureTier !== "quick" && <FinishSeasonCard />}
         </>
       )}
     </div>

@@ -105,8 +105,8 @@ export default async function ConvocacaoPage({
     selectedLeague?.featureTier === "complete" ? safely(getFantasyQuickHighlights(), null) : Promise.resolve(null),
     safely(getStadiums(), []),
     safely(getAllPlayersEquippedCosmeticsMap(), new Map()),
-    account.user ? safely(getDraftWorkspace(callup.id), null) : Promise.resolve(null),
-    account.user ? safely(getCollectiveRoom(callup.id), null) : Promise.resolve(null),
+    account.user && selectedLeague?.featureTier !== "quick" ? safely(getDraftWorkspace(callup.id), null) : Promise.resolve(null),
+    account.user && selectedLeague?.featureTier !== "quick" ? safely(getCollectiveRoom(callup.id), null) : Promise.resolve(null),
   ]);
   const section = params.section === "draft" && draftWorkspace
     ? "draft"
@@ -120,6 +120,9 @@ export default async function ConvocacaoPage({
   const selectablePlayers = account.user
     ? await safely(getSelectableLeaguePlayers(callup.league_id), [])
     : [];
+  const visibleSelectablePlayers = selectedLeague?.featureTier === "quick"
+    ? selectablePlayers.filter((player) => player.member_category === "guest")
+    : selectablePlayers;
   const stadiumName = callup.stadium_name || leagueConfig?.stadium_name || null;
   const stadiumMapUrl = callup.stadium_map_url || leagueConfig?.stadium_map_url || null;
   const stadium = stadiums.find((item) => item.id === callup.stadium_id);
@@ -167,7 +170,7 @@ export default async function ConvocacaoPage({
         currentPlayerId={account.profile?.player_id || null}
         isAuthenticated={Boolean(account.user)}
         isAdmin={account.isAdmin}
-        selectablePlayers={selectablePlayers}
+        selectablePlayers={visibleSelectablePlayers}
         stadiumName={stadiumName}
         stadiumMapUrl={stadiumMapUrl}
         stadiums={stadiums}
@@ -178,6 +181,7 @@ export default async function ConvocacaoPage({
         cartolaEnabled={selectedLeague?.featureTier === "complete"}
         loginReturnTo={params.invite ? `/c/${encodeURIComponent(params.invite)}` : "/convocacao"}
         weather={weather}
+        soloMode={selectedLeague?.featureTier === "quick"}
       />
       )}
     </div>

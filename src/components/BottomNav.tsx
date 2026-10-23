@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, CartolaHat, Trophy, Users, MoreHorizontal, ArrowLeftRight, Flag } from "@/components/icons";
+import { Home, CartolaHat, Trophy, Users, MoreHorizontal, ArrowLeftRight, CalendarDays, Flag } from "@/components/icons";
 import { supabase } from "@/lib/supabase";
 
 const NAV_ITEMS = [
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/cartola", label: "Cartola", icon: CartolaHat },
   { href: "/ranking", label: "Ranking", icon: Trophy },
   { href: "/jogadores", label: "Elenco", icon: Users },
+  { href: "/rodadas", label: "Partidas", icon: CalendarDays },
   { href: "/mais", label: "Mais", icon: MoreHorizontal },
 ] as const;
 
@@ -25,7 +26,7 @@ export function BottomNav({
   currentUserId,
 }: {
   isAuthenticated: boolean;
-  featureTier: "basic" | "complete";
+  featureTier: "quick" | "basic" | "complete";
   hasOpenCallup: boolean;
   hasPendingPayment: boolean;
   canAccessCollective: boolean;
@@ -69,17 +70,19 @@ export function BottomNav({
 
   const roundFlowItem = hasOpenCallup
     ? { href: "/convocacao", label: "Convocação", icon: Flag, notification: true }
-    : hasPendingPayment
-      ? { href: "/pagamentos", label: "Transfermarket", icon: ArrowLeftRight, notification: true }
+    : hasPendingPayment || featureTier === "quick"
+      ? { href: "/pagamentos", label: "Transfermarket", icon: ArrowLeftRight, notification: hasPendingPayment }
       : null;
-  const contextualItems = [
-    NAV_ITEMS[0],
-    ...(roundFlowItem ? [roundFlowItem] : []),
-    ...(featureTier === "complete" ? [NAV_ITEMS[1]] : []),
-    NAV_ITEMS[2],
-    NAV_ITEMS[3],
-    NAV_ITEMS[4],
-  ];
+  const contextualItems = featureTier === "quick"
+    ? [...(roundFlowItem ? [roundFlowItem] : []), NAV_ITEMS[4], NAV_ITEMS[5]]
+    : [
+        NAV_ITEMS[0],
+        ...(roundFlowItem ? [roundFlowItem] : []),
+        ...(featureTier === "complete" ? [NAV_ITEMS[1]] : []),
+        NAV_ITEMS[2],
+        NAV_ITEMS[3],
+        NAV_ITEMS[5],
+      ];
   const visibleItems = isAuthenticated
     ? contextualItems
     : contextualItems.filter((item) => item.href !== "/mais");

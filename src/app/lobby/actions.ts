@@ -50,6 +50,19 @@ export async function enterLeague(formData: FormData) {
   redirect(destination || "/");
 }
 
+export async function enterArchivedQuickLeague(formData: FormData) {
+  const leagueId = String(formData.get("league_id") || "");
+  const { user, memberships } = await getCurrentAccount();
+  if (!user) redirect("/login?next=/lobby");
+  if (!memberships.some((membership) => membership.league_id === leagueId)) {
+    redirect("/lobby?error=access");
+  }
+  (await cookies()).set(ACTIVE_LEAGUE_COOKIE, leagueId, {
+    httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365,
+  });
+  redirect("/rodadas");
+}
+
 export async function toggleFavorite(formData: FormData) {
   const leagueId = String(formData.get("league_id") || "");
   const { client, user } = await getCurrentAccount();
@@ -146,5 +159,48 @@ export async function createLeague(formData: FormData) {
   });
   const destination = await completePendingEntryFlow(client);
   revalidatePath("/", "layout");
-  redirect(destination || "/");
+  redirect(destination || (String(formData.get("tier")) === "quick" ? "/rodadas?create=1" : "/"));
+}
+
+export async function createQuickLeague(formData: FormData) {
+  const { client, user } = await getCurrentAccount();
+  if (!user) redirect("/login?next=/lobby/criar");
+
+  const date = String(formData.get("date") || "");
+  const startTime = String(formData.get("start_time") || "").slice(0, 5);
+  const fieldName = String(formData.get("field_name") || "").trim().replace(/\s+/g, " ");
+  let mapUrl = String(formData.get("map_url") || "").trim();
+  if (mapUrl && !/^https?:\/\//i.test(mapUrl)) mapUrl = `https://${mapUrl}`;
+  let validUrl = false;
+  try {
+    const parsed = new URL(mapUrl);
+    validUrl = parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    validUrl = false;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(startTime)
+    || fieldName.length < 2 || fieldName.length > 80 || !validUrl) {
+    redirect("/lobby/criar?quickError=invalid");
+  }
+
+  const { data, error } = await client.rpc("create_quick_match_session", {
+    p_date: date,
+    p_start_time: startTime,
+    p_field_name: fieldName,
+    p_map_url: mapUrl,
+    p_players_per_team: 5,
+    p_teams_per_round: 3,
+  });
+  const session = data as { league_id?: string; callup_id?: string; round_id?: string } | null;
+  if (error || !session?.league_id || !session.callup_id || !session.round_id) {
+    console.error("Erro ao criar partida rápida:", error);
+    redirect("/lobby/criar?quickError=create");
+  }
+
+  (await cookies()).set(ACTIVE_LEAGUE_COOKIE, session.league_id, {
+    httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax",
+    path: "/", maxAge: 60 * 60 * 24 * 365,
+  });
+  revalidatePath("/", "layout");
+  redirect(`/convocacao?callup=${encodeURIComponent(session.callup_id)}&setup=players`);
 }

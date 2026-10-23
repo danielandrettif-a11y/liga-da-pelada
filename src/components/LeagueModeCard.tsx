@@ -6,8 +6,10 @@ export async function LeagueModeCard() {
   if (!league) return null;
   return <section className="rounded-2xl border border-accent/25 bg-surface p-4">
     <p className="text-xs font-black uppercase tracking-widest text-accent">Tipo da pelada</p>
-    <h2 className="mt-1 font-athletic text-xl font-black text-white">{league.featureTier === "basic" ? "Básica" : "Completa"}</h2>
-    <p className="mt-2 text-xs text-muted">{league.featureTier === "basic"
+    <h2 className="mt-1 font-athletic text-xl font-black text-white">{league.featureTier === "quick" ? "Descartável" : league.featureTier === "basic" ? "Básica" : "Completa"}</h2>
+    <p className="mt-2 text-xs text-muted">{league.featureTier === "quick"
+      ? "Sessão privada, só com convidados. Sem ranking: placar ao vivo, histórico e pagamentos continuam disponíveis."
+      : league.featureTier === "basic"
       ? "Elenco, convocação, partidas e ranking. O histórico fica guardado no upgrade."
       : "Ranking, Cartola, cosméticos e demais recursos liberados."}</p>
     {league.featureTier === "basic" && league.role === "admin" && <form action={upgradeCurrentLeague} className="mt-4">

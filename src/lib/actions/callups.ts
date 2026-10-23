@@ -95,7 +95,11 @@ async function selectedRosterPlayer(playerId: string, client: Awaited<ReturnType
   if (!league) return false;
   const { data } = await client.from("league_members").select("player_id")
     .eq("league_id", league.id).eq("player_id", playerId).eq("is_active", true).maybeSingle();
-  return Boolean(data);
+  if (!data) return false;
+  if (league.featureTier !== "quick") return true;
+  const { data: player } = await client.from("players").select("member_category")
+    .eq("id", playerId).maybeSingle();
+  return player?.member_category === "guest";
 }
 
 export async function getActiveCallups(invite?: { callupId?: string; inviteToken?: string }): Promise<CallupWithEntries[]> {
@@ -225,7 +229,7 @@ export async function getAgendaCallups() {
 export async function openCallup(formData: FormData) {
   const client = await getAdminClient();
   if (!client) return { success: false as const, error: "Somente administradores podem abrir convocacoes." };
-  const request = parseOpenCallupRequest({
+  const parsedRequest = parseOpenCallupRequest({
     date: String(formData.get("date") || ""),
     startTime: formData.get("start_time") ? String(formData.get("start_time")) : null,
     stadiumId: formData.get("stadium_id") ? String(formData.get("stadium_id")) : null,
@@ -233,8 +237,11 @@ export async function openCallup(formData: FormData) {
     playersPerTeam: formData.get("players_per_team") ? String(formData.get("players_per_team")) : null,
     teamsPerRound: formData.get("teams_per_round") ? String(formData.get("teams_per_round")) : null,
   });
-  if (!request) return { success: false as const, error: "Informe uma data valida." };
+  if (!parsedRequest) return { success: false as const, error: "Informe uma data valida." };
   const league = await getActiveLeague();
+  const request = league.feature_tier === "quick"
+    ? { ...parsedRequest, roundType: "friendly" as const }
+    : parsedRequest;
   const result = await openCallupWithPrelist(
     request,
     league.id,
@@ -524,15 +531,18 @@ export async function updateCallup(formData: FormData) {
   if (!client) return { success: false, error: "Somente administradores podem editar convocações." };
   const callupId = String(formData.get("callup_id") || "");
   if (!(await selectedCallup(callupId, client))) return { success: false, error: "Convocação fora da pelada selecionada." };
-  const request = parseEditCallupRequest({
+  const parsedRequest = parseEditCallupRequest({
     callupId,
     date: String(formData.get("date") || ""),
     startTime: formData.get("start_time") ? String(formData.get("start_time")) : null,
     stadiumId: formData.get("stadium_id") ? String(formData.get("stadium_id")) : null,
     roundType: formData.get("round_type") ? String(formData.get("round_type")) : null,
   });
-  if (!request) return { success: false, error: "Informe uma data válida." };
+  if (!parsedRequest) return { success: false, error: "Informe uma data válida." };
   const league = await getActiveLeague();
+  const request = league.feature_tier === "quick"
+    ? { ...parsedRequest, roundType: "friendly" as const }
+    : parsedRequest;
   const result = await editCallup(request, league.id, supabaseCallupEditingGateway(client));
   if (result.success) refreshCallups();
   return result;

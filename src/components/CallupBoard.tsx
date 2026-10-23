@@ -82,6 +82,7 @@ type Props = {
   cartolaEnabled?: boolean;
   loginReturnTo?: string;
   weather?: EventWeather | null;
+  soloMode?: boolean;
 };
 const CALLUP_LIST_TABS = ["confirmed", "waitlist"] as const;
 
@@ -102,6 +103,7 @@ export function CallupBoard({
   cartolaEnabled = true,
   loginReturnTo = "/convocacao",
   weather,
+  soloMode = false,
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState("");
@@ -328,9 +330,9 @@ export function CallupBoard({
                 {callup.status === "locked" ? "Lista Fechada" : isQueueOnlyAfterDraw ? "Times Sorteados · Fila Aberta" : "Convocação Aberta"}
               </span>
               <span className="shrink-0 whitespace-nowrap rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 text-[10px] font-bold text-muted uppercase">
-                {callup.round_type === "friendly" ? "Amistoso" : "Ranked"}
+                {soloMode ? "Sessão privada" : callup.round_type === "friendly" ? "Amistoso" : "Ranked"}
               </span>
-              {isAdmin && (
+              {isAdmin && !soloMode && (
                 <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${callup.is_public ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>
                   <Shield className="h-3 w-3" /> {callup.is_public ? "Lista pública" : "Só convite"}
                 </span>
@@ -356,7 +358,7 @@ export function CallupBoard({
               }}
               variant="glass"
             />
-            {isAdmin && (
+            {isAdmin && !soloMode && (
               <button
                 type="button"
                 onClick={() => run("visibility", () => setCallupVisibility(callup.id, !callup.is_public))}
@@ -388,14 +390,14 @@ export function CallupBoard({
             >
               {loading === "copied-list" ? <CheckCircle2 className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}
             </button>
-            <button
+            {!soloMode && <button
               onClick={copyInvite}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent/40 bg-accent/15 text-accent hover:bg-accent/25 transition-colors shadow-sm"
               title="Compartilhar convite"
               aria-label="Compartilhar convite"
             >
               {loading === "shared" ? <CheckCircle2 className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -520,7 +522,7 @@ export function CallupBoard({
       )}
 
       {/* 2. CTA DE AÇÃO / STATUS DO JOGADOR LOGADO */}
-      <section className="space-y-2">
+      {!soloMode && <section className="space-y-2">
         {error && (
           <div role="alert" className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs font-bold text-danger animate-fade-in">
             {error}
@@ -649,9 +651,14 @@ export function CallupBoard({
             </button>
           </div>
         )}
-      </section>
+      </section>}
 
       {/* 3. FLUXO SIMPLES PARA ADICIONAR JOGADORES */}
+      {soloMode && error && (
+        <div role="alert" className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs font-bold text-danger animate-fade-in">
+          {error}
+        </div>
+      )}
       {canJoinCallup && (
         <section className="overflow-hidden rounded-2xl border border-accent/25 bg-accent/[0.04]">
           <button
@@ -664,8 +671,8 @@ export function CallupBoard({
                 <UserPlus className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-xs font-black text-foreground">Adicionar jogador à convocação</p>
-                <p className="text-pretty text-[10px] text-muted">Escolha alguém do elenco ou crie um convidado temporário</p>
+                <p className="text-xs font-black text-foreground">{soloMode ? "Adicionar quem vai jogar" : "Adicionar jogador à convocação"}</p>
+                <p className="text-pretty text-[10px] text-muted">{soloMode ? "Crie convidados individuais ou cole a lista do WhatsApp" : "Escolha alguém do elenco ou crie um convidado temporário"}</p>
               </div>
             </div>
 
@@ -887,6 +894,21 @@ export function CallupBoard({
 
             </div>
           )}
+        </section>
+      )}
+
+      {soloMode && isAdmin && callup.status === "open" && callup.round_id && !hasDrawnTeams && (
+        <section className="rounded-2xl border border-accent/40 bg-[linear-gradient(120deg,rgba(204,255,0,.15),rgba(4,29,15,.92))] p-4 shadow-[0_0_28px_rgba(204,255,0,.1)]">
+          <div className="flex items-center gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-accent text-background"><Users className="h-5 w-5" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-black uppercase tracking-wider text-accent">Lista pronta?</p>
+              <p className="mt-1 text-xs leading-5 text-muted">{confirmed.length} jogador{confirmed.length === 1 ? "" : "es"} confirmado{confirmed.length === 1 ? "" : "s"}. Você ainda poderá ajustar a formação na próxima tela.</p>
+            </div>
+          </div>
+          <Link href={`/admin/rodada?round=${callup.round_id}&mount=1`} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-black text-background transition-transform active:scale-[.98]">
+            Concluir lista e dividir times <ChevronRight className="h-4 w-4" />
+          </Link>
         </section>
       )}
 
@@ -1346,7 +1368,7 @@ export function CallupBoard({
                 </select>
               </div>
 
-              <div>
+              {soloMode ? <input type="hidden" name="round_type" value="friendly" /> : <div>
                 <label className="mb-1 block text-[10px] font-bold uppercase text-muted">Tipo de Rodada</label>
                 <select
                   name="round_type"
@@ -1356,7 +1378,7 @@ export function CallupBoard({
                   <option value="official">Oficial (Ranked)</option>
                   <option value="friendly">Amistoso</option>
                 </select>
-              </div>
+              </div>}
 
               <div className="mt-5 grid grid-cols-2 gap-3 pt-2">
                 <button

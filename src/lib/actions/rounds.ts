@@ -1199,6 +1199,19 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
       await refreshFluidOverallSafely(`fechamento da rodada ${roundId}`);
     }
 
+    let archived = false;
+    if (selectedLeague.featureTier === "quick") {
+      const { data: archiveResult, error: archiveError } = await client.rpc("archive_quick_league", {
+        p_league_id: selectedLeague.id,
+      });
+      if (archiveError) {
+        console.error("Rodada encerrada, mas a pelada descartável não foi arquivada:", archiveError);
+      } else {
+        archived = archiveResult === true;
+        revalidatePath("/lobby");
+      }
+    }
+
     revalidatePath(`/rodadas/${roundId}`);
     revalidatePath("/rodadas");
     revalidatePath("/convocacao");
@@ -1208,7 +1221,7 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     revalidatePath("/cartola", "layout");
     revalidateTag("rounds", "max");
     revalidateTag("ranking", "max");
-    return { success: true };
+    return { success: true, archived };
   } catch (err: any) {
     console.error("Erro ao encerrar rodada:", err);
     return { success: false, error: err.message };

@@ -12,7 +12,9 @@ export type MyLeague = {
   slug: string;
   role: "admin" | "player";
   isFavorite: boolean;
-  featureTier: "basic" | "complete";
+  featureTier: "quick" | "basic" | "complete";
+  archivedAt: string | null;
+  quickPurgeAt: string | null;
   visibility: "private" | "open";
   logoUrl: string | null;
   coverUrl: string | null;
@@ -23,9 +25,13 @@ export const getMyLeagues = cache(async (): Promise<MyLeague[]> => {
   const { client, user } = await getCurrentAccount();
   if (!user) return [];
 
+  // Funciona como rede de segurança caso o projeto não tenha pg_cron ativo:
+  // qualquer abertura do app remove sessões descartáveis cujo prazo venceu.
+  await client.rpc("cleanup_expired_quick_leagues").then(() => undefined, () => undefined);
+
   const { data: memberships, error } = await client
     .from("league_members")
-    .select("league_id, role, is_favorite, leagues!inner(id, name, slug, is_active, feature_tier, visibility, logo_url, cover_url, accent_color)")
+    .select("league_id, role, is_favorite, leagues!inner(id, name, slug, is_active, feature_tier, visibility, logo_url, cover_url, accent_color, archived_at, quick_purge_at)")
     .eq("user_id", user.id)
     .eq("is_active", true);
   if (error) throw new Error(`Não foi possível carregar suas peladas: ${error.message}`);
@@ -39,7 +45,9 @@ export const getMyLeagues = cache(async (): Promise<MyLeague[]> => {
       slug: league.slug,
       role: membership.role === "admin" ? "admin" as const : "player" as const,
       isFavorite: Boolean(membership.is_favorite),
-      featureTier: league.feature_tier === "basic" ? "basic" as const : "complete" as const,
+      featureTier: league.feature_tier === "quick" ? "quick" as const : league.feature_tier === "basic" ? "basic" as const : "complete" as const,
+      archivedAt: league.archived_at || null,
+      quickPurgeAt: league.quick_purge_at || null,
       visibility: league.visibility === "open" ? "open" as const : "private" as const,
       logoUrl: league.logo_url || null,
       coverUrl: league.cover_url || null,
