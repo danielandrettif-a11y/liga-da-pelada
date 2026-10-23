@@ -184,8 +184,13 @@ export function CallupBoard({
   const myDrawnTeam = currentPlayerId
     ? drawnTeams.find((team) => team.team_players.some((entry) => entry.player_id === currentPlayerId)) || null
     : null;
-  const hasDrawnTeams = callup.status === "converted" && drawnTeams.length > 0;
-  const isQueueOnlyAfterDraw = callup.status === "converted";
+  const hasDrawnTeams = Boolean(callup.round_id) && drawnTeams.length > 0;
+  const isQueueOnlyAfterDraw = hasDrawnTeams;
+  const availableDrawnTeamSlots = hasDrawnTeams
+    ? drawnTeams.reduce((total, team) => total + Math.max(0, (callup.players_per_team || formatPlayers) - team.team_players.length), 0)
+    : 0;
+  const canJoinDrawnTeam = isQueueOnlyAfterDraw && availableDrawnTeamSlots > 0;
+  const canTakeConfirmedSpot = (!isQueueOnlyAfterDraw && confirmed.length < capacity) || canJoinDrawnTeam;
   const canJoinCallup = callup.status === "open" || isQueueOnlyAfterDraw;
   const hasStartedMatch = hasCallupClosingMatch(callup.round?.matches);
   const canLeaveBeforeFirstMatch = (callup.status === "open" || callup.status === "converted") && !hasStartedMatch;
@@ -634,7 +639,7 @@ export function CallupBoard({
             onClick={() => run("join", () => joinActiveCallup(callup.id))}
             disabled={!!loading}
             className={`flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-black uppercase tracking-wider text-background shadow-lg transition-transform active:scale-[0.98] disabled:opacity-50 ${
-              !isQueueOnlyAfterDraw && confirmed.length < capacity
+              canTakeConfirmedSpot
                 ? "bg-accent shadow-[0_0_30px_rgba(204,255,0,0.3)] animate-pulse"
                 : "bg-warning shadow-[0_0_30px_rgba(234,179,8,0.25)]"
             }`}
@@ -643,9 +648,9 @@ export function CallupBoard({
               <>
                 <Loader2 className="h-5 w-5 animate-spin" /> Confirmando...
               </>
-            ) : !isQueueOnlyAfterDraw && confirmed.length < capacity ? (
+            ) : canTakeConfirmedSpot ? (
               <>
-                <CheckCircle2 className="h-5 w-5" /> Confirmar Minha Presença ({remainingSlots} vagas)
+                <CheckCircle2 className="h-5 w-5" /> {canJoinDrawnTeam ? `Entrar em um time (${availableDrawnTeamSlots} vagas)` : `Confirmar Minha Presença (${remainingSlots} vagas)`}
               </>
             ) : (
               <>
