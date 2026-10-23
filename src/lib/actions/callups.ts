@@ -316,6 +316,60 @@ export async function addRosterPlayerToCallup(callupId: string, playerId: string
   return result;
 }
 
+/**
+ * Adiciona vários atletas com uma única ida do navegador ao servidor. Os RPCs
+ * continuam decidindo atomicamente quem entra como confirmado ou na fila,
+ * evitando que a capacidade seja calculada somente no cliente.
+ */
+export async function addRosterPlayersToCallup(callupId: string, playerIds: string[]) {
+  const account = await getCurrentAccount();
+  if (!account.user) return { success: false as const, error: "Entre na sua conta para alterar a lista." };
+  const callup = await selectedCallup(callupId, account.client);
+  const league = await getSelectedLeague();
+  if (!callup || !league) return { success: false as const, error: "Convocação fora da pelada selecionada." };
+
+  const normalizedIds = [...new Set(playerIds.filter((id) => /^[0-9a-f-]{36}$/i.test(id)))].slice(0, 50);
+  if (!normalizedIds.length) return { success: false as const, error: "Selecione pelo menos um jogador." };
+
+  const { data: memberships, error: membershipError } = await account.client
+    .from("league_members")
+    .select("player_id")
+    .eq("league_id", league.id)
+    .eq("is_active", true)
+    .in("player_id", normalizedIds);
+  if (membershipError) return { success: false as const, error: membershipError.message };
+
+  let allowedIds = (memberships || []).map((item) => item.player_id as string);
+  if (league.featureTier === "quick" && allowedIds.length) {
+    const { data: guests, error: guestError } = await account.client
+      .from("players")
+      .select("id")
+      .in("id", allowedIds)
+      .eq("member_category", "guest");
+    if (guestError) return { success: false as const, error: guestError.message };
+    allowedIds = (guests || []).map((item) => item.id as string);
+  }
+  if (allowedIds.length !== normalizedIds.length) {
+    return { success: false as const, error: "Um ou mais jogadores não pertencem ao elenco desta pelada." };
+  }
+
+  const gateway = supabaseCallupPlayersGateway(account.client);
+  const results = await Promise.all(allowedIds.map((playerId) =>
+    addOtherCallupPlayer(callupId, playerId, "member", gateway),
+  ));
+  const failed = results.filter((result) => !result.success);
+  if (failed.length === results.length) {
+    return { success: false as const, error: failed[0]?.error || "Não foi possível adicionar os jogadores." };
+  }
+  refreshCallups();
+  return {
+    success: true as const,
+    added: results.length - failed.length,
+    failed: failed.length,
+    error: failed.length ? `${failed.length} jogador(es) não puderam ser adicionados.` : undefined,
+  };
+}
+
 export async function adminRemoveCallupPlayer(callupId: string, playerId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem alterar a lista." };

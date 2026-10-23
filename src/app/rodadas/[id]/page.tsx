@@ -9,7 +9,6 @@ import { TeamMiniPitch } from "@/components/TeamMiniPitch";
 import { RoundAvailabilityManager } from "@/components/RoundAvailabilityManager";
 import { TeamCrest } from "@/components/TeamCrest";
 import { TeamReferenceBadge } from "@/components/TeamReferenceBadge";
-import { RoundAttendanceManager } from "@/components/RoundAttendanceManager";
 import { StadiumLink } from "@/components/StadiumLink";
 import { getRoundStatistics } from "@/lib/actions/stats";
 import { RoundHistoryTabs } from "@/components/RoundHistoryTabs";
@@ -110,7 +109,13 @@ export default async function RodadaDetalhePage({
         </h2>
         <div className="-mx-2 grid grid-cols-3 gap-1.5">
           {round.teams.map((team: any, index: number) => (
-            <TeamMiniPitch key={team.id} team={team} index={index} />
+            <TeamMiniPitch
+              key={team.id}
+              team={team}
+              index={index}
+              roundId={round.id}
+              canManageIdentity={account.isAdmin && round.status !== "finished"}
+            />
           ))}
           {round.teams.length === 0 && (
             <div className="col-span-full p-6 text-center text-muted text-sm glass-card">
@@ -131,14 +136,6 @@ export default async function RodadaDetalhePage({
         entries={round.round_players || []}
         canManage={account.isAdmin && round.status !== "finished"}
       />
-
-      {round.formation_mode !== "manual" && (
-        <RoundAttendanceManager
-          roundId={round.id}
-          entries={round.round_players || []}
-          canManage={account.isAdmin && round.status !== "finished"}
-        />
-      )}
 
       {/* Partidas */}
       <section>

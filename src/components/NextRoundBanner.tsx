@@ -75,7 +75,7 @@ export function NextRoundBanner({
 
   return (
     <>
-    <article className="group relative isolate flex h-full min-h-[370px] sm:min-h-[440px] flex-col justify-between overflow-hidden rounded-[2rem] border border-amber-500/30 bg-[#040f08] p-5 sm:p-6 shadow-[0_25px_65px_rgba(0,0,0,.65),0_0_35px_rgba(245,158,11,.12)]">
+    <article className={`group relative isolate flex h-full ${canOpenNewRound ? "min-h-[440px]" : "min-h-[370px]"} sm:min-h-[440px] flex-col justify-between overflow-hidden rounded-[2rem] border border-amber-500/30 bg-[#040f08] p-5 sm:p-6 shadow-[0_25px_65px_rgba(0,0,0,.65),0_0_35px_rgba(245,158,11,.12)]`}>
       {/* Link de cobertura em todo o banner */}
       {isAdmin ? (
         <button

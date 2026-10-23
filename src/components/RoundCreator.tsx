@@ -38,6 +38,7 @@ import { isPlayerVisibleInPrelistTab } from "@/lib/callup-ui";
 import { VEST_COLORS } from "@/lib/vest-colors";
 import { createDefaultTeams, type DrawPlayer, type DrawTeam, type RoundCreatorProps } from "./round-creator-model";
 import { MIN_UNDERFILLED_PLAYERS, rebalanceTeamRosters, validateUnderfilledTeamSizes, type RoundTeamSizeMode } from "@/lib/underfilled-rounds";
+import { RoundSetupSteps } from "./RoundSetupSteps";
 
 export function RoundCreator({
   allPlayers,
@@ -530,26 +531,10 @@ export function RoundCreator({
     <div className="space-y-6">
       <div className={`rounded-xl border p-3 text-xs font-bold ${selectedRoundType === "friendly" ? "border-warning/30 bg-warning/10 text-warning" : "border-accent/25 bg-accent/10 text-accent"}`}>
         {selectedRoundType === "friendly" ? "Amistoso: estatísticas separadas do Ranking oficial" : "Rodada oficial · Ranked"}
-        {currentPrelistId && <span className="ml-2 rounded-full bg-warning/15 px-2 py-0.5 text-[9px] font-black text-warning">PRE-LISTA SALVA</span>}
         {sourceCallupId && <span className="ml-1 text-muted">· sincronizada com a convocação</span>}
       </div>
       {/* Progresso */}
-      <div className="flex items-center justify-between px-2">
-        <div className={`flex flex-col items-center gap-1 ${step >= 1 ? "text-accent" : "text-muted"}`}>
-          <div className="w-8 h-8 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">1</div>
-          <span className="text-[10px] font-bold uppercase tracking-wider">Data</span>
-        </div>
-        <div className={`flex-1 h-px ${step >= 2 ? "bg-accent" : "bg-border"} mx-2`} />
-        <div className={`flex flex-col items-center gap-1 ${step >= 2 ? "text-accent" : "text-muted"}`}>
-          <div className="w-8 h-8 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">2</div>
-          <span className="text-[10px] font-bold uppercase tracking-wider">Jogadores</span>
-        </div>
-        <div className={`flex-1 h-px ${step >= 3 ? "bg-accent" : "bg-border"} mx-2`} />
-        <div className={`flex flex-col items-center gap-1 ${step >= 3 ? "text-accent" : "text-muted"}`}>
-          <div className="w-8 h-8 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">3</div>
-          <span className="text-[10px] font-bold uppercase tracking-wider">Times</span>
-        </div>
-      </div>
+      <RoundSetupSteps activeStep={step} />
 
       {error && (
         <div className="p-3 rounded-lg bg-danger/10 text-danger text-xs font-semibold">
@@ -846,18 +831,6 @@ export function RoundCreator({
       {/* STEP 3: Divisão dos Times */}
       {step === 3 && (
         <div className="space-y-6 animate-fade-in">
-
-          {currentPrelistId && (
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-warning/30 bg-warning/5 p-3.5">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-warning">Pré-lista salva</p>
-                <p className="truncate text-xs text-muted">Monte os times ou volte para preparar outra data.</p>
-              </div>
-              <button type="button" onClick={() => setStep(2)} className="flex shrink-0 items-center gap-1.5 rounded-xl border border-warning/35 bg-background px-3 py-2.5 text-[10px] font-black uppercase text-warning">
-                <PencilLine className="h-3.5 w-3.5" /> Editar pré-lista
-              </button>
-            </div>
-          )}
 
           <div className="glass-card p-4">
             <div className="mb-4 flex items-start gap-3">

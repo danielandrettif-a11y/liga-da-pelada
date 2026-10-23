@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarPlus, Plus, ChevronRight, Users, Football } from "@/components/icons";
+import { CalendarDays, CalendarPlus, ChevronRight, Users, Football } from "@/components/icons";
 import Link from "next/link";
 import { getAdminRoundPrelists, getRounds } from "@/lib/actions/rounds";
 import { formatDateShort } from "@/lib/utils";
@@ -86,10 +86,6 @@ export default async function RodadasPage({
             {standaloneCallups.length > 0 ? ` · ${standaloneCallups.length} convocação${standaloneCallups.length === 1 ? "" : "ões"}` : ""}
           </p>
         </div>
-        {account.isAdmin && selectedLeague?.featureTier !== "quick" && <Link href="/admin/rodada?new=1" className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-accent hover:bg-accent-light text-background text-xs font-bold transition-all active:scale-95">
-          <Plus className="w-4 h-4" />
-          Nova pré-lista
-        </Link>}
       </div>
 
       {account.isAdmin && (

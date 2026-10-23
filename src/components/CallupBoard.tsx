@@ -29,7 +29,7 @@ import {
   X,
 } from "@/components/icons";
 import {
-  addRosterPlayerToCallup,
+  addRosterPlayersToCallup,
   adminRemoveCallupPlayer,
   inviteGuestToCallup,
   inviteGuestListToCallup,
@@ -39,6 +39,7 @@ import {
   repairMyPlayerAccount,
   setCallupVisibility,
   updateCallup,
+  createCallupPrelist,
   type CallupWithEntries,
 } from "@/lib/actions/callups";
 import type { Player, PlayerProfile, Stadium } from "@/lib/types";
@@ -64,6 +65,8 @@ import {
   normalizeCallupGuestName,
   parseWhatsAppGuestList,
 } from "@/modules/callups/domain/callup-guest-list";
+import { RoundSetupSteps } from "./RoundSetupSteps";
+import { DelayedPitchLoadingOverlay } from "./DelayedPitchLoadingOverlay";
 
 type Props = {
   callup: CallupWithEntries;
@@ -126,6 +129,7 @@ export function CallupBoard({
   const [isGuestListOpen, setIsGuestListOpen] = useState(false);
   const [guestListText, setGuestListText] = useState("");
   const [guestListNotice, setGuestListNotice] = useState("");
+  const [selectedRosterIds, setSelectedRosterIds] = useState<Set<string>>(new Set());
 
   useDialogViewport(editingCallup, () => !editLoading && setEditingCallup(false));
   useDialogViewport(showWaitlistPopup, () => setShowWaitlistPopup(false));
@@ -257,6 +261,33 @@ export function CallupBoard({
     setLoading("");
   }
 
+  async function handleInviteRosterPlayers() {
+    if (!selectedRosterIds.size) return;
+    const ids = [...selectedRosterIds];
+    setLoading("add-many");
+    setError("");
+    const result = await addRosterPlayersToCallup(callup.id, ids);
+    if (!result.success) setError(result.error || "Não foi possível adicionar os jogadores.");
+    else {
+      setSelectedRosterIds(new Set());
+      if (result.failed) setError(result.error || "Alguns jogadores não puderam ser adicionados.");
+      router.refresh();
+    }
+    setLoading("");
+  }
+
+  async function continueToDraw() {
+    setLoading("draw");
+    setError("");
+    const result = await createCallupPrelist(callup.id);
+    if (!result.success) {
+      setError(result.error || "Não foi possível preparar o sorteio.");
+      setLoading("");
+      return;
+    }
+    router.push(`/admin/rodada?round=${result.roundId}&mount=1`);
+  }
+
   async function copyInvite() {
     const type = callup.round_type === "friendly" ? "Amistoso" : "Pelada Oficial (Ranked)";
     const dateFormatted = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })
@@ -320,6 +351,8 @@ export function CallupBoard({
 
   return (
     <div className="min-w-0 space-y-4 overflow-x-clip pb-6">
+      <DelayedPitchLoadingOverlay active={loading === "draw"} delayMs={250} title="Preparando o sorteio" description="Levando os jogadores confirmados para a divisão dos times…" />
+      <RoundSetupSteps activeStep={2} className="mb-1" />
       {/* 1. HERO CARD DA CONVOCAÇÃO */}
       <section className="relative overflow-hidden rounded-3xl border border-accent/30 bg-gradient-to-br from-accent/15 via-[#07150d] to-surface p-4 sm:p-5 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -486,40 +519,6 @@ export function CallupBoard({
           </div>
         </div>
       </section>
-
-      {isAdmin && callup.status === "open" && !hasDrawnTeams && (
-        <details className="group rounded-2xl border border-accent/25 bg-surface" aria-label="Formato da pelada">
-          <summary className="flex cursor-pointer list-none items-center gap-3 p-4 marker:content-none">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-black text-foreground">Formato da pelada</h2>
-              <p className="mt-0.5 text-xs text-muted">Área do ADM · toque para ajustar</p>
-            </div>
-            <span className="shrink-0 rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-black text-accent">{formatTeams} × {formatPlayers}</span>
-            <ChevronDown className="h-4 w-4 shrink-0 text-accent transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="border-t border-white/10 px-4 pb-4 pt-3">
-            <p className="text-xs text-muted">Ajuste a quantidade de vagas antes do sorteio dos times.</p>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <label className="text-xs font-bold text-muted">
-                Jogadores por time
-                <select value={formatPlayers} onChange={(event) => setFormatPlayers(Number(event.target.value))} disabled={!!loading} className="mt-1 w-full rounded-xl border border-white/15 bg-background px-3 py-2.5 font-bold text-foreground">
-                  {[5, 6, 7].map((size) => <option key={size} value={size}>{size} jogadores</option>)}
-                </select>
-              </label>
-              <label className="text-xs font-bold text-muted">
-                Quantidade de times
-                <select value={formatTeams} onChange={(event) => setFormatTeams(Number(event.target.value))} disabled={!!loading} className="mt-1 w-full rounded-xl border border-white/15 bg-background px-3 py-2.5 font-bold text-foreground">
-                  {[2, 3, 4, 5, 6].map((count) => <option key={count} value={count}>{count} times</option>)}
-                </select>
-              </label>
-            </div>
-            <button type="button" onClick={handleFormatChange} disabled={!!loading || (formatPlayers === callup.players_per_team && formatTeams === callup.teams_per_round)} className="mt-3 w-full rounded-xl bg-accent px-4 py-2.5 text-xs font-black text-background disabled:opacity-50">
-              {loading === "format" ? "Salvando formato..." : "Aplicar formato"}
-            </button>
-            {formatNotice && <p role="status" className="mt-2 text-xs font-semibold text-accent">{formatNotice}</p>}
-          </div>
-        </details>
-      )}
 
       {/* 2. CTA DE AÇÃO / STATUS DO JOGADOR LOGADO */}
       {!soloMode && <section className="space-y-2">
@@ -695,32 +694,47 @@ export function CallupBoard({
                   {availablePlayers.length > 0 && (
                     <div>
                       <p className="mb-2 text-[10px] font-black uppercase text-accent">1. Já está no elenco?</p>
-                      <div className="flex gap-2">
-                        <select
-                          id="callup-player"
-                          defaultValue=""
-                          className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground"
-                        >
-                          <option value="" disabled>Escolha o jogador</option>
+                      <div className="overflow-hidden rounded-xl border border-border bg-background/60">
+                        <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
+                          <span className="text-[10px] font-bold text-muted">Marque um ou vários jogadores</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRosterIds((current) => current.size === availablePlayers.length ? new Set() : new Set(availablePlayers.map((player) => player.id)))}
+                            className="text-[10px] font-black text-accent"
+                          >
+                            {selectedRosterIds.size === availablePlayers.length ? "Limpar" : "Marcar todos"}
+                          </button>
+                        </div>
+                        <div className="grid max-h-52 grid-cols-1 gap-1 overflow-y-auto p-2 sm:grid-cols-2">
                           {availablePlayers.map((player) => (
-                            <option key={player.id} value={player.id}>
-                              {player.name}{player.member_category === "guest" ? " (convidado)" : ""}
-                            </option>
+                            <label key={player.id} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-xs font-bold ${selectedRosterIds.has(player.id) ? "border-accent/60 bg-accent/10 text-foreground" : "border-transparent text-muted hover:bg-surface"}`}>
+                              <input
+                                type="checkbox"
+                                checked={selectedRosterIds.has(player.id)}
+                                onChange={(event) => setSelectedRosterIds((current) => {
+                                  const next = new Set(current);
+                                  if (event.target.checked) next.add(player.id);
+                                  else next.delete(player.id);
+                                  return next;
+                                })}
+                                className="h-4 w-4 shrink-0 accent-[var(--accent)]"
+                              />
+                              <span className="min-w-0 flex-1 truncate">{player.name}</span>
+                              {player.member_category === "guest" && <span className="text-[8px] uppercase text-warning">Convidado</span>}
+                            </label>
                           ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const select = document.getElementById("callup-player") as HTMLSelectElement;
-                            if (select?.value) run("add", () => addRosterPlayerToCallup(callup.id, select.value));
-                          }}
-                          disabled={!!loading}
-                          className="flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-accent px-3 text-xs font-black text-background disabled:opacity-50"
-                        >
-                          <UserPlus className="size-3.5" /> Adicionar
-                        </button>
+                        </div>
                       </div>
-                    </div>
+                      <button
+                        type="button"
+                        onClick={handleInviteRosterPlayers}
+                        disabled={!!loading || selectedRosterIds.size === 0}
+                        className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-3 text-xs font-black text-background disabled:opacity-50"
+                      >
+                        {loading === "add-many" ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                        {selectedRosterIds.size > 0 ? `Adicionar ${selectedRosterIds.size} selecionado${selectedRosterIds.size === 1 ? "" : "s"}` : "Selecione os jogadores"}
+                      </button>
+                      </div>
                   )}
 
                   <form onSubmit={handleInviteGuest} className="space-y-2 border-t border-accent/15 pt-3">
@@ -1149,6 +1163,22 @@ export function CallupBoard({
         )}
       </section>
 
+      {isAdmin && callup.status === "open" && !hasDrawnTeams && (
+        <section className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 rounded-2xl border border-accent/35 bg-[#07150d]/95 p-3 shadow-[0_-12px_32px_rgba(0,0,0,.45)] backdrop-blur-md sm:static sm:bg-surface">
+          <button
+            type="button"
+            onClick={continueToDraw}
+            disabled={!!loading || confirmed.length < 2}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3.5 text-sm font-black text-background transition-transform active:scale-[.99] disabled:opacity-45"
+          >
+            {loading === "draw" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+            Continuar para o sorteio
+            {loading !== "draw" && <ChevronRight className="h-4 w-4" />}
+          </button>
+          {confirmed.length < 2 && <p className="mt-2 text-center text-[10px] font-semibold text-warning">Adicione pelo menos 2 jogadores para continuar.</p>}
+        </section>
+      )}
+
       {showWaitlistPopup && (
         <div
           className="mobile-dialog-backdrop fixed inset-0 z-[300] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in"
@@ -1379,6 +1409,29 @@ export function CallupBoard({
                   <option value="friendly">Amistoso</option>
                 </select>
               </div>}
+
+              {callup.status === "open" && !hasDrawnTeams && (
+                <fieldset className="rounded-2xl border border-accent/25 bg-accent/5 p-3">
+                  <legend className="px-1 text-[10px] font-black uppercase tracking-wider text-accent">Tamanho da pelada</legend>
+                  <p className="mb-3 text-[10px] leading-4 text-muted">Ajuste as vagas antes de seguir para o sorteio.</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-[10px] font-bold text-muted">Jogadores por time
+                      <select value={formatPlayers} onChange={(event) => setFormatPlayers(Number(event.target.value))} disabled={!!loading} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs font-bold text-foreground">
+                        {[5, 6, 7].map((size) => <option key={size} value={size}>{size} × {size}</option>)}
+                      </select>
+                    </label>
+                    <label className="text-[10px] font-bold text-muted">Quantidade de times
+                      <select value={formatTeams} onChange={(event) => setFormatTeams(Number(event.target.value))} disabled={!!loading} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs font-bold text-foreground">
+                        {[2, 3, 4, 5, 6].map((count) => <option key={count} value={count}>{count} times</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <button type="button" onClick={handleFormatChange} disabled={!!loading || (formatPlayers === callup.players_per_team && formatTeams === callup.teams_per_round)} className="mt-3 w-full rounded-xl border border-accent/40 bg-accent/10 px-4 py-2.5 text-xs font-black text-accent disabled:opacity-40">
+                    {loading === "format" ? "Salvando formato..." : `Aplicar ${formatTeams} times de ${formatPlayers}`}
+                  </button>
+                  {formatNotice && <p role="status" className="mt-2 text-[10px] font-semibold text-accent">{formatNotice}</p>}
+                </fieldset>
+              )}
 
               <div className="mt-5 grid grid-cols-2 gap-3 pt-2">
                 <button

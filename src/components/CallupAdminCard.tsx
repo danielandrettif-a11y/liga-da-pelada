@@ -10,6 +10,7 @@ import type { Stadium } from "@/lib/types";
 import { buildCallupInviteMessage, buildCallupInviteUrl, shareCallupInvite } from "@/lib/callup-invite";
 import { saveStadium } from "@/lib/actions/stadiums";
 import { DelayedPitchLoadingOverlay } from "@/components/DelayedPitchLoadingOverlay";
+import { RoundSetupSteps } from "@/components/RoundSetupSteps";
 
 export function CallupAdminCard({
   callups,
@@ -42,7 +43,7 @@ export function CallupAdminCard({
   const [copied, setCopied] = useState(false);
   const [availableStadiums, setAvailableStadiums] = useState(stadiums);
   const [selectedStadiumId, setSelectedStadiumId] = useState(stadiums[0]?.id || "");
-  const [showQuickStadium, setShowQuickStadium] = useState(stadiums.length === 0);
+  const [showQuickStadium, setShowQuickStadium] = useState(false);
   const [quickStadiumName, setQuickStadiumName] = useState("");
   const [quickStadiumAddress, setQuickStadiumAddress] = useState("");
   const [quickStadiumMapsUrl, setQuickStadiumMapsUrl] = useState("");
@@ -189,7 +190,7 @@ export function CallupAdminCard({
     <section>
       <DelayedPitchLoadingOverlay
         active={loading}
-        delayMs={650}
+        delayMs={250}
         title="Organizando a rodada"
         description="Preparando a convocação e o campo…"
       />
@@ -221,6 +222,7 @@ export function CallupAdminCard({
           </div>
         ) : showCreate || !callup ? (
           <form action={create} className="min-w-0 space-y-3 overflow-hidden">
+            <RoundSetupSteps activeStep={1} className="mb-4" />
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10">
                 <CalendarPlus className="h-5 w-5 text-accent" />
@@ -278,28 +280,27 @@ export function CallupAdminCard({
               <label className="mb-1 block text-[10px] font-bold uppercase text-muted">Campo / Estádio</label>
               <select
                 name="stadium_id"
-                value={selectedStadiumId}
+                value={showQuickStadium ? "__new__" : selectedStadiumId}
                 onChange={(event) => {
                   if (event.target.value === "__new__") {
+                    setSelectedStadiumId("");
                     setShowQuickStadium(true);
                     return;
                   }
                   setSelectedStadiumId(event.target.value);
+                  setShowQuickStadium(false);
                 }}
                 className="block w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground"
               >
-                {availableStadiums.length > 0 ? (
-                  availableStadiums.map((stadium) => (
+                <option value="">Escolha um campo (opcional)</option>
+                {availableStadiums.map((stadium) => (
                     <option key={stadium.id} value={stadium.id}>
                       {stadium.name} {stadium.address ? `(${stadium.address})` : ""}
                     </option>
-                  ))
-                ) : (
-                  <option value="">Nenhum campo cadastrado</option>
-                )}
+                  ))}
                 <option value="__new__">＋ Adicionar um novo campo</option>
               </select>
-              {!showQuickStadium && (
+              {!showQuickStadium && availableStadiums.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setShowQuickStadium(true)}

@@ -1,9 +1,14 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { TeamCrest } from "./TeamCrest";
 import { TeamReferenceBadge } from "./TeamReferenceBadge";
+import { Crown, Loader2 } from "@/components/icons";
+import { setRoundTeamCaptain, setRoundTeamVestColor } from "@/lib/actions/rounds";
+import { VEST_COLORS } from "@/lib/vest-colors";
 
 type PitchPlayerProfile = string | null | undefined;
 
@@ -30,12 +35,15 @@ type TeamMiniPitchProps = {
     color: string;
     crest_url?: string | null;
     position?: number | null;
+    captain_player_id?: string | null;
     team_players: PitchPlayer[];
   };
   index: number;
   selectedPlayerId?: string;
   onPlayerClick?: (player: Player) => void;
   showPositionDetails?: boolean;
+  roundId?: string;
+  canManageIdentity?: boolean;
 };
 
 const POSITIONS: Record<number, Array<[number, number]>> = {
@@ -100,7 +108,12 @@ function getPositionAwareCoordinates(players: Array<{ player: PitchPlayerDetails
   return { coordinates, countByRole };
 }
 
-export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, showPositionDetails = false }: TeamMiniPitchProps) {
+export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, showPositionDetails = false, roundId, canManageIdentity = false }: TeamMiniPitchProps) {
+  const router = useRouter();
+  const [captainId, setCaptainId] = useState(team.captain_player_id || "");
+  const [teamColor, setTeamColor] = useState(team.color || "#22c55e");
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
   const playerEntries = team.team_players
     .flatMap((entry) => entry.players ? [{
       player: entry.players,
@@ -123,17 +136,46 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
     : POSITIONS[Math.max(1, visiblePlayers.length)];
   const isCrowded = visiblePlayers.length > 6;
 
+  async function chooseCaptain(playerId: string) {
+    if (!canManageIdentity || !roundId || pending) return;
+    const previous = captainId;
+    const next = previous === playerId ? "" : playerId;
+    setCaptainId(next);
+    setPending(true);
+    setMessage("");
+    const result = await setRoundTeamCaptain(roundId, team.id, next || null);
+    if (!result.success) {
+      setCaptainId(previous);
+      setMessage(result.error || "Não foi possível definir o capitão.");
+    } else router.refresh();
+    setPending(false);
+  }
+
+  async function chooseColor(color: string) {
+    if (!canManageIdentity || !roundId || pending || color === teamColor) return;
+    const previous = teamColor;
+    setTeamColor(color);
+    setPending(true);
+    setMessage("");
+    const result = await setRoundTeamVestColor(roundId, team.id, color);
+    if (!result.success) {
+      setTeamColor(previous);
+      setMessage(result.error || "Não foi possível mudar o colete.");
+    } else router.refresh();
+    setPending(false);
+  }
+
   return (
     <article className={`glass-card min-w-0 overflow-hidden p-1.5 animate-fade-in-up stagger-${Math.min(index + 1, 5)}`}>
       <div className="mb-1.5 flex min-w-0 items-center gap-1.5 px-0.5 py-0.5">
-        <TeamReferenceBadge position={team.position} fallbackIndex={index} color={team.color} className="h-7 w-7 text-sm" />
+        <TeamReferenceBadge position={team.position} fallbackIndex={index} color={teamColor} className="h-7 w-7 text-sm" />
         <div className="min-w-0 flex-1">
           <span className="block text-[7px] font-black uppercase leading-none tracking-wide text-muted">Time</span>
           <h3 className="truncate text-[9px] font-bold leading-tight text-foreground/75" title={team.name}>
             {team.name}
           </h3>
         </div>
-        <TeamCrest name={team.name} crestUrl={team.crest_url} color={team.color} className="h-5 w-5" />
+        <TeamCrest name={team.name} crestUrl={team.crest_url} color={teamColor} className="h-5 w-5" />
         <span className="shrink-0 text-[7px] font-black text-muted">{visiblePlayers.length}J</span>
       </div>
 
@@ -172,14 +214,14 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
             <button
               key={player.id}
               type="button"
-              disabled={!onPlayerClick && !showPositionDetails}
-              onClick={() => onPlayerClick?.(player as Player)}
-              aria-pressed={onPlayerClick ? selectedPlayerId === player.id : undefined}
-              className={`absolute flex ${widthClass} -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-md transition-transform enabled:active:scale-95 ${selectedPlayerId === player.id ? "z-10 bg-warning/20 ring-2 ring-warning" : ""}`}
+              disabled={!onPlayerClick && !showPositionDetails && !canManageIdentity}
+              onClick={() => onPlayerClick ? onPlayerClick(player as Player) : void chooseCaptain(player.id)}
+              aria-pressed={canManageIdentity ? captainId === player.id : onPlayerClick ? selectedPlayerId === player.id : undefined}
+              className={`absolute flex ${widthClass} -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-md transition-transform enabled:active:scale-95 ${(selectedPlayerId === player.id || captainId === player.id) ? "z-10 bg-warning/20 ring-2 ring-warning" : ""}`}
               style={{ left: `${left}%`, top: `${top}%` }}
               title={`${player.name}${goalkeeperOrder ? ` · G${goalkeeperOrder}` : ""}${loanOrder ? ` · E${loanOrder}` : ""}`}
             >
-              <div className="relative rounded-full border-2" style={{ borderColor: team.color }}>
+              <div className="relative rounded-full border-2" style={{ borderColor: teamColor }}>
                 <PlayerAvatar
                   name={player.name}
                   playerId={showPositionDetails ? player.id : undefined}
@@ -203,6 +245,11 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
                     {loanOrder}
                   </span>
                 )}
+                {captainId === player.id && (
+                  <span className="absolute -bottom-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-background bg-warning px-0.5 text-background shadow-[0_2px_6px_rgba(0,0,0,.55)]" aria-label="Capitão do time" title="Capitão">
+                    <Crown className="h-2.5 w-2.5" />
+                  </span>
+                )}
               </div>
               <span className={`mt-0.5 line-clamp-2 w-full rounded bg-black/75 px-0.5 py-0.5 text-center font-black leading-[1.05] text-white shadow-sm ${isCrowded ? "text-[6px]" : "text-[8px]"}`}>
                 {player.name}
@@ -219,6 +266,30 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
           );
         })}
       </div>
+      {canManageIdentity && (
+        <div className="mt-1.5 rounded-lg border border-border/70 bg-background/55 p-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="shrink-0 text-[7px] font-black uppercase text-muted">Colete</span>
+            <div className="flex min-w-0 flex-1 justify-end gap-1 overflow-x-auto py-0.5">
+              {VEST_COLORS.map((vest) => (
+                <button
+                  key={vest.color}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => void chooseColor(vest.color)}
+                  className={`h-4 w-4 shrink-0 rounded-full border-2 ${teamColor.toLowerCase() === vest.color.toLowerCase() ? "scale-110 border-white" : "border-black/40"}`}
+                  style={{ backgroundColor: vest.color }}
+                  aria-label={`Colete ${vest.label}`}
+                  title={vest.label}
+                />
+              ))}
+              {pending && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-accent" />}
+            </div>
+          </div>
+          <p className="mt-1 truncate text-center text-[7px] font-bold text-muted">Toque no jogador para {captainId ? "trocar" : "escolher"} o capitão</p>
+          {message && <p className="mt-1 text-center text-[7px] font-bold text-danger">{message}</p>}
+        </div>
+      )}
     </article>
   );
 }

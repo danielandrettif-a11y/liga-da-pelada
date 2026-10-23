@@ -3,12 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createMatch, findLiveMatchForTeams, setRoundTeamFixedGoalkeeper } from "@/lib/actions/matches";
-import { Swords, ArrowLeft, ChevronRight, AlertTriangle, Check, ArrowLeftRight, Crown, Users } from "@/components/icons";
+import { Swords, ArrowLeft, ChevronRight, AlertTriangle, Check, ArrowLeftRight, Crown } from "@/components/icons";
 import Link from "next/link";
 import { TeamCrest } from "./TeamCrest";
 import { TeamReferenceBadge } from "./TeamReferenceBadge";
-import { markRoundTeamArrived, setRoundTeamCaptain, setRoundTeamVestColor } from "@/lib/actions/rounds";
-import { VEST_COLORS } from "@/lib/vest-colors";
 import { canTeamLendToMatch, pickFairSubstitute } from "@/lib/substitution-draw";
 import { buildStructuralLoans } from "@/lib/underfilled-rounds";
 import { shouldExcludeReplacementScoring } from "@/lib/scoring-eligibility";
@@ -56,14 +54,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
   const availability = useMemo(() => new Map(
     (round?.round_players || []).map((entry: any) => [entry.player_id, entry.availability_status || "available"]),
   ), [round?.round_players]);
-  const attendance = useMemo(() => new Map(
-    (round?.round_players || []).map((entry: any) => [entry.player_id, entry.attendance_status || "pending"]),
-  ), [round?.round_players]);
-  // Apenas uma rodada que realmente registrou uma ordem de chegada deve
-  // exigir os dois times titulares no primeiro jogo. Sorteios aleatório e
-  // equilibrado deixam os três times disponíveis desde o início.
-  const tracksAttendance = round?.formation_mode !== "manual";
-  const usesArrivalOrder = round?.arrival_order_enabled === true;
+  const usesArrivalOrder = false;
   const previousMatch = useMemo(() => [...(round?.matches || [])].sort((a: any, b: any) =>
     (b.match_order || 0) - (a.match_order || 0) || String(b.created_at).localeCompare(String(a.created_at)),
   )[0], [round?.matches]);
@@ -74,9 +65,9 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
   );
   const injuredPlayers = useMemo(() => selectedTeams.flatMap((team: any) =>
     (team.team_players || [])
-      .filter((entry: any) => availability.get(entry.player_id) === "injured" || (tracksAttendance && attendance.get(entry.player_id) !== "present"))
-      .map((entry: any) => ({ team, player: entry.players, playerId: entry.player_id, reason: availability.get(entry.player_id) === "injured" ? "Machucado" : "Ainda nao chegou" })),
-  ), [selectedTeams, availability, tracksAttendance, attendance]);
+      .filter((entry: any) => availability.get(entry.player_id) === "injured")
+      .map((entry: any) => ({ team, player: entry.players, playerId: entry.player_id, reason: "Machucado" })),
+  ), [selectedTeams, availability]);
   // Cobertura de desfalque não depende do rodízio do último jogo: qualquer
   // atleta presente de um time que não participa deste confronto pode entrar.
   // A API repete a validação para impedir que a regra seja burlada pelo cliente.
@@ -86,7 +77,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
   const waitingPlayers = teams
     .filter((team: any) => lenderTeamIds.includes(team.id))
     .flatMap((team: any) => (team.team_players || [])
-      .filter((entry: any) => availability.get(entry.player_id) === "available" && (!tracksAttendance || attendance.get(entry.player_id) === "present"))
+      .filter((entry: any) => availability.get(entry.player_id) === "available")
       .map((entry: any) => ({ team, player: entry.players, playerId: entry.player_id })))
     .filter((entry: any) => entry.player);
   const forcedAbsenceGoalkeeperByTeam = useMemo(() => {
@@ -115,8 +106,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
       players: (team.team_players || []).map((entry: any, index: number) => ({
         playerId: entry.player_id,
         loanOrder: Number(entry.loan_order || entry.goalkeeper_order || index + 1),
-        eligible: availability.get(entry.player_id) === "available"
-          && (!tracksAttendance || attendance.get(entry.player_id) === "present"),
+        eligible: availability.get(entry.player_id) === "available",
       })),
     })),
     selectedTeamIds,
@@ -124,7 +114,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
     previousLoanCount,
     reservedPlayerIds: new Set([...Object.values(replacementByAbsent).filter(Boolean), ...declinedStructuralPlayerIds]),
     preferredPlayerBySlot: new Map(Object.entries(structuralLoanOverrideBySlot)),
-  }), [teams, selectedTeamIds, targetPlayersPerTeam, previousLoanCount, replacementByAbsent, declinedStructuralPlayerIds, structuralLoanOverrideBySlot, availability, attendance, tracksAttendance]);
+  }), [teams, selectedTeamIds, targetPlayersPerTeam, previousLoanCount, replacementByAbsent, declinedStructuralPlayerIds, structuralLoanOverrideBySlot, availability]);
   const structuralShortage = selectedTeams.reduce(
     (total: number, team: any) => total + Math.max(0, targetPlayersPerTeam - (team.team_players || []).length),
     0,
@@ -137,7 +127,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
       loan.targetTeamId === team.id && loan.rotationOrder === 1,
     );
     const players = (team.team_players || [])
-      .filter((entry: any) => availability.get(entry.player_id) !== "injured" && (!tracksAttendance || attendance.get(entry.player_id) === "present"))
+      .filter((entry: any) => availability.get(entry.player_id) !== "injured")
       .map((entry: any) => ({
         id: entry.player_id,
         name: entry.players?.name || "Jogador",
@@ -169,7 +159,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
       }
     }
     return [team.id, players];
-  })), [teams, availability, attendance, tracksAttendance, replacementByAbsent, playerTeamById, waitingPlayers, structuralLoans, teamPlayerById]);
+  })), [teams, availability, replacementByAbsent, playerTeamById, waitingPlayers, structuralLoans, teamPlayerById]);
 
   const bqGoalkeeperSuggestionByTeam = useMemo(() => Object.fromEntries(teams.map((team: any) => {
     const loanStartsGoalkeeperQueue = structuralLoans.some((loan) =>
@@ -397,43 +387,6 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
     router.replace(`/partidas/${res.matchId}`);
   }
 
-  async function markTeamArrived(teamId: string) {
-    setManagementLoading(true);
-    setError("");
-    const result = await markRoundTeamArrived(round.id, teamId);
-    if (!result.success) setError(result.error || "Nao foi possivel atualizar as chegadas.");
-    else router.refresh();
-    setManagementLoading(false);
-  }
-
-  async function handleCaptainChange(teamId: string, playerId: string) {
-    const previous = captainByTeam[teamId] || "";
-    setCaptainByTeam((current) => ({ ...current, [teamId]: playerId }));
-    setManagementLoading(true);
-    setError("");
-    const result = await setRoundTeamCaptain(round.id, teamId, playerId || null);
-    if (!result.success) {
-      setCaptainByTeam((current) => ({ ...current, [teamId]: previous }));
-      setError(result.error || "Nao foi possivel definir o capitao.");
-    } else {
-      router.refresh();
-    }
-    setManagementLoading(false);
-  }
-
-  async function handleVestColorChange(teamId: string, color: string) {
-    const previous = colorByTeam[teamId];
-    setColorByTeam((current) => ({ ...current, [teamId]: color }));
-    setManagementLoading(true);
-    setError("");
-    const result = await setRoundTeamVestColor(round.id, teamId, color);
-    if (!result.success) {
-      setColorByTeam((current) => ({ ...current, [teamId]: previous }));
-      setError(result.error || "Nao foi possivel definir a cor do colete.");
-    } else router.refresh();
-    setManagementLoading(false);
-  }
-
   async function handleFixedGoalkeeperChange(teamId: string) {
     const previous = fixedGoalkeeperByTeam[teamId] || "";
     const nextPlayerId = previous ? "" : goalkeeperByTeam[teamId] || "";
@@ -554,41 +507,6 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
         </div>
       </div>}
 
-      {!quickStart && <section className="glass-card overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent"><Crown className="h-4.5 w-4.5" /></span>
-          <div><h2 className="text-sm font-black text-foreground">Identidade dos times</h2><p className="text-[10px] text-muted">Escolha o colete e o capitão de referência no mesmo lugar.</p></div>
-        </div>
-        <div className="divide-y divide-border">
-          {teams.map((team: any, index: number) => (
-            <div key={team.id} className="grid min-w-0 grid-cols-[auto_auto_1fr] gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[auto_auto_1fr_auto_auto] sm:items-center">
-              <TeamReferenceBadge position={team.position} fallbackIndex={index} color={colorByTeam[team.id] || team.color} className="h-11 w-11 text-xl row-span-2 sm:row-span-1" />
-              <TeamCrest name={team.name} crestUrl={team.crest_url} color={colorByTeam[team.id] || team.color} className="h-9 w-9 shrink-0 row-span-2 sm:row-span-1" />
-              <span className="min-w-0 flex-1 truncate text-[10px] font-bold text-muted">{team.name}</span>
-              <label className="col-start-3 flex min-w-0 items-center gap-2 sm:col-start-auto">
-                <span className="text-[9px] font-black uppercase text-muted">Colete</span>
-                <select value={colorByTeam[team.id] || team.color} onChange={(event) => handleVestColorChange(team.id, event.target.value)} disabled={managementLoading} className="min-w-0 flex-1 rounded-xl border border-border bg-background px-2.5 py-2 text-[10px] font-bold text-foreground disabled:opacity-50 sm:w-28">
-                  {VEST_COLORS.map((item) => <option key={item.color} value={item.color}>{item.label}</option>)}
-                </select>
-              </label>
-              <label className="col-start-3 flex min-w-0 items-center gap-2 sm:col-start-auto">
-                <span className="text-[9px] font-black uppercase text-muted">Capitão</span>
-              <select
-                value={captainByTeam[team.id] || ""}
-                onChange={(event) => handleCaptainChange(team.id, event.target.value)}
-                disabled={managementLoading}
-                aria-label={`Capitão do ${team.name}`}
-                className="min-w-0 flex-1 rounded-xl border border-border bg-background px-2.5 py-2 text-[10px] font-bold text-foreground disabled:opacity-50 sm:w-32"
-              >
-                <option value="">Sem capitão</option>
-                {(team.team_players || []).map((entry: any) => <option key={entry.player_id} value={entry.player_id}>{entry.players?.name}</option>)}
-              </select>
-              </label>
-            </div>
-          ))}
-        </div>
-      </section>}
-
       {!quickStart ? <div className="glass-card p-6 flex flex-col items-center gap-6 animate-fade-in-up">
         
         {error && (
@@ -602,7 +520,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
           <label className="text-xs font-bold text-muted uppercase tracking-wider pl-1">
             Time 1
           </label>
-          <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
             {teams.map((t: any, index: number) => {
               const isSelected = teamAId === t.id;
               const isDisabled = teamBId === t.id || (!previousMatch && usesArrivalOrder && !firstMatchAllowedIds.has(t.id));
@@ -618,15 +536,15 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
                     boxShadow: isSelected ? `0 0 16px ${vestColor}45` : undefined,
                   }}
                   className={`
-                    p-3 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-200
+                    min-w-0 p-2 sm:p-3 rounded-2xl border flex flex-col items-center gap-1.5 sm:gap-2 transition-all duration-200
                     ${isSelected ? "scale-[1.03] ring-1 ring-white/20" : "hover:border-white/30 hover:bg-surface-hover"}
                     ${teamBId === t.id ? "opacity-40 cursor-not-allowed" : ""}
                     ${!previousMatch && usesArrivalOrder && !firstMatchAllowedIds.has(t.id) ? "opacity-35 cursor-not-allowed" : ""}
                   `}
                   disabled={isDisabled}
                 >
-                  <TeamReferenceBadge position={t.position} fallbackIndex={index} color={vestColor} className="h-14 w-14 text-3xl" />
-                  <TeamCrest name={t.name} crestUrl={t.crest_url} color={vestColor} className="h-11 w-11" />
+                  <TeamReferenceBadge position={t.position} fallbackIndex={index} color={vestColor} className="h-11 w-11 text-2xl sm:h-14 sm:w-14 sm:text-3xl" />
+                  <TeamCrest name={t.name} crestUrl={t.crest_url} color={vestColor} className="h-8 w-8 sm:h-11 sm:w-11" />
                   <span className="w-full truncate text-center text-[10px] font-bold text-muted">{t.name}</span>
                   <span
                     className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-black uppercase"
@@ -659,7 +577,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
           <label className="text-xs font-bold text-muted uppercase tracking-wider pl-1">
             Time 2
           </label>
-          <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
             {teams.map((t: any, index: number) => {
               const isSelected = teamBId === t.id;
               const isDisabled = teamAId === t.id || (!previousMatch && usesArrivalOrder && !firstMatchAllowedIds.has(t.id));
@@ -675,15 +593,15 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
                     boxShadow: isSelected ? `0 0 16px ${vestColor}45` : undefined,
                   }}
                   className={`
-                    p-3 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-200
+                    min-w-0 p-2 sm:p-3 rounded-2xl border flex flex-col items-center gap-1.5 sm:gap-2 transition-all duration-200
                     ${isSelected ? "scale-[1.03] ring-1 ring-white/20" : "hover:border-white/30 hover:bg-surface-hover"}
                     ${teamAId === t.id ? "opacity-40 cursor-not-allowed" : ""}
                     ${!previousMatch && usesArrivalOrder && !firstMatchAllowedIds.has(t.id) ? "opacity-35 cursor-not-allowed" : ""}
                   `}
                   disabled={isDisabled}
                 >
-                  <TeamReferenceBadge position={t.position} fallbackIndex={index} color={vestColor} className="h-14 w-14 text-3xl" />
-                  <TeamCrest name={t.name} crestUrl={t.crest_url} color={vestColor} className="h-11 w-11" />
+                  <TeamReferenceBadge position={t.position} fallbackIndex={index} color={vestColor} className="h-11 w-11 text-2xl sm:h-14 sm:w-14 sm:text-3xl" />
+                  <TeamCrest name={t.name} crestUrl={t.crest_url} color={vestColor} className="h-8 w-8 sm:h-11 sm:w-11" />
                   <span className="w-full truncate text-center text-[10px] font-bold text-muted">{t.name}</span>
                   <span
                     className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-black uppercase"
@@ -757,10 +675,6 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
 
           {injuredPlayers.length > 0 && (
             <div className="space-y-4 p-4">
-              {tracksAttendance && [...new Set(injuredPlayers.filter((entry: any) => entry.reason === "Ainda nao chegou").map((entry: any) => entry.team.id))].map((teamId: any) => {
-                const team = teams.find((item: any) => item.id === teamId);
-                return <div key={teamId} className="rounded-xl border border-warning/25 bg-warning/5 p-3"><div className="flex items-center gap-2"><Users className="h-4 w-4 text-warning" /><p className="flex-1 text-xs font-bold text-foreground">Todo mundo do {team?.name} chegou?</p><button type="button" disabled={managementLoading} onClick={() => markTeamArrived(teamId)} className="rounded-lg bg-accent px-3 py-2 text-[9px] font-black uppercase text-background">Sim, todos</button></div><p className="mt-2 text-[10px] text-muted">Se não, escolha abaixo alguém presente de qualquer time que não joga esta partida.</p></div>;
-              })}
               {injuredPlayers.map((entry: any) => {
                 const usedByAnother = new Set(
                   Object.entries(replacementByAbsent)
@@ -817,7 +731,6 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
               const replacementIds = new Set(Object.values(replacementByAbsent).filter(Boolean));
               const candidates = (source?.team_players || []).filter((entry: any) =>
                 availability.get(entry.player_id) === "available"
-                && (!tracksAttendance || attendance.get(entry.player_id) === "present")
                 && !usedByAnotherSlot.has(entry.player_id)
                 && !replacementIds.has(entry.player_id)
               );
