@@ -17,6 +17,7 @@ const command = {
     absent_player_id: null,
   }],
   idempotencyKey: "match-request-1",
+  clientStartedAt: "2026-10-21T12:00:00.000Z",
 };
 
 describe("gateway de abertura de partida", () => {
@@ -42,6 +43,7 @@ describe("gateway de abertura de partida", () => {
       p_goalkeeper_b_rotation_order: null,
       p_lineup: command.lineup,
       p_idempotency_key: "match-request-1",
+      p_client_started_at: "2026-10-21T12:00:00.000Z",
     });
   });
 
@@ -52,7 +54,7 @@ describe("gateway de abertura de partida", () => {
     });
     const gateway = supabaseCreateMatchGateway({ rpc } as unknown as Parameters<typeof supabaseCreateMatchGateway>[0]);
 
-    await expect(gateway.create(command)).rejects.toThrow("Atualização 334 do banco pendente");
+    await expect(gateway.create(command)).rejects.toThrow("Atualização 347 do banco pendente");
   });
 
   it("rejeita resposta sem recibo", async () => {

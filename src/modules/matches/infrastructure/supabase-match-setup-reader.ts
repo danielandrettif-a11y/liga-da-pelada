@@ -9,6 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  */
 export const MATCH_SETUP_ROUND_SELECT = `
   id,
+  league_id,
   number,
   target_players_per_team,
   formation_mode,

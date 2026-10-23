@@ -21,6 +21,9 @@ export default async function NovaPartidaPage({
   }
 
   return (
-    <MatchCreator round={round} />
+    <MatchCreator
+      round={round}
+      draftStorageKey={account.user ? `match-draft:${account.user.id}:${round.league_id}:${round.id}:${round.matches?.length || 0}` : undefined}
+    />
   );
 }

@@ -358,6 +358,7 @@ export async function createMatch(input: CreateMatchInput) {
           : null,
         lineup: lineupRows,
         idempotencyKey,
+        clientStartedAt: input.client_started_at || null,
       }),
     );
 
@@ -394,7 +395,9 @@ export async function createMatch(input: CreateMatchInput) {
     };
   } catch (err: any) {
     console.error("Erro ao criar partida:", err);
-    return { success: false, error: err.message };
+    const message = String(err?.message || "Não foi possível criar a partida.");
+    const uncertain = /fetch failed|failed to fetch|network|econn|socket|aborted|timeout|timed out/i.test(message);
+    return { success: false, error: message, uncertain };
   }
 }
 

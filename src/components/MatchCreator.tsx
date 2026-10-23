@@ -15,15 +15,35 @@ type MatchCreatorProps = {
   round: any;
   initialTeamIds?: [string, string];
   quickStart?: boolean;
+  embedded?: boolean;
   onCancel?: () => void;
+  draftStorageKey?: string;
+  onSyncStateChange?: (syncing: boolean) => void;
 };
 
-export function MatchCreator({ round, initialTeamIds, quickStart = false, onCancel }: MatchCreatorProps) {
+type CreationIntent = {
+  fingerprint: string;
+  key: string;
+  startedAt: string;
+};
+
+export function MatchCreator({
+  round,
+  initialTeamIds,
+  quickStart = false,
+  embedded = false,
+  onCancel,
+  draftStorageKey,
+  onSyncStateChange,
+}: MatchCreatorProps) {
   const router = useRouter();
   const [teamAId, setTeamAId] = useState<string>(initialTeamIds?.[0] || "");
   const [teamBId, setTeamBId] = useState<string>(initialTeamIds?.[1] || "");
   const [loading, setLoading] = useState(false);
   const [creationUncertain, setCreationUncertain] = useState(false);
+  const [provisionalKickoffAt, setProvisionalKickoffAt] = useState<string | null>(null);
+  const [provisionalNow, setProvisionalNow] = useState(() => Date.now());
+  const [confirmedMatchId, setConfirmedMatchId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [replacementByAbsent, setReplacementByAbsent] = useState<Record<string, string>>({});
   const [structuralLoanOverrideBySlot, setStructuralLoanOverrideBySlot] = useState<Record<string, string>>({});
@@ -41,7 +61,9 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
     (round?.teams || []).map((team: any) => [team.id, team.color || "#22c55e"]),
   ));
   const [substitutionNotice, setSubstitutionNotice] = useState<Array<{ absent: string; replacement: string }> | null>(null);
-  const creationIntentRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const creationIntentRef = useRef<CreationIntent | null>(null);
+  const restoringDraftRef = useRef(false);
+  const [draftReady, setDraftReady] = useState(!draftStorageKey);
 
   const teams = useMemo(() => round?.teams || [], [round?.teams]);
   const leagueConfig = Array.isArray(round?.league) ? round.league[0] : round?.league;
@@ -207,6 +229,10 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
   })), [teams, eligibleGoalkeepersByTeam, round?.matches, replacementByAbsent, structuralLoans, forcedAbsenceGoalkeeperByTeam]);
 
   useEffect(() => {
+    if (restoringDraftRef.current) {
+      restoringDraftRef.current = false;
+      return;
+    }
     setReplacementByAbsent({});
     setStructuralLoanOverrideBySlot({});
     setDeclinedStructuralPlayerIds([]);
@@ -277,6 +303,67 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
     ));
   }, [teams]);
 
+  useEffect(() => {
+    if (!draftStorageKey) return;
+    try {
+      const raw = window.sessionStorage.getItem(draftStorageKey);
+      if (raw) {
+        const draft = JSON.parse(raw) as Record<string, unknown>;
+        restoringDraftRef.current = typeof draft.teamAId === "string" || typeof draft.teamBId === "string";
+        if (typeof draft.teamAId === "string") setTeamAId(draft.teamAId);
+        if (typeof draft.teamBId === "string") setTeamBId(draft.teamBId);
+        if (draft.goalkeeperByTeam && typeof draft.goalkeeperByTeam === "object") {
+          setGoalkeeperByTeam(draft.goalkeeperByTeam as Record<string, string>);
+        }
+        if (draft.goalkeeperModeByTeam && typeof draft.goalkeeperModeByTeam === "object") {
+          setGoalkeeperModeByTeam(draft.goalkeeperModeByTeam as Record<string, "bq" | "manual">);
+        }
+        if (draft.replacementByAbsent && typeof draft.replacementByAbsent === "object") {
+          setReplacementByAbsent(draft.replacementByAbsent as Record<string, string>);
+        }
+        if (draft.structuralLoanOverrideBySlot && typeof draft.structuralLoanOverrideBySlot === "object") {
+          setStructuralLoanOverrideBySlot(draft.structuralLoanOverrideBySlot as Record<string, string>);
+        }
+        if (Array.isArray(draft.declinedStructuralPlayerIds)) {
+          setDeclinedStructuralPlayerIds(draft.declinedStructuralPlayerIds.filter((id): id is string => typeof id === "string"));
+        }
+      }
+    } catch {
+      window.sessionStorage.removeItem(draftStorageKey);
+    } finally {
+      setDraftReady(true);
+    }
+  }, [draftStorageKey]);
+
+  useEffect(() => {
+    if (!draftStorageKey || !draftReady || provisionalKickoffAt) return;
+    try {
+      window.sessionStorage.setItem(draftStorageKey, JSON.stringify({
+        teamAId,
+        teamBId,
+        goalkeeperByTeam,
+        goalkeeperModeByTeam,
+        replacementByAbsent,
+        structuralLoanOverrideBySlot,
+        declinedStructuralPlayerIds,
+      }));
+    } catch {
+      // O rascunho é uma conveniência; falta de espaço não bloqueia a partida.
+    }
+  }, [declinedStructuralPlayerIds, draftReady, draftStorageKey, goalkeeperByTeam, goalkeeperModeByTeam, provisionalKickoffAt, replacementByAbsent, structuralLoanOverrideBySlot, teamAId, teamBId]);
+
+  useEffect(() => {
+    onSyncStateChange?.(Boolean(provisionalKickoffAt));
+    return () => onSyncStateChange?.(false);
+  }, [onSyncStateChange, provisionalKickoffAt]);
+
+  useEffect(() => {
+    if (!provisionalKickoffAt) return;
+    setProvisionalNow(Date.now());
+    const timer = window.setInterval(() => setProvisionalNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [provisionalKickoffAt]);
+
   async function handleStart() {
     if (!teamAId || !teamBId) {
       setError("Selecione os dois times para iniciar.");
@@ -300,10 +387,6 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
       setError(`O time de fora não possui jogadores disponíveis suficientes para completar ${targetPlayersPerTeam}x${targetPlayersPerTeam}.`);
       return;
     }
-
-    setLoading(true);
-    setError("");
-    const actionStartedAt = performance.now();
 
     // O match_order seria a quantidade de matches + 1
     const order = (round?.matches?.length || 0) + 1;
@@ -333,12 +416,35 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
       ? creationIntentRef.current
       : null;
     const creationIntentKey = existingIntent?.key || crypto.randomUUID();
-    creationIntentRef.current = { fingerprint: creationFingerprint, key: creationIntentKey };
+    const clientStartedAt = existingIntent?.startedAt || new Date().toISOString();
+    creationIntentRef.current = {
+      fingerprint: creationFingerprint,
+      key: creationIntentKey,
+      startedAt: clientStartedAt,
+    };
+    setProvisionalKickoffAt(clientStartedAt);
+    setProvisionalNow(Date.now());
+    setCreationUncertain(false);
+    setLoading(true);
+    setError("");
+    const actionStartedAt = performance.now();
+    window.requestAnimationFrame(() => {
+      if (!navigator.sendBeacon) return;
+      const payload = JSON.stringify({
+        kind: "client_action",
+        name: "create_match_feedback",
+        value: Math.round(performance.now() - actionStartedAt),
+        path: window.location.pathname,
+        metadata: { provisional: true },
+      });
+      navigator.sendBeacon("/api/internal/observability", new Blob([payload], { type: "application/json" }));
+    });
 
     let res: Awaited<ReturnType<typeof createMatch>> | null = null;
     try {
       res = await createMatch({
         idempotency_key: creationIntentKey,
+        client_started_at: clientStartedAt,
         ...createInput,
       });
     } catch {
@@ -361,6 +467,9 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
       try {
         const existingId = await findLiveMatchForTeams(round.id, teamAId, teamBId);
         if (existingId) {
+          if (draftStorageKey) window.sessionStorage.removeItem(draftStorageKey);
+          setConfirmedMatchId(existingId);
+          setLoading(false);
           router.replace(`/partidas/${existingId}`);
           return;
         }
@@ -370,21 +479,33 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
         setLoading(false);
         return;
       }
-      if (!res) {
+      if (!res || ("uncertain" in res && res.uncertain)) {
         setCreationUncertain(true);
-        setError("Não foi possível confirmar o início. Verifique a rodada antes de tentar novamente.");
+        setError("O cronômetro está rodando neste aparelho, mas o servidor ainda não confirmou a partida.");
       } else {
         // O servidor respondeu com uma rejeição definitiva: uma nova tentativa
         // explícita pode representar uma nova intenção.
         creationIntentRef.current = null;
+        setConfirmedMatchId(null);
+        setProvisionalKickoffAt(null);
         setError(res.error || "Erro ao criar partida");
       }
       setLoading(false);
       return;
     }
 
+    const confirmedId = res.matchId;
+    if (!confirmedId) {
+      setCreationUncertain(true);
+      setError("O servidor confirmou a operação, mas não devolveu o identificador da partida.");
+      setLoading(false);
+      return;
+    }
     creationIntentRef.current = null;
-    router.replace(`/partidas/${res.matchId}`);
+    if (draftStorageKey) window.sessionStorage.removeItem(draftStorageKey);
+    setConfirmedMatchId(confirmedId);
+    setLoading(false);
+    router.replace(`/partidas/${confirmedId}`);
   }
 
   async function handleFixedGoalkeeperChange(teamId: string) {
@@ -466,6 +587,74 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
     );
   }
 
+  if (provisionalKickoffAt) {
+    const elapsedSeconds = Math.max(0, Math.floor(
+      (provisionalNow - new Date(provisionalKickoffAt).getTime()) / 1000,
+    ));
+    const minutes = Math.floor(elapsedSeconds / 60);
+    const seconds = elapsedSeconds % 60;
+    const teamA = teams.find((team: any) => team.id === teamAId);
+    const teamB = teams.find((team: any) => team.id === teamBId);
+
+    return (
+      <section className="space-y-4" role="status" aria-live="polite">
+        <div className="overflow-hidden rounded-3xl border border-accent/35 bg-[#06130b] shadow-[0_0_32px_rgba(190,255,0,0.08)]">
+          <div className="border-b border-accent/20 bg-accent/[.07] px-5 py-4 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[.2em] text-accent">
+              {confirmedMatchId ? "Partida confirmada" : creationUncertain ? "Sem confirmação" : "Sincronizando partida"}
+            </p>
+            <p className="mt-2 font-athletic text-5xl font-black tabular-nums text-foreground">
+              {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+            </p>
+            <p className="mt-2 text-[10px] font-bold text-muted">Cronômetro iniciado neste aparelho</p>
+          </div>
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 py-5 text-center">
+            <div className="min-w-0">
+              <TeamReferenceBadge position={teamA?.position} fallbackIndex={0} color={teamA?.color} className="mx-auto h-14 w-14 text-3xl" />
+              <p className="mt-2 truncate text-xs font-black text-foreground">{teamA?.name}</p>
+            </div>
+            <Swords className="h-6 w-6 text-accent" />
+            <div className="min-w-0">
+              <TeamReferenceBadge position={teamB?.position} fallbackIndex={1} color={teamB?.color} className="mx-auto h-14 w-14 text-3xl" />
+              <p className="mt-2 truncate text-xs font-black text-foreground">{teamB?.name}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className={`rounded-2xl border p-4 text-center ${creationUncertain ? "border-warning/45 bg-warning/10" : "border-accent/25 bg-accent/[.05]"}`}>
+          <p className={`text-xs font-black ${creationUncertain ? "text-warning" : "text-accent"}`}>
+            {confirmedMatchId ? "Tudo certo. Abrindo o placar ao vivo…" : creationUncertain ? "A conexão não confirmou o primeiro apito." : "Confirmando escalações e disponibilidade…"}
+          </p>
+          <p className="mt-1 text-[10px] leading-relaxed text-muted">
+            {confirmedMatchId ? "Se a navegação não acontecer automaticamente, abra o placar pelo botão abaixo." : "Gols, substituições e outros controles serão liberados assim que o servidor confirmar a partida."}
+          </p>
+        </div>
+
+        {creationUncertain && (
+          <button
+            type="button"
+            onClick={() => void handleStart()}
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-4 text-sm font-black text-background disabled:opacity-50"
+          >
+            {loading ? "Confirmando…" : "Tentar confirmar novamente"}
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        )}
+        {confirmedMatchId && (
+          <button
+            type="button"
+            onClick={() => router.replace(`/partidas/${confirmedMatchId}`)}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-4 text-sm font-black text-background"
+          >
+            Abrir placar ao vivo
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        )}
+      </section>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {substitutionNotice && (
@@ -492,7 +681,7 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
         </div>
       )}
       {/* Top bar */}
-      {!quickStart && <div className="flex items-center gap-3">
+      {!quickStart && !embedded && <div className="flex items-center gap-3">
         <Link
           href={`/rodadas/${round.id}`}
           className="w-10 h-10 rounded-full bg-surface hover:bg-surface-hover flex items-center justify-center transition-colors"
@@ -774,9 +963,9 @@ export function MatchCreator({ round, initialTeamIds, quickStart = false, onCanc
         </Link>
       )}
 
-      {quickStart && onCancel && (
+      {(quickStart || embedded) && onCancel && (
         <button type="button" onClick={onCancel} disabled={loading} className="w-full rounded-xl border border-border bg-surface py-3 text-xs font-black text-muted disabled:opacity-50">
-          Agora não · voltar para a rodada
+          {quickStart ? "Agora não · voltar para a rodada" : "Cancelar"}
         </button>
       )}
 

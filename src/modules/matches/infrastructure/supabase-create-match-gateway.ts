@@ -18,6 +18,7 @@ export type CreateLiveMatchCommand = {
   goalkeeperBRotationOrder: number | null;
   lineup: MatchLineupCommand[];
   idempotencyKey: string;
+  clientStartedAt: string | null;
 };
 
 export type CreatedLiveMatchReceipt = {
@@ -46,12 +47,13 @@ export function supabaseCreateMatchGateway(client: SupabaseClient) {
         p_goalkeeper_b_rotation_order: command.goalkeeperBRotationOrder,
         p_lineup: command.lineup,
         p_idempotency_key: command.idempotencyKey,
+        p_client_started_at: command.clientStartedAt,
       });
       if (error) {
         const migrationMissing = error.code === "PGRST202"
           || /create_live_match/i.test(error.message || "") && /schema cache|function/i.test(error.message || "");
         if (migrationMissing) {
-          throw new Error("Atualização 334 do banco pendente. A partida não foi iniciada.");
+          throw new Error("Atualização 347 do banco pendente. A partida não foi iniciada.");
         }
         throw new Error(error.message);
       }

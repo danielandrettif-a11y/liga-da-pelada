@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, CalendarDays, Plus } from "@/components/icons";
+import { ArrowLeft, CalendarDays } from "@/components/icons";
 import { getRound } from "@/lib/actions/rounds";
 import { formatDateShort, formatDuration, formatTimeRange, getMatchElapsedSeconds } from "@/lib/utils";
 import { FinishRoundButton } from "@/components/FinishRoundButton";
@@ -19,6 +19,7 @@ import { getExpenseItems, getPaymentRecipients } from "@/lib/actions/payments";
 import { DeleteMatchButton } from "@/components/DeleteMatchButton";
 import { RoundLiveStats } from "@/components/RoundLiveStats";
 import { getSelectedLeague } from "@/lib/league-context";
+import { RoundMatchLauncher } from "@/components/RoundMatchLauncher";
 
 export const revalidate = 0;
 
@@ -63,6 +64,57 @@ export default async function RodadaDetalhePage({
     .filter(Boolean)
     .sort((a: any, b: any) => a.name.localeCompare(b.name, "pt-BR"));
   const roundElapsedSeconds = (round.matches || []).reduce((total: number, match: any) => total + getMatchElapsedSeconds(match), 0);
+  const matchSetupRound = {
+    id: round.id,
+    league_id: round.league_id,
+    number: round.number,
+    target_players_per_team: round.target_players_per_team,
+    formation_mode: round.formation_mode,
+    arrival_order_enabled: round.arrival_order_enabled,
+    round_players: (round.round_players || []).map((entry: any) => ({
+      player_id: entry.player_id,
+      availability_status: entry.availability_status,
+      attendance_status: entry.attendance_status,
+    })),
+    teams: (round.teams || []).map((team: any) => ({
+      id: team.id,
+      name: team.name,
+      position: team.position,
+      color: team.color,
+      crest_url: team.crest_url,
+      captain_player_id: team.captain_player_id,
+      fixed_goalkeeper_player_id: team.fixed_goalkeeper_player_id,
+      team_players: (team.team_players || []).map((entry: any) => ({
+        player_id: entry.player_id,
+        goalkeeper_order: entry.goalkeeper_order,
+        loan_order: entry.loan_order,
+        players: entry.players ? {
+          id: entry.players.id,
+          name: entry.players.name,
+          is_goalkeeper: entry.players.is_goalkeeper,
+        } : null,
+      })),
+    })),
+    matches: (round.matches || []).map((match: any) => ({
+      id: match.id,
+      team_a_id: match.team_a_id,
+      team_b_id: match.team_b_id,
+      match_order: match.match_order,
+      started_at: match.started_at,
+      created_at: match.created_at,
+      match_players: (match.match_players || []).map((player: any) => ({
+        player_id: player.player_id,
+        team_id: player.team_id,
+        original_team_id: player.original_team_id,
+      })),
+      match_goalkeepers: (match.match_goalkeepers || []).map((goalkeeper: any) => ({
+        player_id: goalkeeper.player_id,
+        team_id: goalkeeper.team_id,
+        rotation_order: goalkeeper.rotation_order,
+      })),
+    })),
+    league: { players_per_team: (round.league as any)?.players_per_team },
+  };
   const overview = (
     <div className="space-y-6">
       {/* Top bar */}
@@ -91,13 +143,7 @@ export default async function RodadaDetalhePage({
       <StadiumLink name={(round.league as any)?.stadium_name} mapUrl={(round.league as any)?.stadium_map_url} />
 
       {round.status !== "finished" && account.isAdmin && (
-        <Link
-          href={`/rodadas/${round.id}/nova-partida`}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-accent px-5 py-4 text-sm font-black uppercase tracking-wide text-background shadow-lg shadow-accent/20 transition-all hover:bg-accent-light active:scale-[0.98]"
-        >
-          <Plus className="h-5 w-5" strokeWidth={3} />
-          Nova Partida
-        </Link>
+        <RoundMatchLauncher round={matchSetupRound} userId={account.user!.id} />
       )}
 
       <RoundLiveStats matches={round.matches || []} players={participants} teams={round.teams || []} />

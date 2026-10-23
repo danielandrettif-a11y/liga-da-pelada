@@ -6,7 +6,7 @@ import type { Player } from "@/lib/types";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { TeamCrest } from "./TeamCrest";
 import { TeamReferenceBadge } from "./TeamReferenceBadge";
-import { Crown, Loader2 } from "@/components/icons";
+import { ChevronDown, Crown, Loader2 } from "@/components/icons";
 import { setRoundTeamCaptain, setRoundTeamVestColor } from "@/lib/actions/rounds";
 import { VEST_COLORS } from "@/lib/vest-colors";
 
@@ -112,6 +112,7 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
   const router = useRouter();
   const [captainId, setCaptainId] = useState(team.captain_player_id || "");
   const [teamColor, setTeamColor] = useState(team.color || "#22c55e");
+  const [colorSelectorOpen, setColorSelectorOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const playerEntries = team.team_players
@@ -161,7 +162,10 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
     if (!result.success) {
       setTeamColor(previous);
       setMessage(result.error || "Não foi possível mudar o colete.");
-    } else router.refresh();
+    } else {
+      setColorSelectorOpen(false);
+      router.refresh();
+    }
     setPending(false);
   }
 
@@ -217,11 +221,11 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
               disabled={!onPlayerClick && !showPositionDetails && !canManageIdentity}
               onClick={() => onPlayerClick ? onPlayerClick(player as Player) : void chooseCaptain(player.id)}
               aria-pressed={canManageIdentity ? captainId === player.id : onPlayerClick ? selectedPlayerId === player.id : undefined}
-              className={`absolute flex ${widthClass} -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-md transition-transform enabled:active:scale-95 ${selectedPlayerId === player.id ? "z-10 ring-2 ring-accent" : ""}`}
+              className={`absolute flex ${widthClass} -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-md transition-transform enabled:cursor-pointer enabled:active:scale-95 ${selectedPlayerId === player.id ? "z-10 ring-2 ring-accent" : ""}`}
               style={{ left: `${left}%`, top: `${top}%` }}
               title={`${player.name}${goalkeeperOrder ? ` · G${goalkeeperOrder}` : ""}${loanOrder ? ` · E${loanOrder}` : ""}`}
             >
-              <div className="relative rounded-full border-2" style={{ borderColor: teamColor }}>
+              <div className="pointer-events-none relative rounded-full border-2" style={{ borderColor: teamColor }}>
                 <PlayerAvatar
                   name={player.name}
                   playerId={showPositionDetails ? player.id : undefined}
@@ -251,7 +255,7 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
                   </span>
                 )}
               </div>
-              <span className={`mt-0.5 block w-full truncate whitespace-nowrap rounded bg-black/75 px-0.5 py-0.5 text-center font-black leading-tight text-white shadow-sm ${isCrowded ? "text-[6px]" : "text-[8px]"}`}>
+              <span className={`pointer-events-none mt-0.5 block w-full truncate whitespace-nowrap rounded bg-black/75 px-0.5 py-0.5 text-center font-black leading-tight text-white shadow-sm ${isCrowded ? "text-[6px]" : "text-[8px]"}`}>
                 {player.name}
               </span>
               {showPositionDetails && (
@@ -268,25 +272,38 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
       </div>
       {canManageIdentity && (
         <div className="mt-1.5 rounded-lg border border-border/70 bg-background/55 p-1.5">
-          <div className="flex items-center gap-1.5">
-            <span className="shrink-0 text-[7px] font-black uppercase text-muted">Colete</span>
-            <div className="flex min-w-0 flex-1 justify-end gap-1 overflow-x-auto py-0.5">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setColorSelectorOpen((current) => !current)}
+            aria-expanded={colorSelectorOpen}
+            className="flex min-h-7 w-full items-center justify-between gap-1 rounded-md px-1 text-left transition-colors hover:bg-white/5 disabled:opacity-60"
+          >
+            <span className="text-[7px] font-black uppercase text-foreground">Colete</span>
+            <span className="flex min-w-0 items-center gap-1">
+              <span className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-white" style={{ backgroundColor: teamColor }} />
+              <ChevronDown className={`h-3 w-3 shrink-0 text-accent transition-transform ${colorSelectorOpen ? "rotate-180" : ""}`} />
+            </span>
+          </button>
+          {colorSelectorOpen && <div className="mt-1.5 border-t border-white/10 pt-1.5">
+            <p className="mb-1 text-center text-[6px] font-black uppercase tracking-wide text-muted">Escolha a cor</p>
+            <div className="grid grid-cols-4 gap-1.5">
               {VEST_COLORS.map((vest) => (
                 <button
                   key={vest.color}
                   type="button"
                   disabled={pending}
                   onClick={() => void chooseColor(vest.color)}
-                  className={`h-4 w-4 shrink-0 rounded-full border-2 ${teamColor.toLowerCase() === vest.color.toLowerCase() ? "scale-110 border-white" : "border-black/40"}`}
+                  className={`mx-auto h-4 w-4 shrink-0 rounded-full border-2 transition-transform active:scale-90 ${teamColor.toLowerCase() === vest.color.toLowerCase() ? "scale-110 border-white ring-1 ring-accent" : "border-black/40"}`}
                   style={{ backgroundColor: vest.color }}
                   aria-label={`Colete ${vest.label}`}
                   title={vest.label}
                 />
               ))}
-              {pending && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-accent" />}
+              {pending && <Loader2 className="col-span-4 mx-auto h-4 w-4 animate-spin text-accent" />}
             </div>
-          </div>
-          <p className="mt-1 truncate text-center text-[7px] font-bold text-muted">Toque no jogador para {captainId ? "trocar" : "escolher"} o capitão</p>
+          </div>}
+          <p className="mt-1 text-center text-[7px] font-bold leading-tight text-muted">Toque na foto ou no nome para {captainId ? "trocar" : "escolher"} o capitão</p>
           {message && <p className="mt-1 text-center text-[7px] font-bold text-danger">{message}</p>}
         </div>
       )}

@@ -16,6 +16,7 @@ import {
   LogIn,
   MapPin,
   PencilLine,
+  Plus,
   Shield,
   Share2,
   Shirt,
@@ -67,6 +68,7 @@ import {
 } from "@/modules/callups/domain/callup-guest-list";
 import { RoundSetupSteps } from "./RoundSetupSteps";
 import { DelayedPitchLoadingOverlay } from "./DelayedPitchLoadingOverlay";
+import { saveStadium } from "@/lib/actions/stadiums";
 
 type Props = {
   callup: CallupWithEntries;
@@ -116,6 +118,14 @@ export function CallupBoard({
   const [editingCallup, setEditingCallup] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
+  const [editableStadiums, setEditableStadiums] = useState(stadiums);
+  const [editStadiumId, setEditStadiumId] = useState(callup.stadium_id || stadiums[0]?.id || "");
+  const [showEditStadium, setShowEditStadium] = useState(stadiums.length === 0);
+  const [newEditStadiumName, setNewEditStadiumName] = useState("");
+  const [newEditStadiumAddress, setNewEditStadiumAddress] = useState("");
+  const [newEditStadiumMapUrl, setNewEditStadiumMapUrl] = useState("");
+  const [editStadiumLoading, setEditStadiumLoading] = useState(false);
+  const [editStadiumError, setEditStadiumError] = useState("");
   const [formatPlayers, setFormatPlayers] = useState(callup.players_per_team || Math.round(callup.capacity / (callup.teams_per_round || 3)));
   const [formatTeams, setFormatTeams] = useState(callup.teams_per_round || 3);
   const [formatNotice, setFormatNotice] = useState("");
@@ -192,6 +202,28 @@ export function CallupBoard({
       setEditLoading(false);
       router.refresh();
     }
+  }
+
+  async function createEditStadium() {
+    setEditStadiumLoading(true);
+    setEditStadiumError("");
+    const formData = new FormData();
+    formData.set("name", newEditStadiumName);
+    formData.set("address", newEditStadiumAddress);
+    formData.set("google_maps_url", newEditStadiumMapUrl);
+    const result = await saveStadium(formData);
+    if (!result.success) {
+      setEditStadiumError(result.error || "Não foi possível cadastrar o campo.");
+    } else {
+      setEditableStadiums((current) => [...current, result.stadium]);
+      setEditStadiumId(result.stadium.id);
+      setShowEditStadium(false);
+      setNewEditStadiumName("");
+      setNewEditStadiumAddress("");
+      setNewEditStadiumMapUrl("");
+      router.refresh();
+    }
+    setEditStadiumLoading(false);
   }
 
   async function run(key: string, action: () => Promise<{ success: boolean; error?: string; status?: "confirmed" | "waitlist" }>) {
@@ -407,7 +439,12 @@ export function CallupBoard({
             {isAdmin && (
               <button
                 type="button"
-                onClick={() => setEditingCallup(true)}
+                onClick={() => {
+                  setEditStadiumId(callup.stadium_id || editableStadiums[0]?.id || "");
+                  setShowEditStadium(editableStadiums.length === 0);
+                  setEditStadiumError("");
+                  setEditingCallup(true);
+                }}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-muted hover:text-accent hover:border-accent/40 transition-colors"
                 title="Editar convocação"
                 aria-label="Editar convocação"
@@ -1362,23 +1399,56 @@ export function CallupBoard({
                 </div>
               </div>
 
-              <div>
+              <div className="space-y-1">
                 <label className="mb-1 block text-[10px] font-bold uppercase text-muted">Campo / Estádio</label>
+                <input type="hidden" name="stadium_id" value={editStadiumId} />
                 <select
-                  name="stadium_id"
-                  defaultValue={callup.stadium_id || (stadiums && stadiums[0]?.id) || ""}
+                  value={showEditStadium ? "__new__" : editStadiumId}
+                  onChange={(event) => {
+                    if (event.target.value === "__new__") {
+                      setEditStadiumId("");
+                      setShowEditStadium(true);
+                      return;
+                    }
+                    setEditStadiumId(event.target.value);
+                    setShowEditStadium(false);
+                  }}
                   className="block w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-xs text-foreground"
                 >
-                  {stadiums && stadiums.length > 0 ? (
-                    stadiums.map((stadium) => (
-                      <option key={stadium.id} value={stadium.id}>
-                        {stadium.name} {stadium.address ? `(${stadium.address})` : ""}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">Estádio Padrão da Liga</option>
-                  )}
+                  <option value="">Estádio padrão da liga</option>
+                  {editableStadiums.map((stadium) => (
+                    <option key={stadium.id} value={stadium.id}>
+                      {stadium.name} {stadium.address ? `(${stadium.address})` : ""}
+                    </option>
+                  ))}
+                  <option value="__new__">＋ Adicionar um novo campo</option>
                 </select>
+                {!showEditStadium && editableStadiums.length > 0 && (
+                  <button type="button" onClick={() => setShowEditStadium(true)} className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-black text-accent">
+                    <Plus className="h-3.5 w-3.5" /> Cadastrar outro campo
+                  </button>
+                )}
+                {showEditStadium && (
+                  <div className="mt-2 space-y-2 rounded-xl border border-accent/30 bg-accent/5 p-3 animate-fade-in">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-black text-foreground">Novo campo</p>
+                      {editableStadiums.length > 0 && <button type="button" onClick={() => setShowEditStadium(false)} aria-label="Fechar cadastro do campo" className="rounded-full p-1 text-muted"><X className="h-4 w-4" /></button>}
+                    </div>
+                    <input value={newEditStadiumName} onChange={(event) => setNewEditStadiumName(event.target.value)} placeholder="Nome do campo" className="block w-full rounded-lg border border-border bg-background px-3 py-2.5 text-xs text-foreground" />
+                    <input value={newEditStadiumAddress} onChange={(event) => setNewEditStadiumAddress(event.target.value)} placeholder="Endereço (opcional)" className="block w-full rounded-lg border border-border bg-background px-3 py-2.5 text-xs text-foreground" />
+                    <input type="url" value={newEditStadiumMapUrl} onChange={(event) => setNewEditStadiumMapUrl(event.target.value)} placeholder="Link do Google Maps" className="block w-full rounded-lg border border-border bg-background px-3 py-2.5 text-xs text-foreground" />
+                    {editStadiumError && <p role="alert" className="text-[11px] font-bold text-danger">{editStadiumError}</p>}
+                    <button
+                      type="button"
+                      onClick={createEditStadium}
+                      disabled={editStadiumLoading || !newEditStadiumName.trim() || !newEditStadiumMapUrl.trim()}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 py-2.5 text-xs font-black text-background disabled:opacity-50"
+                    >
+                      {editStadiumLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                      {editStadiumLoading ? "Cadastrando..." : "Cadastrar e selecionar campo"}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {soloMode ? <input type="hidden" name="round_type" value="friendly" /> : <div>
@@ -1426,7 +1496,7 @@ export function CallupBoard({
                 </button>
                 <button
                   type="submit"
-                  disabled={editLoading}
+                  disabled={editLoading || editStadiumLoading}
                   className="rounded-xl bg-accent py-3 text-xs font-black text-background transition-transform active:scale-[0.99] disabled:opacity-50"
                 >
                   {editLoading ? "Salvando..." : "Salvar alterações"}

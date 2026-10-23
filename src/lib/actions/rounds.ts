@@ -131,6 +131,7 @@ export async function getRound(id: string) {
         team_players (
           player_id,
           goalkeeper_order,
+          loan_order,
           players (*)
         )
       ),
