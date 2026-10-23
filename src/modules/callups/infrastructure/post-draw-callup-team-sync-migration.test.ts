@@ -8,6 +8,13 @@ const migration = readFileSync(
 );
 
 describe("sincronização da convocação com os times após o sorteio", () => {
+  it("valida o limite pelo formato preservado na rodada", () => {
+    expect(migration).toContain("CREATE OR REPLACE FUNCTION public.enforce_team_player_limit()");
+    expect(migration).toContain("round_item.target_players_per_team");
+    expect(migration).toContain("callup.players_per_team");
+    expect(migration).toContain("league.players_per_team");
+  });
+
   it("encaixa confirmados no menor time sem ultrapassar o formato", () => {
     expect(migration).toContain("attach_confirmed_callup_player_to_team");
     expect(migration).toContain("HAVING count(team_player.id) < target_size");

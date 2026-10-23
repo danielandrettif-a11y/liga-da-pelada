@@ -5,6 +5,60 @@
 
 BEGIN;
 
+-- O limite antigo consultava apenas a configuracao atual da liga. Como cada
+-- rodada agora preserva o proprio formato, um 7x7 podia ser bloqueado em 5
+-- atletas quando a liga estivesse configurada como 5x5. A validacao precisa
+-- usar a mesma fonte de verdade empregada pela sincronizacao abaixo.
+CREATE OR REPLACE FUNCTION public.enforce_team_player_limit()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  configured_limit integer;
+  current_size integer;
+BEGIN
+  PERFORM 1
+  FROM public.teams
+  WHERE id = NEW.team_id
+  FOR UPDATE;
+
+  SELECT COALESCE(
+    round_item.target_players_per_team,
+    (
+      SELECT callup.players_per_team
+      FROM public.callups callup
+      WHERE callup.round_id = round_item.id
+        AND callup.players_per_team IS NOT NULL
+      ORDER BY callup.created_at DESC, callup.id DESC
+      LIMIT 1
+    ),
+    league.players_per_team
+  )
+  INTO configured_limit
+  FROM public.teams team
+  JOIN public.rounds round_item ON round_item.id = team.round_id
+  JOIN public.leagues league ON league.id = round_item.league_id
+  WHERE team.id = NEW.team_id;
+
+  IF configured_limit IS NULL THEN
+    RAISE EXCEPTION 'Nao foi possivel identificar o limite de jogadores deste time.';
+  END IF;
+
+  SELECT count(*)
+  INTO current_size
+  FROM public.team_players team_player
+  WHERE team_player.team_id = NEW.team_id
+    AND (TG_OP = 'INSERT' OR team_player.id <> NEW.id);
+
+  IF current_size >= configured_limit THEN
+    RAISE EXCEPTION 'Este time ja atingiu o limite de % jogadores.', configured_limit;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.attach_confirmed_callup_player_to_team(
   p_callup_id uuid,
   p_player_id uuid
