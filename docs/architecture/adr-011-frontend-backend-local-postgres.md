@@ -4,7 +4,7 @@
 
 ## Contexto
 
-O documento `REFACTOR_PROMPT.md` propõe frontend Next.js, backend TypeScript, PostgreSQL 16 na VPS, SSE e Docker Compose. A base atual já usa módulos de domínio/aplicação/infraestrutura, RPCs transacionais no PostgreSQL, uma view de estatísticas, atualização otimista do placar e uma outbox local de gols. Também depende de Supabase Auth, RLS, Storage, PostgREST e Realtime em diversos fluxos. Por isso, mover arquivos ou executar as migrations existentes em um container PostgreSQL vazio não produz uma aplicação funcional.
+O documento `REFACTOR_PROMPT.md` propõe frontend Next.js, backend TypeScript, PostgreSQL 16 na VPS, SSE e Docker Compose. A base atual já usa módulos de domínio/aplicação/infraestrutura, RPCs transacionais no PostgreSQL, uma view de estatísticas, atualização otimista do placar e uma outbox local de gols. Também depende de Supabase Auth, RLS, Storage, PostgREST e Realtime em diversos fluxos. Por isso, mover arquivos ou executar as migrations existentes em um container PostgreSQL vazio não produz uma aplicação funcional. O arquivo `supabase/config.toml` especifica PostgreSQL 17; o backup oficial local de 15/10/2026 declara origem 17.6. O alvo inicial passa a ser **PostgreSQL 17**. Uma mudança para 16 exigiria ensaio separado de exportação lógica e compatibilidade.
 
 ## Decisão proposta
 
@@ -24,7 +24,7 @@ O backend será a única entrada para mutações migradas. A autoridade transaci
 
 ## Ajustes necessários à proposta original
 
-1. **Banco:** as migrations em `supabase/migrations/` dependem de `auth.users`, `auth.uid()`, papéis, `storage.objects`, grants, RLS e funções de plataforma. `/docker-entrypoint-initdb.d` sozinho não fornece esses objetos. Criar um baseline reexecutável e um plano de exportação/restauração com verificação de dados antes de trocar a conexão. PostgreSQL 16 é alvo, não garantia de compatibilidade sem ensaio.
+1. **Banco:** as migrations em `supabase/migrations/` dependem de `auth.users`, `auth.uid()`, papéis, `storage.objects`, grants, RLS e funções de plataforma. `/docker-entrypoint-initdb.d` sozinho não fornece esses objetos. Criar um baseline reexecutável e um plano de exportação/restauração com verificação de dados antes de trocar a conexão. O restore do arquivo existente em 16 não é um caminho suportado; usar 17 para o primeiro ensaio.
 2. **Autenticação e arquivos:** escolher e implementar substitutos locais para Auth/OAuth, Storage e políticas antes de remover o Supabase Cloud. Preservar IDs de usuários e URLs/objetos ou migrá-los com tabela de correspondência verificada. O serviço não deve executar SQL como superusuário nem confiar em `userId` fornecido pelo navegador.
 3. **Gols:** a função `register_goal` já bloqueia a partida, grava evento/placar e trata retry idempotente. O novo caso de uso deve reutilizá-la inicialmente, com contexto autenticado, e publicar somente após commit. Reescrever a regra no TypeScript antes dessa paridade cria risco de gols duplicados e de autorização.
 4. **Ranking:** `player_season_stats` já agrega scouts no banco. A classificação oficial usa as **seis melhores rodadas** e diferencia amistosos, peladas e temporadas. Uma nova query/view deve reproduzir essa semântica; `SUM(points)` não é equivalente. Medir p95 antes de materializar ou duplicar dados.
@@ -44,7 +44,7 @@ O backend será a única entrada para mutações migradas. A autoridade transaci
 ## Sequência de implementação
 
 1. **Baseline:** congelar contratos existentes e medir caminhos críticos. Mapear SDK, RPC, Auth, Storage, Realtime, jobs, push e integrações externas. Guardar fixtures anonimizadas para paridade.
-2. **Banco local em ambiente descartável:** gerar baseline de esquema a partir de um projeto de teste representativo; aplicar migrations posteriores por runner versionado; restaurar cópia anonimizada; comprovar roles, RLS, funções, views, índices, extensões e integridade. Não apontar a aplicação para o banco vazio.
+2. **Banco local em ambiente descartável:** gerar baseline de esquema a partir de um projeto de teste representativo; aplicar migrations posteriores por runner versionado; restaurar cópia anonimizada em PostgreSQL 17; comprovar roles, RLS, funções, views, índices, extensões e integridade. Não apontar a aplicação para o banco vazio.
 3. **Identidade e arquivos:** implementar autenticação e storage locais e migrar dados preservando autorização. Trocar primeiro leitores simples sob configuração reversível. Esta etapa define se serviços Supabase auto-hospedados temporários ou substitutos próprios são mais seguros e leves na VPS.
 4. **Backend de partidas:** extrair contrato HTTP e adaptar o caso de uso atual à conexão local, mantendo a função SQL como autoridade. Testar dois ADMs concorrentes, retry pós-commit, resposta perdida, gol contra, assistência e acesso entre peladas.
 5. **SSE:** publicar gols/encerramento confirmados; expor snapshot + stream autorizado; mudar `MatchLiveBoard` gradualmente; testar reconexão e lacunas. Só então remover os canais Realtime equivalentes.

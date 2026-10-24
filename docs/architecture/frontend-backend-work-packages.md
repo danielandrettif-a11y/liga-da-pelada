@@ -21,7 +21,7 @@ Não mover `src/` inteiro no primeiro commit: isso altera centenas de caminhos s
 ### Lote 0 — prova de compatibilidade do banco
 
 - Inventariar objetos por migration e obter um dump **anonimizado** do ambiente de teste, incluindo esquema, papéis necessários, dados de referência e objetos de Storage; nunca versionar dump ou segredos.
-- Subir PostgreSQL 16 local com volume persistente e executar restauração em base descartável. As migrations novas devem ter runner com tabela de versão, transação por migration e falha explícita; `/docker-entrypoint-initdb.d` serve só para o baseline inicial.
+- Subir PostgreSQL 17 local com volume persistente e executar restauração em base descartável. O backup disponível foi gerado por PostgreSQL 17.6. As migrations novas devem ter runner com tabela de versão, transação por migration e falha explícita; `/docker-entrypoint-initdb.d` serve só para o baseline inicial.
 - Comparar contagens e checksums por pelada/temporada, funções `register_goal`/encerramento, RLS, view `player_season_stats`, extensões e permissões. Registrar resultados no repositório.
 - Gate: criar uma partida descartável e executar rollback sem diferença de dados.
 
@@ -53,7 +53,7 @@ Não mover `src/` inteiro no primeiro commit: isso altera centenas de caminhos s
 ### Lote 5 — organização física e operação
 
 - Mover app Next.js para `frontend/`, backend e scripts SQL para pastas alvo; criar workspaces e builds isolados. Testar caminhos de assets, aliases, service worker, jobs e migrations antes de remover compatibilidade.
-- Compose final: PostgreSQL 16 não exposto publicamente, backend, frontend, proxy TLS, health checks, volumes, backup agendado e teste de restore. Secretos em arquivo/gerenciador fora do Git; `.env.example` apenas documenta nomes.
+- Compose final: PostgreSQL 17 não exposto publicamente, backend, frontend, proxy TLS, health checks, volumes, backup agendado e teste de restore. Secretos em arquivo/gerenciador fora do Git; `.env.example` apenas documenta nomes.
 - Gate: instalação limpa e upgrade de versão em VPS de homologação, teste de rollback e observabilidade dos três tempos críticos.
 
 ## Ordem de PRs recomendada
