@@ -34,7 +34,7 @@ Não mover `src/` inteiro no primeiro commit: isso altera centenas de caminhos s
 
 ### Lote 2 — gols e placar
 
-- Adicionar `POST /api/matches/:id/goals` no backend, validando corpo e sessão. Adaptar a RPC `register_goal` atual em uma transação com contexto autenticado e recebendo o recibo idempotente.
+- Adicionar `POST /api/matches/:id/goals` no backend, validando corpo e sessão. Adaptar a RPC `register_goal` atual em uma transação com contexto autenticado e recebendo o recibo idempotente. Antes de ativar a rota, acrescentar verificação SQL de payload quando a chave já existir; hoje a RPC retorna o recibo anterior sem conferir o conteúdo.
 - Frontend troca apenas o envio de gol para HTTP; conserva a outbox, a chave estável, o placar pendente, retries e reversão atuais de `MatchLiveBoard`.
 - Gate: concorrência de dois ADMs, repetição pós-commit, erro de rede após commit, gol contra, assistência, autorização e comparação do placar/eventos com a implementação atual.
 

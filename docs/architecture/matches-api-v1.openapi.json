@@ -1,0 +1,100 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Liga da Pelada — partidas ao vivo",
+    "version": "1.0.0",
+    "description": "Contrato alvo para a primeira fatia do backend. A implementação entra em operação após o gate de identidade e banco do ADR 011."
+  },
+  "servers": [{ "url": "/" }],
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "liga_session",
+        "description": "Sessão emitida pelo serviço local de identidade. SSE usa a mesma origem e cookie HttpOnly."
+      }
+    },
+    "schemas": {
+      "GoalCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["player_id", "team_id", "idempotency_key"],
+        "properties": {
+          "player_id": { "type": "string", "format": "uuid" },
+          "team_id": { "type": "string", "format": "uuid" },
+          "assist_player_id": { "type": ["string", "null"], "format": "uuid" },
+          "minute": { "type": "integer", "minimum": 0 },
+          "idempotency_key": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "is_own_goal": { "type": "boolean", "default": false }
+        }
+      },
+      "GoalReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["event_id", "idempotent", "score_a", "score_b", "round_id"],
+        "properties": {
+          "event_id": { "type": "string", "format": "uuid" },
+          "idempotent": { "type": "boolean" },
+          "score_a": { "type": "integer", "minimum": 0 },
+          "score_b": { "type": "integer", "minimum": 0 },
+          "round_id": { "type": "string", "format": "uuid" }
+        }
+      },
+      "ApiError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message"],
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/matches/{matchId}/goals": {
+      "parameters": [
+        { "name": "matchId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "post": {
+        "summary": "Registrar gol com chave de idempotência",
+        "description": "Exige ADM da pelada. A gravação de evento e placar ocorre na mesma transação. A publicação SSE só acontece após commit. Repetir a mesma chave e conteúdo devolve o mesmo recibo; payload diferente com a mesma chave é conflito. A origem da requisição deve ser verificada para proteger a sessão baseada em cookie.",
+        "security": [{ "sessionCookie": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GoalCommand" } } }
+        },
+        "responses": {
+          "200": { "description": "Gol confirmado ou recibo idempotente", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GoalReceipt" } } } },
+          "400": { "description": "Dados inválidos", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+          "401": { "description": "Sessão ausente ou expirada" },
+          "403": { "description": "Sem permissão nessa pelada" },
+          "404": { "description": "Partida não encontrada" },
+          "409": { "description": "Partida encerrada ou chave reutilizada com outro conteúdo" },
+          "503": { "description": "Resultado incerto; repetir com a mesma chave" }
+        }
+      }
+    },
+    "/api/matches/{matchId}/stream": {
+      "parameters": [
+        { "name": "matchId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "get": {
+        "summary": "Acompanhar placar por SSE",
+        "description": "Exige acesso à partida. Envia snapshot autorizado ao conectar ou reconectar e eventos `goal` e `match-finished` somente após commit. Heartbeat periódico mantém a conexão; cada evento possui `id`. O cliente reconcilia a outbox pelo `event_id`/chave de idempotência e nunca trata evento local pendente como confirmado.",
+        "security": [{ "sessionCookie": [] }],
+        "responses": {
+          "200": {
+            "description": "Fluxo SSE; eventos snapshot, goal e match-finished",
+            "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-cache" } } },
+            "content": { "text/event-stream": { "schema": { "type": "string" } } }
+          },
+          "401": { "description": "Sessão ausente ou expirada" },
+          "403": { "description": "Sem acesso à partida" },
+          "404": { "description": "Partida não encontrada" }
+        }
+      }
+    }
+  }
+}
