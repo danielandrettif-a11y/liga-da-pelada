@@ -14,6 +14,7 @@
     "test:multi-league": "node scripts/verify-multi-league-isolation.mjs",
     "check": "npm run typecheck && npm test && npm run build",
     "audit:security": "npm audit --omit=dev --audit-level=high",
+    "audit:architecture": "node scripts/audit-architecture.mjs",
     "audit:cards": "node scripts/audit-fantasy-cards.mjs",
     "types:supabase": "node scripts/generate-database-types.mjs",
     "audit:cartola": "node scripts/analyze-cartola-balance.mjs",
