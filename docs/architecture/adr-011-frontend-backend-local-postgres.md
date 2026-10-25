@@ -22,6 +22,8 @@ deploy/                      Dockerfiles, Compose, proxy, backup e restauração
 
 O backend será a única entrada para mutações migradas. A autoridade transacional permanece nas funções SQL existentes até que cada substituição prove paridade de autorização, concorrência, idempotência e resultado. O frontend mantém o comportamento otimista já implementado e passa a chamar a API somente depois que a fatia correspondente estiver pronta.
 
+Para o primeiro corte de infraestrutura, usar a stack Supabase **auto-hospedada** com PostgreSQL 17 na VPS. Isso remove os roundtrips ao Cloud sem obrigar a reescrever Auth, Storage, PostgREST e Realtime no mesmo lote. O backend próprio assume esses contratos gradualmente. A exportação final deve seguir o guia oficial com `roles.sql`, `schema.sql` e `data.sql`; o `pg_dump` bruto existente é material de diagnóstico e não um restore de produção pronto.
+
 ## Ajustes necessários à proposta original
 
 1. **Banco:** as migrations em `supabase/migrations/` dependem de `auth.users`, `auth.uid()`, papéis, `storage.objects`, grants, RLS e funções de plataforma. `/docker-entrypoint-initdb.d` sozinho não fornece esses objetos. Criar um baseline reexecutável e um plano de exportação/restauração com verificação de dados antes de trocar a conexão. O restore do arquivo existente em 16 não é um caminho suportado; usar 17 para o primeiro ensaio.
