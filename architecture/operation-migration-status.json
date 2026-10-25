@@ -31,6 +31,39 @@
       ]
     },
     {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "joinOpenLeague",
+      "state": "backend-pilot",
+      "target": "POST /api/leagues/:leagueId/memberships",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-league-membership.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "toggleFavorite",
+      "state": "backend-pilot",
+      "target": "PATCH /api/leagues/:leagueId/favorite",
+      "evidence": [
+        "backend/src/contexts/leagues/infrastructure/pg-league-lobby-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "requestAccess",
+      "state": "backend-pilot",
+      "target": "POST /api/league-invites/:inviteToken/membership-requests",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-league-membership.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts"
+      ]
+    },
+    {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "registerGoal",
