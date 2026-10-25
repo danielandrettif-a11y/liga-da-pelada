@@ -3,6 +3,7 @@ import type { GoalRepository } from "../contexts/matches/application/register-go
 import type { LeagueRepository } from "../contexts/leagues/application/create-league.js";
 import type { LeagueMembershipRequestRepository } from "../contexts/leagues/application/request-league-membership.js";
 import type { LeagueLobbyRepository } from "../contexts/leagues/application/manage-league-membership.js";
+import type { LeagueAdminRepository } from "../contexts/leagues/application/manage-league-admin.js";
 import { registerGoalRoutes } from "../contexts/matches/presentation/goals-route.js";
 import { registerLeagueRoutes } from "../contexts/leagues/presentation/leagues-route.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
@@ -15,6 +16,7 @@ export function createApp(dependencies: {
   leagueRepository?: LeagueRepository;
   leagueMembershipRequestRepository?: LeagueMembershipRequestRepository;
   leagueLobbyRepository?: LeagueLobbyRepository;
+  leagueAdminRepository?: LeagueAdminRepository;
   logger?: boolean;
 }): FastifyInstance {
   if (dependencies.leaguesEnabled && !dependencies.leagueRepository) {
@@ -25,6 +27,9 @@ export function createApp(dependencies: {
   }
   if (dependencies.leaguesEnabled && !dependencies.leagueLobbyRepository) {
     throw new Error("LeagueLobbyRepository é obrigatório quando ENABLE_LEAGUE_API=true.");
+  }
+  if (dependencies.leaguesEnabled && !dependencies.leagueAdminRepository) {
+    throw new Error("LeagueAdminRepository é obrigatório quando ENABLE_LEAGUE_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
   app.setErrorHandler((error, request, reply) => {
@@ -47,12 +52,14 @@ export function createApp(dependencies: {
     registerGoalRoutes(app, { verifier: dependencies.verifier, repository: dependencies.repository });
   }
   if (dependencies.leaguesEnabled && dependencies.leagueRepository
-    && dependencies.leagueMembershipRequestRepository && dependencies.leagueLobbyRepository) {
+    && dependencies.leagueMembershipRequestRepository && dependencies.leagueLobbyRepository
+    && dependencies.leagueAdminRepository) {
     registerLeagueRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.leagueRepository,
       membershipRequestRepository: dependencies.leagueMembershipRequestRepository,
       lobbyRepository: dependencies.leagueLobbyRepository,
+      adminRepository: dependencies.leagueAdminRepository,
     });
   }
   return app;

@@ -64,6 +64,39 @@
       ]
     },
     {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "reviewAccess",
+      "state": "backend-pilot",
+      "target": "POST /api/league-membership-requests/:requestId/review",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-league-admin.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "addExistingAccount",
+      "state": "backend-pilot",
+      "target": "POST /api/leagues/:leagueId/members",
+      "evidence": [
+        "backend/src/contexts/leagues/infrastructure/pg-league-admin-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "updateLeagueVisibility",
+      "state": "backend-pilot",
+      "target": "PATCH /api/leagues/:leagueId/visibility",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-league-admin.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts"
+      ]
+    },
+    {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "registerGoal",

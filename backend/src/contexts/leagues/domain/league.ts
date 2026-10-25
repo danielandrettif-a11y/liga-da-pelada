@@ -22,10 +22,15 @@ export class InvalidLeagueIdError extends Error {
 }
 
 export function parseLeagueId(value: string): string {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
     throw new InvalidLeagueIdError();
   }
   return value.toLowerCase();
+}
+
+export function parseLeagueVisibility(value: string): LeagueVisibility {
+  if (value !== "private" && value !== "open") throw new InvalidLeagueError();
+  return value;
 }
 
 /** Mesma regra de criação aplicada atualmente em src/modules/leagues/domain. */

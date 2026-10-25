@@ -13,12 +13,20 @@ import {
   type LeagueLobbyRepository,
 } from "../application/manage-league-membership.js";
 import { LeagueLobbyPersistenceError } from "../infrastructure/pg-league-lobby-repository.js";
+import {
+  addExistingAccountToLeague,
+  reviewLeagueMembership,
+  updateLeagueVisibility,
+  type LeagueAdminRepository,
+} from "../application/manage-league-admin.js";
+import { LeagueAdminPersistenceError } from "../infrastructure/pg-league-admin-repository.js";
 
 export function registerLeagueRoutes(app: FastifyInstance, dependencies: {
   verifier: UserVerifier;
   repository: LeagueRepository;
   membershipRequestRepository: LeagueMembershipRequestRepository;
   lobbyRepository: LeagueLobbyRepository;
+  adminRepository: LeagueAdminRepository;
 }): void {
   app.post<{ Body: { name: string; tier: string; visibility: string } }>(
     "/api/leagues",
@@ -157,6 +165,90 @@ export function registerLeagueRoutes(app: FastifyInstance, dependencies: {
           return reply.code(error.statusCode).send({ code: "INVITE_REQUEST_REJECTED", message: error.message });
         }
         request.log.error({ err: error }, "invite membership request failed");
+        return reply.code(503).send({ code: "LEAGUE_UNAVAILABLE", message: "Serviço indisponível." });
+      }
+    },
+  );
+
+  app.post<{ Params: { requestId: string }; Body: { approve: boolean } }>(
+    "/api/league-membership-requests/:requestId/review",
+    {
+      schema: {
+        params: { type: "object", required: ["requestId"], properties: { requestId: { type: "string", format: "uuid" } } },
+        body: { type: "object", additionalProperties: false, required: ["approve"], properties: { approve: { type: "boolean" } } },
+      },
+    },
+    async (request, reply) => {
+      const authentication = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in authentication) {
+        return reply.code(authentication.error.statusCode).send({ code: authentication.error.code, message: authentication.error.message });
+      }
+      try {
+        return await reviewLeagueMembership(request.params.requestId, request.body.approve, authentication.actor, dependencies.adminRepository);
+      } catch (error) {
+        if (error instanceof InvalidLeagueIdError) return reply.code(400).send({ code: "INVALID_REQUEST_ID", message: error.message });
+        if (error instanceof LeagueAdminPersistenceError) {
+          return reply.code(error.statusCode).send({ code: "MEMBERSHIP_REVIEW_REJECTED", message: error.message });
+        }
+        request.log.error({ err: error }, "league membership review failed");
+        return reply.code(503).send({ code: "LEAGUE_UNAVAILABLE", message: "Serviço indisponível." });
+      }
+    },
+  );
+
+  app.post<{ Params: { leagueId: string }; Body: { user_id: string } }>(
+    "/api/leagues/:leagueId/members",
+    {
+      schema: {
+        params: { type: "object", required: ["leagueId"], properties: { leagueId: { type: "string", format: "uuid" } } },
+        body: { type: "object", additionalProperties: false, required: ["user_id"], properties: { user_id: { type: "string", format: "uuid" } } },
+      },
+    },
+    async (request, reply) => {
+      const authentication = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in authentication) {
+        return reply.code(authentication.error.statusCode).send({ code: authentication.error.code, message: authentication.error.message });
+      }
+      try {
+        return reply.code(201).send(await addExistingAccountToLeague(
+          request.params.leagueId, request.body.user_id, authentication.actor, dependencies.adminRepository,
+        ));
+      } catch (error) {
+        if (error instanceof InvalidLeagueIdError) return reply.code(400).send({ code: "INVALID_MEMBER", message: error.message });
+        if (error instanceof LeagueAdminPersistenceError) {
+          return reply.code(error.statusCode).send({ code: "LEAGUE_MEMBER_REJECTED", message: error.message });
+        }
+        request.log.error({ err: error }, "league member addition failed");
+        return reply.code(503).send({ code: "LEAGUE_UNAVAILABLE", message: "Serviço indisponível." });
+      }
+    },
+  );
+
+  app.patch<{ Params: { leagueId: string }; Body: { visibility: string } }>(
+    "/api/leagues/:leagueId/visibility",
+    {
+      schema: {
+        params: { type: "object", required: ["leagueId"], properties: { leagueId: { type: "string", format: "uuid" } } },
+        body: { type: "object", additionalProperties: false, required: ["visibility"], properties: { visibility: { type: "string", enum: ["private", "open"] } } },
+      },
+    },
+    async (request, reply) => {
+      const authentication = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in authentication) {
+        return reply.code(authentication.error.statusCode).send({ code: authentication.error.code, message: authentication.error.message });
+      }
+      try {
+        return await updateLeagueVisibility(
+          request.params.leagueId, request.body.visibility, authentication.actor, dependencies.adminRepository,
+        );
+      } catch (error) {
+        if (error instanceof InvalidLeagueError || error instanceof InvalidLeagueIdError) {
+          return reply.code(400).send({ code: "INVALID_VISIBILITY", message: error.message });
+        }
+        if (error instanceof LeagueAdminPersistenceError) {
+          return reply.code(error.statusCode).send({ code: "LEAGUE_VISIBILITY_REJECTED", message: error.message });
+        }
+        request.log.error({ err: error }, "league visibility update failed");
         return reply.code(503).send({ code: "LEAGUE_UNAVAILABLE", message: "Serviço indisponível." });
       }
     },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseNewLeague } from "./league.js";
+import { parseLeagueId, parseNewLeague } from "./league.js";
 import { parseNewLeague as parseCurrentLeague } from "../../../../../src/modules/leagues/domain/league-creation";
 
 describe("league domain", () => {
@@ -25,5 +25,10 @@ describe("league domain", () => {
       const migrated = (() => { try { return parseNewLeague(input); } catch { return null; } })();
       expect(migrated).toEqual(current);
     }
+  });
+
+  it("accepts UUID values already stored by legacy fixtures", () => {
+    expect(parseLeagueId("b0000000-0000-0000-0000-000000000001"))
+      .toBe("b0000000-0000-0000-0000-000000000001");
   });
 });
