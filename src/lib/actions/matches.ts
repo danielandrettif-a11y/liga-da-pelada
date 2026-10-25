@@ -20,6 +20,7 @@ import { registerLiveGoal } from "@/modules/matches/application/register-live-go
 import { finishSelectedMatch } from "@/modules/matches/application/finish-match";
 import { getMatchState } from "@/modules/matches/infrastructure/match-scope";
 import { GoalWriteError, supabaseGoalGateway } from "@/modules/matches/infrastructure/supabase-goal-gateway";
+import { httpGoalGateway } from "@/modules/matches/infrastructure/http-goal-gateway";
 import { supabaseFinishMatchGateway } from "@/modules/matches/infrastructure/supabase-finish-match-gateway";
 import { chooseFixedGoalkeeper, switchMatchGoalkeeper } from "@/modules/matches/application/manage-goalkeepers";
 import { supabaseGoalkeeperGateway } from "@/modules/matches/infrastructure/supabase-goalkeeper-gateway";
@@ -628,7 +629,19 @@ export async function registerGoal(input: RegisterGoalInput) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
-    const result = await registerLiveGoal(input, supabaseGoalGateway(client));
+    let gateway = supabaseGoalGateway(client);
+    if (process.env.MATCH_GOAL_API_ENABLED === "true") {
+      const backendUrl = process.env.MATCH_GOAL_BACKEND_URL;
+      if (!backendUrl) throw new GoalWriteError("API de gols não configurada.", false);
+      // getAdminClient validou o usuário com getUser. O backend verifica o
+      // access token novamente e aplica o escopo da pelada na própria RPC.
+      const { data: { session }, error } = await client.auth.getSession();
+      if (error || !session?.access_token) {
+        throw new GoalWriteError("Sessão expirada. Entre novamente.", false);
+      }
+      gateway = httpGoalGateway(backendUrl, session.access_token);
+    }
+    const result = await registerLiveGoal(input, gateway);
     if (!result.success) return result;
 
     // A tela ao vivo aplica o placar e o evento pelo resultado da ação e

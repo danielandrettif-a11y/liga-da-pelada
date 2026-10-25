@@ -9,7 +9,7 @@ Este serviço é uma fatia **experimental** da migração. A rota de gol não é
 - `infrastructure`: verifica o access token no Auth auto-hospedado e invoca a função SQL `register_goal` em transação, usando `SET LOCAL ROLE authenticated` e claims locais.
 - `presentation`: `GET /health` e, quando a flag está ativa, `POST /api/matches/:matchId/goals` com Bearer token.
 
-O [contrato alvo](../docs/architecture/matches-api-v1.openapi.json) usa cookie HttpOnly e inclui SSE. Este backend ainda aceita **somente Bearer token** e não implementa SSE. Não publicar como API v1 nem redirecionar o frontend para ele antes de fechar essa diferença e os gates abaixo.
+O [contrato alvo](../docs/architecture/matches-api-v1.openapi.json) usa cookie HttpOnly e inclui SSE. Este backend ainda aceita **somente Bearer token** e não implementa SSE. A Server Action do Next.js possui uma ponte temporária que encaminha o access token ao backend interno quando `MATCH_GOAL_API_ENABLED=true`; ela não abre essa rota ao navegador. Não publicar como API v1 nem ativar a ponte antes de fechar os gates abaixo.
 
 ## Execução local
 
@@ -26,4 +26,4 @@ Para ativar em ambiente descartável, criar `backend/.env` a partir de `.env.exa
 
 A migration `supabase/migrations/351_goal_request_consistency.sql` acrescenta o conteúdo original e o recibo do gol para garantir repetição idempotente mesmo após encerramento. Os eventos anteriores à migration não guardavam minuto solicitado nem placar original; a comparação dos registros antigos cobre os demais campos. O teste SQL em `database/goal-idempotency-*.sql` usa uma base **nova e descartável**.
 
-**Gates ainda abertos:** exportação do banco de testes, restauração completa Auth/Storage, teste da migration sobre o esquema real, teste do adaptador PostgreSQL com usuários reais, contrato final de cookie/CSRF, SSE e troca do cliente. A flag deve permanecer desativada até esses pontos serem fechados.
+**Gates ainda abertos:** restauração na stack Supabase auto-hospedada com Auth/Storage e grants, teste do adaptador PostgreSQL com usuários reais, contrato final de cookie/CSRF, SSE e demais operações de partida. O dump atualizado de testes já foi restaurado em PostgreSQL nativo e a migration 351 aplicou sobre o esquema real, mas esse ensaio excluiu Vault e ACL. As duas flags devem permanecer desativadas até os gates de homologação passarem.

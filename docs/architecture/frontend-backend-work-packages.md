@@ -2,7 +2,7 @@
 
 Este plano detalha o ADR 011. A branch começa com arquitetura e inventário; a aplicação atual continua executável enquanto cada fatia é migrada. `npm run audit:architecture -- --json` lista os arquivos ainda ligados a SDK, Auth, Storage e Realtime (busca estática aproximada, não análise de dependências).
 
-**Progresso na branch:** build standalone do frontend testado; esqueleto do backend Fastify, porta do caso de uso de gol e adaptador PostgreSQL criados; migration 351 corrige a idempotência de gols novos. O backup atualizado do projeto de testes foi restaurado em PostgreSQL 17 descartável, as contagens principais conferem e a migration 351 aplicou sobre o esquema restaurado. O ensaio completo na stack Supabase auto-hospedada, a ativação da rota HTTP e os demais lotes permanecem pendentes.
+**Progresso na branch:** build standalone do frontend testado; esqueleto do backend Fastify, porta do caso de uso de gol e adaptador PostgreSQL criados; migration 351 corrige a idempotência de gols novos. O backup atualizado do projeto de testes foi restaurado em PostgreSQL 17 descartável, as contagens principais conferem e a migration 351 aplicou sobre o esquema restaurado. A Server Action de gols possui uma ponte HTTP interna, desativada por padrão e testada sem banco remoto. O ensaio completo na stack Supabase auto-hospedada, a ativação da rota HTTP e os demais lotes permanecem pendentes.
 
 ## Mapa da base atual para a organização alvo
 
