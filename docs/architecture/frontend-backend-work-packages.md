@@ -11,7 +11,7 @@ Este plano detalha o ADR 011. A branch começa com arquitetura e inventário; a 
 | `src/modules/*/application` | `backend/src/application` | Portas explícitas, testes de caso de uso e tradução de erros HTTP. |
 | `src/modules/*/infrastructure` | `backend/src/infrastructure` | Adaptadores PostgreSQL/serviços locais com transações e autorização equivalentes. |
 | `src/lib/actions/*` | `backend/src/presentation` + cliente em `frontend/` | Cada Server Action só sai após sua rota e fluxos de UI estarem substituídos. |
-| `supabase/migrations/*` | `database/baseline` + `database/migrations` | Baseline reproduzível em PostgreSQL 16; dependências de plataforma resolvidas. |
+| `supabase/migrations/*` | `database/baseline` + `database/migrations` | Baseline reproduzível em PostgreSQL 17; dependências de plataforma resolvidas. |
 | `src/lib/supabase*` e chamadas diretas no navegador | Cliente HTTP/identidade em `frontend/` | Auth, Storage e eventos locais disponíveis e testados. |
 
 Não mover `src/` inteiro no primeiro commit: isso altera centenas de caminhos sem reduzir uma dependência de runtime e dificulta reverter uma fatia com defeito. Usar uma pasta `frontend/` para o app quando os limites de API já existirem. A organização física deve refletir limites funcionais reais.

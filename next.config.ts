@@ -15,6 +15,7 @@ const supabaseImageSource = (() => {
 })();
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   images: {
     // Cartas, escudos e avatares são servidos em vários tamanhos no celular.
     // Deixar o Next gerar WebP/AVIF evita baixar a arte original em cada miniatura.
