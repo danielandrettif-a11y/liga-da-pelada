@@ -1,9 +1,11 @@
 import pg from "pg";
 import { supabaseUserVerifier } from "./infrastructure/auth-user-verifier.js";
-import { pgGoalRepository } from "./infrastructure/pg-goal-repository.js";
+import { pgGoalRepository } from "./contexts/matches/infrastructure/pg-goal-repository.js";
+import { pgLeagueRepository } from "./contexts/leagues/infrastructure/pg-league-repository.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
+const leaguesEnabled = process.env.ENABLE_LEAGUE_API === "true";
 const port = Number(process.env.PORT || "3001");
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("PORT inválida.");
@@ -12,15 +14,17 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 const databaseUrl = process.env.DATABASE_URL;
 const authUrl = process.env.SUPABASE_INTERNAL_URL;
 const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
-if (goalsEnabled && (!databaseUrl || !authUrl || !publishableKey)) {
-  throw new Error("ENABLE_GOAL_API requer DATABASE_URL, SUPABASE_INTERNAL_URL e SUPABASE_PUBLISHABLE_KEY.");
+if ((goalsEnabled || leaguesEnabled) && (!databaseUrl || !authUrl || !publishableKey)) {
+  throw new Error("APIs habilitadas requerem DATABASE_URL, SUPABASE_INTERNAL_URL e SUPABASE_PUBLISHABLE_KEY.");
 }
 
 const pool = new pg.Pool({ connectionString: databaseUrl, max: 10 });
 const app = createApp({
   goalsEnabled,
+  leaguesEnabled,
   verifier: supabaseUserVerifier(authUrl || "http://127.0.0.1:54321", publishableKey || ""),
   repository: pgGoalRepository(pool),
+  leagueRepository: pgLeagueRepository(pool),
 });
 
 try {

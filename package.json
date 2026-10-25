@@ -15,6 +15,7 @@
     "check": "npm run typecheck && npm test && npm run build",
     "audit:security": "npm audit --omit=dev --audit-level=high",
     "audit:architecture": "node scripts/audit-architecture.mjs",
+    "audit:contexts": "node scripts/audit-application-contexts.mjs",
     "audit:db-archive": "node scripts/check-db-archive.mjs",
     "audit:cards": "node scripts/audit-fantasy-cards.mjs",
     "types:supabase": "node scripts/generate-database-types.mjs",

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GoalRepository } from "../application/register-goal.js";
+import type { GoalRepository } from "../contexts/matches/application/register-goal.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 import { createApp } from "./app.js";
 

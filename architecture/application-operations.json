@@ -1,0 +1,1340 @@
+{
+  "version": 1,
+  "operations": [
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "addRosterPlayersToCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "addRosterPlayerToCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "adminAddCallupPlayer"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "adminRemoveCallupPlayer"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "closeCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "createCallupPrelist"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getActiveCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getActiveCallupById"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getActiveCallups"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getAgendaCallups"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "hasActiveCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "inviteGuestListToCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "inviteGuestToCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "joinActiveCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "leaveActiveCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "lockCallupForRound"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "openCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "removeCallupEntry"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "repairMyPlayerAccount"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "setCallupVisibility"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "updateCallup"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "activateCardForRound"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "auditAndRepairCurrentSeasonPacks"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "claimPackCard"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "distributePackToAllLineupUsers"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "generatePacksForFinishedRound"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "getActiveCardForRound"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "getMyInventory"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "getMyInventoryCount"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "getMyPacks"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "giveMyAccountTestPack"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "grantFantasyPackToUser"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "openPack"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "removeActiveCardForRound"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "resetMyAccountCards"
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "restoreMyPassPacks"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "deleteCollectiveMessage"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "editCollectiveMessage"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getActiveCollectiveSummary"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getAdminPreviousCollective"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getCollectiveRoom"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getOlderCollectiveMessages"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "markCollectiveRead"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "sendCollectiveMessage"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "claimPassCosmetic"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "cleanupMyLegacyCosmeticsPreview"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "dismissMyUnopenedBronzePassPack"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "equipCosmetic"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getAdminCosmeticsPreview"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getAllPlayersEquippedCosmeticsMap"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getMyCosmeticsDashboard"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getMyEquippedCosmetics"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getPlayerEquippedCosmetics"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "purchaseSeasonPassShopItem"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "resetMyTestPassRewardClaims"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "createFantasyTestSession"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyAdminData"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyDashboard"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyPlayerDetail"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyPlayerSummary"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyQuickHighlights"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyRanking"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyRoundLineupOverview"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyUserHistory"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyUserRoundHistory"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getMyFantasyHistory"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getMyFantasySummary"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getRevealedLineups"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getSeasonPassDashboard"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "previewFantasyMarketV11"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "processFantasyTestSession"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "repairLegacySavedFantasyLineups"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "reprocessFantasyRound"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "reprocessFantasyRoundWithCurrentRules"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "resetFantasyTestSession"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "saveFantasyLineup"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "updateFantasySettings"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getExpenseItems"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getPaymentAuditLog"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getPaymentRecipients"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getPaymentRounds"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundExpenseSelections"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentChargeLines"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentObligations"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentPlayers"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentWorkspace"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "hasPendingPaymentRound"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "saveExpenseItem"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "savePaymentRecipient"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setExpenseItemPaidInstallments"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setExpenseItemStatus"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setPaymentObligationPaid"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setPaymentRecipientActive"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setPlayerPayment"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "syncRoundExpenseItems"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "updateRoundPaymentDetails"
+    },
+    {
+      "context": "identity",
+      "source": "src/app/cadastro/actions.ts",
+      "name": "signup"
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "login"
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "logout"
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "requestPasswordReset"
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "signInWithGoogle"
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "updatePassword"
+    },
+    {
+      "context": "identity",
+      "source": "src/lib/actions/admins.ts",
+      "name": "getManagedAccounts"
+    },
+    {
+      "context": "identity",
+      "source": "src/lib/actions/admins.ts",
+      "name": "setAccountAdminRole"
+    },
+    {
+      "context": "integrations",
+      "source": "src/app/bq-manager/actions.ts",
+      "name": "createManagerClub"
+    },
+    {
+      "context": "integrations",
+      "source": "src/app/bq-manager/actions.ts",
+      "name": "runManagerCommand"
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "addExistingAccount"
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "continueEntryFlow"
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "createLeague"
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "createQuickLeague"
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "enterArchivedQuickLeague"
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "enterLeague"
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "joinOpenLeague"
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "requestAccess"
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "requestClosedLeague"
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "reviewAccess"
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "toggleFavorite"
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/mais/league-mode-actions.ts",
+      "name": "deleteCurrentLeague"
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/mais/league-mode-actions.ts",
+      "name": "upgradeCurrentLeague"
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "getLeagueConfig"
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "updateLeagueBranding"
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "updateLeagueConfig"
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "updateLeagueName"
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "updateLeagueVisibility"
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "updatePreSeasonEnabled"
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/seasons.ts",
+      "name": "finishSeason"
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/seasons.ts",
+      "name": "getActiveSeason"
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/seasons.ts",
+      "name": "getActiveSeasonRoundIds"
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/seasons.ts",
+      "name": "getLatestFinishedSeason"
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/stadiums.ts",
+      "name": "deleteStadium"
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/stadiums.ts",
+      "name": "getStadiums"
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/stadiums.ts",
+      "name": "reorderStadiums"
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/stadiums.ts",
+      "name": "saveStadium"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/goalkeeper.ts",
+      "name": "selectBestGoalkeeper"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "addFinishedGoalEvent"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "addMatchExtraTime"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "changeMatchGoalkeeper"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "correctFinishedGoal"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "correctFinishedGoalEvent"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "createMatch"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "deleteEvent"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "deleteMatch"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "dispatchMatchTimerThreshold"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "findLiveMatchForTeams"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "finishMatch"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "getFinishedMatchAudit"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "getMatch"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "notifyMatchTimerThreshold"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "registerGoal"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "resetMatchTimer"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "setRoundTeamFixedGoalkeeper"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "substituteMatchPlayer"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "undoLastMatchSubstitution"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "updateMatchTimer"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/api/internal/cartola-reminder/route.ts",
+      "name": "POST"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/api/internal/match-timer-alert/route.ts",
+      "name": "POST"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/api/internal/push-test-alert/route.ts",
+      "name": "POST"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notificacoes/cancelar/actions.ts",
+      "name": "cancelCartolaEmailReminders"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "getNotificationPreferences"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "getPushPublicKey"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "getPushSystemStatus"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "sendCartolaEmailTest"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "sendPushTest"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "setCartolaRemindersEnabled"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "subscribeToPush"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "unsubscribeFromPush"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "updateNotificationPreferences"
+    },
+    {
+      "context": "notifications",
+      "source": "src/lib/actions/inbox.ts",
+      "name": "getMyInboxNotifications"
+    },
+    {
+      "context": "notifications",
+      "source": "src/lib/actions/inbox.ts",
+      "name": "getMyInboxPreview"
+    },
+    {
+      "context": "notifications",
+      "source": "src/lib/actions/inbox.ts",
+      "name": "markInboxRead"
+    },
+    {
+      "context": "operations",
+      "source": "src/app/api/internal/observability/route.ts",
+      "name": "POST"
+    },
+    {
+      "context": "operations",
+      "source": "src/lib/actions/performance.ts",
+      "name": "getPerformanceSummary"
+    },
+    {
+      "context": "roster",
+      "source": "src/app/admin/importar-lista/actions.ts",
+      "name": "importGuestRoster"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/account-career.ts",
+      "name": "getMyAccountCareer"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/fitness.ts",
+      "name": "getMyFitnessRounds"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/fitness.ts",
+      "name": "getPlayerFitnessSummaries"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/fitness.ts",
+      "name": "saveMyFitness"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/fitness.ts",
+      "name": "setFitnessVisibility"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "createPlayer"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "deletePlayer"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayer"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerAchievementBelts"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerAwardSeasons"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerGoalsByClub"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerMonthlyAwards"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerPlaytime"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerRoundHistory"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayers"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayersWithStats"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPreviousMonthAwardWinners"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getRosterGroups"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getSelectableLeaguePlayers"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "savePlayer"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "swapPlayerAvatars"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "updatePlayer"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/private-balance-tags.ts",
+      "name": "getPlayerPrivateBalanceTag"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/private-balance-tags.ts",
+      "name": "setPlayerPrivateBalanceTag"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "getRegisteredMergeCandidates"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "getRegistrationHistory"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "getRosterUnreadState"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "getUnreadRosterPlayers"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "markRosterActivitySeen"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "markRosterActivitySeenThrough"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "mergeGuestWithRegistered"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/speed-draw.ts",
+      "name": "drawTeamsBySpeedOnServer"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/speed-draw.ts",
+      "name": "getPlayerSpeedRatings"
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/speed-draw.ts",
+      "name": "setPlayerSpeedRating"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/adaptive-draw.ts",
+      "name": "drawTeamsAdaptiveOnServer"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "applyDraftSwap"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "createTeamDraft"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "finalizeTeamDraft"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "getDraftWorkspace"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "getDraftWorkspaceByRound"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "makeTeamDraftPick"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "replaceTeamDraftCaptain"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "restartTeamDraft"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "startTeamDraft"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "addRoundEmergencySubstitute"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "applyPermanentRoundTeamFormation"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "applyRoundTeamShuffle"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "createRoundWithTeams"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "deleteRound"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "finishRound"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getActiveLeague"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getAdminRoundPrelist"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getAdminRoundPrelists"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getNextTeamPresetOffset"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getRound"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getRoundMatchSetup"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getRounds"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "markRoundTeamArrived"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "openCallupReplacementVacancy"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "previewRoundTeamShuffle"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "saveRoundPrelist"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setCallupFormat"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setCallupMatchSize"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundAttendanceBulk"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundPlayerAttendance"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundPlayerAvailability"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundTeamCaptain"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundTeamVestColor"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "shuffleRoundTeams"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "swapRoundTeamPlayers"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "transferRoundPlayerIdentity"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "zeroPlayerRoundPoints"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "getBQScoringRules"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "getColumnCScoringRules"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "saveBQScoringRules"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "saveColumnCScoringRules"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/dashboard.ts",
+      "name": "getDashboardData"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "getOverallShadowAdminData"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "publishOverallShadow"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "recalculateAndPublishFluidOverall"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "recalculateOverallShadow"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "refreshFluidOverallSafely"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/reprocess.ts",
+      "name": "executeReprocessSeason"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/reprocess.ts",
+      "name": "previewReprocessSeason"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "calculateRoundStats"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getFriendlyStats"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getLatestPlayerCardOverallMap"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getPlayerRankingEntry"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRanking"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRankingEnrichmentForPlayers"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRankingEssentialData"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRankingExperienceData"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRoundStatistics"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/team-standings.ts",
+      "name": "getSeasonTeamStandings"
+    }
+  ]
+}

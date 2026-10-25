@@ -1,15 +1,19 @@
 # Backend inicial de partidas
 
-Este serviço é uma fatia **experimental** da migração. A rota de gol não é registrada com `ENABLE_GOAL_API=false` (padrão). O Next.js atual continua usando o fluxo existente.
+Este serviço ainda é uma fatia **experimental** da migração. As rotas de gol e criação de pelada não são registradas com `ENABLE_GOAL_API=false` e `ENABLE_LEAGUE_API=false` (padrões). O Next.js atual continua usando os fluxos existentes.
+
+O backend cobre gol e a criação inicial de pelada, ainda sem paridade de contexto completo. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação.
 
 ## Limites implementados
 
 - `domain`: valida o comando sem importar Fastify, PostgreSQL ou Next.js.
 - `application`: recebe um repositório por interface e a identidade verificada.
 - `infrastructure`: verifica o access token no Auth auto-hospedado e invoca a função SQL `register_goal` em transação, usando `SET LOCAL ROLE authenticated` e claims locais.
-- `presentation`: `GET /health` e, quando a flag está ativa, `POST /api/matches/:matchId/goals` com Bearer token.
+- `presentation`: `GET /health` e, quando cada flag está ativa, `POST /api/matches/:matchId/goals` ou `POST /api/leagues` com Bearer token.
 
 O [contrato alvo](../docs/architecture/matches-api-v1.openapi.json) usa cookie HttpOnly e inclui SSE. Este backend ainda aceita **somente Bearer token** e não implementa SSE. A Server Action do Next.js possui uma ponte temporária que encaminha o access token ao backend interno quando `MATCH_GOAL_API_ENABLED=true`; ela não abre essa rota ao navegador. Não publicar como API v1 nem ativar a ponte antes de fechar os gates abaixo.
+
+`POST /api/leagues` é uma segunda fatia: normaliza nome/modo/visibilidade, verifica o usuário no Auth local e chama a RPC transacional `create_league_for_user` com claims autenticadas. Peladas rápidas permanecem privadas. Ainda não há ponte no frontend nem teste com a stack auto-hospedada; a rota deve permanecer desativada. Como a RPC não tem chave de idempotência, o cliente não deve fazer retry automático de criação após resposta incerta.
 
 ## Execução local
 

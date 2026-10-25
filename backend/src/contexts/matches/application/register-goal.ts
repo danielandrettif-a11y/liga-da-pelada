@@ -1,6 +1,5 @@
 import { validateGoalCommand, type GoalCommand, type GoalReceipt } from "../domain/goal.js";
-
-export type Actor = { userId: string };
+import type { Actor } from "../../../shared/actor.js";
 
 export interface GoalRepository {
   /** Confirma a RPC e o recibo na mesma transação, sob a identidade do ator. */

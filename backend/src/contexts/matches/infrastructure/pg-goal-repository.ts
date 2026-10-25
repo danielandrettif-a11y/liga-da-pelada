@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
-import type { Actor, GoalRepository } from "../application/register-goal.js";
+import type { GoalRepository } from "../application/register-goal.js";
+import type { Actor } from "../../../shared/actor.js";
 import type { GoalCommand, GoalReceipt } from "../domain/goal.js";
 
 export class GoalPersistenceError extends Error {

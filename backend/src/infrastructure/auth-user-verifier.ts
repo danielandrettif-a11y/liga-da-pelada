@@ -1,4 +1,4 @@
-import type { Actor } from "../application/register-goal.js";
+import type { Actor } from "../shared/actor.js";
 
 export interface UserVerifier {
   verifyAccessToken(token: string): Promise<Actor | null>;
