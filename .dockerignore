@@ -16,4 +16,5 @@ supabase
 e2e
 amazfit-scoreboard-poc
 scripts
+backend
 *.docx

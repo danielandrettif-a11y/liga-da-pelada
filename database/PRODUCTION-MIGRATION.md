@@ -53,6 +53,8 @@ O banco contém metadados de buckets/objetos, não o conteúdo dos arquivos. Usa
 4. Trocar URL/chave públicas do Supabase na build do frontend, URLs internas no backend, callback Google e proxy/DNS. O Next.js embute variáveis `NEXT_PUBLIC_*` durante o build, portanto precisa ser reconstruído para o novo host.
 5. Abrir tráfego só após testes de leitura e escrita no destino. Monitorar erros, p95 e integridade. Manter o projeto Cloud intacto e sem novas escritas durante a janela de observação.
 
+A migration `351_goal_request_consistency.sql` existe apenas nesta branch. Se o dump final do Cloud ainda não a incluir, aplicá-la **uma vez** no destino restaurado, depois de conferir a sequência real de migrations (inclusive alterações ainda não integradas à branch). Repetir o teste de gol e retry no esquema completo antes de ativar `ENABLE_GOAL_API`.
+
 ## Retorno
 
 Antes de aceitar escritas no destino, retornar consiste em apontar o app para o Cloud e reabrir escritas lá. **Depois** de aceitar escritas no destino, um simples retorno de DNS perde esses novos dados; exigirá exportação reversa ou conciliação explícita. Por isso, o teste de restauração e o corte de tráfego devem estar completos antes de liberar mutações.

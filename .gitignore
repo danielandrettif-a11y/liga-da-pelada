@@ -21,6 +21,7 @@ node_modules/
 
 # production
 /build
+/backend/dist/
 /amazfit-scoreboard-poc/dist/
 
 # misc

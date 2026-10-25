@@ -2,6 +2,8 @@
 
 Este plano detalha o ADR 011. A branch começa com arquitetura e inventário; a aplicação atual continua executável enquanto cada fatia é migrada. `npm run audit:architecture -- --json` lista os arquivos ainda ligados a SDK, Auth, Storage e Realtime (busca estática aproximada, não análise de dependências).
 
+**Progresso na branch:** build standalone do frontend testado; esqueleto do backend Fastify, porta do caso de uso de gol e adaptador PostgreSQL criados; migration 351 corrige a idempotência de gols novos e foi testada em PostgreSQL 17 descartável com um esquema mínimo. A rota HTTP ainda está desligada por padrão. O ensaio com exportação real do projeto de testes e os demais lotes permanecem pendentes.
+
 ## Mapa da base atual para a organização alvo
 
 | Hoje | Destino | Condição para mover |
