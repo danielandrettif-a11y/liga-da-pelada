@@ -2,11 +2,11 @@
 
 **Destino escolhido:** Docker no computador do proprietário, dentro de Ubuntu/WSL2. Este ambiente é descartável e serve para ensaiar a restauração do **projeto de testes** antes de qualquer exportação do banco oficial. A produção continua no Supabase Cloud até o corte planejado em [PRODUCTION-MIGRATION.md](PRODUCTION-MIGRATION.md).
 
-**Situação em 25/10/2026:** Windows 10 Home 22H2, 16 GB de RAM e 4 processadores lógicos. Ubuntu 26.04.1 já roda em WSL2; Docker Engine 29.9.2, Compose 5.6.1 e Supabase CLI 2.122.0 estão instalados. A stack local da tag `self-hosted/v0.8.3` (commit `bc27d2661edd09a5d0b8d76ce33da6d4071a756e`) está saudável em `/home/danie/pelada-homologacao/supabase-project`, com PostgreSQL 17.6. As portas 8000, 5432 e 6543 estão vinculadas somente a `127.0.0.1`. O gateway respondeu HTTP 401 sem credenciais, como esperado. **Ainda não há dados de teste nem de produção restaurados.**
+**Situação em 25/10/2026:** Windows 10 Home 22H2, 16 GB de RAM e 4 processadores lógicos. Ubuntu 26.04.1 já roda em WSL2; Docker Engine 29.9.2, Compose 5.6.1 e Supabase CLI 2.122.0 estão instalados. A stack local da tag `self-hosted/v0.8.3` (commit `bc27d2661edd09a5d0b8d76ce33da6d4071a756e`) está em `/home/danie/pelada-homologacao/supabase-project`, com PostgreSQL 17.6. As portas 8000, 5432 e 6543 estão vinculadas somente a `127.0.0.1`. O banco **de testes** já foi restaurado; nenhum dado do banco real de produção foi importado.
 
-### Próxima ação: exportar o banco de testes
+### Exportação do banco de testes, já concluída
 
-No PowerShell normal do Windows, execute:
+O comando usado no PowerShell normal do Windows foi:
 
 ```powershell
 wsl --user root --exec bash /home/danie/pelada-homologacao/export-test.sh
@@ -23,8 +23,24 @@ Se falhar, o script deixa um log privado na mesma pasta; não o compartilhe sem 
 - O inventário de contagens do `data.sql` e do destino bateu em **92 de 92 tabelas** selecionadas (`public`, `auth.users`, `storage.buckets`, `storage.objects`), sem diferenças. Exemplos: `auth.users` 47, `leagues` 3, `players` 72, `rounds` 11, `matches` 140, `match_events` 254 e `player_round_stats` 155. `storage.objects` tem 0 registros no projeto de testes.
 - As **89 tabelas públicas** do destino estão com RLS habilitado. Um membro autenticado enxergou 140 partidas; um ator autenticado sem vínculo enxergou 0. Todos os 11 serviços da stack continuaram saudáveis depois da restauração.
 - A Supabase CLI alertou sobre chaves estrangeiras circulares no dump de dados; o restore com `SET session_replication_role = replica` passou. Ainda faltam testes de login, grants, funções críticas, Storage, políticas entre duas peladas com dados, paridade de fluxos e ensaio de backup/restauração do próprio destino.
+- O dump do projeto de testes não continha `public.create_league_for_user`. A migration versionada `313_league_catalog_and_self_service_creation.sql` foi aplicada somente no destino local. A migration `351_goal_request_consistency.sql` também foi aplicada somente no destino local. Assim, o teste da nova API usa **dump de testes mais migrations locais**; isso não comprova que a origem já recebeu essas migrations.
+- Um papel local limitado `liga_backend` (sem superusuário e sem criação de papéis) conecta ao PostgreSQL e pode assumir `authenticated`. O backend piloto roda em `liga-backend-local`, na rede `supabase_default`, com porta `127.0.0.1:3001`. O arquivo privado de ambiente fica em `/home/danie/pelada-homologacao/backend-local.env`, fora do Git.
+- `GET /health` respondeu 200; as duas rotas piloto rejeitaram ausência de token com 401. `POST /api/leagues` respondeu 201 com token sintético validado pelo Auth **local** e criou uma pelada apenas no banco descartável. A RPC de criação também passou em transação revertida com o papel limitado. O backend passou em 23 testes automatizados; a primeira execução excedeu o limite padrão de 5 s enquanto a stack iniciava, e a repetição passou com `--testTimeout=15000`.
+- Todas as 140 partidas do dump estão encerradas e seus 1.604 vínculos de jogador estão inativos. A API de gol autenticada respondeu 404 para partida inexistente. Em uma transação revertida, uma partida e um jogador foram temporariamente ativados; a RPC `register_goal` criou o gol e a repetição com a mesma chave retornou `idempotent=true`. Ainda não houve teste positivo **pela API HTTP** nem login com senha de uma conta de testes. O WSL reiniciou serviços durante algumas verificações; confirme a saúde da stack antes de cada sessão de testes.
 
 Este resultado comprova a viabilidade do restore **do projeto de testes** nesta stack. O banco de produção real ainda não foi exportado ou importado.
+
+### Repetir os testes piloto locais
+
+No PowerShell, confirme os contêineres e a API:
+
+```powershell
+wsl --user root --exec docker ps --format '{{.Names}} {{.Status}}'
+wsl --user root --exec docker start liga-backend-local
+Invoke-RestMethod http://127.0.0.1:3001/health
+```
+
+Se o WSL acabou de iniciar, aguarde os serviços `supabase-db`, `supabase-auth` e `supabase-envoy` ficarem saudáveis antes de testar rotas autenticadas. Nesta máquina, chamadas isoladas de `wsl.exe` deixaram a distribuição encerrar entre verificações; manter um terminal Ubuntu aberto durante a sessão de testes preservou os contêineres ativos e todos ficaram saudáveis. Os segredos e dumps continuam fora do repositório. As flags `ENABLE_GOAL_API` e `ENABLE_LEAGUE_API` estão ligadas **somente** no contêiner local de homologação. O frontend Next atual não usa a nova API de peladas; navegar pelo app ainda exercita majoritariamente a arquitetura antiga. Os fluxos completos da aplicação precisam ser migrados e validados localmente antes da VPS.
 
 ## 1. Preparar WSL2 (ação do proprietário)
 
