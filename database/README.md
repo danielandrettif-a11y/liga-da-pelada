@@ -34,6 +34,15 @@ Esse resultado demonstra replay de **schema** a partir do backup antigo com adap
 
 Em outra base PostgreSQL 17 descartável, `goal-idempotency-fixture.sql` criou somente as tabelas e funções necessárias à RPC. A migration 351 e `goal-idempotency-assertions.sql` passaram com `ON_ERROR_STOP=1`: primeiro gol, repetição após encerramento, rejeição de payload diferente e placar/evento únicos. O cluster foi encerrado e removido. Esse teste ainda não valida a migration contra o esquema completo nem contra dados reais; repetir após restaurar a exportação atualizada de testes.
 
+## Ensaio com o backup atualizado de testes em 25/10/2026
+
+- O script `scripts/backup-test-supabase.ps1` gerou os arquivos **fora do Git** `peladabq-test-before-restore-full-20261025-124055.dump` (2.476.998 bytes; SHA256 `F8044D82DEE0EFE5CD3018080F7315AEE30CF0F40770017A98A1989F204A7A3E`) e `peladabq-test-before-restore-public-20261025-124055.dump` (2.140.171 bytes; SHA256 `92B76454C13B2CB9DEF6F54EAD77CA6A11A683BBE8678E8624A9AC016C6F1C24`). Ambos passaram em `pg_restore --list`.
+- A origem declara PostgreSQL 17.11, schemas `auth`, `public`, `storage`, `realtime` e dados de tabelas. O verificador `npm run audit:db-archive` não encontrou problema de versão/esquema.
+- O backup completo foi restaurado em PostgreSQL 17.11 **nativo, local e descartável**, com papéis `anon`, `authenticated` e `service_role` de ensaio. Para contornar a ausência da extensão `supabase_vault`, foram excluídos somente sua entrada no catálogo e o schema `vault`; `--no-owner --no-acl` também foi necessário. Essas exclusões são específicas do ensaio e não são um procedimento de produção.
+- A restauração terminou sem erro. Contagens conferidas com consultas somente de leitura no Supabase de testes: `auth.users` 47, peladas 3, jogadores 72, rodadas 11, partidas 140, eventos 254, estatísticas por rodada 155 e objetos de Storage 0. A cópia local tem 89 tabelas `public` e 207 políticas RLS. A migration 351 aplicou sem erro **sobre o esquema restaurado**.
+
+Esse ensaio confirma restauração de dados e compatibilidade estrutural da migration 351 com o backup de testes. Ainda não comprova proprietários, grants, segredos do Vault, login/OAuth, Storage e Realtime em execução, autorização em runtime ou paridade funcional completa. O destino de homologação deve ser uma stack Supabase auto-hospedada atual, restaurada com a exportação filtrada da CLI oficial.
+
 ## Próximo gate
 
-Obter backup atualizado e anonimizado do ambiente de teste com esquema e dados representativos; separar inventário de objetos da plataforma; restaurar em PostgreSQL 17 com extensões/roles apropriadas; comparar contagens, checksums, políticas e resultados de RPCs. Só depois conectar o backend novo a esse banco. Não versionar dumps, senhas ou arquivos de Storage.
+Montar a stack Supabase auto-hospedada de homologação com PostgreSQL 17 e exportação filtrada da CLI oficial; restaurar papéis, esquema e dados sem as exclusões deste ensaio; conferir grants, extensões, Auth, RLS, Storage/Realtime e resultados de RPCs. Só depois conectar o backend novo a esse banco. Não versionar dumps, senhas ou arquivos de Storage.
