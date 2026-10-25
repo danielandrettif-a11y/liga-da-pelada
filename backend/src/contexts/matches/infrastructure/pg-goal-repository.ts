@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import type { GoalRepository } from "../application/register-goal.js";
 import type { Actor } from "../../../shared/actor.js";
 import type { GoalCommand, GoalReceipt } from "../domain/goal.js";
+import { withAuthenticatedTransaction } from "../../../infrastructure/authenticated-transaction.js";
 
 export class GoalPersistenceError extends Error {
   constructor(message: string, public readonly statusCode: number) {
@@ -36,42 +37,26 @@ function classifyError(cause: unknown): GoalPersistenceError {
 export function pgGoalRepository(pool: Pool): GoalRepository {
   return {
     async registerGoal(command: GoalCommand, actor: Actor): Promise<GoalReceipt> {
-      const client = await pool.connect();
-      let transactionStarted = false;
       try {
-        await client.query("BEGIN");
-        transactionStarted = true;
-        // A conta de conexão deve ter apenas SET ROLE para authenticated, nunca
-        // ser usada pelo frontend. SET LOCAL desaparece no COMMIT/ROLLBACK.
-        await client.query("SET LOCAL ROLE authenticated");
-        await client.query(
-          "SELECT set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claim.role', 'authenticated', true), set_config('request.jwt.claims', $2, true)",
-          [actor.userId, JSON.stringify({ sub: actor.userId, role: "authenticated" })],
-        );
-        const result = await client.query<{ receipt: GoalReceipt }>(
-          "SELECT public.register_goal($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::integer, $6::text, $7::boolean) AS receipt",
-          [
-            command.matchId,
-            command.playerId,
-            command.teamId,
-            command.assistPlayerId || null,
-            command.minute ?? null,
-            command.idempotencyKey,
-            Boolean(command.isOwnGoal),
-          ],
-        );
-        const receipt = result.rows[0]?.receipt;
-        if (!receipt?.event_id || !receipt.round_id) throw new Error("Recibo de gol inválido.");
-        await client.query("COMMIT");
-        transactionStarted = false;
-        return receipt;
+        return await withAuthenticatedTransaction(pool, actor, async (client) => {
+          const result = await client.query<{ receipt: GoalReceipt }>(
+            "SELECT public.register_goal($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::integer, $6::text, $7::boolean) AS receipt",
+            [
+              command.matchId,
+              command.playerId,
+              command.teamId,
+              command.assistPlayerId || null,
+              command.minute ?? null,
+              command.idempotencyKey,
+              Boolean(command.isOwnGoal),
+            ],
+          );
+          const receipt = result.rows[0]?.receipt;
+          if (!receipt?.event_id || !receipt.round_id) throw new Error("Recibo de gol inválido.");
+          return receipt;
+        });
       } catch (error) {
-        if (transactionStarted) {
-          try { await client.query("ROLLBACK"); } catch { /* conexão pode ter caído */ }
-        }
         throw classifyError(error);
-      } finally {
-        client.release();
       }
     },
   };

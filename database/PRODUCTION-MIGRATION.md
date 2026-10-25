@@ -2,6 +2,8 @@
 
 **Estado:** roteiro para execução após homologação. Não executar no banco oficial antes de o ambiente novo, a restauração de teste e os testes de aplicação passarem. O banco de produção continua sendo a autoridade até o corte.
 
+O ambiente de homologação escolhido é Docker no computador do proprietário; veja o [roteiro local](LOCAL-HOMOLOGATION.md). Ele ainda depende da instalação do WSL2 e do Docker Engine. O ensaio local não substitui o dimensionamento do destino definitivo na VPS.
+
 ## 1. Preparar o destino
 
 **Capacidade observada em 25/10/2026:** a VPS atual do Coolify tem 2 vCPUs, 7,8 GiB de RAM, cerca de 4,8 GiB disponíveis naquele instante, 79 GiB livres em disco e nenhum swap. Ela já hospeda o frontend e outros recursos. A [referência oficial da stack completa](https://supabase.com/docs/guides/self-hosting/docker#system-requirements) pede no mínimo 2 cores/4 GB e recomenda 4 cores/8 GB **para o Supabase**. Portanto, não subir uma stack completa de homologação nessa VPS compartilhada sem medir carga e reservar capacidade: o espaço livre momentâneo não garante margem para picos, build e restore. Preferir ambiente de homologação isolado; para produção, dimensionar host ou VPS separada antes do corte.

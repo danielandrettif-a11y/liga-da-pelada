@@ -2,6 +2,8 @@
 
 **Estado:** modelo de destino e inventário verificável; a implementação completa do backend ainda não foi feita. O backend executável atual cobre registro de gol e criação inicial de pelada, ambos desativados por padrão. Os módulos em `src/modules/` já contêm regras de domínio e casos de uso que devem ser preservados, extraídos e conectados às novas portas.
 
+O contexto de estatísticas já possui um núcleo puro de ranking no backend, com limite das seis melhores rodadas e filtro de atividade recente. Ainda faltam leitura autorizada, perfil competitivo, histórico, enriquecimentos, resposta HTTP e troca do frontend. A homologação escolhida será [local com Docker/WSL2](../../database/LOCAL-HOMOLOGATION.md).
+
 O catálogo em [`architecture/application-contexts.json`](../../architecture/application-contexts.json) atribui cada módulo existente, página, arquivo de Server Actions e endpoint interno a **um** contexto. [`application-operations.json`](../../architecture/application-operations.json) enumera as funções exportadas individualmente. `npm run audit:contexts` falha se surgir um item sem dono ou se uma função exportada mudar sem revisão do catálogo. Em 25/10/2026, ele cobre 15 contextos, 9 módulos, 58 páginas, 41 arquivos de entrada e 267 funções exportadas. Isso mede cobertura do **inventário**, não paridade de implementação.
 
 ## Limites e propriedade

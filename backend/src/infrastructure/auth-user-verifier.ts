@@ -5,18 +5,19 @@ export interface UserVerifier {
 }
 
 /** Consulta o Auth auto-hospedado; nunca usa o userId enviado pelo navegador. */
-export function supabaseUserVerifier(baseUrl: string, publishableKey: string): UserVerifier {
+export function supabaseUserVerifier(baseUrl: string, publishableKey: string, fetcher: typeof fetch = fetch): UserVerifier {
   const userUrl = new URL("auth/v1/user", `${baseUrl.replace(/\/+$/, "")}/`);
   return {
     async verifyAccessToken(token) {
-      const response = await fetch(userUrl, {
+      const response = await fetcher(userUrl, {
         headers: { authorization: `Bearer ${token}`, apikey: publishableKey },
         signal: AbortSignal.timeout(5000),
       });
       if (response.status === 401 || response.status === 403) return null;
       if (!response.ok) throw new Error(`Auth indisponível (${response.status}).`);
       const user: unknown = await response.json();
-      if (!user || typeof user !== "object" || !("id" in user) || typeof user.id !== "string") {
+      if (!user || typeof user !== "object" || !("id" in user) || typeof user.id !== "string"
+        || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)) {
         throw new Error("Resposta de Auth inválida.");
       }
       return { userId: user.id };
