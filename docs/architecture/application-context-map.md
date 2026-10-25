@@ -1,5 +1,7 @@
 # Modelo da aplicação inteira para a nova arquitetura
 
+O [plano de migração da aplicação inteira](full-application-migration-plan.md) define a ordem de implementação, os critérios de paridade e a limpeza do código antigo após os testes locais. Este arquivo continua como mapa de propriedade dos contextos.
+
 **Estado:** modelo de destino e inventário verificável; a implementação completa do backend ainda não foi feita. O backend executável atual cobre registro de gol e criação inicial de pelada, ambos desativados por padrão. Os módulos em `src/modules/` já contêm regras de domínio e casos de uso que devem ser preservados, extraídos e conectados às novas portas.
 
 O contexto de estatísticas já possui um núcleo puro de ranking no backend, com limite das seis melhores rodadas e filtro de atividade recente. Ainda faltam leitura autorizada, perfil competitivo, histórico, enriquecimentos, resposta HTTP e troca do frontend. A homologação escolhida será [local com Docker/WSL2](../../database/LOCAL-HOMOLOGATION.md).

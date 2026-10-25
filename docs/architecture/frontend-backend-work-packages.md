@@ -1,5 +1,7 @@
 # Plano executável — frontend, backend e PostgreSQL local
 
+**Histórico:** este recorte inicial foi substituído pelo [plano de migração da aplicação inteira](full-application-migration-plan.md), que inclui os 15 contextos, os gates de homologação local e a limpeza final do repositório. Usar o plano novo para acompanhar a execução.
+
 Este plano detalha o ADR 011. O [modelo da aplicação inteira](application-context-map.md) e `architecture/application-contexts.json` registram todos os contextos, páginas e entradas. `npm run audit:contexts` impede que novas páginas ou entradas fiquem sem dono; `npm run audit:architecture -- --json` lista os arquivos ainda ligados a SDK, Auth, Storage e Realtime (busca estática aproximada, não análise de dependências).
 
 **Progresso na branch:** o inventário cobre 15 contextos, 9 módulos, 58 páginas, 41 arquivos de entrada e 267 funções exportadas. Build standalone do frontend testado; backend Fastify tem os pilotos de gol e criação de pelada, ambos desativados por padrão; migration 351 corrige a idempotência de gols novos. O backup atualizado do projeto de testes foi restaurado em PostgreSQL 17 descartável, as contagens principais conferem e a migration 351 aplicou sobre o esquema restaurado. A Server Action de gols possui uma ponte HTTP interna, desativada por padrão e testada sem banco remoto. Os contextos completos estão **modelados, mas ainda não foram implementados no backend**. O ensaio completo na stack Supabase auto-hospedada e a ativação das rotas HTTP permanecem pendentes.
