@@ -14,7 +14,17 @@ wsl --user root --exec bash /home/danie/pelada-homologacao/export-test.sh
 
 O script [`export-test-supabase-wsl.sh`](../scripts/export-test-supabase-wsl.sh) também está versionado nesta branch e foi copiado para a pasta de homologação. Ele pede **a senha do banco de testes** sem exibi-la, exporta `roles.sql`, `schema.sql` e `data.sql` com a Supabase CLI para uma pasta privada em `/home/danie/pelada-homologacao/exports/` e imprime somente caminho e hashes SHA256. A URL usa o session pooler do projeto de testes `dukjlpdkyngiqxffrxgc`. Não envie senha, `.env`, arquivos SQL ou logs sem anonimização pelo chat. Após o comando terminar, basta informar se concluiu e o caminho da pasta gerada. A senha fica apenas em memória durante a execução, mas a URL com a senha é passada como argumento temporário à CLI; execute somente no computador confiável.
 
-Se falhar, o script deixa um log privado na mesma pasta; não o compartilhe sem revisar URLs e credenciais. Depois da exportação, o próximo passo é restaurar **somente esses dados de teste** no destino local limpo e comparar os inventários.
+Se falhar, o script deixa um log privado na mesma pasta; não o compartilhe sem revisar URLs e credenciais. A primeira execução pode demorar enquanto a CLI baixa a imagem PostgreSQL de dump.
+
+### Ensaio executado em 25/10/2026
+
+- A exportação filtrada do projeto **de testes** foi concluída em `/home/danie/pelada-homologacao/exports/test-y2A27oth`: `roles.sql`, `schema.sql` e `data.sql`. O dump contém dados sensíveis e permanece fora do Git.
+- A restauração oficial em uma transação única terminou com sucesso no Supabase local. A conta `postgres` desta versão não é superusuária e falhou em `GRANT SET ON PARAMETER log_min_messages` do `roles.sql`; o ensaio foi repetido com o superusuário interno `supabase_admin`. A primeira transação foi revertida. Não usar esse papel na aplicação.
+- O inventário de contagens do `data.sql` e do destino bateu em **92 de 92 tabelas** selecionadas (`public`, `auth.users`, `storage.buckets`, `storage.objects`), sem diferenças. Exemplos: `auth.users` 47, `leagues` 3, `players` 72, `rounds` 11, `matches` 140, `match_events` 254 e `player_round_stats` 155. `storage.objects` tem 0 registros no projeto de testes.
+- As **89 tabelas públicas** do destino estão com RLS habilitado. Um membro autenticado enxergou 140 partidas; um ator autenticado sem vínculo enxergou 0. Todos os 11 serviços da stack continuaram saudáveis depois da restauração.
+- A Supabase CLI alertou sobre chaves estrangeiras circulares no dump de dados; o restore com `SET session_replication_role = replica` passou. Ainda faltam testes de login, grants, funções críticas, Storage, políticas entre duas peladas com dados, paridade de fluxos e ensaio de backup/restauração do próprio destino.
+
+Este resultado comprova a viabilidade do restore **do projeto de testes** nesta stack. O banco de produção real ainda não foi exportado ou importado.
 
 ## 1. Preparar WSL2 (ação do proprietário)
 

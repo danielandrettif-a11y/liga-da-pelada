@@ -18,7 +18,7 @@ docker info >/dev/null 2>&1 || { printf 'Docker não está ativo.\n' >&2; exit 2
 export_root=/home/danie/pelada-homologacao/exports
 install -d -m 0700 "$export_root"
 output_dir=$(mktemp -d "$export_root/test-XXXXXXXX")
-printf 'Senha do BANCO DE TESTE Supabase (não será exibida): ' >&2
+printf 'Senha do BANCO DE TESTE Supabase (os caracteres não aparecerão): ' >&2
 IFS= read -r -s db_password
 printf '\n' >&2
 if [[ -z "$db_password" ]]; then
@@ -44,8 +44,11 @@ export_part() {
   fi
 }
 
+printf '[1/3] Exportando roles...\n' >&2
 export_part roles.sql --role-only
+printf '[2/3] Exportando esquema...\n' >&2
 export_part schema.sql
+printf '[3/3] Exportando dados...\n' >&2
 export_part data.sql --use-copy --data-only
 unset db_url
 chown -R danie:danie "$output_dir"
