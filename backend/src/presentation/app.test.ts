@@ -68,4 +68,19 @@ describe("goal HTTP route", () => {
     expect(malformed.json()).toEqual({ code: "INVALID_REQUEST", message: "Dados da requisição inválidos." });
     expect(repository.registerGoal).not.toHaveBeenCalled();
   });
+
+  it("preserves client HTTP errors instead of reporting service unavailability", async () => {
+    const { app } = fixture(true);
+    const result = await app.inject({
+      method: "POST",
+      url: `/api/matches/${matchId}/goals`,
+      headers: { "content-type": "application/xml" },
+      payload: "<goal />",
+    });
+    expect(result.statusCode).toBe(415);
+    expect(result.json()).toEqual({
+      code: "UNSUPPORTED_MEDIA_TYPE",
+      message: "Formato da requisição não suportado.",
+    });
+  });
 });

@@ -8,11 +8,20 @@ afterEach(async () => Promise.all(apps.splice(0).map((app) => app.close())));
 
 function fixture(enabled: boolean) {
   const leagueRepository: LeagueRepository = { create: vi.fn().mockResolvedValue("league-1") };
+  const leagueMembershipRequestRepository = { request: vi.fn().mockResolvedValue(true) };
   const repository: GoalRepository = { registerGoal: vi.fn() };
   const verifier = { verifyAccessToken: vi.fn().mockResolvedValue({ userId: "verified-user" }) };
-  const app = createApp({ goalsEnabled: false, leaguesEnabled: enabled, verifier, repository, leagueRepository, logger: false });
+  const app = createApp({
+    goalsEnabled: false,
+    leaguesEnabled: enabled,
+    verifier,
+    repository,
+    leagueRepository,
+    leagueMembershipRequestRepository,
+    logger: false,
+  });
   apps.push(app);
-  return { app, verifier, leagueRepository };
+  return { app, verifier, leagueRepository, leagueMembershipRequestRepository };
 }
 
 describe("league HTTP route", () => {
@@ -40,5 +49,18 @@ describe("league HTTP route", () => {
     const invalid = await app.inject({ method: "POST", url: "/api/leagues", payload: { ...payload, name: "ab" }, headers: { authorization: "Bearer valid-token" } });
     expect(invalid.statusCode).toBe(400);
     expect(leagueRepository.create).not.toHaveBeenCalled();
+  });
+
+  it("requests access to a private league using only the verified identity", async () => {
+    const { app, leagueMembershipRequestRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000001";
+    const result = await app.inject({
+      method: "POST",
+      url: `/api/leagues/${leagueId}/membership-requests`,
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(result.statusCode).toBe(202);
+    expect(result.json()).toEqual({ requested: true });
+    expect(leagueMembershipRequestRepository.request).toHaveBeenCalledWith(leagueId, { userId: "verified-user" });
   });
 });

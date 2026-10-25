@@ -14,6 +14,20 @@ export class InvalidLeagueError extends Error {
   }
 }
 
+export class InvalidLeagueIdError extends Error {
+  constructor() {
+    super("Pelada inválida.");
+    this.name = "InvalidLeagueIdError";
+  }
+}
+
+export function parseLeagueId(value: string): string {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+    throw new InvalidLeagueIdError();
+  }
+  return value.toLowerCase();
+}
+
 /** Mesma regra de criação aplicada atualmente em src/modules/leagues/domain. */
 export function parseNewLeague(input: { name: string; tier: string; visibility: string }): NewLeague {
   const name = input.name.trim().replace(/\s+/g, " ");

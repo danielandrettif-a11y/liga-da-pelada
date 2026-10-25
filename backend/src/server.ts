@@ -2,6 +2,7 @@ import pg from "pg";
 import { supabaseUserVerifier } from "./infrastructure/auth-user-verifier.js";
 import { pgGoalRepository } from "./contexts/matches/infrastructure/pg-goal-repository.js";
 import { pgLeagueRepository } from "./contexts/leagues/infrastructure/pg-league-repository.js";
+import { pgLeagueMembershipRequestRepository } from "./contexts/leagues/infrastructure/pg-league-membership-request-repository.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -25,6 +26,7 @@ const app = createApp({
   verifier: supabaseUserVerifier(authUrl || "http://127.0.0.1:54321", publishableKey || ""),
   repository: pgGoalRepository(pool),
   leagueRepository: pgLeagueRepository(pool),
+  leagueMembershipRequestRepository: pgLeagueMembershipRequestRepository(pool),
 });
 
 try {

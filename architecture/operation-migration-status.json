@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "states": [
+    "backend-pilot",
+    "frontend-migrated",
+    "verified",
+    "retired"
+  ],
+  "overrides": [
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "createLeague",
+      "state": "backend-pilot",
+      "target": "POST /api/leagues",
+      "evidence": [
+        "backend/src/contexts/leagues/presentation/leagues-route.ts",
+        "backend/src/contexts/leagues/presentation.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "requestClosedLeague",
+      "state": "backend-pilot",
+      "target": "POST /api/leagues/:leagueId/membership-requests",
+      "evidence": [
+        "backend/src/contexts/leagues/presentation/leagues-route.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-league-membership-request-repository.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "registerGoal",
+      "state": "backend-pilot",
+      "target": "POST /api/matches/:matchId/goals",
+      "evidence": [
+        "backend/src/contexts/matches/presentation/goals-route.ts",
+        "backend/src/presentation/app.test.ts"
+      ]
+    }
+  ]
+}

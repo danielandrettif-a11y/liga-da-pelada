@@ -2,6 +2,8 @@
 
 **Estado em 25/10/2026:** plano de execução, não declaração de conclusão. A branch `codex/architecture-reorganization-continued` contém apenas pilotos executáveis de criação de pelada e registro de gol, ambos desativados por padrão fora da homologação local, e um núcleo puro de ranking sem API. O frontend ainda usa majoritariamente o caminho antigo. A remoção do código legado é o **último lote da refatoração**, depois de paridade e testes locais.
 
+**Execução iniciada:** `npm run audit:migration` valida o catálogo de progresso contra as 267 operações e contra os arquivos usados como evidência. Há três operações em `backend-pilot`: criação de pelada, solicitação de acesso a pelada privada e registro de gol. Nenhuma foi marcada como migrada no frontend ou verificada de ponta a ponta.
+
 Este plano interpreta a proposta em `REFACTOR_PROMPT.md` conforme as dependências reais do projeto. O [mapa de contextos](application-context-map.md), [`application-contexts.json`](../../architecture/application-contexts.json) e [`application-operations.json`](../../architecture/application-operations.json) são o inventário de escopo. `npm run audit:contexts` confirmou **15 contextos, 9 módulos, 58 páginas, 41 arquivos de entrada e 267 operações exportadas**. `npm run audit:architecture` encontrou, por busca estática aproximada, 127 arquivos de código com padrões de Supabase SDK, 91 de Auth, 4 de Storage e 9 de Realtime. Esses números medem o trabalho a substituir; não indicam paridade funcional.
 
 ## Arquitetura de destino e decisões
