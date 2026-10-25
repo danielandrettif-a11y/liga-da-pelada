@@ -6,13 +6,13 @@
 
 1. Instalar a [stack Supabase auto-hospedada com Docker](https://supabase.com/docs/guides/self-hosting/docker) em um ambiente de homologação na VPS. Usar PostgreSQL 17, conforme o [guia da versão 17](https://supabase.com/docs/guides/self-hosting/postgres-upgrade-17). Manter banco e Studio fora da internet pública; expor a API por proxy HTTPS.
 2. Configurar segredos novos fora do Git, volumes persistentes, backup do PostgreSQL **e** do Storage, restauração ensaiada e monitoramento. Auth, Storage, PostgREST e Realtime devem estar saudáveis antes da importação.
-3. Configurar OAuth Google e SMTP no novo host. A migração de `auth.users` preserva contas, mas sessões assinadas pela chave antiga podem exigir novo login. Atualizar a URL de callback no Google quando o destino estiver pronto.
+3. Configurar OAuth Google e SMTP no novo host. A migração de `auth.users` preserva contas, mas tokens assinados pela chave antiga deixam de valer: os usuários precisam entrar novamente. Atualizar a URL de callback no Google quando o destino estiver pronto.
 
 ## 2. Fazer ensaio com o projeto de testes
 
 Usar a senha **do banco de testes**, não a senha da conta Supabase. Obter a conexão no botão **Connect** do projeto de testes, preferindo a conexão direta ou session pooler. Guardar a URL de conexão em variável local temporária; não colocar senha em shell history, logs, Git ou chat.
 
-Com Docker e Supabase CLI instalados, seguir a [exportação oficial para self-hosted](https://supabase.com/docs/guides/self-hosting/restore-from-platform):
+Com Docker e Supabase CLI instalados (a CLI usa Docker para o dump), seguir a [exportação oficial para self-hosted](https://supabase.com/docs/guides/self-hosting/restore-from-platform):
 
 ```bash
 supabase db dump --db-url "$OLD_DB_URL" -f roles.sql --role-only
