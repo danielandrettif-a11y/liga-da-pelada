@@ -2,7 +2,19 @@
 
 **Destino escolhido:** Docker no computador do proprietário, dentro de Ubuntu/WSL2. Este ambiente é descartável e serve para ensaiar a restauração do **projeto de testes** antes de qualquer exportação do banco oficial. A produção continua no Supabase Cloud até o corte planejado em [PRODUCTION-MIGRATION.md](PRODUCTION-MIGRATION.md).
 
-**Situação observada em 25/10/2026:** Windows 10 Home 22H2, 16 GB de RAM e 4 processadores lógicos. `docker` não está instalado; `wsl --version` ainda mostra a ajuda antiga e `wsl --status` falha. A ativação do WSL requer PowerShell como administrador e provavelmente reinicialização, que devem ser feitas pelo proprietário do computador.
+**Situação em 25/10/2026:** Windows 10 Home 22H2, 16 GB de RAM e 4 processadores lógicos. Ubuntu 26.04.1 já roda em WSL2; Docker Engine 29.9.2, Compose 5.6.1 e Supabase CLI 2.122.0 estão instalados. A stack local da tag `self-hosted/v0.8.3` (commit `bc27d2661edd09a5d0b8d76ce33da6d4071a756e`) está saudável em `/home/danie/pelada-homologacao/supabase-project`, com PostgreSQL 17.6. As portas 8000, 5432 e 6543 estão vinculadas somente a `127.0.0.1`. O gateway respondeu HTTP 401 sem credenciais, como esperado. **Ainda não há dados de teste nem de produção restaurados.**
+
+### Próxima ação: exportar o banco de testes
+
+No PowerShell normal do Windows, execute:
+
+```powershell
+wsl --user root --exec bash /home/danie/pelada-homologacao/export-test.sh
+```
+
+O script [`export-test-supabase-wsl.sh`](../scripts/export-test-supabase-wsl.sh) também está versionado nesta branch e foi copiado para a pasta de homologação. Ele pede **a senha do banco de testes** sem exibi-la, exporta `roles.sql`, `schema.sql` e `data.sql` com a Supabase CLI para uma pasta privada em `/home/danie/pelada-homologacao/exports/` e imprime somente caminho e hashes SHA256. A URL usa o session pooler do projeto de testes `dukjlpdkyngiqxffrxgc`. Não envie senha, `.env`, arquivos SQL ou logs sem anonimização pelo chat. Após o comando terminar, basta informar se concluiu e o caminho da pasta gerada. A senha fica apenas em memória durante a execução, mas a URL com a senha é passada como argumento temporário à CLI; execute somente no computador confiável.
+
+Se falhar, o script deixa um log privado na mesma pasta; não o compartilhe sem revisar URLs e credenciais. Depois da exportação, o próximo passo é restaurar **somente esses dados de teste** no destino local limpo e comparar os inventários.
 
 ## 1. Preparar WSL2 (ação do proprietário)
 

@@ -2,7 +2,7 @@
 
 **Estado:** roteiro para execução após homologação. Não executar no banco oficial antes de o ambiente novo, a restauração de teste e os testes de aplicação passarem. O banco de produção continua sendo a autoridade até o corte.
 
-O ambiente de homologação escolhido é Docker no computador do proprietário; veja o [roteiro local](LOCAL-HOMOLOGATION.md). Ele ainda depende da instalação do WSL2 e do Docker Engine. O ensaio local não substitui o dimensionamento do destino definitivo na VPS.
+O ambiente de homologação escolhido é Docker no computador do proprietário; veja o [roteiro local](LOCAL-HOMOLOGATION.md). WSL2, Docker Engine e a stack Supabase local já estão ativos. A exportação/restauração de testes e os testes de paridade ainda faltam. O ensaio local não substitui o dimensionamento do destino definitivo na VPS.
 
 ## 1. Preparar o destino
 
