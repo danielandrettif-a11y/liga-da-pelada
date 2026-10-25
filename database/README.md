@@ -30,6 +30,10 @@ Os objetos do Storage exigem cópia separada: o dump do banco leva metadados, n�
 
 Esse resultado demonstra replay de **schema** a partir do backup antigo com adaptações explícitas. Não demonstra migração de dados, preservação de grants, funcionamento de Auth/Storage/Realtime, equivalência de pontuação ou segurança em runtime. O uso de `--no-acl` no ensaio significa que permissões antigas não foram restauradas. A extensão `supabase_vault` e seus dados também não foram migrados.
 
+## Ensaio da migration 351 em 25/10/2026
+
+Em outra base PostgreSQL 17 descartável, `goal-idempotency-fixture.sql` criou somente as tabelas e funções necessárias à RPC. A migration 351 e `goal-idempotency-assertions.sql` passaram com `ON_ERROR_STOP=1`: primeiro gol, repetição após encerramento, rejeição de payload diferente e placar/evento únicos. O cluster foi encerrado e removido. Esse teste ainda não valida a migration contra o esquema completo nem contra dados reais; repetir após restaurar a exportação atualizada de testes.
+
 ## Próximo gate
 
 Obter backup atualizado e anonimizado do ambiente de teste com esquema e dados representativos; separar inventário de objetos da plataforma; restaurar em PostgreSQL 17 com extensões/roles apropriadas; comparar contagens, checksums, políticas e resultados de RPCs. Só depois conectar o backend novo a esse banco. Não versionar dumps, senhas ou arquivos de Storage.
