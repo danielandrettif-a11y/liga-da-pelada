@@ -9,6 +9,65 @@
   "overrides": [
     {
       "context": "leagues",
+      "source": "src/lib/actions/stadiums.ts",
+      "name": "getStadiums",
+      "state": "frontend-migrated",
+      "target": "GET /api/leagues/:leagueId/stadiums",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/stadium.test.ts",
+        "backend/src/contexts/leagues/application/manage-stadiums.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-stadium-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/stadiums.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/stadiums.ts",
+      "name": "saveStadium",
+      "state": "frontend-migrated",
+      "target": "POST|PATCH /api/leagues/:leagueId/stadiums/:stadiumId?",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/stadium.test.ts",
+        "backend/src/contexts/leagues/application/manage-stadiums.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-stadium-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/stadiums.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/stadiums.ts",
+      "name": "deleteStadium",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/leagues/:leagueId/stadiums/:stadiumId",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-stadiums.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-stadium-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/stadiums.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/stadiums.ts",
+      "name": "reorderStadiums",
+      "state": "frontend-migrated",
+      "target": "PUT /api/leagues/:leagueId/stadiums/order",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/stadium.test.ts",
+        "backend/src/contexts/leagues/application/manage-stadiums.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-stadium-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/stadiums.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
       "source": "src/lib/actions/seasons.ts",
       "name": "getActiveSeason",
       "state": "frontend-migrated",

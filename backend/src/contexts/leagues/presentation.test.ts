@@ -55,6 +55,29 @@ function fixture(enabled: boolean) {
     getLatestFinishedSummary: vi.fn().mockResolvedValue({ seasonId: "season-0" }),
     finish: vi.fn().mockResolvedValue({ summary: { seasonId: "season-1" }, newSeasonNumber: 2 }),
   };
+  const stadiumRepository = {
+    list: vi.fn().mockResolvedValue([{
+      id: "00000000-0000-4000-8000-000000000002",
+      league_id: "00000000-0000-4000-8000-000000000001",
+      name: "Arena BQ", address: null, google_maps_url: "https://maps.example/arena",
+      latitude: null, longitude: null, display_order: 1, is_active: true,
+      created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z",
+    }]),
+    create: vi.fn().mockImplementation(async (leagueId, input) => ({
+      id: "00000000-0000-4000-8000-000000000002", league_id: leagueId,
+      name: input.name, address: input.address, google_maps_url: input.googleMapsUrl,
+      latitude: input.latitude, longitude: input.longitude, display_order: 1, is_active: true,
+      created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z",
+    })),
+    update: vi.fn().mockImplementation(async (leagueId, stadiumId, input) => ({
+      id: stadiumId, league_id: leagueId, name: input.name, address: input.address,
+      google_maps_url: input.googleMapsUrl, latitude: input.latitude, longitude: input.longitude,
+      display_order: 1, is_active: true, created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    })),
+    delete: vi.fn().mockResolvedValue(undefined),
+    reorder: vi.fn().mockResolvedValue(undefined),
+  };
   const repository: GoalRepository = { registerGoal: vi.fn() };
   const verifier = { verifyAccessToken: vi.fn().mockResolvedValue({ userId: "verified-user" }) };
   const app = createApp({
@@ -69,12 +92,14 @@ function fixture(enabled: boolean) {
     leagueConfigRepository,
     quickMatchRepository,
     seasonRepository,
+    stadiumRepository,
     logger: false,
   });
   apps.push(app);
   return {
     app, verifier, leagueRepository, leagueMembershipRequestRepository,
     leagueLobbyRepository, leagueAdminRepository, leagueConfigRepository, quickMatchRepository, seasonRepository,
+    stadiumRepository,
   };
 }
 
@@ -143,6 +168,35 @@ describe("league HTTP route", () => {
     });
     expect(result.json()).toEqual({ summary: { seasonId: "season-1" }, newSeasonNumber: 2 });
     expect(seasonRepository.finish).toHaveBeenCalledWith(id, { userId: "verified-user" }, expect.any(String));
+  });
+
+  it("manages stadiums through league-scoped authenticated routes", async () => {
+    const { app, stadiumRepository } = fixture(true);
+    const id = "00000000-0000-4000-8000-000000000001";
+    const stadiumId = "00000000-0000-4000-8000-000000000002";
+    const headers = { authorization: "Bearer valid-token" };
+    const payload = {
+      name: " Arena BQ ", address: null, google_maps_url: "maps.example/arena",
+      latitude: null, longitude: null,
+    };
+
+    expect((await app.inject({ method: "GET", url: `/api/leagues/${id}/stadiums`, headers })).json())
+      .toMatchObject({ stadiums: [{ id: stadiumId }] });
+    const created = await app.inject({ method: "POST", url: `/api/leagues/${id}/stadiums`, headers, payload });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({ stadium: { id: stadiumId, google_maps_url: "https://maps.example/arena" } });
+    await app.inject({ method: "PATCH", url: `/api/leagues/${id}/stadiums/${stadiumId}`, headers, payload });
+    await app.inject({ method: "PUT", url: `/api/leagues/${id}/stadiums/order`, headers, payload: { stadium_ids: [stadiumId] } });
+    await app.inject({ method: "DELETE", url: `/api/leagues/${id}/stadiums/${stadiumId}`, headers });
+
+    expect(stadiumRepository.create).toHaveBeenCalledWith(
+      id,
+      { name: "Arena BQ", address: null, googleMapsUrl: "https://maps.example/arena", latitude: null, longitude: null },
+      { userId: "verified-user" },
+    );
+    expect(stadiumRepository.update).toHaveBeenCalledWith(id, stadiumId, expect.any(Object), { userId: "verified-user" });
+    expect(stadiumRepository.reorder).toHaveBeenCalledWith(id, [stadiumId], { userId: "verified-user" });
+    expect(stadiumRepository.delete).toHaveBeenCalledWith(id, stadiumId, { userId: "verified-user" });
   });
 
   it("rejects missing credentials and invalid names before persistence", async () => {

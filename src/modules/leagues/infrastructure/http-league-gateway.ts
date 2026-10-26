@@ -1,6 +1,6 @@
 import type { NewLeague } from "../domain/league-creation";
 import { DuplicateLeagueNameError, type LeagueCreator } from "../application/create-league";
-import type { RoundType, Season, SeasonSummary } from "@/lib/types";
+import type { RoundType, Season, SeasonSummary, Stadium } from "@/lib/types";
 
 type ApiErrorPayload = { message?: unknown };
 
@@ -30,10 +30,23 @@ export type LeagueHttpGateway = LeagueCreator & {
   getActiveSeasonRoundIds(leagueId: string, roundType: RoundType): Promise<string[]>;
   getLatestFinishedSeason(leagueId: string): Promise<SeasonSummary | null>;
   finishSeason(leagueId: string, confirmation: string): Promise<{ summary: SeasonSummary; newSeasonNumber: number }>;
+  getStadiums(leagueId: string): Promise<Stadium[]>;
+  saveStadium(leagueId: string, input: StadiumApiInput): Promise<Stadium>;
+  deleteStadium(leagueId: string, stadiumId: string): Promise<void>;
+  reorderStadiums(leagueId: string, stadiumIds: string[]): Promise<void>;
 };
 
 export type QuickMatchInput = { date: string; start_time: string; field_name: string; map_url: string };
 export type QuickMatchSession = { league_id: string; callup_id: string; round_id: string };
+
+export type StadiumApiInput = {
+  id?: string | null;
+  name: string;
+  address: string | null;
+  google_maps_url: string;
+  latitude: number | null;
+  longitude: number | null;
+};
 
 export type LeagueConfig = {
   id: string;
@@ -86,7 +99,7 @@ export function httpLeagueGateway(
 ): LeagueHttpGateway {
   if (!accessToken.trim()) throw new LeagueApiError("Sessão expirada. Entre novamente.");
 
-  const request = async (method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: object) => {
+  const request = async (method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", path: string, body?: object) => {
     const url = apiUrl(baseUrl, path);
     let response: Response;
     try {
@@ -212,6 +225,37 @@ export function httpLeagueGateway(
         throw new LeagueApiError("Resposta inválida ao terminar a temporada.", response.status);
       }
       return { summary: payload.summary, newSeasonNumber: payload.newSeasonNumber as number };
+    },
+    async getStadiums(leagueId) {
+      const response = await request("GET", `api/leagues/${encodeURIComponent(leagueId)}/stadiums`);
+      const payload = await response.json().catch(() => null) as { stadiums?: unknown } | null;
+      if (!Array.isArray(payload?.stadiums)
+        || !payload.stadiums.every((stadium) => stadium && typeof stadium === "object"
+          && typeof (stadium as Stadium).id === "string")) {
+        throw new LeagueApiError("Resposta inválida ao carregar os estádios.", response.status);
+      }
+      return payload.stadiums as Stadium[];
+    },
+    async saveStadium(leagueId, input) {
+      const { id, ...body } = input;
+      const path = id
+        ? `api/leagues/${encodeURIComponent(leagueId)}/stadiums/${encodeURIComponent(id)}`
+        : `api/leagues/${encodeURIComponent(leagueId)}/stadiums`;
+      const response = await request(id ? "PATCH" : "POST", path, body);
+      const payload = await response.json().catch(() => null) as { stadium?: Stadium } | null;
+      if (!payload?.stadium || typeof payload.stadium.id !== "string") {
+        throw new LeagueApiError("Resposta inválida ao salvar o estádio.", response.status);
+      }
+      return payload.stadium;
+    },
+    async deleteStadium(leagueId, stadiumId) {
+      await request(
+        "DELETE",
+        `api/leagues/${encodeURIComponent(leagueId)}/stadiums/${encodeURIComponent(stadiumId)}`,
+      );
+    },
+    async reorderStadiums(leagueId, stadiumIds) {
+      await request("PUT", `api/leagues/${encodeURIComponent(leagueId)}/stadiums/order`, { stadium_ids: stadiumIds });
     },
   };
 }

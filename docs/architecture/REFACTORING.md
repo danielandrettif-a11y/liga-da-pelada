@@ -32,6 +32,13 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-26 — estádios no backend modular
+
+- As quatro operações de estádios passaram a usar domínio e casos de uso próprios, repositório PostgreSQL autenticado e rotas HTTP escopadas pela pelada. Criação serializa a próxima ordem; reordenação é uma única transação e rejeita IDs repetidos ou externos à pelada.
+- As Server Actions preservam o contrato das telas e o fallback Supabase enquanto `LEAGUE_API_ENABLED` estiver desligado. Com a flag local ligada, leitura, criação, edição, exclusão e ordenação usam o backend sem aceitar identidade ou papel enviados pelo cliente.
+- O catálogo registra **23/27 operações de peladas** em `frontend-migrated` (**23/267 no total**, além do piloto de gol). Ainda faltam os três fluxos de entrada/retomada e a atualização de branding antes de iniciar o contexto de identidade/elenco.
+- Verificação desta fatia: typecheck e build dos dois pacotes, **855 testes frontend em 166 arquivos**, **68 testes backend em 27 arquivos** e auditorias de migração, contextos e arquitetura aprovados. No banco local restaurado, o smoke autenticado aprovou criação `201`, leitura `200`, edição `200`, ordem atômica `200`, exclusão `200` e confirmou zero registros temporários restantes.
+
 ### 2026-10-22 — RLS, read models, cache, mídia e observabilidade
 
 - A migration 335 passou a envolver `auth.uid/role/jwt` em initplans, separar policies `ALL` conflitantes e consolidar policies permissivas equivalentes com OR. Teste e oficial terminaram com **0 chamadas auth por linha** e **0 pares permissivos sobrepostos**.

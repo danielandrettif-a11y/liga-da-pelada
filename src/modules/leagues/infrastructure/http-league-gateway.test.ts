@@ -78,6 +78,44 @@ describe("httpLeagueGateway", () => {
     ]);
   });
 
+  it("maps stadium CRUD and ordering to league-scoped HTTP contracts", async () => {
+    const stadium = {
+      id: "00000000-0000-4000-8000-000000000002", league_id: leagueId, name: "Arena BQ",
+      address: null, google_maps_url: "https://maps.example/arena", latitude: null, longitude: null,
+      display_order: 1, is_active: true, created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    };
+    const request = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ stadiums: [stadium] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ stadium }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ stadium }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ reordered: true }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ deleted: true }), { status: 200 }));
+    const gateway = httpLeagueGateway("http://backend:3001", "token", request as typeof fetch);
+    const input = {
+      name: stadium.name, address: null, google_maps_url: stadium.google_maps_url,
+      latitude: null, longitude: null,
+    };
+
+    await expect(gateway.getStadiums(leagueId)).resolves.toEqual([stadium]);
+    await expect(gateway.saveStadium(leagueId, input)).resolves.toEqual(stadium);
+    await expect(gateway.saveStadium(leagueId, { ...input, id: stadium.id })).resolves.toEqual(stadium);
+    await gateway.reorderStadiums(leagueId, [stadium.id]);
+    await gateway.deleteStadium(leagueId, stadium.id);
+
+    expect(request.mock.calls.map(([url, options]) => ({
+      method: (options as RequestInit).method,
+      path: (url as URL).pathname,
+      body: (options as RequestInit).body ? JSON.parse(String((options as RequestInit).body)) : null,
+    }))).toEqual([
+      { method: "GET", path: `/api/leagues/${leagueId}/stadiums`, body: null },
+      { method: "POST", path: `/api/leagues/${leagueId}/stadiums`, body: input },
+      { method: "PATCH", path: `/api/leagues/${leagueId}/stadiums/${stadium.id}`, body: input },
+      { method: "PUT", path: `/api/leagues/${leagueId}/stadiums/order`, body: { stadium_ids: [stadium.id] } },
+      { method: "DELETE", path: `/api/leagues/${leagueId}/stadiums/${stadium.id}`, body: null },
+    ]);
+  });
+
   it("maps every migrated lobby command to its stable HTTP contract", async () => {
     const request = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: leagueId, name: "Pelada BQ", can_manage: true }), { status: 200 }))
