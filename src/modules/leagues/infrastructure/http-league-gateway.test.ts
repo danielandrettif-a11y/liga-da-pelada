@@ -35,6 +35,22 @@ describe("httpLeagueGateway", () => {
       .rejects.toBeInstanceOf(DuplicateLeagueNameError);
   });
 
+  it("creates an atomic quick-match session through its stable HTTP contract", async () => {
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      league_id: "quick-league", callup_id: "quick-callup", round_id: "quick-round",
+    }), { status: 201 }));
+    const gateway = httpLeagueGateway("http://backend:3001", "token", request as typeof fetch);
+    await expect(gateway.createQuickMatch({
+      date: "2026-10-24", start_time: "20:30", field_name: "Arena", map_url: "",
+    })).resolves.toEqual({ league_id: "quick-league", callup_id: "quick-callup", round_id: "quick-round" });
+    const [url, options] = request.mock.calls[0] as [URL, RequestInit];
+    expect(url.pathname).toBe("/api/quick-match-sessions");
+    expect(options.method).toBe("POST");
+    expect(JSON.parse(String(options.body))).toEqual({
+      date: "2026-10-24", start_time: "20:30", field_name: "Arena", map_url: "",
+    });
+  });
+
   it("maps every migrated lobby command to its stable HTTP contract", async () => {
     const request = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: leagueId, name: "Pelada BQ", can_manage: true }), { status: 200 }))

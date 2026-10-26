@@ -11,6 +11,7 @@ export class LeagueApiError extends Error {
 }
 
 export type LeagueHttpGateway = LeagueCreator & {
+  createQuickMatch(input: QuickMatchInput): Promise<QuickMatchSession>;
   getConfig(leagueId: string): Promise<LeagueConfig>;
   requestMembership(leagueId: string): Promise<void>;
   joinOpen(leagueId: string): Promise<void>;
@@ -25,6 +26,9 @@ export type LeagueHttpGateway = LeagueCreator & {
   upgrade(leagueId: string): Promise<void>;
   deleteLeague(leagueId: string, confirmName: string): Promise<void>;
 };
+
+export type QuickMatchInput = { date: string; start_time: string; field_name: string; map_url: string };
+export type QuickMatchSession = { league_id: string; callup_id: string; round_id: string };
 
 export type LeagueConfig = {
   id: string;
@@ -99,6 +103,14 @@ export function httpLeagueGateway(
   };
 
   return {
+    async createQuickMatch(input) {
+      const response = await request("POST", "api/quick-match-sessions", input);
+      const payload = await response.json().catch(() => null) as Partial<QuickMatchSession> | null;
+      if (!payload || !payload.league_id || !payload.callup_id || !payload.round_id) {
+        throw new LeagueApiError("Resposta inválida ao criar a partida rápida.", response.status);
+      }
+      return payload as QuickMatchSession;
+    },
     async getConfig(leagueId) {
       const response = await request("GET", `api/leagues/${encodeURIComponent(leagueId)}/config`);
       const payload = await response.json().catch(() => null) as LeagueConfig | null;

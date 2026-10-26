@@ -245,17 +245,23 @@ export async function createQuickLeague(formData: FormData) {
     redirect("/lobby/criar?quickError=invalid");
   }
 
-  const { data, error } = await client.rpc("create_quick_match_session", {
-    p_date: date,
-    p_start_time: startTime,
-    p_field_name: fieldName,
-    p_map_url: mapUrl,
-    p_players_per_team: 5,
-    p_teams_per_round: 3,
-  });
-  const session = data as { league_id?: string; callup_id?: string; round_id?: string } | null;
-  if (error || !session?.league_id || !session.callup_id || !session.round_id) {
+  let session: { league_id: string; callup_id: string; round_id: string } | null = null;
+  try {
+    const api = await leagueApiFor(client);
+    if (api) {
+      session = await api.createQuickMatch({ date, start_time: startTime, field_name: fieldName, map_url: mapUrl });
+    } else {
+      const { data, error } = await client.rpc("create_quick_match_session", {
+        p_date: date, p_start_time: startTime, p_field_name: fieldName, p_map_url: mapUrl,
+        p_players_per_team: 5, p_teams_per_round: 3,
+      });
+      if (error) throw new Error(error.message);
+      session = data as typeof session;
+    }
+  } catch (error) {
     console.error("Erro ao criar partida rápida:", error);
+  }
+  if (!session?.league_id || !session.callup_id || !session.round_id) {
     redirect("/lobby/criar?quickError=create");
   }
 

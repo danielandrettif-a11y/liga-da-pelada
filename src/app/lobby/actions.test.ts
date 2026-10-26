@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   account: vi.fn(), leagues: vi.fn(), rpc: vi.fn(), cookieGet: vi.fn(), cookieSet: vi.fn(), cookieDelete: vi.fn(),
   revalidate: vi.fn(), redirect: vi.fn(), leagueApi: vi.fn(),
-  apiCreate: vi.fn(), apiRequestMembership: vi.fn(), apiSetFavorite: vi.fn(),
+  apiCreate: vi.fn(), apiCreateQuickMatch: vi.fn(), apiRequestMembership: vi.fn(), apiSetFavorite: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
@@ -112,6 +112,23 @@ describe("criação de pelada", () => {
       p_field_name: "",
       p_map_url: "",
     }));
+  });
+
+  it("cria a partida rápida pela API modular quando a ponte está ativa", async () => {
+    mocks.apiCreateQuickMatch.mockResolvedValue({
+      league_id: "api-quick-league", callup_id: "api-quick-callup", round_id: "api-quick-round",
+    });
+    mocks.leagueApi.mockResolvedValue({ createQuickMatch: mocks.apiCreateQuickMatch });
+    const data = new FormData();
+    data.set("date", "2026-10-24"); data.set("start_time", "20:30");
+    data.set("field_name", "Arena BQ"); data.set("map_url", "maps.example/arena");
+    await expect(createQuickLeague(data))
+      .rejects.toThrow("redirect:/convocacao?callup=api-quick-callup&setup=players");
+    expect(mocks.apiCreateQuickMatch).toHaveBeenCalledWith({
+      date: "2026-10-24", start_time: "20:30", field_name: "Arena BQ", map_url: "https://maps.example/arena",
+    });
+    expect(mocks.rpc).not.toHaveBeenCalledWith("create_quick_match_session", expect.anything());
+    expect(mocks.cookieSet).toHaveBeenCalledWith("active_league_id", "api-quick-league", expect.any(Object));
   });
 
   it("mantém o erro de criação e não altera a pelada ativa quando o RPC falha", async () => {

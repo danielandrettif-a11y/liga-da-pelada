@@ -22,6 +22,9 @@ import {
   type LeagueAdminRepository,
 } from "../application/manage-league-admin.js";
 import { LeagueAdminPersistenceError } from "../infrastructure/pg-league-admin-repository.js";
+import { createQuickMatch, type QuickMatchRepository } from "../application/create-quick-match.js";
+import { InvalidQuickMatchError } from "../domain/quick-match.js";
+import { QuickMatchPersistenceError } from "../infrastructure/pg-quick-match-repository.js";
 
 export function registerLeagueRoutes(app: FastifyInstance, dependencies: {
   verifier: UserVerifier;
@@ -29,7 +32,43 @@ export function registerLeagueRoutes(app: FastifyInstance, dependencies: {
   membershipRequestRepository: LeagueMembershipRequestRepository;
   lobbyRepository: LeagueLobbyRepository;
   adminRepository: LeagueAdminRepository;
+  quickMatchRepository: QuickMatchRepository;
 }): void {
+  app.post<{ Body: { date: string; start_time: string; field_name: string; map_url: string } }>(
+    "/api/quick-match-sessions",
+    {
+      schema: {
+        body: {
+          type: "object", additionalProperties: false,
+          required: ["date", "start_time", "field_name", "map_url"],
+          properties: {
+            date: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+            start_time: { type: "string", pattern: "^\\d{2}:\\d{2}$" },
+            field_name: { type: "string", maxLength: 120 },
+            map_url: { type: "string", maxLength: 1100 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const authentication = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
+      try {
+        const session = await createQuickMatch(request.body, authentication.actor, dependencies.quickMatchRepository);
+        return reply.code(201).send(session);
+      } catch (error) {
+        if (error instanceof InvalidQuickMatchError) {
+          return reply.code(400).send({ code: "INVALID_QUICK_MATCH", message: error.message });
+        }
+        if (error instanceof QuickMatchPersistenceError) {
+          return reply.code(error.statusCode).send({ code: "QUICK_MATCH_REJECTED", message: error.message });
+        }
+        request.log.error({ err: error }, "quick match creation failed");
+        return reply.code(503).send({ code: "QUICK_MATCH_UNAVAILABLE", message: "Serviço indisponível." });
+      }
+    },
+  );
+
   app.post<{ Body: { name: string; tier: string; visibility: string } }>(
     "/api/leagues",
     {

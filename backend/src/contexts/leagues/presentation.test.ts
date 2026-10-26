@@ -42,6 +42,9 @@ function fixture(enabled: boolean) {
     updateSettings: vi.fn().mockResolvedValue(undefined),
     setPreseason: vi.fn().mockResolvedValue(undefined),
   };
+  const quickMatchRepository = {
+    create: vi.fn().mockResolvedValue({ league_id: "quick-league", callup_id: "quick-callup", round_id: "quick-round" }),
+  };
   const repository: GoalRepository = { registerGoal: vi.fn() };
   const verifier = { verifyAccessToken: vi.fn().mockResolvedValue({ userId: "verified-user" }) };
   const app = createApp({
@@ -54,12 +57,13 @@ function fixture(enabled: boolean) {
     leagueLobbyRepository,
     leagueAdminRepository,
     leagueConfigRepository,
+    quickMatchRepository,
     logger: false,
   });
   apps.push(app);
   return {
     app, verifier, leagueRepository, leagueMembershipRequestRepository,
-    leagueLobbyRepository, leagueAdminRepository, leagueConfigRepository,
+    leagueLobbyRepository, leagueAdminRepository, leagueConfigRepository, quickMatchRepository,
   };
 }
 
@@ -80,6 +84,21 @@ describe("league HTTP route", () => {
     expect(leagueRepository.create).toHaveBeenCalledWith(
       { name: "Pelada BQ", tier: "quick", visibility: "private" }, { userId: "verified-user" },
     );
+  });
+
+  it("creates the whole quick-match session through one authenticated command", async () => {
+    const { app, quickMatchRepository } = fixture(true);
+    const result = await app.inject({
+      method: "POST", url: "/api/quick-match-sessions",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { date: "2026-10-24", start_time: "20:30", field_name: " Arena   BQ ", map_url: "maps.example/arena" },
+    });
+    expect(result.statusCode).toBe(201);
+    expect(result.json()).toEqual({ league_id: "quick-league", callup_id: "quick-callup", round_id: "quick-round" });
+    expect(quickMatchRepository.create).toHaveBeenCalledWith({
+      date: "2026-10-24", startTime: "20:30", fieldName: "Arena BQ",
+      mapUrl: "https://maps.example/arena", playersPerTeam: 5, teamsPerRound: 3,
+    }, { userId: "verified-user" });
   });
 
   it("rejects missing credentials and invalid names before persistence", async () => {
