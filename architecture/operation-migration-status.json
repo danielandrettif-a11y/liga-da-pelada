@@ -11,89 +11,101 @@
       "context": "leagues",
       "source": "src/app/lobby/actions.ts",
       "name": "createLeague",
-      "state": "backend-pilot",
+      "state": "frontend-migrated",
       "target": "POST /api/leagues",
       "evidence": [
         "backend/src/contexts/leagues/presentation/leagues-route.ts",
-        "backend/src/contexts/leagues/presentation.test.ts"
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/app/lobby/actions.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
       ]
     },
     {
       "context": "leagues",
       "source": "src/app/lobby/actions.ts",
       "name": "requestClosedLeague",
-      "state": "backend-pilot",
+      "state": "frontend-migrated",
       "target": "POST /api/leagues/:leagueId/membership-requests",
       "evidence": [
         "backend/src/contexts/leagues/presentation/leagues-route.ts",
         "backend/src/contexts/leagues/presentation.test.ts",
-        "backend/src/contexts/leagues/infrastructure/pg-league-membership-request-repository.test.ts"
+        "backend/src/contexts/leagues/infrastructure/pg-league-membership-request-repository.test.ts",
+        "src/app/lobby/actions.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
       ]
     },
     {
       "context": "leagues",
       "source": "src/app/lobby/actions.ts",
       "name": "joinOpenLeague",
-      "state": "backend-pilot",
+      "state": "frontend-migrated",
       "target": "POST /api/leagues/:leagueId/memberships",
       "evidence": [
         "backend/src/contexts/leagues/application/manage-league-membership.test.ts",
-        "backend/src/contexts/leagues/presentation.test.ts"
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
       ]
     },
     {
       "context": "leagues",
       "source": "src/app/lobby/actions.ts",
       "name": "toggleFavorite",
-      "state": "backend-pilot",
+      "state": "frontend-migrated",
       "target": "PATCH /api/leagues/:leagueId/favorite",
       "evidence": [
         "backend/src/contexts/leagues/infrastructure/pg-league-lobby-repository.test.ts",
-        "backend/src/contexts/leagues/presentation.test.ts"
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/app/lobby/actions.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
       ]
     },
     {
       "context": "leagues",
       "source": "src/app/lobby/actions.ts",
       "name": "requestAccess",
-      "state": "backend-pilot",
+      "state": "frontend-migrated",
       "target": "POST /api/league-invites/:inviteToken/membership-requests",
       "evidence": [
         "backend/src/contexts/leagues/application/manage-league-membership.test.ts",
-        "backend/src/contexts/leagues/presentation.test.ts"
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
       ]
     },
     {
       "context": "leagues",
       "source": "src/app/lobby/actions.ts",
       "name": "reviewAccess",
-      "state": "backend-pilot",
+      "state": "frontend-migrated",
       "target": "POST /api/league-membership-requests/:requestId/review",
       "evidence": [
         "backend/src/contexts/leagues/application/manage-league-admin.test.ts",
-        "backend/src/contexts/leagues/presentation.test.ts"
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
       ]
     },
     {
       "context": "leagues",
       "source": "src/app/lobby/actions.ts",
       "name": "addExistingAccount",
-      "state": "backend-pilot",
+      "state": "frontend-migrated",
       "target": "POST /api/leagues/:leagueId/members",
       "evidence": [
         "backend/src/contexts/leagues/infrastructure/pg-league-admin-repository.test.ts",
-        "backend/src/contexts/leagues/presentation.test.ts"
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
       ]
     },
     {
       "context": "leagues",
       "source": "src/lib/actions/league.ts",
       "name": "updateLeagueVisibility",
-      "state": "backend-pilot",
+      "state": "frontend-migrated",
       "target": "PATCH /api/leagues/:leagueId/visibility",
       "evidence": [
         "backend/src/contexts/leagues/application/manage-league-admin.test.ts",
-        "backend/src/contexts/leagues/presentation.test.ts"
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/league.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
       ]
     },
     {

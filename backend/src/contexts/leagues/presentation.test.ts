@@ -11,7 +11,7 @@ function fixture(enabled: boolean) {
   const leagueMembershipRequestRepository = { request: vi.fn().mockResolvedValue(true) };
   const leagueLobbyRepository = {
     joinOpen: vi.fn().mockResolvedValue(true),
-    toggleFavorite: vi.fn().mockResolvedValue(true),
+    setFavorite: vi.fn().mockResolvedValue(true),
     requestByInvite: vi.fn().mockResolvedValue("00000000-0000-4000-8000-000000000001"),
   };
   const leagueAdminRepository = {
@@ -81,12 +81,14 @@ describe("league HTTP route", () => {
     const id = "00000000-0000-4000-8000-000000000001";
     const headers = { authorization: "Bearer valid-token" };
     expect((await app.inject({ method: "POST", url: `/api/leagues/${id}/memberships`, headers })).statusCode).toBe(201);
-    expect((await app.inject({ method: "PATCH", url: `/api/leagues/${id}/favorite`, headers })).json()).toEqual({ favorite: true });
+    expect((await app.inject({
+      method: "PATCH", url: `/api/leagues/${id}/favorite`, headers, payload: { favorite: true },
+    })).json()).toEqual({ favorite: true });
     const invite = await app.inject({ method: "POST", url: `/api/league-invites/${id}/membership-requests`, headers });
     expect(invite.statusCode).toBe(202);
     expect(invite.json()).toEqual({ league_id: id });
     expect(leagueLobbyRepository.joinOpen).toHaveBeenCalledWith(id, { userId: "verified-user" });
-    expect(leagueLobbyRepository.toggleFavorite).toHaveBeenCalledWith(id, { userId: "verified-user" });
+    expect(leagueLobbyRepository.setFavorite).toHaveBeenCalledWith(id, true, { userId: "verified-user" });
     expect(leagueLobbyRepository.requestByInvite).toHaveBeenCalledWith(id, { userId: "verified-user" });
   });
 

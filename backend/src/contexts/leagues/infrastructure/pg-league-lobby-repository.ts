@@ -43,10 +43,16 @@ export function pgLeagueLobbyRepository(pool: Pool): LeagueLobbyRepository {
           (row) => row.joined === true);
       } catch (error) { throw translateLobbyFailure(error); }
     },
-    async toggleFavorite(leagueId, actor) {
+    async setFavorite(leagueId, favorite, actor) {
       try {
-        return await authenticated(actor, "SELECT public.toggle_league_favorite($1::uuid) AS favorite", [leagueId],
-          (row) => row.favorite === true);
+        return await authenticated(actor, `
+          UPDATE public.league_members
+             SET is_favorite = $2::boolean
+           WHERE league_id = $1::uuid
+             AND user_id = auth.uid()
+             AND is_active = true
+          RETURNING is_favorite AS favorite
+        `, [leagueId, favorite], (row) => row.favorite === true);
       } catch (error) { throw translateLobbyFailure(error); }
     },
     async requestByInvite(inviteToken, actor) {

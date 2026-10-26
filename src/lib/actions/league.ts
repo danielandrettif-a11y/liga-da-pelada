@@ -11,6 +11,8 @@ import {
   isDuplicateLeagueNameError,
   normalizeLeagueName,
 } from "@/modules/leagues/domain/league-name";
+import { LeagueApiError } from "@/modules/leagues/infrastructure/http-league-gateway";
+import { leagueApiFor } from "@/modules/leagues/infrastructure/league-api-session";
 
 const BRANDING_BUCKET = "league-branding";
 const BRANDING_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -74,10 +76,22 @@ export async function updateLeagueVisibility(leagueId: string, visibility: "priv
   }
   const { client, user } = await getCurrentAccount();
   if (!user) return { success: false, error: "Entre na sua conta novamente." };
-  const { error } = await client.rpc("set_league_visibility", {
-    p_league_id: leagueId, p_visibility: visibility,
-  });
-  if (error) return { success: false, error: error.message };
+  try {
+    const api = await leagueApiFor(client);
+    if (api) {
+      await api.setVisibility(leagueId, visibility);
+    } else {
+      const { error } = await client.rpc("set_league_visibility", {
+        p_league_id: leagueId, p_visibility: visibility,
+      });
+      if (error) return { success: false, error: error.message };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof LeagueApiError ? error.message : "Não foi possível alterar a visibilidade.",
+    };
+  }
   revalidatePath("/admin/liga");
   revalidatePath("/peladas");
   revalidatePath("/lobby");

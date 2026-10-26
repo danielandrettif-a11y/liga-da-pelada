@@ -9,7 +9,7 @@ import { LeagueMembershipRequestPersistenceError } from "../infrastructure/pg-le
 import {
   joinOpenLeague,
   requestLeagueMembershipByInvite,
-  toggleLeagueFavorite,
+  setLeagueFavorite,
   type LeagueLobbyRepository,
 } from "../application/manage-league-membership.js";
 import { LeagueLobbyPersistenceError } from "../infrastructure/pg-league-lobby-repository.js";
@@ -123,16 +123,26 @@ export function registerLeagueRoutes(app: FastifyInstance, dependencies: {
     },
   );
 
-  app.patch<{ Params: { leagueId: string } }>(
+  app.patch<{ Params: { leagueId: string }; Body: { favorite: boolean } }>(
     "/api/leagues/:leagueId/favorite",
-    { schema: { params: { type: "object", required: ["leagueId"], properties: { leagueId: { type: "string", format: "uuid" } } } } },
+    {
+      schema: {
+        params: { type: "object", required: ["leagueId"], properties: { leagueId: { type: "string", format: "uuid" } } },
+        body: { type: "object", additionalProperties: false, required: ["favorite"], properties: { favorite: { type: "boolean" } } },
+      },
+    },
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) {
         return reply.code(authentication.error.statusCode).send({ code: authentication.error.code, message: authentication.error.message });
       }
       try {
-        return await toggleLeagueFavorite(request.params.leagueId, authentication.actor, dependencies.lobbyRepository);
+        return await setLeagueFavorite(
+          request.params.leagueId,
+          request.body.favorite,
+          authentication.actor,
+          dependencies.lobbyRepository,
+        );
       } catch (error) {
         if (error instanceof InvalidLeagueIdError) return reply.code(400).send({ code: "INVALID_LEAGUE", message: error.message });
         if (error instanceof LeagueLobbyPersistenceError) {
