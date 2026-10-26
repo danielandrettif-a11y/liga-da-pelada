@@ -13,6 +13,8 @@ import { pgLeagueEntryRepository } from "./contexts/leagues/infrastructure/pg-le
 import { pgLeagueBrandingRepository } from "./contexts/leagues/infrastructure/pg-league-branding-repository.js";
 import { supabaseLeagueBrandingStorage } from "./contexts/leagues/infrastructure/supabase-league-branding-storage.js";
 import { pgAccountAccessRepository } from "./contexts/identity/infrastructure/pg-account-access-repository.js";
+import { pgIdentityProfileRepository } from "./contexts/identity/infrastructure/pg-identity-profile-repository.js";
+import { supabaseIdentityAuthProvider } from "./contexts/identity/infrastructure/supabase-identity-auth-provider.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -27,11 +29,15 @@ const databaseUrl = process.env.DATABASE_URL;
 const authUrl = process.env.SUPABASE_INTERNAL_URL;
 const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
 const publicUrl = process.env.SUPABASE_PUBLIC_URL;
+const appPublicUrl = process.env.APP_PUBLIC_URL;
 if ((goalsEnabled || leaguesEnabled || identityEnabled) && (!databaseUrl || !authUrl || !publishableKey)) {
   throw new Error("APIs habilitadas requerem DATABASE_URL, SUPABASE_INTERNAL_URL e SUPABASE_PUBLISHABLE_KEY.");
 }
 if (leaguesEnabled && !publicUrl) {
   throw new Error("ENABLE_LEAGUE_API=true requer SUPABASE_PUBLIC_URL para as imagens públicas.");
+}
+if (identityEnabled && (!publicUrl || !appPublicUrl)) {
+  throw new Error("ENABLE_IDENTITY_API=true requer SUPABASE_PUBLIC_URL e APP_PUBLIC_URL.");
 }
 
 const pool = new pg.Pool({ connectionString: databaseUrl, max: 10 });
@@ -55,6 +61,11 @@ const app = createApp({
     authUrl || "http://127.0.0.1:54321", publicUrl || "http://127.0.0.1:54321", publishableKey || "",
   ),
   accountAccessRepository: pgAccountAccessRepository(pool),
+  identityProfileRepository: pgIdentityProfileRepository(pool),
+  identityAuthProvider: supabaseIdentityAuthProvider(
+    authUrl || "http://127.0.0.1:54321", publicUrl || "http://127.0.0.1:54321", publishableKey || "",
+  ),
+  appPublicUrl,
 });
 
 try {

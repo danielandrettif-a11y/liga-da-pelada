@@ -19,3 +19,10 @@ export async function identityApiFor(client: SessionClient): Promise<IdentityHtt
   if (error || !session?.access_token) throw new IdentityApiError("Sessão expirada. Entre novamente.");
   return httpIdentityGateway(backendUrl, session.access_token);
 }
+
+export function identityPublicApi(): IdentityHttpGateway | null {
+  if (process.env.IDENTITY_API_ENABLED !== "true") return null;
+  const backendUrl = process.env.IDENTITY_BACKEND_URL;
+  if (!backendUrl) throw new IdentityApiError("API de identidade não configurada.");
+  return httpIdentityGateway(backendUrl);
+}

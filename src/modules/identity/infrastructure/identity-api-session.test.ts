@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
-import { identityApiFor } from "./identity-api-session";
+import { identityApiFor, identityPublicApi } from "./identity-api-session";
 
 const originalEnabled = process.env.IDENTITY_API_ENABLED;
 const originalUrl = process.env.IDENTITY_BACKEND_URL;
@@ -37,5 +37,11 @@ describe("identityApiFor", () => {
     await expect(identityApiFor({ auth: { getSession } })).resolves.toMatchObject({
       listManagedAccounts: expect.any(Function), setAccountAdminRole: expect.any(Function),
     });
+  });
+
+  it("creates a public gateway without reading a session", () => {
+    process.env.IDENTITY_API_ENABLED = "true";
+    process.env.IDENTITY_BACKEND_URL = "http://backend:3001";
+    expect(identityPublicApi()).toMatchObject({ login: expect.any(Function), signup: expect.any(Function) });
   });
 });

@@ -24,8 +24,34 @@ describe("httpIdentityGateway", () => {
     expect(roleOptions.body).toBe(JSON.stringify({ admin: true }));
   });
 
+  it("uses public authentication and PKCE contracts without a browser token", async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        user_id: userId, requires_confirmation: true,
+      }), { status: 201, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: "access", refresh_token: "refresh",
+      }), { status: 200, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ url: "https://auth.example/authorize" }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }));
+    const gateway = httpIdentityGateway("http://backend:3001", null, fetcher as typeof fetch);
+    await expect(gateway.signup({
+      email: "user@example.com", password: "password-123", name: "Maria",
+      flowId: "1234567890abcdef", codeChallenge: "c".repeat(43), returnPath: "/lobby",
+    })).resolves.toMatchObject({ userId, requiresConfirmation: true, session: null });
+    await expect(gateway.login("user@example.com", "password-123")).resolves.toEqual({
+      accessToken: "access", refreshToken: "refresh",
+    });
+    await expect(gateway.googleAuthorization({
+      flowId: "1234567890abcdef", codeChallenge: "c".repeat(43), returnPath: "/lobby",
+    })).resolves.toBe("https://auth.example/authorize");
+    expect((fetcher.mock.calls[0]?.[1] as RequestInit).headers).not.toHaveProperty("authorization");
+  });
+
   it("rejects missing sessions, invalid URLs and controlled API failures", async () => {
-    expect(() => httpIdentityGateway("http://backend:3001", "")).toThrow("Sessão expirada");
+    const anonymous = httpIdentityGateway("http://backend:3001", "");
+    await expect(anonymous.listManagedAccounts()).rejects.toThrow("Sessão expirada");
     const invalid = httpIdentityGateway("file:///tmp/backend", "token");
     await expect(invalid.listManagedAccounts()).rejects.toBeInstanceOf(IdentityApiError);
     const failing = httpIdentityGateway("http://backend:3001", "token", vi.fn().mockResolvedValue(

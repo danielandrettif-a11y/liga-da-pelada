@@ -32,12 +32,15 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
-### 2026-10-26 — identidade e acesso 2/8 no backend
+### 2026-10-26 — identidade e acesso 8/8 no backend
 
 - A listagem de contas administráveis e a promoção/remoção de ADM global ganharam domínio, caso de uso, repositório PostgreSQL autenticado e rotas próprias. As RPCs existentes continuam responsáveis por autorização, lock, proteção do último ADM e auditoria.
 - O Next usa um gateway HTTP server-only quando `IDENTITY_API_ENABLED=true`; o access token não chega ao navegador por código novo e o caminho Supabase anterior permanece como fallback reversível. A API valida UUID/payload, verifica a sessão e executa SQL sob `SET LOCAL ROLE authenticated` com claims do usuário verificado.
-- Cadastro, login, logout, recuperação, troca de senha e Google OAuth seguem pendentes. O SSR instalado usa PKCE e grava o verificador em cookie, portanto esses seis fluxos serão migrados junto com o callback; proxyar apenas a requisição inicial quebraria confirmação e recuperação.
-- Testes direcionados aprovaram 8 casos no frontend e 9 no backend, além do typecheck dos dois pacotes. O catálogo registra **2/8 operações de identidade** em `frontend-migrated`; homologação real com dois ADMs e a flag ligada ainda é necessária antes de promover para `verified`.
+- Cadastro, login, logout, recuperação, troca de senha e Google OAuth foram migrados junto com o callback PKCE. O Next gera desafio/verificador por fluxo, guarda o verificador em cookie HttpOnly de uso único, envia apenas o desafio ao backend e instala no SSR os tokens recebidos pela comunicação interna. O Auth auto-hospedado continua como infraestrutura substituível; `APP_PUBLIC_URL` e a allow-list de redirects precisam corresponder ao ambiente.
+- Login e callback mantêm a reparação de perfil como melhor esforço: falha temporária no banco não invalida uma sessão emitida corretamente pelo Auth. Troca de senha revoga a sessão no Auth e depois limpa apenas o cookie local. Erros esperados do provedor são traduzidos sem vazar detalhes internos.
+- O catálogo registra **8/8 operações de identidade** em `frontend-migrated`. Testes de domínio, aplicação, adaptadores Auth/PostgreSQL, rotas, gateway, Server Actions, PKCE e callback cobrem o caminho novo; homologação real com confirmação por e-mail, Google de teste, recuperação e dois ADMs ainda é necessária antes de promover para `verified`.
+- A imagem local foi reconstruída e [`verify-local-identity.sh`](../../scripts/verify-local-identity.sh) aprovou login `200`, perfil criado, recuperação aceita `202`, URL OAuth `200`, troca de senha `204`, logout `204`, login com a nova senha `200`, contas `200` e papel idempotente `200`; a fixture foi removida e não restou conta `codex.identity.*`. A confirmação real de cadastro não pôde ser exercitada porque o Auth restaurado aponta para o host SMTP ausente `supabase-mail`; o script valida a rejeição de entrada inválida e deixa o envio real como gate manual.
+- Verificação da fatia: **884 testes frontend em 173 arquivos**, **105 testes backend em 42 arquivos**, typecheck e build dos dois pacotes e auditorias de migração/contextos/arquitetura aprovados.
 
 ### 2026-10-26 — contexto de peladas 27/27 conectado ao backend
 

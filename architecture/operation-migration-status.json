@@ -9,6 +9,98 @@
   "overrides": [
     {
       "context": "identity",
+      "source": "src/app/cadastro/actions.ts",
+      "name": "signup",
+      "state": "frontend-migrated",
+      "target": "POST /api/identity/signup + POST /api/identity/pkce/exchange",
+      "evidence": [
+        "backend/src/contexts/identity/domain/authentication.test.ts",
+        "backend/src/contexts/identity/application/manage-authentication.test.ts",
+        "backend/src/contexts/identity/infrastructure/supabase-identity-auth-provider.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/app/cadastro/actions.test.ts",
+        "src/app/auth/callback/route.test.ts",
+        "src/modules/identity/infrastructure/http-identity-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "login",
+      "state": "frontend-migrated",
+      "target": "POST /api/identity/login",
+      "evidence": [
+        "backend/src/contexts/identity/application/manage-authentication.test.ts",
+        "backend/src/contexts/identity/infrastructure/supabase-identity-auth-provider.test.ts",
+        "backend/src/contexts/identity/infrastructure/pg-identity-profile-repository.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/app/login/actions.test.ts",
+        "src/modules/identity/infrastructure/http-identity-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "logout",
+      "state": "frontend-migrated",
+      "target": "POST /api/identity/logout",
+      "evidence": [
+        "backend/src/contexts/identity/application/manage-authentication.test.ts",
+        "backend/src/contexts/identity/infrastructure/supabase-identity-auth-provider.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/app/login/actions.test.ts",
+        "src/modules/identity/infrastructure/http-identity-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "requestPasswordReset",
+      "state": "frontend-migrated",
+      "target": "POST /api/identity/password-reset + POST /api/identity/pkce/exchange",
+      "evidence": [
+        "backend/src/contexts/identity/domain/authentication.test.ts",
+        "backend/src/contexts/identity/application/manage-authentication.test.ts",
+        "backend/src/contexts/identity/infrastructure/supabase-identity-auth-provider.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/app/login/actions.test.ts",
+        "src/app/auth/callback/route.test.ts",
+        "src/modules/identity/infrastructure/identity-pkce.test.ts"
+      ]
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "signInWithGoogle",
+      "state": "frontend-migrated",
+      "target": "POST /api/identity/oauth/google + POST /api/identity/pkce/exchange",
+      "evidence": [
+        "backend/src/contexts/identity/domain/authentication.test.ts",
+        "backend/src/contexts/identity/application/manage-authentication.test.ts",
+        "backend/src/contexts/identity/infrastructure/supabase-identity-auth-provider.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/app/login/actions.test.ts",
+        "src/app/auth/callback/route.test.ts",
+        "src/modules/identity/infrastructure/identity-pkce.test.ts"
+      ]
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "updatePassword",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/identity/password",
+      "evidence": [
+        "backend/src/contexts/identity/domain/authentication.test.ts",
+        "backend/src/contexts/identity/application/manage-authentication.test.ts",
+        "backend/src/contexts/identity/infrastructure/supabase-identity-auth-provider.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/app/login/actions.test.ts",
+        "src/modules/identity/infrastructure/http-identity-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "identity",
       "source": "src/lib/actions/admins.ts",
       "name": "getManagedAccounts",
       "state": "frontend-migrated",
