@@ -14,6 +14,7 @@ import type {
   LeagueBrandingRepository,
   LeagueBrandingStorage,
 } from "../contexts/leagues/application/manage-league-branding.js";
+import type { AccountAccessRepository } from "../contexts/identity/application/manage-account-access.js";
 import { registerGoalRoutes } from "../contexts/matches/presentation/goals-route.js";
 import { registerLeagueRoutes } from "../contexts/leagues/presentation/leagues-route.js";
 import { registerLeagueConfigRoutes } from "../contexts/leagues/presentation/league-config-route.js";
@@ -21,11 +22,13 @@ import { registerSeasonRoutes } from "../contexts/leagues/presentation/season-ro
 import { registerStadiumRoutes } from "../contexts/leagues/presentation/stadium-route.js";
 import { registerLeagueEntryRoutes } from "../contexts/leagues/presentation/league-entry-route.js";
 import { registerLeagueBrandingRoutes } from "../contexts/leagues/presentation/league-branding-route.js";
+import { registerAccountAccessRoutes } from "../contexts/identity/presentation/account-access-route.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 
 export function createApp(dependencies: {
   goalsEnabled: boolean;
   leaguesEnabled?: boolean;
+  identityEnabled?: boolean;
   verifier: UserVerifier;
   repository: GoalRepository;
   leagueRepository?: LeagueRepository;
@@ -39,6 +42,7 @@ export function createApp(dependencies: {
   leagueEntryRepository?: LeagueEntryRepository;
   leagueBrandingRepository?: LeagueBrandingRepository;
   leagueBrandingStorage?: LeagueBrandingStorage;
+  accountAccessRepository?: AccountAccessRepository;
   logger?: boolean;
 }): FastifyInstance {
   if (dependencies.leaguesEnabled && !dependencies.leagueRepository) {
@@ -70,6 +74,9 @@ export function createApp(dependencies: {
   }
   if (dependencies.leaguesEnabled && (!dependencies.leagueBrandingRepository || !dependencies.leagueBrandingStorage)) {
     throw new Error("BrandingRepository e BrandingStorage são obrigatórios quando ENABLE_LEAGUE_API=true.");
+  }
+  if (dependencies.identityEnabled && !dependencies.accountAccessRepository) {
+    throw new Error("AccountAccessRepository é obrigatório quando ENABLE_IDENTITY_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
   void app.register(multipart);
@@ -125,6 +132,12 @@ export function createApp(dependencies: {
       verifier: dependencies.verifier,
       repository: dependencies.leagueBrandingRepository,
       storage: dependencies.leagueBrandingStorage,
+    });
+  }
+  if (dependencies.identityEnabled && dependencies.accountAccessRepository) {
+    registerAccountAccessRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.accountAccessRepository,
     });
   }
   return app;

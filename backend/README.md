@@ -1,8 +1,8 @@
 # Backend inicial de partidas
 
-Este serviço ainda é uma fatia **experimental** da migração. As rotas de gol e peladas não são registradas com `ENABLE_GOAL_API=false` e `ENABLE_LEAGUE_API=false` (padrões). O Next.js usa a ponte modular somente quando a flag correspondente está ativa; sem ela, preserva os fluxos existentes.
+Este serviço ainda é uma fatia **experimental** da migração. As rotas de gol, peladas e identidade não são registradas com `ENABLE_GOAL_API=false`, `ENABLE_LEAGUE_API=false` e `ENABLE_IDENTITY_API=false` (padrões). O Next.js usa a ponte modular somente quando a flag correspondente está ativa; sem ela, preserva os fluxos existentes.
 
-O backend cobre o piloto de gol e as vinte e sete operações inventariadas do contexto de peladas, ainda sem homologação integral das telas. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação verificada.
+O backend cobre o piloto de gol, as vinte e sete operações inventariadas do contexto de peladas e as duas operações administrativas de identidade, ainda sem homologação integral das telas. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação verificada.
 
 ## Limites implementados
 
@@ -24,6 +24,8 @@ O [contrato alvo](../docs/architecture/matches-api-v1.openapi.json) usa cookie H
 As rotas `/api/leagues/:leagueId/seasons/*` consultam a temporada ativa, seus ids de rodada e o último snapshot encerrado. O encerramento monta o snapshot e chama `finish_season` sob os mesmos claims, lock e transação PostgreSQL; confirmação, escopo de ADM e pendências são revalidados no servidor.
 
 Estádios possuem CRUD e ordem atômica próprios. A seleção de pelada ativa/arquivada é autorizada no servidor antes de o Next gravar o cookie HttpOnly. Branding usa multipart limitado, PostgreSQL autenticado e Storage via bearer do usuário; configurar `SUPABASE_PUBLIC_URL` com a origem acessível pelo navegador, distinta de `SUPABASE_INTERNAL_URL` quando os serviços usam rede Docker.
+
+`GET /api/identity/accounts` e `PATCH /api/identity/accounts/:userId/role` mantêm as RPCs `list_manageable_accounts` e `manage_account_admin_role` como autoridade. O backend verifica o Bearer token, aplica os claims na transação e nunca aceita papel do chamador informado pelo frontend. A ponte é controlada por `IDENTITY_API_ENABLED`/`IDENTITY_BACKEND_URL` no Next e `ENABLE_IDENTITY_API` no backend. Os seis fluxos de Auth permanecem no adaptador SSR enquanto o contrato PKCE, seus cookies de verificador e o callback não forem migrados juntos.
 
 ## Execução local
 

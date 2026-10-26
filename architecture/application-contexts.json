@@ -5,7 +5,7 @@
       "id": "identity",
       "aggregates": ["Account", "AdminRole"],
       "pages": ["src/app/login/page.tsx", "src/app/cadastro/page.tsx", "src/app/redefinir-senha/page.tsx", "src/app/meu-perfil/page.tsx", "src/app/admin/administradores/page.tsx"],
-      "sourceModules": [],
+      "sourceModules": ["identity"],
       "entrypoints": ["src/app/login/actions.ts", "src/app/cadastro/actions.ts", "src/lib/actions/admins.ts"]
     },
     {

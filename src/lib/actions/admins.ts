@@ -2,22 +2,25 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentAccount } from "../auth";
+import { identityApiFor } from "@/modules/identity/infrastructure/identity-api-session";
+import { IdentityApiError } from "@/modules/identity/infrastructure/http-identity-gateway";
+import type { ManagedAccount } from "@/modules/identity/domain/account-access";
 
-export type ManagedAccount = {
-  userId: string;
-  role: "admin" | "player";
-  createdAt: string;
-  player: {
-    id: string;
-    name: string;
-    nickname: string | null;
-    avatarUrl: string | null;
-  } | null;
-};
+export type { ManagedAccount } from "@/modules/identity/domain/account-access";
 
 export async function getManagedAccounts(): Promise<ManagedAccount[]> {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return [];
+
+  const api = await identityApiFor(account.client);
+  if (api) {
+    try {
+      return await api.listManagedAccounts();
+    } catch (error) {
+      console.error("Erro ao buscar contas administrativas na API:", error);
+      return [];
+    }
+  }
 
   const managedResult = await account.client.rpc("list_manageable_accounts");
   if (!managedResult.error) {
@@ -74,6 +77,13 @@ export async function setAccountAdminRole(targetUserId: string, makeAdmin: boole
     }
     if (!targetUserId) return { success: false, error: "Escolha uma conta cadastrada." };
 
+    const api = await identityApiFor(account.client);
+    if (api) {
+      const role = await api.setAccountAdminRole(targetUserId, makeAdmin);
+      revalidateAdminViews();
+      return { success: true, role };
+    }
+
     const { data, error } = await account.client.rpc("manage_account_admin_role", {
       p_target_user_id: targetUserId,
       p_make_admin: makeAdmin,
@@ -92,13 +102,22 @@ export async function setAccountAdminRole(targetUserId: string, makeAdmin: boole
       };
     }
 
-    revalidatePath("/admin/administradores");
-    revalidatePath("/admin/jogadores");
-    revalidatePath("/mais");
-    revalidatePath("/", "layout");
+    revalidateAdminViews();
     return { success: true, role: String(data) as "admin" | "player" };
   } catch (error) {
     console.error("Erro inesperado ao alterar função da conta:", error);
-    return { success: false, error: "Não foi possível alterar o acesso agora. Atualize a página e tente novamente." };
+    return {
+      success: false,
+      error: error instanceof IdentityApiError
+        ? error.message
+        : "Não foi possível alterar o acesso agora. Atualize a página e tente novamente.",
+    };
   }
+}
+
+function revalidateAdminViews() {
+  revalidatePath("/admin/administradores");
+  revalidatePath("/admin/jogadores");
+  revalidatePath("/mais");
+  revalidatePath("/", "layout");
 }

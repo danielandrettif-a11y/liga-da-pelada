@@ -32,6 +32,13 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-26 — identidade e acesso 2/8 no backend
+
+- A listagem de contas administráveis e a promoção/remoção de ADM global ganharam domínio, caso de uso, repositório PostgreSQL autenticado e rotas próprias. As RPCs existentes continuam responsáveis por autorização, lock, proteção do último ADM e auditoria.
+- O Next usa um gateway HTTP server-only quando `IDENTITY_API_ENABLED=true`; o access token não chega ao navegador por código novo e o caminho Supabase anterior permanece como fallback reversível. A API valida UUID/payload, verifica a sessão e executa SQL sob `SET LOCAL ROLE authenticated` com claims do usuário verificado.
+- Cadastro, login, logout, recuperação, troca de senha e Google OAuth seguem pendentes. O SSR instalado usa PKCE e grava o verificador em cookie, portanto esses seis fluxos serão migrados junto com o callback; proxyar apenas a requisição inicial quebraria confirmação e recuperação.
+- Testes direcionados aprovaram 8 casos no frontend e 9 no backend, além do typecheck dos dois pacotes. O catálogo registra **2/8 operações de identidade** em `frontend-migrated`; homologação real com dois ADMs e a flag ligada ainda é necessária antes de promover para `verified`.
+
 ### 2026-10-26 — contexto de peladas 27/27 conectado ao backend
 
 - Os três fluxos de entrada restantes agora concluem a apresentação e autorizam a seleção ativa/arquivada no backend sob claims verificadas; somente o cookie HttpOnly e o redirecionamento continuam como responsabilidade da camada Next.js.

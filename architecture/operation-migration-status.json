@@ -8,6 +8,36 @@
   ],
   "overrides": [
     {
+      "context": "identity",
+      "source": "src/lib/actions/admins.ts",
+      "name": "getManagedAccounts",
+      "state": "frontend-migrated",
+      "target": "GET /api/identity/accounts",
+      "evidence": [
+        "backend/src/contexts/identity/domain/account-access.test.ts",
+        "backend/src/contexts/identity/application/manage-account-access.test.ts",
+        "backend/src/contexts/identity/infrastructure/pg-account-access-repository.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/lib/actions/admins.test.ts",
+        "src/modules/identity/infrastructure/http-identity-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "identity",
+      "source": "src/lib/actions/admins.ts",
+      "name": "setAccountAdminRole",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/identity/accounts/:userId/role",
+      "evidence": [
+        "backend/src/contexts/identity/domain/account-access.test.ts",
+        "backend/src/contexts/identity/application/manage-account-access.test.ts",
+        "backend/src/contexts/identity/infrastructure/pg-account-access-repository.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/lib/actions/admins.test.ts",
+        "src/modules/identity/infrastructure/http-identity-gateway.test.ts"
+      ]
+    },
+    {
       "context": "leagues",
       "source": "src/app/lobby/actions.ts",
       "name": "continueEntryFlow",
