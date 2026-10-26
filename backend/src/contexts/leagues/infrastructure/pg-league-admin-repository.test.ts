@@ -8,6 +8,8 @@ describe("pgLeagueAdminRepository", () => {
       if (sql.includes("review_league_membership")) return { rows: [{ reviewed: true }] };
       if (sql.includes("add_account_to_league")) return { rows: [{ added: true }] };
       if (sql.includes("set_league_visibility")) return { rows: [{ updated: true }] };
+      if (sql.includes("upgrade_league_to_complete")) return { rows: [{ upgraded: true }] };
+      if (sql.includes("delete_league_permanently")) return { rows: [{ deleted: true }] };
       return { rows: [] };
     });
     const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
@@ -16,7 +18,9 @@ describe("pgLeagueAdminRepository", () => {
     await expect(repository.reviewMembershipRequest("request-1", true, actor)).resolves.toBe(true);
     await expect(repository.addAccount("league-1", "user-1", actor)).resolves.toBe(true);
     await expect(repository.setVisibility("league-1", "open", actor)).resolves.toBe(true);
-    expect(query.mock.calls.filter(([sql]) => sql === "SET LOCAL ROLE authenticated")).toHaveLength(3);
-    expect(query.mock.calls.filter(([sql]) => sql === "COMMIT")).toHaveLength(3);
+    await expect(repository.upgradeToComplete("league-1", actor)).resolves.toBe(true);
+    await expect(repository.deletePermanently("league-1", "Pelada BQ", actor)).resolves.toBe(true);
+    expect(query.mock.calls.filter(([sql]) => sql === "SET LOCAL ROLE authenticated")).toHaveLength(5);
+    expect(query.mock.calls.filter(([sql]) => sql === "COMMIT")).toHaveLength(5);
   });
 });

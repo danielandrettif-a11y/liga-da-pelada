@@ -18,6 +18,8 @@ function fixture(enabled: boolean) {
     reviewMembershipRequest: vi.fn().mockResolvedValue(true),
     addAccount: vi.fn().mockResolvedValue(true),
     setVisibility: vi.fn().mockResolvedValue(true),
+    upgradeToComplete: vi.fn().mockResolvedValue(true),
+    deletePermanently: vi.fn().mockResolvedValue(true),
   };
   const leagueConfigRepository = {
     getConfig: vi.fn().mockResolvedValue({
@@ -170,6 +172,22 @@ describe("league HTTP route", () => {
       stadiumName: "Arena", stadiumMapUrl: "https://maps.example/arena", eventDurationMinutes: 150,
     }, { userId: "verified-user" });
     expect(leagueConfigRepository.setPreseason).toHaveBeenCalledWith(id, true, { userId: "verified-user" });
+  });
+
+  it("upgrades and deletes a league through explicit admin commands", async () => {
+    const { app, leagueAdminRepository } = fixture(true);
+    const id = "00000000-0000-4000-8000-000000000001";
+    const headers = { authorization: "Bearer valid-token" };
+    const upgrade = await app.inject({ method: "POST", url: `/api/leagues/${id}/upgrade`, headers });
+    const deletion = await app.inject({
+      method: "DELETE", url: `/api/leagues/${id}`, headers, payload: { confirm_name: "Pelada BQ" },
+    });
+    expect(upgrade.json()).toEqual({ upgraded: true });
+    expect(deletion.json()).toEqual({ deleted: true });
+    expect(leagueAdminRepository.upgradeToComplete).toHaveBeenCalledWith(id, { userId: "verified-user" });
+    expect(leagueAdminRepository.deletePermanently).toHaveBeenCalledWith(
+      id, "Pelada BQ", { userId: "verified-user" },
+    );
   });
 
   it("rejects malformed league settings before persistence", async () => {

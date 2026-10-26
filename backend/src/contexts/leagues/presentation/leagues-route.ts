@@ -15,7 +15,9 @@ import {
 import { LeagueLobbyPersistenceError } from "../infrastructure/pg-league-lobby-repository.js";
 import {
   addExistingAccountToLeague,
+  deleteLeague,
   reviewLeagueMembership,
+  upgradeLeague,
   updateLeagueVisibility,
   type LeagueAdminRepository,
 } from "../application/manage-league-admin.js";
@@ -259,6 +261,56 @@ export function registerLeagueRoutes(app: FastifyInstance, dependencies: {
           return reply.code(error.statusCode).send({ code: "LEAGUE_VISIBILITY_REJECTED", message: error.message });
         }
         request.log.error({ err: error }, "league visibility update failed");
+        return reply.code(503).send({ code: "LEAGUE_UNAVAILABLE", message: "Serviço indisponível." });
+      }
+    },
+  );
+
+  app.post<{ Params: { leagueId: string } }>(
+    "/api/leagues/:leagueId/upgrade",
+    { schema: { params: { type: "object", required: ["leagueId"], properties: { leagueId: { type: "string", format: "uuid" } } } } },
+    async (request, reply) => {
+      const authentication = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
+      try {
+        return await upgradeLeague(request.params.leagueId, authentication.actor, dependencies.adminRepository);
+      } catch (error) {
+        if (error instanceof InvalidLeagueIdError) return reply.code(400).send({ code: "INVALID_LEAGUE", message: error.message });
+        if (error instanceof LeagueAdminPersistenceError) {
+          return reply.code(error.statusCode).send({ code: "LEAGUE_UPGRADE_REJECTED", message: error.message });
+        }
+        request.log.error({ err: error }, "league upgrade failed");
+        return reply.code(503).send({ code: "LEAGUE_UNAVAILABLE", message: "Serviço indisponível." });
+      }
+    },
+  );
+
+  app.delete<{ Params: { leagueId: string }; Body: { confirm_name: string } }>(
+    "/api/leagues/:leagueId",
+    {
+      schema: {
+        params: { type: "object", required: ["leagueId"], properties: { leagueId: { type: "string", format: "uuid" } } },
+        body: {
+          type: "object", additionalProperties: false, required: ["confirm_name"],
+          properties: { confirm_name: { type: "string", minLength: 1, maxLength: 80 } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const authentication = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
+      try {
+        return await deleteLeague(
+          request.params.leagueId, request.body.confirm_name, authentication.actor, dependencies.adminRepository,
+        );
+      } catch (error) {
+        if (error instanceof InvalidLeagueError || error instanceof InvalidLeagueIdError) {
+          return reply.code(400).send({ code: "INVALID_LEAGUE", message: error.message });
+        }
+        if (error instanceof LeagueAdminPersistenceError) {
+          return reply.code(error.statusCode).send({ code: "LEAGUE_DELETE_REJECTED", message: error.message });
+        }
+        request.log.error({ err: error }, "league deletion failed");
         return reply.code(503).send({ code: "LEAGUE_UNAVAILABLE", message: "Serviço indisponível." });
       }
     },

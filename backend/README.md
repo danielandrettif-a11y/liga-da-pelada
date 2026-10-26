@@ -2,7 +2,7 @@
 
 Este serviço ainda é uma fatia **experimental** da migração. As rotas de gol e peladas não são registradas com `ENABLE_GOAL_API=false` e `ENABLE_LEAGUE_API=false` (padrões). O Next.js usa a ponte modular somente quando a flag correspondente está ativa; sem ela, preserva os fluxos existentes.
 
-O backend cobre gol e doze operações de lobby/admin/configuração de peladas, ainda sem paridade de contexto completo. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação.
+O backend cobre gol e quatorze operações de lobby/admin/configuração/ciclo de vida de peladas, ainda sem paridade de contexto completo. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação.
 
 ## Limites implementados
 

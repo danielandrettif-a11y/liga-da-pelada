@@ -55,6 +55,8 @@ describe("httpLeagueGateway", () => {
       stadium_name: "Arena", stadium_map_url: "https://maps.example/arena", event_duration_minutes: 150,
     });
     await gateway.setPreseason(leagueId, true);
+    await gateway.upgrade(leagueId);
+    await gateway.deleteLeague(leagueId, "Pelada BQ");
 
     expect(request.mock.calls.map(([url, options]) => ({
       method: (options as RequestInit).method,
@@ -77,6 +79,8 @@ describe("httpLeagueGateway", () => {
         },
       },
       { method: "PATCH", path: `/api/leagues/${leagueId}/preseason`, body: { enabled: true } },
+      { method: "POST", path: `/api/leagues/${leagueId}/upgrade`, body: null },
+      { method: "DELETE", path: `/api/leagues/${leagueId}`, body: { confirm_name: "Pelada BQ" } },
     ]);
   });
 

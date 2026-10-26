@@ -22,6 +22,8 @@ export type LeagueHttpGateway = LeagueCreator & {
   updateName(leagueId: string, name: string): Promise<{ name: string }>;
   updateSettings(leagueId: string, settings: LeagueSettingsInput): Promise<void>;
   setPreseason(leagueId: string, enabled: boolean): Promise<void>;
+  upgrade(leagueId: string): Promise<void>;
+  deleteLeague(leagueId: string, confirmName: string): Promise<void>;
 };
 
 export type LeagueConfig = {
@@ -75,7 +77,7 @@ export function httpLeagueGateway(
 ): LeagueHttpGateway {
   if (!accessToken.trim()) throw new LeagueApiError("Sessão expirada. Entre novamente.");
 
-  const request = async (method: "GET" | "POST" | "PATCH", path: string, body?: object) => {
+  const request = async (method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: object) => {
     const url = apiUrl(baseUrl, path);
     let response: Response;
     try {
@@ -148,6 +150,12 @@ export function httpLeagueGateway(
     },
     async setPreseason(leagueId, enabled) {
       await request("PATCH", `api/leagues/${encodeURIComponent(leagueId)}/preseason`, { enabled });
+    },
+    async upgrade(leagueId) {
+      await request("POST", `api/leagues/${encodeURIComponent(leagueId)}/upgrade`);
+    },
+    async deleteLeague(leagueId, confirmName) {
+      await request("DELETE", `api/leagues/${encodeURIComponent(leagueId)}`, { confirm_name: confirmName });
     },
   };
 }

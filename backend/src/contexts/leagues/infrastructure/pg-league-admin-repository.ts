@@ -24,6 +24,15 @@ function translateAdminFailure(cause: unknown): LeagueAdminPersistenceError {
   if (/Visibilidade invalida|Visibilidade inválida/i.test(message)) {
     return new LeagueAdminPersistenceError("Visibilidade inválida.", 400);
   }
+  if (/nome exato/i.test(message)) {
+    return new LeagueAdminPersistenceError("Digite o nome exato da pelada para confirmar.", 400);
+  }
+  if (/ultima pelada ativa|última pelada ativa/i.test(message)) {
+    return new LeagueAdminPersistenceError("A última pelada ativa não pode ser excluída.", 409);
+  }
+  if (/dependencias|dependências/i.test(message)) {
+    return new LeagueAdminPersistenceError("Existem dependências sem exclusão em cascata.", 409);
+  }
   return new LeagueAdminPersistenceError("Não foi possível atualizar a pelada.", 503);
 }
 
@@ -43,5 +52,9 @@ export function pgLeagueAdminRepository(pool: Pool): LeagueAdminRepository {
       "SELECT public.add_account_to_league($1::uuid, $2::uuid) AS added", [leagueId, userId], "added"),
     setVisibility: (leagueId, visibility, actor) => execute(actor,
       "SELECT public.set_league_visibility($1::uuid, $2::text) AS updated", [leagueId, visibility], "updated"),
+    upgradeToComplete: (leagueId, actor) => execute(actor,
+      "SELECT public.upgrade_league_to_complete($1::uuid) AS upgraded", [leagueId], "upgraded"),
+    deletePermanently: (leagueId, confirmName, actor) => execute(actor,
+      "SELECT public.delete_league_permanently($1::uuid, $2::text) AS deleted", [leagueId, confirmName], "deleted"),
   };
 }
