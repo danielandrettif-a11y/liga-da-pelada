@@ -98,6 +98,58 @@
     {
       "context": "leagues",
       "source": "src/lib/actions/league.ts",
+      "name": "getLeagueConfig",
+      "state": "frontend-migrated",
+      "target": "GET /api/leagues/:leagueId/config",
+      "evidence": [
+        "backend/src/contexts/leagues/presentation/league-config-route.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/league.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "updateLeagueName",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/leagues/:leagueId/name",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-league-config.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/league.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "updateLeagueConfig",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/leagues/:leagueId/config",
+      "evidence": [
+        "backend/src/contexts/leagues/infrastructure/pg-league-config-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/league.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "updatePreSeasonEnabled",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/leagues/:leagueId/preseason",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-league-config.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/league.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
       "name": "updateLeagueVisibility",
       "state": "frontend-migrated",
       "target": "PATCH /api/leagues/:leagueId/visibility",

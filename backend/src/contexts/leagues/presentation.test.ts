@@ -19,6 +19,27 @@ function fixture(enabled: boolean) {
     addAccount: vi.fn().mockResolvedValue(true),
     setVisibility: vi.fn().mockResolvedValue(true),
   };
+  const leagueConfigRepository = {
+    getConfig: vi.fn().mockResolvedValue({
+      id: "00000000-0000-4000-8000-000000000001",
+      name: "Pelada BQ",
+      match_duration: 7,
+      players_per_team: 5,
+      teams_per_round: 3,
+      preseason_enabled: false,
+      stadium_name: null,
+      stadium_map_url: null,
+      event_duration_minutes: 120,
+      visibility: "private" as const,
+      logo_url: null,
+      cover_url: null,
+      accent_color: "#ccff00",
+      can_manage: true,
+    }),
+    updateName: vi.fn().mockResolvedValue("Novo nome"),
+    updateSettings: vi.fn().mockResolvedValue(undefined),
+    setPreseason: vi.fn().mockResolvedValue(undefined),
+  };
   const repository: GoalRepository = { registerGoal: vi.fn() };
   const verifier = { verifyAccessToken: vi.fn().mockResolvedValue({ userId: "verified-user" }) };
   const app = createApp({
@@ -30,10 +51,14 @@ function fixture(enabled: boolean) {
     leagueMembershipRequestRepository,
     leagueLobbyRepository,
     leagueAdminRepository,
+    leagueConfigRepository,
     logger: false,
   });
   apps.push(app);
-  return { app, verifier, leagueRepository, leagueMembershipRequestRepository, leagueLobbyRepository, leagueAdminRepository };
+  return {
+    app, verifier, leagueRepository, leagueMembershipRequestRepository,
+    leagueLobbyRepository, leagueAdminRepository, leagueConfigRepository,
+  };
 }
 
 describe("league HTTP route", () => {
@@ -112,5 +137,54 @@ describe("league HTTP route", () => {
     expect(leagueAdminRepository.reviewMembershipRequest).toHaveBeenCalledWith(id, true, { userId: "verified-user" });
     expect(leagueAdminRepository.addAccount).toHaveBeenCalledWith(id, id, { userId: "verified-user" });
     expect(leagueAdminRepository.setVisibility).toHaveBeenCalledWith(id, "open", { userId: "verified-user" });
+  });
+
+  it("reads and updates league configuration using the verified actor", async () => {
+    const { app, leagueConfigRepository } = fixture(true);
+    const id = "00000000-0000-4000-8000-000000000001";
+    const headers = { authorization: "Bearer valid-token" };
+    const config = await app.inject({ method: "GET", url: `/api/leagues/${id}/config`, headers });
+    const name = await app.inject({
+      method: "PATCH", url: `/api/leagues/${id}/name`, headers, payload: { name: " Novo   nome " },
+    });
+    const settingsPayload = {
+      match_duration: 8, players_per_team: 6, teams_per_round: 3,
+      stadium_name: "Arena", stadium_map_url: "https://maps.example/arena", event_duration_minutes: 150,
+    };
+    const settings = await app.inject({
+      method: "PATCH", url: `/api/leagues/${id}/config`, headers, payload: settingsPayload,
+    });
+    const preseason = await app.inject({
+      method: "PATCH", url: `/api/leagues/${id}/preseason`, headers, payload: { enabled: true },
+    });
+
+    expect(config.statusCode).toBe(200);
+    expect(config.json()).toMatchObject({ id, name: "Pelada BQ", can_manage: true });
+    expect(name.json()).toEqual({ name: "Novo nome" });
+    expect(settings.json()).toEqual({ updated: true });
+    expect(preseason.json()).toEqual({ enabled: true });
+    expect(leagueConfigRepository.getConfig).toHaveBeenCalledWith(id, { userId: "verified-user" });
+    expect(leagueConfigRepository.updateName).toHaveBeenCalledWith(id, "Novo nome", { userId: "verified-user" });
+    expect(leagueConfigRepository.updateSettings).toHaveBeenCalledWith(id, {
+      matchDuration: 8, playersPerTeam: 6, teamsPerRound: 3,
+      stadiumName: "Arena", stadiumMapUrl: "https://maps.example/arena", eventDurationMinutes: 150,
+    }, { userId: "verified-user" });
+    expect(leagueConfigRepository.setPreseason).toHaveBeenCalledWith(id, true, { userId: "verified-user" });
+  });
+
+  it("rejects malformed league settings before persistence", async () => {
+    const { app, leagueConfigRepository } = fixture(true);
+    const id = "00000000-0000-4000-8000-000000000001";
+    const result = await app.inject({
+      method: "PATCH",
+      url: `/api/leagues/${id}/config`,
+      headers: { authorization: "Bearer valid-token" },
+      payload: {
+        match_duration: 0, players_per_team: 5, teams_per_round: 3,
+        stadium_name: "", stadium_map_url: "", event_duration_minutes: 120,
+      },
+    });
+    expect(result.statusCode).toBe(400);
+    expect(leagueConfigRepository.updateSettings).not.toHaveBeenCalled();
   });
 });

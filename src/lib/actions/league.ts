@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient as createServerClient } from "../supabase/server";
 import { getAdminClient } from "../auth";
 import { MAX_PLAYERS_PER_TEAM, MAX_TEAMS_PER_ROUND, MIN_TEAMS_PER_ROUND } from "../constants";
 import { getSelectedLeague } from "../league-context";
@@ -33,7 +32,14 @@ function storagePathFromPublicUrl(url: string | null | undefined) {
 export async function getLeagueConfig() {
   const selectedLeague = await getSelectedLeague();
   if (!selectedLeague) return null;
-  const client = await createServerClient();
+  const { client, user } = await getCurrentAccount();
+  if (!user) return null;
+  try {
+    const api = await leagueApiFor(client);
+    if (api) return await api.getConfig(selectedLeague.id);
+  } catch {
+    return null;
+  }
   const { data, error } = await client
     .from("leagues")
     .select("*")
@@ -53,6 +59,25 @@ export async function updateLeagueName(leagueId: string, name: string) {
   }
   const { client, user } = await getCurrentAccount();
   if (!user) return { success: false as const, error: "Entre na sua conta novamente." };
+  try {
+    const api = await leagueApiFor(client);
+    if (api) {
+      const result = await api.updateName(leagueId, normalizedName);
+      revalidatePath("/", "layout");
+      revalidatePath("/admin/liga");
+      revalidatePath("/lobby");
+      revalidatePath("/peladas");
+      return { success: true as const, name: result.name };
+    }
+  } catch (error) {
+    if (error instanceof LeagueApiError && error.statusCode === 409) {
+      return { success: false as const, error: DUPLICATE_LEAGUE_NAME_MESSAGE };
+    }
+    return {
+      success: false as const,
+      error: error instanceof LeagueApiError ? error.message : "Não foi possível alterar o nome.",
+    };
+  }
   const { data, error } = await client.from("leagues")
     .update({ name: normalizedName })
     .eq("id", leagueId)
@@ -163,10 +188,21 @@ export async function updateLeagueBranding(leagueId: string, formData: FormData)
 
 export async function updatePreSeasonEnabled(id: string, enabled: boolean) {
   try {
-    const client = await getAdminClient();
-    if (!client) return { success: false, error: "Somente administradores podem alterar a pré-temporada." };
     if (!id) return { success: false, error: "Liga inválida." };
     if ((await getSelectedLeague())?.id !== id) return { success: false, error: "Esta não é a pelada selecionada." };
+    const account = await getCurrentAccount();
+    if (!account.user || !account.isAdmin) {
+      return { success: false, error: "Somente administradores podem alterar a pré-temporada." };
+    }
+    const api = await leagueApiFor(account.client);
+    if (api) {
+      await api.setPreseason(id, enabled);
+      revalidatePath("/");
+      revalidatePath("/mais");
+      return { success: true };
+    }
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem alterar a pré-temporada." };
 
     const { error } = await client
       .from("leagues")
@@ -194,9 +230,6 @@ export async function updateLeagueConfig(
   eventDurationMinutes: number,
 ) {
   try {
-    const client = await getAdminClient();
-    if (!client) return { success: false, error: "Somente administradores podem alterar a liga." };
-
     if (!id) return { success: false, error: "Liga inválida." };
     if ((await getSelectedLeague())?.id !== id) return { success: false, error: "Esta não é a pelada selecionada." };
     if (!Number.isInteger(matchDuration) || matchDuration < 1 || matchDuration > 90) {
@@ -218,6 +251,31 @@ export async function updateLeagueConfig(
     if (!Number.isInteger(eventDurationMinutes) || eventDurationMinutes < 30 || eventDurationMinutes > 720) {
       return { success: false, error: "A duracao total da pelada deve ficar entre 30 minutos e 12 horas." };
     }
+
+    const account = await getCurrentAccount();
+    if (!account.user || !account.isAdmin) {
+      return { success: false, error: "Somente administradores podem alterar a liga." };
+    }
+    const api = await leagueApiFor(account.client);
+    if (api) {
+      await api.updateSettings(id, {
+        match_duration: matchDuration,
+        players_per_team: playersPerTeam,
+        teams_per_round: teamsPerRound,
+        stadium_name: normalizedStadium,
+        stadium_map_url: normalizedMapUrl,
+        event_duration_minutes: eventDurationMinutes,
+      });
+      revalidatePath("/admin/liga");
+      revalidatePath("/admin/rodada");
+      revalidatePath("/admin/prelistas");
+      revalidatePath("/convocacao");
+      revalidatePath("/mais");
+      revalidatePath("/cartola");
+      return { success: true };
+    }
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem alterar a liga." };
 
     const { data: currentLeague, error: currentLeagueError } = await client
       .from("leagues")

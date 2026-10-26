@@ -5,6 +5,7 @@ import { pgLeagueRepository } from "./contexts/leagues/infrastructure/pg-league-
 import { pgLeagueMembershipRequestRepository } from "./contexts/leagues/infrastructure/pg-league-membership-request-repository.js";
 import { pgLeagueLobbyRepository } from "./contexts/leagues/infrastructure/pg-league-lobby-repository.js";
 import { pgLeagueAdminRepository } from "./contexts/leagues/infrastructure/pg-league-admin-repository.js";
+import { pgLeagueConfigRepository } from "./contexts/leagues/infrastructure/pg-league-config-repository.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -31,6 +32,7 @@ const app = createApp({
   leagueMembershipRequestRepository: pgLeagueMembershipRequestRepository(pool),
   leagueLobbyRepository: pgLeagueLobbyRepository(pool),
   leagueAdminRepository: pgLeagueAdminRepository(pool),
+  leagueConfigRepository: pgLeagueConfigRepository(pool),
 });
 
 try {

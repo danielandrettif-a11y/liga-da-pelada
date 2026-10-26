@@ -2,7 +2,7 @@
 
 Este serviço ainda é uma fatia **experimental** da migração. As rotas de gol e peladas não são registradas com `ENABLE_GOAL_API=false` e `ENABLE_LEAGUE_API=false` (padrões). O Next.js usa a ponte modular somente quando a flag correspondente está ativa; sem ela, preserva os fluxos existentes.
 
-O backend cobre gol e oito operações de lobby/admin de peladas, ainda sem paridade de contexto completo. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação.
+O backend cobre gol e doze operações de lobby/admin/configuração de peladas, ainda sem paridade de contexto completo. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação.
 
 ## Limites implementados
 
@@ -16,6 +16,8 @@ As rotas ficam nos contextos de partidas e peladas; `presentation/app.ts` compõ
 O [contrato alvo](../docs/architecture/matches-api-v1.openapi.json) usa cookie HttpOnly e inclui SSE. Este backend ainda aceita **somente Bearer token** e não implementa SSE. A Server Action do Next.js possui uma ponte temporária que encaminha o access token ao backend interno quando `MATCH_GOAL_API_ENABLED=true`; ela não abre essa rota ao navegador. Não publicar como API v1 nem ativar a ponte antes de fechar os gates abaixo.
 
 `POST /api/leagues` normaliza nome/modo/visibilidade, verifica o usuário no Auth local e chama a RPC transacional `create_league_for_user` com claims autenticadas. Peladas rápidas permanecem privadas. O mesmo contexto expõe solicitação privada, entrada aberta, favorito, solicitação por convite, revisão de acesso, inclusão de conta e visibilidade, sempre com identidade obtida do Auth local e operação sob claims autenticadas. Favorito recebe o estado desejado (`{ "favorite": true|false }`) em vez de alternar cegamente, tornando o retry idempotente. A rota de criação respondeu 201 na stack local de testes após aplicar a migration 313, que faltava no dump do projeto de testes. As Server Actions possuem uma ponte temporária habilitada por `LEAGUE_API_ENABLED=true` e `LEAGUE_BACKEND_URL`; ela encaminha o access token apenas no servidor. A ponte deve permanecer desligada fora da homologação local. Como a criação não tem chave de idempotência, o cliente não deve fazer retry automático após resposta incerta.
+
+`GET /api/leagues/:leagueId/config` e os `PATCH` de nome, configuração e pré-temporada formam o segundo recorte. A leitura exige vínculo ativo; as mutações exigem ADM no backend. Mudanças de jogadores por time ou quantidade de times bloqueiam quando existe convocação aberta/bloqueada, com leitura, verificação e gravação na mesma transação para evitar corrida.
 
 ## Execução local
 

@@ -11,6 +11,7 @@ export class LeagueApiError extends Error {
 }
 
 export type LeagueHttpGateway = LeagueCreator & {
+  getConfig(leagueId: string): Promise<LeagueConfig>;
   requestMembership(leagueId: string): Promise<void>;
   joinOpen(leagueId: string): Promise<void>;
   setFavorite(leagueId: string, favorite: boolean): Promise<void>;
@@ -18,6 +19,35 @@ export type LeagueHttpGateway = LeagueCreator & {
   reviewMembership(requestId: string, approve: boolean): Promise<void>;
   addExistingAccount(leagueId: string, userId: string): Promise<void>;
   setVisibility(leagueId: string, visibility: "private" | "open"): Promise<void>;
+  updateName(leagueId: string, name: string): Promise<{ name: string }>;
+  updateSettings(leagueId: string, settings: LeagueSettingsInput): Promise<void>;
+  setPreseason(leagueId: string, enabled: boolean): Promise<void>;
+};
+
+export type LeagueConfig = {
+  id: string;
+  name: string;
+  match_duration: number;
+  players_per_team: number;
+  teams_per_round: number;
+  preseason_enabled: boolean;
+  stadium_name: string | null;
+  stadium_map_url: string | null;
+  event_duration_minutes: number;
+  visibility: "private" | "open";
+  logo_url: string | null;
+  cover_url: string | null;
+  accent_color: string;
+  can_manage: boolean;
+};
+
+export type LeagueSettingsInput = {
+  match_duration: number;
+  players_per_team: number;
+  teams_per_round: number;
+  stadium_name: string;
+  stadium_map_url: string;
+  event_duration_minutes: number;
 };
 
 function apiUrl(baseUrl: string, path: string): URL {
@@ -45,7 +75,7 @@ export function httpLeagueGateway(
 ): LeagueHttpGateway {
   if (!accessToken.trim()) throw new LeagueApiError("Sessão expirada. Entre novamente.");
 
-  const request = async (method: "POST" | "PATCH", path: string, body?: object) => {
+  const request = async (method: "GET" | "POST" | "PATCH", path: string, body?: object) => {
     const url = apiUrl(baseUrl, path);
     let response: Response;
     try {
@@ -67,6 +97,15 @@ export function httpLeagueGateway(
   };
 
   return {
+    async getConfig(leagueId) {
+      const response = await request("GET", `api/leagues/${encodeURIComponent(leagueId)}/config`);
+      const payload = await response.json().catch(() => null) as LeagueConfig | null;
+      if (!payload || typeof payload.id !== "string" || typeof payload.name !== "string"
+        || typeof payload.can_manage !== "boolean") {
+        throw new LeagueApiError("Resposta inválida ao carregar a pelada.", response.status);
+      }
+      return payload;
+    },
     async create(league: NewLeague) {
       const response = await request("POST", "api/leagues", league);
       const payload = await response.json().catch(() => null) as { league_id?: unknown } | null;
@@ -95,6 +134,20 @@ export function httpLeagueGateway(
     },
     async setVisibility(leagueId, visibility) {
       await request("PATCH", `api/leagues/${encodeURIComponent(leagueId)}/visibility`, { visibility });
+    },
+    async updateName(leagueId, name) {
+      const response = await request("PATCH", `api/leagues/${encodeURIComponent(leagueId)}/name`, { name });
+      const payload = await response.json().catch(() => null) as { name?: unknown } | null;
+      if (typeof payload?.name !== "string" || !payload.name) {
+        throw new LeagueApiError("Resposta inválida ao alterar o nome.", response.status);
+      }
+      return { name: payload.name };
+    },
+    async updateSettings(leagueId, settings) {
+      await request("PATCH", `api/leagues/${encodeURIComponent(leagueId)}/config`, settings);
+    },
+    async setPreseason(leagueId, enabled) {
+      await request("PATCH", `api/leagues/${encodeURIComponent(leagueId)}/preseason`, { enabled });
     },
   };
 }

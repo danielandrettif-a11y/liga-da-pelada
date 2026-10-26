@@ -78,7 +78,7 @@ O `-W` solicita cada senha localmente; não a coloque no comando. Guarde os TSV 
 4. Trocar URL/chave públicas do Supabase na build do frontend, URLs internas no backend, callback Google e proxy/DNS. O Next.js embute variáveis `NEXT_PUBLIC_*` durante o build, portanto precisa ser reconstruído para o novo host.
 5. Abrir tráfego só após testes de leitura e escrita no destino. Monitorar erros, p95 e integridade. Manter o projeto Cloud intacto e sem novas escritas durante a janela de observação.
 
-A migration `351_goal_request_consistency.sql` existe apenas nesta branch. Se o dump final do Cloud ainda não a incluir, aplicá-la **uma vez** no destino restaurado, depois de conferir a sequência real de migrations (inclusive alterações ainda não integradas à branch). Repetir o teste de gol e retry no esquema completo antes de ativar `ENABLE_GOAL_API`.
+A homologação local mostrou que o dump de testes estava atrás do repositório: faltavam `313` e o lote `314-349`, além de `351`. Isso **não autoriza** reaplicar cegamente o mesmo intervalo em produção. Antes do corte, comparar o schema do dump oficial novo com cada migration versionada, montar a lista exata que ainda não está incorporada e aplicá-la uma única vez, em ordem, depois de um backup verificável. Se `351_goal_request_consistency.sql` ainda não estiver no Cloud, incluí-la nessa lista. Repetir os testes de gol/retry, branding e configuração de pelada no schema completo antes de ativar as APIs.
 
 ## Retorno
 
