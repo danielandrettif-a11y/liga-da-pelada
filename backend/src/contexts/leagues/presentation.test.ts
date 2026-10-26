@@ -78,6 +78,19 @@ function fixture(enabled: boolean) {
     delete: vi.fn().mockResolvedValue(undefined),
     reorder: vi.fn().mockResolvedValue(undefined),
   };
+  const leagueEntryRepository = {
+    completeEntryFlow: vi.fn().mockResolvedValue(undefined),
+    authorizeSelection: vi.fn().mockResolvedValue(undefined),
+  };
+  const leagueBrandingRepository = {
+    getCurrent: vi.fn().mockResolvedValue({ logoUrl: null, coverUrl: null }),
+    update: vi.fn().mockResolvedValue(undefined),
+  };
+  const leagueBrandingStorage = {
+    upload: vi.fn().mockResolvedValue({ path: "new.png", publicUrl: "https://public/new.png" }),
+    remove: vi.fn().mockResolvedValue(undefined),
+    pathFromPublicUrl: vi.fn().mockReturnValue(null),
+  };
   const repository: GoalRepository = { registerGoal: vi.fn() };
   const verifier = { verifyAccessToken: vi.fn().mockResolvedValue({ userId: "verified-user" }) };
   const app = createApp({
@@ -93,6 +106,9 @@ function fixture(enabled: boolean) {
     quickMatchRepository,
     seasonRepository,
     stadiumRepository,
+    leagueEntryRepository,
+    leagueBrandingRepository,
+    leagueBrandingStorage,
     logger: false,
   });
   apps.push(app);
@@ -100,6 +116,9 @@ function fixture(enabled: boolean) {
     app, verifier, leagueRepository, leagueMembershipRequestRepository,
     leagueLobbyRepository, leagueAdminRepository, leagueConfigRepository, quickMatchRepository, seasonRepository,
     stadiumRepository,
+    leagueEntryRepository,
+    leagueBrandingRepository,
+    leagueBrandingStorage,
   };
 }
 
@@ -197,6 +216,45 @@ describe("league HTTP route", () => {
     expect(stadiumRepository.update).toHaveBeenCalledWith(id, stadiumId, expect.any(Object), { userId: "verified-user" });
     expect(stadiumRepository.reorder).toHaveBeenCalledWith(id, [stadiumId], { userId: "verified-user" });
     expect(stadiumRepository.delete).toHaveBeenCalledWith(id, stadiumId, { userId: "verified-user" });
+  });
+
+  it("completes presentation and authorizes active or archived league selection", async () => {
+    const { app, leagueEntryRepository } = fixture(true);
+    const id = "00000000-0000-4000-8000-000000000001";
+    const headers = { authorization: "Bearer valid-token" };
+    const completion = await app.inject({
+      method: "POST", url: "/api/account/entry-flow/complete", headers, payload: { version: 1 },
+    });
+    const selection = await app.inject({
+      method: "POST", url: `/api/leagues/${id}/selection`, headers, payload: { mode: "archived-quick" },
+    });
+    expect(completion.json()).toEqual({ completed: true });
+    expect(selection.json()).toEqual({ authorized: true });
+    expect(leagueEntryRepository.completeEntryFlow).toHaveBeenCalledWith(1, { userId: "verified-user" });
+    expect(leagueEntryRepository.authorizeSelection)
+      .toHaveBeenCalledWith(id, "archived-quick", { userId: "verified-user" });
+  });
+
+  it("updates branding from a bounded authenticated multipart request", async () => {
+    const { app, leagueBrandingRepository } = fixture(true);
+    const id = "00000000-0000-4000-8000-000000000001";
+    const boundary = "branding-boundary";
+    const payload = Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="accent_color"\r\n\r\n#AABBCC\r\n--${boundary}--\r\n`,
+    );
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/api/leagues/${id}/branding`,
+      headers: {
+        authorization: "Bearer valid-token",
+        "content-type": `multipart/form-data; boundary=${boundary}`,
+      },
+      payload,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ accentColor: "#aabbcc" });
+    expect(leagueBrandingRepository.update)
+      .toHaveBeenCalledWith(id, { accentColor: "#aabbcc" }, { userId: "verified-user" });
   });
 
   it("rejects missing credentials and invalid names before persistence", async () => {

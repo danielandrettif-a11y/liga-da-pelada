@@ -34,6 +34,9 @@ export type LeagueHttpGateway = LeagueCreator & {
   saveStadium(leagueId: string, input: StadiumApiInput): Promise<Stadium>;
   deleteStadium(leagueId: string, stadiumId: string): Promise<void>;
   reorderStadiums(leagueId: string, stadiumIds: string[]): Promise<void>;
+  completeEntryFlow(version: number): Promise<void>;
+  authorizeSelection(leagueId: string, mode: "active" | "archived-quick"): Promise<void>;
+  updateBranding(leagueId: string, formData: FormData): Promise<LeagueBrandingResult>;
 };
 
 export type QuickMatchInput = { date: string; start_time: string; field_name: string; map_url: string };
@@ -46,6 +49,12 @@ export type StadiumApiInput = {
   google_maps_url: string;
   latitude: number | null;
   longitude: number | null;
+};
+
+export type LeagueBrandingResult = {
+  logoUrl?: string | null;
+  coverUrl?: string | null;
+  accentColor: string;
 };
 
 export type LeagueConfig = {
@@ -112,6 +121,24 @@ export function httpLeagueGateway(
         ...(body ? { body: JSON.stringify(body) } : {}),
         cache: "no-store",
         signal: AbortSignal.timeout(10000),
+      });
+    } catch {
+      throw new LeagueApiError("A API de peladas não respondeu.");
+    }
+    if (!response.ok) throw await errorFrom(response);
+    return response;
+  };
+
+  const requestMultipart = async (path: string, body: FormData) => {
+    const url = apiUrl(baseUrl, path);
+    let response: Response;
+    try {
+      response = await fetcher(url, {
+        method: "PATCH",
+        headers: { authorization: `Bearer ${accessToken}` },
+        body,
+        cache: "no-store",
+        signal: AbortSignal.timeout(40000),
       });
     } catch {
       throw new LeagueApiError("A API de peladas não respondeu.");
@@ -256,6 +283,20 @@ export function httpLeagueGateway(
     },
     async reorderStadiums(leagueId, stadiumIds) {
       await request("PUT", `api/leagues/${encodeURIComponent(leagueId)}/stadiums/order`, { stadium_ids: stadiumIds });
+    },
+    async completeEntryFlow(version) {
+      await request("POST", "api/account/entry-flow/complete", { version });
+    },
+    async authorizeSelection(leagueId, mode) {
+      await request("POST", `api/leagues/${encodeURIComponent(leagueId)}/selection`, { mode });
+    },
+    async updateBranding(leagueId, formData) {
+      const response = await requestMultipart(`api/leagues/${encodeURIComponent(leagueId)}/branding`, formData);
+      const payload = await response.json().catch(() => null) as LeagueBrandingResult | null;
+      if (!payload || typeof payload.accentColor !== "string") {
+        throw new LeagueApiError("Resposta inválida ao atualizar a identidade visual.", response.status);
+      }
+      return payload;
     },
   };
 }

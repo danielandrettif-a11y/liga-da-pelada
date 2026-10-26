@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   account: vi.fn(), leagues: vi.fn(), rpc: vi.fn(), cookieGet: vi.fn(), cookieSet: vi.fn(), cookieDelete: vi.fn(),
   revalidate: vi.fn(), redirect: vi.fn(), leagueApi: vi.fn(),
   apiCreate: vi.fn(), apiCreateQuickMatch: vi.fn(), apiRequestMembership: vi.fn(), apiSetFavorite: vi.fn(),
+  apiCompleteEntryFlow: vi.fn(), apiAuthorizeSelection: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
@@ -19,12 +20,23 @@ vi.mock("@/modules/leagues/infrastructure/league-api-session", () => ({
   leagueApiFor: mocks.leagueApi,
 }));
 
-import { createLeague, createQuickLeague, requestClosedLeague, toggleFavorite } from "./actions";
+import {
+  continueEntryFlow,
+  createLeague,
+  createQuickLeague,
+  enterArchivedQuickLeague,
+  enterLeague,
+  requestClosedLeague,
+  toggleFavorite,
+} from "./actions";
 
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.redirect.mockImplementation((url: string) => { throw new Error(`redirect:${url}`); });
-  mocks.account.mockResolvedValue({ user: { id: "owner" }, client: { rpc: mocks.rpc } });
+  mocks.account.mockResolvedValue({
+    user: { id: "owner" }, client: { rpc: mocks.rpc },
+    memberships: [{ league_id: "old-league", role: "admin" }],
+  });
   mocks.leagues.mockResolvedValue([{ id: "old-league", role: "admin" }]);
   mocks.rpc.mockResolvedValue({ data: "new-league", error: null });
   mocks.leagueApi.mockResolvedValue(null);
@@ -186,5 +198,37 @@ describe("favorito", () => {
     await toggleFavorite(data);
     expect(mocks.apiSetFavorite).toHaveBeenCalledWith("league-1", true);
     expect(mocks.revalidate).toHaveBeenCalledWith("/lobby");
+  });
+});
+
+describe("entrada e retomada de pelada", () => {
+  it("conclui a apresentação no backend antes de limpar os cookies", async () => {
+    mocks.cookieGet.mockReturnValue({ value: "/convite/token-seguro" });
+    mocks.leagueApi.mockResolvedValue({ completeEntryFlow: mocks.apiCompleteEntryFlow });
+    await expect(continueEntryFlow()).rejects.toThrow("redirect:/convite/token-seguro");
+    expect(mocks.apiCompleteEntryFlow).toHaveBeenCalledWith(1);
+    expect(mocks.rpc).not.toHaveBeenCalledWith("complete_my_entry_flow", expect.anything());
+    expect(mocks.cookieDelete).toHaveBeenCalled();
+  });
+
+  it("autoriza no backend antes de selecionar uma pelada ativa", async () => {
+    mocks.leagueApi.mockResolvedValue({ authorizeSelection: mocks.apiAuthorizeSelection });
+    const data = new FormData();
+    data.set("league_id", "00000000-0000-4000-8000-000000000001");
+    await expect(enterLeague(data)).rejects.toThrow("redirect:/");
+    expect(mocks.apiAuthorizeSelection)
+      .toHaveBeenCalledWith("00000000-0000-4000-8000-000000000001", "active");
+    expect(mocks.cookieSet).toHaveBeenCalledWith(
+      "active_league_id", "00000000-0000-4000-8000-000000000001", expect.any(Object),
+    );
+  });
+
+  it("exige autorização específica antes de abrir histórico descartável", async () => {
+    mocks.leagueApi.mockResolvedValue({ authorizeSelection: mocks.apiAuthorizeSelection });
+    const data = new FormData();
+    data.set("league_id", "00000000-0000-4000-8000-000000000001");
+    await expect(enterArchivedQuickLeague(data)).rejects.toThrow("redirect:/rodadas");
+    expect(mocks.apiAuthorizeSelection)
+      .toHaveBeenCalledWith("00000000-0000-4000-8000-000000000001", "archived-quick");
   });
 });

@@ -145,6 +145,22 @@ export async function updateLeagueBranding(leagueId: string, formData: FormData)
       return { success: false as const, error: `${item.kind === "logo" ? "O escudo" : "A capa"} deve ser JPG, PNG ou WebP e respeitar o limite de tamanho.` };
     }
   }
+  try {
+    const api = await leagueApiFor(account.client);
+    if (api) {
+      const result = await api.updateBranding(leagueId, formData);
+      revalidatePath("/admin/liga");
+      revalidatePath("/lobby");
+      revalidatePath("/peladas");
+      revalidatePath("/", "layout");
+      return { success: true as const, ...result };
+    }
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof LeagueApiError ? error.message : "Não foi possível atualizar a identidade visual.",
+    };
+  }
   const { data: current, error: currentError } = await account.client.from("leagues")
     .select("logo_url, cover_url").eq("id", leagueId).maybeSingle();
   if (currentError || !current) return { success: false as const, error: "Pelada não encontrada." };

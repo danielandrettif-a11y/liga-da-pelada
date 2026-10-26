@@ -16,12 +16,17 @@ import { supabaseLeagueCreator } from "@/modules/leagues/infrastructure/supabase
 import { asLeagueCreator } from "@/modules/leagues/infrastructure/http-league-gateway";
 import { leagueApiFor } from "@/modules/leagues/infrastructure/league-api-session";
 
-async function completePendingEntryFlow(client: any) {
+async function completePendingEntryFlow(client: Awaited<ReturnType<typeof getCurrentAccount>>["client"]) {
   const cookieStore = await cookies();
   const pending = cookieStore.get(ENTRY_FLOW_PENDING_COOKIE)?.value;
   if (!pending) return null;
-  const { error } = await client.rpc("complete_my_entry_flow", { p_version: ENTRY_FLOW_VERSION });
-  if (error) throw new Error(error.message);
+  const api = await leagueApiFor(client);
+  if (api) {
+    await api.completeEntryFlow(ENTRY_FLOW_VERSION);
+  } else {
+    const { error } = await client.rpc("complete_my_entry_flow", { p_version: ENTRY_FLOW_VERSION });
+    if (error) throw new Error(error.message);
+  }
   cookieStore.set(ENTRY_FLOW_DONE_COOKIE, String(ENTRY_FLOW_VERSION), {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax",
     path: "/", maxAge: 60 * 60 * 24 * 365,
@@ -42,7 +47,11 @@ export async function enterLeague(formData: FormData) {
   const leagueId = String(formData.get("league_id") || "");
   const { client, user, memberships } = await getCurrentAccount();
   if (!user) redirect("/login?next=/lobby");
-  if (!memberships.some((membership) => membership.league_id === leagueId)) {
+  try {
+    const api = await leagueApiFor(client);
+    if (api) await api.authorizeSelection(leagueId, "active");
+    else if (!memberships.some((membership) => membership.league_id === leagueId)) throw new Error("access");
+  } catch {
     redirect("/lobby?error=access");
   }
   (await cookies()).set(ACTIVE_LEAGUE_COOKIE, leagueId, {
@@ -54,9 +63,13 @@ export async function enterLeague(formData: FormData) {
 
 export async function enterArchivedQuickLeague(formData: FormData) {
   const leagueId = String(formData.get("league_id") || "");
-  const { user, memberships } = await getCurrentAccount();
+  const { client, user, memberships } = await getCurrentAccount();
   if (!user) redirect("/login?next=/lobby");
-  if (!memberships.some((membership) => membership.league_id === leagueId)) {
+  try {
+    const api = await leagueApiFor(client);
+    if (api) await api.authorizeSelection(leagueId, "archived-quick");
+    else if (!memberships.some((membership) => membership.league_id === leagueId)) throw new Error("access");
+  } catch {
     redirect("/lobby?error=access");
   }
   (await cookies()).set(ACTIVE_LEAGUE_COOKIE, leagueId, {

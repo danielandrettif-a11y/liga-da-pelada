@@ -9,6 +9,9 @@ import { pgLeagueConfigRepository } from "./contexts/leagues/infrastructure/pg-l
 import { pgQuickMatchRepository } from "./contexts/leagues/infrastructure/pg-quick-match-repository.js";
 import { pgSeasonRepository } from "./contexts/leagues/infrastructure/pg-season-repository.js";
 import { pgStadiumRepository } from "./contexts/leagues/infrastructure/pg-stadium-repository.js";
+import { pgLeagueEntryRepository } from "./contexts/leagues/infrastructure/pg-league-entry-repository.js";
+import { pgLeagueBrandingRepository } from "./contexts/leagues/infrastructure/pg-league-branding-repository.js";
+import { supabaseLeagueBrandingStorage } from "./contexts/leagues/infrastructure/supabase-league-branding-storage.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -21,8 +24,12 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 const databaseUrl = process.env.DATABASE_URL;
 const authUrl = process.env.SUPABASE_INTERNAL_URL;
 const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+const publicUrl = process.env.SUPABASE_PUBLIC_URL;
 if ((goalsEnabled || leaguesEnabled) && (!databaseUrl || !authUrl || !publishableKey)) {
   throw new Error("APIs habilitadas requerem DATABASE_URL, SUPABASE_INTERNAL_URL e SUPABASE_PUBLISHABLE_KEY.");
+}
+if (leaguesEnabled && !publicUrl) {
+  throw new Error("ENABLE_LEAGUE_API=true requer SUPABASE_PUBLIC_URL para as imagens públicas.");
 }
 
 const pool = new pg.Pool({ connectionString: databaseUrl, max: 10 });
@@ -39,6 +46,11 @@ const app = createApp({
   quickMatchRepository: pgQuickMatchRepository(pool),
   seasonRepository: pgSeasonRepository(pool),
   stadiumRepository: pgStadiumRepository(pool),
+  leagueEntryRepository: pgLeagueEntryRepository(pool),
+  leagueBrandingRepository: pgLeagueBrandingRepository(pool),
+  leagueBrandingStorage: supabaseLeagueBrandingStorage(
+    authUrl || "http://127.0.0.1:54321", publicUrl || "http://127.0.0.1:54321", publishableKey || "",
+  ),
 });
 
 try {

@@ -116,6 +116,40 @@ describe("httpLeagueGateway", () => {
     ]);
   });
 
+  it("maps presentation completion and league selection authorization", async () => {
+    const request = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    const gateway = httpLeagueGateway("http://backend:3001", "token", request as typeof fetch);
+    await gateway.completeEntryFlow(1);
+    await gateway.authorizeSelection(leagueId, "active");
+    await gateway.authorizeSelection(leagueId, "archived-quick");
+    expect(request.mock.calls.map(([url, options]) => ({
+      method: (options as RequestInit).method,
+      path: (url as URL).pathname,
+      body: JSON.parse(String((options as RequestInit).body)),
+    }))).toEqual([
+      { method: "POST", path: "/api/account/entry-flow/complete", body: { version: 1 } },
+      { method: "POST", path: `/api/leagues/${leagueId}/selection`, body: { mode: "active" } },
+      { method: "POST", path: `/api/leagues/${leagueId}/selection`, body: { mode: "archived-quick" } },
+    ]);
+  });
+
+  it("sends branding as multipart without overriding its boundary", async () => {
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      logoUrl: "https://public/logo.png", accentColor: "#aabbcc",
+    }), { status: 200 }));
+    const gateway = httpLeagueGateway("http://backend:3001", "token", request as typeof fetch);
+    const formData = new FormData();
+    formData.set("accent_color", "#AABBCC");
+    await expect(gateway.updateBranding(leagueId, formData)).resolves.toEqual({
+      logoUrl: "https://public/logo.png", accentColor: "#aabbcc",
+    });
+    const [url, options] = request.mock.calls[0] as [URL, RequestInit];
+    expect(url.pathname).toBe(`/api/leagues/${leagueId}/branding`);
+    expect(options.method).toBe("PATCH");
+    expect(options.body).toBe(formData);
+    expect(options.headers).toEqual({ authorization: "Bearer token" });
+  });
+
   it("maps every migrated lobby command to its stable HTTP contract", async () => {
     const request = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: leagueId, name: "Pelada BQ", can_manage: true }), { status: 200 }))

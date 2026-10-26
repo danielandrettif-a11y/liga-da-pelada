@@ -2,7 +2,7 @@
 
 Este serviço ainda é uma fatia **experimental** da migração. As rotas de gol e peladas não são registradas com `ENABLE_GOAL_API=false` e `ENABLE_LEAGUE_API=false` (padrões). O Next.js usa a ponte modular somente quando a flag correspondente está ativa; sem ela, preserva os fluxos existentes.
 
-O backend cobre gol e dezenove operações de lobby/admin/configuração/ciclo de vida/temporadas de peladas, ainda sem paridade de contexto completo. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação.
+O backend cobre o piloto de gol e as vinte e sete operações inventariadas do contexto de peladas, ainda sem homologação integral das telas. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação verificada.
 
 ## Limites implementados
 
@@ -22,6 +22,8 @@ O [contrato alvo](../docs/architecture/matches-api-v1.openapi.json) usa cookie H
 `POST /api/quick-match-sessions` valida e cria pelada descartável, convocação e pré-lista em um único comando autenticado. O adaptador mantém a RPC `create_quick_match_session` como fronteira transacional durante a migração; o formato 5×3 é decidido no servidor e não é aceito do cliente.
 
 As rotas `/api/leagues/:leagueId/seasons/*` consultam a temporada ativa, seus ids de rodada e o último snapshot encerrado. O encerramento monta o snapshot e chama `finish_season` sob os mesmos claims, lock e transação PostgreSQL; confirmação, escopo de ADM e pendências são revalidados no servidor.
+
+Estádios possuem CRUD e ordem atômica próprios. A seleção de pelada ativa/arquivada é autorizada no servidor antes de o Next gravar o cookie HttpOnly. Branding usa multipart limitado, PostgreSQL autenticado e Storage via bearer do usuário; configurar `SUPABASE_PUBLIC_URL` com a origem acessível pelo navegador, distinta de `SUPABASE_INTERNAL_URL` quando os serviços usam rede Docker.
 
 ## Execução local
 

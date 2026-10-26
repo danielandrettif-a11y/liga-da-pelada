@@ -32,11 +32,19 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-26 — contexto de peladas 27/27 conectado ao backend
+
+- Os três fluxos de entrada restantes agora concluem a apresentação e autorizam a seleção ativa/arquivada no backend sob claims verificadas; somente o cookie HttpOnly e o redirecionamento continuam como responsabilidade da camada Next.js.
+- Branding ganhou domínio, orquestração com compensação, repositório PostgreSQL e adaptador de Storage autenticado. Logo e capa chegam por multipart limitado a dois arquivos; MIME, assinatura binária e limites de 4/8 MB são validados antes da gravação. O banco só recebe URLs depois do upload, novos objetos são removidos se a persistência falhar e objetos substituídos são apagados após sucesso.
+- `@fastify/multipart` foi fixado em uma versão posterior à correção do advisory de upload abortado; o parser impõe limites explícitos de arquivos, campos, partes e tamanho. `SUPABASE_PUBLIC_URL` separa a URL publicada nas imagens da URL interna usada entre contêineres.
+- O catálogo passa a registrar **27/27 operações de peladas** em `frontend-migrated`. O smoke no banco/Storage locais aprovou seleção ativa `200`, rejeição de modo arquivado numa liga ativa `403`, conclusão do onboarding `200`, upload multipart `200`, persistência do objeto, remoção `200` e limpeza completa. Isso fecha a implementação estrutural desse contexto, mas não o promove a `verified`: ainda é necessário testar manualmente as telas com duas contas/peladas antes de retirar os fallbacks.
+- Verificação final: typecheck e build dos dois pacotes, **862 testes frontend em 166 arquivos**, **82 testes backend em 34 arquivos**, auditorias de migração/contextos/arquitetura e auditoria das dependências de produção do backend aprovados; esta última reportou zero vulnerabilidades.
+
 ### 2026-10-26 — estádios no backend modular
 
 - As quatro operações de estádios passaram a usar domínio e casos de uso próprios, repositório PostgreSQL autenticado e rotas HTTP escopadas pela pelada. Criação serializa a próxima ordem; reordenação é uma única transação e rejeita IDs repetidos ou externos à pelada.
 - As Server Actions preservam o contrato das telas e o fallback Supabase enquanto `LEAGUE_API_ENABLED` estiver desligado. Com a flag local ligada, leitura, criação, edição, exclusão e ordenação usam o backend sem aceitar identidade ou papel enviados pelo cliente.
-- O catálogo registra **23/27 operações de peladas** em `frontend-migrated` (**23/267 no total**, além do piloto de gol). Ainda faltam os três fluxos de entrada/retomada e a atualização de branding antes de iniciar o contexto de identidade/elenco.
+- O catálogo registrava **23/27 operações de peladas** em `frontend-migrated` (**23/267 no total**, além do piloto de gol); os quatro fluxos então pendentes foram concluídos no lote seguinte.
 - Verificação desta fatia: typecheck e build dos dois pacotes, **855 testes frontend em 166 arquivos**, **68 testes backend em 27 arquivos** e auditorias de migração, contextos e arquitetura aprovados. No banco local restaurado, o smoke autenticado aprovou criação `201`, leitura `200`, edição `200`, ordem atômica `200`, exclusão `200` e confirmou zero registros temporários restantes.
 
 ### 2026-10-22 — RLS, read models, cache, mídia e observabilidade

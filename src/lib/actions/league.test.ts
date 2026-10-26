@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   selectedLeague: vi.fn(), account: vi.fn(), leagueApi: vi.fn(), setVisibility: vi.fn(),
   getConfig: vi.fn(), updateName: vi.fn(), updateSettings: vi.fn(), setPreseason: vi.fn(),
+  updateBranding: vi.fn(),
   revalidate: vi.fn(),
 }));
 
@@ -19,6 +20,7 @@ import {
   getLeagueConfig,
   updateLeagueConfig,
   updateLeagueName,
+  updateLeagueBranding,
   updateLeagueVisibility,
   updatePreSeasonEnabled,
 } from "./league";
@@ -33,6 +35,7 @@ beforeEach(() => {
     updateSettings: mocks.updateSettings,
     setPreseason: mocks.setPreseason,
     setVisibility: mocks.setVisibility,
+    updateBranding: mocks.updateBranding,
   });
 });
 
@@ -86,5 +89,28 @@ describe("updateLeagueVisibility", () => {
     await expect(updateLeagueVisibility("league-1", "private")).resolves.toEqual({
       success: false, error: "Não foi possível alterar a visibilidade.",
     });
+  });
+});
+
+describe("updateLeagueBranding", () => {
+  it("forwards the validated multipart form to the modular backend", async () => {
+    mocks.updateBranding.mockResolvedValue({
+      logoUrl: null, coverUrl: "https://public/cover.webp", accentColor: "#aabbcc",
+    });
+    const formData = new FormData();
+    formData.set("accent_color", "#AABBCC");
+    formData.set("remove_logo", "1");
+    await expect(updateLeagueBranding("league-1", formData)).resolves.toEqual({
+      success: true, logoUrl: null, coverUrl: "https://public/cover.webp", accentColor: "#aabbcc",
+    });
+    expect(mocks.updateBranding).toHaveBeenCalledWith("league-1", formData);
+    expect(mocks.revalidate).toHaveBeenCalledWith("/", "layout");
+  });
+
+  it("rejects invalid colors before opening the API session", async () => {
+    const formData = new FormData();
+    formData.set("accent_color", "green");
+    await expect(updateLeagueBranding("league-1", formData)).resolves.toMatchObject({ success: false });
+    expect(mocks.updateBranding).not.toHaveBeenCalled();
   });
 });
