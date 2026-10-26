@@ -6,9 +6,11 @@ import type { LeagueLobbyRepository } from "../contexts/leagues/application/mana
 import type { LeagueAdminRepository } from "../contexts/leagues/application/manage-league-admin.js";
 import type { LeagueConfigRepository } from "../contexts/leagues/application/manage-league-config.js";
 import type { QuickMatchRepository } from "../contexts/leagues/application/create-quick-match.js";
+import type { SeasonRepository } from "../contexts/leagues/application/manage-seasons.js";
 import { registerGoalRoutes } from "../contexts/matches/presentation/goals-route.js";
 import { registerLeagueRoutes } from "../contexts/leagues/presentation/leagues-route.js";
 import { registerLeagueConfigRoutes } from "../contexts/leagues/presentation/league-config-route.js";
+import { registerSeasonRoutes } from "../contexts/leagues/presentation/season-route.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 
 export function createApp(dependencies: {
@@ -22,6 +24,7 @@ export function createApp(dependencies: {
   leagueAdminRepository?: LeagueAdminRepository;
   leagueConfigRepository?: LeagueConfigRepository;
   quickMatchRepository?: QuickMatchRepository;
+  seasonRepository?: SeasonRepository;
   logger?: boolean;
 }): FastifyInstance {
   if (dependencies.leaguesEnabled && !dependencies.leagueRepository) {
@@ -41,6 +44,9 @@ export function createApp(dependencies: {
   }
   if (dependencies.leaguesEnabled && !dependencies.quickMatchRepository) {
     throw new Error("QuickMatchRepository é obrigatório quando ENABLE_LEAGUE_API=true.");
+  }
+  if (dependencies.leaguesEnabled && !dependencies.seasonRepository) {
+    throw new Error("SeasonRepository é obrigatório quando ENABLE_LEAGUE_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
   app.setErrorHandler((error, request, reply) => {
@@ -64,7 +70,8 @@ export function createApp(dependencies: {
   }
   if (dependencies.leaguesEnabled && dependencies.leagueRepository
     && dependencies.leagueMembershipRequestRepository && dependencies.leagueLobbyRepository
-    && dependencies.leagueAdminRepository && dependencies.leagueConfigRepository && dependencies.quickMatchRepository) {
+    && dependencies.leagueAdminRepository && dependencies.leagueConfigRepository && dependencies.quickMatchRepository
+    && dependencies.seasonRepository) {
     registerLeagueRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.leagueRepository,
@@ -76,6 +83,10 @@ export function createApp(dependencies: {
     registerLeagueConfigRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.leagueConfigRepository,
+    });
+    registerSeasonRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.seasonRepository,
     });
   }
   return app;

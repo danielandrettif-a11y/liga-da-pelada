@@ -9,6 +9,62 @@
   "overrides": [
     {
       "context": "leagues",
+      "source": "src/lib/actions/seasons.ts",
+      "name": "getActiveSeason",
+      "state": "frontend-migrated",
+      "target": "GET /api/leagues/:leagueId/seasons/active",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-seasons.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-season-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/seasons.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/seasons.ts",
+      "name": "getActiveSeasonRoundIds",
+      "state": "frontend-migrated",
+      "target": "GET /api/leagues/:leagueId/seasons/active/rounds",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/season.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-season-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/seasons.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/seasons.ts",
+      "name": "getLatestFinishedSeason",
+      "state": "frontend-migrated",
+      "target": "GET /api/leagues/:leagueId/seasons/latest-finished",
+      "evidence": [
+        "backend/src/contexts/leagues/infrastructure/pg-season-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/seasons.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/seasons.ts",
+      "name": "finishSeason",
+      "state": "frontend-migrated",
+      "target": "POST /api/leagues/:leagueId/seasons/active/finish",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/season.test.ts",
+        "backend/src/contexts/leagues/application/manage-seasons.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-season-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/seasons.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
       "source": "src/app/lobby/actions.ts",
       "name": "createLeague",
       "state": "frontend-migrated",

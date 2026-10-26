@@ -1,5 +1,6 @@
 import type { NewLeague } from "../domain/league-creation";
 import { DuplicateLeagueNameError, type LeagueCreator } from "../application/create-league";
+import type { RoundType, Season, SeasonSummary } from "@/lib/types";
 
 type ApiErrorPayload = { message?: unknown };
 
@@ -25,6 +26,10 @@ export type LeagueHttpGateway = LeagueCreator & {
   setPreseason(leagueId: string, enabled: boolean): Promise<void>;
   upgrade(leagueId: string): Promise<void>;
   deleteLeague(leagueId: string, confirmName: string): Promise<void>;
+  getActiveSeason(leagueId: string): Promise<Season | null>;
+  getActiveSeasonRoundIds(leagueId: string, roundType: RoundType): Promise<string[]>;
+  getLatestFinishedSeason(leagueId: string): Promise<SeasonSummary | null>;
+  finishSeason(leagueId: string, confirmation: string): Promise<{ summary: SeasonSummary; newSeasonNumber: number }>;
 };
 
 export type QuickMatchInput = { date: string; start_time: string; field_name: string; map_url: string };
@@ -168,6 +173,45 @@ export function httpLeagueGateway(
     },
     async deleteLeague(leagueId, confirmName) {
       await request("DELETE", `api/leagues/${encodeURIComponent(leagueId)}`, { confirm_name: confirmName });
+    },
+    async getActiveSeason(leagueId) {
+      const response = await request("GET", `api/leagues/${encodeURIComponent(leagueId)}/seasons/active`);
+      const payload = await response.json().catch(() => null) as { season?: Season | null } | null;
+      if (!payload || !("season" in payload)) {
+        throw new LeagueApiError("Resposta inválida ao carregar a temporada.", response.status);
+      }
+      return payload.season ?? null;
+    },
+    async getActiveSeasonRoundIds(leagueId, roundType) {
+      const response = await request(
+        "GET", `api/leagues/${encodeURIComponent(leagueId)}/seasons/active/rounds?round_type=${encodeURIComponent(roundType)}`,
+      );
+      const payload = await response.json().catch(() => null) as { round_ids?: unknown } | null;
+      if (!Array.isArray(payload?.round_ids) || !payload.round_ids.every((id) => typeof id === "string")) {
+        throw new LeagueApiError("Resposta inválida ao carregar as rodadas da temporada.", response.status);
+      }
+      return payload.round_ids as string[];
+    },
+    async getLatestFinishedSeason(leagueId) {
+      const response = await request("GET", `api/leagues/${encodeURIComponent(leagueId)}/seasons/latest-finished`);
+      const payload = await response.json().catch(() => null) as { summary?: SeasonSummary | null } | null;
+      if (!payload || !("summary" in payload)) {
+        throw new LeagueApiError("Resposta inválida ao carregar o histórico da temporada.", response.status);
+      }
+      return payload.summary ?? null;
+    },
+    async finishSeason(leagueId, confirmation) {
+      const response = await request(
+        "POST", `api/leagues/${encodeURIComponent(leagueId)}/seasons/active/finish`, { confirmation },
+      );
+      const payload = await response.json().catch(() => null) as {
+        summary?: SeasonSummary;
+        newSeasonNumber?: unknown;
+      } | null;
+      if (!payload?.summary || !Number.isInteger(payload.newSeasonNumber)) {
+        throw new LeagueApiError("Resposta inválida ao terminar a temporada.", response.status);
+      }
+      return { summary: payload.summary, newSeasonNumber: payload.newSeasonNumber as number };
     },
   };
 }

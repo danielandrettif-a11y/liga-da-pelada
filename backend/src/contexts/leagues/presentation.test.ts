@@ -45,6 +45,16 @@ function fixture(enabled: boolean) {
   const quickMatchRepository = {
     create: vi.fn().mockResolvedValue({ league_id: "quick-league", callup_id: "quick-callup", round_id: "quick-round" }),
   };
+  const seasonRepository = {
+    getActive: vi.fn().mockResolvedValue({
+      id: "season-1", league_id: "00000000-0000-4000-8000-000000000001", number: 1,
+      status: "active" as const, started_at: "2026-01-01T00:00:00.000Z", ended_at: null,
+      stats_snapshot: null, created_at: "2026-01-01T00:00:00.000Z",
+    }),
+    getActiveRoundIds: vi.fn().mockResolvedValue(["round-1"]),
+    getLatestFinishedSummary: vi.fn().mockResolvedValue({ seasonId: "season-0" }),
+    finish: vi.fn().mockResolvedValue({ summary: { seasonId: "season-1" }, newSeasonNumber: 2 }),
+  };
   const repository: GoalRepository = { registerGoal: vi.fn() };
   const verifier = { verifyAccessToken: vi.fn().mockResolvedValue({ userId: "verified-user" }) };
   const app = createApp({
@@ -58,12 +68,13 @@ function fixture(enabled: boolean) {
     leagueAdminRepository,
     leagueConfigRepository,
     quickMatchRepository,
+    seasonRepository,
     logger: false,
   });
   apps.push(app);
   return {
     app, verifier, leagueRepository, leagueMembershipRequestRepository,
-    leagueLobbyRepository, leagueAdminRepository, leagueConfigRepository, quickMatchRepository,
+    leagueLobbyRepository, leagueAdminRepository, leagueConfigRepository, quickMatchRepository, seasonRepository,
   };
 }
 
@@ -99,6 +110,39 @@ describe("league HTTP route", () => {
       date: "2026-10-24", startTime: "20:30", fieldName: "Arena BQ",
       mapUrl: "https://maps.example/arena", playersPerTeam: 5, teamsPerRound: 3,
     }, { userId: "verified-user" });
+  });
+
+  it("reads active and historical season projections with verified scope", async () => {
+    const { app, seasonRepository } = fixture(true);
+    const id = "00000000-0000-4000-8000-000000000001";
+    const headers = { authorization: "Bearer valid-token" };
+    const active = await app.inject({ method: "GET", url: `/api/leagues/${id}/seasons/active`, headers });
+    const rounds = await app.inject({
+      method: "GET", url: `/api/leagues/${id}/seasons/active/rounds?round_type=friendly`, headers,
+    });
+    const latest = await app.inject({ method: "GET", url: `/api/leagues/${id}/seasons/latest-finished`, headers });
+    expect(active.json()).toMatchObject({ season: { id: "season-1", status: "active" } });
+    expect(rounds.json()).toEqual({ round_ids: ["round-1"] });
+    expect(latest.json()).toEqual({ summary: { seasonId: "season-0" } });
+    expect(seasonRepository.getActive).toHaveBeenCalledWith(id, { userId: "verified-user" });
+    expect(seasonRepository.getActiveRoundIds).toHaveBeenCalledWith(id, "friendly", { userId: "verified-user" });
+    expect(seasonRepository.getLatestFinishedSummary).toHaveBeenCalledWith(id, { userId: "verified-user" });
+  });
+
+  it("finishes a season only with explicit confirmation", async () => {
+    const { app, seasonRepository } = fixture(true);
+    const id = "00000000-0000-4000-8000-000000000001";
+    const headers = { authorization: "Bearer valid-token" };
+    const invalid = await app.inject({
+      method: "POST", url: `/api/leagues/${id}/seasons/active/finish`, headers, payload: { confirmation: "terminar" },
+    });
+    expect(invalid.statusCode).toBe(400);
+    expect(seasonRepository.finish).not.toHaveBeenCalled();
+    const result = await app.inject({
+      method: "POST", url: `/api/leagues/${id}/seasons/active/finish`, headers, payload: { confirmation: "Terminar" },
+    });
+    expect(result.json()).toEqual({ summary: { seasonId: "season-1" }, newSeasonNumber: 2 });
+    expect(seasonRepository.finish).toHaveBeenCalledWith(id, { userId: "verified-user" }, expect.any(String));
   });
 
   it("rejects missing credentials and invalid names before persistence", async () => {

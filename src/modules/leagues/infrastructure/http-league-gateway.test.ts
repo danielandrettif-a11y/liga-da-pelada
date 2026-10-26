@@ -51,6 +51,33 @@ describe("httpLeagueGateway", () => {
     });
   });
 
+  it("maps season queries and transition to stable HTTP contracts", async () => {
+    const summary = { seasonId: "season-1" };
+    const request = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ season: { id: "season-1" } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ round_ids: ["round-1"] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ summary }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ summary, newSeasonNumber: 2 }), { status: 200 }));
+    const gateway = httpLeagueGateway("http://backend:3001", "token", request as typeof fetch);
+    await gateway.getActiveSeason(leagueId);
+    await gateway.getActiveSeasonRoundIds(leagueId, "friendly");
+    await gateway.getLatestFinishedSeason(leagueId);
+    await gateway.finishSeason(leagueId, "Terminar");
+    expect(request.mock.calls.map(([url, options]) => ({
+      method: (options as RequestInit).method,
+      path: (url as URL).pathname + (url as URL).search,
+      body: (options as RequestInit).body ? JSON.parse(String((options as RequestInit).body)) : null,
+    }))).toEqual([
+      { method: "GET", path: `/api/leagues/${leagueId}/seasons/active`, body: null },
+      { method: "GET", path: `/api/leagues/${leagueId}/seasons/active/rounds?round_type=friendly`, body: null },
+      { method: "GET", path: `/api/leagues/${leagueId}/seasons/latest-finished`, body: null },
+      {
+        method: "POST", path: `/api/leagues/${leagueId}/seasons/active/finish`,
+        body: { confirmation: "Terminar" },
+      },
+    ]);
+  });
+
   it("maps every migrated lobby command to its stable HTTP contract", async () => {
     const request = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: leagueId, name: "Pelada BQ", can_manage: true }), { status: 200 }))
