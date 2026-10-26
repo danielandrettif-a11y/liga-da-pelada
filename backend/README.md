@@ -1,8 +1,8 @@
 # Backend inicial de partidas
 
-Este serviço ainda é uma fatia **experimental** da migração. As rotas de gol, peladas e identidade não são registradas com `ENABLE_GOAL_API=false`, `ENABLE_LEAGUE_API=false` e `ENABLE_IDENTITY_API=false` (padrões). O Next.js usa a ponte modular somente quando a flag correspondente está ativa; sem ela, preserva os fluxos existentes.
+Este serviço ainda é uma fatia **experimental** da migração. As rotas de gol, peladas, identidade e elenco não são registradas com `ENABLE_GOAL_API=false`, `ENABLE_LEAGUE_API=false`, `ENABLE_IDENTITY_API=false` e `ENABLE_ROSTER_API=false` (padrões). O Next.js usa a ponte modular somente quando a flag correspondente está ativa; sem ela, preserva os fluxos existentes.
 
-O backend cobre o piloto de gol e todas as operações inventariadas dos contextos de peladas (27) e identidade (8), ainda sem homologação integral das telas. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação verificada.
+O backend cobre o piloto de gol, todas as operações inventariadas dos contextos de peladas (27) e identidade (8), e a primeira operação de elenco (carreira da conta), ainda sem homologação integral das telas. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação verificada.
 
 ## Limites implementados
 
@@ -32,6 +32,10 @@ Cadastro, login, logout, recuperação, troca de senha e Google OAuth usam o Aut
 A ponte inteira é controlada por `IDENTITY_API_ENABLED`/`IDENTITY_BACKEND_URL` no Next e `ENABLE_IDENTITY_API` no backend. Enquanto desligada, os adaptadores SSR antigos preservam o funcionamento para homologação e rollback.
 
 O smoke descartável [`verify-local-identity.sh`](../scripts/verify-local-identity.sh) cria uma conta confirmada pela API administrativa **local**, valida login, reparo de perfil, recuperação aceita, URL OAuth, senha, logout, novo login e gestão de papéis, e remove a fixture no trap. Ele não substitui a jornada de confirmação: a stack restaurada atual aponta para `supabase-mail`, que não está em execução. Subir/configurar SMTP local e testar o link recebido, além do Google de teste, continua obrigatório antes de marcar identidade como `verified`.
+
+`GET /api/roster/me/career` consulta `get_my_account_career_stats()` dentro de uma transação com os claims da conta verificada e agrega os totais geral, oficial e amistoso no domínio. A ponte do Next usa `ROSTER_API_ENABLED=true` e `ROSTER_BACKEND_URL`; desligada, a Server Action mantém temporariamente o caminho Supabase existente.
+
+Com a stack local e `ENABLE_ROSTER_API=true`, [`verify-local-roster.sh`](../scripts/verify-local-roster.sh) valida a rota com uma conta local somente para leitura e confere o contrato completo da projeção.
 
 ## Execução local
 

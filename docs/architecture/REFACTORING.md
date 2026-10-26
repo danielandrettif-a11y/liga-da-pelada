@@ -32,6 +32,14 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-26 — primeira fatia vertical de elenco
+
+- Criado o contexto `backend/src/contexts/roster` e o módulo `src/modules/roster` com a operação `getMyAccountCareer`, cobrindo domínio de agregação, caso de uso, porta, adaptador PostgreSQL sob claims verificadas, rota `GET /api/roster/me/career`, gateway HTTP e sessão server-side.
+- A Server Action preserva o retorno vazio para conta anônima/indisponibilidade e mantém o acesso Supabase como fallback somente enquanto `ROSTER_API_ENABLED` estiver desligado. O backend é opt-in com `ENABLE_ROSTER_API=true`.
+- O catálogo passa a registrar **1/35 operações de elenco** em `frontend-migrated`. A fatia tem testes de domínio, aplicação, persistência, rota, gateway, sessão e compatibilidade da Server Action; a tela de perfil ainda precisa ser exercitada na stack local antes de promoção para `verified`.
+- A imagem local foi reconstruída e [`verify-local-roster.sh`](../../scripts/verify-local-roster.sh) aprovou `GET /api/roster/me/career` com `200`, contrato válido e duas linhas reais, sem escrita no banco.
+- Verificação automatizada: **893 testes frontend em 176 arquivos**, **113 testes backend em 46 arquivos**, typecheck e build dos dois pacotes e auditorias de migração/contextos/arquitetura aprovados.
+
 ### 2026-10-26 — identidade e acesso 8/8 no backend
 
 - A listagem de contas administráveis e a promoção/remoção de ADM global ganharam domínio, caso de uso, repositório PostgreSQL autenticado e rotas próprias. As RPCs existentes continuam responsáveis por autorização, lock, proteção do último ADM e auditoria.

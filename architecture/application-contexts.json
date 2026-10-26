@@ -19,7 +19,7 @@
       "id": "roster",
       "aggregates": ["Player", "PlayerIdentity", "FitnessRecord"],
       "pages": ["src/app/jogadores/page.tsx", "src/app/jogadores/[id]/page.tsx", "src/app/jogadores/[id]/carta/page.tsx", "src/app/admin/jogadores/page.tsx", "src/app/admin/jogadores/novo/page.tsx", "src/app/admin/jogadores/[id]/editar/page.tsx", "src/app/admin/importar-lista/page.tsx", "src/app/admin/cadastros/page.tsx"],
-      "sourceModules": [],
+      "sourceModules": ["roster"],
       "entrypoints": ["src/app/admin/importar-lista/actions.ts", "src/lib/actions/players.ts", "src/lib/actions/registrations.ts", "src/lib/actions/fitness.ts", "src/lib/actions/speed-draw.ts", "src/lib/actions/private-balance-tags.ts", "src/lib/actions/account-career.ts"]
     },
     {

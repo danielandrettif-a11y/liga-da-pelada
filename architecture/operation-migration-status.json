@@ -500,6 +500,21 @@
       ]
     },
     {
+      "context": "roster",
+      "source": "src/lib/actions/account-career.ts",
+      "name": "getMyAccountCareer",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/me/career",
+      "evidence": [
+        "backend/src/contexts/roster/domain/account-career.test.ts",
+        "backend/src/contexts/roster/application/get-account-career.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-account-career-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/account-career.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "registerGoal",

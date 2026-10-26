@@ -19,6 +19,7 @@ import type {
   IdentityAuthProvider,
   IdentityProfileRepository,
 } from "../contexts/identity/application/manage-authentication.js";
+import type { AccountCareerRepository } from "../contexts/roster/application/get-account-career.js";
 import { registerGoalRoutes } from "../contexts/matches/presentation/goals-route.js";
 import { registerLeagueRoutes } from "../contexts/leagues/presentation/leagues-route.js";
 import { registerLeagueConfigRoutes } from "../contexts/leagues/presentation/league-config-route.js";
@@ -28,12 +29,14 @@ import { registerLeagueEntryRoutes } from "../contexts/leagues/presentation/leag
 import { registerLeagueBrandingRoutes } from "../contexts/leagues/presentation/league-branding-route.js";
 import { registerAccountAccessRoutes } from "../contexts/identity/presentation/account-access-route.js";
 import { registerAuthenticationRoutes } from "../contexts/identity/presentation/authentication-route.js";
+import { registerAccountCareerRoutes } from "../contexts/roster/presentation/account-career-route.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 
 export function createApp(dependencies: {
   goalsEnabled: boolean;
   leaguesEnabled?: boolean;
   identityEnabled?: boolean;
+  rosterEnabled?: boolean;
   verifier: UserVerifier;
   repository: GoalRepository;
   leagueRepository?: LeagueRepository;
@@ -51,6 +54,7 @@ export function createApp(dependencies: {
   identityAuthProvider?: IdentityAuthProvider;
   identityProfileRepository?: IdentityProfileRepository;
   appPublicUrl?: string;
+  accountCareerRepository?: AccountCareerRepository;
   logger?: boolean;
 }): FastifyInstance {
   if (dependencies.leaguesEnabled && !dependencies.leagueRepository) {
@@ -86,6 +90,9 @@ export function createApp(dependencies: {
   if (dependencies.identityEnabled && (!dependencies.accountAccessRepository || !dependencies.identityAuthProvider
     || !dependencies.identityProfileRepository || !dependencies.appPublicUrl)) {
     throw new Error("Dependências de identidade são obrigatórias quando ENABLE_IDENTITY_API=true.");
+  }
+  if (dependencies.rosterEnabled && !dependencies.accountCareerRepository) {
+    throw new Error("AccountCareerRepository é obrigatório quando ENABLE_ROSTER_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
   void app.register(multipart);
@@ -154,6 +161,12 @@ export function createApp(dependencies: {
       provider: dependencies.identityAuthProvider,
       profiles: dependencies.identityProfileRepository,
       appPublicUrl: dependencies.appPublicUrl,
+    });
+  }
+  if (dependencies.rosterEnabled && dependencies.accountCareerRepository) {
+    registerAccountCareerRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.accountCareerRepository,
     });
   }
   return app;
