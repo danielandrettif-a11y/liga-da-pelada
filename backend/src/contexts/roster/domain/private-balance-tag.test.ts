@@ -11,5 +11,6 @@ describe("private balance tag", () => {
     expect(() => parsePrivateBalanceTag("craque_3")).toThrow("inválida");
     expect(() => parsePlayerId("player-1")).toThrow("Jogador inválido");
     expect(parsePlayerId(" 00000000-0000-4000-8000-000000000001 ")).toBe("00000000-0000-4000-8000-000000000001");
+    expect(parsePlayerId("a0000000-0000-0000-0000-000000000001")).toBe("a0000000-0000-0000-0000-000000000001");
   });
 });

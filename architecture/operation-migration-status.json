@@ -545,6 +545,66 @@
       ]
     },
     {
+      "context": "roster",
+      "source": "src/lib/actions/fitness.ts",
+      "name": "getMyFitnessRounds",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/players/:playerId/fitness-rounds",
+      "evidence": [
+        "backend/src/contexts/roster/domain/fitness.test.ts",
+        "backend/src/contexts/roster/application/manage-fitness.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-fitness-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/fitness.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/fitness.ts",
+      "name": "saveMyFitness",
+      "state": "frontend-migrated",
+      "target": "PUT /api/roster/rounds/:roundId/my-fitness",
+      "evidence": [
+        "backend/src/contexts/roster/domain/fitness.test.ts",
+        "backend/src/contexts/roster/application/manage-fitness.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-fitness-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/fitness.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/fitness.ts",
+      "name": "setFitnessVisibility",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/roster/me/fitness-visibility",
+      "evidence": [
+        "backend/src/contexts/roster/domain/fitness.test.ts",
+        "backend/src/contexts/roster/application/manage-fitness.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-fitness-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/fitness.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/fitness.ts",
+      "name": "getPlayerFitnessSummaries",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/players/:playerId/fitness-summary",
+      "evidence": [
+        "backend/src/contexts/roster/domain/fitness.test.ts",
+        "backend/src/contexts/roster/application/manage-fitness.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-fitness-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/fitness.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "registerGoal",

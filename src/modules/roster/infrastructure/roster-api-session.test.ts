@@ -36,6 +36,10 @@ describe("rosterApiFor", () => {
       getMyAccountCareer: expect.any(Function),
       getPlayerPrivateBalanceTag: expect.any(Function),
       setPlayerPrivateBalanceTag: expect.any(Function),
+      getMyFitnessRounds: expect.any(Function),
+      saveMyFitness: expect.any(Function),
+      setFitnessVisibility: expect.any(Function),
+      getPlayerFitnessSummaries: expect.any(Function),
     });
   });
 });

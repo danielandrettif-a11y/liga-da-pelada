@@ -11,6 +11,12 @@ function fixture(enabled: boolean) {
     get: vi.fn().mockResolvedValue({ allowed: true, tag: "bagre_1" as const }),
     set: vi.fn().mockResolvedValue(undefined),
   };
+  const fitnessRepository = {
+    listMyRounds: vi.fn().mockResolvedValue([]),
+    saveMyFitness: vi.fn().mockResolvedValue("00000000-0000-4000-8000-000000000001"),
+    setMyVisibility: vi.fn().mockResolvedValue("00000000-0000-4000-8000-000000000001"),
+    listSummaryMeasurements: vi.fn().mockResolvedValue([]),
+  };
   const app = createApp({
     goalsEnabled: false,
     rosterEnabled: enabled,
@@ -18,10 +24,11 @@ function fixture(enabled: boolean) {
     repository: { registerGoal: vi.fn() },
     accountCareerRepository,
     privateBalanceTagRepository,
+    fitnessRepository,
     logger: false,
   });
   apps.push(app);
-  return { app, verifier, accountCareerRepository, privateBalanceTagRepository };
+  return { app, verifier, accountCareerRepository, privateBalanceTagRepository, fitnessRepository };
 }
 
 describe("roster HTTP routes", () => {
@@ -71,5 +78,32 @@ describe("roster HTTP routes", () => {
     });
     expect(response.statusCode).toBe(400);
     expect(privateBalanceTagRepository.set).not.toHaveBeenCalled();
+  });
+
+  it("serves owner fitness reads, writes and visibility through verified claims", async () => {
+    const { app, fitnessRepository } = fixture(true);
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const leagueId = "00000000-0000-4000-8000-000000000002";
+    const roundId = "00000000-0000-4000-8000-000000000003";
+    const headers = { authorization: "Bearer valid-token" };
+    const rounds = await app.inject({
+      method: "GET", url: `/api/roster/players/${playerId}/fitness-rounds?league_id=${leagueId}`, headers,
+    });
+    const summary = await app.inject({
+      method: "GET", url: `/api/roster/players/${playerId}/fitness-summary?league_id=${leagueId}`, headers,
+    });
+    const save = await app.inject({
+      method: "PUT", url: `/api/roster/rounds/${roundId}/my-fitness`, headers,
+      payload: { distance: 5.5, pace: 100 },
+    });
+    const visibility = await app.inject({
+      method: "PATCH", url: "/api/roster/me/fitness-visibility", headers, payload: { visible: true },
+    });
+    expect(rounds.statusCode).toBe(200);
+    expect(summary.statusCode).toBe(200);
+    expect(save.statusCode).toBe(200);
+    expect(visibility.statusCode).toBe(200);
+    expect(fitnessRepository.listMyRounds).toHaveBeenCalledWith(playerId, leagueId, { userId: "verified-user" });
+    expect(fitnessRepository.saveMyFitness).toHaveBeenCalledWith(roundId, 5.5, 6, { userId: "verified-user" });
   });
 });

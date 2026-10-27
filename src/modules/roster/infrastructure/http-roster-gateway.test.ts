@@ -53,4 +53,31 @@ describe("httpRosterGateway", () => {
     await expect(gateway.setPlayerPrivateBalanceTag(playerId, "craque_1")).resolves.toBeUndefined();
     expect((fetcher.mock.calls[1]?.[1] as RequestInit).body).toBe(JSON.stringify({ tag: "craque_1" }));
   });
+
+  it("uses the selected league for fitness projections and owner-only commands", async () => {
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const leagueId = "00000000-0000-4000-8000-000000000002";
+    const roundId = "00000000-0000-4000-8000-000000000003";
+    const summary = { distanceKm: 5, averageSpeedKmh: 12, metersPerMinute: 200, entries: 1 };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ rounds: [{
+        roundId, number: 1, date: "2026-10-20", roundType: "official", fitness: null,
+      }] }), { status: 200, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ player_id: playerId }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ player_id: playerId }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ summaries: { official: summary, friendly: summary } }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }));
+    const gateway = httpRosterGateway("http://backend:3001", "token", fetcher as typeof fetch);
+    await expect(gateway.getMyFitnessRounds(playerId, leagueId)).resolves.toHaveLength(1);
+    await expect(gateway.saveMyFitness(roundId, 5, 100)).resolves.toBe(playerId);
+    await expect(gateway.setFitnessVisibility(true)).resolves.toBe(playerId);
+    await expect(gateway.getPlayerFitnessSummaries(playerId, leagueId)).resolves.toMatchObject({ official: summary });
+    expect((fetcher.mock.calls[0]?.[0] as URL).searchParams.get("league_id")).toBe(leagueId);
+    expect((fetcher.mock.calls[1]?.[1] as RequestInit).body).toBe(JSON.stringify({ distance: 5, pace: 100 }));
+  });
 });

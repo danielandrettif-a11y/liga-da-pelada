@@ -30,7 +30,9 @@ payload="$(printf \
 signature="$(printf '%s' "$header.$payload" | openssl dgst -sha256 -hmac "$jwt_secret" -binary | base64_url)"
 response_file="$(mktemp /tmp/liga-roster-career-XXXXXX.json)"
 tag_response_file="$(mktemp /tmp/liga-roster-private-tag-XXXXXX.json)"
-trap 'rm -f -- "$response_file" "$tag_response_file"' EXIT
+fitness_rounds_file="$(mktemp /tmp/liga-roster-fitness-rounds-XXXXXX.json)"
+fitness_summary_file="$(mktemp /tmp/liga-roster-fitness-summary-XXXXXX.json)"
+trap 'rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file"' EXIT
 
 status="$(curl -sS -o "$response_file" -w '%{http_code}' \
   -H "Authorization: Bearer $header.$payload.$signature" \
@@ -71,4 +73,42 @@ PY
 )"
   printf 'private_balance_tag=%s valid=%s\n' "$tag_status" "$tag_valid"
   [[ "$tag_status" == "200" && "$tag_valid" == "1" ]]
+fi
+
+player_id="$(docker exec "$database_container" psql -U postgres -d postgres -Atc \
+  "SELECT player_id FROM public.account_profiles WHERE user_id = '$user_id'::uuid")"
+league_id="$(docker exec "$database_container" psql -U postgres -d postgres -Atc \
+  "SELECT league_id FROM public.league_members WHERE user_id = '$user_id'::uuid AND is_active ORDER BY joined_at LIMIT 1")"
+if [[ -n "$player_id" && -n "$league_id" ]]; then
+  fitness_rounds_status="$(curl -sS -o "$fitness_rounds_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $header.$payload.$signature" \
+    "${backend_url%/}/api/roster/players/$player_id/fitness-rounds?league_id=$league_id")"
+  fitness_summary_status="$(curl -sS -o "$fitness_summary_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $header.$payload.$signature" \
+    "${backend_url%/}/api/roster/players/$player_id/fitness-summary?league_id=$league_id")"
+  if [[ "$fitness_rounds_status" != "200" || "$fitness_summary_status" != "200" ]]; then
+    echo "Leitura local de aptidão falhou (rodadas=$fitness_rounds_status, resumo=$fitness_summary_status)." >&2
+    printf 'rounds_response=%s\nsummary_response=%s\n' \
+      "$(cat "$fitness_rounds_file")" "$(cat "$fitness_summary_file")" >&2
+    exit 1
+  fi
+  fitness_valid="$(python3 - "$fitness_rounds_file" "$fitness_summary_file" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    rounds = json.load(source)
+with open(sys.argv[2], encoding="utf-8") as source:
+    summary = json.load(source)
+totals = {"distanceKm", "averageSpeedKmh", "metersPerMinute", "entries"}
+valid_rounds = isinstance(rounds.get("rounds"), list)
+summaries = summary.get("summaries")
+valid_summary = isinstance(summaries, dict) and all(
+    isinstance(summaries.get(kind), dict) and totals <= summaries[kind].keys()
+    for kind in ("official", "friendly")
+)
+print(int(valid_rounds and valid_summary))
+PY
+)"
+  printf 'fitness_rounds=%s fitness_summary=%s valid=%s\n' \
+    "$fitness_rounds_status" "$fitness_summary_status" "$fitness_valid"
+  [[ "$fitness_rounds_status" == "200" && "$fitness_summary_status" == "200" && "$fitness_valid" == "1" ]]
 fi

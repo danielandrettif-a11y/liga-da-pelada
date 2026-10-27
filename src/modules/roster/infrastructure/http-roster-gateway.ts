@@ -1,5 +1,6 @@
 import type { AccountCareer, AccountCareerRow, CareerTotals } from "../domain/account-career";
 import type { PrivateBalanceTag } from "@/lib/types";
+import type { FitnessRoundEntry, FitnessSummaries, FitnessSummary } from "../domain/fitness";
 
 type ApiErrorPayload = { message?: unknown };
 
@@ -14,6 +15,10 @@ export type RosterHttpGateway = {
   getMyAccountCareer(): Promise<AccountCareer>;
   getPlayerPrivateBalanceTag(playerId: string): Promise<{ allowed: boolean; tag: PrivateBalanceTag | null }>;
   setPlayerPrivateBalanceTag(playerId: string, tag: PrivateBalanceTag | null): Promise<void>;
+  getMyFitnessRounds(playerId: string, leagueId: string): Promise<FitnessRoundEntry[]>;
+  saveMyFitness(roundId: string, distance: number, pace: number): Promise<string>;
+  setFitnessVisibility(visible: boolean): Promise<string>;
+  getPlayerFitnessSummaries(playerId: string, leagueId: string): Promise<FitnessSummaries | null>;
 };
 
 const totalFields = [
@@ -51,6 +56,27 @@ function isCareer(value: unknown): value is AccountCareer {
     && isTotals(career.overall) && isTotals(career.official) && isTotals(career.friendly);
 }
 
+function isFitnessSummary(value: unknown): value is FitnessSummary {
+  if (!value || typeof value !== "object") return false;
+  const summary = value as Record<string, unknown>;
+  return ["distanceKm", "averageSpeedKmh", "metersPerMinute", "entries"]
+    .every((field) => typeof summary[field] === "number" && Number.isFinite(summary[field]));
+}
+
+function isFitnessRound(value: unknown): value is FitnessRoundEntry {
+  if (!value || typeof value !== "object") return false;
+  const round = value as Record<string, unknown>;
+  if (typeof round.roundId !== "string" || typeof round.number !== "number" || typeof round.date !== "string"
+    || (round.roundType !== "official" && round.roundType !== "friendly")) return false;
+  if (round.fitness === null) return true;
+  if (!round.fitness || typeof round.fitness !== "object") return false;
+  const fitness = round.fitness as Record<string, unknown>;
+  return typeof fitness.id === "string" && typeof fitness.player_id === "string"
+    && typeof fitness.round_id === "string" && typeof fitness.distance_km === "number"
+    && typeof fitness.average_speed_kmh === "number" && typeof fitness.created_at === "string"
+    && typeof fitness.updated_at === "string";
+}
+
 async function errorFrom(response: Response): Promise<RosterApiError> {
   const payload: ApiErrorPayload | null = await response.json().catch(() => null);
   return new RosterApiError(
@@ -66,7 +92,7 @@ export function httpRosterGateway(
 ): RosterHttpGateway {
   if (!accessToken.trim()) throw new RosterApiError("Sessão expirada. Entre novamente.");
 
-  const request = async (method: "GET" | "PUT", path: string, body?: object) => {
+  const request = async (method: "GET" | "PUT" | "PATCH", path: string, body?: object) => {
     const url = apiUrl(baseUrl, path);
     let response: Response;
     try {
@@ -113,6 +139,58 @@ export function httpRosterGateway(
       await request(
         "PUT", `api/roster/players/${encodeURIComponent(playerId)}/private-balance-tag`, { tag },
       );
+    },
+    async getMyFitnessRounds(playerId, leagueId) {
+      const response = await request(
+        "GET",
+        `api/roster/players/${encodeURIComponent(playerId)}/fitness-rounds?league_id=${encodeURIComponent(leagueId)}`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const rounds = payload && typeof payload === "object" ? (payload as { rounds?: unknown }).rounds : null;
+      if (!Array.isArray(rounds) || !rounds.every(isFitnessRound)) {
+        throw new RosterApiError("Resposta inválida ao carregar os dados físicos.", response.status);
+      }
+      return rounds;
+    },
+    async saveMyFitness(roundId, distance, pace) {
+      const response = await request(
+        "PUT", `api/roster/rounds/${encodeURIComponent(roundId)}/my-fitness`, { distance, pace },
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const playerId = payload && typeof payload === "object" ? (payload as { player_id?: unknown }).player_id : null;
+      if (typeof playerId !== "string" || !playerId) {
+        throw new RosterApiError("Resposta inválida ao salvar os dados físicos.", response.status);
+      }
+      return playerId;
+    },
+    async setFitnessVisibility(visible) {
+      const response = await request("PATCH", "api/roster/me/fitness-visibility", { visible });
+      const payload: unknown = await response.json().catch(() => null);
+      const playerId = payload && typeof payload === "object" ? (payload as { player_id?: unknown }).player_id : null;
+      if (typeof playerId !== "string" || !playerId) {
+        throw new RosterApiError("Resposta inválida ao alterar a privacidade.", response.status);
+      }
+      return playerId;
+    },
+    async getPlayerFitnessSummaries(playerId, leagueId) {
+      const response = await request(
+        "GET",
+        `api/roster/players/${encodeURIComponent(playerId)}/fitness-summary?league_id=${encodeURIComponent(leagueId)}`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      if (!payload || typeof payload !== "object" || !("summaries" in payload)) {
+        throw new RosterApiError("Resposta inválida ao carregar o resumo físico.", response.status);
+      }
+      const summaries = (payload as { summaries: unknown }).summaries;
+      if (summaries === null) return null;
+      if (!summaries || typeof summaries !== "object") {
+        throw new RosterApiError("Resposta inválida ao carregar o resumo físico.", response.status);
+      }
+      const result = summaries as { official?: unknown; friendly?: unknown };
+      if (!isFitnessSummary(result.official) || !isFitnessSummary(result.friendly)) {
+        throw new RosterApiError("Resposta inválida ao carregar o resumo físico.", response.status);
+      }
+      return { official: result.official, friendly: result.friendly };
     },
   };
 }
