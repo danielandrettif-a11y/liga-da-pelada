@@ -1,4 +1,5 @@
 import type { AccountCareer, AccountCareerRow, CareerTotals } from "../domain/account-career";
+import type { PrivateBalanceTag } from "@/lib/types";
 
 type ApiErrorPayload = { message?: unknown };
 
@@ -11,6 +12,8 @@ export class RosterApiError extends Error {
 
 export type RosterHttpGateway = {
   getMyAccountCareer(): Promise<AccountCareer>;
+  getPlayerPrivateBalanceTag(playerId: string): Promise<{ allowed: boolean; tag: PrivateBalanceTag | null }>;
+  setPlayerPrivateBalanceTag(playerId: string, tag: PrivateBalanceTag | null): Promise<void>;
 };
 
 const totalFields = [
@@ -63,24 +66,53 @@ export function httpRosterGateway(
 ): RosterHttpGateway {
   if (!accessToken.trim()) throw new RosterApiError("Sessão expirada. Entre novamente.");
 
+  const request = async (method: "GET" | "PUT", path: string, body?: object) => {
+    const url = apiUrl(baseUrl, path);
+    let response: Response;
+    try {
+      response = await fetcher(url, {
+        method,
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          ...(body ? { "content-type": "application/json" } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        cache: "no-store",
+        signal: AbortSignal.timeout(10000),
+      });
+    } catch {
+      throw new RosterApiError("A API de elenco não respondeu.");
+    }
+    if (!response.ok) throw await errorFrom(response);
+    return response;
+  };
+
   return {
     async getMyAccountCareer() {
-      const url = apiUrl(baseUrl, "api/roster/me/career");
-      let response: Response;
-      try {
-        response = await fetcher(url, {
-          method: "GET",
-          headers: { authorization: `Bearer ${accessToken}` },
-          cache: "no-store",
-          signal: AbortSignal.timeout(10000),
-        });
-      } catch {
-        throw new RosterApiError("A API de elenco não respondeu.");
-      }
-      if (!response.ok) throw await errorFrom(response);
+      const response = await request("GET", "api/roster/me/career");
       const payload: unknown = await response.json().catch(() => null);
       if (!isCareer(payload)) throw new RosterApiError("Resposta inválida ao carregar a carreira.", response.status);
       return payload;
+    },
+    async getPlayerPrivateBalanceTag(playerId) {
+      const response = await request(
+        "GET", `api/roster/players/${encodeURIComponent(playerId)}/private-balance-tag`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      if (!payload || typeof payload !== "object" || typeof (payload as { allowed?: unknown }).allowed !== "boolean") {
+        throw new RosterApiError("Resposta inválida ao carregar a classificação.", response.status);
+      }
+      const result = payload as { allowed: boolean; tag?: unknown };
+      if (result.tag !== null && result.tag !== "bagre_1" && result.tag !== "bagre_2"
+        && result.tag !== "craque_1" && result.tag !== "craque_2") {
+        throw new RosterApiError("Resposta inválida ao carregar a classificação.", response.status);
+      }
+      return { allowed: result.allowed, tag: result.tag as PrivateBalanceTag | null };
+    },
+    async setPlayerPrivateBalanceTag(playerId, tag) {
+      await request(
+        "PUT", `api/roster/players/${encodeURIComponent(playerId)}/private-balance-tag`, { tag },
+      );
     },
   };
 }

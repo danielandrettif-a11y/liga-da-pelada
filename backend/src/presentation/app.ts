@@ -20,6 +20,7 @@ import type {
   IdentityProfileRepository,
 } from "../contexts/identity/application/manage-authentication.js";
 import type { AccountCareerRepository } from "../contexts/roster/application/get-account-career.js";
+import type { PrivateBalanceTagRepository } from "../contexts/roster/application/manage-private-balance-tag.js";
 import { registerGoalRoutes } from "../contexts/matches/presentation/goals-route.js";
 import { registerLeagueRoutes } from "../contexts/leagues/presentation/leagues-route.js";
 import { registerLeagueConfigRoutes } from "../contexts/leagues/presentation/league-config-route.js";
@@ -30,6 +31,7 @@ import { registerLeagueBrandingRoutes } from "../contexts/leagues/presentation/l
 import { registerAccountAccessRoutes } from "../contexts/identity/presentation/account-access-route.js";
 import { registerAuthenticationRoutes } from "../contexts/identity/presentation/authentication-route.js";
 import { registerAccountCareerRoutes } from "../contexts/roster/presentation/account-career-route.js";
+import { registerPrivateBalanceTagRoutes } from "../contexts/roster/presentation/private-balance-tag-route.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 
 export function createApp(dependencies: {
@@ -55,6 +57,7 @@ export function createApp(dependencies: {
   identityProfileRepository?: IdentityProfileRepository;
   appPublicUrl?: string;
   accountCareerRepository?: AccountCareerRepository;
+  privateBalanceTagRepository?: PrivateBalanceTagRepository;
   logger?: boolean;
 }): FastifyInstance {
   if (dependencies.leaguesEnabled && !dependencies.leagueRepository) {
@@ -91,8 +94,8 @@ export function createApp(dependencies: {
     || !dependencies.identityProfileRepository || !dependencies.appPublicUrl)) {
     throw new Error("Dependências de identidade são obrigatórias quando ENABLE_IDENTITY_API=true.");
   }
-  if (dependencies.rosterEnabled && !dependencies.accountCareerRepository) {
-    throw new Error("AccountCareerRepository é obrigatório quando ENABLE_ROSTER_API=true.");
+  if (dependencies.rosterEnabled && (!dependencies.accountCareerRepository || !dependencies.privateBalanceTagRepository)) {
+    throw new Error("Dependências de elenco são obrigatórias quando ENABLE_ROSTER_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
   void app.register(multipart);
@@ -163,10 +166,14 @@ export function createApp(dependencies: {
       appPublicUrl: dependencies.appPublicUrl,
     });
   }
-  if (dependencies.rosterEnabled && dependencies.accountCareerRepository) {
+  if (dependencies.rosterEnabled && dependencies.accountCareerRepository && dependencies.privateBalanceTagRepository) {
     registerAccountCareerRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.accountCareerRepository,
+    });
+    registerPrivateBalanceTagRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.privateBalanceTagRepository,
     });
   }
   return app;

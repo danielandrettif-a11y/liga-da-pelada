@@ -515,6 +515,36 @@
       ]
     },
     {
+      "context": "roster",
+      "source": "src/lib/actions/private-balance-tags.ts",
+      "name": "getPlayerPrivateBalanceTag",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/players/:playerId/private-balance-tag",
+      "evidence": [
+        "backend/src/contexts/roster/domain/private-balance-tag.test.ts",
+        "backend/src/contexts/roster/application/manage-private-balance-tag.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-private-balance-tag-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/private-balance-tags.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/private-balance-tags.ts",
+      "name": "setPlayerPrivateBalanceTag",
+      "state": "frontend-migrated",
+      "target": "PUT /api/roster/players/:playerId/private-balance-tag",
+      "evidence": [
+        "backend/src/contexts/roster/domain/private-balance-tag.test.ts",
+        "backend/src/contexts/roster/application/manage-private-balance-tag.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-private-balance-tag-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/private-balance-tags.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "registerGoal",

@@ -11,8 +11,10 @@ if [[ -z "$jwt_secret" ]]; then
   exit 1
 fi
 
-user_id="$(docker exec "$database_container" psql -U postgres -d postgres -Atc \
-  "SELECT user_id FROM public.account_profiles ORDER BY (role = 'admin') DESC, created_at LIMIT 1")"
+editor_id="$(docker exec "$database_container" psql -U postgres -d postgres -Atc \
+  "SELECT user_id FROM public.private_balance_tag_editors ORDER BY created_at LIMIT 1")"
+user_id="${editor_id:-$(docker exec "$database_container" psql -U postgres -d postgres -Atc \
+  "SELECT user_id FROM public.account_profiles ORDER BY (role = 'admin') DESC, created_at LIMIT 1")}"
 if [[ -z "$user_id" ]]; then
   echo "A homologação local não possui uma conta com perfil." >&2
   exit 1
@@ -27,7 +29,8 @@ payload="$(printf \
   "$expires_at" "$issued_at" "$user_id" | base64_url)"
 signature="$(printf '%s' "$header.$payload" | openssl dgst -sha256 -hmac "$jwt_secret" -binary | base64_url)"
 response_file="$(mktemp /tmp/liga-roster-career-XXXXXX.json)"
-trap 'rm -f -- "$response_file"' EXIT
+tag_response_file="$(mktemp /tmp/liga-roster-private-tag-XXXXXX.json)"
+trap 'rm -f -- "$response_file" "$tag_response_file"' EXIT
 
 status="$(curl -sS -o "$response_file" -w '%{http_code}' \
   -H "Authorization: Bearer $header.$payload.$signature" \
@@ -50,4 +53,22 @@ PY
 )"
 
 printf 'career=%s %s\n' "$status" "$summary"
-[[ "$summary" == valid=1* ]]
+[[ "$summary" == valid=1* ]] || exit 1
+
+if [[ -n "$editor_id" ]]; then
+  player_id="$(docker exec "$database_container" psql -U postgres -d postgres -Atc \
+    "SELECT id FROM public.players ORDER BY created_at LIMIT 1")"
+  tag_status="$(curl -sS -o "$tag_response_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $header.$payload.$signature" \
+    "${backend_url%/}/api/roster/players/$player_id/private-balance-tag")"
+  tag_valid="$(python3 - "$tag_response_file" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    payload = json.load(source)
+valid_tags = {None, "bagre_1", "bagre_2", "craque_1", "craque_2"}
+print(int(payload.get("allowed") is True and payload.get("tag") in valid_tags))
+PY
+)"
+  printf 'private_balance_tag=%s valid=%s\n' "$tag_status" "$tag_valid"
+  [[ "$tag_status" == "200" && "$tag_valid" == "1" ]]
+fi

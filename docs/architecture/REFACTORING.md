@@ -32,13 +32,14 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
-### 2026-10-26 — primeira fatia vertical de elenco
+### 2026-10-26 — primeiras fatias verticais de elenco
 
 - Criado o contexto `backend/src/contexts/roster` e o módulo `src/modules/roster` com a operação `getMyAccountCareer`, cobrindo domínio de agregação, caso de uso, porta, adaptador PostgreSQL sob claims verificadas, rota `GET /api/roster/me/career`, gateway HTTP e sessão server-side.
+- Leitura e alteração da classificação privada de equilíbrio passam pelas rotas escopadas do jogador. O backend valida o conjunto fechado de tags, verifica `can_manage_private_balance_tags()` na mesma transação da leitura/escrita e mantém RLS e a lista persistida de editores como autoridade.
 - A Server Action preserva o retorno vazio para conta anônima/indisponibilidade e mantém o acesso Supabase como fallback somente enquanto `ROSTER_API_ENABLED` estiver desligado. O backend é opt-in com `ENABLE_ROSTER_API=true`.
-- O catálogo passa a registrar **1/35 operações de elenco** em `frontend-migrated`. A fatia tem testes de domínio, aplicação, persistência, rota, gateway, sessão e compatibilidade da Server Action; a tela de perfil ainda precisa ser exercitada na stack local antes de promoção para `verified`.
-- A imagem local foi reconstruída e [`verify-local-roster.sh`](../../scripts/verify-local-roster.sh) aprovou `GET /api/roster/me/career` com `200`, contrato válido e duas linhas reais, sem escrita no banco.
-- Verificação automatizada: **893 testes frontend em 176 arquivos**, **113 testes backend em 46 arquivos**, typecheck e build dos dois pacotes e auditorias de migração/contextos/arquitetura aprovados.
+- O catálogo passa a registrar **3/35 operações de elenco** em `frontend-migrated`. As fatias têm testes de domínio, aplicação, persistência, rota, gateway, sessão e compatibilidade das Server Actions; as telas ainda precisam ser exercitadas na stack local antes de promoção para `verified`.
+- A imagem local foi reconstruída e [`verify-local-roster.sh`](../../scripts/verify-local-roster.sh) aprovou a carreira com `200`, contrato válido e duas linhas reais, além da leitura privada autorizada com `200` e tag válida, sem escrita no banco.
+- Verificação automatizada: **897 testes frontend em 177 arquivos**, **121 testes backend em 49 arquivos**, typecheck e build dos dois pacotes e auditorias de migração/contextos/arquitetura aprovados.
 
 ### 2026-10-26 — identidade e acesso 8/8 no backend
 

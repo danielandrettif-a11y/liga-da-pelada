@@ -32,6 +32,10 @@ describe("rosterApiFor", () => {
     process.env.ROSTER_API_ENABLED = "true";
     process.env.ROSTER_BACKEND_URL = "http://backend:3001";
     const getSession = vi.fn().mockResolvedValue({ data: { session: { access_token: "token" } }, error: null });
-    await expect(rosterApiFor({ auth: { getSession } })).resolves.toMatchObject({ getMyAccountCareer: expect.any(Function) });
+    await expect(rosterApiFor({ auth: { getSession } })).resolves.toMatchObject({
+      getMyAccountCareer: expect.any(Function),
+      getPlayerPrivateBalanceTag: expect.any(Function),
+      setPlayerPrivateBalanceTag: expect.any(Function),
+    });
   });
 });

@@ -40,4 +40,17 @@ describe("httpRosterGateway", () => {
     ));
     await expect(gateway.getMyAccountCareer()).rejects.toMatchObject({ message: "Carreira indisponível", statusCode: 503 });
   });
+
+  it("reads and updates private balance tags through scoped player routes", async () => {
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ allowed: true, tag: "bagre_2" }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const gateway = httpRosterGateway("http://backend:3001", "token", fetcher as typeof fetch);
+    await expect(gateway.getPlayerPrivateBalanceTag(playerId)).resolves.toEqual({ allowed: true, tag: "bagre_2" });
+    await expect(gateway.setPlayerPrivateBalanceTag(playerId, "craque_1")).resolves.toBeUndefined();
+    expect((fetcher.mock.calls[1]?.[1] as RequestInit).body).toBe(JSON.stringify({ tag: "craque_1" }));
+  });
 });
