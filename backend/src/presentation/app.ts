@@ -24,6 +24,7 @@ import type { PrivateBalanceTagRepository } from "../contexts/roster/application
 import type { FitnessRepository } from "../contexts/roster/application/manage-fitness.js";
 import type { SpeedRatingRepository } from "../contexts/roster/application/manage-speed-ratings.js";
 import type { RosterActivityRepository } from "../contexts/roster/application/manage-roster-activity.js";
+import type { PlayerCatalogRepository } from "../contexts/roster/application/get-player-catalog.js";
 import { registerGoalRoutes } from "../contexts/matches/presentation/goals-route.js";
 import { registerLeagueRoutes } from "../contexts/leagues/presentation/leagues-route.js";
 import { registerLeagueConfigRoutes } from "../contexts/leagues/presentation/league-config-route.js";
@@ -38,6 +39,7 @@ import { registerPrivateBalanceTagRoutes } from "../contexts/roster/presentation
 import { registerFitnessRoutes } from "../contexts/roster/presentation/fitness-route.js";
 import { registerSpeedRatingRoutes } from "../contexts/roster/presentation/speed-rating-route.js";
 import { registerRosterActivityRoutes } from "../contexts/roster/presentation/roster-activity-route.js";
+import { registerPlayerCatalogRoutes } from "../contexts/roster/presentation/player-catalog-route.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 
 export function createApp(dependencies: {
@@ -67,6 +69,7 @@ export function createApp(dependencies: {
   fitnessRepository?: FitnessRepository;
   speedRatingRepository?: SpeedRatingRepository;
   rosterActivityRepository?: RosterActivityRepository;
+  playerCatalogRepository?: PlayerCatalogRepository;
   logger?: boolean;
 }): FastifyInstance {
   if (dependencies.leaguesEnabled && !dependencies.leagueRepository) {
@@ -104,7 +107,8 @@ export function createApp(dependencies: {
     throw new Error("Dependências de identidade são obrigatórias quando ENABLE_IDENTITY_API=true.");
   }
   if (dependencies.rosterEnabled && (!dependencies.accountCareerRepository || !dependencies.privateBalanceTagRepository
-    || !dependencies.fitnessRepository || !dependencies.speedRatingRepository || !dependencies.rosterActivityRepository)) {
+    || !dependencies.fitnessRepository || !dependencies.speedRatingRepository || !dependencies.rosterActivityRepository
+    || !dependencies.playerCatalogRepository)) {
     throw new Error("Dependências de elenco são obrigatórias quando ENABLE_ROSTER_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
@@ -177,7 +181,8 @@ export function createApp(dependencies: {
     });
   }
   if (dependencies.rosterEnabled && dependencies.accountCareerRepository && dependencies.privateBalanceTagRepository
-    && dependencies.fitnessRepository && dependencies.speedRatingRepository && dependencies.rosterActivityRepository) {
+    && dependencies.fitnessRepository && dependencies.speedRatingRepository && dependencies.rosterActivityRepository
+    && dependencies.playerCatalogRepository) {
     registerAccountCareerRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.accountCareerRepository,
@@ -197,6 +202,10 @@ export function createApp(dependencies: {
     registerRosterActivityRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.rosterActivityRepository,
+    });
+    registerPlayerCatalogRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.playerCatalogRepository,
     });
   }
   return app;

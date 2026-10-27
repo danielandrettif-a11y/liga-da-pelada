@@ -37,6 +37,13 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - Next.js foi atualizado de 16.3.8 para 16.4.3, levando junto os binários SWC e `sharp` corrigidos; DOMPurify transitivo passou de 3.4.16 para 3.4.17 e Vitest de 4.1.11 para 4.1.12.
 - `npm audit` completo e `npm audit --omit=dev` passaram com **zero vulnerabilidades**. Typecheck, os **907 testes frontend em 179 arquivos** e o build de produção com Next 16.4.3 também passaram.
 
+### 2026-10-27 — catálogo-base de jogadores no backend modular
+
+- `getPlayers`, `getSelectableLeaguePlayers` e `getPlayer` passaram a usar o contexto de elenco por uma única projeção PostgreSQL escopada à pelada e à conta autenticada. Identidade global e perfil competitivo do vínculo são combinados no domínio, mantendo filtro e ordenação compatíveis.
+- As rotas `GET /api/roster/leagues/:leagueId/players` e `GET /api/roster/leagues/:leagueId/players/:playerId` devolvem contratos completos e conferem `is_league_member()` dentro da transação autenticada. A ponte Next continua desligada por padrão e mantém o fallback Supabase enquanto a homologação não termina.
+- O catálogo passa a registrar **17/35 operações de elenco** em `frontend-migrated`; restam 18 operações de elenco nesta etapa.
+- Verificação: **914 testes frontend em 181 arquivos**, **158 testes backend em 61 arquivos**, typecheck e build dos dois pacotes, auditorias arquiteturais e de dependências aprovados. O smoke Docker local retornou `200` para catálogo, catálogo selecionável e detalhe, além das fatias anteriores, sem gravar dados.
+
 ### 2026-10-26 — primeiras fatias verticais de elenco
 
 - Criado o contexto `backend/src/contexts/roster` e o módulo `src/modules/roster` com a operação `getMyAccountCareer`, cobrindo domínio de agregação, caso de uso, porta, adaptador PostgreSQL sob claims verificadas, rota `GET /api/roster/me/career`, gateway HTTP e sessão server-side.
@@ -46,7 +53,7 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - O estado de novidades do elenco agora é isolado por conta e pelada no backend: resumo, jogadores não vistos e os dois comandos de confirmação usam o marcador persistido do ADM, exigem administração da pelada e preservam as RPCs monotônicas como autoridade de escrita.
 - O primeiro smoke de aptidão encontrou IDs UUID legados com versão zero nas fixtures. A validação do contexto foi alinhada ao formato aceito pelo PostgreSQL e pelo domínio de peladas, com regressão explícita para esses IDs; o smoke repetido aprovou rodadas e resumo com `200`.
 - A Server Action preserva o retorno vazio para conta anônima/indisponibilidade e mantém o acesso Supabase como fallback somente enquanto `ROSTER_API_ENABLED` estiver desligado. O backend é opt-in com `ENABLE_ROSTER_API=true`.
-- O catálogo passa a registrar **14/35 operações de elenco** em `frontend-migrated`. As fatias têm testes de domínio, aplicação, persistência, rota, gateway, sessão e compatibilidade das Server Actions; as telas e as mutações ainda precisam ser exercitadas na stack local antes de promoção para `verified`.
+- Antes do catálogo-base, o lote registrava **14/35 operações de elenco** em `frontend-migrated`. As fatias têm testes de domínio, aplicação, persistência, rota, gateway, sessão e compatibilidade das Server Actions; as telas e as mutações ainda precisam ser exercitadas na stack local antes de promoção para `verified`.
 - A imagem local foi reconstruída e [`verify-local-roster.sh`](../../scripts/verify-local-roster.sh) aprovou carreira, classificação privada, aptidão, velocidades, sorteio sem persistência e as duas leituras de novidades com `200` e contratos válidos, sem escrita no banco.
 - Verificação automatizada: **907 testes frontend em 179 arquivos**, **149 testes backend em 58 arquivos**, typecheck e build dos dois pacotes e auditorias de migração/contextos/arquitetura aprovados.
 

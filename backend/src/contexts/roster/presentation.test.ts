@@ -33,6 +33,10 @@ function fixture(enabled: boolean) {
     markSeenThrough: vi.fn().mockResolvedValue(undefined),
     markSeen: vi.fn().mockResolvedValue(undefined),
   };
+  const playerCatalogRepository = {
+    list: vi.fn().mockResolvedValue([]),
+    get: vi.fn().mockResolvedValue(null),
+  };
   const app = createApp({
     goalsEnabled: false,
     rosterEnabled: enabled,
@@ -43,12 +47,13 @@ function fixture(enabled: boolean) {
     fitnessRepository,
     speedRatingRepository,
     rosterActivityRepository,
+    playerCatalogRepository,
     logger: false,
   });
   apps.push(app);
   return {
     app, verifier, accountCareerRepository, privateBalanceTagRepository, fitnessRepository,
-    speedRatingRepository, rosterActivityRepository,
+    speedRatingRepository, rosterActivityRepository, playerCatalogRepository,
   };
 }
 
@@ -177,5 +182,24 @@ describe("roster HTTP routes", () => {
     expect(through.statusCode).toBe(204);
     expect(all.statusCode).toBe(204);
     expect(rosterActivityRepository.markSeen).toHaveBeenCalledWith(leagueId, { userId: "verified-user" });
+  });
+
+  it("lists and reads the league-scoped player catalog", async () => {
+    const { app, playerCatalogRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const headers = { authorization: "Bearer valid-token" };
+    const list = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/players?selectable_only=true`, headers,
+    });
+    const detail = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/players/${playerId}`, headers,
+    });
+    expect(list.statusCode).toBe(200);
+    expect(list.json()).toEqual({ players: [] });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json()).toEqual({ player: null });
+    expect(playerCatalogRepository.list).toHaveBeenCalledWith(leagueId, { userId: "verified-user" });
+    expect(playerCatalogRepository.get).toHaveBeenCalledWith(leagueId, playerId, { userId: "verified-user" });
   });
 });

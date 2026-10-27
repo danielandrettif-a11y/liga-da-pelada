@@ -131,4 +131,29 @@ describe("httpRosterGateway", () => {
     expect((fetcher.mock.calls[2]?.[1] as RequestInit).body).toBe(JSON.stringify({ seenThrough }));
     expect((fetcher.mock.calls[3]?.[1] as RequestInit).method).toBe("PUT");
   });
+
+  it("loads complete player lists and details from the selected league", async () => {
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const player = {
+      id: playerId, name: "Jogador", nickname: null, profile_bio: null, avatar_url: null,
+      avatar_alternate_url: null, player_profile: "offensive", initial_player_profile: "offensive",
+      profile_decision_source: "initial", profile_source_round_id: null, overall_traits: ["offensive"],
+      overall_seed_mode: "observed", is_goalkeeper: false, member_category: "player", is_selectable: true,
+      is_competitive_profile_complete: false, show_fitness_stats: false, registration_source: "admin",
+      profile_scope: "persistent", created_by_user_id: null, created_at: "2026-10-20T10:00:00.000Z",
+    };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ players: [player] }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ player }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }));
+    const gateway = httpRosterGateway("http://backend:3001", "token", fetcher as typeof fetch);
+    await expect(gateway.getPlayers(leagueId, true)).resolves.toEqual([player]);
+    await expect(gateway.getPlayer(leagueId, playerId)).resolves.toEqual(player);
+    expect((fetcher.mock.calls[0]?.[0] as URL).searchParams.get("selectable_only")).toBe("true");
+    expect((fetcher.mock.calls[1]?.[0] as URL).pathname).toContain(`/players/${playerId}`);
+  });
 });

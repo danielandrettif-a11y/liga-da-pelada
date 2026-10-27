@@ -3,6 +3,7 @@ import type { PrivateBalanceTag } from "@/lib/types";
 import type { FitnessRoundEntry, FitnessSummaries, FitnessSummary } from "../domain/fitness";
 import type { SpeedDrawCommand, SpeedDrawResult, SpeedRating } from "../domain/speed-rating";
 import type { RosterUnreadState, UnreadRosterPlayers } from "../domain/roster-activity";
+import { isRosterPlayer, type RosterPlayer } from "../domain/player-catalog";
 
 type ApiErrorPayload = { message?: unknown };
 
@@ -28,6 +29,8 @@ export type RosterHttpGateway = {
   getUnreadRosterPlayers(leagueId: string): Promise<UnreadRosterPlayers>;
   markRosterActivitySeenThrough(leagueId: string, seenThrough: string): Promise<void>;
   markRosterActivitySeen(leagueId: string): Promise<void>;
+  getPlayers(leagueId: string, selectableOnly?: boolean): Promise<RosterPlayer[]>;
+  getPlayer(leagueId: string, playerId: string): Promise<RosterPlayer | null>;
 };
 
 const totalFields = [
@@ -290,6 +293,31 @@ export function httpRosterGateway(
     },
     async markRosterActivitySeen(leagueId) {
       await request("PUT", `api/roster/leagues/${encodeURIComponent(leagueId)}/activity/read`);
+    },
+    async getPlayers(leagueId, selectableOnly = false) {
+      const response = await request(
+        "GET",
+        `api/roster/leagues/${encodeURIComponent(leagueId)}/players?selectable_only=${selectableOnly}`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const players = payload && typeof payload === "object" ? (payload as { players?: unknown }).players : null;
+      if (!Array.isArray(players) || !players.every(isRosterPlayer)) {
+        throw new RosterApiError("Resposta inválida ao carregar os jogadores.", response.status);
+      }
+      return players;
+    },
+    async getPlayer(leagueId, playerId) {
+      const response = await request(
+        "GET",
+        `api/roster/leagues/${encodeURIComponent(leagueId)}/players/${encodeURIComponent(playerId)}`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const player = payload && typeof payload === "object" ? (payload as { player?: unknown }).player : undefined;
+      if (player === null) return null;
+      if (!isRosterPlayer(player)) {
+        throw new RosterApiError("Resposta inválida ao carregar o jogador.", response.status);
+      }
+      return player;
     },
   };
 }

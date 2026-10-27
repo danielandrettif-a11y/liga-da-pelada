@@ -710,6 +710,51 @@
       ]
     },
     {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayers",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-catalog.test.ts",
+        "backend/src/contexts/roster/application/get-player-catalog.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-catalog-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getSelectableLeaguePlayers",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players?selectable_only=true",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-catalog.test.ts",
+        "backend/src/contexts/roster/application/get-player-catalog.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-catalog-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayer",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-catalog.test.ts",
+        "backend/src/contexts/roster/application/get-player-catalog.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-catalog-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "registerGoal",

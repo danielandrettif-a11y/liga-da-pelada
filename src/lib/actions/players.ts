@@ -25,6 +25,7 @@ import {
   readPlayerRoundHistoryRows,
   readSeasonPlayerTotals,
 } from "@/modules/statistics/infrastructure/supabase-statistics-reader";
+import { rosterApiFor } from "@/modules/roster/infrastructure/roster-api-session";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -114,7 +115,16 @@ async function playerBelongsToSelectedLeague(playerId: string, client: Awaited<R
 export async function getPlayers(selectableOnly = false) {
   const league = await getSelectedLeague();
   if (!league) return [];
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayers(league.id, selectableOnly);
+    } catch {
+      return [];
+    }
+  }
+  const client = account.client;
   const { data, error } = await client
     .from("league_members")
     .select("player_profile, initial_player_profile, overall_traits, overall_seed_mode, players(*)")
@@ -139,7 +149,16 @@ export async function getPlayers(selectableOnly = false) {
 export async function getSelectableLeaguePlayers(leagueId: string) {
   const league = await getSelectedLeague();
   if (!league || league.id !== leagueId) return [] as Player[];
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayers(leagueId, true);
+    } catch {
+      return [] as Player[];
+    }
+  }
+  const client = account.client;
   const { data, error } = await client
     .from("league_members")
     .select("player_profile, initial_player_profile, overall_traits, overall_seed_mode, players(*)")
@@ -164,7 +183,16 @@ export async function getSelectableLeaguePlayers(leagueId: string) {
 export async function getPlayer(id: string) {
   const league = await getSelectedLeague();
   if (!league) return null;
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayer(league.id, id);
+    } catch {
+      return null;
+    }
+  }
+  const client = account.client;
   const { data: membership } = await client.from("league_members")
     .select("player_id, player_profile, initial_player_profile, overall_traits, overall_seed_mode")
     .eq("league_id", league.id).eq("player_id", id).eq("is_active", true).maybeSingle();
