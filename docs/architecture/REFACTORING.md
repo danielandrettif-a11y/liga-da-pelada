@@ -32,6 +32,11 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-27 — correções de segurança do frontend
+
+- Next.js foi atualizado de 16.3.8 para 16.4.3, levando junto os binários SWC e `sharp` corrigidos; DOMPurify transitivo passou de 3.4.16 para 3.4.17 e Vitest de 4.1.11 para 4.1.12.
+- `npm audit` completo e `npm audit --omit=dev` passaram com **zero vulnerabilidades**. Typecheck, os **907 testes frontend em 179 arquivos** e o build de produção com Next 16.4.3 também passaram.
+
 ### 2026-10-26 — primeiras fatias verticais de elenco
 
 - Criado o contexto `backend/src/contexts/roster` e o módulo `src/modules/roster` com a operação `getMyAccountCareer`, cobrindo domínio de agregação, caso de uso, porta, adaptador PostgreSQL sob claims verificadas, rota `GET /api/roster/me/career`, gateway HTTP e sessão server-side.
