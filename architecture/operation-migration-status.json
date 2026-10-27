@@ -860,6 +860,38 @@
       ]
     },
     {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerRoundHistory",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:playerId/round-history",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-history.test.ts",
+        "backend/src/contexts/roster/application/get-player-history.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-history-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-awards.test.ts",
+        "src/modules/roster/domain/player-history.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerAwardSeasons",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:playerId/award-seasons",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-history.test.ts",
+        "backend/src/contexts/roster/application/get-player-history.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-history-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-awards.test.ts",
+        "src/modules/roster/domain/player-history.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "registerGoal",

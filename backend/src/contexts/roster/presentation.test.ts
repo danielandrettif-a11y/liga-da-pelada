@@ -50,6 +50,10 @@ function fixture(enabled: boolean) {
     listAchievementBelts: vi.fn().mockResolvedValue([]),
     listMonthlyAwardWinners: vi.fn().mockResolvedValue([]),
   };
+  const playerHistoryRepository = {
+    listRoundHistory: vi.fn().mockResolvedValue([]),
+    readAwardHistory: vi.fn().mockResolvedValue({ rounds: [], stats: [] }),
+  };
   const app = createApp({
     goalsEnabled: false,
     rosterEnabled: enabled,
@@ -64,13 +68,14 @@ function fixture(enabled: boolean) {
     rosterRegistrationRepository,
     playerProfilePerformanceRepository,
     playerAwardsRepository,
+    playerHistoryRepository,
     logger: false,
   });
   apps.push(app);
   return {
     app, verifier, accountCareerRepository, privateBalanceTagRepository, fitnessRepository,
     speedRatingRepository, rosterActivityRepository, playerCatalogRepository, rosterRegistrationRepository,
-    playerProfilePerformanceRepository, playerAwardsRepository,
+    playerProfilePerformanceRepository, playerAwardsRepository, playerHistoryRepository,
   };
 }
 
@@ -284,5 +289,21 @@ describe("roster HTTP routes", () => {
     expect(playerAwardsRepository.listAchievementBelts).toHaveBeenCalledWith(leagueId, playerId, { userId: "verified-user" });
     expect(playerAwardsRepository.listMonthlyAwardWinners)
       .toHaveBeenCalledWith(leagueId, "2026-09-01", { userId: "verified-user" });
+  });
+
+  it("returns round history and seasonal awards for a league player", async () => {
+    const { app, playerHistoryRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const headers = { authorization: "Bearer valid-token" };
+    const history = await app.inject({ method: "GET",
+      url: `/api/roster/leagues/${leagueId}/players/${playerId}/round-history?round_type=friendly`, headers });
+    const awards = await app.inject({ method: "GET",
+      url: `/api/roster/leagues/${leagueId}/players/${playerId}/award-seasons`, headers });
+    expect(history.json()).toEqual({ history: [] });
+    expect(awards.json()).toEqual({ seasons: [] });
+    expect(playerHistoryRepository.listRoundHistory)
+      .toHaveBeenCalledWith(leagueId, playerId, "friendly", { userId: "verified-user" });
+    expect(playerHistoryRepository.readAwardHistory).toHaveBeenCalledWith(leagueId, { userId: "verified-user" });
   });
 });

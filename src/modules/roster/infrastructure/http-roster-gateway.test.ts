@@ -234,4 +234,21 @@ describe("httpRosterGateway", () => {
       .resolves.toMatchObject([{ playerName: "Ana" }]);
     expect((fetcher.mock.calls[2]?.[0] as URL).searchParams.get("period_start")).toBe("2026-09-01");
   });
+
+  it("loads player round history and seasonal award groups", async () => {
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ history: [] }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ seasons: [] }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }));
+    const gateway = httpRosterGateway("http://backend:3001", "token", fetcher as typeof fetch);
+    await expect(gateway.getPlayerRoundHistory(leagueId, playerId, "friendly")).resolves.toEqual([]);
+    await expect(gateway.getPlayerAwardSeasons(leagueId, playerId)).resolves.toEqual([]);
+    expect((fetcher.mock.calls[0]?.[0] as URL).searchParams.get("round_type")).toBe("friendly");
+    expect((fetcher.mock.calls[1]?.[0] as URL).pathname).toContain("/award-seasons");
+  });
 });

@@ -20,6 +20,13 @@ import {
   type MonthlyAwardWinner,
   type PlayerAchievementBelt,
 } from "../domain/player-awards";
+import {
+  isPlayerAwardSeason,
+  isPlayerRoundHistory,
+  type PlayerAwardSeason,
+  type PlayerHistoryRoundType,
+  type PlayerRoundHistory,
+} from "../domain/player-history";
 
 type ApiErrorPayload = { message?: unknown };
 
@@ -54,6 +61,10 @@ export type RosterHttpGateway = {
   getPlayerMonthlyAwards(leagueId: string, playerId: string): Promise<MonthlyAward[]>;
   getPlayerAchievementBelts(leagueId: string, playerId: string): Promise<PlayerAchievementBelt[]>;
   getMonthlyAwardWinners(leagueId: string, periodStart: string): Promise<MonthlyAwardWinner[]>;
+  getPlayerRoundHistory(
+    leagueId: string, playerId: string, roundType: PlayerHistoryRoundType,
+  ): Promise<PlayerRoundHistory[]>;
+  getPlayerAwardSeasons(leagueId: string, playerId: string): Promise<PlayerAwardSeason[]>;
 };
 
 const totalFields = [
@@ -419,6 +430,28 @@ export function httpRosterGateway(
         throw new RosterApiError("Resposta inválida ao carregar os vencedores mensais.", response.status);
       }
       return winners;
+    },
+    async getPlayerRoundHistory(leagueId, playerId, roundType) {
+      const response = await request(
+        "GET", `api/roster/leagues/${encodeURIComponent(leagueId)}/players/${encodeURIComponent(playerId)}/round-history?round_type=${encodeURIComponent(roundType)}`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const history = payload && typeof payload === "object" ? (payload as { history?: unknown }).history : null;
+      if (!Array.isArray(history) || !history.every(isPlayerRoundHistory)) {
+        throw new RosterApiError("Resposta inválida ao carregar o histórico por rodada.", response.status);
+      }
+      return history;
+    },
+    async getPlayerAwardSeasons(leagueId, playerId) {
+      const response = await request(
+        "GET", `api/roster/leagues/${encodeURIComponent(leagueId)}/players/${encodeURIComponent(playerId)}/award-seasons`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const seasons = payload && typeof payload === "object" ? (payload as { seasons?: unknown }).seasons : null;
+      if (!Array.isArray(seasons) || !seasons.every(isPlayerAwardSeason)) {
+        throw new RosterApiError("Resposta inválida ao carregar as insígnias por temporada.", response.status);
+      }
+      return seasons;
     },
   };
 }

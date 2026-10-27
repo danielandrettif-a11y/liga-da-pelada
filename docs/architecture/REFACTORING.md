@@ -65,6 +65,13 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - O catálogo passa a registrar **24/35 operações de elenco** em `frontend-migrated`; restam 11 operações de elenco. A consulta histórica por temporada permanece em uma fatia própria por depender de rodadas, temporadas e estatísticas.
 - Verificação: **928 testes frontend em 186 arquivos**, **182 testes backend em 70 arquivos**, typecheck, build e auditoria de dependências com zero vulnerabilidades nos dois pacotes. As auditorias registram **59 operações no frontend**, **207 planejadas** e o piloto de gol no backend. O smoke Docker local retornou `200` e contratos válidos para as três novas rotas e todas as fatias anteriores, sem escrita no banco.
 
+### 2026-10-27 — históricos de rodadas e insígnias sazonais
+
+- `getPlayerRoundHistory` passou ao backend modular com escopo pela temporada ativa, pelada e tipo de rodada. A resposta preserva pontuação canônica, valor legado, snapshot da rodada e detalhamento dos scouts, incluindo regras posicionais das versões recentes.
+- `getPlayerAwardSeasons` passou à mesma fronteira de histórico. O domínio calcula destaques da rodada, xerife e lideranças sazonais usando todos os competidores oficiais elegíveis, sem expor linhas brutas do banco.
+- As rotas `GET /api/roster/leagues/:leagueId/players/:playerId/round-history` e `GET /api/roster/leagues/:leagueId/players/:playerId/award-seasons` exigem vínculo com a pelada dentro da transação autenticada. O fallback Supabase permanece disponível com a ponte desligada.
+- O catálogo registra **26/35 operações de elenco** em `frontend-migrated`; restam 9 operações de elenco. Verificação: **932 testes frontend em 187 arquivos**, **191 testes backend em 73 arquivos**, typecheck, builds, auditorias arquiteturais e de dependências com zero vulnerabilidades. O smoke Docker local retornou `200` e contratos válidos para as duas rotas novas e todas as anteriores.
+
 ### 2026-10-26 — primeiras fatias verticais de elenco
 
 - Criado o contexto `backend/src/contexts/roster` e o módulo `src/modules/roster` com a operação `getMyAccountCareer`, cobrindo domínio de agregação, caso de uso, porta, adaptador PostgreSQL sob claims verificadas, rota `GET /api/roster/me/career`, gateway HTTP e sessão server-side.

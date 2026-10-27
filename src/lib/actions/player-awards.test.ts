@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   account: vi.fn(), selectedLeague: vi.fn(), activeSeason: vi.fn(), rosterApi: vi.fn(),
   monthly: vi.fn(), belts: vi.fn(), winners: vi.fn(),
+  roundHistory: vi.fn(), awardSeasons: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
@@ -11,7 +12,10 @@ vi.mock("../league-context", () => ({ getSelectedLeague: mocks.selectedLeague })
 vi.mock("./seasons", () => ({ getActiveSeason: mocks.activeSeason, getActiveSeasonRoundIds: vi.fn() }));
 vi.mock("@/modules/roster/infrastructure/roster-api-session", () => ({ rosterApiFor: mocks.rosterApi }));
 
-import { getPlayerAchievementBelts, getPlayerMonthlyAwards, getPreviousMonthAwardWinners } from "./players";
+import {
+  getPlayerAchievementBelts, getPlayerAwardSeasons, getPlayerMonthlyAwards,
+  getPlayerRoundHistory, getPreviousMonthAwardWinners,
+} from "./players";
 
 const leagueId = "00000000-0000-4000-8000-000000000010";
 const playerId = "00000000-0000-4000-8000-000000000001";
@@ -25,6 +29,8 @@ beforeEach(() => {
     getPlayerMonthlyAwards: mocks.monthly,
     getPlayerAchievementBelts: mocks.belts,
     getMonthlyAwardWinners: mocks.winners,
+    getPlayerRoundHistory: mocks.roundHistory,
+    getPlayerAwardSeasons: mocks.awardSeasons,
   });
 });
 
@@ -46,5 +52,13 @@ describe("player award actions", () => {
     await expect(getPlayerMonthlyAwards(playerId)).resolves.toEqual([]);
     await expect(getPlayerAchievementBelts(playerId)).resolves.toEqual([]);
     await expect(getPreviousMonthAwardWinners()).resolves.toMatchObject({ winners: [] });
+  });
+
+  it("loads round history and seasonal awards through the selected league API", async () => {
+    mocks.roundHistory.mockResolvedValue([]); mocks.awardSeasons.mockResolvedValue([]);
+    await expect(getPlayerRoundHistory(playerId, "friendly")).resolves.toEqual([]);
+    await expect(getPlayerAwardSeasons(playerId)).resolves.toEqual([]);
+    expect(mocks.roundHistory).toHaveBeenCalledWith(leagueId, playerId, "friendly");
+    expect(mocks.awardSeasons).toHaveBeenCalledWith(leagueId, playerId);
   });
 });

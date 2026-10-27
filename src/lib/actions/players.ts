@@ -342,9 +342,20 @@ export async function getPlayersWithStats(roundType: RoundType = "official", sel
 }
 
 export async function getPlayerRoundHistory(playerId: string, roundType: RoundType = "official") {
-  const roundIds = await getActiveSeasonRoundIds(undefined, roundType);
+  const league = await getSelectedLeague();
+  if (!league) return [];
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayerRoundHistory(league.id, playerId, roundType);
+    } catch {
+      return [];
+    }
+  }
+  const roundIds = await getActiveSeasonRoundIds(league.id, roundType);
   if (roundIds.length === 0) return [];
-  const client = await createServerClient();
+  const client = account.client;
   const { data, error } = await readPlayerRoundHistoryRows(client, playerId, roundIds);
 
   if (error) {
@@ -485,7 +496,16 @@ export async function getPlayerGoalsByClub(playerId: string): Promise<PlayerClub
 export async function getPlayerAwardSeasons(playerId: string) {
   const league = await getSelectedLeague();
   if (!league) return [];
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayerAwardSeasons(league.id, playerId);
+    } catch {
+      return [];
+    }
+  }
+  const client = account.client;
   const [seasonsResult, roundsResult] = await Promise.all([
     client.from("seasons").select("id, number, status").eq("league_id", league.id),
     client

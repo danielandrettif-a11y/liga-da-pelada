@@ -46,7 +46,9 @@ player_club_goals_file="$(mktemp /tmp/liga-roster-player-club-goals-XXXXXX.json)
 player_monthly_awards_file="$(mktemp /tmp/liga-roster-player-monthly-awards-XXXXXX.json)"
 player_belts_file="$(mktemp /tmp/liga-roster-player-belts-XXXXXX.json)"
 monthly_winners_file="$(mktemp /tmp/liga-roster-monthly-winners-XXXXXX.json)"
-trap 'rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file" "$speed_ratings_file" "$speed_draw_file" "$activity_state_file" "$activity_players_file" "$catalog_file" "$selectable_catalog_file" "$player_detail_file" "$registration_history_file" "$merge_candidates_file" "$player_playtime_file" "$player_club_goals_file" "$player_monthly_awards_file" "$player_belts_file" "$monthly_winners_file"' EXIT
+player_round_history_file="$(mktemp /tmp/liga-roster-player-round-history-XXXXXX.json)"
+player_award_seasons_file="$(mktemp /tmp/liga-roster-player-award-seasons-XXXXXX.json)"
+trap 'rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file" "$speed_ratings_file" "$speed_draw_file" "$activity_state_file" "$activity_players_file" "$catalog_file" "$selectable_catalog_file" "$player_detail_file" "$registration_history_file" "$merge_candidates_file" "$player_playtime_file" "$player_club_goals_file" "$player_monthly_awards_file" "$player_belts_file" "$monthly_winners_file" "$player_round_history_file" "$player_award_seasons_file"' EXIT
 
 status="$(curl -sS -o "$response_file" -w '%{http_code}' \
   -H "Authorization: Bearer $header.$payload.$signature" \
@@ -281,6 +283,38 @@ PY
   if [[ "$player_monthly_awards_status" != "200" || "$player_belts_status" != "200" \
     || "$monthly_winners_status" != "200" || "$player_awards_valid" != "1" ]]; then
     echo "Leituras de prêmios do jogador falharam." >&2
+    exit 1
+  fi
+
+  player_round_history_status="$(curl -sS -o "$player_round_history_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/players/$catalog_player_id/round-history?round_type=official")"
+  player_award_seasons_status="$(curl -sS -o "$player_award_seasons_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/players/$catalog_player_id/award-seasons")"
+  player_history_valid="$(python3 - "$player_round_history_file" "$player_award_seasons_file" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    history = json.load(source).get("history")
+with open(sys.argv[2], encoding="utf-8") as source:
+    seasons = json.load(source).get("seasons")
+history_fields = {
+    "id", "player_id", "round_id", "games", "wins", "draws", "losses", "goals", "assists",
+    "points", "ranking_points", "legacy_points", "point_breakdown", "rounds",
+}
+season_fields = {"seasonId", "seasonNumber", "seasonStatus", "awards"}
+valid = isinstance(history, list) and all(history_fields <= row.keys() for row in history)
+valid = valid and all(isinstance(row.get("point_breakdown"), list) and isinstance(row.get("rounds"), dict) for row in history)
+valid = valid and isinstance(seasons, list) and all(season_fields <= season.keys() for season in seasons)
+valid = valid and all(isinstance(season.get("awards"), list) for season in seasons)
+print(int(valid))
+PY
+)"
+  printf 'player_round_history=%s player_award_seasons=%s valid=%s\n' \
+    "$player_round_history_status" "$player_award_seasons_status" "$player_history_valid"
+  if [[ "$player_round_history_status" != "200" || "$player_award_seasons_status" != "200" \
+    || "$player_history_valid" != "1" ]]; then
+    echo "Leituras históricas do jogador falharam." >&2
     exit 1
   fi
 fi
