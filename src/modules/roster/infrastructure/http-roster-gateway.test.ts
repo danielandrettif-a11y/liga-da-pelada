@@ -108,4 +108,27 @@ describe("httpRosterGateway", () => {
     expect((fetcher.mock.calls[1]?.[1] as RequestInit).body).toBe(JSON.stringify({ rating: 2 }));
     expect((fetcher.mock.calls[2]?.[1] as RequestInit).method).toBe("POST");
   });
+
+  it("reads and advances league-scoped roster activity", async () => {
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const seenThrough = "2026-10-20T10:01:00.000Z";
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ count: 2, lastSeenAt: "2026-10-20T10:00:00.000Z" }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ playerIds: ["player-a"], seenThrough }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const gateway = httpRosterGateway("http://backend:3001", "token", fetcher as typeof fetch);
+    await expect(gateway.getRosterUnreadState(leagueId)).resolves.toMatchObject({ count: 2 });
+    await expect(gateway.getUnreadRosterPlayers(leagueId)).resolves.toEqual({
+      playerIds: ["player-a"], seenThrough,
+    });
+    await expect(gateway.markRosterActivitySeenThrough(leagueId, seenThrough)).resolves.toBeUndefined();
+    await expect(gateway.markRosterActivitySeen(leagueId)).resolves.toBeUndefined();
+    expect((fetcher.mock.calls[2]?.[1] as RequestInit).body).toBe(JSON.stringify({ seenThrough }));
+    expect((fetcher.mock.calls[3]?.[1] as RequestInit).method).toBe("PUT");
+  });
 });

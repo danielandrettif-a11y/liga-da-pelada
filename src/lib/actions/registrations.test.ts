@@ -5,6 +5,11 @@ const mocks = vi.hoisted(() => ({
   selectedLeague: vi.fn(),
   revalidatePath: vi.fn(),
   rpc: vi.fn(),
+  rosterApi: vi.fn(),
+  unreadState: vi.fn(),
+  unreadPlayers: vi.fn(),
+  markThrough: vi.fn(),
+  markSeen: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
@@ -12,8 +17,11 @@ vi.mock("@/lib/auth", () => ({ getCurrentAccount: mocks.account }));
 vi.mock("@/lib/league-context", () => ({ getSelectedLeague: mocks.selectedLeague }));
 vi.mock("./stats", () => ({ calculateRoundStats: vi.fn() }));
 vi.mock("./overall", () => ({ refreshFluidOverallSafely: vi.fn() }));
+vi.mock("@/modules/roster/infrastructure/roster-api-session", () => ({ rosterApiFor: mocks.rosterApi }));
 
-import { getRosterUnreadState, markRosterActivitySeen, markRosterActivitySeenThrough } from "./registrations";
+import {
+  getRosterUnreadState, getUnreadRosterPlayers, markRosterActivitySeen, markRosterActivitySeenThrough,
+} from "./registrations";
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -24,6 +32,7 @@ beforeEach(() => {
   });
   mocks.selectedLeague.mockResolvedValue({ id: "league-a", role: "admin" });
   mocks.rpc.mockResolvedValue({ error: null });
+  mocks.rosterApi.mockResolvedValue(null);
 });
 
 describe("leitura do elenco por pelada", () => {
@@ -79,6 +88,25 @@ describe("leitura do elenco por pelada", () => {
     mocks.selectedLeague.mockResolvedValue({ id: "league-b", role: "player" });
     expect((await markRosterActivitySeen()).success).toBe(false);
     expect((await markRosterActivitySeenThrough("2026-10-10T12:00:00.000Z")).success).toBe(false);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("usa a API de elenco para leitura e confirmação quando a flag está ativa", async () => {
+    mocks.rosterApi.mockResolvedValue({
+      getRosterUnreadState: mocks.unreadState,
+      getUnreadRosterPlayers: mocks.unreadPlayers,
+      markRosterActivitySeenThrough: mocks.markThrough,
+      markRosterActivitySeen: mocks.markSeen,
+    });
+    mocks.unreadState.mockResolvedValue({ count: 2, lastSeenAt: "2026-10-09T12:00:00.000Z" });
+    mocks.unreadPlayers.mockResolvedValue({ playerIds: ["player-a"], seenThrough: "2026-10-10T12:00:00.000Z" });
+    await expect(getRosterUnreadState()).resolves.toMatchObject({ count: 2 });
+    await expect(getUnreadRosterPlayers()).resolves.toMatchObject({ playerIds: ["player-a"] });
+    await expect(markRosterActivitySeenThrough("2026-10-10T12:00:00.000Z")).resolves.toEqual({ success: true });
+    await expect(markRosterActivitySeen()).resolves.toEqual({ success: true });
+    expect(mocks.unreadState).toHaveBeenCalledWith("league-a");
+    expect(mocks.markThrough).toHaveBeenCalledWith("league-a", "2026-10-10T12:00:00.000Z");
+    expect(mocks.markSeen).toHaveBeenCalledWith("league-a");
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 });

@@ -650,6 +650,66 @@
       ]
     },
     {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "getRosterUnreadState",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/activity/unread-state",
+      "evidence": [
+        "backend/src/contexts/roster/domain/roster-activity.test.ts",
+        "backend/src/contexts/roster/application/manage-roster-activity.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-roster-activity-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/registrations.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "getUnreadRosterPlayers",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/activity/unread-players",
+      "evidence": [
+        "backend/src/contexts/roster/domain/roster-activity.test.ts",
+        "backend/src/contexts/roster/application/manage-roster-activity.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-roster-activity-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/registrations.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "markRosterActivitySeenThrough",
+      "state": "frontend-migrated",
+      "target": "PUT /api/roster/leagues/:leagueId/activity/read-through",
+      "evidence": [
+        "backend/src/contexts/roster/domain/roster-activity.test.ts",
+        "backend/src/contexts/roster/application/manage-roster-activity.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-roster-activity-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/registrations.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "markRosterActivitySeen",
+      "state": "frontend-migrated",
+      "target": "PUT /api/roster/leagues/:leagueId/activity/read",
+      "evidence": [
+        "backend/src/contexts/roster/domain/roster-activity.test.ts",
+        "backend/src/contexts/roster/application/manage-roster-activity.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-roster-activity-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/registrations.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "registerGoal",

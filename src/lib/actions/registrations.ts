@@ -6,6 +6,7 @@ import type { Player, PlayerRegistrationEvent, RosterUnreadState } from "@/lib/t
 import { calculateRoundStats } from "./stats";
 import { refreshFluidOverallSafely } from "./overall";
 import { getSelectedLeague } from "@/lib/league-context";
+import { rosterApiFor } from "@/modules/roster/infrastructure/roster-api-session";
 
 async function getSelectedRosterPlayerIds() {
   const league = await getSelectedLeague();
@@ -57,6 +58,13 @@ export async function getRosterUnreadState(): Promise<RosterUnreadState> {
   const account = await getCurrentAccount();
   const league = await getSelectedLeague();
   if (!account.isAdmin || !account.user || !league || league.role !== "admin") return { count: 0, lastSeenAt: null };
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) return await api.getRosterUnreadState(league.id);
+  } catch (error) {
+    console.error("Erro ao contar novos cadastros:", error);
+    return { count: 0, lastSeenAt: null };
+  }
   const rosterPlayerIds = await getSelectedRosterPlayerIds();
   if (!rosterPlayerIds.length) return { count: 0, lastSeenAt: null };
 
@@ -86,6 +94,13 @@ export async function getUnreadRosterPlayers(): Promise<{ playerIds: string[]; s
   const account = await getCurrentAccount();
   const league = await getSelectedLeague();
   if (!account.isAdmin || !account.user || !league || league.role !== "admin") return { playerIds: [], seenThrough: null };
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) return await api.getUnreadRosterPlayers(league.id);
+  } catch (error) {
+    console.error("Erro ao buscar cadastros não vistos:", error);
+    return { playerIds: [], seenThrough: null };
+  }
   const rosterPlayerIds = await getSelectedRosterPlayerIds();
   if (!rosterPlayerIds.length) return { playerIds: [], seenThrough: null };
 
@@ -124,6 +139,18 @@ export async function markRosterActivitySeenThrough(seenThrough: string) {
   if (Number.isNaN(parsed.getTime())) return { success: false, error: "Data de leitura inválida." };
   const safeSeenThrough = new Date(Math.min(parsed.getTime(), Date.now())).toISOString();
 
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      await api.markRosterActivitySeenThrough(league.id, safeSeenThrough);
+      revalidatePath("/", "layout");
+      revalidatePath("/jogadores");
+      return { success: true };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar esta leitura." };
+  }
+
   const { error } = await account.client.rpc("mark_roster_activity_seen_through", {
     p_league_id: league.id,
     p_seen_through: safeSeenThrough,
@@ -139,6 +166,17 @@ export async function markRosterActivitySeen() {
   const account = await getCurrentAccount();
   const league = await getSelectedLeague();
   if (!account.isAdmin || !league || league.role !== "admin") return { success: false, error: "Somente administradores podem atualizar esta leitura." };
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      await api.markRosterActivitySeen(league.id);
+      revalidatePath("/", "layout");
+      revalidatePath("/jogadores");
+      return { success: true };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar esta leitura." };
+  }
   const { error } = await account.client.rpc("mark_roster_activity_seen", { p_league_id: league.id });
   if (error) return { success: false, error: error.message };
   revalidatePath("/", "layout");

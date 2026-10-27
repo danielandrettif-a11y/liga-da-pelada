@@ -34,7 +34,9 @@ fitness_rounds_file="$(mktemp /tmp/liga-roster-fitness-rounds-XXXXXX.json)"
 fitness_summary_file="$(mktemp /tmp/liga-roster-fitness-summary-XXXXXX.json)"
 speed_ratings_file="$(mktemp /tmp/liga-roster-speed-ratings-XXXXXX.json)"
 speed_draw_file="$(mktemp /tmp/liga-roster-speed-draw-XXXXXX.json)"
-trap 'rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file" "$speed_ratings_file" "$speed_draw_file"' EXIT
+activity_state_file="$(mktemp /tmp/liga-roster-activity-state-XXXXXX.json)"
+activity_players_file="$(mktemp /tmp/liga-roster-activity-players-XXXXXX.json)"
+trap 'rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file" "$speed_ratings_file" "$speed_draw_file" "$activity_state_file" "$activity_players_file"' EXIT
 
 status="$(curl -sS -o "$response_file" -w '%{http_code}' \
   -H "Authorization: Bearer $header.$payload.$signature" \
@@ -85,6 +87,31 @@ PY
     "$speed_ratings_status" "$speed_draw_status" "$speed_valid"
   if [[ "$speed_ratings_status" != "200" || "$speed_draw_status" != "200" || "$speed_valid" != "1" ]]; then
     echo "Leitura ou sorteio local por velocidade falhou." >&2
+    exit 1
+  fi
+  activity_state_status="$(curl -sS -o "$activity_state_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/activity/unread-state")"
+  activity_players_status="$(curl -sS -o "$activity_players_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/activity/unread-players")"
+  activity_valid="$(python3 - "$activity_state_file" "$activity_players_file" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    state = json.load(source)
+with open(sys.argv[2], encoding="utf-8") as source:
+    players = json.load(source)
+valid_state = isinstance(state.get("count"), int) and state["count"] >= 0
+valid_state = valid_state and (state.get("lastSeenAt") is None or isinstance(state["lastSeenAt"], str))
+valid_players = isinstance(players.get("playerIds"), list) and all(isinstance(item, str) for item in players["playerIds"])
+valid_players = valid_players and (players.get("seenThrough") is None or isinstance(players["seenThrough"], str))
+print(int(valid_state and valid_players))
+PY
+)"
+  printf 'roster_activity_state=%s roster_activity_players=%s valid=%s\n' \
+    "$activity_state_status" "$activity_players_status" "$activity_valid"
+  if [[ "$activity_state_status" != "200" || "$activity_players_status" != "200" || "$activity_valid" != "1" ]]; then
+    echo "Leitura local das novidades do elenco falhou." >&2
     exit 1
   fi
 fi

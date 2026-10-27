@@ -2,6 +2,7 @@ import type { AccountCareer, AccountCareerRow, CareerTotals } from "../domain/ac
 import type { PrivateBalanceTag } from "@/lib/types";
 import type { FitnessRoundEntry, FitnessSummaries, FitnessSummary } from "../domain/fitness";
 import type { SpeedDrawCommand, SpeedDrawResult, SpeedRating } from "../domain/speed-rating";
+import type { RosterUnreadState, UnreadRosterPlayers } from "../domain/roster-activity";
 
 type ApiErrorPayload = { message?: unknown };
 
@@ -23,6 +24,10 @@ export type RosterHttpGateway = {
   getPlayerSpeedRatings(leagueId: string): Promise<Record<string, SpeedRating | null>>;
   setPlayerSpeedRating(leagueId: string, playerId: string, rating: SpeedRating | null): Promise<void>;
   drawTeamsBySpeed(leagueId: string, command: SpeedDrawCommand): Promise<SpeedDrawResult>;
+  getRosterUnreadState(leagueId: string): Promise<RosterUnreadState>;
+  getUnreadRosterPlayers(leagueId: string): Promise<UnreadRosterPlayers>;
+  markRosterActivitySeenThrough(leagueId: string, seenThrough: string): Promise<void>;
+  markRosterActivitySeen(leagueId: string): Promise<void>;
 };
 
 const totalFields = [
@@ -98,6 +103,10 @@ function isSpeedDrawResult(value: unknown): value is SpeedDrawResult {
     && Array.isArray(result.teamSummaries) && result.teamSummaries.every(isSpeedSummary)
     && Number.isInteger(result.unratedCount) && Number(result.unratedCount) >= 0
     && Array.isArray(result.attendanceOrder) && result.attendanceOrder.every((id) => typeof id === "string");
+}
+
+function isNullableTimestamp(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
 }
 
 async function errorFrom(response: Response): Promise<RosterApiError> {
@@ -244,6 +253,43 @@ export function httpRosterGateway(
         throw new RosterApiError("Resposta inválida ao sortear os times.", response.status);
       }
       return payload;
+    },
+    async getRosterUnreadState(leagueId) {
+      const response = await request(
+        "GET", `api/roster/leagues/${encodeURIComponent(leagueId)}/activity/unread-state`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      if (!payload || typeof payload !== "object") {
+        throw new RosterApiError("Resposta inválida ao carregar as novidades do elenco.", response.status);
+      }
+      const state = payload as Record<string, unknown>;
+      if (!Number.isInteger(state.count) || Number(state.count) < 0 || !isNullableTimestamp(state.lastSeenAt)) {
+        throw new RosterApiError("Resposta inválida ao carregar as novidades do elenco.", response.status);
+      }
+      return { count: Number(state.count), lastSeenAt: state.lastSeenAt };
+    },
+    async getUnreadRosterPlayers(leagueId) {
+      const response = await request(
+        "GET", `api/roster/leagues/${encodeURIComponent(leagueId)}/activity/unread-players`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      if (!payload || typeof payload !== "object") {
+        throw new RosterApiError("Resposta inválida ao carregar os novos jogadores.", response.status);
+      }
+      const state = payload as Record<string, unknown>;
+      if (!Array.isArray(state.playerIds) || !state.playerIds.every((id) => typeof id === "string")
+        || !isNullableTimestamp(state.seenThrough)) {
+        throw new RosterApiError("Resposta inválida ao carregar os novos jogadores.", response.status);
+      }
+      return { playerIds: state.playerIds, seenThrough: state.seenThrough };
+    },
+    async markRosterActivitySeenThrough(leagueId, seenThrough) {
+      await request(
+        "PUT", `api/roster/leagues/${encodeURIComponent(leagueId)}/activity/read-through`, { seenThrough },
+      );
+    },
+    async markRosterActivitySeen(leagueId) {
+      await request("PUT", `api/roster/leagues/${encodeURIComponent(leagueId)}/activity/read`);
     },
   };
 }

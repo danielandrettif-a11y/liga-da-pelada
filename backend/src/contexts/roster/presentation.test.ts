@@ -25,6 +25,14 @@ function fixture(enabled: boolean) {
     ]),
     setRating: vi.fn().mockResolvedValue(undefined),
   };
+  const rosterActivityRepository = {
+    getUnreadState: vi.fn().mockResolvedValue({ count: 2, lastSeenAt: "2026-10-20T10:00:00.000Z" }),
+    listUnreadEvents: vi.fn().mockResolvedValue([
+      { playerId: "00000000-0000-4000-8000-000000000001", createdAt: "2026-10-20T10:01:00.000Z" },
+    ]),
+    markSeenThrough: vi.fn().mockResolvedValue(undefined),
+    markSeen: vi.fn().mockResolvedValue(undefined),
+  };
   const app = createApp({
     goalsEnabled: false,
     rosterEnabled: enabled,
@@ -34,10 +42,14 @@ function fixture(enabled: boolean) {
     privateBalanceTagRepository,
     fitnessRepository,
     speedRatingRepository,
+    rosterActivityRepository,
     logger: false,
   });
   apps.push(app);
-  return { app, verifier, accountCareerRepository, privateBalanceTagRepository, fitnessRepository, speedRatingRepository };
+  return {
+    app, verifier, accountCareerRepository, privateBalanceTagRepository, fitnessRepository,
+    speedRatingRepository, rosterActivityRepository,
+  };
 }
 
 describe("roster HTTP routes", () => {
@@ -138,5 +150,32 @@ describe("roster HTTP routes", () => {
     expect(draw.statusCode).toBe(200);
     expect(draw.json()).toMatchObject({ teams: expect.arrayContaining([[first], [second]]), unratedCount: 0 });
     expect(speedRatingRepository.setRating).toHaveBeenCalledWith(leagueId, first, 2, { userId: "verified-user" });
+  });
+
+  it("reads and advances the league-scoped roster activity marker", async () => {
+    const { app, rosterActivityRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const headers = { authorization: "Bearer valid-token" };
+    const state = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/activity/unread-state`, headers,
+    });
+    const players = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/activity/unread-players`, headers,
+    });
+    const through = await app.inject({
+      method: "PUT", url: `/api/roster/leagues/${leagueId}/activity/read-through`, headers,
+      payload: { seenThrough: "2026-10-20T10:01:00.000Z" },
+    });
+    const all = await app.inject({
+      method: "PUT", url: `/api/roster/leagues/${leagueId}/activity/read`, headers,
+    });
+    expect(state.statusCode).toBe(200);
+    expect(state.json()).toMatchObject({ count: 2 });
+    expect(players.json()).toMatchObject({
+      playerIds: ["00000000-0000-4000-8000-000000000001"],
+    });
+    expect(through.statusCode).toBe(204);
+    expect(all.statusCode).toBe(204);
+    expect(rosterActivityRepository.markSeen).toHaveBeenCalledWith(leagueId, { userId: "verified-user" });
   });
 });
