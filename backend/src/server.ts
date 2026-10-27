@@ -23,6 +23,7 @@ import { pgRosterActivityRepository } from "./contexts/roster/infrastructure/pg-
 import { pgPlayerCatalogRepository } from "./contexts/roster/infrastructure/pg-player-catalog-repository.js";
 import { pgRosterRegistrationRepository } from "./contexts/roster/infrastructure/pg-roster-registration-repository.js";
 import { pgPlayerProfilePerformanceRepository } from "./contexts/roster/infrastructure/pg-player-profile-performance-repository.js";
+import { pgPlayerAwardsRepository } from "./contexts/roster/infrastructure/pg-player-awards-repository.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -84,6 +85,7 @@ const app = createApp({
   playerCatalogRepository: pgPlayerCatalogRepository(pool),
   rosterRegistrationRepository: pgRosterRegistrationRepository(pool),
   playerProfilePerformanceRepository: pgPlayerProfilePerformanceRepository(pool),
+  playerAwardsRepository: pgPlayerAwardsRepository(pool),
 });
 
 try {

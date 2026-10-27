@@ -2,7 +2,7 @@
 
 Este serviço ainda é uma fatia **experimental** da migração. As rotas de gol, peladas, identidade e elenco não são registradas com `ENABLE_GOAL_API=false`, `ENABLE_LEAGUE_API=false`, `ENABLE_IDENTITY_API=false` e `ENABLE_ROSTER_API=false` (padrões). O Next.js usa a ponte modular somente quando a flag correspondente está ativa; sem ela, preserva os fluxos existentes.
 
-O backend cobre o piloto de gol, todas as operações inventariadas dos contextos de peladas (27) e identidade (8), e vinte e uma operações de elenco (carreira da conta, classificação privada, aptidão, velocidade, estado de leitura, catálogo-base, consultas administrativas e desempenho do perfil), ainda sem homologação integral das telas. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação verificada.
+O backend cobre o piloto de gol, todas as operações inventariadas dos contextos de peladas (27) e identidade (8), e vinte e quatro operações de elenco (carreira da conta, classificação privada, aptidão, velocidade, estado de leitura, catálogo-base, consultas administrativas, desempenho do perfil, prêmios mensais e cinturões), ainda sem homologação integral das telas. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação verificada.
 
 ## Limites implementados
 
@@ -47,9 +47,11 @@ As rotas `/api/roster/leagues/:leagueId/activity/*` entregam o contador e os jog
 
 `GET /api/roster/leagues/:leagueId/players/:playerId/playtime` e `GET /api/roster/leagues/:leagueId/players/:playerId/club-goals` alimentam o perfil público. O tempo respeita entradas, saídas e cronômetro ao vivo; os gols são agrupados pelo escudo histórico dentro da pelada selecionada.
 
+`GET /api/roster/leagues/:leagueId/players/:playerId/monthly-awards`, `GET /api/roster/leagues/:leagueId/players/:playerId/achievement-belts` e `GET /api/roster/leagues/:leagueId/monthly-awards/winners` entregam os reconhecimentos do perfil e do mês anterior. O backend exige vínculo com a pelada e mantém as funções SQL existentes como projeções autorizadas.
+
 As rotas de aptidão listam rodadas encerradas da temporada ativa, gravam distância/ritmo do jogador vinculado, alteram sua visibilidade e produzem resumos oficial/amistoso. O cliente envia a pelada selecionada somente como escopo; vínculo, participação na rodada, temporada, privacidade e acesso continuam validados no banco sob os claims verificados.
 
-Com a stack local e `ENABLE_ROSTER_API=true`, [`verify-local-roster.sh`](../scripts/verify-local-roster.sh) valida carreira, classificação privada, aptidão, avaliações, sorteio somente-leitura, novidades e catálogo-base com contas locais e confere os contratos retornados.
+Com a stack local e `ENABLE_ROSTER_API=true`, [`verify-local-roster.sh`](../scripts/verify-local-roster.sh) valida carreira, classificação privada, aptidão, avaliações, sorteio somente-leitura, novidades, catálogo-base, desempenho e prêmios com contas locais e confere os contratos retornados.
 
 ## Execução local
 

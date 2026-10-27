@@ -43,7 +43,10 @@ registration_history_file="$(mktemp /tmp/liga-roster-registration-history-XXXXXX
 merge_candidates_file="$(mktemp /tmp/liga-roster-merge-candidates-XXXXXX.json)"
 player_playtime_file="$(mktemp /tmp/liga-roster-player-playtime-XXXXXX.json)"
 player_club_goals_file="$(mktemp /tmp/liga-roster-player-club-goals-XXXXXX.json)"
-trap 'rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file" "$speed_ratings_file" "$speed_draw_file" "$activity_state_file" "$activity_players_file" "$catalog_file" "$selectable_catalog_file" "$player_detail_file" "$registration_history_file" "$merge_candidates_file" "$player_playtime_file" "$player_club_goals_file"' EXIT
+player_monthly_awards_file="$(mktemp /tmp/liga-roster-player-monthly-awards-XXXXXX.json)"
+player_belts_file="$(mktemp /tmp/liga-roster-player-belts-XXXXXX.json)"
+monthly_winners_file="$(mktemp /tmp/liga-roster-monthly-winners-XXXXXX.json)"
+trap 'rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file" "$speed_ratings_file" "$speed_draw_file" "$activity_state_file" "$activity_players_file" "$catalog_file" "$selectable_catalog_file" "$player_detail_file" "$registration_history_file" "$merge_candidates_file" "$player_playtime_file" "$player_club_goals_file" "$player_monthly_awards_file" "$player_belts_file" "$monthly_winners_file"' EXIT
 
 status="$(curl -sS -o "$response_file" -w '%{http_code}' \
   -H "Authorization: Bearer $header.$payload.$signature" \
@@ -236,6 +239,48 @@ PY
   if [[ "$player_playtime_status" != "200" || "$player_club_goals_status" != "200" \
     || "$player_performance_valid" != "1" ]]; then
     echo "Leituras de desempenho do perfil falharam." >&2
+    exit 1
+  fi
+
+  previous_month="$(python3 - <<'PY'
+from datetime import datetime
+from zoneinfo import ZoneInfo
+now = datetime.now(ZoneInfo("America/Sao_Paulo"))
+year, month = (now.year - 1, 12) if now.month == 1 else (now.year, now.month - 1)
+print(f"{year:04d}-{month:02d}-01")
+PY
+)"
+  player_monthly_awards_status="$(curl -sS -o "$player_monthly_awards_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/players/$catalog_player_id/monthly-awards")"
+  player_belts_status="$(curl -sS -o "$player_belts_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/players/$catalog_player_id/achievement-belts")"
+  monthly_winners_status="$(curl -sS -o "$monthly_winners_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/monthly-awards/winners?period_start=$previous_month")"
+  player_awards_valid="$(python3 - "$player_monthly_awards_file" "$player_belts_file" "$monthly_winners_file" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    awards = json.load(source).get("awards")
+with open(sys.argv[2], encoding="utf-8") as source:
+    belts = json.load(source).get("belts")
+with open(sys.argv[3], encoding="utf-8") as source:
+    winners = json.load(source).get("winners")
+award_fields = {"type", "periodStart", "points", "roundsPlayed", "isFinal"}
+belt_fields = {"slug", "name", "description", "recordValue", "unit", "scope", "roundId", "roundNumber", "roundDate", "team"}
+winner_fields = award_fields | {"playerId", "playerName", "avatarUrl"}
+valid = isinstance(awards, list) and all(award_fields <= item.keys() for item in awards)
+valid = valid and isinstance(belts, list) and all(belt_fields <= item.keys() for item in belts)
+valid = valid and isinstance(winners, list) and all(winner_fields <= item.keys() for item in winners)
+print(int(valid))
+PY
+)"
+  printf 'player_monthly_awards=%s player_belts=%s monthly_winners=%s valid=%s\n' \
+    "$player_monthly_awards_status" "$player_belts_status" "$monthly_winners_status" "$player_awards_valid"
+  if [[ "$player_monthly_awards_status" != "200" || "$player_belts_status" != "200" \
+    || "$monthly_winners_status" != "200" || "$player_awards_valid" != "1" ]]; then
+    echo "Leituras de prêmios do jogador falharam." >&2
     exit 1
   fi
 fi

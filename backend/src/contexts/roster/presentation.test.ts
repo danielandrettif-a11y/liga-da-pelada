@@ -45,6 +45,11 @@ function fixture(enabled: boolean) {
     listParticipations: vi.fn().mockResolvedValue([]),
     listGoalEvents: vi.fn().mockResolvedValue([]),
   };
+  const playerAwardsRepository = {
+    listMonthlyAwards: vi.fn().mockResolvedValue([]),
+    listAchievementBelts: vi.fn().mockResolvedValue([]),
+    listMonthlyAwardWinners: vi.fn().mockResolvedValue([]),
+  };
   const app = createApp({
     goalsEnabled: false,
     rosterEnabled: enabled,
@@ -58,13 +63,14 @@ function fixture(enabled: boolean) {
     playerCatalogRepository,
     rosterRegistrationRepository,
     playerProfilePerformanceRepository,
+    playerAwardsRepository,
     logger: false,
   });
   apps.push(app);
   return {
     app, verifier, accountCareerRepository, privateBalanceTagRepository, fitnessRepository,
     speedRatingRepository, rosterActivityRepository, playerCatalogRepository, rosterRegistrationRepository,
-    playerProfilePerformanceRepository,
+    playerProfilePerformanceRepository, playerAwardsRepository,
   };
 }
 
@@ -255,5 +261,28 @@ describe("roster HTTP routes", () => {
       .toHaveBeenCalledWith(leagueId, playerId, { userId: "verified-user" });
     expect(playerProfilePerformanceRepository.listGoalEvents)
       .toHaveBeenCalledWith(leagueId, playerId, { userId: "verified-user" });
+  });
+
+  it("returns league-scoped player awards and monthly winners", async () => {
+    const { app, playerAwardsRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const headers = { authorization: "Bearer valid-token" };
+    const monthly = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/players/${playerId}/monthly-awards`, headers,
+    });
+    const belts = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/players/${playerId}/achievement-belts`, headers,
+    });
+    const winners = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/monthly-awards/winners?period_start=2026-09-01`, headers,
+    });
+    expect(monthly.json()).toEqual({ awards: [] });
+    expect(belts.json()).toEqual({ belts: [] });
+    expect(winners.json()).toEqual({ winners: [] });
+    expect(playerAwardsRepository.listMonthlyAwards).toHaveBeenCalledWith(leagueId, playerId, { userId: "verified-user" });
+    expect(playerAwardsRepository.listAchievementBelts).toHaveBeenCalledWith(leagueId, playerId, { userId: "verified-user" });
+    expect(playerAwardsRepository.listMonthlyAwardWinners)
+      .toHaveBeenCalledWith(leagueId, "2026-09-01", { userId: "verified-user" });
   });
 });

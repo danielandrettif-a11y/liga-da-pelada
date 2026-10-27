@@ -815,6 +815,51 @@
       ]
     },
     {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerMonthlyAwards",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:playerId/monthly-awards",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-awards.test.ts",
+        "backend/src/contexts/roster/application/get-player-awards.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-awards-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-awards.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerAchievementBelts",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:playerId/achievement-belts",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-awards.test.ts",
+        "backend/src/contexts/roster/application/get-player-awards.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-awards-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-awards.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPreviousMonthAwardWinners",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/monthly-awards/winners",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-awards.test.ts",
+        "backend/src/contexts/roster/application/get-player-awards.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-awards-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-awards.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "registerGoal",

@@ -58,6 +58,13 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - O catálogo passa a registrar **21/35 operações de elenco** em `frontend-migrated`; restam 14 operações de elenco. A união de perfis foi deliberadamente adiada até que o recálculo de estatísticas, Cartola e OVR possa ser movido como uma unidade completa.
 - Verificação: **923 testes frontend em 184 arquivos**, **174 testes backend em 67 arquivos**, typecheck e build dos dois pacotes e auditorias arquiteturais aprovados. O smoke Docker local retornou `200` para tempo em campo, gols por clube e todas as fatias anteriores, sem escrita no banco.
 
+### 2026-10-27 — prêmios e cinturões do jogador
+
+- `getPlayerMonthlyAwards`, `getPlayerAchievementBelts` e `getPreviousMonthAwardWinners` passaram ao backend modular. O domínio normaliza as linhas SQL e o JSON dos cinturões sem levar detalhes PostgreSQL para a apresentação.
+- As três rotas exigem sessão válida e vínculo com a pelada dentro da transação autenticada. As RPCs existentes continuam como projeções de leitura e a Server Action preserva o fallback Supabase quando a ponte está desligada.
+- O catálogo passa a registrar **24/35 operações de elenco** em `frontend-migrated`; restam 11 operações de elenco. A consulta histórica por temporada permanece em uma fatia própria por depender de rodadas, temporadas e estatísticas.
+- Verificação: **928 testes frontend em 186 arquivos**, **182 testes backend em 70 arquivos**, typecheck, build e auditoria de dependências com zero vulnerabilidades nos dois pacotes. As auditorias registram **59 operações no frontend**, **207 planejadas** e o piloto de gol no backend. O smoke Docker local retornou `200` e contratos válidos para as três novas rotas e todas as fatias anteriores, sem escrita no banco.
+
 ### 2026-10-26 — primeiras fatias verticais de elenco
 
 - Criado o contexto `backend/src/contexts/roster` e o módulo `src/modules/roster` com a operação `getMyAccountCareer`, cobrindo domínio de agregação, caso de uso, porta, adaptador PostgreSQL sob claims verificadas, rota `GET /api/roster/me/career`, gateway HTTP e sessão server-side.

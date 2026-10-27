@@ -207,4 +207,31 @@ describe("httpRosterGateway", () => {
     expect((fetcher.mock.calls[0]?.[0] as URL).pathname).toContain("/playtime");
     expect((fetcher.mock.calls[1]?.[0] as URL).pathname).toContain("/club-goals");
   });
+
+  it("loads monthly awards, achievement belts and previous winners", async () => {
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const award = { type: "goldenBootMonth", periodStart: "2026-09-01", points: 8,
+      roundsPlayed: 4, isFinal: true, metricValue: 6 };
+    const belt = { slug: "top_scorer", name: "Artilheiro", description: "Recorde", recordValue: 4,
+      unit: "gols", scope: "player", roundId: "round-1", roundNumber: 2,
+      roundDate: "2026-09-02", team: null };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ awards: [award] }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ belts: [belt] }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ winners: [{ ...award,
+        playerId, playerName: "Ana", avatarUrl: null }] }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }));
+    const gateway = httpRosterGateway("http://backend:3001", "token", fetcher as typeof fetch);
+    await expect(gateway.getPlayerMonthlyAwards(leagueId, playerId)).resolves.toEqual([award]);
+    await expect(gateway.getPlayerAchievementBelts(leagueId, playerId)).resolves.toEqual([belt]);
+    await expect(gateway.getMonthlyAwardWinners(leagueId, "2026-09-01"))
+      .resolves.toMatchObject([{ playerName: "Ana" }]);
+    expect((fetcher.mock.calls[2]?.[0] as URL).searchParams.get("period_start")).toBe("2026-09-01");
+  });
 });

@@ -541,7 +541,16 @@ export async function getPlayerAwardSeasons(playerId: string) {
 export async function getPlayerMonthlyAwards(playerId: string) {
   const league = await getSelectedLeague();
   if (!league) return [];
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayerMonthlyAwards(league.id, playerId);
+    } catch {
+      return [];
+    }
+  }
+  const client = account.client;
   const { data, error } = await client.rpc("get_monthly_awards_for_player_in_league", {
     p_league_id: league.id,
     p_player_id: playerId,
@@ -558,7 +567,16 @@ export async function getPlayerAchievementBelts(playerId: string): Promise<Playe
   const season = await getActiveSeason();
   if (!season) return [];
 
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayerAchievementBelts(season.league_id, playerId);
+    } catch {
+      return [];
+    }
+  }
+  const client = account.client;
   const { data, error } = await client.rpc("get_player_achievement_belts", {
     p_player_id: playerId,
     p_league_id: season.league_id,
@@ -578,7 +596,16 @@ export async function getPreviousMonthAwardWinners() {
   const periodStart = previousMonthStart();
   const league = await getSelectedLeague();
   if (!league) return { periodStart, winners: [] };
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return { periodStart, winners: await api.getMonthlyAwardWinners(league.id, periodStart) };
+    } catch {
+      return { periodStart, winners: [] };
+    }
+  }
+  const client = account.client;
   const { data, error } = await client.rpc("get_monthly_award_winners_for_league", {
     p_league_id: league.id,
     p_period_start: periodStart,

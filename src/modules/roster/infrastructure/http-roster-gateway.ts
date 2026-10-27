@@ -12,6 +12,14 @@ import {
   type PlayerClubGoals,
   type PlayerPlaytime,
 } from "../domain/player-profile-performance";
+import {
+  isMonthlyAward,
+  isMonthlyAwardWinner,
+  isPlayerAchievementBelt,
+  type MonthlyAward,
+  type MonthlyAwardWinner,
+  type PlayerAchievementBelt,
+} from "../domain/player-awards";
 
 type ApiErrorPayload = { message?: unknown };
 
@@ -43,6 +51,9 @@ export type RosterHttpGateway = {
   getRegisteredMergeCandidates(leagueId: string, guestId: string): Promise<RosterPlayer[]>;
   getPlayerPlaytime(leagueId: string, playerId: string): Promise<PlayerPlaytime>;
   getPlayerGoalsByClub(leagueId: string, playerId: string): Promise<PlayerClubGoals[]>;
+  getPlayerMonthlyAwards(leagueId: string, playerId: string): Promise<MonthlyAward[]>;
+  getPlayerAchievementBelts(leagueId: string, playerId: string): Promise<PlayerAchievementBelt[]>;
+  getMonthlyAwardWinners(leagueId: string, periodStart: string): Promise<MonthlyAwardWinner[]>;
 };
 
 const totalFields = [
@@ -375,6 +386,39 @@ export function httpRosterGateway(
         throw new RosterApiError("Resposta inválida ao carregar os gols por clube.", response.status);
       }
       return clubs;
+    },
+    async getPlayerMonthlyAwards(leagueId, playerId) {
+      const response = await request(
+        "GET", `api/roster/leagues/${encodeURIComponent(leagueId)}/players/${encodeURIComponent(playerId)}/monthly-awards`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const awards = payload && typeof payload === "object" ? (payload as { awards?: unknown }).awards : null;
+      if (!Array.isArray(awards) || !awards.every(isMonthlyAward)) {
+        throw new RosterApiError("Resposta inválida ao carregar os prêmios mensais.", response.status);
+      }
+      return awards;
+    },
+    async getPlayerAchievementBelts(leagueId, playerId) {
+      const response = await request(
+        "GET", `api/roster/leagues/${encodeURIComponent(leagueId)}/players/${encodeURIComponent(playerId)}/achievement-belts`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const belts = payload && typeof payload === "object" ? (payload as { belts?: unknown }).belts : null;
+      if (!Array.isArray(belts) || !belts.every(isPlayerAchievementBelt)) {
+        throw new RosterApiError("Resposta inválida ao carregar os cinturões.", response.status);
+      }
+      return belts;
+    },
+    async getMonthlyAwardWinners(leagueId, periodStart) {
+      const response = await request(
+        "GET", `api/roster/leagues/${encodeURIComponent(leagueId)}/monthly-awards/winners?period_start=${encodeURIComponent(periodStart)}`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const winners = payload && typeof payload === "object" ? (payload as { winners?: unknown }).winners : null;
+      if (!Array.isArray(winners) || !winners.every(isMonthlyAwardWinner)) {
+        throw new RosterApiError("Resposta inválida ao carregar os vencedores mensais.", response.status);
+      }
+      return winners;
     },
   };
 }
