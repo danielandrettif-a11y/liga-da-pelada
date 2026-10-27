@@ -25,6 +25,7 @@ import { pgRosterRegistrationRepository } from "./contexts/roster/infrastructure
 import { pgPlayerProfilePerformanceRepository } from "./contexts/roster/infrastructure/pg-player-profile-performance-repository.js";
 import { pgPlayerAwardsRepository } from "./contexts/roster/infrastructure/pg-player-awards-repository.js";
 import { pgPlayerHistoryRepository } from "./contexts/roster/infrastructure/pg-player-history-repository.js";
+import { pgPlayerManagementRepository } from "./contexts/roster/infrastructure/pg-player-management-repository.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -88,6 +89,7 @@ const app = createApp({
   playerProfilePerformanceRepository: pgPlayerProfilePerformanceRepository(pool),
   playerAwardsRepository: pgPlayerAwardsRepository(pool),
   playerHistoryRepository: pgPlayerHistoryRepository(pool),
+  playerManagementRepository: pgPlayerManagementRepository(pool),
 });
 
 try {

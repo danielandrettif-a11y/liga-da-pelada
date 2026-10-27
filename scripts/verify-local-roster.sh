@@ -48,7 +48,36 @@ player_belts_file="$(mktemp /tmp/liga-roster-player-belts-XXXXXX.json)"
 monthly_winners_file="$(mktemp /tmp/liga-roster-monthly-winners-XXXXXX.json)"
 player_round_history_file="$(mktemp /tmp/liga-roster-player-round-history-XXXXXX.json)"
 player_award_seasons_file="$(mktemp /tmp/liga-roster-player-award-seasons-XXXXXX.json)"
-trap 'rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file" "$speed_ratings_file" "$speed_draw_file" "$activity_state_file" "$activity_players_file" "$catalog_file" "$selectable_catalog_file" "$player_detail_file" "$registration_history_file" "$merge_candidates_file" "$player_playtime_file" "$player_club_goals_file" "$player_monthly_awards_file" "$player_belts_file" "$monthly_winners_file" "$player_round_history_file" "$player_award_seasons_file"' EXIT
+player_create_file="$(mktemp /tmp/liga-roster-player-create-XXXXXX.json)"
+player_update_file="$(mktemp /tmp/liga-roster-player-update-XXXXXX.json)"
+player_import_file="$(mktemp /tmp/liga-roster-player-import-XXXXXX.json)"
+player_swap_file="$(mktemp /tmp/liga-roster-player-swap-XXXXXX.json)"
+smoke_created_player_id=""
+smoke_imported_player_id=""
+cleanup_smoke_players() {
+  local player_ids=()
+  [[ "$smoke_created_player_id" =~ ^[0-9a-f-]{36}$ ]] && player_ids+=("'$smoke_created_player_id'::uuid")
+  [[ "$smoke_imported_player_id" =~ ^[0-9a-f-]{36}$ ]] && player_ids+=("'$smoke_imported_player_id'::uuid")
+  if [[ "${#player_ids[@]}" -gt 0 ]]; then
+    local joined
+    joined="$(IFS=,; echo "${player_ids[*]}")"
+    docker exec "$database_container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+      -c "DELETE FROM public.callup_entries WHERE player_id IN ($joined)" >/dev/null || true
+    docker exec "$database_container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+      -c "DELETE FROM public.players WHERE id IN ($joined)" >/dev/null || true
+  fi
+}
+cleanup_roster_smoke() {
+  cleanup_smoke_players
+  rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file" \
+    "$speed_ratings_file" "$speed_draw_file" "$activity_state_file" "$activity_players_file" \
+    "$catalog_file" "$selectable_catalog_file" "$player_detail_file" "$registration_history_file" \
+    "$merge_candidates_file" "$player_playtime_file" "$player_club_goals_file" \
+    "$player_monthly_awards_file" "$player_belts_file" "$monthly_winners_file" \
+    "$player_round_history_file" "$player_award_seasons_file" "$player_create_file" \
+    "$player_update_file" "$player_import_file" "$player_swap_file"
+}
+trap cleanup_roster_smoke EXIT
 
 status="$(curl -sS -o "$response_file" -w '%{http_code}' \
   -H "Authorization: Bearer $header.$payload.$signature" \
@@ -178,6 +207,87 @@ PY
     echo "Leitura local do catálogo-base de jogadores falhou." >&2
     exit 1
   fi
+
+  smoke_suffix="$(date +%s)-$$"
+  create_body="$(printf '{"name":"Codex roster %s","member_category":"guest","player_profile":"defensive","overall_traits":["defensive"]}' "$smoke_suffix")"
+  player_create_status="$(curl -sS -o "$player_create_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" -H 'Content-Type: application/json' \
+    --data "$create_body" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/players")"
+  smoke_created_player_id="$(python3 - "$player_create_file" <<'PY'
+import json, re, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    player_id = json.load(source).get("player", {}).get("id", "")
+print(player_id if isinstance(player_id, str) and re.fullmatch(r"[0-9a-f-]{36}", player_id) else "")
+PY
+)"
+  if [[ "$player_create_status" != "201" || -z "$smoke_created_player_id" ]]; then
+    echo "Criação local de jogador descartável falhou ($player_create_status)." >&2
+    cat "$player_create_file" >&2
+    exit 1
+  fi
+
+  update_body='{"nickname":"Smoke BQ","is_selectable":true,"player_profile":"offensive","overall_traits":["offensive"]}'
+  player_update_status="$(curl -sS -o "$player_update_file" -w '%{http_code}' \
+    -X PATCH -H "Authorization: Bearer $speed_token" -H 'Content-Type: application/json' \
+    --data "$update_body" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/players/$smoke_created_player_id")"
+  player_update_valid="$(python3 - "$player_update_file" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    player = json.load(source).get("player", {})
+print(int(player.get("nickname") == "Smoke BQ" and player.get("is_selectable") is True
+          and player.get("player_profile") == "offensive" and player.get("overall_traits") == ["offensive"]))
+PY
+)"
+  if [[ "$player_update_status" != "200" || "$player_update_valid" != "1" ]]; then
+    echo "Edição local do jogador descartável falhou ($player_update_status)." >&2
+    exit 1
+  fi
+
+  docker exec "$database_container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c \
+    "UPDATE public.players SET avatar_url = 'smoke-active', avatar_alternate_url = 'smoke-alternate' WHERE id = '$smoke_created_player_id'::uuid" >/dev/null
+  player_swap_status="$(curl -sS -o "$player_swap_file" -w '%{http_code}' \
+    -X POST -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/players/$smoke_created_player_id/swap-avatars")"
+  swapped_avatar="$(docker exec "$database_container" psql -U postgres -d postgres -Atc \
+    "SELECT avatar_url FROM public.players WHERE id = '$smoke_created_player_id'::uuid")"
+  if [[ "$player_swap_status" != "204" || "$swapped_avatar" != "smoke-alternate" ]]; then
+    echo "Troca local de avatares falhou ($player_swap_status)." >&2
+    exit 1
+  fi
+
+  import_body="$(printf '{"names":["Codex import %s"]}' "$smoke_suffix")"
+  player_import_status="$(curl -sS -o "$player_import_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" -H 'Content-Type: application/json' \
+    --data "$import_body" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/guest-imports")"
+  smoke_imported_player_id="$(python3 - "$player_import_file" <<'PY'
+import json, re, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    payload = json.load(source)
+guests = payload.get("guests", [])
+player_id = guests[0].get("playerId", "") if len(guests) == 1 else ""
+valid = payload.get("createdCount") == 1 and isinstance(player_id, str) and re.fullmatch(r"[0-9a-f-]{36}", player_id)
+print(player_id if valid else "")
+PY
+)"
+  if [[ "$player_import_status" != "201" || -z "$smoke_imported_player_id" ]]; then
+    echo "Importação local de convidado descartável falhou ($player_import_status)." >&2
+    cat "$player_import_file" >&2
+    exit 1
+  fi
+  printf 'player_create=%s player_update=%s player_swap=%s guest_import=%s valid=1\n' \
+    "$player_create_status" "$player_update_status" "$player_swap_status" "$player_import_status"
+  cleanup_smoke_players
+  cleanup_count="$(docker exec "$database_container" psql -U postgres -d postgres -Atc \
+    "SELECT count(*) FROM public.players WHERE id IN ('$smoke_created_player_id'::uuid, '$smoke_imported_player_id'::uuid)")"
+  if [[ "$cleanup_count" != "0" ]]; then
+    echo "A limpeza das fixtures descartáveis do elenco falhou." >&2
+    exit 1
+  fi
+  smoke_created_player_id=""
+  smoke_imported_player_id=""
 
   registration_history_status="$(curl -sS -o "$registration_history_file" -w '%{http_code}' \
     -H "Authorization: Bearer $speed_token" \

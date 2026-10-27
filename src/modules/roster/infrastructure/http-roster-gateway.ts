@@ -1,9 +1,11 @@
 import type { AccountCareer, AccountCareerRow, CareerTotals } from "../domain/account-career";
+import type { CreatePlayerInput } from "@/lib/types";
 import type { PrivateBalanceTag } from "@/lib/types";
 import type { FitnessRoundEntry, FitnessSummaries, FitnessSummary } from "../domain/fitness";
 import type { SpeedDrawCommand, SpeedDrawResult, SpeedRating } from "../domain/speed-rating";
 import type { RosterUnreadState, UnreadRosterPlayers } from "../domain/roster-activity";
 import { isRosterPlayer, type RosterPlayer } from "../domain/player-catalog";
+import { isImportedGuest, type ImportedGuest } from "../domain/player-management";
 import { isPlayerRegistrationEvent } from "../domain/roster-registration";
 import type { PlayerRegistrationEvent } from "@/lib/types";
 import {
@@ -54,6 +56,10 @@ export type RosterHttpGateway = {
   markRosterActivitySeen(leagueId: string): Promise<void>;
   getPlayers(leagueId: string, selectableOnly?: boolean): Promise<RosterPlayer[]>;
   getPlayer(leagueId: string, playerId: string): Promise<RosterPlayer | null>;
+  createPlayer(leagueId: string, input: CreatePlayerInput): Promise<RosterPlayer>;
+  updatePlayer(leagueId: string, playerId: string, input: Partial<CreatePlayerInput>): Promise<RosterPlayer>;
+  swapPlayerAvatars(leagueId: string, playerId: string): Promise<void>;
+  importGuestRoster(leagueId: string, names: string[]): Promise<ImportedGuest[]>;
   getRegistrationHistory(leagueId: string): Promise<PlayerRegistrationEvent[]>;
   getRegisteredMergeCandidates(leagueId: string, guestId: string): Promise<RosterPlayer[]>;
   getPlayerPlaytime(leagueId: string, playerId: string): Promise<PlayerPlaytime>;
@@ -352,6 +358,44 @@ export function httpRosterGateway(
         throw new RosterApiError("Resposta inválida ao carregar o jogador.", response.status);
       }
       return player;
+    },
+    async createPlayer(leagueId, input) {
+      const response = await request(
+        "POST", `api/roster/leagues/${encodeURIComponent(leagueId)}/players`, input,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const player = payload && typeof payload === "object" ? (payload as { player?: unknown }).player : null;
+      if (!isRosterPlayer(player)) {
+        throw new RosterApiError("Resposta inválida ao criar o jogador.", response.status);
+      }
+      return player;
+    },
+    async updatePlayer(leagueId, playerId, input) {
+      const response = await request(
+        "PATCH", `api/roster/leagues/${encodeURIComponent(leagueId)}/players/${encodeURIComponent(playerId)}`, input,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const player = payload && typeof payload === "object" ? (payload as { player?: unknown }).player : null;
+      if (!isRosterPlayer(player)) {
+        throw new RosterApiError("Resposta inválida ao atualizar o jogador.", response.status);
+      }
+      return player;
+    },
+    async swapPlayerAvatars(leagueId, playerId) {
+      await request(
+        "POST", `api/roster/leagues/${encodeURIComponent(leagueId)}/players/${encodeURIComponent(playerId)}/swap-avatars`,
+      );
+    },
+    async importGuestRoster(leagueId, names) {
+      const response = await request(
+        "POST", `api/roster/leagues/${encodeURIComponent(leagueId)}/guest-imports`, { names },
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const guests = payload && typeof payload === "object" ? (payload as { guests?: unknown }).guests : null;
+      if (!Array.isArray(guests) || !guests.every(isImportedGuest)) {
+        throw new RosterApiError("Resposta inválida ao importar os convidados.", response.status);
+      }
+      return guests;
     },
     async getRegistrationHistory(leagueId) {
       const response = await request(

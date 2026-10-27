@@ -37,6 +37,12 @@ function fixture(enabled: boolean) {
     list: vi.fn().mockResolvedValue([]),
     get: vi.fn().mockResolvedValue(null),
   };
+  const playerManagementRepository = {
+    create: vi.fn().mockResolvedValue({}),
+    update: vi.fn().mockResolvedValue({}),
+    swapAvatars: vi.fn().mockResolvedValue(undefined),
+    importGuests: vi.fn().mockResolvedValue([]),
+  };
   const rosterRegistrationRepository = {
     listHistory: vi.fn().mockResolvedValue([]),
     listMergeCandidates: vi.fn().mockResolvedValue([]),
@@ -65,6 +71,7 @@ function fixture(enabled: boolean) {
     speedRatingRepository,
     rosterActivityRepository,
     playerCatalogRepository,
+    playerManagementRepository,
     rosterRegistrationRepository,
     playerProfilePerformanceRepository,
     playerAwardsRepository,
@@ -74,7 +81,8 @@ function fixture(enabled: boolean) {
   apps.push(app);
   return {
     app, verifier, accountCareerRepository, privateBalanceTagRepository, fitnessRepository,
-    speedRatingRepository, rosterActivityRepository, playerCatalogRepository, rosterRegistrationRepository,
+    speedRatingRepository, rosterActivityRepository, playerCatalogRepository, playerManagementRepository,
+    rosterRegistrationRepository,
     playerProfilePerformanceRepository, playerAwardsRepository, playerHistoryRepository,
   };
 }
@@ -223,6 +231,67 @@ describe("roster HTTP routes", () => {
     expect(detail.json()).toEqual({ player: null });
     expect(playerCatalogRepository.list).toHaveBeenCalledWith(leagueId, { userId: "verified-user" });
     expect(playerCatalogRepository.get).toHaveBeenCalledWith(leagueId, playerId, { userId: "verified-user" });
+  });
+
+  it("creates, updates, swaps avatars and imports guests through scoped commands", async () => {
+    const { app, playerManagementRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const headers = { authorization: "Bearer valid-token" };
+    const playerRecord = {
+      id: playerId, name: "Convidado", nickname: null, profile_bio: null, avatar_url: "active.jpg",
+      avatar_alternate_url: "alternate.jpg", player_profile: "offensive", initial_player_profile: "offensive",
+      profile_decision_source: "initial", profile_source_round_id: null, overall_traits: ["offensive"],
+      overall_seed_mode: "observed", is_goalkeeper: false, member_category: "guest", is_selectable: true,
+      show_fitness_stats: false, registration_source: "admin", profile_scope: "persistent",
+      created_by_user_id: null, created_at: "2026-10-20T10:00:00.000Z", league_player_profile: "offensive",
+      league_initial_player_profile: "offensive", league_overall_traits: ["offensive"],
+      league_overall_seed_mode: "observed",
+    };
+    playerManagementRepository.create.mockResolvedValue(playerRecord);
+    playerManagementRepository.update.mockResolvedValue({ ...playerRecord, nickname: "BQ" });
+    playerManagementRepository.importGuests.mockResolvedValue([{
+      createdName: "Ana", playerId, addedToCallup: true,
+    }]);
+
+    const created = await app.inject({
+      method: "POST", url: `/api/roster/leagues/${leagueId}/players`, headers,
+      payload: { name: "Convidado", member_category: "guest", player_profile: "offensive" },
+    });
+    const updated = await app.inject({
+      method: "PATCH", url: `/api/roster/leagues/${leagueId}/players/${playerId}`, headers,
+      payload: { nickname: "BQ" },
+    });
+    const swapped = await app.inject({
+      method: "POST", url: `/api/roster/leagues/${leagueId}/players/${playerId}/swap-avatars`, headers,
+    });
+    const imported = await app.inject({
+      method: "POST", url: `/api/roster/leagues/${leagueId}/guest-imports`, headers,
+      payload: { names: ["Ana"] },
+    });
+
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({ player: { id: playerId, member_category: "guest" } });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toMatchObject({ player: { nickname: "BQ" } });
+    expect(swapped.statusCode).toBe(204);
+    expect(imported.statusCode).toBe(201);
+    expect(imported.json()).toMatchObject({ createdCount: 1 });
+    expect(playerManagementRepository.swapAvatars).toHaveBeenCalledWith(
+      leagueId, playerId, { userId: "verified-user" },
+    );
+  });
+
+  it("rejects malformed player commands before persistence", async () => {
+    const { app, playerManagementRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const response = await app.inject({
+      method: "POST", url: `/api/roster/leagues/${leagueId}/players`,
+      headers: { authorization: "Bearer valid-token" },
+      payload: { name: "Ana", member_category: "player" },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(playerManagementRepository.create).not.toHaveBeenCalled();
   });
 
   it("lists league registration history and merge candidates for verified admins", async () => {

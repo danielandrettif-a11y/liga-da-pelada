@@ -32,6 +32,14 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-27 — gestão administrativa e importação do elenco
+
+- `createPlayer`, `updatePlayer`, `swapPlayerAvatars` e `importGuestRoster` passaram ao backend modular. Validação e normalização ficam no domínio; criação e edição de identidade/vínculo executam na mesma transação autenticada; a troca de fotos preserva autorização de ADM global ou dono do perfil; a importação continua usando a RPC transacional que também integra a convocação aberta.
+- As rotas `POST /api/roster/leagues/:leagueId/players`, `PATCH /api/roster/leagues/:leagueId/players/:playerId`, `POST /api/roster/leagues/:leagueId/players/:playerId/swap-avatars` e `POST /api/roster/leagues/:leagueId/guest-imports` preservam os contratos das Server Actions e o fallback Supabase quando a ponte está desligada.
+- O primeiro smoke revelou que `INSERT ... RETURNING` era incompatível com a política de leitura antes da criação do vínculo; o backend passou a gerar o UUID e só lê a projeção após inserir `league_members`. O mesmo ensaio revelou que a RPC de importação ainda persistia o perfil removido `midfield`; a migration `352_fix_guest_roster_import_profile.sql` corrige o perfil e a característica inicial para `offensive`.
+- O catálogo registra **30/35 operações de elenco** em `frontend-migrated`; restam 5 operações de elenco. No inventário inteiro são **65/267 operações no frontend**, 1 piloto no backend e 201 planejadas.
+- Verificação: **938 testes frontend em 188 arquivos**, **205 testes backend em 76 arquivos**, typecheck, builds, auditorias arquiteturais e de dependências com zero vulnerabilidades. O smoke Docker executou criação `201`, edição `200`, troca `204` e importação `201`, repetiu todas as leituras anteriores e removeu as fixtures; a busca residual retornou zero.
+
 ### 2026-10-27 — correções de segurança do frontend
 
 - Next.js foi atualizado de 16.3.8 para 16.4.3, levando junto os binários SWC e `sharp` corrigidos; DOMPurify transitivo passou de 3.4.16 para 3.4.17 e Vitest de 4.1.11 para 4.1.12.

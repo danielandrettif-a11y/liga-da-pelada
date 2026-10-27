@@ -157,6 +157,41 @@ describe("httpRosterGateway", () => {
     expect((fetcher.mock.calls[1]?.[0] as URL).pathname).toContain(`/players/${playerId}`);
   });
 
+  it("creates, updates, swaps and imports through player-management routes", async () => {
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const player = {
+      id: playerId, name: "Convidado", nickname: null, profile_bio: null, avatar_url: "active.jpg",
+      avatar_alternate_url: "alternate.jpg", player_profile: "offensive", initial_player_profile: "offensive",
+      profile_decision_source: "initial", profile_source_round_id: null, overall_traits: ["offensive"],
+      overall_seed_mode: "observed", is_goalkeeper: false, member_category: "guest", is_selectable: true,
+      is_competitive_profile_complete: false, show_fitness_stats: false, registration_source: "admin",
+      profile_scope: "persistent", created_by_user_id: null, created_at: "2026-10-20T10:00:00.000Z",
+    };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ player }), {
+        status: 201, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ player: { ...player, nickname: "BQ" } }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ guests: [{
+        createdName: "Ana", playerId, addedToCallup: true,
+      }] }), { status: 201, headers: { "content-type": "application/json" } }));
+    const gateway = httpRosterGateway("http://backend:3001", "token", fetcher as typeof fetch);
+    await expect(gateway.createPlayer(leagueId, { name: "Convidado", member_category: "guest" }))
+      .resolves.toEqual(player);
+    await expect(gateway.updatePlayer(leagueId, playerId, { nickname: "BQ" }))
+      .resolves.toMatchObject({ nickname: "BQ" });
+    await expect(gateway.swapPlayerAvatars(leagueId, playerId)).resolves.toBeUndefined();
+    await expect(gateway.importGuestRoster(leagueId, ["Ana"])).resolves.toHaveLength(1);
+    expect((fetcher.mock.calls[0]?.[1] as RequestInit).method).toBe("POST");
+    expect((fetcher.mock.calls[1]?.[1] as RequestInit).method).toBe("PATCH");
+    expect((fetcher.mock.calls[2]?.[0] as URL).pathname).toContain("/swap-avatars");
+    expect((fetcher.mock.calls[3]?.[1] as RequestInit).body).toBe(JSON.stringify({ names: ["Ana"] }));
+  });
+
   it("loads administrative registration history and merge candidates", async () => {
     const leagueId = "00000000-0000-4000-8000-000000000010";
     const guestId = "00000000-0000-4000-8000-000000000001";

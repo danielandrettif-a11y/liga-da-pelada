@@ -892,6 +892,67 @@
       ]
     },
     {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "createPlayer",
+      "state": "frontend-migrated",
+      "target": "POST /api/roster/leagues/:leagueId/players",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-management.test.ts",
+        "backend/src/contexts/roster/application/manage-players.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-management-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "updatePlayer",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/roster/leagues/:leagueId/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-management.test.ts",
+        "backend/src/contexts/roster/application/manage-players.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-management-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "swapPlayerAvatars",
+      "state": "frontend-migrated",
+      "target": "POST /api/roster/leagues/:leagueId/players/:playerId/swap-avatars",
+      "evidence": [
+        "backend/src/contexts/roster/application/manage-players.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-management-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/app/admin/importar-lista/actions.ts",
+      "name": "importGuestRoster",
+      "state": "frontend-migrated",
+      "target": "POST /api/roster/leagues/:leagueId/guest-imports",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-management.test.ts",
+        "backend/src/contexts/roster/application/manage-players.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-management-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/app/admin/importar-lista/actions.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts",
+        "supabase/migrations/352_fix_guest_roster_import_profile.sql",
+        "scripts/verify-local-roster.sh"
+      ]
+    },
+    {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "registerGoal",

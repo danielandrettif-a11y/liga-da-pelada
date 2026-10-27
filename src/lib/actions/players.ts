@@ -650,6 +650,17 @@ export async function createPlayer(input: CreatePlayerInput) {
     return { success: false, error: "Jogadores oficiais precisam criar o próprio perfil ao entrar no app." };
   }
 
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      const data = await api.createPlayer(league.id, input);
+      revalidatePlayerPaths(data.id);
+      return { success: true, data };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível criar o jogador." };
+  }
+
   const { data, error } = await client
     .from("players")
     .insert([
@@ -702,6 +713,16 @@ export async function updatePlayer(id: string, input: Partial<CreatePlayerInput>
     return { success: false, error: "Somente administradores desta pelada podem editar jogadores." };
   }
   const client = account.client;
+  try {
+    const api = await rosterApiFor(client);
+    if (api) {
+      const data = await api.updatePlayer(league.id, id, input);
+      revalidatePlayerPaths(id);
+      return { success: true, data };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível editar o jogador." };
+  }
   if (!(await playerBelongsToSelectedLeague(id, client))) {
     return { success: false, error: "Jogador não pertence à pelada selecionada." };
   }
@@ -992,6 +1013,18 @@ export async function swapPlayerAvatars(playerId: string) {
   const ownsPlayer = account.profile?.player_id === playerId;
   if (!account.isAdmin && !ownsPlayer) {
     return { success: false, error: "Você só pode trocar a foto do seu próprio perfil." };
+  }
+  const selectedLeague = await getSelectedLeague();
+  if (!selectedLeague) return { success: false, error: "Selecione uma pelada antes de trocar a foto." };
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      await api.swapPlayerAvatars(selectedLeague.id, playerId);
+      revalidatePlayerPaths(playerId);
+      return { success: true };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível alternar as fotos." };
   }
   if (!(await playerBelongsToSelectedLeague(playerId, account.client))) {
     return { success: false, error: "Jogador não pertence à pelada selecionada." };
