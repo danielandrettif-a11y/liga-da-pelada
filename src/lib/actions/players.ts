@@ -26,6 +26,12 @@ import {
   readSeasonPlayerTotals,
 } from "@/modules/statistics/infrastructure/supabase-statistics-reader";
 import { rosterApiFor } from "@/modules/roster/infrastructure/roster-api-session";
+import type {
+  PlayerClubGoals,
+  PlayerPlaytime,
+} from "@/modules/roster/domain/player-profile-performance";
+
+export type { PlayerClubGoals, PlayerPlaytime } from "@/modules/roster/domain/player-profile-performance";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -381,10 +387,19 @@ export async function getPlayerRoundHistory(playerId: string, roundType: RoundTy
   });
 }
 
-export async function getPlayerPlaytime(playerId: string) {
+export async function getPlayerPlaytime(playerId: string): Promise<PlayerPlaytime> {
   const league = await getSelectedLeague();
   if (!league) return { totalSeconds: 0, officialSeconds: 0, friendlySeconds: 0 };
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayerPlaytime(league.id, playerId);
+    } catch {
+      return { totalSeconds: 0, officialSeconds: 0, friendlySeconds: 0 };
+    }
+  }
+  const client = account.client;
   const { data, error } = await client
     .from("match_players")
     .select("entered_elapsed_seconds, left_elapsed_seconds, matches!inner(started_at, finished_at, timer_started_at, timer_accumulated_seconds, rounds!inner(round_type, league_id))")
@@ -412,20 +427,19 @@ export async function getPlayerPlaytime(playerId: string) {
   return totals;
 }
 
-export type PlayerClubGoals = {
-  key: string;
-  name: string;
-  color: string;
-  crestUrl: string | null;
-  officialGoals: number;
-  friendlyGoals: number;
-  totalGoals: number;
-};
-
 export async function getPlayerGoalsByClub(playerId: string): Promise<PlayerClubGoals[]> {
   const league = await getSelectedLeague();
   if (!league) return [];
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayerGoalsByClub(league.id, playerId);
+    } catch {
+      return [];
+    }
+  }
+  const client = account.client;
   const { data, error } = await client
     .from("match_events")
     .select(`

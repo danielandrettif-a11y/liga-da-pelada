@@ -41,6 +41,10 @@ function fixture(enabled: boolean) {
     listHistory: vi.fn().mockResolvedValue([]),
     listMergeCandidates: vi.fn().mockResolvedValue([]),
   };
+  const playerProfilePerformanceRepository = {
+    listParticipations: vi.fn().mockResolvedValue([]),
+    listGoalEvents: vi.fn().mockResolvedValue([]),
+  };
   const app = createApp({
     goalsEnabled: false,
     rosterEnabled: enabled,
@@ -53,12 +57,14 @@ function fixture(enabled: boolean) {
     rosterActivityRepository,
     playerCatalogRepository,
     rosterRegistrationRepository,
+    playerProfilePerformanceRepository,
     logger: false,
   });
   apps.push(app);
   return {
     app, verifier, accountCareerRepository, privateBalanceTagRepository, fitnessRepository,
     speedRatingRepository, rosterActivityRepository, playerCatalogRepository, rosterRegistrationRepository,
+    playerProfilePerformanceRepository,
   };
 }
 
@@ -226,5 +232,28 @@ describe("roster HTTP routes", () => {
     expect(rosterRegistrationRepository.listHistory).toHaveBeenCalledWith(leagueId, { userId: "verified-user" });
     expect(rosterRegistrationRepository.listMergeCandidates)
       .toHaveBeenCalledWith(leagueId, guestId, { userId: "verified-user" });
+  });
+
+  it("returns league-scoped player playtime and club goals", async () => {
+    const { app, playerProfilePerformanceRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const headers = { authorization: "Bearer valid-token" };
+    const playtime = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/players/${playerId}/playtime`, headers,
+    });
+    const goals = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/players/${playerId}/club-goals`, headers,
+    });
+    expect(playtime.statusCode).toBe(200);
+    expect(playtime.json()).toEqual({
+      playtime: { totalSeconds: 0, officialSeconds: 0, friendlySeconds: 0 },
+    });
+    expect(goals.statusCode).toBe(200);
+    expect(goals.json()).toEqual({ clubs: [] });
+    expect(playerProfilePerformanceRepository.listParticipations)
+      .toHaveBeenCalledWith(leagueId, playerId, { userId: "verified-user" });
+    expect(playerProfilePerformanceRepository.listGoalEvents)
+      .toHaveBeenCalledWith(leagueId, playerId, { userId: "verified-user" });
   });
 });

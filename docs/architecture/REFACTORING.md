@@ -51,6 +51,13 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - O catálogo passa a registrar **19/35 operações de elenco** em `frontend-migrated`; restam 16 operações de elenco. A mutação de união de perfis continua separada para que recálculo de rodadas, Cartola e OVR seja migrado como uma unidade consistente.
 - Verificação: **918 testes frontend em 182 arquivos**, **166 testes backend em 64 arquivos**, typecheck e build dos dois pacotes e auditorias arquiteturais aprovados. O smoke Docker local retornou `200` para as duas novas leituras e para as fatias anteriores, sem escrita no banco.
 
+### 2026-10-27 — desempenho básico no perfil do jogador
+
+- `getPlayerPlaytime` e `getPlayerGoalsByClub` passaram ao backend modular. O domínio soma intervalos encerrados e ao vivo por tipo de rodada e agrega gols por escudo, preservando os nomes e cores canônicos dos quatro clubes históricos.
+- As rotas `GET /api/roster/leagues/:leagueId/players/:playerId/playtime` e `GET /api/roster/leagues/:leagueId/players/:playerId/club-goals` exigem vínculo do leitor com a pelada e limitam todas as junções ao `leagueId` recebido. O fallback Supabase permanece disponível com a ponte desligada.
+- O catálogo passa a registrar **21/35 operações de elenco** em `frontend-migrated`; restam 14 operações de elenco. A união de perfis foi deliberadamente adiada até que o recálculo de estatísticas, Cartola e OVR possa ser movido como uma unidade completa.
+- Verificação: **923 testes frontend em 184 arquivos**, **174 testes backend em 67 arquivos**, typecheck e build dos dois pacotes e auditorias arquiteturais aprovados. O smoke Docker local retornou `200` para tempo em campo, gols por clube e todas as fatias anteriores, sem escrita no banco.
+
 ### 2026-10-26 — primeiras fatias verticais de elenco
 
 - Criado o contexto `backend/src/contexts/roster` e o módulo `src/modules/roster` com a operação `getMyAccountCareer`, cobrindo domínio de agregação, caso de uso, porta, adaptador PostgreSQL sob claims verificadas, rota `GET /api/roster/me/career`, gateway HTTP e sessão server-side.

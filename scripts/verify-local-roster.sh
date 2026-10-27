@@ -41,7 +41,9 @@ selectable_catalog_file="$(mktemp /tmp/liga-roster-selectable-catalog-XXXXXX.jso
 player_detail_file="$(mktemp /tmp/liga-roster-player-detail-XXXXXX.json)"
 registration_history_file="$(mktemp /tmp/liga-roster-registration-history-XXXXXX.json)"
 merge_candidates_file="$(mktemp /tmp/liga-roster-merge-candidates-XXXXXX.json)"
-trap 'rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file" "$speed_ratings_file" "$speed_draw_file" "$activity_state_file" "$activity_players_file" "$catalog_file" "$selectable_catalog_file" "$player_detail_file" "$registration_history_file" "$merge_candidates_file"' EXIT
+player_playtime_file="$(mktemp /tmp/liga-roster-player-playtime-XXXXXX.json)"
+player_club_goals_file="$(mktemp /tmp/liga-roster-player-club-goals-XXXXXX.json)"
+trap 'rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file" "$speed_ratings_file" "$speed_draw_file" "$activity_state_file" "$activity_players_file" "$catalog_file" "$selectable_catalog_file" "$player_detail_file" "$registration_history_file" "$merge_candidates_file" "$player_playtime_file" "$player_club_goals_file"' EXIT
 
 status="$(curl -sS -o "$response_file" -w '%{http_code}' \
   -H "Authorization: Bearer $header.$payload.$signature" \
@@ -205,6 +207,35 @@ PY
   if [[ "$registration_history_status" != "200" || "$merge_candidates_status" != "200" \
     || "$registration_valid" != "1" ]]; then
     echo "Leituras administrativas de cadastro falharam." >&2
+    exit 1
+  fi
+
+  player_playtime_status="$(curl -sS -o "$player_playtime_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/players/$catalog_player_id/playtime")"
+  player_club_goals_status="$(curl -sS -o "$player_club_goals_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/players/$catalog_player_id/club-goals")"
+  player_performance_valid="$(python3 - "$player_playtime_file" "$player_club_goals_file" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    playtime = json.load(source).get("playtime")
+with open(sys.argv[2], encoding="utf-8") as source:
+    clubs = json.load(source).get("clubs")
+valid = isinstance(playtime, dict) and all(
+    isinstance(playtime.get(field), int) and playtime[field] >= 0
+    for field in ("totalSeconds", "officialSeconds", "friendlySeconds")
+)
+club_fields = {"key", "name", "color", "crestUrl", "officialGoals", "friendlyGoals", "totalGoals"}
+valid = valid and isinstance(clubs, list) and all(club_fields <= club.keys() for club in clubs)
+print(int(valid))
+PY
+)"
+  printf 'player_playtime=%s player_club_goals=%s valid=%s\n' \
+    "$player_playtime_status" "$player_club_goals_status" "$player_performance_valid"
+  if [[ "$player_playtime_status" != "200" || "$player_club_goals_status" != "200" \
+    || "$player_performance_valid" != "1" ]]; then
+    echo "Leituras de desempenho do perfil falharam." >&2
     exit 1
   fi
 fi

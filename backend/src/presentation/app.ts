@@ -26,6 +26,7 @@ import type { SpeedRatingRepository } from "../contexts/roster/application/manag
 import type { RosterActivityRepository } from "../contexts/roster/application/manage-roster-activity.js";
 import type { PlayerCatalogRepository } from "../contexts/roster/application/get-player-catalog.js";
 import type { RosterRegistrationRepository } from "../contexts/roster/application/get-roster-registration.js";
+import type { PlayerProfilePerformanceRepository } from "../contexts/roster/application/get-player-profile-performance.js";
 import { registerGoalRoutes } from "../contexts/matches/presentation/goals-route.js";
 import { registerLeagueRoutes } from "../contexts/leagues/presentation/leagues-route.js";
 import { registerLeagueConfigRoutes } from "../contexts/leagues/presentation/league-config-route.js";
@@ -42,6 +43,7 @@ import { registerSpeedRatingRoutes } from "../contexts/roster/presentation/speed
 import { registerRosterActivityRoutes } from "../contexts/roster/presentation/roster-activity-route.js";
 import { registerPlayerCatalogRoutes } from "../contexts/roster/presentation/player-catalog-route.js";
 import { registerRosterRegistrationRoutes } from "../contexts/roster/presentation/roster-registration-route.js";
+import { registerPlayerProfilePerformanceRoutes } from "../contexts/roster/presentation/player-profile-performance-route.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 
 export function createApp(dependencies: {
@@ -73,6 +75,7 @@ export function createApp(dependencies: {
   rosterActivityRepository?: RosterActivityRepository;
   playerCatalogRepository?: PlayerCatalogRepository;
   rosterRegistrationRepository?: RosterRegistrationRepository;
+  playerProfilePerformanceRepository?: PlayerProfilePerformanceRepository;
   logger?: boolean;
 }): FastifyInstance {
   if (dependencies.leaguesEnabled && !dependencies.leagueRepository) {
@@ -111,7 +114,8 @@ export function createApp(dependencies: {
   }
   if (dependencies.rosterEnabled && (!dependencies.accountCareerRepository || !dependencies.privateBalanceTagRepository
     || !dependencies.fitnessRepository || !dependencies.speedRatingRepository || !dependencies.rosterActivityRepository
-    || !dependencies.playerCatalogRepository || !dependencies.rosterRegistrationRepository)) {
+    || !dependencies.playerCatalogRepository || !dependencies.rosterRegistrationRepository
+    || !dependencies.playerProfilePerformanceRepository)) {
     throw new Error("Dependências de elenco são obrigatórias quando ENABLE_ROSTER_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
@@ -185,7 +189,8 @@ export function createApp(dependencies: {
   }
   if (dependencies.rosterEnabled && dependencies.accountCareerRepository && dependencies.privateBalanceTagRepository
     && dependencies.fitnessRepository && dependencies.speedRatingRepository && dependencies.rosterActivityRepository
-    && dependencies.playerCatalogRepository && dependencies.rosterRegistrationRepository) {
+    && dependencies.playerCatalogRepository && dependencies.rosterRegistrationRepository
+    && dependencies.playerProfilePerformanceRepository) {
     registerAccountCareerRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.accountCareerRepository,
@@ -213,6 +218,10 @@ export function createApp(dependencies: {
     registerRosterRegistrationRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.rosterRegistrationRepository,
+    });
+    registerPlayerProfilePerformanceRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.playerProfilePerformanceRepository,
     });
   }
   return app;

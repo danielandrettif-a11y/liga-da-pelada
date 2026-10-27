@@ -187,4 +187,24 @@ describe("httpRosterGateway", () => {
     expect((fetcher.mock.calls[0]?.[0] as URL).pathname).toContain("/registrations");
     expect((fetcher.mock.calls[1]?.[0] as URL).pathname).toContain("/merge-candidates");
   });
+
+  it("loads player playtime and goals grouped by club", async () => {
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const playtime = { totalSeconds: 120, officialSeconds: 90, friendlySeconds: 30 };
+    const clubs = [{ key: "club", name: "Clube", color: "#fff", crestUrl: null,
+      officialGoals: 2, friendlyGoals: 1, totalGoals: 3 }];
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ playtime }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ clubs }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }));
+    const gateway = httpRosterGateway("http://backend:3001", "token", fetcher as typeof fetch);
+    await expect(gateway.getPlayerPlaytime(leagueId, playerId)).resolves.toEqual(playtime);
+    await expect(gateway.getPlayerGoalsByClub(leagueId, playerId)).resolves.toEqual(clubs);
+    expect((fetcher.mock.calls[0]?.[0] as URL).pathname).toContain("/playtime");
+    expect((fetcher.mock.calls[1]?.[0] as URL).pathname).toContain("/club-goals");
+  });
 });

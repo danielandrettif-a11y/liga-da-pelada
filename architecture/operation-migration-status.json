@@ -785,6 +785,36 @@
       ]
     },
     {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerPlaytime",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:playerId/playtime",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-profile-performance.test.ts",
+        "backend/src/contexts/roster/application/get-player-profile-performance.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-profile-performance-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-profile-performance.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerGoalsByClub",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:playerId/club-goals",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-profile-performance.test.ts",
+        "backend/src/contexts/roster/application/get-player-profile-performance.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-profile-performance-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-profile-performance.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "registerGoal",
