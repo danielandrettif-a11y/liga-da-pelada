@@ -2,7 +2,7 @@
 
 Este serviço ainda é uma fatia **experimental** da migração. As rotas de gol, peladas, identidade e elenco não são registradas com `ENABLE_GOAL_API=false`, `ENABLE_LEAGUE_API=false`, `ENABLE_IDENTITY_API=false` e `ENABLE_ROSTER_API=false` (padrões). O Next.js usa a ponte modular somente quando a flag correspondente está ativa; sem ela, preserva os fluxos existentes.
 
-O backend cobre o piloto de gol, todas as operações inventariadas dos contextos de peladas (27) e identidade (8), e dezessete operações de elenco (carreira da conta, classificação privada, aptidão, velocidade, estado de leitura e catálogo-base), ainda sem homologação integral das telas. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação verificada.
+O backend cobre o piloto de gol, todas as operações inventariadas dos contextos de peladas (27) e identidade (8), e dezenove operações de elenco (carreira da conta, classificação privada, aptidão, velocidade, estado de leitura, catálogo-base e consultas administrativas de cadastro), ainda sem homologação integral das telas. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação verificada.
 
 ## Limites implementados
 
@@ -42,6 +42,8 @@ O smoke descartável [`verify-local-identity.sh`](../scripts/verify-local-identi
 As rotas `/api/roster/leagues/:leagueId/activity/*` entregam o contador e os jogadores ainda não vistos e avançam o marcador individual do ADM. Leituras são escopadas por associação ativa; gravações reutilizam `mark_roster_activity_seen[_through]`, que impede regressão do cursor e limita datas futuras no banco.
 
 `GET /api/roster/leagues/:leagueId/players` e `GET /api/roster/leagues/:leagueId/players/:playerId` formam o catálogo-base. A identidade vem de `players`, o perfil competitivo vem de `league_members`, e a leitura exige vínculo ativo da conta com a pelada. `selectable_only=true` restringe o resultado a jogadores e convidados elegíveis.
+
+`GET /api/roster/leagues/:leagueId/registrations` e `GET /api/roster/leagues/:leagueId/players/:guestId/merge-candidates` atendem as telas administrativas de cadastros. Ambas exigem ADM da pelada; o histórico limita os eventos ao elenco ativo e os candidatos excluem o perfil de origem e pessoas inelegíveis.
 
 As rotas de aptidão listam rodadas encerradas da temporada ativa, gravam distância/ritmo do jogador vinculado, alteram sua visibilidade e produzem resumos oficial/amistoso. O cliente envia a pelada selecionada somente como escopo; vínculo, participação na rodada, temporada, privacidade e acesso continuam validados no banco sob os claims verificados.
 

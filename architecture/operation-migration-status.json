@@ -755,6 +755,36 @@
       ]
     },
     {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "getRegistrationHistory",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/registrations",
+      "evidence": [
+        "backend/src/contexts/roster/domain/roster-registration.test.ts",
+        "backend/src/contexts/roster/application/get-roster-registration.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-roster-registration-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/registrations.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "getRegisteredMergeCandidates",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:guestId/merge-candidates",
+      "evidence": [
+        "backend/src/contexts/roster/domain/roster-registration.test.ts",
+        "backend/src/contexts/roster/application/get-roster-registration.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-roster-registration-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/registrations.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "registerGoal",

@@ -4,6 +4,8 @@ import type { FitnessRoundEntry, FitnessSummaries, FitnessSummary } from "../dom
 import type { SpeedDrawCommand, SpeedDrawResult, SpeedRating } from "../domain/speed-rating";
 import type { RosterUnreadState, UnreadRosterPlayers } from "../domain/roster-activity";
 import { isRosterPlayer, type RosterPlayer } from "../domain/player-catalog";
+import { isPlayerRegistrationEvent } from "../domain/roster-registration";
+import type { PlayerRegistrationEvent } from "@/lib/types";
 
 type ApiErrorPayload = { message?: unknown };
 
@@ -31,6 +33,8 @@ export type RosterHttpGateway = {
   markRosterActivitySeen(leagueId: string): Promise<void>;
   getPlayers(leagueId: string, selectableOnly?: boolean): Promise<RosterPlayer[]>;
   getPlayer(leagueId: string, playerId: string): Promise<RosterPlayer | null>;
+  getRegistrationHistory(leagueId: string): Promise<PlayerRegistrationEvent[]>;
+  getRegisteredMergeCandidates(leagueId: string, guestId: string): Promise<RosterPlayer[]>;
 };
 
 const totalFields = [
@@ -318,6 +322,29 @@ export function httpRosterGateway(
         throw new RosterApiError("Resposta inválida ao carregar o jogador.", response.status);
       }
       return player;
+    },
+    async getRegistrationHistory(leagueId) {
+      const response = await request(
+        "GET", `api/roster/leagues/${encodeURIComponent(leagueId)}/registrations`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const events = payload && typeof payload === "object" ? (payload as { events?: unknown }).events : null;
+      if (!Array.isArray(events) || !events.every(isPlayerRegistrationEvent)) {
+        throw new RosterApiError("Resposta inválida ao carregar o histórico de cadastros.", response.status);
+      }
+      return events;
+    },
+    async getRegisteredMergeCandidates(leagueId, guestId) {
+      const response = await request(
+        "GET",
+        `api/roster/leagues/${encodeURIComponent(leagueId)}/players/${encodeURIComponent(guestId)}/merge-candidates`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const players = payload && typeof payload === "object" ? (payload as { players?: unknown }).players : null;
+      if (!Array.isArray(players) || !players.every(isRosterPlayer)) {
+        throw new RosterApiError("Resposta inválida ao carregar os candidatos à união.", response.status);
+      }
+      return players;
     },
   };
 }

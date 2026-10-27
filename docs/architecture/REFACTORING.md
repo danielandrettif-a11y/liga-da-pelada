@@ -44,6 +44,13 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - O catálogo passa a registrar **17/35 operações de elenco** em `frontend-migrated`; restam 18 operações de elenco nesta etapa.
 - Verificação: **914 testes frontend em 181 arquivos**, **158 testes backend em 61 arquivos**, typecheck e build dos dois pacotes, auditorias arquiteturais e de dependências aprovados. O smoke Docker local retornou `200` para catálogo, catálogo selecionável e detalhe, além das fatias anteriores, sem gravar dados.
 
+### 2026-10-27 — consultas administrativas de cadastro do elenco
+
+- `getRegistrationHistory` e `getRegisteredMergeCandidates` passaram ao backend modular. O histórico cruza eventos com membros ativos da pelada e reaplica nome, foto e categoria atuais; candidatos exigem que origem e destino pertençam ao mesmo elenco ativo.
+- As rotas `GET /api/roster/leagues/:leagueId/registrations` e `GET /api/roster/leagues/:leagueId/players/:guestId/merge-candidates` exigem `is_league_admin()` dentro da transação autenticada. O fallback Supabase permanece disponível quando a ponte está desligada.
+- O catálogo passa a registrar **19/35 operações de elenco** em `frontend-migrated`; restam 16 operações de elenco. A mutação de união de perfis continua separada para que recálculo de rodadas, Cartola e OVR seja migrado como uma unidade consistente.
+- Verificação: **918 testes frontend em 182 arquivos**, **166 testes backend em 64 arquivos**, typecheck e build dos dois pacotes e auditorias arquiteturais aprovados. O smoke Docker local retornou `200` para as duas novas leituras e para as fatias anteriores, sem escrita no banco.
+
 ### 2026-10-26 — primeiras fatias verticais de elenco
 
 - Criado o contexto `backend/src/contexts/roster` e o módulo `src/modules/roster` com a operação `getMyAccountCareer`, cobrindo domínio de agregação, caso de uso, porta, adaptador PostgreSQL sob claims verificadas, rota `GET /api/roster/me/career`, gateway HTTP e sessão server-side.

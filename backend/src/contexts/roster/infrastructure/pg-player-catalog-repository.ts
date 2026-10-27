@@ -17,7 +17,7 @@ export class PlayerCatalogPersistenceError extends Error {
   }
 }
 
-type PlayerCatalogRow = {
+export type PlayerCatalogRow = {
   id: string;
   name: string;
   nickname: string | null;
@@ -44,7 +44,7 @@ type PlayerCatalogRow = {
   league_overall_seed_mode: OverallSeedMode;
 };
 
-const projection = `
+export const playerCatalogProjection = `
   SELECT player.id, player.name, player.nickname, player.profile_bio,
          player.avatar_url, player.avatar_alternate_url,
          player.player_profile, player.initial_player_profile,
@@ -88,7 +88,7 @@ async function requireLeagueMember(client: PoolClient, leagueId: string): Promis
   if (access.rows[0]?.allowed !== true) throw new Error("PLAYER_CATALOG_FORBIDDEN");
 }
 
-function record(row: PlayerCatalogRow): PlayerCatalogRecord {
+export function playerCatalogRecordFromRow(row: PlayerCatalogRow): PlayerCatalogRecord {
   return {
     ...row,
     overall_traits: row.overall_traits ?? [],
@@ -102,23 +102,23 @@ export function pgPlayerCatalogRepository(pool: Pool): PlayerCatalogRepository {
     list: (leagueId, actor) => authenticated(pool, actor, async (client) => {
       await requireLeagueMember(client, leagueId);
       const result = await client.query<PlayerCatalogRow>(
-        `${projection}
+        `${playerCatalogProjection}
           WHERE member.league_id = $1::uuid AND member.is_active
           ORDER BY member.joined_at ASC, player.id ASC`,
         [leagueId],
       );
-      return result.rows.map(record);
+      return result.rows.map(playerCatalogRecordFromRow);
     }),
 
     get: (leagueId, playerId, actor) => authenticated(pool, actor, async (client) => {
       await requireLeagueMember(client, leagueId);
       const result = await client.query<PlayerCatalogRow>(
-        `${projection}
+        `${playerCatalogProjection}
           WHERE member.league_id = $1::uuid AND member.player_id = $2::uuid AND member.is_active
           LIMIT 1`,
         [leagueId, playerId],
       );
-      return result.rows[0] ? record(result.rows[0]) : null;
+      return result.rows[0] ? playerCatalogRecordFromRow(result.rows[0]) : null;
     }),
   };
 }

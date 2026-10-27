@@ -39,7 +39,9 @@ activity_players_file="$(mktemp /tmp/liga-roster-activity-players-XXXXXX.json)"
 catalog_file="$(mktemp /tmp/liga-roster-catalog-XXXXXX.json)"
 selectable_catalog_file="$(mktemp /tmp/liga-roster-selectable-catalog-XXXXXX.json)"
 player_detail_file="$(mktemp /tmp/liga-roster-player-detail-XXXXXX.json)"
-trap 'rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file" "$speed_ratings_file" "$speed_draw_file" "$activity_state_file" "$activity_players_file" "$catalog_file" "$selectable_catalog_file" "$player_detail_file"' EXIT
+registration_history_file="$(mktemp /tmp/liga-roster-registration-history-XXXXXX.json)"
+merge_candidates_file="$(mktemp /tmp/liga-roster-merge-candidates-XXXXXX.json)"
+trap 'rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file" "$speed_ratings_file" "$speed_draw_file" "$activity_state_file" "$activity_players_file" "$catalog_file" "$selectable_catalog_file" "$player_detail_file" "$registration_history_file" "$merge_candidates_file"' EXIT
 
 status="$(curl -sS -o "$response_file" -w '%{http_code}' \
   -H "Authorization: Bearer $header.$payload.$signature" \
@@ -167,6 +169,42 @@ PY
   if [[ "$catalog_status" != "200" || "$selectable_catalog_status" != "200" \
     || "$player_detail_status" != "200" || "$catalog_valid" != "1" ]]; then
     echo "Leitura local do catálogo-base de jogadores falhou." >&2
+    exit 1
+  fi
+
+  registration_history_status="$(curl -sS -o "$registration_history_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/registrations")"
+  merge_candidates_status="$(curl -sS -o "$merge_candidates_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/players/$catalog_player_id/merge-candidates")"
+  registration_valid="$(python3 - "$registration_history_file" "$merge_candidates_file" <<'PY'
+import json, sys
+event_fields = {
+    "id", "player_id", "player_name", "avatar_url", "member_category", "source",
+    "created_by_user_id", "created_at",
+}
+player_fields = {
+    "id", "name", "nickname", "profile_bio", "avatar_url", "avatar_alternate_url",
+    "player_profile", "initial_player_profile", "profile_decision_source", "profile_source_round_id",
+    "overall_traits", "overall_seed_mode", "is_goalkeeper", "member_category", "is_selectable",
+    "is_competitive_profile_complete", "show_fitness_stats", "registration_source", "profile_scope",
+    "created_by_user_id", "created_at",
+}
+with open(sys.argv[1], encoding="utf-8") as source:
+    events = json.load(source).get("events")
+with open(sys.argv[2], encoding="utf-8") as source:
+    candidates = json.load(source).get("players")
+valid = isinstance(events, list) and all(event_fields <= event.keys() for event in events)
+valid = valid and isinstance(candidates, list) and all(player_fields <= player.keys() for player in candidates)
+print(int(valid))
+PY
+)"
+  printf 'registration_history=%s merge_candidates=%s valid=%s\n' \
+    "$registration_history_status" "$merge_candidates_status" "$registration_valid"
+  if [[ "$registration_history_status" != "200" || "$merge_candidates_status" != "200" \
+    || "$registration_valid" != "1" ]]; then
+    echo "Leituras administrativas de cadastro falharam." >&2
     exit 1
   fi
 fi

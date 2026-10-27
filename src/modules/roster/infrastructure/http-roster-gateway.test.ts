@@ -156,4 +156,35 @@ describe("httpRosterGateway", () => {
     expect((fetcher.mock.calls[0]?.[0] as URL).searchParams.get("selectable_only")).toBe("true");
     expect((fetcher.mock.calls[1]?.[0] as URL).pathname).toContain(`/players/${playerId}`);
   });
+
+  it("loads administrative registration history and merge candidates", async () => {
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const guestId = "00000000-0000-4000-8000-000000000001";
+    const event = {
+      id: 1, player_id: guestId, player_name: "Convidado", avatar_url: null,
+      member_category: "guest", source: "admin", created_by_user_id: null,
+      created_at: "2026-10-20T10:00:00.000Z",
+    };
+    const player = {
+      id: "00000000-0000-4000-8000-000000000002", name: "Atleta", nickname: null,
+      profile_bio: null, avatar_url: null, avatar_alternate_url: null, player_profile: "offensive",
+      initial_player_profile: "offensive", profile_decision_source: "initial", profile_source_round_id: null,
+      overall_traits: ["offensive"], overall_seed_mode: "observed", is_goalkeeper: false,
+      member_category: "player", is_selectable: true, is_competitive_profile_complete: false,
+      show_fitness_stats: false, registration_source: "site_signup", profile_scope: "persistent",
+      created_by_user_id: null, created_at: "2026-10-20T10:00:00.000Z",
+    };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ events: [event] }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ players: [player] }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }));
+    const gateway = httpRosterGateway("http://backend:3001", "token", fetcher as typeof fetch);
+    await expect(gateway.getRegistrationHistory(leagueId)).resolves.toEqual([event]);
+    await expect(gateway.getRegisteredMergeCandidates(leagueId, guestId)).resolves.toEqual([player]);
+    expect((fetcher.mock.calls[0]?.[0] as URL).pathname).toContain("/registrations");
+    expect((fetcher.mock.calls[1]?.[0] as URL).pathname).toContain("/merge-candidates");
+  });
 });

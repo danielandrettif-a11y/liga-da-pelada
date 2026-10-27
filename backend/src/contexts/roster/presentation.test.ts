@@ -37,6 +37,10 @@ function fixture(enabled: boolean) {
     list: vi.fn().mockResolvedValue([]),
     get: vi.fn().mockResolvedValue(null),
   };
+  const rosterRegistrationRepository = {
+    listHistory: vi.fn().mockResolvedValue([]),
+    listMergeCandidates: vi.fn().mockResolvedValue([]),
+  };
   const app = createApp({
     goalsEnabled: false,
     rosterEnabled: enabled,
@@ -48,12 +52,13 @@ function fixture(enabled: boolean) {
     speedRatingRepository,
     rosterActivityRepository,
     playerCatalogRepository,
+    rosterRegistrationRepository,
     logger: false,
   });
   apps.push(app);
   return {
     app, verifier, accountCareerRepository, privateBalanceTagRepository, fitnessRepository,
-    speedRatingRepository, rosterActivityRepository, playerCatalogRepository,
+    speedRatingRepository, rosterActivityRepository, playerCatalogRepository, rosterRegistrationRepository,
   };
 }
 
@@ -201,5 +206,25 @@ describe("roster HTTP routes", () => {
     expect(detail.json()).toEqual({ player: null });
     expect(playerCatalogRepository.list).toHaveBeenCalledWith(leagueId, { userId: "verified-user" });
     expect(playerCatalogRepository.get).toHaveBeenCalledWith(leagueId, playerId, { userId: "verified-user" });
+  });
+
+  it("lists league registration history and merge candidates for verified admins", async () => {
+    const { app, rosterRegistrationRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const guestId = "00000000-0000-4000-8000-000000000001";
+    const headers = { authorization: "Bearer valid-token" };
+    const history = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/registrations`, headers,
+    });
+    const candidates = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/players/${guestId}/merge-candidates`, headers,
+    });
+    expect(history.statusCode).toBe(200);
+    expect(history.json()).toEqual({ events: [] });
+    expect(candidates.statusCode).toBe(200);
+    expect(candidates.json()).toEqual({ players: [] });
+    expect(rosterRegistrationRepository.listHistory).toHaveBeenCalledWith(leagueId, { userId: "verified-user" });
+    expect(rosterRegistrationRepository.listMergeCandidates)
+      .toHaveBeenCalledWith(leagueId, guestId, { userId: "verified-user" });
   });
 });

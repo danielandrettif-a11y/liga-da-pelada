@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   unreadPlayers: vi.fn(),
   markThrough: vi.fn(),
   markSeen: vi.fn(),
+  registrationHistory: vi.fn(),
+  mergeCandidates: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
@@ -20,7 +22,8 @@ vi.mock("./overall", () => ({ refreshFluidOverallSafely: vi.fn() }));
 vi.mock("@/modules/roster/infrastructure/roster-api-session", () => ({ rosterApiFor: mocks.rosterApi }));
 
 import {
-  getRosterUnreadState, getUnreadRosterPlayers, markRosterActivitySeen, markRosterActivitySeenThrough,
+  getRegisteredMergeCandidates, getRegistrationHistory, getRosterUnreadState, getUnreadRosterPlayers,
+  markRosterActivitySeen, markRosterActivitySeenThrough,
 } from "./registrations";
 
 beforeEach(() => {
@@ -108,5 +111,18 @@ describe("leitura do elenco por pelada", () => {
     expect(mocks.markThrough).toHaveBeenCalledWith("league-a", "2026-10-10T12:00:00.000Z");
     expect(mocks.markSeen).toHaveBeenCalledWith("league-a");
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("usa a API de elenco para histórico administrativo e candidatos à união", async () => {
+    mocks.rosterApi.mockResolvedValue({
+      getRegistrationHistory: mocks.registrationHistory,
+      getRegisteredMergeCandidates: mocks.mergeCandidates,
+    });
+    mocks.registrationHistory.mockResolvedValue([{ id: 1, player_id: "guest-a" }]);
+    mocks.mergeCandidates.mockResolvedValue([{ id: "player-a", name: "Atleta" }]);
+    await expect(getRegistrationHistory()).resolves.toMatchObject([{ id: 1 }]);
+    await expect(getRegisteredMergeCandidates("guest-a")).resolves.toMatchObject([{ id: "player-a" }]);
+    expect(mocks.registrationHistory).toHaveBeenCalledWith("league-a");
+    expect(mocks.mergeCandidates).toHaveBeenCalledWith("league-a", "guest-a");
   });
 });

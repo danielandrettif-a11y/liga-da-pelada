@@ -20,6 +20,15 @@ async function getSelectedRosterPlayerIds() {
 export async function getRegistrationHistory(): Promise<PlayerRegistrationEvent[]> {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return [];
+  const league = await getSelectedLeague();
+  if (!league || league.role !== "admin") return [];
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) return await api.getRegistrationHistory(league.id);
+  } catch (error) {
+    console.error("Erro ao buscar historico de cadastros:", error);
+    return [];
+  }
   const rosterPlayerIds = await getSelectedRosterPlayerIds();
   if (!rosterPlayerIds.length) return [];
 
@@ -187,6 +196,15 @@ export async function markRosterActivitySeen() {
 export async function getRegisteredMergeCandidates(guestId: string): Promise<Player[]> {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return [];
+  const league = await getSelectedLeague();
+  if (!league || league.role !== "admin") return [];
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) return await api.getRegisteredMergeCandidates(league.id, guestId);
+  } catch (error) {
+    console.error("Erro ao buscar candidatos para uniao:", error);
+    return [];
+  }
   const rosterPlayerIds = await getSelectedRosterPlayerIds();
   if (!rosterPlayerIds.includes(guestId)) return [];
 
