@@ -2,7 +2,7 @@
 
 Este serviço ainda é uma fatia **experimental** da migração. As rotas de gol, peladas, identidade e elenco não são registradas com `ENABLE_GOAL_API=false`, `ENABLE_LEAGUE_API=false`, `ENABLE_IDENTITY_API=false` e `ENABLE_ROSTER_API=false` (padrões). O Next.js usa a ponte modular somente quando a flag correspondente está ativa; sem ela, preserva os fluxos existentes.
 
-O backend cobre o piloto de gol, todas as operações inventariadas dos contextos de peladas (27) e identidade (8), e sete operações de elenco (carreira da conta, classificação privada e aptidão), ainda sem homologação integral das telas. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação verificada.
+O backend cobre o piloto de gol, todas as operações inventariadas dos contextos de peladas (27) e identidade (8), e dez operações de elenco (carreira da conta, classificação privada, aptidão e velocidade), ainda sem homologação integral das telas. A arquitetura dos demais fluxos está no [mapa de contextos](../docs/architecture/application-context-map.md), que inventaria as 58 páginas e 41 arquivos de entrada. Cada contexto só passa a ser atendido aqui quando tiver casos de uso, portas, adaptadores, autorização e testes de paridade reais; o catálogo não equivale a uma implementação verificada.
 
 ## Limites implementados
 
@@ -37,9 +37,11 @@ O smoke descartável [`verify-local-identity.sh`](../scripts/verify-local-identi
 
 `GET|PUT /api/roster/players/:playerId/private-balance-tag` preservam a classificação sigilosa. Sem permissão, a leitura informa `allowed=false` sem expor a tag; a escrita exige o editor persistido, valida o valor e reconfere a permissão dentro da mesma transação PostgreSQL.
 
+`GET /api/roster/leagues/:leagueId/speed-ratings`, `PUT /api/roster/leagues/:leagueId/players/:playerId/speed-rating` e `POST /api/roster/leagues/:leagueId/speed-draw` concentram avaliações e sorteio por velocidade. As rotas exigem administração da pelada, relêem membros ativos e elegíveis no banco e nunca aceitam estrelas enviadas pelo navegador.
+
 As rotas de aptidão listam rodadas encerradas da temporada ativa, gravam distância/ritmo do jogador vinculado, alteram sua visibilidade e produzem resumos oficial/amistoso. O cliente envia a pelada selecionada somente como escopo; vínculo, participação na rodada, temporada, privacidade e acesso continuam validados no banco sob os claims verificados.
 
-Com a stack local e `ENABLE_ROSTER_API=true`, [`verify-local-roster.sh`](../scripts/verify-local-roster.sh) valida a rota com uma conta local somente para leitura e confere o contrato completo da projeção.
+Com a stack local e `ENABLE_ROSTER_API=true`, [`verify-local-roster.sh`](../scripts/verify-local-roster.sh) valida carreira, classificação privada, aptidão, avaliações e sorteio somente-leitura com contas locais e confere os contratos retornados.
 
 ## Execução local
 

@@ -1,6 +1,7 @@
 import type { AccountCareer, AccountCareerRow, CareerTotals } from "../domain/account-career";
 import type { PrivateBalanceTag } from "@/lib/types";
 import type { FitnessRoundEntry, FitnessSummaries, FitnessSummary } from "../domain/fitness";
+import type { SpeedDrawCommand, SpeedDrawResult, SpeedRating } from "../domain/speed-rating";
 
 type ApiErrorPayload = { message?: unknown };
 
@@ -19,6 +20,9 @@ export type RosterHttpGateway = {
   saveMyFitness(roundId: string, distance: number, pace: number): Promise<string>;
   setFitnessVisibility(visible: boolean): Promise<string>;
   getPlayerFitnessSummaries(playerId: string, leagueId: string): Promise<FitnessSummaries | null>;
+  getPlayerSpeedRatings(leagueId: string): Promise<Record<string, SpeedRating | null>>;
+  setPlayerSpeedRating(leagueId: string, playerId: string, rating: SpeedRating | null): Promise<void>;
+  drawTeamsBySpeed(leagueId: string, command: SpeedDrawCommand): Promise<SpeedDrawResult>;
 };
 
 const totalFields = [
@@ -77,6 +81,25 @@ function isFitnessRound(value: unknown): value is FitnessRoundEntry {
     && typeof fitness.updated_at === "string";
 }
 
+function isSpeedSummary(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const summary = value as Record<string, unknown>;
+  if (typeof summary.average !== "number" || !Number.isFinite(summary.average)
+    || !summary.stars || typeof summary.stars !== "object") return false;
+  const stars = summary.stars as Record<string, unknown>;
+  return ["1", "2", "3"].every((key) => Number.isInteger(stars[key]) && Number(stars[key]) >= 0);
+}
+
+function isSpeedDrawResult(value: unknown): value is SpeedDrawResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Record<string, unknown>;
+  return Array.isArray(result.teams)
+    && result.teams.every((team) => Array.isArray(team) && team.every((id) => typeof id === "string"))
+    && Array.isArray(result.teamSummaries) && result.teamSummaries.every(isSpeedSummary)
+    && Number.isInteger(result.unratedCount) && Number(result.unratedCount) >= 0
+    && Array.isArray(result.attendanceOrder) && result.attendanceOrder.every((id) => typeof id === "string");
+}
+
 async function errorFrom(response: Response): Promise<RosterApiError> {
   const payload: ApiErrorPayload | null = await response.json().catch(() => null);
   return new RosterApiError(
@@ -92,7 +115,7 @@ export function httpRosterGateway(
 ): RosterHttpGateway {
   if (!accessToken.trim()) throw new RosterApiError("Sessão expirada. Entre novamente.");
 
-  const request = async (method: "GET" | "PUT" | "PATCH", path: string, body?: object) => {
+  const request = async (method: "GET" | "POST" | "PUT" | "PATCH", path: string, body?: object) => {
     const url = apiUrl(baseUrl, path);
     let response: Response;
     try {
@@ -191,6 +214,36 @@ export function httpRosterGateway(
         throw new RosterApiError("Resposta inválida ao carregar o resumo físico.", response.status);
       }
       return { official: result.official, friendly: result.friendly };
+    },
+    async getPlayerSpeedRatings(leagueId) {
+      const response = await request(
+        "GET", `api/roster/leagues/${encodeURIComponent(leagueId)}/speed-ratings`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const ratings = payload && typeof payload === "object"
+        ? (payload as { ratings?: unknown }).ratings : null;
+      if (!ratings || typeof ratings !== "object" || Array.isArray(ratings)
+        || !Object.values(ratings).every((value) => value === null || value === 1 || value === 2 || value === 3)) {
+        throw new RosterApiError("Resposta inválida ao carregar as velocidades.", response.status);
+      }
+      return ratings as Record<string, SpeedRating | null>;
+    },
+    async setPlayerSpeedRating(leagueId, playerId, rating) {
+      await request(
+        "PUT",
+        `api/roster/leagues/${encodeURIComponent(leagueId)}/players/${encodeURIComponent(playerId)}/speed-rating`,
+        { rating },
+      );
+    },
+    async drawTeamsBySpeed(leagueId, command) {
+      const response = await request(
+        "POST", `api/roster/leagues/${encodeURIComponent(leagueId)}/speed-draw`, command,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      if (!isSpeedDrawResult(payload)) {
+        throw new RosterApiError("Resposta inválida ao sortear os times.", response.status);
+      }
+      return payload;
     },
   };
 }

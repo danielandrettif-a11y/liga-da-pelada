@@ -17,6 +17,14 @@ function fixture(enabled: boolean) {
     setMyVisibility: vi.fn().mockResolvedValue("00000000-0000-4000-8000-000000000001"),
     listSummaryMeasurements: vi.fn().mockResolvedValue([]),
   };
+  const speedRatingRepository = {
+    listRatings: vi.fn().mockResolvedValue({ "00000000-0000-4000-8000-000000000001": 3 as const }),
+    listEligiblePlayers: vi.fn().mockResolvedValue([
+      { id: "00000000-0000-4000-8000-000000000001", speedRating: 3 as const },
+      { id: "00000000-0000-4000-8000-000000000002", speedRating: 1 as const },
+    ]),
+    setRating: vi.fn().mockResolvedValue(undefined),
+  };
   const app = createApp({
     goalsEnabled: false,
     rosterEnabled: enabled,
@@ -25,10 +33,11 @@ function fixture(enabled: boolean) {
     accountCareerRepository,
     privateBalanceTagRepository,
     fitnessRepository,
+    speedRatingRepository,
     logger: false,
   });
   apps.push(app);
-  return { app, verifier, accountCareerRepository, privateBalanceTagRepository, fitnessRepository };
+  return { app, verifier, accountCareerRepository, privateBalanceTagRepository, fitnessRepository, speedRatingRepository };
 }
 
 describe("roster HTTP routes", () => {
@@ -105,5 +114,29 @@ describe("roster HTTP routes", () => {
     expect(visibility.statusCode).toBe(200);
     expect(fitnessRepository.listMyRounds).toHaveBeenCalledWith(playerId, leagueId, { userId: "verified-user" });
     expect(fitnessRepository.saveMyFitness).toHaveBeenCalledWith(roundId, 5.5, 6, { userId: "verified-user" });
+  });
+
+  it("reads, updates and uses league-scoped speed ratings through a verified actor", async () => {
+    const { app, speedRatingRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const first = "00000000-0000-4000-8000-000000000001";
+    const second = "00000000-0000-4000-8000-000000000002";
+    const headers = { authorization: "Bearer valid-token" };
+    const ratings = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/speed-ratings`, headers,
+    });
+    const update = await app.inject({
+      method: "PUT", url: `/api/roster/leagues/${leagueId}/players/${first}/speed-rating`, headers,
+      payload: { rating: 2 },
+    });
+    const draw = await app.inject({
+      method: "POST", url: `/api/roster/leagues/${leagueId}/speed-draw`, headers,
+      payload: { playerIds: [first, second], teamCount: 2, playersPerTeam: 1 },
+    });
+    expect(ratings.statusCode).toBe(200);
+    expect(update.statusCode).toBe(204);
+    expect(draw.statusCode).toBe(200);
+    expect(draw.json()).toMatchObject({ teams: expect.arrayContaining([[first], [second]]), unratedCount: 0 });
+    expect(speedRatingRepository.setRating).toHaveBeenCalledWith(leagueId, first, 2, { userId: "verified-user" });
   });
 });

@@ -80,4 +80,32 @@ describe("httpRosterGateway", () => {
     expect((fetcher.mock.calls[0]?.[0] as URL).searchParams.get("league_id")).toBe(leagueId);
     expect((fetcher.mock.calls[1]?.[1] as RequestInit).body).toBe(JSON.stringify({ distance: 5, pace: 100 }));
   });
+
+  it("reads, updates and draws from league-scoped speed ratings", async () => {
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const first = "00000000-0000-4000-8000-000000000001";
+    const second = "00000000-0000-4000-8000-000000000002";
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ratings: { [first]: 3, [second]: null } }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        teams: [[first], [second]],
+        teamSummaries: [
+          { stars: { 1: 0, 2: 0, 3: 1 }, average: 3 },
+          { stars: { 1: 0, 2: 1, 3: 0 }, average: 2 },
+        ],
+        unratedCount: 1,
+        attendanceOrder: [],
+      }), { status: 200, headers: { "content-type": "application/json" } }));
+    const gateway = httpRosterGateway("http://backend:3001", "token", fetcher as typeof fetch);
+    await expect(gateway.getPlayerSpeedRatings(leagueId)).resolves.toEqual({ [first]: 3, [second]: null });
+    await expect(gateway.setPlayerSpeedRating(leagueId, first, 2)).resolves.toBeUndefined();
+    await expect(gateway.drawTeamsBySpeed(leagueId, {
+      playerIds: [first, second], teamCount: 2, playersPerTeam: 1,
+    })).resolves.toMatchObject({ teams: [[first], [second]], unratedCount: 1 });
+    expect((fetcher.mock.calls[1]?.[1] as RequestInit).body).toBe(JSON.stringify({ rating: 2 }));
+    expect((fetcher.mock.calls[2]?.[1] as RequestInit).method).toBe("POST");
+  });
 });

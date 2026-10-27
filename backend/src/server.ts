@@ -18,6 +18,7 @@ import { supabaseIdentityAuthProvider } from "./contexts/identity/infrastructure
 import { pgAccountCareerRepository } from "./contexts/roster/infrastructure/pg-account-career-repository.js";
 import { pgPrivateBalanceTagRepository } from "./contexts/roster/infrastructure/pg-private-balance-tag-repository.js";
 import { pgFitnessRepository } from "./contexts/roster/infrastructure/pg-fitness-repository.js";
+import { pgSpeedRatingRepository } from "./contexts/roster/infrastructure/pg-speed-rating-repository.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -74,6 +75,7 @@ const app = createApp({
   accountCareerRepository: pgAccountCareerRepository(pool),
   privateBalanceTagRepository: pgPrivateBalanceTagRepository(pool),
   fitnessRepository: pgFitnessRepository(pool),
+  speedRatingRepository: pgSpeedRatingRepository(pool),
 });
 
 try {

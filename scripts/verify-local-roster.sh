@@ -32,7 +32,9 @@ response_file="$(mktemp /tmp/liga-roster-career-XXXXXX.json)"
 tag_response_file="$(mktemp /tmp/liga-roster-private-tag-XXXXXX.json)"
 fitness_rounds_file="$(mktemp /tmp/liga-roster-fitness-rounds-XXXXXX.json)"
 fitness_summary_file="$(mktemp /tmp/liga-roster-fitness-summary-XXXXXX.json)"
-trap 'rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file"' EXIT
+speed_ratings_file="$(mktemp /tmp/liga-roster-speed-ratings-XXXXXX.json)"
+speed_draw_file="$(mktemp /tmp/liga-roster-speed-draw-XXXXXX.json)"
+trap 'rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file" "$speed_ratings_file" "$speed_draw_file"' EXIT
 
 status="$(curl -sS -o "$response_file" -w '%{http_code}' \
   -H "Authorization: Bearer $header.$payload.$signature" \
@@ -40,6 +42,51 @@ status="$(curl -sS -o "$response_file" -w '%{http_code}' \
 if [[ "$status" != "200" ]]; then
   echo "Consulta local de carreira falhou ($status)." >&2
   exit 1
+fi
+
+speed_admin_row="$(docker exec "$database_container" psql -U postgres -d postgres -AtF '|' -c \
+  "SELECT user_id, league_id FROM public.league_members WHERE role = 'admin' AND is_active AND user_id IS NOT NULL ORDER BY joined_at LIMIT 1")"
+speed_admin_id="${speed_admin_row%%|*}"
+speed_league_id="${speed_admin_row#*|}"
+if [[ -n "$speed_admin_id" && -n "$speed_league_id" && "$speed_admin_id" != "$speed_admin_row" ]]; then
+  speed_payload="$(printf \
+    '{"aud":"authenticated","exp":%s,"iat":%s,"iss":"supabase","sub":"%s","role":"authenticated","aal":"aal1","is_anonymous":false}' \
+    "$expires_at" "$issued_at" "$speed_admin_id" | base64_url)"
+  speed_signature="$(printf '%s' "$header.$speed_payload" | openssl dgst -sha256 -hmac "$jwt_secret" -binary | base64_url)"
+  speed_token="$header.$speed_payload.$speed_signature"
+  speed_ratings_status="$(curl -sS -o "$speed_ratings_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/speed-ratings")"
+  mapfile -t speed_players < <(docker exec "$database_container" psql -U postgres -d postgres -Atc \
+    "SELECT member.player_id FROM public.league_members member JOIN public.players player ON player.id = member.player_id WHERE member.league_id = '$speed_league_id'::uuid AND member.is_active AND player.is_selectable AND player.member_category IN ('player','guest') ORDER BY member.joined_at LIMIT 2")
+  speed_draw_status="skip"
+  if [[ "${#speed_players[@]}" -eq 2 ]]; then
+    speed_body="$(printf '{"playerIds":["%s","%s"],"teamCount":2,"playersPerTeam":1}' \
+      "${speed_players[0]}" "${speed_players[1]}")"
+    speed_draw_status="$(curl -sS -o "$speed_draw_file" -w '%{http_code}' \
+      -H "Authorization: Bearer $speed_token" -H 'Content-Type: application/json' \
+      --data "$speed_body" \
+      "${backend_url%/}/api/roster/leagues/$speed_league_id/speed-draw")"
+  fi
+  speed_valid="$(python3 - "$speed_ratings_file" "$speed_draw_file" "$speed_draw_status" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    ratings = json.load(source).get("ratings")
+valid = isinstance(ratings, dict) and all(value in (None, 1, 2, 3) for value in ratings.values())
+if sys.argv[3] == "200":
+    with open(sys.argv[2], encoding="utf-8") as source:
+        draw = json.load(source)
+    valid = valid and isinstance(draw.get("teams"), list) and isinstance(draw.get("teamSummaries"), list)
+    valid = valid and isinstance(draw.get("unratedCount"), int) and isinstance(draw.get("attendanceOrder"), list)
+print(int(valid))
+PY
+)"
+  printf 'speed_ratings=%s speed_draw=%s valid=%s\n' \
+    "$speed_ratings_status" "$speed_draw_status" "$speed_valid"
+  if [[ "$speed_ratings_status" != "200" || "$speed_draw_status" != "200" || "$speed_valid" != "1" ]]; then
+    echo "Leitura ou sorteio local por velocidade falhou." >&2
+    exit 1
+  fi
 fi
 
 summary="$(python3 - "$response_file" <<'PY'
