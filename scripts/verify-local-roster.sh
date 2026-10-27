@@ -39,6 +39,8 @@ activity_players_file="$(mktemp /tmp/liga-roster-activity-players-XXXXXX.json)"
 catalog_file="$(mktemp /tmp/liga-roster-catalog-XXXXXX.json)"
 selectable_catalog_file="$(mktemp /tmp/liga-roster-selectable-catalog-XXXXXX.json)"
 player_detail_file="$(mktemp /tmp/liga-roster-player-detail-XXXXXX.json)"
+player_statistics_file="$(mktemp /tmp/liga-roster-player-statistics-XXXXXX.json)"
+roster_groups_file="$(mktemp /tmp/liga-roster-groups-XXXXXX.json)"
 registration_history_file="$(mktemp /tmp/liga-roster-registration-history-XXXXXX.json)"
 merge_candidates_file="$(mktemp /tmp/liga-roster-merge-candidates-XXXXXX.json)"
 player_playtime_file="$(mktemp /tmp/liga-roster-player-playtime-XXXXXX.json)"
@@ -71,7 +73,8 @@ cleanup_roster_smoke() {
   cleanup_smoke_players
   rm -f -- "$response_file" "$tag_response_file" "$fitness_rounds_file" "$fitness_summary_file" \
     "$speed_ratings_file" "$speed_draw_file" "$activity_state_file" "$activity_players_file" \
-    "$catalog_file" "$selectable_catalog_file" "$player_detail_file" "$registration_history_file" \
+    "$catalog_file" "$selectable_catalog_file" "$player_detail_file" "$player_statistics_file" \
+    "$roster_groups_file" "$registration_history_file" \
     "$merge_candidates_file" "$player_playtime_file" "$player_club_goals_file" \
     "$player_monthly_awards_file" "$player_belts_file" "$monthly_winners_file" \
     "$player_round_history_file" "$player_award_seasons_file" "$player_create_file" \
@@ -205,6 +208,44 @@ PY
   if [[ "$catalog_status" != "200" || "$selectable_catalog_status" != "200" \
     || "$player_detail_status" != "200" || "$catalog_valid" != "1" ]]; then
     echo "Leitura local do catálogo-base de jogadores falhou." >&2
+    exit 1
+  fi
+
+  player_statistics_status="$(curl -sS -o "$player_statistics_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/player-statistics?round_type=official&selectable_only=true")"
+  roster_groups_status="$(curl -sS -o "$roster_groups_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/roster-groups?round_type=official")"
+  player_statistics_valid="$(python3 - "$player_statistics_file" "$roster_groups_file" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    players = json.load(source).get("players")
+with open(sys.argv[2], encoding="utf-8") as source:
+    groups = json.load(source)
+statistics_fields = {
+    "rounds", "games", "goals", "assists", "wins", "draws", "losses", "points", "legacyPoints",
+}
+group_names = ("officialPlayers", "activeGuests", "wags", "supporters")
+valid = isinstance(players, list) and all(statistics_fields <= player.keys() for player in players)
+valid = valid and all(player.get("is_selectable") and player.get("member_category") in ("player", "guest") for player in players)
+valid = valid and all(isinstance(groups.get(group), list) for group in group_names)
+valid = valid and all(
+    statistics_fields <= player.keys()
+    for group in group_names for player in groups.get(group, [])
+)
+valid = valid and all(player.get("member_category") == "player" for player in groups.get("officialPlayers", []))
+valid = valid and all(player.get("member_category") == "guest" for player in groups.get("activeGuests", []))
+valid = valid and all(player.get("member_category") == "wag" for player in groups.get("wags", []))
+valid = valid and all(player.get("member_category") == "supporter" for player in groups.get("supporters", []))
+print(int(valid))
+PY
+)"
+  printf 'player_statistics=%s roster_groups=%s valid=%s\n' \
+    "$player_statistics_status" "$roster_groups_status" "$player_statistics_valid"
+  if [[ "$player_statistics_status" != "200" || "$roster_groups_status" != "200" \
+    || "$player_statistics_valid" != "1" ]]; then
+    echo "Leituras de estatísticas e grupos do elenco falharam." >&2
     exit 1
   fi
 

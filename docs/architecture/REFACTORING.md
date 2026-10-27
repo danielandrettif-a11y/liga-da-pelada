@@ -32,6 +32,13 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-27 — estatísticas e agrupamento do elenco
+
+- `getPlayersWithStats` e `getRosterGroups` passaram ao backend modular. A regra de domínio combina o catálogo da pelada com `player_season_stats`, usa `ranking_points` nas rodadas oficiais, preserva `points` como `legacyPoints`, ordena pela pontuação e separa jogadores, convidados, acompanhantes e torcedores.
+- As rotas `GET /api/roster/leagues/:leagueId/player-statistics` e `GET /api/roster/leagues/:leagueId/roster-groups` exigem vínculo ativo com a pelada dentro da transação autenticada. O OVR mais recente é consultado somente para o agrupamento oficial e enriquece somente membros da categoria `player`. As Server Actions mantêm o fallback Supabase quando a ponte está desligada.
+- O catálogo registra **32/35 operações de elenco** em `frontend-migrated`; restam 3: `savePlayer`, `deletePlayer` e `mergeGuestWithRegistered`. No inventário inteiro são **67/267 operações no frontend**, 1 piloto no backend e 199 planejadas.
+- Verificação: **943 testes frontend em 189 arquivos**, **217 testes backend em 79 arquivos**, typecheck, builds, auditorias arquiteturais e de dependências com zero vulnerabilidades. A imagem Docker local foi reconstruída; o smoke retornou `200` e contratos válidos para estatísticas, grupos e todas as leituras anteriores, repetiu as quatro mutações descartáveis e confirmou limpeza residual zero.
+
 ### 2026-10-27 — gestão administrativa e importação do elenco
 
 - `createPlayer`, `updatePlayer`, `swapPlayerAvatars` e `importGuestRoster` passaram ao backend modular. Validação e normalização ficam no domínio; criação e edição de identidade/vínculo executam na mesma transação autenticada; a troca de fotos preserva autorização de ADM global ou dono do perfil; a importação continua usando a RPC transacional que também integra a convocação aberta.

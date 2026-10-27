@@ -43,6 +43,10 @@ function fixture(enabled: boolean) {
     swapAvatars: vi.fn().mockResolvedValue(undefined),
     importGuests: vi.fn().mockResolvedValue([]),
   };
+  const playerStatisticsRepository = {
+    listSeasonTotals: vi.fn().mockResolvedValue([]),
+    listLatestOveralls: vi.fn().mockResolvedValue([]),
+  };
   const rosterRegistrationRepository = {
     listHistory: vi.fn().mockResolvedValue([]),
     listMergeCandidates: vi.fn().mockResolvedValue([]),
@@ -72,6 +76,7 @@ function fixture(enabled: boolean) {
     rosterActivityRepository,
     playerCatalogRepository,
     playerManagementRepository,
+    playerStatisticsRepository,
     rosterRegistrationRepository,
     playerProfilePerformanceRepository,
     playerAwardsRepository,
@@ -82,6 +87,7 @@ function fixture(enabled: boolean) {
   return {
     app, verifier, accountCareerRepository, privateBalanceTagRepository, fitnessRepository,
     speedRatingRepository, rosterActivityRepository, playerCatalogRepository, playerManagementRepository,
+    playerStatisticsRepository,
     rosterRegistrationRepository,
     playerProfilePerformanceRepository, playerAwardsRepository, playerHistoryRepository,
   };
@@ -231,6 +237,43 @@ describe("roster HTTP routes", () => {
     expect(detail.json()).toEqual({ player: null });
     expect(playerCatalogRepository.list).toHaveBeenCalledWith(leagueId, { userId: "verified-user" });
     expect(playerCatalogRepository.get).toHaveBeenCalledWith(leagueId, playerId, { userId: "verified-user" });
+  });
+
+  it("serves league-scoped player statistics and roster groups", async () => {
+    const { app, playerCatalogRepository, playerStatisticsRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const headers = { authorization: "Bearer valid-token" };
+    const statistics = await app.inject({
+      method: "GET",
+      url: `/api/roster/leagues/${leagueId}/player-statistics?round_type=friendly&selectable_only=true`,
+      headers,
+    });
+    const groups = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/roster-groups?round_type=official`, headers,
+    });
+    expect(statistics.statusCode).toBe(200);
+    expect(statistics.json()).toEqual({ players: [] });
+    expect(groups.statusCode).toBe(200);
+    expect(groups.json()).toEqual({ officialPlayers: [], activeGuests: [], wags: [], supporters: [] });
+    expect(playerCatalogRepository.list).toHaveBeenCalledTimes(2);
+    expect(playerStatisticsRepository.listSeasonTotals).toHaveBeenCalledWith(
+      leagueId, "friendly", { userId: "verified-user" },
+    );
+    expect(playerStatisticsRepository.listLatestOveralls).toHaveBeenCalledWith(
+      leagueId, { userId: "verified-user" },
+    );
+  });
+
+  it("rejects malformed statistics queries before persistence", async () => {
+    const { app, playerStatisticsRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/roster/leagues/${leagueId}/player-statistics?round_type=training`,
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(playerStatisticsRepository.listSeasonTotals).not.toHaveBeenCalled();
   });
 
   it("creates, updates, swaps avatars and imports guests through scoped commands", async () => {

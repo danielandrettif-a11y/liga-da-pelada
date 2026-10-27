@@ -157,6 +157,45 @@ describe("httpRosterGateway", () => {
     expect((fetcher.mock.calls[1]?.[0] as URL).pathname).toContain(`/players/${playerId}`);
   });
 
+  it("loads validated player statistics and grouped rosters", async () => {
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const player = {
+      id: "00000000-0000-4000-8000-000000000001", name: "Jogador", nickname: null,
+      profile_bio: null, avatar_url: null, avatar_alternate_url: null, player_profile: "offensive",
+      initial_player_profile: "offensive", profile_decision_source: "initial", profile_source_round_id: null,
+      overall_traits: ["offensive"], overall_seed_mode: "observed", is_goalkeeper: false,
+      member_category: "player", is_selectable: true, is_competitive_profile_complete: false,
+      show_fitness_stats: false, registration_source: "admin", profile_scope: "persistent",
+      created_by_user_id: null, created_at: "2026-10-20T10:00:00.000Z", rounds: 2,
+      games: 4, goals: 3, assists: 1, wins: 1, draws: 1, losses: 0,
+      points: 9.5, legacyPoints: 4, overall: 82,
+      overallPositions: { DEF: 80, ALA_MEI: 83, ATA: 85, GOL: 70 },
+    };
+    const groups = { officialPlayers: [player], activeGuests: [], wags: [], supporters: [] };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ players: [player] }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(groups), {
+        status: 200, headers: { "content-type": "application/json" },
+      }));
+    const gateway = httpRosterGateway("http://backend:3001", "token", fetcher as typeof fetch);
+    await expect(gateway.getPlayersWithStats(leagueId, "official", true)).resolves.toEqual([player]);
+    await expect(gateway.getRosterGroups(leagueId, "official")).resolves.toEqual(groups);
+    expect((fetcher.mock.calls[0]?.[0] as URL).searchParams.get("selectable_only")).toBe("true");
+    expect((fetcher.mock.calls[0]?.[0] as URL).searchParams.get("round_type")).toBe("official");
+    expect((fetcher.mock.calls[1]?.[0] as URL).pathname).toContain("/roster-groups");
+  });
+
+  it("rejects malformed statistics payloads", async () => {
+    const gateway = httpRosterGateway("http://backend:3001", "token", vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ players: [{ id: "incomplete" }] }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }),
+    ));
+    await expect(gateway.getPlayersWithStats("league", "official")).rejects.toThrow("Resposta inválida");
+  });
+
   it("creates, updates, swaps and imports through player-management routes", async () => {
     const leagueId = "00000000-0000-4000-8000-000000000010";
     const playerId = "00000000-0000-4000-8000-000000000001";

@@ -5,6 +5,13 @@ import type { FitnessRoundEntry, FitnessSummaries, FitnessSummary } from "../dom
 import type { SpeedDrawCommand, SpeedDrawResult, SpeedRating } from "../domain/speed-rating";
 import type { RosterUnreadState, UnreadRosterPlayers } from "../domain/roster-activity";
 import { isRosterPlayer, type RosterPlayer } from "../domain/player-catalog";
+import {
+  isRosterGroups,
+  isRosterPlayerStatistics,
+  type RosterGroups,
+  type RosterPlayerStatistics,
+  type RosterStatisticsRoundType,
+} from "../domain/player-statistics";
 import { isImportedGuest, type ImportedGuest } from "../domain/player-management";
 import { isPlayerRegistrationEvent } from "../domain/roster-registration";
 import type { PlayerRegistrationEvent } from "@/lib/types";
@@ -56,6 +63,10 @@ export type RosterHttpGateway = {
   markRosterActivitySeen(leagueId: string): Promise<void>;
   getPlayers(leagueId: string, selectableOnly?: boolean): Promise<RosterPlayer[]>;
   getPlayer(leagueId: string, playerId: string): Promise<RosterPlayer | null>;
+  getPlayersWithStats(
+    leagueId: string, roundType: RosterStatisticsRoundType, selectableOnly?: boolean,
+  ): Promise<RosterPlayerStatistics[]>;
+  getRosterGroups(leagueId: string, roundType: RosterStatisticsRoundType): Promise<RosterGroups>;
   createPlayer(leagueId: string, input: CreatePlayerInput): Promise<RosterPlayer>;
   updatePlayer(leagueId: string, playerId: string, input: Partial<CreatePlayerInput>): Promise<RosterPlayer>;
   swapPlayerAvatars(leagueId: string, playerId: string): Promise<void>;
@@ -358,6 +369,29 @@ export function httpRosterGateway(
         throw new RosterApiError("Resposta inválida ao carregar o jogador.", response.status);
       }
       return player;
+    },
+    async getPlayersWithStats(leagueId, roundType, selectableOnly = false) {
+      const response = await request(
+        "GET",
+        `api/roster/leagues/${encodeURIComponent(leagueId)}/player-statistics?round_type=${encodeURIComponent(roundType)}&selectable_only=${selectableOnly}`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const players = payload && typeof payload === "object" ? (payload as { players?: unknown }).players : null;
+      if (!Array.isArray(players) || !players.every(isRosterPlayerStatistics)) {
+        throw new RosterApiError("Resposta inválida ao carregar as estatísticas do elenco.", response.status);
+      }
+      return players;
+    },
+    async getRosterGroups(leagueId, roundType) {
+      const response = await request(
+        "GET",
+        `api/roster/leagues/${encodeURIComponent(leagueId)}/roster-groups?round_type=${encodeURIComponent(roundType)}`,
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      if (!isRosterGroups(payload)) {
+        throw new RosterApiError("Resposta inválida ao carregar os grupos do elenco.", response.status);
+      }
+      return payload;
     },
     async createPlayer(leagueId, input) {
       const response = await request(

@@ -953,6 +953,38 @@
       ]
     },
     {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayersWithStats",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/player-statistics",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-statistics.test.ts",
+        "backend/src/contexts/roster/application/get-player-statistics.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-statistics-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-statistics.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts",
+        "scripts/verify-local-roster.sh"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getRosterGroups",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/roster-groups",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-statistics.test.ts",
+        "backend/src/contexts/roster/application/get-player-statistics.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-statistics-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-statistics.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts",
+        "scripts/verify-local-roster.sh"
+      ]
+    },
+    {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "registerGoal",

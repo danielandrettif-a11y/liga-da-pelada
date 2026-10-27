@@ -240,6 +240,17 @@ const getPlayersForStatsCached = cache(async (selectableOnly: boolean) => {
 });
 
 export async function getPlayersWithStats(roundType: RoundType = "official", selectableOnly = false) {
+  const league = await getSelectedLeague();
+  if (!league) return [];
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayersWithStats(league.id, roundType, selectableOnly);
+    } catch {
+      return [];
+    }
+  }
   const season = await getActiveSeason();
   const client = await createServerClient();
 
@@ -1057,6 +1068,18 @@ export async function swapPlayerAvatars(playerId: string) {
 }
 
 export async function getRosterGroups(roundType: RoundType = "official") {
+  const league = await getSelectedLeague();
+  if (league) {
+    const account = await getCurrentAccount();
+    if (account.user) {
+      try {
+        const api = await rosterApiFor(account.client);
+        if (api) return await api.getRosterGroups(league.id, roundType);
+      } catch {
+        return { officialPlayers: [], activeGuests: [], wags: [], supporters: [] };
+      }
+    }
+  }
   const [players, overallByPlayer] = await Promise.all([
     getPlayersWithStats(roundType),
     roundType === "official" ? getLatestPlayerCardOverallMap() : Promise.resolve(new Map()),
