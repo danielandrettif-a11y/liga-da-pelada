@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   selectedLeague: vi.fn(),
   revalidatePath: vi.fn(),
   matchApi: vi.fn(),
+  calculateRoundStats: vi.fn(),
+  refreshFluidOverallSafely: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -21,6 +23,8 @@ vi.mock("../auth", () => ({
 }));
 vi.mock("../league-context", () => ({ getSelectedLeague: mocks.selectedLeague }));
 vi.mock("@/modules/matches/infrastructure/match-api-session", () => ({ matchApiFor: mocks.matchApi }));
+vi.mock("./stats", () => ({ calculateRoundStats: mocks.calculateRoundStats }));
+vi.mock("./overall", () => ({ refreshFluidOverallSafely: mocks.refreshFluidOverallSafely }));
 
 import {
   addFinishedGoalEvent,
@@ -59,7 +63,14 @@ describe("matches actions via API gateway", () => {
     vi.resetAllMocks();
 
     const client = {
-      from: vi.fn(),
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: { id: "fantasy-round" }, error: null }),
+          }),
+        }),
+      }),
+      rpc: vi.fn().mockResolvedValue({ error: null }),
       auth: {
         getSession: vi.fn().mockResolvedValue({
           data: { session: { access_token: "test-token" } },
@@ -75,6 +86,8 @@ describe("matches actions via API gateway", () => {
     });
     mocks.adminClient.mockResolvedValue(client);
     mocks.selectedLeague.mockResolvedValue({ id: leagueId, role: "admin" });
+    mocks.calculateRoundStats.mockResolvedValue({ success: true });
+    mocks.refreshFluidOverallSafely.mockResolvedValue({ success: true });
   });
 
   it("routes findLiveMatchForTeams to API gateway", async () => {
@@ -157,6 +170,8 @@ describe("matches actions via API gateway", () => {
 
     const res = await correctFinishedGoal(eventId, "CONFIRMAR");
     expect(res.success).toBe(true);
+    expect(mocks.calculateRoundStats).toHaveBeenCalledWith(roundId);
+    expect(mocks.refreshFluidOverallSafely).toHaveBeenCalledWith(`correção de gol na rodada ${roundId}`);
   });
 
   it("routes correctFinishedGoalEvent to API gateway", async () => {

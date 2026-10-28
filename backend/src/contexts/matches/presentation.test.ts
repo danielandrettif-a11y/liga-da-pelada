@@ -149,6 +149,7 @@ describe("matches presentation routes", () => {
         team_id: teamAId,
         player_out_id: playerAId,
         player_in_id: playerBId,
+        reason: "other",
       },
     });
     expect(res.statusCode).toBe(201);
@@ -176,6 +177,53 @@ describe("matches presentation routes", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().roundId).toBe(roundId);
+  });
+
+  it("exposes the complete canonical correction, goalkeeper and undo contracts", async () => {
+    const repository = createMockRepository();
+    const app = buildApp(repository);
+    const headers = { authorization: "Bearer valid-token" };
+    const responses = await Promise.all([
+      app.inject({ method: "GET", url: `/api/matches/leagues/${leagueId}/${matchId}/audit`, headers }),
+      app.inject({
+        method: "PATCH",
+        url: `/api/matches/leagues/${leagueId}/events/${eventId}/correct-goal-event`,
+        headers,
+        payload: { playerId: playerAId, assistPlayerId: playerBId, confirmation: "CONFIRMAR" },
+      }),
+      app.inject({
+        method: "POST",
+        url: `/api/matches/leagues/${leagueId}/${matchId}/events/add-goal`,
+        headers,
+        payload: { teamId: teamAId, playerId: playerAId, assistPlayerId: null, confirmation: "CONFIRMAR" },
+      }),
+      app.inject({
+        method: "PATCH",
+        url: `/api/matches/leagues/${leagueId}/${matchId}/teams/${teamAId}/goalkeeper`,
+        headers,
+        payload: { playerId: playerAId, elapsedSeconds: 30 },
+      }),
+      app.inject({
+        method: "PATCH",
+        url: `/api/matches/leagues/${leagueId}/rounds/${roundId}/teams/${teamAId}/fixed-goalkeeper`,
+        headers,
+        payload: { playerId: playerAId },
+      }),
+      app.inject({
+        method: "DELETE",
+        url: `/api/matches/leagues/${leagueId}/${matchId}/substitutions/${subId}`,
+        headers,
+      }),
+    ]);
+    await app.close();
+
+    expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 201, 200, 200, 200]);
+    expect(repository.getFinishedMatchAudit).toHaveBeenCalledWith(matchId, leagueId, expect.anything());
+    expect(repository.correctFinishedGoalEvent).toHaveBeenCalled();
+    expect(repository.addFinishedGoalEvent).toHaveBeenCalled();
+    expect(repository.changeMatchGoalkeeper).toHaveBeenCalled();
+    expect(repository.setRoundTeamFixedGoalkeeper).toHaveBeenCalled();
+    expect(repository.undoLastMatchSubstitution).toHaveBeenCalled();
   });
 
   it("POST /api/matches/leagues/:leagueId/rounds/:roundId/goalkeeper/best returns compatibility response", async () => {

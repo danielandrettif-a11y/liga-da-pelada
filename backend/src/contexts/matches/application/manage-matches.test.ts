@@ -112,6 +112,7 @@ describe("manage-matches application layer", () => {
       team_id: teamAId,
       player_out_id: playerAId,
       player_in_id: playerBId,
+      reason: "other",
     }, leagueId, actor, repo);
     expect(sub.substitutionId).toBe(subId);
 

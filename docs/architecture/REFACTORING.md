@@ -32,6 +32,16 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-28 — gols, goleiros e substituições de partidas
+
+- Doze operações de `matches` passaram pela comparação com o fluxo legado: busca da partida ao vivo, auditoria finalizada, registro/exclusão/correção de gols, goleiro fixo e troca ao vivo, substituição e desfazer, além da resposta de compatibilidade do prêmio manual removido.
+- Exclusão e correções de gol, troca de goleiro, substituição e desfazer deixaram de executar `DELETE`/`UPDATE`/`INSERT` parciais no backend. O repositório agora confere o vínculo da partida/evento com a pelada da rota e chama exclusivamente `delete_match_event`, `correct_finished_goal`, `correct_finished_goal_event`, `add_finished_goal_event`, `change_match_goalkeeper`, `substitute_match_player` e `undo_last_match_substitution`.
+- Correções de rodadas encerradas voltaram a executar consolidação de estatísticas, reprocessamento condicional do Cartola e atualização do overall depois da confirmação da RPC; falha derivada retorna aviso e não orienta repetir uma mutação já confirmada.
+- Substituições preservam motivo, lesão opcional, presença obrigatória fora da formação manual e validações transacionais da RPC. Goleiro fixo exige time da rodada/pelada e atleta do próprio time; a troca ao vivo usa o relógio autoritativo do servidor.
+- Permanecem em revisão 9 operações de partidas: `createMatch`, `getMatch`, `finishMatch`, `deleteMatch` e as cinco operações de cronômetro/notificação. Elas dependem de lineup completo, read model/cosméticos, estatísticas/quick start/notificações e QStash/Web Push.
+- Progresso auditado: **150/267 estruturais, 141/267 (52,8%) aceitas em revisão, 0/267 verificadas de ponta a ponta e 126 pendentes de paridade**. Partidas chegaram a **12/21** aceitas.
+- Verificação automatizada: **1.041 testes frontend em 200 arquivos**, **351 testes backend em 98 arquivos**, typecheck e builds dos dois projetos; auditorias de arquitetura, contexto e migração aprovadas; `npm audit --omit=dev` sem vulnerabilidades em frontend e backend.
+
 ### 2026-10-28 — correções administrativas de participantes da rodada
 
 - As três operações finais de `rounds` foram comparadas com o fluxo legado. Transferência de identidade, zeragem de pontos e substituição emergencial agora passam pelos casos de uso com UUIDs validados, exigem que a rodada pertença à pelada da rota e delegam a mutação exclusivamente às RPCs canônicas `transfer_round_player_identity`, `zero_player_round_points` e `add_round_emergency_substitute`.

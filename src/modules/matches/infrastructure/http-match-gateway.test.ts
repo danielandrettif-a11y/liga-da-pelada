@@ -54,4 +54,47 @@ describe("httpMatchGateway", () => {
     const gateway = httpMatchGateway(backendUrl);
     await expect(gateway.finishMatch(leagueId, matchId)).rejects.toThrow(MatchApiError);
   });
+
+  it("sends the canonical correction, goalkeeper and substitution contracts", async () => {
+    const eventId = "00000000-0000-4000-8000-000000000006";
+    const playerAId = "00000000-0000-4000-8000-000000000007";
+    const playerBId = "00000000-0000-4000-8000-000000000008";
+    const teamId = "00000000-0000-4000-8000-000000000009";
+    const substitutionId = "00000000-0000-4000-8000-000000000010";
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ roundId, matchId, substitutionId }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const gateway = httpMatchGateway(backendUrl, "test-token");
+
+    await gateway.correctFinishedGoalEvent(leagueId, eventId, playerAId, playerBId, "CONFIRMAR");
+    await gateway.addFinishedGoalEvent(leagueId, matchId, teamId, playerAId, null, "CONFIRMAR");
+    await gateway.changeMatchGoalkeeper(leagueId, matchId, teamId, playerAId, 30);
+    await gateway.setRoundTeamFixedGoalkeeper(leagueId, roundId, teamId, playerAId);
+    await gateway.substituteMatchPlayer(leagueId, {
+      match_id: matchId,
+      team_id: teamId,
+      player_out_id: playerAId,
+      player_in_id: playerBId,
+      reason: "other",
+    });
+    await gateway.undoLastMatchSubstitution(leagueId, matchId, substitutionId);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/matches/leagues/${leagueId}/events/${eventId}/correct-goal-event`,
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ playerId: playerAId, assistPlayerId: playerBId, confirmation: "CONFIRMAR" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/matches/leagues/${leagueId}/substitutions`,
+      expect.objectContaining({ method: "POST", body: expect.stringContaining('"reason":"other"') }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/matches/leagues/${leagueId}/${matchId}/substitutions/${substitutionId}`,
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
 });

@@ -1,5 +1,6 @@
 import type { Actor } from "../../../shared/actor.js";
 import {
+  MatchValidationError,
   parseMatchUuid,
   validateExtraSeconds,
   validateGoalCorrectionConfirmation,
@@ -68,9 +69,9 @@ export type SubstituteMatchPlayerInput = {
   match_id: string;
   team_id: string;
   player_out_id: string;
-  player_in_id: string;
-  minute?: number;
-  elapsed_seconds?: number;
+  player_in_id?: string;
+  reason: "tired" | "injury" | "other";
+  mark_injured?: boolean;
 };
 
 export interface MatchRepository {
@@ -165,11 +166,14 @@ export function addFinishedGoalEvent(matchId: string, teamId: string, playerId: 
 }
 
 export function changeMatchGoalkeeper(matchId: string, teamId: string, playerId: string, elapsedSeconds: number | undefined, leagueId: string, actor: Actor, repository: MatchRepository) {
+  const normalizedElapsed = Number.isFinite(elapsedSeconds)
+    ? Math.max(0, Math.floor(elapsedSeconds!))
+    : undefined;
   return repository.changeMatchGoalkeeper(
     parseMatchUuid(matchId, "Partida"),
     parseMatchUuid(teamId, "Time"),
     parseMatchUuid(playerId, "Goleiro"),
-    elapsedSeconds,
+    normalizedElapsed,
     parseMatchUuid(leagueId, "Pelada"),
     actor,
   );
@@ -186,13 +190,20 @@ export function setRoundTeamFixedGoalkeeper(roundId: string, teamId: string, pla
 }
 
 export function substituteMatchPlayer(input: SubstituteMatchPlayerInput, leagueId: string, actor: Actor, repository: MatchRepository) {
+  if (!input || !["tired", "injury", "other"].includes(input.reason)) {
+    throw new MatchValidationError("Motivo de substituição inválido.");
+  }
+  const outgoingId = parseMatchUuid(input.player_out_id, "Jogador que sai");
+  const incomingId = input.player_in_id ? parseMatchUuid(input.player_in_id, "Jogador que entra") : undefined;
+  if (incomingId === outgoingId) throw new MatchValidationError("Escolha jogadores diferentes.");
   return repository.substituteMatchPlayer(
     {
       ...input,
       match_id: parseMatchUuid(input.match_id, "Partida"),
       team_id: parseMatchUuid(input.team_id, "Time"),
-      player_out_id: parseMatchUuid(input.player_out_id, "Jogador que sai"),
-      player_in_id: parseMatchUuid(input.player_in_id, "Jogador que entra"),
+      player_out_id: outgoingId,
+      player_in_id: incomingId,
+      mark_injured: Boolean(input.mark_injured),
     },
     parseMatchUuid(leagueId, "Pelada"),
     actor,

@@ -24,8 +24,17 @@ function translateFailure(cause: unknown): MatchPersistenceError {
   if (/MATCH_FORBIDDEN|Somente administradores|Acesso restrito|permission denied|row-level security/i.test(message)) {
     return new MatchPersistenceError("Somente administradores podem realizar esta operação.", 403);
   }
-  if (/MATCH_NOT_FOUND|fora da pelada/i.test(message)) {
+  if (/MATCH_NOT_FOUND|fora da pelada|Partida (não|nao) encontrada/i.test(message)) {
     return new MatchPersistenceError("Partida não encontrada na pelada selecionada.", 404);
+  }
+  if (/Evento (não|nao) encontrado|Gol (não|nao) encontrado|Substitui(c|ç)(a|ã)o (não|nao) encontrada/i.test(message)) {
+    return new MatchPersistenceError(message, 404);
+  }
+  if (/não está em andamento|nao esta em andamento|rodadas finalizadas|já participou|ja participou|outra partida ao vivo|mais recente|gol registrado depois/i.test(message)) {
+    return new MatchPersistenceError(message, 409);
+  }
+  if (/time (?:informado )?(?:não|nao) participa|precisa estar|Escolha|Motivo de substitui(?:c|ç)(?:a|ã)o inv[aá]lido|fora da rodada/i.test(message)) {
+    return new MatchPersistenceError(message, 400);
   }
   return new MatchPersistenceError(message || "Falha na persistência da partida.", 500);
 }
@@ -50,6 +59,43 @@ async function requireLeagueAdmin(client: PoolClient, leagueId: string): Promise
   if (access.rows[0]?.allowed !== true) {
     throw new MatchPersistenceError("Somente administradores podem realizar esta ação.", 403);
   }
+}
+
+async function requireMatchInLeague(
+  client: PoolClient,
+  matchId: string,
+  leagueId: string,
+): Promise<{ round_id: string; status: string; team_a_id: string; team_b_id: string }> {
+  const result = await client.query<{ round_id: string; status: string; team_a_id: string; team_b_id: string }>(
+    `SELECT match_item.round_id, match_item.status, match_item.team_a_id, match_item.team_b_id
+     FROM public.matches match_item
+     JOIN public.rounds round_item ON round_item.id = match_item.round_id
+     WHERE match_item.id = $1::uuid AND round_item.league_id = $2::uuid
+     LIMIT 1`,
+    [matchId, leagueId],
+  );
+  const match = result.rows[0];
+  if (!match) throw new MatchPersistenceError("Partida não encontrada na pelada selecionada.", 404);
+  return match;
+}
+
+async function requireEventInLeague(
+  client: PoolClient,
+  eventId: string,
+  leagueId: string,
+): Promise<{ match_id: string; round_id: string }> {
+  const result = await client.query<{ match_id: string; round_id: string }>(
+    `SELECT event.match_id, match_item.round_id
+     FROM public.match_events event
+     JOIN public.matches match_item ON match_item.id = event.match_id
+     JOIN public.rounds round_item ON round_item.id = match_item.round_id
+     WHERE event.id = $1::uuid AND round_item.league_id = $2::uuid
+     LIMIT 1`,
+    [eventId, leagueId],
+  );
+  const event = result.rows[0];
+  if (!event) throw new MatchPersistenceError("Evento não encontrado na pelada selecionada.", 404);
+  return event;
 }
 
 export function pgMatchRepository(pool: Pool): MatchRepository {
@@ -124,6 +170,9 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
            WHERE m.round_id = $1::uuid
              AND r.league_id = $4::uuid
              AND m.status = 'live'
+             AND m.timer_started_at IS NOT NULL
+             AND EXISTS (SELECT 1 FROM public.match_players player_entry WHERE player_entry.match_id = m.id)
+             AND (SELECT count(*) FROM public.match_goalkeepers goalkeeper WHERE goalkeeper.match_id = m.id) = 2
              AND ((m.team_a_id = $2::uuid AND m.team_b_id = $3::uuid)
                OR (m.team_a_id = $3::uuid AND m.team_b_id = $2::uuid))
            LIMIT 1`,
@@ -136,11 +185,16 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
     async getFinishedMatchAudit(matchId: string, leagueId: string, actor: Actor): Promise<MatchAdminAuditEntry[]> {
       return authenticated(pool, actor, async (client) => {
         const res = await client.query<MatchAdminAuditEntry>(
-          `SELECT a.id, a.action, a.changed_by_name AS "changedByName", a.payload, a.created_at AS "createdAt"
+          `SELECT a.id, a.action,
+                  COALESCE(a.changed_by_name, changed_player.name, 'Administrador') AS "changedByName",
+                  a.payload, a.created_at AS "createdAt"
            FROM public.sports_admin_audit a
            JOIN public.matches m ON m.id = a.match_id
            JOIN public.rounds r ON r.id = m.round_id
+           LEFT JOIN public.account_profiles changed_profile ON changed_profile.user_id = a.changed_by
+           LEFT JOIN public.players changed_player ON changed_player.id = changed_profile.player_id
            WHERE a.match_id = $1::uuid AND r.league_id = $2::uuid
+             AND a.action IN ('goal_corrected', 'goal_assist_corrected', 'goal_event_corrected', 'goal_event_added')
            ORDER BY a.created_at DESC`,
           [matchId, leagueId],
         );
@@ -219,132 +273,87 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
     async deleteEvent(eventId: string, matchId: string, leagueId: string, actor: Actor): Promise<{ roundId: string; scoreA: number; scoreB: number }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const eventRes = await client.query<{ event_type: string; team_id: string }>(
-          "SELECT event_type, team_id FROM public.match_events WHERE id = $1::uuid AND match_id = $2::uuid",
+        const match = await requireMatchInLeague(client, matchId, leagueId);
+        const result = await client.query<{ receipt: { round_id: string; score_a: number; score_b: number } }>(
+          "SELECT public.delete_match_event($1::uuid, $2::uuid) AS receipt",
           [eventId, matchId],
         );
-        const event = eventRes.rows[0];
-        await client.query("DELETE FROM public.match_events WHERE id = $1::uuid", [eventId]);
-
-        const matchRes = await client.query<{ round_id: string; team_a_id: string; score_a: number; score_b: number }>(
-          "SELECT round_id, team_a_id, score_a, score_b FROM public.matches WHERE id = $1::uuid",
-          [matchId],
-        );
-        const match = matchRes.rows[0];
-        let scoreA = match?.score_a || 0;
-        let scoreB = match?.score_b || 0;
-
-        if (event?.event_type === "goal") {
-          if (event.team_id === match?.team_a_id) {
-            scoreA = Math.max(0, scoreA - 1);
-          } else {
-            scoreB = Math.max(0, scoreB - 1);
-          }
-          await client.query("UPDATE public.matches SET score_a = $2, score_b = $3 WHERE id = $1::uuid", [matchId, scoreA, scoreB]);
-        }
-
-        return { roundId: match?.round_id || "", scoreA, scoreB };
+        const receipt = result.rows[0]?.receipt;
+        if (!receipt) throw new MatchPersistenceError("A exclusão do gol não retornou um recibo válido.", 500);
+        return { roundId: receipt.round_id || match.round_id, scoreA: receipt.score_a, scoreB: receipt.score_b };
       });
     },
 
     async correctFinishedGoal(eventId: string, confirmation: string, leagueId: string, actor: Actor): Promise<{ roundId: string; matchId: string; warning?: string }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const eventRes = await client.query<{ match_id: string }>("SELECT match_id FROM public.match_events WHERE id = $1::uuid", [eventId]);
-        const matchId = eventRes.rows[0]?.match_id;
-        if (!matchId) throw new MatchPersistenceError("Evento não encontrado.", 404);
-
-        await client.query("DELETE FROM public.match_events WHERE id = $1::uuid", [eventId]);
-        const matchRes = await client.query<{ round_id: string }>("SELECT round_id FROM public.matches WHERE id = $1::uuid", [matchId]);
-
-        await client.query(
-          `INSERT INTO public.sports_admin_audit (match_id, action, changed_by, changed_by_name, payload)
-           VALUES ($1::uuid, 'goal_corrected', $2::uuid, 'Administrador', $3::jsonb)`,
-          [matchId, actor.userId, JSON.stringify({ eventId, confirmation })],
+        const scope = await requireEventInLeague(client, eventId, leagueId);
+        const result = await client.query<{ receipt: { round_id?: string; match_id?: string } }>(
+          "SELECT public.correct_finished_goal($1::uuid) AS receipt",
+          [eventId],
         );
-
-        return { roundId: matchRes.rows[0]?.round_id || "", matchId };
+        const receipt = result.rows[0]?.receipt;
+        return { roundId: receipt?.round_id || scope.round_id, matchId: receipt?.match_id || scope.match_id };
       });
     },
 
     async correctFinishedGoalEvent(eventId: string, playerId: string, assistPlayerId: string | null, confirmation: string, leagueId: string, actor: Actor): Promise<{ roundId: string; matchId: string; warning?: string }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const eventRes = await client.query<{ match_id: string }>("SELECT match_id FROM public.match_events WHERE id = $1::uuid", [eventId]);
-        const matchId = eventRes.rows[0]?.match_id;
-        if (!matchId) throw new MatchPersistenceError("Evento não encontrado.", 404);
-
-        await client.query(
-          "UPDATE public.match_events SET player_id = $2::uuid, assist_player_id = $3::uuid WHERE id = $1::uuid",
+        const scope = await requireEventInLeague(client, eventId, leagueId);
+        const result = await client.query<{ receipt: { round_id?: string; match_id?: string } }>(
+          "SELECT public.correct_finished_goal_event($1::uuid, $2::uuid, $3::uuid) AS receipt",
           [eventId, playerId, assistPlayerId],
         );
-        const matchRes = await client.query<{ round_id: string }>("SELECT round_id FROM public.matches WHERE id = $1::uuid", [matchId]);
-
-        await client.query(
-          `INSERT INTO public.sports_admin_audit (match_id, action, changed_by, changed_by_name, payload)
-           VALUES ($1::uuid, 'goal_event_corrected', $2::uuid, 'Administrador', $3::jsonb)`,
-          [matchId, actor.userId, JSON.stringify({ eventId, playerId, assistPlayerId, confirmation })],
-        );
-
-        return { roundId: matchRes.rows[0]?.round_id || "", matchId };
+        const receipt = result.rows[0]?.receipt;
+        return { roundId: receipt?.round_id || scope.round_id, matchId: receipt?.match_id || scope.match_id };
       });
     },
 
     async addFinishedGoalEvent(matchId: string, teamId: string, playerId: string, assistPlayerId: string | null, confirmation: string, leagueId: string, actor: Actor): Promise<{ roundId: string; matchId: string; warning?: string }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const matchRes = await client.query<{ round_id: string; team_a_id: string; score_a: number; score_b: number }>(
-          "SELECT round_id, team_a_id, score_a, score_b FROM public.matches WHERE id = $1::uuid",
-          [matchId],
-        );
-        const match = matchRes.rows[0];
-        if (!match) throw new MatchPersistenceError("Partida não encontrada.", 404);
-
-        await client.query(
-          `INSERT INTO public.match_events (match_id, team_id, player_id, assist_player_id, event_type)
-           VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'goal')`,
+        const scope = await requireMatchInLeague(client, matchId, leagueId);
+        const result = await client.query<{ receipt: { round_id?: string; match_id?: string } }>(
+          "SELECT public.add_finished_goal_event($1::uuid, $2::uuid, $3::uuid, $4::uuid) AS receipt",
           [matchId, teamId, playerId, assistPlayerId],
         );
-
-        const isTeamA = teamId === match.team_a_id;
-        const newScoreA = isTeamA ? match.score_a + 1 : match.score_a;
-        const newScoreB = !isTeamA ? match.score_b + 1 : match.score_b;
-        await client.query("UPDATE public.matches SET score_a = $2, score_b = $3 WHERE id = $1::uuid", [matchId, newScoreA, newScoreB]);
-
-        await client.query(
-          `INSERT INTO public.sports_admin_audit (match_id, action, changed_by, changed_by_name, payload)
-           VALUES ($1::uuid, 'goal_event_added', $2::uuid, 'Administrador', $3::jsonb)`,
-          [matchId, actor.userId, JSON.stringify({ teamId, playerId, assistPlayerId, confirmation })],
-        );
-
-        return { roundId: match.round_id, matchId };
+        const receipt = result.rows[0]?.receipt;
+        return { roundId: receipt?.round_id || scope.round_id, matchId: receipt?.match_id || matchId };
       });
     },
 
     async changeMatchGoalkeeper(matchId: string, teamId: string, playerId: string, elapsedSeconds: number | undefined, leagueId: string, actor: Actor): Promise<{ roundId: string }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const matchRes = await client.query<{ round_id: string }>("SELECT round_id FROM public.matches WHERE id = $1::uuid", [matchId]);
-        const roundId = matchRes.rows[0]?.round_id;
-        if (!roundId) throw new MatchPersistenceError("Partida não encontrada.", 404);
-
+        const scope = await requireMatchInLeague(client, matchId, leagueId);
         await client.query(
-          `INSERT INTO public.match_goalkeeper_stints (match_id, team_id, player_id, entered_elapsed_seconds)
-           VALUES ($1::uuid, $2::uuid, $3::uuid, $4)`,
+          "SELECT public.change_match_goalkeeper($1::uuid, $2::uuid, $3::uuid, $4::integer)",
           [matchId, teamId, playerId, elapsedSeconds ?? null],
         );
-
-        return { roundId };
+        return { roundId: scope.round_id };
       });
     },
 
     async setRoundTeamFixedGoalkeeper(roundId: string, teamId: string, playerId: string | null, leagueId: string, actor: Actor): Promise<{ roundId: string }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        await client.query(
-          "UPDATE public.teams SET fixed_goalkeeper_player_id = $2::uuid WHERE id = $1::uuid",
-          [teamId, playerId],
+        const teamResult = await client.query<{ found: boolean }>(
+          `SELECT EXISTS (
+             SELECT 1 FROM public.teams team
+             JOIN public.rounds round_item ON round_item.id = team.round_id
+             WHERE team.id = $1::uuid AND team.round_id = $2::uuid AND round_item.league_id = $3::uuid
+               AND ($4::uuid IS NULL OR EXISTS (
+                 SELECT 1 FROM public.team_players player_entry
+                 WHERE player_entry.team_id = team.id AND player_entry.player_id = $4::uuid
+               ))
+           ) AS found`,
+          [teamId, roundId, leagueId, playerId],
         );
+        if (teamResult.rows[0]?.found !== true) {
+          throw new MatchPersistenceError("Time ou goleiro fora da rodada selecionada.", 400);
+        }
+        await client.query("UPDATE public.teams SET fixed_goalkeeper_player_id = $2::uuid WHERE id = $1::uuid", [teamId, playerId]);
         return { roundId };
       });
     },
@@ -352,45 +361,47 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
     async substituteMatchPlayer(input: SubstituteMatchPlayerInput, leagueId: string, actor: Actor): Promise<{ roundId: string; substitutionId: string }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const matchRes = await client.query<{ round_id: string }>("SELECT round_id FROM public.matches WHERE id = $1::uuid", [input.match_id]);
-        const roundId = matchRes.rows[0]?.round_id;
-        if (!roundId) throw new MatchPersistenceError("Partida não encontrada.", 404);
-
-        const subRes = await client.query<{ id: string }>(
-          `INSERT INTO public.match_substitutions (match_id, team_id, player_out_id, player_in_id, elapsed_seconds)
-           VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5)
-           RETURNING id`,
-          [input.match_id, input.team_id, input.player_out_id, input.player_in_id, input.elapsed_seconds ?? null],
+        const scope = await requireMatchInLeague(client, input.match_id, leagueId);
+        if (input.player_in_id) {
+          const incomingResult = await client.query<{ formation_mode: string; attendance_status: string | null }>(
+            `SELECT round_item.formation_mode, round_player.attendance_status
+             FROM public.matches match_item
+             JOIN public.rounds round_item ON round_item.id = match_item.round_id
+             JOIN public.round_players round_player
+               ON round_player.round_id = round_item.id AND round_player.player_id = $2::uuid
+             WHERE match_item.id = $1::uuid
+             LIMIT 1`,
+            [input.match_id, input.player_in_id],
+          );
+          const incoming = incomingResult.rows[0];
+          if (!incoming) throw new MatchPersistenceError("Substituto não encontrado nesta rodada.", 400);
+          if (incoming.formation_mode !== "manual" && incoming.attendance_status !== "present") {
+            throw new MatchPersistenceError("O substituto ainda não foi marcado como presente.", 400);
+          }
+        }
+        const result = await client.query<{ id: string }>(
+          `SELECT public.substitute_match_player(
+             $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::text, $6::boolean
+           ) AS id`,
+          [input.match_id, input.team_id, input.player_out_id, input.player_in_id || null, input.reason, Boolean(input.mark_injured)],
         );
-
-        await client.query("UPDATE public.match_players SET is_active = false WHERE match_id = $1::uuid AND player_id = $2::uuid", [input.match_id, input.player_out_id]);
-        await client.query(
-          `INSERT INTO public.match_players (match_id, team_id, player_id, is_active, is_starter)
-           VALUES ($1::uuid, $2::uuid, $3::uuid, true, false)
-           ON CONFLICT (match_id, player_id) DO UPDATE SET is_active = true`,
-          [input.match_id, input.team_id, input.player_in_id],
-        );
-
-        return { roundId, substitutionId: subRes.rows[0]?.id || "" };
+        const substitutionId = result.rows[0]?.id;
+        if (!substitutionId) throw new MatchPersistenceError("A substituição não retornou um identificador.", 500);
+        return { roundId: scope.round_id, substitutionId };
       });
     },
 
     async undoLastMatchSubstitution(substitutionId: string, matchId: string, leagueId: string, actor: Actor): Promise<{ roundId: string }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const subRes = await client.query<{ player_out_id: string; player_in_id: string }>(
-          "SELECT player_out_id, player_in_id FROM public.match_substitutions WHERE id = $1::uuid AND match_id = $2::uuid",
+        const scope = await requireMatchInLeague(client, matchId, leagueId);
+        const substitution = await client.query<{ found: boolean }>(
+          "SELECT EXISTS (SELECT 1 FROM public.match_substitutions WHERE id = $1::uuid AND match_id = $2::uuid) AS found",
           [substitutionId, matchId],
         );
-        const sub = subRes.rows[0];
-        if (!sub) throw new MatchPersistenceError("Substituição não encontrada.", 404);
-
-        await client.query("DELETE FROM public.match_substitutions WHERE id = $1::uuid", [substitutionId]);
-        await client.query("UPDATE public.match_players SET is_active = true WHERE match_id = $1::uuid AND player_id = $2::uuid", [matchId, sub.player_out_id]);
-        await client.query("UPDATE public.match_players SET is_active = false WHERE match_id = $1::uuid AND player_id = $2::uuid", [matchId, sub.player_in_id]);
-
-        const matchRes = await client.query<{ round_id: string }>("SELECT round_id FROM public.matches WHERE id = $1::uuid", [matchId]);
-        return { roundId: matchRes.rows[0]?.round_id || "" };
+        if (substitution.rows[0]?.found !== true) throw new MatchPersistenceError("Substituição não encontrada nesta partida.", 404);
+        await client.query("SELECT public.undo_last_match_substitution($1::uuid)", [substitutionId]);
+        return { roundId: scope.round_id };
       });
     },
 

@@ -936,6 +936,29 @@ async function runFinishedGoalCorrection(client: SupabaseClient, input: Finished
   return { success: true as const, warning };
 }
 
+async function refreshFinishedGoalDerivedData(client: SupabaseClient, roundId: string) {
+  try {
+    const stats = await calculateRoundStats(roundId);
+    if (!stats.success) throw new Error(stats.error || "Não foi possível recalcular as estatísticas.");
+    const { data: fantasyRound, error: fantasyRoundError } = await client
+      .from("fantasy_rounds").select("id").eq("round_id", roundId).maybeSingle();
+    if (fantasyRoundError) throw new Error(`Não foi possível localizar a rodada do Cartola: ${fantasyRoundError.message}`);
+    if (fantasyRound) {
+      const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: roundId });
+      if (fantasyError) throw new Error(`O Cartola precisa ser reprocessado: ${fantasyError.message}`);
+    }
+    const overall = await refreshFluidOverallSafely(`correção de gol na rodada ${roundId}`);
+    if (!overall.success) throw new Error(overall.error || "Não foi possível atualizar o Overall.");
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : "Reprocessamento pendente.";
+  }
+}
+
+function joinWarnings(...warnings: Array<string | undefined>) {
+  return warnings.filter(Boolean).join(" ") || undefined;
+}
+
 export async function correctFinishedGoal(eventId: string, confirmation: string) {
   try {
     const client = await getAdminClient();
@@ -944,11 +967,12 @@ export async function correctFinishedGoal(eventId: string, confirmation: string)
     const api = await matchApiFor(client);
     if (api && league) {
       const res = await api.correctFinishedGoal(league.id, eventId, confirmation);
+      const derivedWarning = res.roundId ? await refreshFinishedGoalDerivedData(client, res.roundId) : undefined;
       if (res.matchId) revalidatePath(`/partidas/${res.matchId}`);
       if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
       revalidatePath("/ranking");
       revalidatePath("/cartola", "layout");
-      return res;
+      return { ...res, warning: joinWarnings(res.warning, derivedWarning) };
     }
     return await runFinishedGoalCorrection(client, { kind: "remove", eventId, confirmation });
   } catch (err: any) {
@@ -965,11 +989,12 @@ export async function correctFinishedGoalEvent(eventId: string, playerId: string
     const api = await matchApiFor(client);
     if (api && league) {
       const res = await api.correctFinishedGoalEvent(league.id, eventId, playerId, assistPlayerId, confirmation);
+      const derivedWarning = res.roundId ? await refreshFinishedGoalDerivedData(client, res.roundId) : undefined;
       if (res.matchId) revalidatePath(`/partidas/${res.matchId}`);
       if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
       revalidatePath("/ranking");
       revalidatePath("/cartola", "layout");
-      return res;
+      return { ...res, warning: joinWarnings(res.warning, derivedWarning) };
     }
     return await runFinishedGoalCorrection(client, {
       kind: "edit", eventId, playerId, assistPlayerId, confirmation,
@@ -994,11 +1019,12 @@ export async function addFinishedGoalEvent(
     const api = await matchApiFor(client);
     if (api && league) {
       const res = await api.addFinishedGoalEvent(league.id, matchId, teamId, playerId, assistPlayerId, confirmation);
+      const derivedWarning = res.roundId ? await refreshFinishedGoalDerivedData(client, res.roundId) : undefined;
       if (res.matchId) revalidatePath(`/partidas/${res.matchId}`);
       if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
       revalidatePath("/ranking");
       revalidatePath("/cartola", "layout");
-      return res;
+      return { ...res, warning: joinWarnings(res.warning, derivedWarning) };
     }
     return await runFinishedGoalCorrection(client, {
       kind: "add", matchId, teamId, playerId, assistPlayerId, confirmation,

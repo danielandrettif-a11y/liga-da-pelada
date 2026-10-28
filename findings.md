@@ -8,8 +8,9 @@
 - **Correção aplicada:** leituras passaram a exigir sessão coerente com a RLS da migration 255; sessões sem token mantêm o fallback legado; a abertura de convocação cria sua pré-lista na mesma transação e preserva o contrato da Server Action; fallbacks SQL parciais foram retirados para manter as RPCs versionadas como autoridade.
 - **Aceite incremental:** as 21 operações de convocação foram comparadas com o fluxo legado. Foram corrigidos escopo de estádio, trava de lista incompleta, idempotência da pré-lista e agendamento do Cartola. Quatro operações de sorteio de rodada também passaram ao padrão: a prévia usa o algoritmo de domínio e atributos escopados da pelada; aplicação aleatória e aplicação aprovada usam as RPCs canônicas.
 - **Métrica auditável:** `architecture/operation-parity-status.json` separa revisão de paridade de ponte estrutural e homologação. No aceite anterior, o auditor registrava 113/267 aceitas e 154 pendentes.
-- **Aceite atual:** o auditor registra 129/267 aceitas e 138 pendentes; `verified` continua 0 até o smoke no Supabase local restaurado.
+- **Aceite atual:** o auditor registra 141/267 aceitas e 126 pendentes; `verified` continua 0 até o smoke no Supabase local restaurado.
 - **Rodadas:** 38/38 operações estão aceitas em revisão de código. Além dos leitores, sorteio, pré-lista, ciclo, Draft e equilíbrio adaptativo, as correções de participantes agora usam as RPCs canônicas completas, preservam o motivo da zeragem e mantêm o recálculo de estatísticas, Cartola e overall. A homologação integrada ainda depende do banco local restaurado.
+- **Partidas:** 12/21 operações estão aceitas. Gols, correções finalizadas, goleiros e substituições usam as RPCs escopadas completas e preservam efeitos derivados. As 9 restantes concentram o lineup transacional, read model detalhado, encerramento/exclusão e integrações do cronômetro com QStash/Web Push.
 
 ## 1. Unificação de Pontuação e Integridade de Centésimos
 - **Descoberta:** O sistema Ranked e o Fantasy possuíam discrepâncias históricas na base (ex: ausência de pontos de empate no Cartola, pesos de gols sofridos e bônus de atleta defensivo acoplado na base do Cartola).
