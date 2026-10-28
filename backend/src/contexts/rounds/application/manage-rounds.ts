@@ -13,6 +13,8 @@ import {
   type RoundWithCounts,
 } from "../domain/round.js";
 import type { RoundReshuffleMode, RoundReshuffleSummary } from "../domain/round-team-shuffle.js";
+import type { AdaptiveTeamSummary } from "../domain/adaptive-draw.js";
+import type { DraftPlayerProfile, DraftSwapSuggestion, DraftTeamBalance } from "../domain/draft-balance.js";
 
 export type AdminRoundPrelist = {
   id: string;
@@ -139,7 +141,7 @@ export type DraftWorkspace = {
       name: string;
       nickname: string | null;
       avatarUrl: string | null;
-      profile: string | null;
+      profile: DraftPlayerProfile | null;
       overall: number | null;
       stars: number | null;
       teamSlot: number | null;
@@ -153,7 +155,7 @@ export type DraftWorkspace = {
     name: string;
     nickname: string | null;
     avatarUrl: string | null;
-    profile: string | null;
+    profile: DraftPlayerProfile | null;
     overall: number | null;
     stars: number | null;
     teamSlot: number | null;
@@ -161,15 +163,15 @@ export type DraftWorkspace = {
     pickNumber: number | null;
     active: boolean;
   }>;
-  summaries?: unknown;
-  balanceScore?: number;
-  suggestion?: unknown;
+  summaries: DraftTeamBalance[];
+  balanceScore: number;
+  suggestion: (DraftSwapSuggestion & { playerAName: string; playerBName: string }) | null;
 };
 
 export type ServerAdaptiveDrawResult = {
   success: boolean;
   teams?: string[][];
-  teamSummaries?: unknown[];
+  teamSummaries?: AdaptiveTeamSummary[];
   missingOverallCount?: number;
   missingSpeedCount?: number;
   balanceScore?: number;
@@ -223,7 +225,7 @@ export interface RoundRepository {
 
   // Draft
   createTeamDraft(roundId: string, callupId: string | null, leagueId: string, actor: Actor): Promise<{ draftId: string }>;
-  getDraftWorkspace(draftId: string, leagueId: string, actor: Actor): Promise<DraftWorkspace | null>;
+  getDraftWorkspace(callupId: string, leagueId: string, actor: Actor): Promise<DraftWorkspace | null>;
   getDraftWorkspaceByRound(roundId: string, leagueId: string, actor: Actor): Promise<DraftWorkspace | null>;
   startTeamDraft(draftId: string, leagueId: string, actor: Actor): Promise<void>;
   makeTeamDraftPick(draftId: string, leagueId: string, playerId: string, actor: Actor): Promise<void>;
@@ -334,4 +336,121 @@ export function saveRoundPrelist(input: SaveRoundPrelistInput, leagueId: string,
     stadiumId: input.stadiumId ? parseRoundUuid(input.stadiumId, "Estádio") : null,
   };
   return repository.saveRoundPrelist(normalized, parseRoundUuid(leagueId, "Pelada"), actor);
+}
+
+export function createTeamDraft(
+  input: { roundId: string; callupId?: string | null },
+  leagueId: string,
+  actor: Actor,
+  repository: RoundRepository,
+) {
+  return repository.createTeamDraft(
+    parseRoundUuid(input.roundId, "Rodada"),
+    input.callupId ? parseRoundUuid(input.callupId, "Convocação") : null,
+    parseRoundUuid(leagueId, "Pelada"),
+    actor,
+  );
+}
+
+export function getDraftWorkspace(callupId: string, leagueId: string, actor: Actor, repository: RoundRepository) {
+  return repository.getDraftWorkspace(
+    parseRoundUuid(callupId, "Convocação"),
+    parseRoundUuid(leagueId, "Pelada"),
+    actor,
+  );
+}
+
+export function getDraftWorkspaceByRound(roundId: string, leagueId: string, actor: Actor, repository: RoundRepository) {
+  return repository.getDraftWorkspaceByRound(
+    parseRoundUuid(roundId, "Rodada"),
+    parseRoundUuid(leagueId, "Pelada"),
+    actor,
+  );
+}
+
+export function startTeamDraft(draftId: string, leagueId: string, actor: Actor, repository: RoundRepository) {
+  return repository.startTeamDraft(parseRoundUuid(draftId, "Draft"), parseRoundUuid(leagueId, "Pelada"), actor);
+}
+
+export function makeTeamDraftPick(draftId: string, leagueId: string, playerId: string, actor: Actor, repository: RoundRepository) {
+  return repository.makeTeamDraftPick(
+    parseRoundUuid(draftId, "Draft"),
+    parseRoundUuid(leagueId, "Pelada"),
+    parseRoundUuid(playerId, "Jogador"),
+    actor,
+  );
+}
+
+export function replaceTeamDraftCaptain(
+  draftId: string,
+  leagueId: string,
+  teamSlot: number,
+  playerId: string,
+  actor: Actor,
+  repository: RoundRepository,
+) {
+  if (!Number.isInteger(teamSlot) || teamSlot < 1 || teamSlot > 3) {
+    throw new InvalidRoundError("Escolha um time válido para trocar o capitão.");
+  }
+  return repository.replaceTeamDraftCaptain(
+    parseRoundUuid(draftId, "Draft"),
+    parseRoundUuid(leagueId, "Pelada"),
+    teamSlot,
+    parseRoundUuid(playerId, "Capitão"),
+    actor,
+  );
+}
+
+export function restartTeamDraft(draftId: string, leagueId: string, actor: Actor, repository: RoundRepository) {
+  return repository.restartTeamDraft(parseRoundUuid(draftId, "Draft"), parseRoundUuid(leagueId, "Pelada"), actor);
+}
+
+export function finalizeTeamDraft(draftId: string, leagueId: string, actor: Actor, repository: RoundRepository) {
+  return repository.finalizeTeamDraft(parseRoundUuid(draftId, "Draft"), parseRoundUuid(leagueId, "Pelada"), actor);
+}
+
+export function applyDraftSwap(
+  draftId: string,
+  leagueId: string,
+  playerAId: string,
+  playerBId: string,
+  actor: Actor,
+  repository: RoundRepository,
+) {
+  const playerA = parseRoundUuid(playerAId, "Jogador A");
+  const playerB = parseRoundUuid(playerBId, "Jogador B");
+  if (playerA === playerB) throw new InvalidRoundError("Escolha dois jogadores diferentes.");
+  return repository.applyDraftSwap(
+    parseRoundUuid(draftId, "Draft"),
+    parseRoundUuid(leagueId, "Pelada"),
+    playerA,
+    playerB,
+    actor,
+  );
+}
+
+export function drawTeamsAdaptiveOnServer(
+  input: { playerIds: string[]; attendanceOrder?: string[]; teamCount: number; playersPerTeam: number },
+  leagueId: string,
+  actor: Actor,
+  repository: RoundRepository,
+) {
+  if (!input || !Array.isArray(input.playerIds) || !Array.isArray(input.attendanceOrder || [])) {
+    throw new InvalidRoundError("Configuração de times inválida.");
+  }
+  const teamCount = Math.trunc(input.teamCount);
+  const playersPerTeam = Math.trunc(input.playersPerTeam);
+  const playerIds = [...new Set(input.playerIds)].map((id) => parseRoundUuid(id, "Jogador"));
+  if (teamCount < 2 || teamCount > 4 || playersPerTeam < 1 || playersPerTeam > 10) {
+    throw new InvalidRoundError("Configuração de times inválida.");
+  }
+  if (!playerIds.length || playerIds.length > teamCount * playersPerTeam) {
+    throw new InvalidRoundError("Quantidade de jogadores inválida para o sorteio.");
+  }
+  return repository.drawTeamsAdaptiveOnServer({
+    playerIds,
+    attendanceOrder: [...new Set(input.attendanceOrder || [])].map((id) => parseRoundUuid(id, "Presença")),
+    teamCount,
+    playersPerTeam,
+  }, parseRoundUuid(leagueId, "Pelada"), actor);
 }

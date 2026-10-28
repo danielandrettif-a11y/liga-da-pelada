@@ -11,6 +11,9 @@ const roundId = "00000000-0000-4000-8000-000000000002";
 const teamId = "00000000-0000-4000-8000-000000000003";
 const draftId = "00000000-0000-4000-8000-000000000004";
 const seasonId = "00000000-0000-4000-8000-000000000005";
+const callupId = "00000000-0000-4000-8000-000000000006";
+const playerA = "00000000-0000-4000-8000-000000000007";
+const playerB = "00000000-0000-4000-8000-000000000008";
 
 function fixture(enabled: boolean) {
   const roundRepository: RoundRepository = {
@@ -245,6 +248,45 @@ describe("rounds presentation", () => {
     const body = JSON.parse(response.payload);
     expect(body.draftId).toBe(draftId);
     expect(roundRepository.createTeamDraft).toHaveBeenCalled();
+  });
+
+  it("serves draft workspaces by callup and round", async () => {
+    const { app, roundRepository } = fixture(true);
+    const headers = { authorization: "Bearer valid-token" };
+    const byCallup = await app.inject({
+      method: "GET",
+      url: `/api/rounds/leagues/${leagueId}/callups/${callupId}/draft-workspace`,
+      headers,
+    });
+    const byRound = await app.inject({
+      method: "GET",
+      url: `/api/rounds/leagues/${leagueId}/${roundId}/draft-workspace`,
+      headers,
+    });
+    expect(byCallup.statusCode).toBe(200);
+    expect(byRound.statusCode).toBe(200);
+    expect(roundRepository.getDraftWorkspace).toHaveBeenCalledWith(callupId, leagueId, expect.anything());
+    expect(roundRepository.getDraftWorkspaceByRound).toHaveBeenCalledWith(roundId, leagueId, expect.anything());
+  });
+
+  it("executes the complete draft mutation contract", async () => {
+    const { app, roundRepository } = fixture(true);
+    const headers = { authorization: "Bearer valid-token" };
+    const requests = [
+      app.inject({ method: "POST", url: `/api/rounds/leagues/${leagueId}/drafts/${draftId}/start`, headers }),
+      app.inject({ method: "POST", url: `/api/rounds/leagues/${leagueId}/drafts/${draftId}/pick`, headers, payload: { playerId: playerA } }),
+      app.inject({ method: "POST", url: `/api/rounds/leagues/${leagueId}/drafts/${draftId}/replace-captain`, headers, payload: { teamSlot: 2, newCaptainId: playerB } }),
+      app.inject({ method: "POST", url: `/api/rounds/leagues/${leagueId}/drafts/${draftId}/restart`, headers }),
+      app.inject({ method: "POST", url: `/api/rounds/leagues/${leagueId}/drafts/${draftId}/swap`, headers, payload: { playerAId: playerA, playerBId: playerB } }),
+      app.inject({ method: "POST", url: `/api/rounds/leagues/${leagueId}/drafts/${draftId}/finalize`, headers }),
+    ];
+    const responses = await Promise.all(requests);
+    expect(responses.every((response) => response.statusCode === 200)).toBe(true);
+    expect(roundRepository.startTeamDraft).toHaveBeenCalledWith(draftId, leagueId, expect.anything());
+    expect(roundRepository.makeTeamDraftPick).toHaveBeenCalledWith(draftId, leagueId, playerA, expect.anything());
+    expect(roundRepository.replaceTeamDraftCaptain).toHaveBeenCalledWith(draftId, leagueId, 2, playerB, expect.anything());
+    expect(roundRepository.applyDraftSwap).toHaveBeenCalledWith(draftId, leagueId, playerA, playerB, expect.anything());
+    expect(roundRepository.finalizeTeamDraft).toHaveBeenCalledWith(draftId, leagueId, expect.anything());
   });
 
   it("executes adaptive draw on server", async () => {

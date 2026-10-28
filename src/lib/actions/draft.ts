@@ -55,6 +55,10 @@ function refreshDraft(roundId?: string) {
   if (roundId) revalidatePath(`/rodadas/${roundId}`);
 }
 
+function draftFailure(error: unknown, fallback: string) {
+  return { success: false as const, error: error instanceof Error ? error.message : fallback };
+}
+
 async function getScopedDraft(client: Awaited<ReturnType<typeof getCurrentAccount>>["client"], draftId: string) {
   const league = await getSelectedLeague();
   if (!league) return null;
@@ -69,15 +73,15 @@ export async function createTeamDraft(input: { callupId?: string | null; roundId
   const league = await getSelectedLeague();
   if (!league || league.role !== "admin") return { success: false, error: "Selecione a pelada que voce administra." };
 
-  try {
-    const api = await roundApiFor(client);
-    if (api) {
+  const api = await roundApiFor(client);
+  if (api) {
+    try {
       const res = await api.createTeamDraft(league.id, input.roundId, input.callupId);
       refreshDraft(input.roundId);
       return { success: true, draftId: res.draftId };
+    } catch (error) {
+      return draftFailure(error, "Não foi possível iniciar o Draft.");
     }
-  } catch (error: any) {
-    console.error("Erro ao criar draft via API:", error);
   }
   const { data: round } = await client.from("rounds").select("season_id")
     .eq("id", input.roundId).eq("league_id", league.id).maybeSingle();
@@ -208,33 +212,25 @@ async function getDraftWorkspaceBy(column: "callup_id" | "round_id", value: stri
 }
 
 export async function getDraftWorkspace(callupId: string) {
-  try {
-    const account = await getCurrentAccount();
-    const league = await getSelectedLeague();
-    if (account.user && league) {
-      const api = await roundApiFor(account.client);
-      if (api) {
-        return await api.getDraftWorkspace(league.id, callupId);
-      }
+  const account = await getCurrentAccount();
+  const league = await getSelectedLeague();
+  if (account.user && league) {
+    const api = await roundApiFor(account.client);
+    if (api) {
+      return api.getDraftWorkspace(league.id, callupId);
     }
-  } catch (error: any) {
-    console.error("Erro ao obter draft workspace via API:", error);
   }
   return getDraftWorkspaceBy("callup_id", callupId);
 }
 
 export async function getDraftWorkspaceByRound(roundId: string) {
-  try {
-    const account = await getCurrentAccount();
-    const league = await getSelectedLeague();
-    if (account.user && league) {
-      const api = await roundApiFor(account.client);
-      if (api) {
-        return await api.getDraftWorkspaceByRound(league.id, roundId);
-      }
+  const account = await getCurrentAccount();
+  const league = await getSelectedLeague();
+  if (account.user && league) {
+    const api = await roundApiFor(account.client);
+    if (api) {
+      return api.getDraftWorkspaceByRound(league.id, roundId);
     }
-  } catch (error: any) {
-    console.error("Erro ao obter draft workspace por rodada via API:", error);
   }
   return getDraftWorkspaceBy("round_id", roundId);
 }
@@ -245,15 +241,15 @@ export async function startTeamDraft(draftId: string) {
   const league = await getSelectedLeague();
   if (!league) return { success: false, error: "Selecione uma pelada." };
 
-  try {
-    const api = await roundApiFor(client);
-    if (api) {
+  const api = await roundApiFor(client);
+  if (api) {
+    try {
       await api.startTeamDraft(league.id, draftId);
       refreshDraft();
       return { success: true };
+    } catch (error) {
+      return draftFailure(error, "Não foi possível iniciar o Draft.");
     }
-  } catch (error: any) {
-    console.error("Erro ao iniciar draft via API:", error);
   }
 
   if (!(await getScopedDraft(client, draftId))) return { success: false, error: "Draft fora da pelada selecionada." };
@@ -269,15 +265,15 @@ export async function replaceTeamDraftCaptain(draftId: string, teamSlot: number,
   const league = await getSelectedLeague();
   if (!league) return { success: false, error: "Selecione uma pelada." };
 
-  try {
-    const api = await roundApiFor(client);
-    if (api) {
+  const api = await roundApiFor(client);
+  if (api) {
+    try {
       await api.replaceTeamDraftCaptain(league.id, draftId, teamSlot, playerId);
       refreshDraft();
       return { success: true };
+    } catch (error) {
+      return draftFailure(error, "Não foi possível trocar o capitão.");
     }
-  } catch (error: any) {
-    console.error("Erro ao trocar capitão do draft via API:", error);
   }
 
   if (!(await getScopedDraft(client, draftId))) return { success: false, error: "Draft fora da pelada selecionada." };
@@ -293,15 +289,15 @@ export async function makeTeamDraftPick(draftId: string, playerId: string) {
   const league = await getSelectedLeague();
   if (!league) return { success: false, error: "Selecione uma pelada." };
 
-  try {
-    const api = await roundApiFor(account.client);
-    if (api) {
+  const api = await roundApiFor(account.client);
+  if (api) {
+    try {
       await api.makeTeamDraftPick(league.id, draftId, playerId);
       refreshDraft();
       return { success: true };
+    } catch (error) {
+      return draftFailure(error, "Não foi possível confirmar a escolha.");
     }
-  } catch (error: any) {
-    console.error("Erro ao escolher atleta no draft via API:", error);
   }
 
   if (!(await getScopedDraft(account.client, draftId))) return { success: false, error: "Draft fora da pelada selecionada." };
@@ -317,15 +313,15 @@ export async function restartTeamDraft(draftId: string) {
   const league = await getSelectedLeague();
   if (!league) return { success: false, error: "Selecione uma pelada." };
 
-  try {
-    const api = await roundApiFor(client);
-    if (api) {
+  const api = await roundApiFor(client);
+  if (api) {
+    try {
       await api.restartTeamDraft(league.id, draftId);
       refreshDraft();
       return { success: true };
+    } catch (error) {
+      return draftFailure(error, "Não foi possível reiniciar o Draft.");
     }
-  } catch (error: any) {
-    console.error("Erro ao reiniciar draft via API:", error);
   }
 
   if (!(await getScopedDraft(client, draftId))) return { success: false, error: "Draft fora da pelada selecionada." };
@@ -341,15 +337,15 @@ export async function applyDraftSwap(draftId: string, playerAId: string, playerB
   const league = await getSelectedLeague();
   if (!league) return { success: false, error: "Selecione uma pelada." };
 
-  try {
-    const api = await roundApiFor(client);
-    if (api) {
+  const api = await roundApiFor(client);
+  if (api) {
+    try {
       await api.applyDraftSwap(league.id, draftId, playerAId, playerBId);
       refreshDraft();
       return { success: true };
+    } catch (error) {
+      return draftFailure(error, "Não foi possível aplicar a troca.");
     }
-  } catch (error: any) {
-    console.error("Erro ao aplicar troca no draft via API:", error);
   }
 
   if (!(await getScopedDraft(client, draftId))) return { success: false, error: "Draft fora da pelada selecionada." };
@@ -365,15 +361,15 @@ export async function finalizeTeamDraft(draftId: string) {
   const league = await getSelectedLeague();
   if (!league) return { success: false, error: "Selecione uma pelada." };
 
-  try {
-    const api = await roundApiFor(client);
-    if (api) {
+  const api = await roundApiFor(client);
+  if (api) {
+    try {
       const res = await api.finalizeTeamDraft(league.id, draftId);
       refreshDraft(String(res.roundId));
       return { success: true, roundId: String(res.roundId) };
+    } catch (error) {
+      return draftFailure(error, "Não foi possível confirmar o Draft.");
     }
-  } catch (error: any) {
-    console.error("Erro ao finalizar draft via API:", error);
   }
 
   if (!(await getScopedDraft(client, draftId))) return { success: false, error: "Draft fora da pelada selecionada." };

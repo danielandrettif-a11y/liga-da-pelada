@@ -2,8 +2,12 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { UserVerifier } from "../../../infrastructure/auth-user-verifier.js";
 import { authenticateBearer } from "../../../presentation/authenticate-bearer.js";
 import {
+  applyDraftSwap,
+  createTeamDraft,
   createRoundWithTeams,
   deleteRound,
+  drawTeamsAdaptiveOnServer,
+  finalizeTeamDraft,
   finishRound,
   getActiveLeague,
   getAdminRoundPrelist,
@@ -11,7 +15,13 @@ import {
   getRound,
   getRoundMatchSetup,
   getRounds,
+  getDraftWorkspace,
+  getDraftWorkspaceByRound,
+  makeTeamDraftPick,
+  replaceTeamDraftCaptain,
+  restartTeamDraft,
   saveRoundPrelist,
+  startTeamDraft,
   type RoundRepository,
 } from "../application/manage-rounds.js";
 import { InvalidRoundError } from "../domain/round.js";
@@ -610,11 +620,11 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const result = await dependencies.repository.createTeamDraft(
-          request.params.roundId,
-          request.body?.callupId || null,
+        const result = await createTeamDraft(
+          { roundId: request.params.roundId, callupId: request.body?.callupId || null },
           request.params.leagueId,
           authentication.actor,
+          dependencies.repository,
         );
         return reply.code(201).send({ success: true, ...result });
       } catch (error) {
@@ -623,17 +633,18 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
     },
   );
 
-  // DRAFT: Workspace por draftId
-  app.get<{ Params: { leagueId: string; draftId: string } }>(
-    "/api/rounds/leagues/:leagueId/drafts/:draftId",
+  // DRAFT: Workspace por convocação
+  app.get<{ Params: { leagueId: string; callupId: string } }>(
+    "/api/rounds/leagues/:leagueId/callups/:callupId/draft-workspace",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const ws = await dependencies.repository.getDraftWorkspace(
-          request.params.draftId,
+        const ws = await getDraftWorkspace(
+          request.params.callupId,
           request.params.leagueId,
           authentication.actor,
+          dependencies.repository,
         );
         return reply.code(200).send(ws);
       } catch (error) {
@@ -649,10 +660,11 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const ws = await dependencies.repository.getDraftWorkspaceByRound(
+        const ws = await getDraftWorkspaceByRound(
           request.params.roundId,
           request.params.leagueId,
           authentication.actor,
+          dependencies.repository,
         );
         return reply.code(200).send(ws);
       } catch (error) {
@@ -668,10 +680,11 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        await dependencies.repository.startTeamDraft(
+        await startTeamDraft(
           request.params.draftId,
           request.params.leagueId,
           authentication.actor,
+          dependencies.repository,
         );
         return reply.code(200).send({ success: true });
       } catch (error) {
@@ -690,11 +703,12 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        await dependencies.repository.makeTeamDraftPick(
+        await makeTeamDraftPick(
           request.params.draftId,
           request.params.leagueId,
           request.body.playerId,
           authentication.actor,
+          dependencies.repository,
         );
         return reply.code(200).send({ success: true });
       } catch (error) {
@@ -713,12 +727,13 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        await dependencies.repository.replaceTeamDraftCaptain(
+        await replaceTeamDraftCaptain(
           request.params.draftId,
           request.params.leagueId,
           Number(request.body.teamSlot),
           request.body.newCaptainId,
           authentication.actor,
+          dependencies.repository,
         );
         return reply.code(200).send({ success: true });
       } catch (error) {
@@ -734,10 +749,11 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        await dependencies.repository.restartTeamDraft(
+        await restartTeamDraft(
           request.params.draftId,
           request.params.leagueId,
           authentication.actor,
+          dependencies.repository,
         );
         return reply.code(200).send({ success: true });
       } catch (error) {
@@ -753,10 +769,11 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const result = await dependencies.repository.finalizeTeamDraft(
+        const result = await finalizeTeamDraft(
           request.params.draftId,
           request.params.leagueId,
           authentication.actor,
+          dependencies.repository,
         );
         return reply.code(200).send({ success: true, ...result });
       } catch (error) {
@@ -775,12 +792,13 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        await dependencies.repository.applyDraftSwap(
+        await applyDraftSwap(
           request.params.draftId,
           request.params.leagueId,
           request.body.playerAId,
           request.body.playerBId,
           authentication.actor,
+          dependencies.repository,
         );
         return reply.code(200).send({ success: true });
       } catch (error) {
@@ -804,10 +822,11 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const result = await dependencies.repository.drawTeamsAdaptiveOnServer(
+        const result = await drawTeamsAdaptiveOnServer(
           request.body,
           request.params.leagueId,
           authentication.actor,
+          dependencies.repository,
         );
         return reply.code(200).send(result);
       } catch (error) {

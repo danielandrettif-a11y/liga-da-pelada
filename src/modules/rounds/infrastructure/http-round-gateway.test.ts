@@ -7,6 +7,7 @@ const roundId = "00000000-0000-4000-8000-000000000002";
 const teamId = "00000000-0000-4000-8000-000000000003";
 const draftId = "00000000-0000-4000-8000-000000000004";
 const playerId = "00000000-0000-4000-8000-000000000005";
+const callupId = "00000000-0000-4000-8000-000000000006";
 
 describe("httpRoundGateway", () => {
   it("fetches rounds by season", async () => {
@@ -145,6 +146,57 @@ describe("httpRoundGateway", () => {
         method: "POST",
         body: JSON.stringify({ outPlayerId: playerId }),
       }),
+    );
+  });
+
+  it("reads the draft workspace by callup identity", async () => {
+    const workspace = { id: draftId, callupId, roundId, players: [], captains: [] };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(workspace) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(httpRoundGateway(backendUrl, "test-token").getDraftWorkspace(leagueId, callupId))
+      .resolves.toEqual(workspace);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/rounds/leagues/${leagueId}/callups/${callupId}/draft-workspace`,
+      expect.anything(),
+    );
+  });
+
+  it("sends canonical draft mutation payloads", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({ roundId }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const gateway = httpRoundGateway(backendUrl, "test-token");
+
+    await gateway.makeTeamDraftPick(leagueId, draftId, playerId);
+    await gateway.replaceTeamDraftCaptain(leagueId, draftId, 2, playerId);
+    await gateway.applyDraftSwap(leagueId, draftId, playerId, roundId);
+    await expect(gateway.finalizeTeamDraft(leagueId, draftId)).resolves.toEqual({ roundId });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/rounds/leagues/${leagueId}/drafts/${draftId}/pick`,
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ playerId }) }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/rounds/leagues/${leagueId}/drafts/${draftId}/replace-captain`,
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ teamSlot: 2, newCaptainId: playerId }) }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/rounds/leagues/${leagueId}/drafts/${draftId}/swap`,
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ playerAId: playerId, playerBId: roundId }) }),
+    );
+  });
+
+  it("sends the complete adaptive draw contract", async () => {
+    const result = { success: true, teams: [[playerId], [roundId]], balanceScore: 100 };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(result) });
+    vi.stubGlobal("fetch", fetchMock);
+    const input = { playerIds: [playerId, roundId], attendanceOrder: [playerId], teamCount: 2, playersPerTeam: 1 };
+
+    await expect(httpRoundGateway(backendUrl, "test-token").drawTeamsAdaptiveOnServer(leagueId, input))
+      .resolves.toEqual(result);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/rounds/leagues/${leagueId}/adaptive-draw`,
+      expect.objectContaining({ method: "POST", body: JSON.stringify(input) }),
     );
   });
 });

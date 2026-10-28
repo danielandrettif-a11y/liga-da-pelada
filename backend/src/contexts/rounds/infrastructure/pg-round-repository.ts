@@ -20,6 +20,14 @@ import type {
   RoundPlayerAvailability,
   RoundWithCounts,
 } from "../domain/round.js";
+import { drawTeamsAdaptive } from "../domain/adaptive-draw.js";
+import {
+  calculateDraftBalanceScore,
+  findBestDraftSwap,
+  summarizeDraftTeams,
+  type DraftBalancePlayer,
+  type DraftPlayerProfile,
+} from "../domain/draft-balance.js";
 import {
   drawRoundPlayerOrder,
   ROUND_TEAM_CREST_URLS,
@@ -59,11 +67,20 @@ function translateFailure(cause: unknown): RoundPersistenceError {
   if (/ROUND_NOT_FOUND|fora da pelada/i.test(message)) {
     return new RoundPersistenceError("Rodada não encontrada na pelada selecionada.", 404);
   }
+  if (/Draft não encontrado/i.test(message)) {
+    return new RoundPersistenceError("Draft não encontrado na pelada selecionada.", 404);
+  }
+  if (/vez de outro capitão/i.test(message)) {
+    return new RoundPersistenceError(message, 403);
+  }
   if (error.code === "23505") {
     return new RoundPersistenceError("Houve um conflito na numeração. Atualize a página e tente novamente.", 409);
   }
   if (/pre-lista|jogador fora|Estadio fora|Convocacao aberta|Temporada ativa|Tipo de rodada|data e horario|capacidade/i.test(message)) {
     return new RoundPersistenceError(message, 400);
+  }
+  if (/Draft|capit(ã|a)o|escolha|jogador não está disponível|lista mudou|rodada já possui times/i.test(message)) {
+    return new RoundPersistenceError(message, 409);
   }
   return new RoundPersistenceError(message || "Falha na persistência da rodada.", 500);
 }
@@ -88,6 +105,131 @@ async function requireLeagueAdmin(client: PoolClient, leagueId: string): Promise
   if (access.rows[0]?.allowed !== true) {
     throw new RoundPersistenceError("Somente administradores podem realizar esta ação.", 403);
   }
+}
+
+async function requireDraftInLeague(client: PoolClient, draftId: string, leagueId: string): Promise<void> {
+  const result = await client.query<{ found: boolean }>(
+    "SELECT EXISTS (SELECT 1 FROM public.team_drafts WHERE id = $1::uuid AND league_id = $2::uuid) AS found",
+    [draftId, leagueId],
+  );
+  if (result.rows[0]?.found !== true) {
+    throw new RoundPersistenceError("Draft não encontrado na pelada selecionada.", 404);
+  }
+}
+
+async function readDraftWorkspace(
+  client: PoolClient,
+  lookup: "callup_id" | "round_id",
+  value: string,
+  leagueId: string,
+  actor: Actor,
+): Promise<DraftWorkspace | null> {
+  const draftResult = await client.query<{
+    id: string;
+    callup_id: string | null;
+    round_id: string;
+    status: DraftWorkspace["status"];
+    current_pick: number;
+    pause_reason: string | null;
+    is_admin: boolean;
+    current_player_id: string | null;
+  }>(
+    `SELECT draft.id, draft.callup_id, draft.round_id, draft.status, draft.current_pick,
+            draft.pause_reason, public.is_league_admin($2::uuid) AS is_admin,
+            (SELECT profile.player_id FROM public.account_profiles profile
+             WHERE profile.user_id = $3::uuid LIMIT 1) AS current_player_id
+     FROM public.team_drafts draft
+     WHERE draft.${lookup} = $1::uuid AND draft.league_id = $2::uuid
+     ORDER BY draft.created_at DESC LIMIT 1`,
+    [value, leagueId, actor.userId],
+  );
+  const draft = draftResult.rows[0];
+  if (!draft) return null;
+
+  const playerResult = await client.query<{
+    id: string;
+    name: string;
+    nickname: string | null;
+    avatar_url: string | null;
+    profile_snapshot: DraftPlayerProfile | null;
+    member_profile: DraftPlayerProfile | null;
+    overall_snapshot: number | string | null;
+    speed_rating_snapshot: number | null;
+    captain_team_slot: number | null;
+    selection_order: number | null;
+    win_rate_snapshot: number | string | null;
+    official_rounds_snapshot: number | null;
+    pick_team_slot: number | null;
+    pick_number: number | null;
+  }>(
+    `SELECT player.id, player.name, player.nickname, player.avatar_url,
+            pool.profile_snapshot, member.player_profile AS member_profile,
+            pool.overall_snapshot, pool.speed_rating_snapshot,
+            captain.team_slot AS captain_team_slot, captain.selection_order,
+            captain.win_rate_snapshot, captain.official_rounds_snapshot,
+            pick.team_slot AS pick_team_slot, pick.pick_number
+     FROM public.team_draft_players pool
+     JOIN public.players player ON player.id = pool.player_id
+     LEFT JOIN public.league_members member
+       ON member.league_id = $2::uuid AND member.player_id = player.id AND member.is_active
+     LEFT JOIN public.team_draft_captains captain
+       ON captain.draft_id = pool.draft_id AND captain.captain_player_id = player.id
+     LEFT JOIN public.team_draft_picks pick
+       ON pick.draft_id = pool.draft_id AND pick.player_id = player.id
+     WHERE pool.draft_id = $1::uuid
+     ORDER BY player.name, player.id`,
+    [draft.id, leagueId],
+  );
+
+  const players = playerResult.rows.map((row) => ({
+    id: row.id,
+    name: row.name || "Jogador",
+    nickname: row.nickname || null,
+    avatarUrl: row.avatar_url || null,
+    profile: row.profile_snapshot || row.member_profile || null,
+    overall: row.overall_snapshot === null ? null : Number(row.overall_snapshot),
+    stars: row.speed_rating_snapshot === null ? null : Number(row.speed_rating_snapshot),
+    teamSlot: row.captain_team_slot || row.pick_team_slot || null,
+    isCaptain: row.captain_team_slot !== null,
+    pickNumber: row.pick_number || null,
+    active: true,
+  }));
+  const playerById = new Map(players.map((player) => [player.id, player]));
+  const captains = playerResult.rows.flatMap((row) => row.captain_team_slot === null ? [] : [{
+    teamSlot: row.captain_team_slot,
+    selectionOrder: row.selection_order,
+    winRate: Number(row.win_rate_snapshot || 0),
+    officialRounds: Number(row.official_rounds_snapshot || 0),
+    player: playerById.get(row.id)!,
+  }]);
+  const balancePlayers: DraftBalancePlayer[] = players.flatMap((player) => player.teamSlot === null ? [] : [{
+    id: player.id,
+    teamSlot: player.teamSlot,
+    overall: player.overall,
+    speedRating: player.stars,
+    profile: player.profile,
+    isCaptain: player.isCaptain,
+  }]);
+  const suggestion = balancePlayers.length > 3 ? findBestDraftSwap(balancePlayers) : null;
+  return {
+    id: draft.id,
+    callupId: draft.callup_id,
+    roundId: draft.round_id,
+    status: draft.status,
+    currentPick: Number(draft.current_pick || 1),
+    pauseReason: draft.pause_reason,
+    isAdmin: draft.is_admin === true,
+    currentPlayerId: draft.current_player_id,
+    captains,
+    players,
+    summaries: summarizeDraftTeams(balancePlayers),
+    balanceScore: calculateDraftBalanceScore(balancePlayers),
+    suggestion: suggestion ? {
+      ...suggestion,
+      playerAName: playerById.get(suggestion.playerAId)?.name || "Jogador",
+      playerBName: playerById.get(suggestion.playerBId)?.name || "Jogador",
+    } : null,
+  };
 }
 
 export function pgRoundRepository(pool: Pool): RoundRepository {
@@ -1373,105 +1515,123 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
     async createTeamDraft(roundId: string, callupId: string | null, leagueId: string, actor: Actor): Promise<{ draftId: string }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const res = await client.query<{ id: string }>(
-          `INSERT INTO public.team_drafts (league_id, round_id, callup_id, status)
-           VALUES ($1::uuid, $2::uuid, $3::uuid, 'setup')
-           RETURNING id`,
-          [leagueId, roundId, callupId],
+        const captainResult = await client.query<{ id: string }>(
+          `WITH target_round AS (
+             SELECT id, season_id FROM public.rounds
+             WHERE id = $1::uuid AND league_id = $2::uuid
+           ), source_players AS (
+             SELECT entry.player_id
+             FROM public.callup_entries entry
+             JOIN public.callups callup ON callup.id = entry.callup_id
+             JOIN target_round round_item ON round_item.id = callup.round_id
+             WHERE $3::uuid IS NOT NULL AND entry.callup_id = $3::uuid
+               AND entry.status = 'confirmed' AND callup.league_id = $2::uuid
+             UNION ALL
+             SELECT participant.player_id
+             FROM public.round_players participant
+             JOIN target_round round_item ON round_item.id = participant.round_id
+             WHERE $3::uuid IS NULL
+           )
+           SELECT player.id
+           FROM source_players source
+           JOIN target_round round_item ON true
+           JOIN public.players player ON player.id = source.player_id
+           JOIN public.league_members member
+             ON member.player_id = player.id AND member.league_id = $2::uuid AND member.is_active
+           JOIN public.player_season_stats stats
+             ON stats.player_id = player.id AND stats.season_id = round_item.season_id
+             AND stats.round_type = 'official' AND stats.rounds_count >= 3
+           WHERE player.member_category = 'player' AND player.is_selectable
+           ORDER BY random()
+           LIMIT 3`,
+          [roundId, leagueId, callupId],
         );
-        const draftId = res.rows[0]?.id;
+        const captainIds = captainResult.rows.map((row) => row.id);
+        if (captainIds.length !== 3) {
+          throw new RoundPersistenceError("São necessários três jogadores oficiais com pelo menos três rodadas oficiais nesta temporada.", 400);
+        }
+        const result = await client.query<{ id: string }>(
+          "SELECT public.create_team_draft($1::uuid, $2::uuid, $3::uuid[]) AS id",
+          [callupId, roundId, captainIds],
+        );
+        const draftId = result.rows[0]?.id;
         if (!draftId) throw new RoundPersistenceError("Falha ao criar draft.", 500);
         return { draftId };
       });
     },
 
-    async getDraftWorkspace(draftId: string, leagueId: string, actor: Actor): Promise<DraftWorkspace | null> {
+    async getDraftWorkspace(callupId: string, leagueId: string, actor: Actor): Promise<DraftWorkspace | null> {
       return authenticated(pool, actor, async (client) => {
-        const res = await client.query<{
-          id: string;
-          callup_id: string | null;
-          round_id: string;
-          status: "setup" | "active" | "paused" | "completed" | "confirmed" | "cancelled";
-          current_pick: number;
-          pause_reason: string | null;
-        }>(
-          "SELECT id, callup_id, round_id, status, current_pick, pause_reason FROM public.team_drafts WHERE id = $1::uuid AND league_id = $2::uuid",
-          [draftId, leagueId],
-        );
-        const draft = res.rows[0];
-        if (!draft) return null;
-
-        return {
-          id: draft.id,
-          callupId: draft.callup_id,
-          roundId: draft.round_id,
-          status: draft.status,
-          currentPick: Number(draft.current_pick || 1),
-          pauseReason: draft.pause_reason,
-          isAdmin: true,
-          currentPlayerId: null,
-          captains: [],
-          players: [],
-        };
+        return readDraftWorkspace(client, "callup_id", callupId, leagueId, actor);
       });
     },
 
     async getDraftWorkspaceByRound(roundId: string, leagueId: string, actor: Actor): Promise<DraftWorkspace | null> {
       return authenticated(pool, actor, async (client) => {
-        const res = await client.query<{ id: string }>(
-          "SELECT id FROM public.team_drafts WHERE round_id = $1::uuid AND league_id = $2::uuid ORDER BY created_at DESC LIMIT 1",
-          [roundId, leagueId],
-        );
-        const draftId = res.rows[0]?.id;
-        if (!draftId) return null;
-        return this.getDraftWorkspace(draftId, leagueId, actor);
+        return readDraftWorkspace(client, "round_id", roundId, leagueId, actor);
       });
     },
 
     async startTeamDraft(draftId: string, leagueId: string, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        await client.query("UPDATE public.team_drafts SET status = 'active', updated_at = NOW() WHERE id = $1::uuid AND league_id = $2::uuid", [draftId, leagueId]);
+        await requireDraftInLeague(client, draftId, leagueId);
+        await client.query("SELECT public.start_team_draft($1::uuid)", [draftId]);
       });
     },
 
     async makeTeamDraftPick(draftId: string, leagueId: string, playerId: string, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
-        await requireLeagueAdmin(client, leagueId);
-        await client.query(
-          "INSERT INTO public.team_draft_picks (draft_id, player_id, pick_number) VALUES ($1::uuid, $2::uuid, (SELECT COALESCE(MAX(pick_number), 0) + 1 FROM public.team_draft_picks WHERE draft_id = $1::uuid))",
-          [draftId, playerId],
-        );
+        await requireDraftInLeague(client, draftId, leagueId);
+        await client.query("SELECT public.make_team_draft_pick($1::uuid, $2::uuid)", [draftId, playerId]);
       });
     },
 
     async replaceTeamDraftCaptain(draftId: string, leagueId: string, teamSlot: number, newCaptainId: string, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        await client.query(
-          "UPDATE public.team_draft_captains SET player_id = $3::uuid WHERE draft_id = $1::uuid AND team_slot = $2::int",
-          [draftId, teamSlot, newCaptainId],
-        );
+        await requireDraftInLeague(client, draftId, leagueId);
+        await client.query("SELECT public.replace_team_draft_captain($1::uuid, $2::int, $3::uuid)", [draftId, teamSlot, newCaptainId]);
       });
     },
 
     async restartTeamDraft(draftId: string, leagueId: string, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        await client.query("DELETE FROM public.team_draft_picks WHERE draft_id = $1::uuid", [draftId]);
-        await client.query("UPDATE public.team_drafts SET status = 'setup', current_pick = 1, updated_at = NOW() WHERE id = $1::uuid", [draftId]);
+        await requireDraftInLeague(client, draftId, leagueId);
+        await client.query("SELECT public.restart_team_draft($1::uuid)", [draftId]);
       });
     },
 
     async finalizeTeamDraft(draftId: string, leagueId: string, actor: Actor): Promise<{ roundId: string }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const res = await client.query<{ round_id: string }>(
-          "UPDATE public.team_drafts SET status = 'completed', updated_at = NOW() WHERE id = $1::uuid AND league_id = $2::uuid RETURNING round_id",
-          [draftId, leagueId],
+        await requireDraftInLeague(client, draftId, leagueId);
+        const result = await client.query<{ round_id: string }>(
+          "SELECT public.finalize_team_draft($1::uuid) AS round_id",
+          [draftId],
         );
-        const roundId = res.rows[0]?.round_id;
+        const roundId = result.rows[0]?.round_id;
         if (!roundId) throw new RoundPersistenceError("Draft não encontrado.", 404);
+        await client.query(
+          `UPDATE public.teams team SET
+             name = preset.name, color = preset.color, crest_url = preset.crest_url
+           FROM (VALUES
+             (1, 'Meia Boca Juniors', '#FACC15', '/team-crests/meia-boca-juniors.webp'),
+             (2, 'Patético de Madrid', '#F43F5E', '/team-crests/patetico-de-madrid.webp'),
+             (3, 'MilamB', '#DC2626', '/team-crests/milamb.webp')
+           ) AS preset(position, name, color, crest_url)
+           WHERE team.round_id = $1::uuid AND team.position = preset.position`,
+          [roundId],
+        );
+        const players = await client.query<{ player_id: string }>(
+          "SELECT player_id FROM public.round_players WHERE round_id = $1::uuid ORDER BY player_id",
+          [roundId],
+        );
+        await client.query(
+          "SELECT public.set_round_attendance_bulk($1::uuid, $2::uuid[])",
+          [roundId, players.rows.map((row) => row.player_id)],
+        );
         return { roundId };
       });
     },
@@ -1479,6 +1639,11 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
     async applyDraftSwap(draftId: string, leagueId: string, playerAId: string, playerBId: string, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
+        await requireDraftInLeague(client, draftId, leagueId);
+        await client.query(
+          "SELECT public.swap_team_draft_picks($1::uuid, $2::uuid, $3::uuid)",
+          [draftId, playerAId, playerBId],
+        );
       });
     },
 
@@ -1490,21 +1655,86 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
     }, leagueId: string, actor: Actor): Promise<ServerAdaptiveDrawResult> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const teams: string[][] = [];
-        for (let t = 0; t < input.teamCount; t++) {
-          teams.push([]);
+        const memberResult = await client.query<{
+          player_id: string;
+          player_profile: PlayerProfile | null;
+          speed_rating: number | null;
+        }>(
+          `SELECT member.player_id, member.player_profile, member.speed_rating
+           FROM public.league_members member
+           JOIN public.players player ON player.id = member.player_id
+           WHERE member.league_id = $1::uuid AND member.is_active
+             AND member.player_id = ANY($2::uuid[]) AND player.is_selectable
+             AND player.member_category IN ('player', 'guest')`,
+          [leagueId, input.playerIds],
+        );
+        if (memberResult.rows.length !== input.playerIds.length) {
+          throw new RoundPersistenceError("A lista contém uma pessoa que não está elegível nesta liga.", 400);
         }
-        for (let i = 0; i < input.playerIds.length; i++) {
-          const teamIdx = i % input.teamCount;
-          const pid = input.playerIds[i];
-          if (pid) teams[teamIdx]?.push(pid);
+        const overallResult = await client.query<{ player_id: string; overall: number | string | null }>(
+          "SELECT player_id, overall FROM public.get_latest_player_card_overalls_for_league($1::uuid)",
+          [leagueId],
+        );
+        const tagByPlayer = new Map<string, PrivateBalanceTag>();
+        const privateAccess = await client.query<{ allowed: boolean }>(
+          "SELECT public.can_manage_private_balance_tags() AS allowed",
+        );
+        if (privateAccess.rows[0]?.allowed === true) {
+          const tags = await client.query<{ player_id: string; balance_tag: PrivateBalanceTag }>(
+            "SELECT player_id, balance_tag FROM public.player_private_balance_tags WHERE player_id = ANY($1::uuid[])",
+            [input.playerIds],
+          );
+          for (const row of tags.rows) tagByPlayer.set(row.player_id, row.balance_tag);
         }
-        return {
-          success: true,
-          teams,
-          teamSummaries: [],
-          balanceScore: 100,
-        };
+        const memberByPlayer = new Map(memberResult.rows.map((row) => [row.player_id, row]));
+        const overallByPlayer = new Map(overallResult.rows.flatMap((row) =>
+          row.overall === null || !Number.isFinite(Number(row.overall)) ? [] : [[row.player_id, Number(row.overall)] as const]));
+        const makePlayers = (ids: string[]) => ids.map((id) => {
+          const member = memberByPlayer.get(id)!;
+          const speed = Number(member.speed_rating);
+          const normalizedSpeed: 1 | 2 | 3 | null = speed === 1 || speed === 2 || speed === 3 ? speed : null;
+          const profile = member.player_profile;
+          return {
+            id,
+            overall: overallByPlayer.get(id) ?? null,
+            speedRating: normalizedSpeed,
+            playerProfile: profile === "defensive" || profile === "midfield" || profile === "offensive" ? profile : null,
+            balanceTag: tagByPlayer.get(id) ?? null,
+          };
+        });
+
+        const eligible = new Set(input.playerIds);
+        const requestedOrder = [...new Set(input.attendanceOrder || [])].filter((id) => eligible.has(id));
+        if (requestedOrder.length) {
+          const minimumPresent = Math.min(input.playerIds.length, input.playersPerTeam * 2);
+          const fullOrder = requestedOrder.length < minimumPresent
+            ? [...requestedOrder, ...input.playerIds.filter((id) => !requestedOrder.includes(id))]
+            : requestedOrder;
+          const starterIds = fullOrder.slice(0, minimumPresent);
+          const starterResult = drawTeamsAdaptive({ players: makePlayers(starterIds), teamCount: 2, playersPerTeam: input.playersPerTeam });
+          const starterSet = new Set(starterIds);
+          const waitingIds = [
+            ...fullOrder.slice(minimumPresent),
+            ...input.playerIds.filter((id) => !starterSet.has(id) && !fullOrder.includes(id)),
+          ];
+          const waitingTeams = Array.from({ length: Math.max(0, input.teamCount - 2) }, (_, index) =>
+            waitingIds.slice(index * input.playersPerTeam, (index + 1) * input.playersPerTeam));
+          return {
+            success: true,
+            teams: [...starterResult.teams, ...waitingTeams],
+            teamSummaries: starterResult.teamSummaries,
+            missingOverallCount: starterResult.missingOverallCount,
+            missingSpeedCount: starterResult.missingSpeedCount,
+            balanceScore: starterResult.balanceScore,
+            attendanceOrder: fullOrder,
+          };
+        }
+        const result = drawTeamsAdaptive({
+          players: makePlayers(input.playerIds),
+          teamCount: input.teamCount,
+          playersPerTeam: input.playersPerTeam,
+        });
+        return { success: true, ...result, attendanceOrder: [] };
       });
     },
   };

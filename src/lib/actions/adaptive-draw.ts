@@ -30,13 +30,16 @@ export async function drawTeamsAdaptiveOnServer(input: {
     return { success: false, error: "Apenas administradores desta pelada podem usar o equilíbrio completo." };
   }
 
-  try {
-    const api = await roundApiFor(account.client);
-    if (api) {
+  const api = await roundApiFor(account.client);
+  if (api) {
+    try {
       return await api.drawTeamsAdaptiveOnServer(activeLeague.id, input);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Não foi possível executar o equilíbrio completo.",
+      };
     }
-  } catch (error: any) {
-    console.error("Erro no sorteio adaptativo via API:", error);
   }
 
   const playerIds = [...new Set(input.playerIds)];

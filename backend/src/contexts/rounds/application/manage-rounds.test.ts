@@ -1,20 +1,34 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  applyDraftSwap,
+  createTeamDraft,
   createRoundWithTeams,
   deleteRound,
+  drawTeamsAdaptiveOnServer,
+  finalizeTeamDraft,
   finishRound,
   getActiveLeague,
   getAdminRoundPrelist,
   getRound,
   getRoundMatchSetup,
   getRounds,
+  getDraftWorkspace,
+  getDraftWorkspaceByRound,
+  makeTeamDraftPick,
+  replaceTeamDraftCaptain,
+  restartTeamDraft,
   saveRoundPrelist,
+  startTeamDraft,
   type RoundRepository,
 } from "./manage-rounds.js";
 
 const seasonId = "00000000-0000-4000-8000-000000000001";
 const leagueId = "00000000-0000-4000-8000-000000000002";
 const roundId = "00000000-0000-4000-8000-000000000003";
+const draftId = "00000000-0000-4000-8000-000000000004";
+const callupId = "00000000-0000-4000-8000-000000000005";
+const playerA = "00000000-0000-4000-8000-000000000006";
+const playerB = "00000000-0000-4000-8000-000000000007";
 const actor = { userId: "user-123" };
 
 describe("manage-rounds application service", () => {
@@ -63,7 +77,7 @@ describe("manage-rounds application service", () => {
     transferRoundPlayerIdentity: vi.fn().mockResolvedValue(undefined),
     zeroPlayerRoundPoints: vi.fn().mockResolvedValue(undefined),
     addRoundEmergencySubstitute: vi.fn().mockResolvedValue({ playerId: "player-sub" }),
-    createTeamDraft: vi.fn().mockResolvedValue({ draftId: "draft-1" }),
+    createTeamDraft: vi.fn().mockResolvedValue({ draftId }),
     getDraftWorkspace: vi.fn().mockResolvedValue(null),
     getDraftWorkspaceByRound: vi.fn().mockResolvedValue(null),
     startTeamDraft: vi.fn().mockResolvedValue(undefined),
@@ -140,5 +154,39 @@ describe("manage-rounds application service", () => {
       leagueId,
       actor,
     );
+  });
+
+  it("validates and delegates the complete draft lifecycle", async () => {
+    await createTeamDraft({ roundId, callupId }, leagueId, actor, repository);
+    await getDraftWorkspace(callupId, leagueId, actor, repository);
+    await getDraftWorkspaceByRound(roundId, leagueId, actor, repository);
+    await startTeamDraft(draftId, leagueId, actor, repository);
+    await makeTeamDraftPick(draftId, leagueId, playerA, actor, repository);
+    await replaceTeamDraftCaptain(draftId, leagueId, 2, playerB, actor, repository);
+    await restartTeamDraft(draftId, leagueId, actor, repository);
+    await applyDraftSwap(draftId, leagueId, playerA, playerB, actor, repository);
+    await finalizeTeamDraft(draftId, leagueId, actor, repository);
+
+    expect(repository.createTeamDraft).toHaveBeenCalledWith(roundId, callupId, leagueId, actor);
+    expect(repository.getDraftWorkspace).toHaveBeenCalledWith(callupId, leagueId, actor);
+    expect(repository.makeTeamDraftPick).toHaveBeenCalledWith(draftId, leagueId, playerA, actor);
+    expect(repository.replaceTeamDraftCaptain).toHaveBeenCalledWith(draftId, leagueId, 2, playerB, actor);
+    expect(repository.applyDraftSwap).toHaveBeenCalledWith(draftId, leagueId, playerA, playerB, actor);
+  });
+
+  it("normalizes and delegates adaptive draw input", async () => {
+    await drawTeamsAdaptiveOnServer({
+      playerIds: [playerA, playerA, playerB],
+      attendanceOrder: [playerB],
+      teamCount: 2,
+      playersPerTeam: 2,
+    }, leagueId, actor, repository);
+
+    expect(repository.drawTeamsAdaptiveOnServer).toHaveBeenCalledWith({
+      playerIds: [playerA, playerB],
+      attendanceOrder: [playerB],
+      teamCount: 2,
+      playersPerTeam: 2,
+    }, leagueId, actor);
   });
 });

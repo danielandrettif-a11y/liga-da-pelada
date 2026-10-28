@@ -559,4 +559,132 @@ describe("pgRoundRepository", () => {
     await expect(repo.setRoundTeamVestColor(roundId, teamId, leagueId, "#22c55e", actor))
       .resolves.toBeUndefined();
   });
+
+  it("creates a draft through the canonical RPC with three eligible captains", async () => {
+    const callupId = "00000000-0000-4000-8000-000000000040";
+    const draftId = "00000000-0000-4000-8000-000000000041";
+    const captains = [
+      "00000000-0000-4000-8000-000000000050",
+      "00000000-0000-4000-8000-000000000051",
+      "00000000-0000-4000-8000-000000000052",
+    ];
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("WITH target_round")) return { rows: captains.map((id) => ({ id })) };
+      if (sql.includes("create_team_draft")) return { rows: [{ id: draftId }] };
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    await expect(pgRoundRepository(pool).createTeamDraft(roundId, callupId, leagueId, actor))
+      .resolves.toEqual({ draftId });
+    expect(query).toHaveBeenCalledWith(
+      "SELECT public.create_team_draft($1::uuid, $2::uuid, $3::uuid[]) AS id",
+      [callupId, roundId, captains],
+    );
+  });
+
+  it("builds the complete draft workspace by callup without opening a nested transaction", async () => {
+    const callupId = "00000000-0000-4000-8000-000000000040";
+    const draftId = "00000000-0000-4000-8000-000000000041";
+    const captainId = "00000000-0000-4000-8000-000000000050";
+    const pickedId = "00000000-0000-4000-8000-000000000051";
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("FROM public.team_drafts draft")) {
+        return { rows: [{
+          id: draftId, callup_id: callupId, round_id: roundId, status: "active",
+          current_pick: 2, pause_reason: null, is_admin: true, current_player_id: captainId,
+        }] };
+      }
+      if (sql.includes("FROM public.team_draft_players pool")) {
+        return { rows: [
+          {
+            id: captainId, name: "Capitão", nickname: null, avatar_url: null,
+            profile_snapshot: "offensive", member_profile: "offensive", overall_snapshot: "75",
+            speed_rating_snapshot: 3, captain_team_slot: 1, selection_order: 1,
+            win_rate_snapshot: "60", official_rounds_snapshot: 5, pick_team_slot: null, pick_number: null,
+          },
+          {
+            id: pickedId, name: "Escolhido", nickname: "E", avatar_url: null,
+            profile_snapshot: "defensive", member_profile: "defensive", overall_snapshot: "70",
+            speed_rating_snapshot: 2, captain_team_slot: null, selection_order: null,
+            win_rate_snapshot: null, official_rounds_snapshot: null, pick_team_slot: 2, pick_number: 1,
+          },
+        ] };
+      }
+      return { rows: [] };
+    });
+    const connect = vi.fn().mockResolvedValue({ query, release: vi.fn() });
+    const pool = { connect } as unknown as Pool;
+
+    const workspace = await pgRoundRepository(pool).getDraftWorkspace(callupId, leagueId, actor);
+    expect(workspace).toMatchObject({
+      id: draftId,
+      callupId,
+      isAdmin: true,
+      currentPlayerId: captainId,
+      currentPick: 2,
+      players: [{ id: captainId, teamSlot: 1, isCaptain: true }, { id: pickedId, teamSlot: 2, pickNumber: 1 }],
+      captains: [{ teamSlot: 1, selectionOrder: 1 }],
+    });
+    expect(workspace?.summaries).toHaveLength(3);
+    expect(connect).toHaveBeenCalledTimes(1);
+  });
+
+  it("delegates every draft mutation to its scoped canonical RPC", async () => {
+    const draftId = "00000000-0000-4000-8000-000000000041";
+    const playerA = "00000000-0000-4000-8000-000000000050";
+    const playerB = "00000000-0000-4000-8000-000000000051";
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("SELECT EXISTS") && sql.includes("team_drafts")) return { rows: [{ found: true }] };
+      if (sql.includes("finalize_team_draft")) return { rows: [{ round_id: roundId }] };
+      if (sql.includes("FROM public.round_players")) return { rows: [{ player_id: playerA }, { player_id: playerB }] };
+      return { rows: [], rowCount: 1 };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+    const repo = pgRoundRepository(pool);
+
+    await repo.startTeamDraft(draftId, leagueId, actor);
+    await repo.makeTeamDraftPick(draftId, leagueId, playerA, actor);
+    await repo.replaceTeamDraftCaptain(draftId, leagueId, 2, playerB, actor);
+    await repo.restartTeamDraft(draftId, leagueId, actor);
+    await repo.applyDraftSwap(draftId, leagueId, playerA, playerB, actor);
+    await expect(repo.finalizeTeamDraft(draftId, leagueId, actor)).resolves.toEqual({ roundId });
+
+    expect(query).toHaveBeenCalledWith("SELECT public.start_team_draft($1::uuid)", [draftId]);
+    expect(query).toHaveBeenCalledWith("SELECT public.make_team_draft_pick($1::uuid, $2::uuid)", [draftId, playerA]);
+    expect(query).toHaveBeenCalledWith("SELECT public.replace_team_draft_captain($1::uuid, $2::int, $3::uuid)", [draftId, 2, playerB]);
+    expect(query).toHaveBeenCalledWith("SELECT public.restart_team_draft($1::uuid)", [draftId]);
+    expect(query).toHaveBeenCalledWith("SELECT public.swap_team_draft_picks($1::uuid, $2::uuid, $3::uuid)", [draftId, playerA, playerB]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("set_round_attendance_bulk"), [roundId, [playerA, playerB]]);
+  });
+
+  it("runs the adaptive domain draw with scoped player attributes", async () => {
+    const players = Array.from({ length: 6 }, (_, index) => `00000000-0000-4000-8000-${String(index + 60).padStart(12, "0")}`);
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("FROM public.league_members member")) return { rows: players.map((player_id, index) => ({
+        player_id,
+        player_profile: (["defensive", "midfield", "offensive"] as const)[index % 3],
+        speed_rating: (index % 3) + 1,
+      })) };
+      if (sql.includes("get_latest_player_card_overalls_for_league")) {
+        return { rows: players.map((player_id, index) => ({ player_id, overall: 70 + index })) };
+      }
+      if (sql.includes("can_manage_private_balance_tags")) return { rows: [{ allowed: false }] };
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    const result = await pgRoundRepository(pool).drawTeamsAdaptiveOnServer({
+      playerIds: players,
+      teamCount: 3,
+      playersPerTeam: 2,
+    }, leagueId, actor);
+    expect(result.success).toBe(true);
+    expect(result.teams).toHaveLength(3);
+    expect(new Set(result.teams?.flat()).size).toBe(6);
+    expect(result.teamSummaries).toHaveLength(3);
+  });
 });

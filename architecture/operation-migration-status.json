@@ -1404,7 +1404,7 @@
       "source": "src/lib/actions/draft.ts",
       "name": "createTeamDraft",
       "state": "frontend-migrated",
-      "target": "POST /api/rounds/leagues/:leagueId/drafts",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/draft",
       "evidence": [
         "backend/src/contexts/rounds/domain/round.test.ts",
         "backend/src/contexts/rounds/application/manage-rounds.test.ts",
@@ -1436,7 +1436,7 @@
       "source": "src/lib/actions/draft.ts",
       "name": "getDraftWorkspace",
       "state": "frontend-migrated",
-      "target": "GET /api/rounds/leagues/:leagueId/drafts/:draftId",
+      "target": "GET /api/rounds/leagues/:leagueId/callups/:callupId/draft-workspace",
       "evidence": [
         "backend/src/contexts/rounds/domain/round.test.ts",
         "backend/src/contexts/rounds/application/manage-rounds.test.ts",
@@ -1452,7 +1452,7 @@
       "source": "src/lib/actions/draft.ts",
       "name": "getDraftWorkspaceByRound",
       "state": "frontend-migrated",
-      "target": "GET /api/rounds/leagues/:leagueId/rounds/:roundId/draft",
+      "target": "GET /api/rounds/leagues/:leagueId/:roundId/draft-workspace",
       "evidence": [
         "backend/src/contexts/rounds/domain/round.test.ts",
         "backend/src/contexts/rounds/application/manage-rounds.test.ts",

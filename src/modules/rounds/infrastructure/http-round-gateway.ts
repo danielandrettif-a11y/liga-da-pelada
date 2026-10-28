@@ -56,7 +56,7 @@ export type RoundHttpGateway = {
   zeroPlayerRoundPoints(leagueId: string, roundId: string, playerId: string): Promise<void>;
   addRoundEmergencySubstitute(leagueId: string, roundId: string, input: { name: string; teamId: string }): Promise<{ playerId: string }>;
   createTeamDraft(leagueId: string, roundId: string, callupId?: string | null): Promise<{ draftId: string }>;
-  getDraftWorkspace(leagueId: string, draftId: string): Promise<any>;
+  getDraftWorkspace(leagueId: string, callupId: string): Promise<any>;
   getDraftWorkspaceByRound(leagueId: string, roundId: string): Promise<any>;
   startTeamDraft(leagueId: string, draftId: string): Promise<void>;
   makeTeamDraftPick(leagueId: string, draftId: string, playerId: string): Promise<void>;
@@ -343,8 +343,8 @@ export function httpRoundGateway(backendUrl: string, accessToken?: string): Roun
       return res.json();
     },
 
-    async getDraftWorkspace(leagueId, draftId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/drafts/${draftId}`, {
+    async getDraftWorkspace(leagueId, callupId) {
+      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/callups/${callupId}/draft-workspace`, {
         headers: authHeaders(),
         cache: "no-store",
       });

@@ -32,6 +32,15 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-28 — Draft de times e sorteio adaptativo
+
+- As nove operações do Draft foram comparadas com o fluxo legado. Criação escolhe três capitães elegíveis e delega snapshots/estado à `create_team_draft`; início, escolha, troca de capitão, reinício, swap e confirmação usam exclusivamente as RPCs versionadas e conferem o escopo da pelada solicitado na rota.
+- O workspace por convocação corrigiu o identificador do contrato e agora reconstrói atletas, capitães, ordem de escolha, OVR, velocidade, perfil, médias, nota de equilíbrio, usuário atual e melhor sugestão de troca. A leitura por rodada reutiliza a mesma projeção dentro da mesma transação, sem abrir uma segunda conexão.
+- A confirmação materializa os times pela RPC, aplica os três presets oficiais e marca a presença de todos os participantes na mesma transação autenticada.
+- `drawTeamsAdaptiveOnServer` deixou de distribuir jogadores por módulo: domínio e backend preservam capacidade, atributos, fallbacks, ordem de chegada, titulares e a função de equilíbrio completo. Erros de uma API habilitada não caem silenciosamente no caminho Supabase antigo.
+- Progresso auditado: **150/267 estruturais, 126/267 (47,2%) aceitas em revisão, 0/267 verificadas de ponta a ponta e 141 pendentes de paridade**. Rodadas chegaram a **35/38** aceitas.
+- Verificação automatizada: **1.036 testes frontend em 200 arquivos**, **343 testes backend em 98 arquivos**, typecheck e builds dos dois projetos; auditorias de arquitetura, contexto e migração aprovadas; `npm audit --omit=dev` sem vulnerabilidades em frontend e backend.
+
 ### 2026-10-28 — criação, exclusão e encerramento de rodadas
 
 - `createRoundWithTeams` passou a validar formato, convocação/pré-lista, escopo e aptidão dos jogadores, presença inicial, estádio, nomes, capitães e distribuição reduzida antes de persistir toda a rodada em uma única transação autenticada. Numeração concorrente usa trava transacional e a presença continua sob a RPC canônica.

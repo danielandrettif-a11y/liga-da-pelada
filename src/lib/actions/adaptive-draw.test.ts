@@ -51,4 +51,16 @@ describe("adaptive-draw actions via API gateway", () => {
 
     expect(res).toEqual(mockResult);
   });
+
+  it("does not run the legacy draw after an enabled API failure", async () => {
+    mocks.roundApi.mockResolvedValue({
+      drawTeamsAdaptiveOnServer: vi.fn().mockRejectedValue(new Error("adaptive backend offline")),
+    });
+
+    await expect(drawTeamsAdaptiveOnServer({
+      playerIds: ["p1", "p2"],
+      teamCount: 2,
+      playersPerTeam: 1,
+    })).resolves.toEqual({ success: false, error: "adaptive backend offline" });
+  });
 });

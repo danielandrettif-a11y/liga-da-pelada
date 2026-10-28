@@ -64,12 +64,14 @@ describe("draft actions via API gateway", () => {
 
   it("routes getDraftWorkspace to API gateway", async () => {
     const mockWs = { id: draftId, status: "setup" } as any;
+    const getDraftWorkspaceMock = vi.fn().mockResolvedValue(mockWs);
     mocks.roundApi.mockResolvedValue({
-      getDraftWorkspace: vi.fn().mockResolvedValue(mockWs),
+      getDraftWorkspace: getDraftWorkspaceMock,
     });
 
     const res = await getDraftWorkspace(draftId);
     expect(res).toEqual(mockWs);
+    expect(getDraftWorkspaceMock).toHaveBeenCalledWith(leagueId, draftId);
   });
 
   it("routes getDraftWorkspaceByRound to API gateway", async () => {
@@ -144,5 +146,13 @@ describe("draft actions via API gateway", () => {
 
     const res = await finalizeTeamDraft(draftId);
     expect(res).toEqual({ success: true, roundId });
+  });
+
+  it("does not execute the legacy mutation after an enabled API failure", async () => {
+    mocks.roundApi.mockResolvedValue({
+      startTeamDraft: vi.fn().mockRejectedValue(new Error("draft backend offline")),
+    });
+
+    await expect(startTeamDraft(draftId)).resolves.toEqual({ success: false, error: "draft backend offline" });
   });
 });
