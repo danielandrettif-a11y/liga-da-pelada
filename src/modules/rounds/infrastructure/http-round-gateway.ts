@@ -24,8 +24,16 @@ export type RoundHttpGateway = {
   markRoundTeamArrived(leagueId: string, roundId: string, teamId: string, arrived: boolean): Promise<void>;
   openCallupReplacementVacancy(leagueId: string, callupId: string): Promise<void>;
   previewRoundTeamShuffle(leagueId: string, roundId: string, mode: string): Promise<any>;
-  applyRoundTeamShuffle(leagueId: string, roundId: string, mode: string): Promise<void>;
-  applyPermanentRoundTeamFormation(leagueId: string, roundId: string, input: any): Promise<void>;
+  applyRoundTeamShuffle(
+    leagueId: string,
+    roundId: string,
+    input: { mode: string; assignments?: Array<{ teamId: string; playerIds: string[] }> },
+  ): Promise<void>;
+  applyPermanentRoundTeamFormation(
+    leagueId: string,
+    roundId: string,
+    input: { assignments: Array<{ teamId: string; playerIds: string[] }> },
+  ): Promise<void>;
   swapRoundTeamPlayers(leagueId: string, roundId: string, playerA: string, playerB: string): Promise<void>;
   setRoundAttendanceBulk(leagueId: string, roundId: string, playerIds: string[]): Promise<void>;
   setRoundPlayerAttendance(leagueId: string, roundId: string, playerId: string, present: boolean): Promise<void>;
@@ -210,11 +218,11 @@ export function httpRoundGateway(backendUrl: string, accessToken?: string): Roun
       return res.json();
     },
 
-    async applyRoundTeamShuffle(leagueId, roundId, mode) {
+    async applyRoundTeamShuffle(leagueId, roundId, input) {
       const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/shuffle/apply`, {
         method: "POST",
         headers: authHeaders(true),
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify(input),
       });
       if (!res.ok) await parseApiError(res);
     },

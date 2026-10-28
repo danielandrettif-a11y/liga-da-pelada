@@ -6,6 +6,7 @@ import type {
   CreateRoundWithTeamsInput,
   DraftWorkspace,
   RoundRepository,
+  RoundTeamShufflePreview,
   SaveRoundPrelistInput,
   ServerAdaptiveDrawResult,
   TeamFormationInput,
@@ -16,6 +17,12 @@ import type {
   RoundPlayerAvailability,
   RoundWithCounts,
 } from "../domain/round.js";
+import {
+  isRoundReshuffleMode,
+  previewRoundReshuffle,
+  type PlayerProfile,
+  type PrivateBalanceTag,
+} from "../domain/round-team-shuffle.js";
 
 export class RoundPersistenceError extends Error {
   constructor(message: string, public readonly statusCode: number) {
@@ -529,43 +536,163 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
       });
     },
 
-    async previewRoundTeamShuffle(roundId: string, leagueId: string, mode: string, actor: Actor): Promise<unknown> {
+    async previewRoundTeamShuffle(roundId: string, leagueId: string, mode: string, actor: Actor): Promise<RoundTeamShufflePreview> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        return { roundId, mode, preview: true };
+        if (!isRoundReshuffleMode(mode)) {
+          throw new RoundPersistenceError("Tipo de sorteio inválido.", 400);
+        }
+
+        const roundResult = await client.query<{ status: string; has_live_match: boolean }>(
+          `SELECT r.status,
+                  EXISTS (
+                    SELECT 1 FROM public.matches m
+                    WHERE m.round_id = r.id AND m.status = 'live'
+                  ) AS has_live_match
+           FROM public.rounds r
+           WHERE r.id = $1::uuid AND r.league_id = $2::uuid`,
+          [roundId, leagueId],
+        );
+        const round = roundResult.rows[0];
+        if (!round) throw new RoundPersistenceError("Rodada não encontrada na pelada selecionada.", 404);
+        if (round.status === "finished") throw new RoundPersistenceError("A rodada já foi encerrada.", 409);
+        if (round.has_live_match) {
+          throw new RoundPersistenceError("Encerre a partida ao vivo antes de preparar uma nova formação.", 409);
+        }
+
+        const teamsResult = await client.query<{ id: string }>(
+          "SELECT id FROM public.teams WHERE round_id = $1::uuid ORDER BY position ASC",
+          [roundId],
+        );
+        const teamIds = teamsResult.rows.map((team) => team.id);
+
+        const membersResult = await client.query<{
+          team_id: string;
+          player_id: string;
+          is_goalkeeper: boolean;
+          player_profile: string | null;
+          speed_rating: number | null;
+        }>(
+          `SELECT tp.team_id, tp.player_id,
+                  p.is_goalkeeper,
+                  lm.player_profile,
+                  lm.speed_rating
+           FROM public.team_players tp
+           JOIN public.players p ON p.id = tp.player_id
+           LEFT JOIN public.league_members lm
+             ON lm.league_id = $2::uuid AND lm.player_id = tp.player_id AND lm.is_active = true
+           WHERE tp.team_id = ANY($1::uuid[])
+           ORDER BY tp.team_id ASC, tp.player_id ASC`,
+          [teamIds, leagueId],
+        );
+
+        const playerIdsByTeam = new Map(teamIds.map((teamId) => [teamId, [] as string[]]));
+        const playerById = new Map(membersResult.rows.map((row) => [row.player_id, row]));
+        for (const row of membersResult.rows) {
+          playerIdsByTeam.get(row.team_id)!.push(row.player_id);
+        }
+        const playerIds = teamIds.flatMap((teamId) => playerIdsByTeam.get(teamId) ?? []);
+        if (teamIds.length < 2 || playerIds.length < teamIds.length * 2) {
+          throw new RoundPersistenceError("São necessários pelo menos dois times completos para criar uma nova formação.", 409);
+        }
+
+        const overallResult = await client.query<{ player_id: string; overall: number | string | null }>(
+          "SELECT player_id, overall FROM public.get_latest_player_card_overalls_for_league($1::uuid)",
+          [leagueId],
+        );
+        const overallByPlayer = new Map(overallResult.rows.map((row) => [
+          row.player_id,
+          row.overall === null ? null : Number(row.overall),
+        ]));
+
+        const balanceTagByPlayer = new Map<string, PrivateBalanceTag>();
+        if (mode === "adaptive") {
+          const access = await client.query<{ allowed: boolean }>(
+            "SELECT public.can_manage_private_balance_tags() AS allowed",
+          );
+          if (access.rows[0]?.allowed) {
+            const tags = await client.query<{ player_id: string; balance_tag: PrivateBalanceTag }>(
+              "SELECT player_id, balance_tag FROM public.player_private_balance_tags WHERE player_id = ANY($1::uuid[])",
+              [playerIds],
+            );
+            for (const row of tags.rows) balanceTagByPlayer.set(row.player_id, row.balance_tag);
+          }
+        }
+
+        const preview = previewRoundReshuffle({
+          players: playerIds.map((playerId) => {
+            const player = playerById.get(playerId)!;
+            const speed = Number(player.speed_rating);
+            const profile = player.player_profile;
+            return {
+              id: playerId,
+              overall: overallByPlayer.get(playerId) ?? null,
+              speedRating: speed === 1 || speed === 2 || speed === 3 ? speed : null,
+              playerProfile: profile === "defensive" || profile === "midfield" || profile === "offensive"
+                ? profile as PlayerProfile
+                : null,
+              isGoalkeeper: player.is_goalkeeper === true,
+              balanceTag: balanceTagByPlayer.get(playerId) ?? null,
+            };
+          }),
+          capacities: teamIds.map((teamId) => playerIdsByTeam.get(teamId)?.length ?? 0),
+          mode,
+        });
+
+        return {
+          success: true,
+          mode,
+          assignments: teamIds.map((teamId, index) => ({
+            teamId,
+            playerIds: preview.teams[index] ?? [],
+          })),
+          summaries: preview.summaries,
+          balanceScore: preview.balanceScore,
+        };
       });
     },
 
-    async applyRoundTeamShuffle(roundId: string, leagueId: string, mode: string, actor: Actor): Promise<void> {
+    async applyRoundTeamShuffle(roundId, leagueId, input, actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
+        if (!isRoundReshuffleMode(input.mode)) {
+          throw new RoundPersistenceError("Tipo de sorteio inválido.", 400);
+        }
+        if (!input.assignments) {
+          if (input.mode !== "random") {
+            throw new RoundPersistenceError("Aplique uma prévia aprovada para este tipo de sorteio.", 400);
+          }
+          await client.query("SELECT public.shuffle_round_teams($1::uuid)", [roundId]);
+          return;
+        }
+        if (input.assignments.length < 2) {
+          throw new RoundPersistenceError("A formação precisa conter pelo menos dois times.", 400);
+        }
+        const assignments = input.assignments.map((assignment) => ({
+          team_id: assignment.teamId,
+          player_ids: [...new Set(assignment.playerIds)],
+        }));
+        await client.query(
+          "SELECT public.apply_round_team_shuffle($1::uuid, $2::jsonb, $3::text)",
+          [roundId, JSON.stringify(assignments), input.mode],
+        );
       });
     },
 
     async applyPermanentRoundTeamFormation(roundId: string, leagueId: string, input: TeamFormationInput, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        for (const team of input.teams) {
-          if (team.captainPlayerId !== undefined) {
-            await client.query(
-              "UPDATE public.teams SET captain_player_id = $2::uuid WHERE id = $1::uuid",
-              [team.teamId, team.captainPlayerId],
-            );
-          }
-          await client.query("DELETE FROM public.team_players WHERE team_id = $1::uuid", [team.teamId]);
-          for (const pid of team.playerIds) {
-            await client.query(
-              "INSERT INTO public.team_players (team_id, player_id) VALUES ($1::uuid, $2::uuid)",
-              [team.teamId, pid],
-            );
-          }
+        if (input.teams.length < 2) {
+          throw new RoundPersistenceError("A formação precisa conter pelo menos dois times.", 400);
         }
-      });
-    },
-
-    async shuffleRoundTeams(roundId: string, leagueId: string, options: unknown, actor: Actor): Promise<void> {
-      return authenticated(pool, actor, async (client) => {
-        await requireLeagueAdmin(client, leagueId);
+        const assignments = input.teams.map((team) => ({
+          team_id: team.teamId,
+          player_ids: [...new Set(team.playerIds)],
+        }));
+        await client.query(
+          "SELECT public.apply_round_team_shuffle($1::uuid, $2::jsonb, 'adaptive'::text)",
+          [roundId, JSON.stringify(assignments)],
+        );
       });
     },
 

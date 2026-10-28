@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "acceptedContexts": [
+    "identity",
+    "leagues",
+    "roster"
+  ],
+  "acceptedOperations": [
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "addRosterPlayersToCallup" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "addRosterPlayerToCallup" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "adminAddCallupPlayer" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "adminRemoveCallupPlayer" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "closeCallup" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "createCallupPrelist" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "getActiveCallup" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "getActiveCallupById" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "getActiveCallups" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "getAgendaCallups" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "hasActiveCallup" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "inviteGuestListToCallup" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "inviteGuestToCallup" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "joinActiveCallup" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "leaveActiveCallup" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "lockCallupForRound" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "openCallup" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "removeCallupEntry" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "repairMyPlayerAccount" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "setCallupVisibility" },
+    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "updateCallup" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "applyPermanentRoundTeamFormation" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "applyRoundTeamShuffle" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "previewRoundTeamShuffle" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "shuffleRoundTeams" }
+  ],
+  "evidence": {
+    "callups": [
+      "backend/src/contexts/callups/domain/callup.test.ts",
+      "backend/src/contexts/callups/application/manage-callups.test.ts",
+      "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+      "backend/src/contexts/callups/presentation.test.ts",
+      "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+      "src/lib/actions/callups.test.ts"
+    ],
+    "round-team-shuffle": [
+      "backend/src/contexts/rounds/domain/round-team-shuffle.test.ts",
+      "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+      "backend/src/contexts/rounds/presentation.test.ts",
+      "src/lib/round-reshuffle.test.ts",
+      "src/lib/actions/rounds.test.ts"
+    ]
+  }
+}

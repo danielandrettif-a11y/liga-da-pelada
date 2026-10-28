@@ -5,11 +5,30 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const catalog = JSON.parse(readFileSync(join(root, "architecture/application-operations.json"), "utf8"));
 const progress = JSON.parse(readFileSync(join(root, "architecture/operation-migration-status.json"), "utf8"));
+const parity = JSON.parse(readFileSync(join(root, "architecture/operation-parity-status.json"), "utf8"));
 const keyOf = ({ context, source, name }) => `${context}\u0000${source}\u0000${name}`;
 const knownOperations = new Map(catalog.operations.map((operation) => [keyOf(operation), operation]));
 const allowedStates = new Set(progress.states);
 const overrides = new Map();
 const errors = [];
+const accepted = new Set();
+
+for (const context of parity.acceptedContexts) {
+  const matching = catalog.operations.filter((operation) => operation.context === context);
+  if (!matching.length) errors.push(`Contexto aceito desconhecido: ${context}`);
+  for (const operation of matching) accepted.add(keyOf(operation));
+}
+for (const operation of parity.acceptedOperations) {
+  const key = keyOf(operation);
+  if (!knownOperations.has(key)) errors.push(`Operacao aceita desconhecida: ${operation.context}/${operation.name} (${operation.source})`);
+  if (accepted.has(key)) errors.push(`Operacao aceita duplicada: ${operation.context}/${operation.name} (${operation.source})`);
+  accepted.add(key);
+}
+for (const paths of Object.values(parity.evidence)) {
+  for (const path of paths) {
+    if (!existsSync(join(root, path))) errors.push(`Evidencia de paridade inexistente: ${path}`);
+  }
+}
 
 for (const item of progress.overrides) {
   const key = keyOf(item);
@@ -34,22 +53,30 @@ const rows = catalog.operations.map((operation) => ({
 const contexts = [...new Set(rows.map((row) => row.context))].sort();
 const totals = Object.fromEntries(["planned", ...progress.states].map((state) => [state, 0]));
 for (const row of rows) totals[row.state] += 1;
+for (const key of accepted) {
+  if (overrides.get(key)?.state === undefined) errors.push(`Operacao aceita sem ponte estrutural: ${knownOperations.get(key)?.name}`);
+}
+const acceptedCount = accepted.size;
+const remainingToParity = rows.length - acceptedCount;
 
 if (errors.length) {
   for (const error of errors) console.error(error);
   process.exitCode = 1;
 } else if (process.argv.includes("--json")) {
-  console.log(JSON.stringify({ total: rows.length, totals, contexts: contexts.map((context) => ({
+  console.log(JSON.stringify({ total: rows.length, totals, accepted: acceptedCount, remainingToParity, contexts: contexts.map((context) => ({
     context,
     total: rows.filter((row) => row.context === context).length,
     migrated: rows.filter((row) => row.context === context && row.state !== "planned").length,
+    accepted: rows.filter((row) => row.context === context && accepted.has(keyOf(row))).length,
     verified: rows.filter((row) => row.context === context && row.state === "verified").length,
   })) }, null, 2));
 } else {
   console.log(`Progresso da migracao: ${rows.length} operacoes; ${totals.planned} planejadas; ${totals["backend-pilot"]} no backend; ${totals["frontend-migrated"]} no frontend; ${totals.verified} verificadas; ${totals.retired} retiradas.`);
+  console.log(`Paridade revisada: ${acceptedCount}/${rows.length}; faltam ${remainingToParity} operacoes para o mesmo padrao.`);
   for (const context of contexts) {
     const contextRows = rows.filter((row) => row.context === context);
     const migrated = contextRows.filter((row) => row.state !== "planned").length;
-    console.log(`  ${context}: ${migrated}/${contextRows.length}`);
+    const reviewed = contextRows.filter((row) => accepted.has(keyOf(row))).length;
+    console.log(`  ${context}: ${migrated}/${contextRows.length} estruturais; ${reviewed}/${contextRows.length} aceitas`);
   }
 }

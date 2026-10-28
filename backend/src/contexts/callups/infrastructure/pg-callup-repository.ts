@@ -372,6 +372,8 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
           if (stadium.rows[0]) {
             stadiumName = stadium.rows[0].name;
             stadiumMapUrl = stadium.rows[0].google_maps_url;
+          } else {
+            throw new CallupPersistenceError("Estádio fora da pelada selecionada.", 400);
           }
         }
         if (!stadiumName) {
@@ -452,6 +454,8 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
           if (stadium.rows[0]) {
             stadiumName = stadium.rows[0].name;
             stadiumMapUrl = stadium.rows[0].google_maps_url;
+          } else {
+            throw new CallupPersistenceError("Estádio fora da pelada selecionada.", 400);
           }
         }
         if (!stadiumName) {
@@ -547,6 +551,23 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
     async lockCallup(leagueId: string, callupId: string, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
+        const roster = await client.query<{ capacity: number; confirmed_count: number }>(
+          `SELECT c.capacity,
+                  COUNT(ce.id) FILTER (WHERE ce.status = 'confirmed')::int AS confirmed_count
+           FROM public.callups c
+           LEFT JOIN public.callup_entries ce ON ce.callup_id = c.id
+           WHERE c.id = $2::uuid AND c.league_id = $1::uuid
+           GROUP BY c.id`,
+          [leagueId, callupId],
+        );
+        const callup = roster.rows[0];
+        if (!callup) throw new CallupPersistenceError("Convocação fora da pelada selecionada.", 404);
+        if (Number(callup.confirmed_count) < Number(callup.capacity)) {
+          throw new CallupPersistenceError(
+            `A lista precisa ter ${callup.capacity} confirmados para montar a rodada.`,
+            409,
+          );
+        }
         const result = await client.query(
           "UPDATE public.callups SET status = 'locked', updated_at = NOW() WHERE id = $2::uuid AND league_id = $1::uuid AND status = 'open'",
           [leagueId, callupId],
@@ -788,7 +809,7 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
       leagueId: string,
       callupId: string,
       actor: Actor,
-    ): Promise<{ roundId: string }> {
+    ): Promise<{ roundId: string; created: boolean }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
 
@@ -800,12 +821,31 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
           stadium_name: string | null;
           stadium_map_url: string | null;
           round_type: string;
+          status: string;
+          round_id: string | null;
         }>(
-          "SELECT id, date, start_time, stadium_id, stadium_name, stadium_map_url, round_type FROM public.callups WHERE id = $1::uuid AND league_id = $2::uuid",
+          `SELECT id, date, start_time, stadium_id, stadium_name, stadium_map_url,
+                  round_type, status, round_id
+           FROM public.callups
+           WHERE id = $1::uuid AND league_id = $2::uuid`,
           [callupId, leagueId],
         );
         const callup = callupRes.rows[0];
         if (!callup) throw new CallupPersistenceError("Convocação fora da pelada selecionada.", 404);
+        if (callup.round_id) {
+          const linked = await client.query<{ id: string; status: string; preparation_stage: string | null }>(
+            "SELECT id, status, preparation_stage FROM public.rounds WHERE id = $1::uuid AND league_id = $2::uuid",
+            [callup.round_id, leagueId],
+          );
+          const round = linked.rows[0];
+          if (round?.status === "draft" && round.preparation_stage === "prelist") {
+            return { roundId: round.id, created: false };
+          }
+          throw new CallupPersistenceError("Esta convocação já foi convertida em rodada.", 409);
+        }
+        if (callup.status !== "open") {
+          throw new CallupPersistenceError("A convocação precisa estar aberta para criar a pré-lista.", 409);
+        }
 
         const confirmedRes = await client.query<{ player_id: string }>(
           "SELECT player_id FROM public.callup_entries WHERE callup_id = $1::uuid AND status = 'confirmed' ORDER BY position ASC",
@@ -834,7 +874,7 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
 
         const roundId = result.rows[0]?.save_round_prelist;
         if (!roundId) throw new CallupPersistenceError("Não foi possível gerar a pré-lista.", 500);
-        return { roundId: String(roundId) };
+        return { roundId: String(roundId), created: true };
       });
     },
 

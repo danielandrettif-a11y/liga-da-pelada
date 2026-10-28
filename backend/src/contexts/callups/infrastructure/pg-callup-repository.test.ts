@@ -168,4 +168,45 @@ describe("pgCallupRepository", () => {
 
     expect(result).toEqual({ roundId });
   });
+
+  it("does not lock an incomplete callup", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("confirmed_count")) return { rows: [{ capacity: 12, confirmed_count: 11 }] };
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    await expect(pgCallupRepository(pool).lockCallup(leagueId, callupId, actor))
+      .rejects.toMatchObject({ statusCode: 409 });
+    expect(query).not.toHaveBeenCalledWith(expect.stringContaining("SET status = 'locked'"), expect.anything());
+  });
+
+  it("returns the existing prelist without creating a duplicate", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("FROM public.callups") && sql.includes("round_id")) {
+        return { rows: [{
+          id: callupId,
+          date: "2026-10-30",
+          start_time: "08:00",
+          stadium_id: null,
+          stadium_name: null,
+          stadium_map_url: null,
+          round_type: "official",
+          status: "open",
+          round_id: roundId,
+        }] };
+      }
+      if (sql.includes("preparation_stage")) {
+        return { rows: [{ id: roundId, status: "draft", preparation_stage: "prelist" }] };
+      }
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    await expect(pgCallupRepository(pool).createPrelist(leagueId, callupId, actor))
+      .resolves.toEqual({ roundId, created: false });
+    expect(query).not.toHaveBeenCalledWith(expect.stringContaining("save_round_prelist"), expect.anything());
+  });
 });

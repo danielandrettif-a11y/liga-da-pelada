@@ -8,6 +8,7 @@ import {
   type RoundPlayerAvailability,
   type RoundWithCounts,
 } from "../domain/round.js";
+import type { RoundReshuffleMode, RoundReshuffleSummary } from "../domain/round-team-shuffle.js";
 
 export type AdminRoundPrelist = {
   id: string;
@@ -59,6 +60,16 @@ export type TeamFormationInput = {
     playerIds: string[];
     captainPlayerId?: string | null;
   }>;
+};
+
+export type RoundTeamShuffleAssignment = { teamId: string; playerIds: string[] };
+
+export type RoundTeamShufflePreview = {
+  success: true;
+  mode: RoundReshuffleMode;
+  assignments: RoundTeamShuffleAssignment[];
+  summaries: RoundReshuffleSummary[];
+  balanceScore: number;
 };
 
 export type DraftWorkspace = {
@@ -144,10 +155,14 @@ export interface RoundRepository {
   getNextTeamPresetOffset(leagueId: string, actor: Actor): Promise<{ offset: number }>;
   markRoundTeamArrived(roundId: string, teamId: string, leagueId: string, arrived: boolean, actor: Actor): Promise<void>;
   openCallupReplacementVacancy(callupId: string, leagueId: string, actor: Actor): Promise<void>;
-  previewRoundTeamShuffle(roundId: string, leagueId: string, mode: string, actor: Actor): Promise<unknown>;
-  applyRoundTeamShuffle(roundId: string, leagueId: string, mode: string, actor: Actor): Promise<void>;
+  previewRoundTeamShuffle(roundId: string, leagueId: string, mode: string, actor: Actor): Promise<RoundTeamShufflePreview>;
+  applyRoundTeamShuffle(
+    roundId: string,
+    leagueId: string,
+    input: { mode: string; assignments?: RoundTeamShuffleAssignment[] },
+    actor: Actor,
+  ): Promise<void>;
   applyPermanentRoundTeamFormation(roundId: string, leagueId: string, input: TeamFormationInput, actor: Actor): Promise<void>;
-  shuffleRoundTeams(roundId: string, leagueId: string, options: unknown, actor: Actor): Promise<void>;
   swapRoundTeamPlayers(roundId: string, leagueId: string, playerA: string, playerB: string, actor: Actor): Promise<void>;
   setRoundAttendanceBulk(roundId: string, leagueId: string, playerIds: string[], actor: Actor): Promise<void>;
   setRoundPlayerAttendance(roundId: string, leagueId: string, playerId: string, present: boolean, actor: Actor): Promise<void>;

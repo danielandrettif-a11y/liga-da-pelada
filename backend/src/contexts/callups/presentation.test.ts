@@ -55,7 +55,7 @@ function fixture(enabled: boolean) {
     removePlayer: vi.fn().mockResolvedValue({ revalidateRoundId: null }),
     inviteGuest: vi.fn().mockResolvedValue({ playerId, status: "confirmed", position: 3 }),
     inviteGuestList: vi.fn().mockResolvedValue({ created: 1, confirmed: 1, waitlisted: 0, failed: [] }),
-    createPrelist: vi.fn().mockResolvedValue({ roundId: "00000000-0000-4000-8000-000000000005" }),
+    createPrelist: vi.fn().mockResolvedValue({ roundId: "00000000-0000-4000-8000-000000000005", created: true }),
     repairMyPlayer: vi.fn().mockResolvedValue({ playerId }),
   };
 

@@ -5,10 +5,10 @@
 ## Reorganização de Arquitetura: auditoria após sincronização de 28/10/2026
 
 - A branch contém pontes para 150/267 operações (56,2%), mas o lote operacional novo ainda não foi homologado como paridade funcional.
-- As 70 operações de identidade, peladas e elenco (26,2%) permanecem como base aceita na revisão de código; nenhuma operação do catálogo está em `verified` de ponta a ponta.
-- Convocações, rodadas e partidas voltaram para a fila de revisão de paridade antes da ativação local das flags. Foram encontrados efeitos omitidos em encerramento de rodada/partida e uma operação de sorteio vazia.
+- As 95 operações de identidade, peladas, elenco, convocações e sorteio de times (35,6%) estão aceitas na revisão de código; nenhuma operação do catálogo está em `verified` de ponta a ponta.
+- Convocações passaram na revisão de paridade (21/21). Rodadas e partidas continuam na fila antes da ativação local das flags; encerramento de rodada/partida ainda omite efeitos críticos.
 - Correções desta auditoria: sessão obrigatória segundo a RLS atual, fallback legado sem token, contrato e pré-lista atômica na abertura da convocação, RPCs canônicas sem fallback SQL parcial, composição fail-fast de partidas e typecheck reproduzível.
-- Restam 117 operações sem ponte estrutural e 80 operações do lote operacional para revisão/homologação de paridade.
+- O sorteio de times agora gera prévia real no domínio do backend e aplica a formação aprovada pela RPC transacional. Restam 117 operações sem ponte estrutural e 55 pontes para revisão de paridade: **172 operações ao todo** para chegar ao mesmo padrão.
 
 ## Reorganização de Arquitetura: Contexto `roster` (Elenco) com ponte completa (35/35)
 

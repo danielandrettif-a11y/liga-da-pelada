@@ -33,7 +33,7 @@ function repository(): CallupRepository {
     removePlayer: vi.fn().mockResolvedValue({ revalidateRoundId: null }),
     inviteGuest: vi.fn().mockResolvedValue({ playerId: "guest-1", status: "confirmed", position: 3 }),
     inviteGuestList: vi.fn().mockResolvedValue({ created: 1, confirmed: 1, waitlisted: 0, failed: [] }),
-    createPrelist: vi.fn().mockResolvedValue({ roundId: "round-1" }),
+    createPrelist: vi.fn().mockResolvedValue({ roundId: "round-1", created: true }),
     repairMyPlayer: vi.fn().mockResolvedValue({ playerId: "player-1" }),
   };
 }

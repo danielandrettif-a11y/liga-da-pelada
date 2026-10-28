@@ -113,4 +113,73 @@ describe("pgRoundRepository", () => {
 
     expect(result).toEqual({ roundId });
   });
+
+  it("builds a real shuffle preview from scoped round players", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("EXISTS (") && sql.includes("FROM public.rounds r")) {
+        return { rows: [{ status: "active", has_live_match: false }] };
+      }
+      if (sql.includes("SELECT id FROM public.teams")) {
+        return { rows: [{ id: "team-a" }, { id: "team-b" }] };
+      }
+      if (sql.includes("FROM public.team_players tp")) {
+        return { rows: [
+          { team_id: "team-a", team_position: 1, player_id: "p1", is_goalkeeper: true, player_profile: "defensive", speed_rating: 1 },
+          { team_id: "team-a", team_position: 1, player_id: "p2", is_goalkeeper: false, player_profile: "midfield", speed_rating: 2 },
+          { team_id: "team-b", team_position: 2, player_id: "p3", is_goalkeeper: true, player_profile: "defensive", speed_rating: 3 },
+          { team_id: "team-b", team_position: 2, player_id: "p4", is_goalkeeper: false, player_profile: "offensive", speed_rating: 2 },
+        ] };
+      }
+      if (sql.includes("get_latest_player_card_overalls_for_league")) {
+        return { rows: [
+          { player_id: "p1", overall: 70 },
+          { player_id: "p2", overall: 75 },
+          { player_id: "p3", overall: 72 },
+          { player_id: "p4", overall: 74 },
+        ] };
+      }
+      return { rows: [] };
+    });
+
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+    const preview = await pgRoundRepository(pool).previewRoundTeamShuffle(roundId, leagueId, "balanced", actor);
+
+    expect(preview.success).toBe(true);
+    expect(preview.assignments).toHaveLength(2);
+    expect(new Set(preview.assignments.flatMap((assignment) => assignment.playerIds))).toEqual(new Set(["p1", "p2", "p3", "p4"]));
+  });
+
+  it("applies the exact approved shuffle through the scoped RPC", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    await pgRoundRepository(pool).applyRoundTeamShuffle(roundId, leagueId, {
+      mode: "balanced",
+      assignments: [
+        { teamId: "00000000-0000-4000-8000-000000000010", playerIds: ["00000000-0000-4000-8000-000000000020"] },
+        { teamId: "00000000-0000-4000-8000-000000000011", playerIds: ["00000000-0000-4000-8000-000000000021"] },
+      ],
+    }, actor);
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("public.apply_round_team_shuffle"),
+      [roundId, expect.stringContaining("team_id"), "balanced"],
+    );
+  });
+
+  it("uses the canonical random shuffle RPC when there is no preview payload", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    await pgRoundRepository(pool).applyRoundTeamShuffle(roundId, leagueId, { mode: "random" }, actor);
+
+    expect(query).toHaveBeenCalledWith("SELECT public.shuffle_round_teams($1::uuid)", [roundId]);
+  });
 });

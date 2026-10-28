@@ -86,7 +86,7 @@ function refreshCallups() {
 async function selectedCallup(callupId: string, client: Awaited<ReturnType<typeof getCurrentAccount>>["client"]) {
   const league = await getSelectedLeague();
   if (!league) return null;
-  const { data } = await client.from("callups").select("id, league_id")
+  const { data } = await client.from("callups").select("id, league_id, date, start_time, round_type")
     .eq("id", callupId).eq("league_id", league.id).maybeSingle();
   return data;
 }
@@ -748,8 +748,22 @@ async function prepareSelectedCallupPrelist(
     const api = await callupApiFor(client);
     if (api) {
       const res = await api.createPrelist(selectedLeague.id, callupId);
-      refreshCallups();
-      revalidatePath("/cartola");
+      if (res.created) {
+        if (callup.round_type !== "friendly" && selectedLeague.featureTier === "complete") {
+          try {
+            await scheduleCartolaRoundReminders({
+              roundId: res.roundId,
+              date: callup.date,
+              startTime: callup.start_time || "08:00",
+              includeOpening: true,
+            });
+          } catch (scheduleError) {
+            console.error("Pré-lista criada, mas os lembretes do Cartola não foram agendados:", scheduleError);
+          }
+        }
+        refreshCallups();
+        revalidatePath("/cartola");
+      }
       return { success: true as const, roundId: res.roundId };
     }
   } catch (error: any) {

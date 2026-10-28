@@ -32,13 +32,21 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-28 — paridade de convocações e sorteio de times
+
+- As 21 operações de convocação foram revisadas contra as Server Actions e gateways legados. A API agora rejeita estádio de outra pelada, impede travar lista incompleta, reutiliza pré-lista ainda em rascunho sem duplicação e preserva o agendamento de lembretes do Cartola.
+- `previewRoundTeamShuffle` deixou de devolver uma resposta fictícia: o backend carrega somente a rodada/pelada autorizada, overall, velocidade, perfil, goleiro e, quando permitido, tags privadas; o algoritmo puro preserva capacidade e unicidade. `shuffleRoundTeams`, `applyRoundTeamShuffle` e `applyPermanentRoundTeamFormation` persistem pela RPC transacional versionada.
+- A aplicação de uma prévia passou a transportar os `assignments` aprovados pelo ADM. Erros da API habilitada não caem silenciosamente na implementação antiga.
+- `architecture/operation-parity-status.json` e `npm run audit:migration` tornam o aceite explícito: **150/267 estruturais, 95/267 (35,6%) aceitas em revisão, 0/267 verificadas de ponta a ponta e 172 pendentes de paridade**.
+- Verificação: **1.018 testes frontend em 200 arquivos**, **316 testes backend em 96 arquivos**, typecheck e builds dos dois projetos; auditorias arquitetural/de catálogo aprovadas e `npm audit` com zero vulnerabilidades em frontend e backend.
+
 ### 2026-10-28 — auditoria dos commits de convocações, rodadas e partidas
 
 - A branch foi atualizada até `c4fa53d` e os 5 commits posteriores a `72b4030` foram revisados. As 80 operações novas possuem a estrutura esperada de contexto, rota, gateway e flag, mas o lote ainda não tem paridade funcional suficiente para homologação.
 - Foram corrigidos o contrato público de `openCallup`, a criação atômica da pré-lista, a preservação dos lembretes do Cartola, a exigência de sessão nas leituras protegidas pela RLS atual, a composição obrigatória do repositório de partidas e a execução reproduzível do typecheck em checkout limpo.
 - Fallbacks que duplicavam `create_live_match`, `set_callup_format` e `get_callup_entry_joiners` foram removidos. Essas RPCs são parte do esquema versionado e continuam como autoridade; além de perder regras, tentar um segundo SQL depois do primeiro erro manteria a transação PostgreSQL abortada.
-- Pendências de paridade impedem considerar o lote 3 concluído: `shuffleRoundTeams` ainda é vazio; `finishRound` não preserva o fechamento financeiro, estatísticas e Cartola; `finishMatch` não preserva tempos de saída, recálculo, próxima partida e notificações; outras mutações precisam da mesma comparação antes da ativação das flags.
-- Métricas separadas: **150/267 (56,2%)** possuem ponte estrutural catalogada; **70/267 (26,2%)** passaram pela revisão no padrão das fatias anteriores; **0/267** estão verificadas de ponta a ponta. Restam **117 operações** sem ponte e a revisão de paridade das 80 operações do lote operacional.
+- Pendências de paridade impedem considerar o lote 3 concluído: `finishRound` não preserva o fechamento financeiro, estatísticas e Cartola; `finishMatch` não preserva tempos de saída, recálculo, próxima partida e notificações; outras mutações precisam da mesma comparação antes da ativação das flags. O sorteio de times citado na auditoria foi corrigido no lote seguinte.
+- Linha de base naquele momento: **150/267 (56,2%)** com ponte estrutural, **70/267 (26,2%)** aceitas e **0/267** verificadas. A linha de base atual está no lote acima e no auditor automatizado.
 
 ### 2026-10-27 — estatísticas e agrupamento do elenco
 

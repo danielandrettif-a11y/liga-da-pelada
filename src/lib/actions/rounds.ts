@@ -502,7 +502,7 @@ export async function shuffleRoundTeams(roundId: string) {
     if (league) {
       const api = await roundApiFor(client);
       if (api) {
-        await api.applyRoundTeamShuffle(league.id, roundId, "random");
+        await api.applyRoundTeamShuffle(league.id, roundId, { mode: "random" });
         refreshRoundManagement(roundId);
         return { success: true };
       }
@@ -551,6 +551,7 @@ export async function previewRoundTeamShuffle(roundId: string, mode: RoundReshuf
       }
     } catch (apiErr: any) {
       console.error("Erro no preview de sorteio via API:", apiErr);
+      return { success: false, error: apiErr?.message || "Não foi possível preparar a nova formação." };
     }
 
     const client = account.client;
@@ -643,7 +644,10 @@ export async function applyRoundTeamShuffle(input: {
     if (league) {
       const api = await roundApiFor(client);
       if (api) {
-        await api.applyRoundTeamShuffle(league.id, input.roundId, input.mode);
+        await api.applyRoundTeamShuffle(league.id, input.roundId, {
+          mode: input.mode,
+          assignments: input.assignments,
+        });
         refreshRoundManagement(input.roundId);
         return { success: true };
       }

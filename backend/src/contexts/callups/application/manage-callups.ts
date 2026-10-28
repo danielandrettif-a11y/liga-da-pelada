@@ -37,7 +37,7 @@ export interface CallupRepository {
   removePlayer(leagueId: string, callupId: string, playerId: string, asAdmin: boolean, actor: Actor): Promise<{ revalidateRoundId?: string | null }>;
   inviteGuest(leagueId: string, callupId: string, guest: { name: string; playerProfile?: string; isGoalkeeper?: boolean }, actor: Actor): Promise<CallupInviteResult>;
   inviteGuestList(leagueId: string, callupId: string, guests: Array<{ name: string; isGoalkeeper?: boolean }>, playerProfile: string, actor: Actor): Promise<CallupGuestListResult>;
-  createPrelist(leagueId: string, callupId: string, actor: Actor): Promise<{ roundId: string }>;
+  createPrelist(leagueId: string, callupId: string, actor: Actor): Promise<{ roundId: string; created: boolean }>;
   repairMyPlayer(actor: Actor): Promise<{ playerId?: string }>;
 }
 
@@ -201,7 +201,7 @@ export function createCallupPrelist(
   callupId: string,
   actor: Actor,
   repository: CallupRepository,
-): Promise<{ roundId: string }> {
+): Promise<{ roundId: string; created: boolean }> {
   return repository.createPrelist(
     parseCallupUuid(leagueId, "Pelada"),
     parseCallupUuid(callupId, "Convocação"),

@@ -115,14 +115,14 @@ describe("httpCallupGateway", () => {
   it("creates prelist via HTTP POST", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ success: true, roundId: "00000000-0000-4000-8000-000000000005" }),
+      json: async () => ({ success: true, roundId: "00000000-0000-4000-8000-000000000005", created: true }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
     const gateway = httpCallupGateway(backendUrl, token);
     const result = await gateway.createPrelist(leagueId, callupId);
 
-    expect(result).toEqual({ success: true, roundId: "00000000-0000-4000-8000-000000000005" });
+    expect(result).toEqual({ success: true, roundId: "00000000-0000-4000-8000-000000000005", created: true });
   });
 
   it("repairs my player via HTTP POST", async () => {

@@ -90,7 +90,7 @@ export type CallupHttpGateway = {
     guests: Array<{ name: string; isGoalkeeper?: boolean }>,
     playerProfile: string,
   ): Promise<CallupGuestListResult>;
-  createPrelist(leagueId: string, callupId: string): Promise<{ roundId: string }>;
+  createPrelist(leagueId: string, callupId: string): Promise<{ roundId: string; created: boolean }>;
   repairMyPlayer(): Promise<{ playerId?: string }>;
 };
 

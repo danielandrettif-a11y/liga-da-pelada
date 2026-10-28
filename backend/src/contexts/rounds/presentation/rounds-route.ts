@@ -314,7 +314,7 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
         const preview = await dependencies.repository.previewRoundTeamShuffle(
           request.params.roundId,
           request.params.leagueId,
-          request.body?.mode || "standard",
+          request.body?.mode || "random",
           authentication.actor,
         );
         return reply.code(200).send(preview);
@@ -327,7 +327,7 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
   // Sorteio: aplicar
   app.post<{
     Params: { leagueId: string; roundId: string };
-    Body: { mode: string };
+    Body: { mode: string; assignments?: Array<{ teamId: string; playerIds: string[] }> };
   }>(
     "/api/rounds/leagues/:leagueId/:roundId/shuffle/apply",
     async (request, reply) => {
@@ -337,7 +337,10 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
         await dependencies.repository.applyRoundTeamShuffle(
           request.params.roundId,
           request.params.leagueId,
-          request.body?.mode || "standard",
+          {
+            mode: request.body?.mode || "random",
+            assignments: request.body?.assignments,
+          },
           authentication.actor,
         );
         return reply.code(200).send({ success: true });
@@ -350,7 +353,10 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
   // Formação permanente de times
   app.post<{
     Params: { leagueId: string; roundId: string };
-    Body: { teams: Array<{ teamId: string; playerIds: string[]; captainPlayerId?: string | null }> };
+    Body: {
+      teams?: Array<{ teamId: string; playerIds: string[]; captainPlayerId?: string | null }>;
+      assignments?: Array<{ teamId: string; playerIds: string[] }>;
+    };
   }>(
     "/api/rounds/leagues/:leagueId/:roundId/permanent-formation",
     async (request, reply) => {
@@ -360,7 +366,7 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
         await dependencies.repository.applyPermanentRoundTeamFormation(
           request.params.roundId,
           request.params.leagueId,
-          request.body,
+          { teams: request.body.teams ?? request.body.assignments ?? [] },
           authentication.actor,
         );
         return reply.code(200).send({ success: true });
