@@ -54,13 +54,19 @@
   - Integração no sorteio de rodadas `src/lib/round-draw.ts` e inclusão do botão `🏎️ Por Velocidade` em `src/components/RoundCreator.tsx`.
   - Seletor de velocidade 1-3★ em `src/components/PlayerForm.tsx` e tela de edição admin.
 
-- [x] **Validação e Testes:**
-  - `src/lib/bq-scoring.test.ts` (10/10 testes passando).
-  - `src/lib/speed-draw.test.ts` (5/5 testes passando).
-  - `src/lib/ranked-scoring.test.ts` (20/20 testes passando).
-  - `src/lib/fantasy/engine.test.ts` (38/38 testes passando).
-  - `src/lib/fantasy/lineup-positions.test.ts` (6/6 testes passando).
-  - `src/lib/fantasy/live-projection.test.ts` (10/10 testes passando).
-  - Bateria completa Vitest: 24 arquivos de teste, 170 testes passando com 100% de sucesso.
-  - TypeScript estrito (`npx tsc --noEmit`): 0 erros.
-  - Build de produção Next.js (`npm run build`): Gerado com sucesso (exit code 0).
+- [x] **Migração Arquitetural - Lote 3 (Jogo Operacional - 100% Concluído):**
+  - **Contexto `callups` (21/21 operações):**
+    - Domain, Application, Infrastructure (Postgres), Presentation (Rotas Express) e Handlers no backend.
+    - Gateway HTTP, Sessão de API e Server Actions bridge com testes unitários completos.
+  - **Contexto `rounds` (38/38 operações):**
+    - Domain, Application, Infrastructure (Postgres), Presentation e Server Actions bridge com testes unitários completos.
+  - **Contexto `matches` (21/21 operações):**
+    - Domain, Application (`manage-matches.ts`), Infrastructure (`pg-match-repository.ts`), Presentation (`matches-route.ts`).
+    - Gateway HTTP (`http-match-gateway.ts`), Sessão de API (`match-api-session.ts`).
+    - Bridging de 20 operações em `src/lib/actions/matches.ts` e 1 em `src/lib/actions/goalkeeper.ts`.
+  - **Validação Integrada:**
+    - `npm --prefix backend test`: 95 arquivos de teste, 302 testes passando com 100% de sucesso.
+    - `npm --prefix backend run typecheck`: 0 erros.
+    - `npx vitest run`: todos os testes de matches e gateway passando.
+    - `npx tsc --noEmit`: 0 erros no frontend.
+    - `npm run audit:migration`: 150/267 operações migradas (callups 21/21, identity 8/8, leagues 27/27, matches 21/21, roster 35/35, rounds 38/38).

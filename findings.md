@@ -38,3 +38,17 @@
   - A união de perfis (`mergeGuestWithRegistered`) preserva a verificação `can_merge_profiles_in_league` e a execução da RPC `merge_selectable_player_profiles`, retornando com segurança os `affectedRoundIds` para recálculo.
   - O gateway `httpRosterGateway` no frontend fornece o contrato tipado `mergeGuestWithRegistered` e as Server Actions mantêm um fallback gracioso para RPCs legadas enquanto as pontes de homologação local estiverem sob feature flags.
   - Com isso, o contexto `roster` atinge 100% de cobertura (35 de 35 operações migradas).
+
+## 6. Reorganização de Arquitetura: Contexto Rounds (Rodadas)
+- **Descoberta:** O contexto `rounds` com 38 operações inclui fluxos de persistência pesados (criação de rodada com sorteio, encerramento de rodada com recálculo de scouts e integração com o Cartola).
+- **Decisão Arquitetural:**
+  - Encapsulamento completo no backend sob `backend/src/contexts/rounds/` com repositório PostgreSQL dedicado (`pg-round-repository.ts`) e rotas Express autenticadas.
+  - No frontend, o gateway `httpRoundGateway` e a sessão `roundApiFor` abstraem as chamadas REST, mantendo o fallback gracioso nas server actions legadas.
+  - Conclusão com 100% de cobertura (38 de 38 operações migradas).
+
+## 7. Reorganização de Arquitetura: Contexto Matches (Partidas)
+- **Descoberta:** O contexto `matches` possui 21 operações, com alta sensibilidade a tempo de execução no frontend (ações de cronômetro, substituições ao vivo, auditoria e registro/correção de gols).
+- **Decisão Arquitetural:**
+  - **Tipagem de Gateways REST vs. Discriminated Unions:** Métodos de gateway que lançam exceção em caso de erro HTTP devem tipar seu retorno com `success: true` literal, e não `success: boolean`. Isso permite que o compilador TypeScript do Next.js discrimine perfeitamente os branches de sucesso e falha (ex.: checagens de `res.matchId`, `res.newDuration`, `res.skipped`), eliminando erros de compilação nos componentes React (`MatchLiveBoard`, `MatchCreator`, `DeleteMatchButton`).
+  - **Escopo do Next.js Runtime em Testes:** Funções que usam `after()` de `next/server` ou `cookies()` de `next/headers` (através de `createServerClient()`) devem ter `next/server` mockado nos testes unitários do Vitest e chamadas de gateway devem ser avaliadas antes da inicialização de clientes dependentes de cookies, permitindo execução pura sem request context.
+  - O lote `matches` alcançou 100% de cobertura (21 de 21 operações migradas), concluindo integralmente o **Lote 3: Jogo Operacional**.
