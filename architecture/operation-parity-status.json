@@ -30,7 +30,22 @@
     { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "applyPermanentRoundTeamFormation" },
     { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "applyRoundTeamShuffle" },
     { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "previewRoundTeamShuffle" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "shuffleRoundTeams" }
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "shuffleRoundTeams" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "getActiveLeague" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "getAdminRoundPrelist" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "getAdminRoundPrelists" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "getNextTeamPresetOffset" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "getRounds" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "markRoundTeamArrived" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "openCallupReplacementVacancy" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setCallupFormat" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setCallupMatchSize" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setRoundAttendanceBulk" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setRoundPlayerAttendance" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setRoundPlayerAvailability" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setRoundTeamCaptain" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setRoundTeamVestColor" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "swapRoundTeamPlayers" }
   ],
   "evidence": {
     "callups": [
@@ -46,6 +61,13 @@
       "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
       "backend/src/contexts/rounds/presentation.test.ts",
       "src/lib/round-reshuffle.test.ts",
+      "src/lib/actions/rounds.test.ts"
+    ],
+    "round-management": [
+      "backend/src/contexts/rounds/domain/round.test.ts",
+      "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+      "backend/src/contexts/rounds/presentation.test.ts",
+      "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
       "src/lib/actions/rounds.test.ts"
     ]
   }

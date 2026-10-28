@@ -6,6 +6,7 @@ const leagueId = "00000000-0000-4000-8000-000000000001";
 const roundId = "00000000-0000-4000-8000-000000000002";
 const teamId = "00000000-0000-4000-8000-000000000003";
 const draftId = "00000000-0000-4000-8000-000000000004";
+const playerId = "00000000-0000-4000-8000-000000000005";
 
 describe("httpRoundGateway", () => {
   it("fetches rounds by season", async () => {
@@ -74,5 +75,32 @@ describe("httpRoundGateway", () => {
 
     const gateway = httpRoundGateway(backendUrl);
     await expect(gateway.deleteRound(leagueId, roundId)).rejects.toThrow(RoundApiError);
+  });
+
+  it("requests the preset offset for the selected round type", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ offset: 3 }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(httpRoundGateway(backendUrl, "test-token").getNextTeamPresetOffset(leagueId, "friendly"))
+      .resolves.toEqual({ offset: 3 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/rounds/leagues/${leagueId}/next-team-preset-offset?roundType=friendly`,
+      expect.anything(),
+    );
+  });
+
+  it("sends the outgoing player when opening a replacement vacancy", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await httpRoundGateway(backendUrl, "test-token").openCallupReplacementVacancy(leagueId, roundId, playerId);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/rounds/leagues/${leagueId}/${roundId}/replacement-vacancy`,
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ outPlayerId: playerId }),
+      }),
+    );
   });
 });

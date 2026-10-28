@@ -28,9 +28,13 @@ import {
   deleteRound,
   finishRound,
   getActiveLeague,
+  getAdminRoundPrelist,
+  getAdminRoundPrelists,
   getRound,
   getRounds,
+  openCallupReplacementVacancy,
   saveRoundPrelist,
+  setCallupFormat,
   setRoundPlayerAttendance,
 } from "./rounds";
 
@@ -73,6 +77,12 @@ describe("rounds actions via API gateway", () => {
     expect(getActiveLeagueMock).toHaveBeenCalledWith(leagueId);
   });
 
+  it("does not execute the legacy reader after an enabled API failure", async () => {
+    mocks.roundApi.mockResolvedValue({ getActiveLeague: vi.fn().mockRejectedValue(new Error("backend offline")) });
+
+    await expect(getActiveLeague()).rejects.toThrow("backend offline");
+  });
+
   it("routes getRounds via API when available", async () => {
     const getRoundsMock = vi.fn().mockResolvedValue([{ id: roundId }]);
     mocks.roundApi.mockResolvedValue({ getRounds: getRoundsMock });
@@ -80,6 +90,40 @@ describe("rounds actions via API gateway", () => {
     const result = await getRounds();
     expect(result).toEqual([{ id: roundId }]);
     expect(getRoundsMock).toHaveBeenCalledWith(seasonId);
+  });
+
+  it("does not fall back after an enabled rounds reader fails", async () => {
+    mocks.roundApi.mockResolvedValue({ getRounds: vi.fn().mockRejectedValue(new Error("round reader offline")) });
+
+    await expect(getRounds()).rejects.toThrow("round reader offline");
+  });
+
+  it("routes admin prelist readers through their exact API contracts", async () => {
+    const getAdminRoundPrelistsMock = vi.fn().mockResolvedValue([{ id: roundId, playersCount: 12 }]);
+    const getAdminRoundPrelistMock = vi.fn().mockResolvedValue({
+      id: roundId,
+      callupId: "callup-1",
+      round_players: [{ player_id: "player-1" }],
+    });
+    mocks.roundApi.mockResolvedValue({
+      getActiveLeague: vi.fn().mockResolvedValue({ id: leagueId }),
+      getAdminRoundPrelists: getAdminRoundPrelistsMock,
+      getAdminRoundPrelist: getAdminRoundPrelistMock,
+    });
+
+    await expect(getAdminRoundPrelists()).resolves.toEqual([{ id: roundId, playersCount: 12 }]);
+    await expect(getAdminRoundPrelist(roundId)).resolves.toMatchObject({ id: roundId, callupId: "callup-1" });
+    expect(getAdminRoundPrelistsMock).toHaveBeenCalledWith(leagueId);
+    expect(getAdminRoundPrelistMock).toHaveBeenCalledWith(leagueId, roundId);
+  });
+
+  it("does not use Supabase after an enabled admin prelist reader fails", async () => {
+    mocks.roundApi.mockResolvedValue({
+      getActiveLeague: vi.fn().mockResolvedValue({ id: leagueId }),
+      getAdminRoundPrelists: vi.fn().mockRejectedValue(new Error("prelist reader offline")),
+    });
+
+    await expect(getAdminRoundPrelists()).rejects.toThrow("prelist reader offline");
   });
 
   it("routes getRound via API when available", async () => {
@@ -131,6 +175,25 @@ describe("rounds actions via API gateway", () => {
     const result = await setRoundPlayerAttendance(roundId, "player-1", true);
     expect(result).toEqual({ success: true });
     expect(setRoundPlayerAttendanceMock).toHaveBeenCalledWith(leagueId, roundId, "player-1", true);
+  });
+
+  it("routes callup format through the canonical API contract", async () => {
+    const setCallupFormatMock = vi.fn().mockResolvedValue({ fantasySizePreserved: true, fantasyLineupSize: 6 });
+    mocks.roundApi.mockResolvedValue({
+      getActiveLeague: vi.fn().mockResolvedValue({ id: leagueId }),
+      setCallupFormat: setCallupFormatMock,
+    });
+
+    await expect(setCallupFormat("callup-1", 6, 4)).resolves.toMatchObject({ success: true });
+    expect(setCallupFormatMock).toHaveBeenCalledWith(leagueId, "callup-1", { playersPerTeam: 6, teamsPerRound: 4 });
+  });
+
+  it("sends round and outgoing player when opening a replacement vacancy", async () => {
+    const openVacancyMock = vi.fn().mockResolvedValue(undefined);
+    mocks.roundApi.mockResolvedValue({ openCallupReplacementVacancy: openVacancyMock });
+
+    await expect(openCallupReplacementVacancy(roundId, "player-out")).resolves.toEqual({ success: true });
+    expect(openVacancyMock).toHaveBeenCalledWith(leagueId, roundId, "player-out");
   });
 
   it("routes saveRoundPrelist via API when available", async () => {

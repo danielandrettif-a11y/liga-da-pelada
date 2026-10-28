@@ -6,6 +6,17 @@ export type TeamFormationMode = "auto" | "manual" | "balanced" | "draft";
 export type RoundPlayerAttendance = "pending" | "present";
 export type RoundPlayerAvailability = "available" | "injured";
 
+export const ROUND_VEST_COLORS = new Set([
+  "#22c55e",
+  "#f97316",
+  "#3b82f6",
+  "#ef4444",
+  "#eab308",
+  "#1e293b",
+  "#f8fafc",
+  "#ec4899",
+]);
+
 export type RoundPlayer = {
   id: string;
   round_id: string;
@@ -60,6 +71,8 @@ export type Round = {
 };
 
 export type RoundWithCounts = Round & {
+  playersCount: number;
+  matchesCount: number;
   round_players?: Array<{ count: number }>;
   matches?: Array<{ count: number }>;
 };

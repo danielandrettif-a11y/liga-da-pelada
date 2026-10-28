@@ -6,9 +6,9 @@
 
 - A branch contém pontes para 150/267 operações (56,2%), mas o lote operacional novo ainda não foi homologado como paridade funcional.
 - As 95 operações de identidade, peladas, elenco, convocações e sorteio de times (35,6%) estão aceitas na revisão de código; nenhuma operação do catálogo está em `verified` de ponta a ponta.
-- Convocações passaram na revisão de paridade (21/21). Rodadas e partidas continuam na fila antes da ativação local das flags; encerramento de rodada/partida ainda omite efeitos críticos.
+- Convocações passaram na revisão de paridade (21/21). Rodadas avançaram para 19/38 operações aceitas; partidas continuam na fila antes da ativação local das flags, e o encerramento de rodada/partida ainda omite efeitos críticos.
 - Correções desta auditoria: sessão obrigatória segundo a RLS atual, fallback legado sem token, contrato e pré-lista atômica na abertura da convocação, RPCs canônicas sem fallback SQL parcial, composição fail-fast de partidas e typecheck reproduzível.
-- O sorteio de times agora gera prévia real no domínio do backend e aplica a formação aprovada pela RPC transacional. Restam 117 operações sem ponte estrutural e 55 pontes para revisão de paridade: **172 operações ao todo** para chegar ao mesmo padrão.
+- O sorteio de times, as regras de presença/formato/substituição e os leitores de agenda/pré-lista agora preservam o contrato legado pelo backend. Restam 117 operações sem ponte estrutural e 40 pontes para revisão de paridade: **157 operações ao todo** para chegar ao mesmo padrão.
 
 ## Reorganização de Arquitetura: Contexto `roster` (Elenco) com ponte completa (35/35)
 

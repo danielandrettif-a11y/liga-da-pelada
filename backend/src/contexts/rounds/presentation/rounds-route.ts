@@ -223,7 +223,7 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
   // Tamanho do jogo da convocação
   app.patch<{
     Params: { leagueId: string; callupId: string };
-    Body: { playersPerTeam: number };
+    Body: { playersPerTeam: number; teamsPerRound: number };
   }>(
     "/api/rounds/leagues/:leagueId/callups/:callupId/match-size",
     async (request, reply) => {
@@ -244,13 +244,20 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
   );
 
   // Próximo offset de presets de times
-  app.get<{ Params: { leagueId: string } }>(
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: { roundType?: "official" | "friendly" };
+  }>(
     "/api/rounds/leagues/:leagueId/next-team-preset-offset",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const offset = await dependencies.repository.getNextTeamPresetOffset(request.params.leagueId, authentication.actor);
+        const offset = await dependencies.repository.getNextTeamPresetOffset(
+          request.params.leagueId,
+          request.query.roundType === "friendly" ? "friendly" : "official",
+          authentication.actor,
+        );
         return reply.code(200).send(offset);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -283,15 +290,19 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
   );
 
   // Abrir vaga de reposição
-  app.post<{ Params: { leagueId: string; callupId: string } }>(
-    "/api/rounds/leagues/:leagueId/callups/:callupId/open-vacancy",
+  app.post<{
+    Params: { leagueId: string; roundId: string };
+    Body: { outPlayerId: string };
+  }>(
+    "/api/rounds/leagues/:leagueId/:roundId/replacement-vacancy",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
         await dependencies.repository.openCallupReplacementVacancy(
-          request.params.callupId,
+          request.params.roundId,
           request.params.leagueId,
+          request.body.outPlayerId,
           authentication.actor,
         );
         return reply.code(200).send({ success: true });

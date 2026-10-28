@@ -199,6 +199,25 @@ describe("rounds presentation", () => {
     expect(roundRepository.markRoundTeamArrived).toHaveBeenCalled();
   });
 
+  it("opens a replacement vacancy with the round and outgoing player", async () => {
+    const { app, roundRepository } = fixture(true);
+    const outPlayerId = "00000000-0000-4000-8000-000000000010";
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/rounds/leagues/${leagueId}/${roundId}/replacement-vacancy`,
+      headers: { authorization: "Bearer valid-token" },
+      payload: { outPlayerId },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(roundRepository.openCallupReplacementVacancy).toHaveBeenCalledWith(
+      roundId,
+      leagueId,
+      outPlayerId,
+      expect.anything(),
+    );
+  });
+
   it("creates team draft", async () => {
     const { app, roundRepository } = fixture(true);
     const response = await app.inject({

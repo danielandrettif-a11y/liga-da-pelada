@@ -1676,7 +1676,7 @@
       "source": "src/lib/actions/rounds.ts",
       "name": "getNextTeamPresetOffset",
       "state": "frontend-migrated",
-      "target": "GET /api/rounds/leagues/:leagueId/team-preset-offset",
+      "target": "GET /api/rounds/leagues/:leagueId/next-team-preset-offset?roundType=...",
       "evidence": [
         "backend/src/contexts/rounds/domain/round.test.ts",
         "backend/src/contexts/rounds/application/manage-rounds.test.ts",
@@ -1740,7 +1740,7 @@
       "source": "src/lib/actions/rounds.ts",
       "name": "markRoundTeamArrived",
       "state": "frontend-migrated",
-      "target": "PATCH /api/rounds/leagues/:leagueId/:roundId/teams/:teamId/arrived",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/teams/:teamId/arrived",
       "evidence": [
         "backend/src/contexts/rounds/domain/round.test.ts",
         "backend/src/contexts/rounds/application/manage-rounds.test.ts",
@@ -1756,7 +1756,7 @@
       "source": "src/lib/actions/rounds.ts",
       "name": "openCallupReplacementVacancy",
       "state": "frontend-migrated",
-      "target": "POST /api/rounds/leagues/:leagueId/callups/:callupId/replacement-vacancy",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/replacement-vacancy",
       "evidence": [
         "backend/src/contexts/rounds/domain/round.test.ts",
         "backend/src/contexts/rounds/application/manage-rounds.test.ts",
@@ -1852,7 +1852,7 @@
       "source": "src/lib/actions/rounds.ts",
       "name": "setRoundPlayerAttendance",
       "state": "frontend-migrated",
-      "target": "PATCH /api/rounds/leagues/:leagueId/:roundId/players/:playerId/attendance",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/attendance",
       "evidence": [
         "backend/src/contexts/rounds/domain/round.test.ts",
         "backend/src/contexts/rounds/application/manage-rounds.test.ts",
@@ -1868,7 +1868,7 @@
       "source": "src/lib/actions/rounds.ts",
       "name": "setRoundPlayerAvailability",
       "state": "frontend-migrated",
-      "target": "PATCH /api/rounds/leagues/:leagueId/:roundId/players/:playerId/availability",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/availability",
       "evidence": [
         "backend/src/contexts/rounds/domain/round.test.ts",
         "backend/src/contexts/rounds/application/manage-rounds.test.ts",
@@ -1884,7 +1884,7 @@
       "source": "src/lib/actions/rounds.ts",
       "name": "setRoundTeamCaptain",
       "state": "frontend-migrated",
-      "target": "PATCH /api/rounds/leagues/:leagueId/:roundId/teams/:teamId/captain",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/teams/:teamId/captain",
       "evidence": [
         "backend/src/contexts/rounds/domain/round.test.ts",
         "backend/src/contexts/rounds/application/manage-rounds.test.ts",
@@ -1900,7 +1900,7 @@
       "source": "src/lib/actions/rounds.ts",
       "name": "setRoundTeamVestColor",
       "state": "frontend-migrated",
-      "target": "PATCH /api/rounds/leagues/:leagueId/:roundId/teams/:teamId/vest-color",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/teams/:teamId/vest-color",
       "evidence": [
         "backend/src/contexts/rounds/domain/round.test.ts",
         "backend/src/contexts/rounds/application/manage-rounds.test.ts",

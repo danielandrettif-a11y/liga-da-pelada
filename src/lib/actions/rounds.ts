@@ -50,13 +50,9 @@ const getActiveLeagueCached = cache(async (leagueId: string) => {
 export async function getActiveLeague() {
   const league = await getSelectedLeague();
   if (!league) throw new Error("Escolha uma pelada no lobby.");
-  try {
-    const api = await roundApiFor();
-    if (api) {
-      return await api.getActiveLeague(league.id);
-    }
-  } catch (error: any) {
-    console.error("Erro ao obter pelada ativa via API:", error);
+  const api = await roundApiFor();
+  if (api) {
+    return api.getActiveLeague(league.id);
   }
   return getActiveLeagueCached(league.id);
 }
@@ -115,13 +111,9 @@ const getRoundsCached = cache(async (seasonId: string) => {
 export async function getRounds() {
   const season = await getActiveSeason();
   if (!season) return [];
-  try {
-    const api = await roundApiFor();
-    if (api) {
-      return await api.getRounds(season.id);
-    }
-  } catch (error: any) {
-    console.error("Erro ao buscar rodadas via API:", error);
+  const api = await roundApiFor();
+  if (api) {
+    return api.getRounds(season.id);
   }
   return getRoundsCached(season.id);
 }
@@ -213,13 +205,9 @@ export async function getAdminRoundPrelists() {
   const client = await getAdminClient();
   if (!client) return [];
   const league = await getActiveLeague();
-  try {
-    const api = await roundApiFor(client);
-    if (api) {
-      return await api.getAdminRoundPrelists(league.id);
-    }
-  } catch (error: any) {
-    console.error("Erro ao buscar pre-listas via API:", error);
+  const api = await roundApiFor(client);
+  if (api) {
+    return api.getAdminRoundPrelists(league.id);
   }
 
   const season = await getActiveSeason(league.id);
@@ -265,13 +253,9 @@ export async function getAdminRoundPrelist(id: string) {
   const league = await getSelectedLeague();
   if (!league) return null;
 
-  try {
-    const api = await roundApiFor(client);
-    if (api) {
-      return await api.getAdminRoundPrelist(league.id, id);
-    }
-  } catch (error: any) {
-    console.error("Erro ao buscar pre-lista via API:", error);
+  const api = await roundApiFor(client);
+  if (api) {
+    return api.getAdminRoundPrelist(league.id, id);
   }
 
   const { data, error } = await client
@@ -297,14 +281,10 @@ export async function getAdminRoundPrelist(id: string) {
 
 export async function getNextTeamPresetOffset(roundType: RoundType = "official") {
   const league = await getActiveLeague();
-  try {
-    const api = await roundApiFor();
-    if (api) {
-      const res = await api.getNextTeamPresetOffset(league.id);
-      return res.offset;
-    }
-  } catch (error: any) {
-    console.error("Erro ao obter offset de clubes via API:", error);
+  const api = await roundApiFor();
+  if (api) {
+    const res = await api.getNextTeamPresetOffset(league.id, roundType);
+    return res.offset;
   }
 
   const season = await getActiveSeason(league.id);
@@ -968,23 +948,19 @@ export async function setCallupFormat(callupId: string, playersPerTeam: number, 
     const format = parseCallupFormat(callupId, playersPerTeam, teamsPerRound);
     if (!format) return { success: false as const, error: "Escolha de 5 a 7 jogadores e de 2 a 6 times." };
     const league = await getActiveLeague();
-    try {
-      const api = await roundApiFor(client);
-      if (api) {
-        const res = await api.setCallupFormat(league.id, callupId, { playersPerTeam, teamsPerRound });
-        revalidatePath("/admin/rodada");
-        revalidatePath("/admin/prelistas");
-        revalidatePath("/convocacao");
-        revalidatePath("/cartola");
-        revalidatePath("/rodadas");
-        return {
-          success: true as const,
-          fantasySizePreserved: res?.fantasySizePreserved ?? true,
-          fantasyLineupSize: res?.fantasyLineupSize ?? playersPerTeam,
-        };
-      }
-    } catch (apiErr: any) {
-      console.error("Erro ao ajustar formato da convocação via API:", apiErr);
+    const api = await roundApiFor(client);
+    if (api) {
+      const res = await api.setCallupFormat(league.id, callupId, { playersPerTeam, teamsPerRound });
+      revalidatePath("/admin/rodada");
+      revalidatePath("/admin/prelistas");
+      revalidatePath("/convocacao");
+      revalidatePath("/cartola");
+      revalidatePath("/rodadas");
+      return {
+        success: true as const,
+        fantasySizePreserved: res?.fantasySizePreserved ?? true,
+        fantasyLineupSize: res?.fantasyLineupSize ?? playersPerTeam,
+      };
     }
     const result = await changeCallupFormat(format, league.id, supabaseCallupFormatGateway(client));
     if (!result.success) return result;
@@ -1626,7 +1602,7 @@ export async function openCallupReplacementVacancy(roundId: string, outPlayerId:
     if (league) {
       const api = await roundApiFor(client);
       if (api) {
-        await api.openCallupReplacementVacancy(league.id, roundId);
+        await api.openCallupReplacementVacancy(league.id, roundId, outPlayerId);
         revalidatePath(`/rodadas/${roundId}`);
         revalidatePath(`/rodadas/${roundId}/nova-partida`);
         revalidatePath("/convocacao");

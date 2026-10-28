@@ -19,10 +19,10 @@ export type RoundHttpGateway = {
   getAdminRoundPrelists(leagueId: string): Promise<any[]>;
   saveRoundPrelist(leagueId: string, input: any): Promise<{ roundId: string }>;
   setCallupFormat(leagueId: string, callupId: string, format: { playersPerTeam: number; teamsPerRound: number }): Promise<{ success: boolean; fantasySizePreserved: boolean; fantasyLineupSize: number }>;
-  setCallupMatchSize(leagueId: string, callupId: string, size: { playersPerTeam: number }): Promise<void>;
-  getNextTeamPresetOffset(leagueId: string): Promise<{ offset: number }>;
+  setCallupMatchSize(leagueId: string, callupId: string, size: { playersPerTeam: number; teamsPerRound: number }): Promise<void>;
+  getNextTeamPresetOffset(leagueId: string, roundType?: "official" | "friendly"): Promise<{ offset: number }>;
   markRoundTeamArrived(leagueId: string, roundId: string, teamId: string, arrived: boolean): Promise<void>;
-  openCallupReplacementVacancy(leagueId: string, callupId: string): Promise<void>;
+  openCallupReplacementVacancy(leagueId: string, roundId: string, outPlayerId: string): Promise<void>;
   previewRoundTeamShuffle(leagueId: string, roundId: string, mode: string): Promise<any>;
   applyRoundTeamShuffle(
     leagueId: string,
@@ -182,8 +182,9 @@ export function httpRoundGateway(backendUrl: string, accessToken?: string): Roun
       if (!res.ok) await parseApiError(res);
     },
 
-    async getNextTeamPresetOffset(leagueId: string) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/next-team-preset-offset`, {
+    async getNextTeamPresetOffset(leagueId: string, roundType = "official") {
+      const query = new URLSearchParams({ roundType });
+      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/next-team-preset-offset?${query}`, {
         headers: authHeaders(),
         cache: "no-store",
       });
@@ -200,10 +201,11 @@ export function httpRoundGateway(backendUrl: string, accessToken?: string): Roun
       if (!res.ok) await parseApiError(res);
     },
 
-    async openCallupReplacementVacancy(leagueId, callupId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/callups/${callupId}/open-vacancy`, {
+    async openCallupReplacementVacancy(leagueId, roundId, outPlayerId) {
+      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/replacement-vacancy`, {
         method: "POST",
-        headers: authHeaders(),
+        headers: authHeaders(true),
+        body: JSON.stringify({ outPlayerId }),
       });
       if (!res.ok) await parseApiError(res);
     },

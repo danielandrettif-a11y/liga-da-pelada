@@ -12,19 +12,34 @@ import type { RoundReshuffleMode, RoundReshuffleSummary } from "../domain/round-
 
 export type AdminRoundPrelist = {
   id: string;
+  league_id: string;
+  season_id: string;
   number: number;
   date: string;
   start_time: string | null;
   status: string;
   round_type: string;
   preparation_stage: string;
-  callup_id: string | null;
-  players: Array<{
+  created_at: string;
+  target_players_per_team: number | null;
+  target_teams_per_round: number | null;
+  stadium_id: string | null;
+  stadium_name: string | null;
+  stadium_map_url: string | null;
+  playersCount: number;
+  callupId: string | null;
+  callupStatus: string | null;
+  round_players: Array<{
     player_id: string;
-    name: string;
-    nickname: string | null;
-    avatar_url: string | null;
-    status: string;
+    players: {
+      id: string;
+      name: string;
+      nickname: string | null;
+      avatar_url: string | null;
+      player_profile: string | null;
+      is_goalkeeper: boolean;
+      member_category: string;
+    };
   }>;
 };
 
@@ -151,10 +166,10 @@ export interface RoundRepository {
   getAdminRoundPrelists(leagueId: string, actor: Actor): Promise<AdminRoundPrelist[]>;
   saveRoundPrelist(input: SaveRoundPrelistInput, leagueId: string, actor: Actor): Promise<{ roundId: string }>;
   setCallupFormat(callupId: string, leagueId: string, format: { playersPerTeam: number; teamsPerRound: number }, actor: Actor): Promise<{ fantasySizePreserved: boolean; fantasyLineupSize: number }>;
-  setCallupMatchSize(callupId: string, leagueId: string, size: { playersPerTeam: number }, actor: Actor): Promise<void>;
-  getNextTeamPresetOffset(leagueId: string, actor: Actor): Promise<{ offset: number }>;
+  setCallupMatchSize(callupId: string, leagueId: string, size: { playersPerTeam: number; teamsPerRound: number }, actor: Actor): Promise<void>;
+  getNextTeamPresetOffset(leagueId: string, roundType: "official" | "friendly", actor: Actor): Promise<{ offset: number }>;
   markRoundTeamArrived(roundId: string, teamId: string, leagueId: string, arrived: boolean, actor: Actor): Promise<void>;
-  openCallupReplacementVacancy(callupId: string, leagueId: string, actor: Actor): Promise<void>;
+  openCallupReplacementVacancy(roundId: string, leagueId: string, outPlayerId: string, actor: Actor): Promise<void>;
   previewRoundTeamShuffle(roundId: string, leagueId: string, mode: string, actor: Actor): Promise<RoundTeamShufflePreview>;
   applyRoundTeamShuffle(
     roundId: string,

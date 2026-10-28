@@ -50,9 +50,103 @@ describe("pgRoundRepository", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]?.id).toBe(roundId);
+    expect(result[0]?.playersCount).toBe(24);
+    expect(result[0]?.matchesCount).toBe(5);
     expect(result[0]?.round_players).toEqual([{ count: 24 }]);
     expect(result[0]?.matches).toEqual([{ count: 5 }]);
     expect(query).toHaveBeenCalledWith("SET LOCAL ROLE authenticated");
+  });
+
+  it("returns the admin prelist detail in the legacy screen contract", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("LEFT JOIN LATERAL") && sql.includes("r.id = $1::uuid")) {
+        return { rows: [{
+          id: roundId,
+          league_id: leagueId,
+          season_id: seasonId,
+          number: 7,
+          date: "2026-10-30",
+          start_time: "20:00:00",
+          status: "draft",
+          round_type: "official",
+          preparation_stage: "prelist",
+          created_at: "2026-10-27T10:00:00Z",
+          target_players_per_team: 6,
+          target_teams_per_round: 4,
+          stadium_id: null,
+          stadium_name: "Arena Central",
+          stadium_map_url: null,
+          callup_id: "callup-1",
+          callup_status: "open",
+        }] };
+      }
+      if (sql.includes("FROM public.round_players rp")) {
+        return { rows: [{
+          player_id: "player-1",
+          id: "player-1",
+          name: "Ana",
+          nickname: "A",
+          avatar_url: null,
+          player_profile: "offensive",
+          is_goalkeeper: false,
+          member_category: "player",
+        }] };
+      }
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    const result = await pgRoundRepository(pool).getAdminRoundPrelist(roundId, leagueId, actor);
+
+    expect(result).toMatchObject({
+      id: roundId,
+      callupId: "callup-1",
+      callupStatus: "open",
+      playersCount: 1,
+      round_players: [{ player_id: "player-1", players: { name: "Ana" } }],
+    });
+  });
+
+  it("lists only active-season prelists with counts and linked callups", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("JOIN public.seasons s") && sql.includes("COUNT(rp.id)")) {
+        return { rows: [{
+          id: roundId,
+          league_id: leagueId,
+          season_id: seasonId,
+          number: 8,
+          date: "2026-11-06",
+          start_time: "20:00:00",
+          status: "draft",
+          round_type: "friendly",
+          preparation_stage: "prelist",
+          created_at: "2026-10-27T11:00:00Z",
+          target_players_per_team: 5,
+          target_teams_per_round: 3,
+          stadium_id: null,
+          stadium_name: null,
+          stadium_map_url: null,
+          player_count: 15,
+          callup_id: "callup-2",
+          callup_status: "locked",
+        }] };
+      }
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    const result = await pgRoundRepository(pool).getAdminRoundPrelists(leagueId, actor);
+
+    expect(result).toEqual([expect.objectContaining({
+      id: roundId,
+      playersCount: 15,
+      callupId: "callup-2",
+      callupStatus: "locked",
+      round_players: [],
+    })]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("s.status = 'active'"), [leagueId]);
   });
 
   it("queries active league configuration", async () => {
@@ -181,5 +275,63 @@ describe("pgRoundRepository", () => {
     await pgRoundRepository(pool).applyRoundTeamShuffle(roundId, leagueId, { mode: "random" }, actor);
 
     expect(query).toHaveBeenCalledWith("SELECT public.shuffle_round_teams($1::uuid)", [roundId]);
+  });
+
+  it("delegates round management mutations to their canonical RPCs", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      return { rows: [], rowCount: 1 };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+    const repo = pgRoundRepository(pool);
+    const playerA = "00000000-0000-4000-8000-000000000020";
+    const playerB = "00000000-0000-4000-8000-000000000021";
+    const teamId = "00000000-0000-4000-8000-000000000030";
+    const callupId = "00000000-0000-4000-8000-000000000040";
+
+    await repo.setRoundPlayerAvailability(roundId, leagueId, playerA, "injured", actor);
+    await repo.setRoundPlayerAttendance(roundId, leagueId, playerA, true, actor);
+    await repo.setRoundAttendanceBulk(roundId, leagueId, [playerA, playerA, playerB], actor);
+    await repo.markRoundTeamArrived(roundId, teamId, leagueId, true, actor);
+    await repo.swapRoundTeamPlayers(roundId, leagueId, playerA, playerB, actor);
+    await repo.setRoundTeamCaptain(roundId, teamId, leagueId, playerA, actor);
+    await repo.setCallupMatchSize(callupId, leagueId, { playersPerTeam: 6, teamsPerRound: 4 }, actor);
+    await repo.openCallupReplacementVacancy(roundId, leagueId, playerA, actor);
+
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("set_round_player_availability"), [roundId, playerA, "injured"]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("set_round_player_attendance"), [roundId, playerA, true]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("set_round_attendance_bulk"), [roundId, [playerA, playerB]]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("mark_round_team_arrived"), [roundId, teamId]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("swap_round_team_players"), [roundId, playerA, playerB]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("set_round_team_captain"), [roundId, teamId, playerA]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("set_callup_format"), [callupId, 6, 4]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("open_callup_replacement_vacancy"), [roundId, playerA]);
+  });
+
+  it("calculates the team preset offset inside the active season and requested round type", async () => {
+    const query = vi.fn(async (sql: string) => sql.includes("latest_number")
+      ? { rows: [{ latest_number: 9 }] }
+      : { rows: [] });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    await expect(pgRoundRepository(pool).getNextTeamPresetOffset(leagueId, "friendly", actor))
+      .resolves.toEqual({ offset: 1 });
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("s.status = 'active'"), [leagueId, "friendly"]);
+  });
+
+  it("validates vest colors before updating the scoped team", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("UPDATE public.teams SET color")) return { rows: [], rowCount: 1 };
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+    const repo = pgRoundRepository(pool);
+    const teamId = "00000000-0000-4000-8000-000000000030";
+
+    await expect(repo.setRoundTeamVestColor(roundId, teamId, leagueId, "transparent", actor))
+      .rejects.toMatchObject({ statusCode: 400 });
+    await expect(repo.setRoundTeamVestColor(roundId, teamId, leagueId, "#22c55e", actor))
+      .resolves.toBeUndefined();
   });
 });

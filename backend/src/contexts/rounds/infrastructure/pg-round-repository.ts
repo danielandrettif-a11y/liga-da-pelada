@@ -17,6 +17,7 @@ import type {
   RoundPlayerAvailability,
   RoundWithCounts,
 } from "../domain/round.js";
+import { ROUND_VEST_COLORS } from "../domain/round.js";
 import {
   isRoundReshuffleMode,
   previewRoundReshuffle,
@@ -112,6 +113,8 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
           ...row,
           date: row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date).slice(0, 10),
           created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+          playersCount: Number(row.player_count || 0),
+          matchesCount: Number(row.match_count || 0),
           round_players: [{ count: Number(row.player_count || 0) }],
           matches: [{ count: Number(row.match_count || 0) }],
         }));
@@ -382,17 +385,41 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
         await requireLeagueAdmin(client, leagueId);
         const res = await client.query<{
           id: string;
+          league_id: string;
+          season_id: string;
           number: number;
           date: string | Date;
           start_time: string | null;
           status: string;
           round_type: string;
           preparation_stage: string;
+          created_at: string | Date;
+          target_players_per_team: number | null;
+          target_teams_per_round: number | null;
+          stadium_id: string | null;
+          stadium_name: string | null;
+          stadium_map_url: string | null;
           callup_id: string | null;
+          callup_status: string | null;
         }>(
-          `SELECT id, number, date, start_time, status, round_type, preparation_stage, callup_id
-           FROM public.rounds
-           WHERE id = $1::uuid AND league_id = $2::uuid LIMIT 1`,
+          `SELECT r.id, r.league_id, r.season_id, r.number, r.date, r.start_time,
+                  r.status, r.round_type, r.preparation_stage, r.created_at,
+                  r.target_players_per_team, r.target_teams_per_round,
+                  r.stadium_id, r.stadium_name, r.stadium_map_url,
+                  linked_callup.id AS callup_id, linked_callup.status AS callup_status
+           FROM public.rounds r
+           LEFT JOIN LATERAL (
+             SELECT c.id, c.status
+             FROM public.callups c
+             WHERE c.round_id = r.id AND c.status IN ('open', 'locked')
+             ORDER BY c.created_at DESC
+             LIMIT 1
+           ) linked_callup ON TRUE
+           WHERE r.id = $1::uuid
+             AND r.league_id = $2::uuid
+             AND r.status = 'draft'
+             AND r.preparation_stage = 'prelist'
+           LIMIT 1`,
           [roundId, leagueId],
         );
         const row = res.rows[0];
@@ -400,12 +427,16 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
 
         const playersRes = await client.query<{
           player_id: string;
+          id: string;
           name: string;
           nickname: string | null;
           avatar_url: string | null;
-          status: string;
+          player_profile: string | null;
+          is_goalkeeper: boolean;
+          member_category: string;
         }>(
-          `SELECT rp.player_id, p.name, p.nickname, p.avatar_url, rp.attendance_status AS status
+          `SELECT rp.player_id, p.id, p.name, p.nickname, p.avatar_url,
+                  p.player_profile, p.is_goalkeeper, p.member_category
            FROM public.round_players rp
            JOIN public.players p ON p.id = rp.player_id
            WHERE rp.round_id = $1::uuid
@@ -414,9 +445,36 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
         );
 
         return {
-          ...row,
+          id: row.id,
+          league_id: row.league_id,
+          season_id: row.season_id,
+          number: row.number,
           date: row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date).slice(0, 10),
-          players: playersRes.rows,
+          start_time: row.start_time,
+          status: row.status,
+          round_type: row.round_type,
+          preparation_stage: row.preparation_stage,
+          created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+          target_players_per_team: row.target_players_per_team,
+          target_teams_per_round: row.target_teams_per_round,
+          stadium_id: row.stadium_id,
+          stadium_name: row.stadium_name,
+          stadium_map_url: row.stadium_map_url,
+          playersCount: playersRes.rows.length,
+          callupId: row.callup_id,
+          callupStatus: row.callup_status,
+          round_players: playersRes.rows.map((player) => ({
+            player_id: player.player_id,
+            players: {
+              id: player.id,
+              name: player.name,
+              nickname: player.nickname,
+              avatar_url: player.avatar_url,
+              player_profile: player.player_profile,
+              is_goalkeeper: Boolean(player.is_goalkeeper),
+              member_category: player.member_category,
+            },
+          })),
         };
       });
     },
@@ -426,26 +484,68 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
         await requireLeagueAdmin(client, leagueId);
         const res = await client.query<{
           id: string;
+          league_id: string;
+          season_id: string;
           number: number;
           date: string | Date;
           start_time: string | null;
           status: string;
           round_type: string;
           preparation_stage: string;
+          created_at: string | Date;
+          target_players_per_team: number | null;
+          target_teams_per_round: number | null;
+          stadium_id: string | null;
+          stadium_name: string | null;
+          stadium_map_url: string | null;
+          player_count: string | number;
           callup_id: string | null;
+          callup_status: string | null;
         }>(
-          `SELECT id, number, date, start_time, status, round_type, preparation_stage, callup_id
-           FROM public.rounds
-           WHERE league_id = $1::uuid
-             AND preparation_stage = 'prelist'
-           ORDER BY date DESC, created_at DESC`,
+          `SELECT r.id, r.league_id, r.season_id, r.number, r.date, r.start_time,
+                  r.status, r.round_type, r.preparation_stage, r.created_at,
+                  r.target_players_per_team, r.target_teams_per_round,
+                  r.stadium_id, r.stadium_name, r.stadium_map_url,
+                  COUNT(rp.id)::int AS player_count,
+                  linked_callup.id AS callup_id, linked_callup.status AS callup_status
+           FROM public.rounds r
+           JOIN public.seasons s ON s.id = r.season_id AND s.status = 'active'
+           LEFT JOIN public.round_players rp ON rp.round_id = r.id
+           LEFT JOIN LATERAL (
+             SELECT c.id, c.status
+             FROM public.callups c
+             WHERE c.round_id = r.id AND c.status IN ('open', 'locked')
+             ORDER BY c.created_at DESC
+             LIMIT 1
+           ) linked_callup ON TRUE
+           WHERE r.league_id = $1::uuid
+             AND r.status = 'draft'
+             AND r.preparation_stage = 'prelist'
+           GROUP BY r.id, linked_callup.id, linked_callup.status
+           ORDER BY r.date ASC, r.start_time ASC, r.created_at ASC`,
           [leagueId],
         );
 
         return res.rows.map((row) => ({
-          ...row,
+          id: row.id,
+          league_id: row.league_id,
+          season_id: row.season_id,
+          number: row.number,
           date: row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date).slice(0, 10),
-          players: [],
+          start_time: row.start_time,
+          status: row.status,
+          round_type: row.round_type,
+          preparation_stage: row.preparation_stage,
+          created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+          target_players_per_team: row.target_players_per_team,
+          target_teams_per_round: row.target_teams_per_round,
+          stadium_id: row.stadium_id,
+          stadium_name: row.stadium_name,
+          stadium_map_url: row.stadium_map_url,
+          playersCount: Number(row.player_count || 0),
+          callupId: row.callup_id,
+          callupStatus: row.callup_status,
+          round_players: [],
         }));
       });
     },
@@ -492,46 +592,45 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
       });
     },
 
-    async setCallupMatchSize(callupId: string, leagueId: string, size: { playersPerTeam: number }, actor: Actor): Promise<void> {
+    async setCallupMatchSize(callupId: string, leagueId: string, size: { playersPerTeam: number; teamsPerRound: number }, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
         await client.query(
-          `UPDATE public.callups
-           SET players_per_team = $3::int,
-               capacity = $3::int * teams_per_round,
-               updated_at = NOW()
-           WHERE id = $1::uuid AND league_id = $2::uuid`,
-          [callupId, leagueId, size.playersPerTeam],
+          "SELECT * FROM public.set_callup_format($1::uuid, $2::int, $3::int)",
+          [callupId, size.playersPerTeam, size.teamsPerRound],
         );
       });
     },
 
-    async getNextTeamPresetOffset(leagueId: string, actor: Actor): Promise<{ offset: number }> {
+    async getNextTeamPresetOffset(leagueId: string, roundType: "official" | "friendly", actor: Actor): Promise<{ offset: number }> {
       return authenticated(pool, actor, async (client) => {
-        const res = await client.query<{ max_offset: number }>(
-          "SELECT COALESCE(MAX(number), 0) AS max_offset FROM public.rounds WHERE league_id = $1::uuid",
-          [leagueId],
+        const res = await client.query<{ latest_number: number }>(
+          `SELECT COALESCE(MAX(r.number), 0)::int AS latest_number
+           FROM public.rounds r
+           JOIN public.seasons s ON s.id = r.season_id
+           WHERE r.league_id = $1::uuid
+             AND s.status = 'active'
+             AND r.round_type = $2::text`,
+          [leagueId, roundType],
         );
-        return { offset: Number(res.rows[0]?.max_offset || 0) };
+        return { offset: Number(res.rows[0]?.latest_number || 0) % 4 };
       });
     },
 
     async markRoundTeamArrived(roundId: string, teamId: string, leagueId: string, arrived: boolean, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        await client.query(
-          "UPDATE public.teams SET is_arrived = $3::boolean WHERE id = $2::uuid AND round_id = $1::uuid",
-          [roundId, teamId, arrived],
-        );
+        if (!arrived) throw new RoundPersistenceError("A confirmação de chegada só aceita o estado presente.", 400);
+        await client.query("SELECT public.mark_round_team_arrived($1::uuid, $2::uuid)", [roundId, teamId]);
       });
     },
 
-    async openCallupReplacementVacancy(callupId: string, leagueId: string, actor: Actor): Promise<void> {
+    async openCallupReplacementVacancy(roundId: string, leagueId: string, outPlayerId: string, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
         await client.query(
-          "UPDATE public.callups SET capacity = capacity + 1, updated_at = NOW() WHERE id = $1::uuid AND league_id = $2::uuid",
-          [callupId, leagueId],
+          "SELECT public.open_callup_replacement_vacancy($1::uuid, $2::uuid)",
+          [roundId, outPlayerId],
         );
       });
     },
@@ -699,20 +798,10 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
     async swapRoundTeamPlayers(roundId: string, leagueId: string, playerA: string, playerB: string, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const resA = await client.query<{ team_id: string }>(
-          "SELECT team_id FROM public.team_players WHERE player_id = $1::uuid AND team_id IN (SELECT id FROM public.teams WHERE round_id = $2::uuid)",
-          [playerA, roundId],
+        await client.query(
+          "SELECT public.swap_round_team_players($1::uuid, $2::uuid, $3::uuid)",
+          [roundId, playerA, playerB],
         );
-        const resB = await client.query<{ team_id: string }>(
-          "SELECT team_id FROM public.team_players WHERE player_id = $1::uuid AND team_id IN (SELECT id FROM public.teams WHERE round_id = $2::uuid)",
-          [playerB, roundId],
-        );
-        const teamA = resA.rows[0]?.team_id;
-        const teamB = resB.rows[0]?.team_id;
-        if (!teamA || !teamB || teamA === teamB) return;
-
-        await client.query("UPDATE public.team_players SET team_id = $1::uuid WHERE player_id = $2::uuid AND team_id = $3::uuid", [teamB, playerA, teamA]);
-        await client.query("UPDATE public.team_players SET team_id = $1::uuid WHERE player_id = $2::uuid AND team_id = $3::uuid", [teamA, playerB, teamB]);
       });
     },
 
@@ -720,8 +809,8 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
         await client.query(
-          "UPDATE public.round_players SET attendance_status = 'present', attendance_marked_at = NOW() WHERE round_id = $1::uuid AND player_id = ANY($2::uuid[])",
-          [roundId, playerIds],
+          "SELECT public.set_round_attendance_bulk($1::uuid, $2::uuid[])",
+          [roundId, [...new Set(playerIds)]],
         );
       });
     },
@@ -730,11 +819,8 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
         await client.query(
-          `UPDATE public.round_players
-           SET attendance_status = $3::text,
-               attendance_marked_at = CASE WHEN $3::text = 'present' THEN NOW() ELSE NULL END
-           WHERE round_id = $1::uuid AND player_id = $2::uuid`,
-          [roundId, playerId, present ? "present" : "pending"],
+          "SELECT public.set_round_player_attendance($1::uuid, $2::uuid, $3::boolean)",
+          [roundId, playerId, present],
         );
       });
     },
@@ -743,7 +829,7 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
         await client.query(
-          "UPDATE public.round_players SET availability_status = $3::text, availability_updated_at = NOW() WHERE round_id = $1::uuid AND player_id = $2::uuid",
+          "SELECT public.set_round_player_availability($1::uuid, $2::uuid, $3::text)",
           [roundId, playerId, status],
         );
       });
@@ -753,7 +839,7 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
         await client.query(
-          "UPDATE public.teams SET captain_player_id = $3::uuid WHERE id = $2::uuid AND round_id = $1::uuid",
+          "SELECT public.set_round_team_captain($1::uuid, $2::uuid, $3::uuid)",
           [roundId, teamId, captainId],
         );
       });
@@ -762,10 +848,14 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
     async setRoundTeamVestColor(roundId: string, teamId: string, leagueId: string, color: string, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        await client.query(
+        if (!ROUND_VEST_COLORS.has(color)) throw new RoundPersistenceError("Cor de colete inválida.", 400);
+        const result = await client.query(
           "UPDATE public.teams SET color = $3::text WHERE id = $2::uuid AND round_id = $1::uuid",
           [roundId, teamId, color],
         );
+        if ((result.rowCount ?? 0) === 0) {
+          throw new RoundPersistenceError("Time não encontrado nesta rodada.", 404);
+        }
       });
     },
 
