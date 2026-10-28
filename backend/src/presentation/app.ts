@@ -61,6 +61,8 @@ import { registerPlayerStatisticsRoutes } from "../contexts/roster/presentation/
 import { registerPlayerProfileRoutes } from "../contexts/roster/presentation/player-profile-route.js";
 import { registerCallupRoutes } from "../contexts/callups/presentation/callups-route.js";
 import { registerRoundRoutes } from "../contexts/rounds/presentation/rounds-route.js";
+import { registerMatchRoutes } from "../contexts/matches/presentation/matches-route.js";
+import type { MatchRepository } from "../contexts/matches/application/manage-matches.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 
 export function createApp(dependencies: {
@@ -70,6 +72,7 @@ export function createApp(dependencies: {
   rosterEnabled?: boolean;
   callupsEnabled?: boolean;
   roundsEnabled?: boolean;
+  matchesEnabled?: boolean;
   verifier: UserVerifier;
   repository: GoalRepository;
   leagueRepository?: LeagueRepository;
@@ -103,6 +106,7 @@ export function createApp(dependencies: {
   playerAvatarStorage?: PlayerAvatarStorage;
   callupRepository?: CallupRepository;
   roundRepository?: RoundRepository;
+  matchRepository?: MatchRepository;
   logger?: boolean;
 }): FastifyInstance {
   if (dependencies.leaguesEnabled && !dependencies.leagueRepository) {
@@ -295,6 +299,12 @@ export function createApp(dependencies: {
     registerRoundRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.roundRepository,
+    });
+  }
+  if (dependencies.matchesEnabled && dependencies.matchRepository) {
+    registerMatchRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.matchRepository,
     });
   }
   return app;

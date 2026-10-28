@@ -1032,17 +1032,6 @@
       ]
     },
     {
-      "context": "matches",
-      "source": "src/lib/actions/matches.ts",
-      "name": "registerGoal",
-      "state": "backend-pilot",
-      "target": "POST /api/matches/:matchId/goals",
-      "evidence": [
-        "backend/src/contexts/matches/presentation/goals-route.ts",
-        "backend/src/presentation/app.test.ts"
-      ]
-    },
-    {
       "context": "callups",
       "source": "src/lib/actions/callups.ts",
       "name": "addRosterPlayersToCallup",
@@ -1984,6 +1973,320 @@
         "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
         "src/modules/rounds/infrastructure/round-api-session.test.ts",
         "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/goalkeeper.ts",
+      "name": "selectBestGoalkeeper",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/rounds/:roundId/best-goalkeeper",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/goalkeeper.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "addFinishedGoalEvent",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/events/add-goal",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "addMatchExtraTime",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/extra-time",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "changeMatchGoalkeeper",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/goalkeeper",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "correctFinishedGoal",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/events/:eventId/correct-goal",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "correctFinishedGoalEvent",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/matches/leagues/:leagueId/events/:eventId/correct-goal-event",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "createMatch",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "deleteEvent",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/matches/leagues/:leagueId/:matchId/events/:eventId",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "deleteMatch",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/matches/leagues/:leagueId/:matchId",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "dispatchMatchTimerThreshold",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/timer/dispatch",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "findLiveMatchForTeams",
+      "state": "frontend-migrated",
+      "target": "GET /api/matches/leagues/:leagueId/live",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "finishMatch",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/finish",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "getFinishedMatchAudit",
+      "state": "frontend-migrated",
+      "target": "GET /api/matches/leagues/:leagueId/:matchId/audit",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "getMatch",
+      "state": "frontend-migrated",
+      "target": "GET /api/matches/leagues/:leagueId/:matchId",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "notifyMatchTimerThreshold",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/timer/notify",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "registerGoal",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/:matchId/goals",
+      "evidence": [
+        "backend/src/contexts/matches/presentation/goals-route.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "backend/src/presentation/app.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-goal-gateway.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "resetMatchTimer",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/timer/reset",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "setRoundTeamFixedGoalkeeper",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/rounds/:roundId/teams/:teamId/fixed-goalkeeper",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "substituteMatchPlayer",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/substitutions",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "undoLastMatchSubstitution",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/substitutions/:substitutionId/undo",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "updateMatchTimer",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/timer",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
       ]
     }
   ]

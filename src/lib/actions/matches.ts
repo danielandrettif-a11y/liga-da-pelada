@@ -35,12 +35,18 @@ import { supabaseFinishedGoalCorrectionGateway } from "@/modules/matches/infrast
 import type { FinishedGoalCorrectionInput } from "@/modules/matches/domain/finished-goal-correction";
 import { supabaseCreateMatchGateway, type MatchLineupCommand } from "@/modules/matches/infrastructure/supabase-create-match-gateway";
 import { measureMatchStep } from "../match-performance";
+import { matchApiFor } from "@/modules/matches/infrastructure/match-api-session";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 
 export async function findLiveMatchForTeams(roundId: string, teamAId: string, teamBId: string) {
   const league = await getSelectedLeague();
   if (!league || !roundId || !teamAId || !teamBId || teamAId === teamBId) return null;
+  const api = await matchApiFor();
+  if (api) {
+    const res = await api.findLiveMatchForTeams(league.id, roundId, teamAId, teamBId);
+    return res?.matchId ?? null;
+  }
   const client = await createServerClient();
   const { data: round, error: roundError } = await client.from("rounds")
     .select("league_id").eq("id", roundId).single();
@@ -61,6 +67,13 @@ export async function createMatch(input: CreateMatchInput) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.createMatch(league.id, input);
+      if (res.matchId) revalidatePath(`/rodadas/${input.round_id}`);
+      return res;
+    }
 
     if (!input.round_id || !input.team_a_id || !input.team_b_id || input.team_a_id === input.team_b_id) {
       return { success: false, error: "Selecione dois times diferentes." };
@@ -405,6 +418,10 @@ export async function createMatch(input: CreateMatchInput) {
 export async function getMatch(matchId: string) {
   const league = await getSelectedLeague();
   if (!league) return null;
+  const api = await matchApiFor();
+  if (api) {
+    return api.getMatch(league.id, matchId);
+  }
   const client = await createServerClient();
   const { data, error } = await client
     .from("matches")
@@ -591,6 +608,11 @@ export type MatchAdminAuditEntry = {
 export async function getFinishedMatchAudit(matchId: string): Promise<MatchAdminAuditEntry[]> {
   const account = await getCurrentAccount();
   if (!account.isAdmin || !matchId) return [];
+  const league = await getSelectedLeague();
+  const api = await matchApiFor(account.client);
+  if (api && league) {
+    return api.getFinishedMatchAudit(league.id, matchId);
+  }
   try { await getMatchState(account.client, matchId); } catch { return []; }
 
   const { data: rows, error } = await (account.client as any)
@@ -630,7 +652,7 @@ export async function registerGoal(input: RegisterGoalInput) {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
     let gateway = supabaseGoalGateway(client);
-    if (process.env.MATCH_GOAL_API_ENABLED === "true") {
+    if (process.env.MATCH_GOAL_API_ENABLED === "true" || process.env.MATCHES_API_ENABLED === "true") {
       const backendUrl = process.env.MATCH_GOAL_BACKEND_URL;
       if (!backendUrl) throw new GoalWriteError("API de gols não configurada.", false);
       // getAdminClient validou o usuário com getUser. O backend verifica o
@@ -680,6 +702,13 @@ export async function setRoundTeamFixedGoalkeeper(roundId: string, teamId: strin
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
     const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.setRoundTeamFixedGoalkeeper(league.id, roundId, teamId, playerId);
+      revalidatePath(`/rodadas/${roundId}`);
+      revalidatePath(`/rodadas/${roundId}/nova-partida`);
+      return res;
+    }
     const result = await chooseFixedGoalkeeper(
       { roundId, teamId, playerId, leagueId: league?.id || null },
       supabaseGoalkeeperGateway(client),
@@ -703,6 +732,14 @@ export async function changeMatchGoalkeeper(
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.changeMatchGoalkeeper(league.id, matchId, teamId, playerId, elapsedSeconds);
+      if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
+      revalidatePath("/cartola");
+      return res;
+    }
     const result = await switchMatchGoalkeeper(
       { matchId, teamId, playerId, elapsedSeconds },
       supabaseGoalkeeperGateway(client),
@@ -721,6 +758,17 @@ export async function substituteMatchPlayer(input: SubstituteMatchPlayerInput) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.substituteMatchPlayer(league.id, input);
+      revalidatePath(`/partidas/${input.match_id}`);
+      if (res.roundId) {
+        revalidatePath(`/rodadas/${res.roundId}`);
+        revalidatePath(`/rodadas/${res.roundId}/nova-partida`);
+      }
+      return res;
+    }
     const result = await substitutePlayerInMatch(input, supabaseMatchSubstitutionGateway(client));
     if (!result.success) return result;
     revalidatePath(`/partidas/${input.match_id}`);
@@ -743,6 +791,18 @@ export async function deleteMatch(matchId: string) {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
     if (!matchId) return { success: false, error: "Partida inválida para exclusão." };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.deleteMatch(league.id, matchId);
+      if (res.roundId) {
+        revalidatePath(`/rodadas/${res.roundId}`);
+        revalidatePath(`/rodadas/${res.roundId}/nova-partida`);
+      }
+      revalidatePath("/cartola");
+      revalidatePath("/ranking");
+      return res;
+    }
     await getMatchState(client, matchId);
 
     const { data: match, error: matchError } = await client
@@ -792,6 +852,17 @@ export async function undoLastMatchSubstitution(substitutionId: string, matchId:
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.undoLastMatchSubstitution(league.id, matchId, substitutionId);
+      revalidatePath(`/partidas/${matchId}`);
+      if (res.roundId) {
+        revalidatePath(`/rodadas/${res.roundId}`);
+        revalidatePath(`/rodadas/${res.roundId}/nova-partida`);
+      }
+      return res;
+    }
     const result = await undoMatchSubstitution(
       substitutionId, matchId, supabaseUndoMatchSubstitutionGateway(client),
     );
@@ -810,6 +881,17 @@ export async function deleteEvent(eventId: string, matchId: string, teamId?: str
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.deleteEvent(league.id, matchId, eventId);
+      revalidatePath(`/partidas/${matchId}`);
+      if (res.roundId) {
+        revalidatePath(`/rodadas/${res.roundId}`);
+      }
+      revalidatePath("/cartola");
+      return res;
+    }
     const result = await deleteLiveGoal(eventId, matchId, supabaseDeleteGoalGateway(client));
     if (!result.success) return result;
 
@@ -858,6 +940,16 @@ export async function correctFinishedGoal(eventId: string, confirmation: string)
   try {
     const client = await getAdminClient();
     if (!client) return { success: false as const, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.correctFinishedGoal(league.id, eventId, confirmation);
+      if (res.matchId) revalidatePath(`/partidas/${res.matchId}`);
+      if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
+      revalidatePath("/ranking");
+      revalidatePath("/cartola", "layout");
+      return res;
+    }
     return await runFinishedGoalCorrection(client, { kind: "remove", eventId, confirmation });
   } catch (err: any) {
     console.error("Erro ao corrigir gol finalizado:", err);
@@ -869,6 +961,16 @@ export async function correctFinishedGoalEvent(eventId: string, playerId: string
   try {
     const client = await getAdminClient();
     if (!client) return { success: false as const, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.correctFinishedGoalEvent(league.id, eventId, playerId, assistPlayerId, confirmation);
+      if (res.matchId) revalidatePath(`/partidas/${res.matchId}`);
+      if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
+      revalidatePath("/ranking");
+      revalidatePath("/cartola", "layout");
+      return res;
+    }
     return await runFinishedGoalCorrection(client, {
       kind: "edit", eventId, playerId, assistPlayerId, confirmation,
     });
@@ -888,6 +990,16 @@ export async function addFinishedGoalEvent(
   try {
     const client = await getAdminClient();
     if (!client) return { success: false as const, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.addFinishedGoalEvent(league.id, matchId, teamId, playerId, assistPlayerId, confirmation);
+      if (res.matchId) revalidatePath(`/partidas/${res.matchId}`);
+      if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
+      revalidatePath("/ranking");
+      revalidatePath("/cartola", "layout");
+      return res;
+    }
     return await runFinishedGoalCorrection(client, {
       kind: "add", matchId, teamId, playerId, assistPlayerId, confirmation,
     });
@@ -901,6 +1013,25 @@ export async function finishMatch(matchId: string) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false as const, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.finishMatch(league.id, matchId);
+      try {
+        after(() => {
+          revalidatePath(`/partidas/${matchId}`);
+          if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
+          revalidatePath("/ranking");
+          revalidatePath("/cartola");
+        });
+      } catch {
+        revalidatePath(`/partidas/${matchId}`);
+        if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
+        revalidatePath("/ranking");
+        revalidatePath("/cartola");
+      }
+      return res;
+    }
     return await finishSelectedMatch(matchId, supabaseFinishMatchGateway(client), {
       revalidate(id, roundId) {
         after(() => {
@@ -932,6 +1063,13 @@ export async function updateMatchTimer(matchId: string, action: "start" | "pause
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.updateMatchTimer(league.id, matchId, action);
+      revalidatePath(`/partidas/${matchId}`);
+      return res;
+    }
 
     const match = await getMatchState(client, matchId);
     if (match.status !== "live") return { success: false, error: "A partida nao esta em andamento." };
@@ -985,6 +1123,13 @@ export async function resetMatchTimer(matchId: string) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.resetMatchTimer(league.id, matchId);
+      revalidatePath(`/partidas/${matchId}`);
+      return res;
+    }
 
     const match = await getMatchState(client, matchId);
     if (match.status !== "live") return { success: false, error: "A partida nao esta em andamento." };
@@ -1024,6 +1169,13 @@ export async function addMatchExtraTime(matchId: string, extraSeconds: number) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.addMatchExtraTime(league.id, matchId, extraSeconds);
+      revalidatePath(`/partidas/${matchId}`);
+      return res;
+    }
 
     const match = await getMatchState(client, matchId);
     if (match.status !== "live") return { success: false, error: "A partida não está em andamento." };
@@ -1068,6 +1220,11 @@ export async function notifyMatchTimerThreshold(
 ) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: ADMIN_ERROR };
+  const league = await getSelectedLeague();
+  const api = await matchApiFor(client);
+  if (api && league) {
+    return api.notifyMatchTimerThreshold(league.id, matchId, threshold);
+  }
   return dispatchMatchTimerThreshold(client, matchId, threshold);
 }
 
@@ -1078,6 +1235,11 @@ export async function dispatchMatchTimerThreshold(
   threshold: "one_minute" | "thirty_seconds" | "finished",
 ) {
   try {
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      return await api.dispatchMatchTimerThreshold(league.id, matchId, threshold);
+    }
     const match = await getMatchState(client, matchId);
     if (match.status !== "live" || !match.timer_started_at) {
       return { success: true, skipped: true, reason: "inactive" as const };
