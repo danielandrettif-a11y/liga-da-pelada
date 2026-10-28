@@ -219,9 +219,14 @@ export interface RoundRepository {
   setRoundPlayerAvailability(roundId: string, leagueId: string, playerId: string, status: RoundPlayerAvailability, actor: Actor): Promise<void>;
   setRoundTeamCaptain(roundId: string, teamId: string, leagueId: string, captainId: string | null, actor: Actor): Promise<void>;
   setRoundTeamVestColor(roundId: string, teamId: string, leagueId: string, color: string, actor: Actor): Promise<void>;
-  transferRoundPlayerIdentity(roundId: string, leagueId: string, fromId: string, toId: string, actor: Actor): Promise<void>;
-  zeroPlayerRoundPoints(roundId: string, leagueId: string, playerId: string, actor: Actor): Promise<void>;
-  addRoundEmergencySubstitute(roundId: string, leagueId: string, input: { name: string; teamId: string }, actor: Actor): Promise<{ playerId: string }>;
+  transferRoundPlayerIdentity(roundId: string, leagueId: string, sourcePlayerId: string, targetPlayerId: string, actor: Actor): Promise<void>;
+  zeroPlayerRoundPoints(roundId: string, leagueId: string, playerId: string, reason: string, actor: Actor): Promise<void>;
+  addRoundEmergencySubstitute(
+    roundId: string,
+    leagueId: string,
+    input: { outPlayerId: string; inPlayerId: string; teamId: string },
+    actor: Actor,
+  ): Promise<void>;
 
   // Draft
   createTeamDraft(roundId: string, callupId: string | null, leagueId: string, actor: Actor): Promise<{ draftId: string }>;
@@ -336,6 +341,68 @@ export function saveRoundPrelist(input: SaveRoundPrelistInput, leagueId: string,
     stadiumId: input.stadiumId ? parseRoundUuid(input.stadiumId, "Estádio") : null,
   };
   return repository.saveRoundPrelist(normalized, parseRoundUuid(leagueId, "Pelada"), actor);
+}
+
+export function transferRoundPlayerIdentity(
+  roundId: string,
+  leagueId: string,
+  sourcePlayerId: string,
+  targetPlayerId: string,
+  actor: Actor,
+  repository: RoundRepository,
+) {
+  const sourceId = parseRoundUuid(sourcePlayerId, "Jogador de origem");
+  const targetId = parseRoundUuid(targetPlayerId, "Jogador de destino");
+  if (sourceId === targetId) throw new InvalidRoundError("Escolha dois perfis diferentes.");
+  return repository.transferRoundPlayerIdentity(
+    parseRoundUuid(roundId, "Rodada"),
+    parseRoundUuid(leagueId, "Pelada"),
+    sourceId,
+    targetId,
+    actor,
+  );
+}
+
+export function zeroPlayerRoundPoints(
+  roundId: string,
+  leagueId: string,
+  playerId: string,
+  reason: string,
+  actor: Actor,
+  repository: RoundRepository,
+) {
+  const normalizedReason = typeof reason === "string" ? reason.trim() : "";
+  if (normalizedReason.length > 500) throw new InvalidRoundError("O motivo deve ter no máximo 500 caracteres.");
+  return repository.zeroPlayerRoundPoints(
+    parseRoundUuid(roundId, "Rodada"),
+    parseRoundUuid(leagueId, "Pelada"),
+    parseRoundUuid(playerId, "Jogador"),
+    normalizedReason || "Jogador não participou da rodada",
+    actor,
+  );
+}
+
+export function addRoundEmergencySubstitute(
+  roundId: string,
+  leagueId: string,
+  input: { outPlayerId: string; inPlayerId: string; teamId: string },
+  actor: Actor,
+  repository: RoundRepository,
+) {
+  if (!input || typeof input !== "object") throw new InvalidRoundError("Informe os jogadores da substituição.");
+  const outPlayerId = parseRoundUuid(input.outPlayerId, "Jogador que sai");
+  const inPlayerId = parseRoundUuid(input.inPlayerId, "Jogador substituto");
+  if (outPlayerId === inPlayerId) throw new InvalidRoundError("Escolha jogadores diferentes.");
+  return repository.addRoundEmergencySubstitute(
+    parseRoundUuid(roundId, "Rodada"),
+    parseRoundUuid(leagueId, "Pelada"),
+    {
+      outPlayerId,
+      inPlayerId,
+      teamId: parseRoundUuid(input.teamId, "Time"),
+    },
+    actor,
+  );
 }
 
 export function createTeamDraft(

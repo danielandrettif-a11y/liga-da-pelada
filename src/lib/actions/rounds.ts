@@ -1479,6 +1479,24 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
   }
 }
 
+async function refreshRoundCorrection(
+  client: Awaited<ReturnType<typeof getAdminClient>>,
+  roundId: string,
+  fantasyFailurePrefix: string,
+  overallReason: string,
+) {
+  if (!client) throw new Error("Somente administradores podem corrigir a rodada.");
+  const { calculateRoundStats } = await import("./stats");
+  const stats = await calculateRoundStats(roundId);
+  if (!stats.success) throw new Error(stats.error || "Não foi possível recalcular as estatísticas.");
+  const { data: fantasyRound } = await client.from("fantasy_rounds").select("id").eq("round_id", roundId).maybeSingle();
+  if (fantasyRound) {
+    const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: roundId });
+    if (fantasyError) throw new Error(`${fantasyFailurePrefix}: ${fantasyError.message}`);
+  }
+  await refreshFluidOverallSafely(overallReason);
+}
+
 export async function transferRoundPlayerIdentity(roundId: string, sourcePlayerId: string, targetPlayerId: string) {
   try {
     const client = await getAdminClient();
@@ -1488,6 +1506,12 @@ export async function transferRoundPlayerIdentity(roundId: string, sourcePlayerI
       const api = await roundApiFor(client);
       if (api) {
         await api.transferRoundPlayerIdentity(league.id, roundId, sourcePlayerId, targetPlayerId);
+        await refreshRoundCorrection(
+          client,
+          roundId,
+          "Participação transferida, mas o Cartola precisa ser reprocessado",
+          `transferência de participante na rodada ${roundId}`,
+        );
         revalidatePath(`/rodadas/${roundId}`);
         revalidatePath("/ranking");
         revalidatePath("/cartola", "layout");
@@ -1502,15 +1526,12 @@ export async function transferRoundPlayerIdentity(roundId: string, sourcePlayerI
       p_target_player_id: targetPlayerId,
     });
     if (error) throw new Error(error.message);
-    const { calculateRoundStats } = await import("./stats");
-    const stats = await calculateRoundStats(roundId);
-    if (!stats.success) throw new Error(stats.error || "Não foi possível recalcular a rodada.");
-    const { data: fantasyRound } = await client.from("fantasy_rounds").select("id").eq("round_id", roundId).maybeSingle();
-    if (fantasyRound) {
-      const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: roundId });
-      if (fantasyError) throw new Error(`Participação transferida, mas o Cartola precisa ser reprocessado: ${fantasyError.message}`);
-    }
-    await refreshFluidOverallSafely(`transferência de participante na rodada ${roundId}`);
+    await refreshRoundCorrection(
+      client,
+      roundId,
+      "Participação transferida, mas o Cartola precisa ser reprocessado",
+      `transferência de participante na rodada ${roundId}`,
+    );
     revalidatePath(`/rodadas/${roundId}`);
     revalidatePath("/ranking");
     revalidatePath("/cartola", "layout");
@@ -1528,7 +1549,13 @@ export async function zeroPlayerRoundPoints(roundId: string, playerId: string, r
     if (league) {
       const api = await roundApiFor(client);
       if (api) {
-        await api.zeroPlayerRoundPoints(league.id, roundId, playerId);
+        await api.zeroPlayerRoundPoints(league.id, roundId, playerId, reason);
+        await refreshRoundCorrection(
+          client,
+          roundId,
+          "Pontuação corrigida, mas o Cartola precisa ser reprocessado",
+          `correção de pontuação na rodada ${roundId}`,
+        );
         revalidatePath(`/rodadas/${roundId}`);
         revalidatePath("/ranking");
         revalidatePath("/jogadores");
@@ -1545,17 +1572,12 @@ export async function zeroPlayerRoundPoints(roundId: string, playerId: string, r
       p_reason: reason.trim() || "Jogador não participou da rodada",
     });
     if (error) throw new Error(error.message);
-
-    const stats = await (await import("./stats")).calculateRoundStats(roundId);
-    if (!stats.success) throw new Error(stats.error || "Não foi possível recalcular as estatísticas.");
-
-    const { data: fantasyRound } = await client.from("fantasy_rounds").select("id").eq("round_id", roundId).maybeSingle();
-    if (fantasyRound) {
-      const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: roundId });
-      if (fantasyError) throw new Error(`Pontuação corrigida, mas o Cartola precisa ser reprocessado: ${fantasyError.message}`);
-    }
-
-    await refreshFluidOverallSafely(`correção de pontuação na rodada ${roundId}`);
+    await refreshRoundCorrection(
+      client,
+      roundId,
+      "Pontuação corrigida, mas o Cartola precisa ser reprocessado",
+      `correção de pontuação na rodada ${roundId}`,
+    );
 
     revalidatePath(`/rodadas/${roundId}`);
     revalidatePath("/ranking");
@@ -1577,7 +1599,7 @@ export async function addRoundEmergencySubstitute(roundId: string, outPlayerId: 
     if (league) {
       const api = await roundApiFor(client);
       if (api) {
-        await api.addRoundEmergencySubstitute(league.id, roundId, { name: inPlayerId, teamId });
+        await api.addRoundEmergencySubstitute(league.id, roundId, { outPlayerId, inPlayerId, teamId });
         revalidatePath(`/rodadas/${roundId}`);
         revalidatePath(`/rodadas/${roundId}/nova-partida`);
         revalidatePath("/convocacao");

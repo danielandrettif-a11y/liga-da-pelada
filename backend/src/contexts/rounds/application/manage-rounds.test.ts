@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  addRoundEmergencySubstitute,
   applyDraftSwap,
   createTeamDraft,
   createRoundWithTeams,
@@ -19,7 +20,9 @@ import {
   restartTeamDraft,
   saveRoundPrelist,
   startTeamDraft,
+  transferRoundPlayerIdentity,
   type RoundRepository,
+  zeroPlayerRoundPoints,
 } from "./manage-rounds.js";
 
 const seasonId = "00000000-0000-4000-8000-000000000001";
@@ -76,7 +79,7 @@ describe("manage-rounds application service", () => {
     setRoundTeamVestColor: vi.fn().mockResolvedValue(undefined),
     transferRoundPlayerIdentity: vi.fn().mockResolvedValue(undefined),
     zeroPlayerRoundPoints: vi.fn().mockResolvedValue(undefined),
-    addRoundEmergencySubstitute: vi.fn().mockResolvedValue({ playerId: "player-sub" }),
+    addRoundEmergencySubstitute: vi.fn().mockResolvedValue(undefined),
     createTeamDraft: vi.fn().mockResolvedValue({ draftId }),
     getDraftWorkspace: vi.fn().mockResolvedValue(null),
     getDraftWorkspaceByRound: vi.fn().mockResolvedValue(null),
@@ -122,6 +125,35 @@ describe("manage-rounds application service", () => {
   it("delegates deleteRound with validated UUIDs", async () => {
     await deleteRound(roundId, leagueId, actor, repository);
     expect(repository.deleteRound).toHaveBeenCalledWith(roundId, leagueId, actor);
+  });
+
+  it("validates and delegates round player corrections", async () => {
+    await transferRoundPlayerIdentity(roundId, leagueId, playerA, playerB, actor, repository);
+    await zeroPlayerRoundPoints(roundId, leagueId, playerA, "  ausência confirmada  ", actor, repository);
+    await addRoundEmergencySubstitute(roundId, leagueId, {
+      outPlayerId: playerA,
+      inPlayerId: playerB,
+      teamId: draftId,
+    }, actor, repository);
+
+    expect(repository.transferRoundPlayerIdentity).toHaveBeenCalledWith(roundId, leagueId, playerA, playerB, actor);
+    expect(repository.zeroPlayerRoundPoints).toHaveBeenCalledWith(roundId, leagueId, playerA, "ausência confirmada", actor);
+    expect(repository.addRoundEmergencySubstitute).toHaveBeenCalledWith(
+      roundId,
+      leagueId,
+      { outPlayerId: playerA, inPlayerId: playerB, teamId: draftId },
+      actor,
+    );
+  });
+
+  it("rejects invalid correction contracts before persistence", async () => {
+    expect(() => transferRoundPlayerIdentity(roundId, leagueId, playerA, playerA, actor, repository))
+      .toThrow("Escolha dois perfis diferentes");
+    expect(() => addRoundEmergencySubstitute(roundId, leagueId, {
+      outPlayerId: playerA,
+      inPlayerId: playerA,
+      teamId: draftId,
+    }, actor, repository)).toThrow("Escolha jogadores diferentes");
   });
 
   it("delegates finishRound with normalized financial input", async () => {

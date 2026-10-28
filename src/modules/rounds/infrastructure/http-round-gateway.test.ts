@@ -149,6 +149,40 @@ describe("httpRoundGateway", () => {
     );
   });
 
+  it("sends complete round correction payloads", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    const gateway = httpRoundGateway(backendUrl, "test-token");
+    const targetPlayerId = "00000000-0000-4000-8000-000000000007";
+
+    await gateway.transferRoundPlayerIdentity(leagueId, roundId, playerId, targetPlayerId);
+    await gateway.zeroPlayerRoundPoints(leagueId, roundId, playerId, "ausência confirmada");
+    await gateway.addRoundEmergencySubstitute(leagueId, roundId, {
+      outPlayerId: playerId,
+      inPlayerId: targetPlayerId,
+      teamId,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/rounds/leagues/${leagueId}/${roundId}/transfer-player-identity`,
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ sourcePlayerId: playerId, targetPlayerId }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/rounds/leagues/${leagueId}/${roundId}/players/${playerId}/zero-points`,
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ reason: "ausência confirmada" }) }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/rounds/leagues/${leagueId}/${roundId}/emergency-substitute`,
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ outPlayerId: playerId, inPlayerId: targetPlayerId, teamId }),
+      }),
+    );
+  });
+
   it("reads the draft workspace by callup identity", async () => {
     const workspace = { id: draftId, callupId, roundId, players: [], captains: [] };
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(workspace) });

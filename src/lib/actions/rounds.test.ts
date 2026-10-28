@@ -30,6 +30,7 @@ vi.mock("./stats", () => ({ calculateRoundStats: mocks.calculateRoundStats }));
 vi.mock("./overall", () => ({ refreshFluidOverallSafely: mocks.refreshFluidOverallSafely }));
 
 import {
+  addRoundEmergencySubstitute,
   createRoundWithTeams,
   deleteRound,
   finishRound,
@@ -43,11 +44,16 @@ import {
   saveRoundPrelist,
   setCallupFormat,
   setRoundPlayerAttendance,
+  transferRoundPlayerIdentity,
+  zeroPlayerRoundPoints,
 } from "./rounds";
 
 const leagueId = "00000000-0000-4000-8000-000000000001";
 const roundId = "00000000-0000-4000-8000-000000000002";
 const seasonId = "00000000-0000-4000-8000-000000000003";
+const playerA = "00000000-0000-4000-8000-000000000004";
+const playerB = "00000000-0000-4000-8000-000000000005";
+const teamId = "00000000-0000-4000-8000-000000000006";
 
 describe("rounds actions via API gateway", () => {
   beforeEach(() => {
@@ -62,7 +68,7 @@ describe("rounds actions via API gateway", () => {
           }),
         }),
       }),
-      rpc: vi.fn(),
+      rpc: vi.fn().mockResolvedValue({ data: true, error: null }),
     };
 
     mocks.account.mockResolvedValue({
@@ -233,6 +239,38 @@ describe("rounds actions via API gateway", () => {
 
     await expect(openCallupReplacementVacancy(roundId, "player-out")).resolves.toEqual({ success: true });
     expect(openVacancyMock).toHaveBeenCalledWith(leagueId, roundId, "player-out");
+  });
+
+  it("runs correction post-effects after transferring identity through the API", async () => {
+    const transferMock = vi.fn().mockResolvedValue(undefined);
+    mocks.roundApi.mockResolvedValue({ transferRoundPlayerIdentity: transferMock });
+
+    await expect(transferRoundPlayerIdentity(roundId, playerA, playerB)).resolves.toEqual({ success: true });
+    expect(transferMock).toHaveBeenCalledWith(leagueId, roundId, playerA, playerB);
+    expect(mocks.calculateRoundStats).toHaveBeenCalledWith(roundId);
+    expect(mocks.refreshFluidOverallSafely).toHaveBeenCalledWith(`transferência de participante na rodada ${roundId}`);
+  });
+
+  it("preserves the zero-points reason and runs all correction post-effects", async () => {
+    const zeroMock = vi.fn().mockResolvedValue(undefined);
+    mocks.roundApi.mockResolvedValue({ zeroPlayerRoundPoints: zeroMock });
+
+    await expect(zeroPlayerRoundPoints(roundId, playerA, "ausência confirmada")).resolves.toEqual({ success: true });
+    expect(zeroMock).toHaveBeenCalledWith(leagueId, roundId, playerA, "ausência confirmada");
+    expect(mocks.calculateRoundStats).toHaveBeenCalledWith(roundId);
+    expect(mocks.refreshFluidOverallSafely).toHaveBeenCalledWith(`correção de pontuação na rodada ${roundId}`);
+  });
+
+  it("sends both players when adding an existing emergency substitute", async () => {
+    const substituteMock = vi.fn().mockResolvedValue(undefined);
+    mocks.roundApi.mockResolvedValue({ addRoundEmergencySubstitute: substituteMock });
+
+    await expect(addRoundEmergencySubstitute(roundId, playerA, playerB, teamId)).resolves.toEqual({ success: true });
+    expect(substituteMock).toHaveBeenCalledWith(leagueId, roundId, {
+      outPlayerId: playerA,
+      inPlayerId: playerB,
+      teamId,
+    });
   });
 
   it("routes saveRoundPrelist via API when available", async () => {

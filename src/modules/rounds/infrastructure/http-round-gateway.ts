@@ -52,9 +52,13 @@ export type RoundHttpGateway = {
   setRoundPlayerAvailability(leagueId: string, roundId: string, playerId: string, status: "available" | "injured"): Promise<void>;
   setRoundTeamCaptain(leagueId: string, roundId: string, teamId: string, captainPlayerId: string | null): Promise<void>;
   setRoundTeamVestColor(leagueId: string, roundId: string, teamId: string, color: string): Promise<void>;
-  transferRoundPlayerIdentity(leagueId: string, roundId: string, fromId: string, toId: string): Promise<void>;
-  zeroPlayerRoundPoints(leagueId: string, roundId: string, playerId: string): Promise<void>;
-  addRoundEmergencySubstitute(leagueId: string, roundId: string, input: { name: string; teamId: string }): Promise<{ playerId: string }>;
+  transferRoundPlayerIdentity(leagueId: string, roundId: string, sourcePlayerId: string, targetPlayerId: string): Promise<void>;
+  zeroPlayerRoundPoints(leagueId: string, roundId: string, playerId: string, reason: string): Promise<void>;
+  addRoundEmergencySubstitute(
+    leagueId: string,
+    roundId: string,
+    input: { outPlayerId: string; inPlayerId: string; teamId: string },
+  ): Promise<void>;
   createTeamDraft(leagueId: string, roundId: string, callupId?: string | null): Promise<{ draftId: string }>;
   getDraftWorkspace(leagueId: string, callupId: string): Promise<any>;
   getDraftWorkspaceByRound(leagueId: string, roundId: string): Promise<any>;
@@ -305,20 +309,20 @@ export function httpRoundGateway(backendUrl: string, accessToken?: string): Roun
       if (!res.ok) await parseApiError(res);
     },
 
-    async transferRoundPlayerIdentity(leagueId, roundId, fromId, toId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/transfer-identity`, {
+    async transferRoundPlayerIdentity(leagueId, roundId, sourcePlayerId, targetPlayerId) {
+      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/transfer-player-identity`, {
         method: "POST",
         headers: authHeaders(true),
-        body: JSON.stringify({ fromId, toId }),
+        body: JSON.stringify({ sourcePlayerId, targetPlayerId }),
       });
       if (!res.ok) await parseApiError(res);
     },
 
-    async zeroPlayerRoundPoints(leagueId, roundId, playerId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/zero-points`, {
+    async zeroPlayerRoundPoints(leagueId, roundId, playerId, reason) {
+      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/players/${playerId}/zero-points`, {
         method: "POST",
         headers: authHeaders(true),
-        body: JSON.stringify({ playerId }),
+        body: JSON.stringify({ reason }),
       });
       if (!res.ok) await parseApiError(res);
     },
@@ -330,7 +334,6 @@ export function httpRoundGateway(backendUrl: string, accessToken?: string): Roun
         body: JSON.stringify(input),
       });
       if (!res.ok) await parseApiError(res);
-      return res.json();
     },
 
     async createTeamDraft(leagueId, roundId, callupId) {

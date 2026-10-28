@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { UserVerifier } from "../../../infrastructure/auth-user-verifier.js";
 import { authenticateBearer } from "../../../presentation/authenticate-bearer.js";
 import {
+  addRoundEmergencySubstitute,
   applyDraftSwap,
   createTeamDraft,
   createRoundWithTeams,
@@ -22,7 +23,9 @@ import {
   restartTeamDraft,
   saveRoundPrelist,
   startTeamDraft,
+  transferRoundPlayerIdentity,
   type RoundRepository,
+  zeroPlayerRoundPoints,
 } from "../application/manage-rounds.js";
 import { InvalidRoundError } from "../domain/round.js";
 import { RoundPersistenceError } from "../infrastructure/pg-round-repository.js";
@@ -543,19 +546,20 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
   // Transferência de identidade de jogador na rodada
   app.post<{
     Params: { leagueId: string; roundId: string };
-    Body: { fromId: string; toId: string };
+    Body: { sourcePlayerId: string; targetPlayerId: string };
   }>(
-    "/api/rounds/leagues/:leagueId/:roundId/transfer-identity",
+    "/api/rounds/leagues/:leagueId/:roundId/transfer-player-identity",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        await dependencies.repository.transferRoundPlayerIdentity(
+        await transferRoundPlayerIdentity(
           request.params.roundId,
           request.params.leagueId,
-          request.body.fromId,
-          request.body.toId,
+          request.body.sourcePlayerId,
+          request.body.targetPlayerId,
           authentication.actor,
+          dependencies.repository,
         );
         return reply.code(200).send({ success: true });
       } catch (error) {
@@ -566,19 +570,21 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
 
   // Zerar pontos do atleta na rodada
   app.post<{
-    Params: { leagueId: string; roundId: string };
-    Body: { playerId: string };
+    Params: { leagueId: string; roundId: string; playerId: string };
+    Body: { reason?: string };
   }>(
-    "/api/rounds/leagues/:leagueId/:roundId/zero-points",
+    "/api/rounds/leagues/:leagueId/:roundId/players/:playerId/zero-points",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        await dependencies.repository.zeroPlayerRoundPoints(
+        await zeroPlayerRoundPoints(
           request.params.roundId,
           request.params.leagueId,
-          request.body.playerId,
+          request.params.playerId,
+          request.body?.reason || "",
           authentication.actor,
+          dependencies.repository,
         );
         return reply.code(200).send({ success: true });
       } catch (error) {
@@ -590,20 +596,21 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
   // Substituto emergencial
   app.post<{
     Params: { leagueId: string; roundId: string };
-    Body: { name: string; teamId: string };
+    Body: { outPlayerId: string; inPlayerId: string; teamId: string };
   }>(
     "/api/rounds/leagues/:leagueId/:roundId/emergency-substitute",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const result = await dependencies.repository.addRoundEmergencySubstitute(
+        await addRoundEmergencySubstitute(
           request.params.roundId,
           request.params.leagueId,
           request.body,
           authentication.actor,
+          dependencies.repository,
         );
-        return reply.code(201).send({ success: true, ...result });
+        return reply.code(200).send({ success: true });
       } catch (error) {
         return sendFailure(error, request, reply);
       }

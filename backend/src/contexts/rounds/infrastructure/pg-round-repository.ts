@@ -64,7 +64,7 @@ function translateFailure(cause: unknown): RoundPersistenceError {
   if (/ROUND_FORBIDDEN|Somente administradores|Acesso restrito|permission denied|row-level security/i.test(message)) {
     return new RoundPersistenceError("Somente administradores podem realizar esta operação.", 403);
   }
-  if (/ROUND_NOT_FOUND|fora da pelada/i.test(message)) {
+  if (/ROUND_NOT_FOUND|fora da pelada|Rodada (não|nao) encontrada/i.test(message)) {
     return new RoundPersistenceError("Rodada não encontrada na pelada selecionada.", 404);
   }
   if (/Draft não encontrado/i.test(message)) {
@@ -76,10 +76,10 @@ function translateFailure(cause: unknown): RoundPersistenceError {
   if (error.code === "23505") {
     return new RoundPersistenceError("Houve um conflito na numeração. Atualize a página e tente novamente.", 409);
   }
-  if (/pre-lista|jogador fora|Estadio fora|Convocacao aberta|Temporada ativa|Tipo de rodada|data e horario|capacidade/i.test(message)) {
+  if (/pre-lista|jogador fora|Estadio fora|Convocacao aberta|Temporada ativa|Tipo de rodada|data e horario|capacidade|Substituto invalido|perfil de destino nao e um atleta ativo|não pertence a esta rodada|nao pertence a rodada/i.test(message)) {
     return new RoundPersistenceError(message, 400);
   }
-  if (/Draft|capit(ã|a)o|escolha|jogador não está disponível|lista mudou|rodada já possui times/i.test(message)) {
+  if (/Draft|capit(ã|a)o|escolha|jogador não está disponível|lista mudou|rodada já possui times|partida ao vivo|mesma partida|ja participou|ja esta na rodada|Finalize a rodada/i.test(message)) {
     return new RoundPersistenceError(message, 409);
   }
   return new RoundPersistenceError(message || "Falha na persistência da rodada.", 500);
@@ -104,6 +104,16 @@ async function requireLeagueAdmin(client: PoolClient, leagueId: string): Promise
   );
   if (access.rows[0]?.allowed !== true) {
     throw new RoundPersistenceError("Somente administradores podem realizar esta ação.", 403);
+  }
+}
+
+async function requireRoundInLeague(client: PoolClient, roundId: string, leagueId: string): Promise<void> {
+  const result = await client.query<{ found: boolean }>(
+    "SELECT EXISTS (SELECT 1 FROM public.rounds WHERE id = $1::uuid AND league_id = $2::uuid) AS found",
+    [roundId, leagueId],
+  );
+  if (result.rows[0]?.found !== true) {
+    throw new RoundPersistenceError("Rodada não encontrada na pelada selecionada.", 404);
   }
 }
 
@@ -1464,50 +1474,41 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
       });
     },
 
-    async transferRoundPlayerIdentity(roundId: string, leagueId: string, fromId: string, toId: string, actor: Actor): Promise<void> {
+    async transferRoundPlayerIdentity(roundId: string, leagueId: string, sourcePlayerId: string, targetPlayerId: string, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
+        await requireRoundInLeague(client, roundId, leagueId);
         await client.query(
-          "UPDATE public.team_players SET player_id = $3::uuid WHERE player_id = $2::uuid AND team_id IN (SELECT id FROM public.teams WHERE round_id = $1::uuid)",
-          [roundId, fromId, toId],
-        );
-        await client.query(
-          "UPDATE public.round_players SET player_id = $3::uuid WHERE round_id = $1::uuid AND player_id = $2::uuid",
-          [roundId, fromId, toId],
+          "SELECT public.transfer_round_player_identity($1::uuid, $2::uuid, $3::uuid)",
+          [roundId, sourcePlayerId, targetPlayerId],
         );
       });
     },
 
-    async zeroPlayerRoundPoints(roundId: string, leagueId: string, playerId: string, actor: Actor): Promise<void> {
+    async zeroPlayerRoundPoints(roundId: string, leagueId: string, playerId: string, reason: string, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
+        await requireRoundInLeague(client, roundId, leagueId);
         await client.query(
-          "UPDATE public.round_players SET points_override = 0 WHERE round_id = $1::uuid AND player_id = $2::uuid",
-          [roundId, playerId],
+          "SELECT public.zero_player_round_points($1::uuid, $2::uuid, $3::text)",
+          [roundId, playerId, reason],
         );
       });
     },
 
-    async addRoundEmergencySubstitute(roundId: string, leagueId: string, input: { name: string; teamId: string }, actor: Actor): Promise<{ playerId: string }> {
+    async addRoundEmergencySubstitute(
+      roundId: string,
+      leagueId: string,
+      input: { outPlayerId: string; inPlayerId: string; teamId: string },
+      actor: Actor,
+    ): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const playerInsert = await client.query<{ id: string }>(
-          `INSERT INTO public.players (name, member_category, is_selectable, created_by_user_id)
-           VALUES ($1::text, 'guest', true, $2::uuid) RETURNING id`,
-          [input.name, actor.userId],
-        );
-        const playerId = playerInsert.rows[0]?.id;
-        if (!playerId) throw new RoundPersistenceError("Falha ao criar atleta substituto.", 500);
-
+        await requireRoundInLeague(client, roundId, leagueId);
         await client.query(
-          "INSERT INTO public.team_players (team_id, player_id) VALUES ($1::uuid, $2::uuid)",
-          [input.teamId, playerId],
+          "SELECT public.add_round_emergency_substitute($1::uuid, $2::uuid, $3::uuid, $4::uuid)",
+          [roundId, input.outPlayerId, input.inPlayerId, input.teamId],
         );
-        await client.query(
-          "INSERT INTO public.round_players (round_id, player_id, availability_status, attendance_status) VALUES ($1::uuid, $2::uuid, 'available', 'present')",
-          [roundId, playerId],
-        );
-        return { playerId };
       });
     },
 

@@ -52,6 +52,9 @@
     { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setRoundTeamCaptain" },
     { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setRoundTeamVestColor" },
     { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "swapRoundTeamPlayers" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "addRoundEmergencySubstitute" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "transferRoundPlayerIdentity" },
+    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "zeroPlayerRoundPoints" },
     { "context": "rounds", "source": "src/lib/actions/draft.ts", "name": "applyDraftSwap" },
     { "context": "rounds", "source": "src/lib/actions/draft.ts", "name": "createTeamDraft" },
     { "context": "rounds", "source": "src/lib/actions/draft.ts", "name": "finalizeTeamDraft" },
@@ -81,6 +84,13 @@
     ],
     "round-management": [
       "backend/src/contexts/rounds/domain/round.test.ts",
+      "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+      "backend/src/contexts/rounds/presentation.test.ts",
+      "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+      "src/lib/actions/rounds.test.ts"
+    ],
+    "round-player-corrections": [
+      "backend/src/contexts/rounds/application/manage-rounds.test.ts",
       "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
       "backend/src/contexts/rounds/presentation.test.ts",
       "src/modules/rounds/infrastructure/http-round-gateway.test.ts",

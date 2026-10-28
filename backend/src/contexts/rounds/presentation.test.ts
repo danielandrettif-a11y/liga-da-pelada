@@ -82,7 +82,7 @@ function fixture(enabled: boolean) {
     setRoundTeamVestColor: vi.fn().mockResolvedValue(undefined),
     transferRoundPlayerIdentity: vi.fn().mockResolvedValue(undefined),
     zeroPlayerRoundPoints: vi.fn().mockResolvedValue(undefined),
-    addRoundEmergencySubstitute: vi.fn().mockResolvedValue({ playerId: "00000000-0000-4000-8000-000000000010" }),
+    addRoundEmergencySubstitute: vi.fn().mockResolvedValue(undefined),
     createTeamDraft: vi.fn().mockResolvedValue({ draftId }),
     getDraftWorkspace: vi.fn().mockResolvedValue({ draft: { id: draftId } } as any),
     getDraftWorkspaceByRound: vi.fn().mockResolvedValue({ draft: { id: draftId } } as any),
@@ -232,6 +232,39 @@ describe("rounds presentation", () => {
       roundId,
       leagueId,
       outPlayerId,
+      expect.anything(),
+    );
+  });
+
+  it("executes the scoped round correction contracts", async () => {
+    const { app, roundRepository } = fixture(true);
+    const headers = { authorization: "Bearer valid-token" };
+    const transfer = await app.inject({
+      method: "POST",
+      url: `/api/rounds/leagues/${leagueId}/${roundId}/transfer-player-identity`,
+      headers,
+      payload: { sourcePlayerId: playerA, targetPlayerId: playerB },
+    });
+    const zero = await app.inject({
+      method: "POST",
+      url: `/api/rounds/leagues/${leagueId}/${roundId}/players/${playerA}/zero-points`,
+      headers,
+      payload: { reason: "ausência confirmada" },
+    });
+    const substitute = await app.inject({
+      method: "POST",
+      url: `/api/rounds/leagues/${leagueId}/${roundId}/emergency-substitute`,
+      headers,
+      payload: { outPlayerId: playerA, inPlayerId: playerB, teamId },
+    });
+
+    expect([transfer, zero, substitute].every((response) => response.statusCode === 200)).toBe(true);
+    expect(roundRepository.transferRoundPlayerIdentity).toHaveBeenCalledWith(roundId, leagueId, playerA, playerB, expect.anything());
+    expect(roundRepository.zeroPlayerRoundPoints).toHaveBeenCalledWith(roundId, leagueId, playerA, "ausência confirmada", expect.anything());
+    expect(roundRepository.addRoundEmergencySubstitute).toHaveBeenCalledWith(
+      roundId,
+      leagueId,
+      { outPlayerId: playerA, inPlayerId: playerB, teamId },
       expect.anything(),
     );
   });

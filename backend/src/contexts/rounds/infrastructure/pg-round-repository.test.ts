@@ -533,6 +533,58 @@ describe("pgRoundRepository", () => {
     expect(query).toHaveBeenCalledWith(expect.stringContaining("open_callup_replacement_vacancy"), [roundId, playerA]);
   });
 
+  it("uses the scoped correction RPCs with the complete player contracts", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("SELECT EXISTS") && sql.includes("FROM public.rounds")) return { rows: [{ found: true }] };
+      return { rows: [], rowCount: 1 };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+    const repo = pgRoundRepository(pool);
+    const sourcePlayerId = "00000000-0000-4000-8000-000000000020";
+    const targetPlayerId = "00000000-0000-4000-8000-000000000021";
+    const teamId = "00000000-0000-4000-8000-000000000030";
+
+    await repo.transferRoundPlayerIdentity(roundId, leagueId, sourcePlayerId, targetPlayerId, actor);
+    await repo.zeroPlayerRoundPoints(roundId, leagueId, sourcePlayerId, "ausência confirmada", actor);
+    await repo.addRoundEmergencySubstitute(roundId, leagueId, {
+      outPlayerId: sourcePlayerId,
+      inPlayerId: targetPlayerId,
+      teamId,
+    }, actor);
+
+    expect(query).toHaveBeenCalledWith(
+      "SELECT public.transfer_round_player_identity($1::uuid, $2::uuid, $3::uuid)",
+      [roundId, sourcePlayerId, targetPlayerId],
+    );
+    expect(query).toHaveBeenCalledWith(
+      "SELECT public.zero_player_round_points($1::uuid, $2::uuid, $3::text)",
+      [roundId, sourcePlayerId, "ausência confirmada"],
+    );
+    expect(query).toHaveBeenCalledWith(
+      "SELECT public.add_round_emergency_substitute($1::uuid, $2::uuid, $3::uuid, $4::uuid)",
+      [roundId, sourcePlayerId, targetPlayerId, teamId],
+    );
+  });
+
+  it("rejects correction attempts when the round is outside the selected league", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("SELECT EXISTS") && sql.includes("FROM public.rounds")) return { rows: [{ found: false }] };
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    await expect(pgRoundRepository(pool).zeroPlayerRoundPoints(
+      roundId,
+      leagueId,
+      "00000000-0000-4000-8000-000000000020",
+      "ausência",
+      actor,
+    )).rejects.toMatchObject({ statusCode: 404 });
+    expect(query.mock.calls.some(([sql]) => String(sql).includes("zero_player_round_points"))).toBe(false);
+  });
+
   it("calculates the team preset offset inside the active season and requested round type", async () => {
     const query = vi.fn(async (sql: string) => sql.includes("latest_number")
       ? { rows: [{ latest_number: 9 }] }

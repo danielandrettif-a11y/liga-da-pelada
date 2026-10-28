@@ -32,6 +32,15 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-28 — correções administrativas de participantes da rodada
+
+- As três operações finais de `rounds` foram comparadas com o fluxo legado. Transferência de identidade, zeragem de pontos e substituição emergencial agora passam pelos casos de uso com UUIDs validados, exigem que a rodada pertença à pelada da rota e delegam a mutação exclusivamente às RPCs canônicas `transfer_round_player_identity`, `zero_player_round_points` e `add_round_emergency_substitute`.
+- O contrato de substituição deixou de criar um atleta novo a partir de um campo chamado `name`: a interface envia os IDs do atleta que sai, do substituto existente e do time. A zeragem voltou a transportar e persistir o motivo informado pelo ADM.
+- Transferência e zeragem preservam o pós-processamento legado: consolidação de estatísticas, reprocessamento condicional do Cartola e atualização do overall. Essa composição continua na Server Action até a fatia própria de estatísticas migrar o cálculo; erro da API habilitada não dispara a mutação Supabase antiga.
+- Nenhuma migration foi necessária: as migrations 283 e 284 já contêm as RPCs completas, com autorização e auditoria. O backend deixou de substituí-las por `UPDATE`/`INSERT` parciais.
+- Progresso auditado: **150/267 estruturais, 129/267 (48,3%) aceitas em revisão, 0/267 verificadas de ponta a ponta e 138 pendentes de paridade**. O contexto `rounds` está **38/38** aceito em revisão de código.
+- Verificação automatizada: **1.040 testes frontend em 200 arquivos**, **348 testes backend em 98 arquivos**, typecheck e builds dos dois projetos; auditorias de arquitetura, contexto e migração aprovadas; `npm audit --omit=dev` sem vulnerabilidades em frontend e backend.
+
 ### 2026-10-28 — Draft de times e sorteio adaptativo
 
 - As nove operações do Draft foram comparadas com o fluxo legado. Criação escolhe três capitães elegíveis e delega snapshots/estado à `create_team_draft`; início, escolha, troca de capitão, reinício, swap e confirmação usam exclusivamente as RPCs versionadas e conferem o escopo da pelada solicitado na rota.
