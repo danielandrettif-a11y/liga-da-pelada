@@ -8,11 +8,12 @@ import type {
   RoundRepository,
   RoundTeamShufflePreview,
   SaveRoundPrelistInput,
+  SaveRoundPrelistResult,
   ServerAdaptiveDrawResult,
   TeamFormationInput,
 } from "../application/manage-rounds.js";
 import type {
-  Round,
+  RoundDetail,
   RoundMatchSetup,
   RoundPlayerAvailability,
   RoundWithCounts,
@@ -41,6 +42,12 @@ function translateFailure(cause: unknown): RoundPersistenceError {
   }
   if (/ROUND_NOT_FOUND|fora da pelada/i.test(message)) {
     return new RoundPersistenceError("Rodada não encontrada na pelada selecionada.", 404);
+  }
+  if (error.code === "23505") {
+    return new RoundPersistenceError("Houve um conflito na numeração. Atualize a página e tente novamente.", 409);
+  }
+  if (/pre-lista|jogador fora|Estadio fora|Convocacao aberta|Temporada ativa|Tipo de rodada|data e horario|capacidade/i.test(message)) {
+    return new RoundPersistenceError(message, 400);
   }
   return new RoundPersistenceError(message || "Falha na persistência da rodada.", 500);
 }
@@ -121,143 +128,190 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
       });
     },
 
-    async getRound(roundId: string, leagueId: string, actor: Actor): Promise<Round | null> {
+    async getRound(roundId: string, leagueId: string, actor: Actor): Promise<RoundDetail | null> {
       return authenticated(pool, actor, async (client) => {
-        const result = await client.query<{
-          id: string;
-          league_id: string;
-          season_id: string;
-          number: number;
-          date: string | Date;
-          start_time: string | null;
-          status: "draft" | "active" | "finished";
-          round_type: "official" | "friendly";
-          formation_mode: "auto" | "manual" | "balanced" | "draft";
-          target_players_per_team: number | null;
-          target_teams_per_round: number | null;
-          arrival_order_enabled: boolean;
-          preparation_stage: "prelist" | "teams_ready" | "in_progress" | "completed";
-          stadium_id: string | null;
-          stadium_name: string | null;
-          stadium_map_url: string | null;
-          notes: string | null;
-          payment_pix: string | null;
-          payment_total: number | null;
-          best_goalkeeper_player_id: string | null;
-          created_at: string | Date;
-        }>(
-          "SELECT * FROM public.rounds WHERE id = $1::uuid AND league_id = $2::uuid LIMIT 1",
+        const result = await client.query<{ round: RoundDetail }>(
+          `SELECT to_jsonb(r) || jsonb_build_object(
+             'round_players', COALESCE((
+               SELECT jsonb_agg(
+                 jsonb_build_object(
+                   'player_id', rp.player_id,
+                   'availability_status', rp.availability_status,
+                   'availability_updated_at', rp.availability_updated_at,
+                   'attendance_status', rp.attendance_status,
+                   'attendance_order', rp.attendance_order,
+                   'attendance_marked_at', rp.attendance_marked_at,
+                   'players', to_jsonb(p)
+                 ) ORDER BY p.name, p.id
+               )
+               FROM public.round_players rp
+               JOIN public.players p ON p.id = rp.player_id
+               WHERE rp.round_id = r.id
+             ), '[]'::jsonb),
+             'teams', COALESCE((
+               SELECT jsonb_agg(
+                 to_jsonb(t) || jsonb_build_object(
+                   'team_players', COALESCE((
+                     SELECT jsonb_agg(
+                       jsonb_build_object(
+                         'player_id', tp.player_id,
+                         'goalkeeper_order', tp.goalkeeper_order,
+                         'loan_order', tp.loan_order,
+                         'players', to_jsonb(team_player)
+                       ) ORDER BY tp.goalkeeper_order NULLS LAST, team_player.name, team_player.id
+                     )
+                     FROM public.team_players tp
+                     JOIN public.players team_player ON team_player.id = tp.player_id
+                     WHERE tp.team_id = t.id
+                   ), '[]'::jsonb)
+                 ) ORDER BY t.position NULLS LAST, t.id
+               )
+               FROM public.teams t
+               WHERE t.round_id = r.id
+             ), '[]'::jsonb),
+             'matches', COALESCE((
+               SELECT jsonb_agg(
+                 to_jsonb(m) || jsonb_build_object(
+                   'match_events', COALESCE((
+                     SELECT jsonb_agg(to_jsonb(event_item) ORDER BY event_item.created_at, event_item.id)
+                     FROM public.match_events event_item
+                     WHERE event_item.match_id = m.id
+                   ), '[]'::jsonb),
+                   'match_players', COALESCE((
+                     SELECT jsonb_agg(jsonb_build_object(
+                       'player_id', match_player.player_id,
+                       'team_id', match_player.team_id,
+                       'original_team_id', match_player.original_team_id
+                     ) ORDER BY match_player.created_at, match_player.player_id)
+                     FROM public.match_players match_player
+                     WHERE match_player.match_id = m.id
+                   ), '[]'::jsonb),
+                   'match_goalkeepers', COALESCE((
+                     SELECT jsonb_agg(to_jsonb(goalkeeper) ORDER BY goalkeeper.team_id, goalkeeper.player_id)
+                     FROM public.match_goalkeepers goalkeeper
+                     WHERE goalkeeper.match_id = m.id
+                   ), '[]'::jsonb)
+                 ) ORDER BY
+                   CASE WHEN COALESCE(m.match_order, 0) > 0 THEN 0 ELSE 1 END,
+                   CASE WHEN COALESCE(m.match_order, 0) > 0 THEN m.match_order END,
+                   COALESCE(m.started_at, m.created_at),
+                   m.id
+               )
+               FROM public.matches m
+               WHERE m.round_id = r.id
+             ), '[]'::jsonb),
+             'callups', COALESCE((
+               SELECT jsonb_agg(jsonb_build_object('id', c.id, 'status', c.status) ORDER BY c.created_at, c.id)
+               FROM public.callups c
+               WHERE c.round_id = r.id
+             ), '[]'::jsonb),
+             'league', jsonb_build_object(
+               'stadium_name', league.stadium_name,
+               'stadium_map_url', league.stadium_map_url,
+               'event_duration_minutes', league.event_duration_minutes,
+               'players_per_team', league.players_per_team
+             )
+           ) AS round
+           FROM public.rounds r
+           JOIN public.leagues league ON league.id = r.league_id
+           WHERE r.id = $1::uuid AND r.league_id = $2::uuid
+           LIMIT 1`,
           [roundId, leagueId],
         );
-        const row = result.rows[0];
-        if (!row) return null;
-
-        return {
-          ...row,
-          date: row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date).slice(0, 10),
-          created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
-        };
+        return result.rows[0]?.round ?? null;
       });
     },
 
     async getRoundMatchSetup(roundId: string, leagueId: string, actor: Actor): Promise<RoundMatchSetup | null> {
       return authenticated(pool, actor, async (client) => {
-        const roundRes = await client.query<{
-          id: string;
-          status: "draft" | "active" | "finished";
-          date: string | Date;
-          round_type: "official" | "friendly";
-        }>(
-          "SELECT id, status, date, round_type FROM public.rounds WHERE id = $1::uuid AND league_id = $2::uuid LIMIT 1",
+        const result = await client.query<{ setup: RoundMatchSetup }>(
+          `SELECT jsonb_build_object(
+             'id', r.id,
+             'league_id', r.league_id,
+             'number', r.number,
+             'target_players_per_team', r.target_players_per_team,
+             'formation_mode', r.formation_mode,
+             'arrival_order_enabled', r.arrival_order_enabled,
+             'round_players', COALESCE((
+               SELECT jsonb_agg(jsonb_build_object(
+                 'player_id', rp.player_id,
+                 'availability_status', rp.availability_status,
+                 'attendance_status', rp.attendance_status
+               ) ORDER BY rp.attendance_order NULLS LAST, rp.player_id)
+               FROM public.round_players rp
+               WHERE rp.round_id = r.id
+             ), '[]'::jsonb),
+             'teams', COALESCE((
+               SELECT jsonb_agg(jsonb_build_object(
+                 'id', t.id,
+                 'name', t.name,
+                 'position', t.position,
+                 'color', t.color,
+                 'crest_url', t.crest_url,
+                 'captain_player_id', t.captain_player_id,
+                 'fixed_goalkeeper_player_id', t.fixed_goalkeeper_player_id,
+                 'team_players', COALESCE((
+                   SELECT jsonb_agg(jsonb_build_object(
+                     'player_id', tp.player_id,
+                     'goalkeeper_order', tp.goalkeeper_order,
+                     'loan_order', tp.loan_order,
+                     'players', jsonb_build_object(
+                       'id', p.id,
+                       'name', p.name,
+                       'is_goalkeeper', p.is_goalkeeper
+                     )
+                   ) ORDER BY tp.goalkeeper_order NULLS LAST, p.name, p.id)
+                   FROM public.team_players tp
+                   JOIN public.players p ON p.id = tp.player_id
+                   WHERE tp.team_id = t.id
+                 ), '[]'::jsonb)
+               ) ORDER BY t.position NULLS LAST, t.id)
+               FROM public.teams t
+               WHERE t.round_id = r.id
+             ), '[]'::jsonb),
+             'matches', COALESCE((
+               SELECT jsonb_agg(jsonb_build_object(
+                 'id', m.id,
+                 'team_a_id', m.team_a_id,
+                 'team_b_id', m.team_b_id,
+                 'match_order', m.match_order,
+                 'started_at', m.started_at,
+                 'created_at', m.created_at,
+                 'match_players', COALESCE((
+                   SELECT jsonb_agg(jsonb_build_object(
+                     'player_id', mp.player_id,
+                     'team_id', mp.team_id,
+                     'original_team_id', mp.original_team_id
+                   ) ORDER BY mp.created_at, mp.player_id)
+                   FROM public.match_players mp
+                   WHERE mp.match_id = m.id
+                 ), '[]'::jsonb),
+                 'match_goalkeepers', COALESCE((
+                   SELECT jsonb_agg(jsonb_build_object(
+                     'player_id', mg.player_id,
+                     'team_id', mg.team_id,
+                     'rotation_order', mg.rotation_order
+                   ) ORDER BY mg.team_id, mg.player_id)
+                   FROM public.match_goalkeepers mg
+                   WHERE mg.match_id = m.id
+                 ), '[]'::jsonb)
+               ) ORDER BY
+                 CASE WHEN COALESCE(m.match_order, 0) > 0 THEN 0 ELSE 1 END,
+                 CASE WHEN COALESCE(m.match_order, 0) > 0 THEN m.match_order END,
+                 COALESCE(m.started_at, m.created_at),
+                 m.id)
+               FROM public.matches m
+               WHERE m.round_id = r.id
+             ), '[]'::jsonb),
+             'league', jsonb_build_object('players_per_team', league.players_per_team)
+           ) AS setup
+           FROM public.rounds r
+           JOIN public.leagues league ON league.id = r.league_id
+           WHERE r.id = $1::uuid AND r.league_id = $2::uuid
+           LIMIT 1`,
           [roundId, leagueId],
         );
-        const round = roundRes.rows[0];
-        if (!round) return null;
-
-        const teamsRes = await client.query<{
-          id: string;
-          name: string;
-          color: string;
-          crest_url: string | null;
-          position: number;
-        }>(
-          "SELECT id, name, color, crest_url, position FROM public.teams WHERE round_id = $1::uuid ORDER BY position ASC",
-          [roundId],
-        );
-
-        const teamIds = teamsRes.rows.map((t) => t.id);
-        const teamPlayersMap = new Map<string, Array<{
-          player_id: string;
-          goalkeeper_order: number | null;
-          loan_order?: number | null;
-          player: {
-            id: string;
-            name: string;
-            nickname: string | null;
-            avatar_url: string | null;
-            player_profile: string | null;
-            is_goalkeeper: boolean;
-            member_category: string;
-          };
-        }>>();
-
-        if (teamIds.length > 0) {
-          const tpRes = await client.query<{
-            team_id: string;
-            player_id: string;
-            goalkeeper_order: number | null;
-            loan_order: number | null;
-            p_id: string;
-            p_name: string;
-            p_nickname: string | null;
-            p_avatar_url: string | null;
-            p_player_profile: string | null;
-            p_is_goalkeeper: boolean;
-            p_member_category: string;
-          }>(
-            `SELECT tp.team_id, tp.player_id, tp.goalkeeper_order, tp.loan_order,
-                    p.id AS p_id, p.name AS p_name, p.nickname AS p_nickname,
-                    p.avatar_url AS p_avatar_url, p.player_profile AS p_player_profile,
-                    p.is_goalkeeper AS p_is_goalkeeper, p.member_category AS p_member_category
-             FROM public.team_players tp
-             JOIN public.players p ON p.id = tp.player_id
-             WHERE tp.team_id = ANY($1::uuid[])
-             ORDER BY tp.goalkeeper_order ASC NULLS LAST, p.name ASC`,
-            [teamIds],
-          );
-
-          for (const tp of tpRes.rows) {
-            const list = teamPlayersMap.get(tp.team_id) || [];
-            list.push({
-              player_id: tp.player_id,
-              goalkeeper_order: tp.goalkeeper_order,
-              loan_order: tp.loan_order,
-              player: {
-                id: tp.p_id,
-                name: tp.p_name,
-                nickname: tp.p_nickname,
-                avatar_url: tp.p_avatar_url,
-                player_profile: tp.p_player_profile,
-                is_goalkeeper: Boolean(tp.p_is_goalkeeper),
-                member_category: tp.p_member_category,
-              },
-            });
-            teamPlayersMap.set(tp.team_id, list);
-          }
-        }
-
-        const teams = teamsRes.rows.map((team) => ({
-          ...team,
-          team_players: teamPlayersMap.get(team.id) || [],
-        }));
-
-        return {
-          id: round.id,
-          status: round.status,
-          date: round.date instanceof Date ? round.date.toISOString().slice(0, 10) : String(round.date).slice(0, 10),
-          round_type: round.round_type,
-          teams,
-        };
+        return result.rows[0]?.setup ?? null;
       });
     },
 
@@ -550,9 +604,82 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
       });
     },
 
-    async saveRoundPrelist(input: SaveRoundPrelistInput, leagueId: string, actor: Actor): Promise<{ roundId: string }> {
+    async saveRoundPrelist(input: SaveRoundPrelistInput, leagueId: string, actor: Actor): Promise<SaveRoundPrelistResult> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
+        const leagueResult = await client.query<{
+          players_per_team: number;
+          teams_per_round: number;
+        }>(
+          `SELECT players_per_team, teams_per_round
+           FROM public.leagues
+           WHERE id = $1::uuid AND is_active
+           LIMIT 1`,
+          [leagueId],
+        );
+        const league = leagueResult.rows[0];
+        if (!league) throw new RoundPersistenceError("Pelada selecionada não encontrada ou inativa.", 404);
+
+        const created = !input.roundId;
+        let capacity = Number(league.players_per_team) * Number(league.teams_per_round);
+        let effectivePlayerIds = [...new Set(input.playerIds)];
+        let effectiveDate = input.date;
+        let effectiveRoundType = input.roundType;
+
+        if (input.roundId) {
+          const roundResult = await client.query<{
+            target_players_per_team: number | null;
+            target_teams_per_round: number | null;
+          }>(
+            `SELECT r.target_players_per_team, r.target_teams_per_round
+             FROM public.rounds r
+             JOIN public.seasons s ON s.id = r.season_id AND s.status = 'active'
+             WHERE r.id = $1::uuid
+               AND r.league_id = $2::uuid
+               AND r.status = 'draft'
+               AND r.preparation_stage = 'prelist'
+             LIMIT 1`,
+            [input.roundId, leagueId],
+          );
+          const round = roundResult.rows[0];
+          if (!round) throw new RoundPersistenceError("Pré-lista editável da pelada selecionada não encontrada.", 404);
+          capacity = Number(round.target_players_per_team || league.players_per_team)
+            * Number(round.target_teams_per_round || league.teams_per_round);
+        }
+
+        if (input.callupId) {
+          const callupResult = await client.query<{
+            date: string | Date;
+            round_type: "official" | "friendly";
+            capacity: number;
+          }>(
+            `SELECT date, round_type, capacity
+             FROM public.callups
+             WHERE id = $1::uuid
+               AND league_id = $2::uuid
+               AND status = 'open'
+             FOR UPDATE`,
+            [input.callupId, leagueId],
+          );
+          const callup = callupResult.rows[0];
+          if (!callup) throw new RoundPersistenceError("Convocação aberta da pelada selecionada não encontrada.", 404);
+          const confirmed = await client.query<{ player_id: string }>(
+            `SELECT player_id
+             FROM public.callup_entries
+             WHERE callup_id = $1::uuid AND status = 'confirmed'
+             ORDER BY position, created_at, player_id`,
+            [input.callupId],
+          );
+          effectivePlayerIds = confirmed.rows.map((entry) => entry.player_id);
+          effectiveDate = callup.date instanceof Date ? callup.date.toISOString().slice(0, 10) : String(callup.date).slice(0, 10);
+          effectiveRoundType = callup.round_type;
+          capacity = Number(callup.capacity);
+        }
+
+        if (effectivePlayerIds.length > capacity) {
+          throw new RoundPersistenceError(`A pré-lista aceita no máximo ${capacity} jogadores.`, 400);
+        }
+
         const result = await client.query<{ save_round_prelist: string }>(
           `SELECT public.save_round_prelist(
              $1::uuid, $2::uuid, $3::date, $4::time, $5::text,
@@ -561,10 +688,10 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
           [
             leagueId,
             input.roundId || null,
-            input.date,
-            input.startTime || "08:00",
-            input.roundType || "official",
-            input.playerIds,
+            effectiveDate,
+            input.startTime,
+            effectiveRoundType,
+            effectivePlayerIds,
             input.callupId || null,
             input.stadiumId || null,
             input.stadiumName || null,
@@ -573,7 +700,13 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
         );
         const roundId = result.rows[0]?.save_round_prelist;
         if (!roundId) throw new RoundPersistenceError("Falha ao salvar pré-lista.", 500);
-        return { roundId: String(roundId) };
+        return {
+          roundId: String(roundId),
+          effectiveDate,
+          effectiveStartTime: input.startTime,
+          effectiveRoundType,
+          created,
+        };
       });
     },
 

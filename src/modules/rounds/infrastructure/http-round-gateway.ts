@@ -17,7 +17,13 @@ export type RoundHttpGateway = {
   finishRound(leagueId: string, roundId: string, bestGoalkeeperPlayerId?: string | null): Promise<void>;
   getAdminRoundPrelist(leagueId: string, roundId: string): Promise<any>;
   getAdminRoundPrelists(leagueId: string): Promise<any[]>;
-  saveRoundPrelist(leagueId: string, input: any): Promise<{ roundId: string }>;
+  saveRoundPrelist(leagueId: string, input: any): Promise<{
+    roundId: string;
+    effectiveDate: string;
+    effectiveStartTime: string;
+    effectiveRoundType: "official" | "friendly";
+    created: boolean;
+  }>;
   setCallupFormat(leagueId: string, callupId: string, format: { playersPerTeam: number; teamsPerRound: number }): Promise<{ success: boolean; fantasySizePreserved: boolean; fantasyLineupSize: number }>;
   setCallupMatchSize(leagueId: string, callupId: string, size: { playersPerTeam: number; teamsPerRound: number }): Promise<void>;
   getNextTeamPresetOffset(leagueId: string, roundType?: "official" | "friendly"): Promise<{ offset: number }>;

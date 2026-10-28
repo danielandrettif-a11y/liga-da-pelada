@@ -65,6 +65,31 @@ describe("httpRoundGateway", () => {
     );
   });
 
+  it("returns effective prelist metadata needed by post-commit reminders", async () => {
+    const payload = {
+      roundId,
+      effectiveDate: "2026-10-30",
+      effectiveStartTime: "20:00",
+      effectiveRoundType: "official",
+      created: true,
+    };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(payload) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await httpRoundGateway(backendUrl, "test-token").saveRoundPrelist(leagueId, {
+      date: "2026-10-30",
+      startTime: "20:00",
+      roundType: "official",
+      playerIds: [],
+    });
+
+    expect(result).toEqual(payload);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/rounds/leagues/${leagueId}/prelist`,
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
   it("throws RoundApiError on failure", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,

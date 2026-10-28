@@ -57,6 +57,105 @@ describe("pgRoundRepository", () => {
     expect(query).toHaveBeenCalledWith("SET LOCAL ROLE authenticated");
   });
 
+  it("returns the complete round detail read model in chronological order", async () => {
+    const detail = {
+      id: roundId,
+      league_id: leagueId,
+      season_id: seasonId,
+      number: 3,
+      date: "2026-10-30",
+      start_time: "20:00:00",
+      status: "active",
+      round_type: "official",
+      formation_mode: "manual",
+      target_players_per_team: 6,
+      target_teams_per_round: 3,
+      suppress_goalkeeper_rewards: false,
+      arrival_order_enabled: true,
+      preparation_stage: "teams_ready",
+      notes: null,
+      payment_pix: null,
+      payment_total: null,
+      best_goalkeeper_player_id: null,
+      created_at: "2026-10-27T10:00:00Z",
+      round_players: [{ player_id: "player-1", players: { id: "player-1", name: "Ana", is_goalkeeper: false } }],
+      teams: [{ id: "team-1", position: 1, team_players: [{ player_id: "player-1", players: { id: "player-1", name: "Ana" } }] }],
+      matches: [{ id: "match-1", match_order: 1, match_events: [], match_players: [], match_goalkeepers: [] }],
+      callups: [{ id: "callup-1", status: "locked" }],
+      league: { stadium_name: "Arena", stadium_map_url: null, event_duration_minutes: 120, players_per_team: 6 },
+    };
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes(") AS round") && sql.includes("match_events")) return { rows: [{ round: detail }] };
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    const result = await pgRoundRepository(pool).getRound(roundId, leagueId, actor);
+
+    expect(result).toBe(detail);
+    expect(result).toMatchObject({
+      round_players: [{ players: { name: "Ana" } }],
+      teams: [{ team_players: [{ player_id: "player-1" }] }],
+      matches: [{ match_events: [], match_players: [], match_goalkeepers: [] }],
+      callups: [{ id: "callup-1" }],
+      league: { players_per_team: 6 },
+    });
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("CASE WHEN COALESCE(m.match_order, 0) > 0"), [roundId, leagueId]);
+  });
+
+  it("returns the lean match setup without dropping rotation state", async () => {
+    const setup = {
+      id: roundId,
+      league_id: leagueId,
+      number: 3,
+      target_players_per_team: 6,
+      formation_mode: "manual",
+      arrival_order_enabled: true,
+      round_players: [{ player_id: "player-1", availability_status: "available", attendance_status: "present" }],
+      teams: [{
+        id: "team-1",
+        name: "Time 1",
+        position: 1,
+        color: "#22c55e",
+        crest_url: null,
+        captain_player_id: "player-1",
+        fixed_goalkeeper_player_id: null,
+        team_players: [{
+          player_id: "player-1",
+          goalkeeper_order: 1,
+          loan_order: null,
+          players: { id: "player-1", name: "Ana", is_goalkeeper: true },
+        }],
+      }],
+      matches: [{
+        id: "match-1",
+        team_a_id: "team-1",
+        team_b_id: "team-2",
+        match_order: 1,
+        started_at: null,
+        created_at: "2026-10-30T20:00:00Z",
+        match_players: [{ player_id: "player-1", team_id: "team-1", original_team_id: "team-1" }],
+        match_goalkeepers: [{ player_id: "player-1", team_id: "team-1", rotation_order: 1 }],
+      }],
+      league: { players_per_team: 6 },
+    };
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes(") AS setup")) return { rows: [{ setup }] };
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    const result = await pgRoundRepository(pool).getRoundMatchSetup(roundId, leagueId, actor);
+
+    expect(result).toBe(setup);
+    expect(result).toMatchObject({
+      round_players: [{ attendance_status: "present" }],
+      teams: [{ captain_player_id: "player-1", team_players: [{ players: { name: "Ana" } }] }],
+      matches: [{ match_players: [{ player_id: "player-1" }], match_goalkeepers: [{ rotation_order: 1 }] }],
+      league: { players_per_team: 6 },
+    });
+  });
+
   it("returns the admin prelist detail in the legacy screen contract", async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
@@ -194,6 +293,7 @@ describe("pgRoundRepository", () => {
   it("saves a round prelist via RPC", async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("FROM public.leagues")) return { rows: [{ players_per_team: 6, teams_per_round: 3 }] };
       if (sql.includes("save_round_prelist")) return { rows: [{ save_round_prelist: roundId }] };
       return { rows: [] };
     });
@@ -202,10 +302,66 @@ describe("pgRoundRepository", () => {
     const repo = pgRoundRepository(pool);
     const result = await repo.saveRoundPrelist({
       date: "2026-10-30",
-      playerIds: ["p1", "p2"],
+      startTime: "08:00",
+      roundType: "official",
+      playerIds: [],
     }, leagueId, actor);
 
-    expect(result).toEqual({ roundId });
+    expect(result).toEqual({
+      roundId,
+      effectiveDate: "2026-10-30",
+      effectiveStartTime: "08:00",
+      effectiveRoundType: "official",
+      created: true,
+    });
+  });
+
+  it("uses confirmed callup entries and its canonical date when saving a prelist", async () => {
+    const playerId = "00000000-0000-4000-8000-000000000010";
+    const callupId = "00000000-0000-4000-8000-000000000011";
+    let rpcValues: unknown[] | undefined;
+    const query = vi.fn(async (sql: string, values?: unknown[]) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("FROM public.leagues")) return { rows: [{ players_per_team: 6, teams_per_round: 3 }] };
+      if (sql.includes("FROM public.callups")) {
+        return { rows: [{ date: "2026-11-06", round_type: "friendly", capacity: 12 }] };
+      }
+      if (sql.includes("FROM public.callup_entries")) return { rows: [{ player_id: playerId }] };
+      if (sql.includes("save_round_prelist")) {
+        rpcValues = values;
+        return { rows: [{ save_round_prelist: roundId }] };
+      }
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    const result = await pgRoundRepository(pool).saveRoundPrelist({
+      date: "2026-10-30",
+      startTime: "20:00",
+      roundType: "official",
+      playerIds: [],
+      callupId,
+    }, leagueId, actor);
+
+    expect(result).toMatchObject({
+      roundId,
+      effectiveDate: "2026-11-06",
+      effectiveStartTime: "20:00",
+      effectiveRoundType: "friendly",
+      created: true,
+    });
+    expect(rpcValues).toEqual([
+      leagueId,
+      null,
+      "2026-11-06",
+      "20:00",
+      "friendly",
+      [playerId],
+      callupId,
+      null,
+      null,
+      null,
+    ]);
   });
 
   it("builds a real shuffle preview from scoped round players", async () => {

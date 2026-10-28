@@ -3,6 +3,8 @@ import {
   InvalidRoundError,
   parseRoundUuid,
   validateRoundDate,
+  validateRoundTime,
+  validateRoundType,
   validateTeamSizes,
 } from "./round.js";
 
@@ -20,6 +22,13 @@ describe("Round domain", () => {
   it("validates round date format", () => {
     expect(validateRoundDate("2026-10-30")).toBe("2026-10-30");
     expect(() => validateRoundDate("30/10/2026")).toThrow(InvalidRoundError);
+  });
+
+  it("validates round time and type", () => {
+    expect(validateRoundTime("20:30")).toBe("20:30");
+    expect(validateRoundType("friendly")).toBe("friendly");
+    expect(() => validateRoundTime("25:00")).toThrow(InvalidRoundError);
+    expect(() => validateRoundType("training")).toThrow(InvalidRoundError);
   });
 
   it("validates team sizes (players per team and teams per round)", () => {

@@ -2,7 +2,9 @@ import type { Actor } from "../../../shared/actor.js";
 import {
   parseRoundUuid,
   validateRoundDate,
-  type Round,
+  validateRoundTime,
+  validateRoundType,
+  type RoundDetail,
   type RoundMatchSetup,
   type RoundPlayerAttendance,
   type RoundPlayerAvailability,
@@ -45,14 +47,22 @@ export type AdminRoundPrelist = {
 
 export type SaveRoundPrelistInput = {
   date: string;
-  startTime?: string | null;
-  roundType?: "friendly" | "official";
+  startTime: string;
+  roundType: "friendly" | "official";
   playerIds: string[];
   callupId?: string | null;
   roundId?: string | null;
   stadiumId?: string | null;
   stadiumName?: string | null;
   stadiumMapUrl?: string | null;
+};
+
+export type SaveRoundPrelistResult = {
+  roundId: string;
+  effectiveDate: string;
+  effectiveStartTime: string;
+  effectiveRoundType: "friendly" | "official";
+  created: boolean;
 };
 
 export type CreateRoundWithTeamsInput = {
@@ -146,7 +156,7 @@ export type ServerAdaptiveDrawResult = {
 
 export interface RoundRepository {
   getRounds(seasonId: string, actor: Actor): Promise<RoundWithCounts[]>;
-  getRound(roundId: string, leagueId: string, actor: Actor): Promise<Round | null>;
+  getRound(roundId: string, leagueId: string, actor: Actor): Promise<RoundDetail | null>;
   getRoundMatchSetup(roundId: string, leagueId: string, actor: Actor): Promise<RoundMatchSetup | null>;
   getActiveLeague(leagueId: string, actor: Actor): Promise<{
     id: string;
@@ -164,7 +174,7 @@ export interface RoundRepository {
   finishRound(roundId: string, leagueId: string, bestGoalkeeperPlayerId: string | null, actor: Actor): Promise<void>;
   getAdminRoundPrelist(roundId: string, leagueId: string, actor: Actor): Promise<AdminRoundPrelist | null>;
   getAdminRoundPrelists(leagueId: string, actor: Actor): Promise<AdminRoundPrelist[]>;
-  saveRoundPrelist(input: SaveRoundPrelistInput, leagueId: string, actor: Actor): Promise<{ roundId: string }>;
+  saveRoundPrelist(input: SaveRoundPrelistInput, leagueId: string, actor: Actor): Promise<SaveRoundPrelistResult>;
   setCallupFormat(callupId: string, leagueId: string, format: { playersPerTeam: number; teamsPerRound: number }, actor: Actor): Promise<{ fantasySizePreserved: boolean; fantasyLineupSize: number }>;
   setCallupMatchSize(callupId: string, leagueId: string, size: { playersPerTeam: number; teamsPerRound: number }, actor: Actor): Promise<void>;
   getNextTeamPresetOffset(leagueId: string, roundType: "official" | "friendly", actor: Actor): Promise<{ offset: number }>;
@@ -212,7 +222,7 @@ export function getRounds(seasonId: string, actor: Actor, repository: RoundRepos
   return repository.getRounds(parseRoundUuid(seasonId, "Temporada"), actor);
 }
 
-export function getRound(roundId: string, leagueId: string, actor: Actor, repository: RoundRepository): Promise<Round | null> {
+export function getRound(roundId: string, leagueId: string, actor: Actor, repository: RoundRepository): Promise<RoundDetail | null> {
   return repository.getRound(parseRoundUuid(roundId, "Rodada"), parseRoundUuid(leagueId, "Pelada"), actor);
 }
 
@@ -251,6 +261,15 @@ export function getAdminRoundPrelists(leagueId: string, actor: Actor, repository
 }
 
 export function saveRoundPrelist(input: SaveRoundPrelistInput, leagueId: string, actor: Actor, repository: RoundRepository) {
-  validateRoundDate(input.date);
-  return repository.saveRoundPrelist(input, parseRoundUuid(leagueId, "Pelada"), actor);
+  const normalized: SaveRoundPrelistInput = {
+    ...input,
+    date: validateRoundDate(input.date),
+    startTime: validateRoundTime(input.startTime),
+    roundType: validateRoundType(input.roundType),
+    playerIds: [...new Set(input.playerIds)].map((id) => parseRoundUuid(id, "Jogador")),
+    roundId: input.roundId ? parseRoundUuid(input.roundId, "Rodada") : null,
+    callupId: input.callupId ? parseRoundUuid(input.callupId, "Convocação") : null,
+    stadiumId: input.stadiumId ? parseRoundUuid(input.stadiumId, "Estádio") : null,
+  };
+  return repository.saveRoundPrelist(normalized, parseRoundUuid(leagueId, "Pelada"), actor);
 }

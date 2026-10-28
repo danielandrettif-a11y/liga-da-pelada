@@ -77,32 +77,100 @@ export type RoundWithCounts = Round & {
   matches?: Array<{ count: number }>;
 };
 
+export type PlayerReadModel = {
+  id: string;
+  name: string;
+  nickname?: string | null;
+  avatar_url?: string | null;
+  player_profile?: string | null;
+  is_goalkeeper: boolean;
+  member_category?: string;
+  [key: string]: unknown;
+};
+
+export type RoundDetail = Round & {
+  round_players: Array<{
+    player_id: string;
+    availability_status: RoundPlayerAvailability;
+    availability_updated_at: string | null;
+    attendance_status: RoundPlayerAttendance;
+    attendance_order: number | null;
+    attendance_marked_at: string | null;
+    players: PlayerReadModel;
+  }>;
+  teams: Array<RoundTeam & {
+    captain_player_id: string | null;
+    fixed_goalkeeper_player_id: string | null;
+    team_players: Array<RoundTeamMember & { players: PlayerReadModel }>;
+    [key: string]: unknown;
+  }>;
+  matches: Array<{
+    id: string;
+    team_a_id: string;
+    team_b_id: string;
+    score_a: number;
+    score_b: number;
+    status: string;
+    match_order: number | null;
+    started_at: string | null;
+    finished_at: string | null;
+    created_at: string;
+    match_events: Array<Record<string, unknown>>;
+    match_players: Array<{ player_id: string; team_id: string; original_team_id: string }>;
+    match_goalkeepers: Array<Record<string, unknown>>;
+    [key: string]: unknown;
+  }>;
+  callups: Array<{ id: string; status: string }>;
+  league: {
+    stadium_name: string | null;
+    stadium_map_url: string | null;
+    event_duration_minutes: number;
+    players_per_team: number;
+  };
+};
+
 export type RoundMatchSetup = {
   id: string;
-  status: RoundStatus;
-  date: string;
-  round_type: RoundType;
+  league_id: string;
+  number: number;
+  target_players_per_team: number | null;
+  formation_mode: TeamFormationMode;
+  arrival_order_enabled: boolean;
+  round_players: Array<{
+    player_id: string;
+    availability_status: RoundPlayerAvailability;
+    attendance_status: RoundPlayerAttendance;
+  }>;
   teams: Array<{
     id: string;
     name: string;
     color: string;
     crest_url: string | null;
     position: number;
+    captain_player_id: string | null;
+    fixed_goalkeeper_player_id: string | null;
     team_players: Array<{
       player_id: string;
       goalkeeper_order: number | null;
       loan_order?: number | null;
-      player: {
+      players: {
         id: string;
         name: string;
-        nickname: string | null;
-        avatar_url: string | null;
-        player_profile: string | null;
         is_goalkeeper: boolean;
-        member_category: string;
       };
     }>;
   }>;
+  matches: Array<{
+    id: string;
+    team_a_id: string;
+    team_b_id: string;
+    match_order: number | null;
+    started_at: string | null;
+    created_at: string;
+    match_players: Array<{ player_id: string; team_id: string; original_team_id: string }>;
+    match_goalkeepers: Array<{ player_id: string; team_id: string; rotation_order: number | null }>;
+  }>;
+  league: { players_per_team: number };
 };
 
 export class InvalidRoundError extends Error {
@@ -125,6 +193,20 @@ export function validateRoundDate(date: string): string {
     throw new InvalidRoundError("Informe uma data válida (AAAA-MM-DD).");
   }
   return date;
+}
+
+export function validateRoundTime(time: string): string {
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+    throw new InvalidRoundError("Informe um horário válido (HH:MM).");
+  }
+  return time;
+}
+
+export function validateRoundType(value: string): RoundType {
+  if (value !== "official" && value !== "friendly") {
+    throw new InvalidRoundError("Tipo de rodada inválido.");
+  }
+  return value;
 }
 
 export function validateTeamSizes(playersPerTeam: number, teamsPerRound: number): {

@@ -38,7 +38,13 @@ describe("manage-rounds application service", () => {
     finishRound: vi.fn().mockResolvedValue(undefined),
     getAdminRoundPrelist: vi.fn().mockResolvedValue(null),
     getAdminRoundPrelists: vi.fn().mockResolvedValue([]),
-    saveRoundPrelist: vi.fn().mockResolvedValue({ roundId }),
+    saveRoundPrelist: vi.fn().mockResolvedValue({
+      roundId,
+      effectiveDate: "2026-10-30",
+      effectiveStartTime: "08:00",
+      effectiveRoundType: "official",
+      created: true,
+    }),
     setCallupFormat: vi.fn().mockResolvedValue(undefined),
     setCallupMatchSize: vi.fn().mockResolvedValue(undefined),
     getNextTeamPresetOffset: vi.fn().mockResolvedValue({ offset: 0 }),
@@ -108,10 +114,17 @@ describe("manage-rounds application service", () => {
   });
 
   it("delegates saveRoundPrelist with date validation", async () => {
+    const playerId = "00000000-0000-4000-8000-000000000010";
     await saveRoundPrelist({
       date: "2026-10-30",
-      playerIds: [],
+      startTime: "08:00",
+      roundType: "official",
+      playerIds: [playerId, playerId],
     }, leagueId, actor, repository);
-    expect(repository.saveRoundPrelist).toHaveBeenCalled();
+    expect(repository.saveRoundPrelist).toHaveBeenLastCalledWith(
+      expect.objectContaining({ playerIds: [playerId] }),
+      leagueId,
+      actor,
+    );
   });
 });

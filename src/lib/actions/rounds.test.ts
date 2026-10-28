@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
   revalidateTag: vi.fn(),
   roundApi: vi.fn(),
+  scheduleReminders: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -22,6 +23,7 @@ vi.mock("../auth", () => ({
 vi.mock("../league-context", () => ({ getSelectedLeague: mocks.selectedLeague }));
 vi.mock("./seasons", () => ({ getActiveSeason: mocks.activeSeason }));
 vi.mock("@/modules/rounds/infrastructure/round-api-session", () => ({ roundApiFor: mocks.roundApi }));
+vi.mock("../cartola-reminder-scheduler", () => ({ scheduleCartolaRoundReminders: mocks.scheduleReminders }));
 
 import {
   createRoundWithTeams,
@@ -31,6 +33,7 @@ import {
   getAdminRoundPrelist,
   getAdminRoundPrelists,
   getRound,
+  getRoundMatchSetup,
   getRounds,
   openCallupReplacementVacancy,
   saveRoundPrelist,
@@ -135,6 +138,28 @@ describe("rounds actions via API gateway", () => {
     expect(getRoundMock).toHaveBeenCalledWith(leagueId, roundId);
   });
 
+  it("routes the lean match setup via API", async () => {
+    const getRoundMatchSetupMock = vi.fn().mockResolvedValue({
+      id: roundId,
+      round_players: [],
+      teams: [],
+      matches: [],
+      league: { players_per_team: 6 },
+    });
+    mocks.roundApi.mockResolvedValue({ getRoundMatchSetup: getRoundMatchSetupMock });
+
+    await expect(getRoundMatchSetup(roundId)).resolves.toMatchObject({ id: roundId, matches: [] });
+    expect(getRoundMatchSetupMock).toHaveBeenCalledWith(leagueId, roundId);
+  });
+
+  it("does not fall back after enabled round detail readers fail", async () => {
+    mocks.roundApi.mockResolvedValue({ getRound: vi.fn().mockRejectedValue(new Error("detail offline")) });
+    await expect(getRound(roundId)).rejects.toThrow("detail offline");
+
+    mocks.roundApi.mockResolvedValue({ getRoundMatchSetup: vi.fn().mockRejectedValue(new Error("setup offline")) });
+    await expect(getRoundMatchSetup(roundId)).rejects.toThrow("setup offline");
+  });
+
   it("routes createRoundWithTeams via API when available", async () => {
     const createRoundWithTeamsMock = vi.fn().mockResolvedValue({ roundId });
     mocks.roundApi.mockResolvedValue({
@@ -197,9 +222,15 @@ describe("rounds actions via API gateway", () => {
   });
 
   it("routes saveRoundPrelist via API when available", async () => {
-    const saveRoundPrelistMock = vi.fn().mockResolvedValue({ roundId });
+    const saveRoundPrelistMock = vi.fn().mockResolvedValue({
+      roundId,
+      effectiveDate: "2026-10-30",
+      effectiveStartTime: "08:00",
+      effectiveRoundType: "official",
+      created: true,
+    });
     mocks.roundApi.mockResolvedValue({
-      getActiveLeague: vi.fn().mockResolvedValue({ id: leagueId }),
+      getActiveLeague: vi.fn().mockResolvedValue({ id: leagueId, feature_tier: "complete" }),
       saveRoundPrelist: saveRoundPrelistMock,
     });
 
@@ -211,5 +242,25 @@ describe("rounds actions via API gateway", () => {
     });
     expect(result).toEqual({ success: true, roundId });
     expect(saveRoundPrelistMock).toHaveBeenCalled();
+    expect(mocks.scheduleReminders).toHaveBeenCalledWith({
+      roundId,
+      date: "2026-10-30",
+      startTime: "08:00",
+      includeOpening: true,
+    });
+  });
+
+  it("does not execute the legacy prelist writer after an enabled API failure", async () => {
+    mocks.roundApi.mockResolvedValue({
+      getActiveLeague: vi.fn().mockResolvedValue({ id: leagueId, feature_tier: "complete" }),
+      saveRoundPrelist: vi.fn().mockRejectedValue(new Error("prelist writer offline")),
+    });
+
+    await expect(saveRoundPrelist({
+      date: "2026-10-30",
+      startTime: "08:00",
+      roundType: "official",
+      playerIds: [],
+    })).resolves.toEqual({ success: false, error: "prelist writer offline" });
   });
 });

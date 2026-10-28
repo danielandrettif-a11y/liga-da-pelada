@@ -121,13 +121,9 @@ export async function getRounds() {
 export async function getRound(id: string) {
   const league = await getSelectedLeague();
   if (!league) return null;
-  try {
-    const api = await roundApiFor();
-    if (api) {
-      return await api.getRound(league.id, id);
-    }
-  } catch (error: any) {
-    console.error("Erro ao buscar rodada via API:", error);
+  const api = await roundApiFor();
+  if (api) {
+    return api.getRound(league.id, id);
   }
   const client = await createServerClient();
   const { data, error } = await client
@@ -183,13 +179,9 @@ export async function getRoundMatchSetup(id: string) {
   const league = await getSelectedLeague();
   if (!league) return null;
 
-  try {
-    const api = await roundApiFor();
-    if (api) {
-      return await api.getRoundMatchSetup(league.id, id);
-    }
-  } catch (error: any) {
-    console.error("Erro ao buscar match setup via API:", error);
+  const api = await roundApiFor();
+  if (api) {
+    return api.getRoundMatchSetup(league.id, id);
   }
 
   const client = await createServerClient();
@@ -805,20 +797,28 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem salvar uma pre-lista." };
     const league = await getActiveLeague();
-    try {
-      const api = await roundApiFor(client);
-      if (api) {
-        const res = await api.saveRoundPrelist(league.id, input);
-        revalidatePath("/admin/rodada");
-        revalidatePath("/admin/prelistas");
-        revalidatePath("/rodadas");
-        revalidatePath("/convocacao");
-        revalidatePath("/cartola");
-        revalidatePath("/", "layout");
-        return { success: true, roundId: res.roundId };
+    const api = await roundApiFor(client);
+    if (api) {
+      const res = await api.saveRoundPrelist(league.id, input);
+      if (res.effectiveRoundType === "official" && league.feature_tier === "complete") {
+        try {
+          await scheduleCartolaRoundReminders({
+            roundId: res.roundId,
+            date: res.effectiveDate,
+            startTime: res.effectiveStartTime,
+            includeOpening: res.created,
+          });
+        } catch (scheduleError) {
+          console.error("Pré-lista salva, mas os lembretes do Cartola não foram agendados:", scheduleError);
+        }
       }
-    } catch (apiErr: any) {
-      console.error("Erro ao salvar pré-lista via API:", apiErr);
+      revalidatePath("/admin/rodada");
+      revalidatePath("/admin/prelistas");
+      revalidatePath("/rodadas");
+      revalidatePath("/convocacao");
+      revalidatePath("/cartola");
+      revalidatePath("/", "layout");
+      return { success: true, roundId: res.roundId };
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.startTime)) {
       return { success: false, error: "Informe uma data e um horario validos." };
