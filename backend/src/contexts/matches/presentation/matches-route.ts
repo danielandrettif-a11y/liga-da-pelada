@@ -52,9 +52,9 @@ export function registerMatchRoutes(app: FastifyInstance, dependencies: {
     "/api/matches/leagues/:leagueId/:matchId",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
-      const actor = "error" in authentication ? { userId: "anonymous" } : authentication.actor;
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const match = await getMatch(request.params.matchId, request.params.leagueId, actor, dependencies.repository);
+        const match = await getMatch(request.params.matchId, request.params.leagueId, authentication.actor, dependencies.repository);
         if (!match) return reply.code(404).send({ code: "MATCH_NOT_FOUND", message: "Partida não encontrada." });
         return reply.code(200).send(match);
       } catch (error) {
@@ -68,14 +68,14 @@ export function registerMatchRoutes(app: FastifyInstance, dependencies: {
     "/api/matches/leagues/:leagueId/live",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
-      const actor = "error" in authentication ? { userId: "anonymous" } : authentication.actor;
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
         const matchId = await findLiveMatchForTeams(
           request.query.roundId,
           request.query.teamAId,
           request.query.teamBId,
           request.params.leagueId,
-          actor,
+          authentication.actor,
           dependencies.repository,
         );
         return reply.code(200).send({ matchId });

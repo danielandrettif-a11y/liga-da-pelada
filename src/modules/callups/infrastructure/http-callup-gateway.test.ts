@@ -6,6 +6,7 @@ const token = "token-123";
 const leagueId = "00000000-0000-4000-8000-000000000001";
 const callupId = "00000000-0000-4000-8000-000000000002";
 const playerId = "00000000-0000-4000-8000-000000000003";
+const roundId = "00000000-0000-4000-8000-000000000004";
 
 describe("httpCallupGateway", () => {
   it("lists active callups via HTTP GET", async () => {
@@ -31,7 +32,7 @@ describe("httpCallupGateway", () => {
   it("opens a callup via HTTP POST", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ callupId }),
+      json: async () => ({ callupId, roundId }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -43,7 +44,7 @@ describe("httpCallupGateway", () => {
       teamsPerRound: 4,
     });
 
-    expect(result).toEqual({ callupId });
+    expect(result).toEqual({ callupId, roundId });
     expect(fetchMock).toHaveBeenCalledWith(
       `${backendUrl}/api/callups/leagues/${leagueId}`,
       expect.objectContaining({

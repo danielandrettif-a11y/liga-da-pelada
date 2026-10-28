@@ -58,11 +58,11 @@ export function registerCallupRoutes(app: FastifyInstance, dependencies: {
     { schema: { params: leagueParams } },
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
-      const actor = "error" in authentication ? { userId: "anonymous" } : authentication.actor;
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
         const callups = await listActiveCallups(
           request.params.leagueId,
-          actor,
+          authentication.actor,
           dependencies.repository,
           request.query.inviteCallupId,
         );

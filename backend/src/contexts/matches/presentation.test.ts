@@ -52,6 +52,18 @@ function buildApp(repo: MatchRepository) {
 }
 
 describe("matches presentation routes", () => {
+  it("rejects match reads without a session", async () => {
+    const repository = createMockRepository();
+    const app = buildApp(repository);
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/matches/leagues/${leagueId}/${matchId}`,
+    });
+    await app.close();
+    expect(res.statusCode).toBe(401);
+    expect(repository.getMatch).not.toHaveBeenCalled();
+  });
+
   it("GET /api/matches/leagues/:leagueId/:matchId returns match", async () => {
     const app = buildApp(createMockRepository());
     const res = await app.inject({

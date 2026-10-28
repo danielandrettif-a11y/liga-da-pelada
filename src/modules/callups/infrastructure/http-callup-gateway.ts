@@ -48,7 +48,7 @@ export type CallupHttpGateway = {
       playersPerTeam?: number | null;
       teamsPerRound?: number | null;
     },
-  ): Promise<{ callupId: string }>;
+  ): Promise<{ callupId: string; roundId: string }>;
   updateCallup(
     leagueId: string,
     callupId: string,

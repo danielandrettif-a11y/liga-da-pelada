@@ -32,6 +32,14 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-28 — auditoria dos commits de convocações, rodadas e partidas
+
+- A branch foi atualizada até `c4fa53d` e os 5 commits posteriores a `72b4030` foram revisados. As 80 operações novas possuem a estrutura esperada de contexto, rota, gateway e flag, mas o lote ainda não tem paridade funcional suficiente para homologação.
+- Foram corrigidos o contrato público de `openCallup`, a criação atômica da pré-lista, a preservação dos lembretes do Cartola, a exigência de sessão nas leituras protegidas pela RLS atual, a composição obrigatória do repositório de partidas e a execução reproduzível do typecheck em checkout limpo.
+- Fallbacks que duplicavam `create_live_match`, `set_callup_format` e `get_callup_entry_joiners` foram removidos. Essas RPCs são parte do esquema versionado e continuam como autoridade; além de perder regras, tentar um segundo SQL depois do primeiro erro manteria a transação PostgreSQL abortada.
+- Pendências de paridade impedem considerar o lote 3 concluído: `shuffleRoundTeams` ainda é vazio; `finishRound` não preserva o fechamento financeiro, estatísticas e Cartola; `finishMatch` não preserva tempos de saída, recálculo, próxima partida e notificações; outras mutações precisam da mesma comparação antes da ativação das flags.
+- Métricas separadas: **150/267 (56,2%)** possuem ponte estrutural catalogada; **70/267 (26,2%)** passaram pela revisão no padrão das fatias anteriores; **0/267** estão verificadas de ponta a ponta. Restam **117 operações** sem ponte e a revisão de paridade das 80 operações do lote operacional.
+
 ### 2026-10-27 — estatísticas e agrupamento do elenco
 
 - `getPlayersWithStats` e `getRosterGroups` passaram ao backend modular. A regra de domínio combina o catálogo da pelada com `player_season_stats`, usa `ranking_points` nas rodadas oficiais, preserva `points` como `legacyPoints`, ordena pela pontuação e separa jogadores, convidados, acompanhantes e torcedores.

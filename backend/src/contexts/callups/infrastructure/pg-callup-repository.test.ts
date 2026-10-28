@@ -114,6 +114,7 @@ describe("pgCallupRepository", () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
       if (sql.includes("create_league_callup")) return { rows: [{ create_league_callup: callupId }] };
+      if (sql.includes("save_round_prelist")) return { rows: [{ save_round_prelist: roundId }] };
       return { rows: [] };
     });
 
@@ -134,6 +135,7 @@ describe("pgCallupRepository", () => {
     );
 
     expect(result.callupId).toBe(callupId);
+    expect(result.roundId).toBe(roundId);
   });
 
   it("joins a callup and repairs player if needed", async () => {

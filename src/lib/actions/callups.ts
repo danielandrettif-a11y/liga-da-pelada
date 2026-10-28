@@ -274,8 +274,20 @@ export async function openCallup(formData: FormData) {
         playersPerTeam: request.requestedPlayersPerTeam ? Number(request.requestedPlayersPerTeam) : null,
         teamsPerRound: request.requestedTeamsPerRound ? Number(request.requestedTeamsPerRound) : null,
       });
+      if (request.roundType !== "friendly" && league.feature_tier === "complete") {
+        try {
+          await scheduleCartolaRoundReminders({
+            roundId: res.roundId,
+            date: request.date,
+            startTime: request.startTime || "08:00",
+            includeOpening: true,
+          });
+        } catch (scheduleError) {
+          console.error("Pré-lista criada, mas os lembretes do Cartola não foram agendados:", scheduleError);
+        }
+      }
       refreshCallups();
-      return { success: true as const, id: res.callupId, callupId: res.callupId, roundId: undefined };
+      return { success: true as const, id: res.callupId, roundId: res.roundId };
     }
   } catch (error: any) {
     console.error("Erro ao abrir convocação via API:", error);

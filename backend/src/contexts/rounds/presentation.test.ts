@@ -113,6 +113,7 @@ describe("rounds presentation", () => {
     const response = await app.inject({
       method: "GET",
       url: `/api/rounds/seasons/${seasonId}`,
+      headers: { authorization: "Bearer valid-token" },
     });
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.payload);
@@ -126,11 +127,22 @@ describe("rounds presentation", () => {
     const response = await app.inject({
       method: "GET",
       url: `/api/rounds/leagues/${leagueId}/${roundId}`,
+      headers: { authorization: "Bearer valid-token" },
     });
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.payload);
     expect(body.id).toBe(roundId);
     expect(roundRepository.getRound).toHaveBeenCalled();
+  });
+
+  it("rejects round reads without a session", async () => {
+    const { app, roundRepository } = fixture(true);
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/rounds/leagues/${leagueId}/${roundId}`,
+    });
+    expect(response.statusCode).toBe(401);
+    expect(roundRepository.getRound).not.toHaveBeenCalled();
   });
 
   it("creates a round with teams", async () => {

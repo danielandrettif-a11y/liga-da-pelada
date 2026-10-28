@@ -25,8 +25,18 @@ describe("roundApiFor", () => {
   it("requires a server URL when enabled", async () => {
     process.env.ROUNDS_API_ENABLED = "true";
     delete process.env.ROUNDS_BACKEND_URL;
-    const getSession = vi.fn();
+    const getSession = vi.fn().mockResolvedValue({
+      data: { session: { access_token: "verified-token" } },
+      error: null,
+    });
     await expect(roundApiFor({ auth: { getSession } })).rejects.toThrow("não configurada");
+  });
+
+  it("keeps the legacy path when there is no authenticated session", async () => {
+    process.env.ROUNDS_API_ENABLED = "true";
+    process.env.ROUNDS_BACKEND_URL = "http://backend:3001";
+    const getSession = vi.fn().mockResolvedValue({ data: { session: null }, error: null });
+    await expect(roundApiFor({ auth: { getSession } })).resolves.toBeNull();
   });
 
   it("creates the HTTP adapter with a verified server session", async () => {

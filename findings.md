@@ -1,5 +1,12 @@
 # Descobertas e Decisões Técnicas: Pontuação BQ v5 e Sorteio por Velocidade
 
+## 0. Auditoria de Paridade do Lote Operacional (28/10/2026)
+
+- **Descoberta:** a existência de domínio, caso de uso, repositório, rota, gateway e teste mockado não comprova paridade. Os commits sincronizados marcaram 80 operações de convocações, rodadas e partidas como `frontend-migrated`, embora algumas implementações tenham omitido efeitos do fluxo legado ou estejam vazias.
+- **Evidências:** `shuffleRoundTeams` não altera estado; `finishRound` apenas muda o status da rodada e perde fechamento financeiro, consolidação de estatísticas e Cartola; `finishMatch` perde tempos de saída, recálculo, sugestão da próxima partida e notificações. Os testes unitários existentes validavam chamadas ao mock, não os efeitos no banco restaurado.
+- **Decisão arquitetural:** separar progresso estrutural (150/267) de progresso aceito na revisão (70/267) e de homologação (`verified`, 0/267). As flags do lote operacional permanecem desligadas até cada operação ser comparada com o fluxo legado e exercitada no Supabase local restaurado.
+- **Correção aplicada:** leituras passaram a exigir sessão coerente com a RLS da migration 255; sessões sem token mantêm o fallback legado; a abertura de convocação cria sua pré-lista na mesma transação e preserva o contrato da Server Action; fallbacks SQL parciais foram retirados para manter as RPCs versionadas como autoridade.
+
 ## 1. Unificação de Pontuação e Integridade de Centésimos
 - **Descoberta:** O sistema Ranked e o Fantasy possuíam discrepâncias históricas na base (ex: ausência de pontos de empate no Cartola, pesos de gols sofridos e bônus de atleta defensivo acoplado na base do Cartola).
 - **Decisão Arquitetural:** 

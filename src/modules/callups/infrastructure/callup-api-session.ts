@@ -13,12 +13,11 @@ type SessionClient = {
 
 export async function callupApiFor(client?: SessionClient | null): Promise<CallupHttpGateway | null> {
   if (process.env.CALLUPS_API_ENABLED !== "true") return null;
+  if (!client) return null;
+  const { data: { session } } = await client.auth.getSession();
+  const accessToken = session?.access_token;
+  if (!accessToken) return null;
   const backendUrl = process.env.CALLUPS_BACKEND_URL;
   if (!backendUrl) throw new CallupApiError("API de convocações não configurada.");
-  let accessToken: string | undefined;
-  if (client) {
-    const { data: { session } } = await client.auth.getSession();
-    accessToken = session?.access_token;
-  }
   return httpCallupGateway(backendUrl, accessToken);
 }

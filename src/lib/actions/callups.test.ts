@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   activeLeague: vi.fn(),
   revalidatePath: vi.fn(),
   callupApi: vi.fn(),
+  scheduleReminders: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -18,6 +19,7 @@ vi.mock("../auth", () => ({
 vi.mock("../league-context", () => ({ getSelectedLeague: mocks.selectedLeague }));
 vi.mock("./rounds", () => ({ getActiveLeague: mocks.activeLeague }));
 vi.mock("@/modules/callups/infrastructure/callup-api-session", () => ({ callupApiFor: mocks.callupApi }));
+vi.mock("../cartola-reminder-scheduler", () => ({ scheduleCartolaRoundReminders: mocks.scheduleReminders }));
 
 import {
   closeCallup,
@@ -36,6 +38,7 @@ import {
 const leagueId = "00000000-0000-4000-8000-000000000001";
 const callupId = "00000000-0000-4000-8000-000000000002";
 const playerId = "00000000-0000-4000-8000-000000000003";
+const roundId = "00000000-0000-4000-8000-000000000004";
 
 describe("callups actions via API gateway", () => {
   beforeEach(() => {
@@ -96,7 +99,7 @@ describe("callups actions via API gateway", () => {
   });
 
   it("routes openCallup via API when available", async () => {
-    const openCallupMock = vi.fn().mockResolvedValue({ callupId });
+    const openCallupMock = vi.fn().mockResolvedValue({ callupId, roundId });
     mocks.callupApi.mockResolvedValue({ openCallup: openCallupMock });
 
     const formData = new FormData();
@@ -106,7 +109,7 @@ describe("callups actions via API gateway", () => {
     formData.set("teams_per_round", "4");
 
     const result = await openCallup(formData);
-    expect(result).toEqual({ success: true, callupId });
+    expect(result).toEqual({ success: true, id: callupId, roundId });
     expect(openCallupMock).toHaveBeenCalledWith(leagueId, expect.objectContaining({
       date: "2026-10-30",
       startTime: "08:00",
@@ -114,6 +117,12 @@ describe("callups actions via API gateway", () => {
       teamsPerRound: 4,
     }));
     expect(mocks.revalidatePath).toHaveBeenCalled();
+    expect(mocks.scheduleReminders).toHaveBeenCalledWith({
+      roundId,
+      date: "2026-10-30",
+      startTime: "08:00",
+      includeOpening: true,
+    });
   });
 
   it("routes joinActiveCallup via API when available", async () => {

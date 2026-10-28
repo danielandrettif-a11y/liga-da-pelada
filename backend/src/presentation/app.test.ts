@@ -30,6 +30,16 @@ function fixture(enabled: boolean, actor: { userId: string } | null = { userId: 
 }
 
 describe("goal HTTP route", () => {
+  it("fails fast when matches are enabled without their repository", () => {
+    expect(() => createApp({
+      goalsEnabled: false,
+      matchesEnabled: true,
+      verifier: { verifyAccessToken: vi.fn() },
+      repository: {} as GoalRepository,
+      logger: false,
+    })).toThrow("MatchRepository é obrigatório");
+  });
+
   it("is absent by default", async () => {
     const { app } = fixture(false);
     const result = await app.inject({ method: "POST", url: `/api/matches/${matchId}/goals`, payload: goal });

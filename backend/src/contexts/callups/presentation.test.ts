@@ -9,6 +9,7 @@ afterEach(async () => Promise.all(apps.splice(0).map((app) => app.close())));
 const leagueId = "00000000-0000-4000-8000-000000000001";
 const callupId = "00000000-0000-4000-8000-000000000002";
 const playerId = "00000000-0000-4000-8000-000000000003";
+const roundId = "00000000-0000-4000-8000-000000000004";
 
 function fixture(enabled: boolean) {
   const callupRepository: CallupRepository = {
@@ -43,7 +44,7 @@ function fixture(enabled: boolean) {
         playersCount: 12,
       },
     ]),
-    openCallup: vi.fn().mockResolvedValue({ callupId }),
+    openCallup: vi.fn().mockResolvedValue({ callupId, roundId }),
     updateCallup: vi.fn().mockResolvedValue(undefined),
     closeCallup: vi.fn().mockResolvedValue(undefined),
     setVisibility: vi.fn().mockResolvedValue(undefined),
@@ -85,12 +86,23 @@ describe("callups presentation", () => {
     const response = await app.inject({
       method: "GET",
       url: `/api/callups/leagues/${leagueId}/active`,
+      headers: { authorization: "Bearer valid-token" },
     });
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.payload);
     expect(body).toHaveLength(1);
     expect(body[0].id).toBe(callupId);
     expect(callupRepository.listActive).toHaveBeenCalled();
+  });
+
+  it("rejects active callup reads without a session", async () => {
+    const { app, callupRepository } = fixture(true);
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/callups/leagues/${leagueId}/active`,
+    });
+    expect(response.statusCode).toBe(401);
+    expect(callupRepository.listActive).not.toHaveBeenCalled();
   });
 
   it("creates a callup with valid bearer token", async () => {

@@ -22,7 +22,26 @@ describe("matchApiFor", () => {
     process.env.MATCHES_API_ENABLED = "true";
     delete process.env.MATCHES_BACKEND_URL;
     delete process.env.MATCH_GOAL_BACKEND_URL;
-    await expect(matchApiFor()).rejects.toThrow(MatchApiError);
+    const client = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: { session: { access_token: "my-token" } },
+          error: null,
+        }),
+      },
+    };
+    await expect(matchApiFor(client)).rejects.toThrow(MatchApiError);
+  });
+
+  it("keeps the legacy path when there is no authenticated session", async () => {
+    process.env.MATCHES_API_ENABLED = "true";
+    process.env.MATCHES_BACKEND_URL = "https://backend.example.com";
+    const client = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      },
+    };
+    await expect(matchApiFor(client)).resolves.toBeNull();
   });
 
   it("returns MatchHttpGateway instance with user token", async () => {

@@ -2,7 +2,15 @@
 
 ---
 
-## Reorganização de Arquitetura: Contexto `roster` (Elenco) 100% Concluído (35/35)
+## Reorganização de Arquitetura: auditoria após sincronização de 28/10/2026
+
+- A branch contém pontes para 150/267 operações (56,2%), mas o lote operacional novo ainda não foi homologado como paridade funcional.
+- As 70 operações de identidade, peladas e elenco (26,2%) permanecem como base aceita na revisão de código; nenhuma operação do catálogo está em `verified` de ponta a ponta.
+- Convocações, rodadas e partidas voltaram para a fila de revisão de paridade antes da ativação local das flags. Foram encontrados efeitos omitidos em encerramento de rodada/partida e uma operação de sorteio vazia.
+- Correções desta auditoria: sessão obrigatória segundo a RLS atual, fallback legado sem token, contrato e pré-lista atômica na abertura da convocação, RPCs canônicas sem fallback SQL parcial, composição fail-fast de partidas e typecheck reproduzível.
+- Restam 117 operações sem ponte estrutural e 80 operações do lote operacional para revisão/homologação de paridade.
+
+## Reorganização de Arquitetura: Contexto `roster` (Elenco) com ponte completa (35/35)
 
 - [x] **Operações de Perfil e Gestão (`savePlayer`, `deletePlayer`):**
   - Implementado domínio em `backend/src/contexts/roster/domain/player-profile.ts`.
@@ -54,7 +62,7 @@
   - Integração no sorteio de rodadas `src/lib/round-draw.ts` e inclusão do botão `🏎️ Por Velocidade` em `src/components/RoundCreator.tsx`.
   - Seletor de velocidade 1-3★ em `src/components/PlayerForm.tsx` e tela de edição admin.
 
-- [x] **Migração Arquitetural - Lote 3 (Jogo Operacional - 100% Concluído):**
+- [ ] **Migração Arquitetural - Lote 3 (ponte estrutural criada; paridade em revisão):**
   - **Contexto `callups` (21/21 operações):**
     - Domain, Application, Infrastructure (Postgres), Presentation (Rotas Express) e Handlers no backend.
     - Gateway HTTP, Sessão de API e Server Actions bridge com testes unitários completos.
@@ -64,7 +72,7 @@
     - Domain, Application (`manage-matches.ts`), Infrastructure (`pg-match-repository.ts`), Presentation (`matches-route.ts`).
     - Gateway HTTP (`http-match-gateway.ts`), Sessão de API (`match-api-session.ts`).
     - Bridging de 20 operações em `src/lib/actions/matches.ts` e 1 em `src/lib/actions/goalkeeper.ts`.
-  - **Validação Integrada:**
+  - **Validação registrada nos commits sincronizados (a ser repetida após as correções de paridade):**
     - `npm --prefix backend test`: 95 arquivos de teste, 302 testes passando com 100% de sucesso.
     - `npm --prefix backend run typecheck`: 0 erros.
     - `npx vitest run`: todos os testes de matches e gateway passando.

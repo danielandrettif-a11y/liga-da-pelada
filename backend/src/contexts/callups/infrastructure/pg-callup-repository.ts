@@ -227,22 +227,16 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
           [callupIds],
         );
 
-        // Joiners RPC
-        let joinerNameByEntryId = new Map<string, string | null>();
-        try {
-          const joinersResult = await client.query<{
-            callup_entry_id: string;
-            joined_by_name: string | null;
-          }>(
-            "SELECT callup_entry_id, joined_by_name FROM public.get_callup_entry_joiners($1::uuid[])",
-            [callupIds],
-          );
-          joinerNameByEntryId = new Map(
-            joinersResult.rows.map((j) => [j.callup_entry_id, j.joined_by_name]),
-          );
-        } catch {
-          // Mantém joiners vazios caso a RPC não esteja disponível
-        }
+        const joinersResult = await client.query<{
+          callup_entry_id: string;
+          joined_by_name: string | null;
+        }>(
+          "SELECT callup_entry_id, joined_by_name FROM public.get_callup_entry_joiners($1::uuid[])",
+          [callupIds],
+        );
+        const joinerNameByEntryId = new Map(
+          joinersResult.rows.map((j) => [j.callup_entry_id, j.joined_by_name]),
+        );
 
         const entriesByCallupId = new Map<string, CallupEntry[]>();
         for (const row of entriesResult.rows) {
@@ -364,7 +358,7 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
         capacity: number;
       },
       actor: Actor,
-    ): Promise<{ callupId: string }> {
+    ): Promise<{ callupId: string; roundId: string }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
 
@@ -412,7 +406,25 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
 
         const callupId = result.rows[0]?.create_league_callup;
         if (!callupId) throw new CallupPersistenceError("Não foi possível criar a convocação.", 500);
-        return { callupId: String(callupId) };
+        const prelist = await client.query<{ save_round_prelist: string }>(
+          `SELECT public.save_round_prelist(
+             $1::uuid, NULL::uuid, $2::date, $3::time, $4::text,
+             ARRAY[]::uuid[], $5::uuid, $6::uuid, $7::text, $8::text
+           )`,
+          [
+            leagueId,
+            input.date,
+            input.startTime,
+            input.roundType,
+            callupId,
+            input.stadiumId,
+            stadiumName,
+            stadiumMapUrl,
+          ],
+        );
+        const roundId = prelist.rows[0]?.save_round_prelist;
+        if (!roundId) throw new CallupPersistenceError("Não foi possível preparar a pré-lista.", 500);
+        return { callupId: String(callupId), roundId: String(roundId) };
       });
     },
 

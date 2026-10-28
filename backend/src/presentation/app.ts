@@ -158,6 +158,9 @@ export function createApp(dependencies: {
   if (dependencies.roundsEnabled && !dependencies.roundRepository) {
     throw new Error("RoundRepository é obrigatório quando ENABLE_ROUNDS_API=true.");
   }
+  if (dependencies.matchesEnabled && !dependencies.matchRepository) {
+    throw new Error("MatchRepository é obrigatório quando ENABLE_MATCHES_API=true.");
+  }
   const app = Fastify({ logger: dependencies.logger ?? true });
   void app.register(multipart);
   app.setErrorHandler((error, request, reply) => {

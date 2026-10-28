@@ -37,9 +37,9 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
     "/api/rounds/seasons/:seasonId",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
-      const actor = "error" in authentication ? { userId: "anonymous" } : authentication.actor;
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const rounds = await getRounds(request.params.seasonId, actor, dependencies.repository);
+        const rounds = await getRounds(request.params.seasonId, authentication.actor, dependencies.repository);
         return reply.code(200).send(rounds);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -52,9 +52,9 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
     "/api/rounds/leagues/:leagueId/:roundId",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
-      const actor = "error" in authentication ? { userId: "anonymous" } : authentication.actor;
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const round = await getRound(request.params.roundId, request.params.leagueId, actor, dependencies.repository);
+        const round = await getRound(request.params.roundId, request.params.leagueId, authentication.actor, dependencies.repository);
         return reply.code(200).send(round);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -67,9 +67,9 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
     "/api/rounds/leagues/:leagueId/:roundId/match-setup",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
-      const actor = "error" in authentication ? { userId: "anonymous" } : authentication.actor;
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const setup = await getRoundMatchSetup(request.params.roundId, request.params.leagueId, actor, dependencies.repository);
+        const setup = await getRoundMatchSetup(request.params.roundId, request.params.leagueId, authentication.actor, dependencies.repository);
         return reply.code(200).send(setup);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -82,9 +82,9 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
     "/api/rounds/leagues/:leagueId/active-league",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
-      const actor = "error" in authentication ? { userId: "anonymous" } : authentication.actor;
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const league = await getActiveLeague(request.params.leagueId, actor, dependencies.repository);
+        const league = await getActiveLeague(request.params.leagueId, authentication.actor, dependencies.repository);
         return reply.code(200).send(league);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -248,9 +248,9 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
     "/api/rounds/leagues/:leagueId/next-team-preset-offset",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
-      const actor = "error" in authentication ? { userId: "anonymous" } : authentication.actor;
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const offset = await dependencies.repository.getNextTeamPresetOffset(request.params.leagueId, actor);
+        const offset = await dependencies.repository.getNextTeamPresetOffset(request.params.leagueId, authentication.actor);
         return reply.code(200).send(offset);
       } catch (error) {
         return sendFailure(error, request, reply);

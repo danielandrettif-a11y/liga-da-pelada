@@ -151,42 +151,33 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
     async createMatch(input: CreateMatchInput, leagueId: string, actor: Actor): Promise<{ matchId: string; idempotent: boolean; receipt?: any }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        try {
-          const res = await client.query<{ receipt: any }>(
-            `SELECT public.create_live_match(
-              $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid,
-              $6::int, $7::int, $8::jsonb, $9::text, $10::timestamptz
-            ) AS receipt`,
-            [
-              input.round_id,
-              input.team_a_id,
-              input.team_b_id,
-              input.goalkeeper_a_id,
-              input.goalkeeper_b_id,
-              null,
-              null,
-              JSON.stringify(input.replacements || []),
-              input.idempotency_key || null,
-              input.client_started_at || null,
-            ],
-          );
-          const receipt = res.rows[0]?.receipt;
-          return {
-            matchId: String(receipt?.match_id || receipt?.id || ""),
-            idempotent: Boolean(receipt?.idempotent),
-            receipt,
-          };
-        } catch {
-          // Fallback if create_live_match is not deployed yet in test environment
-          const insertRes = await client.query<{ id: string }>(
-            `INSERT INTO public.matches (round_id, team_a_id, team_b_id, status, started_at, timer_started_at)
-             VALUES ($1::uuid, $2::uuid, $3::uuid, 'live', NOW(), NOW())
-             RETURNING id`,
-            [input.round_id, input.team_a_id, input.team_b_id],
-          );
-          const id = insertRes.rows[0]?.id;
-          return { matchId: String(id || ""), idempotent: false };
+        const res = await client.query<{ receipt: any }>(
+          `SELECT public.create_live_match(
+            $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid,
+            $6::int, $7::int, $8::jsonb, $9::text, $10::timestamptz
+          ) AS receipt`,
+          [
+            input.round_id,
+            input.team_a_id,
+            input.team_b_id,
+            input.goalkeeper_a_id,
+            input.goalkeeper_b_id,
+            null,
+            null,
+            JSON.stringify(input.replacements || []),
+            input.idempotency_key || null,
+            input.client_started_at || null,
+          ],
+        );
+        const receipt = res.rows[0]?.receipt;
+        if (!receipt?.match_id && !receipt?.id) {
+          throw new MatchPersistenceError("A abertura da partida não retornou um recibo válido.", 500);
         }
+        return {
+          matchId: String(receipt.match_id || receipt.id),
+          idempotent: Boolean(receipt.idempotent),
+          receipt,
+        };
       });
     },
 

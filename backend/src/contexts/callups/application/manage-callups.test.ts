@@ -15,13 +15,14 @@ import {
 
 const leagueId = "00000000-0000-4000-8000-000000000010";
 const callupId = "00000000-0000-4000-8000-000000000001";
+const roundId = "00000000-0000-4000-8000-000000000002";
 const actor = { userId: "user-1" };
 
 function repository(): CallupRepository {
   return {
     listActive: vi.fn().mockResolvedValue([]),
     listAgenda: vi.fn().mockResolvedValue([]),
-    openCallup: vi.fn().mockResolvedValue({ callupId }),
+    openCallup: vi.fn().mockResolvedValue({ callupId, roundId }),
     updateCallup: vi.fn().mockResolvedValue(undefined),
     closeCallup: vi.fn().mockResolvedValue(undefined),
     setVisibility: vi.fn().mockResolvedValue(undefined),
@@ -49,7 +50,7 @@ describe("callups application services", () => {
   it("coordinates open and update lifecycle commands", async () => {
     const repo = repository();
     await expect(openCallup(leagueId, { date: "2026-11-01" }, actor, repo))
-      .resolves.toEqual({ callupId });
+      .resolves.toEqual({ callupId, roundId });
     await expect(updateCallup(leagueId, callupId, { date: "2026-11-02" }, actor, repo))
       .resolves.toBeUndefined();
     await expect(closeCallup(leagueId, callupId, actor, repo)).resolves.toBeUndefined();

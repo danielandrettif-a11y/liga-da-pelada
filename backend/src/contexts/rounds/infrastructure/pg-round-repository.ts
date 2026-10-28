@@ -473,31 +473,15 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
     async setCallupFormat(callupId: string, leagueId: string, format: { playersPerTeam: number; teamsPerRound: number }, actor: Actor): Promise<{ fantasySizePreserved: boolean; fantasyLineupSize: number }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        try {
-          const res = await client.query<{ fantasy_lineup_size: number; fantasy_size_preserved: boolean }>(
-            `SELECT fantasy_lineup_size, fantasy_size_preserved FROM public.set_callup_format($1::uuid, $2::int, $3::int)`,
-            [callupId, format.playersPerTeam, format.teamsPerRound],
-          );
-          const row = res.rows[0];
-          return {
-            fantasySizePreserved: Boolean(row?.fantasy_size_preserved),
-            fantasyLineupSize: Number(row?.fantasy_lineup_size || format.playersPerTeam),
-          };
-        } catch {
-          await client.query(
-            `UPDATE public.callups
-             SET players_per_team = $3::int,
-                 teams_per_round = $4::int,
-                 capacity = $3::int * $4::int,
-                 updated_at = NOW()
-             WHERE id = $1::uuid AND league_id = $2::uuid`,
-            [callupId, leagueId, format.playersPerTeam, format.teamsPerRound],
-          );
-          return {
-            fantasySizePreserved: true,
-            fantasyLineupSize: format.playersPerTeam,
-          };
-        }
+        const res = await client.query<{ fantasy_lineup_size: number; fantasy_size_preserved: boolean }>(
+          `SELECT fantasy_lineup_size, fantasy_size_preserved FROM public.set_callup_format($1::uuid, $2::int, $3::int)`,
+          [callupId, format.playersPerTeam, format.teamsPerRound],
+        );
+        const row = res.rows[0];
+        return {
+          fantasySizePreserved: Boolean(row?.fantasy_size_preserved),
+          fantasyLineupSize: Number(row?.fantasy_lineup_size || format.playersPerTeam),
+        };
       });
     },
 

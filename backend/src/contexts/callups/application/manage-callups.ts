@@ -26,7 +26,7 @@ export type CallupGuestListResult = {
 export interface CallupRepository {
   listActive(leagueId: string, actor: Actor, inviteCallupId?: string): Promise<Callup[]>;
   listAgenda(leagueId: string, actor: Actor): Promise<AgendaCallup[]>;
-  openCallup(leagueId: string, input: ReturnType<typeof validateOpenCallupInput>, actor: Actor): Promise<{ callupId: string }>;
+  openCallup(leagueId: string, input: ReturnType<typeof validateOpenCallupInput>, actor: Actor): Promise<{ callupId: string; roundId: string }>;
   updateCallup(leagueId: string, callupId: string, input: ReturnType<typeof validateUpdateCallupInput>, actor: Actor): Promise<void>;
   closeCallup(leagueId: string, callupId: string, actor: Actor): Promise<void>;
   setVisibility(leagueId: string, callupId: string, isPublic: boolean, actor: Actor): Promise<void>;
@@ -65,7 +65,7 @@ export function openCallup(
   input: OpenCallupInput,
   actor: Actor,
   repository: CallupRepository,
-): Promise<{ callupId: string }> {
+): Promise<{ callupId: string; roundId: string }> {
   const cleanLeague = parseCallupUuid(leagueId, "Pelada");
   const validated = validateOpenCallupInput(input);
   return repository.openCallup(cleanLeague, validated, actor);
