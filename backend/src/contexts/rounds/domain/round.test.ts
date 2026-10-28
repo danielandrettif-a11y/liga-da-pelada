@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  drawRoundPlayerOrder,
   InvalidRoundError,
   parseRoundUuid,
   validateRoundDate,
   validateRoundTime,
   validateRoundType,
   validateTeamSizes,
+  validateUnderfilledRoundTeams,
 } from "./round.js";
 
 describe("Round domain", () => {
@@ -37,5 +39,19 @@ describe("Round domain", () => {
     expect(() => validateTeamSizes(8, 4)).toThrow("Escolha 5, 6 ou 7 jogadores por time.");
     expect(() => validateTeamSizes(6, 1)).toThrow("Escolha de 2 a 6 times.");
     expect(() => validateTeamSizes(6, 7)).toThrow("Escolha de 2 a 6 times.");
+  });
+
+  it("accepts balanced underfilled teams and rejects uneven distributions", () => {
+    expect(() => validateUnderfilledRoundTeams([5, 5, 4], 14, 6)).not.toThrow();
+    expect(() => validateUnderfilledRoundTeams([6, 4, 4], 14, 6)).toThrow("diferença entre os times");
+    expect(() => validateUnderfilledRoundTeams([5, 5], 10, 6)).toThrow("pelo menos 12 jogadores");
+  });
+
+  it("draws every player once with contiguous order", () => {
+    expect(drawRoundPlayerOrder(["a", "b", "c"], () => 0)).toEqual([
+      { playerId: "b", order: 1 },
+      { playerId: "c", order: 2 },
+      { playerId: "a", order: 3 },
+    ]);
   });
 });

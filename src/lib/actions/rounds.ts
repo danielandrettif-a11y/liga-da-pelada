@@ -1006,25 +1006,21 @@ export async function createRoundWithTeams(
     }
 
     const league = await getActiveLeague();
-    try {
-      const api = await roundApiFor(client);
-      if (api) {
-        const res = await api.createRoundWithTeams(league.id, {
-          date,
-          roundType: options.roundType || "official",
-          playersPerTeam: options.targetPlayersPerTeam || 6,
-          teams: normalizedTeams,
-          ...options,
-        });
-        revalidatePath("/rodadas");
-        revalidatePath("/admin/prelistas");
-        revalidatePath("/convocacao");
-        revalidatePath("/", "layout");
-        revalidateTag("rounds", "max");
-        return { success: true, roundId: res.roundId };
-      }
-    } catch (apiErr: any) {
-      console.error("Erro ao criar rodada com times via API:", apiErr);
+    const api = await roundApiFor(client);
+    if (api) {
+      const res = await api.createRoundWithTeams(league.id, {
+        date,
+        roundType: options.roundType || "official",
+        playersPerTeam: options.targetPlayersPerTeam || league.players_per_team || DEFAULT_PLAYERS_PER_TEAM,
+        teams: normalizedTeams,
+        ...options,
+      });
+      revalidatePath("/rodadas");
+      revalidatePath("/admin/prelistas");
+      revalidatePath("/convocacao");
+      revalidatePath("/", "layout");
+      revalidateTag("rounds", "max");
+      return { success: true, roundId: res.roundId };
     }
 
     const roundType: RoundType = options.roundType === "friendly" ? "friendly" : "official";
@@ -1331,24 +1327,37 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     if (!client) return { success: false, error: "Somente administradores podem encerrar rodadas." };
     const selectedLeague = await getSelectedLeague();
     if (!selectedLeague) return { success: false, error: "Selecione uma pelada no lobby." };
+    if (!recipient?.id && !pix) return { success: false, error: "Informe a chave PIX que recebera os pagamentos." };
+    if (!recipient?.id && pix.length > 200) return { success: false, error: "A chave PIX deve ter no maximo 200 caracteres." };
 
-    try {
-      const api = await roundApiFor(client);
-      if (api) {
-        await api.finishRound(selectedLeague.id, roundId);
-        revalidatePath(`/rodadas/${roundId}`);
-        revalidatePath("/rodadas");
-        revalidatePath("/convocacao");
-        revalidatePath("/", "layout");
-        revalidatePath("/ranking");
-        revalidatePath("/pagamentos");
-        revalidatePath("/cartola", "layout");
-        revalidateTag("rounds", "max");
-        revalidateTag("ranking", "max");
-        return { success: true, archived: false };
+    const api = await roundApiFor(client);
+    if (api) {
+      const { calculateRoundStats } = await import("./stats");
+      const statsResult = await calculateRoundStats(roundId);
+      if (!statsResult.success) {
+        throw new Error(`Não foi possível consolidar as estatísticas da rodada: ${statsResult.error || "erro desconhecido"}`);
       }
-    } catch (apiErr: any) {
-      console.error("Erro ao encerrar rodada via API:", apiErr);
+      const result = await api.finishRound(selectedLeague.id, roundId, {
+        paymentPix: pix,
+        paymentTotal: total,
+        recipientId: recipient?.id || null,
+        recipientName: recipient?.name || null,
+        expenseItemIds: options?.expenseItemIds || [],
+      });
+      if (result.shouldRefreshOverall) {
+        await refreshFluidOverallSafely(`fechamento da rodada ${roundId}`);
+      }
+      if (result.archived) revalidatePath("/lobby");
+      revalidatePath(`/rodadas/${roundId}`);
+      revalidatePath("/rodadas");
+      revalidatePath("/convocacao");
+      revalidatePath("/", "layout");
+      revalidatePath("/ranking");
+      revalidatePath("/pagamentos");
+      revalidatePath("/cartola", "layout");
+      revalidateTag("rounds", "max");
+      revalidateTag("ranking", "max");
+      return { success: true, archived: result.archived };
     }
 
     const { data: scopedRound } = await client.from("rounds").select("id")

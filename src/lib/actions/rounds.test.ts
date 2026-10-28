@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   revalidateTag: vi.fn(),
   roundApi: vi.fn(),
   scheduleReminders: vi.fn(),
+  calculateRoundStats: vi.fn(),
+  refreshFluidOverallSafely: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -24,6 +26,8 @@ vi.mock("../league-context", () => ({ getSelectedLeague: mocks.selectedLeague })
 vi.mock("./seasons", () => ({ getActiveSeason: mocks.activeSeason }));
 vi.mock("@/modules/rounds/infrastructure/round-api-session", () => ({ roundApiFor: mocks.roundApi }));
 vi.mock("../cartola-reminder-scheduler", () => ({ scheduleCartolaRoundReminders: mocks.scheduleReminders }));
+vi.mock("./stats", () => ({ calculateRoundStats: mocks.calculateRoundStats }));
+vi.mock("./overall", () => ({ refreshFluidOverallSafely: mocks.refreshFluidOverallSafely }));
 
 import {
   createRoundWithTeams,
@@ -69,6 +73,8 @@ describe("rounds actions via API gateway", () => {
     mocks.adminClient.mockResolvedValue(client);
     mocks.selectedLeague.mockResolvedValue({ id: leagueId, role: "admin", featureTier: "complete" });
     mocks.activeSeason.mockResolvedValue({ id: seasonId });
+    mocks.calculateRoundStats.mockResolvedValue({ success: true });
+    mocks.refreshFluidOverallSafely.mockResolvedValue(undefined);
   });
 
   it("routes getActiveLeague via API when available", async () => {
@@ -163,7 +169,7 @@ describe("rounds actions via API gateway", () => {
   it("routes createRoundWithTeams via API when available", async () => {
     const createRoundWithTeamsMock = vi.fn().mockResolvedValue({ roundId });
     mocks.roundApi.mockResolvedValue({
-      getActiveLeague: vi.fn().mockResolvedValue({ id: leagueId }),
+      getActiveLeague: vi.fn().mockResolvedValue({ id: leagueId, players_per_team: 6 }),
       createRoundWithTeams: createRoundWithTeamsMock,
     });
 
@@ -185,12 +191,20 @@ describe("rounds actions via API gateway", () => {
   });
 
   it("routes finishRound via API when available", async () => {
-    const finishRoundMock = vi.fn().mockResolvedValue(undefined);
+    const finishRoundMock = vi.fn().mockResolvedValue({ archived: false, shouldRefreshOverall: true });
     mocks.roundApi.mockResolvedValue({ finishRound: finishRoundMock });
 
     const result = await finishRound(roundId, "pix@example.com", 100);
     expect(result).toEqual({ success: true, archived: false });
-    expect(finishRoundMock).toHaveBeenCalledWith(leagueId, roundId);
+    expect(mocks.calculateRoundStats).toHaveBeenCalledWith(roundId);
+    expect(finishRoundMock).toHaveBeenCalledWith(leagueId, roundId, {
+      paymentPix: "pix@example.com",
+      paymentTotal: 100,
+      recipientId: null,
+      recipientName: null,
+      expenseItemIds: [],
+    });
+    expect(mocks.refreshFluidOverallSafely).toHaveBeenCalledWith(`fechamento da rodada ${roundId}`);
   });
 
   it("routes setRoundPlayerAttendance via API when available", async () => {

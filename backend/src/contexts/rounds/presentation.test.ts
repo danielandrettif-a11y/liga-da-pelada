@@ -52,7 +52,7 @@ function fixture(enabled: boolean) {
     }),
     createRoundWithTeams: vi.fn().mockResolvedValue({ roundId }),
     deleteRound: vi.fn().mockResolvedValue(undefined),
-    finishRound: vi.fn().mockResolvedValue(undefined),
+    finishRound: vi.fn().mockResolvedValue({ archived: false, shouldRefreshOverall: true }),
     getAdminRoundPrelist: vi.fn().mockResolvedValue(null),
     getAdminRoundPrelists: vi.fn().mockResolvedValue([]),
     saveRoundPrelist: vi.fn().mockResolvedValue({
@@ -161,7 +161,10 @@ describe("rounds presentation", () => {
         date: "2026-10-30",
         roundType: "official",
         playersPerTeam: 6,
-        teams: [{ name: "Time 1", color: "Azul", playerIds: [] }],
+        teams: [
+          { name: "Time 1", color: "#22c55e", playerIds: [] },
+          { name: "Time 2", color: "#3b82f6", playerIds: [] },
+        ],
       },
     });
     expect(response.statusCode).toBe(201);
@@ -187,10 +190,16 @@ describe("rounds presentation", () => {
       method: "POST",
       url: `/api/rounds/leagues/${leagueId}/${roundId}/finish`,
       headers: { authorization: "Bearer valid-token" },
-      payload: { bestGoalkeeperPlayerId: null },
+      payload: { paymentPix: "pix@example.com", paymentTotal: 120, expenseItemIds: [] },
     });
     expect(response.statusCode).toBe(200);
-    expect(roundRepository.finishRound).toHaveBeenCalled();
+    expect(JSON.parse(response.payload)).toEqual({ success: true, archived: false, shouldRefreshOverall: true });
+    expect(roundRepository.finishRound).toHaveBeenCalledWith(
+      roundId,
+      leagueId,
+      expect.objectContaining({ paymentPix: "pix@example.com", paymentTotal: 120 }),
+      expect.anything(),
+    );
   });
 
   it("marks round team arrived", async () => {

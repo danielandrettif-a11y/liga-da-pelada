@@ -128,21 +128,21 @@ export function registerRoundRoutes(app: FastifyInstance, dependencies: {
   // Finalizar rodada
   app.post<{
     Params: { leagueId: string; roundId: string };
-    Body: { bestGoalkeeperPlayerId?: string | null };
+    Body: Parameters<typeof finishRound>[2];
   }>(
     "/api/rounds/leagues/:leagueId/:roundId/finish",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        await finishRound(
+        const result = await finishRound(
           request.params.roundId,
           request.params.leagueId,
-          request.body?.bestGoalkeeperPlayerId || null,
+          request.body,
           authentication.actor,
           dependencies.repository,
         );
-        return reply.code(200).send({ success: true });
+        return reply.code(200).send({ success: true, ...result });
       } catch (error) {
         return sendFailure(error, request, reply);
       }

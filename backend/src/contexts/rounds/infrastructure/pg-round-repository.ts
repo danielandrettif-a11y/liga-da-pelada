@@ -5,6 +5,8 @@ import type {
   AdminRoundPrelist,
   CreateRoundWithTeamsInput,
   DraftWorkspace,
+  FinishRoundInput,
+  FinishRoundResult,
   RoundRepository,
   RoundTeamShufflePreview,
   SaveRoundPrelistInput,
@@ -18,7 +20,12 @@ import type {
   RoundPlayerAvailability,
   RoundWithCounts,
 } from "../domain/round.js";
-import { ROUND_VEST_COLORS } from "../domain/round.js";
+import {
+  drawRoundPlayerOrder,
+  ROUND_TEAM_CREST_URLS,
+  ROUND_VEST_COLORS,
+  validateUnderfilledRoundTeams,
+} from "../domain/round.js";
 import {
   isRoundReshuffleMode,
   previewRoundReshuffle,
@@ -32,6 +39,15 @@ export class RoundPersistenceError extends Error {
     this.name = "RoundPersistenceError";
   }
 }
+
+type LockedCallup = {
+  date: string | Date;
+  round_type: "official" | "friendly";
+  status: string;
+  round_id: string | null;
+  players_per_team: number | null;
+  teams_per_round: number | null;
+};
 
 function translateFailure(cause: unknown): RoundPersistenceError {
   if (cause instanceof RoundPersistenceError) return cause;
@@ -87,7 +103,7 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
           start_time: string | null;
           status: "draft" | "active" | "finished";
           round_type: "official" | "friendly";
-          formation_mode: "auto" | "manual" | "balanced" | "draft";
+          formation_mode: "manual" | "random" | "balanced" | "speed" | "adaptive" | "draft";
           target_players_per_team: number | null;
           target_teams_per_round: number | null;
           arrival_order_enabled: boolean;
@@ -344,59 +360,269 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
 
-        // Insere rodada
-        const seasonRes = await client.query<{ id: string }>(
+        const leagueResult = await client.query<{ players_per_team: number; teams_per_round: number }>(
+          "SELECT players_per_team, teams_per_round FROM public.leagues WHERE id = $1::uuid LIMIT 1",
+          [leagueId],
+        );
+        const league = leagueResult.rows[0];
+        if (!league) throw new RoundPersistenceError("Pelada selecionada não encontrada.", 404);
+
+        const seasonResult = await client.query<{ id: string }>(
           "SELECT id FROM public.seasons WHERE league_id = $1::uuid AND status = 'active' LIMIT 1",
           [leagueId],
         );
-        const seasonId = seasonRes.rows[0]?.id;
+        const seasonId = seasonResult.rows[0]?.id;
         if (!seasonId) throw new RoundPersistenceError("Nenhuma temporada ativa encontrada para a pelada.", 400);
 
-        const roundInsert = await client.query<{ id: string }>(
-          `INSERT INTO public.rounds (
-             league_id, season_id, date, start_time, round_type, target_players_per_team,
-             status, preparation_stage, formation_mode
-           ) VALUES (
-             $1::uuid, $2::uuid, $3::date, $4::time, $5::text, $6::int,
-             'draft', 'teams_ready', 'manual'
-           ) RETURNING id`,
-          [
-            leagueId,
-            seasonId,
-            input.date,
-            input.startTime || "08:00",
-            input.roundType,
-            input.playersPerTeam,
-          ],
-        );
-        const roundId = roundInsert.rows[0]?.id;
-        if (!roundId) throw new RoundPersistenceError("Não foi possível criar a rodada.", 500);
+        const teams = input.teams.map((team) => ({
+          ...team,
+          name: team.name.trim(),
+          color: /^#[0-9a-f]{6}$/i.test(team.color) ? team.color : "#111827",
+          crestUrl: team.crestUrl && ROUND_TEAM_CREST_URLS.has(team.crestUrl) ? team.crestUrl : null,
+        }));
+        if (teams.some((team) => !team.name)) {
+          throw new RoundPersistenceError("Todos os times precisam ter um nome.", 400);
+        }
+        if (teams.some((team) => team.name.length > 40)) {
+          throw new RoundPersistenceError("O nome de cada time deve ter no máximo 40 caracteres.", 400);
+        }
+        if (new Set(teams.map((team) => team.name.toLocaleLowerCase("pt-BR"))).size !== teams.length) {
+          throw new RoundPersistenceError("Use um nome diferente para cada time.", 400);
+        }
 
-        // Insere times e jogadores
-        for (let i = 0; i < input.teams.length; i++) {
-          const team = input.teams[i];
-          if (!team) continue;
-          const teamInsert = await client.query<{ id: string }>(
+        const rawPlayerIds = teams.flatMap((team) => team.playerIds);
+        const playerIds = [...new Set(rawPlayerIds)];
+        if (rawPlayerIds.length !== playerIds.length) {
+          throw new RoundPersistenceError("Um jogador não pode aparecer em mais de um time.", 400);
+        }
+        if (teams.some((team) => team.captainPlayerId && !team.playerIds.includes(team.captainPlayerId))) {
+          throw new RoundPersistenceError("O capitão precisa pertencer ao próprio time.", 400);
+        }
+
+        let configuredPlayersPerTeam = league.players_per_team;
+        let configuredTeamsPerRound = league.teams_per_round;
+        let callup: LockedCallup | null = null;
+
+        if (input.callupId) {
+          const callupResult = await client.query<LockedCallup>(
+            `SELECT date, round_type, status, round_id, players_per_team, teams_per_round
+             FROM public.callups
+             WHERE id = $1::uuid AND league_id = $2::uuid
+             FOR UPDATE`,
+            [input.callupId, leagueId],
+          );
+          callup = callupResult.rows[0] || null;
+          if (!callup) throw new RoundPersistenceError("Convocação desta pelada não encontrada.", 404);
+          configuredPlayersPerTeam = callup.players_per_team || configuredPlayersPerTeam;
+          configuredTeamsPerRound = callup.teams_per_round || configuredTeamsPerRound;
+        } else if (input.prelistRoundId) {
+          const formatResult = await client.query<{ target_players_per_team: number | null; target_teams_per_round: number | null }>(
+            `SELECT target_players_per_team, target_teams_per_round
+             FROM public.rounds
+             WHERE id = $1::uuid AND league_id = $2::uuid
+             FOR UPDATE`,
+            [input.prelistRoundId, leagueId],
+          );
+          const format = formatResult.rows[0];
+          if (!format) throw new RoundPersistenceError("Pré-lista desta pelada não encontrada.", 404);
+          configuredPlayersPerTeam = format.target_players_per_team || configuredPlayersPerTeam;
+          configuredTeamsPerRound = format.target_teams_per_round || configuredTeamsPerRound;
+        }
+
+        if (teams.length !== configuredTeamsPerRound) {
+          throw new RoundPersistenceError(`Esta convocação usa ${configuredTeamsPerRound} times.`, 400);
+        }
+        if (!Number.isInteger(input.playersPerTeam) || input.playersPerTeam < 5 || input.playersPerTeam > configuredPlayersPerTeam) {
+          throw new RoundPersistenceError("O formato da partida é incompatível com a convocação.", 400);
+        }
+
+        const configuredCapacity = configuredPlayersPerTeam * configuredTeamsPerRound;
+        const underfilled = playerIds.length < configuredCapacity || input.playersPerTeam < configuredPlayersPerTeam;
+        if (underfilled) {
+          if (!input.confirmUnderfilled) {
+            throw new RoundPersistenceError("Confirme a criação da rodada com menos jogadores.", 400);
+          }
+          try {
+            validateUnderfilledRoundTeams(teams.map((team) => team.playerIds.length), playerIds.length, input.playersPerTeam);
+          } catch (cause) {
+            throw new RoundPersistenceError(cause instanceof Error ? cause.message : "Distribuição inválida de jogadores.", 400);
+          }
+        } else if (teams.some((team) => team.playerIds.length > configuredPlayersPerTeam)) {
+          throw new RoundPersistenceError(`Cada time pode ter no máximo ${configuredPlayersPerTeam} jogadores.`, 400);
+        }
+
+        const attendanceOrder = [...new Set(input.attendanceOrder || [])];
+        const minimumPresent = input.playersPerTeam * 2;
+        if (attendanceOrder.length > 0) {
+          if (playerIds.length < minimumPresent) {
+            throw new RoundPersistenceError(`Selecione pelo menos ${minimumPresent} jogadores para sortear por ordem de chegada.`, 400);
+          }
+          if (attendanceOrder.length < minimumPresent || attendanceOrder.some((id) => !playerIds.includes(id))) {
+            throw new RoundPersistenceError(`Marque pelo menos ${minimumPresent} presenças válidas.`, 400);
+          }
+          const starters = new Set(attendanceOrder.slice(0, minimumPresent));
+          const startingTeams = new Set(teams.slice(0, 2).flatMap((team) => team.playerIds));
+          if (starters.size !== minimumPresent || startingTeams.size !== minimumPresent
+            || [...starters].some((id) => !startingTeams.has(id))) {
+            throw new RoundPersistenceError("Os primeiros presentes precisam formar os dois times titulares.", 400);
+          }
+        }
+
+        const eligibleResult = await client.query<{ id: string }>(
+          `SELECT player.id
+           FROM public.players player
+           JOIN public.league_members member ON member.player_id = player.id
+           WHERE member.league_id = $1::uuid AND member.is_active
+             AND player.id = ANY($2::uuid[]) AND player.is_selectable
+             AND player.member_category IN ('player', 'guest')`,
+          [leagueId, playerIds],
+        );
+        if (eligibleResult.rows.length !== playerIds.length) {
+          throw new RoundPersistenceError("A lista contém uma pessoa que não pode participar de partidas.", 400);
+        }
+
+        if (callup) {
+          if (!["open", "locked"].includes(callup.status)) {
+            throw new RoundPersistenceError("A convocação precisa estar aberta ou bloqueada antes de montar a rodada.", 400);
+          }
+          const confirmedResult = await client.query<{ player_id: string }>(
+            `SELECT player_id FROM public.callup_entries
+             WHERE callup_id = $1::uuid AND status = 'confirmed'
+             ORDER BY player_id`,
+            [input.callupId],
+          );
+          const confirmedIds = confirmedResult.rows.map((row) => row.player_id).sort();
+          const callupDate = callup.date instanceof Date ? callup.date.toISOString().slice(0, 10) : String(callup.date).slice(0, 10);
+          if (callupDate !== input.date || callup.round_type !== input.roundType
+            || confirmedIds.join(",") !== [...playerIds].sort().join(",")) {
+            throw new RoundPersistenceError("Use a data, o tipo e todos os confirmados atuais da convocação.", 400);
+          }
+          if (input.prelistRoundId && callup.round_id !== input.prelistRoundId) {
+            throw new RoundPersistenceError("A convocação não está vinculada a esta pré-lista.", 400);
+          }
+        }
+
+        let stadiumId = input.stadiumId || null;
+        let stadiumName = input.stadiumName?.trim() || null;
+        let stadiumMapUrl = input.stadiumMapUrl?.trim() || null;
+        if (stadiumId) {
+          const stadiumResult = await client.query<{ name: string; google_maps_url: string }>(
+            `SELECT name, google_maps_url FROM public.stadiums
+             WHERE id = $1::uuid AND league_id = $2::uuid AND is_active LIMIT 1`,
+            [stadiumId, leagueId],
+          );
+          const stadium = stadiumResult.rows[0];
+          if (!stadium) throw new RoundPersistenceError("Estádio desta pelada não encontrado.", 400);
+          stadiumName = stadium.name;
+          stadiumMapUrl = stadium.google_maps_url;
+        }
+
+        const formationMode = input.formationMode || "manual";
+        let roundId: string;
+        if (input.prelistRoundId) {
+          const prelistResult = await client.query<{
+            id: string;
+            date: string | Date;
+            round_type: string;
+            player_ids: string[];
+            team_count: number;
+          }>(
+            `SELECT round_item.id, round_item.date, round_item.round_type,
+                    ARRAY(SELECT rp.player_id::text FROM public.round_players rp WHERE rp.round_id = round_item.id ORDER BY rp.player_id) AS player_ids,
+                    (SELECT count(*)::int FROM public.teams team WHERE team.round_id = round_item.id) AS team_count
+             FROM public.rounds round_item
+             WHERE round_item.id = $1::uuid AND round_item.league_id = $2::uuid
+               AND round_item.season_id = $3::uuid AND round_item.status = 'draft'
+               AND round_item.preparation_stage = 'prelist'
+             FOR UPDATE`,
+            [input.prelistRoundId, leagueId, seasonId],
+          );
+          const prelist = prelistResult.rows[0];
+          if (!prelist) throw new RoundPersistenceError("Pré-lista editável não encontrada.", 404);
+          const prelistDate = prelist.date instanceof Date ? prelist.date.toISOString().slice(0, 10) : String(prelist.date).slice(0, 10);
+          if (prelistDate !== input.date || prelist.round_type !== input.roundType
+            || prelist.player_ids.join(",") !== [...playerIds].sort().join(",")) {
+            throw new RoundPersistenceError("Salve a pré-lista com todos os jogadores antes de montar os times.", 400);
+          }
+          if (prelist.team_count > 0) throw new RoundPersistenceError("Esta rodada já possui times montados.", 409);
+          roundId = prelist.id;
+          await client.query(
+            `UPDATE public.rounds SET start_time = $2::time, stadium_id = COALESCE($3::uuid, stadium_id),
+               stadium_name = COALESCE($4::text, stadium_name), stadium_map_url = COALESCE($5::text, stadium_map_url),
+               target_players_per_team = $6::int, target_teams_per_round = $7::int,
+               updated_at = NOW()
+             WHERE id = $1::uuid`,
+            [roundId, input.startTime || "08:00", stadiumId, stadiumName, stadiumMapUrl, input.playersPerTeam, configuredTeamsPerRound],
+          );
+        } else {
+          await client.query("SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext($2::text))", [leagueId, `${seasonId}:${input.roundType}`]);
+          const numberResult = await client.query<{ next_number: number }>(
+            `SELECT COALESCE(MAX(number), 0)::int + 1 AS next_number
+             FROM public.rounds
+             WHERE league_id = $1::uuid AND season_id = $2::uuid AND round_type = $3::text`,
+            [leagueId, seasonId, input.roundType],
+          );
+          const roundInsert = await client.query<{ id: string }>(
+            `INSERT INTO public.rounds (
+               league_id, season_id, number, date, start_time, stadium_id, stadium_name, stadium_map_url,
+               status, round_type, formation_mode, preparation_stage,
+               target_players_per_team, target_teams_per_round
+             ) VALUES (
+               $1::uuid, $2::uuid, $3::int, $4::date, $5::time, $6::uuid, $7::text, $8::text,
+               'draft', $9::text, $10::text, 'teams_ready', $11::int, $12::int
+             ) RETURNING id`,
+            [leagueId, seasonId, numberResult.rows[0]?.next_number || 1, input.date, input.startTime || "08:00",
+              stadiumId, stadiumName, stadiumMapUrl, input.roundType, formationMode, input.playersPerTeam, configuredTeamsPerRound],
+          );
+          roundId = roundInsert.rows[0]?.id || "";
+          if (!roundId) throw new RoundPersistenceError("Não foi possível criar a rodada.", 500);
+          await client.query(
+            `INSERT INTO public.round_players (round_id, player_id)
+             SELECT $1::uuid, player_id FROM unnest($2::uuid[]) AS player_id`,
+            [roundId, playerIds],
+          );
+        }
+
+        const presentPlayerIds = attendanceOrder.length > 0 ? attendanceOrder : playerIds;
+        await client.query("SELECT public.set_round_attendance_bulk($1::uuid, $2::uuid[])", [roundId, presentPlayerIds]);
+
+        for (const [index, team] of teams.entries()) {
+          const teamResult = await client.query<{ id: string }>(
             `INSERT INTO public.teams (round_id, name, color, crest_url, position, captain_player_id)
              VALUES ($1::uuid, $2::text, $3::text, $4::text, $5::int, $6::uuid)
              RETURNING id`,
-            [roundId, team.name, team.color, team.crestUrl || null, i + 1, team.captainPlayerId || null],
+            [roundId, team.name, team.color, team.crestUrl, index + 1, team.captainPlayerId || null],
           );
-          const teamId = teamInsert.rows[0]?.id;
-          if (teamId && team.playerIds.length > 0) {
-            for (let pIdx = 0; pIdx < team.playerIds.length; pIdx++) {
-              const pid = team.playerIds[pIdx];
-              await client.query(
-                "INSERT INTO public.team_players (team_id, player_id) VALUES ($1::uuid, $2::uuid)",
-                [teamId, pid],
-              );
-              await client.query(
-                `INSERT INTO public.round_players (round_id, player_id, availability_status, attendance_status)
-                 VALUES ($1::uuid, $2::uuid, 'available', 'pending')
-                 ON CONFLICT (round_id, player_id) DO NOTHING`,
-                [roundId, pid],
-              );
-            }
+          const teamId = teamResult.rows[0]?.id;
+          if (!teamId) throw new RoundPersistenceError(`Não foi possível criar o time ${team.name}.`, 500);
+          const goalkeeperOrder = drawRoundPlayerOrder(team.playerIds);
+          const loanOrder = new Map(drawRoundPlayerOrder(team.playerIds).map((entry) => [entry.playerId, entry.order]));
+          await client.query(
+            `INSERT INTO public.team_players (team_id, player_id, goalkeeper_order, loan_order)
+             SELECT $1::uuid, item.player_id::uuid, item.goalkeeper_order::int, item.loan_order::int
+             FROM jsonb_to_recordset($2::jsonb) AS item(player_id text, goalkeeper_order int, loan_order int)`,
+            [teamId, JSON.stringify(goalkeeperOrder.map((entry) => ({
+              player_id: entry.playerId,
+              goalkeeper_order: entry.order,
+              loan_order: underfilled ? loanOrder.get(entry.playerId) : null,
+            })))],
+          );
+        }
+
+        await client.query(
+          `UPDATE public.rounds SET preparation_stage = 'teams_ready', formation_mode = $2::text,
+             arrival_order_enabled = $3::boolean, updated_at = NOW()
+           WHERE id = $1::uuid`,
+          [roundId, formationMode, attendanceOrder.length > 0],
+        );
+        if (input.callupId) {
+          const converted = await client.query(
+            `UPDATE public.callups SET status = 'converted', round_id = $3::uuid, updated_at = NOW()
+             WHERE id = $1::uuid AND league_id = $2::uuid AND status IN ('open', 'locked')`,
+            [input.callupId, leagueId, roundId],
+          );
+          if ((converted.rowCount ?? 0) !== 1) {
+            throw new RoundPersistenceError("Não foi possível vincular a convocação à rodada.", 409);
           }
         }
 
@@ -407,30 +633,134 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
     async deleteRound(roundId: string, leagueId: string, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const result = await client.query(
-          "DELETE FROM public.rounds WHERE id = $1::uuid AND league_id = $2::uuid",
+        const scoped = await client.query<{ found: boolean }>(
+          "SELECT EXISTS (SELECT 1 FROM public.rounds WHERE id = $1::uuid AND league_id = $2::uuid) AS found",
           [roundId, leagueId],
         );
-        if ((result.rowCount ?? 0) === 0) {
+        if (scoped.rows[0]?.found !== true) {
           throw new RoundPersistenceError("Rodada não encontrada na pelada selecionada.", 404);
         }
+        await client.query("SELECT public.delete_round_cascade($1::uuid)", [roundId]);
       });
     },
 
-    async finishRound(roundId: string, leagueId: string, bestGoalkeeperPlayerId: string | null, actor: Actor): Promise<void> {
+    async finishRound(roundId: string, leagueId: string, input: FinishRoundInput, actor: Actor): Promise<FinishRoundResult> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const result = await client.query(
-          `UPDATE public.rounds
-           SET status = 'finished',
-               best_goalkeeper_player_id = $3::uuid,
-               updated_at = NOW()
-           WHERE id = $1::uuid AND league_id = $2::uuid`,
-          [roundId, leagueId, bestGoalkeeperPlayerId],
+        const roundResult = await client.query<{
+          status: string;
+          created_at: string | Date;
+          feature_tier: string;
+          full_enabled_at: string | Date | null;
+        }>(
+          `SELECT r.status, r.created_at, league.feature_tier, league.full_enabled_at
+           FROM public.rounds r
+           JOIN public.leagues league ON league.id = r.league_id
+           WHERE r.id = $1::uuid AND r.league_id = $2::uuid
+           FOR UPDATE OF r`,
+          [roundId, leagueId],
         );
-        if ((result.rowCount ?? 0) === 0) {
+        const round = roundResult.rows[0];
+        if (!round) {
           throw new RoundPersistenceError("Rodada não encontrada na pelada selecionada.", 404);
         }
+
+        let paymentPix = input.paymentPix;
+        let recipientId = input.recipientId || null;
+        let recipientName = input.recipientName?.trim() || null;
+        if (recipientId) {
+          const recipientResult = await client.query<{
+            id: string;
+            name: string;
+            pix_key: string;
+          }>(
+            `SELECT id, name, pix_key
+             FROM public.payment_recipients
+             WHERE id = $1::uuid AND league_id = $2::uuid AND is_active
+             LIMIT 1`,
+            [recipientId, leagueId],
+          );
+          const recipient = recipientResult.rows[0];
+          if (!recipient) throw new RoundPersistenceError("O PIX escolhido não está disponível.", 400);
+          paymentPix = recipient.pix_key;
+          recipientName = recipient.name;
+        }
+
+        const fantasyResult = await client.query<{ id: string }>(
+          "SELECT id FROM public.fantasy_rounds WHERE round_id = $1::uuid LIMIT 1",
+          [roundId],
+        );
+        const fantasyRound = fantasyResult.rows[0] || null;
+        if (round.feature_tier === "complete" && !fantasyRound) {
+          const createdAt = new Date(round.created_at).getTime();
+          const fullEnabledAt = round.full_enabled_at ? new Date(round.full_enabled_at).getTime() : null;
+          if (fullEnabledAt === null || createdAt >= fullEnabledAt) {
+            throw new RoundPersistenceError("O Cartola desta rodada não foi criado. Corrija antes de encerrá-la.", 400);
+          }
+        }
+
+        await client.query(
+          `SELECT public.finalize_round_financials(
+             $1::uuid, $2::uuid, $3::text, $4::numeric,
+             $5::uuid, $6::text, $7::uuid[]
+           )`,
+          [
+            roundId,
+            leagueId,
+            paymentPix,
+            input.paymentTotal,
+            recipientId,
+            recipientName,
+            [...new Set(input.expenseItemIds || [])],
+          ],
+        );
+
+        let fantasyTest = false;
+        if (fantasyRound) {
+          const testResult = await client.query<{ found: boolean }>(
+            "SELECT EXISTS (SELECT 1 FROM public.fantasy_test_sessions WHERE round_id = $1::uuid) AS found",
+            [roundId],
+          );
+          fantasyTest = testResult.rows[0]?.found === true;
+          await client.query(
+            fantasyTest
+              ? "SELECT public.process_fantasy_test_round($1::uuid)"
+              : "SELECT public.process_fantasy_round($1::uuid)",
+            [roundId],
+          );
+
+          if (!fantasyTest) {
+            await client.query("SAVEPOINT optional_round_rewards");
+            try {
+              await client.query("SELECT public.ensure_fantasy_round_reward_packs($1::uuid)", [roundId]);
+              await client.query("RELEASE SAVEPOINT optional_round_rewards");
+            } catch {
+              await client.query("ROLLBACK TO SAVEPOINT optional_round_rewards");
+              await client.query("RELEASE SAVEPOINT optional_round_rewards");
+            }
+          }
+        }
+
+        let archived = false;
+        if (round.feature_tier === "quick") {
+          await client.query("SAVEPOINT optional_quick_archive");
+          try {
+            const archiveResult = await client.query<{ archive_quick_league: boolean }>(
+              "SELECT public.archive_quick_league($1::uuid)",
+              [leagueId],
+            );
+            archived = archiveResult.rows[0]?.archive_quick_league === true;
+            await client.query("RELEASE SAVEPOINT optional_quick_archive");
+          } catch {
+            await client.query("ROLLBACK TO SAVEPOINT optional_quick_archive");
+            await client.query("RELEASE SAVEPOINT optional_quick_archive");
+          }
+        }
+
+        return {
+          archived,
+          shouldRefreshOverall: !fantasyTest && round.status !== "finished",
+        };
       });
     },
 

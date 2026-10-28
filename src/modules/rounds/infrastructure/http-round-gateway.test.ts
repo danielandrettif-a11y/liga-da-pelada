@@ -102,6 +102,25 @@ describe("httpRoundGateway", () => {
     await expect(gateway.deleteRound(leagueId, roundId)).rejects.toThrow(RoundApiError);
   });
 
+  it("finishes a round with the financial contract and returns post-commit effects", async () => {
+    const payload = { archived: false, shouldRefreshOverall: true };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(payload) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const input = {
+      paymentPix: "pix@example.com",
+      paymentTotal: 120,
+      recipientId: null,
+      expenseItemIds: ["00000000-0000-4000-8000-000000000010"],
+    };
+    await expect(httpRoundGateway(backendUrl, "test-token").finishRound(leagueId, roundId, input))
+      .resolves.toEqual(payload);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/rounds/leagues/${leagueId}/${roundId}/finish`,
+      expect.objectContaining({ method: "POST", body: JSON.stringify(input) }),
+    );
+  });
+
   it("requests the preset offset for the selected round type", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ offset: 3 }) });
     vi.stubGlobal("fetch", fetchMock);

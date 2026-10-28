@@ -14,7 +14,13 @@ export type RoundHttpGateway = {
   getActiveLeague(leagueId: string): Promise<any>;
   createRoundWithTeams(leagueId: string, input: any): Promise<{ roundId: string }>;
   deleteRound(leagueId: string, roundId: string): Promise<void>;
-  finishRound(leagueId: string, roundId: string, bestGoalkeeperPlayerId?: string | null): Promise<void>;
+  finishRound(leagueId: string, roundId: string, input: {
+    paymentPix: string;
+    paymentTotal: number;
+    recipientId?: string | null;
+    recipientName?: string | null;
+    expenseItemIds?: string[];
+  }): Promise<{ archived: boolean; shouldRefreshOverall: boolean }>;
   getAdminRoundPrelist(leagueId: string, roundId: string): Promise<any>;
   getAdminRoundPrelists(leagueId: string): Promise<any[]>;
   saveRoundPrelist(leagueId: string, input: any): Promise<{
@@ -132,13 +138,14 @@ export function httpRoundGateway(backendUrl: string, accessToken?: string): Roun
       if (!res.ok) await parseApiError(res);
     },
 
-    async finishRound(leagueId: string, roundId: string, bestGoalkeeperPlayerId?: string | null) {
+    async finishRound(leagueId, roundId, input) {
       const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/finish`, {
         method: "POST",
         headers: authHeaders(true),
-        body: JSON.stringify({ bestGoalkeeperPlayerId }),
+        body: JSON.stringify(input),
       });
       if (!res.ok) await parseApiError(res);
+      return res.json();
     },
 
     async getAdminRoundPrelist(leagueId: string, roundId: string) {

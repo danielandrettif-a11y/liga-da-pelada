@@ -22,7 +22,7 @@ describe("pgRoundRepository", () => {
               start_time: "08:00:00",
               status: "active",
               round_type: "official",
-              formation_mode: "auto",
+              formation_mode: "random",
               target_players_per_team: 6,
               target_teams_per_round: 4,
               arrival_order_enabled: true,
@@ -281,13 +281,82 @@ describe("pgRoundRepository", () => {
   it("deletes a round as league admin", async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
-      if (sql.includes("DELETE FROM public.rounds")) return { rowCount: 1 };
+      if (sql.includes("SELECT EXISTS") && sql.includes("public.rounds")) return { rows: [{ found: true }] };
       return { rows: [] };
     });
 
     const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
     const repo = pgRoundRepository(pool);
     await expect(repo.deleteRound(roundId, leagueId, actor)).resolves.toBeUndefined();
+    expect(query).toHaveBeenCalledWith("SELECT public.delete_round_cascade($1::uuid)", [roundId]);
+  });
+
+  it("creates teams, attendance and player orders in one authenticated transaction", async () => {
+    const players = Array.from({ length: 10 }, (_, index) => `00000000-0000-4000-8000-${String(index + 10).padStart(12, "0")}`);
+    let teamNumber = 0;
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("SELECT players_per_team, teams_per_round FROM public.leagues")) {
+        return { rows: [{ players_per_team: 5, teams_per_round: 2 }] };
+      }
+      if (sql.includes("FROM public.seasons")) return { rows: [{ id: seasonId }] };
+      if (sql.includes("FROM public.players player")) return { rows: players.map((id) => ({ id })) };
+      if (sql.includes("next_number")) return { rows: [{ next_number: 4 }] };
+      if (sql.includes("INSERT INTO public.rounds")) return { rows: [{ id: roundId }] };
+      if (sql.includes("INSERT INTO public.teams")) {
+        teamNumber += 1;
+        return { rows: [{ id: `00000000-0000-4000-8000-${String(100 + teamNumber).padStart(12, "0")}` }] };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+    const release = vi.fn();
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release }) } as unknown as Pool;
+
+    await expect(pgRoundRepository(pool).createRoundWithTeams({
+      date: "2026-10-30",
+      startTime: "20:00",
+      roundType: "official",
+      playersPerTeam: 5,
+      formationMode: "balanced",
+      teams: [
+        { name: "Amarelo", color: "#FACC15", crestUrl: "/team-crests/milamb.webp", playerIds: players.slice(0, 5) },
+        { name: "Azul", color: "#3b82f6", playerIds: players.slice(5) },
+      ],
+    }, leagueId, actor)).resolves.toEqual({ roundId });
+
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("pg_advisory_xact_lock"), [leagueId, `${seasonId}:official`]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("set_round_attendance_bulk"), [roundId, players]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO public.teams"), [
+      roundId, "Amarelo", "#FACC15", "/team-crests/milamb.webp", 1, null,
+    ]);
+    expect(query.mock.calls.filter(([sql]) => String(sql).includes("INSERT INTO public.team_players"))).toHaveLength(2);
+    expect(query.mock.calls.map(([sql]) => sql)).toContain("COMMIT");
+    expect(release).toHaveBeenCalledWith(false);
+  });
+
+  it("finishes finances and Cartola atomically before requesting post-commit overall refresh", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("SELECT r.status")) {
+        return { rows: [{ status: "active", created_at: "2026-10-01T12:00:00Z", feature_tier: "complete", full_enabled_at: "2026-09-01T12:00:00Z" }] };
+      }
+      if (sql.includes("FROM public.fantasy_rounds")) return { rows: [{ id: "fantasy-1" }] };
+      if (sql.includes("fantasy_test_sessions")) return { rows: [{ found: false }] };
+      return { rows: [], rowCount: 1 };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    await expect(pgRoundRepository(pool).finishRound(roundId, leagueId, {
+      paymentPix: "pix@example.com",
+      paymentTotal: 150,
+      expenseItemIds: [],
+    }, actor)).resolves.toEqual({ archived: false, shouldRefreshOverall: true });
+
+    const statements = query.mock.calls.map(([sql]) => String(sql));
+    expect(statements.some((sql) => sql.includes("finalize_round_financials"))).toBe(true);
+    expect(statements.some((sql) => sql.includes("process_fantasy_round"))).toBe(true);
+    expect(statements.some((sql) => sql.includes("ensure_fantasy_round_reward_packs"))).toBe(true);
+    expect(statements.at(-1)).toBe("COMMIT");
   });
 
   it("saves a round prelist via RPC", async () => {

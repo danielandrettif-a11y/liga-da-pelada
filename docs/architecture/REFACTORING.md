@@ -32,7 +32,16 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
-### 2026-10-28 — paridade de convocações e rodadas
+### 2026-10-28 — criação, exclusão e encerramento de rodadas
+
+- `createRoundWithTeams` passou a validar formato, convocação/pré-lista, escopo e aptidão dos jogadores, presença inicial, estádio, nomes, capitães e distribuição reduzida antes de persistir toda a rodada em uma única transação autenticada. Numeração concorrente usa trava transacional e a presença continua sob a RPC canônica.
+- `deleteRound` deixou de apagar apenas a linha principal e agora exige escopo da pelada e delega a limpeza completa à `delete_round_cascade`.
+- `finishRound` preserva consolidação de estatísticas antes do comando e executa fechamento financeiro, Cartola, recompensas e arquivamento rápido dentro da transação do backend. Atualização de overall permanece pós-commit; falhas opcionais de recompensa/arquivo usam savepoint sem desfazer o fechamento principal.
+- A ponte habilitada é fail-fast: erro da API na criação não executa silenciosamente a implementação Supabase antiga.
+- Progresso auditado: **150/267 estruturais, 116/267 (43,4%) aceitas em revisão, 0/267 verificadas de ponta a ponta e 151 pendentes de paridade**. Rodadas chegaram a **25/38** aceitas.
+- Verificação automatizada: **1.031 testes frontend em 200 arquivos**, **330 testes backend em 96 arquivos**, typecheck e builds dos dois projetos; auditorias de arquitetura, contexto e migração aprovadas; `npm audit --omit=dev` sem vulnerabilidades em frontend e backend.
+
+### 2026-10-28 — paridade inicial de convocações e rodadas
 
 - As 21 operações de convocação foram revisadas contra as Server Actions e gateways legados. A API agora rejeita estádio de outra pelada, impede travar lista incompleta, reutiliza pré-lista ainda em rascunho sem duplicação e preserva o agendamento de lembretes do Cartola.
 - `previewRoundTeamShuffle` deixou de devolver uma resposta fictícia: o backend carrega somente a rodada/pelada autorizada, overall, velocidade, perfil, goleiro e, quando permitido, tags privadas; o algoritmo puro preserva capacidade e unicidade. `shuffleRoundTeams`, `applyRoundTeamShuffle` e `applyPermanentRoundTeamFormation` persistem pela RPC transacional versionada.

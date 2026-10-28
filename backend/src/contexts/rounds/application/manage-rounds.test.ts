@@ -35,7 +35,7 @@ describe("manage-rounds application service", () => {
     }),
     createRoundWithTeams: vi.fn().mockResolvedValue({ roundId }),
     deleteRound: vi.fn().mockResolvedValue(undefined),
-    finishRound: vi.fn().mockResolvedValue(undefined),
+    finishRound: vi.fn().mockResolvedValue({ archived: false, shouldRefreshOverall: true }),
     getAdminRoundPrelist: vi.fn().mockResolvedValue(null),
     getAdminRoundPrelists: vi.fn().mockResolvedValue([]),
     saveRoundPrelist: vi.fn().mockResolvedValue({
@@ -97,7 +97,10 @@ describe("manage-rounds application service", () => {
       startTime: "08:00",
       roundType: "official",
       playersPerTeam: 6,
-      teams: [],
+      teams: [
+        { name: "Time A", color: "#22c55e", playerIds: [] },
+        { name: "Time B", color: "#3b82f6", playerIds: [] },
+      ],
     }, leagueId, actor, repository);
     expect(repository.createRoundWithTeams).toHaveBeenCalled();
   });
@@ -107,10 +110,21 @@ describe("manage-rounds application service", () => {
     expect(repository.deleteRound).toHaveBeenCalledWith(roundId, leagueId, actor);
   });
 
-  it("delegates finishRound with validated best goalkeeper", async () => {
-    const gkId = "00000000-0000-4000-8000-000000000009";
-    await finishRound(roundId, leagueId, gkId, actor, repository);
-    expect(repository.finishRound).toHaveBeenCalledWith(roundId, leagueId, gkId, actor);
+  it("delegates finishRound with normalized financial input", async () => {
+    const recipientId = "00000000-0000-4000-8000-000000000009";
+    await finishRound(roundId, leagueId, {
+      paymentPix: "  pix@example.com  ",
+      paymentTotal: 100.129,
+      recipientId,
+      expenseItemIds: [recipientId, recipientId],
+    }, actor, repository);
+    expect(repository.finishRound).toHaveBeenCalledWith(roundId, leagueId, {
+      paymentPix: "pix@example.com",
+      paymentTotal: 100.13,
+      recipientId,
+      recipientName: null,
+      expenseItemIds: [recipientId],
+    }, actor);
   });
 
   it("delegates saveRoundPrelist with date validation", async () => {

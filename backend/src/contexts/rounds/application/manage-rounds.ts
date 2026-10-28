@@ -1,9 +1,11 @@
 import type { Actor } from "../../../shared/actor.js";
 import {
+  InvalidRoundError,
   parseRoundUuid,
   validateRoundDate,
   validateRoundTime,
   validateRoundType,
+  validateTeamSizes,
   type RoundDetail,
   type RoundMatchSetup,
   type RoundPlayerAttendance,
@@ -70,6 +72,14 @@ export type CreateRoundWithTeamsInput = {
   startTime?: string | null;
   roundType: "friendly" | "official";
   playersPerTeam: number;
+  callupId?: string | null;
+  prelistRoundId?: string | null;
+  formationMode?: "manual" | "random" | "balanced" | "speed" | "adaptive";
+  attendanceOrder?: string[];
+  stadiumId?: string | null;
+  stadiumName?: string | null;
+  stadiumMapUrl?: string | null;
+  confirmUnderfilled?: boolean;
   teams: Array<{
     name: string;
     color: string;
@@ -77,6 +87,19 @@ export type CreateRoundWithTeamsInput = {
     playerIds: string[];
     captainPlayerId?: string | null;
   }>;
+};
+
+export type FinishRoundInput = {
+  paymentPix: string;
+  paymentTotal: number;
+  recipientId?: string | null;
+  recipientName?: string | null;
+  expenseItemIds?: string[];
+};
+
+export type FinishRoundResult = {
+  archived: boolean;
+  shouldRefreshOverall: boolean;
 };
 
 export type TeamFormationInput = {
@@ -171,7 +194,7 @@ export interface RoundRepository {
   }>;
   createRoundWithTeams(input: CreateRoundWithTeamsInput, leagueId: string, actor: Actor): Promise<{ roundId: string }>;
   deleteRound(roundId: string, leagueId: string, actor: Actor): Promise<void>;
-  finishRound(roundId: string, leagueId: string, bestGoalkeeperPlayerId: string | null, actor: Actor): Promise<void>;
+  finishRound(roundId: string, leagueId: string, input: FinishRoundInput, actor: Actor): Promise<FinishRoundResult>;
   getAdminRoundPrelist(roundId: string, leagueId: string, actor: Actor): Promise<AdminRoundPrelist | null>;
   getAdminRoundPrelists(leagueId: string, actor: Actor): Promise<AdminRoundPrelist[]>;
   saveRoundPrelist(input: SaveRoundPrelistInput, leagueId: string, actor: Actor): Promise<SaveRoundPrelistResult>;
@@ -235,19 +258,58 @@ export function getActiveLeague(leagueId: string, actor: Actor, repository: Roun
 }
 
 export function createRoundWithTeams(input: CreateRoundWithTeamsInput, leagueId: string, actor: Actor, repository: RoundRepository) {
-  validateRoundDate(input.date);
-  return repository.createRoundWithTeams(input, parseRoundUuid(leagueId, "Pelada"), actor);
+  if (!input || !Array.isArray(input.teams) || input.teams.some((team) => !team || !Array.isArray(team.playerIds))) {
+    throw new InvalidRoundError("Informe os times e seus jogadores.");
+  }
+  const teamsPerRound = input.teams.length;
+  validateTeamSizes(input.playersPerTeam, teamsPerRound);
+  const allowedFormationModes = new Set(["manual", "random", "balanced", "speed", "adaptive"]);
+  const normalized: CreateRoundWithTeamsInput = {
+    ...input,
+    date: validateRoundDate(input.date),
+    startTime: validateRoundTime(input.startTime || "08:00"),
+    roundType: validateRoundType(input.roundType),
+    callupId: input.callupId ? parseRoundUuid(input.callupId, "Convocação") : null,
+    prelistRoundId: input.prelistRoundId ? parseRoundUuid(input.prelistRoundId, "Pré-lista") : null,
+    stadiumId: input.stadiumId ? parseRoundUuid(input.stadiumId, "Estádio") : null,
+    formationMode: input.formationMode && allowedFormationModes.has(input.formationMode) ? input.formationMode : "manual",
+    attendanceOrder: [...new Set(Array.isArray(input.attendanceOrder) ? input.attendanceOrder : [])]
+      .map((id) => parseRoundUuid(id, "Presença")),
+    teams: input.teams.map((team) => ({
+      ...team,
+      playerIds: team.playerIds.map((id) => parseRoundUuid(id, "Jogador")),
+      captainPlayerId: team.captainPlayerId ? parseRoundUuid(team.captainPlayerId, "Capitão") : null,
+    })),
+  };
+  return repository.createRoundWithTeams(normalized, parseRoundUuid(leagueId, "Pelada"), actor);
 }
 
 export function deleteRound(roundId: string, leagueId: string, actor: Actor, repository: RoundRepository) {
   return repository.deleteRound(parseRoundUuid(roundId, "Rodada"), parseRoundUuid(leagueId, "Pelada"), actor);
 }
 
-export function finishRound(roundId: string, leagueId: string, bestGoalkeeperPlayerId: string | null, actor: Actor, repository: RoundRepository) {
+export function finishRound(roundId: string, leagueId: string, input: FinishRoundInput, actor: Actor, repository: RoundRepository) {
+  if (!input || typeof input.paymentPix !== "string" || !Array.isArray(input.expenseItemIds || [])) {
+    throw new InvalidRoundError("Informe os dados financeiros da rodada.");
+  }
+  const paymentTotal = Number(input.paymentTotal);
+  const paymentPix = input.paymentPix.trim();
+  if (!Number.isFinite(paymentTotal) || paymentTotal <= 0 || paymentTotal > 99_999_999.99) {
+    throw new InvalidRoundError("Informe um valor total válido para a pelada.");
+  }
+  if (!input.recipientId && (!paymentPix || paymentPix.length > 200)) {
+    throw new InvalidRoundError("Informe uma chave PIX válida, com até 200 caracteres.");
+  }
   return repository.finishRound(
     parseRoundUuid(roundId, "Rodada"),
     parseRoundUuid(leagueId, "Pelada"),
-    bestGoalkeeperPlayerId ? parseRoundUuid(bestGoalkeeperPlayerId, "Goleiro") : null,
+    {
+      paymentPix,
+      paymentTotal: Math.round(paymentTotal * 100) / 100,
+      recipientId: input.recipientId ? parseRoundUuid(input.recipientId, "Destinatário") : null,
+      recipientName: input.recipientName?.trim() || null,
+      expenseItemIds: [...new Set(input.expenseItemIds || [])].map((id) => parseRoundUuid(id, "Despesa")),
+    },
     actor,
   );
 }

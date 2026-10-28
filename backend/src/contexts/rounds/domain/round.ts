@@ -1,7 +1,7 @@
 export type RoundStatus = "draft" | "active" | "finished";
 export type RoundType = "official" | "friendly";
 export type RoundPreparationStage = "prelist" | "teams_ready" | "in_progress" | "completed";
-export type TeamFormationMode = "auto" | "manual" | "balanced" | "draft";
+export type TeamFormationMode = "manual" | "random" | "balanced" | "speed" | "adaptive" | "draft";
 
 export type RoundPlayerAttendance = "pending" | "present";
 export type RoundPlayerAvailability = "available" | "injured";
@@ -15,6 +15,13 @@ export const ROUND_VEST_COLORS = new Set([
   "#1e293b",
   "#f8fafc",
   "#ec4899",
+]);
+
+export const ROUND_TEAM_CREST_URLS = new Set([
+  "/team-crests/meia-boca-juniors.webp",
+  "/team-crests/patetico-de-madrid.webp",
+  "/team-crests/milamb.webp",
+  "/team-crests/inter-de-meiao.webp",
 ]);
 
 export type RoundPlayer = {
@@ -220,4 +227,43 @@ export function validateTeamSizes(playersPerTeam: number, teamsPerRound: number)
     throw new InvalidRoundError("Escolha de 2 a 6 times.");
   }
   return { playersPerTeam, teamsPerRound };
+}
+
+export function validateUnderfilledRoundTeams(
+  teamSizes: number[],
+  selectedPlayers: number,
+  targetPlayersPerTeam: number,
+): void {
+  if (teamSizes.length < 2 || teamSizes.length > 6) {
+    throw new InvalidRoundError("Escolha de 2 a 6 times.");
+  }
+  const minimumPlayers = teamSizes.length === 3
+    ? Math.max(12, targetPlayersPerTeam * 2)
+    : targetPlayersPerTeam * 2;
+  if (selectedPlayers < minimumPlayers) {
+    throw new InvalidRoundError(`Selecione pelo menos ${minimumPlayers} jogadores.`);
+  }
+  if (selectedPlayers > targetPlayersPerTeam * teamSizes.length) {
+    throw new InvalidRoundError(`O modo ${targetPlayersPerTeam}x${targetPlayersPerTeam} aceita no máximo ${targetPlayersPerTeam * teamSizes.length} jogadores.`);
+  }
+  if (teamSizes.some((size) => size > targetPlayersPerTeam)) {
+    throw new InvalidRoundError(`Cada time pode ter no máximo ${targetPlayersPerTeam} jogadores neste modo.`);
+  }
+  if (teamSizes.reduce((total, size) => total + size, 0) !== selectedPlayers) {
+    throw new InvalidRoundError("Todos os jogadores selecionados precisam estar em um time.");
+  }
+  if (Math.max(...teamSizes) - Math.min(...teamSizes) > 1) {
+    throw new InvalidRoundError("Distribua os jogadores igualmente: a diferença entre os times pode ser de no máximo 1 jogador.");
+  }
+}
+
+export function drawRoundPlayerOrder(playerIds: string[], random: () => number = Math.random) {
+  const shuffled = [...playerIds];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const raw = random();
+    const safe = Number.isFinite(raw) ? Math.min(Math.max(raw, 0), 0.9999999999999999) : 0;
+    const target = Math.floor(safe * (index + 1));
+    [shuffled[index], shuffled[target]] = [shuffled[target]!, shuffled[index]!];
+  }
+  return shuffled.map((playerId, index) => ({ playerId, order: index + 1 }));
 }
