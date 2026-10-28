@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   account: vi.fn(), selectedLeague: vi.fn(), rosterApi: vi.fn(), getPlayers: vi.fn(), getPlayer: vi.fn(),
   createPlayer: vi.fn(), updatePlayer: vi.fn(), swapPlayerAvatars: vi.fn(),
+  savePlayer: vi.fn(), deletePlayer: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
@@ -11,7 +12,8 @@ vi.mock("../league-context", () => ({ getSelectedLeague: mocks.selectedLeague })
 vi.mock("@/modules/roster/infrastructure/roster-api-session", () => ({ rosterApiFor: mocks.rosterApi }));
 
 import {
-  createPlayer, getPlayer, getPlayers, getSelectableLeaguePlayers, swapPlayerAvatars, updatePlayer,
+  createPlayer, deletePlayer, getPlayer, getPlayers, getSelectableLeaguePlayers,
+  savePlayer, swapPlayerAvatars, updatePlayer,
 } from "./players";
 
 const leagueId = "00000000-0000-4000-8000-000000000010";
@@ -25,6 +27,7 @@ beforeEach(() => {
   mocks.rosterApi.mockResolvedValue({
     getPlayers: mocks.getPlayers, getPlayer: mocks.getPlayer, createPlayer: mocks.createPlayer,
     updatePlayer: mocks.updatePlayer, swapPlayerAvatars: mocks.swapPlayerAvatars,
+    savePlayer: mocks.savePlayer, deletePlayer: mocks.deletePlayer,
   });
 });
 
@@ -98,5 +101,24 @@ describe("player catalog actions through the roster API", () => {
       .resolves.toEqual({ success: false, error: "Jogador não encontrado" });
     await expect(swapPlayerAvatars(playerId))
       .resolves.toEqual({ success: false, error: "Adicione uma foto extra" });
+  });
+
+  it("saves multipart profiles and deletes players through the roster gateway", async () => {
+    const formData = new FormData();
+    formData.set("name", "Jogador");
+    formData.set("member_category", "guest");
+    mocks.savePlayer.mockResolvedValue(playerId);
+    mocks.deletePlayer.mockResolvedValue(undefined);
+    await expect(savePlayer(playerId, formData)).resolves.toEqual({ success: true, data: { id: playerId } });
+    await expect(deletePlayer(playerId)).resolves.toEqual({ success: true });
+    expect(mocks.savePlayer).toHaveBeenCalledWith(leagueId, playerId, formData);
+    expect(mocks.deletePlayer).toHaveBeenCalledWith(leagueId, playerId);
+  });
+
+  it("preserves controlled failures for full profile persistence", async () => {
+    mocks.savePlayer.mockRejectedValue(new Error("Foto inválida"));
+    mocks.deletePlayer.mockRejectedValue(new Error("Jogador possui vínculos"));
+    await expect(savePlayer(playerId, new FormData())).resolves.toEqual({ success: false, error: "Foto inválida" });
+    await expect(deletePlayer(playerId)).resolves.toEqual({ success: false, error: "Jogador possui vínculos" });
   });
 });

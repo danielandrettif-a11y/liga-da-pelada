@@ -67,12 +67,17 @@ export type RosterHttpGateway = {
     leagueId: string, roundType: RosterStatisticsRoundType, selectableOnly?: boolean,
   ): Promise<RosterPlayerStatistics[]>;
   getRosterGroups(leagueId: string, roundType: RosterStatisticsRoundType): Promise<RosterGroups>;
+  savePlayer(leagueId: string, playerId: string | null, formData: FormData): Promise<string>;
+  deletePlayer(leagueId: string, playerId: string): Promise<void>;
   createPlayer(leagueId: string, input: CreatePlayerInput): Promise<RosterPlayer>;
   updatePlayer(leagueId: string, playerId: string, input: Partial<CreatePlayerInput>): Promise<RosterPlayer>;
   swapPlayerAvatars(leagueId: string, playerId: string): Promise<void>;
   importGuestRoster(leagueId: string, names: string[]): Promise<ImportedGuest[]>;
   getRegistrationHistory(leagueId: string): Promise<PlayerRegistrationEvent[]>;
   getRegisteredMergeCandidates(leagueId: string, guestId: string): Promise<RosterPlayer[]>;
+  mergeGuestWithRegistered(
+    leagueId: string, guestId: string, registeredId: string,
+  ): Promise<{ success: boolean; playerId: string; affectedRoundIds: string[] }>;
   getPlayerPlaytime(leagueId: string, playerId: string): Promise<PlayerPlaytime>;
   getPlayerGoalsByClub(leagueId: string, playerId: string): Promise<PlayerClubGoals[]>;
   getPlayerMonthlyAwards(leagueId: string, playerId: string): Promise<MonthlyAward[]>;
@@ -178,7 +183,7 @@ export function httpRosterGateway(
 ): RosterHttpGateway {
   if (!accessToken.trim()) throw new RosterApiError("Sessão expirada. Entre novamente.");
 
-  const request = async (method: "GET" | "POST" | "PUT" | "PATCH", path: string, body?: object) => {
+  const request = async (method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, body?: object) => {
     const url = apiUrl(baseUrl, path);
     let response: Response;
     try {
@@ -191,6 +196,24 @@ export function httpRosterGateway(
         ...(body ? { body: JSON.stringify(body) } : {}),
         cache: "no-store",
         signal: AbortSignal.timeout(10000),
+      });
+    } catch {
+      throw new RosterApiError("A API de elenco não respondeu.");
+    }
+    if (!response.ok) throw await errorFrom(response);
+    return response;
+  };
+
+  const requestMultipart = async (method: "POST" | "PATCH", path: string, body: FormData) => {
+    const url = apiUrl(baseUrl, path);
+    let response: Response;
+    try {
+      response = await fetcher(url, {
+        method,
+        headers: { authorization: `Bearer ${accessToken}` },
+        body,
+        cache: "no-store",
+        signal: AbortSignal.timeout(30000),
       });
     } catch {
       throw new RosterApiError("A API de elenco não respondeu.");
@@ -393,6 +416,24 @@ export function httpRosterGateway(
       }
       return payload;
     },
+    async savePlayer(leagueId, playerId, formData) {
+      const path = playerId
+        ? `api/roster/leagues/${encodeURIComponent(leagueId)}/players/${encodeURIComponent(playerId)}/profile`
+        : `api/roster/leagues/${encodeURIComponent(leagueId)}/player-profiles`;
+      const response = await requestMultipart(playerId ? "PATCH" : "POST", path, formData);
+      const payload: unknown = await response.json().catch(() => null);
+      const savedId = payload && typeof payload === "object"
+        ? (payload as { playerId?: unknown }).playerId : null;
+      if (typeof savedId !== "string" || !savedId) {
+        throw new RosterApiError("Resposta inválida ao salvar o jogador.", response.status);
+      }
+      return savedId;
+    },
+    async deletePlayer(leagueId, playerId) {
+      await request(
+        "DELETE", `api/roster/leagues/${encodeURIComponent(leagueId)}/players/${encodeURIComponent(playerId)}`,
+      );
+    },
     async createPlayer(leagueId, input) {
       const response = await request(
         "POST", `api/roster/leagues/${encodeURIComponent(leagueId)}/players`, input,
@@ -453,6 +494,20 @@ export function httpRosterGateway(
         throw new RosterApiError("Resposta inválida ao carregar os candidatos à união.", response.status);
       }
       return players;
+    },
+    async mergeGuestWithRegistered(leagueId, guestId, registeredId) {
+      const response = await request(
+        "POST",
+        `api/roster/leagues/${encodeURIComponent(leagueId)}/players/${encodeURIComponent(guestId)}/merge`,
+        { registeredPlayerId: registeredId },
+      );
+      const payload: unknown = await response.json().catch(() => null);
+      const playerId = payload && typeof payload === "object" ? (payload as { playerId?: unknown }).playerId : null;
+      const affectedRoundIds = payload && typeof payload === "object" ? (payload as { affectedRoundIds?: unknown }).affectedRoundIds : null;
+      if (typeof playerId !== "string" || !Array.isArray(affectedRoundIds)) {
+        throw new RosterApiError("Resposta inválida ao unir os perfis de jogador.", response.status);
+      }
+      return { success: true, playerId, affectedRoundIds: affectedRoundIds.map(String) };
     },
     async getPlayerPlaytime(leagueId, playerId) {
       const response = await request(

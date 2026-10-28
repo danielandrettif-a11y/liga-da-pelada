@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   getRegisteredMergeCandidates,
   getRegistrationHistory,
+  mergeGuestPlayer,
   type RosterRegistrationRepository,
 } from "./get-roster-registration.js";
 import type { PlayerCatalogRecord } from "../domain/player-catalog.js";
@@ -27,6 +28,7 @@ function repository(): RosterRegistrationRepository {
       avatar_url: null, member_category: "guest", source: "admin", created_by_user_id: null,
       created_at: "2026-10-20T10:00:00.000Z" }]),
     listMergeCandidates: vi.fn().mockResolvedValue([candidate]),
+    mergePlayers: vi.fn().mockResolvedValue(["00000000-0000-4000-8000-000000000100"]),
   };
 }
 
@@ -42,5 +44,12 @@ describe("get roster registration", () => {
     await expect(getRegisteredMergeCandidates(leagueId, guestId, actor, target))
       .resolves.toMatchObject([{ id: candidate.id, player_profile: "offensive" }]);
     expect(target.listMergeCandidates).toHaveBeenCalledWith(leagueId, guestId, actor);
+  });
+
+  it("merges valid guest and registered player profiles", async () => {
+    const target = repository();
+    await expect(mergeGuestPlayer(leagueId, guestId, candidate.id, actor, target))
+      .resolves.toEqual({ playerId: guestId, affectedRoundIds: ["00000000-0000-4000-8000-000000000100"] });
+    expect(target.mergePlayers).toHaveBeenCalledWith(leagueId, guestId, candidate.id, actor);
   });
 });

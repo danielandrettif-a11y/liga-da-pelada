@@ -94,5 +94,24 @@ export function pgRosterRegistrationRepository(pool: Pool): RosterRegistrationRe
       );
       return result.rows.map(playerCatalogRecordFromRow);
     }),
+
+    mergePlayers: (leagueId, guestId, registeredId, actor) => authenticated(pool, actor, async (client) => {
+      await requireLeagueAdmin(client, leagueId);
+      const check = await client.query<{ can_merge: boolean }>(
+        "SELECT public.can_merge_profiles_in_league($1::uuid, $2::uuid, $3::uuid) AS can_merge",
+        [leagueId, guestId, registeredId],
+      );
+      if (!check.rows[0]?.can_merge) {
+        throw new RosterRegistrationPersistenceError(
+          "A união de perfis usados em outra pelada exige uma rotina de migração própria.", 409,
+        );
+      }
+      const result = await client.query<{ affected_rounds: string[] | null }>(
+        "SELECT public.merge_selectable_player_profiles($1::uuid, $2::uuid) AS affected_rounds",
+        [guestId, registeredId],
+      );
+      const rounds = result.rows[0]?.affected_rounds;
+      return Array.isArray(rounds) ? rounds.map(String) : [];
+    }),
   };
 }

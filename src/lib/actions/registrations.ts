@@ -227,8 +227,43 @@ export async function mergeGuestWithRegistered(guestId: string, registeredId: st
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores podem unir perfis." };
   const league = await getSelectedLeague();
+  if (!league || league.role !== "admin") return { success: false, error: "Somente administradores podem unir perfis." };
+
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      const merged = await api.mergeGuestWithRegistered(league.id, guestId, registeredId);
+      const affectedRoundIds = merged.affectedRoundIds;
+      for (const roundId of affectedRoundIds) {
+        const result = await calculateRoundStats(roundId);
+        if (!result.success) return { success: false, error: `Perfis unidos, mas a rodada precisa ser recalculada: ${result.error}` };
+      }
+      if (affectedRoundIds.length) {
+        const { data: rounds } = await account.client.from("rounds").select("id, date, number, status, round_type").in("id", affectedRoundIds).order("date").order("number");
+        const firstOfficial = (rounds || []).find((round) => round.status === "finished" && round.round_type === "official");
+        if (firstOfficial) {
+          const { data: fantasyRound } = await account.client.from("fantasy_rounds").select("id").eq("round_id", firstOfficial.id).maybeSingle();
+          if (fantasyRound) {
+            const { error: fantasyError } = await account.client.rpc("reprocess_fantasy_from_round", { p_round_id: firstOfficial.id });
+            if (fantasyError) return { success: false, error: `Perfis unidos, mas o Cartola precisa ser reprocessado: ${fantasyError.message}` };
+          }
+        }
+        await refreshFluidOverallSafely(`união de perfis ${registeredId} em ${guestId}`);
+      }
+
+      revalidatePath("/");
+      revalidatePath("/jogadores");
+      revalidatePath("/ranking");
+      revalidatePath("/admin/jogadores");
+      revalidatePath(`/jogadores/${guestId}`);
+      return { success: true, playerId: guestId };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível unir os perfis." };
+  }
+
   const rosterPlayerIds = await getSelectedRosterPlayerIds();
-  if (!league || !rosterPlayerIds.includes(guestId) || !rosterPlayerIds.includes(registeredId)) {
+  if (!rosterPlayerIds.includes(guestId) || !rosterPlayerIds.includes(registeredId)) {
     return { success: false, error: "Os dois perfis precisam pertencer à pelada selecionada." };
   }
   const { data: canMerge, error: mergeCheckError } = await account.client.rpc("can_merge_profiles_in_league", {
@@ -244,7 +279,6 @@ export async function mergeGuestWithRegistered(guestId: string, registeredId: st
     p_source_id: registeredId,
   });
   if (error) return { success: false, error: error.message };
-
   const affectedRoundIds = Array.isArray(data) ? data.map(String) : [];
   for (const roundId of affectedRoundIds) {
     const result = await calculateRoundStats(roundId);

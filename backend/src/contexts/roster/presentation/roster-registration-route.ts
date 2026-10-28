@@ -4,6 +4,7 @@ import { authenticateBearer } from "../../../presentation/authenticate-bearer.js
 import {
   getRegisteredMergeCandidates,
   getRegistrationHistory,
+  mergeGuestPlayer,
   type RosterRegistrationRepository,
 } from "../application/get-roster-registration.js";
 import { InvalidRosterRegistrationError } from "../domain/roster-registration.js";
@@ -62,6 +63,36 @@ export function registerRosterRegistrationRoutes(app: FastifyInstance, dependenc
         return { players: await getRegisteredMergeCandidates(
           request.params.leagueId, request.params.guestId, authentication.actor, dependencies.repository,
         ) };
+      } catch (error) {
+        return sendFailure(error, request, reply);
+      }
+    },
+  );
+
+  app.post<{ Params: { leagueId: string; guestId: string }; Body: { registeredPlayerId: string } }>(
+    "/api/roster/leagues/:leagueId/players/:guestId/merge",
+    {
+      schema: {
+        params: {
+          type: "object", required: ["leagueId", "guestId"], properties: {
+            leagueId: { type: "string", format: "uuid" }, guestId: { type: "string", format: "uuid" },
+          },
+        },
+        body: {
+          type: "object", additionalProperties: false, required: ["registeredPlayerId"],
+          properties: { registeredPlayerId: { type: "string", format: "uuid" } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const authentication = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
+      try {
+        const result = await mergeGuestPlayer(
+          request.params.leagueId, request.params.guestId, request.body.registeredPlayerId,
+          authentication.actor, dependencies.repository,
+        );
+        return { success: true, playerId: result.playerId, affectedRoundIds: result.affectedRoundIds };
       } catch (error) {
         return sendFailure(error, request, reply);
       }

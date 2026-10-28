@@ -30,3 +30,11 @@
   - Tratamento de nulos: Atletas sem avaliação de velocidade registrada são tratados estritamente em memória com o valor neutro padrão de **2 estrelas** (`2★`), sem persistência de registros desnecessários.
   - O algoritmo `drawTeamsBySpeed` distribui os jogadores em serpentina ordenados por velocidade e realiza otimização por troca local (`localSwap`) para minimizar a variância da média de velocidade entre os times.
   - Proteção de borda: Se `teamCount < 2`, a troca local é abortada imediatamente sem disparar erro de índice.
+
+## 5. Reorganização de Arquitetura: Contexto Roster (Elenco)
+- **Descoberta:** As operações de mutação de jogadores (`savePlayer`, `deletePlayer` e `mergeGuestWithRegistered`) combinam lógica de persistência no PostgreSQL/Supabase, upload/remoção de avatares no Storage e recálculo em cascata (estatísticas de rodadas, recálculo de Fantasy e overall fluido).
+- **Decisão Arquitetural:**
+  - Cada operação no backend foi encapsulada em seu respectivo caso de uso (`save-player-profile`, `get-roster-registration` com `mergePlayers`) rodando transação autenticada com validação de administrador da pelada via `public.is_league_admin()`.
+  - A união de perfis (`mergeGuestWithRegistered`) preserva a verificação `can_merge_profiles_in_league` e a execução da RPC `merge_selectable_player_profiles`, retornando com segurança os `affectedRoundIds` para recálculo.
+  - O gateway `httpRosterGateway` no frontend fornece o contrato tipado `mergeGuestWithRegistered` e as Server Actions mantêm um fallback gracioso para RPCs legadas enquanto as pontes de homologação local estiverem sob feature flags.
+  - Com isso, o contexto `roster` atinge 100% de cobertura (35 de 35 operações migradas).

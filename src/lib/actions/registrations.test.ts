@@ -12,18 +12,19 @@ const mocks = vi.hoisted(() => ({
   markSeen: vi.fn(),
   registrationHistory: vi.fn(),
   mergeCandidates: vi.fn(),
+  mergeGuest: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("@/lib/auth", () => ({ getCurrentAccount: mocks.account }));
 vi.mock("@/lib/league-context", () => ({ getSelectedLeague: mocks.selectedLeague }));
-vi.mock("./stats", () => ({ calculateRoundStats: vi.fn() }));
-vi.mock("./overall", () => ({ refreshFluidOverallSafely: vi.fn() }));
+vi.mock("./stats", () => ({ calculateRoundStats: vi.fn().mockResolvedValue({ success: true }) }));
+vi.mock("./overall", () => ({ refreshFluidOverallSafely: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/modules/roster/infrastructure/roster-api-session", () => ({ rosterApiFor: mocks.rosterApi }));
 
 import {
   getRegisteredMergeCandidates, getRegistrationHistory, getRosterUnreadState, getUnreadRosterPlayers,
-  markRosterActivitySeen, markRosterActivitySeenThrough,
+  markRosterActivitySeen, markRosterActivitySeenThrough, mergeGuestWithRegistered,
 } from "./registrations";
 
 beforeEach(() => {
@@ -124,5 +125,18 @@ describe("leitura do elenco por pelada", () => {
     await expect(getRegisteredMergeCandidates("guest-a")).resolves.toMatchObject([{ id: "player-a" }]);
     expect(mocks.registrationHistory).toHaveBeenCalledWith("league-a");
     expect(mocks.mergeCandidates).toHaveBeenCalledWith("league-a", "guest-a");
+  });
+
+  it("usa a API de elenco para união de perfis quando a flag está ativa", async () => {
+    mocks.rosterApi.mockResolvedValue({
+      mergeGuestWithRegistered: mocks.mergeGuest,
+    });
+    mocks.mergeGuest.mockResolvedValue({ success: true, playerId: "guest-a", affectedRoundIds: [] });
+    await expect(mergeGuestWithRegistered("guest-a", "player-a")).resolves.toEqual({
+      success: true, playerId: "guest-a",
+    });
+    expect(mocks.mergeGuest).toHaveBeenCalledWith("league-a", "guest-a", "player-a");
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/jogadores");
   });
 });

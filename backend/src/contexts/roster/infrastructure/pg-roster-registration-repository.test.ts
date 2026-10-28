@@ -39,4 +39,23 @@ describe("pgRosterRegistrationRepository", () => {
     expect(query).toHaveBeenCalledWith(expect.stringContaining("target.player_id = $2::uuid"), [leagueId, guestId]);
     expect(query).toHaveBeenCalledWith(expect.stringContaining("player.member_category IN"), [leagueId, guestId]);
   });
+
+  it("merges player profiles atomically when league permission and scope check succeed", async () => {
+    const registeredId = "00000000-0000-4000-8000-000000000002";
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("can_merge_profiles_in_league")) return { rows: [{ can_merge: true }] };
+      if (sql.includes("merge_selectable_player_profiles")) return { rows: [{ affected_rounds: ["00000000-0000-4000-8000-000000000100"] }] };
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+    await expect(pgRosterRegistrationRepository(pool).mergePlayers(leagueId, guestId, registeredId, actor))
+      .resolves.toEqual(["00000000-0000-4000-8000-000000000100"]);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("can_merge_profiles_in_league"), [leagueId, guestId, registeredId],
+    );
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("merge_selectable_player_profiles"), [guestId, registeredId],
+    );
+  });
 });

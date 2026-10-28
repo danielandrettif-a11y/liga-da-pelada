@@ -1,6 +1,30 @@
 # Progresso da Implementação: Pontuação BQ v5 e Sorteio por Velocidade
 
-## Status Final
+---
+
+## Reorganização de Arquitetura: Contexto `roster` (Elenco) 100% Concluído (35/35)
+
+- [x] **Operações de Perfil e Gestão (`savePlayer`, `deletePlayer`):**
+  - Implementado domínio em `backend/src/contexts/roster/domain/player-profile.ts`.
+  - Caso de uso e transação autenticada em `backend/src/contexts/roster/application/save-player-profile.ts`.
+  - Repositório PostgreSQL em `backend/src/contexts/roster/infrastructure/pg-player-profile-repository.ts`.
+  - Armazenamento de avatares com Supabase Storage em `backend/src/contexts/roster/infrastructure/supabase-player-avatar-storage.ts`.
+  - Rotas multipart e JSON em `backend/src/contexts/roster/presentation/player-profile-route.ts`.
+  - Suporte completo no gateway HTTP e pontes Server Actions em `src/lib/actions/players.ts`.
+
+- [x] **União de Perfis (`mergeGuestWithRegistered`):**
+  - Validação no domínio em `backend/src/contexts/roster/domain/roster-registration.ts`.
+  - Serviço de aplicação em `backend/src/contexts/roster/application/get-roster-registration.ts`.
+  - Execução atômica e verificação de escopo de liga em `backend/src/contexts/roster/infrastructure/pg-roster-registration-repository.ts`.
+  - Rota `POST /api/roster/leagues/:leagueId/players/:guestId/merge` registrada em `roster-registration-route.ts`.
+  - Gateway HTTP e Server Action em `src/lib/actions/registrations.ts` com fallback gracioso para RPC legada quando a flag de API estiver desativada.
+
+- [x] **Auditoria e Cobertura:**
+  - `npm run audit:migration`: 70 operações em `frontend-migrated` (`identity`: 8/8, `leagues`: 27/27, `roster`: 35/35).
+  - Vitest Backend: 83 arquivos de teste passando (234 testes no total).
+  - Vitest Frontend: 190 arquivos de teste passando (951 testes no total).
+  - Typecheck (`tsc --noEmit`) Frontend e Backend: 0 erros.
+  - Build Backend (`npm --prefix backend run build`): Concluído com sucesso.
 - [x] **Scouts Básicos BQ v5 Unificados:**
   - Módulo canônico `src/lib/bq-scoring.ts` criado com cálculo determinístico em centésimos inteiros.
   - Atualização dos 8 scouts base em `src/lib/ranked-scoring.ts` e `src/lib/fantasy/config.ts`.

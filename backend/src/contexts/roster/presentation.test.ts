@@ -47,9 +47,18 @@ function fixture(enabled: boolean) {
     listSeasonTotals: vi.fn().mockResolvedValue([]),
     listLatestOveralls: vi.fn().mockResolvedValue([]),
   };
+  const playerProfileRepository = {
+    getSaveAccess: vi.fn().mockResolvedValue({ isLeagueAdmin: true, isOwner: false, current: null }),
+    saveProfile: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue({ avatarUrl: null, avatarAlternateUrl: null }),
+  };
+  const playerAvatarStorage = {
+    upload: vi.fn(), remove: vi.fn().mockResolvedValue(undefined), pathFromPublicUrl: vi.fn().mockReturnValue(null),
+  };
   const rosterRegistrationRepository = {
     listHistory: vi.fn().mockResolvedValue([]),
     listMergeCandidates: vi.fn().mockResolvedValue([]),
+    mergePlayers: vi.fn().mockResolvedValue(["00000000-0000-4000-8000-000000000100"]),
   };
   const playerProfilePerformanceRepository = {
     listParticipations: vi.fn().mockResolvedValue([]),
@@ -77,6 +86,8 @@ function fixture(enabled: boolean) {
     playerCatalogRepository,
     playerManagementRepository,
     playerStatisticsRepository,
+    playerProfileRepository,
+    playerAvatarStorage,
     rosterRegistrationRepository,
     playerProfilePerformanceRepository,
     playerAwardsRepository,
@@ -88,6 +99,7 @@ function fixture(enabled: boolean) {
     app, verifier, accountCareerRepository, privateBalanceTagRepository, fitnessRepository,
     speedRatingRepository, rosterActivityRepository, playerCatalogRepository, playerManagementRepository,
     playerStatisticsRepository,
+    playerProfileRepository, playerAvatarStorage,
     rosterRegistrationRepository,
     playerProfilePerformanceRepository, playerAwardsRepository, playerHistoryRepository,
   };
@@ -337,6 +349,40 @@ describe("roster HTTP routes", () => {
     expect(playerManagementRepository.create).not.toHaveBeenCalled();
   });
 
+  it("saves multipart player profiles and deletes through authenticated scoped routes", async () => {
+    const { app, playerProfileRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const boundary = "player-profile-boundary";
+    const payload = Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="name"\r\n\r\nConvidado\r\n`
+      + `--${boundary}\r\nContent-Disposition: form-data; name="member_category"\r\n\r\nguest\r\n`
+      + `--${boundary}--\r\n`,
+    );
+    const headers = {
+      authorization: "Bearer valid-token", "content-type": `multipart/form-data; boundary=${boundary}`,
+    };
+    const saved = await app.inject({
+      method: "POST", url: `/api/roster/leagues/${leagueId}/player-profiles`, headers, payload,
+    });
+    const createdId = saved.json().playerId;
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: `/api/roster/leagues/${leagueId}/players/${playerId}`,
+      headers: { authorization: "Bearer valid-token" },
+    });
+    expect(saved.statusCode).toBe(201);
+    expect(createdId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(deleted.statusCode).toBe(204);
+    expect(playerProfileRepository.saveProfile).toHaveBeenCalledWith(
+      leagueId, expect.objectContaining({ playerId: createdId, name: "Convidado", memberCategory: "guest" }),
+      true, { userId: "verified-user" },
+    );
+    expect(playerProfileRepository.delete).toHaveBeenCalledWith(
+      leagueId, playerId, { userId: "verified-user" },
+    );
+  });
+
   it("lists league registration history and merge candidates for verified admins", async () => {
     const { app, rosterRegistrationRepository } = fixture(true);
     const leagueId = "00000000-0000-4000-8000-000000000010";
@@ -417,5 +463,40 @@ describe("roster HTTP routes", () => {
     expect(playerHistoryRepository.listRoundHistory)
       .toHaveBeenCalledWith(leagueId, playerId, "friendly", { userId: "verified-user" });
     expect(playerHistoryRepository.readAwardHistory).toHaveBeenCalledWith(leagueId, { userId: "verified-user" });
+  });
+
+  it("handles registration history, merge candidates and profile merge routes", async () => {
+    const { app, rosterRegistrationRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const guestId = "00000000-0000-4000-8000-000000000001";
+    const registeredId = "00000000-0000-4000-8000-000000000002";
+    const headers = { authorization: "Bearer valid-token" };
+
+    const history = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/registrations`, headers,
+    });
+    const candidates = await app.inject({
+      method: "GET", url: `/api/roster/leagues/${leagueId}/players/${guestId}/merge-candidates`, headers,
+    });
+    const merge = await app.inject({
+      method: "POST",
+      url: `/api/roster/leagues/${leagueId}/players/${guestId}/merge`,
+      headers,
+      payload: { registeredPlayerId: registeredId },
+    });
+
+    expect(history.json()).toEqual({ events: [] });
+    expect(candidates.json()).toEqual({ players: [] });
+    expect(merge.json()).toEqual({
+      success: true,
+      playerId: guestId,
+      affectedRoundIds: ["00000000-0000-4000-8000-000000000100"],
+    });
+    expect(rosterRegistrationRepository.listHistory)
+      .toHaveBeenCalledWith(leagueId, { userId: "verified-user" });
+    expect(rosterRegistrationRepository.listMergeCandidates)
+      .toHaveBeenCalledWith(leagueId, guestId, { userId: "verified-user" });
+    expect(rosterRegistrationRepository.mergePlayers)
+      .toHaveBeenCalledWith(leagueId, guestId, registeredId, { userId: "verified-user" });
   });
 });

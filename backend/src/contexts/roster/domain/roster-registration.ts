@@ -23,3 +23,15 @@ export function parseRosterRegistrationUuid(value: string, label: string): strin
   }
   return normalized;
 }
+
+export function validatePlayerMergeIds(guestId: string, registeredId: string): {
+  guestId: string;
+  registeredId: string;
+} {
+  const cleanGuest = parseRosterRegistrationUuid(guestId, "Jogador convidado");
+  const cleanRegistered = parseRosterRegistrationUuid(registeredId, "Jogador cadastrado");
+  if (cleanGuest === cleanRegistered) {
+    throw new InvalidRosterRegistrationError("Escolha dois perfis diferentes.");
+  }
+  return { guestId: cleanGuest, registeredId: cleanRegistered };
+}

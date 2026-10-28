@@ -787,6 +787,19 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   if (!playerId && !isLeagueAdmin) {
     return { success: false, error: "Somente administradores podem criar jogadores." };
   }
+  if (!selectedLeague) {
+    return { success: false, error: "Selecione uma pelada antes de salvar o jogador." };
+  }
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      const id = await api.savePlayer(selectedLeague.id, playerId, formData);
+      revalidatePlayerPaths(id);
+      return { success: true, data: { id } };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar o jogador." };
+  }
   const client = account.client;
   if (playerId && !(await playerBelongsToSelectedLeague(playerId, client))) {
     return { success: false, error: "Jogador não pertence à pelada selecionada." };
@@ -1098,6 +1111,21 @@ export async function getRosterGroups(roundType: RoundType = "official") {
 }
 
 export async function deletePlayer(id: string) {
+  const account = await getCurrentAccount();
+  const league = await getSelectedLeague();
+  if (!account.user || !league || league.role !== "admin") {
+    return { success: false, error: "Somente administradores podem excluir jogadores." };
+  }
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      await api.deletePlayer(league.id, id);
+      revalidatePlayerPaths(id);
+      return { success: true };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível excluir o jogador." };
+  }
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem excluir jogadores." };
   if (!(await playerBelongsToSelectedLeague(id, client))) {

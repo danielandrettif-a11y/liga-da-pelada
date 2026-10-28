@@ -231,6 +231,26 @@ describe("httpRosterGateway", () => {
     expect((fetcher.mock.calls[3]?.[1] as RequestInit).body).toBe(JSON.stringify({ names: ["Ana"] }));
   });
 
+  it("sends multipart profile persistence and deletion through scoped routes", async () => {
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ playerId }), {
+        status: 200, headers: { "content-type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const gateway = httpRosterGateway("http://backend:3001", "token", fetcher as typeof fetch);
+    const formData = new FormData();
+    formData.set("name", "Jogador");
+    await expect(gateway.savePlayer(leagueId, playerId, formData)).resolves.toBe(playerId);
+    await expect(gateway.deletePlayer(leagueId, playerId)).resolves.toBeUndefined();
+    const saveOptions = fetcher.mock.calls[0]?.[1] as RequestInit;
+    expect(saveOptions.method).toBe("PATCH");
+    expect(saveOptions.body).toBe(formData);
+    expect(saveOptions.headers).toEqual({ authorization: "Bearer token" });
+    expect((fetcher.mock.calls[1]?.[1] as RequestInit).method).toBe("DELETE");
+  });
+
   it("loads administrative registration history and merge candidates", async () => {
     const leagueId = "00000000-0000-4000-8000-000000000010";
     const guestId = "00000000-0000-4000-8000-000000000001";
@@ -260,6 +280,23 @@ describe("httpRosterGateway", () => {
     await expect(gateway.getRegisteredMergeCandidates(leagueId, guestId)).resolves.toEqual([player]);
     expect((fetcher.mock.calls[0]?.[0] as URL).pathname).toContain("/registrations");
     expect((fetcher.mock.calls[1]?.[0] as URL).pathname).toContain("/merge-candidates");
+  });
+
+  it("merges guest with registered player profile through roster API", async () => {
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const guestId = "00000000-0000-4000-8000-000000000001";
+    const registeredId = "00000000-0000-4000-8000-000000000002";
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      success: true, playerId: guestId, affectedRoundIds: ["00000000-0000-4000-8000-000000000100"],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    const gateway = httpRosterGateway("http://backend:3001", "token", fetcher as typeof fetch);
+    await expect(gateway.mergeGuestWithRegistered(leagueId, guestId, registeredId)).resolves.toEqual({
+      success: true, playerId: guestId, affectedRoundIds: ["00000000-0000-4000-8000-000000000100"],
+    });
+    expect((fetcher.mock.calls[0]?.[0] as URL).pathname).toContain(`/players/${guestId}/merge`);
+    expect(JSON.parse((fetcher.mock.calls[0]?.[1] as RequestInit).body as string)).toEqual({
+      registeredPlayerId: registeredId,
+    });
   });
 
   it("loads player playtime and goals grouped by club", async () => {

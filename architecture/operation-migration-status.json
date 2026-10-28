@@ -786,6 +786,21 @@
     },
     {
       "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "mergeGuestWithRegistered",
+      "state": "frontend-migrated",
+      "target": "POST /api/roster/leagues/:leagueId/players/:guestId/merge",
+      "evidence": [
+        "backend/src/contexts/roster/domain/roster-registration.test.ts",
+        "backend/src/contexts/roster/application/get-roster-registration.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-roster-registration-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/registrations.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
       "source": "src/lib/actions/players.ts",
       "name": "getPlayerPlaytime",
       "state": "frontend-migrated",
@@ -980,6 +995,38 @@
         "backend/src/contexts/roster/infrastructure/pg-player-statistics-repository.test.ts",
         "backend/src/contexts/roster/presentation.test.ts",
         "src/lib/actions/player-statistics.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts",
+        "scripts/verify-local-roster.sh"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "savePlayer",
+      "state": "frontend-migrated",
+      "target": "POST /api/roster/leagues/:leagueId/player-profiles + PATCH /api/roster/leagues/:leagueId/players/:playerId/profile",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-profile.test.ts",
+        "backend/src/contexts/roster/application/save-player-profile.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-profile-repository.test.ts",
+        "backend/src/contexts/roster/infrastructure/supabase-player-avatar-storage.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts",
+        "scripts/verify-local-roster.sh"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "deletePlayer",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/roster/leagues/:leagueId/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/roster/application/save-player-profile.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-profile-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
         "src/modules/roster/infrastructure/http-roster-gateway.test.ts",
         "scripts/verify-local-roster.sh"
       ]

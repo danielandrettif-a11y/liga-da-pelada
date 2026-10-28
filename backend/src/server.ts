@@ -27,6 +27,8 @@ import { pgPlayerAwardsRepository } from "./contexts/roster/infrastructure/pg-pl
 import { pgPlayerHistoryRepository } from "./contexts/roster/infrastructure/pg-player-history-repository.js";
 import { pgPlayerManagementRepository } from "./contexts/roster/infrastructure/pg-player-management-repository.js";
 import { pgPlayerStatisticsRepository } from "./contexts/roster/infrastructure/pg-player-statistics-repository.js";
+import { pgPlayerProfileRepository } from "./contexts/roster/infrastructure/pg-player-profile-repository.js";
+import { supabasePlayerAvatarStorage } from "./contexts/roster/infrastructure/supabase-player-avatar-storage.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -46,8 +48,8 @@ const appPublicUrl = process.env.APP_PUBLIC_URL;
 if ((goalsEnabled || leaguesEnabled || identityEnabled || rosterEnabled) && (!databaseUrl || !authUrl || !publishableKey)) {
   throw new Error("APIs habilitadas requerem DATABASE_URL, SUPABASE_INTERNAL_URL e SUPABASE_PUBLISHABLE_KEY.");
 }
-if (leaguesEnabled && !publicUrl) {
-  throw new Error("ENABLE_LEAGUE_API=true requer SUPABASE_PUBLIC_URL para as imagens públicas.");
+if ((leaguesEnabled || rosterEnabled) && !publicUrl) {
+  throw new Error("ENABLE_LEAGUE_API=true ou ENABLE_ROSTER_API=true requer SUPABASE_PUBLIC_URL para imagens públicas.");
 }
 if (identityEnabled && (!publicUrl || !appPublicUrl)) {
   throw new Error("ENABLE_IDENTITY_API=true requer SUPABASE_PUBLIC_URL e APP_PUBLIC_URL.");
@@ -92,6 +94,10 @@ const app = createApp({
   playerHistoryRepository: pgPlayerHistoryRepository(pool),
   playerManagementRepository: pgPlayerManagementRepository(pool),
   playerStatisticsRepository: pgPlayerStatisticsRepository(pool),
+  playerProfileRepository: pgPlayerProfileRepository(pool),
+  playerAvatarStorage: supabasePlayerAvatarStorage(
+    authUrl || "http://127.0.0.1:54321", publicUrl || "http://127.0.0.1:54321", publishableKey || "",
+  ),
 });
 
 try {

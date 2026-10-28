@@ -54,12 +54,18 @@ player_create_file="$(mktemp /tmp/liga-roster-player-create-XXXXXX.json)"
 player_update_file="$(mktemp /tmp/liga-roster-player-update-XXXXXX.json)"
 player_import_file="$(mktemp /tmp/liga-roster-player-import-XXXXXX.json)"
 player_swap_file="$(mktemp /tmp/liga-roster-player-swap-XXXXXX.json)"
+player_profile_create_file="$(mktemp /tmp/liga-roster-profile-create-XXXXXX.json)"
+player_profile_update_file="$(mktemp /tmp/liga-roster-profile-update-XXXXXX.json)"
+player_profile_delete_file="$(mktemp /tmp/liga-roster-profile-delete-XXXXXX.json)"
+player_profile_avatar_file="$(mktemp /tmp/liga-roster-profile-avatar-XXXXXX.png)"
 smoke_created_player_id=""
 smoke_imported_player_id=""
+smoke_profile_player_id=""
 cleanup_smoke_players() {
   local player_ids=()
   [[ "$smoke_created_player_id" =~ ^[0-9a-f-]{36}$ ]] && player_ids+=("'$smoke_created_player_id'::uuid")
   [[ "$smoke_imported_player_id" =~ ^[0-9a-f-]{36}$ ]] && player_ids+=("'$smoke_imported_player_id'::uuid")
+  [[ "$smoke_profile_player_id" =~ ^[0-9a-f-]{36}$ ]] && player_ids+=("'$smoke_profile_player_id'::uuid")
   if [[ "${#player_ids[@]}" -gt 0 ]]; then
     local joined
     joined="$(IFS=,; echo "${player_ids[*]}")"
@@ -78,7 +84,9 @@ cleanup_roster_smoke() {
     "$merge_candidates_file" "$player_playtime_file" "$player_club_goals_file" \
     "$player_monthly_awards_file" "$player_belts_file" "$monthly_winners_file" \
     "$player_round_history_file" "$player_award_seasons_file" "$player_create_file" \
-    "$player_update_file" "$player_import_file" "$player_swap_file"
+    "$player_update_file" "$player_import_file" "$player_swap_file" \
+    "$player_profile_create_file" "$player_profile_update_file" "$player_profile_delete_file" \
+    "$player_profile_avatar_file"
 }
 trap cleanup_roster_smoke EXIT
 
@@ -320,6 +328,53 @@ PY
   fi
   printf 'player_create=%s player_update=%s player_swap=%s guest_import=%s valid=1\n' \
     "$player_create_status" "$player_update_status" "$player_swap_status" "$player_import_status"
+
+  printf 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' \
+    | base64 -d > "$player_profile_avatar_file"
+  player_profile_create_status="$(curl -sS -o "$player_profile_create_file" -w '%{http_code}' \
+    -H "Authorization: Bearer $speed_token" \
+    -F "name=Codex profile $smoke_suffix" -F 'member_category=guest' \
+    -F 'player_profile=offensive' -F 'overall_traits=offensive' \
+    -F "avatar_active=@$player_profile_avatar_file;type=image/png" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/player-profiles")"
+  smoke_profile_player_id="$(python3 - "$player_profile_create_file" <<'PY'
+import json, re, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    player_id = json.load(source).get("playerId", "")
+print(player_id if isinstance(player_id, str) and re.fullmatch(r"[0-9a-f-]{36}", player_id) else "")
+PY
+)"
+  if [[ "$player_profile_create_status" != "201" || -z "$smoke_profile_player_id" ]]; then
+    echo "Criação multipart do perfil descartável falhou ($player_profile_create_status)." >&2
+    cat "$player_profile_create_file" >&2
+    exit 1
+  fi
+  player_profile_update_status="$(curl -sS -o "$player_profile_update_file" -w '%{http_code}' \
+    -X PATCH -H "Authorization: Bearer $speed_token" \
+    -F 'name=Codex profile atualizado' -F 'nickname=Multipart BQ' -F 'member_category=guest' \
+    -F 'player_profile=defensive' -F 'overall_traits=defensive' \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/players/$smoke_profile_player_id/profile")"
+  profile_nickname="$(docker exec "$database_container" psql -U postgres -d postgres -Atc \
+    "SELECT nickname FROM public.players WHERE id = '$smoke_profile_player_id'::uuid")"
+  profile_object_count="$(docker exec "$database_container" psql -U postgres -d postgres -Atc \
+    "SELECT count(*) FROM storage.objects WHERE bucket_id = 'player-avatars' AND name LIKE '$smoke_profile_player_id/%'")"
+  player_profile_delete_status="$(curl -sS -o "$player_profile_delete_file" -w '%{http_code}' \
+    -X DELETE -H "Authorization: Bearer $speed_token" \
+    "${backend_url%/}/api/roster/leagues/$speed_league_id/players/$smoke_profile_player_id")"
+  profile_residual_count="$(docker exec "$database_container" psql -U postgres -d postgres -Atc \
+    "SELECT count(*) FROM public.players WHERE id = '$smoke_profile_player_id'::uuid")"
+  profile_object_residual="$(docker exec "$database_container" psql -U postgres -d postgres -Atc \
+    "SELECT count(*) FROM storage.objects WHERE bucket_id = 'player-avatars' AND name LIKE '$smoke_profile_player_id/%'")"
+  printf 'player_profile_create=%s update=%s delete=%s objects=%s residual=%s storage_residual=%s\n' \
+    "$player_profile_create_status" "$player_profile_update_status" "$player_profile_delete_status" \
+    "$profile_object_count" "$profile_residual_count" "$profile_object_residual"
+  if [[ "$player_profile_update_status" != "200" || "$profile_nickname" != "Multipart BQ" \
+    || "$profile_object_count" != "1" || "$player_profile_delete_status" != "204" \
+    || "$profile_residual_count" != "0" || "$profile_object_residual" != "0" ]]; then
+    echo "Persistência multipart ou exclusão do perfil descartável falhou." >&2
+    exit 1
+  fi
+  smoke_profile_player_id=""
   cleanup_smoke_players
   cleanup_count="$(docker exec "$database_container" psql -U postgres -d postgres -Atc \
     "SELECT count(*) FROM public.players WHERE id IN ('$smoke_created_player_id'::uuid, '$smoke_imported_player_id'::uuid)")"
