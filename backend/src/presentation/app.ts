@@ -35,6 +35,7 @@ import type {
   PlayerAvatarStorage,
   PlayerProfileRepository,
 } from "../contexts/roster/application/save-player-profile.js";
+import type { CallupRepository } from "../contexts/callups/application/manage-callups.js";
 import { registerGoalRoutes } from "../contexts/matches/presentation/goals-route.js";
 import { registerLeagueRoutes } from "../contexts/leagues/presentation/leagues-route.js";
 import { registerLeagueConfigRoutes } from "../contexts/leagues/presentation/league-config-route.js";
@@ -57,6 +58,7 @@ import { registerPlayerHistoryRoutes } from "../contexts/roster/presentation/pla
 import { registerPlayerManagementRoutes } from "../contexts/roster/presentation/player-management-route.js";
 import { registerPlayerStatisticsRoutes } from "../contexts/roster/presentation/player-statistics-route.js";
 import { registerPlayerProfileRoutes } from "../contexts/roster/presentation/player-profile-route.js";
+import { registerCallupRoutes } from "../contexts/callups/presentation/callups-route.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 
 export function createApp(dependencies: {
@@ -64,6 +66,7 @@ export function createApp(dependencies: {
   leaguesEnabled?: boolean;
   identityEnabled?: boolean;
   rosterEnabled?: boolean;
+  callupsEnabled?: boolean;
   verifier: UserVerifier;
   repository: GoalRepository;
   leagueRepository?: LeagueRepository;
@@ -95,6 +98,7 @@ export function createApp(dependencies: {
   playerStatisticsRepository?: PlayerStatisticsRepository;
   playerProfileRepository?: PlayerProfileRepository;
   playerAvatarStorage?: PlayerAvatarStorage;
+  callupRepository?: CallupRepository;
   logger?: boolean;
 }): FastifyInstance {
   if (dependencies.leaguesEnabled && !dependencies.leagueRepository) {
@@ -139,6 +143,9 @@ export function createApp(dependencies: {
     || !dependencies.playerStatisticsRepository || !dependencies.playerProfileRepository
     || !dependencies.playerAvatarStorage)) {
     throw new Error("Dependências de elenco são obrigatórias quando ENABLE_ROSTER_API=true.");
+  }
+  if (dependencies.callupsEnabled && !dependencies.callupRepository) {
+    throw new Error("CallupRepository é obrigatório quando ENABLE_CALLUPS_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
   void app.register(multipart);
@@ -269,6 +276,12 @@ export function createApp(dependencies: {
     registerPlayerHistoryRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.playerHistoryRepository,
+    });
+  }
+  if (dependencies.callupsEnabled && dependencies.callupRepository) {
+    registerCallupRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.callupRepository,
     });
   }
   return app;

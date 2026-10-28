@@ -1041,6 +1041,342 @@
         "backend/src/contexts/matches/presentation/goals-route.ts",
         "backend/src/presentation/app.test.ts"
       ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "addRosterPlayersToCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/players",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "addRosterPlayerToCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/players",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "adminAddCallupPlayer",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/players",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "adminRemoveCallupPlayer",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/callups/leagues/:leagueId/:callupId/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "closeCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/close",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "createCallupPrelist",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/prelist",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getActiveCallup",
+      "state": "frontend-migrated",
+      "target": "GET /api/callups/leagues/:leagueId/active",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getActiveCallupById",
+      "state": "frontend-migrated",
+      "target": "GET /api/callups/leagues/:leagueId/active",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getActiveCallups",
+      "state": "frontend-migrated",
+      "target": "GET /api/callups/leagues/:leagueId/active",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getAgendaCallups",
+      "state": "frontend-migrated",
+      "target": "GET /api/callups/leagues/:leagueId/agenda",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "hasActiveCallup",
+      "state": "frontend-migrated",
+      "target": "GET /api/callups/leagues/:leagueId/active",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "inviteGuestListToCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/guest-list",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "inviteGuestToCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/guests",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "joinActiveCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/join",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "leaveActiveCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/leave",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "lockCallupForRound",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/lock",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "openCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "removeCallupEntry",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/callups/leagues/:leagueId/:callupId/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "repairMyPlayerAccount",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/repair-player",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "setCallupVisibility",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/callups/leagues/:leagueId/:callupId/visibility",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "updateCallup",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/callups/leagues/:leagueId/:callupId",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
     }
   ]
 }

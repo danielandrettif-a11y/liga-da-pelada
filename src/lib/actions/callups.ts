@@ -30,6 +30,7 @@ import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getSelectedLeague } from "../league-context";
 import { createServiceClient } from "../supabase/service";
 import { resolveCallupInvite } from "../callup-invite-server";
+import { callupApiFor } from "@/modules/callups/infrastructure/callup-api-session";
 
 export type CallupEntryWithPlayer = CallupEntry & {
   player: Player;
@@ -136,6 +137,15 @@ export async function getActiveCallups(invite?: { callupId?: string; inviteToken
   const league = await getSelectedLeague();
   if (!league && !invitedCallupId) return [];
 
+  try {
+    const api = await callupApiFor(client);
+    if (api && (league || invitedCallupId)) {
+      return await api.listActive(league?.id || "", invitedCallupId || undefined);
+    }
+  } catch (error) {
+    console.error("Erro ao buscar convocação via API:", error);
+  }
+
   let query = readClient
     .from("callups")
     .select(`
@@ -210,6 +220,16 @@ export async function getAgendaCallups() {
   const { client, user } = await getCurrentAccount();
   const league = await getSelectedLeague();
   if (!user || !league) return [];
+
+  try {
+    const api = await callupApiFor(client);
+    if (api) {
+      return await api.listAgenda(league.id);
+    }
+  } catch (error) {
+    console.error("Erro ao buscar convocações da agenda via API:", error);
+  }
+
   const { data, error } = await client.from("callups")
     .select("id, league_id, date, start_time, round_type, status, round_id, created_at, callup_entries(count)")
     .eq("league_id", league.id)
@@ -242,6 +262,26 @@ export async function openCallup(formData: FormData) {
   const request = league.feature_tier === "quick"
     ? { ...parsedRequest, roundType: "friendly" as const }
     : parsedRequest;
+
+  try {
+    const api = await callupApiFor(client);
+    if (api) {
+      const res = await api.openCallup(league.id, {
+        date: request.date,
+        startTime: request.startTime,
+        stadiumId: request.stadiumId,
+        roundType: request.roundType,
+        playersPerTeam: request.requestedPlayersPerTeam ? Number(request.requestedPlayersPerTeam) : null,
+        teamsPerRound: request.requestedTeamsPerRound ? Number(request.requestedTeamsPerRound) : null,
+      });
+      refreshCallups();
+      return { success: true as const, id: res.callupId, callupId: res.callupId, roundId: undefined };
+    }
+  } catch (error: any) {
+    console.error("Erro ao abrir convocação via API:", error);
+    return { success: false as const, error: error?.message || "Não foi possível abrir a convocação." };
+  }
+
   const result = await openCallupWithPrelist(
     request,
     league.id,
@@ -255,7 +295,22 @@ export async function openCallup(formData: FormData) {
 export async function joinActiveCallup(callupId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre na sua conta para participar." };
-  if (!(await selectedCallup(callupId, account.client))) return { success: false, error: "Convocação fora da pelada selecionada." };
+  const callup = await selectedCallup(callupId, account.client);
+  if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
+
+  try {
+    const api = await callupApiFor(account.client);
+    if (api) {
+      const res = await api.joinCallup(callup.league_id, callupId);
+      refreshCallups();
+      const status: "confirmed" | "waitlist" = res.status === "confirmed" ? "confirmed" : "waitlist";
+      return { success: true, status };
+    }
+  } catch (error: any) {
+    console.error("Erro ao entrar na convocação via API:", error);
+    return { success: false, error: error?.message || "Não foi possível entrar na convocação." };
+  }
+
   const result = await joinSelectedCallup(callupId, supabaseCallupParticipationGateway(account.client));
   if (result.success) refreshCallups();
   return result;
@@ -266,6 +321,24 @@ export async function leaveActiveCallup(callupId: string) {
   if (!account.user) return { success: false, error: "Entre na sua conta para sair." };
   const callup = await selectedCallup(callupId, account.client);
   if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
+
+  try {
+    const api = await callupApiFor(account.client);
+    if (api) {
+      const res = await api.leaveCallup(callup.league_id, callupId);
+      refreshCallups();
+      revalidatePath("/rodadas");
+      if (res.roundId) {
+        revalidatePath(`/rodadas/${res.roundId}`);
+        revalidatePath(`/rodadas/${res.roundId}/nova-partida`);
+      }
+      return { success: true };
+    }
+  } catch (error: any) {
+    console.error("Erro ao sair da convocação via API:", error);
+    return { success: false, error: error?.message || "Não foi possível sair da convocação." };
+  }
+
   const result = await leaveSelectedCallup(
     callupId, callup.league_id, account.user.id, supabaseCallupParticipationGateway(account.client),
   );
@@ -282,9 +355,23 @@ export async function leaveActiveCallup(callupId: string) {
 export async function adminAddCallupPlayer(callupId: string, playerId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false as const, error: "Somente administradores podem alterar a lista." };
-  if (!(await selectedCallup(callupId, client)) || !(await selectedRosterPlayer(playerId, client))) {
+  const callup = await selectedCallup(callupId, client);
+  if (!callup || !(await selectedRosterPlayer(playerId, client))) {
     return { success: false as const, error: "Convocação ou jogador fora da pelada selecionada." };
   }
+
+  try {
+    const api = await callupApiFor(client);
+    if (api) {
+      const res = await api.addPlayer(callup.league_id, callupId, playerId, true);
+      refreshCallups();
+      return { success: true as const, status: res.status };
+    }
+  } catch (error: any) {
+    console.error("Erro ao adicionar jogador via API:", error);
+    return { success: false as const, error: error?.message || "Não foi possível adicionar o jogador." };
+  }
+
   const result = await addOtherCallupPlayer(callupId, playerId, "admin", supabaseCallupPlayersGateway(client));
   if (result.success) refreshCallups();
   return result;
@@ -293,6 +380,18 @@ export async function adminAddCallupPlayer(callupId: string, playerId: string) {
 export async function repairMyPlayerAccount() {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre na sua conta para concluir o cadastro." };
+
+  try {
+    const api = await callupApiFor(account.client);
+    if (api) {
+      const res = await api.repairMyPlayer();
+      refreshCallups();
+      return { success: true, playerId: res.playerId };
+    }
+  } catch (error: any) {
+    console.error("Erro ao reparar conta via API:", error);
+  }
+
   const { data, error } = await account.client.rpc("ensure_my_player_account");
   if (error) return { success: false, error: error.message };
   refreshCallups();
@@ -307,8 +406,21 @@ export async function repairMyPlayerAccount() {
 export async function addRosterPlayerToCallup(callupId: string, playerId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre na sua conta para alterar a lista." };
-  if (!(await selectedCallup(callupId, account.client)) || !(await selectedRosterPlayer(playerId, account.client))) {
+  const callup = await selectedCallup(callupId, account.client);
+  if (!callup || !(await selectedRosterPlayer(playerId, account.client))) {
     return { success: false, error: "Convocação ou jogador fora da pelada selecionada." };
+  }
+
+  try {
+    const api = await callupApiFor(account.client);
+    if (api) {
+      const res = await api.addPlayer(callup.league_id, callupId, playerId, false);
+      refreshCallups();
+      return { success: true, status: res.status };
+    }
+  } catch (error: any) {
+    console.error("Erro ao adicionar jogador do elenco via API:", error);
+    return { success: false, error: error?.message || "Não foi possível adicionar o jogador." };
   }
 
   const result = await addOtherCallupPlayer(callupId, playerId, "member", supabaseCallupPlayersGateway(account.client));
@@ -353,6 +465,33 @@ export async function addRosterPlayersToCallup(callupId: string, playerIds: stri
     return { success: false as const, error: "Um ou mais jogadores não pertencem ao elenco desta pelada." };
   }
 
+  try {
+    const api = await callupApiFor(account.client);
+    if (api) {
+      const results = await Promise.all(allowedIds.map(async (playerId): Promise<{ success: true; error?: undefined } | { success: false; error: string }> => {
+        try {
+          await api.addPlayer(callup.league_id, callupId, playerId, false);
+          return { success: true };
+        } catch (err: any) {
+          return { success: false, error: err?.message || "Erro ao adicionar jogador." };
+        }
+      }));
+      const failed = results.filter((r): r is { success: false; error: string } => !r.success);
+      if (failed.length === results.length) {
+        return { success: false as const, error: failed[0]?.error || "Não foi possível adicionar os jogadores." };
+      }
+      refreshCallups();
+      return {
+        success: true as const,
+        added: results.length - failed.length,
+        failed: failed.length,
+        error: failed.length ? `${failed.length} jogador(es) não puderam ser adicionados.` : undefined,
+      };
+    }
+  } catch (error: any) {
+    console.error("Erro ao adicionar jogadores em lote via API:", error);
+  }
+
   const gateway = supabaseCallupPlayersGateway(account.client);
   const results = await Promise.all(allowedIds.map((playerId) =>
     addOtherCallupPlayer(callupId, playerId, "member", gateway),
@@ -373,7 +512,21 @@ export async function addRosterPlayersToCallup(callupId: string, playerIds: stri
 export async function adminRemoveCallupPlayer(callupId: string, playerId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem alterar a lista." };
-  if (!(await selectedCallup(callupId, client))) return { success: false, error: "Convocação fora da pelada selecionada." };
+  const callup = await selectedCallup(callupId, client);
+  if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
+
+  try {
+    const api = await callupApiFor(client);
+    if (api) {
+      await api.removePlayer(callup.league_id, callupId, playerId, true);
+      refreshCallups();
+      return { success: true };
+    }
+  } catch (error: any) {
+    console.error("Erro ao remover jogador via API:", error);
+    return { success: false, error: error?.message || "Não foi possível remover o jogador." };
+  }
+
   const result = await removeOtherCallupPlayerAsAdmin(callupId, playerId, supabaseCallupPlayersGateway(client));
   if (result.success) refreshCallups();
   return result;
@@ -398,7 +551,21 @@ export async function inviteGuestToCallup({
   if (!account.user) {
     return { success: false, error: "Entre na sua conta para contratar um amigo." };
   }
-  if (!(await selectedCallup(callupId, account.client))) return { success: false, error: "Convocação fora da pelada selecionada." };
+  const callup = await selectedCallup(callupId, account.client);
+  if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
+
+  try {
+    const api = await callupApiFor(account.client);
+    if (api) {
+      const res = await api.inviteGuest(callup.league_id, callupId, { name, playerProfile, isGoalkeeper });
+      refreshCallups();
+      return { success: true, playerId: res.playerId, status: res.status };
+    }
+  } catch (error: any) {
+    console.error("Erro ao convidar amigo via API:", error);
+    return { success: false, error: error?.message || "Não foi possível convidar o amigo." };
+  }
+
   const result = await inviteCallupGuest(
     { callupId, name, playerProfile, isGoalkeeper },
     supabaseCallupGuestsGateway(account.client),
@@ -485,6 +652,17 @@ export async function inviteGuestListToCallup({
   const ignoredExisting = parsed.filter((guest) => existingNames.has(normalizeCallupGuestName(guest.name))).map((guest) => guest.name);
   const guests = parsed.filter((guest) => !existingNames.has(normalizeCallupGuestName(guest.name)));
 
+  try {
+    const api = await callupApiFor(client);
+    if (api) {
+      const res = await api.inviteGuestList(callup.league_id, callupId, guests, playerProfile);
+      if (res.created > 0) refreshCallups();
+      return { success: true, ...res, ignoredExisting };
+    }
+  } catch (error: any) {
+    console.error("Erro ao importar lista de convidados via API:", error);
+  }
+
   const result = await inviteCallupGuestList(
     { callupId, guests, playerProfile },
     supabaseCallupGuestsGateway(client),
@@ -505,6 +683,22 @@ export async function removeCallupEntry(callupId: string, playerId: string) {
   const client = account.client;
   const callup = await selectedCallup(callupId, client);
   if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
+
+  try {
+    const api = await callupApiFor(client);
+    if (api) {
+      const res = await api.removePlayer(callup.league_id, callupId, playerId, account.isAdmin);
+      refreshCallups();
+      if (res.revalidateRoundId) {
+        revalidatePath(`/rodadas/${res.revalidateRoundId}`);
+        revalidatePath(`/rodadas/${res.revalidateRoundId}/nova-partida`);
+      }
+      return { success: true };
+    }
+  } catch (error: any) {
+    console.error("Erro ao remover entrada via API:", error);
+  }
+
   const result = await removeCallupEntryForAccount(
     { callupId, playerId, leagueId: callup.league_id, isAdmin: account.isAdmin },
     supabaseCallupGuestsGateway(client),
@@ -533,9 +727,23 @@ async function prepareSelectedCallupPrelist(
   callupId: string,
   client: Awaited<ReturnType<typeof getCurrentAccount>>["client"],
 ): Promise<PublicPrelistResult> {
-  if (!(await selectedCallup(callupId, client))) return { success: false as const, error: "Convocação fora da pelada selecionada." };
+  const callup = await selectedCallup(callupId, client);
+  if (!callup) return { success: false as const, error: "Convocação fora da pelada selecionada." };
   const selectedLeague = await getSelectedLeague();
   if (!selectedLeague) return { success: false as const, error: "Selecione uma pelada antes de criar a pré-lista." };
+
+  try {
+    const api = await callupApiFor(client);
+    if (api) {
+      const res = await api.createPrelist(selectedLeague.id, callupId);
+      refreshCallups();
+      revalidatePath("/cartola");
+      return { success: true as const, roundId: res.roundId };
+    }
+  } catch (error: any) {
+    console.error("Erro ao criar pré-lista via API:", error);
+  }
+
   const result = await prepareCallupPrelist(
     callupId,
     selectedLeague,
@@ -555,6 +763,19 @@ export async function closeCallup(callupId: string) {
   if (!client) return { success: false, error: "Somente administradores podem fechar convocacoes." };
   const callup = await selectedCallup(callupId, client);
   if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
+
+  try {
+    const api = await callupApiFor(client);
+    if (api) {
+      await api.closeCallup(callup.league_id, callupId);
+      refreshCallups();
+      return { success: true };
+    }
+  } catch (error: any) {
+    console.error("Erro ao fechar convocação via API:", error);
+    return { success: false, error: error?.message || "Não foi possível fechar a convocação." };
+  }
+
   const result = await closeSelectedCallup(callupId, callup.league_id, supabaseCallupManagementGateway(client));
   if (result.success) refreshCallups();
   return result;
@@ -565,6 +786,19 @@ export async function setCallupVisibility(callupId: string, isPublic: boolean) {
   if (!client) return { success: false, error: "Somente administradores podem alterar a visibilidade da convocação." };
   const callup = await selectedCallup(callupId, client);
   if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
+
+  try {
+    const api = await callupApiFor(client);
+    if (api) {
+      await api.setVisibility(callup.league_id, callupId, isPublic);
+      refreshCallups();
+      return { success: true };
+    }
+  } catch (error: any) {
+    console.error("Erro ao alterar visibilidade via API:", error);
+    return { success: false, error: error?.message || "Não foi possível alterar a visibilidade." };
+  }
+
   const result = await changeCallupVisibility(callupId, callup.league_id, isPublic, supabaseCallupManagementGateway(client));
   if (result.success) refreshCallups();
   return result;
@@ -575,6 +809,19 @@ export async function lockCallupForRound(callupId: string) {
   if (!client) return { success: false, error: "Somente administradores podem montar a rodada." };
   const callup = await selectedCallup(callupId, client);
   if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
+
+  try {
+    const api = await callupApiFor(client);
+    if (api) {
+      await api.lockCallup(callup.league_id, callupId);
+      refreshCallups();
+      return { success: true };
+    }
+  } catch (error: any) {
+    console.error("Erro ao trancar convocação via API:", error);
+    return { success: false, error: error?.message || "Não foi possível trancar a convocação." };
+  }
+
   const result = await lockSelectedCallup(callupId, callup.league_id, supabaseCallupManagementGateway(client));
   if (result.success) refreshCallups();
   return result;
@@ -584,7 +831,8 @@ export async function updateCallup(formData: FormData) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem editar convocações." };
   const callupId = String(formData.get("callup_id") || "");
-  if (!(await selectedCallup(callupId, client))) return { success: false, error: "Convocação fora da pelada selecionada." };
+  const callup = await selectedCallup(callupId, client);
+  if (!callup) return { success: false, error: "Convocação fora da pelada selecionada." };
   const parsedRequest = parseEditCallupRequest({
     callupId,
     date: String(formData.get("date") || ""),
@@ -597,6 +845,24 @@ export async function updateCallup(formData: FormData) {
   const request = league.feature_tier === "quick"
     ? { ...parsedRequest, roundType: "friendly" as const }
     : parsedRequest;
+
+  try {
+    const api = await callupApiFor(client);
+    if (api) {
+      await api.updateCallup(league.id, callupId, {
+        date: request.date,
+        startTime: request.startTime,
+        stadiumId: request.stadiumId,
+        roundType: request.roundType,
+      });
+      refreshCallups();
+      return { success: true };
+    }
+  } catch (error: any) {
+    console.error("Erro ao editar convocação via API:", error);
+    return { success: false, error: error?.message || "Não foi possível editar a convocação." };
+  }
+
   const result = await editCallup(request, league.id, supabaseCallupEditingGateway(client));
   if (result.success) refreshCallups();
   return result;
