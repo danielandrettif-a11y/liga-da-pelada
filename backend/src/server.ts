@@ -30,6 +30,7 @@ import { pgPlayerStatisticsRepository } from "./contexts/roster/infrastructure/p
 import { pgPlayerProfileRepository } from "./contexts/roster/infrastructure/pg-player-profile-repository.js";
 import { supabasePlayerAvatarStorage } from "./contexts/roster/infrastructure/supabase-player-avatar-storage.js";
 import { pgCallupRepository } from "./contexts/callups/infrastructure/pg-callup-repository.js";
+import { pgRoundRepository } from "./contexts/rounds/infrastructure/pg-round-repository.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -37,6 +38,7 @@ const leaguesEnabled = process.env.ENABLE_LEAGUE_API === "true";
 const identityEnabled = process.env.ENABLE_IDENTITY_API === "true";
 const rosterEnabled = process.env.ENABLE_ROSTER_API === "true";
 const callupsEnabled = process.env.ENABLE_CALLUPS_API === "true";
+const roundsEnabled = process.env.ENABLE_ROUNDS_API === "true";
 const port = Number(process.env.PORT || "3001");
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("PORT inválida.");
@@ -47,7 +49,7 @@ const authUrl = process.env.SUPABASE_INTERNAL_URL;
 const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
 const publicUrl = process.env.SUPABASE_PUBLIC_URL;
 const appPublicUrl = process.env.APP_PUBLIC_URL;
-if ((goalsEnabled || leaguesEnabled || identityEnabled || rosterEnabled || callupsEnabled) && (!databaseUrl || !authUrl || !publishableKey)) {
+if ((goalsEnabled || leaguesEnabled || identityEnabled || rosterEnabled || callupsEnabled || roundsEnabled) && (!databaseUrl || !authUrl || !publishableKey)) {
   throw new Error("APIs habilitadas requerem DATABASE_URL, SUPABASE_INTERNAL_URL e SUPABASE_PUBLISHABLE_KEY.");
 }
 if ((leaguesEnabled || rosterEnabled) && !publicUrl) {
@@ -64,6 +66,7 @@ const app = createApp({
   identityEnabled,
   rosterEnabled,
   callupsEnabled,
+  roundsEnabled,
   verifier: supabaseUserVerifier(authUrl || "http://127.0.0.1:54321", publishableKey || ""),
   repository: pgGoalRepository(pool),
   leagueRepository: pgLeagueRepository(pool),
@@ -102,6 +105,7 @@ const app = createApp({
     authUrl || "http://127.0.0.1:54321", publicUrl || "http://127.0.0.1:54321", publishableKey || "",
   ),
   callupRepository: pgCallupRepository(pool),
+  roundRepository: pgRoundRepository(pool),
 });
 
 try {

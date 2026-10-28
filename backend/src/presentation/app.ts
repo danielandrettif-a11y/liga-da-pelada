@@ -36,6 +36,7 @@ import type {
   PlayerProfileRepository,
 } from "../contexts/roster/application/save-player-profile.js";
 import type { CallupRepository } from "../contexts/callups/application/manage-callups.js";
+import type { RoundRepository } from "../contexts/rounds/application/manage-rounds.js";
 import { registerGoalRoutes } from "../contexts/matches/presentation/goals-route.js";
 import { registerLeagueRoutes } from "../contexts/leagues/presentation/leagues-route.js";
 import { registerLeagueConfigRoutes } from "../contexts/leagues/presentation/league-config-route.js";
@@ -59,6 +60,7 @@ import { registerPlayerManagementRoutes } from "../contexts/roster/presentation/
 import { registerPlayerStatisticsRoutes } from "../contexts/roster/presentation/player-statistics-route.js";
 import { registerPlayerProfileRoutes } from "../contexts/roster/presentation/player-profile-route.js";
 import { registerCallupRoutes } from "../contexts/callups/presentation/callups-route.js";
+import { registerRoundRoutes } from "../contexts/rounds/presentation/rounds-route.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 
 export function createApp(dependencies: {
@@ -67,6 +69,7 @@ export function createApp(dependencies: {
   identityEnabled?: boolean;
   rosterEnabled?: boolean;
   callupsEnabled?: boolean;
+  roundsEnabled?: boolean;
   verifier: UserVerifier;
   repository: GoalRepository;
   leagueRepository?: LeagueRepository;
@@ -99,6 +102,7 @@ export function createApp(dependencies: {
   playerProfileRepository?: PlayerProfileRepository;
   playerAvatarStorage?: PlayerAvatarStorage;
   callupRepository?: CallupRepository;
+  roundRepository?: RoundRepository;
   logger?: boolean;
 }): FastifyInstance {
   if (dependencies.leaguesEnabled && !dependencies.leagueRepository) {
@@ -146,6 +150,9 @@ export function createApp(dependencies: {
   }
   if (dependencies.callupsEnabled && !dependencies.callupRepository) {
     throw new Error("CallupRepository é obrigatório quando ENABLE_CALLUPS_API=true.");
+  }
+  if (dependencies.roundsEnabled && !dependencies.roundRepository) {
+    throw new Error("RoundRepository é obrigatório quando ENABLE_ROUNDS_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
   void app.register(multipart);
@@ -282,6 +289,12 @@ export function createApp(dependencies: {
     registerCallupRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.callupRepository,
+    });
+  }
+  if (dependencies.roundsEnabled && dependencies.roundRepository) {
+    registerRoundRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.roundRepository,
     });
   }
   return app;

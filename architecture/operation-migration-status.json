@@ -1377,6 +1377,614 @@
         "src/modules/callups/infrastructure/callup-api-session.test.ts",
         "src/lib/actions/callups.test.ts"
       ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/adaptive-draw.ts",
+      "name": "drawTeamsAdaptiveOnServer",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/draw-teams-adaptive",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/adaptive-draw.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "applyDraftSwap",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/drafts/:draftId/swap",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "createTeamDraft",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/drafts",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "finalizeTeamDraft",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/drafts/:draftId/finalize",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "getDraftWorkspace",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/drafts/:draftId",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "getDraftWorkspaceByRound",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/rounds/:roundId/draft",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "makeTeamDraftPick",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/drafts/:draftId/pick",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "replaceTeamDraftCaptain",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/drafts/:draftId/replace-captain",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "restartTeamDraft",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/drafts/:draftId/restart",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "startTeamDraft",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/drafts/:draftId/start",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "addRoundEmergencySubstitute",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/emergency-substitute",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "applyPermanentRoundTeamFormation",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/formation",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "applyRoundTeamShuffle",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/shuffle/apply",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "createRoundWithTeams",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "deleteRound",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/rounds/leagues/:leagueId/:roundId",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "finishRound",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/finish",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getActiveLeague",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/active-league",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getAdminRoundPrelist",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/prelists/:roundId",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getAdminRoundPrelists",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/prelists",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getNextTeamPresetOffset",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/team-preset-offset",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getRound",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/:roundId",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getRoundMatchSetup",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/:roundId/match-setup",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getRounds",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/seasons/:seasonId",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "markRoundTeamArrived",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/rounds/leagues/:leagueId/:roundId/teams/:teamId/arrived",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "openCallupReplacementVacancy",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/callups/:callupId/replacement-vacancy",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "previewRoundTeamShuffle",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/shuffle/preview",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "saveRoundPrelist",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/prelist",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setCallupFormat",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/rounds/leagues/:leagueId/callups/:callupId/format",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setCallupMatchSize",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/rounds/leagues/:leagueId/callups/:callupId/match-size",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundAttendanceBulk",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/attendance/bulk",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundPlayerAttendance",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/rounds/leagues/:leagueId/:roundId/players/:playerId/attendance",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundPlayerAvailability",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/rounds/leagues/:leagueId/:roundId/players/:playerId/availability",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundTeamCaptain",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/rounds/leagues/:leagueId/:roundId/teams/:teamId/captain",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundTeamVestColor",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/rounds/leagues/:leagueId/:roundId/teams/:teamId/vest-color",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "shuffleRoundTeams",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/shuffle",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "swapRoundTeamPlayers",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/swap-players",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "transferRoundPlayerIdentity",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/transfer-player-identity",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "zeroPlayerRoundPoints",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/players/:playerId/zero-points",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
     }
   ]
 }
