@@ -14,7 +14,7 @@ import {
   type FantasySettings,
 } from "@/lib/fantasy/config";
 import { type FantasyMarketHealth } from "@/lib/fantasy/market-v11";
-import { parseFantasyMarketReadModel } from "@/lib/fantasy/market-read-model";
+import { isFantasyMarketPlayerEligible, parseFantasyMarketReadModel } from "@/lib/fantasy/market-read-model";
 import { isCompetitiveProfileComplete } from "@/lib/player-eligibility";
 import { applyCaptainMultiplier } from "@/lib/bq-scoring";
 import { inferOneGoalGames } from "@/lib/column-c-scoring";
@@ -535,6 +535,9 @@ export async function getFantasyDashboard() {
     : settings;
   const displayRound = fantasyRound?.round || latestFinishedRound?.round || null;
   const displayRoundId = displayRound?.id || null;
+  const displayCallupIds = (displayRound?.callups || [])
+    .map((callup: any) => callup.id)
+    .filter(Boolean);
   const officialRoundIds = officialFantasyRounds.map((item: any) => item.round?.id).filter(Boolean);
   const matchIds = (displayRound?.matches || []).map((match: any) => match.id);
 
@@ -639,6 +642,7 @@ export async function getFantasyDashboard() {
     { data: priceRows },
     { data: statRows },
     { data: roundParticipants },
+    { data: callupEntries },
     { data: rawLineup },
     { data: latestLineup },
     { data: latestCardActivation },
@@ -667,6 +671,12 @@ export async function getFantasyDashboard() {
       : Promise.resolve({ data: [] as any[] }),
     displayRoundId
       ? account.client.from("round_players").select("player_id").eq("round_id", displayRoundId)
+      : Promise.resolve({ data: [] as any[] }),
+    !isTest && displayCallupIds.length
+      ? account.client
+          .from("callup_entries")
+          .select("player_id, status")
+          .in("callup_id", displayCallupIds)
       : Promise.resolve({ data: [] as any[] }),
     lineupRequest,
     latestLineupRequest,
@@ -733,6 +743,11 @@ export async function getFantasyDashboard() {
 
   const pricePlayerIds = (priceRows || []).map((row: any) => row.player_id);
   const participantIds = (roundParticipants || []).map((row: any) => row.player_id);
+  // Confirmados e fila de espera fazem parte da lista de convocação. Ambos
+  // precisam ficar disponíveis no mercado enquanto a rodada estiver aberta.
+  const calledUpPlayerIds = new Set<string>(
+    (callupEntries || []).map((row: any) => row.player_id),
+  );
 
   // A consulta de jogadores selecionáveis já trouxe os dados completos do elenco.
   // Só buscamos separadamente os participantes/preços que não façam parte dela
@@ -745,7 +760,11 @@ export async function getFantasyDashboard() {
       return [{ ...player, player_profile: membership.player_profile, overall_traits: membership.overall_traits }];
     });
   const selectableById = new Map(normalizedSelectablePlayers.map((player: any) => [player.id, player]));
-  const additionalPlayerIds = [...new Set([...pricePlayerIds, ...participantIds])].filter(
+  const additionalPlayerIds = [...new Set([
+    ...pricePlayerIds,
+    ...participantIds,
+    ...calledUpPlayerIds,
+  ])].filter(
     (playerId) => !selectableById.has(playerId),
   );
   const { data: additionalPlayers } = additionalPlayerIds.length
@@ -1047,8 +1066,12 @@ export async function getFantasyDashboard() {
   });
 
   const market: FantasyMarketPlayer[] = (players || [])
-    .filter((player: any) => isCompetitiveProfileComplete(player))
-    .filter((player: any) => !enforceRankedActivity || rankedActivePlayerIds.has(player.id))
+    .filter((player: any) => isFantasyMarketPlayerEligible({
+      profileComplete: isCompetitiveProfileComplete(player),
+      enforceRecentActivity: enforceRankedActivity,
+      activeRecently: rankedActivePlayerIds.has(player.id),
+      isCalledUp: calledUpPlayerIds.has(player.id),
+    }))
     .map((player: any) => {
       const priceRow = priceByPlayer.get(player.id) as any;
       const stats = statsByPlayer.get(player.id) || {

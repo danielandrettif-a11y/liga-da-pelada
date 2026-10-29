@@ -125,6 +125,9 @@ export function SeasonPassBoard({
             const isCompleted = progress >= item.houses[item.houses.length - 1];
             const isSelected = item.id === selectedStage.id;
             const isLegend = item.houses.includes(40);
+            // Os círculos de foto do banco são menores que as casas da
+            // arquibancada e do campo na arte de fundo.
+            const avatarSize = item.zone === "bench" ? "h-[40%] w-[40%]" : "h-[58%] w-[58%]";
             const shape = item.zone === "stands"
               ? "aspect-[0.87] w-[11.4%] rounded-[12%]"
               : item.zone === "bench"
@@ -149,7 +152,7 @@ export function SeasonPassBoard({
               >
                 <span className="flex h-full w-full flex-col items-center justify-center leading-none">
                   {isCurrent && playerAvatarUrl ? (
-                    <img src={playerAvatarUrl} alt={playerName || "Jogador"} className="h-[58%] w-[58%] rounded-full border border-accent object-cover" />
+                    <img src={playerAvatarUrl} alt={playerName || "Jogador"} className={`${avatarSize} rounded-full border border-accent object-cover`} />
                   ) : isLegend ? (
                     <span className="relative h-[76%] w-[76%] drop-shadow-[0_0_7px_rgba(250,204,21,.7)]">
                       <Image src="/images/cosmetics/house-40/emblema-lenda-campinho-v1.webp" alt="" fill sizes="64px" className="object-contain" />
