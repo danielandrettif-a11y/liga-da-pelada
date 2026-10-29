@@ -8,6 +8,9 @@ const mocks = vi.hoisted(() => ({
   matchApi: vi.fn(),
   calculateRoundStats: vi.fn(),
   refreshFluidOverallSafely: vi.fn(),
+  buildQuickStart: vi.fn(),
+  scheduleMatchTimerAlerts: vi.fn(),
+  sendMatchFinishedNotifications: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -25,6 +28,14 @@ vi.mock("../league-context", () => ({ getSelectedLeague: mocks.selectedLeague })
 vi.mock("@/modules/matches/infrastructure/match-api-session", () => ({ matchApiFor: mocks.matchApi }));
 vi.mock("./stats", () => ({ calculateRoundStats: mocks.calculateRoundStats }));
 vi.mock("./overall", () => ({ refreshFluidOverallSafely: mocks.refreshFluidOverallSafely }));
+vi.mock("@/modules/matches/infrastructure/supabase-finish-match-gateway", () => ({
+  supabaseFinishMatchGateway: () => ({ buildQuickStart: mocks.buildQuickStart }),
+}));
+vi.mock("../match-timer-scheduler", () => ({ scheduleMatchTimerAlerts: mocks.scheduleMatchTimerAlerts }));
+vi.mock("../push-notifications", () => ({
+  sendMatchFinishedNotifications: mocks.sendMatchFinishedNotifications,
+  sendMatchTimerNotifications: vi.fn(),
+}));
 
 import {
   addFinishedGoalEvent,
@@ -88,6 +99,9 @@ describe("matches actions via API gateway", () => {
     mocks.selectedLeague.mockResolvedValue({ id: leagueId, role: "admin" });
     mocks.calculateRoundStats.mockResolvedValue({ success: true });
     mocks.refreshFluidOverallSafely.mockResolvedValue({ success: true });
+    mocks.buildQuickStart.mockResolvedValue({ rotation: null });
+    mocks.scheduleMatchTimerAlerts.mockResolvedValue({ scheduled: true });
+    mocks.sendMatchFinishedNotifications.mockResolvedValue({ sent: 1 });
   });
 
   it("routes findLiveMatchForTeams to API gateway", async () => {
@@ -101,7 +115,11 @@ describe("matches actions via API gateway", () => {
 
   it("routes createMatch to API gateway", async () => {
     mocks.matchApi.mockResolvedValue({
-      createMatch: vi.fn().mockResolvedValue({ success: true, matchId }),
+      createMatch: vi.fn().mockResolvedValue({
+        success: true,
+        matchId,
+        receipt: { duration_seconds: 420, kickoff_at: "2026-10-29T10:00:00.000Z" },
+      }),
     });
 
     const res = await createMatch({
@@ -115,6 +133,9 @@ describe("matches actions via API gateway", () => {
     if (res.success) {
       expect(res.matchId).toBe(matchId);
     }
+    await vi.waitFor(() => expect(mocks.scheduleMatchTimerAlerts).toHaveBeenCalledWith({
+      matchId, durationSeconds: 420, accumulatedSeconds: 0, startedAt: "2026-10-29T10:00:00.000Z",
+    }));
   });
 
   it("routes getMatch to API gateway", async () => {
@@ -137,11 +158,21 @@ describe("matches actions via API gateway", () => {
 
   it("routes finishMatch to API gateway", async () => {
     mocks.matchApi.mockResolvedValue({
-      finishMatch: vi.fn().mockResolvedValue({ success: true, roundId }),
+      finishMatch: vi.fn().mockResolvedValue({
+        success: true,
+        roundId,
+        match: {
+          id: matchId, round_id: roundId, score_a: 2, score_b: 1,
+          team_a: { name: "Time A" }, team_b: { name: "Time B" },
+        },
+      }),
     });
 
     const res = await finishMatch(matchId);
     expect(res.success).toBe(true);
+    expect(mocks.calculateRoundStats).toHaveBeenCalledWith(roundId);
+    expect(mocks.buildQuickStart).toHaveBeenCalledWith(roundId, matchId);
+    await vi.waitFor(() => expect(mocks.sendMatchFinishedNotifications).toHaveBeenCalled());
   });
 
   it("routes deleteMatch to API gateway", async () => {
@@ -151,6 +182,7 @@ describe("matches actions via API gateway", () => {
 
     const res = await deleteMatch(matchId);
     expect(res.success).toBe(true);
+    expect(mocks.calculateRoundStats).toHaveBeenCalledWith(roundId);
   });
 
   it("routes deleteEvent to API gateway", async () => {

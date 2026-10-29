@@ -71,7 +71,25 @@ export async function createMatch(input: CreateMatchInput) {
     const api = await matchApiFor(client);
     if (api && league) {
       const res = await api.createMatch(league.id, input);
-      if (res.matchId) revalidatePath(`/rodadas/${input.round_id}`);
+      const completeAfterCreation = async () => {
+        if (res.receipt?.duration_seconds && res.receipt?.kickoff_at) {
+          try {
+            await scheduleMatchTimerAlerts({
+              matchId: res.matchId,
+              durationSeconds: Number(res.receipt.duration_seconds),
+              accumulatedSeconds: 0,
+              startedAt: String(res.receipt.kickoff_at),
+            });
+          } catch (schedulingError) {
+            console.error("Erro ao agendar alertas da partida:", schedulingError);
+          }
+        }
+        revalidatePath(`/rodadas/${input.round_id}`);
+        revalidatePath("/", "layout");
+        revalidatePath("/convocacao");
+        revalidatePath("/mais");
+      };
+      try { after(completeAfterCreation); } catch { await completeAfterCreation(); }
       return res;
     }
 
@@ -795,13 +813,14 @@ export async function deleteMatch(matchId: string) {
     const api = await matchApiFor(client);
     if (api && league) {
       const res = await api.deleteMatch(league.id, matchId);
+      const derivedWarning = res.roundId ? await refreshDeletedMatchDerivedData(client, res.roundId) : undefined;
       if (res.roundId) {
         revalidatePath(`/rodadas/${res.roundId}`);
         revalidatePath(`/rodadas/${res.roundId}/nova-partida`);
       }
       revalidatePath("/cartola");
       revalidatePath("/ranking");
-      return res;
+      return { ...res, warning: joinWarnings(res.warning, derivedWarning) };
     }
     await getMatchState(client, matchId);
 
@@ -955,6 +974,28 @@ async function refreshFinishedGoalDerivedData(client: SupabaseClient, roundId: s
   }
 }
 
+async function refreshDeletedMatchDerivedData(client: SupabaseClient, roundId: string) {
+  const warnings: string[] = [];
+  try {
+    const stats = await calculateRoundStats(roundId);
+    if (!stats.success) warnings.push(stats.error || "Não foi possível recalcular as estatísticas.");
+  } catch (error) {
+    warnings.push(error instanceof Error ? error.message : "Não foi possível recalcular as estatísticas.");
+  }
+  try {
+    const { data: fantasyRound, error: fantasyRoundError } = await client
+      .from("fantasy_rounds").select("id").eq("round_id", roundId).maybeSingle();
+    if (fantasyRoundError) warnings.push("A partida foi apagada, mas não foi possível localizar a rodada do Cartola.");
+    if (fantasyRound) {
+      const { error } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: roundId });
+      if (error) warnings.push(`A partida foi apagada, mas o Cartola precisa ser reprocessado: ${error.message}`);
+    }
+  } catch (error) {
+    warnings.push(error instanceof Error ? error.message : "O Cartola precisa ser reprocessado.");
+  }
+  return warnings.join(" ") || undefined;
+}
+
 function joinWarnings(...warnings: Array<string | undefined>) {
   return warnings.filter(Boolean).join(" ") || undefined;
 }
@@ -1043,6 +1084,30 @@ export async function finishMatch(matchId: string) {
     const api = await matchApiFor(client);
     if (api && league) {
       const res = await api.finishMatch(league.id, matchId);
+      const warnings: string[] = [];
+      try {
+        const stats = await calculateRoundStats(res.roundId);
+        if (!stats.success) warnings.push(stats.error || "Erro ao recalcular estatísticas.");
+      } catch (error) {
+        warnings.push(error instanceof Error ? error.message : "Erro ao recalcular estatísticas.");
+      }
+      let quickStart = null;
+      try {
+        quickStart = await supabaseFinishMatchGateway(client).buildQuickStart(res.roundId, matchId);
+      } catch (error) {
+        warnings.push(error instanceof Error ? error.message : "Não foi possível preparar a próxima partida.");
+      }
+      if (!res.alreadyFinished && res.match) {
+        try {
+          after(async () => {
+            try { await sendMatchFinishedNotifications(client, res.match!); }
+            catch (notificationError) { console.error("Erro ao notificar fim de partida:", notificationError); }
+          });
+        } catch {
+          try { await sendMatchFinishedNotifications(client, res.match); }
+          catch (notificationError) { console.error("Erro ao notificar fim de partida:", notificationError); }
+        }
+      }
       try {
         after(() => {
           revalidatePath(`/partidas/${matchId}`);
@@ -1056,7 +1121,7 @@ export async function finishMatch(matchId: string) {
         revalidatePath("/ranking");
         revalidatePath("/cartola");
       }
-      return res;
+      return { ...res, quickStart, warning: joinWarnings(res.warning, warnings.join(" ") || undefined) };
     }
     return await finishSelectedMatch(matchId, supabaseFinishMatchGateway(client), {
       revalidate(id, roundId) {

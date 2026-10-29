@@ -32,6 +32,16 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-29 — ciclo principal da partida
+
+- `createMatch`, `getMatch`, `finishMatch` e `deleteMatch` passaram pela comparação integral com o fluxo legado. Partidas chegaram a **16/21 operações aceitas**; restam somente as cinco operações do cronômetro e suas notificações.
+- A abertura deixou de enviar a lista parcial de substitutos como se fosse a escalação da RPC. O domínio do backend agora monta titulares, substitutos de ausência e empréstimos estruturais, preserva fila justa, goleiro fixo/forçado, ordem lógica e limites da rodada; `create_live_match` continua sendo o único commit, com idempotência e validação transacional no banco.
+- A leitura detalhada passou a entregar os relacionamentos usados pela tela ao vivo: elencos e atletas, times de origem, eventos, passagens no gol, substituições, contexto completo da rodada e cosméticos atuais da conta, sempre limitada à pelada da rota.
+- O encerramento bloqueia a partida, calcula o tempo exibido e o tempo oficial de elegibilidade, finaliza participantes de modo idempotente e devolve o placar necessário à notificação. Estatísticas, sugestão de início rápido, notificação e invalidações continuam como efeitos pós-confirmação na Server Action até os respectivos contextos serem migrados; falhas derivadas viram aviso e não sugerem repetir o encerramento já confirmado.
+- A exclusão exige partida encerrada e rodada ainda aberta, ambas da pelada selecionada. Depois do commit, estatísticas e Cartola são reprocessados; falhas posteriores também são retornadas como aviso.
+- Progresso auditado: **150/267 estruturais, 145/267 (54,3%) aceitas em revisão, 0/267 verificadas de ponta a ponta e 122 pendentes de paridade**.
+- Verificação automatizada: **1.041 testes frontend em 200 arquivos**, **355 testes backend em 99 arquivos**, typecheck e builds dos dois projetos; auditorias de arquitetura, contexto e migração aprovadas; `npm audit --omit=dev` sem vulnerabilidades em frontend e backend.
+
 ### 2026-10-28 — gols, goleiros e substituições de partidas
 
 - Doze operações de `matches` passaram pela comparação com o fluxo legado: busca da partida ao vivo, auditoria finalizada, registro/exclusão/correção de gols, goleiro fixo e troca ao vivo, substituição e desfazer, além da resposta de compatibilidade do prêmio manual removido.

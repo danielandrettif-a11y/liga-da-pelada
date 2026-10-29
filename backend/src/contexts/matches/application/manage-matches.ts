@@ -44,6 +44,15 @@ export type MatchAdminAuditEntry = {
   createdAt: string;
 };
 
+export type FinishedMatchSummary = {
+  id: string;
+  round_id: string;
+  score_a: number;
+  score_b: number;
+  team_a: { name: string } | null;
+  team_b: { name: string } | null;
+};
+
 export type CreateMatchInput = {
   round_id: string;
   team_a_id: string;
@@ -79,7 +88,11 @@ export interface MatchRepository {
   findLiveMatchForTeams(roundId: string, teamAId: string, teamBId: string, leagueId: string, actor: Actor): Promise<string | null>;
   getFinishedMatchAudit(matchId: string, leagueId: string, actor: Actor): Promise<MatchAdminAuditEntry[]>;
   createMatch(input: CreateMatchInput, leagueId: string, actor: Actor): Promise<{ matchId: string; idempotent: boolean; receipt?: any }>;
-  finishMatch(matchId: string, leagueId: string, actor: Actor): Promise<{ roundId: string }>;
+  finishMatch(matchId: string, leagueId: string, actor: Actor): Promise<{
+    roundId: string;
+    alreadyFinished?: boolean;
+    match: FinishedMatchSummary;
+  }>;
   deleteMatch(matchId: string, leagueId: string, actor: Actor): Promise<{ roundId: string }>;
   deleteEvent(eventId: string, matchId: string, leagueId: string, actor: Actor): Promise<{ roundId: string; scoreA: number; scoreB: number }>;
   correctFinishedGoal(eventId: string, confirmation: string, leagueId: string, actor: Actor): Promise<{ roundId: string; matchId: string; warning?: string }>;
@@ -115,12 +128,38 @@ export function getFinishedMatchAudit(matchId: string, leagueId: string, actor: 
 }
 
 export function createMatch(input: CreateMatchInput, leagueId: string, actor: Actor, repository: MatchRepository) {
-  parseMatchUuid(input.round_id, "Rodada");
-  parseMatchUuid(input.team_a_id, "Time A");
-  parseMatchUuid(input.team_b_id, "Time B");
-  parseMatchUuid(input.goalkeeper_a_id, "Goleiro A");
-  parseMatchUuid(input.goalkeeper_b_id, "Goleiro B");
-  return repository.createMatch(input, parseMatchUuid(leagueId, "Pelada"), actor);
+  if (!input) throw new MatchValidationError("Informe os dados da partida.");
+  const normalized: CreateMatchInput = {
+    ...input,
+    round_id: parseMatchUuid(input.round_id, "Rodada"),
+    team_a_id: parseMatchUuid(input.team_a_id, "Time A"),
+    team_b_id: parseMatchUuid(input.team_b_id, "Time B"),
+    goalkeeper_a_id: parseMatchUuid(input.goalkeeper_a_id, "Goleiro A"),
+    goalkeeper_b_id: parseMatchUuid(input.goalkeeper_b_id, "Goleiro B"),
+    replacements: (input.replacements || []).map((entry) => ({
+      team_id: parseMatchUuid(entry.team_id, "Time do empréstimo"),
+      absent_player_id: parseMatchUuid(entry.absent_player_id, "Jogador ausente"),
+      replacement_player_id: parseMatchUuid(entry.replacement_player_id, "Substituto"),
+    })),
+    structural_loan_overrides: (input.structural_loan_overrides || []).map((entry) => ({
+      target_team_id: parseMatchUuid(entry.target_team_id, "Time do empréstimo estrutural"),
+      rotation_order: entry.rotation_order,
+      player_id: parseMatchUuid(entry.player_id, "Jogador emprestado"),
+    })),
+    structural_loan_excluded_player_ids: (input.structural_loan_excluded_player_ids || [])
+      .map((id) => parseMatchUuid(id, "Jogador que recusou o empréstimo")),
+  };
+  if (normalized.team_a_id === normalized.team_b_id) throw new MatchValidationError("Selecione dois times diferentes.");
+  if (normalized.goalkeeper_a_id === normalized.goalkeeper_b_id) throw new MatchValidationError("Escolha um goleiro diferente para cada time.");
+  if ((normalized.replacements?.length || 0) > 30) throw new MatchValidationError("Quantidade de substitutos inválida.");
+  if ((normalized.structural_loan_overrides?.length || 0) > 12
+    || (normalized.structural_loan_excluded_player_ids?.length || 0) > 30) {
+    throw new MatchValidationError("Quantidade de trocas de empréstimo inválida.");
+  }
+  if (normalized.client_started_at && !Number.isFinite(Date.parse(normalized.client_started_at))) {
+    throw new MatchValidationError("Horário de início inválido.");
+  }
+  return repository.createMatch(normalized, parseMatchUuid(leagueId, "Pelada"), actor);
 }
 
 export function finishMatch(matchId: string, leagueId: string, actor: Actor, repository: MatchRepository) {

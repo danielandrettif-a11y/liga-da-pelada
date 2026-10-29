@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from "pg";
+import { randomUUID } from "node:crypto";
 import { withAuthenticatedTransaction } from "../../../infrastructure/authenticated-transaction.js";
 import type { Actor } from "../../../shared/actor.js";
 import type {
@@ -9,6 +10,11 @@ import type {
   SubstituteMatchPlayerInput,
 } from "../application/manage-matches.js";
 import type { MatchTimerAction, MatchTimerThreshold } from "../domain/match.js";
+import {
+  MatchLineupError,
+  prepareMatchLineup,
+  type MatchLineupSnapshot,
+} from "../domain/match-lineup.js";
 
 export class MatchPersistenceError extends Error {
   constructor(message: string, public readonly statusCode: number) {
@@ -19,6 +25,7 @@ export class MatchPersistenceError extends Error {
 
 function translateFailure(cause: unknown): MatchPersistenceError {
   if (cause instanceof MatchPersistenceError) return cause;
+  if (cause instanceof MatchLineupError) return new MatchPersistenceError(cause.message, 400);
   const error = cause as Error & { code?: string };
   const message = error.message || "";
   if (/MATCH_FORBIDDEN|Somente administradores|Acesso restrito|permission denied|row-level security/i.test(message)) {
@@ -30,7 +37,7 @@ function translateFailure(cause: unknown): MatchPersistenceError {
   if (/Evento (não|nao) encontrado|Gol (não|nao) encontrado|Substitui(c|ç)(a|ã)o (não|nao) encontrada/i.test(message)) {
     return new MatchPersistenceError(message, 404);
   }
-  if (/não está em andamento|nao esta em andamento|rodadas finalizadas|já participou|ja participou|outra partida ao vivo|mais recente|gol registrado depois/i.test(message)) {
+  if (/não está em andamento|nao esta em andamento|rodadas finalizadas|rodada já foi encerrada|já participou|ja participou|outra partida ao vivo|mais recente|gol registrado depois|Encerre a partida/i.test(message)) {
     return new MatchPersistenceError(message, 409);
   }
   if (/time (?:informado )?(?:não|nao) participa|precisa estar|Escolha|Motivo de substitui(?:c|ç)(?:a|ã)o inv[aá]lido|fora da rodada/i.test(message)) {
@@ -113,13 +120,28 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
         const match = matchRes.rows[0];
         if (!match) return null;
 
+        const teamQuery = `SELECT team.*, COALESCE(jsonb_agg(jsonb_build_object(
+              'player_id', team_player.player_id,
+              'goalkeeper_order', team_player.goalkeeper_order,
+              'players', CASE WHEN player.id IS NULL THEN NULL ELSE jsonb_build_object(
+                'id', player.id, 'name', player.name, 'nickname', player.nickname,
+                'avatar_url', player.avatar_url, 'player_profile', player.player_profile,
+                'is_goalkeeper', player.is_goalkeeper
+              ) END
+            )) FILTER (WHERE team_player.player_id IS NOT NULL), '[]'::jsonb) AS team_players
+           FROM public.teams team
+           LEFT JOIN public.team_players team_player ON team_player.team_id = team.id
+           LEFT JOIN public.players player ON player.id = team_player.player_id
+           WHERE team.id = $1::uuid
+           GROUP BY team.id`;
         const [teamARes, teamBRes, playersRes, eventsRes, stintsRes, subsRes, roundRes] = await Promise.all([
-          client.query("SELECT * FROM public.teams WHERE id = $1::uuid", [match.team_a_id]),
-          client.query("SELECT * FROM public.teams WHERE id = $1::uuid", [match.team_b_id]),
+          client.query(teamQuery, [match.team_a_id]),
+          client.query(teamQuery, [match.team_b_id]),
           client.query(
-            `SELECT mp.*, row_to_json(p) as player
+            `SELECT mp.*, row_to_json(p) AS player, row_to_json(original_team) AS original_team
              FROM public.match_players mp
              LEFT JOIN public.players p ON p.id = mp.player_id
+             LEFT JOIN public.teams original_team ON original_team.id = mp.original_team_id
              WHERE mp.match_id = $1::uuid`,
             [matchId],
           ),
@@ -137,16 +159,66 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
             [matchId],
           ),
           client.query(
-            `SELECT ms.*, row_to_json(p_out) as player_out, row_to_json(p_in) as player_in
+            `SELECT ms.*, row_to_json(p_out) AS player_out, row_to_json(p_in) AS player_in,
+                    row_to_json(original_team) AS player_in_original_team
              FROM public.match_substitutions ms
              LEFT JOIN public.players p_out ON p_out.id = ms.player_out_id
              LEFT JOIN public.players p_in ON p_in.id = ms.player_in_id
+             LEFT JOIN public.teams original_team ON original_team.id = ms.player_in_original_team_id
              WHERE ms.match_id = $1::uuid
              ORDER BY ms.created_at DESC`,
             [matchId],
           ),
-          client.query("SELECT * FROM public.rounds WHERE id = $1::uuid", [match.round_id]),
+          client.query(
+            `SELECT round_item.*,
+                    COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                      'player_id', round_player.player_id,
+                      'availability_status', round_player.availability_status,
+                      'attendance_status', round_player.attendance_status,
+                      'players', row_to_json(player)
+                    )) FROM public.round_players round_player
+                    LEFT JOIN public.players player ON player.id = round_player.player_id
+                    WHERE round_player.round_id = round_item.id), '[]'::jsonb) AS round_players,
+                    COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                      'id', team.id, 'name', team.name, 'color', team.color,
+                      'crest_url', team.crest_url,
+                      'team_players', COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                        'player_id', team_player.player_id,
+                        'goalkeeper_order', team_player.goalkeeper_order
+                      )) FROM public.team_players team_player WHERE team_player.team_id = team.id), '[]'::jsonb)
+                    )) FROM public.teams team WHERE team.round_id = round_item.id), '[]'::jsonb) AS teams
+             FROM public.rounds round_item
+             WHERE round_item.id = $1::uuid`,
+            [match.round_id],
+          ),
         ]);
+
+        const playerIds = playersRes.rows.map((entry: { player_id?: string }) => entry.player_id).filter(Boolean) as string[];
+        const cosmeticsRes = playerIds.length > 0
+          ? await client.query<{
+              player_id: string;
+              banner_asset_key: string | null;
+              frame_asset_key: string | null;
+              aura_asset_key: string | null;
+            }>(
+              `SELECT profile.player_id,
+                      banner.asset_key AS banner_asset_key,
+                      frame.asset_key AS frame_asset_key,
+                      aura.asset_key AS aura_asset_key
+               FROM public.account_profiles profile
+               JOIN public.account_cosmetic_loadouts loadout ON loadout.user_id = profile.user_id
+               LEFT JOIN public.fantasy_cosmetics banner ON banner.id = loadout.banner_cosmetic_id
+               LEFT JOIN public.fantasy_cosmetics frame ON frame.id = loadout.frame_cosmetic_id
+               LEFT JOIN public.fantasy_cosmetics aura ON aura.id = loadout.aura_cosmetic_id
+               WHERE profile.player_id = ANY($1::uuid[])`,
+              [playerIds],
+            )
+          : { rows: [] };
+        const playerCosmetics = Object.fromEntries(cosmeticsRes.rows.map((entry) => [entry.player_id, {
+          bannerAssetKey: entry.banner_asset_key,
+          frameKey: entry.frame_asset_key,
+          auraKey: entry.aura_asset_key,
+        }]));
 
         return {
           ...match,
@@ -157,6 +229,7 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
           match_goalkeeper_stints: stintsRes.rows,
           match_substitutions: subsRes.rows,
           round: roundRes.rows[0] || null,
+          player_cosmetics: playerCosmetics,
         };
       });
     },
@@ -205,6 +278,96 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
     async createMatch(input: CreateMatchInput, leagueId: string, actor: Actor): Promise<{ matchId: string; idempotent: boolean; receipt?: any }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
+        const roundResult = await client.query<{
+          number: number;
+          status: string;
+          formation_mode: string;
+          arrival_order_enabled: boolean;
+          target_players_per_team: number | null;
+          players_per_team: number | null;
+        }>(
+          `SELECT round_item.number, round_item.status, round_item.formation_mode,
+                  round_item.arrival_order_enabled, round_item.target_players_per_team,
+                  league.players_per_team
+           FROM public.rounds round_item
+           JOIN public.leagues league ON league.id = round_item.league_id
+           WHERE round_item.id = $1::uuid AND round_item.league_id = $2::uuid`,
+          [input.round_id, leagueId],
+        );
+        const round = roundResult.rows[0];
+        if (!round) throw new MatchPersistenceError("Rodada não encontrada na pelada selecionada.", 404);
+
+        const [teamResult, roundPlayerResult, previousMatchResult, loanCountResult] = await Promise.all([
+          client.query<{
+            id: string;
+            name: string;
+            position: number;
+            fixed_goalkeeper_player_id: string | null;
+            player_id: string | null;
+            goalkeeper_order: number | null;
+            loan_order: number | null;
+          }>(
+            `SELECT team.id, team.name, team.position, team.fixed_goalkeeper_player_id,
+                    team_player.player_id, team_player.goalkeeper_order, team_player.loan_order
+             FROM public.teams team
+             LEFT JOIN public.team_players team_player ON team_player.team_id = team.id
+             WHERE team.round_id = $1::uuid
+             ORDER BY team.position, team_player.goalkeeper_order, team_player.player_id`,
+            [input.round_id],
+          ),
+          client.query<{ player_id: string; availability_status: string; attendance_status: string | null }>(
+            `SELECT player_id, availability_status, attendance_status
+             FROM public.round_players WHERE round_id = $1::uuid`,
+            [input.round_id],
+          ),
+          client.query<{ count: string }>(
+            "SELECT count(*)::text AS count FROM public.matches WHERE round_id = $1::uuid",
+            [input.round_id],
+          ),
+          client.query<{ player_id: string; loan_count: string }>(
+            `SELECT match_player.player_id, count(*)::text AS loan_count
+             FROM public.match_players match_player
+             JOIN public.matches match_item ON match_item.id = match_player.match_id
+             WHERE match_item.round_id = $1::uuid
+               AND match_player.original_team_id IS NOT NULL
+               AND match_player.team_id <> match_player.original_team_id
+             GROUP BY match_player.player_id`,
+            [input.round_id],
+          ),
+        ]);
+        const teamById = new Map<string, MatchLineupSnapshot["teams"][number]>();
+        for (const row of teamResult.rows) {
+          const team = teamById.get(row.id) || {
+            id: row.id,
+            name: row.name,
+            position: Number(row.position || 0),
+            fixedGoalkeeperPlayerId: row.fixed_goalkeeper_player_id,
+            players: [],
+          };
+          if (row.player_id) team.players.push({
+            playerId: row.player_id,
+            goalkeeperOrder: Number(row.goalkeeper_order || 0),
+            loanOrder: Number(row.loan_order || row.goalkeeper_order || team.players.length + 1),
+          });
+          teamById.set(row.id, team);
+        }
+        const snapshot: MatchLineupSnapshot = {
+          roundNumber: Number(round.number || 0),
+          roundStatus: round.status,
+          formationMode: round.formation_mode,
+          arrivalOrderEnabled: round.arrival_order_enabled === true,
+          targetPlayersPerTeam: Math.max(1, Number(round.target_players_per_team || round.players_per_team || 6)),
+          previousMatchCount: Number(previousMatchResult.rows[0]?.count || 0),
+          teams: [...teamById.values()],
+          roundPlayers: roundPlayerResult.rows.map((entry) => ({
+            playerId: entry.player_id,
+            availabilityStatus: entry.availability_status,
+            attendanceStatus: entry.attendance_status,
+          })),
+          previousLoanCount: new Map(loanCountResult.rows.map((entry) => [entry.player_id, Number(entry.loan_count || 0)])),
+        };
+        const prepared = prepareMatchLineup(input, snapshot);
+        const idempotencyKey = input.idempotency_key?.trim() || randomUUID();
         const res = await client.query<{ receipt: any }>(
           `SELECT public.create_live_match(
             $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid,
@@ -216,10 +379,10 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
             input.team_b_id,
             input.goalkeeper_a_id,
             input.goalkeeper_b_id,
-            null,
-            null,
-            JSON.stringify(input.replacements || []),
-            input.idempotency_key || null,
+            prepared.goalkeeperARotationOrder,
+            prepared.goalkeeperBRotationOrder,
+            JSON.stringify(prepared.lineup),
+            idempotencyKey,
             input.client_started_at || null,
           ],
         );
@@ -235,38 +398,90 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
       });
     },
 
-    async finishMatch(matchId: string, leagueId: string, actor: Actor): Promise<{ roundId: string }> {
+    async finishMatch(matchId: string, leagueId: string, actor: Actor) {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const matchRes = await client.query<{ round_id: string }>(
-          `UPDATE public.matches
-           SET status = 'finished', finished_at = NOW(), timer_started_at = NULL
-           WHERE id = $1::uuid AND status != 'finished'
-           RETURNING round_id`,
-          [matchId],
+        const currentResult = await client.query<{
+          id: string;
+          round_id: string;
+          status: string;
+          score_a: number;
+          score_b: number;
+          timer_started_at: string | null;
+          timer_accumulated_seconds: number;
+          eligibility_elapsed_offset_seconds: number;
+          team_a_name: string;
+          team_b_name: string;
+        }>(
+          `SELECT match_item.id, match_item.round_id, match_item.status,
+                  match_item.score_a, match_item.score_b, match_item.timer_started_at,
+                  match_item.timer_accumulated_seconds, match_item.eligibility_elapsed_offset_seconds,
+                  team_a.name AS team_a_name, team_b.name AS team_b_name
+           FROM public.matches match_item
+           JOIN public.rounds round_item ON round_item.id = match_item.round_id
+           JOIN public.teams team_a ON team_a.id = match_item.team_a_id
+           JOIN public.teams team_b ON team_b.id = match_item.team_b_id
+           WHERE match_item.id = $1::uuid AND round_item.league_id = $2::uuid
+           FOR UPDATE OF match_item`,
+          [matchId, leagueId],
         );
-        const roundId = matchRes.rows[0]?.round_id;
-        if (!roundId) {
-          const findRes = await client.query<{ round_id: string }>("SELECT round_id FROM public.matches WHERE id = $1::uuid", [matchId]);
-          return { roundId: findRes.rows[0]?.round_id || "" };
+        const current = currentResult.rows[0];
+        if (!current) throw new MatchPersistenceError("Partida não encontrada na pelada selecionada.", 404);
+        const alreadyFinished = current.status === "finished";
+        const runningSeconds = !alreadyFinished && current.timer_started_at
+          ? Math.floor((Date.now() - new Date(current.timer_started_at).getTime()) / 1000)
+          : 0;
+        const elapsedSeconds = Math.max(0, Number(current.timer_accumulated_seconds || 0) + runningSeconds);
+        const officialElapsed = Number(current.eligibility_elapsed_offset_seconds || 0) + elapsedSeconds;
+        if (!alreadyFinished) {
+          await client.query(
+            `UPDATE public.matches
+             SET status = 'finished', finished_at = NOW(), timer_started_at = NULL,
+                 timer_accumulated_seconds = $2::integer
+             WHERE id = $1::uuid`,
+            [matchId, elapsedSeconds],
+          );
         }
-        await client.query("UPDATE public.match_players SET is_active = false WHERE match_id = $1::uuid", [matchId]);
-        return { roundId };
+        await client.query(
+          `UPDATE public.match_players
+           SET left_elapsed_seconds = COALESCE(left_elapsed_seconds, $2::integer), is_active = false
+           WHERE match_id = $1::uuid`,
+          [matchId, officialElapsed],
+        );
+        return {
+          roundId: current.round_id,
+          ...(alreadyFinished ? { alreadyFinished: true } : {}),
+          match: {
+            id: current.id,
+            round_id: current.round_id,
+            score_a: Number(current.score_a || 0),
+            score_b: Number(current.score_b || 0),
+            team_a: { name: current.team_a_name },
+            team_b: { name: current.team_b_name },
+          },
+        };
       });
     },
 
     async deleteMatch(matchId: string, leagueId: string, actor: Actor): Promise<{ roundId: string }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const matchRes = await client.query<{ round_id: string }>(
-          "SELECT round_id FROM public.matches WHERE id = $1::uuid",
-          [matchId],
+        const matchRes = await client.query<{ round_id: string; status: string; round_status: string }>(
+          `SELECT match_item.round_id, match_item.status, round_item.status AS round_status
+           FROM public.matches match_item
+           JOIN public.rounds round_item ON round_item.id = match_item.round_id
+           WHERE match_item.id = $1::uuid AND round_item.league_id = $2::uuid
+           FOR UPDATE OF match_item`,
+          [matchId, leagueId],
         );
-        const roundId = matchRes.rows[0]?.round_id;
-        if (!roundId) throw new MatchPersistenceError("Partida não encontrada.", 404);
-
+        const match = matchRes.rows[0];
+        if (!match) throw new MatchPersistenceError("Partida não encontrada na pelada selecionada.", 404);
+        if (match.status === "live") throw new MatchPersistenceError("Encerre a partida antes de apagá-la.", 409);
+        if (match.round_status === "finished") {
+          throw new MatchPersistenceError("A rodada já foi encerrada. Use a correção da rodada para preservar o histórico.", 409);
+        }
         await client.query("DELETE FROM public.matches WHERE id = $1::uuid", [matchId]);
-        return { roundId };
+        return { roundId: match.round_id };
       });
     },
 

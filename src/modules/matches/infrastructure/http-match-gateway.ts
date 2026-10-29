@@ -15,7 +15,22 @@ export type MatchHttpGateway = {
   findLiveMatchForTeams(leagueId: string, roundId: string, teamAId: string, teamBId: string): Promise<{ matchId: string | null }>;
   getFinishedMatchAudit(leagueId: string, matchId: string): Promise<any[]>;
   createMatch(leagueId: string, input: any): Promise<{ success: true; matchId: string; idempotent?: boolean; receipt?: any; error?: undefined; uncertain?: undefined }>;
-  finishMatch(leagueId: string, matchId: string): Promise<{ success: true; roundId: string; quickStart?: any; error?: undefined }>;
+  finishMatch(leagueId: string, matchId: string): Promise<{
+    success: true;
+    roundId: string;
+    alreadyFinished?: boolean;
+    match?: {
+      id: string;
+      round_id: string;
+      score_a: number;
+      score_b: number;
+      team_a: { name: string } | null;
+      team_b: { name: string } | null;
+    };
+    quickStart?: any;
+    warning?: string;
+    error?: undefined;
+  }>;
   deleteMatch(leagueId: string, matchId: string): Promise<{ success: true; roundId: string; warning?: string; error?: undefined }>;
   deleteEvent(leagueId: string, matchId: string, eventId: string): Promise<{ success: true; roundId: string; scoreA: number; scoreB: number; error?: undefined }>;
   correctFinishedGoal(leagueId: string, eventId: string, confirmation: string): Promise<{ success: true; roundId: string; matchId: string; warning?: string; error?: undefined }>;
