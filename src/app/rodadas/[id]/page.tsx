@@ -64,6 +64,13 @@ export default async function RodadaDetalhePage({
     .filter(Boolean)
     .sort((a: any, b: any) => a.name.localeCompare(b.name, "pt-BR"));
   const roundElapsedSeconds = (round.matches || []).reduce((total: number, match: any) => total + getMatchElapsedSeconds(match), 0);
+  const liveMatch = (round.matches || []).find((match: any) => match.status === "live") || null;
+  const liveMatchTeamA = liveMatch
+    ? (round.teams || []).find((team: any) => team.id === liveMatch.team_a_id)
+    : null;
+  const liveMatchTeamB = liveMatch
+    ? (round.teams || []).find((team: any) => team.id === liveMatch.team_b_id)
+    : null;
   const matchSetupRound = {
     id: round.id,
     league_id: round.league_id,
@@ -153,6 +160,34 @@ export default async function RodadaDetalhePage({
         <h2 className="text-xs font-bold text-muted uppercase tracking-wider px-1">
           Times Formados
         </h2>
+        {liveMatch && (
+          <Link
+            href={`/partidas/${liveMatch.id}`}
+            className="block overflow-hidden rounded-2xl border border-accent/45 bg-accent/[0.07] shadow-[0_0_28px_rgba(190,255,0,0.08)] transition-transform active:scale-[0.99]"
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-accent/20 px-3 py-2">
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-accent">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-accent" /> Partida ao vivo
+              </span>
+              <span className="text-[9px] font-bold text-muted">Abrir placar</span>
+            </div>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 py-2.5">
+              <div className="flex min-w-0 items-center justify-end gap-1.5 text-right">
+                <span className="truncate text-[10px] font-bold text-foreground">{liveMatchTeamA?.name || "Time A"}</span>
+                <TeamReferenceBadge position={liveMatchTeamA?.position} fallbackIndex={0} color={liveMatchTeamA?.color} className="h-7 w-7 shrink-0 text-sm" />
+              </div>
+              <div className="flex items-center gap-1.5 rounded-lg border border-accent/25 bg-background/60 px-2.5 py-1.5">
+                <span className="stat-number text-xl text-foreground">{liveMatch.score_a}</span>
+                <span className="text-[10px] font-black text-muted">×</span>
+                <span className="stat-number text-xl text-foreground">{liveMatch.score_b}</span>
+              </div>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <TeamReferenceBadge position={liveMatchTeamB?.position} fallbackIndex={1} color={liveMatchTeamB?.color} className="h-7 w-7 shrink-0 text-sm" />
+                <span className="truncate text-[10px] font-bold text-foreground">{liveMatchTeamB?.name || "Time B"}</span>
+              </div>
+            </div>
+          </Link>
+        )}
         <div className="-mx-2 grid grid-cols-3 gap-1.5">
           {round.teams.map((team: any, index: number) => (
             <TeamMiniPitch
@@ -207,11 +242,6 @@ export default async function RodadaDetalhePage({
               
               return (
                 <div key={match.id} className="space-y-2">
-                  {isLive && (index === 0 || round.matches[index - 1]?.status !== "live") && (
-                    <div className="flex items-center gap-2 px-1 text-[10px] font-black uppercase tracking-wider text-accent">
-                      <span className="h-2 w-2 animate-pulse rounded-full bg-accent" /> Partida ao vivo
-                    </div>
-                  )}
                   {isFinished && (index === 0 || round.matches[index - 1]?.status !== "finished") && (
                     <p className="px-1 pt-2 text-[10px] font-black uppercase tracking-wider text-muted">Histórico de partidas</p>
                   )}
