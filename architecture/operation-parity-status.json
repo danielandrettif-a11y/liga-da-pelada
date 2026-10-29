@@ -67,20 +67,25 @@
     { "context": "rounds", "source": "src/lib/actions/adaptive-draw.ts", "name": "drawTeamsAdaptiveOnServer" },
     { "context": "matches", "source": "src/lib/actions/goalkeeper.ts", "name": "selectBestGoalkeeper" },
     { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "addFinishedGoalEvent" },
+    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "addMatchExtraTime" },
     { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "changeMatchGoalkeeper" },
     { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "correctFinishedGoal" },
     { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "correctFinishedGoalEvent" },
     { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "createMatch" },
     { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "deleteEvent" },
     { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "deleteMatch" },
+    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "dispatchMatchTimerThreshold" },
     { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "findLiveMatchForTeams" },
     { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "finishMatch" },
     { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "getFinishedMatchAudit" },
     { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "getMatch" },
+    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "notifyMatchTimerThreshold" },
     { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "registerGoal" },
+    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "resetMatchTimer" },
     { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "setRoundTeamFixedGoalkeeper" },
     { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "substituteMatchPlayer" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "undoLastMatchSubstitution" }
+    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "undoLastMatchSubstitution" },
+    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "updateMatchTimer" }
   ],
   "evidence": {
     "callups": [
@@ -144,6 +149,14 @@
       "src/modules/matches/application/finish-match.test.ts",
       "src/modules/matches/infrastructure/http-match-gateway.test.ts",
       "src/modules/matches/infrastructure/quick-start-suggestion.test.ts",
+      "src/lib/actions/matches.test.ts"
+    ],
+    "match-timer-delivery": [
+      "backend/src/contexts/matches/application/manage-matches.test.ts",
+      "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+      "backend/src/contexts/matches/infrastructure/qstash-match-timer-scheduler.test.ts",
+      "backend/src/contexts/matches/presentation.test.ts",
+      "src/modules/matches/infrastructure/http-match-gateway.test.ts",
       "src/lib/actions/matches.test.ts"
     ]
   }

@@ -53,6 +53,30 @@ export type FinishedMatchSummary = {
   team_b: { name: string } | null;
 };
 
+export type MatchTimerState = {
+  status: string;
+  durationSeconds: number;
+  accumulatedSeconds: number;
+  startedAt: string | null;
+};
+
+export type MatchTimerNotificationClaim = {
+  skipped?: boolean;
+  reason?: "inactive" | "too_early" | "already_alerted";
+  secondsLeft?: number;
+  claimedAt?: string;
+  match?: FinishedMatchSummary;
+};
+
+export interface MatchTimerScheduler {
+  schedule(input: {
+    matchId: string;
+    durationSeconds: number;
+    accumulatedSeconds: number;
+    startedAt: string;
+  }): Promise<void>;
+}
+
 export type CreateMatchInput = {
   round_id: string;
   team_a_id: string;
@@ -102,11 +126,14 @@ export interface MatchRepository {
   setRoundTeamFixedGoalkeeper(roundId: string, teamId: string, playerId: string | null, leagueId: string, actor: Actor): Promise<{ roundId: string }>;
   substituteMatchPlayer(input: SubstituteMatchPlayerInput, leagueId: string, actor: Actor): Promise<{ roundId: string; substitutionId: string }>;
   undoLastMatchSubstitution(substitutionId: string, matchId: string, leagueId: string, actor: Actor): Promise<{ roundId: string }>;
-  updateMatchTimer(matchId: string, action: MatchTimerAction, leagueId: string, actor: Actor): Promise<{ timerStartedAt?: string | null; timerAccumulatedSeconds?: number }>;
+  getMatchTimerState(matchId: string, leagueId: string, actor: Actor): Promise<MatchTimerState>;
+  updateMatchTimer(matchId: string, action: MatchTimerAction, startedAt: string | null, leagueId: string, actor: Actor): Promise<{ timerStartedAt?: string | null; timerAccumulatedSeconds?: number }>;
   resetMatchTimer(matchId: string, leagueId: string, actor: Actor): Promise<{ eligibilityOffset: number }>;
-  addMatchExtraTime(matchId: string, extraSeconds: number, leagueId: string, actor: Actor): Promise<{ newDuration: number }>;
-  notifyMatchTimerThreshold(matchId: string, threshold: MatchTimerThreshold, leagueId: string, actor: Actor): Promise<{ sent?: boolean; skipped?: boolean; reason?: string }>;
-  dispatchMatchTimerThreshold(matchId: string, threshold: MatchTimerThreshold, leagueId: string, actor: Actor): Promise<{ sent?: boolean; skipped?: boolean; reason?: string }>;
+  setMatchDuration(matchId: string, durationSeconds: number, leagueId: string, actor: Actor): Promise<{ newDuration: number }>;
+  notifyMatchTimerThreshold(matchId: string, threshold: MatchTimerThreshold, leagueId: string, actor: Actor): Promise<MatchTimerNotificationClaim>;
+  releaseMatchTimerThreshold(matchId: string, threshold: MatchTimerThreshold, claimedAt: string, leagueId: string, actor: Actor): Promise<void>;
+  dispatchMatchTimerThresholdSystem(matchId: string, threshold: MatchTimerThreshold): Promise<MatchTimerNotificationClaim>;
+  releaseMatchTimerThresholdSystem(matchId: string, threshold: MatchTimerThreshold, claimedAt: string): Promise<void>;
 }
 
 export function getMatch(matchId: string, leagueId: string, actor: Actor, repository: MatchRepository): Promise<MatchDetails | null> {
@@ -258,18 +285,43 @@ export function undoLastMatchSubstitution(substitutionId: string, matchId: strin
   );
 }
 
-export function updateMatchTimer(matchId: string, action: string, leagueId: string, actor: Actor, repository: MatchRepository) {
+export async function updateMatchTimer(matchId: string, action: string, leagueId: string, actor: Actor, repository: MatchRepository, scheduler: MatchTimerScheduler) {
   const validatedAction = validateTimerAction(action);
-  return repository.updateMatchTimer(parseMatchUuid(matchId, "Partida"), validatedAction, parseMatchUuid(leagueId, "Pelada"), actor);
+  const validatedMatchId = parseMatchUuid(matchId, "Partida");
+  const validatedLeagueId = parseMatchUuid(leagueId, "Pelada");
+  let startedAt: string | null = null;
+  if (validatedAction === "start") {
+    const state = await repository.getMatchTimerState(validatedMatchId, validatedLeagueId, actor);
+    startedAt = new Date().toISOString();
+    await scheduler.schedule({
+      matchId: validatedMatchId,
+      durationSeconds: state.durationSeconds,
+      accumulatedSeconds: state.accumulatedSeconds,
+      startedAt,
+    });
+  }
+  return repository.updateMatchTimer(validatedMatchId, validatedAction, startedAt, validatedLeagueId, actor);
 }
 
 export function resetMatchTimer(matchId: string, leagueId: string, actor: Actor, repository: MatchRepository) {
   return repository.resetMatchTimer(parseMatchUuid(matchId, "Partida"), parseMatchUuid(leagueId, "Pelada"), actor);
 }
 
-export function addMatchExtraTime(matchId: string, extraSeconds: number, leagueId: string, actor: Actor, repository: MatchRepository) {
+export async function addMatchExtraTime(matchId: string, extraSeconds: number, leagueId: string, actor: Actor, repository: MatchRepository, scheduler: MatchTimerScheduler) {
   const validatedSeconds = validateExtraSeconds(extraSeconds);
-  return repository.addMatchExtraTime(parseMatchUuid(matchId, "Partida"), validatedSeconds, parseMatchUuid(leagueId, "Pelada"), actor);
+  const validatedMatchId = parseMatchUuid(matchId, "Partida");
+  const validatedLeagueId = parseMatchUuid(leagueId, "Pelada");
+  const state = await repository.getMatchTimerState(validatedMatchId, validatedLeagueId, actor);
+  const newDuration = Math.max(60, state.durationSeconds + validatedSeconds);
+  if (state.startedAt) {
+    await scheduler.schedule({
+      matchId: validatedMatchId,
+      durationSeconds: newDuration,
+      accumulatedSeconds: state.accumulatedSeconds,
+      startedAt: state.startedAt,
+    });
+  }
+  return repository.setMatchDuration(validatedMatchId, newDuration, validatedLeagueId, actor);
 }
 
 export function notifyMatchTimerThreshold(matchId: string, threshold: string, leagueId: string, actor: Actor, repository: MatchRepository) {
@@ -279,7 +331,12 @@ export function notifyMatchTimerThreshold(matchId: string, threshold: string, le
 
 export function dispatchMatchTimerThreshold(matchId: string, threshold: string, leagueId: string, actor: Actor, repository: MatchRepository) {
   const validatedThreshold = validateTimerThreshold(threshold);
-  return repository.dispatchMatchTimerThreshold(parseMatchUuid(matchId, "Partida"), validatedThreshold, parseMatchUuid(leagueId, "Pelada"), actor);
+  return repository.notifyMatchTimerThreshold(
+    parseMatchUuid(matchId, "Partida"),
+    validatedThreshold,
+    parseMatchUuid(leagueId, "Pelada"),
+    actor,
+  );
 }
 
 export function selectBestGoalkeeper(_roundId: string, _playerId: string) {

@@ -32,6 +32,7 @@ import { supabasePlayerAvatarStorage } from "./contexts/roster/infrastructure/su
 import { pgCallupRepository } from "./contexts/callups/infrastructure/pg-callup-repository.js";
 import { pgRoundRepository } from "./contexts/rounds/infrastructure/pg-round-repository.js";
 import { pgMatchRepository } from "./contexts/matches/infrastructure/pg-match-repository.js";
+import { qstashMatchTimerScheduler } from "./contexts/matches/infrastructure/qstash-match-timer-scheduler.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -59,6 +60,9 @@ if ((leaguesEnabled || rosterEnabled) && !publicUrl) {
 }
 if (identityEnabled && (!publicUrl || !appPublicUrl)) {
   throw new Error("ENABLE_IDENTITY_API=true requer SUPABASE_PUBLIC_URL e APP_PUBLIC_URL.");
+}
+if (matchesEnabled && !appPublicUrl) {
+  throw new Error("ENABLE_MATCHES_API=true requer APP_PUBLIC_URL para os webhooks do cronômetro.");
 }
 
 const pool = new pg.Pool({ connectionString: databaseUrl, max: 10 });
@@ -110,6 +114,13 @@ const app = createApp({
   callupRepository: pgCallupRepository(pool),
   roundRepository: pgRoundRepository(pool),
   matchRepository: pgMatchRepository(pool),
+  matchTimerScheduler: qstashMatchTimerScheduler({
+    appPublicUrl: appPublicUrl || "http://localhost:3000",
+    token: process.env.QSTASH_TOKEN,
+    webhookSecret: process.env.MATCH_TIMER_WEBHOOK_SECRET,
+    qstashUrl: process.env.QSTASH_URL,
+  }),
+  matchTimerWebhookSecret: process.env.MATCH_TIMER_WEBHOOK_SECRET,
 });
 
 try {

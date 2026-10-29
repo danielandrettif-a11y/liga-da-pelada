@@ -24,9 +24,10 @@ import {
   updateMatchTimer,
   type CreateMatchInput,
   type MatchRepository,
+  type MatchTimerScheduler,
   type SubstituteMatchPlayerInput,
 } from "../application/manage-matches.js";
-import { MatchNotFoundError, MatchValidationError } from "../domain/match.js";
+import { MatchNotFoundError, MatchValidationError, parseMatchUuid, validateTimerThreshold } from "../domain/match.js";
 import { MatchPersistenceError } from "../infrastructure/pg-match-repository.js";
 
 function sendFailure(error: unknown, request: FastifyRequest, reply: FastifyReply) {
@@ -46,6 +47,8 @@ function sendFailure(error: unknown, request: FastifyRequest, reply: FastifyRepl
 export function registerMatchRoutes(app: FastifyInstance, dependencies: {
   verifier: UserVerifier;
   repository: MatchRepository;
+  timerScheduler: MatchTimerScheduler;
+  webhookSecret?: string;
 }): void {
   // Busca partida por ID
   app.get<{ Params: { leagueId: string; matchId: string } }>(
@@ -304,7 +307,10 @@ export function registerMatchRoutes(app: FastifyInstance, dependencies: {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const result = await updateMatchTimer(request.params.matchId, request.body.action, request.params.leagueId, authentication.actor, dependencies.repository);
+        const result = await updateMatchTimer(
+          request.params.matchId, request.body.action, request.params.leagueId,
+          authentication.actor, dependencies.repository, dependencies.timerScheduler,
+        );
         return reply.code(200).send(result);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -334,7 +340,10 @@ export function registerMatchRoutes(app: FastifyInstance, dependencies: {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const result = await addMatchExtraTime(request.params.matchId, request.body.extraSeconds, request.params.leagueId, authentication.actor, dependencies.repository);
+        const result = await addMatchExtraTime(
+          request.params.matchId, request.body.extraSeconds, request.params.leagueId,
+          authentication.actor, dependencies.repository, dependencies.timerScheduler,
+        );
         return reply.code(200).send(result);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -357,6 +366,27 @@ export function registerMatchRoutes(app: FastifyInstance, dependencies: {
     },
   );
 
+  app.delete<{ Params: { leagueId: string; matchId: string }; Body: { threshold: string; claimedAt: string } }>(
+    "/api/matches/leagues/:leagueId/:matchId/timer/notify",
+    async (request, reply) => {
+      const authentication = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
+      try {
+        const threshold = validateTimerThreshold(request.body.threshold);
+        if (!request.body.claimedAt || !Number.isFinite(Date.parse(request.body.claimedAt))) {
+          throw new MatchValidationError("Identificador da tentativa de alerta inválido.");
+        }
+        await dependencies.repository.releaseMatchTimerThreshold(
+          parseMatchUuid(request.params.matchId, "Partida"), threshold, request.body.claimedAt,
+          parseMatchUuid(request.params.leagueId, "Pelada"), authentication.actor,
+        );
+        return reply.code(204).send();
+      } catch (error) {
+        return sendFailure(error, request, reply);
+      }
+    },
+  );
+
   // Dispatch de marco do cronômetro
   app.post<{ Params: { leagueId: string; matchId: string }; Body: { threshold: string } }>(
     "/api/matches/leagues/:leagueId/:matchId/timer/dispatch",
@@ -366,6 +396,45 @@ export function registerMatchRoutes(app: FastifyInstance, dependencies: {
       try {
         const result = await dispatchMatchTimerThreshold(request.params.matchId, request.body.threshold, request.params.leagueId, authentication.actor, dependencies.repository);
         return reply.code(200).send(result);
+      } catch (error) {
+        return sendFailure(error, request, reply);
+      }
+    },
+  );
+
+  app.post<{ Params: { matchId: string }; Body: { threshold: string } }>(
+    "/api/internal/matches/:matchId/timer/dispatch",
+    async (request, reply) => {
+      if (!dependencies.webhookSecret || request.headers.authorization !== `Bearer ${dependencies.webhookSecret}`) {
+        return reply.code(401).send({ code: "UNAUTHORIZED", message: "Não autorizado." });
+      }
+      try {
+        const result = await dependencies.repository.dispatchMatchTimerThresholdSystem(
+          parseMatchUuid(request.params.matchId, "Partida"),
+          validateTimerThreshold(request.body.threshold),
+        );
+        return reply.code(200).send(result);
+      } catch (error) {
+        return sendFailure(error, request, reply);
+      }
+    },
+  );
+
+  app.delete<{ Params: { matchId: string }; Body: { threshold: string; claimedAt: string } }>(
+    "/api/internal/matches/:matchId/timer/dispatch",
+    async (request, reply) => {
+      if (!dependencies.webhookSecret || request.headers.authorization !== `Bearer ${dependencies.webhookSecret}`) {
+        return reply.code(401).send({ code: "UNAUTHORIZED", message: "Não autorizado." });
+      }
+      try {
+        const threshold = validateTimerThreshold(request.body.threshold);
+        if (!request.body.claimedAt || !Number.isFinite(Date.parse(request.body.claimedAt))) {
+          throw new MatchValidationError("Identificador da tentativa de alerta inválido.");
+        }
+        await dependencies.repository.releaseMatchTimerThresholdSystem(
+          parseMatchUuid(request.params.matchId, "Partida"), threshold, request.body.claimedAt,
+        );
+        return reply.code(204).send();
       } catch (error) {
         return sendFailure(error, request, reply);
       }

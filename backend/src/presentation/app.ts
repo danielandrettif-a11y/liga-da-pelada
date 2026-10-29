@@ -62,7 +62,7 @@ import { registerPlayerProfileRoutes } from "../contexts/roster/presentation/pla
 import { registerCallupRoutes } from "../contexts/callups/presentation/callups-route.js";
 import { registerRoundRoutes } from "../contexts/rounds/presentation/rounds-route.js";
 import { registerMatchRoutes } from "../contexts/matches/presentation/matches-route.js";
-import type { MatchRepository } from "../contexts/matches/application/manage-matches.js";
+import type { MatchRepository, MatchTimerScheduler } from "../contexts/matches/application/manage-matches.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 
 export function createApp(dependencies: {
@@ -107,6 +107,8 @@ export function createApp(dependencies: {
   callupRepository?: CallupRepository;
   roundRepository?: RoundRepository;
   matchRepository?: MatchRepository;
+  matchTimerScheduler?: MatchTimerScheduler;
+  matchTimerWebhookSecret?: string;
   logger?: boolean;
 }): FastifyInstance {
   if (dependencies.leaguesEnabled && !dependencies.leagueRepository) {
@@ -158,8 +160,8 @@ export function createApp(dependencies: {
   if (dependencies.roundsEnabled && !dependencies.roundRepository) {
     throw new Error("RoundRepository é obrigatório quando ENABLE_ROUNDS_API=true.");
   }
-  if (dependencies.matchesEnabled && !dependencies.matchRepository) {
-    throw new Error("MatchRepository é obrigatório quando ENABLE_MATCHES_API=true.");
+  if (dependencies.matchesEnabled && (!dependencies.matchRepository || !dependencies.matchTimerScheduler)) {
+    throw new Error("MatchRepository e MatchTimerScheduler são obrigatórios quando ENABLE_MATCHES_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
   void app.register(multipart);
@@ -304,10 +306,12 @@ export function createApp(dependencies: {
       repository: dependencies.roundRepository,
     });
   }
-  if (dependencies.matchesEnabled && dependencies.matchRepository) {
+  if (dependencies.matchesEnabled && dependencies.matchRepository && dependencies.matchTimerScheduler) {
     registerMatchRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.matchRepository,
+      timerScheduler: dependencies.matchTimerScheduler,
+      webhookSecret: dependencies.matchTimerWebhookSecret,
     });
   }
   return app;

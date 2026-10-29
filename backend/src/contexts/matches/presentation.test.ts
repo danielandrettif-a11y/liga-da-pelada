@@ -34,11 +34,16 @@ function createMockRepository(): MatchRepository {
     setRoundTeamFixedGoalkeeper: vi.fn().mockResolvedValue({ roundId }),
     substituteMatchPlayer: vi.fn().mockResolvedValue({ roundId, substitutionId: subId }),
     undoLastMatchSubstitution: vi.fn().mockResolvedValue({ roundId }),
+    getMatchTimerState: vi.fn().mockResolvedValue({
+      status: "live", durationSeconds: 420, accumulatedSeconds: 0, startedAt: null,
+    }),
     updateMatchTimer: vi.fn().mockResolvedValue({ timerStartedAt: "2026-10-30T10:00:00Z" }),
     resetMatchTimer: vi.fn().mockResolvedValue({ eligibilityOffset: 0 }),
-    addMatchExtraTime: vi.fn().mockResolvedValue({ newDuration: 480 }),
-    notifyMatchTimerThreshold: vi.fn().mockResolvedValue({ sent: true }),
-    dispatchMatchTimerThreshold: vi.fn().mockResolvedValue({ sent: true }),
+    setMatchDuration: vi.fn().mockResolvedValue({ newDuration: 480 }),
+    notifyMatchTimerThreshold: vi.fn().mockResolvedValue({ skipped: true, reason: "already_alerted" }),
+    releaseMatchTimerThreshold: vi.fn().mockResolvedValue(undefined),
+    dispatchMatchTimerThresholdSystem: vi.fn().mockResolvedValue({ skipped: true, reason: "already_alerted" }),
+    releaseMatchTimerThresholdSystem: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -47,6 +52,8 @@ function buildApp(repo: MatchRepository) {
   registerMatchRoutes(app, {
     verifier: mockVerifier,
     repository: repo,
+    timerScheduler: { schedule: vi.fn().mockResolvedValue(undefined) },
+    webhookSecret: "webhook-secret",
   });
   return app;
 }
@@ -136,6 +143,52 @@ describe("matches presentation routes", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().timerStartedAt).toBeDefined();
+  });
+
+  it("protects the internal timer claim and supports claim rollback", async () => {
+    const repository = createMockRepository();
+    vi.mocked(repository.dispatchMatchTimerThresholdSystem).mockResolvedValue({
+      claimedAt: "2026-10-29T10:00:00.000Z",
+      secondsLeft: 30,
+      match: {
+        id: matchId,
+        round_id: roundId,
+        score_a: 1,
+        score_b: 0,
+        team_a: { name: "Time A" },
+        team_b: { name: "Time B" },
+      },
+    });
+    const app = buildApp(repository);
+    const url = `/api/internal/matches/${matchId}/timer/dispatch`;
+
+    const denied = await app.inject({
+      method: "POST",
+      url,
+      payload: { threshold: "thirty_seconds" },
+    });
+    const claimed = await app.inject({
+      method: "POST",
+      url,
+      headers: { authorization: "Bearer webhook-secret" },
+      payload: { threshold: "thirty_seconds" },
+    });
+    const released = await app.inject({
+      method: "DELETE",
+      url,
+      headers: { authorization: "Bearer webhook-secret" },
+      payload: { threshold: "thirty_seconds", claimedAt: "2026-10-29T10:00:00.000Z" },
+    });
+    await app.close();
+
+    expect(denied.statusCode).toBe(401);
+    expect(claimed.statusCode).toBe(200);
+    expect(claimed.json().secondsLeft).toBe(30);
+    expect(released.statusCode).toBe(204);
+    expect(repository.dispatchMatchTimerThresholdSystem).toHaveBeenCalledWith(matchId, "thirty_seconds");
+    expect(repository.releaseMatchTimerThresholdSystem).toHaveBeenCalledWith(
+      matchId, "thirty_seconds", "2026-10-29T10:00:00.000Z",
+    );
   });
 
   it("POST /api/matches/leagues/:leagueId/substitutions creates substitution", async () => {

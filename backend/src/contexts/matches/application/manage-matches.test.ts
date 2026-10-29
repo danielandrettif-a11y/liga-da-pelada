@@ -51,11 +51,16 @@ function createMockRepository(): MatchRepository {
     setRoundTeamFixedGoalkeeper: vi.fn().mockResolvedValue({ roundId }),
     substituteMatchPlayer: vi.fn().mockResolvedValue({ roundId, substitutionId: subId }),
     undoLastMatchSubstitution: vi.fn().mockResolvedValue({ roundId }),
+    getMatchTimerState: vi.fn().mockResolvedValue({
+      status: "live", durationSeconds: 420, accumulatedSeconds: 0, startedAt: null,
+    }),
     updateMatchTimer: vi.fn().mockResolvedValue({ timerStartedAt: new Date().toISOString() }),
     resetMatchTimer: vi.fn().mockResolvedValue({ eligibilityOffset: 0 }),
-    addMatchExtraTime: vi.fn().mockResolvedValue({ newDuration: 480 }),
-    notifyMatchTimerThreshold: vi.fn().mockResolvedValue({ sent: true }),
-    dispatchMatchTimerThreshold: vi.fn().mockResolvedValue({ sent: true }),
+    setMatchDuration: vi.fn().mockResolvedValue({ newDuration: 480 }),
+    notifyMatchTimerThreshold: vi.fn().mockResolvedValue({ skipped: true, reason: "already_alerted" }),
+    releaseMatchTimerThreshold: vi.fn().mockResolvedValue(undefined),
+    dispatchMatchTimerThresholdSystem: vi.fn().mockResolvedValue({ skipped: true, reason: "already_alerted" }),
+    releaseMatchTimerThresholdSystem: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -89,20 +94,22 @@ describe("manage-matches application layer", () => {
 
   it("handles timer actions", async () => {
     const repo = createMockRepository();
-    const timer = await updateMatchTimer(matchId, "start", leagueId, actor, repo);
+    const scheduler = { schedule: vi.fn().mockResolvedValue(undefined) };
+    const timer = await updateMatchTimer(matchId, "start", leagueId, actor, repo, scheduler);
     expect(timer.timerStartedAt).toBeDefined();
+    expect(scheduler.schedule).toHaveBeenCalledWith(expect.objectContaining({ matchId, durationSeconds: 420 }));
 
     const reset = await resetMatchTimer(matchId, leagueId, actor, repo);
     expect(reset.eligibilityOffset).toBe(0);
 
-    const extra = await addMatchExtraTime(matchId, 60, leagueId, actor, repo);
+    const extra = await addMatchExtraTime(matchId, 60, leagueId, actor, repo, scheduler);
     expect(extra.newDuration).toBe(480);
 
     const notified = await notifyMatchTimerThreshold(matchId, "one_minute", leagueId, actor, repo);
-    expect(notified.sent).toBe(true);
+    expect(notified.skipped).toBe(true);
 
     const dispatched = await dispatchMatchTimerThreshold(matchId, "finished", leagueId, actor, repo);
-    expect(dispatched.sent).toBe(true);
+    expect(dispatched.skipped).toBe(true);
   });
 
   it("handles substitutions and goalkeepers", async () => {

@@ -7,6 +7,8 @@ import type {
   MatchAdminAuditEntry,
   MatchDetails,
   MatchRepository,
+  MatchTimerNotificationClaim,
+  MatchTimerState,
   SubstituteMatchPlayerInput,
 } from "../application/manage-matches.js";
 import type { MatchTimerAction, MatchTimerThreshold } from "../domain/match.js";
@@ -103,6 +105,114 @@ async function requireEventInLeague(
   const event = result.rows[0];
   if (!event) throw new MatchPersistenceError("Evento não encontrado na pelada selecionada.", 404);
   return event;
+}
+
+async function systemTransaction<T>(pool: Pool, operation: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await operation(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    try { await client.query("ROLLBACK"); } catch { /* conexão será descartada pelo pool se necessário */ }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+function timerAlertColumn(threshold: MatchTimerThreshold) {
+  return threshold === "one_minute"
+    ? "timer_one_minute_alerted_at"
+    : threshold === "thirty_seconds"
+      ? "timer_thirty_seconds_alerted_at"
+      : "timer_finished_alerted_at";
+}
+
+async function claimTimerThreshold(
+  client: PoolClient,
+  matchId: string,
+  threshold: MatchTimerThreshold,
+  leagueId?: string,
+): Promise<MatchTimerNotificationClaim> {
+  const result = await client.query<{
+    id: string;
+    round_id: string;
+    status: string;
+    score_a: number;
+    score_b: number;
+    duration_seconds: number;
+    timer_started_at: string | Date | null;
+    timer_accumulated_seconds: number;
+    alerted_at: string | Date | null;
+    team_a_name: string;
+    team_b_name: string;
+  }>(
+    `SELECT match_item.id, match_item.round_id, match_item.status,
+            match_item.score_a, match_item.score_b, match_item.duration_seconds,
+            match_item.timer_started_at, match_item.timer_accumulated_seconds,
+            match_item.${timerAlertColumn(threshold)} AS alerted_at,
+            team_a.name AS team_a_name, team_b.name AS team_b_name
+     FROM public.matches match_item
+     JOIN public.rounds round_item ON round_item.id = match_item.round_id
+     JOIN public.teams team_a ON team_a.id = match_item.team_a_id
+     JOIN public.teams team_b ON team_b.id = match_item.team_b_id
+     WHERE match_item.id = $1::uuid
+       AND ($2::uuid IS NULL OR round_item.league_id = $2::uuid)
+     FOR UPDATE OF match_item`,
+    [matchId, leagueId || null],
+  );
+  const match = result.rows[0];
+  if (!match) throw new MatchPersistenceError("Partida não encontrada na pelada selecionada.", 404);
+  if (match.status !== "live" || !match.timer_started_at) return { skipped: true, reason: "inactive" };
+  const elapsed = Number(match.timer_accumulated_seconds || 0)
+    + Math.max(0, Math.floor((Date.now() - new Date(match.timer_started_at).getTime()) / 1000));
+  const secondsLeft = Math.max(0, Number(match.duration_seconds || 420) - elapsed);
+  const shouldSend = threshold === "one_minute"
+    ? secondsLeft <= 64
+    : threshold === "thirty_seconds"
+      ? secondsLeft <= 34
+      : secondsLeft <= 4;
+  if (!shouldSend) return { skipped: true, reason: "too_early", secondsLeft };
+  if (match.alerted_at) return { skipped: true, reason: "already_alerted", secondsLeft };
+
+  const claimedAt = new Date().toISOString();
+  const claimed = await client.query(
+    `UPDATE public.matches SET ${timerAlertColumn(threshold)} = $2::timestamptz
+     WHERE id = $1::uuid AND ${timerAlertColumn(threshold)} IS NULL`,
+    [matchId, claimedAt],
+  );
+  if (claimed.rowCount !== 1) return { skipped: true, reason: "already_alerted", secondsLeft };
+  return {
+    secondsLeft,
+    claimedAt,
+    match: {
+      id: match.id,
+      round_id: match.round_id,
+      score_a: Number(match.score_a || 0),
+      score_b: Number(match.score_b || 0),
+      team_a: { name: match.team_a_name },
+      team_b: { name: match.team_b_name },
+    },
+  };
+}
+
+async function releaseTimerThreshold(
+  client: PoolClient,
+  matchId: string,
+  threshold: MatchTimerThreshold,
+  claimedAt: string,
+  leagueId?: string,
+) {
+  await client.query(
+    `UPDATE public.matches match_item SET ${timerAlertColumn(threshold)} = NULL
+     FROM public.rounds round_item
+     WHERE match_item.id = $1::uuid AND round_item.id = match_item.round_id
+       AND ($3::uuid IS NULL OR round_item.league_id = $3::uuid)
+       AND match_item.${timerAlertColumn(threshold)} = $2::timestamptz`,
+    [matchId, claimedAt, leagueId || null],
+  );
 }
 
 export function pgMatchRepository(pool: Pool): MatchRepository {
@@ -620,20 +730,46 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
       });
     },
 
-    async updateMatchTimer(matchId: string, action: MatchTimerAction, leagueId: string, actor: Actor): Promise<{ timerStartedAt?: string | null; timerAccumulatedSeconds?: number }> {
+    async getMatchTimerState(matchId: string, leagueId: string, actor: Actor): Promise<MatchTimerState> {
+      return authenticated(pool, actor, async (client) => {
+        await requireLeagueAdmin(client, leagueId);
+        const matchRes = await client.query<{ status: string; duration_seconds: number; timer_started_at: Date | string | null; timer_accumulated_seconds: number }>(
+          `SELECT match_item.status, match_item.duration_seconds,
+                  match_item.timer_started_at, match_item.timer_accumulated_seconds
+           FROM public.matches match_item
+           JOIN public.rounds round_item ON round_item.id = match_item.round_id
+           WHERE match_item.id = $1::uuid AND round_item.league_id = $2::uuid`,
+          [matchId, leagueId],
+        );
+        const match = matchRes.rows[0];
+        if (!match || match.status !== "live") throw new MatchPersistenceError("A partida não está em andamento.", 400);
+        return {
+          status: match.status,
+          durationSeconds: Number(match.duration_seconds || 420),
+          accumulatedSeconds: Number(match.timer_accumulated_seconds || 0),
+          startedAt: match.timer_started_at ? new Date(match.timer_started_at).toISOString() : null,
+        };
+      });
+    },
+
+    async updateMatchTimer(matchId: string, action: MatchTimerAction, startedAt: string | null, leagueId: string, actor: Actor): Promise<{ timerStartedAt?: string | null; timerAccumulatedSeconds?: number }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
         const matchRes = await client.query<{ status: string; timer_started_at: Date | string | null; timer_accumulated_seconds: number }>(
-          "SELECT status, timer_started_at, timer_accumulated_seconds FROM public.matches WHERE id = $1::uuid",
-          [matchId],
+          `SELECT match_item.status, match_item.timer_started_at, match_item.timer_accumulated_seconds
+           FROM public.matches match_item
+           JOIN public.rounds round_item ON round_item.id = match_item.round_id
+           WHERE match_item.id = $1::uuid AND round_item.league_id = $2::uuid
+           FOR UPDATE OF match_item`,
+          [matchId, leagueId],
         );
         const match = matchRes.rows[0];
         if (!match || match.status !== "live") throw new MatchPersistenceError("A partida não está em andamento.", 400);
 
         if (action === "start") {
-          const startedAt = new Date().toISOString();
-          await client.query("UPDATE public.matches SET timer_started_at = $2 WHERE id = $1::uuid", [matchId, startedAt]);
-          return { timerStartedAt: startedAt };
+          if (!startedAt) throw new MatchPersistenceError("Horário de início do cronômetro ausente.", 400);
+          await client.query("UPDATE public.matches SET timer_started_at = $2::timestamptz WHERE id = $1::uuid", [matchId, startedAt]);
+          return { timerStartedAt: startedAt, timerAccumulatedSeconds: Number(match.timer_accumulated_seconds || 0) };
         } else {
           let accumulated = match.timer_accumulated_seconds || 0;
           if (match.timer_started_at) {
@@ -650,8 +786,13 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
         const matchRes = await client.query<{ status: string; timer_started_at: Date | string | null; timer_accumulated_seconds: number; eligibility_elapsed_offset_seconds: number }>(
-          "SELECT status, timer_started_at, timer_accumulated_seconds, eligibility_elapsed_offset_seconds FROM public.matches WHERE id = $1::uuid",
-          [matchId],
+          `SELECT match_item.status, match_item.timer_started_at, match_item.timer_accumulated_seconds,
+                  match_item.eligibility_elapsed_offset_seconds
+           FROM public.matches match_item
+           JOIN public.rounds round_item ON round_item.id = match_item.round_id
+           WHERE match_item.id = $1::uuid AND round_item.league_id = $2::uuid
+           FOR UPDATE OF match_item`,
+          [matchId, leagueId],
         );
         const match = matchRes.rows[0];
         if (!match || match.status !== "live") throw new MatchPersistenceError("A partida não está em andamento.", 400);
@@ -666,7 +807,10 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
           `UPDATE public.matches
            SET timer_accumulated_seconds = 0,
                timer_started_at = NULL,
-               eligibility_elapsed_offset_seconds = $2
+               eligibility_elapsed_offset_seconds = $2,
+               timer_one_minute_alerted_at = NULL,
+               timer_thirty_seconds_alerted_at = NULL,
+               timer_finished_alerted_at = NULL
            WHERE id = $1::uuid`,
           [matchId, offset],
         );
@@ -675,44 +819,55 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
       });
     },
 
-    async addMatchExtraTime(matchId: string, extraSeconds: number, leagueId: string, actor: Actor): Promise<{ newDuration: number }> {
+    async setMatchDuration(matchId: string, durationSeconds: number, leagueId: string, actor: Actor): Promise<{ newDuration: number }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
-        const matchRes = await client.query<{ duration_seconds: number }>("SELECT duration_seconds FROM public.matches WHERE id = $1::uuid", [matchId]);
-        const current = matchRes.rows[0]?.duration_seconds || 420;
-        const newDuration = Math.max(60, current + extraSeconds);
-
-        await client.query("UPDATE public.matches SET duration_seconds = $2 WHERE id = $1::uuid", [matchId, newDuration]);
-        return { newDuration };
-      });
-    },
-
-    async notifyMatchTimerThreshold(matchId: string, threshold: MatchTimerThreshold, leagueId: string, actor: Actor): Promise<{ sent?: boolean; skipped?: boolean; reason?: string }> {
-      return authenticated(pool, actor, async (client) => {
-        await requireLeagueAdmin(client, leagueId);
-        const alertCol = threshold === "one_minute"
-          ? "timer_one_minute_alerted_at"
-          : threshold === "thirty_seconds"
-            ? "timer_thirty_seconds_alerted_at"
-            : "timer_finished_alerted_at";
-
-        const updateRes = await client.query(
-          `UPDATE public.matches
-           SET ${alertCol} = NOW()
-           WHERE id = $1::uuid AND status = 'live' AND ${alertCol} IS NULL
-           RETURNING id`,
-          [matchId],
+        const result = await client.query<{ duration_seconds: number }>(
+          `UPDATE public.matches match_item SET
+             duration_seconds = $3::integer,
+             timer_one_minute_alerted_at = NULL,
+             timer_thirty_seconds_alerted_at = NULL,
+             timer_finished_alerted_at = NULL
+           FROM public.rounds round_item
+           WHERE match_item.id = $1::uuid AND round_item.id = match_item.round_id
+             AND round_item.league_id = $2::uuid AND match_item.status = 'live'
+           RETURNING match_item.duration_seconds`,
+          [matchId, leagueId, durationSeconds],
         );
-
-        if (updateRes.rowCount === 0) {
-          return { skipped: true, reason: "already_alerted_or_inactive" };
-        }
-        return { sent: true };
+        const updated = result.rows[0];
+        if (!updated) throw new MatchPersistenceError("A partida não está em andamento.", 400);
+        return { newDuration: Number(updated.duration_seconds) };
       });
     },
 
-    async dispatchMatchTimerThreshold(matchId: string, threshold: MatchTimerThreshold, leagueId: string, actor: Actor): Promise<{ sent?: boolean; skipped?: boolean; reason?: string }> {
-      return this.notifyMatchTimerThreshold(matchId, threshold, leagueId, actor);
+    async notifyMatchTimerThreshold(matchId: string, threshold: MatchTimerThreshold, leagueId: string, actor: Actor): Promise<MatchTimerNotificationClaim> {
+      return authenticated(pool, actor, async (client) => {
+        await requireLeagueAdmin(client, leagueId);
+        return claimTimerThreshold(client, matchId, threshold, leagueId);
+      });
+    },
+
+    async releaseMatchTimerThreshold(matchId: string, threshold: MatchTimerThreshold, claimedAt: string, leagueId: string, actor: Actor): Promise<void> {
+      return authenticated(pool, actor, async (client) => {
+        await requireLeagueAdmin(client, leagueId);
+        await releaseTimerThreshold(client, matchId, threshold, claimedAt, leagueId);
+      });
+    },
+
+    async dispatchMatchTimerThresholdSystem(matchId: string, threshold: MatchTimerThreshold): Promise<MatchTimerNotificationClaim> {
+      try {
+        return await systemTransaction(pool, (client) => claimTimerThreshold(client, matchId, threshold));
+      } catch (cause) {
+        throw translateFailure(cause);
+      }
+    },
+
+    async releaseMatchTimerThresholdSystem(matchId: string, threshold: MatchTimerThreshold, claimedAt: string): Promise<void> {
+      try {
+        await systemTransaction(pool, (client) => releaseTimerThreshold(client, matchId, threshold, claimedAt));
+      } catch (cause) {
+        throw translateFailure(cause);
+      }
     },
   };
 }

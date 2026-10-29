@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   if (!result.success) {
     return Response.json({ error: result.error || "Falha ao disparar o alerta." }, { status: 500 });
   }
-  if (result.skipped && result.reason === "too_early") {
+  if ("skipped" in result && result.skipped && result.reason === "too_early") {
     return Response.json({
       error: `Alerta recebido antes do marco; faltam ${result.secondsLeft} segundos.`,
     }, {

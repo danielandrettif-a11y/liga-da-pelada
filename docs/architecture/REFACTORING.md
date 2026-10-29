@@ -24,13 +24,22 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Concluído nesta fase | Formato, abertura, pré-lista, edição, estado e participação extraídos; migrations 325 e 328 aplicadas e validadas em teste e oficial; isolamento entre duas peladas aprovado. |
-| Partidas e pontuação | Banco implantado; código pronto para publicação | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; abertura transacional e outbox de gols implementadas. Migrations 326–327 e 334 aplicadas; catálogo e permissões da 334 conferidos no teste e no oficial. Ainda faltam publicar o commit e executar o ensaio móvel integrado com falhas de rede e dois ADMs. |
+| Partidas e pontuação | 21/21 operações aceitas em revisão | Ciclo de vida, gols, goleiros, substituições e cronômetro extraídos. O cronômetro agenda QStash no backend, reivindica alertas de forma transacional e libera a reivindicação quando o Web Push falha. Ainda falta o ensaio móvel integrado com falhas de rede e dois ADMs para promover o contexto a verificado. |
 | Cartola e cosméticos | Concluído nesta fase | Mutações e leitores principais extraídos; ranking, históricos, ficha e destaques usam modelos analíticos e filtros sazonais. |
 | Pagamentos | Concluído nesta fase | Itens, parcelas, PIX, rateio, obrigações, checklist e auditoria separados em domínio, aplicação e infraestrutura, mantendo RPCs e escopo por pelada. |
 | Estatísticas e demais áreas | Concluído nesta fase | Pontuação canônica e modelos analíticos extraídos; leitores sazonais separados; rankings duplicados removidos; cache limitado à requisição. |
 | Avaliação de tabela de acumulados | Medida no oficial; sem justificativa para criar | No banco oficial, `seasonStats`, `rankingHistory` e `playerHistory` ficaram em 128,51 ms, 119,62 ms e 99,64 ms no p95. Os gargalos estão nos enriquecimentos/RPCs compostas. Ver `reports/performance/BASELINE-2026-10-21.md`. |
 
 ## Registro de lotes
+
+### 2026-10-29 — cronômetro e notificações de partidas
+
+- As cinco operações restantes de `matches` foram comparadas com o fluxo legado e migradas: iniciar/pausar, zerar, adicionar acréscimo, reivindicar um marco e despachar o alerta agendado. O contexto chegou a **21/21 operações aceitas em revisão**.
+- Estado, duração, pausa, reset e as travas de notificação agora são autoritativos no backend/PostgreSQL e sempre limitados à pelada da rota. Reset e mudança de duração invalidam alertas anteriores; a reivindicação bloqueia a linha e tolera a latência do provedor sem duplicar a entrega.
+- O QStash passou a ser uma porta da aplicação com adaptador próprio no backend. Iniciar ou acrescentar tempo reagenda os três marcos; o webhook usa uma rota interna protegida por `MATCH_TIMER_WEBHOOK_SECRET`, sem depender de sessão de navegador.
+- Web Push permanece no adaptador de notificação do Next até a migração desse contexto. O backend devolve uma reivindicação, o Next entrega a mensagem e, se nenhuma entrega for possível, libera exatamente aquela reivindicação para permitir retry seguro.
+- Progresso auditado esperado após a atualização do catálogo: **150/267 estruturais, 150/267 (56,2%) aceitas em revisão, 0/267 verificadas de ponta a ponta e 117 pendentes de paridade**.
+- Verificação desta fatia cobre caso de uso, PostgreSQL, agendamento QStash, autorização da rota interna, gateway HTTP, entrega Web Push e rollback da trava. Gate completo aprovado com **1.043 testes frontend em 200 arquivos**, **359 testes backend em 100 arquivos**, typecheck e builds dos dois projetos; auditorias de arquitetura, contexto e migração aprovadas; `npm audit --omit=dev` sem vulnerabilidades em frontend e backend.
 
 ### 2026-10-29 — ciclo principal da partida
 

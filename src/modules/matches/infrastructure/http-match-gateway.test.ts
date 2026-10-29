@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { httpMatchGateway, MatchApiError } from "./http-match-gateway";
+import {
+  dispatchSystemMatchTimerThreshold,
+  httpMatchGateway,
+  MatchApiError,
+  releaseSystemMatchTimerThreshold,
+} from "./http-match-gateway";
 
 const backendUrl = "https://backend.example.com";
 const leagueId = "00000000-0000-4000-8000-000000000001";
@@ -94,6 +99,34 @@ describe("httpMatchGateway", () => {
     );
     expect(fetchMock).toHaveBeenCalledWith(
       `${backendUrl}/api/matches/leagues/${leagueId}/${matchId}/substitutions/${substitutionId}`,
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("claims and releases timer notifications through user and system boundaries", async () => {
+    const claimedAt = "2026-10-29T10:00:00.000Z";
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ claimedAt, secondsLeft: 30 }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const gateway = httpMatchGateway(backendUrl, "test-token");
+
+    await gateway.notifyMatchTimerThreshold(leagueId, matchId, "thirty_seconds");
+    await gateway.releaseMatchTimerThreshold(leagueId, matchId, "thirty_seconds", claimedAt);
+    await dispatchSystemMatchTimerThreshold(backendUrl, "webhook-secret", matchId, "finished");
+    await releaseSystemMatchTimerThreshold(backendUrl, "webhook-secret", matchId, "finished", claimedAt);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/matches/leagues/${leagueId}/${matchId}/timer/notify`,
+      expect.objectContaining({ method: "DELETE", body: JSON.stringify({ threshold: "thirty_seconds", claimedAt }) }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/internal/matches/${matchId}/timer/dispatch`,
+      expect.objectContaining({ method: "POST", headers: expect.objectContaining({ authorization: "Bearer webhook-secret" }) }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/internal/matches/${matchId}/timer/dispatch`,
       expect.objectContaining({ method: "DELETE" }),
     );
   });

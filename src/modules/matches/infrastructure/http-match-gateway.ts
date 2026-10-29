@@ -10,6 +10,21 @@ type ApiErrorPayload = {
   message?: string;
 };
 
+export type MatchTimerNotificationClaim = {
+  skipped?: boolean;
+  reason?: "inactive" | "too_early" | "already_alerted";
+  secondsLeft?: number;
+  claimedAt?: string;
+  match?: {
+    id: string;
+    round_id: string;
+    score_a: number;
+    score_b: number;
+    team_a: { name: string } | null;
+    team_b: { name: string } | null;
+  };
+};
+
 export type MatchHttpGateway = {
   getMatch(leagueId: string, matchId: string): Promise<any>;
   findLiveMatchForTeams(leagueId: string, roundId: string, teamAId: string, teamBId: string): Promise<{ matchId: string | null }>;
@@ -43,8 +58,9 @@ export type MatchHttpGateway = {
   updateMatchTimer(leagueId: string, matchId: string, action: string): Promise<{ success: true; timerStartedAt?: string | null; timerAccumulatedSeconds?: number; error?: undefined }>;
   resetMatchTimer(leagueId: string, matchId: string): Promise<{ success: true; eligibilityOffset: number; error?: undefined }>;
   addMatchExtraTime(leagueId: string, matchId: string, extraSeconds: number): Promise<{ success: true; newDuration: number; error?: undefined }>;
-  notifyMatchTimerThreshold(leagueId: string, matchId: string, threshold: string): Promise<{ success: true; sent?: boolean; skipped?: boolean; reason?: string; secondsLeft?: number; error?: undefined }>;
-  dispatchMatchTimerThreshold(leagueId: string, matchId: string, threshold: string): Promise<{ success: true; sent?: boolean; skipped?: boolean; reason?: string; secondsLeft?: number; error?: undefined }>;
+  notifyMatchTimerThreshold(leagueId: string, matchId: string, threshold: string): Promise<{ success: true; error?: undefined } & MatchTimerNotificationClaim>;
+  dispatchMatchTimerThreshold(leagueId: string, matchId: string, threshold: string): Promise<{ success: true; error?: undefined } & MatchTimerNotificationClaim>;
+  releaseMatchTimerThreshold(leagueId: string, matchId: string, threshold: string, claimedAt: string): Promise<void>;
   selectBestGoalkeeper(leagueId: string, roundId: string, playerId: string): Promise<{ success: true; error?: undefined }>;
 };
 
@@ -267,6 +283,15 @@ export function httpMatchGateway(backendUrl: string, accessToken?: string): Matc
       return { success: true, ...data };
     },
 
+    async releaseMatchTimerThreshold(leagueId, matchId, threshold, claimedAt) {
+      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/timer/notify`, {
+        method: "DELETE",
+        headers: authHeaders(true),
+        body: JSON.stringify({ threshold, claimedAt }),
+      });
+      if (!res.ok) await parseApiError(res);
+    },
+
     async selectBestGoalkeeper(leagueId, roundId, playerId) {
       const res = await fetch(`${base}/api/matches/leagues/${leagueId}/rounds/${roundId}/goalkeeper/best`, {
         method: "POST",
@@ -277,4 +302,38 @@ export function httpMatchGateway(backendUrl: string, accessToken?: string): Matc
       return res.json();
     },
   };
+}
+
+export async function dispatchSystemMatchTimerThreshold(
+  backendUrl: string,
+  webhookSecret: string,
+  matchId: string,
+  threshold: string,
+): Promise<MatchTimerNotificationClaim> {
+  const base = backendUrl.replace(/\/+$/, "");
+  const response = await fetch(`${base}/api/internal/matches/${matchId}/timer/dispatch`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${webhookSecret}`, "content-type": "application/json" },
+    body: JSON.stringify({ threshold }),
+    cache: "no-store",
+  });
+  if (!response.ok) await parseApiError(response);
+  return response.json();
+}
+
+export async function releaseSystemMatchTimerThreshold(
+  backendUrl: string,
+  webhookSecret: string,
+  matchId: string,
+  threshold: string,
+  claimedAt: string,
+): Promise<void> {
+  const base = backendUrl.replace(/\/+$/, "");
+  const response = await fetch(`${base}/api/internal/matches/${matchId}/timer/dispatch`, {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${webhookSecret}`, "content-type": "application/json" },
+    body: JSON.stringify({ threshold, claimedAt }),
+    cache: "no-store",
+  });
+  if (!response.ok) await parseApiError(response);
 }

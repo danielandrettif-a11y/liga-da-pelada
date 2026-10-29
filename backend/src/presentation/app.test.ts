@@ -37,7 +37,7 @@ describe("goal HTTP route", () => {
       verifier: { verifyAccessToken: vi.fn() },
       repository: {} as GoalRepository,
       logger: false,
-    })).toThrow("MatchRepository é obrigatório");
+    })).toThrow("MatchRepository e MatchTimerScheduler são obrigatórios");
   });
 
   it("is absent by default", async () => {

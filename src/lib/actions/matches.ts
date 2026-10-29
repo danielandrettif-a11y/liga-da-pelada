@@ -36,6 +36,11 @@ import type { FinishedGoalCorrectionInput } from "@/modules/matches/domain/finis
 import { supabaseCreateMatchGateway, type MatchLineupCommand } from "@/modules/matches/infrastructure/supabase-create-match-gateway";
 import { measureMatchStep } from "../match-performance";
 import { matchApiFor } from "@/modules/matches/infrastructure/match-api-session";
+import {
+  dispatchSystemMatchTimerThreshold,
+  releaseSystemMatchTimerThreshold,
+  type MatchTimerNotificationClaim,
+} from "@/modules/matches/infrastructure/http-match-gateway";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 
@@ -1314,9 +1319,36 @@ export async function notifyMatchTimerThreshold(
   const league = await getSelectedLeague();
   const api = await matchApiFor(client);
   if (api && league) {
-    return api.notifyMatchTimerThreshold(league.id, matchId, threshold);
+    const claim = await api.notifyMatchTimerThreshold(league.id, matchId, threshold);
+    return deliverMatchTimerClaim(client, threshold, claim, () => claim.claimedAt
+      ? api.releaseMatchTimerThreshold(league.id, matchId, threshold, claim.claimedAt)
+      : Promise.resolve());
   }
   return dispatchMatchTimerThreshold(client, matchId, threshold);
+}
+
+async function deliverMatchTimerClaim(
+  client: SupabaseClient,
+  threshold: "one_minute" | "thirty_seconds" | "finished",
+  claim: MatchTimerNotificationClaim,
+  release: () => Promise<void>,
+) {
+  if (claim.skipped) return { success: true as const, ...claim };
+  if (!claim.match || !claim.claimedAt) {
+    return { success: false as const, error: "O backend não devolveu uma trava válida para o alerta." };
+  }
+  try {
+    const delivery = await sendMatchTimerNotifications(client, claim.match, threshold);
+    if (delivery.disabled || (delivery.sent === 0 && delivery.failed > 0)) {
+      throw new Error(delivery.disabled
+        ? "As chaves VAPID não estão configuradas no servidor."
+        : "Nenhuma notificação pôde ser entregue.");
+    }
+    return { success: true as const, sent: true, secondsLeft: claim.secondsLeft };
+  } catch (error) {
+    try { await release(); } catch (releaseError) { console.error("Erro ao liberar trava do alerta:", releaseError); }
+    return { success: false as const, error: error instanceof Error ? error.message : "Falha ao enviar o alerta." };
+  }
 }
 
 /** Usado pelo webhook do agendador, sem depender de um navegador aberto. */
@@ -1326,6 +1358,17 @@ export async function dispatchMatchTimerThreshold(
   threshold: "one_minute" | "thirty_seconds" | "finished",
 ) {
   try {
+    if (process.env.MATCHES_API_ENABLED === "true") {
+      const backendUrl = process.env.MATCHES_BACKEND_URL || process.env.MATCH_GOAL_BACKEND_URL;
+      const webhookSecret = process.env.MATCH_TIMER_WEBHOOK_SECRET;
+      if (!backendUrl || !webhookSecret) {
+        return { success: false as const, error: "Backend ou segredo do cronômetro não configurado." };
+      }
+      const claim = await dispatchSystemMatchTimerThreshold(backendUrl, webhookSecret, matchId, threshold);
+      return deliverMatchTimerClaim(client, threshold, claim, () => claim.claimedAt
+        ? releaseSystemMatchTimerThreshold(backendUrl, webhookSecret, matchId, threshold, claim.claimedAt)
+        : Promise.resolve());
+    }
     const league = await getSelectedLeague();
     const api = await matchApiFor(client);
     if (api && league) {

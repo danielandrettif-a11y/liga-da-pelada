@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   buildQuickStart: vi.fn(),
   scheduleMatchTimerAlerts: vi.fn(),
   sendMatchFinishedNotifications: vi.fn(),
+  sendMatchTimerNotifications: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -34,7 +35,7 @@ vi.mock("@/modules/matches/infrastructure/supabase-finish-match-gateway", () => 
 vi.mock("../match-timer-scheduler", () => ({ scheduleMatchTimerAlerts: mocks.scheduleMatchTimerAlerts }));
 vi.mock("../push-notifications", () => ({
   sendMatchFinishedNotifications: mocks.sendMatchFinishedNotifications,
-  sendMatchTimerNotifications: vi.fn(),
+  sendMatchTimerNotifications: mocks.sendMatchTimerNotifications,
 }));
 
 import {
@@ -102,6 +103,7 @@ describe("matches actions via API gateway", () => {
     mocks.buildQuickStart.mockResolvedValue({ rotation: null });
     mocks.scheduleMatchTimerAlerts.mockResolvedValue({ scheduled: true });
     mocks.sendMatchFinishedNotifications.mockResolvedValue({ sent: 1 });
+    mocks.sendMatchTimerNotifications.mockResolvedValue({ sent: 1, failed: 0 });
   });
 
   it("routes findLiveMatchForTeams to API gateway", async () => {
@@ -298,17 +300,45 @@ describe("matches actions via API gateway", () => {
   });
 
   it("routes notifyMatchTimerThreshold to API gateway", async () => {
+    const release = vi.fn().mockResolvedValue(undefined);
     mocks.matchApi.mockResolvedValue({
-      notifyMatchTimerThreshold: vi.fn().mockResolvedValue({ success: true, sent: true }),
+      notifyMatchTimerThreshold: vi.fn().mockResolvedValue({
+        success: true,
+        claimedAt: "2026-10-29T10:00:00.000Z",
+        secondsLeft: 60,
+        match: { id: matchId, round_id: roundId, score_a: 1, score_b: 0, team_a: null, team_b: null },
+      }),
+      releaseMatchTimerThreshold: release,
     });
 
     const res = await notifyMatchTimerThreshold(matchId, "one_minute");
     expect(res.success).toBe(true);
+    expect(mocks.sendMatchTimerNotifications).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: matchId }), "one_minute");
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  it("releases a timer claim when push delivery fails", async () => {
+    const release = vi.fn().mockResolvedValue(undefined);
+    mocks.sendMatchTimerNotifications.mockResolvedValue({ sent: 0, failed: 1 });
+    mocks.matchApi.mockResolvedValue({
+      notifyMatchTimerThreshold: vi.fn().mockResolvedValue({
+        success: true,
+        claimedAt: "2026-10-29T10:00:00.000Z",
+        secondsLeft: 30,
+        match: { id: matchId, round_id: roundId, score_a: 1, score_b: 0, team_a: null, team_b: null },
+      }),
+      releaseMatchTimerThreshold: release,
+    });
+
+    const res = await notifyMatchTimerThreshold(matchId, "thirty_seconds");
+
+    expect(res.success).toBe(false);
+    expect(release).toHaveBeenCalledWith(leagueId, matchId, "thirty_seconds", "2026-10-29T10:00:00.000Z");
   });
 
   it("routes dispatchMatchTimerThreshold to API gateway", async () => {
     mocks.matchApi.mockResolvedValue({
-      dispatchMatchTimerThreshold: vi.fn().mockResolvedValue({ success: true, sent: true }),
+      dispatchMatchTimerThreshold: vi.fn().mockResolvedValue({ success: true, skipped: true, reason: "already_alerted" }),
     });
 
     const res = await dispatchMatchTimerThreshold({} as any, matchId, "finished");

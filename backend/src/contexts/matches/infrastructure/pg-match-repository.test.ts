@@ -235,4 +235,52 @@ describe("pgMatchRepository", () => {
     await expect(pgMatchRepository(pool).getFinishedMatchAudit(matchId, leagueId, actor)).resolves.toHaveLength(1);
     expect(query).toHaveBeenCalledWith(expect.stringContaining("a.action IN"), [matchId, leagueId]);
   });
+
+  it("keeps timer state scoped and claims notifications only after their threshold", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-29T10:07:00.000Z"));
+    const claimedAt = "2026-10-29T10:07:00.000Z";
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("AS alerted_at")) return { rows: [{
+        id: matchId, round_id: roundId, status: "live", score_a: 1, score_b: 0,
+        duration_seconds: 420, timer_started_at: "2026-10-29T10:00:30.000Z",
+        timer_accumulated_seconds: 0, alerted_at: null,
+        team_a_name: "Time A", team_b_name: "Time B",
+      }] };
+      if (sql.includes("duration_seconds") && sql.includes("FROM public.matches match_item") && !sql.includes("FOR UPDATE")) {
+        return { rows: [{ status: "live", duration_seconds: 420, timer_started_at: null, timer_accumulated_seconds: 20 }] };
+      }
+      if (sql.includes("eligibility_elapsed_offset_seconds") && sql.includes("FOR UPDATE")) {
+        return { rows: [{ status: "live", timer_started_at: null, timer_accumulated_seconds: 20, eligibility_elapsed_offset_seconds: 5 }] };
+      }
+      if (sql.includes("FOR UPDATE OF match_item")) {
+        return { rows: [{ status: "live", timer_started_at: null, timer_accumulated_seconds: 20 }] };
+      }
+      if (sql.includes("RETURNING match_item.duration_seconds")) return { rows: [{ duration_seconds: 480 }] };
+      return { rows: [], rowCount: 1 };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+    const repo = pgMatchRepository(pool);
+
+    try {
+      await expect(repo.getMatchTimerState(matchId, leagueId, actor)).resolves.toEqual({
+        status: "live", durationSeconds: 420, accumulatedSeconds: 20, startedAt: null,
+      });
+      await expect(repo.updateMatchTimer(matchId, "start", claimedAt, leagueId, actor))
+        .resolves.toEqual({ timerStartedAt: claimedAt, timerAccumulatedSeconds: 20 });
+      await expect(repo.resetMatchTimer(matchId, leagueId, actor)).resolves.toEqual({ eligibilityOffset: 25 });
+      await expect(repo.setMatchDuration(matchId, 480, leagueId, actor)).resolves.toEqual({ newDuration: 480 });
+      const claim = await repo.notifyMatchTimerThreshold(matchId, "thirty_seconds", leagueId, actor);
+      expect(claim.claimedAt).toBe(claimedAt);
+      expect(claim.secondsLeft).toBe(30);
+      expect(claim.match?.score_a).toBe(1);
+      await repo.releaseMatchTimerThreshold(matchId, "thirty_seconds", claimedAt, leagueId, actor);
+      expect(query).toHaveBeenCalledWith(expect.stringContaining("timer_thirty_seconds_alerted_at = NULL"), [
+        matchId, claimedAt, leagueId,
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
