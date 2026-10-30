@@ -2736,6 +2736,66 @@
         "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
         "src/lib/actions/stats.test.ts"
       ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getLatestPlayerCardOverallMap",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/player-card-overalls",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-operations.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-operations.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-operations-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-operations-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/team-standings.ts",
+      "name": "getSeasonTeamStandings",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/team-standings",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-operations.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-operations.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-operations-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-operations-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/team-standings.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/reprocess.ts",
+      "name": "previewReprocessSeason",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/reprocess/preview",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-operations.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-operations.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-operations-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-operations-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/reprocess.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/reprocess.ts",
+      "name": "executeReprocessSeason",
+      "state": "frontend-migrated",
+      "target": "POST /api/statistics/leagues/:leagueId/reprocess",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-operations.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-operations.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-operations-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-operations-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/reprocess.test.ts"
+      ]
     }
   ]
 }

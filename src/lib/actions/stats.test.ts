@@ -36,6 +36,7 @@ import { getCurrentAccount } from "../auth";
 import {
   calculateRoundStats,
   getFriendlyStats,
+  getLatestPlayerCardOverallMap,
   getPlayerRankingEntry,
   getRanking,
   getRankingEnrichmentForPlayers,
@@ -51,6 +52,17 @@ describe("stats server actions parity", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getSelectedLeague).mockResolvedValue({ id: leagueId, name: "Pelada Teste" } as any);
+  });
+
+  describe("getLatestPlayerCardOverallMap", () => {
+    it("converts the API record to the legacy Map contract", async () => {
+      const overall = { overall: 81, trend: "steady", positions: null, positionTrends: {}, goalkeeperGames: 0, goalkeeperRounds: 0, roundsPlayed: 3 };
+      const gateway = { getPlayerCardOveralls: vi.fn().mockResolvedValue({ [playerId]: overall }) };
+      vi.mocked(getStatisticsApiSession).mockResolvedValue({ gateway } as any);
+      const result = await getLatestPlayerCardOverallMap();
+      expect(result).toEqual(new Map([[playerId, overall]]));
+      expect(gateway.getPlayerCardOveralls).toHaveBeenCalledWith(leagueId);
+    });
   });
 
   describe("getRanking", () => {

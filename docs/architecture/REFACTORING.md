@@ -33,6 +33,14 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-30 — contexto Statistics: Subfatia 4 (Operações Sazonais) (16/22 aceitas)
+
+- Migradas e aceitas `getLatestPlayerCardOverallMap`, `getSeasonTeamStandings`, `previewReprocessSeason` e `executeReprocessSeason`. O progresso global passa a **182/267 operações (68,2%)**, restando 85.
+- `season-operations.ts` preserva o contrato de OVR das cartas e a classificação dos quatro clubes, incluindo desempates, artilheiro e líder de assistências.
+- A prévia e a execução continuam usando as RPCs administrativas existentes; o backend autentica o ator, exige `is_app_admin()` e executa a RPC no mesmo contexto transacional, sem duplicar regras SQL em TypeScript.
+- Rotas: `GET /player-card-overalls`, `GET /team-standings`, `GET /reprocess/preview` e `POST /reprocess`, todas sob `/api/statistics/leagues/:leagueId`.
+- Verificação: **140 arquivos/538 testes backend** e **214 arquivos/1.144 testes frontend**; typecheck, builds de produção, auditorias de migração/contextos/arquitetura e `git diff --check` aprovados.
+
 ### 2026-10-30 — contexto Statistics: Subfatia 3 (Scouts de Rodada e Amistosos) (12/22 aceitas)
 
 - Migradas e aceitas `calculateRoundStats`, `getRoundStatistics` e `getFriendlyStats`. O progresso global passa a **178/267 operações (66,7%)**, restando 89.

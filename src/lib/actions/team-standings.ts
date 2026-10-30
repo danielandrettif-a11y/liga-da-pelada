@@ -3,8 +3,16 @@
 import { createClient as createServerClient } from "../supabase/server";
 import { buildSeasonTeamStandings, type SeasonTeamStanding } from "../season-team-standings";
 import { getActiveSeason } from "./seasons";
+import { getSelectedLeague } from "../league-context";
+import { getStatisticsApiSession } from "@/modules/statistics/infrastructure/statistics-api-session";
 
 export async function getSeasonTeamStandings(): Promise<SeasonTeamStanding[]> {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (!league) return buildSeasonTeamStandings([]);
+    return session.gateway.getSeasonTeamStandings(league.id);
+  }
   const season = await getActiveSeason();
   if (!season) return buildSeasonTeamStandings([]);
 

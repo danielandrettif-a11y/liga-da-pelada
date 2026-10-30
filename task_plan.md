@@ -289,4 +289,24 @@ Implementar a refatoração modular DDD do contexto `Notifications` da aplicaç�
 - [x] **Auditoria e Registros:**
   - Aprovado em 178/267 operações aceitas (`statistics: 12/22`).
 
+---
+
+## Contexto Statistics: Subfatia 4 - Operações Sazonais - Concluída ✅
+
+### Operações Cobertas (4 operações)
+
+1. `getLatestPlayerCardOverallMap` (`src/lib/actions/stats.ts`)
+2. `getSeasonTeamStandings` (`src/lib/actions/team-standings.ts`)
+3. `previewReprocessSeason` (`src/lib/actions/reprocess.ts`)
+4. `executeReprocessSeason` (`src/lib/actions/reprocess.ts`)
+
+### Checklist da Subfatia 4
+
+- [x] Domínio puro para OVR das cartas e classificação dos clubes.
+- [x] Caso de uso com validação do escopo de pelada.
+- [x] Repositório PostgreSQL autenticado e autorização administrativa explícita.
+- [x] Rotas Fastify, gateway HTTP e bridges das Server Actions.
+- [x] Contratos legados preservados; nenhuma mutação é repetida após falha da API habilitada.
+- [x] Auditoria aprovada em **182/267 (68,2%)**, `statistics: 16/22`.
+
 

@@ -545,6 +545,26 @@
       "context": "statistics",
       "source": "src/lib/actions/stats.ts",
       "name": "getFriendlyStats"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getLatestPlayerCardOverallMap"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/team-standings.ts",
+      "name": "getSeasonTeamStandings"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/reprocess.ts",
+      "name": "previewReprocessSeason"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/reprocess.ts",
+      "name": "executeReprocessSeason"
     }
   ],
   "evidence": {
@@ -752,6 +772,38 @@
       "backend/src/contexts/statistics/presentation/round-statistics-route.test.ts",
       "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
       "src/lib/actions/stats.test.ts"
+    ],
+    "statistics\u0000src/lib/actions/stats.ts\u0000getLatestPlayerCardOverallMap": [
+      "backend/src/contexts/statistics/domain/season-operations.test.ts",
+      "backend/src/contexts/statistics/application/manage-season-operations.test.ts",
+      "backend/src/contexts/statistics/infrastructure/pg-season-operations-repository.test.ts",
+      "backend/src/contexts/statistics/presentation/season-operations-route.test.ts",
+      "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+      "src/lib/actions/stats.test.ts"
+    ],
+    "statistics\u0000src/lib/actions/team-standings.ts\u0000getSeasonTeamStandings": [
+      "backend/src/contexts/statistics/domain/season-operations.test.ts",
+      "backend/src/contexts/statistics/application/manage-season-operations.test.ts",
+      "backend/src/contexts/statistics/infrastructure/pg-season-operations-repository.test.ts",
+      "backend/src/contexts/statistics/presentation/season-operations-route.test.ts",
+      "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+      "src/lib/actions/team-standings.test.ts"
+    ],
+    "statistics\u0000src/lib/actions/reprocess.ts\u0000previewReprocessSeason": [
+      "backend/src/contexts/statistics/domain/season-operations.test.ts",
+      "backend/src/contexts/statistics/application/manage-season-operations.test.ts",
+      "backend/src/contexts/statistics/infrastructure/pg-season-operations-repository.test.ts",
+      "backend/src/contexts/statistics/presentation/season-operations-route.test.ts",
+      "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+      "src/lib/actions/reprocess.test.ts"
+    ],
+    "statistics\u0000src/lib/actions/reprocess.ts\u0000executeReprocessSeason": [
+      "backend/src/contexts/statistics/domain/season-operations.test.ts",
+      "backend/src/contexts/statistics/application/manage-season-operations.test.ts",
+      "backend/src/contexts/statistics/infrastructure/pg-season-operations-repository.test.ts",
+      "backend/src/contexts/statistics/presentation/season-operations-route.test.ts",
+      "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+      "src/lib/actions/reprocess.test.ts"
     ]
   }
 }

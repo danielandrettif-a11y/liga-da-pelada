@@ -261,4 +261,24 @@ describe("httpStatisticsGateway", () => {
       expect.objectContaining({ cache: "no-store" }),
     );
   });
+
+  it("routes season aggregates and reprocessing endpoints", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => ({
+      ok: true,
+      json: async () => url.includes("player-card-overalls") ? { p1: { overall: 80 } }
+        : url.includes("team-standings") ? [{ name: "MilamB" }]
+          : url.includes("preview") ? { can_reprocess: true }
+            : { success: true },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const gateway = httpStatisticsGateway(baseUrl, accessToken);
+    await expect(gateway.getPlayerCardOveralls(leagueId)).resolves.toHaveProperty("p1");
+    await expect(gateway.getSeasonTeamStandings(leagueId)).resolves.toHaveLength(1);
+    await expect(gateway.previewReprocessSeason(leagueId)).resolves.toEqual({ can_reprocess: true });
+    await expect(gateway.executeReprocessSeason(leagueId)).resolves.toEqual({ success: true });
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `${baseUrl}/api/statistics/leagues/${leagueId}/reprocess`,
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
 });

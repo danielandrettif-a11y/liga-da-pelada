@@ -169,6 +169,13 @@
 - **Leituras:** `getRoundStatistics` e `getFriendlyStats` são escopadas por `league_id`/temporada, omitem inscrições com zero jogos e mantêm a view sazonal como read model canônico.
 - **Resultado:** Statistics alcança **12/22**, e a aplicação **178/267 (66,7%)**.
 
+## 16. Reorganização de Arquitetura: Contexto Statistics - Subfatia 4 (Operações Sazonais)
+
+- **Descoberta:** mapa de OVR e classificação por times são read models sazonais; prévia e execução de reprocessamento são uma única fronteira administrativa sustentada por RPCs atômicas existentes.
+- **Decisão:** manter agregações determinísticas no domínio e preservar `preview_reprocess_season`/`reprocess_active_season_v5` como autoridades transacionais, acrescentando autenticação e `is_app_admin()` explícitos no backend.
+- **Paridade:** os bridges mantêm `Map` no OVR, as respostas de erro da prévia/execução e o fallback legado somente com `STATISTICS_API_ENABLED` desligada.
+- **Resultado:** Statistics alcança **16/22**, e a aplicação **182/267 (68,2%)**.
+
 
 
 

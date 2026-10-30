@@ -95,6 +95,8 @@ import type { SeasonRankingRepository } from "../contexts/statistics/application
 import { registerSeasonRankingRoutes } from "../contexts/statistics/presentation/season-ranking-route.js";
 import { registerRoundStatisticsRoutes } from "../contexts/statistics/presentation/round-statistics-route.js";
 import type { RoundStatisticsRepository } from "../contexts/statistics/application/manage-round-statistics.js";
+import { registerSeasonOperationsRoutes } from "../contexts/statistics/presentation/season-operations-route.js";
+import type { SeasonOperationsRepository } from "../contexts/statistics/application/manage-season-operations.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 
 export function createApp(dependencies: {
@@ -162,6 +164,7 @@ export function createApp(dependencies: {
   scoringRulesRepository?: ScoringRulesRepository;
   seasonRankingRepository?: SeasonRankingRepository;
   roundStatisticsRepository?: RoundStatisticsRepository;
+  seasonOperationsRepository?: SeasonOperationsRepository;
   emailConfigured?: boolean;
   logger?: boolean;
 }): FastifyInstance {
@@ -236,7 +239,8 @@ export function createApp(dependencies: {
     throw new Error("ScoringRulesRepository é obrigatório quando ENABLE_STATISTICS_API=true.");
   }
   if (dependencies.statisticsEnabled && dependencies.strictContextDependencies
-    && (!dependencies.seasonRankingRepository || !dependencies.roundStatisticsRepository)) {
+    && (!dependencies.seasonRankingRepository || !dependencies.roundStatisticsRepository
+      || !dependencies.seasonOperationsRepository)) {
     throw new Error("Dependências de estatísticas são obrigatórias quando ENABLE_STATISTICS_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
@@ -471,6 +475,12 @@ export function createApp(dependencies: {
     registerRoundStatisticsRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.roundStatisticsRepository,
+    });
+  }
+  if (dependencies.statisticsEnabled && dependencies.seasonOperationsRepository) {
+    registerSeasonOperationsRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.seasonOperationsRepository,
     });
   }
   return app;

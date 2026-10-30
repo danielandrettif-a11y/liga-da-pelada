@@ -273,7 +273,16 @@
 
 ## Próximo passo de Statistics
 
-- Restam 10 operações: dashboard, leitura/publicação/reprocessamento de overall, reprocessamento sazonal, mapa de overall das cartas e classificação por times.
+- Restam 6 operações: dashboard e o ciclo completo de leitura, cálculo, publicação e atualização segura do OVR sombra.
+
+## Contexto Statistics - Subfatia 4 (Operações Sazonais) Concluída ✅
+
+- Operações: `getLatestPlayerCardOverallMap`, `getSeasonTeamStandings`, `previewReprocessSeason` e `executeReprocessSeason`.
+- Backend modular em `season-operations.ts`, `manage-season-operations.ts`, `pg-season-operations-repository.ts` e `season-operations-route.ts`.
+- Reprocessamento continua atômico nas RPCs existentes e exige administrador global antes da chamada.
+- Auditoria: **182/267 (68,2%)**, `statistics: 16/22`; faltam 85 operações globais.
+- Testes: **140 arquivos/538 backend** e **214 arquivos/1.144 frontend**.
+- Gates finais: typecheck e builds de produção dos dois projetos, auditorias de migração/contextos/arquitetura e `git diff --check` aprovados.
 
 
 

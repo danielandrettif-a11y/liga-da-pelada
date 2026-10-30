@@ -103,6 +103,12 @@ function overallTrend(value: unknown): OverallTrend {
 }
 
 export async function getLatestPlayerCardOverallMap(client?: any) {
+  const session = await getStatisticsApiSession(client);
+  if (session) {
+    const league = await getSelectedLeague();
+    if (!league) return new Map<string, PlayerCardOverall>();
+    return new Map(Object.entries(await session.gateway.getPlayerCardOveralls(league.id)));
+  }
   client ||= await createServerClient();
   const league = await getSelectedLeague();
   if (!league) return new Map<string, PlayerCardOverall>();

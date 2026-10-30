@@ -1,7 +1,9 @@
 import type { BQBaseScoringSnapshot } from "@/lib/bq-scoring";
 import type { ColumnCScoringSettings } from "@/lib/actions/bq-scoring";
 import type { RankingEntry, RankingExperienceData } from "@/lib/ranking";
-import type { FriendlyStatsEntry, RoundStatistics } from "@/lib/actions/stats";
+import type { FriendlyStatsEntry, PlayerCardOverall, RoundStatistics } from "@/lib/actions/stats";
+import type { ReprocessExecutionResult, ReprocessPreviewResult } from "@/lib/actions/reprocess";
+import type { SeasonTeamStanding } from "@/lib/season-team-standings";
 
 export type RankingEnrichment = Pick<
   RankingEntry,
@@ -60,6 +62,10 @@ export interface StatisticsGateway {
   calculateRoundStats(leagueId: string, roundId: string): Promise<{ success: boolean; error?: string }>;
   getRoundStatistics(leagueId: string, roundId: string): Promise<RoundStatistics | null>;
   getFriendlyStats(leagueId: string): Promise<FriendlyStatsEntry[]>;
+  getPlayerCardOveralls(leagueId: string): Promise<Record<string, PlayerCardOverall>>;
+  getSeasonTeamStandings(leagueId: string): Promise<SeasonTeamStanding[]>;
+  previewReprocessSeason(leagueId: string): Promise<ReprocessPreviewResult>;
+  executeReprocessSeason(leagueId: string): Promise<ReprocessExecutionResult>;
 }
 
 export type StatisticsHttpGateway = StatisticsGateway;
@@ -248,6 +254,34 @@ export function httpStatisticsGateway(
       return requestJson<FriendlyStatsEntry[]>(
         `/api/statistics/leagues/${encodeURIComponent(leagueId)}/friendlies`,
         { headers: authHeaders(), cache: "no-store" },
+      );
+    },
+
+    async getPlayerCardOveralls(leagueId) {
+      return requestJson<Record<string, PlayerCardOverall>>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/player-card-overalls`,
+        { headers: authHeaders(), cache: "no-store" },
+      );
+    },
+
+    async getSeasonTeamStandings(leagueId) {
+      return requestJson<SeasonTeamStanding[]>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/team-standings`,
+        { headers: authHeaders(), cache: "no-store" },
+      );
+    },
+
+    async previewReprocessSeason(leagueId) {
+      return requestJson<ReprocessPreviewResult>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/reprocess/preview`,
+        { headers: authHeaders(), cache: "no-store" },
+      );
+    },
+
+    async executeReprocessSeason(leagueId) {
+      return requestJson<ReprocessExecutionResult>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/reprocess`,
+        { method: "POST", headers: authHeaders(true) },
       );
     },
   };

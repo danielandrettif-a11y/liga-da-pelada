@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentAccount } from "../auth";
 import { getActiveLeague } from "./rounds";
+import { getStatisticsApiSession } from "@/modules/statistics/infrastructure/statistics-api-session";
 
 export type ReprocessPreviewResult = {
   can_reprocess: boolean;
@@ -40,6 +41,14 @@ export async function previewReprocessSeason(): Promise<ReprocessPreviewResult> 
   }
 
   const league = await getActiveLeague();
+  const session = await getStatisticsApiSession(account.client);
+  if (session) {
+    try {
+      return await session.gateway.previewReprocessSeason(league.id);
+    } catch (error) {
+      return { can_reprocess: false, reason: error instanceof Error ? error.message : "Erro ao gerar prévia de reprocessamento." };
+    }
+  }
   const { data, error } = await account.client.rpc("preview_reprocess_season", {
     p_league_id: league.id,
   });
@@ -59,6 +68,18 @@ export async function executeReprocessSeason(): Promise<ReprocessExecutionResult
   }
 
   const league = await getActiveLeague();
+  const session = await getStatisticsApiSession(account.client);
+  if (session) {
+    try {
+      const result = await session.gateway.executeReprocessSeason(league.id);
+      revalidatePath("/admin");
+      revalidatePath("/cartola");
+      revalidatePath("/ranking");
+      return result;
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Erro ao executar reprocessamento." };
+    }
+  }
   const { data, error } = await account.client.rpc("reprocess_active_season_v5", {
     p_league_id: league.id,
   });

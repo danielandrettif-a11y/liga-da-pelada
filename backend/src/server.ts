@@ -48,6 +48,7 @@ import { resendCartolaReminderEmailSender } from "./contexts/notifications/infra
 import { pgScoringRulesRepository } from "./contexts/statistics/infrastructure/pg-scoring-rules-repository.js";
 import { pgSeasonRankingRepository } from "./contexts/statistics/infrastructure/pg-season-ranking-repository.js";
 import { pgRoundStatisticsRepository } from "./contexts/statistics/infrastructure/pg-round-statistics-repository.js";
+import { pgSeasonOperationsRepository } from "./contexts/statistics/infrastructure/pg-season-operations-repository.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -183,6 +184,7 @@ const app = createApp({
   scoringRulesRepository: pgScoringRulesRepository(pool),
   seasonRankingRepository: pgSeasonRankingRepository(pool),
   roundStatisticsRepository: pgRoundStatisticsRepository(pool),
+  seasonOperationsRepository: pgSeasonOperationsRepository(pool),
   emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL && process.env.EMAIL_UNSUBSCRIBE_SECRET),
 });
 
