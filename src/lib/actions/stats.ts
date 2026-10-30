@@ -345,6 +345,16 @@ function aggregateRankingRows(
 }
 
 export async function calculateRoundStats(roundId: string) {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (!league) return { success: false, error: "Selecione uma pelada no lobby." };
+    try {
+      return await session.gateway.calculateRoundStats(league.id, roundId);
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Erro ao recalcular estatísticas." };
+    }
+  }
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem recalcular estatisticas." };
@@ -761,6 +771,8 @@ export async function getRanking() {
 export async function getRoundStatistics(roundId: string): Promise<RoundStatistics | null> {
   const league = await getSelectedLeague();
   if (!league) return null;
+  const session = await getStatisticsApiSession();
+  if (session) return session.gateway.getRoundStatistics(league.id, roundId);
   const supabase = await createServerClient();
   const [{ data: round, error: roundError }, { data: rows, error: statsError }] = await Promise.all([
     supabase
@@ -1276,6 +1288,12 @@ export type FriendlyStatsEntry = {
 };
 
 export async function getFriendlyStats(): Promise<FriendlyStatsEntry[]> {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (!league) return [];
+    return session.gateway.getFriendlyStats(league.id);
+  }
   const supabase = await createServerClient();
   const season = await getActiveSeason();
   if (!season) return [];

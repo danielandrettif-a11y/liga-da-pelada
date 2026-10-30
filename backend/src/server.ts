@@ -47,6 +47,7 @@ import { qstashCartolaReminderScheduler } from "./contexts/notifications/infrast
 import { resendCartolaReminderEmailSender } from "./contexts/notifications/infrastructure/resend-cartola-reminder-email-sender.js";
 import { pgScoringRulesRepository } from "./contexts/statistics/infrastructure/pg-scoring-rules-repository.js";
 import { pgSeasonRankingRepository } from "./contexts/statistics/infrastructure/pg-season-ranking-repository.js";
+import { pgRoundStatisticsRepository } from "./contexts/statistics/infrastructure/pg-round-statistics-repository.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -181,6 +182,7 @@ const app = createApp({
   statisticsEnabled,
   scoringRulesRepository: pgScoringRulesRepository(pool),
   seasonRankingRepository: pgSeasonRankingRepository(pool),
+  roundStatisticsRepository: pgRoundStatisticsRepository(pool),
   emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL && process.env.EMAIL_UNSUBSCRIBE_SECRET),
 });
 

@@ -259,11 +259,21 @@
 
 ---
 
-## Próximo Passo: Contexto Statistics - Subfatia 3 (Scouts de Rodada e Amistosos) ⏳
+## Contexto Statistics - Subfatia 3 (Scouts de Rodada e Amistosos) Concluída ✅
 - Operações:
   1. `calculateRoundStats` (`src/lib/actions/stats.ts`)
   2. `getFriendlyStats` (`src/lib/actions/stats.ts`)
   3. `getRoundStatistics` (`src/lib/actions/stats.ts`)
+- Backend modular completo em `domain/round-statistics.ts`, `application/manage-round-statistics.ts`, `infrastructure/pg-round-statistics-repository.ts` e `presentation/round-statistics-route.ts`.
+- Recalculo autenticado por ADM, transacional e escopado pela pelada, incluindo reconciliação do Cartola.
+- Gateway e Server Actions usam a API quando `STATISTICS_API_ENABLED=true`; fallback existe somente quando a flag está desligada.
+- Auditoria: **178/267 (66,7%)**, `statistics: 12/22`; faltam 89 operações globais.
+- Testes: **136 arquivos/525 backend** e **212 arquivos/1.139 frontend**.
+- Gates finais: typecheck e build de produção dos dois projetos, auditorias de migração/contextos/arquitetura e `git diff --check` aprovados.
+
+## Próximo passo de Statistics
+
+- Restam 10 operações: dashboard, leitura/publicação/reprocessamento de overall, reprocessamento sazonal, mapa de overall das cartas e classificação por times.
 
 
 

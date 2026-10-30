@@ -269,7 +269,7 @@ Implementar a refatoração modular DDD do contexto `Notifications` da aplicaç�
 
 ---
 
-## Contexto Statistics: Subfatia 3 - Scouts de Rodada e Amistosos - A Seguir ⏳
+## Contexto Statistics: Subfatia 3 - Scouts de Rodada e Amistosos - Concluída ✅
 
 ### Operações Cobertas (3 operações)
 1. `calculateRoundStats` (`src/lib/actions/stats.ts`)
@@ -277,16 +277,16 @@ Implementar a refatoração modular DDD do contexto `Notifications` da aplicaç�
 3. `getRoundStatistics` (`src/lib/actions/stats.ts`)
 
 ### Planejamento da Subfatia 3
-- [ ] **Backend - Domínio e Casos de Uso:**
+- [x] **Backend - Domínio e Casos de Uso:**
   - Consolidar apuração de partidas encerradas, scouts defensivos/ofensivos e de goleiros em rodadas oficiais e amistosas.
   - `calculateRoundStats`: cálculo determinístico, gravação atômica em `player_round_stats` e reconciliação dos totais do Cartola (`reconcile_fantasy_round_totals`).
   - `getRoundStatistics` e `getFriendlyStats`: leituras de atuações e líderes/destaques da rodada.
-- [ ] **Backend - Infraestrutura e Apresentação:**
+- [x] **Backend - Infraestrutura e Apresentação:**
   - Repositório PostgreSQL para rodadas, partidas, escalações e eventos.
   - Rotas Fastify em `round-statistics-route.ts`.
-- [ ] **Frontend - Gateway e Bridging:**
+- [x] **Frontend - Gateway e Bridging:**
   - Métodos em `http-statistics-gateway.ts` e bridging em `src/lib/actions/stats.ts`.
-- [ ] **Auditoria e Registros:**
-  - Avançar para 178/267 operações aceitas (`statistics: 12/22`).
+- [x] **Auditoria e Registros:**
+  - Aprovado em 178/267 operações aceitas (`statistics: 12/22`).
 
 

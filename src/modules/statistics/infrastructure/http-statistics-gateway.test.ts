@@ -224,4 +224,41 @@ describe("httpStatisticsGateway", () => {
       }),
     );
   });
+
+  it("recalculates round statistics via POST", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const gateway = httpStatisticsGateway(baseUrl, accessToken);
+
+    await expect(gateway.calculateRoundStats(leagueId, "round-1")).resolves.toEqual({ success: true });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${baseUrl}/api/statistics/leagues/${leagueId}/rounds/round-1/recalculate`,
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("fetches a round read model and returns null on 404", async () => {
+    const readModel = { roundId: "round-1", roundType: "official", entries: [], highlights: {} };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => readModel })
+      .mockResolvedValueOnce({ ok: false, status: 404, json: async () => null });
+    vi.stubGlobal("fetch", fetchMock);
+    const gateway = httpStatisticsGateway(baseUrl, accessToken);
+
+    await expect(gateway.getRoundStatistics(leagueId, "round-1")).resolves.toEqual(readModel);
+    await expect(gateway.getRoundStatistics(leagueId, "missing")).resolves.toBeNull();
+  });
+
+  it("fetches friendly statistics via GET", async () => {
+    const friendlies = [{ player: { id: "p1", name: "A" }, games: 2 }];
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => friendlies });
+    vi.stubGlobal("fetch", fetchMock);
+    const gateway = httpStatisticsGateway(baseUrl, accessToken);
+
+    await expect(gateway.getFriendlyStats(leagueId)).resolves.toEqual(friendlies);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${baseUrl}/api/statistics/leagues/${leagueId}/friendlies`,
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
 });

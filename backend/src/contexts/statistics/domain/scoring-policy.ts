@@ -191,3 +191,98 @@ export function rankingRulesToSnapshot(
     goalkeeperGoalConceded: map.get("goal_conceded") ?? BQ_SCORING_V5.goalkeeperGoalConceded,
   };
 }
+
+export function normalizeBQScoringSnapshot(
+  value: Record<string, unknown> | null | undefined,
+): BQBaseScoringSnapshot {
+  const source = value || {};
+  const numeric = (camel: string, snake: string, fallback: number) =>
+    Number(source[camel] ?? source[snake] ?? fallback);
+  return {
+    version: numeric("version", "scoring_version", BQ_SCORING_V5.version),
+    goal: numeric("goal", "goal_points", BQ_SCORING_V5.goal),
+    assist: numeric("assist", "assist_points", BQ_SCORING_V5.assist),
+    win: numeric("win", "win_points", BQ_SCORING_V5.win),
+    draw: numeric("draw", "draw_points", BQ_SCORING_V5.draw),
+    loss: numeric("loss", "loss_points", BQ_SCORING_V5.loss),
+    ownGoal: numeric("ownGoal", "own_goal_points", BQ_SCORING_V5.ownGoal),
+    goalkeeperAppearance: numeric("goalkeeperAppearance", "goalkeeper_appearance_points", BQ_SCORING_V5.goalkeeperAppearance),
+    goalkeeperGoalConceded: numeric("goalkeeperGoalConceded", "goal_conceded_points", BQ_SCORING_V5.goalkeeperGoalConceded),
+    defenderGoal: numeric("defenderGoal", "defender_goal_points", 5),
+    defenderAssist: numeric("defenderAssist", "defender_assist_points", 3),
+    defenderCleanSheet: numeric("defenderCleanSheet", "defender_clean_sheet_points", 3),
+    defenderOneGoal: numeric("defenderOneGoal", "defender_one_goal_points", 1),
+    defenderOneGoalConceded: numeric("defenderOneGoalConceded", "defender_one_goal_conceded_points", -0.75),
+    defenderTwoGoalsConceded: numeric("defenderTwoGoalsConceded", "defender_two_goals_conceded_points", -1.75),
+    teamGoalConceded: numeric("teamGoalConceded", "line_goal_conceded_points", -0.5),
+    goalkeeperCleanSheet: numeric("goalkeeperCleanSheet", "goalkeeper_slot_clean_sheet_points", 4),
+    goalkeeperOneGoal: numeric("goalkeeperOneGoal", "goalkeeper_slot_one_goal_points", 2),
+  };
+}
+
+export type RankedScoringStats = {
+  wins?: number; goals?: number; assists?: number; draws?: number; losses?: number; ownGoals?: number;
+  goalkeeperAppearances?: number; goalkeeperGoalsConceded?: number; goalkeeperGoals?: number;
+  goalkeeperAssists?: number; goalkeeperOwnGoals?: number; goalkeeperCleanSheets?: number;
+  teamGoalsConceded?: number; defensiveCleanGames?: number; defensiveOneGoalGames?: number;
+  lineRole?: "DEF" | "ATA";
+};
+
+const count = (value: number | null | undefined) => Number(value || 0);
+const cents = (value: number) => Math.round(value * 100);
+const inferOneGoalGames = (games: number, cleanSheets: number, goalsConceded: number) => {
+  const nonCleanGames = Math.max(0, count(games) - count(cleanSheets));
+  return Math.max(0, Math.min(nonCleanGames, nonCleanGames * 2 - count(goalsConceded)));
+};
+const inferTwoGoalGames = (goalsConceded: number, oneGoalGames: number) =>
+  Math.max(0, (count(goalsConceded) - count(oneGoalGames)) / 2);
+
+export function calculateRankedPoints(stats: RankedScoringStats, snapshot: BQBaseScoringSnapshot): number {
+  if (Number(snapshot.version || 0) < 11) {
+    return (
+      count(stats.goals) * cents(snapshot.goal)
+      + count(stats.assists) * cents(snapshot.assist)
+      + count(stats.wins) * cents(snapshot.win)
+      + count(stats.draws) * cents(snapshot.draw)
+      + count(stats.losses) * cents(snapshot.loss)
+      + count(stats.ownGoals) * cents(snapshot.ownGoal)
+      + count(stats.goalkeeperAppearances) * cents(snapshot.goalkeeperAppearance)
+      + count(stats.goalkeeperGoalsConceded) * cents(snapshot.goalkeeperGoalConceded)
+    ) / 100;
+  }
+
+  const defensive = stats.lineRole === "DEF";
+  const lineGoals = Math.max(0, count(stats.goals) - count(stats.goalkeeperGoals));
+  const lineAssists = Math.max(0, count(stats.assists) - count(stats.goalkeeperAssists));
+  const lineOwnGoals = Math.max(0, count(stats.ownGoals) - count(stats.goalkeeperOwnGoals));
+  const lineConceded = Math.max(0, count(stats.teamGoalsConceded) - count(stats.goalkeeperGoalsConceded));
+  const progressive = Number(snapshot.version) >= 12;
+  const tiered = defensive && Number(snapshot.version) >= 13;
+  const oneGoalGames = defensive ? count(stats.defensiveOneGoalGames) : 0;
+  const twoGoalGames = tiered ? inferTwoGoalGames(lineConceded, oneGoalGames) : 0;
+  const lineConcededPoints = tiered
+    ? oneGoalGames * cents(snapshot.defenderOneGoalConceded ?? -0.75)
+      + twoGoalGames * cents(snapshot.defenderTwoGoalsConceded ?? -1.75)
+    : lineConceded * cents(snapshot.teamGoalConceded ?? -0.5);
+  const line = (
+    lineGoals * cents(defensive ? (snapshot.defenderGoal ?? 5) : snapshot.goal)
+    + lineAssists * cents(defensive ? (snapshot.defenderAssist ?? 3) : snapshot.assist)
+    + lineConcededPoints
+    + (defensive ? count(stats.defensiveCleanGames) * cents(snapshot.defenderCleanSheet ?? 3) : 0)
+    + (progressive && defensive ? oneGoalGames * cents(snapshot.defenderOneGoal ?? 1) : 0)
+    + lineOwnGoals * cents(snapshot.ownGoal)
+  ) / 100;
+  const goalkeeperOneGoalGames = progressive
+    ? inferOneGoalGames(count(stats.goalkeeperAppearances), count(stats.goalkeeperCleanSheets), count(stats.goalkeeperGoalsConceded))
+    : 0;
+  const goalkeeper = (
+    count(stats.goalkeeperAppearances) * cents(snapshot.goalkeeperAppearance)
+    + count(stats.goalkeeperGoals) * cents(snapshot.defenderGoal ?? 5)
+    + count(stats.goalkeeperAssists) * cents(snapshot.defenderAssist ?? 3)
+    + count(stats.goalkeeperGoalsConceded) * cents(snapshot.goalkeeperGoalConceded)
+    + count(stats.goalkeeperCleanSheets) * cents(progressive ? (snapshot.goalkeeperCleanSheet ?? 4) : 2)
+    + goalkeeperOneGoalGames * cents(snapshot.goalkeeperOneGoal ?? 2)
+    + count(stats.goalkeeperOwnGoals) * cents(snapshot.ownGoal)
+  ) / 100;
+  return line + goalkeeper;
+}

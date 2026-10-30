@@ -93,6 +93,8 @@ import type { ScoringRulesRepository } from "../contexts/statistics/application/
 import { registerScoringRulesRoutes } from "../contexts/statistics/presentation/scoring-rules-route.js";
 import type { SeasonRankingRepository } from "../contexts/statistics/application/manage-season-ranking.js";
 import { registerSeasonRankingRoutes } from "../contexts/statistics/presentation/season-ranking-route.js";
+import { registerRoundStatisticsRoutes } from "../contexts/statistics/presentation/round-statistics-route.js";
+import type { RoundStatisticsRepository } from "../contexts/statistics/application/manage-round-statistics.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 
 export function createApp(dependencies: {
@@ -159,6 +161,7 @@ export function createApp(dependencies: {
   preferencesRepository?: NotificationPreferencesRepository;
   scoringRulesRepository?: ScoringRulesRepository;
   seasonRankingRepository?: SeasonRankingRepository;
+  roundStatisticsRepository?: RoundStatisticsRepository;
   emailConfigured?: boolean;
   logger?: boolean;
 }): FastifyInstance {
@@ -232,7 +235,8 @@ export function createApp(dependencies: {
   if (dependencies.statisticsEnabled && !dependencies.scoringRulesRepository) {
     throw new Error("ScoringRulesRepository é obrigatório quando ENABLE_STATISTICS_API=true.");
   }
-  if (dependencies.statisticsEnabled && dependencies.strictContextDependencies && !dependencies.seasonRankingRepository) {
+  if (dependencies.statisticsEnabled && dependencies.strictContextDependencies
+    && (!dependencies.seasonRankingRepository || !dependencies.roundStatisticsRepository)) {
     throw new Error("Dependências de estatísticas são obrigatórias quando ENABLE_STATISTICS_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
@@ -461,6 +465,12 @@ export function createApp(dependencies: {
     registerSeasonRankingRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.seasonRankingRepository,
+    });
+  }
+  if (dependencies.statisticsEnabled && dependencies.roundStatisticsRepository) {
+    registerRoundStatisticsRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.roundStatisticsRepository,
     });
   }
   return app;

@@ -2691,6 +2691,51 @@
         "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
         "src/lib/actions/stats.test.ts"
       ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "calculateRoundStats",
+      "state": "frontend-migrated",
+      "target": "POST /api/statistics/leagues/:leagueId/rounds/:roundId/recalculate",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/round-statistics.test.ts",
+        "backend/src/contexts/statistics/application/manage-round-statistics.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-round-statistics-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/round-statistics-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRoundStatistics",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/rounds/:roundId",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/round-statistics.test.ts",
+        "backend/src/contexts/statistics/application/manage-round-statistics.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-round-statistics-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/round-statistics-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getFriendlyStats",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/friendlies",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/round-statistics.test.ts",
+        "backend/src/contexts/statistics/application/manage-round-statistics.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-round-statistics-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/round-statistics-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
     }
   ]
 }

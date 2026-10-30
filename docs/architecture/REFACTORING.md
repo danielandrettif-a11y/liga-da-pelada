@@ -33,6 +33,15 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-10-30 — contexto Statistics: Subfatia 3 (Scouts de Rodada e Amistosos) (12/22 aceitas)
+
+- Migradas e aceitas `calculateRoundStats`, `getRoundStatistics` e `getFriendlyStats`. O progresso global passa a **178/267 operações (66,7%)**, restando 89.
+- O domínio `round-statistics.ts` preserva elegibilidade de participantes, placar, gols/assistências, gol contra, períodos e snapshots de goleiro, versões BQ/Coluna C, perfis congelados, bônus posicionais e overrides de zeragem.
+- `pg-round-statistics-repository.ts` autoriza o ADM dentro da transação autenticada, lê a rodada exclusivamente na pelada informada, grava `player_round_stats` e reconcilia o Cartola antes do commit. Nenhuma falha da API habilitada dispara a mutação legada.
+- As leituras de rodada encerrada e amistosos usam pelada/temporada ativas, ignoram linhas sem participação e preservam os contratos públicos anteriores.
+- Rotas: `POST /api/statistics/leagues/:leagueId/rounds/:roundId/recalculate`, `GET /api/statistics/leagues/:leagueId/rounds/:roundId` e `GET /api/statistics/leagues/:leagueId/friendlies`.
+- Verificação: **136 arquivos/525 testes backend** e **212 arquivos/1.139 testes frontend**; typecheck e build de produção dos dois projetos, auditorias de migração/contextos/arquitetura e `git diff --check` aprovados.
+
 ### 2026-10-30 — contexto Statistics: Subfatia 1 (Pontuação BQ v5) e Subfatia 2 (Ranking Oficial e Desempates) (9/22 aceitas)
 
 - O contexto **Statistics** avançou de 0 para **9/22 operações estruturais e aceitas**. O progresso auditado global da aplicação avançou para **175 de 267 operações aceitas (65,5%)**, restando apenas 92 operações para a conclusão integral.

@@ -163,6 +163,12 @@
   - **Invariante Next.js Server Actions:** arquivos com a diretiva `"use server"` só podem exportar funções assíncronas (e declarações de tipo com `export type`). Exportar valores ou constantes normais (como `export const DEFAULT_COLUMN_C_SCORING = ...`) gera falha de compilação no `next build` (`invalid-use-server-value`). A constante padrão foi transferida para `src/lib/column-c-scoring.ts`, preservando a pureza das Server Actions.
   - Marco atingido: **500 testes passando no backend** (131 arquivos) e **1.130 testes passando no frontend** (212 arquivos), com **175 de 267 operações aceitas (65,5%)**.
 
+## 15. Reorganização de Arquitetura: Contexto Statistics - Subfatia 3 (Scouts de Rodada e Amistosos)
+- **Descoberta:** `calculateRoundStats` é uma unidade transacional, não apenas um somatório. Além dos scouts, preserva elegibilidade por rodada, substitutos sem pontuação, snapshots de goleiro, perfis congelados, regras históricas, overrides administrativos e reconciliação do Cartola.
+- **Decisão:** manter o cálculo determinístico no domínio, a autorização/leitura/gravação no repositório PostgreSQL e executar upsert e reconciliação antes do mesmo commit. A feature flag só escolhe o caminho; erro da API ativa não repete a mutação no Supabase legado.
+- **Leituras:** `getRoundStatistics` e `getFriendlyStats` são escopadas por `league_id`/temporada, omitem inscrições com zero jogos e mantêm a view sazonal como read model canônico.
+- **Resultado:** Statistics alcança **12/22**, e a aplicação **178/267 (66,7%)**.
+
 
 
 

@@ -34,11 +34,14 @@ import { createClient as createServerClient } from "../supabase/server";
 import { getActiveSeason } from "./seasons";
 import { getCurrentAccount } from "../auth";
 import {
+  calculateRoundStats,
+  getFriendlyStats,
   getPlayerRankingEntry,
   getRanking,
   getRankingEnrichmentForPlayers,
   getRankingEssentialData,
   getRankingExperienceData,
+  getRoundStatistics,
 } from "./stats";
 
 describe("stats server actions parity", () => {
@@ -204,6 +207,43 @@ describe("stats server actions parity", () => {
 
       const result = await getRankingEnrichmentForPlayers([playerId]);
       expect(result).toEqual({});
+    });
+  });
+
+  describe("round statistics slice", () => {
+    const roundId = "33333333-3333-4333-8333-333333333333";
+
+    it("routes calculateRoundStats through the API and does not invoke legacy persistence", async () => {
+      const gateway = { calculateRoundStats: vi.fn().mockResolvedValue({ success: true }) };
+      vi.mocked(getStatisticsApiSession).mockResolvedValue({ gateway } as any);
+
+      await expect(calculateRoundStats(roundId)).resolves.toEqual({ success: true });
+      expect(gateway.calculateRoundStats).toHaveBeenCalledWith(leagueId, roundId);
+    });
+
+    it("returns the API error contract without a silent legacy mutation", async () => {
+      const gateway = { calculateRoundStats: vi.fn().mockRejectedValue(new Error("backend indisponível")) };
+      vi.mocked(getStatisticsApiSession).mockResolvedValue({ gateway } as any);
+
+      await expect(calculateRoundStats(roundId)).resolves.toEqual({ success: false, error: "backend indisponível" });
+    });
+
+    it("routes getRoundStatistics through the API", async () => {
+      const readModel = { roundId, roundType: "official", entries: [], highlights: {} };
+      const gateway = { getRoundStatistics: vi.fn().mockResolvedValue(readModel) };
+      vi.mocked(getStatisticsApiSession).mockResolvedValue({ gateway } as any);
+
+      await expect(getRoundStatistics(roundId)).resolves.toEqual(readModel);
+      expect(gateway.getRoundStatistics).toHaveBeenCalledWith(leagueId, roundId);
+    });
+
+    it("routes getFriendlyStats through the API", async () => {
+      const friendlies = [{ player: { id: playerId, name: "Atleta" }, games: 2 }];
+      const gateway = { getFriendlyStats: vi.fn().mockResolvedValue(friendlies) };
+      vi.mocked(getStatisticsApiSession).mockResolvedValue({ gateway } as any);
+
+      await expect(getFriendlyStats()).resolves.toEqual(friendlies);
+      expect(gateway.getFriendlyStats).toHaveBeenCalledWith(leagueId);
     });
   });
 });

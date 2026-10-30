@@ -1,6 +1,7 @@
 import type { BQBaseScoringSnapshot } from "@/lib/bq-scoring";
 import type { ColumnCScoringSettings } from "@/lib/actions/bq-scoring";
 import type { RankingEntry, RankingExperienceData } from "@/lib/ranking";
+import type { FriendlyStatsEntry, RoundStatistics } from "@/lib/actions/stats";
 
 export type RankingEnrichment = Pick<
   RankingEntry,
@@ -56,6 +57,9 @@ export interface StatisticsGateway {
     leagueId: string,
     playerIds: string[],
   ): Promise<Record<string, RankingEnrichment>>;
+  calculateRoundStats(leagueId: string, roundId: string): Promise<{ success: boolean; error?: string }>;
+  getRoundStatistics(leagueId: string, roundId: string): Promise<RoundStatistics | null>;
+  getFriendlyStats(leagueId: string): Promise<FriendlyStatsEntry[]>;
 }
 
 export type StatisticsHttpGateway = StatisticsGateway;
@@ -218,6 +222,32 @@ export function httpStatisticsGateway(
           headers: authHeaders(true),
           body: JSON.stringify({ playerIds }),
         },
+      );
+    },
+
+    async calculateRoundStats(leagueId, roundId) {
+      return requestJson<{ success: boolean; error?: string }>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/rounds/${encodeURIComponent(roundId)}/recalculate`,
+        { method: "POST", headers: authHeaders(true) },
+      );
+    },
+
+    async getRoundStatistics(leagueId, roundId) {
+      try {
+        return await requestJson<RoundStatistics>(
+          `/api/statistics/leagues/${encodeURIComponent(leagueId)}/rounds/${encodeURIComponent(roundId)}`,
+          { headers: authHeaders(), cache: "no-store" },
+        );
+      } catch (error) {
+        if (error instanceof StatisticsApiError && error.statusCode === 404) return null;
+        throw error;
+      }
+    },
+
+    async getFriendlyStats(leagueId) {
+      return requestJson<FriendlyStatsEntry[]>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/friendlies`,
+        { headers: authHeaders(), cache: "no-store" },
       );
     },
   };
