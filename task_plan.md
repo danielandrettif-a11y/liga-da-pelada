@@ -326,19 +326,19 @@ Implementar a refatoração modular DDD do contexto `Notifications` da aplicaç�
 10. `previewFantasyMarketV11` (`src/lib/actions/fantasy.ts`)
 11. `repairLegacySavedFantasyLineups` (`src/lib/actions/fantasy.ts`)
 
-### Checklist da Subfatia 1
-- [ ] **Backend - Domínio e Casos de Uso (`backend/src/contexts/fantasy/`)**
+### Checklist da Subfatia 1 - Concluída ✅
+- [x] **Backend - Domínio e Casos de Uso (`backend/src/contexts/fantasy/`)**
   - Entidades de mercado, atletas, pontuação BQ v5, projeção e regras de escalação (`market-lineup.ts`).
   - Casos de uso: `manage-fantasy-market.ts` (dashboard, atleta, destaques, escalação, validações de orçamento/capitão/posições).
   - Testes unitários puros de domínio e aplicação.
-- [ ] **Backend - Infraestrutura e Apresentação**
+- [x] **Backend - Infraestrutura e Apresentação**
   - Repositório PostgreSQL autenticado via `SET LOCAL ROLE authenticated` e RPCs determinísticas.
   - Rotas Fastify em `market-lineup-route.ts` sob `ENABLE_FANTASY_API`.
   - Testes de repositório e rotas Fastify.
-- [ ] **Frontend - Gateway e Sessão de API (`src/modules/fantasy/`)**
+- [x] **Frontend - Gateway e Sessão de API (`src/modules/fantasy/`)**
   - `http-fantasy-gateway.ts` e `fantasy-api-session.ts`.
   - Testes unitários de gateway e session factory.
-- [ ] **Frontend - Bridging nas Server Actions (`src/lib/actions/fantasy.ts`)**
+- [x] **Frontend - Bridging nas Server Actions (`src/lib/actions/fantasy.ts`)**
   - Conexão com a API quando `FANTASY_API_ENABLED=true` e fallback legado completo.
   - Testes unitários de paridade em `src/lib/actions/fantasy.test.ts`.
 
@@ -407,4 +407,40 @@ Implementar a refatoração modular DDD do contexto `Notifications` da aplicaç�
 - [x] **Frontend - Bridging nas Server Actions (`src/lib/actions/fantasy-cards.ts`):**
   - Bridging com fallback legado preservado e testes de paridade em `fantasy-cards.test.ts` (6 testes passando).
   - Auditoria: Cards 15/15 (100%) concluído! Total geral do projeto: 244/267 (91,4%) aceitas!
+
+---
+
+## Contexto Cosmetics: Conclusão Integral (11 operações) - Concluído ✅
+- [x] **Backend Modular DDD:** Domínio (`cosmetics.ts`), Casos de uso (`manage-cosmetics.ts`), Repositório PostgreSQL (`pg-cosmetics-repository.ts`), Rotas Fastify (`cosmetics-route.ts`) sob `ENABLE_COSMETICS_API`. 14 testes passando.
+- [x] **Frontend Módulo Cosmetics:** Gateway HTTP (`http-cosmetics-gateway.ts`) e Sessão (`cosmetics-api-session.ts`).
+- [x] **Bridging Server Actions:** Em `src/lib/actions/cosmetics.ts` (11 operações) e testes em `cosmetics.test.ts`.
+- [x] **Auditoria:** 11/11 estruturais e aceitas!
+
+---
+
+## Contexto Collective: Conclusão Integral (8 operações) - Concluído ✅
+- [x] **Backend Modular DDD:** Domínio (`collective.ts`), Casos de uso (`manage-collective.ts`), Repositório PostgreSQL (`pg-collective-repository.ts`), Rotas Fastify (`collective-route.ts`) sob `ENABLE_COLLECTIVE_API`. 11 testes passando.
+- [x] **Frontend Módulo Collective:** Gateway HTTP (`http-collective-gateway.ts`) e Sessão (`collective-api-session.ts`).
+- [x] **Bridging Server Actions:** Em `src/lib/actions/collective.ts` (8 operações) e testes em `collective.test.ts`.
+- [x] **Auditoria:** 8/8 estruturais e aceitas!
+
+---
+
+## Contexto Integrations: Conclusão Integral (2 operações) - Concluído ✅
+- [x] **Backend Modular DDD:** Domínio (`manager.ts`), Casos de uso (`manage-manager.ts`), Repositório PostgreSQL (`pg-manager-repository.ts`), Rotas Fastify (`manager-route.ts`) sob `ENABLE_INTEGRATIONS_API`. 7 testes passando.
+- [x] **Frontend Módulo Integrations:** Gateway HTTP (`http-manager-gateway.ts`) e Sessão (`manager-api-session.ts`).
+- [x] **Bridging Server Actions:** Em `src/app/bq-manager/actions.ts` (2 operações) e testes em `actions.test.ts`.
+- [x] **Auditoria:** 2/2 estruturais e aceitas!
+
+---
+
+## Contexto Operations: Conclusão Integral (2 operações) - Concluído ✅
+- [x] **Backend Modular DDD:** Domínio (`operations.ts`), Casos de uso (`manage-operations.ts`), Repositório PostgreSQL (`pg-operations-repository.ts`), Rotas Fastify (`operations-route.ts`) sob `ENABLE_OPERATIONS_API`. 7 testes passando.
+- [x] **Frontend Módulo Operations:** Gateway HTTP (`http-operations-gateway.ts`) e Sessão (`operations-api-session.ts`).
+- [x] **Bridging Server Actions & Route:** Em `src/lib/actions/performance.ts` e `src/app/api/internal/observability/route.ts` com testes dedicados.
+- [x] **Auditoria:** 2/2 estruturais e aceitas!
+
+---
+
+## 🏆 MARCO HISTÓRICO: 267 de 267 operações (100%) da Liga da Pelada migradas com paridade auditada e zero regressão!
 

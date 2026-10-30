@@ -300,7 +300,9 @@
         "src/app/bq-manager/page.tsx",
         "src/app/bq-manager/demo/page.tsx"
       ],
-      "sourceModules": [],
+      "sourceModules": [
+        "integrations"
+      ],
       "entrypoints": [
         "src/app/bq-manager/actions.ts"
       ]
@@ -313,7 +315,9 @@
       "pages": [
         "src/app/admin/performance/page.tsx"
       ],
-      "sourceModules": [],
+      "sourceModules": [
+        "operations"
+      ],
       "entrypoints": [
         "src/lib/actions/performance.ts",
         "src/app/api/internal/observability/route.ts"

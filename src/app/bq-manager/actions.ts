@@ -6,6 +6,7 @@ import { executeCommand, ManagerRuleError, newManagerState } from "@/lib/bq-mana
 import { createManagerClient, readCatalog, readManagerSave, readManagerSourceLeague } from "@/lib/bq-manager/server";
 import type { ClubIdentity, ManagerCommand, ManagerResult } from "@/lib/bq-manager/types";
 import { getSelectedLeague } from "@/lib/league-context";
+import { managerApiFor } from "@/modules/integrations/infrastructure/manager-api-session";
 
 async function getAuthorizedManagerLeagueId(appClient: Awaited<ReturnType<typeof getCurrentAccount>>["client"]) {
   const [selectedLeague, sourceLeagueId] = await Promise.all([
@@ -19,6 +20,10 @@ export async function createManagerClub(identity: ClubIdentity): Promise<Manager
   try {
     const account = await getCurrentAccount();
     if (!account.user) return { ok: false, message: "Entre na sua conta para criar um clube." };
+    const managerApi = await managerApiFor(account.client);
+    if (managerApi) {
+      return managerApi.createClub(identity);
+    }
     if (!await getAuthorizedManagerLeagueId(account.client)) {
       return { ok: false, message: "Selecione a pelada BQ para acessar esta carreira." };
     }
@@ -39,6 +44,10 @@ export async function runManagerCommand(command: ManagerCommand, expectedVersion
   try {
     const account = await getCurrentAccount();
     if (!account.user) return { ok: false, message: "Sua sessão expirou. Entre novamente." };
+    const managerApi = await managerApiFor(account.client);
+    if (managerApi) {
+      return managerApi.runCommand(command, expectedVersion);
+    }
     const managerLeagueId = await getAuthorizedManagerLeagueId(account.client);
     if (!managerLeagueId) return { ok: false, message: "Selecione a pelada BQ para acessar esta carreira." };
     const client = createManagerClient();

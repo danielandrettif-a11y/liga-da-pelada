@@ -875,6 +875,121 @@
       "context": "cards",
       "source": "src/lib/actions/fantasy-cards.ts",
       "name": "grantFantasyPackToUser"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getMyCosmeticsDashboard"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "cleanupMyLegacyCosmeticsPreview"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "dismissMyUnopenedBronzePassPack"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "resetMyTestPassRewardClaims"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "claimPassCosmetic"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "purchaseSeasonPassShopItem"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "equipCosmetic"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getAdminCosmeticsPreview"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getMyEquippedCosmetics"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getPlayerEquippedCosmetics"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getAllPlayersEquippedCosmeticsMap"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getActiveCollectiveSummary"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getCollectiveRoom"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getOlderCollectiveMessages"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "sendCollectiveMessage"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "editCollectiveMessage"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "deleteCollectiveMessage"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "markCollectiveRead"
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getAdminPreviousCollective"
+    },
+    {
+      "context": "integrations",
+      "source": "src/app/bq-manager/actions.ts",
+      "name": "createManagerClub"
+    },
+    {
+      "context": "integrations",
+      "source": "src/app/bq-manager/actions.ts",
+      "name": "runManagerCommand"
+    },
+    {
+      "context": "operations",
+      "source": "src/lib/actions/performance.ts",
+      "name": "getPerformanceSummary"
+    },
+    {
+      "context": "operations",
+      "source": "src/app/api/internal/observability/route.ts",
+      "name": "POST"
     }
   ],
   "evidence": {

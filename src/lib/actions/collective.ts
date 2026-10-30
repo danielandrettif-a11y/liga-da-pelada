@@ -12,6 +12,7 @@ import {
   type CollectivePageCursor,
   type CollectivePageMessage,
 } from "@/modules/collective/infrastructure/supabase-collective-reader";
+import { collectiveApiFor } from "@/modules/collective/infrastructure/collective-api-session";
 
 export type CollectiveSummary = {
   callupId: string;
@@ -88,8 +89,16 @@ function collectiveSummary(callup: any, unreadCount: number): CollectiveSummary 
 }
 
 export async function getActiveCollectiveSummary(): Promise<CollectiveSummary | null> {
-  const { account, callups } = await listCollectiveCandidates();
+  const account = await getCurrentAccount();
   if (!account.user) return null;
+  const collectiveApi = await collectiveApiFor(account.client);
+  if (collectiveApi) {
+    const league = await getSelectedLeague();
+    if (league) {
+      return collectiveApi.getActiveCollectiveSummary(league.id);
+    }
+  }
+  const { callups } = await listCollectiveCandidates();
   const visibleCallups = callups.filter(isCollectiveVisible);
   const callup = callups.find(isCollectiveOpen) || visibleCallups[0];
   if (!callup) return null;
@@ -98,8 +107,16 @@ export async function getActiveCollectiveSummary(): Promise<CollectiveSummary | 
 }
 
 export async function getCollectiveRoom(callupId?: string): Promise<CollectiveRoomData | null> {
-  const { account, callups } = await listCollectiveCandidates();
+  const account = await getCurrentAccount();
   if (!account.user) return null;
+  const collectiveApi = await collectiveApiFor(account.client);
+  if (collectiveApi) {
+    const league = await getSelectedLeague();
+    if (league) {
+      return collectiveApi.getCollectiveRoom(league.id, callupId);
+    }
+  }
+  const { callups } = await listCollectiveCandidates();
   const visibleCallups = callups.filter(isCollectiveVisible);
   const activeCallup = callupId
     ? visibleCallups.find((callup) => callup.id === callupId)
@@ -127,8 +144,16 @@ export async function getOlderCollectiveMessages(
   callupId: string,
   cursor: CollectivePageCursor,
 ) {
-  const { account, callups } = await listCollectiveCandidates();
+  const account = await getCurrentAccount();
   if (!account.user) return { success: false as const, messages: [], error: "Entre para carregar a conversa." };
+  const collectiveApi = await collectiveApiFor(account.client);
+  if (collectiveApi) {
+    const league = await getSelectedLeague();
+    if (league) {
+      return collectiveApi.getOlderCollectiveMessages(league.id, callupId, cursor);
+    }
+  }
+  const { callups } = await listCollectiveCandidates();
   const visibleCallups = callups.filter(isCollectiveVisible);
   if (!visibleCallups.some((callup) => callup.id === callupId)) {
     return { success: false as const, messages: [], error: "Coletiva fora da pelada selecionada." };
@@ -170,6 +195,28 @@ export async function sendCollectiveMessage(formData: FormData) {
   const account = await getCurrentAccount();
   if (!account.user || !account.profile?.player_id) return { success: false, error: "Entre com um jogador vinculado para conversar." };
   const callupId = String(formData.get("callup_id") || "");
+  const collectiveApi = await collectiveApiFor(account.client);
+  if (collectiveApi) {
+    const league = await getSelectedLeague();
+    if (league) {
+      const body = String(formData.get("body") || "").trim();
+      const duration = Math.trunc(Number(formData.get("duration") || 0));
+      const replyToMessageId = String(formData.get("reply_to_message_id") || "").trim() || null;
+      const res = await collectiveApi.sendCollectiveMessage(league.id, {
+        callupId,
+        body,
+        kind: "text",
+        duration,
+        replyToMessageId,
+        senderPlayerId: account.profile.player_id,
+      });
+      if (res.success) {
+        revalidatePath("/coletiva");
+        revalidatePath("/convocacao");
+      }
+      return res;
+    }
+  }
   if (!(await isCallupInSelectedLeague(account.client, callupId))) {
     return { success: false, error: "Esta Coletiva não pertence à pelada selecionada." };
   }
@@ -231,6 +278,17 @@ export async function sendCollectiveMessage(formData: FormData) {
 export async function editCollectiveMessage(messageId: string, body: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre para editar." };
+  const collectiveApi = await collectiveApiFor(account.client);
+  if (collectiveApi) {
+    const league = await getSelectedLeague();
+    if (league) {
+      const res = await collectiveApi.editCollectiveMessage(league.id, messageId, body);
+      if (res.success) {
+        revalidatePath("/coletiva");
+      }
+      return res;
+    }
+  }
   const clean = body.trim();
   if (!clean || clean.length > 1000) return { success: false, error: "Use entre 1 e 1.000 caracteres." };
   if (!(await isMessageInSelectedLeague(account.client, messageId))) {
@@ -245,6 +303,17 @@ export async function editCollectiveMessage(messageId: string, body: string) {
 export async function deleteCollectiveMessage(messageId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre para apagar." };
+  const collectiveApi = await collectiveApiFor(account.client);
+  if (collectiveApi) {
+    const league = await getSelectedLeague();
+    if (league) {
+      const res = await collectiveApi.deleteCollectiveMessage(league.id, messageId);
+      if (res.success) {
+        revalidatePath("/coletiva");
+      }
+      return res;
+    }
+  }
   if (!(await isMessageInSelectedLeague(account.client, messageId))) {
     return { success: false, error: "Mensagem fora da pelada selecionada." };
   }
@@ -259,6 +328,13 @@ export async function deleteCollectiveMessage(messageId: string) {
 export async function markCollectiveRead(readTargets: Array<{ callupId: string; messageId: string }>) {
   const account = await getCurrentAccount();
   if (!account.user || !readTargets.length) return { success: false };
+  const collectiveApi = await collectiveApiFor(account.client);
+  if (collectiveApi) {
+    const league = await getSelectedLeague();
+    if (league) {
+      return collectiveApi.markCollectiveRead(league.id, readTargets);
+    }
+  }
   const league = await getSelectedLeague();
   if (!league) return { success: false };
   const callupIds = [...new Set(readTargets.map((target) => target.callupId))];
@@ -279,6 +355,10 @@ export async function getAdminPreviousCollective(): Promise<CollectiveRoomData |
   const account = await getCurrentAccount();
   const league = await getSelectedLeague();
   if (!account.isAdmin || !league || league.role !== "admin") return null;
+  const collectiveApi = await collectiveApiFor(account.client);
+  if (collectiveApi) {
+    return collectiveApi.getAdminPreviousCollective(league.id);
+  }
   const { data } = await account.client
     .from("callups")
     .select("id, date, round:round_id!inner(id, status)")

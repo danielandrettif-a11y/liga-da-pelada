@@ -3782,6 +3782,376 @@
         "src/modules/cards/infrastructure/cards-api-session.test.ts",
         "src/lib/actions/fantasy-cards.test.ts"
       ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getMyCosmeticsDashboard",
+      "state": "frontend-migrated",
+      "target": "GET /api/cosmetics/dashboard",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "cleanupMyLegacyCosmeticsPreview",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/admin/cleanup-legacy",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "dismissMyUnopenedBronzePassPack",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/admin/dismiss-bronze-pack",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "resetMyTestPassRewardClaims",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/admin/reset-test-claims",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "claimPassCosmetic",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/claim-pass",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "purchaseSeasonPassShopItem",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/purchase-shop",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "equipCosmetic",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/equip",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getAdminCosmeticsPreview",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/admin-preview",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getMyEquippedCosmetics",
+      "state": "frontend-migrated",
+      "target": "GET /api/cosmetics/equipped/me",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getPlayerEquippedCosmetics",
+      "state": "frontend-migrated",
+      "target": "GET /api/cosmetics/equipped/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getAllPlayersEquippedCosmeticsMap",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/equipped/players-map",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getActiveCollectiveSummary",
+      "state": "frontend-migrated",
+      "target": "GET /api/collective/leagues/:leagueId/summary",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getCollectiveRoom",
+      "state": "frontend-migrated",
+      "target": "GET /api/collective/leagues/:leagueId/room",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getOlderCollectiveMessages",
+      "state": "frontend-migrated",
+      "target": "POST /api/collective/leagues/:leagueId/callups/:callupId/messages",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "sendCollectiveMessage",
+      "state": "frontend-migrated",
+      "target": "POST /api/collective/leagues/:leagueId/messages",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "editCollectiveMessage",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/collective/leagues/:leagueId/messages/:messageId",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "deleteCollectiveMessage",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/collective/leagues/:leagueId/messages/:messageId",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "markCollectiveRead",
+      "state": "frontend-migrated",
+      "target": "POST /api/collective/leagues/:leagueId/reads",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getAdminPreviousCollective",
+      "state": "frontend-migrated",
+      "target": "GET /api/collective/leagues/:leagueId/admin-previous",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "integrations",
+      "source": "src/app/bq-manager/actions.ts",
+      "name": "createManagerClub",
+      "state": "frontend-migrated",
+      "target": "POST /api/integrations/manager/club",
+      "evidence": [
+        "backend/src/contexts/integrations/domain/manager.test.ts",
+        "backend/src/contexts/integrations/application/manage-manager.test.ts",
+        "backend/src/contexts/integrations/infrastructure/pg-manager-repository.test.ts",
+        "backend/src/contexts/integrations/presentation/manager-route.test.ts",
+        "src/modules/integrations/infrastructure/http-manager-gateway.test.ts",
+        "src/modules/integrations/infrastructure/manager-api-session.test.ts",
+        "src/app/bq-manager/actions.test.ts"
+      ]
+    },
+    {
+      "context": "integrations",
+      "source": "src/app/bq-manager/actions.ts",
+      "name": "runManagerCommand",
+      "state": "frontend-migrated",
+      "target": "POST /api/integrations/manager/command",
+      "evidence": [
+        "backend/src/contexts/integrations/domain/manager.test.ts",
+        "backend/src/contexts/integrations/application/manage-manager.test.ts",
+        "backend/src/contexts/integrations/infrastructure/pg-manager-repository.test.ts",
+        "backend/src/contexts/integrations/presentation/manager-route.test.ts",
+        "src/modules/integrations/infrastructure/http-manager-gateway.test.ts",
+        "src/modules/integrations/infrastructure/manager-api-session.test.ts",
+        "src/app/bq-manager/actions.test.ts"
+      ]
+    },
+    {
+      "context": "operations",
+      "source": "src/lib/actions/performance.ts",
+      "name": "getPerformanceSummary",
+      "state": "frontend-migrated",
+      "target": "GET /api/operations/performance-summary",
+      "evidence": [
+        "backend/src/contexts/operations/domain/operations.test.ts",
+        "backend/src/contexts/operations/application/manage-operations.test.ts",
+        "backend/src/contexts/operations/infrastructure/pg-operations-repository.test.ts",
+        "backend/src/contexts/operations/presentation/operations-route.test.ts",
+        "src/modules/operations/infrastructure/http-operations-gateway.test.ts",
+        "src/modules/operations/infrastructure/operations-api-session.test.ts",
+        "src/lib/actions/performance.test.ts",
+        "src/app/api/internal/observability/route.test.ts"
+      ]
+    },
+    {
+      "context": "operations",
+      "source": "src/app/api/internal/observability/route.ts",
+      "name": "POST",
+      "state": "frontend-migrated",
+      "target": "POST /api/internal/operations/observability",
+      "evidence": [
+        "backend/src/contexts/operations/domain/operations.test.ts",
+        "backend/src/contexts/operations/application/manage-operations.test.ts",
+        "backend/src/contexts/operations/infrastructure/pg-operations-repository.test.ts",
+        "backend/src/contexts/operations/presentation/operations-route.test.ts",
+        "src/modules/operations/infrastructure/http-operations-gateway.test.ts",
+        "src/modules/operations/infrastructure/operations-api-session.test.ts",
+        "src/lib/actions/performance.test.ts",
+        "src/app/api/internal/observability/route.test.ts"
+      ]
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { reportServerEvent } from "@/lib/observability";
+import { operationsApi } from "@/modules/operations/infrastructure/operations-api-session";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
-  await reportServerEvent({
+  const payload = {
     kind: kind as "client_error" | "web_vital" | "client_action",
     name,
     message: typeof body.message === "string" ? body.message : undefined,
@@ -41,7 +42,15 @@ export async function POST(request: NextRequest) {
     metadata: typeof body.metadata === "object" && body.metadata !== null
       ? body.metadata as Record<string, string | number | boolean | null>
       : undefined,
-  });
+  };
+
+  const opsApi = await operationsApi();
+  if (opsApi) {
+    await opsApi.reportServerEvent(payload);
+    return new NextResponse(null, { status: 204 });
+  }
+
+  await reportServerEvent(payload);
 
   return new NextResponse(null, { status: 204 });
 }

@@ -106,6 +106,14 @@ import type { FantasyAdminRepository } from "../contexts/fantasy/application/man
 import { registerFantasyAdminRoutes } from "../contexts/fantasy/presentation/fantasy-admin-route.js";
 import type { CardsRepository } from "../contexts/cards/application/manage-cards.js";
 import { registerCardsRoutes } from "../contexts/cards/presentation/cards-route.js";
+import type { CosmeticsRepository } from "../contexts/cosmetics/application/manage-cosmetics.js";
+import { registerCosmeticsRoutes } from "../contexts/cosmetics/presentation/cosmetics-route.js";
+import type { CollectiveRepository } from "../contexts/collective/application/manage-collective.js";
+import { registerCollectiveRoutes } from "../contexts/collective/presentation/collective-route.js";
+import type { ManagerRepository } from "../contexts/integrations/application/manage-manager.js";
+import { registerManagerRoutes } from "../contexts/integrations/presentation/manager-route.js";
+import type { OperationsRepository } from "../contexts/operations/application/manage-operations.js";
+import { registerOperationsRoutes } from "../contexts/operations/presentation/operations-route.js";
 
 export function createApp(dependencies: {
   goalsEnabled: boolean;
@@ -180,6 +188,14 @@ export function createApp(dependencies: {
   fantasyMarketLineupRepository?: FantasyMarketLineupRepository;
   fantasyAdminRepository?: FantasyAdminRepository;
   cardsRepository?: CardsRepository;
+  cosmeticsEnabled?: boolean;
+  cosmeticsRepository?: CosmeticsRepository;
+  collectiveEnabled?: boolean;
+  collectiveRepository?: CollectiveRepository;
+  integrationsEnabled?: boolean;
+  managerRepository?: ManagerRepository;
+  operationsEnabled?: boolean;
+  operationsRepository?: OperationsRepository;
   emailConfigured?: boolean;
   logger?: boolean;
 }): FastifyInstance {
@@ -520,6 +536,29 @@ export function createApp(dependencies: {
     registerCardsRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.cardsRepository,
+    });
+  }
+  if (dependencies.cosmeticsEnabled && dependencies.cosmeticsRepository) {
+    registerCosmeticsRoutes(app, {
+      userVerifier: dependencies.verifier,
+      repository: dependencies.cosmeticsRepository,
+    });
+  }
+  if (dependencies.collectiveEnabled && dependencies.collectiveRepository) {
+    registerCollectiveRoutes(app, {
+      userVerifier: dependencies.verifier,
+      repository: dependencies.collectiveRepository,
+    });
+  }
+  if (dependencies.integrationsEnabled && dependencies.managerRepository) {
+    registerManagerRoutes(app, {
+      userVerifier: dependencies.verifier,
+      repository: dependencies.managerRepository,
+    });
+  }
+  if (dependencies.operationsEnabled && dependencies.operationsRepository) {
+    registerOperationsRoutes(app, {
+      repository: dependencies.operationsRepository,
     });
   }
   return app;

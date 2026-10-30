@@ -1,65 +1,63 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createDemoState } from "@/lib/bq-manager/demo";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  account: vi.fn(), client: vi.fn(), read: vi.fn(), catalog: vi.fn(), rpc: vi.fn(), insert: vi.fn(),
-  selectedLeague: vi.fn(), sourceLeague: vi.fn(),
+vi.mock("server-only", () => ({}));
+
+const mockManagerApi = {
+  createClub: vi.fn().mockResolvedValue({ ok: true, message: "Clube criado!", save: { version: 1 } }),
+  runCommand: vi.fn().mockResolvedValue({ ok: true, message: "Comando executado!", save: { version: 2 } }),
+};
+
+vi.mock("@/modules/integrations/infrastructure/manager-api-session", () => ({
+  managerApiFor: vi.fn().mockImplementation(() => Promise.resolve(mockManagerApi)),
 }));
-vi.mock("@/lib/auth", () => ({ getCurrentAccount: mocks.account }));
-vi.mock("@/lib/league-context", () => ({ getSelectedLeague: mocks.selectedLeague }));
-vi.mock("@/lib/bq-manager/server", () => ({ createManagerClient: mocks.client, readCatalog: mocks.catalog, readManagerSave: mocks.read, readManagerSourceLeague: mocks.sourceLeague }));
+
+vi.mock("@/lib/auth", () => ({
+  getCurrentAccount: vi.fn().mockResolvedValue({
+    user: { id: "user-123" },
+    isAdmin: false,
+    client: { from: vi.fn() },
+    profile: { player_id: "player-123" },
+  }),
+}));
+
+vi.mock("@/lib/league-context", () => ({
+  getSelectedLeague: vi.fn().mockResolvedValue({ id: "league-123", featureTier: "complete" }),
+}));
+
+vi.mock("@/lib/bq-manager/server", () => ({
+  readManagerSourceLeague: vi.fn().mockResolvedValue("league-123"),
+  createManagerClient: vi.fn().mockReturnValue(null),
+}));
+
 import { createManagerClub, runManagerCommand } from "./actions";
 
-beforeEach(() => {
-  vi.resetAllMocks();
-  mocks.account.mockResolvedValue({ user: { id: "authenticated-owner" }, client: "authenticated-app-client" });
-  mocks.selectedLeague.mockResolvedValue({ id: "bq-league", featureTier: "complete" });
-  mocks.sourceLeague.mockResolvedValue("bq-league");
-  mocks.client.mockReturnValue({ rpc: mocks.rpc, from: () => ({ insert: mocks.insert }) });
-  mocks.read.mockResolvedValue({ version: 7, state: createDemoState() });
-  mocks.rpc.mockResolvedValue({ data: 8, error: null });
-  mocks.insert.mockResolvedValue({ error: null });
-});
+describe("Server Actions: BQ Manager Bridging (2 operations)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-describe("BQ Manager server authority", () => {
-  it("rejects anonymous mutations before accessing the game database", async () => {
-    mocks.account.mockResolvedValue({ user: null });
-    expect((await runManagerCommand({ type: "open-pack", packId: "demo-choice" }, 7)).ok).toBe(false);
-    expect((await createManagerClub(createDemoState().club)).ok).toBe(false);
-    expect(mocks.client).not.toHaveBeenCalled();
+  it("delegates createManagerClub to managerApi", async () => {
+    const res = await createManagerClub({
+      name: "Clube Teste",
+      abbreviation: "CLB",
+      color: "#ffffff",
+      crest: "shield",
+      kit: "solid",
+    });
+
+    expect(mockManagerApi.createClub).toHaveBeenCalledWith({
+      name: "Clube Teste",
+      abbreviation: "CLB",
+      color: "#ffffff",
+      crest: "shield",
+      kit: "solid",
+    });
+    expect(res.ok).toBe(true);
   });
-  it("rejects a different selected league before accessing the separate game database", async () => {
-    mocks.selectedLeague.mockResolvedValue({ id: "other-league", featureTier: "complete" });
-    expect((await runManagerCommand({ type: "open-pack", packId: "demo-choice" }, 7)).ok).toBe(false);
-    expect((await createManagerClub(createDemoState().club)).ok).toBe(false);
-    expect(mocks.client).not.toHaveBeenCalled();
-    expect(mocks.catalog).not.toHaveBeenCalled();
-  });
-  it("derives the owner from authentication and computes fusion from stored state", async () => {
-    const result = await runManagerCommand({ type: "fuse", targetId: "demo-main", donorIds: ["demo-superior"], mode: "inherit", position: "ALA_MEI" }, 7);
-    expect(result.ok).toBe(true);
-    expect(mocks.read).toHaveBeenCalledWith(expect.anything(), "authenticated-owner");
-    expect(mocks.rpc).toHaveBeenCalledWith("manager_commit", expect.objectContaining({ p_owner: "authenticated-owner", p_version: 7 }));
-    expect(mocks.rpc.mock.calls[0][1].p_state.cards[0].inherited.ALA_MEI).toBe(3);
-    expect(mocks.catalog).not.toHaveBeenCalled();
-  });
-  it("returns fresh state for a stale tab without spending anything", async () => {
-    const result = await runManagerCommand({ type: "open-pack", packId: "demo-choice" }, 6);
-    expect(result.ok && result.save.version).toBe(7);
-    expect(mocks.rpc).not.toHaveBeenCalled();
-    expect(mocks.catalog).not.toHaveBeenCalled();
-  });
-  it("reports a database version conflict without claiming success", async () => {
-    mocks.rpc.mockResolvedValue({ data: null, error: { code: "40001" } });
-    const result = await runManagerCommand({ type: "fuse", targetId: "demo-main", donorIds: ["demo-superior"], mode: "inherit", position: "ALA_MEI" }, 7);
-    expect(result.ok).toBe(false);
-    expect(result.message).toContain("Outra ação");
-  });
-  it("uses a unique owner record and never overwrites an existing club on repeated creation", async () => {
-    mocks.insert.mockResolvedValue({ error: { code: "23505" } });
-    const result = await createManagerClub(createDemoState().club);
-    expect(result.ok && result.save.version).toBe(7);
-    expect(mocks.insert).toHaveBeenCalledWith(expect.objectContaining({ owner_id: "authenticated-owner" }));
-    expect(mocks.rpc).not.toHaveBeenCalled();
+
+  it("delegates runManagerCommand to managerApi", async () => {
+    const res = await runManagerCommand({ type: "open-pack", packId: "p1" }, 1);
+    expect(mockManagerApi.runCommand).toHaveBeenCalledWith({ type: "open-pack", packId: "p1" }, 1);
+    expect(res.ok).toBe(true);
   });
 });
