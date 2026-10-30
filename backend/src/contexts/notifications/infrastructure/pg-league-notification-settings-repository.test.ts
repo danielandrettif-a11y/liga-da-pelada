@@ -1,0 +1,44 @@
+import { describe, expect, it, vi } from "vitest";
+import type { Pool } from "pg";
+import { pgLeagueNotificationSettingsRepository } from "./pg-league-notification-settings-repository.js";
+import { NotificationPersistenceError } from "./pg-inbox-repository.js";
+
+describe("pgLeagueNotificationSettingsRepository", () => {
+  const leagueId = "00000000-0000-4000-8000-000000000001";
+  const actor = { userId: "00000000-0000-4000-8000-000000000002" };
+
+  it("updates cartola_email_tested_at when user is league admin", async () => {
+    const query = vi.fn().mockImplementation(async (sql: string) => {
+      if (sql.includes("is_league_admin")) {
+        return { rows: [{ allowed: true }] };
+      }
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+    const repo = pgLeagueNotificationSettingsRepository(pool);
+
+    const testedAt = new Date().toISOString();
+    const result = await repo.recordEmailTestedAt(leagueId, actor, testedAt);
+    expect(result).toBe(true);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE public.leagues"),
+      [leagueId, testedAt],
+    );
+  });
+
+  it("rejects when user is not league admin", async () => {
+    const query = vi.fn().mockImplementation(async (sql: string) => {
+      if (sql.includes("is_league_admin")) {
+        return { rows: [{ allowed: false }] };
+      }
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+    const repo = pgLeagueNotificationSettingsRepository(pool);
+
+    await expect(
+      repo.recordEmailTestedAt(leagueId, actor, new Date().toISOString()),
+    ).rejects.toThrow(NotificationPersistenceError);
+  });
+});
+

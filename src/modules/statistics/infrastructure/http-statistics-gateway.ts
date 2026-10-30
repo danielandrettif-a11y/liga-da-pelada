@@ -1,0 +1,224 @@
+import type { BQBaseScoringSnapshot } from "@/lib/bq-scoring";
+import type { ColumnCScoringSettings } from "@/lib/actions/bq-scoring";
+import type { RankingEntry, RankingExperienceData } from "@/lib/ranking";
+
+export type RankingEnrichment = Pick<
+  RankingEntry,
+  | "overall"
+  | "overallTrend"
+  | "overallPositions"
+  | "overallPositionTrends"
+  | "overallGoalkeeperGames"
+  | "overallGoalkeeperRounds"
+  | "speedRating"
+  | "fitness"
+  | "achievementBelts"
+  | "cosmetics"
+>;
+
+export class StatisticsApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = "StatisticsApiError";
+  }
+}
+
+export interface StatisticsGateway {
+  getBQScoringRules(leagueId: string): Promise<BQBaseScoringSnapshot>;
+  getColumnCScoringRules(leagueId: string): Promise<ColumnCScoringSettings>;
+  saveBQScoringRules(
+    leagueId: string,
+    snapshot: BQBaseScoringSnapshot,
+  ): Promise<{ success: boolean; version?: number; error?: string }>;
+  saveColumnCScoringRules(
+    leagueId: string,
+    values: ColumnCScoringSettings,
+    options?: { reprocessRanked?: boolean },
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    roundsReprocessed?: number;
+    playerRoundsReprocessed?: number;
+  }>;
+  getRanking(leagueId: string): Promise<RankingEntry[]>;
+  getRankingExperience(
+    leagueId: string,
+    options?: { includeEnrichment?: boolean },
+  ): Promise<RankingExperienceData>;
+  getPlayerRankingEntry(
+    leagueId: string,
+    playerId: string,
+  ): Promise<{ entry: RankingEntry; position: number } | null>;
+  getRankingEnrichmentForPlayers(
+    leagueId: string,
+    playerIds: string[],
+  ): Promise<Record<string, RankingEnrichment>>;
+}
+
+export type StatisticsHttpGateway = StatisticsGateway;
+
+export function httpStatisticsGateway(
+  baseUrlOrOptions: string | { baseUrl: string; accessToken?: string },
+  maybeToken?: string,
+): StatisticsGateway {
+  const options =
+    typeof baseUrlOrOptions === "string"
+      ? { baseUrl: baseUrlOrOptions, accessToken: maybeToken }
+      : baseUrlOrOptions;
+
+  const normalizedBase = options.baseUrl.replace(/\/+$/, "");
+
+  function authHeaders(withJson = false): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (options.accessToken) {
+      headers.authorization = `Bearer ${options.accessToken}`;
+    }
+    if (withJson) {
+      headers["content-type"] = "application/json";
+    }
+    return headers;
+  }
+
+  async function requestJson<T>(
+    path: string,
+    init?: RequestInit,
+  ): Promise<T> {
+    const url = `${normalizedBase}${path}`;
+    const response = await fetch(url, init);
+    const body: unknown = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const message =
+        body && typeof body === "object" && "message" in body && typeof body.message === "string"
+          ? body.message
+          : body && typeof body === "object" && "error" in body && typeof body.error === "string"
+            ? body.error
+            : `HTTP ${response.status}`;
+      throw new StatisticsApiError(message, response.status);
+    }
+
+    return body as T;
+  }
+
+  return {
+    async getBQScoringRules(leagueId: string): Promise<BQBaseScoringSnapshot> {
+      return requestJson<BQBaseScoringSnapshot>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/scoring/bq`,
+        {
+          headers: authHeaders(),
+          cache: "no-store",
+        },
+      );
+    },
+
+    async getColumnCScoringRules(leagueId: string): Promise<ColumnCScoringSettings> {
+      return requestJson<ColumnCScoringSettings>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/scoring/column-c`,
+        {
+          headers: authHeaders(),
+          cache: "no-store",
+        },
+      );
+    },
+
+    async saveBQScoringRules(
+      leagueId: string,
+      snapshot: BQBaseScoringSnapshot,
+    ): Promise<{ success: boolean; version?: number; error?: string }> {
+      return requestJson<{ success: boolean; version?: number; error?: string }>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/scoring/bq`,
+        {
+          method: "PUT",
+          headers: authHeaders(true),
+          body: JSON.stringify(snapshot),
+        },
+      );
+    },
+
+    async saveColumnCScoringRules(
+      leagueId: string,
+      values: ColumnCScoringSettings,
+      options?: { reprocessRanked?: boolean },
+    ): Promise<{
+      success: boolean;
+      error?: string;
+      roundsReprocessed?: number;
+      playerRoundsReprocessed?: number;
+    }> {
+      return requestJson<{
+        success: boolean;
+        error?: string;
+        roundsReprocessed?: number;
+        playerRoundsReprocessed?: number;
+      }>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/scoring/column-c`,
+        {
+          method: "PUT",
+          headers: authHeaders(true),
+          body: JSON.stringify({ settings: values, options }),
+        },
+      );
+    },
+
+    async getRanking(leagueId: string): Promise<RankingEntry[]> {
+      return requestJson<RankingEntry[]>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/ranking`,
+        {
+          headers: authHeaders(),
+          cache: "no-store",
+        },
+      );
+    },
+
+    async getRankingExperience(
+      leagueId: string,
+      options?: { includeEnrichment?: boolean },
+    ): Promise<RankingExperienceData> {
+      const includeParam = options?.includeEnrichment === false ? "includeEnrichment=false" : "includeEnrichment=true";
+      return requestJson<RankingExperienceData>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/ranking/experience?${includeParam}`,
+        {
+          headers: authHeaders(),
+          cache: "no-store",
+        },
+      );
+    },
+
+    async getPlayerRankingEntry(
+      leagueId: string,
+      playerId: string,
+    ): Promise<{ entry: RankingEntry; position: number } | null> {
+      try {
+        return await requestJson<{ entry: RankingEntry; position: number }>(
+          `/api/statistics/leagues/${encodeURIComponent(leagueId)}/ranking/players/${encodeURIComponent(playerId)}`,
+          {
+            headers: authHeaders(),
+            cache: "no-store",
+          },
+        );
+      } catch (err) {
+        if (err instanceof StatisticsApiError && err.statusCode === 404) {
+          return null;
+        }
+        throw err;
+      }
+    },
+
+    async getRankingEnrichmentForPlayers(
+      leagueId: string,
+      playerIds: string[],
+    ): Promise<Record<string, RankingEnrichment>> {
+      return requestJson<Record<string, RankingEnrichment>>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/ranking/enrichment`,
+        {
+          method: "POST",
+          headers: authHeaders(true),
+          body: JSON.stringify({ playerIds }),
+        },
+      );
+    },
+  };
+}

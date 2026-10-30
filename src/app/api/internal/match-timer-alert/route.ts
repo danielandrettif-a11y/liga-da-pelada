@@ -1,3 +1,4 @@
+import { httpNotificationGateway } from "@/modules/notifications/infrastructure/http-notification-gateway";
 import { dispatchMatchTimerThreshold } from "@/lib/actions/matches";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -29,6 +30,35 @@ export async function POST(request: Request) {
     || (body.threshold !== "one_minute" && body.threshold !== "thirty_seconds" && body.threshold !== "finished")
   ) {
     return Response.json({ error: "Alerta inválido." }, { status: 400 });
+  }
+
+  const backendUrl =
+    process.env.NOTIFICATIONS_BACKEND_URL ||
+    process.env.INTERNAL_BACKEND_URL ||
+    process.env.INTERNAL_API_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_API_URL;
+
+  if (process.env.ENABLE_NOTIFICATIONS_API === "true" && backendUrl) {
+    const gateway = httpNotificationGateway(backendUrl);
+    try {
+      const result = await gateway.dispatchMatchTimerAlert(body.matchId, body.threshold, expectedSecret);
+      if (!result.success) {
+        return Response.json({ error: result.error || "Falha ao disparar o alerta." }, { status: 500 });
+      }
+      if (result.skipped && result.reason === "too_early") {
+        return Response.json({
+          error: `Alerta recebido antes do marco; faltam ${result.secondsLeft} segundos.`,
+        }, {
+          status: 425,
+          headers: { "Retry-After": "1" },
+        });
+      }
+      return Response.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao disparar o alerta.";
+      return Response.json({ error: message }, { status: 500 });
+    }
   }
 
   const client = createServiceClient();

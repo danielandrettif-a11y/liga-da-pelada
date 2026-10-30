@@ -2288,6 +2288,409 @@
         "src/lib/actions/matches.test.ts",
         "src/modules/matches/infrastructure/http-match-gateway.test.ts"
       ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/lib/actions/inbox.ts",
+      "name": "getMyInboxPreview",
+      "state": "frontend-migrated",
+      "target": "GET /api/notifications/inbox/preview",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/inbox-notification.test.ts",
+        "backend/src/contexts/notifications/application/manage-inbox.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-inbox-repository.test.ts",
+        "backend/src/contexts/notifications/presentation/inbox-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/lib/actions/inbox.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/lib/actions/inbox.ts",
+      "name": "markInboxRead",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/inbox/read",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/inbox-notification.test.ts",
+        "backend/src/contexts/notifications/application/manage-inbox.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-inbox-repository.test.ts",
+        "backend/src/contexts/notifications/presentation/inbox-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/lib/actions/inbox.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/lib/actions/inbox.ts",
+      "name": "getMyInboxNotifications",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/inbox/sync",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/inbox-notification.test.ts",
+        "backend/src/contexts/notifications/application/manage-inbox.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-inbox-repository.test.ts",
+        "backend/src/contexts/notifications/presentation/inbox-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/lib/actions/inbox.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "getPushPublicKey",
+      "state": "frontend-migrated",
+      "target": "GET /api/notifications/push/public-key",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-subscription.test.ts",
+        "backend/src/contexts/notifications/domain/notification-preferences.test.ts",
+        "backend/src/contexts/notifications/application/manage-preferences.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-notification-preferences-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/env-push-configuration-provider.test.ts",
+        "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "getPushSystemStatus",
+      "state": "frontend-migrated",
+      "target": "GET /api/notifications/push/status",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-subscription.test.ts",
+        "backend/src/contexts/notifications/domain/notification-preferences.test.ts",
+        "backend/src/contexts/notifications/application/manage-preferences.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-notification-preferences-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/env-push-configuration-provider.test.ts",
+        "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "subscribeToPush",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/push/subscribe",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-subscription.test.ts",
+        "backend/src/contexts/notifications/domain/notification-preferences.test.ts",
+        "backend/src/contexts/notifications/application/manage-preferences.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-notification-preferences-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/env-push-configuration-provider.test.ts",
+        "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "unsubscribeFromPush",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/push/unsubscribe",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-subscription.test.ts",
+        "backend/src/contexts/notifications/domain/notification-preferences.test.ts",
+        "backend/src/contexts/notifications/application/manage-preferences.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-notification-preferences-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/env-push-configuration-provider.test.ts",
+        "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "getNotificationPreferences",
+      "state": "frontend-migrated",
+      "target": "GET /api/notifications/preferences/:leagueId",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-subscription.test.ts",
+        "backend/src/contexts/notifications/domain/notification-preferences.test.ts",
+        "backend/src/contexts/notifications/application/manage-preferences.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-notification-preferences-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/env-push-configuration-provider.test.ts",
+        "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "updateNotificationPreferences",
+      "state": "frontend-migrated",
+      "target": "PUT /api/notifications/preferences",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-subscription.test.ts",
+        "backend/src/contexts/notifications/domain/notification-preferences.test.ts",
+        "backend/src/contexts/notifications/application/manage-preferences.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-notification-preferences-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/env-push-configuration-provider.test.ts",
+        "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "sendPushTest",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/test-push",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-delivery.test.ts",
+        "backend/src/contexts/notifications/application/manage-delivery.test.ts",
+        "backend/src/contexts/notifications/infrastructure/qstash-push-alert-scheduler.test.ts",
+        "backend/src/contexts/notifications/presentation/delivery-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "sendCartolaEmailTest",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/test-cartola-email",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-delivery.test.ts",
+        "backend/src/contexts/notifications/application/manage-delivery.test.ts",
+        "backend/src/contexts/notifications/infrastructure/resend-cartola-email-sender.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-league-notification-settings-repository.test.ts",
+        "backend/src/contexts/notifications/presentation/delivery-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/api/internal/push-test-alert/route.ts",
+      "name": "POST",
+      "state": "frontend-migrated",
+      "target": "POST /api/internal/notifications/push-test-alert",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-delivery.test.ts",
+        "backend/src/contexts/notifications/application/manage-delivery.test.ts",
+        "backend/src/contexts/notifications/infrastructure/web-push-notification-sender.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+        "backend/src/contexts/notifications/presentation/delivery-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/app/api/internal/push-test-alert/route.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "setCartolaRemindersEnabled",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/cartola/reminders/toggle",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/cartola-reminder.test.ts",
+        "backend/src/contexts/notifications/application/manage-cartola-reminders.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-cartola-reminder-repository.test.ts",
+        "backend/src/contexts/notifications/presentation/cartola-reminder-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notificacoes/cancelar/actions.ts",
+      "name": "cancelCartolaEmailReminders",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/cartola/reminders/cancel",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/cartola-reminder.test.ts",
+        "backend/src/contexts/notifications/application/manage-cartola-reminders.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-cartola-reminder-repository.test.ts",
+        "backend/src/contexts/notifications/presentation/cartola-reminder-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/app/mais/notificacoes/cancelar/actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/api/internal/cartola-reminder/route.ts",
+      "name": "POST",
+      "state": "frontend-migrated",
+      "target": "POST /api/internal/notifications/cartola-reminder",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/cartola-reminder.test.ts",
+        "backend/src/contexts/notifications/application/manage-cartola-reminders.test.ts",
+        "backend/src/contexts/notifications/infrastructure/qstash-cartola-reminder-scheduler.test.ts",
+        "backend/src/contexts/notifications/infrastructure/resend-cartola-reminder-email-sender.test.ts",
+        "backend/src/contexts/notifications/presentation/cartola-reminder-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/app/api/internal/cartola-reminder/route.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/api/internal/match-timer-alert/route.ts",
+      "name": "POST",
+      "state": "frontend-migrated",
+      "target": "POST /api/internal/matches/:matchId/timer/dispatch",
+      "evidence": [
+        "backend/src/contexts/matches/presentation.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/app/api/internal/match-timer-alert/route.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "getBQScoringRules",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/scoring/bq",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/scoring-policy.test.ts",
+        "backend/src/contexts/statistics/application/manage-scoring-rules.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-scoring-rules-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/scoring-rules-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/bq-scoring.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "getColumnCScoringRules",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/scoring/column-c",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/scoring-policy.test.ts",
+        "backend/src/contexts/statistics/application/manage-scoring-rules.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-scoring-rules-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/scoring-rules-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/bq-scoring.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "saveBQScoringRules",
+      "state": "frontend-migrated",
+      "target": "PUT /api/statistics/leagues/:leagueId/scoring/bq",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/scoring-policy.test.ts",
+        "backend/src/contexts/statistics/application/manage-scoring-rules.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-scoring-rules-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/scoring-rules-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/bq-scoring.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "saveColumnCScoringRules",
+      "state": "frontend-migrated",
+      "target": "PUT /api/statistics/leagues/:leagueId/scoring/column-c",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/scoring-policy.test.ts",
+        "backend/src/contexts/statistics/application/manage-scoring-rules.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-scoring-rules-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/scoring-rules-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/bq-scoring.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getPlayerRankingEntry",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/ranking/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-ranking.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-ranking.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-ranking-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-ranking-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRanking",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/ranking",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-ranking.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-ranking.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-ranking-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-ranking-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRankingEnrichmentForPlayers",
+      "state": "frontend-migrated",
+      "target": "POST /api/statistics/leagues/:leagueId/ranking/enrichment",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-ranking.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-ranking.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-ranking-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-ranking-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRankingEssentialData",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/ranking/experience?includeEnrichment=false",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-ranking.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-ranking.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-ranking-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-ranking-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRankingExperienceData",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/ranking/experience?includeEnrichment=true",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-ranking.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-ranking.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-ranking-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-ranking-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
     }
   ]
 }

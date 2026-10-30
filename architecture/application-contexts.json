@@ -89,7 +89,7 @@
       "id": "notifications",
       "aggregates": ["Inbox", "NotificationPreference", "Delivery"],
       "pages": ["src/app/notificacoes/page.tsx", "src/app/mais/notificacoes/page.tsx", "src/app/mais/notificacoes/cancelar/page.tsx"],
-      "sourceModules": [],
+      "sourceModules": ["notifications"],
       "entrypoints": ["src/lib/actions/inbox.ts", "src/app/mais/notification-actions.ts", "src/app/mais/notificacoes/cancelar/actions.ts", "src/app/api/internal/cartola-reminder/route.ts", "src/app/api/internal/match-timer-alert/route.ts", "src/app/api/internal/push-test-alert/route.ts"]
     },
     {

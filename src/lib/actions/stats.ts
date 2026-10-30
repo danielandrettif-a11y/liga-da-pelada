@@ -24,6 +24,7 @@ import {
   resolveRankingRoleWeights,
   type RankingRoleWeight,
 } from "../ranking-position-bonus";
+import { getStatisticsApiSession } from "@/modules/statistics/infrastructure/statistics-api-session";
 
 type RankingStatsRow = {
   player_id: string;
@@ -745,6 +746,13 @@ export async function calculateRoundStats(roundId: string) {
 }
 
 export async function getRanking() {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (league) {
+      return session.gateway.getRanking(league.id);
+    }
+  }
   // Todas as superfícies de ranking usam o mesmo read model (atividade,
   // elegibilidade e seis melhores rodadas), evitando totais divergentes.
   return (await getRankingExperienceData()).general;
@@ -1084,6 +1092,13 @@ const getRankingExperienceDataCached = cache(getRankingExperienceDataUncached);
 const getRankingEssentialDataCached = cache(() => getRankingExperienceDataUncached(false));
 
 export async function getRankingEssentialData(): Promise<RankingExperienceData> {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (league) {
+      return session.gateway.getRankingExperience(league.id, { includeEnrichment: false });
+    }
+  }
   return getRankingEssentialDataCached();
 }
 
@@ -1097,6 +1112,13 @@ type RankingEnrichment = Pick<RankingEntry,
 export async function getRankingEnrichmentForPlayers(playerIds: string[]): Promise<Record<string, RankingEnrichment>> {
   const requested = [...new Set(playerIds)].filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)).slice(0, 150);
   if (!requested.length) return {};
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (league) {
+      return session.gateway.getRankingEnrichmentForPlayers(league.id, requested);
+    }
+  }
   const [league, season, account] = await Promise.all([getSelectedLeague(), getActiveSeason(), getCurrentAccount()]);
   if (!league || !season || season.league_id !== league.id || !account.user) return {};
   const client = account.client;
@@ -1150,6 +1172,13 @@ export async function getRankingEnrichmentForPlayers(playerIds: string[]): Promi
 }
 
 export async function getRankingExperienceData(): Promise<RankingExperienceData> {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (league) {
+      return session.gateway.getRankingExperience(league.id, { includeEnrichment: true });
+    }
+  }
   // React.cache compartilha o resultado somente dentro da requisição atual.
   // Pelada e sessão continuam resolvidas pelo contexto autenticado dessa
   // requisição; nenhum dado é persistido entre usuários.
@@ -1159,6 +1188,10 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
 export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: RankingEntry; position: number } | null> {
   const league = await getSelectedLeague();
   if (!league) return null;
+  const session = await getStatisticsApiSession();
+  if (session) {
+    return session.gateway.getPlayerRankingEntry(league.id, playerId);
+  }
   const supabase = await createServerClient();
   const data = await getRankingExperienceData();
   const index = data.general.findIndex((item) => item.player.id === playerId);

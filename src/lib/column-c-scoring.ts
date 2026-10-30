@@ -23,6 +23,38 @@ export const COLUMN_C_SCORING = {
   GOL: { goal: 5, assist: 3, conceded: -0.5, cleanSheet: 4, oneGoal: 2, appearance: 1, ownGoal: -3 },
 } as const;
 
+export type ColumnCScoringSettings = {
+  attackerGoalPoints: number;
+  attackerAssistPoints: number;
+  lineGoalConcededPoints: number;
+  defenderGoalPoints: number;
+  defenderAssistPoints: number;
+  defenderCleanSheetPoints: number;
+  defenderOneGoalPoints: number;
+  defenderOneGoalConcededPoints: number;
+  defenderTwoGoalsConcededPoints: number;
+  goalkeeperSlotAppearancePoints: number;
+  goalkeeperSlotGoalConcededPoints: number;
+  goalkeeperSlotCleanSheetPoints: number;
+  goalkeeperSlotOneGoalPoints: number;
+};
+
+export const DEFAULT_COLUMN_C_SCORING: ColumnCScoringSettings = {
+  attackerGoalPoints: 4,
+  attackerAssistPoints: 2.5,
+  lineGoalConcededPoints: -0.5,
+  defenderGoalPoints: 5,
+  defenderAssistPoints: 3,
+  defenderCleanSheetPoints: 3,
+  defenderOneGoalPoints: 1,
+  defenderOneGoalConcededPoints: -0.75,
+  defenderTwoGoalsConcededPoints: -1.75,
+  goalkeeperSlotAppearancePoints: 1,
+  goalkeeperSlotGoalConcededPoints: -0.5,
+  goalkeeperSlotCleanSheetPoints: 4,
+  goalkeeperSlotOneGoalPoints: 2,
+};
+
 export type ColumnCStats = {
   goals?: number;
   assists?: number;

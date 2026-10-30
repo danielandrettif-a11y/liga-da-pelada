@@ -32,7 +32,20 @@ import { supabasePlayerAvatarStorage } from "./contexts/roster/infrastructure/su
 import { pgCallupRepository } from "./contexts/callups/infrastructure/pg-callup-repository.js";
 import { pgRoundRepository } from "./contexts/rounds/infrastructure/pg-round-repository.js";
 import { pgMatchRepository } from "./contexts/matches/infrastructure/pg-match-repository.js";
+import { pgInboxRepository } from "./contexts/notifications/infrastructure/pg-inbox-repository.js";
+import { pgPushSubscriptionRepository } from "./contexts/notifications/infrastructure/pg-push-subscription-repository.js";
+import { pgNotificationPreferencesRepository } from "./contexts/notifications/infrastructure/pg-notification-preferences-repository.js";
+import { envPushConfigurationProvider } from "./contexts/notifications/infrastructure/env-push-configuration-provider.js";
 import { qstashMatchTimerScheduler } from "./contexts/matches/infrastructure/qstash-match-timer-scheduler.js";
+import { qstashPushAlertScheduler } from "./contexts/notifications/infrastructure/qstash-push-alert-scheduler.js";
+import { webPushNotificationSender } from "./contexts/notifications/infrastructure/web-push-notification-sender.js";
+import { resendCartolaEmailSender } from "./contexts/notifications/infrastructure/resend-cartola-email-sender.js";
+import { pgLeagueNotificationSettingsRepository } from "./contexts/notifications/infrastructure/pg-league-notification-settings-repository.js";
+import { pgCartolaReminderRepository } from "./contexts/notifications/infrastructure/pg-cartola-reminder-repository.js";
+import { qstashCartolaReminderScheduler } from "./contexts/notifications/infrastructure/qstash-cartola-reminder-scheduler.js";
+import { resendCartolaReminderEmailSender } from "./contexts/notifications/infrastructure/resend-cartola-reminder-email-sender.js";
+import { pgScoringRulesRepository } from "./contexts/statistics/infrastructure/pg-scoring-rules-repository.js";
+import { pgSeasonRankingRepository } from "./contexts/statistics/infrastructure/pg-season-ranking-repository.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -42,6 +55,8 @@ const rosterEnabled = process.env.ENABLE_ROSTER_API === "true";
 const callupsEnabled = process.env.ENABLE_CALLUPS_API === "true";
 const roundsEnabled = process.env.ENABLE_ROUNDS_API === "true";
 const matchesEnabled = process.env.ENABLE_MATCHES_API === "true";
+const notificationsEnabled = process.env.ENABLE_NOTIFICATIONS_API === "true";
+const statisticsEnabled = process.env.ENABLE_STATISTICS_API === "true";
 const port = Number(process.env.PORT || "3001");
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("PORT inválida.");
@@ -52,7 +67,7 @@ const authUrl = process.env.SUPABASE_INTERNAL_URL;
 const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
 const publicUrl = process.env.SUPABASE_PUBLIC_URL;
 const appPublicUrl = process.env.APP_PUBLIC_URL;
-if ((goalsEnabled || leaguesEnabled || identityEnabled || rosterEnabled || callupsEnabled || roundsEnabled || matchesEnabled) && (!databaseUrl || !authUrl || !publishableKey)) {
+if ((goalsEnabled || leaguesEnabled || identityEnabled || rosterEnabled || callupsEnabled || roundsEnabled || matchesEnabled || notificationsEnabled || statisticsEnabled) && (!databaseUrl || !authUrl || !publishableKey)) {
   throw new Error("APIs habilitadas requerem DATABASE_URL, SUPABASE_INTERNAL_URL e SUPABASE_PUBLISHABLE_KEY.");
 }
 if ((leaguesEnabled || rosterEnabled) && !publicUrl) {
@@ -74,6 +89,7 @@ const app = createApp({
   callupsEnabled,
   roundsEnabled,
   matchesEnabled,
+  notificationsEnabled,
   verifier: supabaseUserVerifier(authUrl || "http://127.0.0.1:54321", publishableKey || ""),
   repository: pgGoalRepository(pool),
   leagueRepository: pgLeagueRepository(pool),
@@ -121,6 +137,47 @@ const app = createApp({
     qstashUrl: process.env.QSTASH_URL,
   }),
   matchTimerWebhookSecret: process.env.MATCH_TIMER_WEBHOOK_SECRET,
+  inboxRepository: pgInboxRepository(pool),
+  pushConfig: envPushConfigurationProvider(process.env),
+  pushSubscriptions: pgPushSubscriptionRepository(pool),
+  pushDeliverySubscriptions: pgPushSubscriptionRepository(pool),
+  pushAlertScheduler: qstashPushAlertScheduler({
+    appPublicUrl: appPublicUrl || "http://localhost:3000",
+    token: process.env.QSTASH_TOKEN,
+    webhookSecret: process.env.MATCH_TIMER_WEBHOOK_SECRET,
+    qstashUrl: process.env.QSTASH_URL,
+  }),
+  pushNotificationSender: webPushNotificationSender({
+    pushConfig: envPushConfigurationProvider(process.env),
+    privateKey: process.env.VAPID_PRIVATE_KEY,
+    subject: process.env.VAPID_SUBJECT,
+  }),
+  cartolaEmailSender: resendCartolaEmailSender({
+    apiKey: process.env.RESEND_API_KEY,
+    fromEmail: process.env.RESEND_FROM_EMAIL,
+    unsubscribeSecret: process.env.EMAIL_UNSUBSCRIBE_SECRET,
+    appPublicUrl: appPublicUrl || "http://localhost:3000",
+  }),
+  leagueNotificationSettings: pgLeagueNotificationSettingsRepository(pool),
+  cartolaReminderRepository: pgCartolaReminderRepository(pool),
+  cartolaReminderScheduler: qstashCartolaReminderScheduler({
+    appPublicUrl: appPublicUrl || "http://localhost:3000",
+    token: process.env.QSTASH_TOKEN,
+    webhookSecret: process.env.MATCH_TIMER_WEBHOOK_SECRET,
+    qstashUrl: process.env.QSTASH_URL,
+  }),
+  cartolaReminderEmailSender: resendCartolaReminderEmailSender({
+    apiKey: process.env.RESEND_API_KEY,
+    fromEmail: process.env.RESEND_FROM_EMAIL,
+    unsubscribeSecret: process.env.EMAIL_UNSUBSCRIBE_SECRET,
+    appPublicUrl: appPublicUrl || "http://localhost:3000",
+  }),
+  cartolaUnsubscribeSecret: process.env.EMAIL_UNSUBSCRIBE_SECRET,
+  preferencesRepository: pgNotificationPreferencesRepository(pool),
+  statisticsEnabled,
+  scoringRulesRepository: pgScoringRulesRepository(pool),
+  seasonRankingRepository: pgSeasonRankingRepository(pool),
+  emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL && process.env.EMAIL_UNSUBSCRIBE_SECRET),
 });
 
 try {

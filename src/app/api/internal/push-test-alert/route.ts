@@ -1,3 +1,4 @@
+import { httpNotificationGateway } from "@/modules/notifications/infrastructure/http-notification-gateway";
 import { sendPushTestNotification } from "@/lib/push-notifications";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -20,6 +21,18 @@ export async function POST(request: Request) {
 
   if (typeof body.userId !== "string" || !/^[0-9a-f-]{36}$/i.test(body.userId)) {
     return Response.json({ error: "Usuário inválido." }, { status: 400 });
+  }
+
+  const backendUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+  if (process.env.ENABLE_NOTIFICATIONS_API === "true" && backendUrl) {
+    const gateway = httpNotificationGateway(backendUrl);
+    try {
+      const result = await gateway.deliverPushTestAlert(body.userId, expectedSecret);
+      return Response.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao entregar o teste.";
+      return Response.json({ error: message }, { status: 500 });
+    }
   }
 
   const client = createServiceClient();

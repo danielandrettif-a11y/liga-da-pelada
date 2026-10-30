@@ -6,86 +6,531 @@
     "roster"
   ],
   "acceptedOperations": [
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "addRosterPlayersToCallup" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "addRosterPlayerToCallup" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "adminAddCallupPlayer" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "adminRemoveCallupPlayer" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "closeCallup" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "createCallupPrelist" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "getActiveCallup" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "getActiveCallupById" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "getActiveCallups" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "getAgendaCallups" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "hasActiveCallup" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "inviteGuestListToCallup" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "inviteGuestToCallup" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "joinActiveCallup" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "leaveActiveCallup" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "lockCallupForRound" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "openCallup" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "removeCallupEntry" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "repairMyPlayerAccount" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "setCallupVisibility" },
-    { "context": "callups", "source": "src/lib/actions/callups.ts", "name": "updateCallup" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "applyPermanentRoundTeamFormation" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "applyRoundTeamShuffle" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "previewRoundTeamShuffle" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "shuffleRoundTeams" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "createRoundWithTeams" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "deleteRound" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "finishRound" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "getActiveLeague" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "getAdminRoundPrelist" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "getAdminRoundPrelists" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "getNextTeamPresetOffset" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "getRound" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "getRoundMatchSetup" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "getRounds" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "markRoundTeamArrived" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "openCallupReplacementVacancy" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "saveRoundPrelist" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setCallupFormat" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setCallupMatchSize" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setRoundAttendanceBulk" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setRoundPlayerAttendance" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setRoundPlayerAvailability" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setRoundTeamCaptain" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "setRoundTeamVestColor" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "swapRoundTeamPlayers" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "addRoundEmergencySubstitute" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "transferRoundPlayerIdentity" },
-    { "context": "rounds", "source": "src/lib/actions/rounds.ts", "name": "zeroPlayerRoundPoints" },
-    { "context": "rounds", "source": "src/lib/actions/draft.ts", "name": "applyDraftSwap" },
-    { "context": "rounds", "source": "src/lib/actions/draft.ts", "name": "createTeamDraft" },
-    { "context": "rounds", "source": "src/lib/actions/draft.ts", "name": "finalizeTeamDraft" },
-    { "context": "rounds", "source": "src/lib/actions/draft.ts", "name": "getDraftWorkspace" },
-    { "context": "rounds", "source": "src/lib/actions/draft.ts", "name": "getDraftWorkspaceByRound" },
-    { "context": "rounds", "source": "src/lib/actions/draft.ts", "name": "makeTeamDraftPick" },
-    { "context": "rounds", "source": "src/lib/actions/draft.ts", "name": "replaceTeamDraftCaptain" },
-    { "context": "rounds", "source": "src/lib/actions/draft.ts", "name": "restartTeamDraft" },
-    { "context": "rounds", "source": "src/lib/actions/draft.ts", "name": "startTeamDraft" },
-    { "context": "rounds", "source": "src/lib/actions/adaptive-draw.ts", "name": "drawTeamsAdaptiveOnServer" },
-    { "context": "matches", "source": "src/lib/actions/goalkeeper.ts", "name": "selectBestGoalkeeper" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "addFinishedGoalEvent" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "addMatchExtraTime" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "changeMatchGoalkeeper" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "correctFinishedGoal" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "correctFinishedGoalEvent" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "createMatch" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "deleteEvent" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "deleteMatch" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "dispatchMatchTimerThreshold" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "findLiveMatchForTeams" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "finishMatch" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "getFinishedMatchAudit" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "getMatch" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "notifyMatchTimerThreshold" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "registerGoal" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "resetMatchTimer" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "setRoundTeamFixedGoalkeeper" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "substituteMatchPlayer" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "undoLastMatchSubstitution" },
-    { "context": "matches", "source": "src/lib/actions/matches.ts", "name": "updateMatchTimer" }
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "addRosterPlayersToCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "addRosterPlayerToCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "adminAddCallupPlayer"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "adminRemoveCallupPlayer"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "closeCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "createCallupPrelist"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getActiveCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getActiveCallupById"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getActiveCallups"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getAgendaCallups"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "hasActiveCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "inviteGuestListToCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "inviteGuestToCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "joinActiveCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "leaveActiveCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "lockCallupForRound"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "openCallup"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "removeCallupEntry"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "repairMyPlayerAccount"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "setCallupVisibility"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "updateCallup"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "applyPermanentRoundTeamFormation"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "applyRoundTeamShuffle"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "previewRoundTeamShuffle"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "shuffleRoundTeams"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "createRoundWithTeams"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "deleteRound"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "finishRound"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getActiveLeague"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getAdminRoundPrelist"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getAdminRoundPrelists"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getNextTeamPresetOffset"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getRound"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getRoundMatchSetup"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getRounds"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "markRoundTeamArrived"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "openCallupReplacementVacancy"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "saveRoundPrelist"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setCallupFormat"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setCallupMatchSize"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundAttendanceBulk"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundPlayerAttendance"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundPlayerAvailability"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundTeamCaptain"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundTeamVestColor"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "swapRoundTeamPlayers"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "addRoundEmergencySubstitute"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "transferRoundPlayerIdentity"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "zeroPlayerRoundPoints"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "applyDraftSwap"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "createTeamDraft"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "finalizeTeamDraft"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "getDraftWorkspace"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "getDraftWorkspaceByRound"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "makeTeamDraftPick"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "replaceTeamDraftCaptain"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "restartTeamDraft"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "startTeamDraft"
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/adaptive-draw.ts",
+      "name": "drawTeamsAdaptiveOnServer"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/goalkeeper.ts",
+      "name": "selectBestGoalkeeper"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "addFinishedGoalEvent"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "addMatchExtraTime"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "changeMatchGoalkeeper"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "correctFinishedGoal"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "correctFinishedGoalEvent"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "createMatch"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "deleteEvent"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "deleteMatch"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "dispatchMatchTimerThreshold"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "findLiveMatchForTeams"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "finishMatch"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "getFinishedMatchAudit"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "getMatch"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "notifyMatchTimerThreshold"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "registerGoal"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "resetMatchTimer"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "setRoundTeamFixedGoalkeeper"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "substituteMatchPlayer"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "undoLastMatchSubstitution"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "updateMatchTimer"
+    },
+    {
+      "context": "notifications",
+      "source": "src/lib/actions/inbox.ts",
+      "name": "getMyInboxPreview"
+    },
+    {
+      "context": "notifications",
+      "source": "src/lib/actions/inbox.ts",
+      "name": "markInboxRead"
+    },
+    {
+      "context": "notifications",
+      "source": "src/lib/actions/inbox.ts",
+      "name": "getMyInboxNotifications"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "getPushPublicKey"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "getPushSystemStatus"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "subscribeToPush"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "unsubscribeFromPush"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "getNotificationPreferences"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "updateNotificationPreferences"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "sendPushTest"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "sendCartolaEmailTest"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/api/internal/push-test-alert/route.ts",
+      "name": "POST"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "setCartolaRemindersEnabled"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notificacoes/cancelar/actions.ts",
+      "name": "cancelCartolaEmailReminders"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/api/internal/cartola-reminder/route.ts",
+      "name": "POST"
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/api/internal/match-timer-alert/route.ts",
+      "name": "POST"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "getBQScoringRules"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "getColumnCScoringRules"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "saveBQScoringRules"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "saveColumnCScoringRules"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getPlayerRankingEntry"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRanking"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRankingEnrichmentForPlayers"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRankingEssentialData"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRankingExperienceData"
+    }
   ],
   "evidence": {
     "callups": [
@@ -158,6 +603,116 @@
       "backend/src/contexts/matches/presentation.test.ts",
       "src/modules/matches/infrastructure/http-match-gateway.test.ts",
       "src/lib/actions/matches.test.ts"
+    ],
+    "notifications-inbox": [
+      "backend/src/contexts/notifications/domain/inbox-notification.test.ts",
+      "backend/src/contexts/notifications/application/manage-inbox.test.ts",
+      "backend/src/contexts/notifications/infrastructure/pg-inbox-repository.test.ts",
+      "backend/src/contexts/notifications/presentation/inbox-route.test.ts",
+      "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+      "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+      "src/lib/actions/inbox.test.ts"
+    ],
+    "notifications-preferences-and-push": [
+      "backend/src/contexts/notifications/domain/push-subscription.test.ts",
+      "backend/src/contexts/notifications/domain/notification-preferences.test.ts",
+      "backend/src/contexts/notifications/application/manage-preferences.test.ts",
+      "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+      "backend/src/contexts/notifications/infrastructure/pg-notification-preferences-repository.test.ts",
+      "backend/src/contexts/notifications/infrastructure/env-push-configuration-provider.test.ts",
+      "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
+      "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+      "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+      "src/app/mais/notification-actions.test.ts"
+    ],
+    "notifications\u0000src/app/mais/notification-actions.ts\u0000sendPushTest": [
+      "backend/src/contexts/notifications/domain/push-delivery.test.ts",
+      "backend/src/contexts/notifications/application/manage-delivery.test.ts",
+      "backend/src/contexts/notifications/infrastructure/qstash-push-alert-scheduler.test.ts",
+      "backend/src/contexts/notifications/presentation/delivery-route.test.ts",
+      "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+      "src/app/mais/notification-actions.test.ts"
+    ],
+    "notifications\u0000src/app/mais/notification-actions.ts\u0000sendCartolaEmailTest": [
+      "backend/src/contexts/notifications/domain/push-delivery.test.ts",
+      "backend/src/contexts/notifications/application/manage-delivery.test.ts",
+      "backend/src/contexts/notifications/infrastructure/resend-cartola-email-sender.test.ts",
+      "backend/src/contexts/notifications/infrastructure/pg-league-notification-settings-repository.test.ts",
+      "backend/src/contexts/notifications/presentation/delivery-route.test.ts",
+      "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+      "src/app/mais/notification-actions.test.ts"
+    ],
+    "notifications\u0000src/app/api/internal/push-test-alert/route.ts\u0000POST": [
+      "backend/src/contexts/notifications/domain/push-delivery.test.ts",
+      "backend/src/contexts/notifications/application/manage-delivery.test.ts",
+      "backend/src/contexts/notifications/infrastructure/web-push-notification-sender.test.ts",
+      "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+      "backend/src/contexts/notifications/presentation/delivery-route.test.ts",
+      "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+      "src/app/api/internal/push-test-alert/route.test.ts"
+    ],
+    "notifications\u0000src/app/mais/notification-actions.ts\u0000setCartolaRemindersEnabled": [
+      "backend/src/contexts/notifications/domain/cartola-reminder.test.ts",
+      "backend/src/contexts/notifications/application/manage-cartola-reminders.test.ts",
+      "backend/src/contexts/notifications/infrastructure/pg-cartola-reminder-repository.test.ts",
+      "backend/src/contexts/notifications/presentation/cartola-reminder-route.test.ts",
+      "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+      "src/app/mais/notification-actions.test.ts"
+    ],
+    "notifications\u0000src/app/mais/notificacoes/cancelar/actions.ts\u0000cancelCartolaEmailReminders": [
+      "backend/src/contexts/notifications/domain/cartola-reminder.test.ts",
+      "backend/src/contexts/notifications/application/manage-cartola-reminders.test.ts",
+      "backend/src/contexts/notifications/infrastructure/pg-cartola-reminder-repository.test.ts",
+      "backend/src/contexts/notifications/presentation/cartola-reminder-route.test.ts",
+      "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+      "src/app/mais/notificacoes/cancelar/actions.test.ts"
+    ],
+    "notifications\u0000src/app/api/internal/cartola-reminder/route.ts\u0000POST": [
+      "backend/src/contexts/notifications/domain/cartola-reminder.test.ts",
+      "backend/src/contexts/notifications/application/manage-cartola-reminders.test.ts",
+      "backend/src/contexts/notifications/infrastructure/qstash-cartola-reminder-scheduler.test.ts",
+      "backend/src/contexts/notifications/infrastructure/resend-cartola-reminder-email-sender.test.ts",
+      "backend/src/contexts/notifications/presentation/cartola-reminder-route.test.ts",
+      "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+      "src/app/api/internal/cartola-reminder/route.test.ts"
+    ],
+    "notifications\u0000src/app/api/internal/match-timer-alert/route.ts\u0000POST": [
+      "backend/src/contexts/matches/presentation.test.ts",
+      "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+      "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+      "src/app/api/internal/match-timer-alert/route.test.ts"
+    ],
+    "statistics\u0000src/lib/actions/bq-scoring.ts\u0000getBQScoringRules": [
+      "backend/src/contexts/statistics/domain/scoring-policy.test.ts",
+      "backend/src/contexts/statistics/application/manage-scoring-rules.test.ts",
+      "backend/src/contexts/statistics/infrastructure/pg-scoring-rules-repository.test.ts",
+      "backend/src/contexts/statistics/presentation/scoring-rules-route.test.ts",
+      "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+      "src/lib/actions/bq-scoring.test.ts"
+    ],
+    "statistics\u0000src/lib/actions/bq-scoring.ts\u0000getColumnCScoringRules": [
+      "backend/src/contexts/statistics/domain/scoring-policy.test.ts",
+      "backend/src/contexts/statistics/application/manage-scoring-rules.test.ts",
+      "backend/src/contexts/statistics/infrastructure/pg-scoring-rules-repository.test.ts",
+      "backend/src/contexts/statistics/presentation/scoring-rules-route.test.ts",
+      "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+      "src/lib/actions/bq-scoring.test.ts"
+    ],
+    "statistics\u0000src/lib/actions/bq-scoring.ts\u0000saveBQScoringRules": [
+      "backend/src/contexts/statistics/domain/scoring-policy.test.ts",
+      "backend/src/contexts/statistics/application/manage-scoring-rules.test.ts",
+      "backend/src/contexts/statistics/infrastructure/pg-scoring-rules-repository.test.ts",
+      "backend/src/contexts/statistics/presentation/scoring-rules-route.test.ts",
+      "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+      "src/lib/actions/bq-scoring.test.ts"
+    ],
+    "statistics\u0000src/lib/actions/bq-scoring.ts\u0000saveColumnCScoringRules": [
+      "backend/src/contexts/statistics/domain/scoring-policy.test.ts",
+      "backend/src/contexts/statistics/application/manage-scoring-rules.test.ts",
+      "backend/src/contexts/statistics/infrastructure/pg-scoring-rules-repository.test.ts",
+      "backend/src/contexts/statistics/presentation/scoring-rules-route.test.ts",
+      "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+      "src/lib/actions/bq-scoring.test.ts"
     ]
   }
 }

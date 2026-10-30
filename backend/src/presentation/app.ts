@@ -62,7 +62,35 @@ import { registerPlayerProfileRoutes } from "../contexts/roster/presentation/pla
 import { registerCallupRoutes } from "../contexts/callups/presentation/callups-route.js";
 import { registerRoundRoutes } from "../contexts/rounds/presentation/rounds-route.js";
 import { registerMatchRoutes } from "../contexts/matches/presentation/matches-route.js";
+import { registerInboxRoutes } from "../contexts/notifications/presentation/inbox-route.js";
+import { registerPreferencesRoutes } from "../contexts/notifications/presentation/preferences-route.js";
+import { registerDeliveryRoutes } from "../contexts/notifications/presentation/delivery-route.js";
+import { manageDelivery } from "../contexts/notifications/application/manage-delivery.js";
+import { registerCartolaReminderRoutes } from "../contexts/notifications/presentation/cartola-reminder-route.js";
+import { manageCartolaReminders } from "../contexts/notifications/application/manage-cartola-reminders.js";
+import type {
+  CartolaReminderEmailSender,
+  CartolaReminderRepository,
+  CartolaReminderScheduler,
+} from "../contexts/notifications/application/manage-cartola-reminders.js";
+import type { InboxRepository } from "../contexts/notifications/application/manage-inbox.js";
+import type {
+  CartolaEmailSender,
+  LeagueNotificationSettingsRepository,
+  PushAlertScheduler,
+  PushDeliverySubscriptionRepository,
+  PushNotificationSender,
+} from "../contexts/notifications/application/manage-delivery.js";
+import type {
+  NotificationPreferencesRepository,
+  PushConfigurationProvider,
+  PushSubscriptionRepository,
+} from "../contexts/notifications/application/manage-preferences.js";
 import type { MatchRepository, MatchTimerScheduler } from "../contexts/matches/application/manage-matches.js";
+import type { ScoringRulesRepository } from "../contexts/statistics/application/manage-scoring-rules.js";
+import { registerScoringRulesRoutes } from "../contexts/statistics/presentation/scoring-rules-route.js";
+import type { SeasonRankingRepository } from "../contexts/statistics/application/manage-season-ranking.js";
+import { registerSeasonRankingRoutes } from "../contexts/statistics/presentation/season-ranking-route.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 
 export function createApp(dependencies: {
@@ -73,6 +101,8 @@ export function createApp(dependencies: {
   callupsEnabled?: boolean;
   roundsEnabled?: boolean;
   matchesEnabled?: boolean;
+  notificationsEnabled?: boolean;
+  statisticsEnabled?: boolean;
   verifier: UserVerifier;
   repository: GoalRepository;
   leagueRepository?: LeagueRepository;
@@ -109,6 +139,22 @@ export function createApp(dependencies: {
   matchRepository?: MatchRepository;
   matchTimerScheduler?: MatchTimerScheduler;
   matchTimerWebhookSecret?: string;
+  inboxRepository?: InboxRepository;
+  pushConfig?: PushConfigurationProvider;
+  pushSubscriptions?: PushSubscriptionRepository;
+  pushAlertScheduler?: PushAlertScheduler;
+  pushNotificationSender?: PushNotificationSender;
+  pushDeliverySubscriptions?: PushDeliverySubscriptionRepository;
+  cartolaEmailSender?: CartolaEmailSender;
+  leagueNotificationSettings?: LeagueNotificationSettingsRepository;
+  cartolaReminderRepository?: CartolaReminderRepository;
+  cartolaReminderScheduler?: CartolaReminderScheduler;
+  cartolaReminderEmailSender?: CartolaReminderEmailSender;
+  cartolaUnsubscribeSecret?: string;
+  preferencesRepository?: NotificationPreferencesRepository;
+  scoringRulesRepository?: ScoringRulesRepository;
+  seasonRankingRepository?: SeasonRankingRepository;
+  emailConfigured?: boolean;
   logger?: boolean;
 }): FastifyInstance {
   if (dependencies.leaguesEnabled && !dependencies.leagueRepository) {
@@ -162,6 +208,12 @@ export function createApp(dependencies: {
   }
   if (dependencies.matchesEnabled && (!dependencies.matchRepository || !dependencies.matchTimerScheduler)) {
     throw new Error("MatchRepository e MatchTimerScheduler são obrigatórios quando ENABLE_MATCHES_API=true.");
+  }
+  if (dependencies.notificationsEnabled && (!dependencies.inboxRepository || !dependencies.pushConfig || !dependencies.pushSubscriptions || !dependencies.preferencesRepository)) {
+    throw new Error("Dependências de notificações são obrigatórias quando ENABLE_NOTIFICATIONS_API=true.");
+  }
+  if (dependencies.statisticsEnabled && !dependencies.scoringRulesRepository) {
+    throw new Error("ScoringRulesRepository é obrigatório quando ENABLE_STATISTICS_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
   void app.register(multipart);
@@ -312,6 +364,79 @@ export function createApp(dependencies: {
       repository: dependencies.matchRepository,
       timerScheduler: dependencies.matchTimerScheduler,
       webhookSecret: dependencies.matchTimerWebhookSecret,
+    });
+  }
+  if (dependencies.notificationsEnabled && dependencies.inboxRepository) {
+    registerInboxRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.inboxRepository,
+    });
+  }
+  if (dependencies.notificationsEnabled && dependencies.pushConfig && dependencies.pushSubscriptions && dependencies.preferencesRepository) {
+    registerPreferencesRoutes(app, {
+      verifier: dependencies.verifier,
+      pushConfig: dependencies.pushConfig,
+      pushSubscriptions: dependencies.pushSubscriptions,
+      preferences: dependencies.preferencesRepository,
+      emailConfigured: dependencies.emailConfigured ?? false,
+    });
+  }
+  if (
+    dependencies.notificationsEnabled
+    && dependencies.pushAlertScheduler
+    && dependencies.pushNotificationSender
+    && dependencies.pushDeliverySubscriptions
+    && dependencies.pushConfig
+    && dependencies.cartolaEmailSender
+    && dependencies.leagueNotificationSettings
+  ) {
+    const deliveryService = manageDelivery({
+      pushScheduler: dependencies.pushAlertScheduler,
+      pushSender: dependencies.pushNotificationSender,
+      pushSubscriptions: dependencies.pushDeliverySubscriptions,
+      pushConfig: dependencies.pushConfig,
+      emailSender: dependencies.cartolaEmailSender,
+      leagueSettings: dependencies.leagueNotificationSettings,
+    });
+    registerDeliveryRoutes(app, {
+      verifier: dependencies.verifier,
+      deliveryService,
+      webhookSecret: dependencies.matchTimerWebhookSecret,
+    });
+  }
+  if (
+    dependencies.notificationsEnabled
+    && dependencies.cartolaReminderRepository
+    && dependencies.cartolaReminderScheduler
+    && dependencies.cartolaReminderEmailSender
+    && dependencies.pushNotificationSender
+    && dependencies.pushDeliverySubscriptions
+  ) {
+    const cartolaService = manageCartolaReminders({
+      repository: dependencies.cartolaReminderRepository,
+      scheduler: dependencies.cartolaReminderScheduler,
+      pushSender: dependencies.pushNotificationSender,
+      pushSubscriptions: dependencies.pushDeliverySubscriptions,
+      emailSender: dependencies.cartolaReminderEmailSender,
+      unsubscribeSecret: dependencies.cartolaUnsubscribeSecret,
+    });
+    registerCartolaReminderRoutes(app, {
+      verifier: dependencies.verifier,
+      cartolaService,
+      scheduler: dependencies.cartolaReminderScheduler,
+      webhookSecret: dependencies.matchTimerWebhookSecret,
+    });
+  }
+  if (dependencies.statisticsEnabled && dependencies.scoringRulesRepository) {
+    registerScoringRulesRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.scoringRulesRepository,
+    });
+  }
+  if (dependencies.statisticsEnabled && dependencies.seasonRankingRepository) {
+    registerSeasonRankingRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.seasonRankingRepository,
     });
   }
   return app;

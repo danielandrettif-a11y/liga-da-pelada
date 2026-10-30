@@ -27,10 +27,41 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Partidas e pontuação | 21/21 operações aceitas em revisão | Ciclo de vida, gols, goleiros, substituições e cronômetro extraídos. O cronômetro agenda QStash no backend, reivindica alertas de forma transacional e libera a reivindicação quando o Web Push falha. Ainda falta o ensaio móvel integrado com falhas de rede e dois ADMs para promover o contexto a verificado. |
 | Cartola e cosméticos | Concluído nesta fase | Mutações e leitores principais extraídos; ranking, históricos, ficha e destaques usam modelos analíticos e filtros sazonais. |
 | Pagamentos | Concluído nesta fase | Itens, parcelas, PIX, rateio, obrigações, checklist e auditoria separados em domínio, aplicação e infraestrutura, mantendo RPCs e escopo por pelada. |
-| Estatísticas e demais áreas | Concluído nesta fase | Pontuação canônica e modelos analíticos extraídos; leitores sazonais separados; rankings duplicados removidos; cache limitado à requisição. |
+| Notificações | Concluído nesta fase (16/16) | Inbox, preferências, push subscriptions, envio Web Push e e-mail Resend, agendamento QStash de lembretes do Cartola e alerta de cronômetro com 100% de paridade e fail-fast. |
+| Estatísticas e demais áreas | Em migração | Pontuação canônica e modelos analíticos extraídos; leitores sazonais separados; rankings duplicados removidos; cache limitado à requisição. |
 | Avaliação de tabela de acumulados | Medida no oficial; sem justificativa para criar | No banco oficial, `seasonStats`, `rankingHistory` e `playerHistory` ficaram em 128,51 ms, 119,62 ms e 99,64 ms no p95. Os gargalos estão nos enriquecimentos/RPCs compostas. Ver `reports/performance/BASELINE-2026-10-21.md`. |
 
 ## Registro de lotes
+
+### 2026-10-30 — contexto Statistics: Subfatia 1 (Pontuação BQ v5) e Subfatia 2 (Ranking Oficial e Desempates) (9/22 aceitas)
+
+- O contexto **Statistics** avançou de 0 para **9/22 operações estruturais e aceitas**. O progresso auditado global da aplicação avançou para **175 de 267 operações aceitas (65,5%)**, restando apenas 92 operações para a conclusão integral.
+- **Subfatia 1 (Regras de Pontuação BQ v5 e Coluna C - 4 operações):** `getBQScoringRules`, `getColumnCScoringRules`, `saveBQScoringRules` e `saveColumnCScoringRules` (`src/lib/actions/bq-scoring.ts`). Domínio `scoring-policy.ts` com centésimos inteiros, caso de uso `manage-scoring-rules.ts`, repositório PostgreSQL `pg-scoring-rules-repository.ts` e rotas Fastify `/api/statistics/leagues/:leagueId/scoring/*`.
+- **Subfatia 2 (Núcleo do Ranking Oficial e Desempates - 5 operações):** `getRanking`, `getRankingEssentialData`, `getPlayerRankingEntry`, `getRankingExperienceData` e `getRankingEnrichmentForPlayers` (`src/lib/actions/stats.ts`).
+  - Domínio `season-ranking.ts` puro e determinístico: cálculo oficial das 6 melhores rodadas da temporada (`countedInTop6`), desempates canônicos (`points > wins > goals > assists`), filtros de atividade nas 3 rodadas mais recentes e corte de perfil competitivo completo.
+  - Caso de uso `manage-season-ranking.ts` estruturando as visões geral (`general`), mensal (`monthly`) e última rodada (`latestRound`), com agregação de prêmios de rodada (`buildAwardSeasonsByPlayer`, `countAwards`).
+  - Repositório `pg-season-ranking-repository.ts` conectado com `SET LOCAL ROLE authenticated`, cobrindo consultas de temporada, rodadas oficiais, estatísticas de atletas e enriquecimentos (fitness, cosméticos, RPCs de overall, velocidade e cinturões).
+  - Rotas Fastify `/api/statistics/leagues/:leagueId/ranking/*` sob a flag `ENABLE_STATISTICS_API`.
+  - Gateway HTTP `http-statistics-gateway.ts` e Server Actions em `src/lib/actions/stats.ts` mantendo fallback legado transparente quando a flag estiver inativa.
+  - Testes de paridade unitários em `src/lib/actions/stats.test.ts`.
+  - Ajuste de conformidade Next.js App Router: `DEFAULT_COLUMN_C_SCORING` isolado em `src/lib/column-c-scoring.ts`, respeitando a regra estrita de que arquivos `"use server"` só podem exportar funções assíncronas.
+- Verificação automatizada completa aprovada:
+  - Backend: **131 arquivos de teste, 500 testes passando** (marco de 500 testes alcançado!), `tsc` com 0 erros.
+  - Frontend: **212 arquivos de teste, 1.130 testes passando**, `tsc` com 0 erros, build Next.js Turbopack 100% verde gerando todas as 28 rotas e páginas estáticas e dinâmicas.
+  - Auditorias: `npm run audit:migration` com **175/267 aceitas (65,5%)** e `npm run audit:contexts` aprovado (15 contextos, 12 módulos, 58 páginas, 41 entradas, 267 funções catalogadas).
+
+### 2026-10-29 — conclusão integral do contexto Notifications (16/16 operações aceitas)
+
+- O contexto **Notifications** foi migrado e revisado integralmente, atingindo **16/16 operações estruturais e aceitas (100% de paridade)**. O progresso auditado global da aplicação avançou para **166 de 267 operações aceitas (62,2%)**, restando 101 operações para a paridade completa.
+- **Subfatia 1 (Inbox - 3 operações):** `getMyInboxPreview`, `markInboxRead` e `getMyInboxNotifications` (`src/lib/actions/inbox.ts`). Domínio puro `inbox-notification.ts`, repositório PostgreSQL `pg-inbox-repository.ts`, caso de uso `manage-inbox.ts` e rotas Fastify `/api/notifications/inbox/*`.
+- **Subfatia 2 (Preferências e Push - 6 operações):** `getPushPublicKey`, `getPushSystemStatus`, `subscribeToPush`, `unsubscribeFromPush`, `getNotificationPreferences` e `updateNotificationPreferences` (`src/app/mais/notification-actions.ts`). Domínios `notification-preferences.ts` e `push-subscription.ts`, repositórios PostgreSQL `pg-notification-preferences-repository.ts` e `pg-push-subscription-repository.ts`, rotas Fastify `/api/notifications/preferences` e `/api/notifications/push/*`.
+- **Subfatia 3 (Entrega Push, Testes e Webhook Interno - 3 operações):** `sendPushTest`, `sendCartolaEmailTest` e o webhook interno seguro `POST /api/internal/push-test-alert`. Domínio `push-delivery.ts`, caso de uso `manage-delivery.ts`, adaptador de envio `web-push-notification-sender.ts`, agendador QStash `qstash-push-alert-scheduler.ts`, remetente de e-mail Resend `resend-cartola-email-sender.ts`, repositório de configurações de pelada `pg-league-notification-settings-repository.ts` e rota de despacho `/api/internal/notifications/push-test-alert`.
+- **Subfatia 4 (Lembretes do Cartola e E-mail - 3 operações):** `setCartolaRemindersEnabled`, `cancelCartolaEmailReminders` e o webhook interno idempotente `POST /api/internal/cartola-reminder`. Domínio `cartola-reminder.ts`, caso de uso `manage-cartola-reminders.ts`, repositório de claims transacionais com tolerância a reclaim `pg-cartola-reminder-repository.ts`, remetente Resend de lembretes `resend-cartola-reminder-email-sender.ts`, agendador QStash `qstash-cartola-reminder-scheduler.ts` e rota `/api/internal/notifications/cartola-reminder`. Cancelamento de lembretes desacoplado de login via token HMAC SHA-256 (`cartola-email:${userId}`) e chave `EMAIL_UNSUBSCRIBE_SECRET`.
+- **Subfatia 5 (Alertas de Partidas e Cronômetro - 1 operação):** `POST /api/internal/match-timer-alert`. Conectado ao `httpNotificationGateway.dispatchMatchTimerAlert(body.matchId, body.threshold, expectedSecret)` encaminhando com segurança para a rota interna `/api/internal/matches/:matchId/timer/dispatch`, preservando contrato de erro 425 com cabeçalho `Retry-After: 1` para disparos prematuros (`too_early`) e mantendo fallback legado idêntico caso a flag `ENABLE_NOTIFICATIONS_API` esteja desligada.
+- Verificação automatizada completa aprovada:
+  - Backend: **124 arquivos de teste, 450 testes passando**, `tsc` com 0 erros, compilação de produção TS sem falhas.
+  - Frontend: **205 arquivos de teste, 1.070+ testes passando**, `tsc` com 0 erros, build de produção do Next.js Turbopack bem-sucedido (todas as 28 rotas e páginas estáticas/dinâmicas geradas sem erros).
+  - Auditoria: `npm run audit:contexts` aprovado (15 contextos, 12 módulos, 58 páginas, 41 entradas catalogadas), `npm run audit:migration` com 166/267 aceitas e 0 violações de integridade.
 
 ### 2026-10-29 — cronômetro e notificações de partidas
 
@@ -475,6 +506,22 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - Testes novos: limites de formato, bloqueio de convocação de outra pelada/fechada, filtros do gateway e retorno do tamanho do Cartola. Tipagem, 511 testes em 73 arquivos e build aprovados.
 - Migrations: nenhuma. Banco e dados de produção não foram alterados. Não foram executados testes integrados contra duas peladas reais neste lote.
 - Commit: consultar o registro Git deste lote; nenhuma implantação efetuada.
+
+### 2026-10-29 — migração e paridade de Notifications (Subfatia 1: Inbox)
+
+- Migração vertical completa das 3 operações de Inbox: `getMyInboxPreview`, `markInboxRead` e `getMyInboxNotifications`.
+- Backend:
+  - Domínio com validação de invariantes e normalização de rotas em `backend/src/contexts/notifications/domain/inbox-notification.ts`.
+  - Casos de uso de aplicação e porta `InboxRepository` em `backend/src/contexts/notifications/application/manage-inbox.ts`.
+  - Repositório PostgreSQL `pg-inbox-repository.ts` operando sob transações autenticadas (`withAuthenticatedTransaction`) com `SET LOCAL ROLE authenticated` e escopo restrito ao ator autenticado (`actor.userId`).
+  - Rotas Fastify protegidas por Bearer token registradas em `backend/src/contexts/notifications/presentation/inbox-route.ts` sob a feature flag `ENABLE_NOTIFICATIONS_API`.
+- Frontend:
+  - Módulo `src/modules/notifications/` com tipos de domínio, cliente HTTP interno `httpNotificationGateway` e factory de sessão `notificationApiFor` controlada pela feature flag `NOTIFICATIONS_API_ENABLED`.
+  - Server Actions em `src/lib/actions/inbox.ts` delegam ao gateway Fastify quando a sessão está ativa e mantêm o fallback legado intacto quando desligada.
+- Verificação:
+  - 100% de aprovação nos testes frontend (203 arquivos, 1.055 testes) e backend (104 arquivos, 374 testes).
+  - TypeScript estrito (`typecheck`) e builds de produção aprovados em ambos os projetos.
+  - Auditoria de migração avançou para 153/267 operações estruturais e aceitas (`notifications: 3/16`).
 
 ### 2026-10-17 — piloto e diagnóstico das estatísticas
 

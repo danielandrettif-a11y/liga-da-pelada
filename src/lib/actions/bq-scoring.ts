@@ -5,23 +5,10 @@ import { getCurrentAccount } from "../auth";
 import { getActiveLeague } from "./rounds";
 import { BQ_SCORING_V5, type BQBaseScoringSnapshot, rankingRulesToSnapshot } from "../bq-scoring";
 import { DEFAULT_FANTASY_SETTINGS, normalizeFantasySettingsRow, type FantasySettings } from "../fantasy/config";
+import { statisticsApiFor } from "@/modules/statistics/infrastructure/statistics-api-session";
+import { DEFAULT_COLUMN_C_SCORING, type ColumnCScoringSettings } from "../column-c-scoring";
 
-export type ColumnCScoringSettings = Pick<
-  FantasySettings,
-  | "attackerGoalPoints"
-  | "attackerAssistPoints"
-  | "lineGoalConcededPoints"
-  | "defenderGoalPoints"
-  | "defenderAssistPoints"
-  | "defenderCleanSheetPoints"
-  | "defenderOneGoalPoints"
-  | "defenderOneGoalConcededPoints"
-  | "defenderTwoGoalsConcededPoints"
-  | "goalkeeperSlotAppearancePoints"
-  | "goalkeeperSlotGoalConcededPoints"
-  | "goalkeeperSlotCleanSheetPoints"
-  | "goalkeeperSlotOneGoalPoints"
->;
+export type { ColumnCScoringSettings };
 
 function pickColumnCSettings(settings: FantasySettings): ColumnCScoringSettings {
   return {
@@ -45,6 +32,15 @@ export async function getBQScoringRules(): Promise<BQBaseScoringSnapshot> {
   const account = await getCurrentAccount();
   const league = await getActiveLeague();
 
+  const api = await statisticsApiFor(account.client);
+  if (api) {
+    try {
+      return await api.getBQScoringRules(league.id);
+    } catch (error) {
+      console.error("Falha ao buscar regras BQ via API; aplicando fallback:", error);
+    }
+  }
+
   const { data, error } = await account.client
     .from("ranking_rules")
     .select("event_type, points")
@@ -61,6 +57,16 @@ export async function getBQScoringRules(): Promise<BQBaseScoringSnapshot> {
 export async function getColumnCScoringRules(): Promise<ColumnCScoringSettings> {
   const account = await getCurrentAccount();
   const league = await getActiveLeague();
+
+  const api = await statisticsApiFor(account.client);
+  if (api) {
+    try {
+      return await api.getColumnCScoringRules(league.id);
+    } catch (error) {
+      console.error("Falha ao buscar regras da Coluna C via API; aplicando fallback:", error);
+    }
+  }
+
   const { data, error } = await account.client
     .from("fantasy_settings")
     .select("*")
@@ -80,6 +86,21 @@ export async function saveBQScoringRules(
   }
 
   const league = await getActiveLeague();
+
+  const api = await statisticsApiFor(account.client);
+  if (api) {
+    try {
+      const result = await api.saveBQScoringRules(league.id, snapshot);
+      revalidatePath("/admin/pontuacao");
+      revalidatePath("/ranking");
+      revalidatePath("/cartola");
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao salvar regras BQ via API.";
+      return { success: false, error: message };
+    }
+  }
+
   const { error } = await account.client.rpc("save_bq_scoring_rules", {
     p_league_id: league.id,
     p_snapshot: snapshot,
@@ -106,6 +127,21 @@ export async function saveColumnCScoringRules(
   }
 
   const league = await getActiveLeague();
+
+  const api = await statisticsApiFor(account.client);
+  if (api) {
+    try {
+      const result = await api.saveColumnCScoringRules(league.id, values, options);
+      revalidatePath("/admin/pontuacao");
+      revalidatePath("/ranking");
+      revalidatePath("/cartola");
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao salvar regras posicionais via API.";
+      return { success: false, error: message };
+    }
+  }
+
   const { data, error } = await account.client.rpc("save_column_c_scoring_settings", {
     p_league_id: league.id,
     p_attacker_goal_points: values.attackerGoalPoints,

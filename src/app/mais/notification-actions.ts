@@ -8,6 +8,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { sendCartolaReminderTest } from "@/lib/cartola-reminders";
 import { scheduleCartolaRoundReminders } from "@/lib/cartola-reminder-scheduler";
 import { revalidatePath } from "next/cache";
+import { notificationApiFor } from "@/modules/notifications/infrastructure/notification-api-session";
 
 export type SerializedPushSubscription = {
   endpoint: string;
@@ -20,6 +21,10 @@ export type SerializedPushSubscription = {
 };
 
 export async function getPushPublicKey() {
+  const account = await getCurrentAccount();
+  const api = await notificationApiFor(account.client);
+  if (api) return api.getPushPublicKey();
+
   const { publicKey, configured, error: configurationError } = getWebPushConfiguration();
   const backgroundAlertsConfigured = Boolean(
     process.env.QSTASH_TOKEN
@@ -40,6 +45,10 @@ export async function getPushPublicKey() {
 }
 
 export async function getPushSystemStatus() {
+  const account = await getCurrentAccount();
+  const api = await notificationApiFor(account.client);
+  if (api) return api.getPushSystemStatus();
+
   const { configured, error } = getWebPushConfiguration();
   return {
     pushConfigured: configured,
@@ -66,6 +75,9 @@ export async function subscribeToPush(subscription: SerializedPushSubscription) 
   if (!account.user) return { success: false, error: "Entre na sua conta para ativar notificações." };
   if (!isValidSubscription(subscription)) return { success: false, error: "Assinatura de notificação inválida." };
 
+  const api = await notificationApiFor(account.client);
+  if (api) return api.subscribeToPush(subscription);
+
   const { error } = await account.client
     .from("push_subscriptions")
     .upsert({
@@ -90,6 +102,9 @@ export async function unsubscribeFromPush(endpoint: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Sessão expirada." };
 
+  const api = await notificationApiFor(account.client);
+  if (api) return api.unsubscribeFromPush(endpoint);
+
   const { error } = await account.client
     .from("push_subscriptions")
     .delete()
@@ -107,6 +122,16 @@ export async function unsubscribeFromPush(endpoint: string) {
 export async function sendPushTest() {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre na sua conta para testar as notificações." };
+
+  const api = await notificationApiFor(account.client);
+  if (api) {
+    try {
+      return await api.sendPushTest();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "erro desconhecido no servidor";
+      return { success: false, error: `Falha no teste: ${message}` };
+    }
+  }
 
   try {
     await schedulePushTestAlert(account.user.id);
@@ -150,6 +175,10 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
   const account = await getCurrentAccount();
   if (!account.user) return null;
   const league = await getActiveLeague();
+
+  const api = await notificationApiFor(account.client);
+  if (api) return api.getNotificationPreferences(league.id);
+
   const [{ data: preference }, { data: leagueSettings }] = await Promise.all([
     account.client.from("user_notification_preferences").select("match_push_enabled, callup_push_enabled, cartola_push_enabled, cartola_email_enabled, collective_push_enabled").eq("user_id", account.user.id).maybeSingle(),
     account.client.from("leagues").select("cartola_reminders_enabled, cartola_email_tested_at").eq("id", league.id).maybeSingle(),
@@ -175,6 +204,14 @@ export async function updateNotificationPreferences(input: {
 }) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre na sua conta para alterar as notificações." };
+
+  const api = await notificationApiFor(account.client);
+  if (api) {
+    const res = await api.updateNotificationPreferences(input);
+    if (res.success) revalidatePath("/mais/notificacoes");
+    return res;
+  }
+
   const { error } = await account.client.from("user_notification_preferences").upsert({
     user_id: account.user.id,
     match_push_enabled: input.matchPushEnabled,
@@ -192,6 +229,23 @@ export async function updateNotificationPreferences(input: {
 export async function sendCartolaEmailTest() {
   const account = await getCurrentAccount();
   if (!account.user?.email || !account.isAdmin) return { success: false, error: "Somente um ADM com e-mail pode executar o teste." };
+
+  const api = await notificationApiFor(account.client);
+  if (api) {
+    try {
+      const league = await getActiveLeague();
+      const res = await api.sendCartolaEmailTest({
+        leagueId: league.id,
+        email: account.user.email,
+        name: String(account.user.user_metadata?.name || account.user.email.split("@")[0]).split(" ")[0],
+      });
+      if (res.success) revalidatePath("/mais/notificacoes");
+      return res;
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Não foi possível enviar o teste." };
+    }
+  }
+
   try {
     const league = await getActiveLeague();
     await sendCartolaReminderTest({
@@ -215,6 +269,18 @@ export async function setCartolaRemindersEnabled(enabled: boolean) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores podem alterar o envio geral." };
   const league = await getActiveLeague();
+
+  const api = await notificationApiFor(account.client);
+  if (api) {
+    try {
+      const res = await api.setCartolaRemindersEnabled(league.id, enabled);
+      if (res.success) revalidatePath("/mais/notificacoes");
+      return res;
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Erro ao alterar envio geral." };
+    }
+  }
+
   const service = createServiceClient();
   if (!service) return { success: false, error: "SUPABASE_SERVICE_ROLE_KEY não configurada." };
   const { data: config, error: configError } = await service.from("leagues").select("cartola_email_tested_at").eq("id", league.id).single();
