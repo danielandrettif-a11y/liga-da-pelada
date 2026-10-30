@@ -30,7 +30,7 @@ describe("POST /api/internal/push-test-alert", () => {
     process.env = {
       ...originalEnv,
       MATCH_TIMER_WEBHOOK_SECRET: "test-secret-123",
-      ENABLE_NOTIFICATIONS_API: "false",
+      NOTIFICATIONS_API_ENABLED: "false",
     };
   });
 
@@ -60,8 +60,8 @@ describe("POST /api/internal/push-test-alert", () => {
     expect(response.status).toBe(400);
   });
 
-  it("routes through API gateway when ENABLE_NOTIFICATIONS_API=true", async () => {
-    process.env.ENABLE_NOTIFICATIONS_API = "true";
+  it("routes through API gateway when NOTIFICATIONS_API_ENABLED=true", async () => {
+    process.env.NOTIFICATIONS_API_ENABLED = "true";
     process.env.INTERNAL_API_URL = "http://backend.internal";
 
     mocks.deliverPushTestAlert.mockResolvedValue({ success: true, sent: 2 });

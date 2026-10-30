@@ -31,7 +31,7 @@ describe("POST /api/internal/match-timer-alert", () => {
     process.env = {
       ...originalEnv,
       MATCH_TIMER_WEBHOOK_SECRET: "test-timer-secret",
-      ENABLE_NOTIFICATIONS_API: "false",
+      NOTIFICATIONS_API_ENABLED: "false",
     };
   });
 
@@ -61,8 +61,8 @@ describe("POST /api/internal/match-timer-alert", () => {
     expect(response.status).toBe(400);
   });
 
-  it("routes through API gateway when ENABLE_NOTIFICATIONS_API=true", async () => {
-    process.env.ENABLE_NOTIFICATIONS_API = "true";
+  it("routes through API gateway when NOTIFICATIONS_API_ENABLED=true", async () => {
+    process.env.NOTIFICATIONS_API_ENABLED = "true";
     process.env.INTERNAL_API_URL = "http://backend.internal";
 
     mocks.dispatchMatchTimerAlert.mockResolvedValue({ success: true });
@@ -85,7 +85,7 @@ describe("POST /api/internal/match-timer-alert", () => {
   });
 
   it("handles too_early skipping with status 425 and Retry-After via gateway", async () => {
-    process.env.ENABLE_NOTIFICATIONS_API = "true";
+    process.env.NOTIFICATIONS_API_ENABLED = "true";
     process.env.INTERNAL_API_URL = "http://backend.internal";
 
     mocks.dispatchMatchTimerAlert.mockResolvedValue({

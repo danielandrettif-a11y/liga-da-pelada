@@ -49,6 +49,7 @@ export interface SeasonRankingRepository {
   ): Promise<RankingRawEnrichmentData>;
   findLeaguePlayer(actor: Actor, leagueId: string, playerId: string): Promise<RankingPlayer | null>;
   findPlayerCosmetics(actor: Actor, playerId: string): Promise<PlayerEquippedCosmetics | null>;
+  findActiveLeaguePlayerIds(actor: Actor, leagueId: string, playerIds: string[]): Promise<string[]>;
 }
 
 export class ManageSeasonRankingUseCase {
@@ -312,6 +313,9 @@ export class ManageSeasonRankingUseCase {
     const requested = [...new Set(playerIds)].filter((id) => uuidRegex.test(id)).slice(0, 150);
     if (!requested.length) return {};
 
+    const allowedPlayerIds = await this.repository.findActiveLeaguePlayerIds(actor, leagueId, requested);
+    if (!allowedPlayerIds.length) return {};
+
     const activeSeason = await this.repository.findActiveSeason(actor, leagueId);
     if (!activeSeason) return {};
 
@@ -323,7 +327,7 @@ export class ManageSeasonRankingUseCase {
       leagueId,
       activeSeason.id,
       roundIds,
-      requested,
+      allowedPlayerIds,
     );
 
     const fitnessByPlayer = new Map<string, { distanceKm: number; speedTotal: number; entries: number }>();
@@ -336,7 +340,7 @@ export class ManageSeasonRankingUseCase {
     }
 
     const result: Record<string, RankingEnrichment> = {};
-    for (const id of requested) {
+    for (const id of allowedPlayerIds) {
       const overallData = enrichment.overallByPlayer.get(id);
       const fitness = fitnessByPlayer.get(id);
 

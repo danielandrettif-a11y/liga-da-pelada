@@ -77,6 +77,8 @@ import type { InboxRepository } from "../contexts/notifications/application/mana
 import type {
   CartolaEmailSender,
   LeagueNotificationSettingsRepository,
+  MatchTimerClaimRepository,
+  MatchTimerDeliveryRepository,
   PushAlertScheduler,
   PushDeliverySubscriptionRepository,
   PushNotificationSender,
@@ -103,6 +105,7 @@ export function createApp(dependencies: {
   matchesEnabled?: boolean;
   notificationsEnabled?: boolean;
   statisticsEnabled?: boolean;
+  strictContextDependencies?: boolean;
   verifier: UserVerifier;
   repository: GoalRepository;
   leagueRepository?: LeagueRepository;
@@ -147,6 +150,8 @@ export function createApp(dependencies: {
   pushDeliverySubscriptions?: PushDeliverySubscriptionRepository;
   cartolaEmailSender?: CartolaEmailSender;
   leagueNotificationSettings?: LeagueNotificationSettingsRepository;
+  matchTimerClaims?: MatchTimerClaimRepository;
+  matchTimerDelivery?: MatchTimerDeliveryRepository;
   cartolaReminderRepository?: CartolaReminderRepository;
   cartolaReminderScheduler?: CartolaReminderScheduler;
   cartolaReminderEmailSender?: CartolaReminderEmailSender;
@@ -212,8 +217,23 @@ export function createApp(dependencies: {
   if (dependencies.notificationsEnabled && (!dependencies.inboxRepository || !dependencies.pushConfig || !dependencies.pushSubscriptions || !dependencies.preferencesRepository)) {
     throw new Error("Dependências de notificações são obrigatórias quando ENABLE_NOTIFICATIONS_API=true.");
   }
+  if (dependencies.notificationsEnabled && dependencies.strictContextDependencies && (
+    !dependencies.inboxRepository || !dependencies.pushConfig || !dependencies.pushSubscriptions
+    || !dependencies.preferencesRepository || !dependencies.pushAlertScheduler
+    || !dependencies.pushNotificationSender || !dependencies.pushDeliverySubscriptions
+    || !dependencies.cartolaEmailSender || !dependencies.leagueNotificationSettings
+    || !dependencies.matchTimerClaims || !dependencies.matchTimerDelivery
+    || !dependencies.cartolaReminderRepository || !dependencies.cartolaReminderScheduler
+    || !dependencies.cartolaReminderEmailSender || !dependencies.matchTimerWebhookSecret
+    || !dependencies.cartolaUnsubscribeSecret
+  )) {
+    throw new Error("Dependências de notificações são obrigatórias quando ENABLE_NOTIFICATIONS_API=true.");
+  }
   if (dependencies.statisticsEnabled && !dependencies.scoringRulesRepository) {
     throw new Error("ScoringRulesRepository é obrigatório quando ENABLE_STATISTICS_API=true.");
+  }
+  if (dependencies.statisticsEnabled && dependencies.strictContextDependencies && !dependencies.seasonRankingRepository) {
+    throw new Error("Dependências de estatísticas são obrigatórias quando ENABLE_STATISTICS_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
   void app.register(multipart);
@@ -389,6 +409,8 @@ export function createApp(dependencies: {
     && dependencies.pushConfig
     && dependencies.cartolaEmailSender
     && dependencies.leagueNotificationSettings
+    && dependencies.matchTimerClaims
+    && dependencies.matchTimerDelivery
   ) {
     const deliveryService = manageDelivery({
       pushScheduler: dependencies.pushAlertScheduler,
@@ -397,6 +419,8 @@ export function createApp(dependencies: {
       pushConfig: dependencies.pushConfig,
       emailSender: dependencies.cartolaEmailSender,
       leagueSettings: dependencies.leagueNotificationSettings,
+      matchTimerClaims: dependencies.matchTimerClaims,
+      matchTimerDelivery: dependencies.matchTimerDelivery,
     });
     registerDeliveryRoutes(app, {
       verifier: dependencies.verifier,

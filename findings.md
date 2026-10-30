@@ -124,8 +124,9 @@
   - Esse endpoint recebe requisições autenticadas pelo segredo `MATCH_TIMER_WEBHOOK_SECRET` disparadas pelo QStash para alertar marcos da partida (`one_minute`, `thirty_seconds`, `finished`).
   - Quando um marco é chamado prematuramente pelo agendador antes do tempo real decorrido, o sistema deve responder com status HTTP 425 e cabeçalho `Retry-After: 1`, instruindo o QStash a retentar a entrega imediatamente.
 - **Decisão Arquitetural:**
-  - O gateway `httpNotificationGateway` expõe `dispatchMatchTimerAlert(matchId, threshold, webhookSecret)` roteando para o endpoint interno no backend `/api/internal/matches/:matchId/timer/dispatch`.
-  - A rota Next.js `src/app/api/internal/match-timer-alert/route.ts` consome o gateway sob a flag `ENABLE_NOTIFICATIONS_API === "true"` e, quando `result.skipped && result.reason === "too_early"`, preserva estritamente a resposta 425 com o cabeçalho `Retry-After: 1`.
+  - O gateway `httpNotificationGateway` expõe `dispatchMatchTimerAlert(matchId, threshold, webhookSecret)` roteando para o endpoint de entrega do contexto Notifications `/api/internal/notifications/match-timer-alert`.
+  - A rota Next.js `src/app/api/internal/match-timer-alert/route.ts` consome o gateway sob a flag `NOTIFICATIONS_API_ENABLED === "true"` e, quando `result.skipped && result.reason === "too_early"`, preserva estritamente a resposta 425 com o cabeçalho `Retry-After: 1`.
+  - O backend reivindica o marco via porta de Matches, resolve assinaturas apenas dos jogadores da rodada com preferência ativa, entrega o Web Push e libera a reivindicação exata se nenhuma entrega tiver sucesso.
   - O fallback legado Supabase permanece intacto e funcional quando a flag estiver desligada.
   - Com isso, o contexto `notifications` atinge **16 de 16 operações aceitas (100% de paridade)**, elevando o total do sistema para **166 de 267 operações aceitas (62,2%)**.
 
@@ -138,7 +139,7 @@
   - Domínio `backend/src/contexts/statistics/domain/scoring-policy.ts` encapsulando `normalizeBQScoringRules`, `normalizeColumnCScoringRules` e cálculos seguros com centésimos inteiros.
   - Caso de uso `manage-scoring-rules.ts` com transação autenticada e verificação de privilégios de administrador de pelada.
   - Repositório `pg-scoring-rules-repository.ts` conectado via `SET LOCAL ROLE authenticated` e rotas Fastify em `scoring-rules-route.ts`.
-  - Gateway frontend `http-statistics-gateway.ts` e session factory `statistics-api-session.ts` com a flag `ENABLE_STATISTICS_API`.
+  - Gateway frontend `http-statistics-gateway.ts` e session factory `statistics-api-session.ts` com a flag `STATISTICS_API_ENABLED`; `ENABLE_STATISTICS_API` fica restrita ao processo backend.
   - Conexão em `src/lib/actions/bq-scoring.ts` preservando fallback legado e total paridade funcional (170/267 no total).
 
 ## 14. Reorganização de Arquitetura: Contexto Statistics - Subfatia 2 (Núcleo do Ranking Oficial e Desempates)

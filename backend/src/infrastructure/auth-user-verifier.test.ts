@@ -5,9 +5,17 @@ const userId = "00000000-0000-4000-8000-000000000001";
 
 describe("supabaseUserVerifier", () => {
   it("accepts only an identity returned by the local Auth service", async () => {
-    const fetcher = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: userId }) });
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: userId, email: "admin@pelada.com", user_metadata: { full_name: "Admin BQ" } }),
+    });
     const verifier = supabaseUserVerifier("http://kong:8000", "public-key", fetcher);
-    await expect(verifier.verifyAccessToken("valid-token")).resolves.toEqual({ userId });
+    await expect(verifier.verifyAccessToken("valid-token")).resolves.toEqual({
+      userId,
+      email: "admin@pelada.com",
+      name: "Admin BQ",
+    });
     expect(fetcher).toHaveBeenCalledWith(new URL("http://kong:8000/auth/v1/user"), expect.objectContaining({
       headers: { authorization: "Bearer valid-token", apikey: "public-key" },
     }));

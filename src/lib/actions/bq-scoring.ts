@@ -34,11 +34,7 @@ export async function getBQScoringRules(): Promise<BQBaseScoringSnapshot> {
 
   const api = await statisticsApiFor(account.client);
   if (api) {
-    try {
-      return await api.getBQScoringRules(league.id);
-    } catch (error) {
-      console.error("Falha ao buscar regras BQ via API; aplicando fallback:", error);
-    }
+    return api.getBQScoringRules(league.id);
   }
 
   const { data, error } = await account.client
@@ -60,11 +56,7 @@ export async function getColumnCScoringRules(): Promise<ColumnCScoringSettings> 
 
   const api = await statisticsApiFor(account.client);
   if (api) {
-    try {
-      return await api.getColumnCScoringRules(league.id);
-    } catch (error) {
-      console.error("Falha ao buscar regras da Coluna C via API; aplicando fallback:", error);
-    }
+    return api.getColumnCScoringRules(league.id);
   }
 
   const { data, error } = await account.client

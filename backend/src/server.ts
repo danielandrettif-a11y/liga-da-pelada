@@ -41,6 +41,7 @@ import { qstashPushAlertScheduler } from "./contexts/notifications/infrastructur
 import { webPushNotificationSender } from "./contexts/notifications/infrastructure/web-push-notification-sender.js";
 import { resendCartolaEmailSender } from "./contexts/notifications/infrastructure/resend-cartola-email-sender.js";
 import { pgLeagueNotificationSettingsRepository } from "./contexts/notifications/infrastructure/pg-league-notification-settings-repository.js";
+import { pgMatchTimerDeliveryRepository } from "./contexts/notifications/infrastructure/pg-match-timer-delivery-repository.js";
 import { pgCartolaReminderRepository } from "./contexts/notifications/infrastructure/pg-cartola-reminder-repository.js";
 import { qstashCartolaReminderScheduler } from "./contexts/notifications/infrastructure/qstash-cartola-reminder-scheduler.js";
 import { resendCartolaReminderEmailSender } from "./contexts/notifications/infrastructure/resend-cartola-reminder-email-sender.js";
@@ -90,6 +91,7 @@ const app = createApp({
   roundsEnabled,
   matchesEnabled,
   notificationsEnabled,
+  strictContextDependencies: true,
   verifier: supabaseUserVerifier(authUrl || "http://127.0.0.1:54321", publishableKey || ""),
   repository: pgGoalRepository(pool),
   leagueRepository: pgLeagueRepository(pool),
@@ -159,6 +161,8 @@ const app = createApp({
     appPublicUrl: appPublicUrl || "http://localhost:3000",
   }),
   leagueNotificationSettings: pgLeagueNotificationSettingsRepository(pool),
+  matchTimerClaims: pgMatchRepository(pool),
+  matchTimerDelivery: pgMatchTimerDeliveryRepository(pool),
   cartolaReminderRepository: pgCartolaReminderRepository(pool),
   cartolaReminderScheduler: qstashCartolaReminderScheduler({
     appPublicUrl: appPublicUrl || "http://localhost:3000",

@@ -57,6 +57,18 @@ describe("bq-scoring actions (parity & fallback)", () => {
       expect(mockGateway.getBQScoringRules).toHaveBeenCalledWith(leagueId);
     });
 
+    it("does not fall back to Supabase when the enabled API fails", async () => {
+      const expected = new Error("backend unavailable");
+      const fakeClient = { from: vi.fn() };
+      mocks.statisticsApiFor.mockResolvedValue({
+        getBQScoringRules: vi.fn().mockRejectedValue(expected),
+      });
+      mocks.getCurrentAccount.mockResolvedValue({ client: fakeClient, isAdmin: true });
+
+      await expect(getBQScoringRules()).rejects.toBe(expected);
+      expect(fakeClient.from).not.toHaveBeenCalled();
+    });
+
     it("falls back to Supabase query when statisticsApiFor returns null", async () => {
       mocks.statisticsApiFor.mockResolvedValue(null);
       const fakeClient = {
@@ -103,6 +115,18 @@ describe("bq-scoring actions (parity & fallback)", () => {
       const result = await getColumnCScoringRules();
       expect(result).toEqual(DEFAULT_COLUMN_C_SCORING);
       expect(mockGateway.getColumnCScoringRules).toHaveBeenCalledWith(leagueId);
+    });
+
+    it("does not fall back to Supabase when the enabled API fails", async () => {
+      const expected = new Error("backend unavailable");
+      const fakeClient = { from: vi.fn() };
+      mocks.statisticsApiFor.mockResolvedValue({
+        getColumnCScoringRules: vi.fn().mockRejectedValue(expected),
+      });
+      mocks.getCurrentAccount.mockResolvedValue({ client: fakeClient, isAdmin: true });
+
+      await expect(getColumnCScoringRules()).rejects.toBe(expected);
+      expect(fakeClient.from).not.toHaveBeenCalled();
     });
 
     it("falls back to Supabase query when statisticsApiFor returns null", async () => {

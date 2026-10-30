@@ -228,7 +228,7 @@ describe("httpNotificationGateway", () => {
     );
   });
 
-  it("calls POST /api/notifications/test-cartola-email with league and admin data", async () => {
+  it("calls POST /api/notifications/test-cartola-email with only the league", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue({ success: true, testedAt: "2026-10-30T00:00:00Z" }),
@@ -237,19 +237,13 @@ describe("httpNotificationGateway", () => {
 
     const result = await gateway.sendCartolaEmailTest({
       leagueId: "league-123",
-      email: "admin@pelada.com",
-      name: "Admin",
     });
     expect(result).toEqual({ success: true, testedAt: "2026-10-30T00:00:00Z" });
     expect(fetchMock).toHaveBeenCalledWith(
       "http://backend.local/api/notifications/test-cartola-email",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({
-          leagueId: "league-123",
-          email: "admin@pelada.com",
-          name: "Admin",
-        }),
+        body: JSON.stringify({ leagueId: "league-123" }),
       }),
     );
   });
@@ -334,7 +328,7 @@ describe("httpNotificationGateway", () => {
     );
   });
 
-  it("calls POST /api/internal/matches/:matchId/timer/dispatch", async () => {
+  it("calls POST /api/internal/notifications/match-timer-alert", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue({ success: true, skipped: true, reason: "already_alerted" }),
@@ -344,13 +338,13 @@ describe("httpNotificationGateway", () => {
     const result = await gateway.dispatchMatchTimerAlert("match-123", "finished", "secret-456");
     expect(result).toEqual({ success: true, skipped: true, reason: "already_alerted" });
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://backend.local/api/internal/matches/match-123/timer/dispatch",
+      "http://backend.local/api/internal/notifications/match-timer-alert",
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({
           authorization: "Bearer secret-456",
         }),
-        body: JSON.stringify({ threshold: "finished" }),
+        body: JSON.stringify({ matchId: "match-123", threshold: "finished" }),
       }),
     );
   });

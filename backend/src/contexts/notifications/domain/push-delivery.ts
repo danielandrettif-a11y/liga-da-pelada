@@ -43,3 +43,27 @@ export function buildPushTestPayload(userId: string): PushNotificationPayload {
   };
 }
 
+export function buildMatchTimerPayload(
+  match: {
+    id: string;
+    score_a: number;
+    score_b: number;
+    team_a: { name: string } | null;
+    team_b: { name: string } | null;
+  },
+  threshold: "one_minute" | "thirty_seconds" | "finished",
+): PushNotificationPayload {
+  const leftTeam = match.team_a?.name || "Time A";
+  const rightTeam = match.team_b?.name || "Time B";
+  const score = `${leftTeam} ${match.score_a} × ${match.score_b} ${rightTeam}`;
+  const isFinal = threshold === "finished";
+  return {
+    title: isFinal ? "Fim de jogo!!" : threshold === "one_minute" ? "1 minuto restante!" : "30 segundos restantes!",
+    body: isFinal ? score : `${score} · prepare o apito final.`,
+    tag: `match-timer-${threshold}-${match.id}`,
+    url: `/partidas/${match.id}`,
+    icon: "/icons/pelada-bq-v2-192.png",
+    badge: "/icons/pelada-bq-v2-192.png",
+  };
+}
+

@@ -15,6 +15,8 @@ function buildApp(options: {
       if (token === "valid-token") {
         return {
           userId: "00000000-0000-4000-8000-000000000001",
+          email: "trusted@pelada.com",
+          name: "Identidade Verificada",
         };
       }
       return null;
@@ -24,6 +26,7 @@ function buildApp(options: {
   const deliveryService = {
     schedulePushTest: vi.fn(async () => ({ scheduled: true })),
     deliverPushTestAlert: vi.fn(async () => ({ sent: 1, failed: 0 })),
+    deliverMatchTimerAlert: vi.fn(async () => ({ sent: 1, failed: 0, secondsLeft: 30 })),
     sendCartolaEmailTest: vi.fn(async () => ({ success: true, testedAt: "2026-10-30T00:00:00.000Z" })),
     ...options.deliveryService,
   } as unknown as DeliveryApplicationService;
@@ -94,8 +97,8 @@ describe("Delivery Fastify routes", () => {
       });
       expect(deliveryService.sendCartolaEmailTest).toHaveBeenCalledWith("league-123", {
         userId: "00000000-0000-4000-8000-000000000001",
-        email: "user@pelada.com",
-        name: "Jogador Teste",
+        email: "trusted@pelada.com",
+        name: "Identidade Verificada",
       });
     });
   });
@@ -169,6 +172,36 @@ describe("Delivery Fastify routes", () => {
       });
       expect(response.statusCode).toBe(502);
       expect(response.json().error).toContain("Este aparelho não possui assinatura");
+    });
+  });
+
+  describe("POST /api/internal/notifications/match-timer-alert", () => {
+    it("rejects an invalid webhook secret", async () => {
+      const { app } = buildApp({ webhookSecret: "valid-secret" });
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/internal/notifications/match-timer-alert",
+        headers: { authorization: "Bearer wrong-secret" },
+        payload: {
+          matchId: "00000000-0000-4000-8000-000000000010",
+          threshold: "thirty_seconds",
+        },
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
+    it("validates and delivers a timer alert through the notification service", async () => {
+      const { app, deliveryService } = buildApp({ webhookSecret: "valid-secret" });
+      const matchId = "00000000-0000-4000-8000-000000000010";
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/internal/notifications/match-timer-alert",
+        headers: { authorization: "Bearer valid-secret" },
+        payload: { matchId, threshold: "thirty_seconds" },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ success: true, sent: 1, failed: 0, secondsLeft: 30 });
+      expect(deliveryService.deliverMatchTimerAlert).toHaveBeenCalledWith(matchId, "thirty_seconds");
     });
   });
 });

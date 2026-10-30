@@ -22,6 +22,21 @@ function overallTrend(value: unknown): OverallTrend {
 export class PgSeasonRankingRepository implements SeasonRankingRepository {
   constructor(private readonly pool: Pool) {}
 
+  async findActiveLeaguePlayerIds(actor: Actor, leagueId: string, playerIds: string[]): Promise<string[]> {
+    if (!playerIds.length) return [];
+    return withAuthenticatedTransaction(this.pool, actor, async (client) => {
+      const result = await client.query<{ player_id: string }>(
+        `SELECT membership.player_id
+         FROM public.league_members membership
+         WHERE membership.league_id = $1::uuid
+           AND membership.player_id = ANY($2::uuid[])
+           AND membership.is_active = true`,
+        [leagueId, playerIds],
+      );
+      return result.rows.map((row) => row.player_id);
+    });
+  }
+
   async findActiveSeason(actor: Actor, leagueId: string): Promise<VisibleSeasonMeta | null> {
     return withAuthenticatedTransaction(this.pool, actor, async (client) => {
       const result = await client.query<{

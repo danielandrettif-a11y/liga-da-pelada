@@ -20,10 +20,7 @@ type SessionClient = {
 export async function statisticsApiFor(
   client?: SessionClient | null,
 ): Promise<StatisticsHttpGateway | null> {
-  if (
-    process.env.STATISTICS_API_ENABLED !== "true" &&
-    process.env.ENABLE_STATISTICS_API !== "true"
-  ) {
+  if (process.env.STATISTICS_API_ENABLED !== "true") {
     return null;
   }
   if (!client) return null;
@@ -49,10 +46,7 @@ export type StatisticsApiSession = {
 export async function getStatisticsApiSession(
   client?: SessionClient | null,
 ): Promise<StatisticsApiSession | null> {
-  if (
-    process.env.STATISTICS_API_ENABLED !== "true" &&
-    process.env.ENABLE_STATISTICS_API !== "true"
-  ) {
+  if (process.env.STATISTICS_API_ENABLED !== "true") {
     return null;
   }
 

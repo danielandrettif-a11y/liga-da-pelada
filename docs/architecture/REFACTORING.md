@@ -42,17 +42,19 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
   - Caso de uso `manage-season-ranking.ts` estruturando as visões geral (`general`), mensal (`monthly`) e última rodada (`latestRound`), com agregação de prêmios de rodada (`buildAwardSeasonsByPlayer`, `countAwards`).
   - Repositório `pg-season-ranking-repository.ts` conectado com `SET LOCAL ROLE authenticated`, cobrindo consultas de temporada, rodadas oficiais, estatísticas de atletas e enriquecimentos (fitness, cosméticos, RPCs de overall, velocidade e cinturões).
   - Rotas Fastify `/api/statistics/leagues/:leagueId/ranking/*` sob a flag `ENABLE_STATISTICS_API`.
-  - Gateway HTTP `http-statistics-gateway.ts` e Server Actions em `src/lib/actions/stats.ts` mantendo fallback legado transparente quando a flag estiver inativa.
+  - Gateway HTTP `http-statistics-gateway.ts` e Server Actions em `src/lib/actions/stats.ts` mantendo fallback legado somente quando a flag estiver inativa; uma API habilitada que falha não dispara leitura duplicada no Supabase.
   - Testes de paridade unitários em `src/lib/actions/stats.test.ts`.
   - Ajuste de conformidade Next.js App Router: `DEFAULT_COLUMN_C_SCORING` isolado em `src/lib/column-c-scoring.ts`, respeitando a regra estrita de que arquivos `"use server"` só podem exportar funções assíncronas.
 - Verificação automatizada completa aprovada:
-  - Backend: **131 arquivos de teste, 500 testes passando** (marco de 500 testes alcançado!), `tsc` com 0 erros.
-  - Frontend: **212 arquivos de teste, 1.130 testes passando**, `tsc` com 0 erros, build Next.js Turbopack 100% verde gerando todas as 28 rotas e páginas estáticas e dinâmicas.
+  - Backend: **132 arquivos de teste, 511 testes passando**, `tsc` e build com 0 erros.
+  - Frontend: **212 arquivos de teste, 1.132 testes passando**, `tsc` com 0 erros, build Next.js Turbopack 100% verde gerando todas as 28 páginas estáticas previstas e as rotas dinâmicas.
+  - `npm audit` aprovado com **0 vulnerabilidades** nos dois pacotes.
   - Auditorias: `npm run audit:migration` com **175/267 aceitas (65,5%)** e `npm run audit:contexts` aprovado (15 contextos, 12 módulos, 58 páginas, 41 entradas, 267 funções catalogadas).
 
 ### 2026-10-29 — conclusão integral do contexto Notifications (16/16 operações aceitas)
 
 - O contexto **Notifications** foi migrado e revisado integralmente, atingindo **16/16 operações estruturais e aceitas (100% de paridade)**. O progresso auditado global da aplicação avançou para **166 de 267 operações aceitas (62,2%)**, restando 101 operações para a paridade completa.
+- A revisão pós-Antigravity de 30/10 corrigiu três lacunas antes de manter essa aceitação: o teste de e-mail agora autoriza o ADM e resolve o destinatário no backend antes do envio; o alerta do cronômetro reivindica, entrega Web Push aos jogadores da rodada e libera a trava em falha total; e as rotas Next usam `NOTIFICATIONS_API_ENABLED`, enquanto o processo backend usa `ENABLE_NOTIFICATIONS_API`. A composição de produção também falha cedo se faltar qualquer dependência do contexto.
 - **Subfatia 1 (Inbox - 3 operações):** `getMyInboxPreview`, `markInboxRead` e `getMyInboxNotifications` (`src/lib/actions/inbox.ts`). Domínio puro `inbox-notification.ts`, repositório PostgreSQL `pg-inbox-repository.ts`, caso de uso `manage-inbox.ts` e rotas Fastify `/api/notifications/inbox/*`.
 - **Subfatia 2 (Preferências e Push - 6 operações):** `getPushPublicKey`, `getPushSystemStatus`, `subscribeToPush`, `unsubscribeFromPush`, `getNotificationPreferences` e `updateNotificationPreferences` (`src/app/mais/notification-actions.ts`). Domínios `notification-preferences.ts` e `push-subscription.ts`, repositórios PostgreSQL `pg-notification-preferences-repository.ts` e `pg-push-subscription-repository.ts`, rotas Fastify `/api/notifications/preferences` e `/api/notifications/push/*`.
 - **Subfatia 3 (Entrega Push, Testes e Webhook Interno - 3 operações):** `sendPushTest`, `sendCartolaEmailTest` e o webhook interno seguro `POST /api/internal/push-test-alert`. Domínio `push-delivery.ts`, caso de uso `manage-delivery.ts`, adaptador de envio `web-push-notification-sender.ts`, agendador QStash `qstash-push-alert-scheduler.ts`, remetente de e-mail Resend `resend-cartola-email-sender.ts`, repositório de configurações de pelada `pg-league-notification-settings-repository.ts` e rota de despacho `/api/internal/notifications/push-test-alert`.

@@ -4,6 +4,8 @@ import {
   NotificationDeliveryError,
   type CartolaEmailSender,
   type LeagueNotificationSettingsRepository,
+  type MatchTimerClaimRepository,
+  type MatchTimerDeliveryRepository,
   type PushAlertScheduler,
   type PushDeliverySubscriptionRepository,
   type PushNotificationSender,
@@ -43,7 +45,17 @@ function createFixtures() {
   };
 
   const leagueSettings: LeagueNotificationSettingsRepository = {
+    getEmailTestRecipient: vi.fn(async () => ({ email: "admin@pelada.com", name: "Admin Pelada" })),
     recordEmailTestedAt: vi.fn(async () => true),
+  };
+
+  const matchTimerClaims: MatchTimerClaimRepository = {
+    dispatchMatchTimerThresholdSystem: vi.fn(async () => ({ skipped: true, reason: "already_alerted" })),
+    releaseMatchTimerThresholdSystem: vi.fn(async () => undefined),
+  };
+  const matchTimerDelivery: MatchTimerDeliveryRepository = {
+    listSubscriptionsForRound: vi.fn(async () => []),
+    removeExpiredEndpoints: vi.fn(async () => true),
   };
 
   const service = manageDelivery({
@@ -53,6 +65,8 @@ function createFixtures() {
     pushConfig,
     emailSender,
     leagueSettings,
+    matchTimerClaims,
+    matchTimerDelivery,
   });
 
   return {
@@ -63,6 +77,8 @@ function createFixtures() {
     pushConfig,
     emailSender,
     leagueSettings,
+    matchTimerClaims,
+    matchTimerDelivery,
   };
 }
 
@@ -119,13 +135,83 @@ describe("manageDelivery application service", () => {
     });
   });
 
+  describe("deliverMatchTimerAlert", () => {
+    const match = {
+      id: "00000000-0000-4000-8000-000000000001",
+      round_id: "00000000-0000-4000-8000-000000000002",
+      score_a: 2,
+      score_b: 1,
+      team_a: { name: "Azul" },
+      team_b: { name: "Branco" },
+    };
+
+    it("claims, resolves the audience and delivers the timer push", async () => {
+      const { service, matchTimerClaims, matchTimerDelivery, pushSender } = createFixtures();
+      vi.mocked(matchTimerClaims.dispatchMatchTimerThresholdSystem).mockResolvedValue({
+        claimedAt: "2026-10-30T00:00:00.000Z",
+        secondsLeft: 30,
+        match,
+      });
+      vi.mocked(matchTimerDelivery.listSubscriptionsForRound).mockResolvedValue([
+        { endpoint: "https://push.example.com/match", p256dh: "key", auth: "auth" },
+      ]);
+
+      const result = await service.deliverMatchTimerAlert(match.id, "thirty_seconds");
+
+      expect(result.sent).toBe(1);
+      expect(matchTimerDelivery.listSubscriptionsForRound).toHaveBeenCalledWith(match.round_id);
+      expect(pushSender.sendPush).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.objectContaining({
+          title: "30 segundos restantes!",
+          tag: `match-timer-thirty_seconds-${match.id}`,
+          url: `/partidas/${match.id}`,
+        }),
+      );
+    });
+
+    it("releases the exact claim when every provider delivery fails", async () => {
+      const { service, matchTimerClaims, matchTimerDelivery, pushSender } = createFixtures();
+      const claimedAt = "2026-10-30T00:00:00.000Z";
+      vi.mocked(matchTimerClaims.dispatchMatchTimerThresholdSystem).mockResolvedValue({ claimedAt, match });
+      vi.mocked(matchTimerDelivery.listSubscriptionsForRound).mockResolvedValue([
+        { endpoint: "https://push.example.com/match", p256dh: "key", auth: "auth" },
+      ]);
+      vi.mocked(pushSender.sendPush).mockResolvedValue({
+        sent: 0,
+        failed: 1,
+        expiredEndpoints: [],
+        failureReasons: ["provider failure"],
+      });
+
+      await expect(service.deliverMatchTimerAlert(match.id, "finished")).rejects.toThrow(
+        "Nenhuma notificação pôde ser entregue.",
+      );
+      expect(matchTimerClaims.releaseMatchTimerThresholdSystem).toHaveBeenCalledWith(
+        match.id,
+        "finished",
+        claimedAt,
+      );
+    });
+
+    it("does not claim an alert while VAPID is disabled", async () => {
+      const { service, pushConfig, matchTimerClaims } = createFixtures();
+      vi.mocked(pushConfig.isConfigured).mockReturnValue(false);
+
+      await expect(service.deliverMatchTimerAlert(match.id, "finished")).resolves.toEqual({
+        sent: 0,
+        failed: 0,
+        disabled: true,
+      });
+      expect(matchTimerClaims.dispatchMatchTimerThresholdSystem).not.toHaveBeenCalled();
+    });
+  });
+
   describe("sendCartolaEmailTest", () => {
     it("sends test email and records tested date for admin with email", async () => {
       const { service, emailSender, leagueSettings } = createFixtures();
       const result = await service.sendCartolaEmailTest("league-1", {
         userId: "admin-1",
-        email: "admin@pelada.com",
-        name: "Admin Pelada",
       });
 
       expect(result.success).toBe(true);
@@ -142,15 +228,17 @@ describe("manageDelivery application service", () => {
       );
     });
 
-    it("rejects when admin has no email", async () => {
-      const { service } = createFixtures();
+    it("rejects before sending when the repository cannot authorize or resolve the recipient", async () => {
+      const { service, leagueSettings, emailSender } = createFixtures();
+      vi.mocked(leagueSettings.getEmailTestRecipient).mockRejectedValue(
+        new Error("Somente um ADM com e-mail pode executar o teste."),
+      );
       await expect(
         service.sendCartolaEmailTest("league-1", {
           userId: "admin-1",
-          email: null,
-          name: "Admin",
         }),
       ).rejects.toThrow("Somente um ADM com e-mail pode executar o teste.");
+      expect(emailSender.sendCartolaEmailTest).not.toHaveBeenCalled();
     });
   });
 });

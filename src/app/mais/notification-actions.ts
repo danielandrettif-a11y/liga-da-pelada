@@ -236,8 +236,6 @@ export async function sendCartolaEmailTest() {
       const league = await getActiveLeague();
       const res = await api.sendCartolaEmailTest({
         leagueId: league.id,
-        email: account.user.email,
-        name: String(account.user.user_metadata?.name || account.user.email.split("@")[0]).split(" ")[0],
       });
       if (res.success) revalidatePath("/mais/notificacoes");
       return res;

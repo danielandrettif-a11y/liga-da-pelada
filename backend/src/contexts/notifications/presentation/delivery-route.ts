@@ -4,6 +4,7 @@ import { authenticateBearer } from "../../../presentation/authenticate-bearer.js
 import type { DeliveryApplicationService } from "../application/manage-delivery.js";
 import { NotificationDeliveryError } from "../application/manage-delivery.js";
 import { NotificationPersistenceError } from "../infrastructure/pg-inbox-repository.js";
+import { parseMatchUuid, validateTimerThreshold } from "../../matches/domain/match.js";
 
 type DeliveryRouteDependencies = {
   verifier: UserVerifier;
@@ -51,17 +52,13 @@ export function registerDeliveryRoutes(
       return reply.status(auth.error.statusCode).send({ success: false, error: auth.error.message });
     }
 
-    const body = (request.body || {}) as { leagueId?: string; email?: string; name?: string };
+    const body = (request.body || {}) as { leagueId?: string };
     if (!body.leagueId || typeof body.leagueId !== "string") {
       return reply.status(400).send({ success: false, error: "Pelada inválida." });
     }
 
     try {
-      const result = await deliveryService.sendCartolaEmailTest(body.leagueId, {
-        userId: auth.actor.userId,
-        email: body.email,
-        name: body.name,
-      });
+      const result = await deliveryService.sendCartolaEmailTest(body.leagueId, auth.actor);
       return reply.status(200).send({ success: true, testedAt: result.testedAt });
     } catch (error) {
       if (error instanceof NotificationPersistenceError) {
@@ -101,6 +98,28 @@ export function registerDeliveryRoutes(
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha ao entregar o teste.";
       return reply.status(500).send({ error: message });
+    }
+  });
+
+  app.post("/api/internal/notifications/match-timer-alert", async (request, reply) => {
+    if (!authorizeInternalWebhook(request, reply)) return;
+
+    const body = (request.body || {}) as { matchId?: string; threshold?: string };
+    try {
+      const result = await deliveryService.deliverMatchTimerAlert(
+        parseMatchUuid(body.matchId, "Partida"),
+        validateTimerThreshold(body.threshold || ""),
+      );
+      if (result.disabled) {
+        return reply.status(503).send({ success: false, error: "As chaves VAPID não estão configuradas." });
+      }
+      return reply.status(200).send({ success: true, ...result });
+    } catch (error) {
+      const status = error instanceof NotificationDeliveryError ? error.statusCode : 500;
+      return reply.status(status).send({
+        success: false,
+        error: error instanceof Error ? error.message : "Falha ao entregar alerta do cronômetro.",
+      });
     }
   });
 }

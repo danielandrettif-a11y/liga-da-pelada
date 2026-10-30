@@ -181,8 +181,8 @@
 - **Operação Concluída e Aceita:**
   1. `POST` (`src/app/api/internal/match-timer-alert/route.ts`)
 - **Frontend Gateway & Bridging:**
-  - `httpNotificationGateway.dispatchMatchTimerAlert(matchId, threshold, webhookSecret)` roteando para `/api/internal/matches/:matchId/timer/dispatch`.
-  - `src/app/api/internal/match-timer-alert/route.ts` atualizado para usar o gateway HTTP sob a flag `ENABLE_NOTIFICATIONS_API === "true"` e `backendUrl` configurado.
+  - `httpNotificationGateway.dispatchMatchTimerAlert(matchId, threshold, webhookSecret)` roteando para `/api/internal/notifications/match-timer-alert`.
+  - `src/app/api/internal/match-timer-alert/route.ts` atualizado para usar o gateway HTTP sob a flag `NOTIFICATIONS_API_ENABLED === "true"` e `backendUrl` configurado.
   - Preservação estrita do status HTTP 425 e cabeçalho `Retry-After: 1` quando `result.skipped && result.reason === "too_early"`.
   - Fallback legado Supabase preservado integralmente quando a flag estiver desligada.
   - Testes de paridade: `src/app/api/internal/match-timer-alert/route.test.ts` (5 testes passando com 100% de sucesso).
@@ -255,6 +255,7 @@
 - **Auditoria:**
   - `npm run audit:migration`: **175/267 operações aceitas (65,5%)**; **`statistics: 9/22`**. Faltam 92 operações para o mesmo padrão em toda a aplicação.
   - `npm run audit:contexts`: 15 contextos, 12 módulos, 58 páginas, 41 entradas, 267 funções catalogadas.
+  - Revisão pós-Antigravity aprovada em 30/10: destinatário do e-mail derivado da identidade autenticada após autorização de ADM; Web Push do cronômetro entregue no backend com rollback da trava; composição de produção fail-fast; **132 arquivos/511 testes backend** e **212 arquivos/1.132 testes frontend**, builds aprovados e 0 vulnerabilidades npm.
 
 ---
 

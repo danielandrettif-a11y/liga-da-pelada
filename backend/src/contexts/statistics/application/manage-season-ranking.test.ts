@@ -29,6 +29,7 @@ describe("ManageSeasonRankingUseCase", () => {
       }),
       findLeaguePlayer: vi.fn().mockResolvedValue(null),
       findPlayerCosmetics: vi.fn().mockResolvedValue(null),
+      findActiveLeaguePlayerIds: vi.fn(async (_actor, _leagueId, ids) => ids),
     };
 
     const useCase = new ManageSeasonRankingUseCase(repo);
@@ -171,6 +172,7 @@ describe("ManageSeasonRankingUseCase", () => {
       findEnrichmentData: vi.fn().mockResolvedValue(enrichment),
       findLeaguePlayer: vi.fn().mockResolvedValue(null),
       findPlayerCosmetics: vi.fn().mockResolvedValue(null),
+      findActiveLeaguePlayerIds: vi.fn(async (_actor, _leagueId, ids) => ids),
     };
 
     const useCase = new ManageSeasonRankingUseCase(repo);
@@ -256,6 +258,7 @@ describe("ManageSeasonRankingUseCase", () => {
         return null;
       }),
       findPlayerCosmetics: vi.fn().mockResolvedValue(null),
+      findActiveLeaguePlayerIds: vi.fn(async (_actor, _leagueId, ids) => ids),
     };
 
     const useCase = new ManageSeasonRankingUseCase(repo);
@@ -304,6 +307,7 @@ describe("ManageSeasonRankingUseCase", () => {
       }),
       findLeaguePlayer: vi.fn().mockResolvedValue(null),
       findPlayerCosmetics: vi.fn().mockResolvedValue(null),
+      findActiveLeaguePlayerIds: vi.fn(async (_actor, _leagueId, ids) => ids),
     };
 
     const useCase = new ManageSeasonRankingUseCase(repo);
@@ -314,5 +318,30 @@ describe("ManageSeasonRankingUseCase", () => {
     expect(enrichmentMap[p1].speedRating).toBe(2);
     expect(enrichmentMap[p1].fitness?.distanceKm).toBe(4.5);
     expect(enrichmentMap["invalid-id"]).toBeUndefined();
+  });
+
+  it("omits valid players that are not active members of the requested league", async () => {
+    const member = "11111111-1111-4111-8111-111111111111";
+    const outsider = "22222222-2222-4222-8222-222222222222";
+    const repo: SeasonRankingRepository = {
+      findActiveSeason: vi.fn().mockResolvedValue({ id: "s1", number: 1, status: "active" }),
+      findVisibleSeasons: vi.fn().mockResolvedValue([]),
+      findFinishedOfficialRounds: vi.fn().mockResolvedValue([]),
+      findPlayerRoundStats: vi.fn().mockResolvedValue([]),
+      findEnrichmentData: vi.fn().mockResolvedValue({
+        fitnessRows: [], cosmeticsByPlayer: new Map(), overallByPlayer: new Map(),
+        speedByPlayer: new Map(), achievementBeltsByPlayer: new Map(),
+      }),
+      findLeaguePlayer: vi.fn().mockResolvedValue(null),
+      findPlayerCosmetics: vi.fn().mockResolvedValue(null),
+      findActiveLeaguePlayerIds: vi.fn().mockResolvedValue([member]),
+    };
+
+    const result = await new ManageSeasonRankingUseCase(repo)
+      .getRankingEnrichmentForPlayers(mockActor, "league-1", [member, outsider]);
+
+    expect(result).toHaveProperty(member);
+    expect(result).not.toHaveProperty(outsider);
+    expect(repo.findEnrichmentData).toHaveBeenCalledWith(mockActor, "league-1", "s1", [], [member]);
   });
 });

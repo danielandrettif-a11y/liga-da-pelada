@@ -16,6 +16,24 @@ function createMockPool(queryMock: ReturnType<typeof vi.fn>): Pool {
 }
 
 describe("PgSeasonRankingRepository", () => {
+  it("findActiveLeaguePlayerIds keeps only active members of the requested league", async () => {
+    const query = vi.fn().mockImplementation(async (sql: string) => {
+      if (sql.includes("FROM public.league_members")) {
+        return { rows: [{ player_id: "member-1" }] };
+      }
+      return { rows: [] };
+    });
+    const repo = new PgSeasonRankingRepository(createMockPool(query));
+
+    const result = await repo.findActiveLeaguePlayerIds(mockActor, "league-1", ["member-1", "outsider-1"]);
+
+    expect(result).toEqual(["member-1"]);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("membership.is_active = true"),
+      ["league-1", ["member-1", "outsider-1"]],
+    );
+  });
+
   it("findActiveSeason returns season meta or null", async () => {
     const query = vi.fn().mockImplementation(async (sql: string) => {
       if (sql.includes("SET LOCAL")) return { rows: [] };

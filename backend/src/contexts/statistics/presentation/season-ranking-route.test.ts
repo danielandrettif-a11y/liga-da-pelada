@@ -27,6 +27,7 @@ function buildApp(repoOverrides: Partial<SeasonRankingRepository> = {}) {
     }),
     findLeaguePlayer: vi.fn().mockResolvedValue(null),
     findPlayerCosmetics: vi.fn().mockResolvedValue(null),
+    findActiveLeaguePlayerIds: vi.fn(async (_actor, _leagueId, ids) => ids),
     ...repoOverrides,
   };
 

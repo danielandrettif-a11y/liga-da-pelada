@@ -53,8 +53,6 @@ export interface NotificationGateway {
   }>;
   sendCartolaEmailTest(input: {
     leagueId: string;
-    email?: string;
-    name?: string;
   }): Promise<{ success: boolean; testedAt?: string; error?: string }>;
   deliverPushTestAlert(
     userId: string,
@@ -297,14 +295,14 @@ export function httpNotificationGateway(
 
     async dispatchMatchTimerAlert(matchId: string, threshold: string, webhookSecret: string) {
       return requestJson<{ success?: boolean; skipped?: boolean; reason?: string; secondsLeft?: number; error?: string }>(
-        `/api/internal/matches/${encodeURIComponent(matchId)}/timer/dispatch`,
+        "/api/internal/notifications/match-timer-alert",
         {
           method: "POST",
           headers: {
             "content-type": "application/json",
             authorization: `Bearer ${webhookSecret}`,
           },
-          body: JSON.stringify({ threshold }),
+          body: JSON.stringify({ matchId, threshold }),
         },
       );
     },

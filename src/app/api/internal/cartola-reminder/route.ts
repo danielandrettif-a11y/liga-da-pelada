@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     process.env.NEXT_PUBLIC_BACKEND_URL ||
     process.env.NEXT_PUBLIC_API_URL;
 
-  if (process.env.ENABLE_NOTIFICATIONS_API === "true" && backendUrl) {
+  if (process.env.NOTIFICATIONS_API_ENABLED === "true" && backendUrl) {
     const gateway = httpNotificationGateway(backendUrl);
     try {
       const result = await gateway.relayOrDispatchCartolaReminder(body, secret);

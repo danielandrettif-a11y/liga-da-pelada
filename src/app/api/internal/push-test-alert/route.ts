@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   }
 
   const backendUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
-  if (process.env.ENABLE_NOTIFICATIONS_API === "true" && backendUrl) {
+  if (process.env.NOTIFICATIONS_API_ENABLED === "true" && backendUrl) {
     const gateway = httpNotificationGateway(backendUrl);
     try {
       const result = await gateway.deliverPushTestAlert(body.userId, expectedSecret);

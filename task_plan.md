@@ -160,10 +160,10 @@ Implementar a refatoração modular DDD do contexto `Notifications` da aplicaç�
 
 ### Checklist da Subfatia 5
 - [x] **Frontend - Gateway HTTP (`src/modules/notifications/infrastructure/http-notification-gateway.ts`)**
-  - Método `dispatchMatchTimerAlert(matchId, threshold, webhookSecret)` chamando `POST /api/internal/matches/:matchId/timer/dispatch`
+  - Método `dispatchMatchTimerAlert(matchId, threshold, webhookSecret)` chamando `POST /api/internal/notifications/match-timer-alert`
   - Teste unitário correspondente em `http-notification-gateway.test.ts`
 - [x] **Frontend - Rota Interna e Bridge (`src/app/api/internal/match-timer-alert/route.ts`)**
-  - Roteamento sob flag `ENABLE_NOTIFICATIONS_API === "true"` e backendUrl configurado
+  - Roteamento sob flag `NOTIFICATIONS_API_ENABLED === "true"` e backendUrl configurado
   - Preservação estrita de contrato de erro 425 com cabeçalho `Retry-After: 1` quando `reason === "too_early"`
   - Fallback legado inalterado e seguro quando flag estiver desligada
   - Teste unitário e de regressão em `src/app/api/internal/match-timer-alert/route.test.ts`
@@ -259,7 +259,7 @@ Implementar a refatoração modular DDD do contexto `Notifications` da aplicaç�
   - Testes unitários no gateway cobrindo as 5 operações em `http-statistics-gateway.test.ts` (9 testes passando).
 - [x] **Etapa 6: Frontend - Bridging nas Server Actions (`src/lib/actions/stats.ts`)**
   - Conectado `getRanking`, `getRankingEssentialData`, `getRankingExperienceData`, `getPlayerRankingEntry`, `getRankingEnrichmentForPlayers`.
-  - Preservado rigorosamente fallback legado para quando `ENABLE_STATISTICS_API` estiver desligada.
+  - Preservado rigorosamente fallback legado para quando `STATISTICS_API_ENABLED` estiver desligada; falhas da API habilitada não executam fallback silencioso.
   - Testes de paridade unitários em `src/lib/actions/stats.test.ts` (10 testes passando).
 - [x] **Etapa 7: Validação, Auditoria e Registros**
   - Backend: **131 arquivos, 500 testes passando**, `tsc` com 0 erros.

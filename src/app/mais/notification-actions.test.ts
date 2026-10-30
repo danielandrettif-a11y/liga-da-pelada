@@ -237,8 +237,6 @@ describe("notification-actions via API gateway and legacy fallback", () => {
     expect(result).toEqual({ success: true, testedAt: "2026-10-30T00:00:00Z" });
     expect(sendEmailApi).toHaveBeenCalledWith({
       leagueId,
-      email: "user@exemplo.com",
-      name: "Usuario",
     });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/mais/notificacoes");
   });

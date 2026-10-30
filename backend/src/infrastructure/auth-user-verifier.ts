@@ -20,7 +20,19 @@ export function supabaseUserVerifier(baseUrl: string, publishableKey: string, fe
         || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)) {
         throw new Error("Resposta de Auth inválida.");
       }
-      return { userId: user.id };
+      const identity = user as {
+        id: string;
+        email?: unknown;
+        user_metadata?: { name?: unknown; full_name?: unknown; display_name?: unknown };
+      };
+      const metadata = identity.user_metadata;
+      const name = [metadata?.name, metadata?.full_name, metadata?.display_name]
+        .find((value): value is string => typeof value === "string" && value.trim().length > 0);
+      return {
+        userId: identity.id,
+        email: typeof identity.email === "string" ? identity.email : null,
+        name: name?.trim() || null,
+      };
     },
   };
 }
