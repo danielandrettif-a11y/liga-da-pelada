@@ -75,3 +75,4 @@ describe("Finance Infrastructure: PgFinanceRepository", () => {
     );
   });
 });
+

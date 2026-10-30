@@ -128,3 +128,4 @@ describe("Statistics Domain: overall-shadow", () => {
     ).toEqual({ valid: true });
   });
 });
+

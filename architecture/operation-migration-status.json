@@ -3190,6 +3190,598 @@
         "src/modules/finance/infrastructure/finance-api-session.test.ts",
         "src/lib/actions/payments.test.ts"
       ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyDashboard",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/dashboard",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyPlayerDetail",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyPlayerSummary",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyQuickHighlights",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/quick-highlights",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getMyFantasySummary",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/my-summary",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getMyFantasyHistory",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/my-history",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getRevealedLineups",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/rounds/:roundId/revealed-lineups",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyRoundLineupOverview",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/rounds/:roundId/overview",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "saveFantasyLineup",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/rounds/:roundId/lineup",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "previewFantasyMarketV11",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/preview-market",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "repairLegacySavedFantasyLineups",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/repair-lineups",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyRanking",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/ranking",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyUserHistory",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/users/:userId/history",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyUserRoundHistory",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/users/:userId/rounds/:roundId/history",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getSeasonPassDashboard",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/season-pass",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyAdminData",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/admin-data",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "updateFantasySettings",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/settings",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "reprocessFantasyRound",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/rounds/:roundId/reprocess",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "reprocessFantasyRoundWithCurrentRules",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/rounds/:roundId/reprocess",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "createFantasyTestSession",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/rounds/:roundId/test-session/create",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "processFantasyTestSession",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/rounds/:roundId/test-session/process",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "resetFantasyTestSession",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/rounds/:roundId/test-session/reset",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "getMyPacks",
+      "state": "frontend-migrated",
+      "target": "GET /api/cards/leagues/:leagueId/packs",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "restoreMyPassPacks",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/packs/restore-pass",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "openPack",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/packs/:packId/open",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "claimPackCard",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/packs/:packId/claim",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "getMyInventory",
+      "state": "frontend-migrated",
+      "target": "GET /api/cards/leagues/:leagueId/inventory",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "getMyInventoryCount",
+      "state": "frontend-migrated",
+      "target": "GET /api/cards/leagues/:leagueId/inventory/count",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "getActiveCardForRound",
+      "state": "frontend-migrated",
+      "target": "GET /api/cards/leagues/:leagueId/rounds/:roundId/active",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "activateCardForRound",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/rounds/:roundId/activate",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "removeActiveCardForRound",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/cards/leagues/:leagueId/rounds/:roundId/active",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "generatePacksForFinishedRound",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/rounds/:roundId/generate-packs",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "giveMyAccountTestPack",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/packs/test-pack",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "resetMyAccountCards",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/reset-my-cards",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "distributePackToAllLineupUsers",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/packs/distribute-all",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "auditAndRepairCurrentSeasonPacks",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/packs/audit-repair",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "grantFantasyPackToUser",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/packs/grant-user",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
     }
   ]
 }

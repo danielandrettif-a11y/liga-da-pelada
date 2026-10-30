@@ -92,3 +92,4 @@ describe("Finance Application: manage-finance", () => {
     expect(repo.setPlayerPayment).toHaveBeenCalledWith("l1", "r1", "p1", true, "player-1");
   });
 });
+

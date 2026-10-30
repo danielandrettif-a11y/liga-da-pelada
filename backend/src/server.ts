@@ -52,6 +52,9 @@ import { pgSeasonOperationsRepository } from "./contexts/statistics/infrastructu
 import { PgDashboardRepository } from "./contexts/statistics/infrastructure/pg-dashboard-repository.js";
 import { PgOverallShadowRepository } from "./contexts/statistics/infrastructure/pg-overall-shadow-repository.js";
 import { PgFinanceRepository } from "./contexts/finance/infrastructure/pg-finance-repository.js";
+import { PgFantasyMarketLineupRepository } from "./contexts/fantasy/infrastructure/pg-market-lineup-repository.js";
+import { PgFantasyAdminRepository } from "./contexts/fantasy/infrastructure/pg-fantasy-admin-repository.js";
+import { PgCardsRepository } from "./contexts/cards/infrastructure/pg-cards-repository.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -64,6 +67,8 @@ const matchesEnabled = process.env.ENABLE_MATCHES_API === "true";
 const notificationsEnabled = process.env.ENABLE_NOTIFICATIONS_API === "true";
 const statisticsEnabled = process.env.ENABLE_STATISTICS_API === "true";
 const financeEnabled = process.env.ENABLE_FINANCE_API === "true";
+const fantasyEnabled = process.env.ENABLE_FANTASY_API === "true";
+const cardsEnabled = process.env.ENABLE_CARDS_API === "true";
 const port = Number(process.env.PORT || "3001");
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("PORT inválida.");
@@ -74,7 +79,7 @@ const authUrl = process.env.SUPABASE_INTERNAL_URL;
 const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
 const publicUrl = process.env.SUPABASE_PUBLIC_URL;
 const appPublicUrl = process.env.APP_PUBLIC_URL;
-if ((goalsEnabled || leaguesEnabled || identityEnabled || rosterEnabled || callupsEnabled || roundsEnabled || matchesEnabled || notificationsEnabled || statisticsEnabled || financeEnabled) && (!databaseUrl || !authUrl || !publishableKey)) {
+if ((goalsEnabled || leaguesEnabled || identityEnabled || rosterEnabled || callupsEnabled || roundsEnabled || matchesEnabled || notificationsEnabled || statisticsEnabled || financeEnabled || fantasyEnabled || cardsEnabled) && (!databaseUrl || !authUrl || !publishableKey)) {
   throw new Error("APIs habilitadas requerem DATABASE_URL, SUPABASE_INTERNAL_URL e SUPABASE_PUBLISHABLE_KEY.");
 }
 if ((leaguesEnabled || rosterEnabled) && !publicUrl) {
@@ -190,6 +195,13 @@ const app = createApp({
   roundStatisticsRepository: pgRoundStatisticsRepository(pool),
   seasonOperationsRepository: pgSeasonOperationsRepository(pool),
   emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL && process.env.EMAIL_UNSUBSCRIBE_SECRET),
+  financeEnabled,
+  financeRepository: new PgFinanceRepository(pool),
+  fantasyEnabled,
+  fantasyMarketLineupRepository: new PgFantasyMarketLineupRepository(pool),
+  fantasyAdminRepository: new PgFantasyAdminRepository(pool),
+  cardsEnabled,
+  cardsRepository: new PgCardsRepository(pool),
 });
 
 try {

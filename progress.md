@@ -324,3 +324,57 @@
   - `finance: 19/19 (100%)`
 - Testes 100% verdes: **152 arquivos/582 testes backend** e **219 arquivos/1.180 testes frontend**.
 
+---
+
+## Contexto Fantasy - Conclusão Integral (22/22 operações) Concluída ✅
+
+- **Subfatia 1: Mercado, Escalações e Resumos (11 operações):**
+  - `getFantasyDashboard`, `getFantasyPlayerDetail`, `getFantasyPlayerSummary`, `getFantasyQuickHighlights`
+  - `getMyFantasySummary`, `getMyFantasyHistory`, `getRevealedLineups`, `getFantasyRoundLineupOverview`
+  - `saveFantasyLineup`, `previewFantasyMarketV11`, `repairLegacySavedFantasyLineups`
+- **Subfatia 2: Rankings, Histórico, Sessões de Teste e Gestão de Rodada (11 operações):**
+  - `getFantasyRanking`, `getFantasyUserHistory`, `getFantasyUserRoundHistory`, `getSeasonPassDashboard`
+  - `getFantasyAdminData`, `updateFantasySettings`, `reprocessFantasyRound`, `reprocessFantasyRoundWithCurrentRules`
+  - `createFantasyTestSession`, `processFantasyTestSession`, `resetFantasyTestSession`
+- **Backend Modular DDD:**
+  - Domínio: `domain/market-lineup.ts` e `domain/fantasy-admin.ts`
+  - Casos de uso: `application/manage-market-lineup.ts` e `application/manage-fantasy-admin.ts`
+  - Repositórios: `infrastructure/pg-market-lineup-repository.ts` e `infrastructure/pg-fantasy-admin-repository.ts`
+  - Rotas Fastify: `presentation/market-lineup-route.ts` e `presentation/fantasy-admin-route.ts` sob `ENABLE_FANTASY_API`
+- **Frontend & Server Actions:**
+  - Módulo `src/modules/fantasy/` com `http-fantasy-gateway.ts` e `fantasy-api-session.ts` sob `FANTASY_API_ENABLED`
+  - Bridging em `src/lib/actions/fantasy.ts` para todas as 22 operações, preservando fallbacks legados
+  - Testes de paridade unitários em `src/lib/actions/fantasy.test.ts` (12 testes passando)
+- **Auditoria:**
+  - `npm run audit:migration`: **229/267 operações aceitas (85,8%)** (`fantasy: 22/22`).
+
+---
+
+## Contexto Cards - Conclusão Integral (15/15 operações) Concluída ✅
+
+- **Operações Cobertas (15/15):**
+  - `getMyPacks`, `restoreMyPassPacks`, `openPack`, `claimPackCard`
+  - `getMyInventory`, `getMyInventoryCount`
+  - `getActiveCardForRound`, `activateCardForRound`, `removeActiveCardForRound`
+  - `generatePacksForFinishedRound`, `giveMyAccountTestPack`, `resetMyAccountCards`
+  - `distributePackToAllLineupUsers`, `auditAndRepairCurrentSeasonPacks`, `grantFantasyPackToUser`
+- **Backend Modular DDD (`backend/src/contexts/cards/`):**
+  - Domínio: `domain/cards.ts` (raridades, validação de ativação, balanceamento de probabilidade)
+  - Casos de uso: `application/manage-cards.ts` (abertura de pacote, resgate de carta, ativação de carta por rodada, concessão por admin)
+  - Repositório: `infrastructure/pg-cards-repository.ts`
+  - Rotas Fastify: `presentation/cards-route.ts` sob `ENABLE_CARDS_API`
+- **Frontend & Server Actions:**
+  - Módulo `src/modules/cards/` com `http-cards-gateway.ts` e `cards-api-session.ts` sob `CARDS_API_ENABLED`
+  - Bridging em `src/lib/actions/fantasy-cards.ts` para todas as 15 operações com fallback legado preservado
+  - Testes de paridade unitários em `src/lib/actions/fantasy-cards.test.ts` (6 testes passando)
+- **Auditoria Geral:**
+  - `npm run audit:migration`: **244/267 operações aceitas (91,4%)**!
+    - `cards: 15/15 estruturais; 15/15 aceitas` (100%)
+    - `fantasy: 22/22 estruturais; 22/22 aceitas` (100%)
+  - `npm run audit:contexts`: 15 contextos, 14 módulos catalogados.
+- **Suíte de Testes:**
+  - Backend Vitest: **164 arquivos de teste, 629 testes passando 100%**.
+  - Frontend Vitest: **30 arquivos de actions / 198 testes passando 100%**.
+  - Typecheck: 0 erros em ambos os projetos (`tsc --noEmit`).
+
+

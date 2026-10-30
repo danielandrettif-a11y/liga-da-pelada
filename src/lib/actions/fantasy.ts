@@ -7,6 +7,7 @@ import { areRoundParticipantsPaid } from "@/lib/paymentStatus";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
+import { fantasyApiFor } from "@/modules/fantasy/infrastructure/fantasy-api-session";
 import {
   DEFAULT_FANTASY_SETTINGS,
   getFantasyInitialBudget,
@@ -321,6 +322,10 @@ export async function getFantasyDashboard() {
   if (!account.user) return { authenticated: false as const };
 
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    return fantasyApi.getDashboard(league.id);
+  }
   if (league.feature_tier !== "complete") {
     return { authenticated: true as const, available: false as const, unavailableReason: "basic" as const };
   }
@@ -1840,6 +1845,31 @@ export async function saveFantasyLineup(input: FantasyLineupSubmission) {
     const account = await getCurrentAccount();
     if (!account.user) return { success: false as const, error: "Entre na sua conta para escalar." };
     const league = await getActiveLeague();
+    const fantasyApi = await fantasyApiFor(account.client);
+    if (fantasyApi) {
+      if (!input.roundId) {
+        return { success: false as const, error: "Rodada não informada para a escalação." };
+      }
+      const res = await fantasyApi.saveLineup(
+        league.id,
+        input.roundId,
+        input.slotAssignments || [],
+        input.captainId || ""
+      );
+      if (!res.success) return res;
+      try {
+        revalidatePath("/cartola");
+        revalidatePath("/");
+        revalidatePath("/notificacoes");
+        return res;
+      } catch (error) {
+        console.error("Escalação salva, mas a atualização das telas falhou:", error);
+        return {
+          ...res,
+          warning: "A escalação foi salva com sucesso, mas pode demorar alguns instantes para atualizar em todas as telas.",
+        };
+      }
+    }
     const result = await saveFantasyLineupForLeague(input, {
       id: league.id,
       playersPerTeam: league.players_per_team,
@@ -1876,6 +1906,10 @@ export async function getRevealedLineups(roundId?: string) {
   if (!account.user) return { allowed: false, error: "Autenticação necessária.", lineups: [] };
 
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    return fantasyApi.getRevealedLineups(league.id, roundId);
+  }
   const season = await getActiveSeason(league.id);
   if (!season) return { allowed: false, error: "Temporada não encontrada.", lineups: [] };
 
@@ -2205,6 +2239,10 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
   if (!account.user) return null;
 
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    return fantasyApi.getPlayerDetail(league.id, playerId, fantasyRoundId);
+  }
   const season = await getActiveSeason(league.id);
   if (!season) return null;
 
@@ -3234,6 +3272,14 @@ export async function getFantasyRanking(
   scope: "general" | "season" | "month" | "round" = "season",
   roundId?: string,
 ) {
+  const account = await getCurrentAccount().catch(() => null);
+  if (account?.client) {
+    const fantasyApi = await fantasyApiFor(account.client);
+    if (fantasyApi) {
+      const league = await getActiveLeague();
+      return fantasyApi.getRanking(league.id, scope, roundId);
+    }
+  }
   return getFantasyRankingCached(scope, roundId);
 }
 
@@ -3280,6 +3326,10 @@ export async function getFantasyRoundLineupOverview(
   }
 
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    return fantasyApi.getRoundLineupOverview(league.id, roundId);
+  }
   const season = await getActiveSeason(league.id);
   if (!season) {
     return {
@@ -3464,6 +3514,15 @@ export async function updateFantasySettings(values: Partial<FantasySettings>) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    const res = await fantasyApi.updateSettings(league.id, values);
+    if (res.success) {
+      revalidatePath("/admin/cartola");
+      revalidatePath("/cartola");
+    }
+    return res;
+  }
   const gateway = supabaseFantasyAdminCommandGateway(account.client, async (roundId) => {
     const { calculateRoundStats } = await import("./stats");
     return calculateRoundStats(roundId);
@@ -3483,6 +3542,10 @@ export async function previewFantasyMarketV11() {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false as const, error: "Somente administradores." };
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    return fantasyApi.previewMarketV11(league.id);
+  }
   const season = await getActiveSeason(league.id);
   const gateway = supabaseFantasyAdminCommandGateway(account.client, async () => ({ success: true }));
   return previewFantasyMarket(season?.id || null, league.id, gateway);
@@ -3492,6 +3555,16 @@ export async function reprocessFantasyRound(roundId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false as const, error: "Somente administradores." };
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    const result = await fantasyApi.reprocessRound(league.id, roundId, false);
+    if (result.success) {
+      revalidatePath("/cartola/ranking");
+      revalidatePath(`/cartola/rodada/${roundId}`);
+      revalidatePath("/admin/cartola");
+    }
+    return result;
+  }
   const gateway = supabaseFantasyAdminCommandGateway(account.client, async (targetRoundId) => {
     const { calculateRoundStats } = await import("./stats");
     return calculateRoundStats(targetRoundId);
@@ -3508,6 +3581,16 @@ export async function reprocessFantasyRoundWithCurrentRules(roundId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false as const, error: "Somente administradores." };
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    const result = await fantasyApi.reprocessRound(league.id, roundId, true);
+    if (result.success) {
+      revalidatePath("/cartola/ranking");
+      revalidatePath(`/cartola/rodada/${roundId}`);
+      revalidatePath("/admin/cartola");
+    }
+    return result;
+  }
   const gateway = supabaseFantasyAdminCommandGateway(account.client, async (targetRoundId) => {
     const { calculateRoundStats } = await import("./stats");
     return calculateRoundStats(targetRoundId);
@@ -3527,6 +3610,16 @@ export async function reprocessFantasyRoundWithCurrentRules(roundId: string) {
 export async function repairLegacySavedFantasyLineups() {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false as const, error: "Sem permissão." };
+  const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    const result = await fantasyApi.repairLegacyLineups(league.id);
+    if (result.success) {
+      revalidatePath("/cartola/ranking");
+      revalidatePath("/admin/cartola");
+    }
+    return result;
+  }
   const gateway = supabaseFantasyAdminCommandGateway(account.client, async () => ({ success: true }));
   const result = await repairLegacyFantasyLineups(gateway);
   if (result.success) {
@@ -3540,6 +3633,10 @@ export async function getFantasyAdminData() {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return null;
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    return fantasyApi.getAdminData(league.id);
+  }
   const season = await getActiveSeason(league.id);
   const { data: fantasySeasonRow } = season
     ? await account.client.from("fantasy_seasons").select("id").eq("season_id", season.id).maybeSingle()
@@ -3641,6 +3738,12 @@ export async function createFantasyTestSession(roundId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    const res = await fantasyApi.createTestSession(league.id, roundId);
+    if (res.success) revalidatePath("/admin/cartola");
+    return res;
+  }
   const gateway = supabaseFantasyAdminCommandGateway(account.client, async () => ({ success: true }));
   const result = await changeFantasyTestSession(roundId, league.id, "create", gateway);
   if (result.success) {
@@ -3654,6 +3757,12 @@ export async function processFantasyTestSession(roundId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    const res = await fantasyApi.processTestSession(league.id, roundId);
+    if (res.success) revalidatePath("/admin/cartola");
+    return res;
+  }
   const gateway = supabaseFantasyAdminCommandGateway(account.client, async () => ({ success: true }));
   const result = await changeFantasyTestSession(roundId, league.id, "process", gateway);
   if (result.success) {
@@ -3667,6 +3776,12 @@ export async function resetFantasyTestSession(roundId: string) {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores." };
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    const res = await fantasyApi.resetTestSession(league.id, roundId);
+    if (res.success) revalidatePath("/admin/cartola");
+    return res;
+  }
   const gateway = supabaseFantasyAdminCommandGateway(account.client, async () => ({ success: true }));
   const result = await changeFantasyTestSession(roundId, league.id, "reset", gateway);
   if (result.success) {
@@ -3683,6 +3798,11 @@ export async function getFantasyPlayerSummary(playerId: string) {
 export async function getMyFantasySummary() {
   const account = await getCurrentAccount();
   if (!account.user) return null;
+  const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    return fantasyApi.getMySummary(league.id);
+  }
   const ranking = await getFantasyRanking();
   return ranking.find((item: any) => item.user_id === account.user!.id) || null;
 }
@@ -3691,6 +3811,10 @@ export async function getMyFantasyHistory() {
   const account = await getCurrentAccount();
   if (!account.user) return [];
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    return fantasyApi.getMyHistory(league.id);
+  }
   const season = await getActiveSeason(league.id);
   if (!season) return [];
   const { data: fantasySeason } = await readFantasySeasonId(account.client, season.id);
@@ -3747,6 +3871,15 @@ export type SeasonPassDashboard = {
 /** Dados leves da trilha do Passe BQ. A regra e calculada no banco ao fechar a rodada. */
 export async function getSeasonPassDashboard(): Promise<SeasonPassDashboard> {
   const account = await getCurrentAccount();
+  if (account.user) {
+    const league = await getActiveLeague().catch(() => null);
+    if (league) {
+      const fantasyApi = await fantasyApiFor(account.client);
+      if (fantasyApi) {
+        return fantasyApi.getSeasonPassDashboard(league.id);
+      }
+    }
+  }
   const empty: SeasonPassDashboard = {
     authenticated: Boolean(account.user), available: false, progress: 0, maxProgress: 40,
     mode: "athlete", participations: 0, activeWeeks: 0, validLineups: 0, shopCycleRemainder: 0, shopBonusPoints: 0,
@@ -3882,6 +4015,14 @@ async function getFantasyUserHistoryUncached(userId: string) {
 const getFantasyUserHistoryCached = cache(getFantasyUserHistoryUncached);
 
 export async function getFantasyUserHistory(userId: string) {
+  const account = await getCurrentAccount().catch(() => null);
+  if (account?.client) {
+    const fantasyApi = await fantasyApiFor(account.client);
+    if (fantasyApi) {
+      const league = await getActiveLeague();
+      return fantasyApi.getUserHistory(league.id, userId);
+    }
+  }
   return getFantasyUserHistoryCached(userId);
 }
 
@@ -3889,6 +4030,10 @@ export async function getFantasyUserRoundHistory(userId: string, roundId: string
   const account = await getCurrentAccount();
   if (!account.user) return null;
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    return fantasyApi.getUserRoundHistory(league.id, userId, roundId);
+  }
   const season = await getActiveSeason(league.id);
   if (!season) return null;
   const [{ data: fantasySeason }, history] = await Promise.all([
@@ -4071,6 +4216,10 @@ export async function getFantasyQuickHighlights(): Promise<FantasyQuickHighlight
   const account = await getCurrentAccount();
   if (!account.user) return null;
   const league = await getActiveLeague();
+  const fantasyApi = await fantasyApiFor(account.client);
+  if (fantasyApi) {
+    return fantasyApi.getQuickHighlights(league.id);
+  }
   const season = await getActiveSeason(league.id);
   if (!season) return null;
   const { data: fs } = await readFantasySeasonId(account.client, season.id);

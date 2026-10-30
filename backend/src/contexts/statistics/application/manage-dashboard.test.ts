@@ -37,3 +37,4 @@ describe("Statistics Application: manage-dashboard", () => {
     expect(result.venue.name).toBe("Campão");
   });
 });
+

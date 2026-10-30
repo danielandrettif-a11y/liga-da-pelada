@@ -115,3 +115,4 @@ describe("Finance Domain", () => {
     expect(areRoundParticipantsPaid(participants, [{ player_id: "p2", paid: true }])).toBe(true);
   });
 });
+

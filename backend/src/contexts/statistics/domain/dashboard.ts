@@ -206,3 +206,4 @@ export function buildDashboardData(raw: {
     lastRound: raw.lastRound || null,
   };
 }
+

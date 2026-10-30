@@ -66,3 +66,4 @@ describe("finance-api-session", () => {
     expect(session?.backendUrl).toBe("http://localhost:3001");
   });
 });
+

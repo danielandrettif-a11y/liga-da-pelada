@@ -98,6 +98,14 @@ import type { RoundStatisticsRepository } from "../contexts/statistics/applicati
 import { registerSeasonOperationsRoutes } from "../contexts/statistics/presentation/season-operations-route.js";
 import type { SeasonOperationsRepository } from "../contexts/statistics/application/manage-season-operations.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
+import type { FinanceRepository } from "../contexts/finance/application/manage-finance.js";
+import { registerFinanceRoutes } from "../contexts/finance/presentation/finance-route.js";
+import type { FantasyMarketLineupRepository } from "../contexts/fantasy/application/manage-market-lineup.js";
+import { registerMarketLineupRoutes } from "../contexts/fantasy/presentation/market-lineup-route.js";
+import type { FantasyAdminRepository } from "../contexts/fantasy/application/manage-fantasy-admin.js";
+import { registerFantasyAdminRoutes } from "../contexts/fantasy/presentation/fantasy-admin-route.js";
+import type { CardsRepository } from "../contexts/cards/application/manage-cards.js";
+import { registerCardsRoutes } from "../contexts/cards/presentation/cards-route.js";
 
 export function createApp(dependencies: {
   goalsEnabled: boolean;
@@ -165,6 +173,13 @@ export function createApp(dependencies: {
   seasonRankingRepository?: SeasonRankingRepository;
   roundStatisticsRepository?: RoundStatisticsRepository;
   seasonOperationsRepository?: SeasonOperationsRepository;
+  financeEnabled?: boolean;
+  financeRepository?: FinanceRepository;
+  fantasyEnabled?: boolean;
+  cardsEnabled?: boolean;
+  fantasyMarketLineupRepository?: FantasyMarketLineupRepository;
+  fantasyAdminRepository?: FantasyAdminRepository;
+  cardsRepository?: CardsRepository;
   emailConfigured?: boolean;
   logger?: boolean;
 }): FastifyInstance {
@@ -481,6 +496,30 @@ export function createApp(dependencies: {
     registerSeasonOperationsRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.seasonOperationsRepository,
+    });
+  }
+  if (dependencies.financeEnabled && dependencies.financeRepository) {
+    registerFinanceRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.financeRepository,
+    });
+  }
+  if (dependencies.fantasyEnabled && dependencies.fantasyMarketLineupRepository) {
+    registerMarketLineupRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.fantasyMarketLineupRepository,
+    });
+  }
+  if (dependencies.fantasyEnabled && dependencies.fantasyAdminRepository) {
+    registerFantasyAdminRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.fantasyAdminRepository,
+    });
+  }
+  if (dependencies.cardsEnabled && dependencies.cardsRepository) {
+    registerCardsRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.cardsRepository,
     });
   }
   return app;

@@ -205,7 +205,9 @@
       "pages": [
         "src/app/admin/cartola/pacotes/page.tsx"
       ],
-      "sourceModules": [],
+      "sourceModules": [
+        "cards"
+      ],
       "entrypoints": [
         "src/lib/actions/fantasy-cards.ts"
       ]

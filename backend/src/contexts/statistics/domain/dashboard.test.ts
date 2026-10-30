@@ -77,3 +77,4 @@ describe("Statistics Domain: buildDashboardData", () => {
     expect(data.activeCallup?.id).toBe("callup-1");
   });
 });
+

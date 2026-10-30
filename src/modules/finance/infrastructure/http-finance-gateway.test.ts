@@ -85,3 +85,4 @@ describe("httpFinanceGateway", () => {
     await expect(gateway.getExpenseItems(leagueId)).rejects.toThrow(FinanceApiError);
   });
 });
+

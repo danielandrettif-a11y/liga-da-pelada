@@ -309,4 +309,102 @@ Implementar a refatoração modular DDD do contexto `Notifications` da aplicaç�
 - [x] Contratos legados preservados; nenhuma mutação é repetida após falha da API habilitada.
 - [x] Auditoria aprovada em **182/267 (68,2%)**, `statistics: 16/22`.
 
+---
+
+## Contexto Fantasy: Subfatia 1 - Mercado, Escalações e Resumos (11 operações)
+
+### Operações Cobertas
+1. `getFantasyDashboard` (`src/lib/actions/fantasy.ts`)
+2. `getFantasyPlayerDetail` (`src/lib/actions/fantasy.ts`)
+3. `getFantasyPlayerSummary` (`src/lib/actions/fantasy.ts`)
+4. `getFantasyQuickHighlights` (`src/lib/actions/fantasy.ts`)
+5. `getMyFantasySummary` (`src/lib/actions/fantasy.ts`)
+6. `getMyFantasyHistory` (`src/lib/actions/fantasy.ts`)
+7. `getRevealedLineups` (`src/lib/actions/fantasy.ts`)
+8. `getFantasyRoundLineupOverview` (`src/lib/actions/fantasy.ts`)
+9. `saveFantasyLineup` (`src/lib/actions/fantasy.ts`)
+10. `previewFantasyMarketV11` (`src/lib/actions/fantasy.ts`)
+11. `repairLegacySavedFantasyLineups` (`src/lib/actions/fantasy.ts`)
+
+### Checklist da Subfatia 1
+- [ ] **Backend - Domínio e Casos de Uso (`backend/src/contexts/fantasy/`)**
+  - Entidades de mercado, atletas, pontuação BQ v5, projeção e regras de escalação (`market-lineup.ts`).
+  - Casos de uso: `manage-fantasy-market.ts` (dashboard, atleta, destaques, escalação, validações de orçamento/capitão/posições).
+  - Testes unitários puros de domínio e aplicação.
+- [ ] **Backend - Infraestrutura e Apresentação**
+  - Repositório PostgreSQL autenticado via `SET LOCAL ROLE authenticated` e RPCs determinísticas.
+  - Rotas Fastify em `market-lineup-route.ts` sob `ENABLE_FANTASY_API`.
+  - Testes de repositório e rotas Fastify.
+- [ ] **Frontend - Gateway e Sessão de API (`src/modules/fantasy/`)**
+  - `http-fantasy-gateway.ts` e `fantasy-api-session.ts`.
+  - Testes unitários de gateway e session factory.
+- [ ] **Frontend - Bridging nas Server Actions (`src/lib/actions/fantasy.ts`)**
+  - Conexão com a API quando `FANTASY_API_ENABLED=true` e fallback legado completo.
+  - Testes unitários de paridade em `src/lib/actions/fantasy.test.ts`.
+
+---
+
+## Contexto Fantasy: Subfatia 2 - Rankings, Histórico, Sessões de Teste e Gestão (11 operações)
+
+### Operações Cobertas
+1. `getFantasyRanking` (`src/lib/actions/fantasy.ts`)
+2. `getFantasyUserHistory` (`src/lib/actions/fantasy.ts`)
+3. `getFantasyUserRoundHistory` (`src/lib/actions/fantasy.ts`)
+4. `getSeasonPassDashboard` (`src/lib/actions/fantasy.ts`)
+5. `getFantasyAdminData` (`src/lib/actions/fantasy.ts`)
+6. `updateFantasySettings` (`src/lib/actions/fantasy.ts`)
+7. `reprocessFantasyRound` (`src/lib/actions/fantasy.ts`)
+8. `reprocessFantasyRoundWithCurrentRules` (`src/lib/actions/fantasy.ts`)
+9. `createFantasyTestSession` (`src/lib/actions/fantasy.ts`)
+10. `processFantasyTestSession` (`src/lib/actions/fantasy.ts`)
+11. `resetFantasyTestSession` (`src/lib/actions/fantasy.ts`)
+
+### Checklist da Subfatia 2 - Concluída ✅
+- [x] **Backend - Domínio e Casos de Uso:**
+  - Modelos de ranking, histórico e auditoria administrativa (`fantasy-admin.ts`).
+  - Casos de uso para ranking sazonal/mensal, histórico por usuário, sessões de teste e recálculo de rodada.
+  - Testes unitários de domínio e aplicação.
+- [x] **Backend - Infraestrutura e Apresentação:**
+  - Repositório PostgreSQL e rotas Fastify em `fantasy-admin-route.ts`.
+  - Testes de repositório e rotas Fastify.
+- [x] **Frontend - Gateway e Bridging:**
+  - Métodos correspondentes no gateway HTTP.
+  - Bridging em `src/lib/actions/fantasy.ts` com testes unitários em `fantasy.test.ts`.
+  - Auditoria: Fantasy 22/22 (100%) concluído!
+
+---
+
+## Contexto Cards: Conclusão Integral (15 operações) - Concluído ✅
+
+### Operações Cobertas
+1. `getMyPacks` (`src/lib/actions/fantasy-cards.ts`)
+2. `restoreMyPassPacks` (`src/lib/actions/fantasy-cards.ts`)
+3. `openPack` (`src/lib/actions/fantasy-cards.ts`)
+4. `claimPackCard` (`src/lib/actions/fantasy-cards.ts`)
+5. `getMyInventory` (`src/lib/actions/fantasy-cards.ts`)
+6. `getMyInventoryCount` (`src/lib/actions/fantasy-cards.ts`)
+7. `getActiveCardForRound` (`src/lib/actions/fantasy-cards.ts`)
+8. `activateCardForRound` (`src/lib/actions/fantasy-cards.ts`)
+9. `removeActiveCardForRound` (`src/lib/actions/fantasy-cards.ts`)
+10. `generatePacksForFinishedRound` (`src/lib/actions/fantasy-cards.ts`)
+11. `giveMyAccountTestPack` (`src/lib/actions/fantasy-cards.ts`)
+12. `resetMyAccountCards` (`src/lib/actions/fantasy-cards.ts`)
+13. `distributePackToAllLineupUsers` (`src/lib/actions/fantasy-cards.ts`)
+14. `auditAndRepairCurrentSeasonPacks` (`src/lib/actions/fantasy-cards.ts`)
+15. `grantFantasyPackToUser` (`src/lib/actions/fantasy-cards.ts`)
+
+### Checklist de Cards
+- [x] **Backend - Domínio e Casos de Uso (`backend/src/contexts/cards/`):**
+  - Entidades de pacotes, inventário, raridades, ativação por rodada e auditoria (`cards.ts`).
+  - Casos de uso: `manage-cards.ts`.
+  - Testes unitários puros de domínio e aplicação (9 testes passando).
+- [x] **Backend - Infraestrutura e Apresentação:**
+  - Repositório PostgreSQL (`pg-cards-repository.ts`) e rotas Fastify (`cards-route.ts`) sob `ENABLE_CARDS_API`.
+  - Testes unitários de repositório e rotas Fastify (7 testes passando).
+- [x] **Frontend - Módulo Cards (`src/modules/cards/`):**
+  - Gateway HTTP (`http-cards-gateway.ts`) e sessão (`cards-api-session.ts`).
+  - Testes unitários de gateway e sessão (5 testes passando).
+- [x] **Frontend - Bridging nas Server Actions (`src/lib/actions/fantasy-cards.ts`):**
+  - Bridging com fallback legado preservado e testes de paridade em `fantasy-cards.test.ts` (6 testes passando).
+  - Auditoria: Cards 15/15 (100%) concluído! Total geral do projeto: 244/267 (91,4%) aceitas!
 

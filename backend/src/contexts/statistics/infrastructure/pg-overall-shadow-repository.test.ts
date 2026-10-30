@@ -47,3 +47,4 @@ describe("Statistics Infrastructure: PgOverallShadowRepository", () => {
     );
   });
 });
+

@@ -41,3 +41,4 @@ describe("Statistics Infrastructure: PgDashboardRepository", () => {
     expect(data.nextRound?.id).toBe("r1");
   });
 });
+

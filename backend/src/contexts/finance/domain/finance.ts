@@ -174,3 +174,4 @@ export function areRoundParticipantsPaid(
   );
   return participants.every((p) => p.is_monthly_payer || paidSet.has(p.id));
 }
+
