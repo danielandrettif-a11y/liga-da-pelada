@@ -2796,6 +2796,400 @@
         "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
         "src/lib/actions/reprocess.test.ts"
       ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/dashboard.ts",
+      "name": "getDashboardData",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/dashboard",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/dashboard.test.ts",
+        "backend/src/contexts/statistics/application/manage-dashboard.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-dashboard-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/dashboard-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/dashboard.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "getOverallShadowAdminData",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/overall/shadow",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+        "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/overall.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "recalculateOverallShadow",
+      "state": "frontend-migrated",
+      "target": "POST /api/statistics/leagues/:leagueId/overall/shadow/recalculate",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+        "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/overall.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "publishOverallShadow",
+      "state": "frontend-migrated",
+      "target": "POST /api/statistics/leagues/:leagueId/overall/shadow/publish",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+        "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/overall.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "recalculateAndPublishFluidOverall",
+      "state": "frontend-migrated",
+      "target": "POST /api/statistics/leagues/:leagueId/overall/fluid/recalculate-and-publish",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+        "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/overall.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "refreshFluidOverallSafely",
+      "state": "frontend-migrated",
+      "target": "POST /api/statistics/leagues/:leagueId/overall/fluid/refresh",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+        "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/overall.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getExpenseItems",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/expenses",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "saveExpenseItem",
+      "state": "frontend-migrated",
+      "target": "POST /api/finance/leagues/:leagueId/expenses",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setExpenseItemStatus",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/finance/leagues/:leagueId/expenses/:id/status",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setExpenseItemPaidInstallments",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/finance/leagues/:leagueId/expenses/:id/paid-installments",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getPaymentRecipients",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/recipients",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "savePaymentRecipient",
+      "state": "frontend-migrated",
+      "target": "POST /api/finance/leagues/:leagueId/recipients",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setPaymentRecipientActive",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/finance/leagues/:leagueId/recipients/:id/active",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getPaymentRounds",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/rounds",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "hasPendingPaymentRound",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/rounds/has-pending",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentWorkspace",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/rounds/:roundId/workspace",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentPlayers",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/rounds/:roundId/players",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentObligations",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/rounds/:roundId/obligations",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setPaymentObligationPaid",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/finance/leagues/:leagueId/obligations/:id/paid",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setPlayerPayment",
+      "state": "frontend-migrated",
+      "target": "POST /api/finance/leagues/:leagueId/rounds/:roundId/payments",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundExpenseSelections",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/rounds/:roundId/expense-selections",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "syncRoundExpenseItems",
+      "state": "frontend-migrated",
+      "target": "POST /api/finance/leagues/:leagueId/rounds/:roundId/expense-selections",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "updateRoundPaymentDetails",
+      "state": "frontend-migrated",
+      "target": "PUT /api/finance/leagues/:leagueId/rounds/:roundId/details",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentChargeLines",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/rounds/:roundId/charge-lines",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getPaymentAuditLog",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/audit-log",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
     }
   ]
 }

@@ -1,12 +1,19 @@
 "use server";
 
 import { getActiveSeason } from "./seasons";
+import { getStatisticsApiSession } from "@/modules/statistics/infrastructure/statistics-api-session";
 import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getCurrentAccount } from "../auth";
 import { getEventWeather } from "../weather";
 
 export async function getDashboardData() {
   try {
+    const session = await getStatisticsApiSession();
+    if (session) {
+      const season = await getActiveSeason();
+      if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
+      return session.gateway.getDashboardData(season.league_id);
+    }
     const account = await getCurrentAccount();
     const season = await getActiveSeason();
     if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");

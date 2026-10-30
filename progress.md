@@ -284,9 +284,43 @@
 - Testes: **140 arquivos/538 backend** e **214 arquivos/1.144 frontend**.
 - Gates finais: typecheck e builds de produção dos dois projetos, auditorias de migração/contextos/arquitetura e `git diff --check` aprovados.
 
+---
 
+## Contexto Statistics - Subfatia 5 (Dashboard e OVR Sombra) Concluída
 
+- Operações:
+  1. `getDashboardData` (`src/lib/actions/dashboard.ts`)
+  2. `getOverallShadowAdminData` (`src/lib/actions/overall.ts`)
+  3. `recalculateOverallShadow` (`src/lib/actions/overall.ts`)
+  4. `publishOverallShadow` (`src/lib/actions/overall.ts`)
+  5. `recalculateAndPublishFluidOverall` (`src/lib/actions/overall.ts`)
+  6. `refreshFluidOverallSafely` (`src/lib/actions/overall.ts`)
+- Backend modular completo:
+  - `backend/src/contexts/statistics/domain/dashboard.ts` e `overall-shadow.ts`
+  - `backend/src/contexts/statistics/application/manage-dashboard.ts` e `manage-overall-shadow.ts`
+  - `backend/src/contexts/statistics/infrastructure/pg-dashboard-repository.ts` e `pg-overall-shadow-repository.ts`
+  - `backend/src/contexts/statistics/presentation/dashboard-route.ts` e `overall-shadow-route.ts`
+- Gateway HTTP e bridges Server Actions com fallback de legado preservado.
+- Auditoria: **Statistics 22/22 (100%)** concluído!
 
+---
 
+## Contexto Finance - Conclusão Integral (19/19 operações) Concluída
 
+- **Subfatia 1: Despesas e Destinatários PIX (9 operações):**
+  - `getExpenseItems`, `saveExpenseItem`, `setExpenseItemStatus`, `setExpenseItemPaidInstallments`
+  - `getPaymentRecipients`, `savePaymentRecipient`, `setPaymentRecipientActive`
+  - `hasPendingPaymentRound`, `getPaymentRounds`
+- **Subfatia 2: Workspace de Rodada, Obrigações e Auditoria (10 operações):**
+  - `getRoundPaymentWorkspace`, `getRoundPaymentPlayers`, `getRoundPaymentObligations`
+  - `setPaymentObligationPaid`, `setPlayerPayment`, `getRoundExpenseSelections`
+  - `syncRoundExpenseItems`, `updateRoundPaymentDetails`, `getRoundPaymentChargeLines`
+  - `getPaymentAuditLog`
+- Backend modular em `backend/src/contexts/finance/` (domínio, aplicação, infraestrutura PostgreSQL e rotas Fastify) sob flag `ENABLE_FINANCE_API`.
+- Módulo frontend `src/modules/finance/` com `http-finance-gateway.ts` e `finance-api-session.ts`.
+- Servidor actions em `src/lib/actions/payments.ts` com fallback de legado preservado.
+- Auditoria: **207/267 operações aceitas (77,5%)**!
+  - `statistics: 22/22 (100%)`
+  - `finance: 19/19 (100%)`
+- Testes 100% verdes: **152 arquivos/582 testes backend** e **219 arquivos/1.180 testes frontend**.
 

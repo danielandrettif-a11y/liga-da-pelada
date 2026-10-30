@@ -65,7 +65,13 @@ export interface StatisticsGateway {
   getPlayerCardOveralls(leagueId: string): Promise<Record<string, PlayerCardOverall>>;
   getSeasonTeamStandings(leagueId: string): Promise<SeasonTeamStanding[]>;
   previewReprocessSeason(leagueId: string): Promise<ReprocessPreviewResult>;
-  executeReprocessSeason(leagueId: string): Promise<ReprocessExecutionResult>;
+    executeReprocessSeason(leagueId: string): Promise<ReprocessExecutionResult>;
+  getDashboardData(leagueId: string): Promise<any>;
+  getOverallShadowAdminData(leagueId: string): Promise<any>;
+  recalculateOverallShadow(leagueId: string): Promise<any>;
+  publishOverallShadow(leagueId: string, runId: string): Promise<any>;
+  recalculateAndPublishFluidOverall(leagueId: string): Promise<any>;
+  refreshFluidOverallSafely(leagueId: string, reason?: string): Promise<any>;
 }
 
 export type StatisticsHttpGateway = StatisticsGateway;
@@ -284,5 +290,55 @@ export function httpStatisticsGateway(
         { method: "POST", headers: authHeaders(true) },
       );
     },
+    async getDashboardData(leagueId: string) {
+      return requestJson<{ success: boolean; data?: any; error?: string }>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/dashboard`,
+        { headers: authHeaders(), cache: "no-store" },
+      );
+    },
+
+    async getOverallShadowAdminData(leagueId: string) {
+      const response = await requestJson<{ success: boolean; data?: any }>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/overall/shadow`,
+        { headers: authHeaders(), cache: "no-store" },
+      );
+      return response?.data ?? null;
+    },
+
+    async recalculateOverallShadow(leagueId: string) {
+      return requestJson<any>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/overall/shadow/recalculate`,
+        { method: "POST", headers: authHeaders(true) },
+      );
+    },
+
+    async publishOverallShadow(leagueId: string, runId: string) {
+      return requestJson<any>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/overall/shadow/publish`,
+        {
+          method: "POST",
+          headers: authHeaders(true),
+          body: JSON.stringify({ runId }),
+        },
+      );
+    },
+
+    async recalculateAndPublishFluidOverall(leagueId: string) {
+      return requestJson<any>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/overall/fluid/recalculate-and-publish`,
+        { method: "POST", headers: authHeaders(true) },
+      );
+    },
+
+    async refreshFluidOverallSafely(leagueId: string, reason = "rotina") {
+      return requestJson<any>(
+        `/api/statistics/leagues/${encodeURIComponent(leagueId)}/overall/fluid/refresh`,
+        {
+          method: "POST",
+          headers: authHeaders(true),
+          body: JSON.stringify({ reason }),
+        },
+      );
+    },
   };
-}
+};

@@ -49,6 +49,9 @@ import { pgScoringRulesRepository } from "./contexts/statistics/infrastructure/p
 import { pgSeasonRankingRepository } from "./contexts/statistics/infrastructure/pg-season-ranking-repository.js";
 import { pgRoundStatisticsRepository } from "./contexts/statistics/infrastructure/pg-round-statistics-repository.js";
 import { pgSeasonOperationsRepository } from "./contexts/statistics/infrastructure/pg-season-operations-repository.js";
+import { PgDashboardRepository } from "./contexts/statistics/infrastructure/pg-dashboard-repository.js";
+import { PgOverallShadowRepository } from "./contexts/statistics/infrastructure/pg-overall-shadow-repository.js";
+import { PgFinanceRepository } from "./contexts/finance/infrastructure/pg-finance-repository.js";
 import { createApp } from "./presentation/app.js";
 
 const goalsEnabled = process.env.ENABLE_GOAL_API === "true";
@@ -60,6 +63,7 @@ const roundsEnabled = process.env.ENABLE_ROUNDS_API === "true";
 const matchesEnabled = process.env.ENABLE_MATCHES_API === "true";
 const notificationsEnabled = process.env.ENABLE_NOTIFICATIONS_API === "true";
 const statisticsEnabled = process.env.ENABLE_STATISTICS_API === "true";
+const financeEnabled = process.env.ENABLE_FINANCE_API === "true";
 const port = Number(process.env.PORT || "3001");
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("PORT inválida.");
@@ -70,7 +74,7 @@ const authUrl = process.env.SUPABASE_INTERNAL_URL;
 const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
 const publicUrl = process.env.SUPABASE_PUBLIC_URL;
 const appPublicUrl = process.env.APP_PUBLIC_URL;
-if ((goalsEnabled || leaguesEnabled || identityEnabled || rosterEnabled || callupsEnabled || roundsEnabled || matchesEnabled || notificationsEnabled || statisticsEnabled) && (!databaseUrl || !authUrl || !publishableKey)) {
+if ((goalsEnabled || leaguesEnabled || identityEnabled || rosterEnabled || callupsEnabled || roundsEnabled || matchesEnabled || notificationsEnabled || statisticsEnabled || financeEnabled) && (!databaseUrl || !authUrl || !publishableKey)) {
   throw new Error("APIs habilitadas requerem DATABASE_URL, SUPABASE_INTERNAL_URL e SUPABASE_PUBLISHABLE_KEY.");
 }
 if ((leaguesEnabled || rosterEnabled) && !publicUrl) {

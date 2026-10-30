@@ -565,6 +565,131 @@
       "context": "statistics",
       "source": "src/lib/actions/reprocess.ts",
       "name": "executeReprocessSeason"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/dashboard.ts",
+      "name": "getDashboardData"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "getOverallShadowAdminData"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "recalculateOverallShadow"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "publishOverallShadow"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "recalculateAndPublishFluidOverall"
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "refreshFluidOverallSafely"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getExpenseItems"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "saveExpenseItem"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setExpenseItemStatus"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setExpenseItemPaidInstallments"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getPaymentRecipients"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "savePaymentRecipient"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setPaymentRecipientActive"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getPaymentRounds"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "hasPendingPaymentRound"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentWorkspace"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentPlayers"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentObligations"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setPaymentObligationPaid"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setPlayerPayment"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundExpenseSelections"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "syncRoundExpenseItems"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "updateRoundPaymentDetails"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentChargeLines"
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getPaymentAuditLog"
     }
   ],
   "evidence": {
@@ -804,6 +929,225 @@
       "backend/src/contexts/statistics/presentation/season-operations-route.test.ts",
       "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
       "src/lib/actions/reprocess.test.ts"
+    ],
+    "statistics src/lib/actions/dashboard.ts getDashboardData": [
+      "backend/src/contexts/statistics/domain/dashboard.test.ts",
+      "backend/src/contexts/statistics/application/manage-dashboard.test.ts",
+      "backend/src/contexts/statistics/infrastructure/pg-dashboard-repository.test.ts",
+      "backend/src/contexts/statistics/presentation/dashboard-route.test.ts",
+      "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+      "src/lib/actions/dashboard.test.ts"
+    ],
+    "statistics src/lib/actions/overall.ts getOverallShadowAdminData": [
+      "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+      "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+      "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+      "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+      "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+      "src/lib/actions/overall.test.ts"
+    ],
+    "statistics src/lib/actions/overall.ts recalculateOverallShadow": [
+      "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+      "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+      "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+      "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+      "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+      "src/lib/actions/overall.test.ts"
+    ],
+    "statistics src/lib/actions/overall.ts publishOverallShadow": [
+      "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+      "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+      "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+      "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+      "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+      "src/lib/actions/overall.test.ts"
+    ],
+    "statistics src/lib/actions/overall.ts recalculateAndPublishFluidOverall": [
+      "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+      "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+      "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+      "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+      "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+      "src/lib/actions/overall.test.ts"
+    ],
+    "statistics src/lib/actions/overall.ts refreshFluidOverallSafely": [
+      "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+      "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+      "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+      "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+      "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+      "src/lib/actions/overall.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts getExpenseItems": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts saveExpenseItem": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts setExpenseItemStatus": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts setExpenseItemPaidInstallments": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts getPaymentRecipients": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts savePaymentRecipient": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts setPaymentRecipientActive": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts getPaymentRounds": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts hasPendingPaymentRound": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts getRoundPaymentWorkspace": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts getRoundPaymentPlayers": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts getRoundPaymentObligations": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts setPaymentObligationPaid": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts setPlayerPayment": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts getRoundExpenseSelections": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts syncRoundExpenseItems": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts updateRoundPaymentDetails": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts getRoundPaymentChargeLines": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
+    ],
+    "finance src/lib/actions/payments.ts getPaymentAuditLog": [
+      "backend/src/contexts/finance/domain/finance.test.ts",
+      "backend/src/contexts/finance/application/manage-finance.test.ts",
+      "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+      "backend/src/contexts/finance/presentation/finance-route.test.ts",
+      "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+      "src/modules/finance/infrastructure/finance-api-session.test.ts",
+      "src/lib/actions/payments.test.ts"
     ]
   }
 }

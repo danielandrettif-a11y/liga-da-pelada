@@ -3,108 +3,319 @@
   "contexts": [
     {
       "id": "identity",
-      "aggregates": ["Account", "AdminRole"],
-      "pages": ["src/app/login/page.tsx", "src/app/cadastro/page.tsx", "src/app/redefinir-senha/page.tsx", "src/app/meu-perfil/page.tsx", "src/app/admin/administradores/page.tsx"],
-      "sourceModules": ["identity"],
-      "entrypoints": ["src/app/login/actions.ts", "src/app/cadastro/actions.ts", "src/lib/actions/admins.ts"]
+      "aggregates": [
+        "Account",
+        "AdminRole"
+      ],
+      "pages": [
+        "src/app/login/page.tsx",
+        "src/app/cadastro/page.tsx",
+        "src/app/redefinir-senha/page.tsx",
+        "src/app/meu-perfil/page.tsx",
+        "src/app/admin/administradores/page.tsx"
+      ],
+      "sourceModules": [
+        "identity"
+      ],
+      "entrypoints": [
+        "src/app/login/actions.ts",
+        "src/app/cadastro/actions.ts",
+        "src/lib/actions/admins.ts"
+      ]
     },
     {
       "id": "leagues",
-      "aggregates": ["League", "Membership", "Season", "Stadium"],
-      "pages": ["src/app/page.tsx", "src/app/inicio/page.tsx", "src/app/lobby/page.tsx", "src/app/lobby/criar/page.tsx", "src/app/peladas/page.tsx", "src/app/convite/[token]/page.tsx", "src/app/admin/liga/page.tsx", "src/app/mais/estadios/page.tsx", "src/app/mais/page.tsx"],
-      "sourceModules": ["leagues"],
-      "entrypoints": ["src/app/lobby/actions.ts", "src/app/mais/league-mode-actions.ts", "src/lib/actions/league.ts", "src/lib/actions/seasons.ts", "src/lib/actions/stadiums.ts"]
+      "aggregates": [
+        "League",
+        "Membership",
+        "Season",
+        "Stadium"
+      ],
+      "pages": [
+        "src/app/page.tsx",
+        "src/app/inicio/page.tsx",
+        "src/app/lobby/page.tsx",
+        "src/app/lobby/criar/page.tsx",
+        "src/app/peladas/page.tsx",
+        "src/app/convite/[token]/page.tsx",
+        "src/app/admin/liga/page.tsx",
+        "src/app/mais/estadios/page.tsx",
+        "src/app/mais/page.tsx"
+      ],
+      "sourceModules": [
+        "leagues"
+      ],
+      "entrypoints": [
+        "src/app/lobby/actions.ts",
+        "src/app/mais/league-mode-actions.ts",
+        "src/lib/actions/league.ts",
+        "src/lib/actions/seasons.ts",
+        "src/lib/actions/stadiums.ts"
+      ]
     },
     {
       "id": "roster",
-      "aggregates": ["Player", "PlayerIdentity", "FitnessRecord"],
-      "pages": ["src/app/jogadores/page.tsx", "src/app/jogadores/[id]/page.tsx", "src/app/jogadores/[id]/carta/page.tsx", "src/app/admin/jogadores/page.tsx", "src/app/admin/jogadores/novo/page.tsx", "src/app/admin/jogadores/[id]/editar/page.tsx", "src/app/admin/importar-lista/page.tsx", "src/app/admin/cadastros/page.tsx"],
-      "sourceModules": ["roster"],
-      "entrypoints": ["src/app/admin/importar-lista/actions.ts", "src/lib/actions/players.ts", "src/lib/actions/registrations.ts", "src/lib/actions/fitness.ts", "src/lib/actions/speed-draw.ts", "src/lib/actions/private-balance-tags.ts", "src/lib/actions/account-career.ts"]
+      "aggregates": [
+        "Player",
+        "PlayerIdentity",
+        "FitnessRecord"
+      ],
+      "pages": [
+        "src/app/jogadores/page.tsx",
+        "src/app/jogadores/[id]/page.tsx",
+        "src/app/jogadores/[id]/carta/page.tsx",
+        "src/app/admin/jogadores/page.tsx",
+        "src/app/admin/jogadores/novo/page.tsx",
+        "src/app/admin/jogadores/[id]/editar/page.tsx",
+        "src/app/admin/importar-lista/page.tsx",
+        "src/app/admin/cadastros/page.tsx"
+      ],
+      "sourceModules": [
+        "roster"
+      ],
+      "entrypoints": [
+        "src/app/admin/importar-lista/actions.ts",
+        "src/lib/actions/players.ts",
+        "src/lib/actions/registrations.ts",
+        "src/lib/actions/fitness.ts",
+        "src/lib/actions/speed-draw.ts",
+        "src/lib/actions/private-balance-tags.ts",
+        "src/lib/actions/account-career.ts"
+      ]
     },
     {
       "id": "callups",
-      "aggregates": ["Callup", "CallupEntry", "ReplacementSlot"],
-      "pages": ["src/app/convocacao/page.tsx", "src/app/c/[token]/page.tsx", "src/app/admin/prelistas/page.tsx"],
-      "sourceModules": ["callups"],
-      "entrypoints": ["src/lib/actions/callups.ts"]
+      "aggregates": [
+        "Callup",
+        "CallupEntry",
+        "ReplacementSlot"
+      ],
+      "pages": [
+        "src/app/convocacao/page.tsx",
+        "src/app/c/[token]/page.tsx",
+        "src/app/admin/prelistas/page.tsx"
+      ],
+      "sourceModules": [
+        "callups"
+      ],
+      "entrypoints": [
+        "src/lib/actions/callups.ts"
+      ]
     },
     {
       "id": "rounds",
-      "aggregates": ["Round", "Team", "TeamDraft"],
-      "pages": ["src/app/rodadas/page.tsx", "src/app/rodadas/[id]/page.tsx", "src/app/rodadas/[id]/nova-partida/page.tsx", "src/app/draft/page.tsx", "src/app/admin/rodada/page.tsx"],
-      "sourceModules": ["rounds"],
-      "entrypoints": ["src/lib/actions/rounds.ts", "src/lib/actions/draft.ts", "src/lib/actions/adaptive-draw.ts"]
+      "aggregates": [
+        "Round",
+        "Team",
+        "TeamDraft"
+      ],
+      "pages": [
+        "src/app/rodadas/page.tsx",
+        "src/app/rodadas/[id]/page.tsx",
+        "src/app/rodadas/[id]/nova-partida/page.tsx",
+        "src/app/draft/page.tsx",
+        "src/app/admin/rodada/page.tsx"
+      ],
+      "sourceModules": [
+        "rounds"
+      ],
+      "entrypoints": [
+        "src/lib/actions/rounds.ts",
+        "src/lib/actions/draft.ts",
+        "src/lib/actions/adaptive-draw.ts"
+      ]
     },
     {
       "id": "matches",
-      "aggregates": ["Match", "MatchEvent", "MatchLineup"],
-      "pages": ["src/app/partidas/[id]/page.tsx", "src/app/estadio/page.tsx"],
-      "sourceModules": ["matches"],
-      "entrypoints": ["src/lib/actions/matches.ts", "src/lib/actions/goalkeeper.ts"]
+      "aggregates": [
+        "Match",
+        "MatchEvent",
+        "MatchLineup"
+      ],
+      "pages": [
+        "src/app/partidas/[id]/page.tsx",
+        "src/app/estadio/page.tsx"
+      ],
+      "sourceModules": [
+        "matches"
+      ],
+      "entrypoints": [
+        "src/lib/actions/matches.ts",
+        "src/lib/actions/goalkeeper.ts"
+      ]
     },
     {
       "id": "statistics",
-      "aggregates": ["RoundStatistics", "ScoringPolicy", "OverallCalculation"],
-      "pages": ["src/app/ranking/page.tsx", "src/app/admin/overall/page.tsx", "src/app/admin/pontuacao/page.tsx", "src/app/admin/reprocessar/page.tsx"],
-      "sourceModules": ["statistics"],
-      "entrypoints": ["src/lib/actions/stats.ts", "src/lib/actions/team-standings.ts", "src/lib/actions/overall.ts", "src/lib/actions/reprocess.ts", "src/lib/actions/bq-scoring.ts", "src/lib/actions/dashboard.ts"]
+      "aggregates": [
+        "RoundStatistics",
+        "ScoringPolicy",
+        "OverallCalculation"
+      ],
+      "pages": [
+        "src/app/ranking/page.tsx",
+        "src/app/admin/overall/page.tsx",
+        "src/app/admin/pontuacao/page.tsx",
+        "src/app/admin/reprocessar/page.tsx"
+      ],
+      "sourceModules": [
+        "statistics"
+      ],
+      "entrypoints": [
+        "src/lib/actions/stats.ts",
+        "src/lib/actions/team-standings.ts",
+        "src/lib/actions/overall.ts",
+        "src/lib/actions/reprocess.ts",
+        "src/lib/actions/bq-scoring.ts",
+        "src/lib/actions/dashboard.ts"
+      ]
     },
     {
       "id": "fantasy",
-      "aggregates": ["FantasySeason", "FantasyRound", "Lineup", "Portfolio"],
-      "pages": ["src/app/cartola/page.tsx", "src/app/cartola/historico/page.tsx", "src/app/cartola/historico/[roundId]/page.tsx", "src/app/cartola/ranking/page.tsx", "src/app/cartola/ranking/[userId]/page.tsx", "src/app/cartola/ranking/[userId]/[roundId]/page.tsx", "src/app/cartola/ranking/[userId]/[roundId]/[playerId]/page.tsx", "src/app/admin/cartola/page.tsx", "src/app/admin/transfermarket/page.tsx"],
-      "sourceModules": ["fantasy"],
-      "entrypoints": ["src/lib/actions/fantasy.ts"]
+      "aggregates": [
+        "FantasySeason",
+        "FantasyRound",
+        "Lineup",
+        "Portfolio"
+      ],
+      "pages": [
+        "src/app/cartola/page.tsx",
+        "src/app/cartola/historico/page.tsx",
+        "src/app/cartola/historico/[roundId]/page.tsx",
+        "src/app/cartola/ranking/page.tsx",
+        "src/app/cartola/ranking/[userId]/page.tsx",
+        "src/app/cartola/ranking/[userId]/[roundId]/page.tsx",
+        "src/app/cartola/ranking/[userId]/[roundId]/[playerId]/page.tsx",
+        "src/app/admin/cartola/page.tsx",
+        "src/app/admin/transfermarket/page.tsx"
+      ],
+      "sourceModules": [
+        "fantasy"
+      ],
+      "entrypoints": [
+        "src/lib/actions/fantasy.ts"
+      ]
     },
     {
       "id": "cards",
-      "aggregates": ["Pack", "CardInventory", "CardActivation"],
-      "pages": ["src/app/admin/cartola/pacotes/page.tsx"],
+      "aggregates": [
+        "Pack",
+        "CardInventory",
+        "CardActivation"
+      ],
+      "pages": [
+        "src/app/admin/cartola/pacotes/page.tsx"
+      ],
       "sourceModules": [],
-      "entrypoints": ["src/lib/actions/fantasy-cards.ts"]
+      "entrypoints": [
+        "src/lib/actions/fantasy-cards.ts"
+      ]
     },
     {
       "id": "cosmetics",
-      "aggregates": ["CosmeticInventory", "Loadout", "SeasonPass"],
-      "pages": ["src/app/cartola/passe/page.tsx"],
-      "sourceModules": ["cosmetics"],
-      "entrypoints": ["src/lib/actions/cosmetics.ts"]
+      "aggregates": [
+        "CosmeticInventory",
+        "Loadout",
+        "SeasonPass"
+      ],
+      "pages": [
+        "src/app/cartola/passe/page.tsx"
+      ],
+      "sourceModules": [
+        "cosmetics"
+      ],
+      "entrypoints": [
+        "src/lib/actions/cosmetics.ts"
+      ]
     },
     {
       "id": "finance",
-      "aggregates": ["RoundPayment", "ExpenseItem", "PaymentObligation", "Recipient"],
-      "pages": ["src/app/pagamentos/page.tsx", "src/app/mais/caixinha/page.tsx", "src/app/mais/pix/page.tsx"],
-      "sourceModules": ["payments"],
-      "entrypoints": ["src/lib/actions/payments.ts"]
+      "aggregates": [
+        "RoundPayment",
+        "ExpenseItem",
+        "PaymentObligation",
+        "Recipient"
+      ],
+      "pages": [
+        "src/app/pagamentos/page.tsx",
+        "src/app/mais/caixinha/page.tsx",
+        "src/app/mais/pix/page.tsx"
+      ],
+      "sourceModules": [
+        "payments",
+        "finance"
+      ],
+      "entrypoints": [
+        "src/lib/actions/payments.ts"
+      ]
     },
     {
       "id": "collective",
-      "aggregates": ["CollectiveRoom", "Message"],
-      "pages": ["src/app/coletiva/page.tsx", "src/app/mais/coletivas/page.tsx"],
-      "sourceModules": ["collective"],
-      "entrypoints": ["src/lib/actions/collective.ts"]
+      "aggregates": [
+        "CollectiveRoom",
+        "Message"
+      ],
+      "pages": [
+        "src/app/coletiva/page.tsx",
+        "src/app/mais/coletivas/page.tsx"
+      ],
+      "sourceModules": [
+        "collective"
+      ],
+      "entrypoints": [
+        "src/lib/actions/collective.ts"
+      ]
     },
     {
       "id": "notifications",
-      "aggregates": ["Inbox", "NotificationPreference", "Delivery"],
-      "pages": ["src/app/notificacoes/page.tsx", "src/app/mais/notificacoes/page.tsx", "src/app/mais/notificacoes/cancelar/page.tsx"],
-      "sourceModules": ["notifications"],
-      "entrypoints": ["src/lib/actions/inbox.ts", "src/app/mais/notification-actions.ts", "src/app/mais/notificacoes/cancelar/actions.ts", "src/app/api/internal/cartola-reminder/route.ts", "src/app/api/internal/match-timer-alert/route.ts", "src/app/api/internal/push-test-alert/route.ts"]
+      "aggregates": [
+        "Inbox",
+        "NotificationPreference",
+        "Delivery"
+      ],
+      "pages": [
+        "src/app/notificacoes/page.tsx",
+        "src/app/mais/notificacoes/page.tsx",
+        "src/app/mais/notificacoes/cancelar/page.tsx"
+      ],
+      "sourceModules": [
+        "notifications"
+      ],
+      "entrypoints": [
+        "src/lib/actions/inbox.ts",
+        "src/app/mais/notification-actions.ts",
+        "src/app/mais/notificacoes/cancelar/actions.ts",
+        "src/app/api/internal/cartola-reminder/route.ts",
+        "src/app/api/internal/match-timer-alert/route.ts",
+        "src/app/api/internal/push-test-alert/route.ts"
+      ]
     },
     {
       "id": "integrations",
-      "aggregates": ["ManagerSourceLeague"],
-      "pages": ["src/app/bq-manager/page.tsx", "src/app/bq-manager/demo/page.tsx"],
+      "aggregates": [
+        "ManagerSourceLeague"
+      ],
+      "pages": [
+        "src/app/bq-manager/page.tsx",
+        "src/app/bq-manager/demo/page.tsx"
+      ],
       "sourceModules": [],
-      "entrypoints": ["src/app/bq-manager/actions.ts"]
+      "entrypoints": [
+        "src/app/bq-manager/actions.ts"
+      ]
     },
     {
       "id": "operations",
-      "aggregates": ["PerformanceEvent"],
-      "pages": ["src/app/admin/performance/page.tsx"],
+      "aggregates": [
+        "PerformanceEvent"
+      ],
+      "pages": [
+        "src/app/admin/performance/page.tsx"
+      ],
       "sourceModules": [],
-      "entrypoints": ["src/lib/actions/performance.ts", "src/app/api/internal/observability/route.ts"]
+      "entrypoints": [
+        "src/lib/actions/performance.ts",
+        "src/app/api/internal/observability/route.ts"
+      ]
     }
   ]
 }
