@@ -32,3 +32,4 @@ describe("Fantasy Domain: Fantasy Admin & Ranking", () => {
     expect(validResult.normalizedBudget).toBe(120.46);
   });
 });
+

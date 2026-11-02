@@ -15,6 +15,7 @@ export interface FantasyAdminRepository {
   getRankingRawEntries(
     leagueId: string,
     scope: FantasyRankingScope,
+    actorUserId: string,
     roundId?: string
   ): Promise<Array<{
     userId: string;
@@ -25,23 +26,25 @@ export interface FantasyAdminRepository {
     lastRoundPoints: number | null;
     lineupsCount: number;
   }>>;
-  getUserHistory(leagueId: string, userId: string): Promise<UserFantasyHistoryEntry[]>;
+  getUserHistory(leagueId: string, userId: string, actorUserId: string): Promise<UserFantasyHistoryEntry[]>;
   getUserRoundHistory(
     leagueId: string,
     userId: string,
-    roundId: string
+    roundId: string,
+    actorUserId: string
   ): Promise<FantasyUserRoundHistoryDetail | null>;
   getSeasonPassDashboard(leagueId: string, userId: string): Promise<SeasonPassDashboardData>;
-  getAdminData(leagueId: string): Promise<FantasyAdminConfigData>;
-  updateSettings(leagueId: string, settings: { initialBudget?: number }): Promise<{ success: boolean }>;
+  getAdminData(leagueId: string, userId: string): Promise<FantasyAdminConfigData>;
+  updateSettings(leagueId: string, settings: { initialBudget?: number }, userId: string): Promise<{ success: boolean }>;
   reprocessRound(
     leagueId: string,
     roundId: string,
-    useCurrentRules?: boolean
+    useCurrentRules: boolean | undefined,
+    userId: string
   ): Promise<{ success: boolean; reprocessedLineupsCount: number }>;
-  createTestSession(leagueId: string, roundId: string): Promise<{ success: boolean }>;
-  processTestSession(leagueId: string, roundId: string): Promise<{ success: boolean }>;
-  resetTestSession(leagueId: string, roundId: string): Promise<{ success: boolean }>;
+  createTestSession(leagueId: string, roundId: string, userId: string): Promise<{ success: boolean }>;
+  processTestSession(leagueId: string, roundId: string, userId: string): Promise<{ success: boolean }>;
+  resetTestSession(leagueId: string, roundId: string, userId: string): Promise<{ success: boolean }>;
 }
 
 export class ManageFantasyAdminUseCase {
@@ -53,7 +56,7 @@ export class ManageFantasyAdminUseCase {
     scope: FantasyRankingScope = "season",
     roundId?: string
   ): Promise<FantasyRankingEntry[]> {
-    const raw = await this.repo.getRankingRawEntries(leagueId, scope, roundId);
+    const raw = await this.repo.getRankingRawEntries(leagueId, scope, actor.userId, roundId);
     return sortFantasyRankingEntries(raw);
   }
 
@@ -62,7 +65,7 @@ export class ManageFantasyAdminUseCase {
     leagueId: string,
     userId: string
   ): Promise<UserFantasyHistoryEntry[]> {
-    return this.repo.getUserHistory(leagueId, userId);
+    return this.repo.getUserHistory(leagueId, userId, actor.userId);
   }
 
   async getUserRoundHistory(
@@ -71,7 +74,7 @@ export class ManageFantasyAdminUseCase {
     userId: string,
     roundId: string
   ): Promise<FantasyUserRoundHistoryDetail | null> {
-    return this.repo.getUserRoundHistory(leagueId, userId, roundId);
+    return this.repo.getUserRoundHistory(leagueId, userId, roundId, actor.userId);
   }
 
   async getSeasonPassDashboard(actor: Actor, leagueId: string): Promise<SeasonPassDashboardData> {
@@ -86,7 +89,7 @@ export class ManageFantasyAdminUseCase {
     if (!isAdmin) {
       return { success: false, error: "Acesso restrito a administradores da liga." };
     }
-    const data = await this.repo.getAdminData(leagueId);
+    const data = await this.repo.getAdminData(leagueId, actor.userId);
     return { success: true, data };
   }
 
@@ -107,7 +110,7 @@ export class ManageFantasyAdminUseCase {
 
     return this.repo.updateSettings(leagueId, {
       initialBudget: validation.normalizedBudget,
-    });
+    }, actor.userId);
   }
 
   async reprocessRound(
@@ -120,7 +123,7 @@ export class ManageFantasyAdminUseCase {
     if (!isAdmin) {
       return { success: false, error: "Acesso restrito a administradores da liga." };
     }
-    return this.repo.reprocessRound(leagueId, roundId, useCurrentRules);
+    return this.repo.reprocessRound(leagueId, roundId, useCurrentRules, actor.userId);
   }
 
   async createTestSession(
@@ -132,7 +135,7 @@ export class ManageFantasyAdminUseCase {
     if (!isAdmin) {
       return { success: false, error: "Acesso restrito a administradores da liga." };
     }
-    return this.repo.createTestSession(leagueId, roundId);
+    return this.repo.createTestSession(leagueId, roundId, actor.userId);
   }
 
   async processTestSession(
@@ -144,7 +147,7 @@ export class ManageFantasyAdminUseCase {
     if (!isAdmin) {
       return { success: false, error: "Acesso restrito a administradores da liga." };
     }
-    return this.repo.processTestSession(leagueId, roundId);
+    return this.repo.processTestSession(leagueId, roundId, actor.userId);
   }
 
   async resetTestSession(
@@ -156,6 +159,7 @@ export class ManageFantasyAdminUseCase {
     if (!isAdmin) {
       return { success: false, error: "Acesso restrito a administradores da liga." };
     }
-    return this.repo.resetTestSession(leagueId, roundId);
+    return this.repo.resetTestSession(leagueId, roundId, actor.userId);
   }
 }
+

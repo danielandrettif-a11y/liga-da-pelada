@@ -105,13 +105,19 @@ export function buildDashboardData(raw: {
   liveMatch?: any | null;
   lastRound?: any | null;
   activeCallups?: any[] | null;
+  nextRoundWeather?: unknown;
 }): DashboardData {
   const league = raw.league;
   const matchDuration = Number(league?.matchDuration ?? 7);
   const eventDurationMinutes = Number(league?.eventDurationMinutes ?? 120);
   const preseasonEnabled = Boolean(league?.preseasonEnabled);
 
-  const rawCallups = Array.isArray(raw.activeCallups) ? raw.activeCallups : [];
+  const rawCallups = (Array.isArray(raw.activeCallups) ? raw.activeCallups : []).filter((callup: any) => {
+    if (!callup.round) return true;
+    return !(callup.round.matches || []).some((match: any) =>
+      Boolean(match.started_at) || ["in_progress", "live", "finished"].includes(match.status),
+    );
+  });
   const mappedCallups: DashboardCallup[] = rawCallups.map((c: any) => {
     const entries = Array.isArray(c.callup_entries || c.entries)
       ? (c.callup_entries || c.entries).map((e: any) => ({
@@ -190,6 +196,22 @@ export function buildDashboardData(raw: {
       }
     : null;
 
+  const matchingOfficialCallup = mappedCallups.find((callup) =>
+    callup.roundType === "official" && (callup.roundId === nextRound?.id || callup.date === nextRound?.date));
+  const matchingFriendlyCallup = mappedCallups.find((callup) =>
+    callup.roundType === "friendly" && (callup.roundId === nextFriendly?.id || callup.date === nextFriendly?.date));
+  if (nextRound && nextRound.confirmedPlayers === 0) nextRound.confirmedPlayers = matchingOfficialCallup?.confirmed || 0;
+  if (nextFriendly && nextFriendly.confirmedPlayers === 0) nextFriendly.confirmedPlayers = matchingFriendlyCallup?.confirmed || 0;
+
+  const lastRound = raw.lastRound ? {
+    ...raw.lastRound,
+    matches: (raw.lastRound.matches || []).map((match: any) => ({
+      ...match,
+      teamA: (raw.lastRound.teams || []).find((team: any) => team.id === match.team_a_id) || null,
+      teamB: (raw.lastRound.teams || []).find((team: any) => team.id === match.team_b_id) || null,
+    })).sort((left: any, right: any) => Number(left.match_order || 0) - Number(right.match_order || 0)),
+  } : null;
+
   return {
     nextRound,
     nextFriendly,
@@ -199,11 +221,12 @@ export function buildDashboardData(raw: {
       name: nextRound?.stadiumName || league?.stadiumName || null,
       mapUrl: nextRound?.stadiumMapUrl || league?.stadiumMapUrl || null,
     },
+    nextRoundWeather: matchingOfficialCallup?.weather || raw.nextRoundWeather || null,
     eventDurationMinutes,
     preseasonEnabled,
     activeCallup: mappedCallups[0] || null,
     activeCallups: mappedCallups,
-    lastRound: raw.lastRound || null,
+    lastRound,
   };
 }
 

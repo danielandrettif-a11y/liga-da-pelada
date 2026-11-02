@@ -72,3 +72,4 @@ describe("Infrastructure: PgCardsRepository", () => {
     expect(executedSql).toContain("INSERT INTO fantasy_active_cards");
   });
 });
+

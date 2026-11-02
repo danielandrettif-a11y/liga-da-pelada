@@ -64,3 +64,4 @@ describe("httpCardsGateway", () => {
     ).rejects.toThrow("Carta inválida.");
   });
 });
+

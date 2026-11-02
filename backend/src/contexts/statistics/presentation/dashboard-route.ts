@@ -32,9 +32,7 @@ export function registerDashboardRoutes(
       }
 
       try {
-        const data = await service.getDashboard({
-          leagueId: request.params.leagueId,
-        });
+        const data = await service.getDashboard(authentication.actor, request.params.leagueId);
         return reply.code(200).send({ success: true, data });
       } catch (error: any) {
         return sendFailure(error, request, reply);

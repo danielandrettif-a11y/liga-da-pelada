@@ -108,3 +108,4 @@ describe("Application: ManageCardsUseCase", () => {
     expect(result.awardedUsersCount).toBe(6);
   });
 });
+

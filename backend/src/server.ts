@@ -51,6 +51,7 @@ import { pgRoundStatisticsRepository } from "./contexts/statistics/infrastructur
 import { pgSeasonOperationsRepository } from "./contexts/statistics/infrastructure/pg-season-operations-repository.js";
 import { PgDashboardRepository } from "./contexts/statistics/infrastructure/pg-dashboard-repository.js";
 import { PgOverallShadowRepository } from "./contexts/statistics/infrastructure/pg-overall-shadow-repository.js";
+import { calculatePlayerOveralls, parseOverallFormulaConfig } from "./contexts/statistics/domain/overall-engine.js";
 import { PgFinanceRepository } from "./contexts/finance/infrastructure/pg-finance-repository.js";
 import { PgFantasyMarketLineupRepository } from "./contexts/fantasy/infrastructure/pg-market-lineup-repository.js";
 import { PgFantasyAdminRepository } from "./contexts/fantasy/infrastructure/pg-fantasy-admin-repository.js";
@@ -202,6 +203,12 @@ const app = createApp({
   seasonRankingRepository: pgSeasonRankingRepository(pool),
   roundStatisticsRepository: pgRoundStatisticsRepository(pool),
   seasonOperationsRepository: pgSeasonOperationsRepository(pool),
+  dashboardRepository: new PgDashboardRepository(pool),
+  overallShadowRepository: new PgOverallShadowRepository(pool),
+  overallCalculationEngine: {
+    parseFormulaConfig: parseOverallFormulaConfig,
+    calculateOveralls: calculatePlayerOveralls,
+  },
   emailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL && process.env.EMAIL_UNSUBSCRIBE_SECRET),
   financeEnabled,
   financeRepository: new PgFinanceRepository(pool),

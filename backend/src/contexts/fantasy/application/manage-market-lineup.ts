@@ -18,19 +18,22 @@ export interface FantasyMarketLineupRepository {
   getPlayerDetail(
     leagueId: string,
     playerId: string,
+    userId: string,
     fantasyRoundId?: string
   ): Promise<FantasyPlayerPerformanceDetail | null>;
-  getQuickHighlights(leagueId: string): Promise<FantasyMarketQuickHighlights>;
+  getQuickHighlights(leagueId: string, userId: string): Promise<FantasyMarketQuickHighlights>;
   getMySummary(leagueId: string, userId: string): Promise<FantasyUserSummary | null>;
   getMyHistory(leagueId: string, userId: string): Promise<UserFantasyHistoryEntry[]>;
   getRevealedLineups(
     leagueId: string,
+    userId: string,
     roundId?: string
   ): Promise<{ allowed: boolean; error?: string; lineups: any[] }>;
-  getRoundLineupOverview(leagueId: string, roundId?: string): Promise<FantasyRoundOverview>;
+  getRoundLineupOverview(leagueId: string, userId: string, roundId?: string): Promise<FantasyRoundOverview>;
   getMarketRoundInfo(
     leagueId: string,
-    roundId: string
+    roundId: string,
+    userId: string
   ): Promise<{ isMarketOpen: boolean; playerPrices: Map<string, number>; userBudget: number }>;
   saveLineup(params: {
     leagueId: string;
@@ -40,8 +43,8 @@ export interface FantasyMarketLineupRepository {
     slots: FantasyLineupSlot[];
     totalCost: number;
   }): Promise<{ success: boolean; error?: string; lineupId?: string }>;
-  previewMarketV11(leagueId: string): Promise<{ success: boolean; data?: any; error?: string }>;
-  repairLegacyLineups(leagueId: string): Promise<{ success: boolean; repairedCount: number }>;
+  previewMarketV11(leagueId: string, userId: string): Promise<{ success: boolean; data?: any; error?: string }>;
+  repairLegacyLineups(leagueId: string, userId: string): Promise<{ success: boolean; repairedCount: number }>;
 }
 
 export class ManageFantasyMarketLineupUseCase {
@@ -57,11 +60,11 @@ export class ManageFantasyMarketLineupUseCase {
     playerId: string,
     fantasyRoundId?: string
   ): Promise<FantasyPlayerPerformanceDetail | null> {
-    return this.repo.getPlayerDetail(leagueId, playerId, fantasyRoundId);
+    return this.repo.getPlayerDetail(leagueId, playerId, actor.userId, fantasyRoundId);
   }
 
   async getQuickHighlights(actor: Actor, leagueId: string): Promise<FantasyMarketQuickHighlights> {
-    return this.repo.getQuickHighlights(leagueId);
+    return this.repo.getQuickHighlights(leagueId, actor.userId);
   }
 
   async getMySummary(actor: Actor, leagueId: string): Promise<FantasyUserSummary | null> {
@@ -77,7 +80,7 @@ export class ManageFantasyMarketLineupUseCase {
     leagueId: string,
     roundId?: string
   ): Promise<{ allowed: boolean; error?: string; lineups: any[] }> {
-    return this.repo.getRevealedLineups(leagueId, roundId);
+    return this.repo.getRevealedLineups(leagueId, actor.userId, roundId);
   }
 
   async getRoundLineupOverview(
@@ -85,7 +88,7 @@ export class ManageFantasyMarketLineupUseCase {
     leagueId: string,
     roundId?: string
   ): Promise<FantasyRoundOverview> {
-    return this.repo.getRoundLineupOverview(leagueId, roundId);
+    return this.repo.getRoundLineupOverview(leagueId, actor.userId, roundId);
   }
 
   async saveLineup(
@@ -95,7 +98,7 @@ export class ManageFantasyMarketLineupUseCase {
     slots: FantasyLineupSlot[],
     captainPlayerId: string
   ): Promise<{ success: boolean; error?: string; lineupId?: string }> {
-    const marketInfo = await this.repo.getMarketRoundInfo(leagueId, roundId);
+    const marketInfo = await this.repo.getMarketRoundInfo(leagueId, roundId, actor.userId);
 
     const validation = validateLineupSubmission({
       slots,
@@ -127,7 +130,7 @@ export class ManageFantasyMarketLineupUseCase {
     if (!isAdmin) {
       return { success: false, error: "Acesso restrito a administradores da liga." };
     }
-    return this.repo.previewMarketV11(leagueId);
+    return this.repo.previewMarketV11(leagueId, actor.userId);
   }
 
   async repairLegacyLineups(
@@ -138,7 +141,7 @@ export class ManageFantasyMarketLineupUseCase {
     if (!isAdmin) {
       return { success: false, error: "Acesso restrito a administradores da liga." };
     }
-    const result = await this.repo.repairLegacyLineups(leagueId);
+    const result = await this.repo.repairLegacyLineups(leagueId, actor.userId);
     return { success: true, repairedCount: result.repairedCount };
   }
 }

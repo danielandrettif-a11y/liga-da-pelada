@@ -76,3 +76,4 @@ describe("httpFantasyGateway", () => {
     await expect(gateway.getDashboard("l1")).rejects.toThrow("Falha de conexão com a API de Fantasy");
   });
 });
+

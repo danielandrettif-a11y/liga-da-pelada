@@ -1,5 +1,7 @@
 import type { Pool } from "pg";
 import type { Actor } from "../../../shared/actor.js";
+import { withAuthenticatedTransaction } from "../../../infrastructure/authenticated-transaction.js";
+import { buildOverallHistoryInput } from "../domain/overall-history.js";
 import type {
   OverallHistoryData,
   OverallPlayerSource,
@@ -10,14 +12,20 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
   constructor(private readonly db: Pool) {}
 
   async checkIsAdmin(actor: Actor, leagueId: string): Promise<boolean> {
-    const res = await this.db.query<{ is_admin: boolean }>(
-      `SELECT (lm.role = 'admin' OR EXISTS (SELECT 1 FROM profiles p WHERE p.id = $1 AND p.is_app_admin = true)) as is_admin
-       FROM league_members lm
-       WHERE lm.player_id = $1 AND lm.league_id = $2
-       LIMIT 1`,
-      [actor.userId, leagueId],
-    );
-    return Boolean(res.rows[0]?.is_admin);
+    return withAuthenticatedTransaction(this.db, actor, async (client) => {
+      const res = await client.query<{ is_admin: boolean }>(
+        `SELECT (
+           EXISTS (SELECT 1 FROM public.account_profiles profile WHERE profile.user_id = $1 AND profile.role = 'admin')
+           OR EXISTS (
+             SELECT 1 FROM public.league_members member
+             WHERE member.user_id = $1 AND member.league_id = $2
+               AND member.is_active = true AND member.role IN ('admin', 'owner')
+           )
+         ) AS is_admin`,
+        [actor.userId, leagueId],
+      );
+      return Boolean(res.rows[0]?.is_admin);
+    });
   }
 
   async getFormula(key: string): Promise<{ id: string; label: string; config?: any } | null> {
@@ -29,7 +37,7 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
   }
 
   async loadHistory(leagueId: string): Promise<OverallHistoryData> {
-    const [membersRes, roundsRes, overridesRes] = await Promise.all([
+    const [membersRes, roundsRes] = await Promise.all([
       this.db.query<{
         player_id: string;
         name: string;
@@ -64,32 +72,106 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
          ORDER BY date ASC, created_at ASC`,
         [leagueId],
       ),
-      this.db.query<{ round_id: string; player_id: string }>(
-        `SELECT round_id, player_id
-         FROM player_round_stat_overrides
-         WHERE override_type = 'zero_points'`,
-        [],
-      ),
     ]);
 
     const officialPlayers: OverallPlayerSource[] = membersRes.rows.map((r: any) => ({
       id: r.player_id,
       name: r.name || "Jogador",
-      playerProfile: r.player_profile,
-      initialPlayerProfile: r.initial_player_profile,
+      playerProfile: r.player_profile as OverallPlayerSource["playerProfile"],
+      initialPlayerProfile: r.initial_player_profile as OverallPlayerSource["initialPlayerProfile"],
       overallTraits: Array.isArray(r.overall_traits) ? r.overall_traits : [],
       overallSeedMode: r.overall_seed_mode,
       isGoalkeeper: Boolean(r.is_goalkeeper),
     }));
 
     const pendingPlayers = officialPlayers
-      .filter((p: OverallPlayerSource) => p.overallTraits.length < 1 || p.overallTraits.length > 2)
+      .filter((p: OverallPlayerSource) => (p.overallTraits || []).length < 1 || (p.overallTraits || []).length > 2)
       .map(({ id, name }) => ({ id, name }));
 
-    return {
+    const roundIds = roundsRes.rows.map((round) => round.id);
+    if (roundIds.length === 0) {
+      return { players: officialPlayers, pendingPlayers, rounds: [], zeroPointOverrides: [] };
+    }
+
+    const [statsRes, matchesRes, overridesRes] = await Promise.all([
+      this.db.query<any>(
+        `SELECT round_id, player_id, player_profile_locked, goals, assists, own_goals
+         FROM public.player_round_stats WHERE round_id = ANY($1::uuid[])`,
+        [roundIds],
+      ),
+      this.db.query<any>(
+        `SELECT id, round_id, status, team_a_id, team_b_id, score_a, score_b,
+                duration_seconds, timer_accumulated_seconds, eligibility_elapsed_offset_seconds
+         FROM public.matches WHERE round_id = ANY($1::uuid[])`,
+        [roundIds],
+      ),
+      this.db.query<{ round_id: string; player_id: string }>(
+        `SELECT override_item.round_id, override_item.player_id
+         FROM public.player_round_stat_overrides override_item
+         JOIN public.rounds round_item ON round_item.id = override_item.round_id
+         WHERE round_item.league_id = $1 AND override_item.override_type = 'zero_points'`,
+        [leagueId],
+      ),
+    ]);
+    const matchIds = matchesRes.rows.map((match: any) => match.id);
+    const emptyRows = { rows: [] as any[] };
+    const [eventsRes, playersRes, goalkeepersRes, stintsRes] = matchIds.length > 0
+      ? await Promise.all([
+          this.db.query<any>(
+            `SELECT match_id, player_id, assist_player_id, team_id, is_own_goal, elapsed_seconds, minute,
+                    goalkeeper_a_player_id, goalkeeper_b_player_id
+             FROM public.match_events WHERE match_id = ANY($1::uuid[])`,
+            [matchIds],
+          ),
+          this.db.query<any>(
+            `SELECT match_id, player_id, team_id, entered_elapsed_seconds, left_elapsed_seconds
+             FROM public.match_players WHERE match_id = ANY($1::uuid[])`,
+            [matchIds],
+          ),
+          this.db.query<any>(
+            `SELECT match_id, player_id, team_id
+             FROM public.match_goalkeepers WHERE match_id = ANY($1::uuid[])`,
+            [matchIds],
+          ),
+          this.db.query<any>(
+            `SELECT match_id, player_id, team_id, entered_elapsed_seconds, left_elapsed_seconds, selected_at
+             FROM public.match_goalkeeper_stints WHERE match_id = ANY($1::uuid[])`,
+            [matchIds],
+          ),
+        ])
+      : [emptyRows, emptyRows, emptyRows, emptyRows];
+
+    const groupBy = (rows: any[], key: string) => {
+      const grouped = new Map<string, any[]>();
+      for (const row of rows) grouped.set(row[key], [...(grouped.get(row[key]) || []), row]);
+      return grouped;
+    };
+    const statsByRound = groupBy(statsRes.rows, "round_id");
+    const matchesByRound = groupBy(matchesRes.rows, "round_id");
+    const eventsByMatch = groupBy(eventsRes.rows, "match_id");
+    const playersByMatch = groupBy(playersRes.rows, "match_id");
+    const goalkeepersByMatch = groupBy(goalkeepersRes.rows, "match_id");
+    const stintsByMatch = groupBy(stintsRes.rows, "match_id");
+    const rawRounds = roundsRes.rows.map((round: any) => ({
+      ...round,
+      player_round_stats: statsByRound.get(round.id) || [],
+      matches: (matchesByRound.get(round.id) || []).map((match: any) => ({
+        ...match,
+        match_events: eventsByMatch.get(match.id) || [],
+        match_players: playersByMatch.get(match.id) || [],
+        match_goalkeepers: goalkeepersByMatch.get(match.id) || [],
+        match_goalkeeper_stints: stintsByMatch.get(match.id) || [],
+      })),
+    }));
+    const history = buildOverallHistoryInput({
       players: officialPlayers,
+      rounds: rawRounds,
+      zeroPointOverrides: overridesRes.rows,
+    });
+    return {
+      ...history,
+      players: history.players as OverallPlayerSource[],
       pendingPlayers,
-      rounds: roundsRes.rows.map((r: any) => ({ ...r, roundType: r.round_type })),
       zeroPointOverrides: overridesRes.rows,
     };
   }
@@ -174,8 +256,11 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
     snapshots: any[];
     breakdowns: any[];
   }): Promise<void> {
-    for (const s of params.snapshots) {
-      await this.db.query(
+    const client = await this.db.connect();
+    try {
+      await client.query("BEGIN");
+      for (const s of params.snapshots) {
+        await client.query(
         `INSERT INTO player_overall_snapshots
          (calculation_run_id, player_id, overall, def_overall, ala_mei_overall, ata_overall, gol_overall, confidence, rounds_played, is_provisional, is_stale, data_quality)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
@@ -183,17 +268,48 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
           params.runId,
           s.playerId || s.player_id,
           s.overall,
-          s.def_overall ?? s.def,
-          s.ala_mei_overall ?? s.alaMei,
-          s.ata_overall ?? s.ata,
-          s.gol_overall ?? s.gol,
-          s.confidence,
-          s.rounds_played ?? s.roundsPlayed ?? 0,
-          s.is_provisional ?? s.provisional ?? false,
-          s.is_stale ?? s.stale ?? false,
-          JSON.stringify(s.data_quality || {}),
+          s.positions?.DEF?.value ?? s.def_overall ?? s.def,
+          s.positions?.ATA?.value ?? s.ala_mei_overall ?? s.alaMei,
+          s.positions?.ATA?.value ?? s.ata_overall ?? s.ata,
+          s.positions?.GOL?.value ?? s.gol_overall ?? s.gol,
+          Math.max(s.positions?.DEF?.confidence || 0, s.positions?.ALA_MEI?.confidence || 0, s.positions?.ATA?.confidence || 0),
+          s.roundsPlayed ?? s.rounds_played ?? 0,
+          s.isProvisional ?? s.is_provisional ?? s.provisional ?? false,
+          s.isStale ?? s.is_stale ?? s.stale ?? false,
+          JSON.stringify({
+            mode: "shadow",
+            effective_profile: s.effectiveProfile,
+            profile_source: "admin_fixed",
+            scout_totals: s.scoutTotals,
+            position_confidence: Object.fromEntries(Object.entries(s.positions || {}).map(([role, position]: [string, any]) => [role, position.confidence])),
+            overall_trend: s.trend,
+            position_trends: s.positionTrends,
+          }),
         ],
-      );
+        );
+      }
+      for (const item of params.breakdowns) {
+        await client.query(
+          `INSERT INTO public.player_overall_round_breakdowns
+           (calculation_run_id, player_id, round_id, round_date, round_index, goals, assists, own_goals,
+            goals_conceded, attacking_score, goal_score, assist_score, defensive_score, timing_quality,
+            played_profile, profile_decision_source, profile_appearance_number, profile_def_overall,
+            profile_ata_overall, role_evidence, trait_evidence, positions, position_confidence)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+          [params.runId, item.playerId, item.roundId, item.roundDate, item.roundIndex, item.goals,
+            item.assists, item.ownGoals, item.goalsConceded, item.attackingScore, item.goalScore,
+            item.assistScore, item.defensiveScore, item.timingQuality, item.playedProfile,
+            item.profileSource, item.appearanceNumber, item.profileDefOverall, item.profileAtaOverall,
+            JSON.stringify(item.roleEvidence), JSON.stringify(item.traitEvidence), JSON.stringify(item.positions),
+            JSON.stringify(item.confidence)],
+        );
+      }
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
   }
 

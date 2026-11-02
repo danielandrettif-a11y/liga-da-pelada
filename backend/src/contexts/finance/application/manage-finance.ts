@@ -19,6 +19,7 @@ import {
 } from "../domain/finance.js";
 
 export interface FinanceRepository {
+  checkCanAccess(actor: Actor, leagueId: string): Promise<boolean>;
   checkIsAdmin(actor: Actor, leagueId: string): Promise<boolean>;
   getExpenseItems(leagueId: string, includeArchived: boolean): Promise<ExpenseItem[]>;
   saveExpenseItem(leagueId: string, userId: string, input: ExpenseItemInput): Promise<{ success: boolean; error?: string }>;
@@ -32,14 +33,14 @@ export interface FinanceRepository {
     participants: Array<{ id: string; is_monthly_payer?: boolean }>;
     payments: Array<{ player_id: string; paid: boolean }>;
   } | null>;
-  getRoundPaymentWorkspace(roundId: string): Promise<any | null>;
+  getRoundPaymentWorkspace(leagueId: string, roundId: string): Promise<any | null>;
   getRoundPaymentPlayers(leagueId: string, roundId: string): Promise<PaymentPlayer[]>;
   getRoundPaymentObligations(leagueId: string, roundId: string): Promise<PaymentObligation[]>;
-  setPaymentObligationPaid(id: string, amountPaid: number): Promise<{ success: boolean; error?: string }>;
+  setPaymentObligationPaid(leagueId: string, id: string, amountPaid: number, userId: string): Promise<{ success: boolean; error?: string }>;
   setPlayerPayment(leagueId: string, roundId: string, playerId: string, paid: boolean, changedByUserId: string): Promise<{ success: boolean; error?: string }>;
   getRoundExpenseSelections(leagueId: string, roundId: string): Promise<RoundExpenseSelection[]>;
-  syncRoundExpenseItems(leagueId: string, roundId: string, expenseItemIds: string[]): Promise<{ success: boolean; error?: string }>;
-  updateRoundPaymentDetails(leagueId: string, input: RoundPaymentDetailsInput): Promise<{
+  syncRoundExpenseItems(leagueId: string, roundId: string, expenseItemIds: string[], userId: string): Promise<{ success: boolean; error?: string }>;
+  updateRoundPaymentDetails(leagueId: string, input: RoundPaymentDetailsInput, userId: string): Promise<{
     success: boolean;
     error?: string;
     details?: {
@@ -91,6 +92,7 @@ export type ManageFinanceService = {
 export function createManageFinanceService(repository: FinanceRepository): ManageFinanceService {
   return {
     async getExpenseItems(actor, leagueId, includeArchived = false) {
+      if (!await repository.checkCanAccess(actor, leagueId)) return [];
       return repository.getExpenseItems(leagueId, includeArchived);
     },
 
@@ -139,10 +141,12 @@ export function createManageFinanceService(repository: FinanceRepository): Manag
     },
 
     async getPaymentRounds(actor, leagueId) {
+      if (!await repository.checkCanAccess(actor, leagueId)) return [];
       return repository.getPaymentRounds(leagueId);
     },
 
     async hasPendingPaymentRound(actor, leagueId) {
+      if (!await repository.checkCanAccess(actor, leagueId)) return false;
       const state = await repository.getLatestFinishedRoundPaymentState(leagueId);
       if (!state) return false;
       return !areRoundParticipantsPaid(state.participants, state.payments);
@@ -150,16 +154,19 @@ export function createManageFinanceService(repository: FinanceRepository): Manag
 
     async getRoundPaymentWorkspace(actor, leagueId, roundId) {
       if (!roundId) return null;
-      return repository.getRoundPaymentWorkspace(roundId);
+      if (!await repository.checkCanAccess(actor, leagueId)) return null;
+      return repository.getRoundPaymentWorkspace(leagueId, roundId);
     },
 
     async getRoundPaymentPlayers(actor, leagueId, roundId) {
       if (!roundId) return [];
+      if (!await repository.checkCanAccess(actor, leagueId)) return [];
       return repository.getRoundPaymentPlayers(leagueId, roundId);
     },
 
     async getRoundPaymentObligations(actor, leagueId, roundId) {
       if (!roundId) return [];
+      if (!await repository.checkCanAccess(actor, leagueId)) return [];
       return repository.getRoundPaymentObligations(leagueId, roundId);
     },
 
@@ -168,25 +175,28 @@ export function createManageFinanceService(repository: FinanceRepository): Manag
       if (!Number.isFinite(amountPaid) || amountPaid < 0) {
         return { success: false, error: "Valor de pagamento inválido." };
       }
-      return repository.setPaymentObligationPaid(id, amountPaid);
+      if (!await repository.checkCanAccess(actor, leagueId)) return { success: false, error: "Acesso negado." };
+      return repository.setPaymentObligationPaid(leagueId, id, amountPaid, actor.userId);
     },
 
     async setPlayerPayment(actor, leagueId, roundId, playerId, paid) {
       if (!roundId || !playerId) {
         return { success: false, error: "Dados incompletos para confirmar pagamento." };
       }
+      if (!await repository.checkCanAccess(actor, leagueId)) return { success: false, error: "Acesso negado." };
       return repository.setPlayerPayment(leagueId, roundId, playerId, paid, actor.userId);
     },
 
     async getRoundExpenseSelections(actor, leagueId, roundId) {
       if (!roundId) return [];
+      if (!await repository.checkCanAccess(actor, leagueId)) return [];
       return repository.getRoundExpenseSelections(leagueId, roundId);
     },
 
     async syncRoundExpenseItems(actor, leagueId, roundId, expenseItemIds) {
       const isAdmin = await repository.checkIsAdmin(actor, leagueId);
       if (!isAdmin) return { success: false, error: "Somente administradores podem editar a cobrança." };
-      return repository.syncRoundExpenseItems(leagueId, roundId, expenseItemIds || []);
+      return repository.syncRoundExpenseItems(leagueId, roundId, expenseItemIds || [], actor.userId);
     },
 
     async updateRoundPaymentDetails(actor, leagueId, input) {
@@ -194,11 +204,12 @@ export function createManageFinanceService(repository: FinanceRepository): Manag
       if (!isAdmin) return { success: false, error: "Somente administradores podem editar os dados do PIX." };
       const validation = validateRoundPaymentDetails(input);
       if ("error" in validation) return { success: false, error: validation.error };
-      return repository.updateRoundPaymentDetails(leagueId, input);
+      return repository.updateRoundPaymentDetails(leagueId, input, actor.userId);
     },
 
     async getRoundPaymentChargeLines(actor, leagueId, roundId) {
       if (!roundId) return [];
+      if (!await repository.checkCanAccess(actor, leagueId)) return [];
       return repository.getRoundPaymentChargeLines(leagueId, roundId);
     },
 

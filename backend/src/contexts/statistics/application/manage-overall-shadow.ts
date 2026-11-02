@@ -1,4 +1,5 @@
 import type { Actor } from "../../../shared/actor.js";
+import type { OverallPlayer } from "../domain/overall-engine.js";
 import {
   FORMULA_KEY,
   COMPARISON_FORMULA_KEY,
@@ -7,14 +8,8 @@ import {
   type OverallShadowAdminData,
 } from "../domain/overall-shadow.js";
 
-export type OverallPlayerSource = {
-  id: string;
+export type OverallPlayerSource = OverallPlayer & {
   name: string;
-  playerProfile?: string | null;
-  initialPlayerProfile?: string | null;
-  overallTraits: string[];
-  overallSeedMode?: string | null;
-  isGoalkeeper: boolean;
 };
 
 export type OverallHistoryData = {
@@ -81,7 +76,7 @@ export type ManageOverallShadowService = {
 
 export function createManageOverallShadowService(
   repository: OverallShadowRepository,
-  calculationEngine?: {
+  calculationEngine: {
     parseFormulaConfig: (config: any) => any;
     calculateOveralls: (players: any[], rounds: any[], config: any) => { snapshots: any[]; breakdowns: any[] };
   },
@@ -152,15 +147,12 @@ export function createManageOverallShadowService(
           (p) => (p.overallTraits || []).length >= 1 && (p.overallTraits || []).length <= 2,
         );
 
-        let snapshots: any[] = [];
-        let breakdowns: any[] = [];
-
-        if (calculationEngine) {
-          const parsedConfig = calculationEngine.parseFormulaConfig(formula.config);
-          const result = calculationEngine.calculateOveralls(validPlayers, history.rounds, parsedConfig);
-          snapshots = result.snapshots;
-          breakdowns = result.breakdowns;
-        }
+        const parsedConfig = calculationEngine.parseFormulaConfig(formula.config);
+        const { snapshots, breakdowns } = calculationEngine.calculateOveralls(
+          validPlayers,
+          history.rounds,
+          parsedConfig,
+        );
 
         await repository.saveCalculatedData({ runId, snapshots, breakdowns });
         await repository.markRunSucceeded(runId, leagueId);

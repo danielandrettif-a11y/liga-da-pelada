@@ -89,3 +89,4 @@ describe("Application: ManageFantasyAdminUseCase", () => {
     expect(repo.updateSettings).toHaveBeenCalledWith(leagueId, { initialBudget: 120 });
   });
 });
+

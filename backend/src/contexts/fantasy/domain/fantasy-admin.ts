@@ -76,3 +76,4 @@ export function sortFantasyRankingEntries(
     patrimony: Math.round(entry.patrimony * 100) / 100,
   }));
 }
+

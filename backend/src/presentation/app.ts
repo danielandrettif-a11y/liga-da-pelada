@@ -97,6 +97,10 @@ import { registerRoundStatisticsRoutes } from "../contexts/statistics/presentati
 import type { RoundStatisticsRepository } from "../contexts/statistics/application/manage-round-statistics.js";
 import { registerSeasonOperationsRoutes } from "../contexts/statistics/presentation/season-operations-route.js";
 import type { SeasonOperationsRepository } from "../contexts/statistics/application/manage-season-operations.js";
+import type { DashboardRepository } from "../contexts/statistics/application/manage-dashboard.js";
+import { registerDashboardRoutes } from "../contexts/statistics/presentation/dashboard-route.js";
+import type { OverallShadowRepository } from "../contexts/statistics/application/manage-overall-shadow.js";
+import { registerOverallShadowRoutes } from "../contexts/statistics/presentation/overall-shadow-route.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
 import type { FinanceRepository } from "../contexts/finance/application/manage-finance.js";
 import { registerFinanceRoutes } from "../contexts/finance/presentation/finance-route.js";
@@ -181,6 +185,12 @@ export function createApp(dependencies: {
   seasonRankingRepository?: SeasonRankingRepository;
   roundStatisticsRepository?: RoundStatisticsRepository;
   seasonOperationsRepository?: SeasonOperationsRepository;
+  dashboardRepository?: DashboardRepository;
+  overallShadowRepository?: OverallShadowRepository;
+  overallCalculationEngine?: {
+    parseFormulaConfig: (config: unknown) => unknown;
+    calculateOveralls: (players: any[], rounds: any[], config: any) => { snapshots: any[]; breakdowns: any[] };
+  };
   financeEnabled?: boolean;
   financeRepository?: FinanceRepository;
   fantasyEnabled?: boolean;
@@ -271,7 +281,8 @@ export function createApp(dependencies: {
   }
   if (dependencies.statisticsEnabled && dependencies.strictContextDependencies
     && (!dependencies.seasonRankingRepository || !dependencies.roundStatisticsRepository
-      || !dependencies.seasonOperationsRepository)) {
+      || !dependencies.seasonOperationsRepository || !dependencies.dashboardRepository
+      || !dependencies.overallShadowRepository || !dependencies.overallCalculationEngine)) {
     throw new Error("Dependências de estatísticas são obrigatórias quando ENABLE_STATISTICS_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
@@ -512,6 +523,19 @@ export function createApp(dependencies: {
     registerSeasonOperationsRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.seasonOperationsRepository,
+    });
+  }
+  if (dependencies.statisticsEnabled && dependencies.dashboardRepository) {
+    registerDashboardRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.dashboardRepository,
+    });
+  }
+  if (dependencies.statisticsEnabled && dependencies.overallShadowRepository && dependencies.overallCalculationEngine) {
+    registerOverallShadowRoutes(app, {
+      verifier: dependencies.verifier,
+      repository: dependencies.overallShadowRepository,
+      calculationEngine: dependencies.overallCalculationEngine,
     });
   }
   if (dependencies.financeEnabled && dependencies.financeRepository) {

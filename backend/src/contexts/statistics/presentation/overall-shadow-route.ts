@@ -19,7 +19,7 @@ export function registerOverallShadowRoutes(
   dependencies: {
     verifier: UserVerifier;
     repository: OverallShadowRepository;
-    calculationEngine?: {
+    calculationEngine: {
       parseFormulaConfig: (config: any) => any;
       calculateOveralls: (players: any[], rounds: any[], config: any) => { snapshots: any[]; breakdowns: any[] };
     };
