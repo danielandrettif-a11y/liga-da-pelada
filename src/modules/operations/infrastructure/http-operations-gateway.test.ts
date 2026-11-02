@@ -8,7 +8,11 @@ describe("httpOperationsGateway", () => {
       json: () => Promise.resolve([{ kind: "api", name: "test", path: "/test", samples: 1 }]),
     });
 
-    const gateway = httpOperationsGateway("http://localhost:3001", mockFetch as any);
+    const gateway = httpOperationsGateway(
+      "http://localhost:3001",
+      { accessToken: "user-token", internalToken: "internal-token" },
+      mockFetch as any,
+    );
     const summary = await gateway.getPerformanceSummary(12);
 
     expect(mockFetch).toHaveBeenCalledWith(
@@ -16,6 +20,8 @@ describe("httpOperationsGateway", () => {
       expect.objectContaining({ headers: expect.any(Headers) })
     );
     expect(summary).toHaveLength(1);
+    const headers = mockFetch.mock.calls[0][1].headers as Headers;
+    expect(headers.get("authorization")).toBe("Bearer user-token");
   });
 
   it("reports server event via POST /api/internal/operations/observability", async () => {
@@ -24,9 +30,15 @@ describe("httpOperationsGateway", () => {
       status: 204,
     });
 
-    const gateway = httpOperationsGateway("http://localhost:3001", mockFetch as any);
+    const gateway = httpOperationsGateway(
+      "http://localhost:3001",
+      { accessToken: "user-token", internalToken: "internal-token" },
+      mockFetch as any,
+    );
     const res = await gateway.reportServerEvent({ kind: "web_vital", name: "LCP", value: 120 });
     expect(res.success).toBe(true);
+    const headers = mockFetch.mock.calls[0][1].headers as Headers;
+    expect(headers.get("authorization")).toBe("Bearer internal-token");
   });
 
   it("throws OperationsApiError on error", async () => {
@@ -36,7 +48,7 @@ describe("httpOperationsGateway", () => {
       json: () => Promise.resolve({ error: "Erro interno" }),
     });
 
-    const gateway = httpOperationsGateway("http://localhost:3001", mockFetch as any);
+    const gateway = httpOperationsGateway("http://localhost:3001", { accessToken: "user-token" }, mockFetch as any);
     await expect(gateway.getPerformanceSummary()).rejects.toThrow(OperationsApiError);
   });
 });

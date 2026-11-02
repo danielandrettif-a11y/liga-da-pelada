@@ -78,6 +78,7 @@ const cosmeticsEnabled = process.env.ENABLE_COSMETICS_API === "true";
 const collectiveEnabled = process.env.ENABLE_COLLECTIVE_API === "true";
 const integrationsEnabled = process.env.ENABLE_INTEGRATIONS_API === "true";
 const operationsEnabled = process.env.ENABLE_OPERATIONS_API === "true";
+const operationsInternalToken = process.env.OPERATIONS_INTERNAL_TOKEN;
 const port = Number(process.env.PORT || "3001");
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("PORT inválida.");
@@ -225,6 +226,7 @@ const app = createApp({
   managerRepository: new PgManagerRepository(pool),
   operationsEnabled,
   operationsRepository: new PgOperationsRepository(pool),
+  operationsInternalToken,
 });
 
 try {

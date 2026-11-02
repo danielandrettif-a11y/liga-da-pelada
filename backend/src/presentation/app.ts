@@ -206,6 +206,7 @@ export function createApp(dependencies: {
   managerRepository?: ManagerRepository;
   operationsEnabled?: boolean;
   operationsRepository?: OperationsRepository;
+  operationsInternalToken?: string;
   emailConfigured?: boolean;
   logger?: boolean;
 }): FastifyInstance {
@@ -284,6 +285,10 @@ export function createApp(dependencies: {
       || !dependencies.seasonOperationsRepository || !dependencies.dashboardRepository
       || !dependencies.overallShadowRepository || !dependencies.overallCalculationEngine)) {
     throw new Error("Dependências de estatísticas são obrigatórias quando ENABLE_STATISTICS_API=true.");
+  }
+  if (dependencies.operationsEnabled && (!dependencies.operationsRepository
+    || !dependencies.operationsInternalToken)) {
+    throw new Error("OperationsRepository e OPERATIONS_INTERNAL_TOKEN são obrigatórios quando ENABLE_OPERATIONS_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
   void app.register(multipart);
@@ -583,6 +588,8 @@ export function createApp(dependencies: {
   if (dependencies.operationsEnabled && dependencies.operationsRepository) {
     registerOperationsRoutes(app, {
       repository: dependencies.operationsRepository,
+      userVerifier: dependencies.verifier,
+      internalToken: dependencies.operationsInternalToken!,
     });
   }
   return app;

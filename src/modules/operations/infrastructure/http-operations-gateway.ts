@@ -18,6 +18,7 @@ export type OperationsHttpGateway = {
 
 export function httpOperationsGateway(
   baseUrl: string,
+  credentials: { accessToken?: string; internalToken?: string } = {},
   fetcher: typeof fetch = fetch
 ): OperationsHttpGateway {
   const normalizedBase = baseUrl.replace(/\/+$/, "");
@@ -25,6 +26,10 @@ export function httpOperationsGateway(
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const url = `${normalizedBase}${path}`;
     const headers = new Headers(init?.headers);
+    const token = path.startsWith("/api/internal/")
+      ? credentials.internalToken
+      : credentials.accessToken;
+    if (token) headers.set("Authorization", `Bearer ${token}`);
     if (init?.body && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }

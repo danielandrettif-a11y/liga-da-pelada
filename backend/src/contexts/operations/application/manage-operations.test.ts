@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { ManageOperationsUseCase, type OperationsRepository } from "./manage-operations.js";
 
 describe("ManageOperationsUseCase", () => {
+  const actor = { userId: "11111111-1111-4111-8111-111111111111" };
   const createMockRepo = (): OperationsRepository => ({
     getPerformanceSummary: vi.fn().mockResolvedValue([]),
     recordServerEvent: vi.fn().mockResolvedValue({ success: true }),
@@ -11,14 +12,14 @@ describe("ManageOperationsUseCase", () => {
     const repo = createMockRepo();
     const useCase = new ManageOperationsUseCase(repo);
 
-    await useCase.getPerformanceSummary(0);
-    expect(repo.getPerformanceSummary).toHaveBeenCalledWith(1);
+    await useCase.getPerformanceSummary(actor, 0);
+    expect(repo.getPerformanceSummary).toHaveBeenCalledWith(actor, 1);
 
-    await useCase.getPerformanceSummary(1000);
-    expect(repo.getPerformanceSummary).toHaveBeenCalledWith(720);
+    await useCase.getPerformanceSummary(actor, 1000);
+    expect(repo.getPerformanceSummary).toHaveBeenCalledWith(actor, 720);
 
-    await useCase.getPerformanceSummary(48);
-    expect(repo.getPerformanceSummary).toHaveBeenCalledWith(48);
+    await useCase.getPerformanceSummary(actor, 48);
+    expect(repo.getPerformanceSummary).toHaveBeenCalledWith(actor, 48);
   });
 
   it("validates event before recording", async () => {

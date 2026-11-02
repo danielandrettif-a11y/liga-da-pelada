@@ -15,11 +15,11 @@ export type PerformanceSummaryRow = {
 };
 
 export async function getPerformanceSummary(hours = 24): Promise<PerformanceSummaryRow[]> {
-  const opsApi = await operationsApi();
+  const client = await createClient();
+  const opsApi = await operationsApi(client);
   if (opsApi) {
     return opsApi.getPerformanceSummary(hours);
   }
-  const client = await createClient();
   const { data, error } = await client.rpc("get_app_performance_summary", {
     p_hours: Math.max(1, Math.min(720, Math.trunc(hours))),
   });
