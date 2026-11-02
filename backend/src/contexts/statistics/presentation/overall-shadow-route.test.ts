@@ -50,7 +50,14 @@ describe("Statistics Presentation: overall-shadow-route", () => {
       markRunPublished: vi.fn().mockResolvedValue(undefined),
       ...repoOverrides,
     };
-    registerOverallShadowRoutes(app, { verifier, repository });
+    registerOverallShadowRoutes(app, {
+      verifier,
+      repository,
+      calculationEngine: {
+        parseFormulaConfig: vi.fn((config) => config),
+        calculateOveralls: vi.fn(() => ({ snapshots: [{ playerId: "p1" }], breakdowns: [] })),
+      },
+    });
     return app;
   }
 

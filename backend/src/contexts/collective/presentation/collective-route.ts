@@ -5,11 +5,14 @@ import {
   ManageCollectiveUseCase,
   type CollectiveRepository,
 } from "../application/manage-collective.js";
+import { CollectiveAccessError } from "../domain/collective.js";
 
 function sendFailure(error: unknown, request: FastifyRequest, reply: FastifyReply) {
   request.log.error({ err: error }, "collective operation failed");
-  const message = error instanceof Error ? error.message : "Erro interno no serviço da Coletiva.";
-  return reply.code(500).send({ success: false, error: message });
+  if (error instanceof CollectiveAccessError) {
+    return reply.code(403).send({ success: false, error: error.message });
+  }
+  return reply.code(500).send({ success: false, error: "Erro interno no serviço da Coletiva." });
 }
 
 export function registerCollectiveRoutes(

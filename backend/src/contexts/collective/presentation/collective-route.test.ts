@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import { registerCollectiveRoutes } from "./collective-route.js";
 import type { CollectiveRepository } from "../application/manage-collective.js";
 import type { UserVerifier } from "../../../infrastructure/auth-user-verifier.js";
+import { CollectiveAccessError } from "../domain/collective.js";
 
 describe("Collective Routes", () => {
   const createMockRepo = (): CollectiveRepository => ({
@@ -97,5 +98,22 @@ describe("Collective Routes", () => {
       headers: { authorization: "Bearer valid-token" },
     });
     expect(deleteRes.statusCode).toBe(200);
+  });
+
+  it("returns 403 without exposing internals when a collective is outside the selected league", async () => {
+    const app = Fastify();
+    const repo = createMockRepo();
+    vi.mocked(repo.getOlderMessages).mockRejectedValue(new CollectiveAccessError());
+    registerCollectiveRoutes(app, { repository: repo, userVerifier: createMockVerifier() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/collective/leagues/l1/callups/foreign/messages",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { cursor: { createdAt: "2026-11-01T00:00:00Z", id: "m1" } },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error).toContain("não pertence");
   });
 });

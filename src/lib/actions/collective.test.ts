@@ -5,6 +5,27 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
   unstable_cache: (fn: any) => fn,
 }));
+vi.mock("next/server", () => ({ after: vi.fn() }));
+
+const { mockUpload, mockRemove, mockMaybeSingle, mockSupabaseClient } = vi.hoisted(() => {
+  const upload = vi.fn().mockResolvedValue({ error: null });
+  const remove = vi.fn().mockResolvedValue({ error: null });
+  const maybeSingle = vi.fn().mockResolvedValue({ data: { id: "c1" }, error: null });
+  const query: any = {};
+  query.select = vi.fn(() => query);
+  query.eq = vi.fn(() => query);
+  query.maybeSingle = maybeSingle;
+  return {
+    mockUpload: upload,
+    mockRemove: remove,
+    mockMaybeSingle: maybeSingle,
+    mockSupabaseClient: {
+      from: vi.fn(() => query),
+      rpc: vi.fn().mockResolvedValue({ data: true, error: null }),
+      storage: { from: vi.fn(() => ({ upload, remove })) },
+    },
+  };
+});
 
 const mockCollectiveApi = {
   getActiveCollectiveSummary: vi.fn().mockResolvedValue({ callupId: "c1", unreadCount: 0 }),
@@ -38,9 +59,9 @@ vi.mock("@/modules/collective/infrastructure/collective-api-session", () => ({
 
 vi.mock("../auth", () => ({
   getCurrentAccount: vi.fn().mockResolvedValue({
-    user: { id: "user-123" },
+    user: { id: "user-123", user_metadata: { name: "Jogador" } },
     isAdmin: true,
-    client: { from: vi.fn() },
+    client: mockSupabaseClient,
     profile: { player_id: "player-123" },
   }),
 }));
@@ -63,6 +84,9 @@ import {
 describe("Server Actions: Collective Bridging (8 operations)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockMaybeSingle.mockResolvedValue({ data: { id: "c1" }, error: null });
+    mockUpload.mockResolvedValue({ error: null });
+    mockSupabaseClient.rpc.mockResolvedValue({ data: true, error: null });
   });
 
   it("delegates read operations to collectiveApi", async () => {
@@ -84,7 +108,12 @@ describe("Server Actions: Collective Bridging (8 operations)", () => {
     formData.set("callup_id", "c1");
     formData.set("body", "Vamos galera!");
     const sendRes = await sendCollectiveMessage(formData);
-    expect(mockCollectiveApi.sendCollectiveMessage).toHaveBeenCalled();
+    expect(mockCollectiveApi.sendCollectiveMessage).toHaveBeenCalledWith("league-123", expect.objectContaining({
+      callupId: "c1",
+      body: "Vamos galera!",
+      kind: "text",
+    }));
+    expect(mockCollectiveApi.sendCollectiveMessage.mock.calls[0][1]).not.toHaveProperty("senderPlayerId");
     expect(sendRes.success).toBe(true);
 
     const editRes = await editCollectiveMessage("m1", "Texto editado");
@@ -98,6 +127,27 @@ describe("Server Actions: Collective Bridging (8 operations)", () => {
     const readRes = await markCollectiveRead([{ callupId: "c1", messageId: "m1" }]);
     expect(mockCollectiveApi.markCollectiveRead).toHaveBeenCalledWith("league-123", [{ callupId: "c1", messageId: "m1" }]);
     expect(readRes.success).toBe(true);
+  });
+
+  it("uploads media before sending only its scoped metadata through the backend", async () => {
+    const formData = new FormData();
+    formData.set("callup_id", "c1");
+    formData.set("media", new File([new Uint8Array([1, 2, 3])], "foto.webp", { type: "image/webp" }));
+
+    const result = await sendCollectiveMessage(formData);
+
+    expect(result.success).toBe(true);
+    expect(mockUpload).toHaveBeenCalledWith(
+      expect.stringMatching(/^c1\/user-123\/.+\.webp$/),
+      expect.any(File),
+      { contentType: "image/webp", upsert: false },
+    );
+    const payload = mockCollectiveApi.sendCollectiveMessage.mock.calls[0][1];
+    expect(payload).toMatchObject({
+      callupId: "c1", kind: "image", mediaMime: "image/webp", mediaSize: 3,
+    });
+    expect(payload.mediaPath).toMatch(/^c1\/user-123\//);
+    expect(payload).not.toHaveProperty("senderPlayerId");
   });
 
   it("delegates admin previous collective to collectiveApi", async () => {

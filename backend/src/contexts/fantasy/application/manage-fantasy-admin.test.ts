@@ -86,7 +86,7 @@ describe("Application: ManageFantasyAdminUseCase", () => {
 
     const valid = await useCase.updateSettings(adminActor, leagueId, { initialBudget: 120 });
     expect(valid.success).toBe(true);
-    expect(repo.updateSettings).toHaveBeenCalledWith(leagueId, { initialBudget: 120 });
+    expect(repo.updateSettings).toHaveBeenCalledWith(leagueId, { initialBudget: 120 }, adminActor.userId);
   });
 });
 

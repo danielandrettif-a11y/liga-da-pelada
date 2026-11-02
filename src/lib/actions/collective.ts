@@ -195,35 +195,13 @@ export async function sendCollectiveMessage(formData: FormData) {
   const account = await getCurrentAccount();
   if (!account.user || !account.profile?.player_id) return { success: false, error: "Entre com um jogador vinculado para conversar." };
   const callupId = String(formData.get("callup_id") || "");
-  const collectiveApi = await collectiveApiFor(account.client);
-  if (collectiveApi) {
-    const league = await getSelectedLeague();
-    if (league) {
-      const body = String(formData.get("body") || "").trim();
-      const duration = Math.trunc(Number(formData.get("duration") || 0));
-      const replyToMessageId = String(formData.get("reply_to_message_id") || "").trim() || null;
-      const res = await collectiveApi.sendCollectiveMessage(league.id, {
-        callupId,
-        body,
-        kind: "text",
-        duration,
-        replyToMessageId,
-        senderPlayerId: account.profile.player_id,
-      });
-      if (res.success) {
-        revalidatePath("/coletiva");
-        revalidatePath("/convocacao");
-      }
-      return res;
-    }
-  }
-  if (!(await isCallupInSelectedLeague(account.client, callupId))) {
-    return { success: false, error: "Esta Coletiva não pertence à pelada selecionada." };
-  }
   const body = String(formData.get("body") || "").trim();
   const file = formData.get("media");
   const duration = Math.trunc(Number(formData.get("duration") || 0));
   const replyToMessageId = String(formData.get("reply_to_message_id") || "").trim() || null;
+  if (!callupId || !(await isCallupInSelectedLeague(account.client, callupId))) {
+    return { success: false, error: "Esta Coletiva não pertence à pelada selecionada." };
+  }
   const { data: allowed } = await account.client.rpc("can_access_collective_chat", { p_callup_id: callupId });
   if (!allowed) return { success: false, error: "A Coletiva não está disponível para esta conta." };
   let kind: "text" | "image" | "audio" = "text";
@@ -243,11 +221,57 @@ export async function sendCollectiveMessage(formData: FormData) {
     mediaSize = file.size;
   }
   if (!body && !mediaPath) return { success: false, error: "Escreva uma mensagem ou anexe uma mídia." };
-  if (body.length > 1000) return { success: false, error: "A mensagem pode ter no máximo 1.000 caracteres." };
+  if (body.length > 1000) {
+    if (mediaPath) await account.client.storage.from("collective-media").remove([mediaPath]);
+    return { success: false, error: "A mensagem pode ter no máximo 1.000 caracteres." };
+  }
+
+  const finishSuccess = () => {
+    revalidatePath("/coletiva");
+    revalidatePath("/convocacao");
+    const fallbackSenderName = String(account.user!.user_metadata?.name || account.user!.user_metadata?.full_name || "Jogador");
+    after(async () => {
+      try {
+        await pushCollectiveMessage(callupId, account.user!.id, account.profile!.player_id!, fallbackSenderName, kind, body);
+      } catch (pushError) {
+        console.error("Falha no push da Coletiva:", pushError);
+      }
+    });
+    return { success: true as const };
+  };
+
+  const collectiveApi = await collectiveApiFor(account.client);
+  const league = await getSelectedLeague();
+  if (collectiveApi && league) {
+    try {
+      const result = await collectiveApi.sendCollectiveMessage(league.id, {
+        callupId,
+        body,
+        kind,
+        mediaPath,
+        mediaMime,
+        mediaSize,
+        duration: kind === "audio" ? duration : null,
+        replyToMessageId,
+      });
+      if (!result.success) {
+        if (mediaPath) await account.client.storage.from("collective-media").remove([mediaPath]);
+        return result;
+      }
+      return finishSuccess();
+    } catch (error) {
+      if (mediaPath) await account.client.storage.from("collective-media").remove([mediaPath]);
+      return { success: false, error: error instanceof Error ? error.message : "Não foi possível enviar a mensagem." };
+    }
+  }
+
   const { data: callup } = await account.client.from("callups").select("round_id").eq("id", callupId).maybeSingle();
   if (replyToMessageId) {
     const { data: replied } = await account.client.from("collective_messages").select("id").eq("id", replyToMessageId).eq("callup_id", callupId).maybeSingle();
-    if (!replied) return { success: false, error: "A mensagem respondida não pertence a esta Coletiva." };
+    if (!replied) {
+      if (mediaPath) await account.client.storage.from("collective-media").remove([mediaPath]);
+      return { success: false, error: "A mensagem respondida não pertence a esta Coletiva." };
+    }
   }
   const { data: inserted, error } = await account.client.from("collective_messages").insert({
     callup_id: callupId,
@@ -266,13 +290,7 @@ export async function sendCollectiveMessage(formData: FormData) {
     if (mediaPath) await account.client.storage.from("collective-media").remove([mediaPath]);
     return { success: false, error: error.message };
   }
-  revalidatePath("/coletiva");
-  revalidatePath("/convocacao");
-  if (inserted?.id) {
-    const fallbackSenderName = String(account.user.user_metadata?.name || account.user.user_metadata?.full_name || "Jogador");
-    after(async () => { try { await pushCollectiveMessage(callupId, account.user!.id, account.profile!.player_id!, fallbackSenderName, kind, body); } catch (pushError) { console.error("Falha no push da Coletiva:", pushError); } });
-  }
-  return { success: true };
+  return inserted?.id ? finishSuccess() : { success: false, error: "A mensagem não foi criada." };
 }
 
 export async function editCollectiveMessage(messageId: string, body: string) {

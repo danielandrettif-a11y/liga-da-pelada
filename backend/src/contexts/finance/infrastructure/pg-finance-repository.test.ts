@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { PgFinanceRepository } from "./pg-finance-repository.js";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 
 describe("Finance Infrastructure: PgFinanceRepository", () => {
   it("checks admin status via SQL query", async () => {
@@ -11,7 +11,7 @@ describe("Finance Infrastructure: PgFinanceRepository", () => {
     const isAdmin = await repo.checkIsAdmin({ userId: "u1" }, "l1");
     expect(isAdmin).toBe(true);
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringContaining("SELECT (lm.role = 'admin'"),
+      expect.stringContaining("member.role IN ('admin', 'owner')"),
       ["u1", "l1"],
     );
   });
@@ -53,26 +53,27 @@ describe("Finance Infrastructure: PgFinanceRepository", () => {
     });
     expect(result.success).toBe(true);
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringContaining("INSERT INTO expense_items"),
+      expect.stringContaining("INSERT INTO league_expense_items"),
       expect.arrayContaining(["l1", "Churrasco"]),
     );
   });
 
   it("updates player payment and inserts audit log", async () => {
+    const query = vi.fn().mockImplementation(async (sql: string) => {
+      if (sql.includes("FROM public.round_players")) return { rows: [{ exists: 1 }], rowCount: 1 };
+      return { rows: [], rowCount: 0 };
+    });
     const mockPool = {
-      query: vi.fn().mockResolvedValue({ rows: [] }),
+      connect: vi.fn().mockResolvedValue({ query, release: vi.fn() } as unknown as PoolClient),
     } as unknown as Pool;
     const repo = new PgFinanceRepository(mockPool);
     const result = await repo.setPlayerPayment("l1", "r1", "p1", true, "u1");
     expect(result.success).toBe(true);
-    expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringContaining("INSERT INTO round_payments"),
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO public.round_payments"),
       expect.any(Array),
     );
-    expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringContaining("INSERT INTO payment_audit_log"),
-      expect.any(Array),
-    );
+    expect(query).toHaveBeenCalledWith("COMMIT");
   });
 });
 

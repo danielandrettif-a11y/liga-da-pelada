@@ -5,6 +5,7 @@ import {
   type CollectiveRoomData,
   type CollectiveCursor,
   validateMessageBody,
+  validateMessageKind,
 } from "../domain/collective.js";
 
 export interface CollectiveRepository {
@@ -77,6 +78,10 @@ export class ManageCollectiveUseCase {
     if (!callupId) {
       return { success: false as const, messages: [], error: "Convocação não informada." };
     }
+    if (!cursor || typeof cursor.createdAt !== "string" || !cursor.createdAt
+      || typeof cursor.id !== "string" || !cursor.id || Number.isNaN(Date.parse(cursor.createdAt))) {
+      return { success: false as const, messages: [], error: "Cursor de paginação inválido." };
+    }
     const res = await this.repository.getOlderMessages(actor, leagueId, callupId, cursor);
     return { success: true as const, ...res };
   }
@@ -99,13 +104,52 @@ export class ManageCollectiveUseCase {
     if (!input.callupId) {
       return { success: false, error: "Convocação não informada." };
     }
-    if (!input.body && !input.mediaPath) {
+    if (!validateMessageKind(input.kind)) {
+      return { success: false, error: "Tipo de mensagem inválido." };
+    }
+    const body = typeof input.body === "string" ? input.body.trim() : "";
+    const hasMedia = Boolean(input.mediaPath);
+    if (!body && !hasMedia) {
       return { success: false, error: "Escreva uma mensagem ou anexe uma mídia." };
     }
-    if (input.body && input.body.length > 1000) {
+    if (body.length > 1000) {
       return { success: false, error: "A mensagem pode ter no máximo 1.000 caracteres." };
     }
-    return this.repository.sendMessage(actor, leagueId, input);
+    if (input.kind === "text" && hasMedia) {
+      return { success: false, error: "Mensagens de texto não podem conter mídia." };
+    }
+    if (input.kind !== "text" && !hasMedia) {
+      return { success: false, error: "A mídia da mensagem não foi informada." };
+    }
+    if (hasMedia) {
+      const expectedPrefix = `${input.callupId}/${actor.userId}/`;
+      const fileName = input.mediaPath!.slice(expectedPrefix.length);
+      if (!input.mediaPath!.startsWith(expectedPrefix) || !fileName || fileName.includes("/")) {
+        return { success: false, error: "O caminho da mídia não pertence ao usuário autenticado." };
+      }
+    }
+    if (hasMedia && (!Number.isInteger(input.mediaSize) || Number(input.mediaSize) < 1 || Number(input.mediaSize) > 8 * 1024 * 1024)) {
+      return { success: false, error: "O arquivo pode ter no máximo 8 MB." };
+    }
+    const imageMimes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+    const audioMimes = new Set(["audio/webm", "audio/mp4", "audio/mpeg", "audio/ogg"]);
+    if (input.kind === "image" && !imageMimes.has(input.mediaMime || "")) {
+      return { success: false, error: "Envie uma imagem válida." };
+    }
+    if (input.kind === "audio") {
+      if (!audioMimes.has(input.mediaMime || "")) {
+        return { success: false, error: "Envie um áudio válido." };
+      }
+      if (!Number.isInteger(input.duration) || Number(input.duration) < 1 || Number(input.duration) > 60) {
+        return { success: false, error: "O áudio deve ter entre 1 e 60 segundos." };
+      }
+    }
+    return this.repository.sendMessage(actor, leagueId, {
+      ...input,
+      body,
+      duration: input.kind === "audio" ? input.duration : null,
+      senderPlayerId: undefined,
+    });
   }
 
   async editMessage(actor: Actor, leagueId: string, messageId: string, body: string) {
@@ -123,8 +167,11 @@ export class ManageCollectiveUseCase {
   }
 
   async markRead(actor: Actor, leagueId: string, targets: Array<{ callupId: string; messageId: string }>) {
-    if (!targets || targets.length === 0) return { success: false };
-    return this.repository.markRead(actor, leagueId, targets);
+    if (!Array.isArray(targets) || targets.length === 0 || targets.length > 100) return { success: false };
+    const validTargets = targets.filter((target) => target && typeof target.callupId === "string"
+      && Boolean(target.callupId) && typeof target.messageId === "string" && Boolean(target.messageId));
+    if (validTargets.length !== targets.length) return { success: false };
+    return this.repository.markRead(actor, leagueId, validTargets);
   }
 
   async getAdminPreviousCollective(actor: Actor, leagueId: string) {

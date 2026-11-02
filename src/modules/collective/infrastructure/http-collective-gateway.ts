@@ -27,10 +27,21 @@ export type CollectiveHttpGateway = {
   getAdminPreviousCollective(leagueId: string): Promise<CollectiveRoomData | null>;
 };
 
+type ApiCollectiveMessage = Omit<CollectivePageMessage, "mediaUrl"> & {
+  mediaPath?: string | null;
+};
+
+type ApiCollectiveRoom = Omit<CollectiveRoomData, "messages"> & {
+  messages: ApiCollectiveMessage[];
+};
+
+type SignMediaPaths = (paths: string[]) => Promise<Map<string, string>>;
+
 export function httpCollectiveGateway(
   baseUrl: string,
   accessToken: string,
-  fetcher: typeof fetch = fetch
+  fetcher: typeof fetch = fetch,
+  signMediaPaths?: SignMediaPaths,
 ): CollectiveHttpGateway {
   const normalizedBase = baseUrl.replace(/\/+$/, "");
 
@@ -59,6 +70,27 @@ export function httpCollectiveGateway(
     return res.json() as Promise<T>;
   }
 
+  async function mapMessages(messages: ApiCollectiveMessage[]): Promise<CollectivePageMessage[]> {
+    const paths = [...new Set(messages.map((message) => message.mediaPath || "").filter(Boolean))];
+    let signedByPath = new Map<string, string>();
+    if (paths.length && signMediaPaths) {
+      try {
+        signedByPath = await signMediaPaths(paths);
+      } catch {
+        // A falha ao assinar uma mídia não deve impedir a leitura da conversa.
+      }
+    }
+    return messages.map(({ mediaPath, ...message }) => ({
+      ...message,
+      mediaUrl: mediaPath ? signedByPath.get(mediaPath) || null : null,
+    }));
+  }
+
+  async function mapRoom(room: ApiCollectiveRoom | null): Promise<CollectiveRoomData | null> {
+    if (!room) return null;
+    return { ...room, messages: await mapMessages(room.messages || []) };
+  }
+
   return {
     async getActiveCollectiveSummary(leagueId) {
       return request<CollectiveSummary | null>(`/api/collective/leagues/${leagueId}/summary`);
@@ -66,13 +98,14 @@ export function httpCollectiveGateway(
 
     async getCollectiveRoom(leagueId, callupId) {
       const q = callupId ? `?callupId=${encodeURIComponent(callupId)}` : "";
-      return request<CollectiveRoomData | null>(`/api/collective/leagues/${leagueId}/room${q}`);
+      const room = await request<ApiCollectiveRoom | null>(`/api/collective/leagues/${leagueId}/room${q}`);
+      return mapRoom(room);
     },
 
     async getOlderCollectiveMessages(leagueId, callupId, cursor) {
-      return request<{
+      const page = await request<{
         success: boolean;
-        messages: CollectivePageMessage[];
+        messages: ApiCollectiveMessage[];
         hasOlderMessages: boolean;
         nextCursor: CollectivePageCursor | null;
         error?: string;
@@ -80,6 +113,7 @@ export function httpCollectiveGateway(
         method: "POST",
         body: JSON.stringify({ cursor }),
       });
+      return { ...page, messages: await mapMessages(page.messages || []) };
     },
 
     async sendCollectiveMessage(leagueId, payload) {
@@ -110,7 +144,8 @@ export function httpCollectiveGateway(
     },
 
     async getAdminPreviousCollective(leagueId) {
-      return request<CollectiveRoomData | null>(`/api/collective/leagues/${leagueId}/admin-previous`);
+      const room = await request<ApiCollectiveRoom | null>(`/api/collective/leagues/${leagueId}/admin-previous`);
+      return mapRoom(room);
     },
   };
 }

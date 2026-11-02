@@ -35,6 +35,35 @@ describe("httpCollectiveGateway", () => {
     expect(deleteRes.success).toBe(true);
   });
 
+  it("converts private media paths into signed URLs for room reads", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        summary: { callupId: "c1", unreadCount: 0 },
+        callupIds: ["c1"],
+        messages: [{
+          id: "m1", callupId: "c1", senderUserId: "u1", senderPlayerId: "p1",
+          senderName: "Ana", senderAvatarUrl: null, kind: "image", body: null,
+          mediaPath: "c1/u1/photo.webp", mediaMime: "image/webp", duration: null,
+          editedAt: null, deletedAt: null, createdAt: "2026-11-02T10:00:00Z",
+          own: true, replyTo: null,
+        }],
+        isAdmin: false, currentUserId: "u1", firstUnreadMessageId: null,
+        lastReadMessageId: null, hasOlderMessages: false, nextCursor: null,
+      }),
+    });
+    const signMediaPaths = vi.fn().mockResolvedValue(new Map([
+      ["c1/u1/photo.webp", "https://signed.test/photo.webp"],
+    ]));
+    const gateway = httpCollectiveGateway("http://localhost:3001", "token", mockFetch as any, signMediaPaths);
+
+    const room = await gateway.getCollectiveRoom("league-1");
+
+    expect(signMediaPaths).toHaveBeenCalledWith(["c1/u1/photo.webp"]);
+    expect(room?.messages[0].mediaUrl).toBe("https://signed.test/photo.webp");
+    expect(room?.messages[0]).not.toHaveProperty("mediaPath");
+  });
+
   it("throws CollectiveApiError on server failure", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: false,

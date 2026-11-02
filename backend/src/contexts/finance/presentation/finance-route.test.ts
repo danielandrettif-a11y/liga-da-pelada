@@ -20,6 +20,7 @@ describe("Finance Presentation: finance-route", () => {
       }),
     };
     const repository: FinanceRepository = {
+      checkCanAccess: vi.fn().mockResolvedValue(true),
       checkIsAdmin: vi.fn(async (actor: Actor) => actor.userId === "admin-1"),
       getExpenseItems: vi.fn().mockResolvedValue([{ id: "ei-1", name: "Bolas", total_amount: 150 }]),
       saveExpenseItem: vi.fn().mockResolvedValue({ success: true }),

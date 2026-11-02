@@ -8,6 +8,7 @@ describe("Finance Application: manage-finance", () => {
 
   function createMockRepo(overrides: Partial<FinanceRepository> = {}): FinanceRepository {
     return {
+      checkCanAccess: vi.fn().mockResolvedValue(true),
       checkIsAdmin: vi.fn(async (actor: Actor) => actor.userId === "admin-1"),
       getExpenseItems: vi.fn().mockResolvedValue([]),
       saveExpenseItem: vi.fn().mockResolvedValue({ success: true }),

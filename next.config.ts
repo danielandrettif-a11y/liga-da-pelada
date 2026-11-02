@@ -16,6 +16,14 @@ const supabaseImageSource = (() => {
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  turbopack: {
+    // O backend usa NodeNext e, corretamente, referencia o artefato `.js`.
+    // Ao compartilhar o domínio TypeScript com o Next, apontamos apenas esse
+    // módulo-fonte para evitar que o bundler procure um `.js` ainda não emitido.
+    resolveAlias: {
+      "./goalkeeper-timeline.js": "./backend/src/contexts/statistics/domain/goalkeeper-timeline.ts",
+    },
+  },
   images: {
     // Cartas, escudos e avatares são servidos em vários tamanhos no celular.
     // Deixar o Next gerar WebP/AVIF evita baixar a arte original em cada miniatura.

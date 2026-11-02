@@ -74,7 +74,7 @@ describe("Application: ManageFantasyMarketLineupUseCase", () => {
 
     const result = await useCase.getPlayerDetail(actor, leagueId, "p1");
     expect(result?.playerId).toBe("p1");
-    expect(repo.getPlayerDetail).toHaveBeenCalledWith(leagueId, "p1", undefined);
+    expect(repo.getPlayerDetail).toHaveBeenCalledWith(leagueId, "p1", actor.userId, undefined);
   });
 
   it("saves lineup after successful validation", async () => {
@@ -118,7 +118,7 @@ describe("Application: ManageFantasyMarketLineupUseCase", () => {
     const result = await useCase.repairLegacyLineups(actor, leagueId);
     expect(result.success).toBe(true);
     expect(result.repairedCount).toBe(3);
-    expect(repo.repairLegacyLineups).toHaveBeenCalledWith(leagueId);
+    expect(repo.repairLegacyLineups).toHaveBeenCalledWith(leagueId, actor.userId);
   });
 });
 

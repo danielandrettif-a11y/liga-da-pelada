@@ -58,7 +58,9 @@ describe("ManageCollectiveUseCase", () => {
     // Valid message should delegate
     const sendValid = await useCase.sendMessage(actor, "l1", { callupId: "c1", body: "Bom jogo!", kind: "text" });
     expect(sendValid.success).toBe(true);
-    expect(repo.sendMessage).toHaveBeenCalled();
+    expect(repo.sendMessage).toHaveBeenCalledWith(actor, "l1", expect.objectContaining({
+      callupId: "c1", body: "Bom jogo!", kind: "text", senderPlayerId: undefined,
+    }));
 
     // Edit validation
     const editEmpty = await useCase.editMessage(actor, "l1", "m1", "  ");
@@ -68,6 +70,28 @@ describe("ManageCollectiveUseCase", () => {
     const editValid = await useCase.editMessage(actor, "l1", "m1", "Texto editado");
     expect(editValid.success).toBe(true);
     expect(repo.editMessage).toHaveBeenCalledWith(actor, "l1", "m1", "Texto editado");
+  });
+
+  it("rejects invalid media metadata before reaching persistence", async () => {
+    const repo = createMockRepo();
+    const useCase = new ManageCollectiveUseCase(repo);
+
+    expect((await useCase.sendMessage(actor, "l1", {
+      callupId: "c1", body: "x", kind: "system",
+    })).success).toBe(false);
+    expect((await useCase.sendMessage(actor, "l1", {
+      callupId: "c1", body: "", kind: "image", mediaPath: "c1/user-1/photo.webp",
+      mediaMime: "image/webp", mediaSize: 8 * 1024 * 1024 + 1,
+    })).success).toBe(false);
+    expect((await useCase.sendMessage(actor, "l1", {
+      callupId: "c1", body: "", kind: "audio", mediaPath: "c1/user-1/voice.webm",
+      mediaMime: "audio/webm", mediaSize: 100, duration: 61,
+    })).success).toBe(false);
+    expect((await useCase.sendMessage(actor, "l1", {
+      callupId: "c1", body: "", kind: "image", mediaPath: "c1/another-user/photo.webp",
+      mediaMime: "image/webp", mediaSize: 100,
+    })).success).toBe(false);
+    expect(repo.sendMessage).not.toHaveBeenCalled();
   });
 
   it("delegates deletion, read marks and admin previous collective", async () => {

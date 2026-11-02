@@ -8,6 +8,10 @@ import type { Actor } from "../../../shared/actor.js";
 describe("Statistics Application: manage-overall-shadow", () => {
   const adminActor: Actor = { userId: "u1" };
   const playerActor: Actor = { userId: "u2" };
+  const calculationEngine = {
+    parseFormulaConfig: vi.fn((config) => config),
+    calculateOveralls: vi.fn(() => ({ snapshots: [{ playerId: "p1" }], breakdowns: [] })),
+  };
 
   function createMockRepo(overrides: Partial<OverallShadowRepository> = {}): OverallShadowRepository {
     return {
@@ -44,20 +48,20 @@ describe("Statistics Application: manage-overall-shadow", () => {
   }
 
   it("returns null if actor is not admin for getOverallShadowAdminData", async () => {
-    const service = createManageOverallShadowService(createMockRepo());
+    const service = createManageOverallShadowService(createMockRepo(), calculationEngine);
     const result = await service.getOverallShadowAdminData(playerActor, "l1");
     expect(result).toBeNull();
   });
 
   it("returns shadow admin data for admin", async () => {
-    const service = createManageOverallShadowService(createMockRepo());
+    const service = createManageOverallShadowService(createMockRepo(), calculationEngine);
     const result = await service.getOverallShadowAdminData(adminActor, "l1");
     expect(result).not.toBeNull();
     expect(result?.latestRun?.id).toBe("run-1");
   });
 
   it("fails recalculation if actor is not admin", async () => {
-    const service = createManageOverallShadowService(createMockRepo());
+    const service = createManageOverallShadowService(createMockRepo(), calculationEngine);
     const result = await service.recalculateOverallShadow(playerActor, "l1");
     expect(result.success).toBe(false);
     expect(result.error).toContain("Somente administradores");
@@ -65,7 +69,7 @@ describe("Statistics Application: manage-overall-shadow", () => {
 
   it("successfully recalculates overall shadow", async () => {
     const repo = createMockRepo();
-    const service = createManageOverallShadowService(repo);
+    const service = createManageOverallShadowService(repo, calculationEngine);
     const result = await service.recalculateOverallShadow(adminActor, "l1");
     expect(result.success).toBe(true);
     expect(result.runId).toBe("run-new");
@@ -75,7 +79,7 @@ describe("Statistics Application: manage-overall-shadow", () => {
 
   it("publishes shadow run when valid", async () => {
     const repo = createMockRepo();
-    const service = createManageOverallShadowService(repo);
+    const service = createManageOverallShadowService(repo, calculationEngine);
     const result = await service.publishOverallShadow(adminActor, "l1", "run-1");
     expect(result.success).toBe(true);
     expect(repo.markRunPublished).toHaveBeenCalledWith("run-1", "l1");
