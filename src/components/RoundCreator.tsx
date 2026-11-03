@@ -35,6 +35,7 @@ import { supabase } from "@/lib/supabase";
 import { DeleteRoundButton } from "./DeleteRoundButton";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { isPlayerVisibleInPrelistTab } from "@/lib/callup-ui";
+import { getCallupDrawMinimum } from "@/lib/callup-draw";
 import { VEST_COLORS } from "@/lib/vest-colors";
 import { createDefaultTeams, type DrawPlayer, type DrawTeam, type RoundCreatorProps } from "./round-creator-model";
 import { MIN_UNDERFILLED_PLAYERS, rebalanceTeamRosters, validateUnderfilledTeamSizes, type RoundTeamSizeMode } from "@/lib/underfilled-rounds";
@@ -96,7 +97,7 @@ export function RoundCreator({
   const roundCapacity = teamCapacity * teamCount;
   const minimumPlayersToMount = teamCount === 2
     ? Math.max(10, (teamCapacity - 1) * 2)
-    : teamCount === 3 ? Math.max(MIN_UNDERFILLED_PLAYERS, teamCapacity * 2) : teamCapacity * 2;
+    : Math.max(MIN_UNDERFILLED_PLAYERS, getCallupDrawMinimum(roundCapacity));
 
   function selectRoundType(type: RoundType) {
     if (sourceCallupId) return;
