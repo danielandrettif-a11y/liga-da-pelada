@@ -15,13 +15,14 @@ describe("httpManagerGateway", () => {
       color: "#0000ff",
       crest: "shield",
       kit: "stripes",
-    });
+    }, "league-123");
 
     expect(res.ok).toBe(true);
     expect(mockFetch).toHaveBeenCalledWith(
       "http://localhost:3001/api/integrations/manager/club",
       expect.objectContaining({ headers: expect.any(Headers) })
     );
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual(expect.objectContaining({ leagueId: "league-123" }));
   });
 
   it("runs command via POST /api/integrations/manager/command", async () => {
@@ -31,13 +32,14 @@ describe("httpManagerGateway", () => {
     });
 
     const gateway = httpManagerGateway("http://localhost:3001", "test-token", mockFetch as any);
-    const res = await gateway.runCommand({ type: "open-pack", packId: "p1" }, 1);
+    const res = await gateway.runCommand({ type: "open-pack", packId: "p1" }, 1, "league-123");
 
     expect(res.ok).toBe(true);
     expect(mockFetch).toHaveBeenCalledWith(
       "http://localhost:3001/api/integrations/manager/command",
       expect.objectContaining({ headers: expect.any(Headers) })
     );
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual(expect.objectContaining({ leagueId: "league-123" }));
   });
 
   it("throws ManagerApiError on error", async () => {
@@ -48,6 +50,6 @@ describe("httpManagerGateway", () => {
     });
 
     const gateway = httpManagerGateway("http://localhost:3001", "test-token", mockFetch as any);
-    await expect(gateway.runCommand({ type: "open-pack", packId: "p1" }, 1)).rejects.toThrow(ManagerApiError);
+    await expect(gateway.runCommand({ type: "open-pack", packId: "p1" }, 1, "league-123")).rejects.toThrow(ManagerApiError);
   });
 });

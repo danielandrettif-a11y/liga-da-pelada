@@ -1,10 +1,8 @@
 import {
   type CosmeticSlot,
-  type UserEquippedCosmetics,
   type CosmeticPreviewLoadout,
   type EquippedCosmeticsSummary,
   isValidCosmeticSlot,
-  sanitizeEquippedCosmetics,
 } from "../domain/cosmetics.js";
 
 export interface CosmeticsRepository {
@@ -12,7 +10,6 @@ export interface CosmeticsRepository {
     userId: string;
     leagueId: string;
     seasonId: string | null;
-    isAdmin: boolean;
   }): Promise<any>;
 
   equipCosmetic(params: {
@@ -36,22 +33,22 @@ export interface CosmeticsRepository {
 
   getMyEquippedCosmetics(userId: string): Promise<EquippedCosmeticsSummary | null>;
 
-  getPlayerEquippedCosmetics(playerId: string): Promise<EquippedCosmeticsSummary | null>;
+  getPlayerEquippedCosmetics(playerId: string, userId: string): Promise<EquippedCosmeticsSummary | null>;
 
-  getAllPlayersEquippedCosmeticsMap(playerIds?: string[]): Promise<Record<string, EquippedCosmeticsSummary>>;
+  getAllPlayersEquippedCosmeticsMap(playerIds: string[] | undefined, userId: string): Promise<Record<string, EquippedCosmeticsSummary>>;
 
   resolveAdminCosmeticsPreview(params: {
-    isAdmin: boolean;
-    ownPlayerId: string | null;
+    userId: string;
     playerId: string;
     requested: CosmeticPreviewLoadout;
   }): Promise<EquippedCosmeticsSummary | null>;
 
-  cleanupLegacyCosmeticsPreview(fantasySeasonId: string | null): Promise<{ success: boolean; error?: string }>;
+  cleanupLegacyCosmeticsPreview(userId: string, fantasySeasonId: string | null): Promise<{ success: boolean; removed?: number; error?: string }>;
 
-  dismissUnopenedBronzePassPack(fantasySeasonId: string | null): Promise<{ success: boolean; error?: string }>;
+  dismissUnopenedBronzePassPack(userId: string, fantasySeasonId: string | null): Promise<{ success: boolean; dismissed?: number; error?: string }>;
 
   resetTestPassRewardClaims(params: {
+    userId: string;
     fantasySeasonId: string;
     selectedFantasySeasonId: string | null;
   }): Promise<{ success: boolean; error?: string }>;
@@ -64,7 +61,6 @@ export class ManageCosmeticsUseCase {
     userId: string;
     leagueId: string;
     seasonId: string | null;
-    isAdmin: boolean;
   }) {
     return this.repository.getCosmeticsDashboard(params);
   }
@@ -111,32 +107,32 @@ export class ManageCosmeticsUseCase {
     return this.repository.getMyEquippedCosmetics(userId);
   }
 
-  async getPlayerEquipped(playerId: string) {
-    return this.repository.getPlayerEquippedCosmetics(playerId);
+  async getPlayerEquipped(playerId: string, userId: string) {
+    return this.repository.getPlayerEquippedCosmetics(playerId, userId);
   }
 
-  async getAllPlayersMap(playerIds?: string[]) {
-    return this.repository.getAllPlayersEquippedCosmeticsMap(playerIds);
+  async getAllPlayersMap(playerIds: string[] | undefined, userId: string) {
+    return this.repository.getAllPlayersEquippedCosmeticsMap(playerIds, userId);
   }
 
   async resolveAdminPreview(params: {
-    isAdmin: boolean;
-    ownPlayerId: string | null;
+    userId: string;
     playerId: string;
     requested: CosmeticPreviewLoadout;
   }) {
     return this.repository.resolveAdminCosmeticsPreview(params);
   }
 
-  async cleanupLegacyPreview(fantasySeasonId: string | null) {
-    return this.repository.cleanupLegacyCosmeticsPreview(fantasySeasonId);
+  async cleanupLegacyPreview(userId: string, fantasySeasonId: string | null) {
+    return this.repository.cleanupLegacyCosmeticsPreview(userId, fantasySeasonId);
   }
 
-  async dismissBronzePack(fantasySeasonId: string | null) {
-    return this.repository.dismissUnopenedBronzePassPack(fantasySeasonId);
+  async dismissBronzePack(userId: string, fantasySeasonId: string | null) {
+    return this.repository.dismissUnopenedBronzePassPack(userId, fantasySeasonId);
   }
 
   async resetTestClaims(params: {
+    userId: string;
     fantasySeasonId: string;
     selectedFantasySeasonId: string | null;
   }) {

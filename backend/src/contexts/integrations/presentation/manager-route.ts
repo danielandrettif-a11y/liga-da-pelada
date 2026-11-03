@@ -8,8 +8,7 @@ import {
 
 function sendFailure(error: unknown, request: FastifyRequest, reply: FastifyReply) {
   request.log.error({ err: error }, "manager operation failed");
-  const message = error instanceof Error ? error.message : "Erro interno no serviço BQ Manager.";
-  return reply.code(500).send({ ok: false, message });
+  return reply.code(500).send({ ok: false, message: "Erro interno no serviço BQ Manager." });
 }
 
 export function registerManagerRoutes(
@@ -22,15 +21,15 @@ export function registerManagerRoutes(
   const useCase = new ManageManagerUseCase(options.repository);
 
   // 1. Criar Clube
-  app.post<{ Body: { identity: any } }>(
+  app.post<{ Body: { leagueId: string; identity: any } }>(
     "/api/integrations/manager/club",
     async (request, reply) => {
       const auth = await authenticateBearer(request, options.userVerifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
 
       try {
-        const res = await useCase.createClub(auth.actor, request.body?.identity || {});
-        return reply.code(res.ok ? 200 : 400).send(res);
+        const res = await useCase.createClub(auth.actor, request.body?.leagueId || "", request.body?.identity || {});
+        return reply.code(200).send(res);
       } catch (err) {
         return sendFailure(err, request, reply);
       }
@@ -38,16 +37,16 @@ export function registerManagerRoutes(
   );
 
   // 2. Executar Comando
-  app.post<{ Body: { command: any; expectedVersion: number } }>(
+  app.post<{ Body: { leagueId: string; command: any; expectedVersion: number } }>(
     "/api/integrations/manager/command",
     async (request, reply) => {
       const auth = await authenticateBearer(request, options.userVerifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
 
-      const { command, expectedVersion } = request.body || {};
+      const { leagueId, command, expectedVersion } = request.body || {};
       try {
-        const res = await useCase.runCommand(auth.actor, command, expectedVersion);
-        return reply.code(res.ok ? 200 : 400).send(res);
+        const res = await useCase.runCommand(auth.actor, leagueId, command, expectedVersion);
+        return reply.code(200).send(res);
       } catch (err) {
         return sendFailure(err, request, reply);
       }

@@ -9,10 +9,10 @@ describe("httpCosmeticsGateway", () => {
     });
 
     const gateway = httpCosmeticsGateway("http://localhost:3001", "test-token", mockFetch as any);
-    const res = await gateway.getCosmeticsDashboard("league-1", "season-1", true);
+    const res = await gateway.getCosmeticsDashboard("league-1", "season-1");
 
     expect(mockFetch).toHaveBeenCalledWith(
-      "http://localhost:3001/api/cosmetics/dashboard?leagueId=league-1&seasonId=season-1&isAdmin=true",
+      "http://localhost:3001/api/cosmetics/dashboard?leagueId=league-1&seasonId=season-1",
       expect.objectContaining({
         headers: expect.any(Headers),
       })

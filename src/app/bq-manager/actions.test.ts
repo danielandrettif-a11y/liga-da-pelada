@@ -51,13 +51,13 @@ describe("Server Actions: BQ Manager Bridging (2 operations)", () => {
       color: "#ffffff",
       crest: "shield",
       kit: "solid",
-    });
+    }, "league-123");
     expect(res.ok).toBe(true);
   });
 
   it("delegates runManagerCommand to managerApi", async () => {
     const res = await runManagerCommand({ type: "open-pack", packId: "p1" }, 1);
-    expect(mockManagerApi.runCommand).toHaveBeenCalledWith({ type: "open-pack", packId: "p1" }, 1);
+    expect(mockManagerApi.runCommand).toHaveBeenCalledWith({ type: "open-pack", packId: "p1" }, 1, "league-123");
     expect(res.ok).toBe(true);
   });
 });

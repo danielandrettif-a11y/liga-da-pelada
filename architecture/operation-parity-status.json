@@ -880,9 +880,89 @@
       "context": "operations",
       "source": "src/app/api/internal/observability/route.ts",
       "name": "POST"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "claimPassCosmetic"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "cleanupMyLegacyCosmeticsPreview"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "dismissMyUnopenedBronzePassPack"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "equipCosmetic"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getAdminCosmeticsPreview"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getAllPlayersEquippedCosmeticsMap"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getMyCosmeticsDashboard"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getMyEquippedCosmetics"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getPlayerEquippedCosmetics"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "purchaseSeasonPassShopItem"
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "resetMyTestPassRewardClaims"
+    },
+    {
+      "context": "integrations",
+      "source": "src/app/bq-manager/actions.ts",
+      "name": "createManagerClub"
+    },
+    {
+      "context": "integrations",
+      "source": "src/app/bq-manager/actions.ts",
+      "name": "runManagerCommand"
     }
   ],
   "evidence": {
+    "cosmetics": [
+      "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+      "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+      "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+      "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+      "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts"
+    ],
+    "integrations-manager": [
+      "backend/src/contexts/integrations/domain/manager.test.ts",
+      "backend/src/contexts/integrations/application/manage-manager.test.ts",
+      "backend/src/contexts/integrations/infrastructure/pg-manager-repository.test.ts",
+      "backend/src/contexts/integrations/presentation/manager-route.test.ts",
+      "src/modules/integrations/infrastructure/http-manager-gateway.test.ts",
+      "src/app/bq-manager/actions.test.ts"
+    ],
     "callups": [
       "backend/src/contexts/callups/domain/callup.test.ts",
       "backend/src/contexts/callups/application/manage-callups.test.ts",

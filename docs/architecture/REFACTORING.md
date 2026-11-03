@@ -21,17 +21,25 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 | Etapa | Estado | Evidência / próximo passo |
 | --- | --- | --- |
-| Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
+| Base, limites entre camadas e registro de decisões | Concluído nesta fase | 15 contextos catalogados, camadas e portas auditadas; 267 operações possuem ponte estrutural. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Concluído nesta fase | Formato, abertura, pré-lista, edição, estado e participação extraídos; migrations 325 e 328 aplicadas e validadas em teste e oficial; isolamento entre duas peladas aprovado. |
 | Partidas e pontuação | 21/21 operações aceitas em revisão | Ciclo de vida, gols, goleiros, substituições e cronômetro extraídos. O cronômetro agenda QStash no backend, reivindica alertas de forma transacional e libera a reivindicação quando o Web Push falha. Ainda falta o ensaio móvel integrado com falhas de rede e dois ADMs para promover o contexto a verificado. |
-| Cartola e cosméticos | Concluído nesta fase | Mutações e leitores principais extraídos; ranking, históricos, ficha e destaques usam modelos analíticos e filtros sazonais. |
+| Cartola e cosméticos | 24/33 operações aceitas | Cosméticos 11/11; Fantasy 13/22. Restam nove projeções analíticas ricas antes de ativar `FANTASY_API_ENABLED`. |
 | Pagamentos | Concluído nesta fase | Itens, parcelas, PIX, rateio, obrigações, checklist e auditoria separados em domínio, aplicação e infraestrutura, mantendo RPCs e escopo por pelada. |
 | Notificações | Concluído nesta fase (16/16) | Inbox, preferências, push subscriptions, envio Web Push e e-mail Resend, agendamento QStash de lembretes do Cartola e alerta de cronômetro com 100% de paridade e fail-fast. |
-| Estatísticas e demais áreas | Em migração | Pontuação canônica e modelos analíticos extraídos; leitores sazonais separados; rankings duplicados removidos; cache limitado à requisição. |
+| Estatísticas e demais áreas | Concluído em revisão de código | Estatísticas 22/22 e todos os demais contextos, exceto as nove projeções analíticas de Fantasy, estão aceitos. |
 | Avaliação de tabela de acumulados | Medida no oficial; sem justificativa para criar | No banco oficial, `seasonStats`, `rankingHistory` e `playerHistory` ficaram em 128,51 ms, 119,62 ms e 99,64 ms no p95. Os gargalos estão nos enriquecimentos/RPCs compostas. Ver `reports/performance/BASELINE-2026-10-21.md`. |
 
 ## Registro de lotes
+
+### 2026-11-03 — Cosméticos e BQ Manager corrigidos; gate honesto para produção
+
+- **Cosméticos chegou a 11/11**: o backend agora usa as tabelas reais `fantasy_cosmetics`, inventário global e `account_cosmetic_loadouts`, preserva os oito slots, monta o contrato completo do dashboard e executa as RPCs canônicas de equipar, resgatar, comprar e limpar. Permissão administrativa é derivada no PostgreSQL; `isAdmin` e `ownPlayerId` enviados pelo cliente deixaram de ser confiados.
+- **Integrações chegou a 2/2**: BQ Manager autoriza a pelada no banco principal e grava o save exclusivamente no projeto Supabase isolado. O backend executa as regras de abrir/resgatar/fundir, mantém idempotência, catálogo autenticado e concorrência otimista via `manager_commit`.
+- As variáveis de ativação foram documentadas nos exemplos de ambiente. `FANTASY_API_ENABLED` permanece explicitamente desligada: as nove operações analíticas ainda devolvem projeções resumidas e não preservam dashboard, ranking ao vivo, cartas/cosméticos e histórico detalhado do legado.
+- Progresso conservador: **258/267 operações aceitas (96,6%)**, restando **9**, todas no contexto Fantasy. As 267 pontes existem, mas ainda são **0/267 verificadas em jornada integrada**; aceite de código não equivale a liberação em produção.
+- Verificação: **695 testes backend em 181 arquivos** e **1.238 testes frontend em 237 arquivos**, typecheck e builds de produção aprovados, auditorias de contexto/arquitetura/migração aprovadas e `npm audit --omit=dev` sem vulnerabilidades nos dois projetos.
 
 ### 2026-11-03 — Fantasy administrativo, histórico pessoal, destaques e Passe BQ
 

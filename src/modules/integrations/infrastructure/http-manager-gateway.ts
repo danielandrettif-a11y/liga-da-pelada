@@ -12,8 +12,8 @@ export class ManagerApiError extends Error {
 }
 
 export type ManagerHttpGateway = {
-  createClub(identity: ClubIdentity): Promise<ManagerResult>;
-  runCommand(command: ManagerCommand, expectedVersion: number): Promise<ManagerResult>;
+  createClub(identity: ClubIdentity, leagueId: string): Promise<ManagerResult>;
+  runCommand(command: ManagerCommand, expectedVersion: number, leagueId: string): Promise<ManagerResult>;
 };
 
 export function httpManagerGateway(
@@ -49,17 +49,17 @@ export function httpManagerGateway(
   }
 
   return {
-    async createClub(identity) {
+    async createClub(identity, leagueId) {
       return request<ManagerResult>("/api/integrations/manager/club", {
         method: "POST",
-        body: JSON.stringify({ identity }),
+        body: JSON.stringify({ identity, leagueId }),
       });
     },
 
-    async runCommand(command, expectedVersion) {
+    async runCommand(command, expectedVersion, leagueId) {
       return request<ManagerResult>("/api/integrations/manager/command", {
         method: "POST",
-        body: JSON.stringify({ command, expectedVersion }),
+        body: JSON.stringify({ command, expectedVersion, leagueId }),
       });
     },
   };

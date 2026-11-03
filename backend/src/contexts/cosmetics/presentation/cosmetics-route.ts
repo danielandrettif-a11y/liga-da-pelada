@@ -8,8 +8,7 @@ import {
 
 function sendFailure(error: unknown, request: FastifyRequest, reply: FastifyReply) {
   request.log.error({ err: error }, "cosmetics operation failed");
-  const message = error instanceof Error ? error.message : "Erro interno no serviço de cosméticos.";
-  return reply.code(500).send({ success: false, error: message });
+  return reply.code(500).send({ success: false, error: "Erro interno no serviço de cosméticos." });
 }
 
 export function registerCosmeticsRoutes(
@@ -22,19 +21,18 @@ export function registerCosmeticsRoutes(
   const useCase = new ManageCosmeticsUseCase(options.repository);
 
   // 1. Dashboard
-  app.get<{ Querystring: { leagueId?: string; seasonId?: string; isAdmin?: string } }>(
+  app.get<{ Querystring: { leagueId?: string; seasonId?: string } }>(
     "/api/cosmetics/dashboard",
     async (request, reply) => {
       const auth = await authenticateBearer(request, options.userVerifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
 
-      const { leagueId = "", seasonId = null, isAdmin = "false" } = request.query;
+      const { leagueId = "", seasonId = null } = request.query;
       try {
         const dashboard = await useCase.getDashboard({
           userId: auth.actor.userId,
           leagueId,
           seasonId,
-          isAdmin: isAdmin === "true",
         });
         return reply.code(200).send(dashboard);
       } catch (err) {
@@ -53,7 +51,7 @@ export function registerCosmeticsRoutes(
       const { slot, cosmeticId } = request.body || {};
       try {
         const res = await useCase.equip({ userId: auth.actor.userId, slot, cosmeticId });
-        return reply.code(res.success ? 200 : 400).send(res);
+        return reply.code(200).send(res);
       } catch (err) {
         return sendFailure(err, request, reply);
       }
@@ -70,7 +68,7 @@ export function registerCosmeticsRoutes(
       const { rewardId, cosmeticId, fantasySeasonId } = request.body || {};
       try {
         const res = await useCase.claimPassCosmetic({ userId: auth.actor.userId, rewardId, cosmeticId, fantasySeasonId });
-        return reply.code(res.success ? 200 : 400).send(res);
+        return reply.code(200).send(res);
       } catch (err) {
         return sendFailure(err, request, reply);
       }
@@ -87,7 +85,7 @@ export function registerCosmeticsRoutes(
       const { shopItemId, fantasySeasonId } = request.body || {};
       try {
         const res = await useCase.purchaseShopItem({ userId: auth.actor.userId, shopItemId, fantasySeasonId });
-        return reply.code(res.success ? 200 : 400).send(res);
+        return reply.code(200).send(res);
       } catch (err) {
         return sendFailure(err, request, reply);
       }
@@ -119,7 +117,7 @@ export function registerCosmeticsRoutes(
 
       const { playerId } = request.params;
       try {
-        const equipped = await useCase.getPlayerEquipped(playerId);
+        const equipped = await useCase.getPlayerEquipped(playerId, auth.actor.userId);
         return reply.code(200).send(equipped);
       } catch (err) {
         return sendFailure(err, request, reply);
@@ -136,7 +134,7 @@ export function registerCosmeticsRoutes(
 
       const { playerIds } = request.body || {};
       try {
-        const map = await useCase.getAllPlayersMap(playerIds);
+        const map = await useCase.getAllPlayersMap(playerIds, auth.actor.userId);
         return reply.code(200).send(map);
       } catch (err) {
         return sendFailure(err, request, reply);
@@ -145,17 +143,16 @@ export function registerCosmeticsRoutes(
   );
 
   // 8. Admin Preview
-  app.post<{ Body: { playerId: string; requested: any; ownPlayerId?: string | null; isAdmin?: boolean } }>(
+  app.post<{ Body: { playerId: string; requested: any } }>(
     "/api/cosmetics/admin-preview",
     async (request, reply) => {
       const auth = await authenticateBearer(request, options.userVerifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
 
-      const { playerId, requested, ownPlayerId = null, isAdmin = true } = request.body || {};
+      const { playerId, requested } = request.body || {};
       try {
         const preview = await useCase.resolveAdminPreview({
-          isAdmin: Boolean(isAdmin),
-          ownPlayerId: ownPlayerId || auth.actor.userId,
+          userId: auth.actor.userId,
           playerId,
           requested,
         });
@@ -173,14 +170,9 @@ export function registerCosmeticsRoutes(
       const auth = await authenticateBearer(request, options.userVerifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
 
-      const token = request.headers.authorization?.slice(7) || "";
-      if (request.headers["x-is-admin"] !== "true" && token !== "admin-token" && !token.startsWith("admin")) {
-        return reply.code(403).send({ success: false, error: "Apenas administradores." });
-      }
-
       const { fantasySeasonId = null } = request.body || {};
       try {
-        const res = await useCase.cleanupLegacyPreview(fantasySeasonId);
+        const res = await useCase.cleanupLegacyPreview(auth.actor.userId, fantasySeasonId);
         return reply.code(200).send(res);
       } catch (err) {
         return sendFailure(err, request, reply);
@@ -197,7 +189,7 @@ export function registerCosmeticsRoutes(
 
       const { fantasySeasonId = null } = request.body || {};
       try {
-        const res = await useCase.dismissBronzePack(fantasySeasonId);
+        const res = await useCase.dismissBronzePack(auth.actor.userId, fantasySeasonId);
         return reply.code(200).send(res);
       } catch (err) {
         return sendFailure(err, request, reply);
@@ -214,7 +206,7 @@ export function registerCosmeticsRoutes(
 
       const { fantasySeasonId, selectedFantasySeasonId = null } = request.body || {};
       try {
-        const res = await useCase.resetTestClaims({ fantasySeasonId, selectedFantasySeasonId });
+        const res = await useCase.resetTestClaims({ userId: auth.actor.userId, fantasySeasonId, selectedFantasySeasonId });
         return reply.code(200).send(res);
       } catch (err) {
         return sendFailure(err, request, reply);

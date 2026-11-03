@@ -40,7 +40,7 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
   if (cosmeticsApi) {
     const league = await getActiveLeague();
     const season = await getActiveSeason(league.id);
-    return cosmeticsApi.getCosmeticsDashboard(league.id, season?.id || null, account.isAdmin);
+    return cosmeticsApi.getCosmeticsDashboard(league.id, season?.id || null);
   }
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
@@ -197,7 +197,7 @@ export async function getAdminCosmeticsPreview(playerId: string, requested: Cosm
   const account = await getCurrentAccount();
   const cosmeticsApi = await cosmeticsApiFor(account.client);
   if (cosmeticsApi) {
-    return cosmeticsApi.getAdminCosmeticsPreview(playerId, requested, account.profile?.player_id || null, account.isAdmin);
+    return cosmeticsApi.getAdminCosmeticsPreview(playerId, requested);
   }
   return resolveAdminCosmeticsPreview({
     isAdmin: account.isAdmin,

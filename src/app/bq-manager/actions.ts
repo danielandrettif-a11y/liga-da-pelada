@@ -20,12 +20,11 @@ export async function createManagerClub(identity: ClubIdentity): Promise<Manager
   try {
     const account = await getCurrentAccount();
     if (!account.user) return { ok: false, message: "Entre na sua conta para criar um clube." };
+    const managerLeagueId = await getAuthorizedManagerLeagueId(account.client);
+    if (!managerLeagueId) return { ok: false, message: "Selecione a pelada BQ para acessar esta carreira." };
     const managerApi = await managerApiFor(account.client);
     if (managerApi) {
-      return managerApi.createClub(identity);
-    }
-    if (!await getAuthorizedManagerLeagueId(account.client)) {
-      return { ok: false, message: "Selecione a pelada BQ para acessar esta carreira." };
+      return managerApi.createClub(identity, managerLeagueId);
     }
     const client = createManagerClient();
     if (!client) return { ok: false, message: "A carreira ainda está em preparação. Experimente a demonstração." };
@@ -44,12 +43,12 @@ export async function runManagerCommand(command: ManagerCommand, expectedVersion
   try {
     const account = await getCurrentAccount();
     if (!account.user) return { ok: false, message: "Sua sessão expirou. Entre novamente." };
-    const managerApi = await managerApiFor(account.client);
-    if (managerApi) {
-      return managerApi.runCommand(command, expectedVersion);
-    }
     const managerLeagueId = await getAuthorizedManagerLeagueId(account.client);
     if (!managerLeagueId) return { ok: false, message: "Selecione a pelada BQ para acessar esta carreira." };
+    const managerApi = await managerApiFor(account.client);
+    if (managerApi) {
+      return managerApi.runCommand(command, expectedVersion, managerLeagueId);
+    }
     const client = createManagerClient();
     if (!client) return { ok: false, message: "A carreira ainda está em preparação." };
     const save = await readManagerSave(client, account.user.id);

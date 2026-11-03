@@ -15,7 +15,10 @@ const mockCosmeticsApi = {
   purchaseSeasonPassShopItem: vi.fn().mockResolvedValue({ success: true }),
   equipCosmetic: vi.fn().mockResolvedValue({ success: true }),
   getAdminCosmeticsPreview: vi.fn().mockResolvedValue(null),
-  getMyEquippedCosmetics: vi.fn().mockResolvedValue({ border: null, avatar: null, card_theme: null, goal_effect: null }),
+  getMyEquippedCosmetics: vi.fn().mockResolvedValue({
+    frameKey: null, auraKey: null, titleName: null, bannerAssetKey: null,
+    nameplateKey: null, backgroundAssetKey: null, showcaseAssetKey: null, pitchAssetKey: null,
+  }),
   getPlayerEquippedCosmetics: vi.fn().mockResolvedValue(null),
   getAllPlayersEquippedCosmeticsMap: vi.fn().mockResolvedValue(new Map()),
 };
@@ -67,7 +70,7 @@ describe("Server Actions: Cosmetics Bridging (11 operations)", () => {
 
   it("delegates dashboard and equipped query operations to cosmeticsApi", async () => {
     const dashboard = await getMyCosmeticsDashboard();
-    expect(mockCosmeticsApi.getCosmeticsDashboard).toHaveBeenCalledWith("league-123", "season-123", true);
+    expect(mockCosmeticsApi.getCosmeticsDashboard).toHaveBeenCalledWith("league-123", "season-123");
     expect(dashboard).toEqual({ catalog: [], unlockedIds: [] });
 
     await getMyEquippedCosmetics();
@@ -96,7 +99,7 @@ describe("Server Actions: Cosmetics Bridging (11 operations)", () => {
 
   it("delegates admin preview and cleanup operations to cosmeticsApi", async () => {
     await getAdminCosmeticsPreview("player-123", { frame: "f-1" });
-    expect(mockCosmeticsApi.getAdminCosmeticsPreview).toHaveBeenCalledWith("player-123", { frame: "f-1" }, "player-123", true);
+    expect(mockCosmeticsApi.getAdminCosmeticsPreview).toHaveBeenCalledWith("player-123", { frame: "f-1" });
 
     const cleanupRes = await cleanupMyLegacyCosmeticsPreview();
     expect(mockCosmeticsApi.cleanupLegacyCosmeticsPreview).toHaveBeenCalledWith("fs-123");

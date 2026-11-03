@@ -27,7 +27,7 @@ describe("Manager Routes", () => {
       method: "POST",
       url: "/api/integrations/manager/club",
       headers: { authorization: "Bearer valid-token" },
-      payload: { identity: { name: "Clube Exemplo", abbreviation: "EXA", color: "#fff" } },
+      payload: { leagueId: "league-1", identity: { name: "Clube Exemplo", abbreviation: "EXA", color: "#ffffff", crest: "shield", kit: "solid" } },
     });
 
     expect(res.statusCode).toBe(200);
@@ -44,7 +44,7 @@ describe("Manager Routes", () => {
       method: "POST",
       url: "/api/integrations/manager/command",
       headers: { authorization: "Bearer valid-token" },
-      payload: { command: { type: "open-pack", packId: "p1" }, expectedVersion: 1 },
+      payload: { leagueId: "league-1", command: { type: "open-pack", packId: "p1" }, expectedVersion: 1 },
     });
 
     expect(res.statusCode).toBe(200);

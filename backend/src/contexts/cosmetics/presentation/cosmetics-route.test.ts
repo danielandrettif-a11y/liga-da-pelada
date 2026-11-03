@@ -1,104 +1,75 @@
-import { describe, it, expect, vi } from "vitest";
 import Fastify from "fastify";
-import { registerCosmeticsRoutes } from "./cosmetics-route.js";
-import type { CosmeticsRepository } from "../application/manage-cosmetics.js";
+import { describe, expect, it, vi } from "vitest";
 import type { UserVerifier } from "../../../infrastructure/auth-user-verifier.js";
+import type { CosmeticsRepository } from "../application/manage-cosmetics.js";
+import { registerCosmeticsRoutes } from "./cosmetics-route.js";
+
+const createMockRepo = (): CosmeticsRepository => ({
+  getCosmeticsDashboard: vi.fn().mockResolvedValue({ available: true, previewCatalog: [] }),
+  equipCosmetic: vi.fn().mockResolvedValue({ success: true }),
+  claimPassCosmetic: vi.fn().mockResolvedValue({ success: true }),
+  purchaseSeasonPassShopItem: vi.fn().mockResolvedValue({ success: true }),
+  getMyEquippedCosmetics: vi.fn().mockResolvedValue(null),
+  getPlayerEquippedCosmetics: vi.fn().mockResolvedValue(null),
+  getAllPlayersEquippedCosmeticsMap: vi.fn().mockResolvedValue({}),
+  resolveAdminCosmeticsPreview: vi.fn().mockResolvedValue(null),
+  cleanupLegacyCosmeticsPreview: vi.fn().mockResolvedValue({ success: true, removed: 0 }),
+  dismissUnopenedBronzePassPack: vi.fn().mockResolvedValue({ success: true, dismissed: 0 }),
+  resetTestPassRewardClaims: vi.fn().mockResolvedValue({ success: true }),
+});
+
+const verifier: UserVerifier = {
+  verifyAccessToken: vi.fn().mockResolvedValue({ userId: "u1", email: "test@example.com", role: "member", isAdmin: false }),
+};
 
 describe("Cosmetics Routes", () => {
-  const createMockRepo = (): CosmeticsRepository => ({
-    getCosmeticsDashboard: vi.fn().mockResolvedValue({ catalog: [], unlockedIds: [], equipped: null }),
-    equipCosmetic: vi.fn().mockResolvedValue({ success: true }),
-    claimPassCosmetic: vi.fn().mockResolvedValue({ success: true }),
-    purchaseSeasonPassShopItem: vi.fn().mockResolvedValue({ success: true }),
-    getMyEquippedCosmetics: vi.fn().mockResolvedValue({ border: null, avatar: null, card_theme: null, goal_effect: null }),
-    getPlayerEquippedCosmetics: vi.fn().mockResolvedValue(null),
-    getAllPlayersEquippedCosmeticsMap: vi.fn().mockResolvedValue({}),
-    resolveAdminCosmeticsPreview: vi.fn().mockResolvedValue(null),
-    cleanupLegacyCosmeticsPreview: vi.fn().mockResolvedValue({ success: true }),
-    dismissUnopenedBronzePassPack: vi.fn().mockResolvedValue({ success: true }),
-    resetTestPassRewardClaims: vi.fn().mockResolvedValue({ success: true }),
-  });
-
-  const createMockVerifier = (isAdmin = false): UserVerifier => ({
-    verifyAccessToken: vi.fn().mockResolvedValue({
-      userId: "u1",
-      email: "test@example.com",
-      role: isAdmin ? "admin" : "member",
-      isAdmin,
-    }),
-  });
-
-  it("GET /api/cosmetics/dashboard returns 200 with dashboard data", async () => {
+  it("does not forward a spoofed isAdmin dashboard query", async () => {
     const app = Fastify();
     const repo = createMockRepo();
-    registerCosmeticsRoutes(app, { repository: repo, userVerifier: createMockVerifier() });
-
-    const res = await app.inject({
-      method: "GET",
-      url: "/api/cosmetics/dashboard?leagueId=l1&seasonId=s1",
+    registerCosmeticsRoutes(app, { repository: repo, userVerifier: verifier });
+    const response = await app.inject({
+      method: "GET", url: "/api/cosmetics/dashboard?leagueId=l1&seasonId=s1&isAdmin=true",
       headers: { authorization: "Bearer valid-token" },
     });
-
-    expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body);
-    expect(body.catalog).toEqual([]);
-    expect(repo.getCosmeticsDashboard).toHaveBeenCalledWith({
-      userId: "u1",
-      leagueId: "l1",
-      seasonId: "s1",
-      isAdmin: false,
-    });
+    expect(response.statusCode).toBe(200);
+    expect(repo.getCosmeticsDashboard).toHaveBeenCalledWith({ userId: "u1", leagueId: "l1", seasonId: "s1" });
   });
 
-  it("POST /api/cosmetics/equip delegates to useCase", async () => {
+  it("accepts the canonical frame slot and returns business outcomes with HTTP 200", async () => {
     const app = Fastify();
     const repo = createMockRepo();
-    registerCosmeticsRoutes(app, { repository: repo, userVerifier: createMockVerifier() });
-
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/cosmetics/equip",
-      headers: { authorization: "Bearer valid-token" },
-      payload: { slot: "border", cosmeticId: "c1" },
+    vi.mocked(repo.equipCosmetic).mockResolvedValue({ success: false, error: "Sem posse" });
+    registerCosmeticsRoutes(app, { repository: repo, userVerifier: verifier });
+    const response = await app.inject({
+      method: "POST", url: "/api/cosmetics/equip", headers: { authorization: "Bearer valid-token" },
+      payload: { slot: "frame", cosmeticId: "c1" },
     });
-
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).success).toBe(true);
-    expect(repo.equipCosmetic).toHaveBeenCalledWith({
-      userId: "u1",
-      slot: "border",
-      cosmeticId: "c1",
-    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ success: false, error: "Sem posse" });
+    expect(repo.equipCosmetic).toHaveBeenCalledWith({ userId: "u1", slot: "frame", cosmeticId: "c1" });
   });
 
-  it("GET /api/cosmetics/equipped/me returns equipped summary", async () => {
+  it("drops spoofed preview flags and sends only actor-owned input", async () => {
     const app = Fastify();
     const repo = createMockRepo();
-    registerCosmeticsRoutes(app, { repository: repo, userVerifier: createMockVerifier() });
-
-    const res = await app.inject({
-      method: "GET",
-      url: "/api/cosmetics/equipped/me",
-      headers: { authorization: "Bearer valid-token" },
+    registerCosmeticsRoutes(app, { repository: repo, userVerifier: verifier });
+    const response = await app.inject({
+      method: "POST", url: "/api/cosmetics/admin-preview", headers: { authorization: "Bearer valid-token" },
+      payload: { playerId: "p1", requested: { frame: "c1" }, isAdmin: true, ownPlayerId: "p1" },
     });
-
-    expect(res.statusCode).toBe(200);
-    expect(repo.getMyEquippedCosmetics).toHaveBeenCalledWith("u1");
+    expect(response.statusCode).toBe(200);
+    expect(repo.resolveAdminCosmeticsPreview).toHaveBeenCalledWith({ userId: "u1", playerId: "p1", requested: { frame: "c1" } });
   });
 
-  it("admin routes enforce admin permission", async () => {
+  it("passes the authenticated actor to scoped maintenance RPCs", async () => {
     const app = Fastify();
     const repo = createMockRepo();
-    registerCosmeticsRoutes(app, { repository: repo, userVerifier: createMockVerifier(false) });
-
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/cosmetics/admin/cleanup-legacy",
-      headers: { authorization: "Bearer non-admin-token" },
+    registerCosmeticsRoutes(app, { repository: repo, userVerifier: verifier });
+    const response = await app.inject({
+      method: "POST", url: "/api/cosmetics/admin/cleanup-legacy", headers: { authorization: "Bearer valid-token" },
       payload: { fantasySeasonId: "fs1" },
     });
-
-    expect(res.statusCode).toBe(403);
-    expect(repo.cleanupLegacyCosmeticsPreview).not.toHaveBeenCalled();
+    expect(response.statusCode).toBe(200);
+    expect(repo.cleanupLegacyCosmeticsPreview).toHaveBeenCalledWith("u1", "fs1");
   });
 });

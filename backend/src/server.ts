@@ -58,7 +58,7 @@ import { PgFantasyAdminRepository } from "./contexts/fantasy/infrastructure/pg-f
 import { PgCardsRepository } from "./contexts/cards/infrastructure/pg-cards-repository.js";
 import { PgCosmeticsRepository } from "./contexts/cosmetics/infrastructure/pg-cosmetics-repository.js";
 import { PgCollectiveRepository } from "./contexts/collective/infrastructure/pg-collective-repository.js";
-import { PgManagerRepository } from "./contexts/integrations/infrastructure/pg-manager-repository.js";
+import { managerStoreFromEnvironment, PgManagerRepository } from "./contexts/integrations/infrastructure/pg-manager-repository.js";
 import { PgOperationsRepository } from "./contexts/operations/infrastructure/pg-operations-repository.js";
 import { createApp } from "./presentation/app.js";
 
@@ -223,7 +223,7 @@ const app = createApp({
   collectiveEnabled,
   collectiveRepository: new PgCollectiveRepository(pool),
   integrationsEnabled,
-  managerRepository: new PgManagerRepository(pool),
+  managerRepository: new PgManagerRepository(pool, managerStoreFromEnvironment(process.env)),
   operationsEnabled,
   operationsRepository: new PgOperationsRepository(pool),
   operationsInternalToken,

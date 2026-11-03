@@ -7,28 +7,30 @@ import {
 } from "../domain/manager.js";
 
 export interface ManagerRepository {
-  createClub(actor: Actor, identity: ClubIdentity): Promise<ManagerResult>;
-  runCommand(actor: Actor, command: ManagerCommand, expectedVersion: number): Promise<ManagerResult>;
+  createClub(actor: Actor, leagueId: string, identity: ClubIdentity): Promise<ManagerResult>;
+  runCommand(actor: Actor, leagueId: string, command: ManagerCommand, expectedVersion: number): Promise<ManagerResult>;
 }
 
 export class ManageManagerUseCase {
   constructor(private readonly repository: ManagerRepository) {}
 
-  async createClub(actor: Actor, identity: ClubIdentity): Promise<ManagerResult> {
+  async createClub(actor: Actor, leagueId: string, identity: ClubIdentity): Promise<ManagerResult> {
+    if (!leagueId) return { ok: false, message: "Selecione a pelada BQ para acessar esta carreira." };
     const val = validateClubIdentity(identity);
     if (!val.valid) {
       return { ok: false, message: val.error || "Dados do clube inválidos." };
     }
-    return this.repository.createClub(actor, identity);
+    return this.repository.createClub(actor, leagueId, val.value!);
   }
 
-  async runCommand(actor: Actor, command: ManagerCommand, expectedVersion: number): Promise<ManagerResult> {
+  async runCommand(actor: Actor, leagueId: string, command: ManagerCommand, expectedVersion: number): Promise<ManagerResult> {
+    if (!leagueId) return { ok: false, message: "Selecione a pelada BQ para acessar esta carreira." };
     if (!command || !command.type) {
       return { ok: false, message: "Comando inválido." };
     }
     if (!Number.isSafeInteger(expectedVersion)) {
       return { ok: false, message: "Versão inválida." };
     }
-    return this.repository.runCommand(actor, command, expectedVersion);
+    return this.repository.runCommand(actor, leagueId, command, expectedVersion);
   }
 }

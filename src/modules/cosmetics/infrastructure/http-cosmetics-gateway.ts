@@ -14,14 +14,14 @@ export class CosmeticsApiError extends Error {
 }
 
 export type CosmeticsHttpGateway = {
-  getCosmeticsDashboard(leagueId: string, seasonId: string | null, isAdmin: boolean): Promise<CosmeticsDashboard>;
+  getCosmeticsDashboard(leagueId: string, seasonId: string | null): Promise<CosmeticsDashboard>;
   cleanupLegacyCosmeticsPreview(fantasySeasonId: string | null): Promise<{ success: boolean; removed?: number; error?: string }>;
   dismissUnopenedBronzePassPack(fantasySeasonId: string | null): Promise<{ success: boolean; dismissed?: number; error?: string }>;
   resetTestPassRewardClaims(fantasySeasonId: string, selectedFantasySeasonId: string | null): Promise<{ success: boolean; removed?: number; error?: string }>;
   claimPassCosmetic(rewardId: string, cosmeticId: string, fantasySeasonId: string): Promise<{ success: boolean; error?: string }>;
   purchaseSeasonPassShopItem(shopItemId: string, fantasySeasonId: string): Promise<{ success: boolean; error?: string }>;
   equipCosmetic(slot: CosmeticSlot, cosmeticId: string | null): Promise<{ success: boolean; error?: string }>;
-  getAdminCosmeticsPreview(playerId: string, requested: CosmeticPreviewLoadout, ownPlayerId: string | null, isAdmin: boolean): Promise<EquippedCosmeticsSummary | null>;
+  getAdminCosmeticsPreview(playerId: string, requested: CosmeticPreviewLoadout): Promise<EquippedCosmeticsSummary | null>;
   getMyEquippedCosmetics(): Promise<EquippedCosmeticsSummary | null>;
   getPlayerEquippedCosmetics(playerId: string): Promise<EquippedCosmeticsSummary | null>;
   getAllPlayersEquippedCosmeticsMap(playerIds?: string[]): Promise<Map<string, EquippedCosmeticsSummary>>;
@@ -60,11 +60,10 @@ export function httpCosmeticsGateway(
   }
 
   return {
-    async getCosmeticsDashboard(leagueId, seasonId, isAdmin) {
+    async getCosmeticsDashboard(leagueId, seasonId) {
       const q = new URLSearchParams();
       if (leagueId) q.set("leagueId", leagueId);
       if (seasonId) q.set("seasonId", seasonId);
-      if (isAdmin) q.set("isAdmin", "true");
       return request<CosmeticsDashboard>(`/api/cosmetics/dashboard?${q.toString()}`);
     },
 
@@ -110,10 +109,10 @@ export function httpCosmeticsGateway(
       });
     },
 
-    async getAdminCosmeticsPreview(playerId, requested, ownPlayerId, isAdmin) {
+    async getAdminCosmeticsPreview(playerId, requested) {
       return request<EquippedCosmeticsSummary | null>("/api/cosmetics/admin-preview", {
         method: "POST",
-        body: JSON.stringify({ playerId, requested, ownPlayerId, isAdmin }),
+        body: JSON.stringify({ playerId, requested }),
       });
     },
 

@@ -14,24 +14,24 @@ describe("ManageManagerUseCase", () => {
     const repo = createMockRepo();
     const useCase = new ManageManagerUseCase(repo);
 
-    const invalidRes = await useCase.createClub(actor, { name: "", abbreviation: "AB", color: "#fff" });
+    const invalidRes = await useCase.createClub(actor, "league-1", { name: "", abbreviation: "AB", color: "#ffffff", crest: "shield", kit: "solid" });
     expect(invalidRes.ok).toBe(false);
     expect(repo.createClub).not.toHaveBeenCalled();
 
-    const validRes = await useCase.createClub(actor, { name: "Clube", abbreviation: "CLB", color: "#fff" });
+    const validRes = await useCase.createClub(actor, "league-1", { name: " Clube  Teste ", abbreviation: "clb", color: "#ffffff", crest: "shield", kit: "solid" });
     expect(validRes.ok).toBe(true);
-    expect(repo.createClub).toHaveBeenCalled();
+    expect(repo.createClub).toHaveBeenCalledWith(actor, "league-1", { name: "Clube Teste", abbreviation: "CLB", color: "#ffffff", crest: "shield", kit: "solid" });
   });
 
   it("validates command before delegating runCommand", async () => {
     const repo = createMockRepo();
     const useCase = new ManageManagerUseCase(repo);
 
-    const invalidRes = await useCase.runCommand(actor, null as any, 1);
+    const invalidRes = await useCase.runCommand(actor, "league-1", null as any, 1);
     expect(invalidRes.ok).toBe(false);
     expect(repo.runCommand).not.toHaveBeenCalled();
 
-    const validRes = await useCase.runCommand(actor, { type: "open-pack", packId: "p1" }, 1);
+    const validRes = await useCase.runCommand(actor, "league-1", { type: "open-pack", packId: "p1" }, 1);
     expect(validRes.ok).toBe(true);
     expect(repo.runCommand).toHaveBeenCalled();
   });
