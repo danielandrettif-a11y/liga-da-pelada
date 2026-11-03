@@ -175,9 +175,6 @@ export function registerMarketLineupRoutes(
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
         const result = await useCase.previewMarketV11(auth.actor, request.params.leagueId);
-        if (!result.success) {
-          return reply.code(403).send({ code: "FORBIDDEN", message: result.error });
-        }
         return reply.code(200).send(result);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -193,9 +190,6 @@ export function registerMarketLineupRoutes(
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
         const result = await useCase.repairLegacyLineups(auth.actor, request.params.leagueId);
-        if (!result.success) {
-          return reply.code(403).send({ code: "FORBIDDEN", message: result.error });
-        }
         return reply.code(200).send(result);
       } catch (error) {
         return sendFailure(error, request, reply);

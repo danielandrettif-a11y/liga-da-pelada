@@ -85,9 +85,9 @@ export type FantasyPlayerPerformanceDetail = {
 };
 
 export type FantasyMarketQuickHighlights = {
-  topValuedPlayer: { id: string; name: string; price: number; variation: number } | null;
-  topScorerPlayer: { id: string; name: string; averagePoints: number } | null;
-  bestCostBenefitPlayer: { id: string; name: string; scorePerCoin: number } | null;
+  topScorer: { name: string; avatarUrl: string | null; points: number } | null;
+  topGain: { name: string; avatarUrl: string | null; variation: number; priceChange: number } | null;
+  topDrop: { name: string; avatarUrl: string | null; variation: number; priceChange: number } | null;
 };
 
 export type FantasyRoundOverview = {

@@ -29,9 +29,9 @@ describe("Application: ManageFantasyMarketLineupUseCase", () => {
       price: 10,
     } as any),
     getQuickHighlights: vi.fn().mockResolvedValue({
-      topValuedPlayer: null,
-      topScorerPlayer: null,
-      bestCostBenefitPlayer: null,
+      topScorer: null,
+      topGain: null,
+      topDrop: null,
     }),
     getMySummary: vi.fn().mockResolvedValue({
       userId: "user-1",
@@ -55,8 +55,8 @@ describe("Application: ManageFantasyMarketLineupUseCase", () => {
       playersPerTeam: 1,
     }),
     saveLineup: vi.fn().mockResolvedValue({ success: true, lineupId: "lineup-1" }),
-    previewMarketV11: vi.fn().mockResolvedValue({ success: true, data: { status: "ok" } }),
-    repairLegacyLineups: vi.fn().mockResolvedValue({ success: true, repairedCount: 3 }),
+    previewMarketV11: vi.fn().mockResolvedValue({ success: true, preview: { status: "ok" } }),
+    repairLegacyLineups: vi.fn().mockResolvedValue({ success: true, repaired: 3, lineups: [] }),
     ...overrides,
   });
 
@@ -115,7 +115,7 @@ describe("Application: ManageFantasyMarketLineupUseCase", () => {
 
     const result = await useCase.repairLegacyLineups(actor, leagueId);
     expect(result.success).toBe(true);
-    expect(result.repairedCount).toBe(3);
+    expect(result.repaired).toBe(3);
     expect(repo.repairLegacyLineups).toHaveBeenCalledWith(leagueId, actor.userId);
   });
 });

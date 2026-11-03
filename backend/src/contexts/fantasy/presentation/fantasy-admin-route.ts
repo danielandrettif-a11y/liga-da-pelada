@@ -113,14 +113,13 @@ export function registerFantasyAdminRoutes(
   );
 
   // 6. Atualizar Configurações do Cartola
-  app.post<{ Params: { leagueId: string }; Body: { initialBudget?: number } }>(
+  app.post<{ Params: { leagueId: string }; Body: Record<string, unknown> }>(
     "/api/fantasy/leagues/:leagueId/settings",
     async (request, reply) => {
       const auth = await authenticateBearer(request, dependencies.verifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
         const res = await useCase.updateSettings(auth.actor, request.params.leagueId, request.body);
-        if (!res.success) return reply.code(400).send({ code: "INVALID_SETTINGS", message: res.error });
         return reply.code(200).send(res);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -144,7 +143,6 @@ export function registerFantasyAdminRoutes(
           request.params.roundId,
           request.body?.useCurrentRules
         );
-        if (!res.success) return reply.code(403).send({ code: "FORBIDDEN", message: res.error });
         return reply.code(200).send(res);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -160,7 +158,6 @@ export function registerFantasyAdminRoutes(
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
         const res = await useCase.createTestSession(auth.actor, request.params.leagueId, request.params.roundId);
-        if (!res.success) return reply.code(403).send({ code: "FORBIDDEN", message: res.error });
         return reply.code(200).send(res);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -176,7 +173,6 @@ export function registerFantasyAdminRoutes(
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
         const res = await useCase.processTestSession(auth.actor, request.params.leagueId, request.params.roundId);
-        if (!res.success) return reply.code(403).send({ code: "FORBIDDEN", message: res.error });
         return reply.code(200).send(res);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -192,7 +188,6 @@ export function registerFantasyAdminRoutes(
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
         const res = await useCase.resetTestSession(auth.actor, request.params.leagueId, request.params.roundId);
-        if (!res.success) return reply.code(403).send({ code: "FORBIDDEN", message: res.error });
         return reply.code(200).send(res);
       } catch (error) {
         return sendFailure(error, request, reply);

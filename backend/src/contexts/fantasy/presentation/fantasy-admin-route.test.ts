@@ -27,19 +27,26 @@ describe("Presentation: FantasyAdminRoute", () => {
     getSeasonPassDashboard: vi.fn().mockResolvedValue({
       authenticated: true,
       available: true,
-      progress: 50,
-      maxProgress: 100,
-      currentLevel: 2,
-      rewards: [],
+      progress: 5,
+      maxProgress: 40,
+      mode: "athlete",
+      participations: 2,
+      activeWeeks: 1,
+      validLineups: 2,
+      shopCycleRemainder: 0,
+      shopBonusPoints: 0,
+      nextMilestone: 10,
+      playerName: "Alice",
+      playerAvatarUrl: null,
+      events: [],
     }),
     getAdminData: vi.fn().mockResolvedValue({
-      initialBudget: 100,
-      marketOpenDelayMinutes: 0,
-      isTestSessionActive: false,
-      testSessionRoundId: null,
+      settings: { initial_budget: 100 }, rounds: [], testSession: null,
+      friendlyRounds: [], marketStatus: null,
     }),
     updateSettings: vi.fn().mockResolvedValue({ success: true }),
-    reprocessRound: vi.fn().mockResolvedValue({ success: true, reprocessedLineupsCount: 8 }),
+    rebuildRoundStats: vi.fn().mockResolvedValue(undefined),
+    reprocessRound: vi.fn().mockResolvedValue({ success: true, affectedRounds: 8 }),
     createTestSession: vi.fn().mockResolvedValue({ success: true }),
     processTestSession: vi.fn().mockResolvedValue({ success: true }),
     resetTestSession: vi.fn().mockResolvedValue({ success: true }),
@@ -92,7 +99,8 @@ describe("Presentation: FantasyAdminRoute", () => {
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.payload);
     expect(body.authenticated).toBe(true);
-    expect(body.currentLevel).toBe(2);
+    expect(body.mode).toBe("athlete");
+    expect(body.nextMilestone).toBe(10);
   });
 
   it("POST /api/fantasy/leagues/:leagueId/rounds/:roundId/reprocess returns 200 for admin", async () => {
@@ -108,7 +116,7 @@ describe("Presentation: FantasyAdminRoute", () => {
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.payload);
     expect(body.success).toBe(true);
-    expect(body.reprocessedLineupsCount).toBe(8);
+    expect(body.affectedRounds).toBe(8);
   });
 
   it("rejects an invalid reprocess option", async () => {
@@ -123,6 +131,20 @@ describe("Presentation: FantasyAdminRoute", () => {
 
     expect(res.statusCode).toBe(400);
     expect(repo.reprocessRound).not.toHaveBeenCalled();
+  });
+
+  it("preserves expected business failures as action results", async () => {
+    const repo = createMockRepo({ rebuildRoundStats: vi.fn().mockRejectedValue(new Error("falha")) });
+    const app = await buildApp(repo);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/fantasy/leagues/l1/rounds/r1/reprocess",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { useCurrentRules: false },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.payload)).toMatchObject({ success: false });
   });
 });
 

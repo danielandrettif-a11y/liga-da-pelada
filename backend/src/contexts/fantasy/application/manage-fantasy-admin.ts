@@ -1,7 +1,7 @@
 import type { Actor } from "../../../shared/actor.js";
 import {
+  buildFantasySettingsPayload,
   sortFantasyRankingEntries,
-  validateFantasySettingsUpdate,
   type FantasyAdminConfigData,
   type FantasyRankingEntry,
   type FantasyRankingScope,
@@ -35,13 +35,14 @@ export interface FantasyAdminRepository {
   ): Promise<FantasyUserRoundHistoryDetail | null>;
   getSeasonPassDashboard(leagueId: string, userId: string): Promise<SeasonPassDashboardData>;
   getAdminData(leagueId: string, userId: string): Promise<FantasyAdminConfigData>;
-  updateSettings(leagueId: string, settings: { initialBudget?: number }, userId: string): Promise<{ success: boolean }>;
+  updateSettings(leagueId: string, settings: Record<string, number>, userId: string): Promise<{ success: boolean; error?: string }>;
+  rebuildRoundStats(leagueId: string, roundId: string, userId: string): Promise<void>;
   reprocessRound(
     leagueId: string,
     roundId: string,
     useCurrentRules: boolean | undefined,
     userId: string
-  ): Promise<{ success: boolean; reprocessedLineupsCount: number }>;
+  ): Promise<{ success: boolean; affectedRounds: number }>;
   createTestSession(leagueId: string, roundId: string, userId: string): Promise<{ success: boolean }>;
   processTestSession(leagueId: string, roundId: string, userId: string): Promise<{ success: boolean }>;
   resetTestSession(leagueId: string, roundId: string, userId: string): Promise<{ success: boolean }>;
@@ -96,21 +97,22 @@ export class ManageFantasyAdminUseCase {
   async updateSettings(
     actor: Actor,
     leagueId: string,
-    settings: { initialBudget?: number }
+    settings: Record<string, unknown>
   ): Promise<{ success: boolean; error?: string }> {
     const isAdmin = await this.repo.isLeagueAdmin(leagueId, actor.userId);
     if (!isAdmin) {
       return { success: false, error: "Acesso restrito a administradores da liga." };
     }
 
-    const validation = validateFantasySettingsUpdate(settings);
+    const validation = buildFantasySettingsPayload(settings);
     if (!validation.valid) {
       return { success: false, error: validation.error };
     }
-
-    return this.repo.updateSettings(leagueId, {
-      initialBudget: validation.normalizedBudget,
-    }, actor.userId);
+    try {
+      return await this.repo.updateSettings(leagueId, validation.payload, actor.userId);
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Erro ao salvar configurações." };
+    }
   }
 
   async reprocessRound(
@@ -118,12 +120,25 @@ export class ManageFantasyAdminUseCase {
     leagueId: string,
     roundId: string,
     useCurrentRules?: boolean
-  ): Promise<{ success: boolean; reprocessedLineupsCount?: number; error?: string }> {
+  ): Promise<{ success: boolean; affectedRounds?: number; error?: string }> {
     const isAdmin = await this.repo.isLeagueAdmin(leagueId, actor.userId);
     if (!isAdmin) {
       return { success: false, error: "Acesso restrito a administradores da liga." };
     }
-    return this.repo.reprocessRound(leagueId, roundId, useCurrentRules, actor.userId);
+    try {
+      await this.repo.rebuildRoundStats(leagueId, roundId, actor.userId);
+    } catch (error) {
+      const prefix = useCurrentRules
+        ? "Não foi possível recalcular as estatísticas"
+        : "Não foi possível reconstruir os scouts antes do reprocessamento";
+      return { success: false, error: `${prefix}: ${error instanceof Error ? error.message : "erro desconhecido"}` };
+    }
+    try {
+      const result = await this.repo.reprocessRound(leagueId, roundId, useCurrentRules, actor.userId);
+      return useCurrentRules ? result : { success: result.success };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Erro ao reprocessar o Cartola." };
+    }
   }
 
   async createTestSession(
@@ -135,7 +150,8 @@ export class ManageFantasyAdminUseCase {
     if (!isAdmin) {
       return { success: false, error: "Acesso restrito a administradores da liga." };
     }
-    return this.repo.createTestSession(leagueId, roundId, actor.userId);
+    try { return await this.repo.createTestSession(leagueId, roundId, actor.userId); }
+    catch (error) { return { success: false, error: error instanceof Error ? error.message : "Erro ao criar sessão de teste." }; }
   }
 
   async processTestSession(
@@ -147,7 +163,8 @@ export class ManageFantasyAdminUseCase {
     if (!isAdmin) {
       return { success: false, error: "Acesso restrito a administradores da liga." };
     }
-    return this.repo.processTestSession(leagueId, roundId, actor.userId);
+    try { return await this.repo.processTestSession(leagueId, roundId, actor.userId); }
+    catch (error) { return { success: false, error: error instanceof Error ? error.message : "Erro ao processar sessão de teste." }; }
   }
 
   async resetTestSession(
@@ -159,7 +176,8 @@ export class ManageFantasyAdminUseCase {
     if (!isAdmin) {
       return { success: false, error: "Acesso restrito a administradores da liga." };
     }
-    return this.repo.resetTestSession(leagueId, roundId, actor.userId);
+    try { return await this.repo.resetTestSession(leagueId, roundId, actor.userId); }
+    catch (error) { return { success: false, error: error instanceof Error ? error.message : "Erro ao resetar sessão de teste." }; }
   }
 }
 

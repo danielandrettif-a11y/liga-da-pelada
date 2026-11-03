@@ -29,9 +29,9 @@ describe("Presentation: MarketLineupRoute", () => {
       price: 10,
     } as any),
     getQuickHighlights: vi.fn().mockResolvedValue({
-      topValuedPlayer: null,
-      topScorerPlayer: null,
-      bestCostBenefitPlayer: null,
+      topScorer: null,
+      topGain: null,
+      topDrop: null,
     }),
     getMySummary: vi.fn().mockResolvedValue({
       userId: "u1",
@@ -55,8 +55,8 @@ describe("Presentation: MarketLineupRoute", () => {
       playersPerTeam: 1,
     }),
     saveLineup: vi.fn().mockResolvedValue({ success: true, lineupId: "lineup-1" }),
-    previewMarketV11: vi.fn().mockResolvedValue({ success: true, data: {} }),
-    repairLegacyLineups: vi.fn().mockResolvedValue({ success: true, repairedCount: 2 }),
+    previewMarketV11: vi.fn().mockResolvedValue({ success: true, preview: {} }),
+    repairLegacyLineups: vi.fn().mockResolvedValue({ success: true, repaired: 2, lineups: [] }),
     ...overrides,
   });
 

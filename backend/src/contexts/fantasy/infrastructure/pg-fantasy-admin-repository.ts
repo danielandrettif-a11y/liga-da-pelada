@@ -3,9 +3,10 @@ import { withAuthenticatedTransaction } from "../../../infrastructure/authentica
 import type { FantasyAdminRepository } from "../application/manage-fantasy-admin.js";
 import type { FantasyAdminConfigData, FantasyRankingScope, FantasyUserRoundHistoryDetail, SeasonPassDashboardData } from "../domain/fantasy-admin.js";
 import type { UserFantasyHistoryEntry } from "../domain/market-lineup.js";
+import type { RoundStatisticsRepository } from "../../statistics/application/manage-round-statistics.js";
 
 export class PgFantasyAdminRepository implements FantasyAdminRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(private readonly pool: Pool, private readonly roundStatistics: RoundStatisticsRepository) {}
   private withUser<T>(userId: string, operation: (client: PoolClient) => Promise<T>) {
     return withAuthenticatedTransaction(this.pool, { userId }, operation);
   }
@@ -87,38 +88,105 @@ export class PgFantasyAdminRepository implements FantasyAdminRepository {
 
   async getSeasonPassDashboard(leagueId: string, userId: string): Promise<SeasonPassDashboardData> {
     return this.withUser(userId, async (client) => {
-      const result = await client.query<any>(
-        `SELECT pass.progress, reward.house, reward.reward_key
-         FROM public.fantasy_seasons season
-         LEFT JOIN public.fantasy_season_passes pass ON pass.fantasy_season_id=season.id AND pass.user_id=$2
-         LEFT JOIN public.fantasy_season_pass_rewards reward ON reward.fantasy_season_id=season.id
-         JOIN public.seasons core ON core.id=season.season_id AND core.status='active'
-         WHERE season.league_id=$1 ORDER BY reward.house`, [leagueId, userId]);
-      if (!result.rows.length) return { authenticated: true, available: false, progress: 0, maxProgress: 40, currentLevel: 0, rewards: [] };
-      const progress = Number(result.rows[0]?.progress || 0);
-      return { authenticated: true, available: true, progress, maxProgress: 40, currentLevel: progress,
-        rewards: result.rows.filter((row: any) => row.house != null).map((row: any) => ({ level: Number(row.house),
-          title: String(row.reward_key).replaceAll('_',' '), unlocked: progress >= Number(row.house), claimed: false })) };
+      const [profile, pass, events] = await Promise.all([
+        client.query<any>(
+          `SELECT player.name,player.avatar_url,player.member_category
+           FROM public.account_profiles profile JOIN public.players player ON player.id=profile.player_id
+           JOIN public.league_members member ON member.player_id=player.id AND member.league_id=$1::uuid AND member.is_active
+           WHERE profile.user_id=$2::uuid LIMIT 1`, [leagueId, userId]),
+        client.query<any>(
+          `SELECT pass.progress,pass.progression_mode,pass.participations,pass.active_weeks,
+                  pass.valid_lineups,pass.goals_assists_remainder,pass.shop_bonus_points
+           FROM public.fantasy_season_passes pass
+           JOIN public.fantasy_seasons fantasy_season ON fantasy_season.id=pass.fantasy_season_id
+           JOIN public.seasons core ON core.id=fantasy_season.season_id AND core.status='active'
+           WHERE fantasy_season.league_id=$1::uuid AND pass.user_id=$2::uuid LIMIT 1`, [leagueId, userId]),
+        client.query<any>(
+          `SELECT event.id,event.event_type,event.houses,event.source_round_id,event.created_at,
+                  round_item.number round_number,round_item.date round_date
+           FROM public.fantasy_season_pass_events event
+           JOIN public.fantasy_seasons fantasy_season ON fantasy_season.id=event.fantasy_season_id
+           JOIN public.seasons core ON core.id=fantasy_season.season_id AND core.status='active'
+           LEFT JOIN public.rounds round_item ON round_item.id=event.source_round_id
+           WHERE fantasy_season.league_id=$1::uuid AND event.user_id=$2::uuid
+           ORDER BY event.created_at DESC LIMIT 8`, [leagueId, userId]),
+      ]);
+      const player = profile.rows[0];
+      if (!player) return { authenticated: true, available: false, progress: 0, maxProgress: 40,
+        mode: "athlete", participations: 0, activeWeeks: 0, validLineups: 0, shopCycleRemainder: 0,
+        shopBonusPoints: 0, nextMilestone: 1, playerName: null, playerAvatarUrl: null, events: [] };
+      const row = pass.rows[0];
+      const progress = Number(row?.progress || 0);
+      const milestones = [1, 5, 10, 18, 25, 32, 40];
+      return { authenticated: true, available: true, progress, maxProgress: 40,
+        mode: row?.progression_mode === "community" || ["wag", "supporter"].includes(player.member_category)
+          ? "community" : "athlete",
+        participations: Number(row?.participations || 0), activeWeeks: Number(row?.active_weeks || 0),
+        validLineups: Number(row?.valid_lineups || 0), shopCycleRemainder: Number(row?.goals_assists_remainder || 0),
+        shopBonusPoints: Number(row?.shop_bonus_points || 0),
+        nextMilestone: milestones.find((milestone) => milestone > progress) ?? null,
+        playerName: player.name || null, playerAvatarUrl: player.avatar_url || null,
+        events: events.rows.map((event: any) => ({ id: event.id, eventType: event.event_type,
+          houses: Number(event.houses), roundId: event.source_round_id || null,
+          roundNumber: event.round_number == null ? null : Number(event.round_number),
+          roundDate: event.round_date || null, createdAt: event.created_at })) };
     });
   }
 
   async getAdminData(leagueId: string, userId: string): Promise<FantasyAdminConfigData> {
     return this.withUser(userId, async (client) => {
-      const [settings, session] = await Promise.all([
-        client.query<any>("SELECT initial_budget FROM public.fantasy_settings WHERE league_id=$1", [leagueId]),
-        client.query<any>("SELECT round_id FROM public.fantasy_test_sessions WHERE league_id=$1", [leagueId]),
+      const fantasySeason = await client.query<any>(
+        `SELECT fantasy_season.id FROM public.fantasy_seasons fantasy_season
+         JOIN public.seasons core ON core.id=fantasy_season.season_id AND core.status='active'
+         WHERE fantasy_season.league_id=$1::uuid LIMIT 1`, [leagueId]);
+      const fantasySeasonId = fantasySeason.rows[0]?.id || null;
+      const [settings, rounds, session, friendlyRounds, marketStatus] = await Promise.all([
+        client.query<any>("SELECT * FROM public.fantasy_settings WHERE league_id=$1::uuid", [leagueId]),
+        fantasySeasonId ? client.query<any>(
+          `SELECT fantasy_round.id,fantasy_round.market_status,fantasy_round.processed_at,
+                  fantasy_round.rules_version,fantasy_round.scoring_version,
+                  jsonb_build_object('id',round_item.id,'number',round_item.number,'date',round_item.date,
+                    'status',round_item.status,'round_type',round_item.round_type) round
+           FROM public.fantasy_rounds fantasy_round JOIN public.rounds round_item ON round_item.id=fantasy_round.round_id
+           WHERE fantasy_round.fantasy_season_id=$1::uuid ORDER BY fantasy_round.created_at DESC LIMIT 20`, [fantasySeasonId])
+          : Promise.resolve({ rows: [] }),
+        client.query<any>(
+          `SELECT session_item.*,jsonb_build_object('id',round_item.id,'number',round_item.number,
+             'date',round_item.date,'start_time',round_item.start_time,'status',round_item.status,
+             'round_type',round_item.round_type,'round_players',jsonb_build_array(jsonb_build_object('count',
+               (SELECT count(*) FROM public.round_players player WHERE player.round_id=round_item.id))),
+             'matches',COALESCE((SELECT jsonb_agg(jsonb_build_object('id',match_item.id,'status',match_item.status,
+               'started_at',match_item.started_at)) FROM public.matches match_item WHERE match_item.round_id=round_item.id),'[]'::jsonb)) round
+           FROM public.fantasy_test_sessions session_item JOIN public.rounds round_item ON round_item.id=session_item.round_id
+           WHERE session_item.league_id=$1::uuid LIMIT 1`, [leagueId]),
+        client.query<any>(
+          `SELECT round_item.id,round_item.number,round_item.date,round_item.start_time,round_item.status,round_item.round_type,
+                  jsonb_build_array(jsonb_build_object('count',(SELECT count(*) FROM public.round_players player WHERE player.round_id=round_item.id))) round_players,
+                  COALESCE((SELECT jsonb_agg(jsonb_build_object('id',match_item.id,'status',match_item.status,'started_at',match_item.started_at))
+                    FROM public.matches match_item WHERE match_item.round_id=round_item.id),'[]'::jsonb) matches
+           FROM public.rounds round_item JOIN public.seasons core ON core.id=round_item.season_id AND core.status='active'
+           WHERE round_item.league_id=$1::uuid AND round_item.round_type='friendly'
+           ORDER BY round_item.date DESC LIMIT 12`, [leagueId]),
+        fantasySeasonId ? client.query<any>("SELECT public.get_fantasy_market_v11_status($1::uuid) data", [fantasySeasonId])
+          : Promise.resolve({ rows: [] }),
       ]);
-      return { initialBudget: Number(settings.rows[0]?.initial_budget || 55), marketOpenDelayMinutes: 0,
-        isTestSessionActive: Boolean(session.rows[0]), testSessionRoundId: session.rows[0]?.round_id || null };
+      return { settings: settings.rows[0] || { initial_budget: 55, initial_player_price: 10,
+          min_player_price: 5, max_player_price: 20, captain_multiplier: 1.5 },
+        rounds: rounds.rows, testSession: session.rows[0] || null,
+        friendlyRounds: friendlyRounds.rows, marketStatus: marketStatus.rows[0]?.data || null };
     });
   }
 
-  async updateSettings(leagueId: string, settings: { initialBudget?: number }, userId: string) {
+  async updateSettings(leagueId: string, settings: Record<string, number>, userId: string) {
     return this.withUser(userId, async (client) => {
       await client.query("SELECT public.update_fantasy_settings_for_league($1::uuid,$2::jsonb)",
-        [leagueId, JSON.stringify({ initial_budget: settings.initialBudget })]);
+        [leagueId, JSON.stringify(settings)]);
       return { success: true };
     });
+  }
+
+  rebuildRoundStats(leagueId: string, roundId: string, userId: string) {
+    return this.roundStatistics.recalculateRoundStats({ userId }, leagueId, roundId);
   }
 
   async reprocessRound(leagueId: string, roundId: string, useCurrentRules: boolean | undefined, userId: string) {
@@ -128,7 +196,7 @@ export class PgFantasyAdminRepository implements FantasyAdminRepository {
         `SELECT public.${rpc}($1::uuid) data WHERE EXISTS (SELECT 1 FROM public.rounds WHERE id=$1 AND league_id=$2)`,
         [roundId, leagueId]);
       if (!result.rows[0]) throw new Error("Rodada fora da pelada selecionada.");
-      return { success: true, reprocessedLineupsCount: Number(result.rows[0].data?.affected_lineups || result.rows[0].data?.affected_finished_rounds || 0) };
+      return { success: true, affectedRounds: Number(result.rows[0].data?.affected_finished_rounds || 1) };
     });
   }
 

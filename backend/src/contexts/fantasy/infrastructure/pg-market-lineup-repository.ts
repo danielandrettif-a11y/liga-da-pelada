@@ -156,26 +156,24 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
     });
   }
 
-  async getQuickHighlights(leagueId: string, userId: string): Promise<FantasyMarketQuickHighlights> {
+  async getQuickHighlights(leagueId: string, userId: string): Promise<FantasyMarketQuickHighlights | null> {
     return this.withUser(userId, async (client) => {
       const result = await client.query<any>(
-        `SELECT player.id, player.name, price.current_price price, price.total_points,
-                price.rounds_played, COALESCE(history.variation_rate,0) variation
+        `SELECT player.name,player.avatar_url,price.last_round_points,price.last_price_change,price.variation_rate
          FROM public.fantasy_player_prices price
          JOIN public.fantasy_seasons season ON season.id = price.fantasy_season_id
+         JOIN public.seasons core ON core.id=season.season_id AND core.status='active'
          JOIN public.players player ON player.id = price.player_id
-         LEFT JOIN LATERAL (SELECT variation_rate FROM public.fantasy_player_price_history item
-           WHERE item.fantasy_season_id = price.fantasy_season_id AND item.player_id = price.player_id
-           ORDER BY item.created_at DESC LIMIT 1) history ON true
          WHERE season.league_id = $1`, [leagueId]);
-      const rows = result.rows.map((row: any) => ({ ...row, price: Number(row.price), total: Number(row.total_points),
-        average: Number(row.rounds_played) ? Number(row.total_points) / Number(row.rounds_played) : 0 }));
-      const valued = [...rows].sort((a, b) => b.price - a.price)[0];
-      const scorer = [...rows].sort((a, b) => b.average - a.average)[0];
-      const benefit = [...rows].filter((r) => r.price > 0).sort((a, b) => b.average / b.price - a.average / a.price)[0];
-      return { topValuedPlayer: valued ? { id: valued.id, name: valued.name, price: valued.price, variation: Number(valued.variation) } : null,
-        topScorerPlayer: scorer ? { id: scorer.id, name: scorer.name, averagePoints: Math.round(scorer.average * 100) / 100 } : null,
-        bestCostBenefitPlayer: benefit ? { id: benefit.id, name: benefit.name, scorePerCoin: Math.round(benefit.average / benefit.price * 100) / 100 } : null };
+      if (!result.rows.length) return null;
+      const rows = result.rows.map((row: any) => ({ name: row.name || "Jogador", avatarUrl: row.avatar_url || null,
+        points: Number(row.last_round_points || 0), priceChange: Number(row.last_price_change || 0),
+        variation: Number(row.variation_rate || 0) }));
+      const scorer = [...rows].sort((a, b) => b.points - a.points)[0]!;
+      const gain = [...rows].sort((a, b) => b.variation - a.variation)[0]!;
+      const drop = [...rows].sort((a, b) => a.variation - b.variation)[0]!;
+      return { topScorer: scorer.points > 0 ? scorer : null, topGain: gain.variation > 0 ? gain : null,
+        topDrop: drop.variation < 0 ? drop : null };
     });
   }
 
@@ -195,8 +193,22 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
     });
   }
 
-  async getMyHistory(leagueId: string, userId: string): Promise<UserFantasyHistoryEntry[]> {
-    return this.withUser(userId, async (client) => this.readHistory(client, leagueId, userId));
+  async getMyHistory(leagueId: string, userId: string): Promise<unknown[]> {
+    return this.withUser(userId, async (client) => {
+      const result = await client.query<any>(
+        `SELECT lineup.id,lineup.status,lineup.total_points,lineup.budget_before,lineup.budget_after,lineup.created_at,
+                jsonb_build_object('round_id',fantasy_round.round_id,'market_status',fantasy_round.market_status,
+                  'fantasy_season_id',fantasy_round.fantasy_season_id,'rounds',jsonb_build_object(
+                    'number',round_item.number,'date',round_item.date)) fantasy_rounds
+         FROM public.fantasy_lineups lineup
+         JOIN public.fantasy_rounds fantasy_round ON fantasy_round.id=lineup.fantasy_round_id
+         JOIN public.fantasy_seasons fantasy_season ON fantasy_season.id=fantasy_round.fantasy_season_id
+         JOIN public.seasons core ON core.id=fantasy_season.season_id AND core.status='active'
+         JOIN public.rounds round_item ON round_item.id=fantasy_round.round_id
+         WHERE fantasy_season.league_id=$1::uuid AND lineup.user_id=$2::uuid
+         ORDER BY lineup.created_at DESC`, [leagueId, userId]);
+      return result.rows;
+    });
   }
 
   private async readHistory(client: PoolClient, leagueId: string, userId: string): Promise<UserFantasyHistoryEntry[]> {
@@ -304,7 +316,7 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
           `SELECT public.preview_fantasy_market_v11(season.id) data FROM public.fantasy_seasons season
            JOIN public.seasons core ON core.id=season.season_id
            WHERE season.league_id=$1 AND core.status='active' LIMIT 1`, [leagueId]);
-        return result.rows[0] ? { success: true, data: result.rows[0].data }
+        return result.rows[0] ? { success: true, preview: result.rows[0].data }
           : { success: false, error: "O Cartola desta pelada ainda não foi iniciado." };
       });
     } catch (error: any) { return { success: false, error: error.message }; }
@@ -313,6 +325,7 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
   async repairLegacyLineups(leagueId: string, userId: string) {
     const result = await this.withUser(userId, async (client) => client.query<any>(
       `SELECT public.repair_legacy_saved_fantasy_lineups() data WHERE public.is_league_admin($1::uuid)`, [leagueId]));
-    return { success: true, repairedCount: Number(result.rows[0]?.data?.repaired || 0) };
+    return { success: true, repaired: Number(result.rows[0]?.data?.repaired || 0),
+      lineups: Array.isArray(result.rows[0]?.data?.lineups) ? result.rows[0].data.lineups : [] };
   }
 }

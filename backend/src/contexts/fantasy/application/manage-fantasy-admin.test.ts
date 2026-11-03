@@ -29,19 +29,26 @@ describe("Application: ManageFantasyAdminUseCase", () => {
     getSeasonPassDashboard: vi.fn().mockResolvedValue({
       authenticated: true,
       available: true,
-      progress: 50,
-      maxProgress: 100,
-      currentLevel: 2,
-      rewards: [],
+      progress: 5,
+      maxProgress: 40,
+      mode: "athlete",
+      participations: 2,
+      activeWeeks: 1,
+      validLineups: 2,
+      shopCycleRemainder: 0,
+      shopBonusPoints: 0,
+      nextMilestone: 10,
+      playerName: "Alice",
+      playerAvatarUrl: null,
+      events: [],
     }),
     getAdminData: vi.fn().mockResolvedValue({
-      initialBudget: 100,
-      marketOpenDelayMinutes: 0,
-      isTestSessionActive: false,
-      testSessionRoundId: null,
+      settings: { initial_budget: 100 }, rounds: [], testSession: null,
+      friendlyRounds: [], marketStatus: null,
     }),
     updateSettings: vi.fn().mockResolvedValue({ success: true }),
-    reprocessRound: vi.fn().mockResolvedValue({ success: true, reprocessedLineupsCount: 8 }),
+    rebuildRoundStats: vi.fn().mockResolvedValue(undefined),
+    reprocessRound: vi.fn().mockResolvedValue({ success: true, affectedRounds: 8 }),
     createTestSession: vi.fn().mockResolvedValue({ success: true }),
     processTestSession: vi.fn().mockResolvedValue({ success: true }),
     resetTestSession: vi.fn().mockResolvedValue({ success: true }),
@@ -74,19 +81,28 @@ describe("Application: ManageFantasyAdminUseCase", () => {
 
     const result = await useCase.reprocessRound(adminActor, leagueId, "r1", true);
     expect(result.success).toBe(true);
-    expect(result.reprocessedLineupsCount).toBe(8);
+    expect(result.affectedRounds).toBe(8);
+    expect(repo.rebuildRoundStats).toHaveBeenCalledWith(leagueId, "r1", adminActor.userId);
   });
 
   it("validates and updates settings for admin", async () => {
     const repo = createMockRepo();
     const useCase = new ManageFantasyAdminUseCase(repo);
 
-    const invalid = await useCase.updateSettings(adminActor, leagueId, { initialBudget: 10 });
+    const invalid = await useCase.updateSettings(adminActor, leagueId, { goalPoints: 10 });
     expect(invalid.success).toBe(false);
 
     const valid = await useCase.updateSettings(adminActor, leagueId, { initialBudget: 120 });
     expect(valid.success).toBe(true);
-    expect(repo.updateSettings).toHaveBeenCalledWith(leagueId, { initialBudget: 120 }, adminActor.userId);
+    expect(repo.updateSettings).toHaveBeenCalledWith(leagueId, { initial_budget: 120 }, adminActor.userId);
+  });
+
+  it("does not reprocess when rebuilding round stats fails", async () => {
+    const repo = createMockRepo({ rebuildRoundStats: vi.fn().mockRejectedValue(new Error("falha nos scouts")) });
+    const result = await new ManageFantasyAdminUseCase(repo).reprocessRound(adminActor, leagueId, "r1", false);
+    expect(result).toEqual({ success: false,
+      error: "Não foi possível reconstruir os scouts antes do reprocessamento: falha nos scouts" });
+    expect(repo.reprocessRound).not.toHaveBeenCalled();
   });
 });
 

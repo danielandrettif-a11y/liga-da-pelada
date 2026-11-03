@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Pool } from "pg";
+import type { RoundStatisticsRepository } from "../../statistics/application/manage-round-statistics.js";
 import { PgFantasyAdminRepository } from "./pg-fantasy-admin-repository.js";
 
 describe("Infrastructure: PgFantasyAdminRepository", () => {
+  const roundStatistics = { recalculateRoundStats: vi.fn().mockResolvedValue(undefined),
+    findRoundStatistics: vi.fn(), findFriendlyStats: vi.fn() } as unknown as RoundStatisticsRepository;
   const createMockPool = (queryHandler: (sql: string, params?: any[]) => Promise<any>): Pool => {
     const client = {
       query: vi.fn().mockImplementation((sql: string, params?: any[]) => {
@@ -35,7 +38,7 @@ describe("Infrastructure: PgFantasyAdminRepository", () => {
       return { rows: [] };
     });
 
-    const repo = new PgFantasyAdminRepository(pool);
+    const repo = new PgFantasyAdminRepository(pool, roundStatistics);
     const rows = await repo.getRankingRawEntries("l1", "season", "viewer-1");
     expect(rows.length).toBe(1);
     expect(rows[0].totalPoints).toBe(150.5);
@@ -48,8 +51,8 @@ describe("Infrastructure: PgFantasyAdminRepository", () => {
       return { rows: [] };
     });
 
-    const repo = new PgFantasyAdminRepository(pool);
-    const res = await repo.updateSettings("l1", { initialBudget: 120 }, "admin-1");
+    const repo = new PgFantasyAdminRepository(pool, roundStatistics);
+    const res = await repo.updateSettings("l1", { initial_budget: 120 }, "admin-1");
     expect(res.success).toBe(true);
     expect(executedSql.some((sql) => sql.includes("update_fantasy_settings_for_league"))).toBe(true);
   });
@@ -59,7 +62,7 @@ describe("Infrastructure: PgFantasyAdminRepository", () => {
       || sql.includes("process_fantasy_test_round") || sql.includes("reset_fantasy_test_session")
       ? { rows: [{ data: true }] }
       : { rows: [] });
-    const repo = new PgFantasyAdminRepository(pool);
+    const repo = new PgFantasyAdminRepository(pool, roundStatistics);
 
     expect((await repo.createTestSession("l1", "r1", "admin-1")).success).toBe(true);
     expect((await repo.processTestSession("l1", "r1", "admin-1")).success).toBe(true);

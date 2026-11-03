@@ -105,6 +105,27 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
     ]);
   });
 
+  it("returns quick highlights with the public action contract", async () => {
+    const pool = createMockPool(async (sql) => sql.includes("price.last_round_points") ? { rows: [
+      { name: "A", avatar_url: null, last_round_points: 9, last_price_change: 1, variation_rate: 2 },
+      { name: "B", avatar_url: "b.png", last_round_points: 4, last_price_change: -2, variation_rate: -3 },
+    ] } : { rows: [] });
+
+    const result = await new PgFantasyMarketLineupRepository(pool).getQuickHighlights("l1", "u1");
+    expect(result?.topScorer?.name).toBe("A");
+    expect(result?.topGain?.variation).toBe(2);
+    expect(result?.topDrop?.name).toBe("B");
+  });
+
+  it("returns personal history in the same nested shape as the Supabase reader", async () => {
+    const row = { id: "lineup-1", status: "scored", fantasy_rounds: { round_id: "r1", rounds: { number: 1 } } };
+    const pool = createMockPool(async (sql) => sql.includes("jsonb_build_object('round_id'")
+      ? { rows: [row] } : { rows: [] });
+
+    const result = await new PgFantasyMarketLineupRepository(pool).getMyHistory("l1", "u1");
+    expect(result).toEqual([row]);
+  });
+
   it("returns revealed lineups only when market is closed", async () => {
     const pool = createMockPool(async (sql) => {
       if (sql.includes("FROM public.fantasy_rounds fantasy_round")) {

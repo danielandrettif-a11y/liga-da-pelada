@@ -697,6 +697,66 @@
       "name": "saveFantasyLineup"
     },
     {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyQuickHighlights"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getMyFantasyHistory"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getSeasonPassDashboard"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyAdminData"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "updateFantasySettings"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "previewFantasyMarketV11"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "reprocessFantasyRound"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "reprocessFantasyRoundWithCurrentRules"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "repairLegacySavedFantasyLineups"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "createFantasyTestSession"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "processFantasyTestSession"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "resetFantasyTestSession"
+    },
+    {
       "context": "cards",
       "source": "src/lib/actions/fantasy-cards.ts",
       "name": "getMyPacks"

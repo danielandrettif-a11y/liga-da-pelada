@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildFantasySettingsPayload,
   sortFantasyRankingEntries,
-  validateFantasySettingsUpdate,
 } from "./fantasy-admin.js";
 
 describe("Fantasy Domain: Fantasy Admin & Ranking", () => {
@@ -23,13 +23,14 @@ describe("Fantasy Domain: Fantasy Admin & Ranking", () => {
     expect(sorted[2].rank).toBe(3);
   });
 
-  it("validates initial budget bounds", () => {
-    expect(validateFantasySettingsUpdate({ initialBudget: 10 }).valid).toBe(false);
-    expect(validateFantasySettingsUpdate({ initialBudget: 600 }).valid).toBe(false);
-
-    const validResult = validateFantasySettingsUpdate({ initialBudget: 120.456 });
-    expect(validResult.valid).toBe(true);
-    expect(validResult.normalizedBudget).toBe(120.46);
+  it("builds the scoped settings payload and protects canonical scouts", () => {
+    expect(buildFantasySettingsPayload({ goalPoints: 5 }).valid).toBe(false);
+    expect(buildFantasySettingsPayload({ initialBudget: 75, captain_multiplier: 1.8,
+      defenderOneGoalConcededPoints: -1 })).toEqual({ valid: true, payload: {
+        initial_budget: 75,
+        captain_multiplier: 1.8,
+        defender_one_goal_conceded_points: -1,
+      } });
   });
 });
 

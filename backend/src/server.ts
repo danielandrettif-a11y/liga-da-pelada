@@ -215,7 +215,7 @@ const app = createApp({
   financeRepository: new PgFinanceRepository(pool),
   fantasyEnabled,
   fantasyMarketLineupRepository: new PgFantasyMarketLineupRepository(pool),
-  fantasyAdminRepository: new PgFantasyAdminRepository(pool),
+  fantasyAdminRepository: new PgFantasyAdminRepository(pool, pgRoundStatisticsRepository(pool)),
   cardsEnabled,
   cardsRepository: new PgCardsRepository(pool),
   cosmeticsEnabled,

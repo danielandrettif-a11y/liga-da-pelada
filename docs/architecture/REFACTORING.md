@@ -33,6 +33,15 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-11-03 — Fantasy administrativo, histórico pessoal, destaques e Passe BQ
+
+- Mais **12 operações de Fantasy** foram comparadas com o caminho Supabase e aceitas: `getFantasyQuickHighlights`, `getMyFantasyHistory`, `getSeasonPassDashboard`, `getFantasyAdminData`, `updateFantasySettings`, `previewFantasyMarketV11`, os dois modos de reprocessamento, reparo legado e as três operações da sessão de teste. Fantasy passa a **13/22**.
+- Os contratos HTTP agora preservam exatamente os resultados esperados pelas Server Actions. Falhas de negócio de configuração, prévia, reparo, reprocessamento e sessão de teste retornam `{ success: false, error }`, sem serem convertidas em exceções pelo gateway.
+- O reprocessamento volta a reconstruir obrigatoriamente os scouts pelo contexto Statistics antes de chamar a RPC canônica. A dependência entre contextos é uma porta explícita; falha no recálculo interrompe a operação e mantém a mensagem pública do fluxo legado.
+- Passe BQ preserva modo atleta/comunidade, participações, semanas, escalações válidas, bônus da loja, próximo marco, identidade e os oito eventos recentes. Histórico pessoal e destaques rápidos preservam os formatos aninhados consumidos pelas telas.
+- Progresso conservador: **245/267 operações aceitas (91,8%)**, restando **22**: nove leitores analíticos de Fantasy, onze operações de Cosméticos e duas de Integrações.
+- Verificação: typecheck do backend e frontend; **693 testes backend em 181 arquivos** e **1.238 testes frontend em 237 arquivos**; builds de produção e auditorias registrados no fechamento da fatia.
+
 ### 2026-11-03 — Cards completo e recibo transacional da escalação do Fantasy
 
 - O contexto **Cards** foi comparado novamente com o esquema e as RPCs reais. As 15 operações agora usam `fantasy_round_packs`, `fantasy_pack_offers`, `fantasy_user_cards` e `fantasy_card_activations`, com escopo por pelada, transações autenticadas, idempotência de abertura/resgate, autorização administrativa e validação dos alvos. O contexto passa a **15/15 operações aceitas**.
