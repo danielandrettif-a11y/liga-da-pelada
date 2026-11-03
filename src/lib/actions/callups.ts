@@ -26,7 +26,6 @@ import {
   normalizeCallupGuestName,
   parseWhatsAppGuestList,
 } from "@/modules/callups/domain/callup-guest-list";
-import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getSelectedLeague } from "../league-context";
 import { createServiceClient } from "../supabase/service";
 import { resolveCallupInvite } from "../callup-invite-server";
@@ -55,14 +54,8 @@ export type CallupWithEntries = Callup & {
 };
 
 function normalizeCallup(data: any): CallupWithEntries | null {
-  const linkedRound = data?.round;
-  if (linkedRound) {
-    // Sorteio concluído não encerra a convocação. Ela continua acessível para
-    // desistências e reposições até o primeiro jogo realmente começar.
-    const hasStartedMatches = hasCallupClosingMatch(linkedRound.matches);
-    if (hasStartedMatches) return null;
-  }
-
+  // A convocação continua visível durante a rodada. Depois do primeiro jogo,
+  // novas inclusões entram na fila e não alteram times que já estão jogando.
   const rawEntries = (data?.callup_entries || []) as Array<CallupEntryWithPlayer & { player: Player | null }>;
   // Uma relação invisível por RLS não pode derrubar a convocação inteira.
   // A política correta está na migration 306; este filtro protege também

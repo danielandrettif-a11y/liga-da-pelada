@@ -56,7 +56,7 @@ import type { EquippedCosmeticsSummary } from "@/lib/actions/cosmetics";
 import Image from "next/image";
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
 import { useUrlState } from "@/lib/useUrlState";
-import { hasCallupClosingMatch } from "@/lib/callup-lifecycle";
+import { hasCallupClosingMatch, hasDrawnCallupTeams } from "@/lib/callup-lifecycle";
 import { WeatherBadge } from "./WeatherBadge";
 import type { EventWeather } from "@/lib/weather";
 import { setCallupFormat } from "@/lib/actions/rounds";
@@ -184,14 +184,14 @@ export function CallupBoard({
   const myDrawnTeam = currentPlayerId
     ? drawnTeams.find((team) => team.team_players.some((entry) => entry.player_id === currentPlayerId)) || null
     : null;
-  const hasDrawnTeams = Boolean(callup.round_id) && drawnTeams.length > 0;
+  const hasDrawnTeams = Boolean(callup.round_id) && hasDrawnCallupTeams(drawnTeams);
   const isQueueOnlyAfterDraw = hasDrawnTeams;
   const availableDrawnTeamSlots = hasDrawnTeams
     ? drawnTeams.reduce((total, team) => total + Math.max(0, (callup.players_per_team || formatPlayers) - team.team_players.length), 0)
     : 0;
   const canJoinDrawnTeam = isQueueOnlyAfterDraw && availableDrawnTeamSlots > 0;
   const canTakeConfirmedSpot = (!isQueueOnlyAfterDraw && confirmed.length < capacity) || canJoinDrawnTeam;
-  const canJoinCallup = callup.status === "open" || isQueueOnlyAfterDraw;
+  const canJoinCallup = callup.status === "open" || callup.status === "converted";
   const hasStartedMatch = hasCallupClosingMatch(callup.round?.matches);
   const canLeaveBeforeFirstMatch = (callup.status === "open" || callup.status === "converted") && !hasStartedMatch;
 
@@ -658,10 +658,14 @@ export function CallupBoard({
               </>
             )}
           </button>
-        ) : currentPlayerId ? (
+        ) : currentPlayerId && hasDrawnTeams ? (
           <div className="rounded-2xl border border-accent/25 bg-accent/[.06] p-4 text-center">
             <p className="text-xs font-black uppercase tracking-wider text-accent">Times já sorteados</p>
             <p className="mt-1 text-[11px] leading-relaxed text-muted">Seu time aparece no destaque acima. Se alguém desistir antes do primeiro jogo, a vaga reabre aqui no mesmo time.</p>
+          </div>
+        ) : currentPlayerId ? (
+          <div className="rounded-2xl border border-warning/25 bg-warning/10 p-3.5 text-center text-xs font-bold text-warning">
+            A lista está temporariamente indisponível. Atualize a página ou fale com o ADM.
           </div>
         ) : (
           <div className="rounded-2xl border border-warning/25 bg-warning/10 p-3.5 text-center text-xs font-bold text-warning">
