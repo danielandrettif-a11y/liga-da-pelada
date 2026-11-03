@@ -29,7 +29,7 @@ import {
 import { getSelectedLeague } from "../league-context";
 import { createServiceClient } from "../supabase/service";
 import { resolveCallupInvite } from "../callup-invite-server";
-import { isFinishedCallupRound } from "../callup-lifecycle";
+import { hasCallupClosingMatch, isFinishedCallupRound } from "../callup-lifecycle";
 
 export type CallupEntryWithPlayer = CallupEntry & {
   player: Player;
@@ -55,11 +55,10 @@ export type CallupWithEntries = Callup & {
 };
 
 function normalizeCallup(data: any): CallupWithEntries | null {
-  // A convocação continua visível durante a rodada. Depois do primeiro jogo,
-  // novas inclusões entram na fila e não alteram times que já estão jogando.
-  // Rodadas efetivamente finalizadas são históricas e não podem disputar a
-  // posição de "convocação atual" com a próxima lista aberta.
-  if (isFinishedCallupRound(data?.round)) return null;
+  // A pré-lista e o sorteio não fecham a convocação. O primeiro jogo sim:
+  // dali em diante a rodada é histórica para esta tela e nenhuma inclusão ou
+  // saída pode disputar a posição da próxima convocação aberta.
+  if (isFinishedCallupRound(data?.round) || hasCallupClosingMatch(data?.round?.matches)) return null;
 
   const rawEntries = (data?.callup_entries || []) as Array<CallupEntryWithPlayer & { player: Player | null }>;
   // Uma relação invisível por RLS não pode derrubar a convocação inteira.
