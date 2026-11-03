@@ -35,8 +35,23 @@ export async function getRegistrationHistory(): Promise<PlayerRegistrationEvent[
     return [];
   }
   const events = data as PlayerRegistrationEvent[];
+  const creatorIds = [...new Set(events.map((event) => event.created_by_user_id).filter((id): id is string => Boolean(id)))];
+  const { data: creators } = creatorIds.length
+    ? await account.client
+        .from("account_profiles")
+        .select("user_id, players(name, avatar_url)")
+        .in("user_id", creatorIds)
+    : { data: [] };
+  const creatorsById = new Map((creators || []).map((profile) => {
+    const player = Array.isArray(profile.players) ? profile.players[0] : profile.players;
+    return [profile.user_id, player || null];
+  }));
   const playerIds = events.map((event) => event.player_id).filter((id): id is string => Boolean(id));
-  if (playerIds.length === 0) return events;
+  if (playerIds.length === 0) return events.map((event) => ({
+    ...event,
+    created_by_name: event.created_by_user_id ? creatorsById.get(event.created_by_user_id)?.name || null : null,
+    created_by_avatar_url: event.created_by_user_id ? creatorsById.get(event.created_by_user_id)?.avatar_url || null : null,
+  }));
   const { data: currentPlayers } = await account.client
     .from("players")
     .select("id, name, avatar_url, member_category")
@@ -49,7 +64,13 @@ export async function getRegistrationHistory(): Promise<PlayerRegistrationEvent[
       player_name: current.name,
       avatar_url: current.avatar_url || event.avatar_url,
       member_category: current.member_category,
-    } : event;
+      created_by_name: event.created_by_user_id ? creatorsById.get(event.created_by_user_id)?.name || null : null,
+      created_by_avatar_url: event.created_by_user_id ? creatorsById.get(event.created_by_user_id)?.avatar_url || null : null,
+    } : {
+      ...event,
+      created_by_name: event.created_by_user_id ? creatorsById.get(event.created_by_user_id)?.name || null : null,
+      created_by_avatar_url: event.created_by_user_id ? creatorsById.get(event.created_by_user_id)?.avatar_url || null : null,
+    };
   }) as PlayerRegistrationEvent[];
 }
 

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const migration = readFileSync(
   join(process.cwd(), "supabase/migrations/349_keep_pre_draw_callup_capacity.sql"),
   "utf8",
-);
+).replace(/\r\n/g, "\n");
 
 describe("capacidade da convocação antes do sorteio", () => {
   it("só usa as vagas dos times quando os times já existem", () => {

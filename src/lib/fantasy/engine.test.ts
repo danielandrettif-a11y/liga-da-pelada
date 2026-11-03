@@ -73,6 +73,7 @@ describe("Cartola V2 — Suíte de Testes e Validação Econômica", () => {
     it("mantém o patrimônio proporcional nas modalidades de 5 e 6 atletas", () => {
       expect(getFantasyInitialBudget(5)).toBe(55);
       expect(getFantasyInitialBudget(6)).toBe(66);
+      expect(getFantasyInitialBudget(7)).toBe(77);
       expect(validateFantasyDraft({ playerIds: ["a", "b", "c", "d", "e", "f"], captainPlayerId: "a", prices, budget: 66, maxPlayers: 6 })).toMatchObject({ valid: true, complete: true, cost: 60 });
       expect(validateFantasyDraft({ playerIds: ["a", "b", "c", "d", "e", "f"], captainPlayerId: "a", prices, budget: 59, maxPlayers: 6 }).valid).toBe(false);
     });

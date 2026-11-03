@@ -8,7 +8,7 @@ export const revalidate = 0;
 export default async function NovaPartidaPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
   const account = await getCurrentAccount();

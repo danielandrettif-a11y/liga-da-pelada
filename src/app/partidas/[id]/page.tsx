@@ -9,7 +9,7 @@ export const revalidate = 0;
 export default async function PartidaAoVivoPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
   const [match, league, account] = await Promise.all([
@@ -29,8 +29,9 @@ export default async function PartidaAoVivoPage({
     : [];
 
   const duration = league?.match_duration || 7;
+  const goalsToFinish = league?.goals_to_finish || 2;
 
   return (
-    <MatchLiveBoard match={match} matchDuration={duration} canManage={account.isAdmin} auditLog={auditLog} />
+    <MatchLiveBoard match={match} matchDuration={duration} goalsToFinish={goalsToFinish} canManage={account.isAdmin} auditLog={auditLog} />
   );
 }

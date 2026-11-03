@@ -27,7 +27,7 @@ export default async function RodadaDetalhePage({
   params,
   searchParams,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string; sort?: string }>;
 }) {
   const { id } = await params;

@@ -45,9 +45,15 @@ describe("match participation rules", () => {
     expect(transitionMatchTimer(started, "pause", 15_900)).toEqual({ startedAt: null, accumulated: 17 });
   });
 
-  it("offers to finish only when the scoring team reaches two goals", () => {
+  it("uses two goals as the backward-compatible default", () => {
     expect(shouldOfferMatchFinishAfterGoal(1, 2)).toBe(true);
     expect(shouldOfferMatchFinishAfterGoal(2, 3)).toBe(false);
     expect(shouldOfferMatchFinishAfterGoal(0, 1)).toBe(false);
+  });
+
+  it("offers to finish at the goal target configured by the league", () => {
+    expect(shouldOfferMatchFinishAfterGoal(2, 3, 3)).toBe(true);
+    expect(shouldOfferMatchFinishAfterGoal(1, 2, 3)).toBe(false);
+    expect(shouldOfferMatchFinishAfterGoal(3, 4, 3)).toBe(false);
   });
 });
