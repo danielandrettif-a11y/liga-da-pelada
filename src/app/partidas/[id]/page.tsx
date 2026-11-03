@@ -29,7 +29,7 @@ export default async function PartidaAoVivoPage({
     : [];
 
   const duration = league?.match_duration || 7;
-  const goalsToFinish = league?.goals_to_finish || 2;
+  const goalsToFinish = Number(match.goals_to_finish ?? league?.goals_to_finish ?? 2);
 
   return (
     <MatchLiveBoard match={match} matchDuration={duration} goalsToFinish={goalsToFinish} canManage={account.isAdmin} auditLog={auditLog} />

@@ -340,6 +340,7 @@ function HoldExtraTimeButton({
 type MatchLiveBoardProps = {
   match: any;
   matchDuration: number;
+  /** Zero significa partida sem limite de gols. */
   goalsToFinish: number;
   canManage: boolean;
   auditLog?: MatchAdminAuditEntry[];

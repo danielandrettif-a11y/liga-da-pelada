@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CalendarPlus, CheckCircle2, ChevronRight, Clock, Loader2, Lock, MapPin, PencilLine, Plus, Share2, Stadium as StadiumIcon, X } from "@/components/icons";
-import { closeCallup, createCallupPrelist, openCallup, setCallupVisibility, updateCallup, type CallupWithEntries } from "@/lib/actions/callups";
+import { CalendarPlus, CheckCircle2, ChevronDown, ChevronRight, Clock, Loader2, Lock, MapPin, PencilLine, Plus, Share2, Stadium as StadiumIcon, X } from "@/components/icons";
+import { closeCallup, createCallupPrelist, openCallup, setCallupMatchRules, setCallupVisibility, updateCallup, type CallupWithEntries } from "@/lib/actions/callups";
 import { setCallupFormat } from "@/lib/actions/rounds";
 import type { Stadium } from "@/lib/types";
 import { buildCallupInviteMessage, buildCallupInviteUrl, shareCallupInvite } from "@/lib/callup-invite";
 import { saveStadium } from "@/lib/actions/stadiums";
 import { DelayedPitchLoadingOverlay } from "@/components/DelayedPitchLoadingOverlay";
 import { RoundSetupSteps } from "@/components/RoundSetupSteps";
+import { hasCallupClosingMatch } from "@/lib/callup-lifecycle";
 
 export function CallupAdminCard({
   callups,
@@ -37,6 +38,10 @@ export function CallupAdminCard({
   const [formatPlayersPerTeam, setFormatPlayersPerTeam] = useState<number | null>(null);
   const [formatTeamsPerRound, setFormatTeamsPerRound] = useState<number | null>(null);
   const [formatNotice, setFormatNotice] = useState("");
+  const [showMoreSettings, setShowMoreSettings] = useState(false);
+  const [matchDurationDraft, setMatchDurationDraft] = useState(7);
+  const [goalsToFinishDraft, setGoalsToFinishDraft] = useState(2);
+  const [matchRulesNotice, setMatchRulesNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
@@ -57,7 +62,15 @@ export function CallupAdminCard({
   const currentPlayersPerTeam = callup?.players_per_team || Math.max(1, Math.round(capacity / (callup?.teams_per_round || teamsPerRound)));
   const currentTeamsPerRound = callup?.teams_per_round || teamsPerRound;
   const canEditFormat = callup?.status === "open" && (!callup.round || (callup.round.status === "draft" && !callup.round.teams?.length));
+  const hasStartedMatch = hasCallupClosingMatch(callup?.round?.matches);
+  const canEditMatchRules = Boolean(callup && ["open", "locked", "converted"].includes(callup.status) && !hasStartedMatch);
   const isQuickLeague = featureTier === "quick";
+
+  useEffect(() => {
+    setMatchDurationDraft(Number(callup?.match_duration ?? 7));
+    setGoalsToFinishDraft(Number(callup?.goals_to_finish ?? 2));
+    setMatchRulesNotice("");
+  }, [callup?.id, callup?.match_duration, callup?.goals_to_finish]);
 
   async function create(formData: FormData) {
     setLoading(true);
@@ -139,6 +152,20 @@ export function CallupAdminCard({
       setFormatNotice(result.fantasySizePreserved
         ? `Partida alterada para ${nextPlayers}×${nextPlayers}, com ${nextTeams} times. O Cartola permanece com ${result.fantasyLineupSize} titulares porque já há escalações salvas.`
         : `Formato atualizado: ${nextTeams} times de ${nextPlayers}. O Cartola desta rodada acompanha o novo tamanho.`);
+      router.refresh();
+    }
+    setLoading(false);
+  }
+
+  async function saveMatchRules() {
+    if (!callup) return;
+    setLoading(true);
+    setError("");
+    setMatchRulesNotice("");
+    const result = await setCallupMatchRules(callup.id, matchDurationDraft, goalsToFinishDraft);
+    if (!result.success) setError(result.error || "Não foi possível salvar as regras das partidas.");
+    else {
+      setMatchRulesNotice("Configurações das partidas atualizadas.");
       router.refresh();
     }
     setLoading(false);
@@ -516,6 +543,54 @@ export function CallupAdminCard({
               <p className="mt-2 text-[11px] text-muted">{(formatPlayersPerTeam ?? currentPlayersPerTeam) * (formatTeamsPerRound ?? currentTeamsPerRound)} vagas no total. {canEditFormat ? "Se faltarem jogadores, escolha um formato menor antes de montar os times." : "Formato travado após montar os times."}</p>
               {canEditFormat && (formatPlayersPerTeam !== null || formatTeamsPerRound !== null) && (
                 <button type="button" onClick={saveFormat} disabled={loading} className="mt-2 w-full rounded-lg bg-accent px-3 py-2 text-xs font-black text-background disabled:opacity-50">{loading ? "Salvando..." : "Aplicar formato"}</button>
+              )}
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-border bg-background/60">
+              <button
+                type="button"
+                aria-expanded={showMoreSettings}
+                onClick={() => setShowMoreSettings((current) => !current)}
+                className="flex w-full items-center gap-3 p-3 text-left"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-black text-foreground">Mais configurações</p>
+                  <p className="mt-0.5 text-[10px] text-muted">
+                    {matchDurationDraft} min · {goalsToFinishDraft === 0 ? "sem limite de gols" : `até ${goalsToFinishDraft} ${goalsToFinishDraft === 1 ? "gol" : "gols"}`}
+                  </p>
+                </div>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${showMoreSettings ? "rotate-180" : ""}`} />
+              </button>
+              {showMoreSettings && (
+                <div className="space-y-3 border-t border-border p-3">
+                  {matchRulesNotice && <p className="rounded-lg border border-accent/30 bg-accent/10 p-2.5 text-[11px] font-semibold text-accent">{matchRulesNotice}</p>}
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-[10px] font-bold text-muted">Duração da partida
+                      <input type="number" min={1} max={90} value={matchDurationDraft} onChange={(event) => setMatchDurationDraft(Number(event.target.value))} disabled={!canEditMatchRules || loading} className="mt-1 block w-full rounded-lg border border-border bg-background px-2 py-2 text-xs text-foreground disabled:opacity-60" />
+                    </label>
+                    <label className="text-[10px] font-bold text-muted">Máximo de gols
+                      <select value={goalsToFinishDraft} onChange={(event) => setGoalsToFinishDraft(Number(event.target.value))} disabled={!canEditMatchRules || loading} className="mt-1 block w-full rounded-lg border border-border bg-background px-2 py-2 text-xs text-foreground disabled:opacity-60">
+                        <option value={0}>Sem limite</option>
+                        {Array.from({ length: 20 }, (_, index) => index + 1).map((goals) => <option key={goals} value={goals}>{goals} {goals === 1 ? "gol" : "gols"}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <p className="text-[11px] leading-4 text-muted">
+                    {canEditMatchRules
+                      ? "Essas regras valem para todas as partidas desta convocação."
+                      : "Configurações travadas após o início da primeira partida."}
+                  </p>
+                  {canEditMatchRules && (
+                    <button
+                      type="button"
+                      onClick={saveMatchRules}
+                      disabled={loading || (matchDurationDraft === Number(callup.match_duration ?? 7) && goalsToFinishDraft === Number(callup.goals_to_finish ?? 2))}
+                      className="w-full rounded-lg bg-accent px-3 py-2 text-xs font-black text-background disabled:opacity-40"
+                    >
+                      {loading ? "Salvando..." : "Salvar configurações"}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 

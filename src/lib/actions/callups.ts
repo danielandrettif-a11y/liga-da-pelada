@@ -567,6 +567,39 @@ export async function setCallupVisibility(callupId: string, isPublic: boolean) {
   return result;
 }
 
+export async function setCallupMatchRules(callupId: string, matchDuration: number, goalsToFinish: number) {
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem alterar as regras das partidas." };
+  if (!Number.isInteger(matchDuration) || matchDuration < 1 || matchDuration > 90) {
+    return { success: false, error: "A duração precisa estar entre 1 e 90 minutos." };
+  }
+  if (!Number.isInteger(goalsToFinish) || goalsToFinish < 0 || goalsToFinish > 20) {
+    return { success: false, error: "Escolha até 20 gols ou use a opção sem limite." };
+  }
+  if (!(await selectedCallup(callupId, client))) {
+    return { success: false, error: "Convocação fora da pelada selecionada." };
+  }
+
+  const { error } = await client.rpc("update_callup_match_rules", {
+    p_callup_id: callupId,
+    p_match_duration: matchDuration,
+    p_goals_to_finish: goalsToFinish,
+  });
+  if (error) {
+    const migrationMissing = error.code === "PGRST202"
+      || /update_callup_match_rules/i.test(error.message || "") && /schema cache|function/i.test(error.message || "");
+    return {
+      success: false,
+      error: migrationMissing
+        ? "A migration 352 ainda precisa ser aplicada no banco."
+        : error.message || "Não foi possível salvar as regras das partidas.",
+    };
+  }
+  refreshCallups();
+  revalidatePath("/partidas/[id]", "page");
+  return { success: true };
+}
+
 export async function lockCallupForRound(callupId: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem montar a rodada." };

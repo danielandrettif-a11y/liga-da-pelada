@@ -56,4 +56,9 @@ describe("match participation rules", () => {
     expect(shouldOfferMatchFinishAfterGoal(1, 2, 3)).toBe(false);
     expect(shouldOfferMatchFinishAfterGoal(3, 4, 3)).toBe(false);
   });
+
+  it("never offers automatic finishing when the callup has no goal limit", () => {
+    expect(shouldOfferMatchFinishAfterGoal(0, 1, 0)).toBe(false);
+    expect(shouldOfferMatchFinishAfterGoal(8, 9, 0)).toBe(false);
+  });
 });

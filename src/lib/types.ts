@@ -135,6 +135,8 @@ export type League = {
   owner_id: string | null;
   is_active: boolean;
   match_duration: number;
+  /** Zero significa partida sem limite de gols. */
+  goals_to_finish: number;
   players_per_team: number;
   teams_per_round: number;
   stadium_name: string | null;
@@ -202,6 +204,9 @@ export type Callup = {
   capacity: number;
   players_per_team?: number | null;
   teams_per_round?: number | null;
+  match_duration?: number | null;
+  /** Zero significa partida sem limite de gols. */
+  goals_to_finish?: number | null;
   waitlist_capacity: number;
   stadium_id?: string | null;
   stadium_name?: string | null;
@@ -361,6 +366,8 @@ export type Match = {
   timer_accumulated_seconds: number;
   eligibility_elapsed_offset_seconds: number;
   duration_seconds: number;
+  /** Zero significa partida sem limite de gols. */
+  goals_to_finish?: number;
   timer_thirty_seconds_alerted_at?: string | null;
   timer_finished_alerted_at?: string | null;
   timer_one_minute_alerted_at?: string | null;
@@ -604,7 +611,7 @@ export type Database = {
       };
       leagues: {
         Row: League;
-        Insert: Omit<League, 'id' | 'created_at' | 'is_active' | 'match_duration' | 'players_per_team' | 'teams_per_round' | 'stadium_name' | 'stadium_map_url' | 'event_duration_minutes'> & { id?: string; created_at?: string; is_active?: boolean; match_duration?: number; players_per_team?: number; teams_per_round?: number; stadium_name?: string | null; stadium_map_url?: string | null; event_duration_minutes?: number };
+        Insert: Omit<League, 'id' | 'created_at' | 'is_active' | 'match_duration' | 'goals_to_finish' | 'players_per_team' | 'teams_per_round' | 'stadium_name' | 'stadium_map_url' | 'event_duration_minutes'> & { id?: string; created_at?: string; is_active?: boolean; match_duration?: number; goals_to_finish?: number; players_per_team?: number; teams_per_round?: number; stadium_name?: string | null; stadium_map_url?: string | null; event_duration_minutes?: number };
         Update: Partial<Omit<League, 'id'>>;
       };
       league_members: {
@@ -679,7 +686,7 @@ export type Database = {
       };
       matches: {
         Row: Match;
-        Insert: Omit<Match, 'id' | 'created_at' | 'score_a' | 'score_b' | 'status' | 'timer_started_at' | 'timer_accumulated_seconds' | 'eligibility_elapsed_offset_seconds' | 'duration_seconds' | 'timer_thirty_seconds_alerted_at' | 'timer_finished_alerted_at'> & { id?: string; created_at?: string; score_a?: number; score_b?: number; status?: MatchStatus; timer_started_at?: string | null; timer_accumulated_seconds?: number; eligibility_elapsed_offset_seconds?: number; duration_seconds?: number; timer_thirty_seconds_alerted_at?: string | null; timer_finished_alerted_at?: string | null };
+        Insert: Omit<Match, 'id' | 'created_at' | 'score_a' | 'score_b' | 'status' | 'timer_started_at' | 'timer_accumulated_seconds' | 'eligibility_elapsed_offset_seconds' | 'duration_seconds' | 'goals_to_finish' | 'timer_thirty_seconds_alerted_at' | 'timer_finished_alerted_at'> & { id?: string; created_at?: string; score_a?: number; score_b?: number; status?: MatchStatus; timer_started_at?: string | null; timer_accumulated_seconds?: number; eligibility_elapsed_offset_seconds?: number; duration_seconds?: number; goals_to_finish?: number; timer_thirty_seconds_alerted_at?: string | null; timer_finished_alerted_at?: string | null };
         Update: Partial<Omit<Match, 'id'>>;
       };
       match_players: {
