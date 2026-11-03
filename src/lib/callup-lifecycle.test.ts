@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasCallupClosingMatch, hasDrawnCallupTeams } from "./callup-lifecycle";
+import { hasCallupClosingMatch, hasDrawnCallupTeams, isFinishedCallupRound } from "./callup-lifecycle";
 
 describe("hasCallupClosingMatch", () => {
   it("mantém a convocação visível depois do sorteio e antes do primeiro jogo", () => {
@@ -25,5 +25,14 @@ describe("hasDrawnCallupTeams", () => {
       { team_players: [] },
       { team_players: [{ player_id: "player-1" }] },
     ])).toBe(true);
+  });
+});
+
+describe("isFinishedCallupRound", () => {
+  it("remove apenas rodadas encerradas da lista de convocações atuais", () => {
+    expect(isFinishedCallupRound({ status: "finished" })).toBe(true);
+    expect(isFinishedCallupRound({ status: "in_progress" })).toBe(false);
+    expect(isFinishedCallupRound({ status: "draft" })).toBe(false);
+    expect(isFinishedCallupRound(null)).toBe(false);
   });
 });
