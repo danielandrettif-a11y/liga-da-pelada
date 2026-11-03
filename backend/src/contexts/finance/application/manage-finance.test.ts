@@ -10,6 +10,10 @@ describe("Finance Application: manage-finance", () => {
     return {
       checkCanAccess: vi.fn().mockResolvedValue(true),
       checkIsAdmin: vi.fn(async (actor: Actor) => actor.userId === "admin-1"),
+      recipientIsActive: vi.fn().mockResolvedValue(true),
+      getExpenseInstallmentState: vi.fn().mockResolvedValue({ installmentCount: 2, registeredCount: 0 }),
+      getRoundStatus: vi.fn().mockResolvedValue("finished"),
+      listActiveRoundExpenseItemIds: vi.fn().mockResolvedValue([]),
       getExpenseItems: vi.fn().mockResolvedValue([]),
       saveExpenseItem: vi.fn().mockResolvedValue({ success: true }),
       setExpenseItemStatus: vi.fn().mockResolvedValue({ success: true }),
@@ -56,6 +60,24 @@ describe("Finance Application: manage-finance", () => {
     });
     expect(result.success).toBe(true);
     expect(repo.saveExpenseItem).toHaveBeenCalledWith("l1", "admin-1", expect.any(Object));
+  });
+
+  it("rejects an inactive or cross-league PIX recipient", async () => {
+    const repo = createMockRepo({ recipientIsActive: vi.fn().mockResolvedValue(false) });
+    const result = await createManageFinanceService(repo).saveExpenseItem(adminActor, "l1", {
+      name: "Bolas", totalAmount: 100, installmentCount: 2, recipientId: "rec-other",
+    });
+    expect(result.success).toBe(false);
+    expect(repo.saveExpenseItem).not.toHaveBeenCalled();
+  });
+
+  it("prevents paid installments from exceeding the expense total", async () => {
+    const repo = createMockRepo({
+      getExpenseInstallmentState: vi.fn().mockResolvedValue({ installmentCount: 3, registeredCount: 2 }),
+    });
+    const result = await createManageFinanceService(repo).setExpenseItemPaidInstallments(adminActor, "l1", "item-1", 2);
+    expect(result.success).toBe(false);
+    expect(repo.setExpenseItemPaidInstallments).not.toHaveBeenCalled();
   });
 
   it("checks pending payment round correctly", async () => {

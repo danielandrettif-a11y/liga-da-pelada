@@ -48,10 +48,10 @@ export interface OverallShadowRepository {
     runId: string;
     snapshots: any[];
     breakdowns: any[];
-  }): Promise<void>;
-  markRunSucceeded(runId: string, leagueId: string): Promise<void>;
-  markRunFailed(runId: string, leagueId: string, error: string): Promise<void>;
-  markRunPublished(runId: string, leagueId: string): Promise<void>;
+  }, userId: string): Promise<void>;
+  markRunSucceeded(runId: string, leagueId: string, userId: string): Promise<void>;
+  markRunFailed(runId: string, leagueId: string, error: string, userId: string): Promise<void>;
+  markRunPublished(runId: string, leagueId: string, userId: string): Promise<void>;
 }
 
 export type ManageOverallShadowService = {
@@ -154,8 +154,8 @@ export function createManageOverallShadowService(
           parsedConfig,
         );
 
-        await repository.saveCalculatedData({ runId, snapshots, breakdowns });
-        await repository.markRunSucceeded(runId, leagueId);
+        await repository.saveCalculatedData({ runId, snapshots, breakdowns }, actor.userId);
+        await repository.markRunSucceeded(runId, leagueId, actor.userId);
 
         return {
           success: true,
@@ -166,7 +166,7 @@ export function createManageOverallShadowService(
         };
       } catch (err: any) {
         if (runId) {
-          await repository.markRunFailed(runId, leagueId, err.message || "Erro desconhecido");
+          await repository.markRunFailed(runId, leagueId, err.message || "Erro desconhecido", actor.userId);
         }
         return { success: false, error: err.message || "Não foi possível calcular os OVRs." };
       }
@@ -190,7 +190,7 @@ export function createManageOverallShadowService(
       }
 
       try {
-        await repository.markRunPublished(runId, leagueId);
+        await repository.markRunPublished(runId, leagueId, actor.userId);
         return { success: true };
       } catch (err: any) {
         return { success: false, error: err.message };

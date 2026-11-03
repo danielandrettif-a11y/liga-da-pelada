@@ -1,50 +1,37 @@
 import { describe, expect, it, vi } from "vitest";
-import { PgOverallShadowRepository } from "./pg-overall-shadow-repository";
-import type { DatabaseConnection } from "../../../shared/infrastructure/database/database-connection";
+import type { Pool, PoolClient } from "pg";
+import { PgOverallShadowRepository } from "./pg-overall-shadow-repository.js";
+
+function authenticatedPool(operation: (sql: string) => { rows: any[]; rowCount?: number }) {
+  const query = vi.fn().mockImplementation(async (sql: string) => operation(sql));
+  const client = { query, release: vi.fn() } as unknown as PoolClient;
+  return { pool: { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool, query };
+}
 
 describe("Statistics Infrastructure: PgOverallShadowRepository", () => {
   it("fetches formula by key", async () => {
-    const mockDb: DatabaseConnection = {
-      query: vi.fn().mockResolvedValue({
-        rows: [{ id: "f-1", label: "v20", config: {} }],
-      }),
-      transaction: vi.fn(),
-    };
-    const repo = new PgOverallShadowRepository(mockDb);
+    const query = vi.fn().mockResolvedValue({ rows: [{ id: "f-1", label: "v20", config: {} }] });
+    const repo = new PgOverallShadowRepository({ query } as unknown as Pool);
     const result = await repo.getFormula("adaptive-v20-statistical-confidence");
     expect(result?.id).toBe("f-1");
-    expect(mockDb.query).toHaveBeenCalledWith(
-      expect.stringContaining("SELECT id, label, config FROM overall_formula_versions"),
-      ["adaptive-v20-statistical-confidence"],
-    );
   });
 
-  it("creates a new run record", async () => {
-    const mockDb: DatabaseConnection = {
-      query: vi.fn().mockResolvedValue({ rows: [{ id: "run-abc" }] }),
-      transaction: vi.fn(),
-    };
-    const repo = new PgOverallShadowRepository(mockDb);
-    const runId = await repo.createRun({
-      leagueId: "l1",
-      formulaVersionId: "f1",
-      sourceThroughRoundId: "r1",
-      createdBy: "u1",
-    });
+  it("creates a new run inside the authenticated transaction", async () => {
+    const { pool, query } = authenticatedPool((sql) => sql.includes("INSERT INTO overall_calculation_runs")
+      ? { rows: [{ id: "run-abc" }], rowCount: 1 }
+      : { rows: [], rowCount: 0 });
+    const repo = new PgOverallShadowRepository(pool);
+    const runId = await repo.createRun({ leagueId: "l1", formulaVersionId: "f1", sourceThroughRoundId: "r1", createdBy: "u1" });
     expect(runId).toBe("run-abc");
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO overall_calculation_runs"), ["l1", "f1", "r1", "u1"]);
   });
 
-  it("marks run as succeeded", async () => {
-    const mockDb: DatabaseConnection = {
-      query: vi.fn().mockResolvedValue({ rows: [] }),
-      transaction: vi.fn(),
-    };
-    const repo = new PgOverallShadowRepository(mockDb);
-    await repo.markRunSucceeded("run-1", "l1");
-    expect(mockDb.query).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE overall_calculation_runs"),
-      ["run-1", "l1"],
-    );
+  it("marks run as succeeded only when a scoped row is updated", async () => {
+    const { pool, query } = authenticatedPool((sql) => sql.includes("UPDATE overall_calculation_runs")
+      ? { rows: [], rowCount: 1 }
+      : { rows: [], rowCount: 0 });
+    const repo = new PgOverallShadowRepository(pool);
+    await repo.markRunSucceeded("run-1", "l1", "u1");
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("UPDATE overall_calculation_runs"), ["run-1", "l1"]);
   });
 });
-

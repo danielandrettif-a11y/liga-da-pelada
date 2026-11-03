@@ -20,28 +20,65 @@ export class PgFinanceRepository implements FinanceRepository {
   constructor(private readonly db: Pool) {}
 
   async checkCanAccess(actor: Actor, leagueId: string): Promise<boolean> {
-    const result = await this.db.query<{ allowed: boolean }>(
-      `SELECT (
-         EXISTS (SELECT 1 FROM public.account_profiles profile WHERE profile.user_id = $1 AND profile.role = 'admin')
-         OR EXISTS (SELECT 1 FROM public.league_members member
-           WHERE member.league_id = $2 AND member.user_id = $1 AND member.is_active = true)
-       ) AS allowed`,
-      [actor.userId, leagueId],
-    );
-    return Boolean(result.rows[0]?.allowed);
+    return withAuthenticatedTransaction(this.db, actor, async (client) => {
+      const result = await client.query<{ allowed: boolean }>(
+        "SELECT public.is_league_member($1::uuid) AS allowed",
+        [leagueId],
+      );
+      return Boolean(result.rows[0]?.allowed);
+    });
   }
 
   async checkIsAdmin(actor: Actor, leagueId: string): Promise<boolean> {
-    const res = await this.db.query<{ is_admin: boolean }>(
-      `SELECT (
-         EXISTS (SELECT 1 FROM public.account_profiles profile WHERE profile.user_id = $1 AND profile.role = 'admin')
-         OR EXISTS (SELECT 1 FROM public.league_members member
-           WHERE member.user_id = $1 AND member.league_id = $2 AND member.is_active = true
-             AND member.role IN ('admin', 'owner'))
-       ) AS is_admin`,
-      [actor.userId, leagueId],
+    return withAuthenticatedTransaction(this.db, actor, async (client) => {
+      const result = await client.query<{ is_admin: boolean }>(
+        "SELECT public.is_league_admin($1::uuid) AS is_admin",
+        [leagueId],
+      );
+      return Boolean(result.rows[0]?.is_admin);
+    });
+  }
+
+  async recipientIsActive(leagueId: string, recipientId: string): Promise<boolean> {
+    const result = await this.db.query(
+      "SELECT 1 FROM public.payment_recipients WHERE id = $1::uuid AND league_id = $2::uuid AND is_active",
+      [recipientId, leagueId],
     );
-    return Boolean(res.rows[0]?.is_admin);
+    return Boolean(result.rowCount);
+  }
+
+  async getExpenseInstallmentState(leagueId: string, id: string) {
+    const result = await this.db.query<{ installment_count: number; registered_count: number }>(
+      `SELECT item.installment_count,
+              count(installment.id) FILTER (WHERE installment.status = 'active')::integer AS registered_count
+       FROM public.league_expense_items item
+       LEFT JOIN public.round_expense_installments installment ON installment.expense_item_id = item.id
+       WHERE item.id = $1::uuid AND item.league_id = $2::uuid
+       GROUP BY item.id, item.installment_count`,
+      [id, leagueId],
+    );
+    const row = result.rows[0];
+    return row ? { installmentCount: Number(row.installment_count), registeredCount: Number(row.registered_count) } : null;
+  }
+
+  async getRoundStatus(leagueId: string, roundId: string): Promise<string | null> {
+    const result = await this.db.query<{ status: string }>(
+      "SELECT status FROM public.rounds WHERE id = $1::uuid AND league_id = $2::uuid",
+      [roundId, leagueId],
+    );
+    return result.rows[0]?.status || null;
+  }
+
+  async listActiveRoundExpenseItemIds(leagueId: string, roundId: string): Promise<string[]> {
+    const result = await this.db.query<{ expense_item_id: string }>(
+      `SELECT installment.expense_item_id
+       FROM public.round_expense_installments installment
+       JOIN public.rounds round_item ON round_item.id = installment.round_id
+       WHERE installment.round_id = $1::uuid AND round_item.league_id = $2::uuid
+         AND installment.status = 'active'`,
+      [roundId, leagueId],
+    );
+    return [...new Set(result.rows.map((row) => row.expense_item_id))];
   }
 
   async getExpenseItems(leagueId: string, includeArchived: boolean): Promise<ExpenseItem[]> {
@@ -77,36 +114,49 @@ export class PgFinanceRepository implements FinanceRepository {
 
   async saveExpenseItem(leagueId: string, userId: string, input: ExpenseItemInput): Promise<{ success: boolean; error?: string }> {
     try {
-      await this.db.query(
-        `INSERT INTO league_expense_items (league_id, name, description, total_amount, installment_count, recipient_id, created_by, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')`,
+      await withAuthenticatedTransaction(this.db, { userId }, (client) => client.query(
+        `INSERT INTO public.league_expense_items
+          (league_id, name, description, total_amount, installment_count, recipient_id, created_by, status)
+         SELECT $1::uuid, $2, $3, $4, $5, recipient.id, $7::uuid, 'active'
+         FROM public.payment_recipients recipient
+         WHERE recipient.id = $6::uuid AND recipient.league_id = $1::uuid AND recipient.is_active`,
         [leagueId, input.name, input.description || null, input.totalAmount, input.installmentCount, input.recipientId, userId],
-      );
+      ).then((result) => {
+        if (!result.rowCount) throw new Error("Escolha um PIX ativo desta pelada.");
+      }));
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
   }
 
-  async setExpenseItemStatus(leagueId: string, id: string, status: "active" | "archived"): Promise<{ success: boolean; error?: string }> {
+  async setExpenseItemStatus(leagueId: string, id: string, status: "active" | "archived", userId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      await this.db.query(
-        `UPDATE league_expense_items SET status = $1, updated_at = now() WHERE id = $2 AND league_id = $3`,
-        [status, id, leagueId],
-      );
-      return { success: true };
+      const updated = await withAuthenticatedTransaction(this.db, { userId }, async (client) => {
+        const result = await client.query(
+          `UPDATE public.league_expense_items SET status = $1, updated_at = now()
+           WHERE id = $2::uuid AND league_id = $3::uuid`,
+          [status, id, leagueId],
+        );
+        return Boolean(result.rowCount);
+      });
+      return updated ? { success: true } : { success: false, error: "Item não pertence a esta pelada." };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
   }
 
-  async setExpenseItemPaidInstallments(leagueId: string, id: string, paidInstallments: number): Promise<{ success: boolean; error?: string }> {
+  async setExpenseItemPaidInstallments(leagueId: string, id: string, paidInstallments: number, userId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      await this.db.query(
-        `UPDATE league_expense_items SET paid_installments_before_app = $1, updated_at = now() WHERE id = $2 AND league_id = $3`,
-        [paidInstallments, id, leagueId],
-      );
-      return { success: true };
+      const updated = await withAuthenticatedTransaction(this.db, { userId }, async (client) => {
+        const result = await client.query(
+          `UPDATE public.league_expense_items SET paid_installments_before_app = $1, updated_at = now()
+           WHERE id = $2::uuid AND league_id = $3::uuid`,
+          [paidInstallments, id, leagueId],
+        );
+        return Boolean(result.rowCount);
+      });
+      return updated ? { success: true } : { success: false, error: "Item não pertence a esta pelada." };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
@@ -128,31 +178,40 @@ export class PgFinanceRepository implements FinanceRepository {
 
   async savePaymentRecipient(leagueId: string, userId: string, input: PaymentRecipientInput): Promise<{ success: boolean; error?: string }> {
     try {
-      if (input.id) {
-        await this.db.query(
-          `UPDATE payment_recipients SET name = $1, pix_key = $2, pix_type = $3, is_active = $4 WHERE id = $5 AND league_id = $6`,
-          [input.name, input.pixKey, input.pixType || null, input.active !== false, input.id, leagueId],
-        );
-      } else {
-        await this.db.query(
-          `INSERT INTO payment_recipients (league_id, name, pix_key, pix_type, is_active, created_by)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
+      const saved = await withAuthenticatedTransaction(this.db, { userId }, async (client) => {
+        if (input.id) {
+          const result = await client.query(
+            `UPDATE public.payment_recipients
+             SET name = $1, pix_key = $2, pix_type = $3, is_active = $4
+             WHERE id = $5::uuid AND league_id = $6::uuid`,
+            [input.name, input.pixKey, input.pixType || null, input.active !== false, input.id, leagueId],
+          );
+          return Boolean(result.rowCount);
+        }
+        const result = await client.query(
+          `INSERT INTO public.payment_recipients (league_id, name, pix_key, pix_type, is_active, created_by)
+           VALUES ($1::uuid, $2, $3, $4, $5, $6::uuid)`,
           [leagueId, input.name, input.pixKey, input.pixType || null, input.active !== false, userId],
         );
-      }
+        return Boolean(result.rowCount);
+      });
+      if (!saved) return { success: false, error: "Destinatário não pertence a esta pelada." };
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
   }
 
-  async setPaymentRecipientActive(leagueId: string, id: string, active: boolean): Promise<{ success: boolean; error?: string }> {
+  async setPaymentRecipientActive(leagueId: string, id: string, active: boolean, userId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      await this.db.query(
-        `UPDATE payment_recipients SET is_active = $1 WHERE id = $2 AND league_id = $3`,
-        [active, id, leagueId],
-      );
-      return { success: true };
+      const updated = await withAuthenticatedTransaction(this.db, { userId }, async (client) => {
+        const result = await client.query(
+          `UPDATE public.payment_recipients SET is_active = $1 WHERE id = $2::uuid AND league_id = $3::uuid`,
+          [active, id, leagueId],
+        );
+        return Boolean(result.rowCount);
+      });
+      return updated ? { success: true } : { success: false, error: "Destinatário não pertence a esta pelada." };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
@@ -160,14 +219,16 @@ export class PgFinanceRepository implements FinanceRepository {
 
   async getPaymentRounds(leagueId: string): Promise<PaymentRound[]> {
     const res = await this.db.query<any>(
-      `SELECT id, number, date, status, round_type, payment_pix, payment_total, payment_recipient_name,
-              COALESCE(payment_extra_time_total, 0) as payment_extra_time_total,
-              COALESCE(payment_extra_time_player_ids, '[]'::jsonb) as payment_extra_time_player_ids,
-              COALESCE(payment_ball_fund_total, 0) as payment_ball_fund_total,
-              COALESCE(payment_ball_fund_player_ids, '[]'::jsonb) as payment_ball_fund_player_ids
-       FROM rounds
-       WHERE league_id = $1
-       ORDER BY date DESC, number DESC`,
+      `SELECT round_item.id, round_item.number, round_item.date, round_item.status, round_item.round_type,
+              round_item.payment_pix, round_item.payment_total, round_item.payment_recipient_name,
+              COALESCE(round_item.payment_extra_time_total, 0) as payment_extra_time_total,
+              COALESCE(round_item.payment_extra_time_player_ids, '[]'::jsonb) as payment_extra_time_player_ids,
+              COALESCE(round_item.payment_ball_fund_total, 0) as payment_ball_fund_total,
+              COALESCE(round_item.payment_ball_fund_player_ids, '[]'::jsonb) as payment_ball_fund_player_ids
+       FROM rounds round_item
+       JOIN seasons season ON season.id = round_item.season_id
+       WHERE round_item.league_id = $1 AND season.status = 'active'
+       ORDER BY round_item.date DESC, round_item.created_at DESC`,
       [leagueId],
     );
     return res.rows.map((r) => ({
@@ -188,7 +249,11 @@ export class PgFinanceRepository implements FinanceRepository {
 
   async getLatestFinishedRoundPaymentState(leagueId: string) {
     const roundRes = await this.db.query<{ id: string }>(
-      `SELECT id FROM rounds WHERE league_id = $1 AND round_type = 'official' AND status = 'finished' ORDER BY date DESC, number DESC LIMIT 1`,
+      `SELECT round_item.id
+       FROM public.rounds round_item
+       JOIN public.seasons season ON season.id = round_item.season_id
+       WHERE round_item.league_id = $1 AND season.status = 'active' AND round_item.status = 'finished'
+       ORDER BY round_item.date DESC, round_item.created_at DESC LIMIT 1`,
       [leagueId],
     );
     const roundId = roundRes.rows[0]?.id;

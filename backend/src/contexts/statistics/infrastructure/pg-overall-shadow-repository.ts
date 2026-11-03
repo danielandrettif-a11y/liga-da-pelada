@@ -14,15 +14,8 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
   async checkIsAdmin(actor: Actor, leagueId: string): Promise<boolean> {
     return withAuthenticatedTransaction(this.db, actor, async (client) => {
       const res = await client.query<{ is_admin: boolean }>(
-        `SELECT (
-           EXISTS (SELECT 1 FROM public.account_profiles profile WHERE profile.user_id = $1 AND profile.role = 'admin')
-           OR EXISTS (
-             SELECT 1 FROM public.league_members member
-             WHERE member.user_id = $1 AND member.league_id = $2
-               AND member.is_active = true AND member.role IN ('admin', 'owner')
-           )
-         ) AS is_admin`,
-        [actor.userId, leagueId],
+        "SELECT public.is_league_admin($1::uuid) AS is_admin",
+        [leagueId],
       );
       return Boolean(res.rows[0]?.is_admin);
     });
@@ -240,12 +233,11 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
     sourceThroughRoundId: string | null;
     createdBy: string;
   }): Promise<string> {
-    const result = await this.db.query<{ id: string }>(
+    const result = await withAuthenticatedTransaction(this.db, { userId: params.createdBy }, (client) => client.query<{ id: string }>(
       `INSERT INTO overall_calculation_runs (league_id, formula_version_id, source_through_round_id, created_by, status, started_at)
-       VALUES ($1, $2, $3, $4, 'processing', now())
-       RETURNING id`,
+       VALUES ($1, $2, $3, $4, 'processing', now()) RETURNING id`,
       [params.leagueId, params.formulaVersionId, params.sourceThroughRoundId, params.createdBy],
-    );
+    ));
     const row = result.rows[0];
     if (!row) throw new Error("Não foi possível criar a execução de OVR.");
     return row.id;
@@ -255,10 +247,8 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
     runId: string;
     snapshots: any[];
     breakdowns: any[];
-  }): Promise<void> {
-    const client = await this.db.connect();
-    try {
-      await client.query("BEGIN");
+  }, userId: string): Promise<void> {
+    await withAuthenticatedTransaction(this.db, { userId }, async (client) => {
       for (const s of params.snapshots) {
         await client.query(
         `INSERT INTO player_overall_snapshots
@@ -269,7 +259,7 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
           s.playerId || s.player_id,
           s.overall,
           s.positions?.DEF?.value ?? s.def_overall ?? s.def,
-          s.positions?.ATA?.value ?? s.ala_mei_overall ?? s.alaMei,
+          s.positions?.ALA_MEI?.value ?? s.ala_mei_overall ?? s.alaMei,
           s.positions?.ATA?.value ?? s.ata_overall ?? s.ata,
           s.positions?.GOL?.value ?? s.gol_overall ?? s.gol,
           Math.max(s.positions?.DEF?.confidence || 0, s.positions?.ALA_MEI?.confidence || 0, s.positions?.ATA?.confidence || 0),
@@ -304,39 +294,36 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
             JSON.stringify(item.confidence)],
         );
       }
-      await client.query("COMMIT");
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 
-  async markRunSucceeded(runId: string, leagueId: string): Promise<void> {
-    await this.db.query(
+  async markRunSucceeded(runId: string, leagueId: string, userId: string): Promise<void> {
+    const result = await withAuthenticatedTransaction(this.db, { userId }, (client) => client.query(
       `UPDATE overall_calculation_runs
        SET status = 'succeeded', completed_at = now()
        WHERE id = $1 AND league_id = $2`,
       [runId, leagueId],
-    );
+    ));
+    if (!result.rowCount) throw new Error("Execução de OVR não encontrada.");
   }
 
-  async markRunFailed(runId: string, leagueId: string, error: string): Promise<void> {
-    await this.db.query(
+  async markRunFailed(runId: string, leagueId: string, error: string, userId: string): Promise<void> {
+    const result = await withAuthenticatedTransaction(this.db, { userId }, (client) => client.query(
       `UPDATE overall_calculation_runs
        SET status = 'failed', completed_at = now(), error_message = $3
        WHERE id = $1 AND league_id = $2`,
       [runId, leagueId, error],
-    );
+    ));
+    if (!result.rowCount) throw new Error("Execução de OVR não encontrada.");
   }
 
-  async markRunPublished(runId: string, leagueId: string): Promise<void> {
-    await this.db.query(
+  async markRunPublished(runId: string, leagueId: string, userId: string): Promise<void> {
+    const result = await withAuthenticatedTransaction(this.db, { userId }, (client) => client.query(
       `UPDATE overall_calculation_runs
        SET status = 'published', published_at = now()
        WHERE id = $1 AND league_id = $2 AND status = 'succeeded'`,
       [runId, leagueId],
-    );
+    ));
+    if (!result.rowCount) throw new Error("Execução de OVR não está pronta para publicação.");
   }
 }

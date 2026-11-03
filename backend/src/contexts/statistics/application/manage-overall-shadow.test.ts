@@ -74,7 +74,7 @@ describe("Statistics Application: manage-overall-shadow", () => {
     expect(result.success).toBe(true);
     expect(result.runId).toBe("run-new");
     expect(repo.createRun).toHaveBeenCalled();
-    expect(repo.markRunSucceeded).toHaveBeenCalledWith("run-new", "l1");
+    expect(repo.markRunSucceeded).toHaveBeenCalledWith("run-new", "l1", "u1");
   });
 
   it("publishes shadow run when valid", async () => {
@@ -82,6 +82,6 @@ describe("Statistics Application: manage-overall-shadow", () => {
     const service = createManageOverallShadowService(repo, calculationEngine);
     const result = await service.publishOverallShadow(adminActor, "l1", "run-1");
     expect(result.success).toBe(true);
-    expect(repo.markRunPublished).toHaveBeenCalledWith("run-1", "l1");
+    expect(repo.markRunPublished).toHaveBeenCalledWith("run-1", "l1", "u1");
   });
 });

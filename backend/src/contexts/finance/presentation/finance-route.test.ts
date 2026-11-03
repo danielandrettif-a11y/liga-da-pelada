@@ -22,6 +22,10 @@ describe("Finance Presentation: finance-route", () => {
     const repository: FinanceRepository = {
       checkCanAccess: vi.fn().mockResolvedValue(true),
       checkIsAdmin: vi.fn(async (actor: Actor) => actor.userId === "admin-1"),
+      recipientIsActive: vi.fn().mockResolvedValue(true),
+      getExpenseInstallmentState: vi.fn().mockResolvedValue({ installmentCount: 2, registeredCount: 0 }),
+      getRoundStatus: vi.fn().mockResolvedValue("finished"),
+      listActiveRoundExpenseItemIds: vi.fn().mockResolvedValue([]),
       getExpenseItems: vi.fn().mockResolvedValue([{ id: "ei-1", name: "Bolas", total_amount: 150 }]),
       saveExpenseItem: vi.fn().mockResolvedValue({ success: true }),
       setExpenseItemStatus: vi.fn().mockResolvedValue({ success: true }),
@@ -110,6 +114,38 @@ describe("Finance Presentation: finance-route", () => {
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body.success).toBe(true);
+  });
+
+  it("does not coerce a missing payment state to false", async () => {
+    const app = buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/finance/leagues/l1/rounds/r1/payments",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { playerId: "p1" },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body).error).toContain("estado do pagamento");
+  });
+
+  it("rejects a payment details body for a different round", async () => {
+    const app = buildApp();
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/finance/leagues/l1/rounds/r1/details",
+      headers: { authorization: "Bearer valid-token" },
+      payload: {
+        roundId: "r2",
+        paymentPix: "pix@chave",
+        paymentTotal: 100,
+        extraTimeTotal: 0,
+        extraTimePlayerIds: [],
+        ballFundTotal: 0,
+        ballFundPlayerIds: [],
+      },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body).error).toContain("não corresponde");
   });
 });
 

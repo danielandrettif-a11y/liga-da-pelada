@@ -129,6 +129,13 @@ export function validatePaidInstallments(value: number) {
   return { value: paidInstallments } as const;
 }
 
+export function normalizeExpenseItemIds(ids: unknown): string[] {
+  if (!Array.isArray(ids)) return [];
+  return [...new Set(ids.filter((id): id is string =>
+    typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id),
+  ))];
+}
+
 export function validatePaymentRecipient(input: PaymentRecipientInput) {
   const name = String(input.name || "").trim();
   const pixKey = String(input.pixKey || "").trim();

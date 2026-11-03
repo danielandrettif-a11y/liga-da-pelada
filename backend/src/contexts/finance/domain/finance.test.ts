@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   areRoundParticipantsPaid,
+  normalizeExpenseItemIds,
   validateExpenseItem,
   validatePaidInstallments,
   validatePaymentRecipient,
@@ -113,6 +114,12 @@ describe("Finance Domain", () => {
     ];
     expect(areRoundParticipantsPaid(participants, [{ player_id: "p2", paid: false }])).toBe(false);
     expect(areRoundParticipantsPaid(participants, [{ player_id: "p2", paid: true }])).toBe(true);
+  });
+
+  it("keeps only unique UUID expense identifiers", () => {
+    const id = "123e4567-e89b-42d3-a456-426614174000";
+    expect(normalizeExpenseItemIds([id, "invalid", id, null])).toEqual([id]);
+    expect(normalizeExpenseItemIds("invalid")).toEqual([]);
   });
 });
 

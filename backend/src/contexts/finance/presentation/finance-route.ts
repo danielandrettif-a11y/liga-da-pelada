@@ -15,7 +15,7 @@ function sendFailure(error: unknown, request: FastifyRequest, reply: FastifyRepl
   request.log.error({ err: error }, "finance operation failed");
   return reply.code(500).send({
     code: "FINANCE_SERVER_ERROR",
-    message: (error as Error)?.message || "Erro no servidor financeiro.",
+    message: "Erro no servidor financeiro.",
   });
 }
 
@@ -66,6 +66,9 @@ export function registerFinanceRoutes(
       const auth = await authenticateBearer(request, dependencies.verifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
+        if (request.body?.status !== "active" && request.body?.status !== "archived") {
+          return reply.code(400).send({ success: false, error: "Status inválido." });
+        }
         const result = await service.setExpenseItemStatus(
           auth.actor,
           request.params.leagueId,
@@ -137,11 +140,14 @@ export function registerFinanceRoutes(
       const auth = await authenticateBearer(request, dependencies.verifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
+        if (typeof request.body?.active !== "boolean") {
+          return reply.code(400).send({ success: false, error: "Informe se o destinatário está ativo." });
+        }
         const result = await service.setPaymentRecipientActive(
           auth.actor,
           request.params.leagueId,
           request.params.id,
-          Boolean(request.body?.active),
+          request.body.active,
         );
         return reply.code(result.success ? 200 : 400).send(result);
       } catch (err) {
@@ -252,12 +258,15 @@ export function registerFinanceRoutes(
       const auth = await authenticateBearer(request, dependencies.verifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
+        if (typeof request.body?.paid !== "boolean") {
+          return reply.code(400).send({ success: false, error: "Informe o estado do pagamento." });
+        }
         const result = await service.setPlayerPayment(
           auth.actor,
           request.params.leagueId,
           request.params.roundId,
           request.body?.playerId,
-          Boolean(request.body?.paid),
+          request.body.paid,
         );
         return reply.code(result.success ? 200 : 400).send(result);
       } catch (err) {
@@ -308,10 +317,13 @@ export function registerFinanceRoutes(
       const auth = await authenticateBearer(request, dependencies.verifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
+        if (request.body?.roundId && request.body.roundId !== request.params.roundId) {
+          return reply.code(400).send({ success: false, error: "A rodada informada não corresponde à URL." });
+        }
         const result = await service.updateRoundPaymentDetails(
           auth.actor,
           request.params.leagueId,
-          request.body,
+          { ...request.body, roundId: request.params.roundId },
         );
         return reply.code(result.success ? 200 : 400).send(result);
       } catch (err) {

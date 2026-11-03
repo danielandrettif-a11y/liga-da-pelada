@@ -4,15 +4,17 @@ import type { Pool, PoolClient } from "pg";
 
 describe("Finance Infrastructure: PgFinanceRepository", () => {
   it("checks admin status via SQL query", async () => {
+    const query = vi.fn().mockImplementation(async (sql: string) =>
+      sql.includes("is_league_admin") ? { rows: [{ is_admin: true }], rowCount: 1 } : { rows: [], rowCount: 0 });
     const mockPool = {
-      query: vi.fn().mockResolvedValue({ rows: [{ is_admin: true }] }),
+      connect: vi.fn().mockResolvedValue({ query, release: vi.fn() } as unknown as PoolClient),
     } as unknown as Pool;
     const repo = new PgFinanceRepository(mockPool);
     const isAdmin = await repo.checkIsAdmin({ userId: "u1" }, "l1");
     expect(isAdmin).toBe(true);
-    expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringContaining("member.role IN ('admin', 'owner')"),
-      ["u1", "l1"],
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("is_league_admin"),
+      ["l1"],
     );
   });
 
@@ -40,9 +42,23 @@ describe("Finance Infrastructure: PgFinanceRepository", () => {
     expect(items[0].recipient?.name).toBe("Loja");
   });
 
+  it("lists payment rounds only from the active season", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const repo = new PgFinanceRepository({ query } as unknown as Pool);
+    await repo.getPaymentRounds("l1");
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("season.status = 'active'"),
+      ["l1"],
+    );
+  });
+
   it("saves expense item", async () => {
+    const query = vi.fn().mockImplementation(async (sql: string) => ({
+      rows: [],
+      rowCount: sql.includes("INSERT INTO public.league_expense_items") ? 1 : 0,
+    }));
     const mockPool = {
-      query: vi.fn().mockResolvedValue({ rows: [] }),
+      connect: vi.fn().mockResolvedValue({ query, release: vi.fn() } as unknown as PoolClient),
     } as unknown as Pool;
     const repo = new PgFinanceRepository(mockPool);
     const result = await repo.saveExpenseItem("l1", "u1", {
@@ -52,8 +68,8 @@ describe("Finance Infrastructure: PgFinanceRepository", () => {
       recipientId: "rec-1",
     });
     expect(result.success).toBe(true);
-    expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringContaining("INSERT INTO league_expense_items"),
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO public.league_expense_items"),
       expect.arrayContaining(["l1", "Churrasco"]),
     );
   });
