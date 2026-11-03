@@ -5,12 +5,13 @@ import {
   ManageFantasyMarketLineupUseCase,
   type FantasyMarketLineupRepository,
 } from "../application/manage-market-lineup.js";
+import type { FantasyLineupSubmission } from "../domain/market-lineup.js";
 
 function sendFailure(error: unknown, request: FastifyRequest, reply: FastifyReply) {
   request.log.error({ err: error }, "fantasy operation failed");
   return reply.code(500).send({
     code: "FANTASY_SERVER_ERROR",
-    message: (error as Error)?.message || "Erro no servidor de fantasy.",
+    message: "Erro no servidor de fantasy.",
   });
 }
 
@@ -147,7 +148,7 @@ export function registerMarketLineupRoutes(
   // 8. Salvar Escalação
   app.post<{
     Params: { leagueId: string; roundId: string };
-    Body: { slots: any[]; captainPlayerId: string };
+    Body: Omit<FantasyLineupSubmission, "roundId"> & { roundId?: string };
   }>("/api/fantasy/leagues/:leagueId/rounds/:roundId/lineup", async (request, reply) => {
     const auth = await authenticateBearer(request, dependencies.verifier);
     if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
@@ -155,9 +156,7 @@ export function registerMarketLineupRoutes(
       const result = await useCase.saveLineup(
         auth.actor,
         request.params.leagueId,
-        request.params.roundId,
-        request.body.slots,
-        request.body.captainPlayerId
+        { ...request.body, roundId: request.params.roundId }
       );
       if (!result.success) {
         return reply.code(400).send({ code: "INVALID_LINEUP", message: result.error });

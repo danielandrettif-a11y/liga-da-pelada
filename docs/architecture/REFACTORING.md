@@ -33,6 +33,14 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-11-03 — Cards completo e recibo transacional da escalação do Fantasy
+
+- O contexto **Cards** foi comparado novamente com o esquema e as RPCs reais. As 15 operações agora usam `fantasy_round_packs`, `fantasy_pack_offers`, `fantasy_user_cards` e `fantasy_card_activations`, com escopo por pelada, transações autenticadas, idempotência de abertura/resgate, autorização administrativa e validação dos alvos. O contexto passa a **15/15 operações aceitas**.
+- A ativação não confia mais no slug enviado pelo cliente: a definição vem da instância possuída e bloqueada no banco. O snapshot preserva a versão, o tipo e a configuração do efeito; Caça-Talentos valida a mediana, Vice-Capitão não pode repetir o capitão e Duelo Direto deixa o segundo alvo para o sorteio do banco.
+- `saveFantasyLineup` preserva titulares, slots, capitão, palpites e reserva e chama as RPCs canônicas de teste ou `save_fantasy_lineup_with_reserve`. É a primeira das 22 operações de Fantasy aceita nesta revisão; os leitores analíticos e comandos administrativos continuam pendentes.
+- A declaração automática herdada do lote Antigravity foi corrigida: Cosméticos (11), Integrações (2) e as outras 21 operações de Fantasy voltaram a pendentes até revisão real. Progresso conservador: **233/267 operações aceitas (87,3%)**, restando **34**.
+- Verificação desta fatia: typecheck e builds de produção do backend e frontend; **689 testes backend em 181 arquivos** e **1.238 testes frontend em 237 arquivos**; auditorias de contexto/arquitetura e migração, esta última em 233/267. A auditoria conectada do catálogo de cartas requer `.env.local` e permanece para a homologação com banco local.
+
 ### 2026-10-30 — contexto Statistics: Subfatia 4 (Operações Sazonais) (16/22 aceitas)
 
 - Migradas e aceitas `getLatestPlayerCardOverallMap`, `getSeasonTeamStandings`, `previewReprocessSeason` e `executeReprocessSeason`. O progresso global passa a **182/267 operações (68,2%)**, restando 85.

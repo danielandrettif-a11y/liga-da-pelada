@@ -1852,9 +1852,7 @@ export async function saveFantasyLineup(input: FantasyLineupSubmission) {
       }
       const res = await fantasyApi.saveLineup(
         league.id,
-        input.roundId,
-        input.slotAssignments || [],
-        input.captainId || ""
+        input
       );
       if (!res.success) return res;
       try {

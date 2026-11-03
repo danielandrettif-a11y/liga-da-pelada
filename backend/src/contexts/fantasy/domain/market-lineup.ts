@@ -17,9 +17,22 @@ export type FantasyMarketPlayerSummary = {
 };
 
 export type FantasyLineupSlot = {
-  slotRole: "GOL" | "DEF" | "MEI" | "ATA";
+  slotRole: "GOL" | "DEF" | "ATA";
+  slotIndex: number;
   playerId: string;
   isCaptain?: boolean;
+};
+
+export type FantasyLineupSubmission = {
+  roundId: string;
+  playerIds: string[];
+  slotAssignments: FantasyLineupSlot[];
+  captainId: string;
+  scorerId?: string | null;
+  assistId?: string | null;
+  challengeId?: string | null;
+  reservePlayerId?: string | null;
+  reserveRole?: "GOL" | "DEF" | "ATA" | null;
 };
 
 export type SavedFantasyLineup = {
@@ -102,8 +115,8 @@ export type UserFantasyHistoryEntry = {
 };
 
 export function validateLineupSubmission(params: {
-  slots: FantasyLineupSlot[];
-  captainPlayerId: string;
+  input: FantasyLineupSubmission;
+  playersPerTeam: number;
   availableBudget: number;
   playerPrices: Map<string, number>;
   isMarketOpen: boolean;
@@ -112,24 +125,41 @@ export function validateLineupSubmission(params: {
     return { valid: false, error: "O mercado está fechado para esta rodada.", totalCost: 0 };
   }
 
-  if (!params.slots || params.slots.length === 0) {
-    return { valid: false, error: "A escalação não pode estar vazia.", totalCost: 0 };
+  const { input } = params;
+  if (!input.slotAssignments || input.slotAssignments.length !== params.playersPerTeam
+    || input.playerIds.length !== params.playersPerTeam) {
+    return { valid: false, error: `Escolha exatamente ${params.playersPerTeam} titulares.`, totalCost: 0 };
+  }
+
+  const slotsAreValid = input.slotAssignments.every((slot) =>
+    input.playerIds.includes(slot.playerId) && Number.isInteger(slot.slotIndex) && slot.slotIndex >= 0)
+    && new Set(input.slotAssignments.map((slot) => slot.slotIndex)).size === params.playersPerTeam;
+  if (!slotsAreValid) return { valid: false, error: "As posições da escalação são inválidas.", totalCost: 0 };
+
+  if (Boolean(input.reservePlayerId) !== Boolean(input.reserveRole)) {
+    return { valid: false, error: "Escolha o jogador e a posição do banco de reserva.", totalCost: 0 };
+  }
+  if (input.reservePlayerId && input.playerIds.includes(input.reservePlayerId)) {
+    return { valid: false, error: "O jogador do banco não pode estar entre os titulares.", totalCost: 0 };
   }
 
   const playerIds = new Set<string>();
   let totalCostCents = 0;
 
-  for (const slot of params.slots) {
+  for (const slot of input.slotAssignments) {
     if (playerIds.has(slot.playerId)) {
       return { valid: false, error: "Não é permitido escalar o mesmo atleta duas vezes.", totalCost: 0 };
     }
     playerIds.add(slot.playerId);
 
-    const price = params.playerPrices.get(slot.playerId) ?? 5.0;
+    const price = params.playerPrices.get(slot.playerId);
+    if (price == null || !Number.isFinite(price) || price < 0) {
+      return { valid: false, error: "A escalação contém atleta fora do mercado atual.", totalCost: 0 };
+    }
     totalCostCents += Math.round(price * 100);
   }
 
-  if (!playerIds.has(params.captainPlayerId)) {
+  if (!playerIds.has(input.captainId)) {
     return { valid: false, error: "O capitão selecionado deve estar na sua escalação.", totalCost: 0 };
   }
 

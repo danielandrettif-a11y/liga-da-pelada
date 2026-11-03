@@ -10,7 +10,7 @@ function sendFailure(error: unknown, request: FastifyRequest, reply: FastifyRepl
   request.log.error({ err: error }, "cards operation failed");
   return reply.code(500).send({
     code: "CARDS_SERVER_ERROR",
-    message: (error as Error)?.message || "Erro no servidor de cartas.",
+    message: "Erro no servidor de cartas.",
   });
 }
 
@@ -45,7 +45,7 @@ export function registerCardsRoutes(
       const auth = await authenticateBearer(request, dependencies.verifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
-        const res = await useCase.restoreMyPassPacks(auth.actor, request.params.leagueId, request.body.fantasySeasonId);
+        const res = await useCase.restoreMyPassPacks(auth.actor, request.params.leagueId, request.body?.fantasySeasonId);
         if (!res.success) return reply.code(403).send({ code: "FORBIDDEN", message: res.error });
         return reply.code(200).send(res);
       } catch (error) {
@@ -81,7 +81,7 @@ export function registerCardsRoutes(
           auth.actor,
           request.params.leagueId,
           request.params.packId,
-          request.body.chosenSlug
+          request.body?.chosenSlug
         );
         if (!res.success) return reply.code(400).send({ code: "INVALID_CLAIM", message: res.error });
         return reply.code(200).send(res);
@@ -152,7 +152,7 @@ export function registerCardsRoutes(
     try {
       const res = await useCase.activateCardForRound(auth.actor, request.params.leagueId, {
         roundId: request.params.roundId,
-        ...request.body,
+        ...(request.body || {}),
       });
       if (!res.success) return reply.code(400).send({ code: "INVALID_ACTIVATION", message: res.error });
       return reply.code(200).send(res);
@@ -169,6 +169,7 @@ export function registerCardsRoutes(
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
         const res = await useCase.removeActiveCardForRound(auth.actor, request.params.leagueId, request.params.roundId);
+        if (!res.success) return reply.code(400).send({ code: "INVALID_REMOVAL", message: res.error });
         return reply.code(200).send(res);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -199,6 +200,7 @@ export function registerCardsRoutes(
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
         const res = await useCase.giveMyAccountTestPack(auth.actor, request.params.leagueId);
+        if (!res.success) return reply.code(403).send({ code: "FORBIDDEN", message: res.error });
         return reply.code(200).send(res);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -214,6 +216,7 @@ export function registerCardsRoutes(
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
         const res = await useCase.resetMyAccountCards(auth.actor, request.params.leagueId);
+        if (!res.success) return reply.code(400).send({ code: "INVALID_RESET", message: res.error });
         return reply.code(200).send(res);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -260,7 +263,7 @@ export function registerCardsRoutes(
       const auth = await authenticateBearer(request, dependencies.verifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
-        const res = await useCase.grantFantasyPackToUser(auth.actor, request.params.leagueId, request.body.targetUserId);
+        const res = await useCase.grantFantasyPackToUser(auth.actor, request.params.leagueId, request.body?.targetUserId);
         if (!res.success) return reply.code(403).send({ code: "FORBIDDEN", message: res.error });
         return reply.code(200).send(res);
       } catch (error) {

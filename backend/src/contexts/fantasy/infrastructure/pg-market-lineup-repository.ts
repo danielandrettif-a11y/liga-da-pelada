@@ -2,7 +2,6 @@ import type { Pool, PoolClient } from "pg";
 import { withAuthenticatedTransaction } from "../../../infrastructure/authenticated-transaction.js";
 import type { FantasyMarketLineupRepository } from "../application/manage-market-lineup.js";
 import type {
-  FantasyLineupSlot,
   FantasyMarketDashboardData,
   FantasyMarketPlayerSummary,
   FantasyMarketQuickHighlights,
@@ -250,32 +249,50 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
   async getMarketRoundInfo(leagueId: string, roundId: string, userId: string) {
     return this.withUser(userId, async (client) => {
       const round = await client.query<any>(
-        `SELECT fantasy_round.id, fantasy_round.market_status, fantasy_round.fantasy_season_id
+        `SELECT fantasy_round.id, fantasy_round.market_status, fantasy_round.fantasy_season_id,
+                COALESCE((fantasy_round.settings_snapshot->>'players_per_team')::integer, league.players_per_team, 5) players_per_team
          FROM public.fantasy_rounds fantasy_round JOIN public.rounds round_item ON round_item.id = fantasy_round.round_id
+         JOIN public.leagues league ON league.id=round_item.league_id
          WHERE round_item.id = $1 AND round_item.league_id = $2`, [roundId, leagueId]);
       const item = round.rows[0];
-      if (!item) return { isMarketOpen: false, playerPrices: new Map<string, number>(), userBudget: 0 };
+      if (!item) return { isMarketOpen: false, playerPrices: new Map<string, number>(), userBudget: 0, playersPerTeam: 5 };
       const [prices, account] = await Promise.all([
         client.query<any>("SELECT player_id,current_price FROM public.fantasy_player_prices WHERE fantasy_season_id=$1", [item.fantasy_season_id]),
         client.query<any>("SELECT current_budget FROM public.fantasy_accounts WHERE fantasy_season_id=$1 AND user_id=$2", [item.fantasy_season_id, userId]),
       ]);
       return { isMarketOpen: item.market_status === "open",
         playerPrices: new Map(prices.rows.map((row: any) => [row.player_id, Number(row.current_price)])),
-        userBudget: Number(account.rows[0]?.current_budget || 0) };
+        userBudget: Number(account.rows[0]?.current_budget || 0), playersPerTeam: Number(item.players_per_team || 5) };
     });
   }
 
-  async saveLineup(params: { leagueId: string; roundId: string; userId: string; captainPlayerId: string;
-    slots: FantasyLineupSlot[]; totalCost: number }) {
+  async saveLineup(params: { leagueId: string; roundId: string; userId: string;
+    input: import("../domain/market-lineup.js").FantasyLineupSubmission; totalCost: number }) {
     try {
       return await this.withUser(params.userId, async (client) => {
-        const result = await client.query<{ id: string }>(
-          `SELECT public.save_fantasy_lineup($1::uuid,$2::uuid[],$3::uuid,NULL,NULL,NULL,$4::jsonb) id
-           WHERE EXISTS (SELECT 1 FROM public.rounds WHERE id=$1::uuid AND league_id=$5::uuid)`,
-          [params.roundId, params.slots.map((slot) => slot.playerId), params.captainPlayerId,
-            JSON.stringify(params.slots), params.leagueId]);
+        const scopedRound = await client.query(
+          `SELECT 1 FROM public.rounds round_item
+           WHERE round_item.id=$1::uuid AND round_item.league_id=$2::uuid`, [params.roundId, params.leagueId]);
+        if (!scopedRound.rowCount) return { success: false, error: "Rodada não encontrada." };
+        const slots = params.input.slotAssignments.map((slot) => ({
+          player_id: slot.playerId, slot_index: slot.slotIndex, slot_role: slot.slotRole,
+        }));
+        const testSession = await client.query(
+          "SELECT 1 FROM public.fantasy_test_sessions WHERE round_id=$1::uuid", [params.roundId]);
+        if (testSession.rowCount && params.input.reservePlayerId) {
+          return { success: false, error: "O banco de reserva ainda não está disponível na rodada de testes." };
+        }
+        const common = [params.roundId, params.input.playerIds, params.input.captainId,
+          params.input.scorerId || null, params.input.assistId || null, params.input.challengeId || null,
+          JSON.stringify(slots)];
+        const result = testSession.rowCount
+          ? await client.query<{ id: string }>(
+              "SELECT public.save_fantasy_test_lineup($1::uuid,$2::uuid[],$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::jsonb) id", common)
+          : await client.query<{ id: string }>(
+              "SELECT public.save_fantasy_lineup_with_reserve($1::uuid,$2::uuid[],$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::jsonb,$8::uuid,$9::text) id",
+              [...common, params.input.reservePlayerId || null, params.input.reserveRole || null]);
         return result.rows[0]?.id ? { success: true, lineupId: result.rows[0].id }
-          : { success: false, error: "Rodada não encontrada." };
+          : { success: true, error: undefined };
       });
     } catch (error: any) { return { success: false, error: error.message }; }
   }

@@ -10,7 +10,7 @@ function sendFailure(error: unknown, request: FastifyRequest, reply: FastifyRepl
   request.log.error({ err: error }, "fantasy admin operation failed");
   return reply.code(500).send({
     code: "FANTASY_ADMIN_ERROR",
-    message: (error as Error)?.message || "Erro no servidor de fantasy admin.",
+    message: "Erro no servidor de fantasy admin.",
   });
 }
 
@@ -32,6 +32,10 @@ export function registerFantasyAdminRoutes(
     if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
     try {
       const scope = request.query.scope || "season";
+      if (!["general", "season", "month", "round"].includes(scope)
+        || (scope === "round" && !request.query.roundId)) {
+        return reply.code(400).send({ code: "INVALID_SCOPE", message: "Filtro de ranking inválido." });
+      }
       const ranking = await useCase.getRanking(auth.actor, request.params.leagueId, scope, request.query.roundId);
       return reply.code(200).send(ranking);
     } catch (error) {
@@ -131,6 +135,9 @@ export function registerFantasyAdminRoutes(
       const auth = await authenticateBearer(request, dependencies.verifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
+        if (request.body?.useCurrentRules != null && typeof request.body.useCurrentRules !== "boolean") {
+          return reply.code(400).send({ code: "INVALID_REPROCESS", message: "Opção de reprocessamento inválida." });
+        }
         const res = await useCase.reprocessRound(
           auth.actor,
           request.params.leagueId,

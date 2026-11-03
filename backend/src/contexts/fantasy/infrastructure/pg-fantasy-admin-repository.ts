@@ -24,23 +24,25 @@ export class PgFantasyAdminRepository implements FantasyAdminRepository {
            FROM public.fantasy_lineups lineup
            JOIN public.fantasy_rounds fantasy_round ON fantasy_round.id = lineup.fantasy_round_id
            JOIN public.fantasy_seasons fantasy_season ON fantasy_season.id = fantasy_round.fantasy_season_id
+           JOIN public.seasons core_season ON core_season.id=fantasy_season.season_id
            JOIN public.rounds round_item ON round_item.id = fantasy_round.round_id
            CROSS JOIN LATERAL (SELECT max(number) latest_number FROM public.rounds WHERE league_id = $1 AND status = 'finished') latest
-           WHERE fantasy_season.league_id = $1
+           WHERE fantasy_season.league_id = $1 AND ($2='general' OR core_season.status='active')
              AND ($2::text NOT IN ('round','month') OR ($2 = 'round' AND round_item.id = $3::uuid)
                OR ($2 = 'month' AND date_trunc('month', round_item.date) = date_trunc('month', current_date)))
            GROUP BY lineup.user_id
          )
-         SELECT account.user_id, COALESCE(player.name, split_part(auth_user.email,'@',1), 'Jogador') user_name,
-                player.avatar_url, COALESCE(selected.points, account.total_points,0) total_points,
+         SELECT account.user_id, COALESCE(player.name, 'Jogador') user_name,
+                player.avatar_url, CASE WHEN $2 IN ('round','month') THEN COALESCE(selected.points,0)
+                  ELSE COALESCE(selected.points,account.total_points,0) END total_points,
                 account.current_budget patrimony, selected.last_round_points, COALESCE(selected.lineups_count,0) lineups_count
          FROM public.fantasy_accounts account
          JOIN public.fantasy_seasons season ON season.id = account.fantasy_season_id
+         JOIN public.seasons core_season ON core_season.id=season.season_id
          LEFT JOIN selected ON selected.user_id = account.user_id
          LEFT JOIN public.account_profiles profile ON profile.user_id = account.user_id
          LEFT JOIN public.players player ON player.id = profile.player_id
-         LEFT JOIN auth.users auth_user ON auth_user.id = account.user_id
-         WHERE season.league_id = $1`, [leagueId, scope, roundId || null]);
+         WHERE season.league_id = $1 AND ($2='general' OR core_season.status='active')`, [leagueId, scope, roundId || null]);
       return result.rows.map((row: any) => ({ userId: row.user_id, userName: row.user_name,
         userAvatarUrl: row.avatar_url || null, totalPoints: Number(row.total_points), patrimony: Number(row.patrimony),
         lastRoundPoints: row.last_round_points == null ? null : Number(row.last_round_points), lineupsCount: Number(row.lineups_count) }));

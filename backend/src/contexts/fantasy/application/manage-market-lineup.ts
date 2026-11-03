@@ -1,7 +1,7 @@
 import type { Actor } from "../../../shared/actor.js";
 import {
   validateLineupSubmission,
-  type FantasyLineupSlot,
+  type FantasyLineupSubmission,
   type FantasyMarketDashboardData,
   type FantasyMarketPlayerSummary,
   type FantasyMarketQuickHighlights,
@@ -34,13 +34,12 @@ export interface FantasyMarketLineupRepository {
     leagueId: string,
     roundId: string,
     userId: string
-  ): Promise<{ isMarketOpen: boolean; playerPrices: Map<string, number>; userBudget: number }>;
+  ): Promise<{ isMarketOpen: boolean; playerPrices: Map<string, number>; userBudget: number; playersPerTeam: number }>;
   saveLineup(params: {
     leagueId: string;
     roundId: string;
     userId: string;
-    captainPlayerId: string;
-    slots: FantasyLineupSlot[];
+    input: FantasyLineupSubmission;
     totalCost: number;
   }): Promise<{ success: boolean; error?: string; lineupId?: string }>;
   previewMarketV11(leagueId: string, userId: string): Promise<{ success: boolean; data?: any; error?: string }>;
@@ -94,15 +93,13 @@ export class ManageFantasyMarketLineupUseCase {
   async saveLineup(
     actor: Actor,
     leagueId: string,
-    roundId: string,
-    slots: FantasyLineupSlot[],
-    captainPlayerId: string
+    input: FantasyLineupSubmission
   ): Promise<{ success: boolean; error?: string; lineupId?: string }> {
-    const marketInfo = await this.repo.getMarketRoundInfo(leagueId, roundId, actor.userId);
+    const marketInfo = await this.repo.getMarketRoundInfo(leagueId, input.roundId, actor.userId);
 
     const validation = validateLineupSubmission({
-      slots,
-      captainPlayerId,
+      input,
+      playersPerTeam: marketInfo.playersPerTeam,
       availableBudget: marketInfo.userBudget,
       playerPrices: marketInfo.playerPrices,
       isMarketOpen: marketInfo.isMarketOpen,
@@ -114,10 +111,9 @@ export class ManageFantasyMarketLineupUseCase {
 
     return this.repo.saveLineup({
       leagueId,
-      roundId,
+      roundId: input.roundId,
       userId: actor.userId,
-      captainPlayerId,
-      slots,
+      input,
       totalCost: validation.totalCost,
     });
   }

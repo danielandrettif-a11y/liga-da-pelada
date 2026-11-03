@@ -17,7 +17,7 @@ export type FantasyHttpGateway = {
   getMyHistory(leagueId: string): Promise<any>;
   getRevealedLineups(leagueId: string, roundId?: string): Promise<any>;
   getRoundLineupOverview(leagueId: string, roundId?: string): Promise<any>;
-  saveLineup(leagueId: string, roundId: string, slots: any[], captainPlayerId: string): Promise<any>;
+  saveLineup(leagueId: string, input: any): Promise<any>;
   previewMarketV11(leagueId: string): Promise<any>;
   repairLegacyLineups(leagueId: string): Promise<any>;
   // Métodos da Subfatia 2 que adicionaremos a seguir
@@ -90,10 +90,19 @@ export function httpFantasyGateway(baseUrl: string, accessToken: string): Fantas
       const rId = roundId ? encodeURIComponent(roundId) : "active";
       return request(`/api/fantasy/leagues/${encodeURIComponent(leagueId)}/rounds/${rId}/overview`);
     },
-    saveLineup(leagueId, roundId, slots, captainPlayerId) {
-      return request(`/api/fantasy/leagues/${encodeURIComponent(leagueId)}/rounds/${encodeURIComponent(roundId)}/lineup`, {
+    saveLineup(leagueId, input) {
+      return request(`/api/fantasy/leagues/${encodeURIComponent(leagueId)}/rounds/${encodeURIComponent(input.roundId)}/lineup`, {
         method: "POST",
-        body: JSON.stringify({ slots, captainPlayerId }),
+        body: JSON.stringify({
+          playerIds: input.playerIds,
+          slotAssignments: input.slotAssignments,
+          captainId: input.captainId,
+          scorerId: input.scorerId,
+          assistId: input.assistId,
+          challengeId: input.challengeId,
+          reservePlayerId: input.reservePlayerId,
+          reserveRole: input.reserveRole,
+        }),
       });
     },
     previewMarketV11(leagueId) {

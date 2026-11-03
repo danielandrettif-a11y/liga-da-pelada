@@ -67,6 +67,19 @@ describe("Presentation: FantasyAdminRoute", () => {
     expect(body[0].rank).toBe(1);
   });
 
+  it("rejects round ranking without a round id", async () => {
+    const repo = createMockRepo();
+    const app = await buildApp(repo);
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/fantasy/leagues/l1/ranking?scope=round",
+      headers: { authorization: "Bearer valid-token" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(repo.getRankingRawEntries).not.toHaveBeenCalled();
+  });
+
   it("GET /api/fantasy/leagues/:leagueId/season-pass returns 200 with pass dashboard", async () => {
     const repo = createMockRepo();
     const app = await buildApp(repo);
@@ -96,6 +109,20 @@ describe("Presentation: FantasyAdminRoute", () => {
     const body = JSON.parse(res.payload);
     expect(body.success).toBe(true);
     expect(body.reprocessedLineupsCount).toBe(8);
+  });
+
+  it("rejects an invalid reprocess option", async () => {
+    const repo = createMockRepo();
+    const app = await buildApp(repo);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/fantasy/leagues/l1/rounds/r1/reprocess",
+      headers: { authorization: "Bearer valid-token" },
+      payload: { useCurrentRules: "yes" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(repo.reprocessRound).not.toHaveBeenCalled();
   });
 });
 

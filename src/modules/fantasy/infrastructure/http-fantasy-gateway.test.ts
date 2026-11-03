@@ -38,9 +38,8 @@ describe("httpFantasyGateway", () => {
     const gateway = httpFantasyGateway(baseUrl, token);
     const result = await gateway.saveLineup(
       "league-1",
-      "round-1",
-      [{ slotRole: "ATA", playerId: "p1" }],
-      "p1"
+      { roundId: "round-1", playerIds: ["p1"],
+        slotAssignments: [{ slotRole: "ATA", slotIndex: 0, playerId: "p1" }], captainId: "p1" }
     );
 
     expect(result.success).toBe(true);
@@ -49,8 +48,9 @@ describe("httpFantasyGateway", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
-          slots: [{ slotRole: "ATA", playerId: "p1" }],
-          captainPlayerId: "p1",
+          playerIds: ["p1"],
+          slotAssignments: [{ slotRole: "ATA", slotIndex: 0, playerId: "p1" }],
+          captainId: "p1",
         }),
       })
     );
@@ -65,7 +65,7 @@ describe("httpFantasyGateway", () => {
 
     const gateway = httpFantasyGateway(baseUrl, token);
     await expect(
-      gateway.saveLineup("l1", "r1", [], "p1")
+      gateway.saveLineup("l1", { roundId: "r1", playerIds: [], slotAssignments: [], captainId: "p1" })
     ).rejects.toThrow("Orçamento estourado.");
   });
 

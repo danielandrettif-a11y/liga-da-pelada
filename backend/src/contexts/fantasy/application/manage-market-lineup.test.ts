@@ -52,6 +52,7 @@ describe("Application: ManageFantasyMarketLineupUseCase", () => {
       isMarketOpen: true,
       playerPrices: new Map([["p1", 10.0], ["p2", 8.0]]),
       userBudget: 100.0,
+      playersPerTeam: 1,
     }),
     saveLineup: vi.fn().mockResolvedValue({ success: true, lineupId: "lineup-1" }),
     previewMarketV11: vi.fn().mockResolvedValue({ success: true, data: { status: "ok" } }),
@@ -81,13 +82,11 @@ describe("Application: ManageFantasyMarketLineupUseCase", () => {
     const repo = createMockRepo();
     const useCase = new ManageFantasyMarketLineupUseCase(repo);
 
-    const result = await useCase.saveLineup(
-      actor,
-      leagueId,
-      "round-1",
-      [{ slotRole: "ATA", playerId: "p1" }],
-      "p1"
-    );
+    const input = {
+      roundId: "round-1", playerIds: ["p1"], captainId: "p1",
+      slotAssignments: [{ slotRole: "ATA" as const, slotIndex: 0, playerId: "p1" }],
+    };
+    const result = await useCase.saveLineup(actor, leagueId, input);
 
     expect(result.success).toBe(true);
     expect(result.lineupId).toBe("lineup-1");
@@ -95,8 +94,7 @@ describe("Application: ManageFantasyMarketLineupUseCase", () => {
       leagueId,
       roundId: "round-1",
       userId: actor.userId,
-      captainPlayerId: "p1",
-      slots: [{ slotRole: "ATA", playerId: "p1" }],
+      input,
       totalCost: 10.0,
     });
   });

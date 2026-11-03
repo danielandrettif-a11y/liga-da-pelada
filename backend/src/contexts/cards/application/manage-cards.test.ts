@@ -21,30 +21,36 @@ describe("Application: ManageCardsUseCase", () => {
     openPack: vi.fn().mockResolvedValue({
       success: true,
       offers: [
-        { slug: "c1", name: "Card 1", description: "", rarity: "common", cost: 0 },
-        { slug: "c2", name: "Card 2", description: "", rarity: "rare", cost: 0 },
+        { slug: "c1", name: "Card 1", description: "", rarity: "COMMON", effectType: "NONE", effectConfig: {}, enabled: true, icon: "🃏", requiresTarget: "NONE" },
+        { slug: "c2", name: "Card 2", description: "", rarity: "RARE", effectType: "NONE", effectConfig: {}, enabled: true, icon: "🃏", requiresTarget: "NONE" },
       ],
     }),
     getPackById: vi.fn().mockResolvedValue({
       id: "pack-1",
-      userId: "user-2",
-      leagueId,
+      roundId: "r1",
       status: "opened",
-      cardSlugOffer1: "c1",
-      cardSlugOffer2: "c2",
+      openedAt: null,
+      chosenCardId: null,
       createdAt: "",
+      offers: ["c1", "c2"].map((slug, index) => ({ slot: index + 1, card: {
+        slug, name: slug, description: "", rarity: "COMMON", effectType: "NONE",
+        effectConfig: {}, enabled: true, icon: "🃏", requiresTarget: "NONE",
+      } })),
     }),
     claimPackCard: vi.fn().mockResolvedValue({ success: true }),
     getMyInventory: vi.fn().mockResolvedValue({ cards: [], groupedBySlug: {} }),
     getMyInventoryCount: vi.fn().mockResolvedValue(5),
     getActiveCardForRound: vi.fn().mockResolvedValue(null),
-    getCardDefinition: vi.fn().mockResolvedValue({
+    getOwnedCardDefinition: vi.fn().mockResolvedValue({
       slug: "c1",
       name: "Card 1",
       description: "",
-      rarity: "common",
-      cost: 0,
-      requiresTargetPlayer: false,
+      rarity: "COMMON",
+      effectType: "NONE",
+      effectConfig: {},
+      enabled: true,
+      icon: "🃏",
+      requiresTarget: "NONE",
     }),
     isRoundOpen: vi.fn().mockResolvedValue(true),
     activateCardForRound: vi.fn().mockResolvedValue({ success: true }),
@@ -88,6 +94,45 @@ describe("Application: ManageCardsUseCase", () => {
 
     expect(result.success).toBe(true);
     expect(repo.activateCardForRound).toHaveBeenCalled();
+  });
+
+  it("uses the owned database card definition instead of trusting the client slug", async () => {
+    const repo = createMockRepo({
+      getOwnedCardDefinition: vi.fn().mockResolvedValue({
+        slug: "double_prediction",
+        name: "Palpite duplo",
+        description: "",
+        rarity: "RARE",
+        effectType: "NONE",
+        effectConfig: {},
+        enabled: true,
+        icon: "🃏",
+        requiresTarget: "DUO_PLAYERS",
+      }),
+    });
+    const useCase = new ManageCardsUseCase(repo);
+
+    const result = await useCase.activateCardForRound(userActor, leagueId, {
+      roundId: "r1",
+      userCardId: "uc1",
+      cardSlug: "client-forged-slug",
+      targetPlayerId: "p1",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("dois atletas diferentes");
+    expect(repo.getOwnedCardDefinition).toHaveBeenCalledWith(leagueId, "user-2", "r1", "uc1");
+    expect(repo.activateCardForRound).not.toHaveBeenCalled();
+  });
+
+  it("blocks test pack generation for non-admin", async () => {
+    const repo = createMockRepo();
+    const useCase = new ManageCardsUseCase(repo);
+
+    const result = await useCase.giveMyAccountTestPack(userActor, leagueId);
+
+    expect(result.success).toBe(false);
+    expect(repo.giveMyAccountTestPack).not.toHaveBeenCalled();
   });
 
   it("blocks distributePackToAllLineupUsers for non-admin", async () => {

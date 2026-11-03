@@ -34,7 +34,7 @@ export interface CardsRepository {
   }>;
   getMyInventoryCount(leagueId: string, userId: string): Promise<number>;
   getActiveCardForRound(leagueId: string, userId: string, roundId: string): Promise<FantasyActiveCardDTO | null>;
-  getCardDefinition(cardSlug: string): Promise<FantasyCardDefinition | null>;
+  getOwnedCardDefinition(leagueId: string, userId: string, roundId: string, userCardId: string): Promise<FantasyCardDefinition | null>;
   isRoundOpen(leagueId: string, userId: string, roundId: string): Promise<boolean>;
   activateCardForRound(params: {
     leagueId: string;
@@ -73,16 +73,19 @@ export class ManageCardsUseCase {
   }
 
   async restoreMyPassPacks(actor: Actor, leagueId: string, fantasySeasonId: string) {
+    if (!fantasySeasonId) return { success: false, error: "Passe da temporada não encontrado." };
     const isAdmin = await this.repo.isLeagueAdmin(leagueId, actor.userId);
     if (!isAdmin) return { success: false, error: "Apenas administradores." };
     return this.repo.restoreMyPassPacks(leagueId, actor.userId, fantasySeasonId);
   }
 
   async openPack(actor: Actor, leagueId: string, packId: string) {
+    if (!packId) return { success: false, error: "Pacote não encontrado." };
     return this.repo.openPack(leagueId, actor.userId, packId);
   }
 
   async claimPackCard(actor: Actor, leagueId: string, packId: string, chosenSlug: string) {
+    if (!packId || !chosenSlug) return { success: false, error: "Pacote e carta são obrigatórios." };
     const pack = await this.repo.getPackById(leagueId, actor.userId, packId);
     if (!pack) return { success: false, error: "Pacote não encontrado." };
 
@@ -116,13 +119,16 @@ export class ManageCardsUseCase {
       targetPrediction?: string | null;
     }
   ) {
+    if (!params.roundId || !params.userCardId) return { success: false, error: "Rodada e carta são obrigatórias." };
     const isRoundOpen = await this.repo.isRoundOpen(leagueId, actor.userId, params.roundId);
-    const cardDef = await this.repo.getCardDefinition(params.cardSlug);
-    if (!cardDef) return { success: false, error: "Definição de carta não encontrada." };
+    const cardDef = await this.repo.getOwnedCardDefinition(leagueId, actor.userId, params.roundId, params.userCardId);
+    if (!cardDef) return { success: false, error: "Carta não encontrada ou indisponível no seu inventário." };
 
     const validation = validateCardActivation({
       cardDefinition: cardDef,
       targetPlayerId: params.targetPlayerId,
+      targetPlayer2Id: params.targetPlayer2Id,
+      targetPrediction: params.targetPrediction,
       isRoundOpen,
     });
     if (!validation.valid) return { success: false, error: validation.error };
@@ -139,6 +145,7 @@ export class ManageCardsUseCase {
   }
 
   async removeActiveCardForRound(actor: Actor, leagueId: string, roundId: string) {
+    if (!roundId) return { success: false, error: "Rodada não encontrada." };
     return this.repo.removeActiveCardForRound(leagueId, actor.userId, roundId);
   }
 
@@ -149,6 +156,8 @@ export class ManageCardsUseCase {
   }
 
   async giveMyAccountTestPack(actor: Actor, leagueId: string) {
+    const isAdmin = await this.repo.isLeagueAdmin(leagueId, actor.userId);
+    if (!isAdmin) return { success: false, error: "Apenas administradores podem gerar pacotes de teste." };
     return this.repo.giveMyAccountTestPack(leagueId, actor.userId);
   }
 
@@ -171,6 +180,7 @@ export class ManageCardsUseCase {
   async grantFantasyPackToUser(actor: Actor, leagueId: string, targetUserId: string) {
     const isAdmin = await this.repo.isLeagueAdmin(leagueId, actor.userId);
     if (!isAdmin) return { success: false, error: "Apenas administradores." };
+    if (!targetUserId) return { success: false, error: "Escolha uma pessoa para receber o pacote." };
     return this.repo.grantFantasyPackToUser(leagueId, targetUserId, actor.userId);
   }
 }

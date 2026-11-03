@@ -17,7 +17,7 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
   };
 
   it("checks admin status correctly", async () => {
-    const pool = createMockPool(async (sql) => {
+    const pool = createMockPool(async (sql, params) => {
       if (sql.includes("public.is_league_admin")) {
         return { rows: [{ allowed: 1 }], rowCount: 1 };
       }
@@ -69,8 +69,14 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
   });
 
   it("saves lineup and returns lineupId", async () => {
-    const pool = createMockPool(async (sql) => {
-      if (sql.includes("public.save_fantasy_lineup")) {
+    let saveParams: any[] | undefined;
+    const pool = createMockPool(async (sql, params) => {
+      if (sql.includes("SELECT 1 FROM public.rounds round_item")) {
+        return { rows: [{ exists: 1 }], rowCount: 1 };
+      }
+      if (sql.includes("fantasy_test_sessions")) return { rows: [], rowCount: 0 };
+      if (sql.includes("public.save_fantasy_lineup_with_reserve")) {
+        saveParams = params;
         return { rows: [{ id: "lineup-xyz" }] };
       }
       return { rows: [] };
@@ -81,13 +87,22 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
       leagueId: "l1",
       roundId: "r1",
       userId: "u1",
-      captainPlayerId: "p1",
-      slots: [{ slotRole: "ATA", playerId: "p1" }],
+      input: {
+        roundId: "r1", playerIds: ["p1"], captainId: "p1",
+        scorerId: "p1", assistId: "p1", challengeId: "p1",
+        reservePlayerId: "p2", reserveRole: "ATA",
+        slotAssignments: [{ slotRole: "ATA", slotIndex: 0, playerId: "p1" }],
+      },
       totalCost: 10,
     });
 
     expect(result.success).toBe(true);
     expect(result.lineupId).toBe("lineup-xyz");
+    expect(saveParams).toEqual([
+      "r1", ["p1"], "p1", "p1", "p1", "p1",
+      JSON.stringify([{ player_id: "p1", slot_index: 0, slot_role: "ATA" }]),
+      "p2", "ATA",
+    ]);
   });
 
   it("returns revealed lineups only when market is closed", async () => {

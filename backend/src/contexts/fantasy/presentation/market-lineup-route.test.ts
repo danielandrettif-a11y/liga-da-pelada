@@ -52,6 +52,7 @@ describe("Presentation: MarketLineupRoute", () => {
       isMarketOpen: true,
       playerPrices: new Map([["p1", 10.0]]),
       userBudget: 100.0,
+      playersPerTeam: 1,
     }),
     saveLineup: vi.fn().mockResolvedValue({ success: true, lineupId: "lineup-1" }),
     previewMarketV11: vi.fn().mockResolvedValue({ success: true, data: {} }),
@@ -88,8 +89,15 @@ describe("Presentation: MarketLineupRoute", () => {
       url: "/api/fantasy/leagues/l1/rounds/r1/lineup",
       headers: { authorization: "Bearer valid-token" },
       payload: {
-        captainPlayerId: "p1",
-        slots: [{ slotRole: "ATA", playerId: "p1" }],
+        roundId: "forged-round",
+        playerIds: ["p1"],
+        captainId: "p1",
+        scorerId: "p1",
+        assistId: "p1",
+        challengeId: "p1",
+        reservePlayerId: "p2",
+        reserveRole: "ATA",
+        slotAssignments: [{ slotRole: "ATA", slotIndex: 0, playerId: "p1" }],
       },
     });
 
@@ -97,6 +105,17 @@ describe("Presentation: MarketLineupRoute", () => {
     const body = JSON.parse(res.payload);
     expect(body.success).toBe(true);
     expect(body.lineupId).toBe("lineup-1");
+    expect(repo.saveLineup).toHaveBeenCalledWith(expect.objectContaining({
+      roundId: "r1",
+      input: expect.objectContaining({
+        roundId: "r1",
+        scorerId: "p1",
+        assistId: "p1",
+        challengeId: "p1",
+        reservePlayerId: "p2",
+        reserveRole: "ATA",
+      }),
+    }));
   });
 
   it("GET /api/fantasy/leagues/:leagueId/rounds/:roundId/revealed-lineups returns 200", async () => {

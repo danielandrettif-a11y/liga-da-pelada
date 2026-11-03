@@ -694,112 +694,7 @@
     {
       "context": "fantasy",
       "source": "src/lib/actions/fantasy.ts",
-      "name": "getFantasyDashboard"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "getFantasyPlayerDetail"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "getFantasyPlayerSummary"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "getFantasyQuickHighlights"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "getMyFantasySummary"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "getMyFantasyHistory"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "getRevealedLineups"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "getFantasyRoundLineupOverview"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
       "name": "saveFantasyLineup"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "previewFantasyMarketV11"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "repairLegacySavedFantasyLineups"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "getFantasyRanking"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "getFantasyUserHistory"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "getFantasyUserRoundHistory"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "getSeasonPassDashboard"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "getFantasyAdminData"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "updateFantasySettings"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "reprocessFantasyRound"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "reprocessFantasyRoundWithCurrentRules"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "createFantasyTestSession"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "processFantasyTestSession"
-    },
-    {
-      "context": "fantasy",
-      "source": "src/lib/actions/fantasy.ts",
-      "name": "resetFantasyTestSession"
     },
     {
       "context": "cards",
@@ -877,61 +772,6 @@
       "name": "grantFantasyPackToUser"
     },
     {
-      "context": "cosmetics",
-      "source": "src/lib/actions/cosmetics.ts",
-      "name": "getMyCosmeticsDashboard"
-    },
-    {
-      "context": "cosmetics",
-      "source": "src/lib/actions/cosmetics.ts",
-      "name": "cleanupMyLegacyCosmeticsPreview"
-    },
-    {
-      "context": "cosmetics",
-      "source": "src/lib/actions/cosmetics.ts",
-      "name": "dismissMyUnopenedBronzePassPack"
-    },
-    {
-      "context": "cosmetics",
-      "source": "src/lib/actions/cosmetics.ts",
-      "name": "resetMyTestPassRewardClaims"
-    },
-    {
-      "context": "cosmetics",
-      "source": "src/lib/actions/cosmetics.ts",
-      "name": "claimPassCosmetic"
-    },
-    {
-      "context": "cosmetics",
-      "source": "src/lib/actions/cosmetics.ts",
-      "name": "purchaseSeasonPassShopItem"
-    },
-    {
-      "context": "cosmetics",
-      "source": "src/lib/actions/cosmetics.ts",
-      "name": "equipCosmetic"
-    },
-    {
-      "context": "cosmetics",
-      "source": "src/lib/actions/cosmetics.ts",
-      "name": "getAdminCosmeticsPreview"
-    },
-    {
-      "context": "cosmetics",
-      "source": "src/lib/actions/cosmetics.ts",
-      "name": "getMyEquippedCosmetics"
-    },
-    {
-      "context": "cosmetics",
-      "source": "src/lib/actions/cosmetics.ts",
-      "name": "getPlayerEquippedCosmetics"
-    },
-    {
-      "context": "cosmetics",
-      "source": "src/lib/actions/cosmetics.ts",
-      "name": "getAllPlayersEquippedCosmeticsMap"
-    },
-    {
       "context": "collective",
       "source": "src/lib/actions/collective.ts",
       "name": "getActiveCollectiveSummary"
@@ -970,16 +810,6 @@
       "context": "collective",
       "source": "src/lib/actions/collective.ts",
       "name": "getAdminPreviousCollective"
-    },
-    {
-      "context": "integrations",
-      "source": "src/app/bq-manager/actions.ts",
-      "name": "createManagerClub"
-    },
-    {
-      "context": "integrations",
-      "source": "src/app/bq-manager/actions.ts",
-      "name": "runManagerCommand"
     },
     {
       "context": "operations",
