@@ -11,8 +11,8 @@ describe("Presentation: FantasyAdminRoute", () => {
 
   const createMockRepo = (overrides: Partial<FantasyAdminRepository> = {}): FantasyAdminRepository => ({
     isLeagueAdmin: vi.fn().mockResolvedValue(true),
-    getRankingRawEntries: vi.fn().mockResolvedValue([
-      { userId: "u1", userName: "Alice", userAvatarUrl: null, totalPoints: 100, patrimony: 100, lastRoundPoints: 10, lineupsCount: 2 },
+    getRanking: vi.fn().mockResolvedValue([
+      { user_id: "u1", total_points: 100, position: 1 },
     ]),
     getUserHistory: vi.fn().mockResolvedValue([]),
     getUserRoundHistory: vi.fn().mockResolvedValue({
@@ -71,7 +71,7 @@ describe("Presentation: FantasyAdminRoute", () => {
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.payload);
     expect(body.length).toBe(1);
-    expect(body[0].rank).toBe(1);
+    expect(body[0].position).toBe(1);
   });
 
   it("rejects round ranking without a round id", async () => {
@@ -84,7 +84,7 @@ describe("Presentation: FantasyAdminRoute", () => {
     });
 
     expect(res.statusCode).toBe(400);
-    expect(repo.getRankingRawEntries).not.toHaveBeenCalled();
+    expect(repo.getRanking).not.toHaveBeenCalled();
   });
 
   it("GET /api/fantasy/leagues/:leagueId/season-pass returns 200 with pass dashboard", async () => {

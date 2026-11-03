@@ -1,4 +1,5 @@
 import type { Actor } from "../../../shared/actor.js";
+import type { FantasyRankingReadModel } from "../domain/analytical-read-models.js";
 import {
   validateLineupSubmission,
   type FantasyLineupSubmission,
@@ -22,7 +23,7 @@ export interface FantasyMarketLineupRepository {
     fantasyRoundId?: string
   ): Promise<FantasyPlayerPerformanceDetail | null>;
   getQuickHighlights(leagueId: string, userId: string): Promise<FantasyMarketQuickHighlights | null>;
-  getMySummary(leagueId: string, userId: string): Promise<FantasyUserSummary | null>;
+  getMySummary(leagueId: string, userId: string): Promise<FantasyRankingReadModel | null>;
   getMyHistory(leagueId: string, userId: string): Promise<unknown[]>;
   getRevealedLineups(
     leagueId: string,
@@ -66,7 +67,7 @@ export class ManageFantasyMarketLineupUseCase {
     return this.repo.getQuickHighlights(leagueId, actor.userId);
   }
 
-  async getMySummary(actor: Actor, leagueId: string): Promise<FantasyUserSummary | null> {
+  async getMySummary(actor: Actor, leagueId: string): Promise<FantasyRankingReadModel | null> {
     return this.repo.getMySummary(leagueId, actor.userId);
   }
 

@@ -4,6 +4,8 @@
 
 **Situação em 25/10/2026:** Windows 10 Home 22H2, 16 GB de RAM e 4 processadores lógicos. Ubuntu 26.04.1 já roda em WSL2; Docker Engine 29.9.2, Compose 5.6.1 e Supabase CLI 2.122.0 estão instalados. A stack local da tag `self-hosted/v0.8.3` (commit `bc27d2661edd09a5d0b8d76ce33da6d4071a756e`) está em `/home/danie/pelada-homologacao/supabase-project`, com PostgreSQL 17.6. As portas 8000, 5432 e 6543 estão vinculadas somente a `127.0.0.1`. O banco **de testes** já foi restaurado; nenhum dado do banco real de produção foi importado.
 
+**Revalidação de código em 03/11/2026:** backend com 695 testes em 181 arquivos, frontend com 1.238 testes em 237 arquivos, typechecks e builds de produção aprovados. A auditoria permanece em 258/267 operações com paridade revisada e 0/267 verificadas em jornada integrada. A stack Docker iniciou, mas o WSL encerrou a distribuição quando a chamada isolada terminou; mantenha um terminal Ubuntu aberto durante a sessão. Testar os contextos aceitos com suas flags individuais e manter `FANTASY_API_ENABLED=false` até fechar as nove projeções analíticas.
+
 ### Exportação do banco de testes, já concluída
 
 O comando usado no PowerShell normal do Windows foi:

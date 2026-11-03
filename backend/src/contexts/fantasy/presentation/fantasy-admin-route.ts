@@ -71,9 +71,6 @@ export function registerFantasyAdminRoutes(
           request.params.userId,
           request.params.roundId
         );
-        if (!detail) {
-          return reply.code(404).send({ code: "NOT_FOUND", message: "Histórico da rodada não encontrado." });
-        }
         return reply.code(200).send(detail);
       } catch (error) {
         return sendFailure(error, request, reply);

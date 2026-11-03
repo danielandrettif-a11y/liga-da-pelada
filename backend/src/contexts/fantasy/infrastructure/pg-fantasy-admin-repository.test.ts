@@ -19,29 +19,32 @@ describe("Infrastructure: PgFantasyAdminRepository", () => {
     } as unknown as Pool;
   };
 
-  it("retrieves raw ranking entries", async () => {
+  it("builds the canonical enriched ranking contract", async () => {
     const pool = createMockPool(async (sql) => {
-      if (sql.includes("FROM public.fantasy_accounts account")) {
+      if (sql.includes("SELECT fantasy_season.id")) return { rows: [{ id: "fs1" }] };
+      if (sql.includes("SELECT fantasy_round.id")) return { rows: [{ id: "fr1", round_id: "r1", market_status: "finished", date: "2026-01-01", number: 1, status: "finished" }] };
+      if (sql.includes("WITH lineup_metrics")) {
         return {
           rows: [
             {
               user_id: "u1",
-              user_name: "Cartoleiro 1",
-              user_avatar_url: null,
               total_points: 150.5,
-              patrimony: 100,
-              lineups_count: 5,
+              current_budget: 100,
+              rounds_played: 5,
             },
           ],
         };
       }
+      if (sql.includes("FROM public.account_profiles")) return { rows: [{ user_id: "u1", player: { name: "Cartoleiro 1", avatar_url: null } }] };
+      if (sql.includes("FROM public.account_cosmetic_loadouts")) return { rows: [] };
       return { rows: [] };
     });
 
     const repo = new PgFantasyAdminRepository(pool, roundStatistics);
-    const rows = await repo.getRankingRawEntries("l1", "season", "viewer-1");
+    const rows = await repo.getRanking("l1", "season", "viewer-1");
     expect(rows.length).toBe(1);
-    expect(rows[0].totalPoints).toBe(150.5);
+    expect(rows[0]).toMatchObject({ user_id: "u1", total_points: 150.5, position: 1,
+      player: { name: "Cartoleiro 1", avatar_url: null } });
   });
 
   it("updates fantasy settings initial budget", async () => {

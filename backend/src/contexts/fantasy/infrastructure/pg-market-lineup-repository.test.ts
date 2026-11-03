@@ -129,7 +129,7 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
   it("returns revealed lineups only when market is closed", async () => {
     const pool = createMockPool(async (sql) => {
       if (sql.includes("FROM public.fantasy_rounds fantasy_round")) {
-        return { rows: [{ id: "fantasy-round-1", market_status: "closed" }] };
+        return { rows: [{ id: "fantasy-round-1", round_id: "round-1", market_status: "finished", status: "finished", number: 1, date: "2026-01-01" }] };
       }
       if (sql.includes("FROM public.fantasy_lineups lineup")) {
         return {
@@ -138,9 +138,12 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
               id: "l1",
               user_id: "u1",
               captain_player_id: "p1",
-              slots: [],
-              score: 45.5,
-              total_cost: 95,
+              prediction_points: 0,
+              score_breakdown: {},
+              profile: { name: "Alice", avatar_url: null },
+              players: [{ id: "lp1", player_id: "p1", slot_index: 0, slot_role: "ATA", total_points: 45.5,
+                player_name_locked: "Atleta", avatar_url_locked: null, price_locked: 10 }],
+              reserves: [],
             },
           ],
         };
@@ -153,7 +156,8 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
 
     expect(result.allowed).toBe(true);
     expect(result.lineups.length).toBe(1);
-    expect(result.lineups[0].score).toBe(45.5);
+    expect(result.lineups[0]).toMatchObject({ userId: "u1", userName: "Alice", totalPoints: 45.5,
+      players: [{ playerId: "p1", points: 45.5 }] });
   });
 
   it("blocks revealed lineups when market is open", async () => {

@@ -1,8 +1,11 @@
 import type { Pool, PoolClient } from "pg";
 import { withAuthenticatedTransaction } from "../../../infrastructure/authenticated-transaction.js";
 import type { FantasyAdminRepository } from "../application/manage-fantasy-admin.js";
+import type {
+  FantasyUserHistoryReadModel,
+  FantasyUserRoundHistoryReadModel,
+} from "../domain/analytical-read-models.js";
 import type { FantasyAdminConfigData, FantasyRankingScope, FantasyUserRoundHistoryDetail, SeasonPassDashboardData } from "../domain/fantasy-admin.js";
-import type { UserFantasyHistoryEntry } from "../domain/market-lineup.js";
 import type { RoundStatisticsRepository } from "../../statistics/application/manage-round-statistics.js";
 
 export class PgFantasyAdminRepository implements FantasyAdminRepository {
@@ -16,74 +19,240 @@ export class PgFantasyAdminRepository implements FantasyAdminRepository {
       "SELECT 1 WHERE public.is_league_admin($1::uuid)", [leagueId])).rowCount));
   }
 
-  async getRankingRawEntries(leagueId: string, scope: FantasyRankingScope, actorUserId: string, roundId?: string) {
+  async getRanking(leagueId: string, scope: FantasyRankingScope, actorUserId: string, roundId?: string) {
     return this.withUser(actorUserId, async (client) => {
+      const season = await client.query<{ id: string }>(
+        `SELECT fantasy_season.id FROM public.fantasy_seasons fantasy_season
+         JOIN public.seasons core ON core.id=fantasy_season.season_id AND core.status='active'
+         WHERE fantasy_season.league_id=$1::uuid LIMIT 1`, [leagueId]);
+      const fantasySeasonId = season.rows[0]?.id;
+      if (!fantasySeasonId) return [];
+      const periodScope = scope === "general" ? "season" : scope;
+      const rounds = await client.query<any>(
+        `SELECT fantasy_round.id,fantasy_round.round_id,fantasy_round.market_status,round_item.date,
+                round_item.number,round_item.status
+         FROM public.fantasy_rounds fantasy_round JOIN public.rounds round_item ON round_item.id=fantasy_round.round_id
+         WHERE fantasy_round.fantasy_season_id=$1::uuid ORDER BY round_item.date DESC,round_item.number DESC`, [fantasySeasonId]);
+      let selected = rounds.rows;
+      if (periodScope === "round") {
+        const target = roundId
+          ? rounds.rows.find((item: any) => item.round_id === roundId || item.id === roundId)
+          : rounds.rows.find((item: any) => item.status !== "finished" && ["open","in_progress"].includes(item.market_status)) || rounds.rows[0];
+        selected = target ? [target] : [];
+      } else if (periodScope === "month") {
+        const latest = rounds.rows.find((item: any) => item.market_status === "finished" || item.market_status === "in_progress" || item.status === "finished");
+        const month = String(latest?.date || "").slice(0,7);
+        selected = rounds.rows.filter((item: any) => String(item.date || "").startsWith(month));
+      }
+      const fantasyRoundIds = selected.map((item: any) => item.id);
+      if (!fantasyRoundIds.length) return [];
       const result = await client.query<any>(
-        `WITH selected AS (
-           SELECT lineup.user_id, sum(lineup.total_points) points, count(*)::int lineups_count,
-                  max(lineup.total_points) FILTER (WHERE round_item.number = latest.latest_number) last_round_points
+        `WITH lineup_metrics AS (
+           SELECT lineup.user_id,min(lineup.id::text)::uuid id,
+             sum(COALESCE(lineup.total_points,0)) total_points,count(*)::int rounds_played,
+             max(COALESCE(lineup.total_points,0)) best_round_points,
+             max(lineup.budget_after) budget_after,max(lineup.budget_before) budget_before,
+             (array_agg(lineup.score_breakdown ORDER BY lineup.created_at DESC))[1] score_breakdown
            FROM public.fantasy_lineups lineup
-           JOIN public.fantasy_rounds fantasy_round ON fantasy_round.id = lineup.fantasy_round_id
-           JOIN public.fantasy_seasons fantasy_season ON fantasy_season.id = fantasy_round.fantasy_season_id
-           JOIN public.seasons core_season ON core_season.id=fantasy_season.season_id
-           JOIN public.rounds round_item ON round_item.id = fantasy_round.round_id
-           CROSS JOIN LATERAL (SELECT max(number) latest_number FROM public.rounds WHERE league_id = $1 AND status = 'finished') latest
-           WHERE fantasy_season.league_id = $1 AND ($2='general' OR core_season.status='active')
-             AND ($2::text NOT IN ('round','month') OR ($2 = 'round' AND round_item.id = $3::uuid)
-               OR ($2 = 'month' AND date_trunc('month', round_item.date) = date_trunc('month', current_date)))
+           WHERE lineup.fantasy_round_id=ANY($1::uuid[])
+             AND ($2::text='round' OR lineup.status='scored')
            GROUP BY lineup.user_id
+         ), player_metrics AS (
+           SELECT lineup.user_id,sum(COALESCE(player.captain_bonus,0)) captain_bonus_points,
+             sum(COALESCE(player.total_points,0)) FILTER (WHERE player.slot_role='DEF') def_points,
+             sum(COALESCE(player.total_points,0)) FILTER (WHERE player.slot_role IN ('ATA','MEI')) attack_points,
+             count(player.id)::int FILTER (WHERE player.slot_role IN ('ATA','MEI')) attack_selection_count
+           FROM public.fantasy_lineups lineup JOIN public.fantasy_lineup_players player ON player.lineup_id=lineup.id
+           WHERE lineup.fantasy_round_id=ANY($1::uuid[])
+             AND ($2::text='round' OR lineup.status='scored') GROUP BY lineup.user_id
          )
-         SELECT account.user_id, COALESCE(player.name, 'Jogador') user_name,
-                player.avatar_url, CASE WHEN $2 IN ('round','month') THEN COALESCE(selected.points,0)
-                  ELSE COALESCE(selected.points,account.total_points,0) END total_points,
-                account.current_budget patrimony, selected.last_round_points, COALESCE(selected.lineups_count,0) lineups_count
+         SELECT account.id,account.user_id,COALESCE(metrics.total_points,0) total_points,
+           COALESCE(metrics.rounds_played,0) rounds_played,COALESCE(metrics.best_round_points,0) best_round_points,
+           COALESCE(player_metrics.captain_bonus_points,0) captain_bonus_points,COALESCE(player_metrics.def_points,0) def_points,
+           0::numeric mid_points,0::int mid_selection_count,0::numeric mid_average_points,
+           COALESCE(player_metrics.attack_points,0) attack_points,COALESCE(player_metrics.attack_selection_count,0) attack_selection_count,
+           COALESCE(player_metrics.attack_points,0)/greatest(1,COALESCE(player_metrics.attack_selection_count,0)) attack_average_points,
+           CASE WHEN $2::text='round' THEN COALESCE(metrics.budget_after,metrics.budget_before,0)
+             ELSE COALESCE(account.current_budget,0) END current_budget,
+           false is_live,metrics.score_breakdown
          FROM public.fantasy_accounts account
-         JOIN public.fantasy_seasons season ON season.id = account.fantasy_season_id
-         JOIN public.seasons core_season ON core_season.id=season.season_id
-         LEFT JOIN selected ON selected.user_id = account.user_id
-         LEFT JOIN public.account_profiles profile ON profile.user_id = account.user_id
-         LEFT JOIN public.players player ON player.id = profile.player_id
-         WHERE season.league_id = $1 AND ($2='general' OR core_season.status='active')`, [leagueId, scope, roundId || null]);
-      return result.rows.map((row: any) => ({ userId: row.user_id, userName: row.user_name,
-        userAvatarUrl: row.avatar_url || null, totalPoints: Number(row.total_points), patrimony: Number(row.patrimony),
-        lastRoundPoints: row.last_round_points == null ? null : Number(row.last_round_points), lineupsCount: Number(row.lineups_count) }));
+         LEFT JOIN lineup_metrics metrics ON metrics.user_id=account.user_id
+         LEFT JOIN player_metrics ON player_metrics.user_id=account.user_id
+         WHERE account.fantasy_season_id=$3::uuid`, [fantasyRoundIds, periodScope, fantasySeasonId]);
+      const entries = periodScope === "round" ? result.rows.filter((item: any) => Number(item.rounds_played)>0) : result.rows;
+      const userIds = entries.map((item: any) => item.user_id);
+      if (!userIds.length) return [];
+      const [profiles, cosmetics, activations] = await Promise.all([
+        client.query<any>(
+          `SELECT profile.user_id,jsonb_build_object('name',player.name,'avatar_url',player.avatar_url) player
+           FROM public.account_profiles profile LEFT JOIN public.players player ON player.id=profile.player_id
+           WHERE profile.user_id=ANY($1::uuid[])`, [userIds]),
+        client.query<any>(
+          `SELECT loadout.user_id,frame.asset_key frame_key,aura.asset_key aura_key,
+                  nameplate.asset_key nameplate_key,title.name title_name,background.asset_key background_key
+           FROM public.account_cosmetic_loadouts loadout
+           LEFT JOIN public.fantasy_cosmetics frame ON frame.id=loadout.frame_cosmetic_id
+           LEFT JOIN public.fantasy_cosmetics aura ON aura.id=loadout.aura_cosmetic_id
+           LEFT JOIN public.fantasy_cosmetics nameplate ON nameplate.id=loadout.nameplate_cosmetic_id
+           LEFT JOIN public.fantasy_cosmetics title ON title.id=loadout.title_cosmetic_id
+           LEFT JOIN public.fantasy_cosmetics background ON background.id=loadout.background_cosmetic_id
+           WHERE loadout.user_id=ANY($1::uuid[])`, [userIds]),
+        periodScope === "round" ? client.query<any>(
+          `SELECT activation.user_id,activation.status,activation.result_bonus,activation.result_details,
+                  card.slug,card.name,card.rarity,card.description
+           FROM public.fantasy_card_activations activation
+           LEFT JOIN public.fantasy_cards card ON card.id=activation.card_id
+           WHERE activation.round_id=$1::uuid AND activation.user_id=ANY($2::uuid[])`, [selected[0].round_id,userIds])
+          : Promise.resolve({ rows: [] }),
+      ]);
+      const profileByUser=new Map(profiles.rows.map((item:any)=>[item.user_id,item.player]));
+      const cosmeticsByUser=new Map(cosmetics.rows.map((item:any)=>[item.user_id,{frameKey:item.frame_key||null,auraKey:item.aura_key||null,
+        nameplateKey:item.nameplate_key||null,titleName:item.title_name||null,backgroundAssetKey:item.background_key||null}]));
+      const cardByUser=new Map(activations.rows.map((item:any)=>[item.user_id,{slug:item.slug||null,name:item.name||"Carta utilizada",
+        rarity:item.rarity||"COMMON",bonus:Number(item.result_bonus||0),budgetRecovery:Number(item.result_details?.budgetRecovery||0),
+        description:item.result_details?.description||null,status:item.status||"RESERVED",details:item.result_details||{},
+        fallbackBonus:Number(entries.find((entry:any)=>entry.user_id===item.user_id)?.score_breakdown?.cardBonus||0)}]));
+      const enriched=entries.map((item:any)=>{const card:any=cardByUser.get(item.user_id);const pending=["RESERVED","LOCKED"].includes(String(card?.status||"").toUpperCase());
+        const monetary=Number(card?.details?.budgetRecovery||0)>0||Number(card?.details?.discountAmount||0)>0||Number(card?.details?.discountPercent||0)>0
+          ||card?.slug==="bargain"||card?.slug==="extra_credit"||Number(card?.details?.budgetBonus||0)>0;
+        const cardPoints=card&&!pending&&!monetary?Math.max(Number(card.bonus||0),Number(card.fallbackBonus||0)):0;
+        return {...item,total_points:Number(item.total_points||0)+(periodScope==="round"?cardPoints:0),player:profileByUser.get(item.user_id)||null,
+          cosmetics:cosmeticsByUser.get(item.user_id)||null,roundCard:card||null};});
+      enriched.sort((a:any,b:any)=>Number(b.total_points||0)-Number(a.total_points||0));
+      let previous:number|null=null,position=0;
+      return enriched.map((item:any,index:number)=>{const points=Number(item.total_points||0);if(previous!==points)position=index+1;previous=points;return{...item,position};});
     });
   }
 
-  async getUserHistory(leagueId: string, userId: string, actorUserId: string): Promise<UserFantasyHistoryEntry[]> {
-    return this.withUser(actorUserId, async (client) => {
-      const result = await client.query<any>(
-        `SELECT round_item.id round_id, round_item.number, lineup.total_points, lineup.round_position,
-                lineup.budget_after, captain.name captain_name
-         FROM public.fantasy_lineups lineup JOIN public.fantasy_rounds fantasy_round ON fantasy_round.id=lineup.fantasy_round_id
-         JOIN public.fantasy_seasons season ON season.id=fantasy_round.fantasy_season_id
-         JOIN public.rounds round_item ON round_item.id=fantasy_round.round_id
-         LEFT JOIN public.players captain ON captain.id=lineup.captain_player_id
-         WHERE season.league_id=$1 AND lineup.user_id=$2 ORDER BY round_item.number DESC`, [leagueId, userId]);
-      return result.rows.map((row: any) => ({ roundId: row.round_id, roundNumber: Number(row.number), score: Number(row.total_points),
-        rankInRound: Number(row.round_position || 0), patrimonyAfter: Number(row.budget_after || 0), captainName: row.captain_name || null }));
-    });
+  async getUserHistory(leagueId: string, userId: string, actorUserId: string): Promise<FantasyUserHistoryReadModel | null> {
+    return this.withUser(actorUserId, (client) => this.readUserHistory(client, leagueId, userId));
   }
 
-  async getUserRoundHistory(leagueId: string, userId: string, roundId: string, actorUserId: string): Promise<FantasyUserRoundHistoryDetail | null> {
+  async getUserRoundHistory(leagueId: string, userId: string, roundId: string, actorUserId: string): Promise<FantasyUserRoundHistoryReadModel | null> {
     return this.withUser(actorUserId, async (client) => {
-      const result = await client.query<any>(
-        `SELECT lineup.user_id, round_item.id round_id, round_item.number, lineup.total_points,
-                lineup.captain_player_id, COALESCE((fantasy_round.settings_snapshot->>'captain_multiplier')::numeric,1) captain_multiplier,
-                COALESCE(jsonb_agg(jsonb_build_object('slotRole', item.slot_role, 'playerId', item.player_id,
-                  'playerName', player.name, 'score', item.total_points, 'isCaptain', item.player_id=lineup.captain_player_id)
-                  ORDER BY item.created_at) FILTER (WHERE item.id IS NOT NULL),'[]'::jsonb) slots
-         FROM public.fantasy_lineups lineup JOIN public.fantasy_rounds fantasy_round ON fantasy_round.id=lineup.fantasy_round_id
-         JOIN public.fantasy_seasons season ON season.id=fantasy_round.fantasy_season_id
-         JOIN public.rounds round_item ON round_item.id=fantasy_round.round_id
+      const [history, fantasyRoundResult] = await Promise.all([
+        this.readUserHistory(client, leagueId, userId),
+        client.query<any>(
+          `SELECT fantasy_round.id, fantasy_round.round_id, fantasy_round.market_status,
+                  fantasy_round.scoring_version, fantasy_round.settings_snapshot,
+                  jsonb_build_object('number',round_item.number,'date',round_item.date,
+                    'status',round_item.status,'suppress_goalkeeper_rewards',round_item.suppress_goalkeeper_rewards,
+                    'matches',COALESCE((SELECT jsonb_agg(jsonb_build_object('id',match_item.id,
+                      'status',match_item.status,'started_at',match_item.started_at))
+                      FROM public.matches match_item WHERE match_item.round_id=round_item.id),'[]'::jsonb)) round
+           FROM public.fantasy_rounds fantasy_round
+           JOIN public.fantasy_seasons fantasy_season ON fantasy_season.id=fantasy_round.fantasy_season_id
+           JOIN public.seasons core ON core.id=fantasy_season.season_id AND core.status='active'
+           JOIN public.rounds round_item ON round_item.id=fantasy_round.round_id
+           WHERE fantasy_season.league_id=$1::uuid AND round_item.id=$2::uuid`, [leagueId, roundId]),
+      ]);
+      const fantasyRound = fantasyRoundResult.rows[0];
+      if (!fantasyRound) return null;
+      const lineupResult = await client.query<any>(
+        `SELECT lineup.*,
+                COALESCE(jsonb_agg(to_jsonb(item) || jsonb_build_object('players',
+                  jsonb_build_object('name',player.name,'avatar_url',player.avatar_url))
+                  ORDER BY item.created_at) FILTER (WHERE item.id IS NOT NULL),'[]'::jsonb) fantasy_lineup_players
+         FROM public.fantasy_lineups lineup
          LEFT JOIN public.fantasy_lineup_players item ON item.lineup_id=lineup.id
          LEFT JOIN public.players player ON player.id=item.player_id
-         WHERE season.league_id=$1 AND lineup.user_id=$2 AND round_item.id=$3
-         GROUP BY lineup.id, round_item.id, round_item.number, fantasy_round.settings_snapshot`, [leagueId, userId, roundId]);
-      const row = result.rows[0];
-      return row ? { userId: row.user_id, roundId: row.round_id, roundNumber: Number(row.number), score: Number(row.total_points),
-        captainPlayerId: row.captain_player_id, captainMultiplier: Number(row.captain_multiplier), slots: row.slots || [] } : null;
+         WHERE lineup.fantasy_round_id=$1::uuid AND lineup.user_id=$2::uuid
+         GROUP BY lineup.id`, [fantasyRound.id, userId]);
+      const storedLineup = lineupResult.rows[0];
+      if (!storedLineup) return null;
+      const playerIds = (storedLineup.fantasy_lineup_players || []).map((item: any) => item.player_id);
+      const [stats, prices, predictions, activation] = await Promise.all([
+        playerIds.length ? client.query<any>(
+          `SELECT player_id,games,goals,assists,wins,draws,losses,own_goals,goalkeeper_games,
+                  goalkeeper_goals,goalkeeper_assists,goalkeeper_own_goals,goalkeeper_wins,
+                  goalkeeper_draws,goalkeeper_losses,clean_sheets,goals_conceded,
+                  defensive_clean_games,defensive_one_goal_games,team_goals_conceded
+           FROM public.player_round_stats WHERE round_id=$1::uuid AND player_id=ANY($2::uuid[])`, [roundId, playerIds])
+          : Promise.resolve({ rows: [] }),
+        playerIds.length ? client.query<any>(
+          `SELECT player_id,price_before,price_after,price_change
+           FROM public.fantasy_player_price_history
+           WHERE fantasy_round_id=$1::uuid AND player_id=ANY($2::uuid[])`, [fantasyRound.id, playerIds])
+          : Promise.resolve({ rows: [] }),
+        client.query<any>(
+          `SELECT id,name,avatar_url FROM public.players
+           WHERE id=ANY($1::uuid[])`, [[storedLineup.top_scorer_player_id, storedLineup.top_assist_player_id].filter(Boolean)]),
+        client.query<any>(
+          `SELECT activation.status,activation.result_bonus,activation.result_details,
+                  jsonb_build_object('name',card.name,'slug',card.slug,'rarity',card.rarity,'description',card.description) card
+           FROM public.fantasy_card_activations activation
+           LEFT JOIN public.fantasy_cards card ON card.id=activation.card_id
+           WHERE activation.round_id=$1::uuid AND activation.user_id=$2::uuid`, [roundId, userId]),
+      ]);
+      const pricesByPlayer = new Map(prices.rows.map((price: any) => [price.player_id, price]));
+      const players = (storedLineup.fantasy_lineup_players || []).map((item: any) => {
+        const price: any = pricesByPlayer.get(item.player_id);
+        return { ...item, price_after: price?.price_after ?? item.price_after,
+          price_change: price?.price_change ?? (item.price_after == null ? null : Number(item.price_after)-Number(item.price_locked||0)) };
+      });
+      const playerPoints = players.length
+        ? players.reduce((total: number, item: any) => total + Number(item.total_points || 0), 0)
+        : Number(storedLineup.player_points ?? storedLineup.total_points ?? 0);
+      const directActivation = activation.rows[0], directCard = directActivation?.card;
+      const historyLineup = history?.lineups?.find((item: any) => item.fantasyRound?.round_id === roundId);
+      return {
+        history: history || { player: null },
+        lineup: { ...storedLineup, player_points: playerPoints,
+          total_points: Number(storedLineup.total_points ?? playerPoints), fantasy_lineup_players: players },
+        round: fantasyRound.round, isLive: false,
+        scoringVersion: Number(fantasyRound.settings_snapshot?.scoring_version ?? fantasyRound.scoring_version ?? 5),
+        settingsSnapshot: fantasyRound.settings_snapshot || {},
+        statsByPlayer: Object.fromEntries(stats.rows.map((stat: any) => [stat.player_id, stat])),
+        predictionPlayers: Object.fromEntries(predictions.rows.map((player: any) => [player.id, player])),
+        activeCard: directCard ? { ...directCard, status: directActivation.status,
+          bonus: Number(directActivation.result_bonus || 0), details: directActivation.result_details || null }
+          : historyLineup?.activeCard || null,
+      };
     });
+  }
+
+  private async readUserHistory(client: PoolClient, leagueId: string, userId: string): Promise<FantasyUserHistoryReadModel | null> {
+    const [profile, account, lineups] = await Promise.all([
+      client.query<any>(
+        `SELECT profile.user_id,jsonb_build_object('name',player.name,'avatar_url',player.avatar_url) players
+         FROM public.account_profiles profile JOIN public.players player ON player.id=profile.player_id
+         JOIN public.league_members member ON member.player_id=player.id AND member.league_id=$1::uuid AND member.is_active
+         WHERE profile.user_id=$2::uuid LIMIT 1`, [leagueId, userId]),
+      client.query<any>(
+        `SELECT account.total_points,account.current_budget,account.rounds_played,account.best_round_points
+         FROM public.fantasy_accounts account
+         JOIN public.fantasy_seasons fantasy_season ON fantasy_season.id=account.fantasy_season_id
+         JOIN public.seasons core ON core.id=fantasy_season.season_id AND core.status='active'
+         WHERE fantasy_season.league_id=$1::uuid AND account.user_id=$2::uuid LIMIT 1`, [leagueId, userId]),
+      client.query<any>(
+        `SELECT lineup.*,
+                jsonb_build_object('round_id',fantasy_round.round_id,'market_status',fantasy_round.market_status,
+                  'settings_snapshot',fantasy_round.settings_snapshot) fantasy_round,
+                jsonb_build_object('number',round_item.number,'date',round_item.date,'status',round_item.status) round
+         FROM public.fantasy_lineups lineup
+         JOIN public.fantasy_rounds fantasy_round ON fantasy_round.id=lineup.fantasy_round_id
+         JOIN public.fantasy_seasons fantasy_season ON fantasy_season.id=fantasy_round.fantasy_season_id
+         JOIN public.seasons core ON core.id=fantasy_season.season_id AND core.status='active'
+         JOIN public.rounds round_item ON round_item.id=fantasy_round.round_id
+         WHERE fantasy_season.league_id=$1::uuid AND lineup.user_id=$2::uuid AND lineup.status='scored'
+         ORDER BY lineup.created_at DESC`, [leagueId, userId]),
+    ]);
+    if (!profile.rows[0] || !account.rows[0]) return null;
+    const roundIds = lineups.rows.map((lineup: any) => lineup.fantasy_round?.round_id).filter(Boolean);
+    const activations = roundIds.length ? await client.query<any>(
+      `SELECT activation.round_id,activation.status,activation.result_bonus,activation.result_details,
+              jsonb_build_object('name',card.name,'slug',card.slug,'rarity',card.rarity,'description',card.description) card
+       FROM public.fantasy_card_activations activation
+       LEFT JOIN public.fantasy_cards card ON card.id=activation.card_id
+       WHERE activation.user_id=$1::uuid AND activation.round_id=ANY($2::uuid[])`, [userId, roundIds]) : { rows: [] };
+    const cardByRound = new Map(activations.rows.map((item: any) => [item.round_id, item]));
+    const fantasyAccount = account.rows[0];
+    return { userId, player: profile.rows[0].players,
+      account: { totalPoints:Number(fantasyAccount.total_points||0), currentBudget:Number(fantasyAccount.current_budget||0),
+        roundsPlayed:Number(fantasyAccount.rounds_played||0), bestRoundPoints:Number(fantasyAccount.best_round_points||0) },
+      lineups: lineups.rows.map((lineup: any) => { const activation:any=cardByRound.get(lineup.fantasy_round?.round_id);
+        return { ...lineup, fantasyRound:lineup.fantasy_round, round:lineup.round,
+          activeCard:activation?.card?{...activation.card,status:activation.status,bonus:Number(activation.result_bonus||0),details:activation.result_details||null}:null }; }) };
   }
 
   async getSeasonPassDashboard(leagueId: string, userId: string): Promise<SeasonPassDashboardData> {

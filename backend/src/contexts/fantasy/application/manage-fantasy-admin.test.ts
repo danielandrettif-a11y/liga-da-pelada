@@ -12,9 +12,9 @@ describe("Application: ManageFantasyAdminUseCase", () => {
 
   const createMockRepo = (overrides: Partial<FantasyAdminRepository> = {}): FantasyAdminRepository => ({
     isLeagueAdmin: vi.fn().mockImplementation(async (_lId, uId) => uId === "admin-1"),
-    getRankingRawEntries: vi.fn().mockResolvedValue([
-      { userId: "u1", userName: "Alice", userAvatarUrl: null, totalPoints: 100, patrimony: 100, lastRoundPoints: 10, lineupsCount: 2 },
-      { userId: "u2", userName: "Bob", userAvatarUrl: null, totalPoints: 150, patrimony: 110, lastRoundPoints: 20, lineupsCount: 2 },
+    getRanking: vi.fn().mockResolvedValue([
+      { user_id: "u2", total_points: 150, position: 1 },
+      { user_id: "u1", total_points: 100, position: 2 },
     ]),
     getUserHistory: vi.fn().mockResolvedValue([]),
     getUserRoundHistory: vi.fn().mockResolvedValue({
@@ -55,15 +55,14 @@ describe("Application: ManageFantasyAdminUseCase", () => {
     ...overrides,
   });
 
-  it("returns sorted ranking with positions", async () => {
+  it("delegates the canonical ranking read model", async () => {
     const repo = createMockRepo();
     const useCase = new ManageFantasyAdminUseCase(repo);
 
     const ranking = await useCase.getRanking(userActor, leagueId);
-    expect(ranking[0].userId).toBe("u2");
-    expect(ranking[0].rank).toBe(1);
-    expect(ranking[1].userId).toBe("u1");
-    expect(ranking[1].rank).toBe(2);
+    expect(ranking[0].user_id).toBe("u2");
+    expect(ranking[0].position).toBe(1);
+    expect(repo.getRanking).toHaveBeenCalledWith(leagueId, "season", userActor.userId, undefined);
   });
 
   it("blocks getAdminData for non-admin", async () => {

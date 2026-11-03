@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 import { withAuthenticatedTransaction } from "../../../infrastructure/authenticated-transaction.js";
 import type { FantasyMarketLineupRepository } from "../application/manage-market-lineup.js";
+import type { FantasyRankingReadModel } from "../domain/analytical-read-models.js";
 import type {
   FantasyMarketDashboardData,
   FantasyMarketPlayerSummary,
@@ -177,19 +178,57 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
     });
   }
 
-  async getMySummary(leagueId: string, userId: string): Promise<FantasyUserSummary | null> {
+  async getMySummary(leagueId: string, userId: string): Promise<FantasyRankingReadModel | null> {
     return this.withUser(userId, async (client) => {
       const result = await client.query<any>(
-        `WITH ranked AS (SELECT account.*, dense_rank() OVER (ORDER BY account.total_points DESC) season_rank
-          FROM public.fantasy_accounts account JOIN public.fantasy_seasons season ON season.id = account.fantasy_season_id
-          WHERE season.league_id = $1)
-         SELECT ranked.*, (SELECT count(*) FROM public.fantasy_lineups lineup
-           JOIN public.fantasy_rounds round_item ON round_item.id = lineup.fantasy_round_id
-           WHERE round_item.fantasy_season_id = ranked.fantasy_season_id AND lineup.user_id = ranked.user_id) lineups_count
-         FROM ranked WHERE user_id = $2`, [leagueId, userId]);
+        `WITH active_season AS (
+           SELECT fantasy_season.id FROM public.fantasy_seasons fantasy_season
+           JOIN public.seasons core ON core.id=fantasy_season.season_id AND core.status='active'
+           WHERE fantasy_season.league_id=$1::uuid LIMIT 1
+         ), lineup_metrics AS (
+           SELECT lineup.user_id,sum(COALESCE(lineup.total_points,0)) total_points,count(*)::int rounds_played,
+             max(COALESCE(lineup.total_points,0)) best_round_points
+           FROM public.fantasy_lineups lineup JOIN public.fantasy_rounds fantasy_round ON fantasy_round.id=lineup.fantasy_round_id
+           WHERE fantasy_round.fantasy_season_id=(SELECT id FROM active_season) AND lineup.status='scored'
+           GROUP BY lineup.user_id
+         ), player_metrics AS (
+           SELECT lineup.user_id,sum(COALESCE(item.captain_bonus,0)) captain_bonus_points,
+             sum(COALESCE(item.total_points,0)) FILTER (WHERE item.slot_role='DEF') def_points,
+             sum(COALESCE(item.total_points,0)) FILTER (WHERE item.slot_role IN ('ATA','MEI')) attack_points,
+             count(item.id)::int FILTER (WHERE item.slot_role IN ('ATA','MEI')) attack_selection_count
+           FROM public.fantasy_lineups lineup JOIN public.fantasy_rounds fantasy_round ON fantasy_round.id=lineup.fantasy_round_id
+           JOIN public.fantasy_lineup_players item ON item.lineup_id=lineup.id
+           WHERE fantasy_round.fantasy_season_id=(SELECT id FROM active_season) AND lineup.status='scored'
+           GROUP BY lineup.user_id
+         ), ranking AS (
+           SELECT account.id,account.user_id,COALESCE(lineup_metrics.total_points,0) total_points,
+             COALESCE(lineup_metrics.rounds_played,0) rounds_played,COALESCE(lineup_metrics.best_round_points,0) best_round_points,
+             COALESCE(player_metrics.captain_bonus_points,0) captain_bonus_points,
+             COALESCE(player_metrics.def_points,0) def_points,0::numeric mid_points,0::int mid_selection_count,
+             0::numeric mid_average_points,COALESCE(player_metrics.attack_points,0) attack_points,
+             COALESCE(player_metrics.attack_selection_count,0) attack_selection_count,
+             COALESCE(player_metrics.attack_points,0)/greatest(1,COALESCE(player_metrics.attack_selection_count,0)) attack_average_points,
+             COALESCE(account.current_budget,0) current_budget,false is_live,
+             dense_rank() OVER (ORDER BY COALESCE(lineup_metrics.total_points,0) DESC) position
+           FROM public.fantasy_accounts account LEFT JOIN lineup_metrics ON lineup_metrics.user_id=account.user_id
+           LEFT JOIN player_metrics ON player_metrics.user_id=account.user_id
+           WHERE account.fantasy_season_id=(SELECT id FROM active_season)
+         )
+         SELECT ranking.*,jsonb_build_object('name',player.name,'avatar_url',player.avatar_url) player,
+           CASE WHEN loadout.user_id IS NULL THEN NULL ELSE jsonb_build_object(
+             'frameKey',frame.asset_key,'auraKey',aura.asset_key,'nameplateKey',nameplate.asset_key,
+             'titleName',title.name,'backgroundAssetKey',background.asset_key) END cosmetics,NULL::jsonb "roundCard"
+         FROM ranking LEFT JOIN public.account_profiles profile ON profile.user_id=ranking.user_id
+         LEFT JOIN public.players player ON player.id=profile.player_id
+         LEFT JOIN public.account_cosmetic_loadouts loadout ON loadout.user_id=ranking.user_id
+         LEFT JOIN public.fantasy_cosmetics frame ON frame.id=loadout.frame_cosmetic_id
+         LEFT JOIN public.fantasy_cosmetics aura ON aura.id=loadout.aura_cosmetic_id
+         LEFT JOIN public.fantasy_cosmetics nameplate ON nameplate.id=loadout.nameplate_cosmetic_id
+         LEFT JOIN public.fantasy_cosmetics title ON title.id=loadout.title_cosmetic_id
+         LEFT JOIN public.fantasy_cosmetics background ON background.id=loadout.background_cosmetic_id
+         WHERE ranking.user_id=$2::uuid`, [leagueId, userId]);
       const row = result.rows[0];
-      return row ? { userId, totalPoints: Number(row.total_points), seasonRank: Number(row.season_rank),
-        patrimony: Number(row.current_budget), lineupsCount: Number(row.lineups_count) } : null;
+      return row || null;
     });
   }
 
@@ -228,33 +267,154 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
 
   async getRevealedLineups(leagueId: string, userId: string, roundId?: string) {
     return this.withUser(userId, async (client) => {
-      if (!roundId) return { allowed: true, lineups: [] };
       const round = await client.query<any>(
-        `SELECT fantasy_round.id, fantasy_round.market_status FROM public.fantasy_rounds fantasy_round
+        `SELECT fantasy_round.id, fantasy_round.market_status,round_item.id round_id,
+                round_item.number,round_item.date,round_item.status
+         FROM public.fantasy_rounds fantasy_round
          JOIN public.rounds round_item ON round_item.id = fantasy_round.round_id
-         WHERE round_item.id = $1 AND round_item.league_id = $2`, [roundId, leagueId]);
+         JOIN public.fantasy_seasons fantasy_season ON fantasy_season.id=fantasy_round.fantasy_season_id
+         JOIN public.seasons core ON core.id=fantasy_season.season_id AND core.status='active'
+         WHERE round_item.league_id=$1::uuid AND ($2::uuid IS NULL OR round_item.id=$2::uuid)
+         ORDER BY CASE WHEN round_item.status<>'finished' AND fantasy_round.market_status IN ('open','in_progress') THEN 0 ELSE 1 END,
+           round_item.date DESC,round_item.number DESC LIMIT 1`, [leagueId, roundId && roundId !== "active" ? roundId : null]);
       if (!round.rows[0]) return { allowed: false, error: "Rodada não encontrada.", lineups: [] };
-      if (round.rows[0].market_status === "open") return { allowed: false,
-        error: "As escalações só podem ser visualizadas após o fechamento do mercado.", lineups: [] };
+      const target=round.rows[0];
+      if (target.market_status === "open" && target.status !== "finished") return { allowed:false,isMarketOpen:true,
+        error:"As escalações só são reveladas após o fechamento do mercado (início da primeira partida).",lineups:[] };
       const lineups = await client.query<any>(
-        `SELECT lineup.*, COALESCE(jsonb_agg(jsonb_build_object('slotRole', item.slot_role, 'playerId', item.player_id,
-          'score', item.total_points) ORDER BY item.created_at) FILTER (WHERE item.id IS NOT NULL), '[]'::jsonb) slots
-         FROM public.fantasy_lineups lineup LEFT JOIN public.fantasy_lineup_players item ON item.lineup_id = lineup.id
-         WHERE lineup.fantasy_round_id = $1 GROUP BY lineup.id`, [round.rows[0].id]);
-      return { allowed: true, lineups: lineups.rows };
+        `SELECT lineup.*,
+          jsonb_build_object('name',profile_player.name,'avatar_url',profile_player.avatar_url) profile,
+          COALESCE(jsonb_agg(to_jsonb(item) ORDER BY item.slot_index)
+            FILTER(WHERE item.id IS NOT NULL),'[]'::jsonb) players,
+          COALESCE((SELECT jsonb_agg(to_jsonb(reserve)) FROM public.fantasy_lineup_reserves reserve
+            WHERE reserve.lineup_id=lineup.id),'[]'::jsonb) reserves
+         FROM public.fantasy_lineups lineup
+         LEFT JOIN public.fantasy_lineup_players item ON item.lineup_id=lineup.id
+         LEFT JOIN public.account_profiles profile ON profile.user_id=lineup.user_id
+         LEFT JOIN public.players profile_player ON profile_player.id=profile.player_id
+         WHERE lineup.fantasy_round_id=$1::uuid
+         GROUP BY lineup.id,profile_player.id`, [target.id]);
+      const usable=lineups.rows.filter((lineup:any)=>lineup.players?.length>0);
+      const playerIds=[...new Set(usable.flatMap((item:any)=>item.players.map((player:any)=>player.player_id)))] as string[];
+      const predictionIds=[...new Set(usable.flatMap((item:any)=>[item.top_scorer_player_id,item.top_assist_player_id,item.challenge_player_id].filter(Boolean)))] as string[];
+      const [prices,predictions,activations]=await Promise.all([
+        playerIds.length?client.query<any>(`SELECT player_id,price_before,price_after,price_change FROM public.fantasy_player_price_history
+          WHERE fantasy_round_id=$1::uuid AND player_id=ANY($2::uuid[])`,[target.id,playerIds]):Promise.resolve({rows:[]}),
+        predictionIds.length?client.query<any>("SELECT id,name,avatar_url FROM public.players WHERE id=ANY($1::uuid[])",[predictionIds]):Promise.resolve({rows:[]}),
+        usable.length?client.query<any>(`SELECT activation.user_id,activation.status,activation.result_bonus,activation.result_details,
+          card.name,card.slug,card.rarity FROM public.fantasy_card_activations activation
+          LEFT JOIN public.fantasy_cards card ON card.id=activation.card_id
+          WHERE activation.round_id=$1::uuid AND activation.user_id=ANY($2::uuid[])`,[target.round_id,usable.map((item:any)=>item.user_id)]):Promise.resolve({rows:[]}),
+      ]);
+      const priceByPlayer=new Map(prices.rows.map((item:any)=>[item.player_id,item]));
+      const predictionById=new Map(predictions.rows.map((item:any)=>[item.id,item]));
+      const activationByUser=new Map(activations.rows.map((item:any)=>[item.user_id,item]));
+      const revealed=usable.map((lineup:any)=>{
+        const activation:any=activationByUser.get(lineup.user_id),details=activation?.result_details||{};
+        const pending=["RESERVED","LOCKED"].includes(String(activation?.status||"").toUpperCase());
+        const monetary=Number(details.budgetRecovery||0)>0||Number(details.discountAmount||0)>0||Number(details.discountPercent||0)>0
+          ||activation?.slug==="bargain"||activation?.slug==="extra_credit"||Number(details.budgetBonus||0)>0;
+        const cardPoints=activation&&!pending&&!monetary?Math.max(Number(activation.result_bonus||0),Number(lineup.score_breakdown?.cardBonus||0)):0;
+        const reserve=lineup.reserves?.[0]||null;
+        const playerPoints=lineup.players.reduce((total:number,item:any)=>total+Number(item.total_points||0),0)+Number(reserve?.points_gain||0);
+        const named=(id:string|null)=>{const player:any=id?predictionById.get(id):null;return player?{id:player.id,name:player.name}:null;};
+        return {lineupId:lineup.id,userId:lineup.user_id,isCurrentUser:lineup.user_id===userId,
+          userName:lineup.profile?.name||"Cartoleiro",userAvatarUrl:lineup.profile?.avatar_url||null,
+          totalPoints:playerPoints+cardPoints,playerPoints,predictionPoints:Number(lineup.prediction_points||0),
+          position:lineup.round_position||null,captainId:lineup.captain_player_id,
+          topScorer:named(lineup.top_scorer_player_id),topAssist:named(lineup.top_assist_player_id),challengePlayer:named(lineup.challenge_player_id),
+          reserve:reserve?{playerId:reserve.player_id,name:reserve.player_name_locked||"Reserva",avatarUrl:reserve.avatar_url_locked||null,
+            slotRole:reserve.slot_role,basePoints:Number(reserve.base_points||0),applied:Boolean(reserve.applied),
+            replacedPlayerId:reserve.replaced_player_id||null,pointsGain:Number(reserve.points_gain||0)}:null,
+          activeCard:activation?{name:activation.name,slug:activation.slug,rarity:activation.rarity,status:activation.status,
+            bonus:Number(activation.result_bonus||0),details,fallbackBonus:Number(lineup.score_breakdown?.cardBonus||0)}:null,
+          players:lineup.players.map((item:any)=>{const price:any=priceByPlayer.get(item.player_id);return{playerId:item.player_id,
+            name:item.player_name_locked||"Jogador",avatarUrl:item.avatar_url_locked||null,slotRole:item.slot_role||null,
+            isCaptain:item.player_id===lineup.captain_player_id,priceLocked:Number(item.price_locked||0),
+            priceAfter:price?.price_after!=null?Number(price.price_after):item.price_after!=null?Number(item.price_after):null,
+            priceChange:price?.price_change!=null?Number(price.price_change):item.price_after!=null?Number(item.price_after)-Number(item.price_locked||0):null,
+            basePoints:Number(item.base_points||0),positionBonus:Number(item.position_bonus||0),captainBonus:Number(item.captain_bonus||0),
+            points:Number(item.total_points||0)};})};});
+      revealed.sort((a:any,b:any)=>b.totalPoints-a.totalPoints);
+      return {allowed:true,isMarketOpen:false,roundNumber:Number(target.number),roundDate:target.date,lineups:revealed};
     });
   }
 
   async getRoundLineupOverview(leagueId: string, userId: string, roundId?: string): Promise<FantasyRoundOverview> {
     return this.withUser(userId, async (client) => {
-      if (!roundId) return { roundId: "", isRoundOpen: false, confirmedCount: 0, revealedLineupsCount: 0 };
       const result = await client.query<any>(
-        `SELECT fantasy_round.market_status, count(lineup.id)::int confirmed_count
-         FROM public.fantasy_rounds fantasy_round JOIN public.rounds round_item ON round_item.id = fantasy_round.round_id
-         LEFT JOIN public.fantasy_lineups lineup ON lineup.fantasy_round_id = fantasy_round.id
-         WHERE round_item.id = $1 AND round_item.league_id = $2 GROUP BY fantasy_round.id`, [roundId, leagueId]);
-      const row = result.rows[0]; const count = Number(row?.confirmed_count || 0); const open = row?.market_status === "open";
-      return { roundId, isRoundOpen: open, confirmedCount: count, revealedLineupsCount: open ? 0 : count };
+        `SELECT fantasy_round.id,fantasy_round.market_status,round_item.id round_id,round_item.number,
+                round_item.date,round_item.status,
+                EXISTS(SELECT 1 FROM public.matches match_item WHERE match_item.round_id=round_item.id
+                  AND (match_item.started_at IS NOT NULL OR match_item.status IN ('live','finished'))) has_started
+         FROM public.fantasy_rounds fantasy_round JOIN public.rounds round_item ON round_item.id=fantasy_round.round_id
+         JOIN public.fantasy_seasons fantasy_season ON fantasy_season.id=fantasy_round.fantasy_season_id
+         JOIN public.seasons core ON core.id=fantasy_season.season_id AND core.status='active'
+         WHERE round_item.league_id=$1::uuid AND ($2::uuid IS NULL OR round_item.id=$2::uuid)
+         ORDER BY CASE WHEN round_item.status<>'finished' AND fantasy_round.market_status IN ('open','in_progress') THEN 0 ELSE 1 END,
+           round_item.date DESC,round_item.number DESC LIMIT 1`, [leagueId,roundId&&roundId!=="active"?roundId:null]);
+      const row=result.rows[0];
+      const empty={isRoundOpen:false,confirmedCount:0,pendingCount:0,confirmed:[],pending:[],ranking:[]};
+      if(!row)return empty as any;
+      const isRoundOpen=row.market_status==="open"&&!row.has_started&&row.status!=="finished";
+      if(!isRoundOpen){
+        const rankingRows=await client.query<any>(
+          `SELECT lineup.id,lineup.user_id,lineup.total_points,lineup.budget_after current_budget,1 rounds_played,false is_live,
+                  lineup.score_breakdown,jsonb_build_object('name',player.name,'avatar_url',player.avatar_url) player,
+                  CASE WHEN loadout.user_id IS NULL THEN NULL ELSE jsonb_build_object('frameKey',frame.asset_key,
+                    'auraKey',aura.asset_key,'nameplateKey',nameplate.asset_key,'titleName',title.name,
+                    'backgroundAssetKey',background.asset_key) END cosmetics,
+                  CASE WHEN card.id IS NULL THEN NULL ELSE jsonb_build_object('slug',card.slug,'name',card.name,
+                    'rarity',card.rarity,'bonus',COALESCE(activation.result_bonus,0),'budgetRecovery',
+                    COALESCE((activation.result_details->>'budgetRecovery')::numeric,0),'description',activation.result_details->>'description',
+                    'status',activation.status,'details',COALESCE(activation.result_details,'{}'::jsonb),
+                    'fallbackBonus',COALESCE((lineup.score_breakdown->>'cardBonus')::numeric,0)) END "roundCard"
+           FROM public.fantasy_lineups lineup
+           LEFT JOIN public.account_profiles profile ON profile.user_id=lineup.user_id
+           LEFT JOIN public.players player ON player.id=profile.player_id
+           LEFT JOIN public.account_cosmetic_loadouts loadout ON loadout.user_id=lineup.user_id
+           LEFT JOIN public.fantasy_cosmetics frame ON frame.id=loadout.frame_cosmetic_id
+           LEFT JOIN public.fantasy_cosmetics aura ON aura.id=loadout.aura_cosmetic_id
+           LEFT JOIN public.fantasy_cosmetics nameplate ON nameplate.id=loadout.nameplate_cosmetic_id
+           LEFT JOIN public.fantasy_cosmetics title ON title.id=loadout.title_cosmetic_id
+           LEFT JOIN public.fantasy_cosmetics background ON background.id=loadout.background_cosmetic_id
+           LEFT JOIN public.fantasy_card_activations activation ON activation.user_id=lineup.user_id AND activation.round_id=$2::uuid
+           LEFT JOIN public.fantasy_cards card ON card.id=activation.card_id
+           WHERE lineup.fantasy_round_id=$1::uuid`,[row.id,row.round_id]);
+        const ordered=rankingRows.rows.map((item:any)=>{const card=item.roundCard,details=card?.details||{};
+          const pending=["RESERVED","LOCKED"].includes(String(card?.status||"").toUpperCase());
+          const monetary=Number(details.budgetRecovery||0)>0||Number(details.discountAmount||0)>0||Number(details.discountPercent||0)>0
+            ||card?.slug==="bargain"||card?.slug==="extra_credit"||Number(details.budgetBonus||0)>0;
+          const cardPoints=card&&!pending&&!monetary?Math.max(Number(card.bonus||0),Number(card.fallbackBonus||0)):0;
+          return{...item,total_points:Number(item.total_points||0)+cardPoints};}).sort((a:any,b:any)=>b.total_points-a.total_points);
+        let previousPoints:number|null=null,previousPosition=0;
+        const ranking=ordered.map((item:any,index:number)=>{const points=Number(item.total_points||0);
+          const position=previousPoints===points?previousPosition:index+1;previousPoints=points;previousPosition=position;
+          return{...item,position};});
+        return{isRoundOpen:false,roundNumber:Number(row.number),roundDate:row.date,roundId:row.round_id,
+          confirmedCount:ranking.length,pendingCount:0,confirmed:[],pending:[],ranking} as any;
+      }
+      const accounts=await client.query<any>(
+        `SELECT account.user_id,lineup.created_at saved_at,lineup.total_points,
+                jsonb_build_object('name',player.name,'avatar_url',player.avatar_url) player,
+                CASE WHEN loadout.user_id IS NULL THEN NULL ELSE jsonb_build_object('frameKey',frame.asset_key,
+                  'auraKey',aura.asset_key,'backgroundAssetKey',background.asset_key) END cosmetics
+         FROM public.fantasy_accounts account
+         JOIN public.fantasy_seasons fantasy_season ON fantasy_season.id=account.fantasy_season_id
+         LEFT JOIN public.fantasy_lineups lineup ON lineup.user_id=account.user_id AND lineup.fantasy_round_id=$2::uuid
+         LEFT JOIN public.account_profiles profile ON profile.user_id=account.user_id
+         LEFT JOIN public.players player ON player.id=profile.player_id
+         LEFT JOIN public.account_cosmetic_loadouts loadout ON loadout.user_id=account.user_id
+         LEFT JOIN public.fantasy_cosmetics frame ON frame.id=loadout.frame_cosmetic_id
+         LEFT JOIN public.fantasy_cosmetics aura ON aura.id=loadout.aura_cosmetic_id
+         LEFT JOIN public.fantasy_cosmetics background ON background.id=loadout.background_cosmetic_id
+         WHERE fantasy_season.league_id=$1::uuid`,[leagueId,row.id]);
+      const entries=accounts.rows.map((item:any)=>({userId:item.user_id,playerName:item.player?.name||"Cartoleiro",
+        avatarUrl:item.player?.avatar_url||null,hasSaved:Boolean(item.saved_at),savedAt:item.saved_at||null,points:null,
+        isCurrentUser:item.user_id===userId,cosmetics:item.cosmetics||null}));
+      const confirmed=entries.filter((item:any)=>item.hasSaved),pending=entries.filter((item:any)=>!item.hasSaved);
+      return{isRoundOpen:true,roundNumber:Number(row.number),roundDate:row.date,roundId:row.round_id,
+        confirmedCount:confirmed.length,pendingCount:pending.length,confirmed,pending,ranking:[]} as any;
     });
   }
 

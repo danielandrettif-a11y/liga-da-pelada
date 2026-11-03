@@ -1,38 +1,31 @@
 import type { Actor } from "../../../shared/actor.js";
+import type {
+  FantasyRankingReadModel,
+  FantasyUserHistoryReadModel,
+  FantasyUserRoundHistoryReadModel,
+} from "../domain/analytical-read-models.js";
 import {
   buildFantasySettingsPayload,
-  sortFantasyRankingEntries,
   type FantasyAdminConfigData,
-  type FantasyRankingEntry,
   type FantasyRankingScope,
-  type FantasyUserRoundHistoryDetail,
   type SeasonPassDashboardData,
 } from "../domain/fantasy-admin.js";
-import type { UserFantasyHistoryEntry } from "../domain/market-lineup.js";
 
 export interface FantasyAdminRepository {
   isLeagueAdmin(leagueId: string, userId: string): Promise<boolean>;
-  getRankingRawEntries(
+  getRanking(
     leagueId: string,
     scope: FantasyRankingScope,
     actorUserId: string,
     roundId?: string
-  ): Promise<Array<{
-    userId: string;
-    userName: string;
-    userAvatarUrl: string | null;
-    totalPoints: number;
-    patrimony: number;
-    lastRoundPoints: number | null;
-    lineupsCount: number;
-  }>>;
-  getUserHistory(leagueId: string, userId: string, actorUserId: string): Promise<UserFantasyHistoryEntry[]>;
+  ): Promise<FantasyRankingReadModel[]>;
+  getUserHistory(leagueId: string, userId: string, actorUserId: string): Promise<FantasyUserHistoryReadModel | null>;
   getUserRoundHistory(
     leagueId: string,
     userId: string,
     roundId: string,
     actorUserId: string
-  ): Promise<FantasyUserRoundHistoryDetail | null>;
+  ): Promise<FantasyUserRoundHistoryReadModel | null>;
   getSeasonPassDashboard(leagueId: string, userId: string): Promise<SeasonPassDashboardData>;
   getAdminData(leagueId: string, userId: string): Promise<FantasyAdminConfigData>;
   updateSettings(leagueId: string, settings: Record<string, number>, userId: string): Promise<{ success: boolean; error?: string }>;
@@ -56,16 +49,15 @@ export class ManageFantasyAdminUseCase {
     leagueId: string,
     scope: FantasyRankingScope = "season",
     roundId?: string
-  ): Promise<FantasyRankingEntry[]> {
-    const raw = await this.repo.getRankingRawEntries(leagueId, scope, actor.userId, roundId);
-    return sortFantasyRankingEntries(raw);
+  ): Promise<FantasyRankingReadModel[]> {
+    return this.repo.getRanking(leagueId, scope, actor.userId, roundId);
   }
 
   async getUserHistory(
     actor: Actor,
     leagueId: string,
     userId: string
-  ): Promise<UserFantasyHistoryEntry[]> {
+  ): Promise<FantasyUserHistoryReadModel | null> {
     return this.repo.getUserHistory(leagueId, userId, actor.userId);
   }
 
@@ -74,7 +66,7 @@ export class ManageFantasyAdminUseCase {
     leagueId: string,
     userId: string,
     roundId: string
-  ): Promise<FantasyUserRoundHistoryDetail | null> {
+  ): Promise<FantasyUserRoundHistoryReadModel | null> {
     return this.repo.getUserRoundHistory(leagueId, userId, roundId, actor.userId);
   }
 
