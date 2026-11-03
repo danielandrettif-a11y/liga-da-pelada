@@ -181,11 +181,11 @@ export function CallupAdminCard({
     setError("");
     const result = await createCallupPrelist(callup.id);
     if (!result.success) {
-      setError(result.error || "Não foi possível preparar a pré-lista.");
+      setError(result.error || "Não foi possível preparar a rodada.");
       setLoading(false);
       return;
     }
-    router.push(`/convocacao?callup=${callup.id}`);
+    router.push(`/admin/rodada?round=${result.roundId}&mount=1`);
   }
 
   async function copy() {
@@ -634,7 +634,7 @@ export function CallupAdminCard({
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-sm font-black text-background disabled:opacity-40"
             >
               <Lock className="h-4 w-4" />
-              {callup.round_id ? "Montar times" : "Preparar pré-lista"}
+              Montar times
             </button>
           </div>
         )}

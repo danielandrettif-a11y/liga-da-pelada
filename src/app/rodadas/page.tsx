@@ -1,6 +1,6 @@
 import { CalendarDays, CalendarPlus, ChevronRight, Users, Football } from "@/components/icons";
 import Link from "next/link";
-import { getAdminRoundPrelists, getRounds } from "@/lib/actions/rounds";
+import { getRounds } from "@/lib/actions/rounds";
 import { formatDateShort } from "@/lib/utils";
 import { getCurrentAccount } from "@/lib/auth";
 import { DeleteRoundButton } from "@/components/DeleteRoundButton";
@@ -43,25 +43,15 @@ export default async function RodadasPage({
     getAgendaCallups(),
     getSelectedLeague(),
   ]);
-  const [activeCallups, leagueConfig, stadiums, adminPrelists] = account.isAdmin
-    ? await Promise.all([getActiveCallups(), getLeagueConfig(), getStadiums(), getAdminRoundPrelists()])
-    : [[], null, [], []];
-  const visiblePrelists = adminPrelists || [];
-  const listedRoundIds = new Set([
-    ...rounds.map((round: any) => round.id),
-    ...visiblePrelists.map((prelist: any) => prelist.id),
-  ]);
+  const [activeCallups, leagueConfig, stadiums] = account.isAdmin
+    ? await Promise.all([getActiveCallups(), getLeagueConfig(), getStadiums()])
+    : [[], null, []];
+  const listedRoundIds = new Set(rounds.map((round: any) => round.id));
   const standaloneCallups = agendaCallups.filter((callup) =>
     isStandaloneCallupVisible(callup, listedRoundIds),
   );
   const agendaItems = [
     ...rounds.map((round: any) => ({ ...round, agendaKind: "round" as const })),
-    ...visiblePrelists.map((prelist: any) => ({
-      ...prelist,
-      agendaKind: "prelist" as const,
-      preparation_stage: "prelist",
-      matchesCount: 0,
-    })),
     ...standaloneCallups.map((callup) => ({
       ...callup,
       agendaKind: "callup" as const,
@@ -82,7 +72,6 @@ export default async function RodadasPage({
           <h1 className="text-xl font-bold text-foreground">Agenda e histórico</h1>
           <p className="text-xs text-muted mt-0.5">
             {rounds.length} rodadas registradas
-            {visiblePrelists.length > 0 ? ` · ${visiblePrelists.length} pré-lista${visiblePrelists.length === 1 ? "" : "s"} pronta${visiblePrelists.length === 1 ? "" : "s"}` : ""}
             {standaloneCallups.length > 0 ? ` · ${standaloneCallups.length} convocação${standaloneCallups.length === 1 ? "" : "ões"}` : ""}
           </p>
         </div>
@@ -116,7 +105,6 @@ export default async function RodadasPage({
       {/* Rounds List */}
       <div id="historico" className="scroll-mt-4 space-y-3">
         {agendaItems.map((round, index) => {
-          const isPrelist = round.agendaKind === "prelist";
           const isCallup = round.agendaKind === "callup";
           const roundTypeTheme = round.round_type === "friendly"
             ? {
@@ -131,16 +119,12 @@ export default async function RodadasPage({
                 text: "text-sky-300",
                 badge: "bg-sky-400/15",
               };
-          const useRoundTypeTheme = isPrelist || isCallup || round.status === "finished";
+          const useRoundTypeTheme = isCallup || round.status === "finished";
           const statusStyle = isCallup
             ? { label: round.status === "closed" ? "Encerrada" : round.status === "locked" ? "Lista fechada" : "Convocação aberta", bg: roundTypeTheme.badge, text: roundTypeTheme.text }
-            : isPrelist
-            ? { label: "Pré-lista", bg: roundTypeTheme.badge, text: roundTypeTheme.text }
             : STATUS_STYLES[round.status as keyof typeof STATUS_STYLES] || STATUS_STYLES.draft;
           const href = isCallup
             ? `/convocacao?callup=${round.id}`
-            : isPrelist
-            ? `/admin/rodada?round=${round.id}&mount=1`
             : `/rodadas/${round.id}`;
 
           const card = (
@@ -177,7 +161,6 @@ export default async function RodadasPage({
                       {round.playersCount > 0 && <span className="inline-flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{round.playersCount} jogadores</span>}
                       {round.matchesCount > 0 && <span className="inline-flex items-center gap-1.5"><Football className="h-3.5 w-3.5" />{round.matchesCount} partidas</span>}
                     </div>
-                    {isPrelist && <p className={`mt-2 flex items-center gap-1 text-[9px] font-black uppercase tracking-wide ${roundTypeTheme.text}`}>Pré-lista pronta · montar times e iniciar <ChevronRight className="h-3 w-3" /></p>}
                     {isCallup && <p className={`mt-2 flex items-center gap-1 text-[9px] font-black uppercase tracking-wide ${roundTypeTheme.text}`}>{round.status === "closed" ? "Convocação encerrada" : "Abrir lista de convocados"} {round.status !== "closed" && <ChevronRight className="h-3 w-3" />}</p>}
                   </div>
                   {account.isAdmin && !isCallup ? <div className="mr-10" /> : round.status !== "closed" && <ChevronRight className="w-5 h-5 text-muted flex-shrink-0" />}
