@@ -64,24 +64,35 @@ export type FantasyMarketDashboardData = {
 };
 
 export type FantasyPlayerPerformanceDetail = {
-  playerId: string;
-  name: string;
-  avatarUrl: string | null;
-  profile: string | null;
+  player: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+    profile: string | null;
+    memberCategory: string | null;
+  };
   price: number;
-  averagePoints: number;
   totalPoints: number;
-  matchesPlayed: number;
-  goals: number;
-  assists: number;
-  cleanSheets: number;
-  formLevel: "hot" | "warm" | "cold";
-  recentRounds: Array<{
-    roundId: string;
-    roundNumber: number;
-    score: number;
-    priceVariation: number;
-  }>;
+  roundsPlayed: number;
+  averagePoints: number;
+  stats: Record<string, number>;
+  trend: string;
+  trendLabel: string;
+  trendIcon: string;
+  form: string;
+  formLabel: string;
+  formIcon: string;
+  formColorClass: string;
+  costBenefitScore: number;
+  costBenefitRatio: number;
+  costBenefitFormatted: string;
+  expectedPoints: number;
+  recentPointsList: number[];
+  allTags: unknown[];
+  compactTags: unknown[];
+  history: Array<Record<string, unknown>>;
+  roundDetail: Record<string, unknown> | null;
+  cosmetics: { bannerAssetKey: string | null; frameKey: string | null };
 };
 
 export type FantasyMarketQuickHighlights = {

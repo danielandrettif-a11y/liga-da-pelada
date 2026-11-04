@@ -25,13 +25,22 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Concluído nesta fase | Formato, abertura, pré-lista, edição, estado e participação extraídos; migrations 325 e 328 aplicadas e validadas em teste e oficial; isolamento entre duas peladas aprovado. |
 | Partidas e pontuação | 21/21 operações aceitas em revisão | Ciclo de vida, gols, goleiros, substituições e cronômetro extraídos. O cronômetro agenda QStash no backend, reivindica alertas de forma transacional e libera a reivindicação quando o Web Push falha. Ainda falta o ensaio móvel integrado com falhas de rede e dois ADMs para promover o contexto a verificado. |
-| Cartola e cosméticos | 30/33 operações aceitas | Cosméticos 11/11; Fantasy 19/22. Restam três projeções analíticas ricas antes de ativar `FANTASY_API_ENABLED`. |
+| Cartola e cosméticos | 32/33 operações aceitas | Cosméticos 11/11; Fantasy 21/22. Resta o dashboard composto antes de ativar `FANTASY_API_ENABLED`. |
 | Pagamentos | Concluído nesta fase | Itens, parcelas, PIX, rateio, obrigações, checklist e auditoria separados em domínio, aplicação e infraestrutura, mantendo RPCs e escopo por pelada. |
 | Notificações | Concluído nesta fase (16/16) | Inbox, preferências, push subscriptions, envio Web Push e e-mail Resend, agendamento QStash de lembretes do Cartola e alerta de cronômetro com 100% de paridade e fail-fast. |
-| Estatísticas e demais áreas | Concluído em revisão de código | Estatísticas 22/22 e todos os demais contextos, exceto as três projeções analíticas de Fantasy, estão aceitos. |
+| Estatísticas e demais áreas | Concluído em revisão de código | Estatísticas 22/22 e todos os demais contextos, exceto o dashboard composto de Fantasy, estão aceitos. |
 | Avaliação de tabela de acumulados | Medida no oficial; sem justificativa para criar | No banco oficial, `seasonStats`, `rankingHistory` e `playerHistory` ficaram em 128,51 ms, 119,62 ms e 99,64 ms no p95. Os gargalos estão nos enriquecimentos/RPCs compostas. Ver `reports/performance/BASELINE-2026-10-21.md`. |
 
 ## Registro de lotes
+
+### 2026-11-04 — ficha completa do atleta no backend modular
+
+- `getFantasyPlayerDetail` e seu alias público `getFantasyPlayerSummary` agora retornam o contrato rico consumido pelas duas interfaces: identidade, preço e patrimônio esportivo, histórico de mercado, tendência, forma, custo-benefício, tags, cosméticos e detalhe da rodada.
+- O detalhe da rodada reutiliza o domínio canônico para scouts e pontuação, preserva a vaga e o capitão do usuário, mantém a apuração persistida do goleiro em rodada encerrada e expõe breakdown de pontos, simulação da vaga GOL, partidas disputadas e regras vigentes no snapshot.
+- A infraestrutura resolve corretamente rodada corrente e rodada histórica pelo identificador de `fantasy_rounds`; estatísticas consolidadas substituem a projeção em rodadas encerradas, enquanto a rodada ativa usa eventos, participantes, goleiros e substituições carregados pela projeção compartilhada.
+- O smoke autenticado [`verify-local-fantasy-player-detail.sh`](../../scripts/verify-local-fantasy-player-detail.sh) chamou a ficha atual e a histórica contra o PostgreSQL 17 restaurado no WSL: **2/2 consultas responderam 200** e preservaram `history` e `roundDetail`.
+- Progresso conservador: **266/267 operações aceitas (99,6%)**, restando apenas `getFantasyDashboard`. `FANTASY_API_ENABLED` continua desligada porque o dashboard ainda precisa preservar mercado, radar, escalação, cartas, conta, boletim e projeção ao vivo em um único contrato.
+- Verificação: **707 testes backend em 182 arquivos**, **1.238 testes frontend em 237 arquivos**, typechecks, builds de produção, auditorias de arquitetura/contextos/migração e `git diff --check` aprovados.
 
 ### 2026-11-04 — cinco projeções analíticas de Fantasy aceitas
 

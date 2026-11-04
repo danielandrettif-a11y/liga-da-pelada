@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Pool } from "pg";
+import { DEFAULT_FANTASY_SETTINGS } from "../domain/config.js";
 import { PgFantasyMarketLineupRepository } from "./pg-market-lineup-repository.js";
 
 const mockReadLiveFantasyProjection = vi.hoisted(() => vi.fn());
@@ -76,6 +77,53 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
     expect(data.balance).toBe(100);
     expect(data.players.length).toBe(1);
     expect(data.confirmedCount).toBe(3);
+  });
+
+  it("returns the rich player detail contract with the selected round projection", async () => {
+    mockReadLiveFantasyProjection.mockResolvedValue({
+      roundId: "round-1", fantasyRoundId: "fantasy-round-1", isLive: true,
+      settings: DEFAULT_FANTASY_SETTINGS, matches: [],
+      byUserId: new Map([["user-1", { userId: "user-1", players: [{ playerId: "p1",
+        basePoints: 6, positionBonus: 1, captainBonus: 3.5, totalPoints: 10.5 }] }]]),
+      storedPlayersByUserId: new Map(),
+      statsByPlayer: new Map([["p1", { playerId: "p1", playerProfile: "offensive", games: 1,
+        goals: 1, assists: 0, wins: 1, draws: 0, losses: 0, ownGoals: 0,
+        goalkeeperGames: 0, goalkeeperGoals: 0, goalkeeperAssists: 0, goalkeeperOwnGoals: 0,
+        goalkeeperWins: 0, goalkeeperDraws: 0, goalkeeperLosses: 0, goalsConceded: 0,
+        cleanSheets: 0, defensiveCleanGames: 0, defensiveOneGoalGames: 0,
+        teamGoalsConceded: 0, basePoints: 6 }]]),
+    });
+    const pool = createMockPool(async (sql) => {
+      if (sql.includes("member.player_profile profile")) return { rows: [{ id: "p1", name: "Atleta",
+        avatar_url: null, member_category: "player", is_goalkeeper: false, profile: "offensive",
+        fantasy_season_id: "season-1", current_price: 12, total_points: 20, rounds_played: 2 }] };
+      if (sql.includes("SELECT history.id")) return { rows: [{ id: "h1", fantasy_round_id: "fantasy-round-1",
+        round_number: 1, round_date: "2026-01-01", price_before: 10, price_after: 12,
+        variation_rate: 0.2, price_change: 2, round_points: 6, goals: 1, assists: 0,
+        wins: 1, games: 1, created_at: "2026-01-01T12:00:00Z" }] };
+      if (sql.includes("SELECT stats.*")) return { rows: [{ goals: 2, assists: 1, wins: 2,
+        losses: 0, games: 2, goalkeeper_games: 0, goals_conceded: 0 }] };
+      if (sql.includes("banner.asset_key")) return { rows: [{ banner_asset_key: "banner", frame_asset_key: "frame" }] };
+      if (sql.includes("fantasy_round.fantasy_season_id")) return { rows: [{ id: "fantasy-round-1",
+        round_id: "round-1", market_status: "in_progress", status: "in_progress", number: 1,
+        date: "2026-01-01" }] };
+      if (sql.includes("lineup.captain_player_id")) return { rows: [{ captain_player_id: "p1",
+        slot_role: "ATA", base_points: 0, position_bonus: 0, captain_bonus: 0, total_points: 0 }] };
+      if (sql.includes("SELECT * FROM public.player_round_stats")) return { rows: [] };
+      return { rows: [] };
+    });
+
+    const result = await new PgFantasyMarketLineupRepository(pool)
+      .getPlayerDetail("league-1", "p1", "user-1");
+
+    expect(result).toMatchObject({
+      player: { id: "p1", name: "Atleta", profile: "offensive" },
+      price: 12, totalPoints: 20, roundsPlayed: 2,
+      stats: { goals: 2, assists: 1, games: 2 },
+      roundDetail: { status: "live", slotRole: "ATA", isCaptain: true, totalPoints: 10.5 },
+      cosmetics: { bannerAssetKey: "banner", frameKey: "frame" },
+    });
+    expect(result?.history[0]).toMatchObject({ fantasyRoundId: "fantasy-round-1", roundPoints: 10.5 });
   });
 
   it("saves lineup and returns lineupId", async () => {

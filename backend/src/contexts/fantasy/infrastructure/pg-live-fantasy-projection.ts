@@ -20,6 +20,14 @@ export type FantasyLiveProjectionReadModel = {
   byUserId: Map<string, ProjectionRow>;
   storedPlayersByUserId: Map<string, StoredProjectionPlayer[]>;
   statsByPlayer: ReturnType<typeof projectFantasyLiveStats>;
+  settings: FantasySettings;
+  matches: FantasyLiveMatch[];
+  round: {
+    number: number;
+    date: string | null;
+    status: string;
+    marketStatus: string;
+  };
 };
 
 const settingKeys = {
@@ -186,5 +194,7 @@ export async function readLiveFantasyProjection(
     isLive: round.market_status !== "finished" && round.status !== "finished",
     byUserId: new Map(projections.map((item) => [item.userId, item])),
     storedPlayersByUserId: new Map(lineupsResult.rows.map((item: any) => [item.user_id, item.players || []])),
-    statsByPlayer: stats };
+    statsByPlayer: stats, settings, matches,
+    round: { number: Number(round.number || 0), date: round.date || null,
+      status: round.status, marketStatus: round.market_status } };
 }

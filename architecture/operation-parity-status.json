@@ -714,6 +714,16 @@
     {
       "context": "fantasy",
       "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyPlayerDetail"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyPlayerSummary"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
       "name": "getFantasyRanking"
     },
     {
