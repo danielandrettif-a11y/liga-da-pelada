@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
 function loadEnv(path) {
+  if (!fs.existsSync(path)) return {};
   return Object.fromEntries(
     fs.readFileSync(path, "utf8")
       .split(/\r?\n/)
@@ -24,7 +25,7 @@ function countBy(items, selector) {
   }, {});
 }
 
-const env = loadEnv(".env.local");
+const env = { ...loadEnv(".env.local"), ...process.env };
 if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.SUPABASE_SECRET_KEY) {
   throw new Error("NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SECRET_KEY são obrigatórios.");
 }

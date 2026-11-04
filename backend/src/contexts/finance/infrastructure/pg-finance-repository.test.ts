@@ -3,6 +3,8 @@ import { PgFinanceRepository } from "./pg-finance-repository.js";
 import type { Pool, PoolClient } from "pg";
 
 describe("Finance Infrastructure: PgFinanceRepository", () => {
+  const actor = { userId: "u1" };
+
   it("checks admin status via SQL query", async () => {
     const query = vi.fn().mockImplementation(async (sql: string) =>
       sql.includes("is_league_admin") ? { rows: [{ is_admin: true }], rowCount: 1 } : { rows: [], rowCount: 0 });
@@ -19,8 +21,7 @@ describe("Finance Infrastructure: PgFinanceRepository", () => {
   });
 
   it("gets expense items", async () => {
-    const mockPool = {
-      query: vi.fn().mockResolvedValue({
+    const query = vi.fn().mockResolvedValue({
         rows: [
           {
             id: "ei-1",
@@ -33,10 +34,12 @@ describe("Finance Infrastructure: PgFinanceRepository", () => {
             recipient_pix_key: "loja@pix",
           },
         ],
-      }),
+      });
+    const mockPool = {
+      connect: vi.fn().mockResolvedValue({ query, release: vi.fn() } as unknown as PoolClient),
     } as unknown as Pool;
     const repo = new PgFinanceRepository(mockPool);
-    const items = await repo.getExpenseItems("l1", false);
+    const items = await repo.getExpenseItems(actor, "l1", false);
     expect(items).toHaveLength(1);
     expect(items[0].name).toBe("Bolas");
     expect(items[0].recipient?.name).toBe("Loja");
@@ -44,8 +47,11 @@ describe("Finance Infrastructure: PgFinanceRepository", () => {
 
   it("lists payment rounds only from the active season", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [] });
-    const repo = new PgFinanceRepository({ query } as unknown as Pool);
-    await repo.getPaymentRounds("l1");
+    const pool = {
+      connect: vi.fn().mockResolvedValue({ query, release: vi.fn() } as unknown as PoolClient),
+    } as unknown as Pool;
+    const repo = new PgFinanceRepository(pool);
+    await repo.getPaymentRounds(actor, "l1");
     expect(query).toHaveBeenCalledWith(
       expect.stringContaining("season.status = 'active'"),
       ["l1"],

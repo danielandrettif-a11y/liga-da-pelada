@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, QueryResult, QueryResultRow } from "pg";
 import type { Actor } from "../../../shared/actor.js";
 import { withAuthenticatedTransaction } from "../../../infrastructure/authenticated-transaction.js";
 import type { FinanceRepository } from "../application/manage-finance.js";
@@ -18,6 +18,14 @@ import type {
 
 export class PgFinanceRepository implements FinanceRepository {
   constructor(private readonly db: Pool) {}
+
+  private queryAs<T extends QueryResultRow = any>(
+    actor: Actor,
+    text: string,
+    values: unknown[] = [],
+  ): Promise<QueryResult<T>> {
+    return withAuthenticatedTransaction(this.db, actor, (client) => client.query<T>(text, values));
+  }
 
   async checkCanAccess(actor: Actor, leagueId: string): Promise<boolean> {
     return withAuthenticatedTransaction(this.db, actor, async (client) => {
@@ -39,16 +47,16 @@ export class PgFinanceRepository implements FinanceRepository {
     });
   }
 
-  async recipientIsActive(leagueId: string, recipientId: string): Promise<boolean> {
-    const result = await this.db.query(
+  async recipientIsActive(actor: Actor, leagueId: string, recipientId: string): Promise<boolean> {
+    const result = await this.queryAs(actor,
       "SELECT 1 FROM public.payment_recipients WHERE id = $1::uuid AND league_id = $2::uuid AND is_active",
       [recipientId, leagueId],
     );
     return Boolean(result.rowCount);
   }
 
-  async getExpenseInstallmentState(leagueId: string, id: string) {
-    const result = await this.db.query<{ installment_count: number; registered_count: number }>(
+  async getExpenseInstallmentState(actor: Actor, leagueId: string, id: string) {
+    const result = await this.queryAs<{ installment_count: number; registered_count: number }>(actor,
       `SELECT item.installment_count,
               count(installment.id) FILTER (WHERE installment.status = 'active')::integer AS registered_count
        FROM public.league_expense_items item
@@ -61,16 +69,16 @@ export class PgFinanceRepository implements FinanceRepository {
     return row ? { installmentCount: Number(row.installment_count), registeredCount: Number(row.registered_count) } : null;
   }
 
-  async getRoundStatus(leagueId: string, roundId: string): Promise<string | null> {
-    const result = await this.db.query<{ status: string }>(
+  async getRoundStatus(actor: Actor, leagueId: string, roundId: string): Promise<string | null> {
+    const result = await this.queryAs<{ status: string }>(actor,
       "SELECT status FROM public.rounds WHERE id = $1::uuid AND league_id = $2::uuid",
       [roundId, leagueId],
     );
     return result.rows[0]?.status || null;
   }
 
-  async listActiveRoundExpenseItemIds(leagueId: string, roundId: string): Promise<string[]> {
-    const result = await this.db.query<{ expense_item_id: string }>(
+  async listActiveRoundExpenseItemIds(actor: Actor, leagueId: string, roundId: string): Promise<string[]> {
+    const result = await this.queryAs<{ expense_item_id: string }>(actor,
       `SELECT installment.expense_item_id
        FROM public.round_expense_installments installment
        JOIN public.rounds round_item ON round_item.id = installment.round_id
@@ -81,22 +89,22 @@ export class PgFinanceRepository implements FinanceRepository {
     return [...new Set(result.rows.map((row) => row.expense_item_id))];
   }
 
-  async getExpenseItems(leagueId: string, includeArchived: boolean): Promise<ExpenseItem[]> {
+  async getExpenseItems(actor: Actor, leagueId: string, includeArchived: boolean): Promise<ExpenseItem[]> {
     const query = includeArchived
       ? `SELECT ei.*, pr.name as recipient_name, pr.pix_key as recipient_pix_key,
-                ei.paid_installments_before_app + (SELECT count(*) FROM round_expense_installments installment WHERE installment.expense_item_id = ei.id AND installment.status = 'active') AS paid_installments
-         FROM league_expense_items ei
-         LEFT JOIN payment_recipients pr ON pr.id = ei.recipient_id
+                ei.paid_installments_before_app + (SELECT count(*) FROM public.round_expense_installments installment WHERE installment.expense_item_id = ei.id AND installment.status = 'active') AS paid_installments
+         FROM public.league_expense_items ei
+         LEFT JOIN public.payment_recipients pr ON pr.id = ei.recipient_id
          WHERE ei.league_id = $1
          ORDER BY ei.created_at DESC`
       : `SELECT ei.*, pr.name as recipient_name, pr.pix_key as recipient_pix_key,
-                ei.paid_installments_before_app + (SELECT count(*) FROM round_expense_installments installment WHERE installment.expense_item_id = ei.id AND installment.status = 'active') AS paid_installments
-         FROM league_expense_items ei
-         LEFT JOIN payment_recipients pr ON pr.id = ei.recipient_id
+                ei.paid_installments_before_app + (SELECT count(*) FROM public.round_expense_installments installment WHERE installment.expense_item_id = ei.id AND installment.status = 'active') AS paid_installments
+         FROM public.league_expense_items ei
+         LEFT JOIN public.payment_recipients pr ON pr.id = ei.recipient_id
          WHERE ei.league_id = $1 AND ei.status = 'active'
          ORDER BY ei.created_at DESC`;
 
-    const res = await this.db.query<any>(query, [leagueId]);
+    const res = await this.queryAs<any>(actor, query, [leagueId]);
     return res.rows.map((r) => ({
       id: r.id,
       name: r.name,
@@ -162,11 +170,11 @@ export class PgFinanceRepository implements FinanceRepository {
     }
   }
 
-  async getPaymentRecipients(leagueId: string, includeInactive: boolean): Promise<PaymentRecipient[]> {
+  async getPaymentRecipients(actor: Actor, leagueId: string, includeInactive: boolean): Promise<PaymentRecipient[]> {
     const query = includeInactive
-      ? `SELECT id, name, pix_key, pix_type, is_active FROM payment_recipients WHERE league_id = $1 ORDER BY name ASC`
-      : `SELECT id, name, pix_key, pix_type, is_active FROM payment_recipients WHERE league_id = $1 AND is_active = true ORDER BY name ASC`;
-    const res = await this.db.query<any>(query, [leagueId]);
+      ? `SELECT id, name, pix_key, pix_type, is_active FROM public.payment_recipients WHERE league_id = $1 ORDER BY name ASC`
+      : `SELECT id, name, pix_key, pix_type, is_active FROM public.payment_recipients WHERE league_id = $1 AND is_active = true ORDER BY name ASC`;
+    const res = await this.queryAs<any>(actor, query, [leagueId]);
     return res.rows.map((r) => ({
       id: r.id,
       name: r.name,
@@ -217,16 +225,16 @@ export class PgFinanceRepository implements FinanceRepository {
     }
   }
 
-  async getPaymentRounds(leagueId: string): Promise<PaymentRound[]> {
-    const res = await this.db.query<any>(
+  async getPaymentRounds(actor: Actor, leagueId: string): Promise<PaymentRound[]> {
+    const res = await this.queryAs<any>(actor,
       `SELECT round_item.id, round_item.number, round_item.date, round_item.status, round_item.round_type,
               round_item.payment_pix, round_item.payment_total, round_item.payment_recipient_name,
               COALESCE(round_item.payment_extra_time_total, 0) as payment_extra_time_total,
-              COALESCE(round_item.payment_extra_time_player_ids, '[]'::jsonb) as payment_extra_time_player_ids,
+              COALESCE(round_item.payment_extra_time_player_ids, '{}'::uuid[]) as payment_extra_time_player_ids,
               COALESCE(round_item.payment_ball_fund_total, 0) as payment_ball_fund_total,
-              COALESCE(round_item.payment_ball_fund_player_ids, '[]'::jsonb) as payment_ball_fund_player_ids
-       FROM rounds round_item
-       JOIN seasons season ON season.id = round_item.season_id
+              COALESCE(round_item.payment_ball_fund_player_ids, '{}'::uuid[]) as payment_ball_fund_player_ids
+       FROM public.rounds round_item
+       JOIN public.seasons season ON season.id = round_item.season_id
        WHERE round_item.league_id = $1 AND season.status = 'active'
        ORDER BY round_item.date DESC, round_item.created_at DESC`,
       [leagueId],
@@ -247,41 +255,41 @@ export class PgFinanceRepository implements FinanceRepository {
     }));
   }
 
-  async getLatestFinishedRoundPaymentState(leagueId: string) {
-    const roundRes = await this.db.query<{ id: string }>(
-      `SELECT round_item.id
-       FROM public.rounds round_item
-       JOIN public.seasons season ON season.id = round_item.season_id
-       WHERE round_item.league_id = $1 AND season.status = 'active' AND round_item.status = 'finished'
-       ORDER BY round_item.date DESC, round_item.created_at DESC LIMIT 1`,
-      [leagueId],
-    );
-    const roundId = roundRes.rows[0]?.id;
-    if (!roundId) return null;
+  async getLatestFinishedRoundPaymentState(actor: Actor, leagueId: string) {
+    return withAuthenticatedTransaction(this.db, actor, async (client) => {
+      const roundRes = await client.query<{ id: string }>(
+        `SELECT round_item.id
+         FROM public.rounds round_item
+         JOIN public.seasons season ON season.id = round_item.season_id
+         WHERE round_item.league_id = $1 AND season.status = 'active' AND round_item.status = 'finished'
+         ORDER BY round_item.date DESC, round_item.created_at DESC LIMIT 1`,
+        [leagueId],
+      );
+      const roundId = roundRes.rows[0]?.id;
+      if (!roundId) return null;
 
-    const [participantsRes, paymentsRes] = await Promise.all([
-      this.db.query<{ id: string; is_monthly_payer: boolean }>(
+      const participantsRes = await client.query<{ id: string; is_monthly_payer: boolean }>(
         `SELECT p.id, COALESCE(lm.is_monthly_payer, false) as is_monthly_payer
-         FROM round_players rp
-         JOIN players p ON p.id = rp.player_id
-         LEFT JOIN league_members lm ON lm.player_id = p.id AND lm.league_id = $1
+         FROM public.round_players rp
+         JOIN public.players p ON p.id = rp.player_id
+         LEFT JOIN public.league_members lm ON lm.player_id = p.id AND lm.league_id = $1
          WHERE rp.round_id = $2`,
         [leagueId, roundId],
-      ),
-      this.db.query<{ player_id: string; paid: boolean }>(
-        `SELECT player_id, paid FROM round_payments WHERE round_id = $1`,
+      );
+      const paymentsRes = await client.query<{ player_id: string; paid: boolean }>(
+        `SELECT player_id, paid FROM public.round_payments WHERE round_id = $1`,
         [roundId],
-      ),
-    ]);
+      );
 
-    return {
-      participants: participantsRes.rows,
-      payments: paymentsRes.rows,
-    };
+      return {
+        participants: participantsRes.rows,
+        payments: paymentsRes.rows,
+      };
+    });
   }
 
-  async getRoundPaymentWorkspace(leagueId: string, roundId: string): Promise<any | null> {
-    const res = await this.db.query<any>(
+  async getRoundPaymentWorkspace(actor: Actor, leagueId: string, roundId: string): Promise<any | null> {
+    const res = await this.queryAs<any>(actor,
       `SELECT public.get_round_payment_read_model(round_item.id) AS read_model
        FROM public.rounds round_item
        WHERE round_item.id = $1 AND round_item.league_id = $2`,
@@ -290,15 +298,15 @@ export class PgFinanceRepository implements FinanceRepository {
     return res.rows[0]?.read_model || null;
   }
 
-  async getRoundPaymentPlayers(leagueId: string, roundId: string): Promise<PaymentPlayer[]> {
-    const res = await this.db.query<any>(
+  async getRoundPaymentPlayers(actor: Actor, leagueId: string, roundId: string): Promise<PaymentPlayer[]> {
+    const res = await this.queryAs<any>(actor,
       `SELECT p.id, p.name, p.avatar_url,
               COALESCE(rp.paid, false) as paid,
               rp.paid_at
-       FROM round_players rpl
-       JOIN players p ON p.id = rpl.player_id
-       LEFT JOIN round_payments rp ON rp.round_id = $2 AND rp.player_id = p.id
-       JOIN rounds r ON r.id = rpl.round_id
+       FROM public.round_players rpl
+       JOIN public.players p ON p.id = rpl.player_id
+       LEFT JOIN public.round_payments rp ON rp.round_id = $2 AND rp.player_id = p.id
+       JOIN public.rounds r ON r.id = rpl.round_id
        WHERE rpl.round_id = $2 AND r.league_id = $1
        ORDER BY p.name ASC`,
       [leagueId, roundId],
@@ -312,12 +320,12 @@ export class PgFinanceRepository implements FinanceRepository {
     }));
   }
 
-  async getRoundPaymentObligations(leagueId: string, roundId: string): Promise<PaymentObligation[]> {
-    const res = await this.db.query<any>(
+  async getRoundPaymentObligations(actor: Actor, leagueId: string, roundId: string): Promise<PaymentObligation[]> {
+    const res = await this.queryAs<any>(actor,
       `SELECT obligation.id, obligation.round_id, obligation.player_id, obligation.recipient_name,
               obligation.recipient_pix, obligation.amount_due, obligation.amount_paid, obligation.status
-       FROM round_payment_obligations obligation
-       JOIN rounds round_item ON round_item.id = obligation.round_id
+       FROM public.round_payment_obligations obligation
+       JOIN public.rounds round_item ON round_item.id = obligation.round_id
        WHERE obligation.round_id = $2 AND round_item.league_id = $1`,
       [leagueId, roundId],
     );
@@ -377,11 +385,11 @@ export class PgFinanceRepository implements FinanceRepository {
     }
   }
 
-  async getRoundExpenseSelections(leagueId: string, roundId: string): Promise<RoundExpenseSelection[]> {
-    const res = await this.db.query<any>(
+  async getRoundExpenseSelections(actor: Actor, leagueId: string, roundId: string): Promise<RoundExpenseSelection[]> {
+    const res = await this.queryAs<any>(actor,
       `SELECT installment.expense_item_id, installment.installment_number
-       FROM round_expense_installments installment
-       JOIN rounds round_item ON round_item.id = installment.round_id
+       FROM public.round_expense_installments installment
+       JOIN public.rounds round_item ON round_item.id = installment.round_id
        WHERE installment.round_id = $2 AND installment.status = 'active' AND round_item.league_id = $1`,
       [leagueId, roundId],
     );
@@ -449,11 +457,12 @@ export class PgFinanceRepository implements FinanceRepository {
     }
   }
 
-  async getRoundPaymentChargeLines(leagueId: string, roundId: string): Promise<PaymentChargeLine[]> {
-    const res = await this.db.query<any>(
-      `SELECT id, player_id, recipient_name, recipient_pix, label, amount, charge_type
-       FROM round_payment_charge_lines charge
-       JOIN rounds round_item ON round_item.id = charge.round_id
+  async getRoundPaymentChargeLines(actor: Actor, leagueId: string, roundId: string): Promise<PaymentChargeLine[]> {
+    const res = await this.queryAs<any>(actor,
+      `SELECT charge.id, charge.player_id, charge.recipient_name, charge.recipient_pix,
+              charge.label, charge.amount, charge.charge_type
+       FROM public.round_payment_charge_lines charge
+       JOIN public.rounds round_item ON round_item.id = charge.round_id
        WHERE charge.round_id = $2 AND round_item.league_id = $1`,
       [leagueId, roundId],
     );
@@ -468,14 +477,14 @@ export class PgFinanceRepository implements FinanceRepository {
     }));
   }
 
-  async getPaymentAuditLog(leagueId: string): Promise<PaymentAuditLogEntry[]> {
-    const res = await this.db.query<any>(
+  async getPaymentAuditLog(actor: Actor, leagueId: string): Promise<PaymentAuditLogEntry[]> {
+    const res = await this.queryAs<any>(actor,
       `SELECT pal.id, pal.round_id, pal.target_player_id, pal.paid, pal.changed_by_player_id, pal.created_at,
               pal.target_player_name,
               pal.changed_by_name,
               r.number as round_number, r.date as round_date, r.round_type
-       FROM round_payment_audit pal
-       JOIN rounds r ON r.id = pal.round_id
+       FROM public.round_payment_audit pal
+       JOIN public.rounds r ON r.id = pal.round_id
        WHERE r.league_id = $1
        ORDER BY pal.created_at DESC LIMIT 100`,
       [leagueId],

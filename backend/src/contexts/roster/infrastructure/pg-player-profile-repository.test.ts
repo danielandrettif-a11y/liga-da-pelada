@@ -36,7 +36,12 @@ describe("pgPlayerProfileRepository", () => {
       : sql.includes("FROM public.league_members member") ? { rows: [{ ...accessRow, is_owner: true }] }
         : { rows: [] });
     await pgPlayerProfileRepository(poolWith(query)).saveProfile(leagueId, command, false, actor);
-    expect(query.mock.calls.some(([sql]) => String(sql).includes("UPDATE public.players"))).toBe(true);
+    const playerUpdate = query.mock.calls.find(([sql]) => String(sql).includes("UPDATE public.players"));
+    expect(playerUpdate).toBeDefined();
+    expect(playerUpdate?.[0]).toContain("is_goalkeeper = $7");
+    expect(playerUpdate?.[1]).toEqual([
+      playerId, "Jogador", null, null, null, null, false, "guest", true,
+    ]);
     expect(query.mock.calls.some(([sql]) => String(sql).includes("UPDATE public.league_members"))).toBe(false);
   });
 

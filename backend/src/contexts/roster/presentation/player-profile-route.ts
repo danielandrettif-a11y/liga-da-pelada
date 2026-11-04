@@ -18,6 +18,9 @@ function sendFailure(error: unknown, request: FastifyRequest, reply: FastifyRepl
     return reply.code(400).send({ code: "INVALID_PLAYER_PROFILE", message: error.message });
   }
   if (error instanceof PlayerProfilePersistenceError || error instanceof PlayerAvatarStorageError) {
+    if (error instanceof PlayerProfilePersistenceError && error.cause) {
+      request.log.error({ err: error.cause }, "player profile persistence failed");
+    }
     return reply.code(error.statusCode).send({ code: "PLAYER_PROFILE_REJECTED", message: error.message });
   }
   if (error && typeof error === "object" && "statusCode" in error && error.statusCode === 413) {

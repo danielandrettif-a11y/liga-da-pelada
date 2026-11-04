@@ -5,8 +5,8 @@ import type { PlayerProfileRepository } from "../application/save-player-profile
 import type { PlayerProfileAccess, SavePlayerProfileCommand } from "../domain/player-profile.js";
 
 export class PlayerProfilePersistenceError extends Error {
-  constructor(message: string, public readonly statusCode: number) {
-    super(message);
+  constructor(message: string, public readonly statusCode: number, options?: ErrorOptions) {
+    super(message, options);
     this.name = "PlayerProfilePersistenceError";
   }
 }
@@ -15,18 +15,18 @@ function translateFailure(cause: unknown): PlayerProfilePersistenceError {
   if (cause instanceof PlayerProfilePersistenceError) return cause;
   const message = cause instanceof Error ? cause.message : "";
   if (/PLAYER_PROFILE_FORBIDDEN|permission denied|row-level security/i.test(message)) {
-    return new PlayerProfilePersistenceError("Acesso restrito a esta operação.", 403);
+    return new PlayerProfilePersistenceError("Acesso restrito a esta operação.", 403, { cause });
   }
   if (/PLAYER_PROFILE_NOT_FOUND/i.test(message)) {
-    return new PlayerProfilePersistenceError("Jogador não encontrado nesta pelada.", 404);
+    return new PlayerProfilePersistenceError("Jogador não encontrado nesta pelada.", 404, { cause });
   }
   if (/foreign key|violates.*constraint/i.test(message)) {
-    return new PlayerProfilePersistenceError("Este jogador possui vínculos que impedem a exclusão.", 409);
+    return new PlayerProfilePersistenceError("Este jogador possui vínculos que impedem a exclusão.", 409, { cause });
   }
   if (/duplicate key|unique constraint/i.test(message)) {
-    return new PlayerProfilePersistenceError("Já existe um cadastro com esses dados.", 409);
+    return new PlayerProfilePersistenceError("Já existe um cadastro com esses dados.", 409, { cause });
   }
-  return new PlayerProfilePersistenceError("Não foi possível salvar o perfil do jogador.", 503);
+  return new PlayerProfilePersistenceError("Não foi possível salvar o perfil do jogador.", 503, { cause });
 }
 
 async function authenticated<T>(pool: Pool, actor: Actor, operation: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -137,10 +137,10 @@ export function pgPlayerProfileRepository(pool: Pool): PlayerProfileRepository {
       await client.query(
         `UPDATE public.players
             SET name = $2, nickname = $3, profile_bio = $4, avatar_url = $5,
-                avatar_alternate_url = $6, is_goalkeeper = $9,
-                member_category = $10, is_selectable = $11
+                avatar_alternate_url = $6, is_goalkeeper = $7,
+                member_category = $8, is_selectable = $9
           WHERE id = $1::uuid`,
-        values(command),
+        updateValues(command),
       );
       if (access.isLeagueAdmin) {
         await client.query(
@@ -176,5 +176,13 @@ function values(command: SavePlayerProfileCommand): unknown[] {
     command.playerId, command.name, command.nickname, command.profileBio,
     command.avatarUrl, command.avatarAlternateUrl, command.playerProfile,
     command.overallTraits, command.isGoalkeeper, command.memberCategory, command.isSelectable,
+  ];
+}
+
+function updateValues(command: SavePlayerProfileCommand): unknown[] {
+  return [
+    command.playerId, command.name, command.nickname, command.profileBio,
+    command.avatarUrl, command.avatarAlternateUrl, command.isGoalkeeper,
+    command.memberCategory, command.isSelectable,
   ];
 }

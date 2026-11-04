@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, QueryResult, QueryResultRow } from "pg";
 import type { Actor } from "../../../shared/actor.js";
 import { withAuthenticatedTransaction } from "../../../infrastructure/authenticated-transaction.js";
 import { buildOverallHistoryInput } from "../domain/overall-history.js";
@@ -11,6 +11,14 @@ import type {
 export class PgOverallShadowRepository implements OverallShadowRepository {
   constructor(private readonly db: Pool) {}
 
+  private queryAs<T extends QueryResultRow = any>(
+    actor: Actor,
+    text: string,
+    values: unknown[] = [],
+  ): Promise<QueryResult<T>> {
+    return withAuthenticatedTransaction(this.db, actor, (client) => client.query<T>(text, values));
+  }
+
   async checkIsAdmin(actor: Actor, leagueId: string): Promise<boolean> {
     return withAuthenticatedTransaction(this.db, actor, async (client) => {
       const res = await client.query<{ is_admin: boolean }>(
@@ -21,17 +29,17 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
     });
   }
 
-  async getFormula(key: string): Promise<{ id: string; label: string; config?: any } | null> {
-    const result = await this.db.query<{ id: string; label: string; config: any }>(
-      `SELECT id, label, config FROM overall_formula_versions WHERE key = $1 LIMIT 1`,
+  async getFormula(actor: Actor, key: string): Promise<{ id: string; label: string; config?: any } | null> {
+    const result = await this.queryAs<{ id: string; label: string; config: any }>(actor,
+      `SELECT id, label, config FROM public.overall_formula_versions WHERE key = $1 LIMIT 1`,
       [key],
     );
     return result.rows[0] || null;
   }
 
-  async loadHistory(leagueId: string): Promise<OverallHistoryData> {
+  async loadHistory(actor: Actor, leagueId: string): Promise<OverallHistoryData> {
     const [membersRes, roundsRes] = await Promise.all([
-      this.db.query<{
+      this.queryAs<{
         player_id: string;
         name: string;
         player_profile: string | null;
@@ -40,27 +48,27 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
         overall_seed_mode: string | null;
         is_goalkeeper: boolean;
         member_category: string;
-      }>(
+      }>(actor,
         `SELECT lm.player_id, p.name,
                 COALESCE(lm.player_profile, p.player_profile) as player_profile,
                 COALESCE(lm.initial_player_profile, lm.player_profile, p.initial_player_profile, p.player_profile) as initial_player_profile,
                 COALESCE(lm.overall_traits, p.overall_traits) as overall_traits,
                 COALESCE(lm.overall_seed_mode, p.overall_seed_mode) as overall_seed_mode,
-                p.is_goalkeeper, lm.member_category
-         FROM league_members lm
-         JOIN players p ON p.id = lm.player_id
-         WHERE lm.league_id = $1 AND lm.member_category = 'player'`,
+                p.is_goalkeeper, p.member_category
+         FROM public.league_members lm
+         JOIN public.players p ON p.id = lm.player_id
+         WHERE lm.league_id = $1 AND p.member_category = 'player'`,
         [leagueId],
       ),
-      this.db.query<{
+      this.queryAs<{
         id: string;
         number: number;
         date: string;
         round_type: string;
         status: string;
-      }>(
+      }>(actor,
         `SELECT id, number, date, round_type, status
-         FROM rounds
+         FROM public.rounds
          WHERE league_id = $1 AND round_type = 'official' AND status = 'finished'
          ORDER BY date ASC, created_at ASC`,
         [leagueId],
@@ -87,18 +95,18 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
     }
 
     const [statsRes, matchesRes, overridesRes] = await Promise.all([
-      this.db.query<any>(
+      this.queryAs<any>(actor,
         `SELECT round_id, player_id, player_profile_locked, goals, assists, own_goals
          FROM public.player_round_stats WHERE round_id = ANY($1::uuid[])`,
         [roundIds],
       ),
-      this.db.query<any>(
+      this.queryAs<any>(actor,
         `SELECT id, round_id, status, team_a_id, team_b_id, score_a, score_b,
                 duration_seconds, timer_accumulated_seconds, eligibility_elapsed_offset_seconds
          FROM public.matches WHERE round_id = ANY($1::uuid[])`,
         [roundIds],
       ),
-      this.db.query<{ round_id: string; player_id: string }>(
+      this.queryAs<{ round_id: string; player_id: string }>(actor,
         `SELECT override_item.round_id, override_item.player_id
          FROM public.player_round_stat_overrides override_item
          JOIN public.rounds round_item ON round_item.id = override_item.round_id
@@ -110,23 +118,23 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
     const emptyRows = { rows: [] as any[] };
     const [eventsRes, playersRes, goalkeepersRes, stintsRes] = matchIds.length > 0
       ? await Promise.all([
-          this.db.query<any>(
+          this.queryAs<any>(actor,
             `SELECT match_id, player_id, assist_player_id, team_id, is_own_goal, elapsed_seconds, minute,
                     goalkeeper_a_player_id, goalkeeper_b_player_id
              FROM public.match_events WHERE match_id = ANY($1::uuid[])`,
             [matchIds],
           ),
-          this.db.query<any>(
+          this.queryAs<any>(actor,
             `SELECT match_id, player_id, team_id, entered_elapsed_seconds, left_elapsed_seconds
              FROM public.match_players WHERE match_id = ANY($1::uuid[])`,
             [matchIds],
           ),
-          this.db.query<any>(
+          this.queryAs<any>(actor,
             `SELECT match_id, player_id, team_id
              FROM public.match_goalkeepers WHERE match_id = ANY($1::uuid[])`,
             [matchIds],
           ),
-          this.db.query<any>(
+          this.queryAs<any>(actor,
             `SELECT match_id, player_id, team_id, entered_elapsed_seconds, left_elapsed_seconds, selected_at
              FROM public.match_goalkeeper_stints WHERE match_id = ANY($1::uuid[])`,
             [matchIds],
@@ -169,17 +177,17 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
     };
   }
 
-  async getLatestRun(leagueId: string, formulaId: string) {
-    const result = await this.db.query<{
+  async getLatestRun(actor: Actor, leagueId: string, formulaId: string) {
+    const result = await this.queryAs<{
       id: string;
       status: string;
       created_at: string;
       completed_at: string | null;
       error_message: string | null;
       formula_version_id: string;
-    }>(
+    }>(actor,
       `SELECT id, status, created_at, completed_at, error_message, formula_version_id
-       FROM overall_calculation_runs
+       FROM public.overall_calculation_runs
        WHERE league_id = $1 AND formula_version_id = $2 AND status IN ('succeeded', 'published', 'failed')
        ORDER BY created_at DESC LIMIT 1`,
       [leagueId, formulaId],
@@ -187,25 +195,25 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
     return result.rows[0] || null;
   }
 
-  async getRunById(runId: string, leagueId: string) {
-    const result = await this.db.query<{
+  async getRunById(actor: Actor, runId: string, leagueId: string) {
+    const result = await this.queryAs<{
       id: string;
       status: string;
       formula_version_id: string;
-    }>(
+    }>(actor,
       `SELECT id, status, formula_version_id
-       FROM overall_calculation_runs
+       FROM public.overall_calculation_runs
        WHERE id = $1 AND league_id = $2 LIMIT 1`,
       [runId, leagueId],
     );
     return result.rows[0] || null;
   }
 
-  async getSnapshots(runId: string) {
-    const result = await this.db.query<any>(
+  async getSnapshots(actor: Actor, runId: string) {
+    const result = await this.queryAs<any>(actor,
       `SELECT s.*, p.name as player_name
-       FROM player_overall_snapshots s
-       LEFT JOIN players p ON p.id = s.player_id
+       FROM public.player_overall_snapshots s
+       LEFT JOIN public.players p ON p.id = s.player_id
        WHERE s.calculation_run_id = $1
        ORDER BY s.overall DESC`,
       [runId],
@@ -216,10 +224,10 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
     }));
   }
 
-  async getBreakdowns(runId: string) {
-    const result = await this.db.query<any>(
+  async getBreakdowns(actor: Actor, runId: string) {
+    const result = await this.queryAs<any>(actor,
       `SELECT *
-       FROM player_overall_round_breakdowns
+       FROM public.player_overall_round_breakdowns
        WHERE calculation_run_id = $1
        ORDER BY round_index DESC`,
       [runId],
@@ -234,7 +242,7 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
     createdBy: string;
   }): Promise<string> {
     const result = await withAuthenticatedTransaction(this.db, { userId: params.createdBy }, (client) => client.query<{ id: string }>(
-      `INSERT INTO overall_calculation_runs (league_id, formula_version_id, source_through_round_id, created_by, status, started_at)
+      `INSERT INTO public.overall_calculation_runs (league_id, formula_version_id, source_through_round_id, created_by, status, started_at)
        VALUES ($1, $2, $3, $4, 'processing', now()) RETURNING id`,
       [params.leagueId, params.formulaVersionId, params.sourceThroughRoundId, params.createdBy],
     ));
@@ -251,7 +259,7 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
     await withAuthenticatedTransaction(this.db, { userId }, async (client) => {
       for (const s of params.snapshots) {
         await client.query(
-        `INSERT INTO player_overall_snapshots
+        `INSERT INTO public.player_overall_snapshots
          (calculation_run_id, player_id, overall, def_overall, ala_mei_overall, ata_overall, gol_overall, confidence, rounds_played, is_provisional, is_stale, data_quality)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
         [
@@ -299,7 +307,7 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
 
   async markRunSucceeded(runId: string, leagueId: string, userId: string): Promise<void> {
     const result = await withAuthenticatedTransaction(this.db, { userId }, (client) => client.query(
-      `UPDATE overall_calculation_runs
+      `UPDATE public.overall_calculation_runs
        SET status = 'succeeded', completed_at = now()
        WHERE id = $1 AND league_id = $2`,
       [runId, leagueId],
@@ -309,7 +317,7 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
 
   async markRunFailed(runId: string, leagueId: string, error: string, userId: string): Promise<void> {
     const result = await withAuthenticatedTransaction(this.db, { userId }, (client) => client.query(
-      `UPDATE overall_calculation_runs
+      `UPDATE public.overall_calculation_runs
        SET status = 'failed', completed_at = now(), error_message = $3
        WHERE id = $1 AND league_id = $2`,
       [runId, leagueId, error],
@@ -319,7 +327,7 @@ export class PgOverallShadowRepository implements OverallShadowRepository {
 
   async markRunPublished(runId: string, leagueId: string, userId: string): Promise<void> {
     const result = await withAuthenticatedTransaction(this.db, { userId }, (client) => client.query(
-      `UPDATE overall_calculation_runs
+      `UPDATE public.overall_calculation_runs
        SET status = 'published', published_at = now()
        WHERE id = $1 AND league_id = $2 AND status = 'succeeded'`,
       [runId, leagueId],

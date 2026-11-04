@@ -21,9 +21,9 @@ export type OverallHistoryData = {
 
 export interface OverallShadowRepository {
   checkIsAdmin(actor: Actor, leagueId: string): Promise<boolean>;
-  getFormula(key: string): Promise<{ id: string; label: string; config?: any } | null>;
-  loadHistory(leagueId: string): Promise<OverallHistoryData>;
-  getLatestRun(leagueId: string, formulaId: string): Promise<{
+  getFormula(actor: Actor, key: string): Promise<{ id: string; label: string; config?: any } | null>;
+  loadHistory(actor: Actor, leagueId: string): Promise<OverallHistoryData>;
+  getLatestRun(actor: Actor, leagueId: string, formulaId: string): Promise<{
     id: string;
     status: string;
     created_at: string;
@@ -31,13 +31,13 @@ export interface OverallShadowRepository {
     error_message: string | null;
     formula_version_id: string;
   } | null>;
-  getRunById(runId: string, leagueId: string): Promise<{
+  getRunById(actor: Actor, runId: string, leagueId: string): Promise<{
     id: string;
     status: string;
     formula_version_id: string;
   } | null>;
-  getSnapshots(runId: string): Promise<any[]>;
-  getBreakdowns(runId: string): Promise<any[]>;
+  getSnapshots(actor: Actor, runId: string): Promise<any[]>;
+  getBreakdowns(actor: Actor, runId: string): Promise<any[]>;
   createRun(params: {
     leagueId: string;
     formulaVersionId: string;
@@ -86,26 +86,26 @@ export function createManageOverallShadowService(
       const isAdmin = await repository.checkIsAdmin(actor, leagueId);
       if (!isAdmin) return null;
 
-      const formula = await repository.getFormula(FORMULA_KEY);
+      const formula = await repository.getFormula(actor, FORMULA_KEY);
       if (!formula) {
         return { latestRun: null, snapshots: [], pendingPlayers: [] };
       }
 
-      const history = await repository.loadHistory(leagueId);
-      const latestRun = await repository.getLatestRun(leagueId, formula.id);
+      const history = await repository.loadHistory(actor, leagueId);
+      const latestRun = await repository.getLatestRun(actor, leagueId, formula.id);
       if (!latestRun) {
         return { latestRun: null, snapshots: [], pendingPlayers: history.pendingPlayers };
       }
 
-      const comparisonFormula = await repository.getFormula(COMPARISON_FORMULA_KEY);
+      const comparisonFormula = await repository.getFormula(actor, COMPARISON_FORMULA_KEY);
       const comparisonRun = comparisonFormula
-        ? await repository.getLatestRun(leagueId, comparisonFormula.id)
+        ? await repository.getLatestRun(actor, leagueId, comparisonFormula.id)
         : null;
 
       const [snapshots, breakdowns, comparisonSnapshots] = await Promise.all([
-        repository.getSnapshots(latestRun.id),
-        repository.getBreakdowns(latestRun.id),
-        comparisonRun ? repository.getSnapshots(comparisonRun.id) : Promise.resolve([]),
+        repository.getSnapshots(actor, latestRun.id),
+        repository.getBreakdowns(actor, latestRun.id),
+        comparisonRun ? repository.getSnapshots(actor, comparisonRun.id) : Promise.resolve([]),
       ]);
 
       return buildOverallShadowAdminData({
@@ -124,12 +124,12 @@ export function createManageOverallShadowService(
         return { success: false, error: "Somente administradores podem recalcular o OVR." };
       }
 
-      const formula = await repository.getFormula(FORMULA_KEY);
+      const formula = await repository.getFormula(actor, FORMULA_KEY);
       if (!formula) {
         return { success: false, error: "A fórmula v20 não foi encontrada. Confirme a migration 242." };
       }
 
-      const history = await repository.loadHistory(leagueId);
+      const history = await repository.loadHistory(actor, leagueId);
       const latestRound = [...history.rounds]
         .filter((r) => r.roundType === "official" && r.status === "finished")
         .at(-1);
@@ -178,12 +178,12 @@ export function createManageOverallShadowService(
         return { success: false, error: "Somente administradores podem publicar o OVR." };
       }
 
-      const formula = await repository.getFormula(FORMULA_KEY);
+      const formula = await repository.getFormula(actor, FORMULA_KEY);
       if (!formula) {
         return { success: false, error: "A fórmula v20 não foi encontrada." };
       }
 
-      const run = await repository.getRunById(runId, leagueId);
+      const run = await repository.getRunById(actor, runId, leagueId);
       const validation = validateRunForPublication(run, formula.id);
       if (!validation.valid) {
         return { success: false, error: validation.reason };

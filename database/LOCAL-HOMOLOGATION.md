@@ -6,6 +6,12 @@
 
 **Revalidação de código em 03/11/2026:** backend com 695 testes em 181 arquivos, frontend com 1.238 testes em 237 arquivos, typechecks e builds de produção aprovados. A auditoria permanece em 258/267 operações com paridade revisada e 0/267 verificadas em jornada integrada. A stack Docker iniciou, mas o WSL encerrou a distribuição quando a chamada isolada terminou; mantenha um terminal Ubuntu aberto durante a sessão. Testar os contextos aceitos com suas flags individuais e manter `FANTASY_API_ENABLED=false` até fechar as nove projeções analíticas.
 
+**Homologação ampliada em 04/11/2026:** os 11 serviços do Supabase e o backend modular ficaram saudáveis no WSL/Docker. A imagem local final desta rodada é `liga-backend-local:validation-fixes-3`, com todos os contextos aceitos habilitados; `FANTASY_API_ENABLED=false` e `ENABLE_NOTIFICATIONS_API=false` continuam deliberadamente desligados. O agregador [`verify-local-all.sh`](../scripts/verify-local-all.sh) passou em todos os smokes de escrita, limpeza e leitura: identidade, peladas, temporadas, estádios, partida rápida, elenco/Storage e 43 consultas transversais de convocações, rodadas, estatísticas, finanças, cartas, cosméticos, coletiva e operações. O backend passou em **695 testes/181 arquivos**, o frontend em **1.238 testes/237 arquivos**, ambos com typecheck e build de produção aprovados. As auditorias npm de produção retornaram **0 vulnerabilidades** nos dois pacotes. O Playwright passou em **14 cenários** públicos/demo em mobile e desktop; oito jornadas administrativas foram corretamente puladas porque ainda não há credenciais E2E descartáveis configuradas.
+
+O ensaio encontrou e corrigiu defeitos que só apareceram contra PostgreSQL/RLS reais: parâmetros descontínuos no update de perfil, perda da causa original no log, limpeza do avatar após excluir o jogador, consultas financeiras/OVR fora da transação autenticada, nomes de schema ausentes e três incompatibilidades SQL. A migration [`353_allow_avatar_owner_cleanup.sql`](../supabase/migrations/353_allow_avatar_owner_cleanup.sql) recompõe leitura pública e remoção de avatar pelo proprietário mesmo após a cascata da linha do jogador. O dump privado anterior à alteração permanece em `/home/danie/pelada-homologacao/backups/pre-player-avatar-policy-20261103.dump`. [`check-local-db-archive.sh`](../scripts/check-local-db-archive.sh) confirmou origem PostgreSQL 17.6, schemas `auth` e `storage`, dados de tabelas e compatibilidade direta com PostgreSQL 17. A auditoria local de cartas encontrou 172 pacotes, 131 cartas e 74 ativações, sem escopo quebrado, órfãos ou divergência de liga.
+
+A paridade estrutural continua em **258/267 (96,6%)**: faltam as mesmas nove projeções analíticas de Fantasy. O contador permanece em **0/267 verificadas** porque esse estado exige jornadas integradas autenticadas registradas, não somente testes automatizados e smokes de API. Antes da VPS/live ainda faltam: implementar as nove operações, criar contas E2E descartáveis para as jornadas administrativas, fornecer QStash/VAPID/Resend para notificações e repetir o ensaio com uma exportação nova de produção em janela controlada. Nenhum dado do banco real foi importado neste ambiente.
+
 ### Exportação do banco de testes, já concluída
 
 O comando usado no PowerShell normal do Windows foi:
@@ -47,12 +53,9 @@ No PowerShell, confirme os contêineres e a API:
 wsl --user root --exec docker ps --format '{{.Names}} {{.Status}}'
 wsl --user root --exec docker start liga-backend-local
 Invoke-RestMethod http://127.0.0.1:3001/health
-wsl --user root --exec bash /mnt/c/Users/danie/.codex/worktrees/architecture-reorganization/Liga-da-pelada/scripts/verify-local-league-favorite.sh
-wsl --user root --exec bash /mnt/c/Users/danie/.codex/worktrees/architecture-reorganization/Liga-da-pelada/scripts/verify-local-league-config.sh
-wsl --user root --exec bash /mnt/c/Users/danie/.codex/worktrees/architecture-reorganization/Liga-da-pelada/scripts/verify-local-league-lifecycle.sh
-wsl --user root --exec bash /mnt/c/Users/danie/.codex/worktrees/architecture-reorganization/Liga-da-pelada/scripts/verify-local-quick-match.sh
-wsl --user root --exec bash /mnt/c/Users/danie/.codex/worktrees/architecture-reorganization/Liga-da-pelada/scripts/verify-local-seasons.sh
-wsl --user root --exec bash /mnt/c/Users/danie/.codex/worktrees/architecture-reorganization/Liga-da-pelada/scripts/verify-local-identity.sh
+wsl --user root --exec bash /mnt/c/Users/danie/.codex/worktrees/architecture-reorganization/Liga-da-pelada/scripts/verify-local-all.sh
+wsl --user root --exec bash /mnt/c/Users/danie/.codex/worktrees/architecture-reorganization/Liga-da-pelada/scripts/check-local-db-archive.sh
+wsl --user root --exec bash /mnt/c/Users/danie/.codex/worktrees/architecture-reorganization/Liga-da-pelada/scripts/audit-local-fantasy-cards.sh
 ```
 
 Se o WSL acabou de iniciar, aguarde os serviços `supabase-db`, `supabase-auth` e `supabase-envoy` ficarem saudáveis antes de testar rotas autenticadas. Nesta máquina, chamadas isoladas de `wsl.exe` deixaram a distribuição encerrar entre verificações; manter um terminal Ubuntu aberto durante a sessão de testes preservou os contêineres ativos e todos ficaram saudáveis. Os segredos e dumps continuam fora do repositório. As flags `ENABLE_GOAL_API`, `ENABLE_LEAGUE_API` e `ENABLE_IDENTITY_API` estão ligadas **somente** no contêiner local de homologação. Para exercitar as operações conectadas pelas Server Actions, iniciar o Next local com as flags e URLs correspondentes; sem elas, ele preserva o caminho Supabase legado. Os demais fluxos ainda usam majoritariamente a arquitetura antiga e precisam ser migrados e validados localmente antes da VPS.
