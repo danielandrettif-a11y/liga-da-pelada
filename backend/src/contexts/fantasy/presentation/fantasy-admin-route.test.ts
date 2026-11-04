@@ -103,6 +103,20 @@ describe("Presentation: FantasyAdminRoute", () => {
     expect(body.nextMilestone).toBe(10);
   });
 
+  it("GET /api/fantasy/leagues/:leagueId/users/:userId/history preserves the read model", async () => {
+    const history = { userId: "u2", player: { name: "Alice", avatar_url: null },
+      account: { totalPoints: 10, currentBudget: 55, roundsPlayed: 1, bestRoundPoints: 10 }, lineups: [] };
+    const repo = createMockRepo({ getUserHistory: vi.fn().mockResolvedValue(history) });
+    const app = await buildApp(repo);
+
+    const res = await app.inject({ method: "GET", url: "/api/fantasy/leagues/l1/users/u2/history",
+      headers: { authorization: "Bearer valid-token" } });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.payload)).toEqual(history);
+    expect(repo.getUserHistory).toHaveBeenCalledWith("l1", "u2", "u1");
+  });
+
   it("POST /api/fantasy/leagues/:leagueId/rounds/:roundId/reprocess returns 200 for admin", async () => {
     const repo = createMockRepo();
     const app = await buildApp(repo);

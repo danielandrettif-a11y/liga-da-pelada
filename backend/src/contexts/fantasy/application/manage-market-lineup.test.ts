@@ -46,7 +46,10 @@ describe("Application: ManageFantasyMarketLineupUseCase", () => {
       roundId: "r1",
       isRoundOpen: true,
       confirmedCount: 4,
-      revealedLineupsCount: 0,
+      pendingCount: 0,
+      confirmed: [],
+      pending: [],
+      ranking: [],
     }),
     getMarketRoundInfo: vi.fn().mockResolvedValue({
       isMarketOpen: true,
@@ -76,6 +79,18 @@ describe("Application: ManageFantasyMarketLineupUseCase", () => {
     const result = await useCase.getPlayerDetail(actor, leagueId, "p1");
     expect(result?.playerId).toBe("p1");
     expect(repo.getPlayerDetail).toHaveBeenCalledWith(leagueId, "p1", actor.userId, undefined);
+  });
+
+  it("delegates the complete round overview contract to repo", async () => {
+    const repo = createMockRepo();
+    const result = await new ManageFantasyMarketLineupUseCase(repo).getRoundLineupOverview(
+      actor,
+      leagueId,
+      "round-1",
+    );
+
+    expect(result).toMatchObject({ isRoundOpen: true, confirmedCount: 4, pendingCount: 0 });
+    expect(repo.getRoundLineupOverview).toHaveBeenCalledWith(leagueId, actor.userId, "round-1");
   });
 
   it("saves lineup after successful validation", async () => {

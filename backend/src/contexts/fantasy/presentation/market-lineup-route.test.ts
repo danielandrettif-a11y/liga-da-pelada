@@ -46,7 +46,10 @@ describe("Presentation: MarketLineupRoute", () => {
       roundId: "r1",
       isRoundOpen: true,
       confirmedCount: 2,
-      revealedLineupsCount: 0,
+      pendingCount: 0,
+      confirmed: [],
+      pending: [],
+      ranking: [],
     }),
     getMarketRoundInfo: vi.fn().mockResolvedValue({
       isMarketOpen: true,

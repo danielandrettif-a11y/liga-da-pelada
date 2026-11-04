@@ -174,5 +174,30 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
     expect(result.allowed).toBe(false);
     expect(result.error).toContain("após o fechamento do mercado");
   });
+
+  it("keeps missed lineups pending in an open round overview", async () => {
+    const pool = createMockPool(async (sql) => {
+      if (sql.includes("EXISTS(SELECT 1 FROM public.matches")) {
+        return { rows: [{ id: "fantasy-round-1", round_id: "round-1", number: 1,
+          date: "2026-01-01", market_status: "open", status: "open", has_started: false }] };
+      }
+      if (sql.includes("FROM public.fantasy_accounts account")) {
+        return { rows: [
+          { user_id: "u1", saved_at: "2026-01-01T12:00:00Z", lineup_status: "saved",
+            player: { name: "Alice", avatar_url: null }, cosmetics: null },
+          { user_id: "u2", saved_at: "2026-01-01T12:01:00Z", lineup_status: "missed",
+            player: { name: "Bob", avatar_url: null }, cosmetics: null },
+        ] };
+      }
+      return { rows: [] };
+    });
+
+    const result = await new PgFantasyMarketLineupRepository(pool)
+      .getRoundLineupOverview("league-1", "u1", "round-1");
+
+    expect(result.confirmed.map((item) => item.userId)).toEqual(["u1"]);
+    expect(result.pending.map((item) => item.userId)).toEqual(["u2"]);
+    expect(result.pending[0]?.savedAt).toBeNull();
+  });
 });
 

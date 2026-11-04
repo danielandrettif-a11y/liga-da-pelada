@@ -709,6 +709,11 @@
     {
       "context": "fantasy",
       "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyUserHistory"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
       "name": "getSeasonPassDashboard"
     },
     {

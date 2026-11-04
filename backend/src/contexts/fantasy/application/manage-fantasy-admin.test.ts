@@ -65,6 +65,17 @@ describe("Application: ManageFantasyAdminUseCase", () => {
     expect(repo.getRanking).toHaveBeenCalledWith(leagueId, "season", userActor.userId, undefined);
   });
 
+  it("delegates user history with the viewer identity", async () => {
+    const history = { userId: "u1", player: { name: "Alice", avatar_url: null },
+      account: { totalPoints: 10, currentBudget: 55, roundsPlayed: 1, bestRoundPoints: 10 }, lineups: [] };
+    const repo = createMockRepo({ getUserHistory: vi.fn().mockResolvedValue(history) });
+
+    const result = await new ManageFantasyAdminUseCase(repo).getUserHistory(userActor, leagueId, "u1");
+
+    expect(result).toEqual(history);
+    expect(repo.getUserHistory).toHaveBeenCalledWith(leagueId, "u1", userActor.userId);
+  });
+
   it("blocks getAdminData for non-admin", async () => {
     const repo = createMockRepo();
     const useCase = new ManageFantasyAdminUseCase(repo);

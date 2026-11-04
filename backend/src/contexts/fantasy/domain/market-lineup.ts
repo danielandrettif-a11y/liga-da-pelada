@@ -91,10 +91,30 @@ export type FantasyMarketQuickHighlights = {
 };
 
 export type FantasyRoundOverview = {
-  roundId: string;
+  roundId?: string | null;
+  roundNumber?: number | null;
+  roundDate?: string | null;
   isRoundOpen: boolean;
   confirmedCount: number;
-  revealedLineupsCount: number;
+  pendingCount: number;
+  confirmed: FantasyLineupStatusEntry[];
+  pending: FantasyLineupStatusEntry[];
+  ranking: Array<Record<string, unknown>>;
+};
+
+export type FantasyLineupStatusEntry = {
+  userId: string;
+  playerName: string;
+  avatarUrl: string | null;
+  hasSaved: boolean;
+  savedAt: string | null;
+  points?: number | null;
+  isCurrentUser: boolean;
+  cosmetics: {
+    frameKey: string | null;
+    auraKey: string | null;
+    backgroundAssetKey: string | null;
+  } | null;
 };
 
 export type FantasyUserSummary = {

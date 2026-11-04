@@ -354,8 +354,15 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
          ORDER BY CASE WHEN round_item.status<>'finished' AND fantasy_round.market_status IN ('open','in_progress') THEN 0 ELSE 1 END,
            round_item.date DESC,round_item.number DESC LIMIT 1`, [leagueId,roundId&&roundId!=="active"?roundId:null]);
       const row=result.rows[0];
-      const empty={isRoundOpen:false,confirmedCount:0,pendingCount:0,confirmed:[],pending:[],ranking:[]};
-      if(!row)return empty as any;
+      const empty: FantasyRoundOverview = {
+        isRoundOpen: false,
+        confirmedCount: 0,
+        pendingCount: 0,
+        confirmed: [],
+        pending: [],
+        ranking: [],
+      };
+      if(!row)return empty;
       const isRoundOpen=row.market_status==="open"&&!row.has_started&&row.status!=="finished";
       if(!isRoundOpen){
         const rankingRows=await client.query<any>(
@@ -392,10 +399,10 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
           const position=previousPoints===points?previousPosition:index+1;previousPoints=points;previousPosition=position;
           return{...item,position};});
         return{isRoundOpen:false,roundNumber:Number(row.number),roundDate:row.date,roundId:row.round_id,
-          confirmedCount:ranking.length,pendingCount:0,confirmed:[],pending:[],ranking} as any;
+          confirmedCount:ranking.length,pendingCount:0,confirmed:[],pending:[],ranking};
       }
       const accounts=await client.query<any>(
-        `SELECT account.user_id,lineup.created_at saved_at,lineup.total_points,
+         `SELECT account.user_id,lineup.created_at saved_at,lineup.status lineup_status,lineup.total_points,
                 jsonb_build_object('name',player.name,'avatar_url',player.avatar_url) player,
                 CASE WHEN loadout.user_id IS NULL THEN NULL ELSE jsonb_build_object('frameKey',frame.asset_key,
                   'auraKey',aura.asset_key,'backgroundAssetKey',background.asset_key) END cosmetics
@@ -410,11 +417,12 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
          LEFT JOIN public.fantasy_cosmetics background ON background.id=loadout.background_cosmetic_id
          WHERE fantasy_season.league_id=$1::uuid`,[leagueId,row.id]);
       const entries=accounts.rows.map((item:any)=>({userId:item.user_id,playerName:item.player?.name||"Cartoleiro",
-        avatarUrl:item.player?.avatar_url||null,hasSaved:Boolean(item.saved_at),savedAt:item.saved_at||null,points:null,
+        avatarUrl:item.player?.avatar_url||null,hasSaved:Boolean(item.saved_at)&&item.lineup_status!=="missed",
+        savedAt:item.lineup_status!=="missed"?item.saved_at||null:null,points:null,
         isCurrentUser:item.user_id===userId,cosmetics:item.cosmetics||null}));
       const confirmed=entries.filter((item:any)=>item.hasSaved),pending=entries.filter((item:any)=>!item.hasSaved);
       return{isRoundOpen:true,roundNumber:Number(row.number),roundDate:row.date,roundId:row.round_id,
-        confirmedCount:confirmed.length,pendingCount:pending.length,confirmed,pending,ranking:[]} as any;
+        confirmedCount:confirmed.length,pendingCount:pending.length,confirmed,pending,ranking:[]};
     });
   }
 

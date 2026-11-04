@@ -25,13 +25,21 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Concluído nesta fase | Formato, abertura, pré-lista, edição, estado e participação extraídos; migrations 325 e 328 aplicadas e validadas em teste e oficial; isolamento entre duas peladas aprovado. |
 | Partidas e pontuação | 21/21 operações aceitas em revisão | Ciclo de vida, gols, goleiros, substituições e cronômetro extraídos. O cronômetro agenda QStash no backend, reivindica alertas de forma transacional e libera a reivindicação quando o Web Push falha. Ainda falta o ensaio móvel integrado com falhas de rede e dois ADMs para promover o contexto a verificado. |
-| Cartola e cosméticos | 24/33 operações aceitas | Cosméticos 11/11; Fantasy 13/22. Restam nove projeções analíticas ricas antes de ativar `FANTASY_API_ENABLED`. |
+| Cartola e cosméticos | 25/33 operações aceitas | Cosméticos 11/11; Fantasy 14/22. Restam oito projeções analíticas ricas antes de ativar `FANTASY_API_ENABLED`. |
 | Pagamentos | Concluído nesta fase | Itens, parcelas, PIX, rateio, obrigações, checklist e auditoria separados em domínio, aplicação e infraestrutura, mantendo RPCs e escopo por pelada. |
 | Notificações | Concluído nesta fase (16/16) | Inbox, preferências, push subscriptions, envio Web Push e e-mail Resend, agendamento QStash de lembretes do Cartola e alerta de cronômetro com 100% de paridade e fail-fast. |
-| Estatísticas e demais áreas | Concluído em revisão de código | Estatísticas 22/22 e todos os demais contextos, exceto as nove projeções analíticas de Fantasy, estão aceitos. |
+| Estatísticas e demais áreas | Concluído em revisão de código | Estatísticas 22/22 e todos os demais contextos, exceto as oito projeções analíticas de Fantasy, estão aceitos. |
 | Avaliação de tabela de acumulados | Medida no oficial; sem justificativa para criar | No banco oficial, `seasonStats`, `rankingHistory` e `playerHistory` ficaram em 128,51 ms, 119,62 ms e 99,64 ms no p95. Os gargalos estão nos enriquecimentos/RPCs compostas. Ver `reports/performance/BASELINE-2026-10-21.md`. |
 
 ## Registro de lotes
+
+### 2026-11-04 — histórico público do Cartola aceito e contratos incompletos expostos
+
+- `getFantasyUserHistory` foi comparado ponta a ponta com o contrato consumido pela tela: identidade, conta, escalações pontuadas da temporada ativa e carta por rodada permanecem limitadas à pelada selecionada. Foram adicionados testes de infraestrutura, aplicação e rota HTTP, incluindo os filtros de pelada, temporada ativa e status `scored`.
+- A visão geral da rodada deixou de usar um tipo resumido incorreto. O domínio agora declara `confirmed`, `pending`, `ranking`, metadados da rodada e cosméticos. A consulta também voltou a tratar escalação `missed` como pendente, preservando a regra do legado.
+- A revisão detectou que as outras oito pontes ainda não podem ser liberadas: dashboard e ficha do atleta perderiam campos usados pela interface; ranking, visão da rodada, escalações reveladas, resumo pessoal e detalhe histórico ainda não reproduzem todas as projeções ao vivo. `FANTASY_API_ENABLED` continua desligada.
+- Progresso conservador: **259/267 operações aceitas (97,0%)**, restando **8**, todas no contexto Fantasy. O estado integrado permanece **0/267 verificadas** até executar jornadas autenticadas com as flags efetivamente ligadas.
+- Verificação: **700 testes backend em 181 arquivos** e **1.238 testes frontend em 237 arquivos**, typechecks, builds de produção, auditoria de migração e `git diff --check` aprovados.
 
 ### 2026-11-03 — Cosméticos e BQ Manager corrigidos; gate honesto para produção
 

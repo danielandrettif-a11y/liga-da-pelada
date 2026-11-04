@@ -47,6 +47,43 @@ describe("Infrastructure: PgFantasyAdminRepository", () => {
       player: { name: "Cartoleiro 1", avatar_url: null } });
   });
 
+  it("returns user history scoped to the selected league and active season", async () => {
+    const pool = createMockPool(async (sql, params) => {
+      if (sql.includes("FROM public.account_profiles profile")) {
+        expect(params).toEqual(["league-1", "user-1"]);
+        return { rows: [{ user_id: "user-1", players: { name: "Alice", avatar_url: null } }] };
+      }
+      if (sql.includes("FROM public.fantasy_accounts account")) {
+        expect(params).toEqual(["league-1", "user-1"]);
+        return { rows: [{ total_points: "42.5", current_budget: "61.25", rounds_played: 2,
+          best_round_points: "25.5" }] };
+      }
+      if (sql.includes("FROM public.fantasy_lineups lineup")) {
+        expect(sql).toContain("core.status='active'");
+        expect(sql).toContain("lineup.status='scored'");
+        return { rows: [{ id: "lineup-1", fantasy_round: { round_id: "round-1" },
+          round: { number: 1, date: "2026-01-01", status: "finished" } }] };
+      }
+      if (sql.includes("FROM public.fantasy_card_activations activation")) {
+        return { rows: [{ round_id: "round-1", status: "APPLIED", result_bonus: "3",
+          result_details: { description: "Bônus" },
+          card: { name: "Carta", slug: "card", rarity: "COMMON", description: null } }] };
+      }
+      return { rows: [] };
+    });
+
+    const history = await new PgFantasyAdminRepository(pool, roundStatistics)
+      .getUserHistory("league-1", "user-1", "viewer-1");
+
+    expect(history).toMatchObject({
+      userId: "user-1",
+      player: { name: "Alice", avatar_url: null },
+      account: { totalPoints: 42.5, currentBudget: 61.25, roundsPlayed: 2, bestRoundPoints: 25.5 },
+      lineups: [{ id: "lineup-1", fantasyRound: { round_id: "round-1" },
+        activeCard: { slug: "card", bonus: 3 } }],
+    });
+  });
+
   it("updates fantasy settings initial budget", async () => {
     const executedSql: string[] = [];
     const pool = createMockPool(async (sql) => {
