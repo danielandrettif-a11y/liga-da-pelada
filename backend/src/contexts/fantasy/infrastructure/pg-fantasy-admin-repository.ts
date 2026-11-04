@@ -7,6 +7,12 @@ import type {
 } from "../domain/analytical-read-models.js";
 import type { FantasyAdminConfigData, FantasyRankingScope, FantasyUserRoundHistoryDetail, SeasonPassDashboardData } from "../domain/fantasy-admin.js";
 import type { RoundStatisticsRepository } from "../../statistics/application/manage-round-statistics.js";
+import {
+  resolveFantasyBulletinTotal,
+  resolveFantasyFinishedPlayerScores,
+  resolveFantasyLineupPlayerTotal,
+} from "../domain/lineup-player-total.js";
+import { readLiveFantasyProjection } from "./pg-live-fantasy-projection.js";
 
 export class PgFantasyAdminRepository implements FantasyAdminRepository {
   constructor(private readonly pool: Pool, private readonly roundStatistics: RoundStatisticsRepository) {}
@@ -46,6 +52,14 @@ export class PgFantasyAdminRepository implements FantasyAdminRepository {
       }
       const fantasyRoundIds = selected.map((item: any) => item.id);
       if (!fantasyRoundIds.length) return [];
+      let live = await readLiveFantasyProjection(client, {
+        leagueId,
+        fantasySeasonId,
+        targetRoundId: periodScope === "round" ? selected[0]?.round_id : undefined,
+      });
+      if (periodScope === "month" && live && !selected.some((item: any) => item.round_id === live?.roundId)) {
+        live = null;
+      }
       const result = await client.query<any>(
         `WITH lineup_metrics AS (
            SELECT lineup.user_id,min(lineup.id::text)::uuid id,
@@ -61,7 +75,7 @@ export class PgFantasyAdminRepository implements FantasyAdminRepository {
            SELECT lineup.user_id,sum(COALESCE(player.captain_bonus,0)) captain_bonus_points,
              sum(COALESCE(player.total_points,0)) FILTER (WHERE player.slot_role='DEF') def_points,
              sum(COALESCE(player.total_points,0)) FILTER (WHERE player.slot_role IN ('ATA','MEI')) attack_points,
-             count(player.id)::int FILTER (WHERE player.slot_role IN ('ATA','MEI')) attack_selection_count
+              (count(player.id) FILTER (WHERE player.slot_role IN ('ATA','MEI')))::int attack_selection_count
            FROM public.fantasy_lineups lineup JOIN public.fantasy_lineup_players player ON player.lineup_id=lineup.id
            WHERE lineup.fantasy_round_id=ANY($1::uuid[])
              AND ($2::text='round' OR lineup.status='scored') GROUP BY lineup.user_id
@@ -79,7 +93,62 @@ export class PgFantasyAdminRepository implements FantasyAdminRepository {
          LEFT JOIN lineup_metrics metrics ON metrics.user_id=account.user_id
          LEFT JOIN player_metrics ON player_metrics.user_id=account.user_id
          WHERE account.fantasy_season_id=$3::uuid`, [fantasyRoundIds, periodScope, fantasySeasonId]);
-      const entries = periodScope === "round" ? result.rows.filter((item: any) => Number(item.rounds_played)>0) : result.rows;
+      let entries = periodScope === "round" ? result.rows.filter((item: any) => Number(item.rounds_played)>0) : result.rows;
+      if (periodScope === "round" && live?.roundId === selected[0]?.round_id) {
+        const activeLive = live!;
+        const byUser = new Map(entries.map((item: any) => [item.user_id, item]));
+        for (const projection of activeLive.byUserId.values()) {
+          const stored: any = byUser.get(projection.userId) || {};
+          const projectedPlayerScores = activeLive.isLive
+            ? projection.players.map((player) => ({ playerId: player.playerId, points: Number(player.totalPoints || 0) }))
+            : resolveFantasyFinishedPlayerScores({
+                projectedPlayers: projection.players,
+                storedPlayers: activeLive.storedPlayersByUserId.get(projection.userId),
+              });
+          const projectedTeamPoints = projectedPlayerScores.reduce((total, player) => total + player.points, 0);
+          byUser.set(projection.userId, {
+            ...stored,
+            id: stored.id || projection.lineupId,
+            user_id: projection.userId,
+            total_points: projectedTeamPoints,
+            rounds_played: 1,
+            best_round_points: projectedTeamPoints,
+            current_budget: Number(stored.current_budget || 0),
+            is_live: activeLive.isLive,
+            score_breakdown: stored.score_breakdown || {},
+          });
+        }
+        entries = [...byUser.values()];
+      } else if (live) {
+        const byUser = new Map(entries.map((item: any) => [item.user_id, item]));
+        for (const projection of live.byUserId.values()) {
+          const stored: any = byUser.get(projection.userId) || {};
+          const defPlayers = projection.players.filter((item) => item.slotRole === "DEF");
+          const attackPlayers = projection.players.filter((item) => item.slotRole === "ATA");
+          const livePoints = Number(projection.totalPoints || 0);
+          byUser.set(projection.userId, {
+            ...stored,
+            id: stored.id || projection.lineupId,
+            user_id: projection.userId,
+            total_points: Number(stored.total_points || 0) + livePoints,
+            rounds_played: Number(stored.rounds_played || 0),
+            best_round_points: Math.max(Number(stored.best_round_points || 0), livePoints),
+            captain_bonus_points: Number(stored.captain_bonus_points || 0) + Number(projection.captainBonus || 0),
+            def_points: Number(stored.def_points || 0) + defPlayers.reduce((sum, item) => sum + Number(item.totalPoints || 0), 0),
+            mid_points: 0,
+            mid_selection_count: 0,
+            mid_average_points: 0,
+            attack_points: Number(stored.attack_points || 0) + attackPlayers.reduce((sum, item) => sum + Number(item.totalPoints || 0), 0),
+            attack_selection_count: Number(stored.attack_selection_count || 0) + attackPlayers.length,
+            current_budget: Number(stored.current_budget || 0),
+            is_live: true,
+          });
+        }
+        entries = [...byUser.values()].map((item: any) => ({
+          ...item,
+          attack_average_points: Number(item.attack_points || 0) / Math.max(1, Number(item.attack_selection_count || 0)),
+        }));
+      }
       const userIds = entries.map((item: any) => item.user_id);
       if (!userIds.length) return [];
       const [profiles, cosmetics, activations] = await Promise.all([
@@ -133,7 +202,7 @@ export class PgFantasyAdminRepository implements FantasyAdminRepository {
       const [history, fantasyRoundResult] = await Promise.all([
         this.readUserHistory(client, leagueId, userId),
         client.query<any>(
-          `SELECT fantasy_round.id, fantasy_round.round_id, fantasy_round.market_status,
+          `SELECT fantasy_round.id, fantasy_round.fantasy_season_id, fantasy_round.round_id, fantasy_round.market_status,
                   fantasy_round.scoring_version, fantasy_round.settings_snapshot,
                   jsonb_build_object('number',round_item.number,'date',round_item.date,
                     'status',round_item.status,'suppress_goalkeeper_rewards',round_item.suppress_goalkeeper_rewards,
@@ -160,6 +229,12 @@ export class PgFantasyAdminRepository implements FantasyAdminRepository {
          GROUP BY lineup.id`, [fantasyRound.id, userId]);
       const storedLineup = lineupResult.rows[0];
       if (!storedLineup) return null;
+      const live = await readLiveFantasyProjection(client, {
+        leagueId,
+        fantasySeasonId: fantasyRound.fantasy_season_id,
+        targetRoundId: roundId,
+      });
+      const projection = live?.roundId === roundId ? live.byUserId.get(userId) || null : null;
       const playerIds = (storedLineup.fantasy_lineup_players || []).map((item: any) => item.player_id);
       const [stats, prices, predictions, activation] = await Promise.all([
         playerIds.length ? client.query<any>(
@@ -185,24 +260,64 @@ export class PgFantasyAdminRepository implements FantasyAdminRepository {
            WHERE activation.round_id=$1::uuid AND activation.user_id=$2::uuid`, [roundId, userId]),
       ]);
       const pricesByPlayer = new Map(prices.rows.map((price: any) => [price.player_id, price]));
+      const finishedScores = projection && !live?.isLive
+        ? resolveFantasyFinishedPlayerScores({
+            projectedPlayers: projection.players,
+            storedPlayers: storedLineup.fantasy_lineup_players,
+          })
+        : [];
+      const finishedByPlayer = new Map(finishedScores.map((item) => [item.playerId, item.points]));
+      const projectedByPlayer = new Map((projection?.players || []).map((item) => [item.playerId, item]));
       const players = (storedLineup.fantasy_lineup_players || []).map((item: any) => {
         const price: any = pricesByPlayer.get(item.player_id);
-        return { ...item, price_after: price?.price_after ?? item.price_after,
+        const projected = projectedByPlayer.get(item.player_id);
+        const useProjection = Boolean(projected && (live?.isLive || item.slot_role !== "GOL"));
+        return { ...item,
+          base_points: useProjection ? Number(projected?.basePoints || 0) + Number(projected?.positionBonus || 0) : item.base_points,
+          position_bonus: useProjection ? Number(projected?.positionBonus || 0) : item.position_bonus,
+          captain_bonus: useProjection ? Number(projected?.captainBonus || 0) : item.captain_bonus,
+          total_points: useProjection
+            ? Number(projected?.totalPoints || 0)
+            : (finishedByPlayer.get(item.player_id) ?? item.total_points),
+          price_after: price?.price_after ?? item.price_after,
           price_change: price?.price_change ?? (item.price_after == null ? null : Number(item.price_after)-Number(item.price_locked||0)) };
       });
-      const playerPoints = players.length
+      const playerPoints = projection
         ? players.reduce((total: number, item: any) => total + Number(item.total_points || 0), 0)
-        : Number(storedLineup.player_points ?? storedLineup.total_points ?? 0);
+          + Number(projection.reserve?.pointsGain || 0)
+        : resolveFantasyLineupPlayerTotal({ storedPlayers: players,
+            storedPlayerPoints: storedLineup.player_points, storedTotalPoints: storedLineup.total_points });
       const directActivation = activation.rows[0], directCard = directActivation?.card;
       const historyLineup = history?.lineups?.find((item: any) => item.fantasyRound?.round_id === roundId);
       return {
         history: history || { player: null },
         lineup: { ...storedLineup, player_points: playerPoints,
-          total_points: Number(storedLineup.total_points ?? playerPoints), fantasy_lineup_players: players },
-        round: fantasyRound.round, isLive: false,
+          prediction_points: projection?.predictionPoints ?? storedLineup.prediction_points,
+          total_points: projection
+            ? resolveFantasyBulletinTotal({ playerPoints, cardPoints: projection.cardPoints })
+            : Number(storedLineup.total_points ?? playerPoints),
+          score_breakdown: projection ? { ...(storedLineup.score_breakdown || {}),
+            captainBonus: projection.captainBonus, positionBonus: projection.positionBonus,
+            cardBonus: projection.cardPoints, live: true } : storedLineup.score_breakdown,
+          fantasy_lineup_players: players },
+        round: fantasyRound.round, isLive: Boolean(projection && live?.isLive),
         scoringVersion: Number(fantasyRound.settings_snapshot?.scoring_version ?? fantasyRound.scoring_version ?? 5),
         settingsSnapshot: fantasyRound.settings_snapshot || {},
-        statsByPlayer: Object.fromEntries(stats.rows.map((stat: any) => [stat.player_id, stat])),
+        statsByPlayer: projection
+          ? Object.fromEntries(playerIds.map((playerId: string) => {
+              const stat = live?.statsByPlayer.get(playerId);
+              return [playerId, stat ? {
+                player_id: playerId, games: stat.games, goals: stat.goals, assists: stat.assists,
+                wins: stat.wins, draws: stat.draws, losses: stat.losses, own_goals: stat.ownGoals,
+                goalkeeper_games: stat.goalkeeperGames, clean_sheets: stat.cleanSheets,
+                goalkeeper_goals: stat.goalkeeperGoals, goalkeeper_assists: stat.goalkeeperAssists,
+                goalkeeper_own_goals: stat.goalkeeperOwnGoals, goalkeeper_wins: stat.goalkeeperWins,
+                goalkeeper_draws: stat.goalkeeperDraws, goalkeeper_losses: stat.goalkeeperLosses,
+                goals_conceded: stat.goalsConceded, defensive_clean_games: stat.defensiveCleanGames,
+                defensive_one_goal_games: stat.defensiveOneGoalGames, team_goals_conceded: stat.teamGoalsConceded,
+              } : {}];
+            }))
+          : Object.fromEntries(stats.rows.map((stat: any) => [stat.player_id, stat])),
         predictionPlayers: Object.fromEntries(predictions.rows.map((player: any) => [player.id, player])),
         activeCard: directCard ? { ...directCard, status: directActivation.status,
           bonus: Number(directActivation.result_bonus || 0), details: directActivation.result_details || null }

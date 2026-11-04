@@ -714,6 +714,31 @@
     {
       "context": "fantasy",
       "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyRanking"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyRoundLineupOverview"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyUserRoundHistory"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getMyFantasySummary"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getRevealedLineups"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
       "name": "getSeasonPassDashboard"
     },
     {

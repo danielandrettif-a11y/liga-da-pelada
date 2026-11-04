@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from "pg";
 import { withAuthenticatedTransaction } from "../../../infrastructure/authenticated-transaction.js";
 import type { FantasyMarketLineupRepository } from "../application/manage-market-lineup.js";
 import type { FantasyRankingReadModel } from "../domain/analytical-read-models.js";
+import { resolveFantasyFinishedPlayerScores } from "../domain/lineup-player-total.js";
 import type {
   FantasyMarketDashboardData,
   FantasyMarketPlayerSummary,
@@ -11,6 +12,7 @@ import type {
   FantasyUserSummary,
   UserFantasyHistoryEntry,
 } from "../domain/market-lineup.js";
+import { readLiveFantasyProjection } from "./pg-live-fantasy-projection.js";
 
 export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepository {
   constructor(private readonly pool: Pool) {}
@@ -195,7 +197,7 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
            SELECT lineup.user_id,sum(COALESCE(item.captain_bonus,0)) captain_bonus_points,
              sum(COALESCE(item.total_points,0)) FILTER (WHERE item.slot_role='DEF') def_points,
              sum(COALESCE(item.total_points,0)) FILTER (WHERE item.slot_role IN ('ATA','MEI')) attack_points,
-             count(item.id)::int FILTER (WHERE item.slot_role IN ('ATA','MEI')) attack_selection_count
+              (count(item.id) FILTER (WHERE item.slot_role IN ('ATA','MEI')))::int attack_selection_count
            FROM public.fantasy_lineups lineup JOIN public.fantasy_rounds fantasy_round ON fantasy_round.id=lineup.fantasy_round_id
            JOIN public.fantasy_lineup_players item ON item.lineup_id=lineup.id
            WHERE fantasy_round.fantasy_season_id=(SELECT id FROM active_season) AND lineup.status='scored'
@@ -228,7 +230,32 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
          LEFT JOIN public.fantasy_cosmetics background ON background.id=loadout.background_cosmetic_id
          WHERE ranking.user_id=$2::uuid`, [leagueId, userId]);
       const row = result.rows[0];
-      return row || null;
+      if (!row) return null;
+      const season = await client.query<{ id: string }>(
+        `SELECT fantasy_season.id FROM public.fantasy_seasons fantasy_season
+         JOIN public.seasons core ON core.id=fantasy_season.season_id AND core.status='active'
+         WHERE fantasy_season.league_id=$1::uuid LIMIT 1`, [leagueId]);
+      const fantasySeasonId = season.rows[0]?.id;
+      const live = fantasySeasonId
+        ? await readLiveFantasyProjection(client, { leagueId, fantasySeasonId })
+        : null;
+      const projection = live?.byUserId.get(userId);
+      if (!projection) return row;
+      const defPlayers = projection.players.filter((item) => item.slotRole === "DEF");
+      const attackPlayers = projection.players.filter((item) => item.slotRole === "ATA");
+      const attackSelections = Number(row.attack_selection_count || 0) + attackPlayers.length;
+      return {
+        ...row,
+        total_points: Number(row.total_points || 0) + Number(projection.totalPoints || 0),
+        best_round_points: Math.max(Number(row.best_round_points || 0), Number(projection.totalPoints || 0)),
+        captain_bonus_points: Number(row.captain_bonus_points || 0) + Number(projection.captainBonus || 0),
+        def_points: Number(row.def_points || 0) + defPlayers.reduce((sum, item) => sum + Number(item.totalPoints || 0), 0),
+        attack_points: Number(row.attack_points || 0) + attackPlayers.reduce((sum, item) => sum + Number(item.totalPoints || 0), 0),
+        attack_selection_count: attackSelections,
+        attack_average_points: (Number(row.attack_points || 0)
+          + attackPlayers.reduce((sum, item) => sum + Number(item.totalPoints || 0), 0)) / Math.max(1, attackSelections),
+        is_live: true,
+      };
     });
   }
 
@@ -268,7 +295,7 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
   async getRevealedLineups(leagueId: string, userId: string, roundId?: string) {
     return this.withUser(userId, async (client) => {
       const round = await client.query<any>(
-        `SELECT fantasy_round.id, fantasy_round.market_status,round_item.id round_id,
+        `SELECT fantasy_round.id, fantasy_round.fantasy_season_id, fantasy_round.market_status,round_item.id round_id,
                 round_item.number,round_item.date,round_item.status
          FROM public.fantasy_rounds fantasy_round
          JOIN public.rounds round_item ON round_item.id = fantasy_round.round_id
@@ -309,6 +336,11 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
       const priceByPlayer=new Map(prices.rows.map((item:any)=>[item.player_id,item]));
       const predictionById=new Map(predictions.rows.map((item:any)=>[item.id,item]));
       const activationByUser=new Map(activations.rows.map((item:any)=>[item.user_id,item]));
+      const live = await readLiveFantasyProjection(client, {
+        leagueId,
+        fantasySeasonId: target.fantasy_season_id,
+        targetRoundId: target.round_id,
+      });
       const revealed=usable.map((lineup:any)=>{
         const activation:any=activationByUser.get(lineup.user_id),details=activation?.result_details||{};
         const pending=["RESERVED","LOCKED"].includes(String(activation?.status||"").toUpperCase());
@@ -316,7 +348,15 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
           ||activation?.slug==="bargain"||activation?.slug==="extra_credit"||Number(details.budgetBonus||0)>0;
         const cardPoints=activation&&!pending&&!monetary?Math.max(Number(activation.result_bonus||0),Number(lineup.score_breakdown?.cardBonus||0)):0;
         const reserve=lineup.reserves?.[0]||null;
-        const playerPoints=lineup.players.reduce((total:number,item:any)=>total+Number(item.total_points||0),0)+Number(reserve?.points_gain||0);
+        const projection=live?.byUserId.get(lineup.user_id);
+        const resolvedScores=projection
+          ? live?.isLive
+            ? projection.players.map((item)=>({playerId:item.playerId,points:Number(item.totalPoints||0)}))
+            : resolveFantasyFinishedPlayerScores({projectedPlayers:projection.players,storedPlayers:lineup.players})
+          : lineup.players.map((item:any)=>({playerId:item.player_id,points:Number(item.total_points||0)}));
+        const projectedPointsByPlayer=new Map(resolvedScores.map((item:any)=>[item.playerId,item.points]));
+        const reservePointsGain=Number(projection?.reserve?.pointsGain??reserve?.points_gain??0);
+        const playerPoints=resolvedScores.reduce((total:number,item:any)=>total+item.points,0)+reservePointsGain;
         const named=(id:string|null)=>{const player:any=id?predictionById.get(id):null;return player?{id:player.id,name:player.name}:null;};
         return {lineupId:lineup.id,userId:lineup.user_id,isCurrentUser:lineup.user_id===userId,
           userName:lineup.profile?.name||"Cartoleiro",userAvatarUrl:lineup.profile?.avatar_url||null,
@@ -324,8 +364,9 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
           position:lineup.round_position||null,captainId:lineup.captain_player_id,
           topScorer:named(lineup.top_scorer_player_id),topAssist:named(lineup.top_assist_player_id),challengePlayer:named(lineup.challenge_player_id),
           reserve:reserve?{playerId:reserve.player_id,name:reserve.player_name_locked||"Reserva",avatarUrl:reserve.avatar_url_locked||null,
-            slotRole:reserve.slot_role,basePoints:Number(reserve.base_points||0),applied:Boolean(reserve.applied),
-            replacedPlayerId:reserve.replaced_player_id||null,pointsGain:Number(reserve.points_gain||0)}:null,
+             slotRole:reserve.slot_role,basePoints:Number(projection?.reserve?.basePoints??(reserve.base_points||0)),
+            applied:Boolean(projection?.reserve?.applied??reserve.applied),
+            replacedPlayerId:projection?.reserve?.replacedPlayerId??(reserve.replaced_player_id||null),pointsGain:reservePointsGain}:null,
           activeCard:activation?{name:activation.name,slug:activation.slug,rarity:activation.rarity,status:activation.status,
             bonus:Number(activation.result_bonus||0),details,fallbackBonus:Number(lineup.score_breakdown?.cardBonus||0)}:null,
           players:lineup.players.map((item:any)=>{const price:any=priceByPlayer.get(item.player_id);return{playerId:item.player_id,
@@ -334,7 +375,7 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
             priceAfter:price?.price_after!=null?Number(price.price_after):item.price_after!=null?Number(item.price_after):null,
             priceChange:price?.price_change!=null?Number(price.price_change):item.price_after!=null?Number(item.price_after)-Number(item.price_locked||0):null,
             basePoints:Number(item.base_points||0),positionBonus:Number(item.position_bonus||0),captainBonus:Number(item.captain_bonus||0),
-            points:Number(item.total_points||0)};})};});
+             points:projectedPointsByPlayer.get(item.player_id)??Number(item.total_points||0)};})};});
       revealed.sort((a:any,b:any)=>b.totalPoints-a.totalPoints);
       return {allowed:true,isMarketOpen:false,roundNumber:Number(target.number),roundDate:target.date,lineups:revealed};
     });
@@ -343,7 +384,7 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
   async getRoundLineupOverview(leagueId: string, userId: string, roundId?: string): Promise<FantasyRoundOverview> {
     return this.withUser(userId, async (client) => {
       const result = await client.query<any>(
-        `SELECT fantasy_round.id,fantasy_round.market_status,round_item.id round_id,round_item.number,
+        `SELECT fantasy_round.id,fantasy_round.fantasy_season_id,fantasy_round.market_status,round_item.id round_id,round_item.number,
                 round_item.date,round_item.status,
                 EXISTS(SELECT 1 FROM public.matches match_item WHERE match_item.round_id=round_item.id
                   AND (match_item.started_at IS NOT NULL OR match_item.status IN ('live','finished'))) has_started
@@ -388,12 +429,32 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
            LEFT JOIN public.fantasy_card_activations activation ON activation.user_id=lineup.user_id AND activation.round_id=$2::uuid
            LEFT JOIN public.fantasy_cards card ON card.id=activation.card_id
            WHERE lineup.fantasy_round_id=$1::uuid`,[row.id,row.round_id]);
-        const ordered=rankingRows.rows.map((item:any)=>{const card=item.roundCard,details=card?.details||{};
+        const live = await readLiveFantasyProjection(client, {
+          leagueId,
+          fantasySeasonId: row.fantasy_season_id,
+          targetRoundId: row.round_id,
+        });
+        const projectionByUser = live?.byUserId || new Map();
+        const ordered=rankingRows.rows.map((item:any)=>{
+          const projection = projectionByUser.get(item.user_id);
+          const card=item.roundCard,details=card?.details||{};
           const pending=["RESERVED","LOCKED"].includes(String(card?.status||"").toUpperCase());
           const monetary=Number(details.budgetRecovery||0)>0||Number(details.discountAmount||0)>0||Number(details.discountPercent||0)>0
             ||card?.slug==="bargain"||card?.slug==="extra_credit"||Number(details.budgetBonus||0)>0;
           const cardPoints=card&&!pending&&!monetary?Math.max(Number(card.bonus||0),Number(card.fallbackBonus||0)):0;
-          return{...item,total_points:Number(item.total_points||0)+cardPoints};}).sort((a:any,b:any)=>b.total_points-a.total_points);
+          const projectedPlayerScores = projection && !live?.isLive
+            ? resolveFantasyFinishedPlayerScores({
+                projectedPlayers: projection.players,
+                storedPlayers: live?.storedPlayersByUserId.get(item.user_id),
+              })
+            : null;
+          const fieldPoints = projection
+            ? projectedPlayerScores
+              ? projectedPlayerScores.reduce((sum, player) => sum + player.points, 0)
+              : projection.players.reduce((sum: number, player: any) => sum + Number(player.totalPoints || 0), 0)
+            : Number(item.total_points || 0);
+          return{...item,total_points:fieldPoints+cardPoints,is_live:Boolean(projection&&live?.isLive)};
+        }).sort((a:any,b:any)=>b.total_points-a.total_points);
         let previousPoints:number|null=null,previousPosition=0;
         const ranking=ordered.map((item:any,index:number)=>{const points=Number(item.total_points||0);
           const position=previousPoints===points?previousPosition:index+1;previousPoints=points;previousPosition=position;

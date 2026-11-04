@@ -25,13 +25,22 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Concluído nesta fase | Formato, abertura, pré-lista, edição, estado e participação extraídos; migrations 325 e 328 aplicadas e validadas em teste e oficial; isolamento entre duas peladas aprovado. |
 | Partidas e pontuação | 21/21 operações aceitas em revisão | Ciclo de vida, gols, goleiros, substituições e cronômetro extraídos. O cronômetro agenda QStash no backend, reivindica alertas de forma transacional e libera a reivindicação quando o Web Push falha. Ainda falta o ensaio móvel integrado com falhas de rede e dois ADMs para promover o contexto a verificado. |
-| Cartola e cosméticos | 25/33 operações aceitas | Cosméticos 11/11; Fantasy 14/22. Restam oito projeções analíticas ricas antes de ativar `FANTASY_API_ENABLED`. |
+| Cartola e cosméticos | 30/33 operações aceitas | Cosméticos 11/11; Fantasy 19/22. Restam três projeções analíticas ricas antes de ativar `FANTASY_API_ENABLED`. |
 | Pagamentos | Concluído nesta fase | Itens, parcelas, PIX, rateio, obrigações, checklist e auditoria separados em domínio, aplicação e infraestrutura, mantendo RPCs e escopo por pelada. |
 | Notificações | Concluído nesta fase (16/16) | Inbox, preferências, push subscriptions, envio Web Push e e-mail Resend, agendamento QStash de lembretes do Cartola e alerta de cronômetro com 100% de paridade e fail-fast. |
-| Estatísticas e demais áreas | Concluído em revisão de código | Estatísticas 22/22 e todos os demais contextos, exceto as oito projeções analíticas de Fantasy, estão aceitos. |
+| Estatísticas e demais áreas | Concluído em revisão de código | Estatísticas 22/22 e todos os demais contextos, exceto as três projeções analíticas de Fantasy, estão aceitos. |
 | Avaliação de tabela de acumulados | Medida no oficial; sem justificativa para criar | No banco oficial, `seasonStats`, `rankingHistory` e `playerHistory` ficaram em 128,51 ms, 119,62 ms e 99,64 ms no p95. Os gargalos estão nos enriquecimentos/RPCs compostas. Ver `reports/performance/BASELINE-2026-10-21.md`. |
 
 ## Registro de lotes
+
+### 2026-11-04 — cinco projeções analíticas de Fantasy aceitas
+
+- `getFantasyRanking`, `getFantasyRoundLineupOverview`, `getFantasyUserRoundHistory`, `getMyFantasySummary` e `getRevealedLineups` agora reutilizam o mesmo domínio canônico de pontuação, capitão, bônus por posição, reserva e goleiro usado pelo frontend. O backend recompõe a projeção ao vivo dentro da transação autenticada e mantém o resultado persistido para rodadas encerradas.
+- O leitor compartilhado carrega temporada, rodada, configurações congeladas, escalações, participantes, partidas, gols, goleiros e substituições. Ranking de rodada, resumo pessoal, visão geral, escalações reveladas e detalhe histórico recebem a mesma projeção por usuário e por atleta, sem duplicar as fórmulas na infraestrutura.
+- O build do Next revelou a diferença entre resolução TypeScript do Turbopack e imports NodeNext do backend. `next.config.ts` agora aponta somente os imports `.js` desse domínio para seus fontes `.ts`, preservando tanto o build standalone do frontend quanto o artefato executável do backend.
+- O smoke autenticado [`verify-local-fantasy-analytics.sh`](../../scripts/verify-local-fantasy-analytics.sh) executou as cinco rotas contra o PostgreSQL 17 restaurado no WSL. A primeira passagem encontrou duas expressões `FILTER` com cast em posição inválida; após a correção, **5/5 consultas responderam 200** na imagem `liga-backend-local:fantasy-live-5`.
+- Progresso conservador: **264/267 operações aceitas (98,9%)**, restando **3**: `getFantasyDashboard`, `getFantasyPlayerDetail` e `getFantasyPlayerSummary`. `FANTASY_API_ENABLED` permanece desligada até concluir as três e repetir a jornada completa.
+- Verificação: **706 testes backend em 182 arquivos**, **1.238 testes frontend em 237 arquivos**, typechecks, builds de produção, smoke WSL/PostgreSQL e auditorias de arquitetura/migração aprovados.
 
 ### 2026-11-04 — histórico público do Cartola aceito e contratos incompletos expostos
 

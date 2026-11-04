@@ -1,0 +1,174 @@
+import { BQ_SCORING_V5, buildBQBasePointBreakdown, calculateBQBasePoints, type BQBaseScoringSnapshot, type BQPlayerStats } from "./bq-scoring.js";
+import { COLUMN_C_SCORING, calculateColumnCRankedPoints, inferOneGoalGames, inferTwoGoalGames, type ColumnCLineRole } from "./column-c-scoring.js";
+
+export const RANKED_SCORING = {
+  win: BQ_SCORING_V5.win,
+  goal: BQ_SCORING_V5.goal,
+  assist: BQ_SCORING_V5.assist,
+  draw: BQ_SCORING_V5.draw,
+  loss: BQ_SCORING_V5.loss,
+  ownGoal: BQ_SCORING_V5.ownGoal,
+  goalkeeperAppearance: BQ_SCORING_V5.goalkeeperAppearance,
+  goalkeeperGoalConceded: BQ_SCORING_V5.goalkeeperGoalConceded,
+} as const;
+
+export type RankedScoringStats = {
+  wins?: number;
+  goals?: number;
+  assists?: number;
+  draws?: number;
+  losses?: number;
+  ownGoals?: number;
+  goalkeeperAppearances?: number;
+  goalkeeperGoalsConceded?: number;
+  goalkeeperGoals?: number;
+  goalkeeperAssists?: number;
+  goalkeeperOwnGoals?: number;
+  goalkeeperCleanSheets?: number;
+  teamGoalsConceded?: number;
+  defensiveCleanGames?: number;
+  defensiveOneGoalGames?: number;
+  lineRole?: ColumnCLineRole;
+};
+
+export type RankedPointBreakdownItem = {
+  label: string;
+  count: number;
+  points: number;
+};
+
+function amount(value: number | null | undefined) {
+  return Number(value || 0);
+}
+
+/**
+ * Fonte única da pontuação Ranked. Delega para calculateBQBasePoints para
+ * garantir paridade com o Cartola nos 8 scouts básicos.
+ */
+export function calculateRankedPoints(stats: RankedScoringStats, snapshot?: BQBaseScoringSnapshot) {
+  const scoring = snapshot ?? BQ_SCORING_V5;
+  if (Number(scoring.version || 0) >= 11) {
+    return calculateColumnCRankedPoints(stats.lineRole || "ATA", {
+      goals: stats.goals,
+      assists: stats.assists,
+      ownGoals: stats.ownGoals,
+      teamGoalsConceded: stats.teamGoalsConceded,
+      defensiveCleanGames: stats.defensiveCleanGames,
+      defensiveOneGoalGames: stats.defensiveOneGoalGames,
+      goalkeeperGames: stats.goalkeeperAppearances,
+      goalkeeperGoals: stats.goalkeeperGoals,
+      goalkeeperAssists: stats.goalkeeperAssists,
+      goalkeeperOwnGoals: stats.goalkeeperOwnGoals,
+      goalkeeperGoalsConceded: stats.goalkeeperGoalsConceded,
+      goalkeeperCleanSheets: stats.goalkeeperCleanSheets,
+    }, Number(scoring.version || 0), {
+      goal: stats.lineRole === "DEF" ? scoring.defenderGoal : scoring.goal,
+      assist: stats.lineRole === "DEF" ? scoring.defenderAssist : scoring.assist,
+      conceded: scoring.teamGoalConceded,
+      cleanSheet: scoring.defenderCleanSheet,
+      oneGoal: scoring.defenderOneGoal,
+      oneGoalConceded: scoring.defenderOneGoalConceded,
+      twoGoalsConceded: scoring.defenderTwoGoalsConceded,
+      ownGoal: scoring.ownGoal,
+    }, {
+      appearance: scoring.goalkeeperAppearance,
+      goal: scoring.defenderGoal,
+      assist: scoring.defenderAssist,
+      conceded: scoring.goalkeeperGoalConceded,
+      cleanSheet: scoring.goalkeeperCleanSheet,
+      oneGoal: scoring.goalkeeperOneGoal,
+      ownGoal: scoring.ownGoal,
+    });
+  }
+  const bqStats: BQPlayerStats = {
+    goals: amount(stats.goals),
+    assists: amount(stats.assists),
+    wins: amount(stats.wins),
+    draws: amount(stats.draws),
+    losses: amount(stats.losses),
+    ownGoals: amount(stats.ownGoals),
+    goalkeeperAppearances: amount(stats.goalkeeperAppearances),
+    goalkeeperGoalsConceded: amount(stats.goalkeeperGoalsConceded),
+  };
+  return calculateBQBasePoints(scoring, bqStats);
+}
+
+export function buildRankedPointBreakdown(
+  stats: RankedScoringStats,
+  snapshot: BQBaseScoringSnapshot = BQ_SCORING_V5,
+  options: { suppressGoalkeeperRewards?: boolean } = {},
+): RankedPointBreakdownItem[] {
+  if (Number(snapshot.version || 0) >= 11) {
+    const role = stats.lineRole || "ATA";
+    const rule = COLUMN_C_SCORING[role];
+    const lineGoalPoints = role === "DEF"
+      ? (snapshot.defenderGoal ?? rule.goal)
+      : snapshot.goal;
+    const lineAssistPoints = role === "DEF"
+      ? (snapshot.defenderAssist ?? rule.assist)
+      : snapshot.assist;
+    const lineGoals = Math.max(0, amount(stats.goals) - amount(stats.goalkeeperGoals));
+    const lineAssists = Math.max(0, amount(stats.assists) - amount(stats.goalkeeperAssists));
+    const lineOwnGoals = Math.max(0, amount(stats.ownGoals) - amount(stats.goalkeeperOwnGoals));
+    const lineConceded = Math.max(0, amount(stats.teamGoalsConceded) - amount(stats.goalkeeperGoalsConceded));
+    const progressiveDefense = Number(snapshot.version || 0) >= 12;
+    const tieredDefensePenalty = Number(snapshot.version || 0) >= 13 && role === "DEF";
+    const defensiveOneGoalGames = role === "DEF" ? amount(stats.defensiveOneGoalGames) : 0;
+    const defensiveTwoGoalGames = tieredDefensePenalty
+      ? inferTwoGoalGames(lineConceded, defensiveOneGoalGames)
+      : 0;
+    const goalkeeperOneGoalGames = progressiveDefense
+      ? inferOneGoalGames(
+          amount(stats.goalkeeperAppearances),
+          amount(stats.goalkeeperCleanSheets),
+          amount(stats.goalkeeperGoalsConceded),
+        )
+      : 0;
+    const rows: Array<[string, number, number]> = [
+      [`Gols como ${role}`, lineGoals, lineGoalPoints],
+      [`Assistências como ${role}`, lineAssists, lineAssistPoints],
+      ["Gols sofridos pelo time", tieredDefensePenalty ? 0 : lineConceded, snapshot.teamGoalConceded ?? rule.conceded],
+      ["Clean sheets como DEF", role === "DEF" ? amount(stats.defensiveCleanGames) : 0, snapshot.defenderCleanSheet ?? COLUMN_C_SCORING.DEF.cleanSheet],
+      ["Clean sheet regressivo com 1 gol sofrido como DEF", progressiveDefense && role === "DEF" ? defensiveOneGoalGames : 0, snapshot.defenderOneGoal ?? COLUMN_C_SCORING.DEF.oneGoal],
+      ["Jogos com 1 gol sofrido como DEF", progressiveDefense && role === "DEF" ? defensiveOneGoalGames : 0, tieredDefensePenalty ? (snapshot.defenderOneGoalConceded ?? COLUMN_C_SCORING.DEF.oneGoalConceded) : (snapshot.defenderOneGoal ?? COLUMN_C_SCORING.DEF.oneGoal)],
+      ["Jogos com 2 gols sofridos como DEF", defensiveTwoGoalGames, snapshot.defenderTwoGoalsConceded ?? COLUMN_C_SCORING.DEF.twoGoalsConceded],
+      ["Gols contra na linha", lineOwnGoals, snapshot.ownGoal],
+      ["Atuações no gol", amount(stats.goalkeeperAppearances), snapshot.goalkeeperAppearance],
+      ["Gols feitos no gol", amount(stats.goalkeeperGoals), snapshot.defenderGoal ?? COLUMN_C_SCORING.GOL.goal],
+      ["Assistências no gol", amount(stats.goalkeeperAssists), snapshot.defenderAssist ?? COLUMN_C_SCORING.GOL.assist],
+      ["Gols sofridos no gol", amount(stats.goalkeeperGoalsConceded), snapshot.goalkeeperGoalConceded],
+      ["Clean sheets no gol", amount(stats.goalkeeperCleanSheets), progressiveDefense ? (snapshot.goalkeeperCleanSheet ?? COLUMN_C_SCORING.GOL.cleanSheet) : 2],
+      ["Jogos com 1 gol sofrido no gol", goalkeeperOneGoalGames, snapshot.goalkeeperOneGoal ?? COLUMN_C_SCORING.GOL.oneGoal],
+      ["Gols contra no gol", amount(stats.goalkeeperOwnGoals), snapshot.ownGoal],
+    ];
+    return rows.filter(([, count]) => count > 0).map(([label, count, unit]) => ({ label, count, points: count * unit }));
+  }
+  const normalized: BQPlayerStats = {
+    goals: amount(stats.goals), assists: amount(stats.assists), wins: amount(stats.wins),
+    draws: amount(stats.draws), losses: amount(stats.losses), ownGoals: amount(stats.ownGoals),
+    goalkeeperAppearances: amount(stats.goalkeeperAppearances),
+    goalkeeperGoalsConceded: amount(stats.goalkeeperGoalsConceded),
+  };
+  return buildBQBasePointBreakdown(snapshot, normalized, options).map(({ label, count, points }) => ({ label, count, points }));
+}
+
+export const RANKED_SCORING_RULES = [
+  { key: "attackerGoal", icon: "⚽", label: "Gol ATA/ALA", description: "Gol jogando na linha como ATA/ALA.", points: COLUMN_C_SCORING.ATA.goal },
+  { key: "attackerAssist", icon: "🎯", label: "Assist. ATA/ALA", description: "Assistência como ATA/ALA.", points: COLUMN_C_SCORING.ATA.assist },
+  { key: "defenderGoal", icon: "⚽", label: "Gol DEF/VOL", description: "Gol jogando na linha como DEF/VOL.", points: COLUMN_C_SCORING.DEF.goal },
+  { key: "defenderAssist", icon: "🎯", label: "Assist. DEF/VOL", description: "Assistência como DEF/VOL.", points: COLUMN_C_SCORING.DEF.assist },
+  { key: "lineConceded", icon: "🥅", label: "Gol sofrido ATA/ALA", description: "Para o atleta escalado como ATA/ALA.", points: COLUMN_C_SCORING.ATA.conceded, suffix: " por gol" },
+  { key: "defenderClean", icon: "🔒", label: "Faixa DEF · 0 sofridos", description: "Por jogo sem sofrer gol como DEF/VOL.", points: COLUMN_C_SCORING.DEF.cleanSheet },
+  { key: "defenderOneGoal", icon: "🛡️", label: "Faixa DEF · 1 sofrido", description: "Total por jogo com exatamente um gol sofrido como DEF/VOL.", points: COLUMN_C_SCORING.DEF.oneGoalConceded },
+  { key: "defenderTwoGoals", icon: "🥅", label: "Faixa DEF · 2 sofridos", description: "Total por jogo com exatamente dois gols sofridos como DEF/VOL.", points: COLUMN_C_SCORING.DEF.twoGoalsConceded },
+  { key: "ownGoal", icon: "⚠️", label: "Gol contra", description: "Por gol contra registrado.", points: COLUMN_C_SCORING.ATA.ownGoal },
+] as const;
+
+export const RANKED_GOALKEEPER_SCORING_RULES = [
+  { key: "goalkeeperAppearance", icon: "🧤", label: "Atuação no GOL", description: "Somente quando registrado no gol naquela partida.", points: COLUMN_C_SCORING.GOL.appearance },
+  { key: "goalkeeperGoal", icon: "⚽", label: "Gol como GOL", description: "Gol marcado durante a atuação no gol.", points: COLUMN_C_SCORING.GOL.goal },
+  { key: "goalkeeperAssist", icon: "🎯", label: "Assist. como GOL", description: "Assistência durante a atuação no gol.", points: COLUMN_C_SCORING.GOL.assist },
+  { key: "goalkeeperGoalConceded", icon: "🥅", label: "Sofrido no GOL", description: "Por gol sofrido enquanto estiver no gol.", points: COLUMN_C_SCORING.GOL.conceded, suffix: " por gol" },
+  { key: "goalkeeperClean", icon: "🔒", label: "Faixa GOL · 0 sofridos", description: "Por atuação no gol sem sofrer gol.", points: COLUMN_C_SCORING.GOL.cleanSheet },
+  { key: "goalkeeperOneGoal", icon: "🛡️", label: "Faixa GOL · 1 sofrido", description: "Por atuação no gol com exatamente um gol sofrido.", points: COLUMN_C_SCORING.GOL.oneGoal },
+] as const;

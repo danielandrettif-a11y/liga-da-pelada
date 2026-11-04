@@ -18,10 +18,20 @@ const nextConfig: NextConfig = {
   output: "standalone",
   turbopack: {
     // O backend usa NodeNext e, corretamente, referencia o artefato `.js`.
-    // Ao compartilhar o domínio TypeScript com o Next, apontamos apenas esse
-    // módulo-fonte para evitar que o bundler procure um `.js` ainda não emitido.
+    // Ao compartilhar o domínio TypeScript com o Next, apontamos esses imports
+    // internos para os fontes, sem alterar a saída executável do backend.
     resolveAlias: {
+      "./bq-scoring.js": "./backend/src/contexts/fantasy/domain/bq-scoring.ts",
+      "./column-c-scoring.js": "./backend/src/contexts/fantasy/domain/column-c-scoring.ts",
+      "./config.js": "./backend/src/contexts/fantasy/domain/config.ts",
+      "./engine.js": "./backend/src/contexts/fantasy/domain/engine.ts",
       "./goalkeeper-timeline.js": "./backend/src/contexts/statistics/domain/goalkeeper-timeline.ts",
+      "./lineup-positions.js": "./backend/src/contexts/fantasy/domain/lineup-positions.ts",
+      "./market-v11.js": "./backend/src/contexts/fantasy/domain/market-v11.ts",
+      "./position-breakdown.js": "./backend/src/contexts/fantasy/domain/position-breakdown.ts",
+      "./ranked-scoring.js": "./backend/src/contexts/fantasy/domain/ranked-scoring.ts",
+      "./reserve.js": "./backend/src/contexts/fantasy/domain/reserve.ts",
+      "../../statistics/domain/goalkeeper-timeline.js": "./backend/src/contexts/statistics/domain/goalkeeper-timeline.ts",
     },
   },
   images: {

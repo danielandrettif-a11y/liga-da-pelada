@@ -1,7 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Pool } from "pg";
 import type { RoundStatisticsRepository } from "../../statistics/application/manage-round-statistics.js";
 import { PgFantasyAdminRepository } from "./pg-fantasy-admin-repository.js";
+
+const mockReadLiveFantasyProjection = vi.hoisted(() => vi.fn());
+vi.mock("./pg-live-fantasy-projection.js", () => ({
+  readLiveFantasyProjection: mockReadLiveFantasyProjection,
+}));
 
 describe("Infrastructure: PgFantasyAdminRepository", () => {
   const roundStatistics = { recalculateRoundStats: vi.fn().mockResolvedValue(undefined),
@@ -18,6 +23,11 @@ describe("Infrastructure: PgFantasyAdminRepository", () => {
       connect: vi.fn().mockResolvedValue(client),
     } as unknown as Pool;
   };
+
+  beforeEach(() => {
+    mockReadLiveFantasyProjection.mockReset();
+    mockReadLiveFantasyProjection.mockResolvedValue(null);
+  });
 
   it("builds the canonical enriched ranking contract", async () => {
     const pool = createMockPool(async (sql) => {
@@ -45,6 +55,31 @@ describe("Infrastructure: PgFantasyAdminRepository", () => {
     expect(rows.length).toBe(1);
     expect(rows[0]).toMatchObject({ user_id: "u1", total_points: 150.5, position: 1,
       player: { name: "Cartoleiro 1", avatar_url: null } });
+  });
+
+  it("merges the canonical live projection into season ranking", async () => {
+    mockReadLiveFantasyProjection.mockResolvedValue({
+      roundId: "r-live", fantasyRoundId: "fr-live", isLive: true,
+      byUserId: new Map([["u1", { lineupId: "lineup-live", userId: "u1", totalPoints: 8,
+        captainBonus: 2, players: [{ playerId: "p1", slotRole: "ATA", totalPoints: 8 }] }]]),
+      statsByPlayer: new Map(),
+    });
+    const pool = createMockPool(async (sql) => {
+      if (sql.includes("SELECT fantasy_season.id")) return { rows: [{ id: "fs1" }] };
+      if (sql.includes("SELECT fantasy_round.id")) return { rows: [{ id: "fr0", round_id: "r0",
+        market_status: "finished", date: "2026-01-01", number: 1, status: "finished" }] };
+      if (sql.includes("WITH lineup_metrics")) return { rows: [{ user_id: "u1", total_points: 10,
+        current_budget: 55, rounds_played: 1, best_round_points: 10, captain_bonus_points: 1,
+        def_points: 0, attack_points: 10, attack_selection_count: 1 }] };
+      if (sql.includes("FROM public.account_profiles")) return { rows: [{ user_id: "u1",
+        player: { name: "Alice", avatar_url: null } }] };
+      return { rows: [] };
+    });
+
+    const rows = await new PgFantasyAdminRepository(pool, roundStatistics).getRanking("l1", "season", "viewer-1");
+
+    expect(rows[0]).toMatchObject({ user_id: "u1", total_points: 18, best_round_points: 10,
+      captain_bonus_points: 3, attack_points: 18, attack_selection_count: 2, is_live: true });
   });
 
   it("returns user history scoped to the selected league and active season", async () => {
@@ -82,6 +117,44 @@ describe("Infrastructure: PgFantasyAdminRepository", () => {
       lineups: [{ id: "lineup-1", fantasyRound: { round_id: "round-1" },
         activeCard: { slug: "card", bonus: 3 } }],
     });
+  });
+
+  it("rebuilds user round history with the live projection", async () => {
+    mockReadLiveFantasyProjection.mockResolvedValue({
+      roundId: "round-1", fantasyRoundId: "fantasy-round-1", isLive: true,
+      byUserId: new Map([["user-1", { userId: "user-1", playerPoints: 6, captainBonus: 2,
+        predictionPoints: 0, positionBonus: 1, cardPoints: 0, players: [{ playerId: "player-1",
+          slotRole: "ATA", basePoints: 5, positionBonus: 1, captainBonus: 2, totalPoints: 8 }] }]]),
+      statsByPlayer: new Map([["player-1", { playerId: "player-1", games: 1, goals: 1,
+        assists: 0, wins: 1, draws: 0, losses: 0, ownGoals: 0, goalkeeperGames: 0,
+        cleanSheets: 0, goalkeeperGoals: 0, goalkeeperAssists: 0, goalkeeperOwnGoals: 0,
+        goalkeeperWins: 0, goalkeeperDraws: 0, goalkeeperLosses: 0, goalsConceded: 0,
+        defensiveCleanGames: 0, defensiveOneGoalGames: 0, teamGoalsConceded: 0 }]]),
+    });
+    const pool = createMockPool(async (sql) => {
+      if (sql.includes("FROM public.account_profiles profile")) return { rows: [{ players: { name: "Alice", avatar_url: null } }] };
+      if (sql.includes("FROM public.fantasy_accounts account")) return { rows: [{ total_points: 10,
+        current_budget: 55, rounds_played: 1, best_round_points: 10 }] };
+      if (sql.includes("jsonb_build_object('round_id'")) return { rows: [] };
+      if (sql.includes("SELECT fantasy_round.id, fantasy_round.fantasy_season_id")) return { rows: [{
+        id: "fantasy-round-1", fantasy_season_id: "season-1", round_id: "round-1",
+        market_status: "in_progress", scoring_version: 14, settings_snapshot: {},
+        round: { number: 1, status: "in_progress", matches: [] },
+      }] };
+      if (sql.includes("COALESCE(jsonb_agg(to_jsonb(item)")) return { rows: [{
+        id: "lineup-1", user_id: "user-1", captain_player_id: "player-1", score_breakdown: {},
+        fantasy_lineup_players: [{ player_id: "player-1", slot_role: "ATA", total_points: 1,
+          price_locked: 10 }],
+      }] };
+      return { rows: [] };
+    });
+
+    const result = await new PgFantasyAdminRepository(pool, roundStatistics)
+      .getUserRoundHistory("league-1", "user-1", "round-1", "viewer-1");
+
+    expect(result).toMatchObject({ isLive: true, lineup: { player_points: 8, total_points: 8,
+      fantasy_lineup_players: [{ player_id: "player-1", total_points: 8, captain_bonus: 2 }] } });
+    expect(result?.statsByPlayer["player-1"]).toMatchObject({ goals: 1, wins: 1 });
   });
 
   it("updates fantasy settings initial budget", async () => {
