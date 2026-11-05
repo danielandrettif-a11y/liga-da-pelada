@@ -15,6 +15,7 @@ import {
 } from "@/lib/fantasy/config";
 import { type FantasyMarketHealth } from "@/lib/fantasy/market-v11";
 import { isFantasyMarketPlayerEligible, parseFantasyMarketReadModel } from "@/lib/fantasy/market-read-model";
+import { getCheapestValidFantasyLineupCost } from "@/lib/fantasy/market-affordability";
 import { isCompetitiveProfileComplete } from "@/lib/player-eligibility";
 import { applyCaptainMultiplier } from "@/lib/bq-scoring";
 import { inferOneGoalGames } from "@/lib/column-c-scoring";
@@ -56,7 +57,6 @@ import { isParticipantScoringEligible } from "@/lib/scoring-eligibility";
 import { resolveFantasyCardPointBonus } from "@/lib/fantasy/card-benefits";
 import { buildFantasyGoalkeeperSimulationStats } from "@/lib/fantasy/goalkeeper-simulation";
 import { calculateGoalkeeperMatchScouts } from "@/lib/goalkeeper-timeline";
-import { rankingActivePlayerIds } from "@/lib/ranking";
 import { compareFantasyRoundPriority } from "@/lib/fantasy-round-order";
 import { saveFantasyLineupForLeague } from "@/modules/fantasy/application/save-lineup";
 import { supabaseFantasyLineupGateway } from "@/modules/fantasy/infrastructure/supabase-lineup-gateway";
@@ -786,14 +786,6 @@ export async function getFantasyDashboard() {
     : Array.from(allPlayersById.values());
 
   const priceByPlayer = new Map((priceRows || []).map((row: any) => [row.player_id, row]));
-  const recentRankedRoundIds = officialFantasyRounds
-    .filter((item: any) => item.round?.status === "finished")
-    .sort(byRoundDateDesc)
-    .slice(0, 3)
-    .map((item: any) => item.round?.id)
-    .filter(Boolean);
-  const rankedActivePlayerIds = rankingActivePlayerIds(recentRankedRoundIds, statRows || []);
-  const enforceRankedActivity = !isTest && recentRankedRoundIds.length > 0;
   const statsByPlayer = new Map<
     string,
     { goals: number; assists: number; ownGoals: number; wins: number; draws: number; losses: number; games: number; goalkeeperGames: number; goalkeeperGoals: number; goalkeeperAssists: number; goalkeeperOwnGoals: number; goalkeeperWins: number; goalkeeperDraws: number; goalkeeperLosses: number; goalsConceded: number; cleanSheets: number; defensiveCleanGames: number; defensiveOneGoalGames: number; teamGoalsConceded: number }
@@ -1064,13 +1056,13 @@ export async function getFantasyDashboard() {
     previousLineups: previousLineupsFormatted,
     minSample: settings.minSampleForRadar ?? 3,
   });
+  const seasonInitialPlayerPrice = Number(
+    fantasySeason.initial_player_price ?? settings.initialPlayerPrice,
+  );
 
   const market: FantasyMarketPlayer[] = (players || [])
     .filter((player: any) => isFantasyMarketPlayerEligible({
       profileComplete: isCompetitiveProfileComplete(player),
-      enforceRecentActivity: enforceRankedActivity,
-      activeRecently: rankedActivePlayerIds.has(player.id),
-      isCalledUp: calledUpPlayerIds.has(player.id),
     }))
     .map((player: any) => {
       const priceRow = priceByPlayer.get(player.id) as any;
@@ -1097,7 +1089,7 @@ export async function getFantasyDashboard() {
       };
       const price = isTest
         ? settings.initialPlayerPrice
-        : Number(priceRow?.current_price ?? settings.initialPlayerPrice);
+        : Number(priceRow?.current_price ?? seasonInitialPlayerPrice);
       const totalPoints = isTest ? 0 : Number(priceRow?.total_points || 0);
       const roundsPlayed = isTest ? 0 : Number(priceRow?.rounds_played || 0);
       const variation = isTest ? 0 : lastVariation.get(player.id) || 0;
@@ -1778,9 +1770,14 @@ export async function getFantasyDashboard() {
 
   const dynamicInitialBudget = getFantasyInitialBudget(playersPerTeam);
   const storedBudget = Number(fantasyAccount?.current_budget ?? dynamicInitialBudget);
+  const marketBudgetFloor = getCheapestValidFantasyLineupCost(market, playersPerTeam);
+  const ordinaryBudgetFloor = Math.max(storedBudget, dynamicInitialBudget);
   const adjustedBudget = isTest
     ? dynamicInitialBudget
-    : Math.max(storedBudget, dynamicInitialBudget);
+    : Math.max(ordinaryBudgetFloor, marketBudgetFloor ?? 0);
+  const budgetSupportApplied = !isTest
+    && marketBudgetFloor !== null
+    && marketBudgetFloor > ordinaryBudgetFloor + 0.001;
   const latestFinishedPlayerScores = latestLineup
     ? resolveFantasyFinishedPlayerScores({
         projectedPlayers: latestFinishedProjection?.players,
@@ -1827,6 +1824,8 @@ export async function getFantasyDashboard() {
     radar: radarData,
     marketHealth,
     budget: adjustedBudget,
+    marketBudgetFloor,
+    budgetSupportApplied,
     account: {
       totalPoints: Number(fantasyAccount?.total_points || 0),
       roundsPlayed: Number(fantasyAccount?.rounds_played || 0),

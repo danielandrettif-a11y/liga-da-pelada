@@ -7,18 +7,12 @@ export type FantasyMarketReadModel = {
 
 type FantasyMarketEligibilityInput = {
   profileComplete: boolean;
-  enforceRecentActivity: boolean;
-  activeRecently: boolean;
-  isCalledUp: boolean;
 };
 
 export function isFantasyMarketPlayerEligible({
   profileComplete,
-  enforceRecentActivity,
-  activeRecently,
-  isCalledUp,
 }: FantasyMarketEligibilityInput) {
-  return profileComplete && (!enforceRecentActivity || activeRecently || isCalledUp);
+  return profileComplete;
 }
 
 export function parseFantasyMarketReadModel(data: unknown, hasError: boolean): FantasyMarketReadModel | null {

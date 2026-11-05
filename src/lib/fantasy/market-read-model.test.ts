@@ -18,30 +18,11 @@ describe("parseFantasyMarketReadModel", () => {
 });
 
 describe("isFantasyMarketPlayerEligible", () => {
-  it("mantém no mercado o perfil completo convocado mesmo sem atividade recente", () => {
-    expect(isFantasyMarketPlayerEligible({
-      profileComplete: true,
-      enforceRecentActivity: true,
-      activeRecently: false,
-      isCalledUp: true,
-    })).toBe(true);
+  it("mantém qualquer perfil completo no mercado, mesmo após várias ausências", () => {
+    expect(isFantasyMarketPlayerEligible({ profileComplete: true })).toBe(true);
   });
 
-  it("continua ocultando quem não jogou recentemente nem está na convocação", () => {
-    expect(isFantasyMarketPlayerEligible({
-      profileComplete: true,
-      enforceRecentActivity: true,
-      activeRecently: false,
-      isCalledUp: false,
-    })).toBe(false);
-  });
-
-  it("não libera perfil incompleto apenas por estar na convocação", () => {
-    expect(isFantasyMarketPlayerEligible({
-      profileComplete: false,
-      enforceRecentActivity: true,
-      activeRecently: false,
-      isCalledUp: true,
-    })).toBe(false);
+  it("continua ocultando perfil incompleto", () => {
+    expect(isFantasyMarketPlayerEligible({ profileComplete: false })).toBe(false);
   });
 });

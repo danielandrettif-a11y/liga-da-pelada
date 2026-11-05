@@ -30,6 +30,8 @@ export default async function CartolaPage({ searchParams }: PageProps<"/cartola"
       playersPerTeam={data.playersPerTeam}
       market={data.market}
       budget={data.budget}
+      marketBudgetFloor={data.marketBudgetFloor}
+      budgetSupportApplied={data.budgetSupportApplied}
       lineup={data.lineup}
       insights={data.insights}
       radar={data.radar}
