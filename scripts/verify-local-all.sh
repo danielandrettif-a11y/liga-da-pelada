@@ -5,6 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 checks=(
   verify-local-league-favorite.sh
   verify-local-league-config.sh
+  verify-local-callup-match-rules.sh
   verify-local-league-lifecycle.sh
   verify-local-stadiums.sh
   verify-local-league-entry-branding.sh

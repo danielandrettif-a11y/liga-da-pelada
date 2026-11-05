@@ -45,7 +45,7 @@ if [[ "$status" != "200" ]]; then
   exit 1
 fi
 
-for key in authenticated available fantasySeasonId fantasyRound market lineup insights radar account lastRound availablePacks inventoryCount liveProjection; do
+for key in authenticated available fantasySeasonId fantasyRound market lineup insights radar account lastRound availablePacks inventoryCount liveProjection marketBudgetFloor budgetSupportApplied; do
   if ! grep -q "\"$key\"" "$response_file"; then
     echo "Dashboard sem o campo obrigatório: $key" >&2
     exit 1
@@ -57,4 +57,4 @@ if ! grep -q '"authenticated":true' "$response_file" || ! grep -q '"available":t
   exit 1
 fi
 
-echo "Dashboard Fantasy local aprovado com mercado, escalação, radar, conta, cartas, boletim e projeção."
+echo "Dashboard Fantasy local aprovado com mercado, orçamento mínimo, escalação, radar, conta, cartas, boletim e projeção."

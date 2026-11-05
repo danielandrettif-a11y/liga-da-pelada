@@ -51,6 +51,7 @@ name_payload="$(docker exec "$database_container" psql -U postgres -d postgres -
 settings_payload="$(docker exec "$database_container" psql -U postgres -d postgres -Atc "
   SELECT json_build_object(
     'match_duration', match_duration,
+    'goals_to_finish', goals_to_finish,
     'players_per_team', players_per_team,
     'teams_per_round', teams_per_round,
     'stadium_name', COALESCE(stadium_name, ''),
