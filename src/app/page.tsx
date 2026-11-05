@@ -11,7 +11,6 @@ import { getDashboardData } from "@/lib/actions/dashboard";
 import { getLatestFinishedSeason } from "@/lib/actions/seasons";
 import { PreviousSeasonBanner } from "@/components/PreviousSeasonBanner";
 import { LiveMatchBanner, type HomeLiveMatch } from "@/components/LiveMatchBanner";
-import { PreSeasonBanner } from "@/components/PreSeasonBanner";
 import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
 import { NextRoundBanner } from "@/components/NextRoundBanner";
 import { OpenCallupBanner } from "@/components/OpenCallupBanner";
@@ -101,7 +100,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     );
   }
 
-  const { nextRound, nextFriendly, preseasonEnabled, activeCallups = [], liveMatch, matchDuration, venue, nextRoundWeather, eventDurationMinutes, lastRound } = data;
+  const { nextRound, activeCallups = [], liveMatch, matchDuration, venue, nextRoundWeather, eventDurationMinutes, lastRound } = data;
 
   const currentPlayerId = account.profile?.player_id || null;
 
@@ -116,7 +115,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         matchDuration={matchDuration}
       />
 
-      {/* Carrossel Principal Unificado (Convocação + Rodada/Pré-lista) */}
+      {/* Carrossel principal unificado: convocação e próxima rodada. */}
       <section className="space-y-3">
         <div className="px-1">
           <h2 className="font-athletic text-sm font-black uppercase italic tracking-wider text-foreground">
@@ -135,9 +134,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             };
           });
 
-          const roundSlide = preseasonEnabled ? (
-            <PreSeasonBanner key="friendly" isAdmin={account.isAdmin} friendly={nextFriendly} />
-          ) : (
+          const roundSlide = (
             <NextRoundBanner
               key="round"
               round={nextRound}

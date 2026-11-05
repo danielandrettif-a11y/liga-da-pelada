@@ -548,6 +548,23 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
       });
     },
 
+    async setMatchRules(leagueId: string, callupId: string, matchDuration: number, goalsToFinish: number, actor: Actor): Promise<void> {
+      return authenticated(pool, actor, async (client) => {
+        await requireLeagueAdmin(client, leagueId);
+        const check = await client.query<{ id: string }>(
+          "SELECT id FROM public.callups WHERE id = $2::uuid AND league_id = $1::uuid",
+          [leagueId, callupId],
+        );
+        if ((check.rowCount ?? 0) === 0) {
+          throw new CallupPersistenceError("Convocação não encontrada na pelada selecionada.", 404);
+        }
+        await client.query(
+          "SELECT public.update_callup_match_rules($1::uuid, $2::integer, $3::integer)",
+          [callupId, matchDuration, goalsToFinish],
+        );
+      });
+    },
+
     async lockCallup(leagueId: string, callupId: string, actor: Actor): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);

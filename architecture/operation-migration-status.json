@@ -1338,6 +1338,22 @@
     {
       "context": "callups",
       "source": "src/lib/actions/callups.ts",
+      "name": "setCallupMatchRules",
+      "state": "frontend-migrated",
+      "target": "PUT /api/callups/leagues/:leagueId/:callupId/match-rules",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
       "name": "setCallupVisibility",
       "state": "frontend-migrated",
       "target": "PATCH /api/callups/leagues/:leagueId/:callupId/visibility",

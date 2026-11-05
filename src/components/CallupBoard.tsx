@@ -56,7 +56,7 @@ import type { EquippedCosmeticsSummary } from "@/lib/actions/cosmetics";
 import Image from "next/image";
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
 import { useUrlState } from "@/lib/useUrlState";
-import { hasCallupClosingMatch } from "@/lib/callup-lifecycle";
+import { hasCallupClosingMatch, hasDrawnCallupTeams } from "@/lib/callup-lifecycle";
 import { WeatherBadge } from "./WeatherBadge";
 import type { EventWeather } from "@/lib/weather";
 import { setCallupFormat } from "@/lib/actions/rounds";
@@ -69,6 +69,7 @@ import {
 import { RoundSetupSteps } from "./RoundSetupSteps";
 import { DelayedPitchLoadingOverlay } from "./DelayedPitchLoadingOverlay";
 import { saveStadium } from "@/lib/actions/stadiums";
+import { getCallupDrawMinimum, getPlayersMissingForCallupDraw } from "@/lib/callup-draw";
 
 type Props = {
   callup: CallupWithEntries;
@@ -180,18 +181,21 @@ export function CallupBoard({
 
   const progressPercent = Math.min(100, Math.round((confirmed.length / capacity) * 100));
   const remainingSlots = Math.max(0, capacity - confirmed.length);
+  const drawMinimum = getCallupDrawMinimum(capacity);
+  const playersMissingForDraw = getPlayersMissingForCallupDraw(confirmed.length, capacity);
+  const canStartDraw = playersMissingForDraw === 0;
   const drawnTeams = callup.round?.teams || [];
   const myDrawnTeam = currentPlayerId
     ? drawnTeams.find((team) => team.team_players.some((entry) => entry.player_id === currentPlayerId)) || null
     : null;
-  const hasDrawnTeams = Boolean(callup.round_id) && drawnTeams.length > 0;
+  const hasDrawnTeams = Boolean(callup.round_id) && hasDrawnCallupTeams(drawnTeams);
   const isQueueOnlyAfterDraw = hasDrawnTeams;
   const availableDrawnTeamSlots = hasDrawnTeams
     ? drawnTeams.reduce((total, team) => total + Math.max(0, (callup.players_per_team || formatPlayers) - team.team_players.length), 0)
     : 0;
   const canJoinDrawnTeam = isQueueOnlyAfterDraw && availableDrawnTeamSlots > 0;
   const canTakeConfirmedSpot = (!isQueueOnlyAfterDraw && confirmed.length < capacity) || canJoinDrawnTeam;
-  const canJoinCallup = callup.status === "open" || isQueueOnlyAfterDraw;
+  const canJoinCallup = callup.status === "open" || callup.status === "converted";
   const hasStartedMatch = hasCallupClosingMatch(callup.round?.matches);
   const canLeaveBeforeFirstMatch = (callup.status === "open" || callup.status === "converted") && !hasStartedMatch;
 
@@ -658,10 +662,14 @@ export function CallupBoard({
               </>
             )}
           </button>
-        ) : currentPlayerId ? (
+        ) : currentPlayerId && hasDrawnTeams ? (
           <div className="rounded-2xl border border-accent/25 bg-accent/[.06] p-4 text-center">
             <p className="text-xs font-black uppercase tracking-wider text-accent">Times já sorteados</p>
             <p className="mt-1 text-[11px] leading-relaxed text-muted">Seu time aparece no destaque acima. Se alguém desistir antes do primeiro jogo, a vaga reabre aqui no mesmo time.</p>
+          </div>
+        ) : currentPlayerId ? (
+          <div className="rounded-2xl border border-warning/25 bg-warning/10 p-3.5 text-center text-xs font-bold text-warning">
+            A lista está temporariamente indisponível. Atualize a página ou fale com o ADM.
           </div>
         ) : (
           <div className="rounded-2xl border border-warning/25 bg-warning/10 p-3.5 text-center text-xs font-bold text-warning">
@@ -951,6 +959,39 @@ export function CallupBoard({
         </section>
       )}
 
+      {!soloMode && isAdmin && canJoinCallup && !hasDrawnTeams && !hasStartedMatch && (
+        <section className={`rounded-2xl border p-4 shadow-[0_12px_32px_rgba(0,0,0,.22)] ${canStartDraw ? "border-accent/45 bg-[linear-gradient(120deg,rgba(204,255,0,.16),rgba(4,29,15,.95))]" : "border-warning/35 bg-warning/[.07]"}`}>
+          <div className="flex items-start gap-3">
+            <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${canStartDraw ? "bg-accent text-background" : "bg-warning/15 text-warning"}`}>
+              <Shirt className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className={`text-[10px] font-black uppercase tracking-[.16em] ${canStartDraw ? "text-accent" : "text-warning"}`}>Próximo passo</p>
+              <h2 className="mt-0.5 text-sm font-black text-foreground">Sortear os times</h2>
+              <p className="mt-1 text-[11px] leading-4 text-muted">
+                {canStartDraw
+                  ? `Mínimo atingido: ${confirmed.length} confirmados. Na próxima tela você escolhe o tipo de sorteio e revisa os times.`
+                  : `O sorteio será liberado com ${drawMinimum} confirmados. Faltam ${playersMissingForDraw} ${playersMissingForDraw === 1 ? "pessoa" : "pessoas"}.`}
+              </p>
+            </div>
+            <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-black ${canStartDraw ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>
+              {confirmed.length}/{drawMinimum}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={continueToDraw}
+            disabled={!!loading || !canStartDraw}
+            className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-black text-background shadow-[0_0_24px_rgba(204,255,0,.16)] transition-transform active:scale-[.98] disabled:bg-white/10 disabled:text-muted disabled:shadow-none disabled:opacity-70"
+          >
+            {loading === "draw" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+            {canStartDraw ? "Sortear times agora" : `Sorteio disponível com ${drawMinimum}`}
+            {canStartDraw && loading !== "draw" && <ChevronRight className="h-4 w-4" />}
+          </button>
+          <p className="mt-2 text-center text-[10px] font-semibold text-muted">Pode iniciar com até 3 vagas abertas; a convocação só fecha no primeiro jogo.</p>
+        </section>
+      )}
+
       {/* 4. LISTA DE JOGADORES COM ABAS (CONFIRMADOS VS FILA DE ESPERA) */}
       <section className="space-y-3">
         {/* Seletor de Abas */}
@@ -1187,22 +1228,6 @@ export function CallupBoard({
           </div>
         )}
       </section>
-
-      {isAdmin && callup.status === "open" && !hasDrawnTeams && (
-        <section className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 rounded-2xl border border-accent/35 bg-[#07150d]/95 p-3 shadow-[0_-12px_32px_rgba(0,0,0,.45)] backdrop-blur-md sm:static sm:bg-surface">
-          <button
-            type="button"
-            onClick={continueToDraw}
-            disabled={!!loading || confirmed.length < 2}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3.5 text-sm font-black text-background transition-transform active:scale-[.99] disabled:opacity-45"
-          >
-            {loading === "draw" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
-            Continuar para o sorteio
-            {loading !== "draw" && <ChevronRight className="h-4 w-4" />}
-          </button>
-          {confirmed.length < 2 && <p className="mt-2 text-center text-[10px] font-semibold text-warning">Adicione pelo menos 2 jogadores para continuar.</p>}
-        </section>
-      )}
 
       {showWaitlistPopup && (
         <div

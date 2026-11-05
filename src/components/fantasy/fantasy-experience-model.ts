@@ -45,6 +45,8 @@ export type FantasyExperienceProps = {
   settings: FantasySettings;
   market: FantasyMarketPlayer[];
   budget: number;
+  marketBudgetFloor?: number | null;
+  budgetSupportApplied?: boolean;
   lineup: any;
   insights: FantasyDashboardInsights;
   radar?: FantasyRadarData;

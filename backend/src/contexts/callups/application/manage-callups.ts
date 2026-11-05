@@ -1,6 +1,7 @@
 import type { Actor } from "../../../shared/actor.js";
 import {
   parseCallupUuid,
+  validateCallupMatchRulesInput,
   validateOpenCallupInput,
   validateUpdateCallupInput,
   type AgendaCallup,
@@ -30,6 +31,7 @@ export interface CallupRepository {
   updateCallup(leagueId: string, callupId: string, input: ReturnType<typeof validateUpdateCallupInput>, actor: Actor): Promise<void>;
   closeCallup(leagueId: string, callupId: string, actor: Actor): Promise<void>;
   setVisibility(leagueId: string, callupId: string, isPublic: boolean, actor: Actor): Promise<void>;
+  setMatchRules(leagueId: string, callupId: string, matchDuration: number, goalsToFinish: number, actor: Actor): Promise<void>;
   lockCallup(leagueId: string, callupId: string, actor: Actor): Promise<void>;
   joinCallup(leagueId: string, callupId: string, actor: Actor): Promise<{ status: CallupEntryStatus; position: number }>;
   leaveCallup(leagueId: string, callupId: string, actor: Actor): Promise<{ roundId?: string | null }>;
@@ -101,6 +103,24 @@ export function setCallupVisibility(
   repository: CallupRepository,
 ): Promise<void> {
   return repository.setVisibility(parseCallupUuid(leagueId, "Pelada"), parseCallupUuid(callupId, "Convocação"), isPublic, actor);
+}
+
+export function setCallupMatchRules(
+  leagueId: string,
+  callupId: string,
+  matchDuration: number,
+  goalsToFinish: number,
+  actor: Actor,
+  repository: CallupRepository,
+): Promise<void> {
+  const validated = validateCallupMatchRulesInput(matchDuration, goalsToFinish);
+  return repository.setMatchRules(
+    parseCallupUuid(leagueId, "Pelada"),
+    parseCallupUuid(callupId, "Convocação"),
+    validated.matchDuration,
+    validated.goalsToFinish,
+    actor,
+  );
 }
 
 export function lockCallup(

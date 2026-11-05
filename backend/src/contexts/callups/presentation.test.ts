@@ -48,6 +48,7 @@ function fixture(enabled: boolean) {
     updateCallup: vi.fn().mockResolvedValue(undefined),
     closeCallup: vi.fn().mockResolvedValue(undefined),
     setVisibility: vi.fn().mockResolvedValue(undefined),
+    setMatchRules: vi.fn().mockResolvedValue(undefined),
     lockCallup: vi.fn().mockResolvedValue(undefined),
     joinCallup: vi.fn().mockResolvedValue({ status: "confirmed", position: 1 }),
     leaveCallup: vi.fn().mockResolvedValue({ roundId: null }),
@@ -182,5 +183,19 @@ describe("callups presentation", () => {
     expect(body.success).toBe(true);
     expect(body.playerId).toBe(playerId);
     expect(callupRepository.repairMyPlayer).toHaveBeenCalled();
+  });
+
+  it("updates callup match rules", async () => {
+    const { app, callupRepository } = fixture(true);
+    const response = await app.inject({
+      method: "PUT",
+      url: `/api/callups/leagues/${leagueId}/${callupId}/match-rules`,
+      headers: { authorization: "Bearer valid-token" },
+      payload: { matchDuration: 10, goalsToFinish: 3 },
+    });
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.payload);
+    expect(body.success).toBe(true);
+    expect(callupRepository.setMatchRules).toHaveBeenCalled();
   });
 });

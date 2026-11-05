@@ -152,3 +152,16 @@ export function validateUpdateCallupInput(input: UpdateCallupInput): {
 
   return { date: input.date, startTime, stadiumId, roundType };
 }
+
+export function validateCallupMatchRulesInput(matchDuration: number, goalsToFinish: number): {
+  matchDuration: number;
+  goalsToFinish: number;
+} {
+  if (!Number.isInteger(matchDuration) || matchDuration < 1 || matchDuration > 90) {
+    throw new InvalidCallupError("A duração precisa estar entre 1 e 90 minutos.");
+  }
+  if (!Number.isInteger(goalsToFinish) || goalsToFinish < 0 || goalsToFinish > 20) {
+    throw new InvalidCallupError("Escolha até 20 gols ou use a opção sem limite.");
+  }
+  return { matchDuration, goalsToFinish };
+}

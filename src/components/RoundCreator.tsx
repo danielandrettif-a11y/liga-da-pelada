@@ -35,6 +35,7 @@ import { supabase } from "@/lib/supabase";
 import { DeleteRoundButton } from "./DeleteRoundButton";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import { isPlayerVisibleInPrelistTab } from "@/lib/callup-ui";
+import { getCallupDrawMinimum } from "@/lib/callup-draw";
 import { VEST_COLORS } from "@/lib/vest-colors";
 import { createDefaultTeams, type DrawPlayer, type DrawTeam, type RoundCreatorProps } from "./round-creator-model";
 import { MIN_UNDERFILLED_PLAYERS, rebalanceTeamRosters, validateUnderfilledTeamSizes, type RoundTeamSizeMode } from "@/lib/underfilled-rounds";
@@ -96,7 +97,7 @@ export function RoundCreator({
   const roundCapacity = teamCapacity * teamCount;
   const minimumPlayersToMount = teamCount === 2
     ? Math.max(10, (teamCapacity - 1) * 2)
-    : teamCount === 3 ? Math.max(MIN_UNDERFILLED_PLAYERS, teamCapacity * 2) : teamCapacity * 2;
+    : Math.max(MIN_UNDERFILLED_PLAYERS, getCallupDrawMinimum(roundCapacity));
 
   function selectRoundType(type: RoundType) {
     if (sourceCallupId) return;
@@ -215,7 +216,7 @@ export function RoundCreator({
       setError(result.error || "Não foi possível adicionar o jogador à convocação.");
     } else if (result.status === "waitlist") {
       setSelectedPlayerIds(previous);
-      setNotice("As vagas da pré-lista estão completas; o jogador foi adicionado à fila da convocação.");
+      setNotice("As vagas da convocação estão completas; o jogador foi adicionado à fila.");
     } else {
       router.refresh();
     }
@@ -230,7 +231,7 @@ export function RoundCreator({
 
     const player = allPlayers.find((item) => item.id === playerId);
     const accepted = window.confirm(
-      `Remover ${player?.name || "este jogador"} da pré-lista e da convocação? Se houver alguém na fila, essa pessoa poderá subir automaticamente.`,
+      `Remover ${player?.name || "este jogador"} da convocação? Se houver alguém na fila, essa pessoa poderá subir automaticamente.`,
     );
     if (!accepted) return;
 
@@ -279,7 +280,7 @@ export function RoundCreator({
 
   async function persistPrelist(destination: "list" | "teams") {
     if (destination === "teams" && selectedPlayerIds.size === 0) {
-      setError("Adicione jogadores antes de montar os times. A pré-lista vazia pode ser salva para abrir o Cartola.");
+      setError("Adicione jogadores antes de montar os times. A rodada vazia pode ser salva para abrir o Cartola.");
       return;
     }
     setLoading(true);
@@ -294,7 +295,7 @@ export function RoundCreator({
       stadiumId: selectedStadiumId,
     });
     if (!result.success || !result.roundId) {
-      setError(result.error || "Nao foi possivel salvar a pre-lista.");
+      setError(result.error || "Não foi possível salvar a rodada.");
       setLoading(false);
       return;
     }
@@ -303,7 +304,7 @@ export function RoundCreator({
       router.replace(`/admin/rodada?round=${result.roundId}&mount=1`);
       setStep(3);
     } else {
-      router.push("/admin/prelistas");
+      router.push("/rodadas");
     }
     setLoading(false);
   }
@@ -499,7 +500,7 @@ export function RoundCreator({
 
   async function handleStartDraft() {
     if (!currentPrelistId) {
-      setError("Salve a pré-lista antes de iniciar o Draft.");
+      setError("Salve a rodada antes de iniciar o Draft.");
       return;
     }
     if (teamCount !== 3) {
@@ -674,8 +675,8 @@ export function RoundCreator({
           {currentPrelistId && (
             <div className="rounded-2xl border border-warning/30 bg-warning/5 p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-warning">Pre-lista</p><p className="text-xs text-muted">Participantes salvos. Edite e salve novamente quando precisar.</p></div>
-                <div className="flex items-center gap-2"><span className="rounded-full bg-warning/15 px-2.5 py-1 text-[9px] font-black text-warning">RASCUNHO</span>{prelistNumber && <DeleteRoundButton redirectTo="/admin/prelistas" round={{ id: currentPrelistId, number: prelistNumber, round_type: selectedRoundType, date, playersCount: selectedPlayerIds.size, matchesCount: 0 }} />}</div>
+                <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-warning">Rodada em preparação</p><p className="text-xs text-muted">Participantes salvos. Edite e monte os times quando estiver pronto.</p></div>
+                <div className="flex items-center gap-2"><span className="rounded-full bg-warning/15 px-2.5 py-1 text-[9px] font-black text-warning">RASCUNHO</span>{prelistNumber && <DeleteRoundButton redirectTo="/rodadas" round={{ id: currentPrelistId, number: prelistNumber, round_type: selectedRoundType, date, playersCount: selectedPlayerIds.size, matchesCount: 0 }} />}</div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <input type="date" value={date} disabled={Boolean(sourceCallupId)} onChange={(event) => setDate(event.target.value)} className="min-w-0 rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground disabled:opacity-60" />
@@ -796,7 +797,7 @@ export function RoundCreator({
                       : "Nenhum jogador selecionado"}
                 </p>
                 <p className="mt-1 text-[10px] text-muted">
-                  {playerListTab === "available" ? "Abra a aba Selecionados para revisar a pré-lista." : "Escolha jogadores na aba Disponíveis."}
+                  {playerListTab === "available" ? "Abra a aba Selecionados para revisar a convocação." : "Escolha jogadores na aba Disponíveis."}
                 </p>
               </div>
             )}
@@ -804,7 +805,7 @@ export function RoundCreator({
 
           <div className="flex gap-3">
             <button
-              onClick={() => currentPrelistId ? router.push("/admin/prelistas") : setStep(1)}
+              onClick={() => currentPrelistId ? router.push("/rodadas") : setStep(1)}
               className="flex-1 bg-surface hover:bg-surface-hover text-foreground font-bold py-3.5 rounded-xl transition-all active:scale-[0.98]"
             >
               Voltar
@@ -814,7 +815,7 @@ export function RoundCreator({
               disabled={loading}
               className="flex-1 border border-accent/40 bg-accent/10 text-accent font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50"
             >
-              {loading ? "Salvando..." : currentPrelistId ? "Salvar e voltar" : "Salvar pre-lista"}
+              {loading ? "Salvando..." : currentPrelistId ? "Salvar e voltar" : "Salvar rodada"}
             </button>
           </div>
           <button
@@ -1091,7 +1092,7 @@ export function RoundCreator({
 
           <div className="flex gap-3">
             <button
-              onClick={() => currentPrelistId ? router.push("/admin/prelistas") : setStep(2)}
+              onClick={() => currentPrelistId ? router.push("/rodadas") : setStep(2)}
               className="flex-1 bg-surface hover:bg-surface-hover text-foreground font-bold py-3.5 rounded-xl transition-all active:scale-[0.98]"
             >
               Voltar

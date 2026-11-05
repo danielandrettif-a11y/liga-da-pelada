@@ -15,6 +15,7 @@ import {
   openCallup,
   removePlayerFromCallup,
   repairMyPlayerAccount,
+  setCallupMatchRules,
   setCallupVisibility,
   updateCallup,
   type CallupRepository,
@@ -164,6 +165,29 @@ export function registerCallupRoutes(app: FastifyInstance, dependencies: {
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
         await setCallupVisibility(request.params.leagueId, request.params.callupId, Boolean(request.body.isPublic), authentication.actor, dependencies.repository);
+        return reply.code(200).send({ success: true });
+      } catch (error) {
+        return sendFailure(error, request, reply);
+      }
+    },
+  );
+
+  // Alterar regras de partida da convocação
+  app.put<{ Params: { leagueId: string; callupId: string }; Body: { matchDuration: number; goalsToFinish: number } }>(
+    "/api/callups/leagues/:leagueId/:callupId/match-rules",
+    { schema: { params: callupParams } },
+    async (request, reply) => {
+      const authentication = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
+      try {
+        await setCallupMatchRules(
+          request.params.leagueId,
+          request.params.callupId,
+          Number(request.body.matchDuration),
+          Number(request.body.goalsToFinish),
+          authentication.actor,
+          dependencies.repository,
+        );
         return reply.code(200).send({ success: true });
       } catch (error) {
         return sendFailure(error, request, reply);

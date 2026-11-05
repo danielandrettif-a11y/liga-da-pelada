@@ -71,7 +71,7 @@ export function FantasyTestManager({ testSession, friendlyRounds }: { testSessio
         <div className="rounded-2xl border border-success/25 bg-success/8 p-4">
           <p className="text-[10px] font-black uppercase tracking-[.16em] text-success">Como testar sem sujar a temporada</p>
           <ol className="mt-2 space-y-1.5 text-xs leading-5 text-muted">
-            <li><strong className="text-foreground">1.</strong> Crie uma pré-lista do tipo <strong className="text-foreground">Amistoso</strong>.</li>
+            <li><strong className="text-foreground">1.</strong> Abra uma convocação do tipo <strong className="text-foreground">Amistoso</strong>.</li>
             <li><strong className="text-foreground">2.</strong> Selecione o amistoso aqui e crie o ambiente Sandbox.</li>
             <li><strong className="text-foreground">3.</strong> Teste escalações e pontuação; depois use <strong className="text-foreground">Resetar teste</strong>.</li>
           </ol>
@@ -117,7 +117,7 @@ export function FantasyTestManager({ testSession, friendlyRounds }: { testSessio
                 {pending ? "Criando ambiente..." : "Criar ambiente de teste"}
               </button>
             ) : (
-              <p className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted">Não há amistoso disponível nesta temporada. Crie uma pré-lista de amistoso primeiro.</p>
+              <p className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted">Não há amistoso disponível nesta temporada. Abra uma convocação de amistoso primeiro.</p>
             )}
           </>
         )}

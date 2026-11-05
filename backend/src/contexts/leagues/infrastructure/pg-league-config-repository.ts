@@ -125,7 +125,8 @@ export function pgLeagueConfigRepository(pool: Pool): LeagueConfigRepository {
                    teams_per_round = $4::integer,
                    stadium_name = $5::text,
                    stadium_map_url = $6::text,
-                   event_duration_minutes = $7::integer
+                   event_duration_minutes = $7::integer,
+                   goals_to_finish = COALESCE($8::integer, goals_to_finish, 2)
              WHERE id = $1::uuid
           `, [
             leagueId,
@@ -135,6 +136,7 @@ export function pgLeagueConfigRepository(pool: Pool): LeagueConfigRepository {
             settings.stadiumName,
             settings.stadiumMapUrl,
             settings.eventDurationMinutes,
+            settings.goalsToFinish ?? null,
           ]);
         });
       } catch (error) {

@@ -42,6 +42,13 @@ export default async function HistoricoCadastrosPage() {
                 <span className="rounded-full border border-border px-2 py-0.5 text-[8px] font-black uppercase text-muted">{CATEGORY_LABELS[event.member_category]}</span>
                 <span className="rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-[8px] font-black uppercase text-accent">{SOURCE_LABELS[event.source]}</span>
               </div>
+              <p className="mt-1 text-[10px] text-muted">
+                {event.source === "site_signup"
+                  ? "Criado pelo próprio usuário no site"
+                  : event.source === "admin"
+                    ? `Cadastrado pelo ADM ${event.created_by_name || "não identificado"}`
+                    : "Origem anterior ao histórico de auditoria"}
+              </p>
             </div>
             <time className="shrink-0 text-right text-[9px] font-bold leading-4 text-muted" dateTime={event.created_at}>
               {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(event.created_at))}

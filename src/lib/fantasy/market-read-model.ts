@@ -5,6 +5,16 @@ export type FantasyMarketReadModel = {
   history: any[];
 };
 
+type FantasyMarketEligibilityInput = {
+  profileComplete: boolean;
+};
+
+export function isFantasyMarketPlayerEligible({
+  profileComplete,
+}: FantasyMarketEligibilityInput) {
+  return profileComplete;
+}
+
 export function parseFantasyMarketReadModel(data: unknown, hasError: boolean): FantasyMarketReadModel | null {
   if (hasError || !data || typeof data !== "object" || Array.isArray(data)) return null;
   const value = data as Record<string, unknown>;

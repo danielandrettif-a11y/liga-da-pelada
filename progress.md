@@ -423,5 +423,28 @@
   - Testes Frontend Vitest: **33 arquivos / 205 testes passando 100%**.
   - Typecheck (`tsc --noEmit`): **0 erros** em ambos os projetos.
 
+---
+
+## 🔄 Sincronização e Atualização com a Versão Mais Nova (`origin/main`) em 05/11/2026 ✅
+
+- **Origem:** Incorporação de 12 novos commits de `origin/main` (atualizações até 05/11/2026):
+  - Regras de meta de gols por pelada e convocação editável (`goals_to_finish` e `setCallupMatchRules`).
+  - Sorteio antecipado, novo fluxo de presença e encerramento de convocação na 1ª partida.
+  - Correção e melhorias no mercado e acessibilidade de escalação no Cartola (`market-affordability`).
+  - Migrações do banco: 350, 351, 352 e 353 integradas com sucesso.
+- **Resolução de Conflitos e Adaptações Arquiteturais:**
+  - `src/lib/actions/callups.ts`: Resolvido conflito preservando bridging com a sessão modular de API e os novos helpers de ciclo de vida.
+  - Contexto `callups` estendido para suportar a nova operação `setCallupMatchRules`: domínio (`validateCallupMatchRulesInput`), aplicação (`manage-callups.ts`), repositório PostgreSQL autenticado (`pg-callup-repository.ts`), rotas Fastify (`callups-route.ts`), gateway HTTP (`http-callup-gateway.ts`) e bridge na Server Action com testes de paridade unitários.
+  - Contexto `leagues` estendido para acomodar `goals_to_finish` opcional em `updateSettings` e `updateLeagueConfig`.
+- **Resultados Auditados Atualizados:**
+  - `npm run audit:migration`: **268 de 268 operações aceitas (100%)**!
+    - `callups`: 22/22 (adicionada `setCallupMatchRules`)
+    - Todas as demais fatias preservadas em 100%.
+  - `npm run audit:contexts`: **15 contextos, 16 módulos, 58 páginas, 41 entradas e 268 funções exportadas catalogadas**.
+  - Testes Backend Vitest: **180 arquivos / 669 testes passando 100%**.
+  - Testes Frontend Vitest: **35 arquivos / 209 testes passando 100%**.
+  - Typecheck (`tsc --noEmit`): **0 erros** em ambos os projetos.
+
+
 
 

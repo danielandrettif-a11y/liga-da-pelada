@@ -32,6 +32,7 @@ import {
   lockCallupForRound,
   openCallup,
   repairMyPlayerAccount,
+  setCallupMatchRules,
   setCallupVisibility,
 } from "./callups";
 
@@ -172,5 +173,13 @@ describe("callups actions via API gateway", () => {
     const result = await repairMyPlayerAccount();
     expect(result).toEqual({ success: true, playerId });
     expect(repairMyPlayer).toHaveBeenCalled();
+  });
+
+  it("routes setCallupMatchRules via API when available", async () => {
+    const setMatchRulesMock = vi.fn().mockResolvedValue(undefined);
+    mocks.callupApi.mockResolvedValue({ setMatchRules: setMatchRulesMock });
+
+    await expect(setCallupMatchRules(callupId, 10, 3)).resolves.toEqual({ success: true });
+    expect(setMatchRulesMock).toHaveBeenCalledWith(leagueId, callupId, 10, 3);
   });
 });
