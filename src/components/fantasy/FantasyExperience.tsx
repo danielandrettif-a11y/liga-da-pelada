@@ -1681,13 +1681,13 @@ export function FantasyExperience({
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {open && selected.length > 0 && (
+                {open && validSelectedCount > 0 && (
                   <button type="button" onClick={sellAll} className="rounded-lg border border-danger/30 bg-danger/[.07] px-2.5 py-1.5 text-[10px] font-bold text-danger transition-colors hover:bg-danger/15">Vender todos</button>
                 )}
               </div>
             </div>
 
-            {open && selected.length === playersPerTeam && !captainId && (
+            {open && validSelectedCount === playersPerTeam && !captainId && (
               <p className="rounded-xl border border-warning/35 bg-warning/10 px-3 py-2 text-[10px] font-bold text-warning">Falta escolher o capitão antes de concluir sua escalação.</p>
             )}
             {status === "in_progress" && (
@@ -2382,7 +2382,7 @@ export function FantasyExperience({
                     <span className="text-[9px] font-bold text-muted">livres</span>
                   </span>
                   <span className="text-[10px] font-bold text-accent">
-                    · {selected.length}/{playersPerTeam} escalados
+                    · {validSelectedCount}/{playersPerTeam} escalados
                   </span>
                 </div>
               </div>
@@ -2391,7 +2391,7 @@ export function FantasyExperience({
                 onClick={() => setActiveTab("team")}
                 className="shrink-0 rounded-xl bg-accent px-3 py-1.5 text-xs font-black uppercase tracking-tight text-background shadow transition-transform active:scale-95"
               >
-                Ver Time ({selected.length}/{playersPerTeam}) →
+                Ver Time ({validSelectedCount}/{playersPerTeam}) →
               </button>
             </div>
 
