@@ -130,8 +130,8 @@ describe("PgSeasonRankingRepository", () => {
       if (sql.includes("player_round_fitness")) {
         return { rows: [{ player_id: "p1", distance_km: 6.0, average_speed_kmh: 9.5 }] };
       }
-      if (sql.includes("player_equipped_cosmetics")) {
-        return { rows: [{ player_id: "p1", slot: "title", name: "Lenda", asset_key: "title_legend" }] };
+      if (sql.includes("account_cosmetic_loadouts")) {
+        return { rows: [{ player_id: "p1", title_name: "Lenda" }] };
       }
       if (sql.includes("get_latest_player_card_overalls_for_league")) {
         return {
@@ -173,8 +173,8 @@ describe("PgSeasonRankingRepository", () => {
       if (sql.includes("FROM public.players p")) {
         return { rows: [{ id: "p1", name: "League Member" }] };
       }
-      if (sql.includes("FROM public.player_equipped_cosmetics")) {
-        return { rows: [{ slot: "frame", name: "Gold", asset_key: "gold_frame" }] };
+      if (sql.includes("FROM public.account_profiles profile")) {
+        return { rows: [{ frame_key: "gold_frame" }] };
       }
       return { rows: [] };
     });

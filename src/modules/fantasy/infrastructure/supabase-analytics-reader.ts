@@ -53,7 +53,8 @@ export async function readMyFantasyHistoryRows(
 
 export async function readFantasyQuickHighlightPrices(client: SupabaseClient, fantasySeasonId: string) {
   return client
-    .from("fantasy_player_prices")
-    .select("player_id, current_price, last_round_points, last_price_change, variation_rate, players(name, avatar_url)")
-    .eq("fantasy_season_id", fantasySeasonId);
+    .from("fantasy_player_price_history")
+    .select("player_id, round_points, price_change, variation_rate, players(name, avatar_url)")
+    .eq("fantasy_season_id", fantasySeasonId)
+    .order("created_at", { ascending: false });
 }

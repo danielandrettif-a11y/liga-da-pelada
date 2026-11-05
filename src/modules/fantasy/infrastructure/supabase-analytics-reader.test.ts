@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   readFantasyPlayerDetailBase,
+  readFantasyQuickHighlightPrices,
   readMyFantasyHistoryRows,
 } from "./supabase-analytics-reader";
 
@@ -47,5 +48,14 @@ describe("supabase fantasy analytics reader", () => {
     await readMyFantasyHistoryRows({ from: vi.fn(() => rows) } as any, "user-a", "fantasy-a");
     expect(rows.eq).toHaveBeenCalledWith("user_id", "user-a");
     expect(rows.eq).toHaveBeenCalledWith("fantasy_rounds.fantasy_season_id", "fantasy-a");
+  });
+
+  it("lê os destaques a partir do histórico de preços mais recente", async () => {
+    const rows = query([]);
+    const client = { from: vi.fn(() => rows) } as any;
+    await readFantasyQuickHighlightPrices(client, "fantasy-a");
+    expect(client.from).toHaveBeenCalledWith("fantasy_player_price_history");
+    expect(rows.select).toHaveBeenCalledWith(expect.stringContaining("round_points"));
+    expect(rows.order).toHaveBeenCalledWith("created_at", { ascending: false });
   });
 });

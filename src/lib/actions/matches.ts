@@ -588,36 +588,6 @@ export async function getMatch(matchId: string) {
     };
   }
 
-  // Compatibilidade com cosméticos antigos ainda gravados diretamente por
-  // jogador. Eles só completam lacunas e nunca sobrescrevem a escolha atual.
-  const missingPlayerIds = playerIds.filter((playerId) => !player_cosmetics[playerId]);
-  if (missingPlayerIds.length > 0) {
-    const { data: equippedCosmetics, error: cosmeticsError } = await client
-      .from("player_equipped_cosmetics")
-      .select("player_id, slot, cosmetic:cosmetic_id(asset_key)")
-      .in("player_id", missingPlayerIds)
-      .in("slot", ["banner", "frame", "aura"]);
-
-    if (cosmeticsError) {
-      console.error("Erro ao buscar capas equipadas da partida:", cosmeticsError);
-    } else {
-      for (const item of equippedCosmetics || []) {
-        const playerId = item.player_id;
-        if (!playerId) continue;
-
-        const equipped = player_cosmetics[playerId] ||= {
-          bannerAssetKey: null,
-          frameKey: null,
-          auraKey: null,
-        };
-        const assetKey = (item.cosmetic as { asset_key?: string | null } | null)?.asset_key || null;
-        if (item.slot === "banner") equipped.bannerAssetKey = assetKey;
-        if (item.slot === "frame") equipped.frameKey = assetKey;
-        if (item.slot === "aura") equipped.auraKey = assetKey;
-      }
-    }
-  }
-
   return { ...data, player_cosmetics };
 }
 

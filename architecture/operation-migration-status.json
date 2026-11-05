@@ -27,7 +27,7 @@
       "context": "identity",
       "source": "src/app/login/actions.ts",
       "name": "login",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "POST /api/identity/login",
       "evidence": [
         "backend/src/contexts/identity/application/manage-authentication.test.ts",
@@ -35,7 +35,9 @@
         "backend/src/contexts/identity/infrastructure/pg-identity-profile-repository.test.ts",
         "backend/src/contexts/identity/presentation.test.ts",
         "src/app/login/actions.test.ts",
-        "src/modules/identity/infrastructure/http-identity-gateway.test.ts"
+        "src/modules/identity/infrastructure/http-identity-gateway.test.ts",
+        "e2e/round-and-scoring.spec.ts",
+        "scripts/verify-local-identity.sh"
       ]
     },
     {
@@ -438,13 +440,15 @@
       "context": "leagues",
       "source": "src/lib/actions/league.ts",
       "name": "getLeagueConfig",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "GET /api/leagues/:leagueId/config",
       "evidence": [
         "backend/src/contexts/leagues/presentation/league-config-route.ts",
         "backend/src/contexts/leagues/presentation.test.ts",
         "src/lib/actions/league.test.ts",
-        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts",
+        "e2e/round-and-scoring.spec.ts",
+        "scripts/verify-local-league-config.sh"
       ]
     },
     {
@@ -1131,7 +1135,7 @@
       "context": "callups",
       "source": "src/lib/actions/callups.ts",
       "name": "getActiveCallup",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "GET /api/callups/leagues/:leagueId/active",
       "evidence": [
         "backend/src/contexts/callups/domain/callup.test.ts",
@@ -1140,7 +1144,9 @@
         "backend/src/contexts/callups/presentation.test.ts",
         "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
         "src/modules/callups/infrastructure/callup-api-session.test.ts",
-        "src/lib/actions/callups.test.ts"
+        "src/lib/actions/callups.test.ts",
+        "e2e/round-and-scoring.spec.ts",
+        "scripts/verify-local-context-reads.sh"
       ]
     },
     {
@@ -2173,7 +2179,7 @@
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "getFinishedMatchAudit",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "GET /api/matches/leagues/:leagueId/:matchId/audit",
       "evidence": [
         "backend/src/contexts/matches/domain/match.test.ts",
@@ -2181,14 +2187,15 @@
         "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
         "backend/src/contexts/matches/presentation.test.ts",
         "src/lib/actions/matches.test.ts",
-        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts",
+        "e2e/round-and-scoring.spec.ts"
       ]
     },
     {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
       "name": "getMatch",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "GET /api/matches/leagues/:leagueId/:matchId",
       "evidence": [
         "backend/src/contexts/matches/domain/match.test.ts",
@@ -2196,7 +2203,8 @@
         "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
         "backend/src/contexts/matches/presentation.test.ts",
         "src/lib/actions/matches.test.ts",
-        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts",
+        "e2e/round-and-scoring.spec.ts"
       ]
     },
     {
@@ -3033,7 +3041,7 @@
       "context": "finance",
       "source": "src/lib/actions/payments.ts",
       "name": "hasPendingPaymentRound",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "GET /api/finance/leagues/:leagueId/rounds/has-pending",
       "evidence": [
         "backend/src/contexts/finance/domain/finance.test.ts",
@@ -3042,7 +3050,8 @@
         "backend/src/contexts/finance/presentation/finance-route.test.ts",
         "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
         "src/modules/finance/infrastructure/finance-api-session.test.ts",
-        "src/lib/actions/payments.test.ts"
+        "src/lib/actions/payments.test.ts",
+        "scripts/verify-local-context-reads.sh"
       ]
     },
     {
@@ -3209,7 +3218,7 @@
       "context": "fantasy",
       "source": "src/lib/actions/fantasy.ts",
       "name": "getFantasyDashboard",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "GET /api/fantasy/leagues/:leagueId/dashboard",
       "evidence": [
         "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
@@ -3218,7 +3227,9 @@
         "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
         "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
         "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
-        "src/lib/actions/fantasy.test.ts"
+        "src/lib/actions/fantasy.test.ts",
+        "e2e/round-and-scoring.spec.ts",
+        "scripts/verify-local-fantasy-dashboard.sh"
       ]
     },
     {

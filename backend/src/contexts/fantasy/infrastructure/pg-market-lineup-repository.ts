@@ -399,11 +399,24 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
   async getQuickHighlights(leagueId: string, userId: string): Promise<FantasyMarketQuickHighlights | null> {
     return this.withUser(userId, async (client) => {
       const result = await client.query<any>(
-        `SELECT player.name,player.avatar_url,price.last_round_points,price.last_price_change,price.variation_rate
+        `SELECT player.name,player.avatar_url,
+                latest.round_points AS last_round_points,
+                latest.price_change AS last_price_change,
+                latest.variation_rate
          FROM public.fantasy_player_prices price
          JOIN public.fantasy_seasons season ON season.id = price.fantasy_season_id
          JOIN public.seasons core ON core.id=season.season_id AND core.status='active'
          JOIN public.players player ON player.id = price.player_id
+         LEFT JOIN LATERAL (
+           SELECT history.round_points,
+                  history.price_after - history.price_before AS price_change,
+                  history.variation_rate
+           FROM public.fantasy_player_price_history history
+           WHERE history.fantasy_season_id = price.fantasy_season_id
+             AND history.player_id = price.player_id
+           ORDER BY history.created_at DESC, history.id DESC
+           LIMIT 1
+         ) latest ON true
          WHERE season.league_id = $1`, [leagueId]);
       if (!result.rows.length) return null;
       const rows = result.rows.map((row: any) => ({ name: row.name || "Jogador", avatarUrl: row.avatar_url || null,

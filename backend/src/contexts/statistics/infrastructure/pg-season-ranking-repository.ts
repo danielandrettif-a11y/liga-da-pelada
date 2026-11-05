@@ -225,28 +225,33 @@ export class PgSeasonRankingRepository implements SeasonRankingRepository {
       try {
         const cosParams: any[] = [];
         let cosSql = `
-          SELECT pec.player_id, pec.slot, c.name, c.asset_key
-          FROM public.player_equipped_cosmetics pec
-          JOIN public.cosmetics c ON c.id = pec.cosmetic_id
+          SELECT profile.player_id,
+                 frame.asset_key AS frame_key,
+                 aura.asset_key AS aura_key,
+                 title.name AS title_name,
+                 banner.asset_key AS banner_key,
+                 nameplate.asset_key AS nameplate_key
+          FROM public.account_profiles profile
+          JOIN public.account_cosmetic_loadouts loadout ON loadout.user_id = profile.user_id
+          LEFT JOIN public.fantasy_cosmetics frame ON frame.id = loadout.frame_cosmetic_id
+          LEFT JOIN public.fantasy_cosmetics aura ON aura.id = loadout.aura_cosmetic_id
+          LEFT JOIN public.fantasy_cosmetics title ON title.id = loadout.title_cosmetic_id
+          LEFT JOIN public.fantasy_cosmetics banner ON banner.id = loadout.banner_cosmetic_id
+          LEFT JOIN public.fantasy_cosmetics nameplate ON nameplate.id = loadout.nameplate_cosmetic_id
+          WHERE profile.player_id IS NOT NULL
         `;
         if (playerIds && playerIds.length) {
           cosParams.push(playerIds);
-          cosSql += ` WHERE pec.player_id = ANY($1::uuid[])`;
+          cosSql += ` AND profile.player_id = ANY($1::uuid[])`;
         }
         const cosRes = await client.query(cosSql, cosParams);
-        const mapByPlayerAndSlot = new Map<string, Map<string, { name: string; asset_key: string }>>();
         for (const row of cosRes.rows) {
-          const m = mapByPlayerAndSlot.get(row.player_id) || new Map();
-          m.set(row.slot, { name: row.name, asset_key: row.asset_key });
-          mapByPlayerAndSlot.set(row.player_id, m);
-        }
-        for (const [pid, slotMap] of mapByPlayerAndSlot.entries()) {
-          cosmeticsByPlayer.set(pid, {
-            frameKey: slotMap.get("frame")?.asset_key || null,
-            auraKey: slotMap.get("aura")?.asset_key || null,
-            titleName: slotMap.get("title")?.name || null,
-            bannerAssetKey: slotMap.get("banner")?.asset_key || null,
-            nameplateKey: slotMap.get("nameplate")?.asset_key || null,
+          cosmeticsByPlayer.set(row.player_id, {
+            frameKey: row.frame_key || null,
+            auraKey: row.aura_key || null,
+            titleName: row.title_name || null,
+            bannerAssetKey: row.banner_key || null,
+            nameplateKey: row.nameplate_key || null,
           });
         }
       } catch {
@@ -371,23 +376,35 @@ export class PgSeasonRankingRepository implements SeasonRankingRepository {
     return withAuthenticatedTransaction(this.pool, actor, async (client) => {
       try {
         const result = await client.query<{
-          slot: string;
-          name: string;
-          asset_key: string;
+          frame_key: string | null;
+          aura_key: string | null;
+          title_name: string | null;
+          banner_key: string | null;
+          nameplate_key: string | null;
         }>(
-          `SELECT pec.slot, c.name, c.asset_key
-           FROM public.player_equipped_cosmetics pec
-           JOIN public.cosmetics c ON c.id = pec.cosmetic_id
-           WHERE pec.player_id = $1::uuid`,
+          `SELECT frame.asset_key AS frame_key,
+                  aura.asset_key AS aura_key,
+                  title.name AS title_name,
+                  banner.asset_key AS banner_key,
+                  nameplate.asset_key AS nameplate_key
+           FROM public.account_profiles profile
+           JOIN public.account_cosmetic_loadouts loadout ON loadout.user_id = profile.user_id
+           LEFT JOIN public.fantasy_cosmetics frame ON frame.id = loadout.frame_cosmetic_id
+           LEFT JOIN public.fantasy_cosmetics aura ON aura.id = loadout.aura_cosmetic_id
+           LEFT JOIN public.fantasy_cosmetics title ON title.id = loadout.title_cosmetic_id
+           LEFT JOIN public.fantasy_cosmetics banner ON banner.id = loadout.banner_cosmetic_id
+           LEFT JOIN public.fantasy_cosmetics nameplate ON nameplate.id = loadout.nameplate_cosmetic_id
+           WHERE profile.player_id = $1::uuid`,
           [playerId],
         );
-        const map = new Map(result.rows.map((r) => [r.slot, { name: r.name, asset_key: r.asset_key }]));
+        const row = result.rows[0];
+        if (!row) return null;
         return {
-          frameKey: map.get("frame")?.asset_key || null,
-          auraKey: map.get("aura")?.asset_key || null,
-          titleName: map.get("title")?.name || null,
-          bannerAssetKey: map.get("banner")?.asset_key || null,
-          nameplateKey: map.get("nameplate")?.asset_key || null,
+          frameKey: row.frame_key || null,
+          auraKey: row.aura_key || null,
+          titleName: row.title_name || null,
+          bannerAssetKey: row.banner_key || null,
+          nameplateKey: row.nameplate_key || null,
         };
       } catch {
         return null;

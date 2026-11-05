@@ -58,6 +58,36 @@ describe("Finance Infrastructure: PgFinanceRepository", () => {
     );
   });
 
+  it("reads the latest payment state without relying on a nonexistent membership column", async () => {
+    const query = vi.fn().mockImplementation(async (sql: string) => {
+      if (sql.includes("FROM public.rounds")) return { rows: [{ id: "r1" }], rowCount: 1 };
+      if (sql.includes("FROM public.round_players")) {
+        return { rows: [{ id: "p1", is_monthly_payer: false }], rowCount: 1 };
+      }
+      if (sql.includes("FROM public.round_payments")) {
+        return { rows: [{ player_id: "p1", paid: true }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+    const pool = {
+      connect: vi.fn().mockResolvedValue({ query, release: vi.fn() } as unknown as PoolClient),
+    } as unknown as Pool;
+    const repo = new PgFinanceRepository(pool);
+
+    const state = await repo.getLatestFinishedRoundPaymentState(actor, "l1");
+
+    expect(state).toEqual({
+      participants: [{ id: "p1", is_monthly_payer: false }],
+      payments: [{ player_id: "p1", paid: true }],
+    });
+    const participantSql = query.mock.calls
+      .map(([sql]) => String(sql))
+      .find((sql) => sql.includes("FROM public.round_players"));
+    expect(participantSql).not.toContain("lm.is_monthly_payer");
+    expect(participantSql).not.toContain("JOIN public.league_members");
+    expect(participantSql).toContain("round_item.league_id = $1");
+  });
+
   it("saves expense item", async () => {
     const query = vi.fn().mockImplementation(async (sql: string) => ({
       rows: [],

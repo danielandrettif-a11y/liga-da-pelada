@@ -19,4 +19,14 @@ describe("destaques rápidos do Cartola", () => {
       topDrop: null,
     });
   });
+
+  it("considera somente o registro mais recente de cada jogador", () => {
+    const result = buildFantasyQuickHighlights([
+      { player_id: "p1", round_points: 2, variation_rate: 1, players: { name: "Atual" } },
+      { player_id: "p1", round_points: 99, variation_rate: 9, players: { name: "Antigo" } },
+      { player_id: "p2", round_points: 4, variation_rate: -1, players: { name: "Outro" } },
+    ]);
+    expect(result?.topScorer?.name).toBe("Outro");
+    expect(result?.topGain?.name).toBe("Atual");
+  });
 });

@@ -379,7 +379,7 @@
 
 ---
 
-## 🏆 MARCO FINAL: 100% DE REFATORAÇÃO ARQUITETURAL CONCLUÍDA (267/267 OPERAÇÕES) ✅
+## 🏆 MARCO FINAL: 100% DE REFATORAÇÃO ARQUITETURAL CONCLUÍDA (268/268 OPERAÇÕES) ✅
 
 - **Contexto Cosmetics (11/11 operações):**
   - Backend DDD em `backend/src/contexts/cosmetics/` (domínio, aplicação, postgres repo e rotas Fastify sob `ENABLE_COSMETICS_API`).
@@ -402,8 +402,8 @@
   - Bridging em `src/lib/actions/performance.ts` e `src/app/api/internal/observability/route.ts` com testes em `performance.test.ts` e `route.test.ts`.
 
 - **Resultados Auditados:**
-  - `npm run audit:migration`: **267 de 267 operações aceitas (100%)**!
-    - `callups`: 21/21
+  - `npm run audit:migration`: **268 de 268 operações aceitas (100%)**!
+    - `callups`: 22/22
     - `cards`: 15/15
     - `collective`: 8/8
     - `cosmetics`: 11/11
@@ -422,6 +422,14 @@
   - Testes Backend Vitest: **180 arquivos / 668 testes passando 100%**.
   - Testes Frontend Vitest: **33 arquivos / 205 testes passando 100%**.
   - Typecheck (`tsc --noEmit`): **0 erros** em ambos os projetos.
+
+### Homologação autenticada local — 05/11/2026
+
+- **7/268 operações** passaram de `frontend-migrated` para `verified`, com evidência em Playwright e smokes contra o Supabase/PostgreSQL local.
+- Playwright: **26 cenários aprovados** em mobile e desktop; 2 mutações destrutivas puladas por configuração.
+- Regressão: **712 testes backend/183 arquivos** e **1.265 testes frontend/244 arquivos**, com typechecks e builds aprovados.
+- Integração: agregador com 43 leituras sem falha e Fantasy aprovado em 5 consultas analíticas, 2 fichas e 1 dashboard.
+- Restam **3 fatias operacionais** antes do live: notificações externas, ensaio com exportação nova de produção e deploy/cutover na VPS.
 
 
 

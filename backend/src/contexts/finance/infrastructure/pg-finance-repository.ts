@@ -269,11 +269,11 @@ export class PgFinanceRepository implements FinanceRepository {
       if (!roundId) return null;
 
       const participantsRes = await client.query<{ id: string; is_monthly_payer: boolean }>(
-        `SELECT p.id, COALESCE(lm.is_monthly_payer, false) as is_monthly_payer
+        `SELECT p.id, false AS is_monthly_payer
          FROM public.round_players rp
          JOIN public.players p ON p.id = rp.player_id
-         LEFT JOIN public.league_members lm ON lm.player_id = p.id AND lm.league_id = $1
-         WHERE rp.round_id = $2`,
+         JOIN public.rounds round_item ON round_item.id = rp.round_id
+         WHERE round_item.league_id = $1 AND rp.round_id = $2`,
         [leagueId, roundId],
       );
       const paymentsRes = await client.query<{ player_id: string; paid: boolean }>(

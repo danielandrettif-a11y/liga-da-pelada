@@ -12,6 +12,8 @@ describe("match domain validations", () => {
   it("validates valid UUIDs", () => {
     const validUuid = "123e4567-e89b-12d3-a456-426614174000";
     expect(parseMatchUuid(validUuid, "ID")).toBe(validUuid);
+    expect(parseMatchUuid("b0000000-0000-0000-0000-000000000001", "ID"))
+      .toBe("b0000000-0000-0000-0000-000000000001");
   });
 
   it("throws error for invalid UUIDs", () => {

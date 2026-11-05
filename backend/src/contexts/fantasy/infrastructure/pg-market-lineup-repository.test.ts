@@ -178,7 +178,7 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
   });
 
   it("returns quick highlights with the public action contract", async () => {
-    const pool = createMockPool(async (sql) => sql.includes("price.last_round_points") ? { rows: [
+    const pool = createMockPool(async (sql) => sql.includes("LEFT JOIN LATERAL") ? { rows: [
       { name: "A", avatar_url: null, last_round_points: 9, last_price_change: 1, variation_rate: 2 },
       { name: "B", avatar_url: "b.png", last_round_points: 4, last_price_change: -2, variation_rate: -3 },
     ] } : { rows: [] });

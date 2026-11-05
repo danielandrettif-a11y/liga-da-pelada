@@ -1,20 +1,28 @@
 export type FantasyQuickHighlightPriceRow = {
+  player_id?: string | null;
   current_price?: number | null;
   last_round_points?: number | null;
   last_price_change?: number | null;
+  round_points?: number | null;
+  price_change?: number | null;
   variation_rate?: number | null;
   players?: { name?: string | null; avatar_url?: string | null } | Array<{ name?: string | null; avatar_url?: string | null }> | null;
 };
 
 export function buildFantasyQuickHighlights(prices: FantasyQuickHighlightPriceRow[]) {
   if (!prices.length) return null;
-  const values = prices.map((item) => {
+  const latestByPlayer = new Map<string, FantasyQuickHighlightPriceRow>();
+  const rowsWithoutPlayer = prices.filter((item) => !item.player_id);
+  for (const item of prices) {
+    if (item.player_id && !latestByPlayer.has(item.player_id)) latestByPlayer.set(item.player_id, item);
+  }
+  const values = [...latestByPlayer.values(), ...rowsWithoutPlayer].map((item) => {
     const player = Array.isArray(item.players) ? item.players[0] : item.players;
     return {
       name: player?.name || "Jogador",
       avatarUrl: player?.avatar_url || null,
-      points: Number(item.last_round_points || 0),
-      priceChange: Number(item.last_price_change || 0),
+      points: Number(item.round_points ?? item.last_round_points ?? 0),
+      priceChange: Number(item.price_change ?? item.last_price_change ?? 0),
       variation: Number(item.variation_rate || 0),
     };
   });
