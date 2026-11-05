@@ -46,16 +46,21 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
         return { rows: [{ feature_tier: "complete" }] };
       }
       if (sql.includes("FROM public.seasons season") && sql.includes("fantasy_seasons")) {
-        return { rows: [{ fantasy_season_id: "season-1", initial_budget: 100 }] };
+        return { rows: [{ season_id: "core-season-1", fantasy_season_id: "season-1",
+          initial_budget: 100, initial_player_price: 10 }] };
       }
       if (sql.includes("FROM public.fantasy_rounds fantasy_round")) {
-        return { rows: [{ fantasy_round_id: "fantasy-round-1", round_id: "round-1", number: 1, market_status: "open" }] };
+        return { rows: [{ id: "fantasy-round-1", fantasy_round_id: "fantasy-round-1",
+          round_id: "round-1", number: 1, status: "draft", market_status: "open", has_started: false }] };
       }
       if (sql.includes("FROM public.fantasy_accounts")) {
         return { rows: [{ current_budget: 100 }] };
       }
       if (sql.includes("FROM public.fantasy_lineups lineup") && sql.includes("lineup.user_id")) {
-        return { rows: [] };
+        return { rows: ["u1", "u2", "u3"].map((user_id) => ({
+          id: `lineup-${user_id}`, user_id, fantasy_round_id: "fantasy-round-1",
+          captain_player_id: "p1", players: [{ player_id: "p1" }], reserves: [],
+        })) };
       }
       if (sql.includes("FROM public.league_members member")) {
         return { rows: [{ id: "p1", name: "Player 1", current_price: 8.5, is_goalkeeper: false, total_points: 75, rounds_played: 1 }] };
@@ -77,6 +82,13 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
     expect(data.balance).toBe(100);
     expect(data.players.length).toBe(1);
     expect(data.confirmedCount).toBe(3);
+    expect(data).toMatchObject({
+      fantasySeasonId: "season-1",
+      fantasyRound: { id: "fantasy-round-1", status: "open", betweenRounds: false },
+      market: [{ id: "p1", name: "Player 1", popularityPercent: 100 }],
+      radar: { totalLineups: 3, hasMinSample: true },
+      liveProjection: { isLive: false },
+    });
   });
 
   it("returns the rich player detail contract with the selected round projection", async () => {

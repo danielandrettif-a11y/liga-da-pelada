@@ -50,6 +50,26 @@ export type SavedFantasyLineup = {
 export type FantasyMarketDashboardData = {
   authenticated: boolean;
   available: boolean;
+  unavailableReason?: "basic" | "no-season" | "no-round";
+  migrationRequired?: boolean;
+  isAdmin?: boolean;
+  settings?: Record<string, unknown>;
+  playersPerTeam?: number;
+  round?: Record<string, unknown> | null;
+  fantasySeasonId?: string;
+  fantasyRound?: Record<string, unknown>;
+  latestFinishedRoundPaid?: boolean;
+  market?: Array<Record<string, unknown>>;
+  insights?: Record<string, unknown>;
+  radar?: Record<string, unknown>;
+  marketHealth?: Record<string, unknown> | null;
+  account?: { totalPoints: number; roundsPlayed: number; bestRoundPoints: number };
+  lastRound?: Record<string, unknown> | null;
+  activeCard?: Record<string, unknown> | null;
+  availablePacks?: Array<Record<string, unknown>>;
+  availablePacksCount?: number;
+  inventoryCount?: number;
+  liveProjection?: Record<string, unknown>;
   roundId?: string | null;
   roundNumber?: number | null;
   marketOpen: boolean;

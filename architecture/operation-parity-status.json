@@ -699,6 +699,11 @@
     {
       "context": "fantasy",
       "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyDashboard"
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
       "name": "getFantasyQuickHighlights"
     },
     {
@@ -1460,6 +1465,7 @@
       "src/lib/actions/payments.test.ts"
     ],
     "fantasy src/lib/actions/fantasy.ts getFantasyDashboard": [
+      "backend/src/contexts/fantasy/domain/dashboard.test.ts",
       "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
       "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
       "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",

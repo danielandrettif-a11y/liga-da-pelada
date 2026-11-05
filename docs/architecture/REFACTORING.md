@@ -25,13 +25,21 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Concluído nesta fase | Formato, abertura, pré-lista, edição, estado e participação extraídos; migrations 325 e 328 aplicadas e validadas em teste e oficial; isolamento entre duas peladas aprovado. |
 | Partidas e pontuação | 21/21 operações aceitas em revisão | Ciclo de vida, gols, goleiros, substituições e cronômetro extraídos. O cronômetro agenda QStash no backend, reivindica alertas de forma transacional e libera a reivindicação quando o Web Push falha. Ainda falta o ensaio móvel integrado com falhas de rede e dois ADMs para promover o contexto a verificado. |
-| Cartola e cosméticos | 32/33 operações aceitas | Cosméticos 11/11; Fantasy 21/22. Resta o dashboard composto antes de ativar `FANTASY_API_ENABLED`. |
+| Cartola e cosméticos | 33/33 operações aceitas | Cosméticos 11/11 e Fantasy 22/22. O dashboard composto passou no PostgreSQL local; a flag pode ser ativada de forma controlada no ensaio integrado. |
 | Pagamentos | Concluído nesta fase | Itens, parcelas, PIX, rateio, obrigações, checklist e auditoria separados em domínio, aplicação e infraestrutura, mantendo RPCs e escopo por pelada. |
 | Notificações | Concluído nesta fase (16/16) | Inbox, preferências, push subscriptions, envio Web Push e e-mail Resend, agendamento QStash de lembretes do Cartola e alerta de cronômetro com 100% de paridade e fail-fast. |
-| Estatísticas e demais áreas | Concluído em revisão de código | Estatísticas 22/22 e todos os demais contextos, exceto o dashboard composto de Fantasy, estão aceitos. |
+| Estatísticas e demais áreas | Concluído em revisão de código | As 267 operações catalogadas possuem ponte estrutural e paridade aceita; a promoção a verificada ainda depende das jornadas integradas registradas. |
 | Avaliação de tabela de acumulados | Medida no oficial; sem justificativa para criar | No banco oficial, `seasonStats`, `rankingHistory` e `playerHistory` ficaram em 128,51 ms, 119,62 ms e 99,64 ms no p95. Os gargalos estão nos enriquecimentos/RPCs compostas. Ver `reports/performance/BASELINE-2026-10-21.md`. |
 
 ## Registro de lotes
+
+### 2026-11-04 — dashboard composto encerra a paridade de Fantasy
+
+- `getFantasyDashboard` agora entrega o contrato completo consumido pela experiência do Cartola: rodada ativa ou intervalo entre rodadas, configurações congeladas, mercado enriquecido, escalação ou portfólio, conta, boletim anterior, cartas, saúde do mercado e projeção ao vivo.
+- A composição reutiliza `readLiveFantasyProjection` e o motor canônico do domínio. Tendência, forma, custo-benefício, tags, popularidade, insights e radar ficam em `domain/dashboard.ts`; PostgreSQL/RLS permanecem responsáveis pelo escopo de liga, temporada e usuário.
+- O teste real encontrou e corrigiu uma referência inválida a `league_members.member_category`; a coluna canônica é `players.member_category`. A imagem sem cache `liga-backend-local:fantasy-dashboard` executou [`verify-local-fantasy-dashboard.sh`](../../scripts/verify-local-fantasy-dashboard.sh): a rota autenticada respondeu **200** com mercado, escalação, radar, conta, cartas, boletim e projeção.
+- Progresso de paridade: **267/267 operações aceitas (100%)**, incluindo Fantasy **22/22**. `FANTASY_API_ENABLED` permanece `false` apenas como padrão de rollout; já pode ser ligada no ambiente local para a jornada visual completa antes da VPS.
+- Verificação: **708 testes backend em 183 arquivos**, **1.238 testes frontend em 237 arquivos**, typechecks, builds de produção, auditorias e smoke WSL/PostgreSQL aprovados. O suporte final a sessão de teste e estado de pagamento passou novamente no typecheck, nos 21 testes direcionados, no build backend e no smoke real.
 
 ### 2026-11-04 — ficha completa do atleta no backend modular
 
