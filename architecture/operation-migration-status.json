@@ -2315,7 +2315,7 @@
       "context": "notifications",
       "source": "src/lib/actions/inbox.ts",
       "name": "getMyInboxPreview",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "GET /api/notifications/inbox/preview",
       "evidence": [
         "backend/src/contexts/notifications/domain/inbox-notification.test.ts",
@@ -2324,14 +2324,15 @@
         "backend/src/contexts/notifications/presentation/inbox-route.test.ts",
         "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
         "src/modules/notifications/infrastructure/notification-api-session.test.ts",
-        "src/lib/actions/inbox.test.ts"
+        "src/lib/actions/inbox.test.ts",
+        "scripts/verify-local-notifications.sh"
       ]
     },
     {
       "context": "notifications",
       "source": "src/lib/actions/inbox.ts",
       "name": "markInboxRead",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "POST /api/notifications/inbox/read",
       "evidence": [
         "backend/src/contexts/notifications/domain/inbox-notification.test.ts",
@@ -2340,14 +2341,15 @@
         "backend/src/contexts/notifications/presentation/inbox-route.test.ts",
         "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
         "src/modules/notifications/infrastructure/notification-api-session.test.ts",
-        "src/lib/actions/inbox.test.ts"
+        "src/lib/actions/inbox.test.ts",
+        "scripts/verify-local-notifications.sh"
       ]
     },
     {
       "context": "notifications",
       "source": "src/lib/actions/inbox.ts",
       "name": "getMyInboxNotifications",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "POST /api/notifications/inbox/sync",
       "evidence": [
         "backend/src/contexts/notifications/domain/inbox-notification.test.ts",
@@ -2356,14 +2358,15 @@
         "backend/src/contexts/notifications/presentation/inbox-route.test.ts",
         "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
         "src/modules/notifications/infrastructure/notification-api-session.test.ts",
-        "src/lib/actions/inbox.test.ts"
+        "src/lib/actions/inbox.test.ts",
+        "scripts/verify-local-notifications.sh"
       ]
     },
     {
       "context": "notifications",
       "source": "src/app/mais/notification-actions.ts",
       "name": "getPushPublicKey",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "GET /api/notifications/push/public-key",
       "evidence": [
         "backend/src/contexts/notifications/domain/push-subscription.test.ts",
@@ -2375,14 +2378,15 @@
         "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
         "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
         "src/modules/notifications/infrastructure/notification-api-session.test.ts",
-        "src/app/mais/notification-actions.test.ts"
+        "src/app/mais/notification-actions.test.ts",
+        "scripts/verify-local-notifications.sh"
       ]
     },
     {
       "context": "notifications",
       "source": "src/app/mais/notification-actions.ts",
       "name": "getPushSystemStatus",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "GET /api/notifications/push/status",
       "evidence": [
         "backend/src/contexts/notifications/domain/push-subscription.test.ts",
@@ -2394,14 +2398,16 @@
         "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
         "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
         "src/modules/notifications/infrastructure/notification-api-session.test.ts",
-        "src/app/mais/notification-actions.test.ts"
+        "src/app/mais/notification-actions.test.ts",
+        "e2e/round-and-scoring.spec.ts",
+        "scripts/verify-local-notifications.sh"
       ]
     },
     {
       "context": "notifications",
       "source": "src/app/mais/notification-actions.ts",
       "name": "subscribeToPush",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "POST /api/notifications/push/subscribe",
       "evidence": [
         "backend/src/contexts/notifications/domain/push-subscription.test.ts",
@@ -2413,14 +2419,15 @@
         "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
         "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
         "src/modules/notifications/infrastructure/notification-api-session.test.ts",
-        "src/app/mais/notification-actions.test.ts"
+        "src/app/mais/notification-actions.test.ts",
+        "scripts/verify-local-notifications.sh"
       ]
     },
     {
       "context": "notifications",
       "source": "src/app/mais/notification-actions.ts",
       "name": "unsubscribeFromPush",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "POST /api/notifications/push/unsubscribe",
       "evidence": [
         "backend/src/contexts/notifications/domain/push-subscription.test.ts",
@@ -2432,14 +2439,15 @@
         "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
         "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
         "src/modules/notifications/infrastructure/notification-api-session.test.ts",
-        "src/app/mais/notification-actions.test.ts"
+        "src/app/mais/notification-actions.test.ts",
+        "scripts/verify-local-notifications.sh"
       ]
     },
     {
       "context": "notifications",
       "source": "src/app/mais/notification-actions.ts",
       "name": "getNotificationPreferences",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "GET /api/notifications/preferences/:leagueId",
       "evidence": [
         "backend/src/contexts/notifications/domain/push-subscription.test.ts",
@@ -2451,14 +2459,16 @@
         "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
         "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
         "src/modules/notifications/infrastructure/notification-api-session.test.ts",
-        "src/app/mais/notification-actions.test.ts"
+        "src/app/mais/notification-actions.test.ts",
+        "e2e/round-and-scoring.spec.ts",
+        "scripts/verify-local-notifications.sh"
       ]
     },
     {
       "context": "notifications",
       "source": "src/app/mais/notification-actions.ts",
       "name": "updateNotificationPreferences",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "PUT /api/notifications/preferences",
       "evidence": [
         "backend/src/contexts/notifications/domain/push-subscription.test.ts",
@@ -2470,14 +2480,16 @@
         "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
         "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
         "src/modules/notifications/infrastructure/notification-api-session.test.ts",
-        "src/app/mais/notification-actions.test.ts"
+        "src/app/mais/notification-actions.test.ts",
+        "e2e/round-and-scoring.spec.ts",
+        "scripts/verify-local-notifications.sh"
       ]
     },
     {
       "context": "notifications",
       "source": "src/app/mais/notification-actions.ts",
       "name": "sendPushTest",
-      "state": "frontend-migrated",
+      "state": "verified",
       "target": "POST /api/notifications/test-push",
       "evidence": [
         "backend/src/contexts/notifications/domain/push-delivery.test.ts",
@@ -2485,7 +2497,8 @@
         "backend/src/contexts/notifications/infrastructure/qstash-push-alert-scheduler.test.ts",
         "backend/src/contexts/notifications/presentation/delivery-route.test.ts",
         "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
-        "src/app/mais/notification-actions.test.ts"
+        "src/app/mais/notification-actions.test.ts",
+        "scripts/verify-local-notifications.sh"
       ]
     },
     {

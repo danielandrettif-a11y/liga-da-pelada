@@ -65,6 +65,29 @@ test.describe("fluxos críticos de rodada e pontuação", () => {
     await expect(page.getByText(/pelada|configurações|liga/i).first()).toBeVisible();
   });
 
+  test("preferências de notificações usam a API modular e restauram a alteração", async () => {
+    await page.goto("/mais/notificacoes");
+    await expect(page.locator("body")).not.toContainText("Algo saiu do jogo");
+    await expect(page.getByRole("heading", { name: "Preferências de notificações" })).toBeVisible();
+
+    const matchAlerts = page.getByRole("switch", { name: "Alertas de partida" });
+    await expect(matchAlerts).toBeVisible();
+    const original = await matchAlerts.getAttribute("aria-checked");
+    const changed = original === "true" ? "false" : "true";
+
+    try {
+      await matchAlerts.click();
+      await expect(matchAlerts).toHaveAttribute("aria-checked", changed);
+      await expect(matchAlerts).toBeEnabled();
+    } finally {
+      if (await matchAlerts.getAttribute("aria-checked") !== original) {
+        await matchAlerts.click();
+        await expect(matchAlerts).toHaveAttribute("aria-checked", original!);
+        await expect(matchAlerts).toBeEnabled();
+      }
+    }
+  });
+
   test("registra e desfaz um gol sem deixar resíduos", async () => {
     test.skip(!allowMutations || !matchId, "Habilite mutações somente em uma partida descartável em andamento.");
     await page.goto(`/partidas/${matchId}`);
