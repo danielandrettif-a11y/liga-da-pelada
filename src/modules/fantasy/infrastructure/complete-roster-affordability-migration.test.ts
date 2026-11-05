@@ -17,6 +17,7 @@ describe("migration 353: elenco completo e Cartola acessível", () => {
 
   it("calcula e aplica o time válido mais barato como piso", () => {
     expect(migration).toContain("get_fantasy_minimum_viable_lineup_cost");
+    expect(migration).toContain("formations(team_size, defenders, attackers)");
     expect(migration).toContain("GREATEST(base_budget, target_team_size * 11.00");
     expect(migration).toContain("ON CONFLICT (fantasy_season_id, user_id) DO UPDATE");
   });

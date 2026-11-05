@@ -17,7 +17,7 @@ AS $$
     SELECT season.id, season.league_id, season.initial_player_price
     FROM public.fantasy_seasons season
     WHERE season.id = p_fantasy_season_id
-  ), formations(defenders, attackers) AS (
+  ), formations(team_size, defenders, attackers) AS (
     SELECT * FROM (VALUES
       (5, 2, 2),
       (6, 2, 3),
