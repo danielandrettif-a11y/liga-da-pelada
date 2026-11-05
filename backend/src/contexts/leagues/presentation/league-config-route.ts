@@ -78,6 +78,7 @@ export function registerLeagueConfigRoutes(app: FastifyInstance, dependencies: {
     Params: { leagueId: string };
     Body: {
       match_duration: number;
+      goals_to_finish: number;
       players_per_team: number;
       teams_per_round: number;
       stadium_name: string;
@@ -93,11 +94,12 @@ export function registerLeagueConfigRoutes(app: FastifyInstance, dependencies: {
           type: "object",
           additionalProperties: false,
           required: [
-            "match_duration", "players_per_team", "teams_per_round",
+            "match_duration", "goals_to_finish", "players_per_team", "teams_per_round",
             "stadium_name", "stadium_map_url", "event_duration_minutes",
           ],
           properties: {
             match_duration: { type: "integer" },
+            goals_to_finish: { type: "integer" },
             players_per_team: { type: "integer" },
             teams_per_round: { type: "integer" },
             stadium_name: { type: "string", maxLength: 240 },

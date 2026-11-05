@@ -340,6 +340,8 @@ function HoldExtraTimeButton({
 type MatchLiveBoardProps = {
   match: any;
   matchDuration: number;
+  /** Zero significa partida sem limite de gols. */
+  goalsToFinish: number;
   canManage: boolean;
   auditLog?: MatchAdminAuditEntry[];
 };
@@ -399,7 +401,7 @@ function GoalPickerPlayerOption({ entry, cosmetics, isGoalkeeper = false, onClic
   );
 }
 
-export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] }: MatchLiveBoardProps) {
+export function MatchLiveBoard({ match, matchDuration, goalsToFinish, canManage, auditLog = [] }: MatchLiveBoardProps) {
   const router = useRouter();
   const refreshTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submittingGoalRef = useRef(false);
@@ -859,9 +861,9 @@ export function MatchLiveBoard({ match, matchDuration, canManage, auditLog = [] 
 
           const isTeamA = item.input.team_id === match.team_a_id;
           const currentTeamScore = Number(isTeamA ? result.scoreA : result.scoreB);
-          if (!result.idempotent && shouldOfferMatchFinishAfterGoal(currentTeamScore - 1, currentTeamScore)) {
+          if (!result.idempotent && shouldOfferMatchFinishAfterGoal(currentTeamScore - 1, currentTeamScore, goalsToFinish)) {
             const teamName = isTeamA ? match.team_a.name : match.team_b.name;
-            setFinishPrompt(`${teamName} chegou a 2 gols. Encerrar a partida e preparar a próxima?`);
+            setFinishPrompt(`${teamName} chegou a ${goalsToFinish} ${goalsToFinish === 1 ? "gol" : "gols"}. Encerrar a partida e preparar a próxima?`);
           }
           reportMatchAction("register_goal", startedAt, true);
           continue;

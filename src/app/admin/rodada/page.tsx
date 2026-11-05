@@ -56,13 +56,13 @@ export default async function NovaRodadaPage({ searchParams }: PageProps<"/admin
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Link
-          href={prelist ? "/admin/prelistas" : "/rodadas"}
+          href="/rodadas"
           className="w-10 h-10 rounded-full bg-surface hover:bg-surface-hover flex items-center justify-center transition-colors"
         >
           <ArrowLeft className="w-5 h-5 text-muted" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-foreground">{prelist ? "Montar times" : (callup?.round_type || requestedType) === "friendly" ? "Nova pré-lista de amistoso" : "Nova pré-lista"}</h1>
+          <h1 className="text-xl font-bold text-foreground">{prelist ? "Montar times" : (callup?.round_type || requestedType) === "friendly" ? "Novo amistoso" : "Nova rodada"}</h1>
           <p className="text-xs text-muted mt-0.5">
             Monte os times para a próxima pelada
           </p>

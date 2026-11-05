@@ -26,7 +26,7 @@ describe("pgLeagueConfigRepository", () => {
     await expect(repository.getConfig(leagueId, actor)).resolves.toMatchObject({ id: leagueId, can_manage: true });
     await expect(repository.updateName(leagueId, "Novo nome", actor)).resolves.toBe("Novo nome");
     await expect(repository.updateSettings(leagueId, {
-      matchDuration: 8, playersPerTeam: 6, teamsPerRound: 3,
+      matchDuration: 8, goalsToFinish: 3, playersPerTeam: 6, teamsPerRound: 3,
       stadiumName: "Arena", stadiumMapUrl: "https://maps.example/arena", eventDurationMinutes: 150,
     }, actor)).resolves.toBeUndefined();
     await expect(repository.setPreseason(leagueId, true, actor)).resolves.toBeUndefined();
@@ -37,7 +37,7 @@ describe("pgLeagueConfigRepository", () => {
   it("rejects format changes while a callup is active and rolls back", async () => {
     const { repository, query } = fixture({ activeCallup: true });
     await expect(repository.updateSettings(leagueId, {
-      matchDuration: 8, playersPerTeam: 6, teamsPerRound: 3,
+      matchDuration: 8, goalsToFinish: 3, playersPerTeam: 6, teamsPerRound: 3,
       stadiumName: null, stadiumMapUrl: null, eventDurationMinutes: 120,
     }, actor)).rejects.toMatchObject({ statusCode: 409 });
     expect(query.mock.calls.filter(([sql]) => sql === "ROLLBACK")).toHaveLength(1);

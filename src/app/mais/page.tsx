@@ -7,11 +7,9 @@ import { CallupAdminCard } from "@/components/CallupAdminCard";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { getActiveCallups } from "@/lib/actions/callups";
 import { getLeagueConfig } from "@/lib/actions/league";
-import { PreSeasonToggle } from "@/components/PreSeasonToggle";
 import { LeagueModeCard } from "@/components/LeagueModeCard";
 import {
   UserPlus,
-  CalendarPlus,
   Shield,
   ChevronRight,
   Sliders,
@@ -46,12 +44,6 @@ const ADMIN_SECTIONS = [
         icon: Stadium,
         label: "Campos e Estádios",
         description: "Cadastrar locais e links do Google Maps",
-      },
-      {
-        href: "/admin/prelistas",
-        icon: CalendarPlus,
-        label: "Pré-listas e Rodadas",
-        description: "Preparar datas, jogadores e montar times",
       },
       {
         href: "/admin/transfermarket",
@@ -293,13 +285,6 @@ export default async function MaisPage({ searchParams }: MaisPageProps) {
           />
 
           <LeagueModeCard />
-
-          {leagueConfig && (
-            selectedLeague?.featureTier !== "quick" && <PreSeasonToggle
-              leagueId={leagueConfig.id}
-              initialEnabled={leagueConfig.preseason_enabled === true}
-            />
-          )}
 
           {ADMIN_SECTIONS.map((section) => (
             <div key={section.title}>

@@ -10,8 +10,10 @@ export function getOfficialElapsedSeconds(displayedElapsedSeconds: number, eligi
   return Math.max(0, displayedElapsedSeconds) + Math.max(0, eligibilityOffsetSeconds);
 }
 
-export function shouldOfferMatchFinishAfterGoal(previousScore: number, currentScore: number) {
-  return previousScore < 2 && currentScore >= 2;
+export function shouldOfferMatchFinishAfterGoal(previousScore: number, currentScore: number, goalsToFinish: number | null = 2) {
+  if (goalsToFinish === null || !Number.isFinite(goalsToFinish) || goalsToFinish <= 0) return false;
+  const target = Math.floor(goalsToFinish);
+  return previousScore < target && currentScore >= target;
 }
 
 export type MatchTimerSnapshot = {

@@ -6,6 +6,7 @@ import {
   calculateMarketPopularity,
   getFantasyPlayerTags,
 } from "./engine.js";
+import { getFantasySlotRoles, type FantasyFormation } from "./lineup-positions.js";
 
 export type FantasyDashboardPlayerInput = {
   id: string;
@@ -36,6 +37,52 @@ const byNumberDesc = (field: string) => (a: Record<string, any>, b: Record<strin
 
 function highlight(player: Record<string, any> | undefined, value: string, extra: string, badge: string) {
   return player ? { player, value, extra, badge } : null;
+}
+
+type AffordableDashboardPlayer = Pick<FantasyDashboardPlayerInput, "id" | "price" | "profile">;
+
+function formationCost(
+  players: AffordableDashboardPlayer[],
+  playersPerTeam: number,
+  formation: FantasyFormation,
+) {
+  const roles = getFantasySlotRoles(playersPerTeam, formation);
+  const defendersNeeded = roles.filter((role) => role === "DEF").length;
+  const attackersNeeded = roles.filter((role) => role === "ATA").length;
+  let cheapest = Number.POSITIVE_INFINITY;
+
+  for (const goalkeeper of players) {
+    const remaining = players.filter((player) => player.id !== goalkeeper.id);
+    const defenders = remaining
+      .filter((player) => player.profile === "defensive")
+      .sort((a, b) => a.price - b.price)
+      .slice(0, defendersNeeded);
+    const attackers = remaining
+      .filter((player) => player.profile === "offensive" || player.profile === "midfield")
+      .sort((a, b) => a.price - b.price)
+      .slice(0, attackersNeeded);
+    if (defenders.length !== defendersNeeded || attackers.length !== attackersNeeded) continue;
+    cheapest = Math.min(
+      cheapest,
+      goalkeeper.price
+        + defenders.reduce((total, player) => total + player.price, 0)
+        + attackers.reduce((total, player) => total + player.price, 0),
+    );
+  }
+
+  return Number.isFinite(cheapest) ? Math.round((cheapest + Number.EPSILON) * 100) / 100 : null;
+}
+
+/** Minimum budget that still permits one complete, position-valid lineup. */
+export function getCheapestValidFantasyLineupCost(
+  players: AffordableDashboardPlayer[],
+  playersPerTeam: number,
+) {
+  const formations: FantasyFormation[] = playersPerTeam === 6 ? ["2-3", "3-2"] : ["2-3"];
+  const costs = formations
+    .map((formation) => formationCost(players, playersPerTeam, formation))
+    .filter((cost): cost is number => cost !== null);
+  return costs.length ? Math.min(...costs) : null;
 }
 
 export function buildFantasyDashboardAnalytics(input: {

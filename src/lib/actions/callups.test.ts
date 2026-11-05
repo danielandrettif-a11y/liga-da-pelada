@@ -32,6 +32,7 @@ import {
   lockCallupForRound,
   openCallup,
   repairMyPlayerAccount,
+  setCallupMatchRules,
   setCallupVisibility,
 } from "./callups";
 
@@ -149,10 +150,12 @@ describe("callups actions via API gateway", () => {
     const closeCallupMock = vi.fn().mockResolvedValue(undefined);
     const lockCallupMock = vi.fn().mockResolvedValue(undefined);
     const setVisibilityMock = vi.fn().mockResolvedValue(undefined);
+    const setMatchRulesMock = vi.fn().mockResolvedValue(undefined);
     mocks.callupApi.mockResolvedValue({
       closeCallup: closeCallupMock,
       lockCallup: lockCallupMock,
       setVisibility: setVisibilityMock,
+      setMatchRules: setMatchRulesMock,
     });
 
     await expect(closeCallup(callupId)).resolves.toEqual({ success: true });
@@ -163,6 +166,9 @@ describe("callups actions via API gateway", () => {
 
     await expect(setCallupVisibility(callupId, false)).resolves.toEqual({ success: true });
     expect(setVisibilityMock).toHaveBeenCalledWith(leagueId, callupId, false);
+
+    await expect(setCallupMatchRules(callupId, 8, 3)).resolves.toEqual({ success: true });
+    expect(setMatchRulesMock).toHaveBeenCalledWith(leagueId, callupId, 8, 3);
   });
 
   it("routes repairMyPlayerAccount via API when available", async () => {

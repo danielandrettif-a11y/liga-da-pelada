@@ -99,6 +99,11 @@
     {
       "context": "callups",
       "source": "src/lib/actions/callups.ts",
+      "name": "setCallupMatchRules"
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
       "name": "setCallupVisibility"
     },
     {

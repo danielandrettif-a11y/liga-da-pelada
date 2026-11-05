@@ -111,6 +111,8 @@ export function FantasyExperience({
   settings,
   market,
   budget,
+  marketBudgetFloor = null,
+  budgetSupportApplied = false,
   lineup,
   insights,
   radar,
@@ -1458,6 +1460,14 @@ export function FantasyExperience({
               accent={betweenRounds || remaining >= 0}
             />
           </div>
+          {budgetSupportApplied && marketBudgetFloor !== null && (
+            <div className="mt-3 rounded-xl border border-accent/25 bg-accent/[.07] px-3 py-2.5">
+              <p className="text-[9px] font-black uppercase tracking-[.14em] text-accent">Garantia de escalação</p>
+              <p className="mt-1 text-[10px] leading-4 text-muted">
+                Seu patrimônio recebeu o piso de {formatFantasyMoney(marketBudgetFloor, settings.currencyName)}, calculado pelo time válido mais barato deste mercado. Os preços dos atletas não foram alterados.
+              </p>
+            </div>
+          )}
           {status === "in_progress" && (
             <div className="mt-3 flex items-center gap-2 text-[10px] font-bold text-accent">
               <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" /> Prévia ao vivo</span>

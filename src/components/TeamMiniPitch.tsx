@@ -119,7 +119,6 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
     .flatMap((entry) => entry.players ? [{
       player: entry.players,
       goalkeeperOrder: entry.goalkeeper_order ?? null,
-      loanOrder: entry.loan_order ?? null,
       cartolaPoints: Number(entry.cartola_points || 0),
     }] : []);
   const players = showPositionDetails
@@ -185,7 +184,7 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
 
       <div className="mb-1 flex items-center justify-end px-0.5">
         <span className="rounded bg-accent/10 px-1 py-0.5 text-[7px] font-black uppercase leading-none text-accent">
-          G = gol · E = empréstimo
+          Ordem do gol
         </span>
       </div>
 
@@ -203,7 +202,7 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
         <div className="absolute left-1/2 top-1.5 h-6 w-12 -translate-x-1/2 border border-t-0 border-white/30" />
         <div className="absolute bottom-1.5 left-1/2 h-6 w-12 -translate-x-1/2 border border-b-0 border-white/30" />
 
-        {visiblePlayers.map(({ player, goalkeeperOrder, loanOrder, cartolaPoints }, playerIndex) => {
+        {visiblePlayers.map(({ player, goalkeeperOrder, cartolaPoints }, playerIndex) => {
           const [left, top] = positions[playerIndex];
           const position = getPitchPosition(player);
           const playersInRole = positionAwareLayout.countByRole.get(position.label) || 1;
@@ -223,7 +222,7 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
               aria-pressed={canManageIdentity ? captainId === player.id : onPlayerClick ? selectedPlayerId === player.id : undefined}
               className={`absolute flex ${widthClass} -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-md transition-transform enabled:cursor-pointer enabled:active:scale-95 ${selectedPlayerId === player.id ? "z-10 ring-2 ring-accent" : ""}`}
               style={{ left: `${left}%`, top: `${top}%` }}
-              title={`${player.name}${goalkeeperOrder ? ` · G${goalkeeperOrder}` : ""}${loanOrder ? ` · E${loanOrder}` : ""}`}
+              title={`${player.name}${goalkeeperOrder ? ` · G${goalkeeperOrder}` : ""}`}
             >
               <div className="pointer-events-none relative rounded-full border-2" style={{ borderColor: teamColor }}>
                 <PlayerAvatar
@@ -239,14 +238,6 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
                     aria-label={`${goalkeeperOrder}º na ordem do gol`}
                   >
                     {goalkeeperOrder}
-                  </span>
-                )}
-                {loanOrder && (
-                  <span
-                    className="absolute -left-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-background bg-sky-400 px-0.5 font-athletic text-[8px] font-black leading-none text-background shadow-[0_2px_6px_rgba(0,0,0,.55)]"
-                    aria-label={`${loanOrder}º na fila de empréstimo`}
-                  >
-                    {loanOrder}
                   </span>
                 )}
                 {captainId === player.id && (

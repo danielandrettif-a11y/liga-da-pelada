@@ -26,6 +26,7 @@ function fixture(enabled: boolean) {
       id: "00000000-0000-4000-8000-000000000001",
       name: "Pelada BQ",
       match_duration: 7,
+      goals_to_finish: 2,
       players_per_team: 5,
       teams_per_round: 3,
       preseason_enabled: false,
@@ -325,7 +326,7 @@ describe("league HTTP route", () => {
       method: "PATCH", url: `/api/leagues/${id}/name`, headers, payload: { name: " Novo   nome " },
     });
     const settingsPayload = {
-      match_duration: 8, players_per_team: 6, teams_per_round: 3,
+      match_duration: 8, goals_to_finish: 3, players_per_team: 6, teams_per_round: 3,
       stadium_name: "Arena", stadium_map_url: "https://maps.example/arena", event_duration_minutes: 150,
     };
     const settings = await app.inject({
@@ -343,7 +344,7 @@ describe("league HTTP route", () => {
     expect(leagueConfigRepository.getConfig).toHaveBeenCalledWith(id, { userId: "verified-user" });
     expect(leagueConfigRepository.updateName).toHaveBeenCalledWith(id, "Novo nome", { userId: "verified-user" });
     expect(leagueConfigRepository.updateSettings).toHaveBeenCalledWith(id, {
-      matchDuration: 8, playersPerTeam: 6, teamsPerRound: 3,
+      matchDuration: 8, goalsToFinish: 3, playersPerTeam: 6, teamsPerRound: 3,
       stadiumName: "Arena", stadiumMapUrl: "https://maps.example/arena", eventDurationMinutes: 150,
     }, { userId: "verified-user" });
     expect(leagueConfigRepository.setPreseason).toHaveBeenCalledWith(id, true, { userId: "verified-user" });
@@ -373,7 +374,7 @@ describe("league HTTP route", () => {
       url: `/api/leagues/${id}/config`,
       headers: { authorization: "Bearer valid-token" },
       payload: {
-        match_duration: 0, players_per_team: 5, teams_per_round: 3,
+        match_duration: 0, goals_to_finish: 2, players_per_team: 5, teams_per_round: 3,
         stadium_name: "", stadium_map_url: "", event_duration_minutes: 120,
       },
     });

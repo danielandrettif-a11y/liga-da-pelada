@@ -61,6 +61,7 @@ export type CallupHttpGateway = {
   ): Promise<void>;
   closeCallup(leagueId: string, callupId: string): Promise<void>;
   setVisibility(leagueId: string, callupId: string, isPublic: boolean): Promise<void>;
+  setMatchRules(leagueId: string, callupId: string, matchDuration: number, goalsToFinish: number): Promise<void>;
   lockCallup(leagueId: string, callupId: string): Promise<void>;
   joinCallup(
     leagueId: string,
@@ -163,6 +164,15 @@ export function httpCallupGateway(backendUrl: string, accessToken?: string): Cal
         method: "PATCH",
         headers: authHeaders(true),
         body: JSON.stringify({ isPublic }),
+      });
+      if (!res.ok) await parseApiError(res);
+    },
+
+    async setMatchRules(leagueId, callupId, matchDuration, goalsToFinish) {
+      const res = await fetch(`${base}/api/callups/leagues/${leagueId}/${callupId}/match-rules`, {
+        method: "PATCH",
+        headers: authHeaders(true),
+        body: JSON.stringify({ matchDuration, goalsToFinish }),
       });
       if (!res.ok) await parseApiError(res);
     },

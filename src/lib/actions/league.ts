@@ -239,6 +239,7 @@ export async function updatePreSeasonEnabled(id: string, enabled: boolean) {
 export async function updateLeagueConfig(
   id: string,
   matchDuration: number,
+  goalsToFinish: number,
   playersPerTeam: number,
   teamsPerRound: number,
   stadiumName: string,
@@ -250,6 +251,9 @@ export async function updateLeagueConfig(
     if ((await getSelectedLeague())?.id !== id) return { success: false, error: "Esta não é a pelada selecionada." };
     if (!Number.isInteger(matchDuration) || matchDuration < 1 || matchDuration > 90) {
       return { success: false, error: "A duração deve ficar entre 1 e 90 minutos." };
+    }
+    if (!Number.isInteger(goalsToFinish) || goalsToFinish < 1 || goalsToFinish > 20) {
+      return { success: false, error: "A meta da partida deve ficar entre 1 e 20 gols." };
     }
     if (!Number.isInteger(playersPerTeam) || playersPerTeam < 1 || playersPerTeam > MAX_PLAYERS_PER_TEAM) {
       return { success: false, error: `Cada time deve ter entre 1 e ${MAX_PLAYERS_PER_TEAM} jogadores.` };
@@ -276,6 +280,7 @@ export async function updateLeagueConfig(
     if (api) {
       await api.updateSettings(id, {
         match_duration: matchDuration,
+        goals_to_finish: goalsToFinish,
         players_per_team: playersPerTeam,
         teams_per_round: teamsPerRound,
         stadium_name: normalizedStadium,
@@ -319,6 +324,7 @@ export async function updateLeagueConfig(
       .from("leagues")
       .update({
         match_duration: matchDuration,
+        goals_to_finish: goalsToFinish,
         players_per_team: playersPerTeam,
         teams_per_round: teamsPerRound,
         stadium_name: normalizedStadium || null,

@@ -26,11 +26,11 @@ import {
   normalizeCallupGuestName,
   parseWhatsAppGuestList,
 } from "@/modules/callups/domain/callup-guest-list";
-import { hasCallupClosingMatch } from "../callup-lifecycle";
 import { getSelectedLeague } from "../league-context";
 import { createServiceClient } from "../supabase/service";
 import { resolveCallupInvite } from "../callup-invite-server";
 import { callupApiFor } from "@/modules/callups/infrastructure/callup-api-session";
+import { hasCallupClosingMatch, isFinishedCallupRound } from "../callup-lifecycle";
 
 export type CallupEntryWithPlayer = CallupEntry & {
   player: Player;
@@ -56,13 +56,10 @@ export type CallupWithEntries = Callup & {
 };
 
 function normalizeCallup(data: any): CallupWithEntries | null {
-  const linkedRound = data?.round;
-  if (linkedRound) {
-    // Sorteio concluído não encerra a convocação. Ela continua acessível para
-    // desistências e reposições até o primeiro jogo realmente começar.
-    const hasStartedMatches = hasCallupClosingMatch(linkedRound.matches);
-    if (hasStartedMatches) return null;
-  }
+  // A pré-lista e o sorteio não fecham a convocação. O primeiro jogo sim:
+  // dali em diante a rodada é histórica para esta tela e nenhuma inclusão ou
+  // saída pode disputar a posição da próxima convocação aberta.
+  if (isFinishedCallupRound(data?.round) || hasCallupClosingMatch(data?.round?.matches)) return null;
 
   const rawEntries = (data?.callup_entries || []) as Array<CallupEntryWithPlayer & { player: Player | null }>;
   // Uma relação invisível por RLS não pode derrubar a convocação inteira.
@@ -828,6 +825,53 @@ export async function setCallupVisibility(callupId: string, isPublic: boolean) {
   const result = await changeCallupVisibility(callupId, callup.league_id, isPublic, supabaseCallupManagementGateway(client));
   if (result.success) refreshCallups();
   return result;
+}
+
+export async function setCallupMatchRules(callupId: string, matchDuration: number, goalsToFinish: number) {
+  const client = await getAdminClient();
+  if (!client) return { success: false, error: "Somente administradores podem alterar as regras das partidas." };
+  if (!Number.isInteger(matchDuration) || matchDuration < 1 || matchDuration > 90) {
+    return { success: false, error: "A duração precisa estar entre 1 e 90 minutos." };
+  }
+  if (!Number.isInteger(goalsToFinish) || goalsToFinish < 0 || goalsToFinish > 20) {
+    return { success: false, error: "Escolha até 20 gols ou use a opção sem limite." };
+  }
+  const callup = await selectedCallup(callupId, client);
+  if (!callup) {
+    return { success: false, error: "Convocação fora da pelada selecionada." };
+  }
+
+  try {
+    const api = await callupApiFor(client);
+    if (api) {
+      await api.setMatchRules(callup.league_id, callupId, matchDuration, goalsToFinish);
+      refreshCallups();
+      revalidatePath("/partidas/[id]", "page");
+      return { success: true };
+    }
+  } catch (error: any) {
+    console.error("Erro ao alterar regras da convocação via API:", error);
+    return { success: false, error: error?.message || "Não foi possível salvar as regras das partidas." };
+  }
+
+  const { error } = await client.rpc("update_callup_match_rules", {
+    p_callup_id: callupId,
+    p_match_duration: matchDuration,
+    p_goals_to_finish: goalsToFinish,
+  });
+  if (error) {
+    const migrationMissing = error.code === "PGRST202"
+      || /update_callup_match_rules/i.test(error.message || "") && /schema cache|function/i.test(error.message || "");
+    return {
+      success: false,
+      error: migrationMissing
+        ? "A migration 358 ainda precisa ser aplicada no banco."
+        : error.message || "Não foi possível salvar as regras das partidas.",
+    };
+  }
+  refreshCallups();
+  revalidatePath("/partidas/[id]", "page");
+  return { success: true };
 }
 
 export async function lockCallupForRound(callupId: string) {

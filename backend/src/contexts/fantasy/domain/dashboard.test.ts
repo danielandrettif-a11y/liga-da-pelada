@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { buildFantasyDashboardAnalytics } from "./dashboard.js";
+import { buildFantasyDashboardAnalytics, getCheapestValidFantasyLineupCost } from "./dashboard.js";
 
 describe("Fantasy dashboard analytics", () => {
+  it("calculates the cheapest valid lineup across both six-player formations", () => {
+    expect(getCheapestValidFantasyLineupCost([
+      { id: "d1", price: 5, profile: "defensive" },
+      { id: "d2", price: 6, profile: "defensive" },
+      { id: "d3", price: 20, profile: "defensive" },
+      { id: "a1", price: 4, profile: "offensive" },
+      { id: "a2", price: 7, profile: "offensive" },
+      { id: "a3", price: 8, profile: "offensive" },
+      { id: "a4", price: 9, profile: "offensive" },
+    ], 6)).toBe(39);
+  });
+
   it("builds market, popularity, insights and radar from canonical inputs", () => {
     const result = buildFantasyDashboardAnalytics({
       players: [{

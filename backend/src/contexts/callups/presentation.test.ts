@@ -48,6 +48,7 @@ function fixture(enabled: boolean) {
     updateCallup: vi.fn().mockResolvedValue(undefined),
     closeCallup: vi.fn().mockResolvedValue(undefined),
     setVisibility: vi.fn().mockResolvedValue(undefined),
+    setMatchRules: vi.fn().mockResolvedValue(undefined),
     lockCallup: vi.fn().mockResolvedValue(undefined),
     joinCallup: vi.fn().mockResolvedValue({ status: "confirmed", position: 1 }),
     leaveCallup: vi.fn().mockResolvedValue({ roundId: null }),
@@ -136,6 +137,25 @@ describe("callups presentation", () => {
     expect(body.success).toBe(true);
     expect(body.status).toBe("confirmed");
     expect(callupRepository.joinCallup).toHaveBeenCalled();
+  });
+
+  it("updates callup match rules with a valid bearer token", async () => {
+    const { app, callupRepository } = fixture(true);
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/api/callups/leagues/${leagueId}/${callupId}/match-rules`,
+      headers: { authorization: "Bearer valid-token" },
+      payload: { matchDuration: 8, goalsToFinish: 3 },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ success: true });
+    expect(callupRepository.setMatchRules).toHaveBeenCalledWith(
+      leagueId,
+      callupId,
+      8,
+      3,
+      { userId: "user-123" },
+    );
   });
 
   it("leaves a callup with valid bearer token", async () => {

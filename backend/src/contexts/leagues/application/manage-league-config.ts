@@ -6,6 +6,7 @@ export type LeagueConfig = {
   id: string;
   name: string;
   match_duration: number;
+  goals_to_finish: number;
   players_per_team: number;
   teams_per_round: number;
   preseason_enabled: boolean;

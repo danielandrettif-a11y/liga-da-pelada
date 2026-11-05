@@ -1,5 +1,6 @@
 export type LeagueSettings = {
   matchDuration: number;
+  goalsToFinish: number;
   playersPerTeam: number;
   teamsPerRound: number;
   stadiumName: string | null;
@@ -24,6 +25,7 @@ export function parseLeagueName(value: string): string {
 
 export function parseLeagueSettings(input: {
   match_duration: number;
+  goals_to_finish: number;
   players_per_team: number;
   teams_per_round: number;
   stadium_name: string;
@@ -32,6 +34,9 @@ export function parseLeagueSettings(input: {
 }): LeagueSettings {
   if (!Number.isInteger(input.match_duration) || input.match_duration < 1 || input.match_duration > 90) {
     throw new InvalidLeagueSettingsError("A duração deve ficar entre 1 e 90 minutos.");
+  }
+  if (!Number.isInteger(input.goals_to_finish) || input.goals_to_finish < 1 || input.goals_to_finish > 20) {
+    throw new InvalidLeagueSettingsError("A meta da partida deve ficar entre 1 e 20 gols.");
   }
   if (!Number.isInteger(input.players_per_team) || input.players_per_team < 1 || input.players_per_team > 10) {
     throw new InvalidLeagueSettingsError("Cada time deve ter entre 1 e 10 jogadores.");
@@ -56,6 +61,7 @@ export function parseLeagueSettings(input: {
   }
   return {
     matchDuration: input.match_duration,
+    goalsToFinish: input.goals_to_finish,
     playersPerTeam: input.players_per_team,
     teamsPerRound: input.teams_per_round,
     stadiumName: stadiumName || null,

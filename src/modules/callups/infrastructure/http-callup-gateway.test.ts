@@ -74,6 +74,21 @@ describe("httpCallupGateway", () => {
     );
   });
 
+  it("updates match rules via HTTP PATCH", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await httpCallupGateway(backendUrl, token).setMatchRules(leagueId, callupId, 8, 3);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/callups/leagues/${leagueId}/${callupId}/match-rules`,
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ matchDuration: 8, goalsToFinish: 3 }),
+      }),
+    );
+  });
+
   it("leaves a callup via HTTP POST", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

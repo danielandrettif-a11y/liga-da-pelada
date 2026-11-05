@@ -182,6 +182,22 @@ describe("pgCallupRepository", () => {
     expect(query).not.toHaveBeenCalledWith(expect.stringContaining("SET status = 'locked'"), expect.anything());
   });
 
+  it("updates match rules through the protected database function", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("update_callup_match_rules")) return { rows: [{}], rowCount: 1 };
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    await expect(pgCallupRepository(pool).setMatchRules(leagueId, callupId, 8, 3, actor))
+      .resolves.toBeUndefined();
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("update_callup_match_rules"),
+      [leagueId, callupId, 8, 3],
+    );
+  });
+
   it("returns the existing prelist without creating a duplicate", async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };

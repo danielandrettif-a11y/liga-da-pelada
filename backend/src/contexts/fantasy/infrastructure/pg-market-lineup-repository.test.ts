@@ -78,6 +78,8 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
     expect(data.available).toBe(true);
     expect(data.marketOpen).toBe(true);
     expect(data.budget).toBe(100);
+    expect(data.marketBudgetFloor).toBeNull();
+    expect(data.budgetSupportApplied).toBe(false);
     expect(data.spent).toBe(0);
     expect(data.balance).toBe(100);
     expect(data.players.length).toBe(1);

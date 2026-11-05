@@ -8,6 +8,7 @@ import {
   lockCallup,
   openCallup,
   repairMyPlayerAccount,
+  setCallupMatchRules,
   setCallupVisibility,
   updateCallup,
   type CallupRepository,
@@ -26,6 +27,7 @@ function repository(): CallupRepository {
     updateCallup: vi.fn().mockResolvedValue(undefined),
     closeCallup: vi.fn().mockResolvedValue(undefined),
     setVisibility: vi.fn().mockResolvedValue(undefined),
+    setMatchRules: vi.fn().mockResolvedValue(undefined),
     lockCallup: vi.fn().mockResolvedValue(undefined),
     joinCallup: vi.fn().mockResolvedValue({ status: "confirmed", position: 1 }),
     leaveCallup: vi.fn().mockResolvedValue({ roundId: null }),
@@ -55,11 +57,13 @@ describe("callups application services", () => {
       .resolves.toBeUndefined();
     await expect(closeCallup(leagueId, callupId, actor, repo)).resolves.toBeUndefined();
     await expect(setCallupVisibility(leagueId, callupId, true, actor, repo)).resolves.toBeUndefined();
+    await expect(setCallupMatchRules(leagueId, callupId, 8, 3, actor, repo)).resolves.toBeUndefined();
     await expect(lockCallup(leagueId, callupId, actor, repo)).resolves.toBeUndefined();
     expect(repo.openCallup).toHaveBeenCalledWith(leagueId, expect.objectContaining({ date: "2026-11-01" }), actor);
     expect(repo.updateCallup).toHaveBeenCalledWith(leagueId, callupId, expect.objectContaining({ date: "2026-11-02" }), actor);
     expect(repo.closeCallup).toHaveBeenCalledWith(leagueId, callupId, actor);
     expect(repo.setVisibility).toHaveBeenCalledWith(leagueId, callupId, true, actor);
+    expect(repo.setMatchRules).toHaveBeenCalledWith(leagueId, callupId, 8, 3, actor);
     expect(repo.lockCallup).toHaveBeenCalledWith(leagueId, callupId, actor);
   });
 

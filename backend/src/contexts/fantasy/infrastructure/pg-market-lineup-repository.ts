@@ -13,8 +13,8 @@ import type {
   UserFantasyHistoryEntry,
 } from "../domain/market-lineup.js";
 import { buildFantasyPlayerPerformanceDetail, type FantasyPlayerHistoryItem } from "../domain/player-detail.js";
-import { buildFantasyDashboardAnalytics } from "../domain/dashboard.js";
-import { DEFAULT_FANTASY_SETTINGS, normalizeFantasySettingsRow } from "../domain/config.js";
+import { buildFantasyDashboardAnalytics, getCheapestValidFantasyLineupCost } from "../domain/dashboard.js";
+import { DEFAULT_FANTASY_SETTINGS, getFantasyInitialBudget, normalizeFantasySettingsRow } from "../domain/config.js";
 import { calculateFantasyGoalkeeperSlotPoints } from "../domain/engine.js";
 import { readLiveFantasyProjection } from "./pg-live-fantasy-projection.js";
 
@@ -216,8 +216,17 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
       const effectiveLineup = ownedLineup ? { ...ownedLineup, fantasy_lineup_players:ownedLineup.players,
         fantasy_lineup_reserves:ownedLineup.reserves } : !activeRound && portfolio ? portfolio : null;
       const account = accountResult.rows[0] || {};
-      const initialBudget = Number(season.initial_budget || DEFAULT_FANTASY_SETTINGS.initialBudget);
-      const budget = Math.max(Number(account.current_budget ?? initialBudget), initialBudget);
+      const playersPerTeam = Number(displayRound?.settings_snapshot?.players_per_team || league.players_per_team || 5);
+      const dynamicInitialBudget = getFantasyInitialBudget(playersPerTeam);
+      const storedBudget = Number(account.current_budget ?? dynamicInitialBudget);
+      const marketBudgetFloor = getCheapestValidFantasyLineupCost(analytics.market, playersPerTeam);
+      const ordinaryBudgetFloor = Math.max(storedBudget, dynamicInitialBudget);
+      const budget = testSession
+        ? dynamicInitialBudget
+        : Math.max(ordinaryBudgetFloor, marketBudgetFloor ?? 0);
+      const budgetSupportApplied = !testSession
+        && marketBudgetFloor !== null
+        && marketBudgetFloor > ordinaryBudgetFloor + 0.001;
       const spent = Number(ownedLineup?.lineup_cost || 0);
       const currentProjection = projection?.byUserId.get(userId) || null;
       const latestLineup = latestFinished
@@ -231,7 +240,7 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
       const availablePacks = packsResult.rows.filter((item:any)=>item.status!=="claimed");
       return {
         authenticated:true,available:true,isAdmin:Boolean(league.is_admin),settings:scoringSettings,
-        playersPerTeam:Number(displayRound?.settings_snapshot?.players_per_team||league.players_per_team||5),
+        playersPerTeam,
         round:displayRound?{id:displayRound.round_id,number:Number(displayRound.number),date:displayRound.date,
           start_time:displayRound.start_time,status:displayRound.status}:null,
         fantasySeasonId:season.fantasy_season_id,
@@ -241,7 +250,8 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
           scoringVersion:Number(scoringSettings.scoringVersion||0)},
         latestFinishedRoundPaid:Boolean(latestFinished?.participants_paid),market:analytics.market,lineup:effectiveLineup,
         insights:analytics.insights,radar:analytics.radar,marketHealth:healthResult.rows[0]?.data||null,
-        budget,account:{totalPoints:Number(account.total_points||0),roundsPlayed:Number(account.rounds_played||0),
+        budget,marketBudgetFloor,budgetSupportApplied,
+        account:{totalPoints:Number(account.total_points||0),roundsPlayed:Number(account.rounds_played||0),
           bestRoundPoints:Number(account.best_round_points||0)},
         lastRound:latestFinished?{roundId:latestFinished.round_id,userId,number:Number(latestFinished.number),
           date:latestFinished.date,playerPoints:latestPlayerScores.reduce((sum:number,item:any)=>sum+item.points,0),

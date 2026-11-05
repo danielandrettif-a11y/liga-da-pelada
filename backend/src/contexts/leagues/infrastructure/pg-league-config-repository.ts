@@ -45,6 +45,7 @@ export function pgLeagueConfigRepository(pool: Pool): LeagueConfigRepository {
             SELECT league.id,
                    league.name,
                    league.match_duration,
+                   league.goals_to_finish,
                    league.players_per_team,
                    league.teams_per_round,
                    league.preseason_enabled,
@@ -121,15 +122,17 @@ export function pgLeagueConfigRepository(pool: Pool): LeagueConfigRepository {
           await client.query(`
             UPDATE public.leagues
                SET match_duration = $2::integer,
-                   players_per_team = $3::integer,
-                   teams_per_round = $4::integer,
-                   stadium_name = $5::text,
-                   stadium_map_url = $6::text,
-                   event_duration_minutes = $7::integer
+                   goals_to_finish = $3::integer,
+                   players_per_team = $4::integer,
+                   teams_per_round = $5::integer,
+                   stadium_name = $6::text,
+                   stadium_map_url = $7::text,
+                   event_duration_minutes = $8::integer
              WHERE id = $1::uuid
           `, [
             leagueId,
             settings.matchDuration,
+            settings.goalsToFinish,
             settings.playersPerTeam,
             settings.teamsPerRound,
             settings.stadiumName,

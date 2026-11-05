@@ -16,6 +16,7 @@ import {
   removePlayerFromCallup,
   repairMyPlayerAccount,
   setCallupVisibility,
+  setCallupMatchRules,
   updateCallup,
   type CallupRepository,
 } from "../application/manage-callups.js";
@@ -164,6 +165,45 @@ export function registerCallupRoutes(app: FastifyInstance, dependencies: {
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
         await setCallupVisibility(request.params.leagueId, request.params.callupId, Boolean(request.body.isPublic), authentication.actor, dependencies.repository);
+        return reply.code(200).send({ success: true });
+      } catch (error) {
+        return sendFailure(error, request, reply);
+      }
+    },
+  );
+
+  // Trancar convocação
+  app.patch<{
+    Params: { leagueId: string; callupId: string };
+    Body: { matchDuration: number; goalsToFinish: number };
+  }>(
+    "/api/callups/leagues/:leagueId/:callupId/match-rules",
+    {
+      schema: {
+        params: callupParams,
+        body: {
+          type: "object",
+          additionalProperties: false,
+          required: ["matchDuration", "goalsToFinish"],
+          properties: {
+            matchDuration: { type: "integer", minimum: 1, maximum: 90 },
+            goalsToFinish: { type: "integer", minimum: 0, maximum: 20 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const authentication = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
+      try {
+        await setCallupMatchRules(
+          request.params.leagueId,
+          request.params.callupId,
+          request.body.matchDuration,
+          request.body.goalsToFinish,
+          authentication.actor,
+          dependencies.repository,
+        );
         return reply.code(200).send({ success: true });
       } catch (error) {
         return sendFailure(error, request, reply);

@@ -13,7 +13,7 @@ export const revalidate = 0;
 export default async function EditarJogadorPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
   const player = await getPlayer(id);

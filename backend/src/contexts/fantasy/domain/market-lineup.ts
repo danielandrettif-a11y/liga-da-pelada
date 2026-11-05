@@ -75,6 +75,8 @@ export type FantasyMarketDashboardData = {
   marketOpen: boolean;
   marketClosesAt?: string | null;
   budget: number;
+  marketBudgetFloor?: number | null;
+  budgetSupportApplied?: boolean;
   spent: number;
   balance: number;
   players: FantasyMarketPlayerSummary[];

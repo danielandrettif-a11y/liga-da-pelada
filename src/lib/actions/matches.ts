@@ -462,6 +462,7 @@ export async function getMatch(matchId: string) {
       timer_started_at,
       timer_accumulated_seconds,
       duration_seconds,
+      goals_to_finish,
       eligibility_elapsed_offset_seconds,
       created_at,
       team_a:team_a_id (

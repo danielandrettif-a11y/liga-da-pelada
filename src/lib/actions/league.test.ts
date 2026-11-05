@@ -52,13 +52,14 @@ describe("league configuration bridge", () => {
       success: true, name: "Novo nome",
     });
     await expect(updateLeagueConfig(
-      "league-1", 8, 6, 3, " Arena ", "https://maps.example/arena", 150,
+      "league-1", 8, 3, 6, 3, " Arena ", "https://maps.example/arena", 150,
     )).resolves.toEqual({ success: true });
     await expect(updatePreSeasonEnabled("league-1", true)).resolves.toEqual({ success: true });
 
     expect(mocks.updateName).toHaveBeenCalledWith("league-1", "Novo nome");
     expect(mocks.updateSettings).toHaveBeenCalledWith("league-1", {
       match_duration: 8,
+      goals_to_finish: 3,
       players_per_team: 6,
       teams_per_round: 3,
       stadium_name: "Arena",

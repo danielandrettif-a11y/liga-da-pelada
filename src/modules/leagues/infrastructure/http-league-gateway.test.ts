@@ -166,7 +166,7 @@ describe("httpLeagueGateway", () => {
     request.mockResolvedValueOnce(new Response(JSON.stringify({ name: "Novo nome" }), { status: 200 }));
     await gateway.updateName(leagueId, "Novo nome");
     await gateway.updateSettings(leagueId, {
-      match_duration: 8, players_per_team: 6, teams_per_round: 3,
+      match_duration: 8, goals_to_finish: 3, players_per_team: 6, teams_per_round: 3,
       stadium_name: "Arena", stadium_map_url: "https://maps.example/arena", event_duration_minutes: 150,
     });
     await gateway.setPreseason(leagueId, true);
@@ -189,7 +189,7 @@ describe("httpLeagueGateway", () => {
       {
         method: "PATCH", path: `/api/leagues/${leagueId}/config`,
         body: {
-          match_duration: 8, players_per_team: 6, teams_per_round: 3,
+          match_duration: 8, goals_to_finish: 3, players_per_team: 6, teams_per_round: 3,
           stadium_name: "Arena", stadium_map_url: "https://maps.example/arena", event_duration_minutes: 150,
         },
       },

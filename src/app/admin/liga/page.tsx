@@ -7,6 +7,7 @@ import Image from "next/image";
 import { ArrowLeft, ImagePlus, Save } from "@/components/icons";
 import { getLeagueConfig, updateLeagueBranding, updateLeagueConfig, updateLeagueName, updateLeagueVisibility } from "@/lib/actions/league";
 import { deleteCurrentLeague } from "@/app/mais/league-mode-actions";
+import { getFantasyInitialBudget } from "@/lib/fantasy/config";
 
 export default function LigaConfigPage() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function LigaConfigPage() {
   
   const [leagueId, setLeagueId] = useState("");
   const [matchDuration, setMatchDuration] = useState(7);
+  const [goalsToFinish, setGoalsToFinish] = useState(2);
   const [playersPerTeam, setPlayersPerTeam] = useState(5);
   const [teamsPerRound, setTeamsPerRound] = useState(3);
   const [stadiumName, setStadiumName] = useState("");
@@ -54,6 +56,7 @@ export default function LigaConfigPage() {
         setNameDraft(config.name);
         setCanManage(config.can_manage);
         setMatchDuration(config.match_duration || 7);
+        setGoalsToFinish(config.goals_to_finish || 2);
         setPlayersPerTeam(config.players_per_team || 5);
         setTeamsPerRound(config.teams_per_round || 3);
         setStadiumName(config.stadium_name || "");
@@ -83,6 +86,7 @@ export default function LigaConfigPage() {
     const res = await updateLeagueConfig(
       leagueId,
       matchDuration,
+      goalsToFinish,
       playersPerTeam,
       teamsPerRound,
       stadiumName,
@@ -262,6 +266,23 @@ export default function LigaConfigPage() {
           />
         </div>
 
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-muted uppercase tracking-wider">
+            Gols para encerrar a partida
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="20"
+            value={goalsToFinish}
+            onChange={(e) => setGoalsToFinish(Number(e.target.value))}
+            className="w-full bg-surface-hover border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-accent transition-colors"
+          />
+          <p className="text-[10px] leading-relaxed text-muted">
+            Ao atingir essa quantidade, o placar oferece encerrar a partida. O padrão é 2 gols.
+          </p>
+        </div>
+
         <div className="space-y-2 border-t border-border pt-5">
           <label className="text-xs font-bold text-muted uppercase tracking-wider">
             Estadio / endereco da pelada
@@ -320,6 +341,9 @@ export default function LigaConfigPage() {
           />
           <p className="text-[10px] leading-relaxed text-muted">
             O padrão é 5. Você pode escolher entre 1 e 10 jogadores em cada time.
+          </p>
+          <p className="rounded-lg border border-accent/20 bg-accent/5 px-3 py-2 text-[10px] leading-relaxed text-muted">
+            Cartola proporcional: {playersPerTeam} vagas recebem patrimônio inicial de <strong className="text-accent">C$ {getFantasyInitialBudget(playersPerTeam).toFixed(2).replace(".", ",")}</strong> (C$ 11,00 por jogador). Sorteio e convocação usam {playersPerTeam * teamsPerRound} jogadores no formato completo.
           </p>
         </div>
 
