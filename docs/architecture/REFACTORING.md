@@ -33,6 +33,13 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-11-06 — copia atual do Storage oficial
+
+- Foi criada uma chave S3 temporaria exclusiva para o ensaio, usada somente durante a copia e revogada imediatamente depois. Os arquivos locais de credencial foram removidos; nenhum segredo entrou em logs, documentos, Git ou chat.
+- O inventario S3 confirmou exatamente os mesmos **71 objetos e 21.895.042 bytes** registrados na fotografia SQL. Todos foram copiados para um diretorio privado fora do repositorio, com permissao `0700`. `rclone check --download --one-way` comparou o conteudo baixado com a origem e terminou sem diferencas; os logs privados foram preservados sem serem versionados.
+- [`backup-official-storage.sh`](../../scripts/backup-official-storage.sh) torna o procedimento repetivel, exige arquivo de credencial fora do Git, recusa destino existente, fixa a imagem do rclone por digest, compara contagem/bytes e executa verificacao por download. Ele nunca remove backups nem um destino parcial.
+- O Storage atual esta preservado e validado localmente, mas ainda nao foi importado numa stack descartavel porque o dump atual do banco, que contem buckets e metadados correspondentes, continua indisponivel. A senha do banco oficial nao esta nos artefatos privados existentes e o painel nao permite recupera-la; redefini-la alteraria producao e permanece proibido nesta etapa. Nao houve promocao para `verified`.
+
 ### 2026-11-06 — fotografia agregada atual do projeto oficial
 
 - O painel autenticado do projeto oficial foi usado somente para leitura. A pagina de backups confirmou que o plano Free nao oferece backups gerenciados para download; nenhuma senha, chave, linha pessoal ou objeto do Storage foi aberto, e nenhuma configuracao ou dado de producao foi alterado.

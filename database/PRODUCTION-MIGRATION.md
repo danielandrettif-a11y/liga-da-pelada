@@ -2,7 +2,7 @@
 
 **Estado:** roteiro para execução após homologação. Não executar no banco oficial antes de o ambiente novo, a restauração de teste e os testes de aplicação passarem. O banco de produção continua sendo a autoridade até o corte.
 
-O ambiente de homologação escolhido é Docker no computador do proprietário; veja o [roteiro local](LOCAL-HOMOLOGATION.md). WSL2, Docker Engine e a stack Supabase local já estão ativos. A exportação/restauração do projeto de testes foi concluída. Em 06/11, um snapshot local reconciliado foi restaurado duas vezes do zero: 94 tabelas/14.644 linhas, 9.412 objetos/owners/privilégios e 24 atributos/memberships de papéis coincidiram sem divergências. O roundtrip dos dois objetos Storage locais também passou. Uma consulta posterior, somente leitura, mediu o projeto oficial atual em 91 tabelas públicas/16.109 linhas, 53 usuários Auth e 71 objetos Storage/21.895.042 bytes declarados; o destino local tinha 14.592 linhas públicas e divergiu em 60 tabelas. O plano Free não ofereceu backup gerenciado para download. Isso valida o procedimento e o destino local, mas não substitui uma exportação oficial atual, a cópia dos bytes do Storage oficial nem o dimensionamento do destino definitivo na VPS.
+O ambiente de homologação escolhido é Docker no computador do proprietário; veja o [roteiro local](LOCAL-HOMOLOGATION.md). WSL2, Docker Engine e a stack Supabase local já estão ativos. A exportação/restauração do projeto de testes foi concluída. Em 06/11, um snapshot local reconciliado foi restaurado duas vezes do zero: 94 tabelas/14.644 linhas, 9.412 objetos/owners/privilégios e 24 atributos/memberships de papéis coincidiram sem divergências. O roundtrip dos dois objetos Storage locais também passou. Uma consulta posterior, somente leitura, mediu o projeto oficial atual em 91 tabelas públicas/16.109 linhas, 53 usuários Auth e 71 objetos Storage/21.895.042 bytes declarados; o destino local tinha 14.592 linhas públicas e divergiu em 60 tabelas. Os 71 objetos/21.895.042 bytes oficiais foram depois copiados para armazenamento privado local e passaram em `rclone check --download`; a chave temporária foi revogada. O plano Free não ofereceu backup gerenciado para download. Isso valida o procedimento e preserva os bytes atuais do Storage, mas não substitui uma exportação oficial atual do banco nem o dimensionamento do destino definitivo na VPS.
 
 ## 1. Preparar o destino
 
@@ -40,6 +40,16 @@ O comando segue o [procedimento oficial](https://supabase.com/docs/guides/self-h
 ## 3. Copiar os arquivos do Storage
 
 O banco contém metadados de buckets/objetos, não o conteúdo dos arquivos. Usar o [guia oficial de cópia S3 com rclone](https://supabase.com/docs/guides/self-hosting/copy-from-platform-s3): criar credenciais S3 separadas na origem e no destino, confirmar os buckets e copiar cada bucket. Não copiar arquivos diretamente para `volumes/storage/`; a estrutura interna e os metadados precisam ser gerados pelo serviço Storage. Comparar número e tamanho dos objetos e abrir amostras de avatares, escudos e imagens privadas/públicas.
+
+Para preservar e validar os bytes da origem antes do restore, use uma chave S3 temporaria num arquivo `0600` fora do Git:
+
+```bash
+bash scripts/backup-official-storage.sh \
+  /caminho/privado/official-s3.env \
+  /caminho/privado/storage-official-AAAA-MM-DD
+```
+
+O script usa uma imagem rclone fixada por digest, recusa sobrescrever destino existente e executa `rclone check --download`. Revogue a chave no painel e remova o arquivo de credencial logo depois. A copia local e um backup dos bytes; a importacao definitiva ainda deve passar pelo S3/API do servico Storage no destino restaurado, nunca por escrita direta no volume interno.
 
 ## 4. Verificar homologação
 
