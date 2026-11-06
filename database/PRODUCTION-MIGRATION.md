@@ -2,7 +2,7 @@
 
 **Estado:** roteiro para execução após homologação. Não executar no banco oficial antes de o ambiente novo, a restauração de teste e os testes de aplicação passarem. O banco de produção continua sendo a autoridade até o corte.
 
-O ambiente de homologação escolhido é Docker no computador do proprietário; veja o [roteiro local](LOCAL-HOMOLOGATION.md). WSL2, Docker Engine e a stack Supabase local já estão ativos. A exportação/restauração do projeto de testes foi concluída e as contagens de 92 tabelas bateram. Testes de paridade completos ainda faltam. O ensaio local não substitui o dimensionamento do destino definitivo na VPS.
+O ambiente de homologação escolhido é Docker no computador do proprietário; veja o [roteiro local](LOCAL-HOMOLOGATION.md). WSL2, Docker Engine e a stack Supabase local já estão ativos. A exportação/restauração do projeto de testes foi concluída. Em 06/11, um snapshot local reconciliado foi restaurado duas vezes do zero: 94 tabelas/14.644 linhas, 9.412 objetos/owners/privilégios e 24 atributos/memberships de papéis coincidiram sem divergências. O roundtrip dos dois objetos Storage locais também passou. Isso valida o procedimento e o destino local, mas não substitui uma exportação oficial atual, a cópia dos bytes do Storage oficial nem o dimensionamento do destino definitivo na VPS.
 
 ## 1. Preparar o destino
 

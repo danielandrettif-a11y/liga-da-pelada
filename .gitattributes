@@ -1,1 +1,6 @@
 scripts/export-test-supabase-wsl.sh text eol=lf
+scripts/restore-local-db-archive.sh text eol=lf
+scripts/verify-local-db-restore.py text eol=lf
+scripts/verify-local-storage-roundtrip.py text eol=lf
+supabase/migrations/360_restore_collective_storage_policies.sql text eol=lf
+supabase/migrations/361_deterministic_rls_auth_function_optimization.sql text eol=lf

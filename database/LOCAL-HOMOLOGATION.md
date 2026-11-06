@@ -1,6 +1,6 @@
 # Homologação local da migração no Windows
 
-**Jornada autenticada homologada em 05/11/2026:** a imagem `liga-backend-local:authenticated-e2e-fixes` substituiu os backends das portas 3001 e 3002. O ensaio corrigiu a coluna financeira inexistente `league_members.is_monthly_payer`, aceitou os UUIDs determinísticos históricos do PostgreSQL no domínio de partidas, migrou a leitura de cosméticos do ranking para `account_profiles`/`account_cosmetic_loadouts` e passou a calcular os destaques Fantasy pelo último registro real do histórico de preços. O Playwright passou em **26 cenários** mobile/desktop de login, rodada, partida, Cartola, convocação, administração, áreas públicas e BQ Manager; duas mutações de gol ficaram corretamente puladas por segurança. O agregador local concluiu todos os fluxos de escrita/limpeza e **43 leituras** sem falha, enquanto Fantasy passou em **5 consultas analíticas, 2 fichas de atleta e 1 dashboard**. As rotas corrigidas de pendência financeira e destaques rápidos responderam 200 diretamente, e os dois logs finais ficaram com zero erro. A regressão terminou com **712 testes backend/183 arquivos**, **1.265 testes frontend/244 arquivos**, typechecks e builds de produção aprovados. O catálogo agora possui **268/268 operações aceitas e 7/268 verificadas de ponta a ponta**.
+**Jornada autenticada homologada em 05/11/2026:** a imagem `liga-backend-local:authenticated-e2e-fixes` substituiu os backends das portas 3001 e 3002. O ensaio corrigiu a coluna financeira inexistente `league_members.is_monthly_payer`, aceitou os UUIDs determinísticos históricos do PostgreSQL no domínio de partidas, migrou a leitura de cosméticos do ranking para `account_profiles`/`account_cosmetic_loadouts` e passou a calcular os destaques Fantasy pelo último registro real do histórico de preços. O Playwright passou em **26 cenários** mobile/desktop de login, rodada, partida, Cartola, convocação, administração, áreas públicas e BQ Manager; duas mutações de gol ficaram corretamente puladas por segurança. O agregador local concluiu todos os fluxos de escrita/limpeza e **43 leituras** sem falha, enquanto Fantasy passou em **5 consultas analíticas, 2 fichas de atleta e 1 dashboard**. As rotas corrigidas de pendência financeira e destaques rápidos responderam 200 diretamente, e os dois logs finais ficaram com zero erro. A regressão terminou com **712 testes backend/183 arquivos**, **1.265 testes frontend/244 arquivos**, typechecks e builds de produção aprovados. Depois da validação local de Notificações, o catálogo possui **268/268 operações aceitas e 17/268 verificadas**.
 
 **Integração da `main` homologada em 05/11/2026:** o banco PostgreSQL 17.6 restaurado recebeu as migrations `354–359` depois do backup privado verificável `/home/danie/pelada-homologacao/backups/pre-354-359-20261105T154425Z.dump`. O arquivo contém dados e os schemas `auth` e `storage` e é compatível com PostgreSQL 17. A imagem `liga-backend-local:main-sync-29b4c2a` substituiu os dois backends locais, preservando flags, rede, portas e reinício. O agregador [`verify-local-all.sh`](../scripts/verify-local-all.sh) passou incluindo a nova rota idempotente de regras por convocação; os smokes Fantasy passaram em 5 consultas analíticas, 2 fichas de atleta e no dashboard, que agora exige `marketBudgetFloor` e `budgetSupportApplied`. As checagens estruturais confirmaram funções e triggers novos, sem valores nulos nos backfills de liga, convocação ou partida. A auditoria de cartas permaneceu íntegra: 172 pacotes, 131 cartas, 74 ativações e zero divergências ou órfãos.
 
@@ -22,7 +22,7 @@
 
 O ensaio encontrou e corrigiu defeitos que só apareceram contra PostgreSQL/RLS reais: parâmetros descontínuos no update de perfil, perda da causa original no log, limpeza do avatar após excluir o jogador, consultas financeiras/OVR fora da transação autenticada, nomes de schema ausentes e três incompatibilidades SQL. A migration [`353_allow_avatar_owner_cleanup.sql`](../supabase/migrations/353_allow_avatar_owner_cleanup.sql) recompõe leitura pública e remoção de avatar pelo proprietário mesmo após a cascata da linha do jogador. O dump privado anterior à alteração permanece em `/home/danie/pelada-homologacao/backups/pre-player-avatar-policy-20261103.dump`. [`check-local-db-archive.sh`](../scripts/check-local-db-archive.sh) confirmou origem PostgreSQL 17.6, schemas `auth` e `storage`, dados de tabelas e compatibilidade direta com PostgreSQL 17. A auditoria local de cartas encontrou 172 pacotes, 131 cartas e 74 ativações, sem escopo quebrado, órfãos ou divergência de liga.
 
-A paridade estrutural está em **268/268 (100%)**. Há **7/268 operações verificadas** por jornadas autenticadas e smokes integrados; as demais continuam aceitas sem receber um estado de verificação maior do que a evidência disponível. Antes da VPS/live ainda faltam três fatias: configurar e validar QStash/VAPID/Resend para notificações, repetir o ensaio com uma exportação nova de produção em janela controlada e executar o deploy/cutover assistido na VPS. Nenhum dado do banco real foi importado neste ambiente.
+A paridade estrutural está em **268/268 (100%)**. Há **17/268 operações verificadas** por jornadas autenticadas e smokes integrados; as demais continuam aceitas sem receber um estado de verificação maior do que a evidência disponível. Restam duas grandes fatias: repetir este ensaio com uma exportação oficial atual e os bytes do Storage, e executar homologação/corte na VPS com QStash, Web Push e Resend reais. Nenhum dado atual do banco real foi importado neste ambiente.
 
 ### Exportação do banco de testes, já concluída
 
@@ -56,6 +56,30 @@ Se falhar, o script deixa um log privado na mesma pasta; não o compartilhe sem 
 - Para as fatias de elenco, habilite `ENABLE_ROSTER_API=true` no backend local e execute [`verify-local-roster.sh`](../scripts/verify-local-roster.sh). O script usa contas já existentes, cria duas fixtures de jogador com nomes `Codex roster ...` e `Codex import ...`, exercita criação, edição, troca de fotos e importação, remove primeiro os vínculos de convocação e depois os jogadores e confirma contagem residual zero. Em 27/10, as quatro mutações, as estatísticas oficiais, os quatro grupos do elenco e todas as projeções anteriores passaram. A migration local `352_fix_guest_roster_import_profile.sql` foi necessária porque a RPC legada ainda gravava `midfield`, valor rejeitado pelo esquema vigente. Isso não comprova que a origem recebeu a migration.
 
 Este resultado comprova a viabilidade do restore **do projeto de testes** nesta stack. O banco de produção real ainda não foi exportado ou importado.
+
+### Restore reconciliado e repetível em 06/11/2026
+
+O banco local recebeu, depois de backup verificável, a migration 311, os dois arquivos 312 e a definição posterior da 332; as migrations 360 e 361 recompõem de forma idempotente as políticas Storage da aplicação e tornam determinística a otimização Auth/RLS. Um novo dump privado foi restaurado com proprietários e ACLs em dois PostgreSQL 17 isolados, ambos com `network=none` e sem portas publicadas. A segunda execução usou somente as ferramentas versionadas abaixo:
+
+```bash
+bash scripts/restore-local-db-archive.sh \
+  /caminho/privado/snapshot.dump \
+  liga-restore-identificador-unico \
+  banco_restore
+
+python3 scripts/verify-local-db-restore.py \
+  --destination-container liga-restore-identificador-unico \
+  --destination-database banco_restore
+```
+
+O restaurador recusa um nome de container já existente para não continuar sobre estado parcial, valida o catálogo antes de criar o destino, usa senha local aleatória e preserva o container ao final para inspeção. O verificador lê somente contagens e definições canônicas: não imprime valores das linhas nem segredos. O resultado reproduzível foi:
+
+- 94 tabelas e 14.644 linhas idênticas entre as entradas `COPY` do arquivo e o destino, incluindo `auth.users`, `storage.buckets` e `storage.objects`;
+- 9.412 objetos, owners e privilégios idênticos nos schemas `public`, `auth` e `storage`, cobrindo colunas, views, funções, constraints, índices, políticas, triggers, RLS, grants de relações/funções/schemas/colunas e extensões;
+- 24 atributos/memberships de papéis idênticos e o mesmo estado ausente do ledger `supabase_migrations`;
+- restore com owners/ACLs sem erro, repetido do zero em outro container.
+
+O snapshot usado contém dois objetos do Storage local e os respectivos bytes já passaram em download, cópia descartável e comparação SHA-256 pela API com [`verify-local-storage-roundtrip.py`](../scripts/verify-local-storage-roundtrip.py). Isso valida o mecanismo local, não a migração do Storage oficial: o dump histórico possui 68 metadados sem os arquivos e ainda é necessária uma exportação atual da origem, seguida da cópia S3 oficial e conferência de contagem, tamanho e amostras. Não promover operações no catálogo apenas por esta paridade de restore.
 
 ### Repetir os testes piloto locais
 
