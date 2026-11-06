@@ -61,6 +61,14 @@ Este resultado comprova a viabilidade do restore **do projeto de testes** nesta 
 
 Além do ensaio de `.dump` abaixo, a exportação filtrada do projeto de testes (`roles.sql`, `schema.sql`, `data.sql`) foi restaurada em transação única num PostgreSQL descartável em rede Docker interna, sem portas. Foi necessário inicializar Auth e Storage com as migrations de suas imagens antes da importação; um banco PostgreSQL vazio não é equivalente à stack inicializada. As **92 tabelas e 12.967 linhas** do inventário coincidiram com as entradas `COPY` do arquivo. A comparação não prova igualdade de conteúdo, permissões nem bytes de Storage; a exportação atual oficial continua pendente. Logs e exportações são privados.
 
+Para repetir a comparação de contagens no WSL, com Docker disponível e o destino local restaurado ligado:
+
+```bash
+python3 scripts/verify-local-filtered-export.py /caminho/privado/data.sql --container nome-do-container-local
+```
+
+O comando não imprime linhas da exportação; retorna código 1 para contagens divergentes e 2 para erro de leitura, formato ou conexão. Não substitui a comparação de schema, grants, RLS, jornadas autenticadas ou arquivos Storage.
+
 O banco local recebeu, depois de backup verificável, a migration 311, os dois arquivos 312 e a definição posterior da 332; as migrations 360 e 361 recompõem de forma idempotente as políticas Storage da aplicação e tornam determinística a otimização Auth/RLS. Um novo dump privado foi restaurado com proprietários e ACLs em dois PostgreSQL 17 isolados, ambos com `network=none` e sem portas publicadas. A segunda execução usou somente as ferramentas versionadas abaixo:
 
 ```bash
