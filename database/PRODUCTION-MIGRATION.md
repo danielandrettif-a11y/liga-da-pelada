@@ -2,7 +2,7 @@
 
 **Estado:** roteiro para execução após homologação. Não executar no banco oficial antes de o ambiente novo, a restauração de teste e os testes de aplicação passarem. O banco de produção continua sendo a autoridade até o corte.
 
-O ambiente de homologação escolhido é Docker no computador do proprietário; veja o [roteiro local](LOCAL-HOMOLOGATION.md). WSL2, Docker Engine e a stack Supabase local já estão ativos. A exportação/restauração do projeto de testes foi concluída. Em 06/11, um snapshot local reconciliado foi restaurado duas vezes do zero: 94 tabelas/14.644 linhas, 9.412 objetos/owners/privilégios e 24 atributos/memberships de papéis coincidiram sem divergências. O roundtrip dos dois objetos Storage locais também passou. Isso valida o procedimento e o destino local, mas não substitui uma exportação oficial atual, a cópia dos bytes do Storage oficial nem o dimensionamento do destino definitivo na VPS.
+O ambiente de homologação escolhido é Docker no computador do proprietário; veja o [roteiro local](LOCAL-HOMOLOGATION.md). WSL2, Docker Engine e a stack Supabase local já estão ativos. A exportação/restauração do projeto de testes foi concluída. Em 06/11, um snapshot local reconciliado foi restaurado duas vezes do zero: 94 tabelas/14.644 linhas, 9.412 objetos/owners/privilégios e 24 atributos/memberships de papéis coincidiram sem divergências. O roundtrip dos dois objetos Storage locais também passou. Uma consulta posterior, somente leitura, mediu o projeto oficial atual em 91 tabelas públicas/16.109 linhas, 53 usuários Auth e 71 objetos Storage/21.895.042 bytes declarados; o destino local tinha 14.592 linhas públicas e divergiu em 60 tabelas. O plano Free não ofereceu backup gerenciado para download. Isso valida o procedimento e o destino local, mas não substitui uma exportação oficial atual, a cópia dos bytes do Storage oficial nem o dimensionamento do destino definitivo na VPS.
 
 ## 1. Preparar o destino
 
@@ -69,6 +69,30 @@ node scripts/compare-db-inventories.mjs $origem $destino
 ```
 
 O `-W` solicita cada senha localmente; não a coloque no comando. Guarde os TSV fora do Git. Uma diferença dá código de saída 1; arquivo malformado ou incompleto dá código 2. Igualdade de contagens é necessária, mas não prova igualdade das linhas, grants, RLS ou conteúdo dos arquivos no Storage. Faça essa comparação com a origem sem novas escritas após a exportação, ou registre e explique o delta esperado. Também valide `rclone size` e amostras de arquivos por bucket.
+
+Para uma fotografia mais ampla, execute [`production-proof-inventory.sql`](production-proof-inventory.sql) na origem e no destino. A consulta retorna duas linhas (`exact_public_counts` e `signatures`) com contagens exatas das tabelas públicas, Auth, inventário lógico do Storage e digests de metadados. No destino Docker local:
+
+```powershell
+$sql = Get-Content -Raw database/production-proof-inventory.sql
+$destino = Join-Path $env:TEMP 'liga-production-proof-local.tsv'
+$saida = $sql | wsl -u root -e docker exec -i supabase-db `
+  psql -X -q -t -A -F "`t" -v ON_ERROR_STOP=1 `
+  -U supabase_admin -d postgres
+if ($LASTEXITCODE -ne 0) { throw 'Inventario local falhou' }
+[System.IO.File]::WriteAllLines($destino, [string[]]$saida)
+```
+
+No painel da origem, execute a mesma consulta, exporte as duas linhas como um CSV e mantenha o arquivo fora do Git:
+
+```powershell
+python scripts/compare-production-proof.py `
+  --source-combined-csv '<production-proof.csv>' `
+  --destination-tsv $destino
+```
+
+Para a evidencia de 06/11, que foi exportada antes da consolidacao da consulta, o comparador tambem aceita `--source-counts-csv` e `--source-signatures-csv` juntos.
+
+Codigo de saida `0` exige igualdade de contagens por tabela e de todos os grupos de assinatura; `1` registra divergencia esperada ou bloqueante; `2` indica evidencia malformada. Os digests detectam drift, mas nao substituem uma exportacao, checksums do conteudo das linhas nem a copia dos bytes do Storage.
 
 ## 5. Fazer o corte de produção
 

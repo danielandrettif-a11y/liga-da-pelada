@@ -33,6 +33,14 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-11-06 — fotografia agregada atual do projeto oficial
+
+- O painel autenticado do projeto oficial foi usado somente para leitura. A pagina de backups confirmou que o plano Free nao oferece backups gerenciados para download; nenhuma senha, chave, linha pessoal ou objeto do Storage foi aberto, e nenhuma configuracao ou dado de producao foi alterado.
+- Duas consultas agregadas registraram a fotografia atual: **91 tabelas publicas, 16.109 linhas, 53 usuarios Auth, 3 buckets e 71 objetos Storage com 21.895.042 bytes declarados**. Tambem foram coletadas contagens e assinaturas MD5 de colunas, funcoes, indices, triggers, politicas e RLS. Os CSVs de evidencia permanecem privados e fora do repositorio.
+- A consulta foi consolidada em [`production-proof-inventory.sql`](../../database/production-proof-inventory.sql). Ela usa uma unica instrucao somente leitura e retorna apenas nomes, contagens e digests. [`compare-production-proof.py`](../../scripts/compare-production-proof.py) valida os exports do painel, compara-os com a saida TSV de um destino e nunca imprime valores de linhas.
+- A comparacao com a stack local atual encontrou as mesmas 91 tabelas, mas **16.109 linhas na origem contra 14.592 no destino**, com 60 tabelas divergentes e oito grupos de assinatura divergentes (`auth`, colunas, funcoes, indices, politicas, RLS, Storage e triggers). Isso comprova que o snapshot local ensaiado nao e uma copia atual da producao e impede promover operacoes a `verified`.
+- O inventario atual reduz a incerteza, mas nao substitui `roles.sql`, `schema.sql`, `data.sql` nem os bytes dos 71 objetos. Como o painel nao fornece backup no plano atual e extrair ou redefinir credenciais antigas violaria o procedimento seguro, a primeira grande fatia continua pendente ate uma exportacao oficial nova e credenciais S3 temporarias serem fornecidas durante uma janela controlada. Permanecem **duas grandes fatias**: restore local dos dados/arquivos oficiais atuais e homologacao/corte na VPS com provedores reais.
+
 ### 2026-11-06 — restore filtrado da Supabase CLI em ambiente isolado
 
 - A comparação manual foi convertida em [`verify-local-filtered-export.py`](../../scripts/verify-local-filtered-export.py) e repetida contra o export privado de testes e o destino isolado: **92 tabelas e 12.967 linhas**, zero diferenças. Testes cobrem contagens, duplicidade, arquivo incompleto e inventário inválido; nenhum valor de linha é exibido.
