@@ -33,6 +33,13 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 
 ## Registro de lotes
 
+### 2026-11-06 — restore filtrado da Supabase CLI em ambiente isolado
+
+- A exportação privada de testes `roles.sql`, `schema.sql` e `data.sql` foi restaurada em transação única em um PostgreSQL 17 descartável, numa rede Docker interna sem portas publicadas. Auth e Storage inicializaram seus próprios schemas com versões da stack local e segredos novos, antes do restore; os serviços foram parados durante a importação. A transação passou sem erro e os arquivos originais foram preservados.
+- Tentativas anteriores em PostgreSQL sem os schemas internos completos falharam e reverteram: a exportação filtrada exige a stack inicializada, incluindo `extensions` e as migrations internas de Auth e Storage. Não editar essas estruturas manualmente para forçar o restore. Logs ficaram privados.
+- A contagem das entradas `COPY` da exportação foi comparada com `migration-inventory.sql` no destino: **92/92 tabelas e 12.967/12.967 linhas**, incluindo `auth.users`, `storage.buckets` e `storage.objects`, sem diferenças. Contagens não provam igualdade de conteúdo ou de permissões; faltam jornadas integradas neste destino e verificação dos bytes do Storage oficial. Não houve promoção de operações.
+- O ensaio usa exportação de testes, não uma exportação atual de produção. Permanecem duas grandes fatias: o ensaio com dados e arquivos oficiais atuais, e homologação/corte na VPS com provedores reais.
+
 ### 2026-11-06 — migração histórica completa e reconciliação do restore local
 
 - Um checkpoint privado validado de 2.392.389 bytes foi criado antes da migration 264 na cópia `historical_pre264_probe`. A 264 passou e removeu somente a linha legada sem administrador correspondente, reduzindo `admin_roster_reads` de 12 para 11. As migrations 265–359 passaram em ordem na cópia isolada, incluindo os dois arquivos numerados 312; o dump e o banco histórico de referência permaneceram intactos.
