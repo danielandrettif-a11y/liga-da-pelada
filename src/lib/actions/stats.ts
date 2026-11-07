@@ -1083,8 +1083,27 @@ async function getRankingExperienceDataUncached(includeEnrichment = true): Promi
 const getRankingExperienceDataCached = cache(getRankingExperienceDataUncached);
 const getRankingEssentialDataCached = cache(() => getRankingExperienceDataUncached(false));
 
+async function withLeagueRankingProfiles(data: RankingExperienceData): Promise<RankingExperienceData> {
+  const league = await getSelectedLeague();
+  if (!league) return data;
+  const client = await createServerClient();
+  const { data: profiles, error } = await client.from("league_members")
+    .select("player_id, player_profile").eq("league_id", league.id);
+  if (error) console.error("Erro ao buscar posições da pelada para o ranking:", error);
+  const positions = new Map((profiles || []).map((item) => [item.player_id, item.player_profile]));
+  const apply = (entries: RankingEntry[]) => entries.map((entry) => ({
+    ...entry, player: { ...entry.player, player_profile: positions.get(entry.player.id) ?? null },
+  }));
+  return {
+    ...data,
+    general: apply(data.general),
+    monthly: data.monthly ? { ...data.monthly, entries: apply(data.monthly.entries) } : null,
+    latestRound: data.latestRound ? { ...data.latestRound, entries: apply(data.latestRound.entries) } : null,
+  };
+}
+
 export async function getRankingEssentialData(): Promise<RankingExperienceData> {
-  return getRankingEssentialDataCached();
+  return withLeagueRankingProfiles(await getRankingEssentialDataCached());
 }
 
 type RankingEnrichment = Pick<RankingEntry,
@@ -1153,7 +1172,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   // React.cache compartilha o resultado somente dentro da requisição atual.
   // Pelada e sessão continuam resolvidas pelo contexto autenticado dessa
   // requisição; nenhum dado é persistido entre usuários.
-  return getRankingExperienceDataCached();
+  return withLeagueRankingProfiles(await getRankingExperienceDataCached());
 }
 
 export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: RankingEntry; position: number } | null> {

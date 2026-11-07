@@ -1587,8 +1587,11 @@ export function MatchLiveBoard({ match, matchDuration, goalsToFinish, canManage,
               <button type="button" onClick={() => setGoalkeeperChangeTeamId(null)} disabled={goalkeeperSaving} aria-label="Fechar troca de goleiro" className="rounded-lg p-2 text-muted disabled:opacity-50"><X className="h-5 w-5" /></button>
             </div>
             <div className="mobile-dialog-scroll min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4 pb-6">
+              {!(match.match_players || []).some((entry: any) => entry.team_id === goalkeeperChangeTeamId && (isFinished || entry.is_active)) && (
+                <p className="text-sm text-muted">Nenhum participante encontrado para este time nesta partida.</p>
+              )}
               {(match.match_players || [])
-                .filter((entry: any) => entry.team_id === goalkeeperChangeTeamId && entry.is_active)
+                .filter((entry: any) => entry.team_id === goalkeeperChangeTeamId && (isFinished || entry.is_active))
                 .map((entry: any) => {
                   const current = entry.player_id === goalkeeperByTeam[goalkeeperChangeTeamId];
                   return <button

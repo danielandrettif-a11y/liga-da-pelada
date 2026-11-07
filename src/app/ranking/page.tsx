@@ -10,7 +10,7 @@ export default async function RankingPage({ searchParams }: PageProps<"/ranking"
   const params = await searchParams;
   const initialMode = params.mode === "fantasy" ? "fantasy" : params.mode === "teams" ? "teams" : "ranked";
   const initialView = params.period === "latest" || params.period === "month" ? params.period : "season";
-  const allowedFilters = new Set(["general", "goals", "assists", "wins", "winRate", "awards", "overall", "overallDef", "overallAta", "overallGol"]);
+  const allowedFilters = new Set(["general", "pointsDef", "pointsAta", "goals", "assists", "wins", "winRate", "awards", "overall", "overallDef", "overallAta", "overallGol"]);
   const initialFilter = typeof params.filter === "string" && allowedFilters.has(params.filter) ? params.filter : "general";
   const needsEnrichment = initialMode === "ranked" && !initialFilter.startsWith("overall");
   // Cada aba carrega apenas o próprio conjunto de dados. Antes, a abertura do
