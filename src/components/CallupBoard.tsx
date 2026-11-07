@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
@@ -70,6 +70,7 @@ import { RoundSetupSteps } from "./RoundSetupSteps";
 import { DelayedPitchLoadingOverlay } from "./DelayedPitchLoadingOverlay";
 import { saveStadium } from "@/lib/actions/stadiums";
 import { getCallupDrawMinimum, getPlayersMissingForCallupDraw } from "@/lib/callup-draw";
+import { supabase } from "@/lib/supabase";
 
 type Props = {
   callup: CallupWithEntries;
@@ -112,6 +113,8 @@ export function CallupBoard({
   soloMode = false,
 }: Props) {
   const router = useRouter();
+  const realtimeRefreshTimer = useRef<number | null>(null);
+  const [, startRealtimeRefresh] = useTransition();
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
   const [showCartolaPopup, setShowCartolaPopup] = useState(false);
@@ -144,6 +147,44 @@ export function CallupBoard({
 
   useDialogViewport(editingCallup, () => !editLoading && setEditingCallup(false));
   useDialogViewport(showWaitlistPopup, () => setShowWaitlistPopup(false));
+
+  useEffect(() => {
+    const refreshList = () => {
+      if (realtimeRefreshTimer.current) window.clearTimeout(realtimeRefreshTimer.current);
+      realtimeRefreshTimer.current = window.setTimeout(() => {
+        if (document.visibilityState === "visible") {
+          startRealtimeRefresh(() => router.refresh());
+        }
+      }, 150);
+    };
+    const channel = supabase
+      .channel(`callup-list-${callup.id}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "callup_entries",
+        filter: `callup_id=eq.${callup.id}`,
+      }, refreshList)
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "callups",
+        filter: `id=eq.${callup.id}`,
+      }, refreshList)
+      .subscribe();
+
+    const refreshOnReturn = () => {
+      if (document.visibilityState === "visible") refreshList();
+    };
+    window.addEventListener("focus", refreshOnReturn);
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    return () => {
+      if (realtimeRefreshTimer.current) window.clearTimeout(realtimeRefreshTimer.current);
+      window.removeEventListener("focus", refreshOnReturn);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+      void supabase.removeChannel(channel);
+    };
+  }, [callup.id, router]);
 
   const confirmed = callup.entries.filter((entry) => entry.status === "confirmed");
   const waitlist = callup.entries.filter((entry) => entry.status === "waitlist");

@@ -22,6 +22,11 @@ export type GoalkeeperGateway = {
     playerId: string,
     elapsedSeconds?: number,
   ): Promise<Record<string, unknown> | null>;
+  correctFinishedGoalkeeper(
+    matchId: string,
+    teamId: string,
+    playerId: string,
+  ): Promise<Record<string, unknown> | null>;
 };
 
 export async function chooseFixedGoalkeeper(
@@ -57,5 +62,26 @@ export async function switchMatchGoalkeeper(
   const data = await gateway.changeMatchGoalkeeper(
     input.matchId, input.teamId, input.playerId, input.elapsedSeconds,
   );
+  return { success: true as const, roundId: match.roundId, data };
+}
+
+export async function correctFinishedMatchGoalkeeper(
+  input: { matchId: string; teamId: string; playerId: string; confirmation: string },
+  gateway: GoalkeeperGateway,
+) {
+  if (input.confirmation !== "EDITAR") {
+    return { success: false as const, error: "Digite EDITAR para liberar correções em partidas finalizadas." };
+  }
+  const validationError = validateGoalkeeperChange(input.matchId, input.teamId, input.playerId);
+  if (validationError) return { success: false as const, error: validationError };
+
+  const match = await gateway.loadMatch(input.matchId);
+  if (match.status !== "finished") {
+    return { success: false as const, error: "A correção é exclusiva para uma partida finalizada." };
+  }
+  if (input.teamId !== match.teamAId && input.teamId !== match.teamBId) {
+    return { success: false as const, error: "Time fora desta partida." };
+  }
+  const data = await gateway.correctFinishedGoalkeeper(input.matchId, input.teamId, input.playerId);
   return { success: true as const, roundId: match.roundId, data };
 }

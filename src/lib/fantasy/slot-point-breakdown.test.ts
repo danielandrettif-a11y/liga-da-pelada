@@ -82,7 +82,7 @@ describe("buildFantasyColumnCLineSlotBreakdown", () => {
 
     expect(rows.map(({ label, count, points }) => ({ label, count, points }))).toEqual([
       { label: "Faixa DEF · 1 gol sofrido", count: 1, points: -0.75 },
-      { label: "Faixa DEF · 2 gols sofridos", count: 1, points: -1.75 },
+      { label: "Faixa DEF · blocos de 2 gols sofridos", count: 1, points: -1.75 },
     ]);
   });
 

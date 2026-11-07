@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import {
   registerGoal,
   changeMatchGoalkeeper,
+  correctFinishedGoalkeeper,
   finishMatch,
   deleteEvent,
   addFinishedGoalEvent,
@@ -950,19 +951,22 @@ export function MatchLiveBoard({ match, matchDuration, goalsToFinish, canManage,
   }
 
   async function handleChangeGoalkeeper(teamId: string, playerId: string) {
-    if (!canManage || isFinished || goalkeeperSaving || playerId === goalkeeperByTeam[teamId]) return;
+    if (!canManage || (isFinished && !correctionsUnlocked) || goalkeeperSaving || playerId === goalkeeperByTeam[teamId]) return;
     const startedAt = performance.now();
     setGoalkeeperSaving(true);
     setError("");
     let succeeded = false;
     try {
-      const result = await changeMatchGoalkeeper(match.id, teamId, playerId);
+      const result = isFinished
+        ? await correctFinishedGoalkeeper(match.id, teamId, playerId, "EDITAR")
+        : await changeMatchGoalkeeper(match.id, teamId, playerId);
       if (!result.success) {
         setError(result.error || "Não foi possível trocar o goleiro.");
       } else {
         succeeded = true;
         setGoalkeeperOverrideByTeam((current) => ({ ...current, [teamId]: playerId }));
         setGoalkeeperChangeTeamId(null);
+        if ("warning" in result && result.warning) setError(`Goleiro corrigido. ${result.warning}`);
         router.refresh();
       }
     } catch (cause: any) {
@@ -1175,15 +1179,15 @@ export function MatchLiveBoard({ match, matchDuration, goalsToFinish, canManage,
       <div className="flex max-w-full items-center gap-1 rounded-2xl border border-cyan-300/25 bg-cyan-300/[.07] pl-2 pr-1 text-[11px] font-bold text-cyan-100">
         <span aria-hidden="true">🧤</span>
         <span className="max-w-16 truncate py-2 sm:max-w-24" title={label}>{label}</span>
-        {canManage && !isFinished && (
+        {canManage && (!isFinished || correctionsUnlocked) && (
           <button
             type="button"
             onClick={() => setGoalkeeperChangeTeamId(teamId)}
             disabled={loading || goalkeeperSaving}
-            aria-label={`Trocar goleiro do ${teamName}`}
+            aria-label={`${isFinished ? "Corrigir" : "Trocar"} goleiro do ${teamName}`}
             className="min-h-9 shrink-0 rounded-r-2xl border-l border-cyan-300/25 px-2 text-accent underline underline-offset-2 disabled:opacity-50"
           >
-            Trocar
+            {isFinished ? "Corrigir" : "Trocar"}
           </button>
         )}
       </div>
@@ -1340,7 +1344,7 @@ export function MatchLiveBoard({ match, matchDuration, goalsToFinish, canManage,
                 {correctionsUnlocked ? "🔓 Correções liberadas" : "🔒 Correções bloqueadas"}
               </p>
               <p className="mt-1 text-[10px] font-semibold text-muted">
-                {correctionsUnlocked ? "Você pode adicionar, editar ou remover gols e assistências." : "Proteção contra alterações acidentais na partida finalizada."}
+                {correctionsUnlocked ? "Você pode corrigir goleiros, gols e assistências." : "Proteção contra alterações acidentais na partida finalizada."}
               </p>
             </div>
             <button
@@ -1572,13 +1576,13 @@ export function MatchLiveBoard({ match, matchDuration, goalsToFinish, canManage,
         </div>
       )}
 
-      {goalkeeperChangeTeamId && canManage && !isFinished && (
+      {goalkeeperChangeTeamId && canManage && (!isFinished || correctionsUnlocked) && (
         <div className="mobile-dialog-backdrop bg-background/85 animate-fade-in" role="dialog" aria-modal="true" aria-label="Trocar goleiro">
           <div className="glass-card flex max-h-[85dvh] w-full max-w-sm flex-col overflow-hidden">
             <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
               <div>
-                <h3 className="text-sm font-black text-foreground">🧤 Trocar goleiro</h3>
-                <p className="mt-1 text-[10px] text-muted">Quem entra no gol agora? Os scouts seguem o período de cada goleiro.</p>
+                <h3 className="text-sm font-black text-foreground">🧤 {isFinished ? "Corrigir goleiro" : "Trocar goleiro"}</h3>
+                <p className="mt-1 text-[10px] text-muted">{isFinished ? "Quem foi o goleiro deste time? A correção vale para toda a partida e recalcula os scouts." : "Quem entra no gol agora? Os scouts seguem o período de cada goleiro."}</p>
               </div>
               <button type="button" onClick={() => setGoalkeeperChangeTeamId(null)} disabled={goalkeeperSaving} aria-label="Fechar troca de goleiro" className="rounded-lg p-2 text-muted disabled:opacity-50"><X className="h-5 w-5" /></button>
             </div>

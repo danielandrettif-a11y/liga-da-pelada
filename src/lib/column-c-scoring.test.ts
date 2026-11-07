@@ -43,6 +43,11 @@ describe("pontuação Coluna C", () => {
     expect(calculateColumnCGoalkeeperPoints({ goalkeeperGames: 1, goalkeeperGoalsConceded: 2 })).toBe(0);
   });
 
+  it("trata três gols sofridos pelo DEF como um bloco e meio da faixa de dois", () => {
+    expect(inferTwoGoalGames(3, 0)).toBe(1.5);
+    expect(calculateColumnCLinePoints("DEF", { teamGoalsConceded: 3 })).toBe(-2.625);
+  });
+
   it("reconstrói partidas de um gol e preserva a regra v11", () => {
     expect(inferOneGoalGames(5, 2, 5)).toBe(1);
     expect(calculateColumnCGoalkeeperPoints({ goalkeeperGames: 1, goalkeeperCleanSheets: 1 }, 11)).toBe(3);

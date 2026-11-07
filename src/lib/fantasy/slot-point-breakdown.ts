@@ -54,7 +54,7 @@ export function buildFantasyColumnCLineSlotBreakdown(
     ["teamGoalsConceded", "Gols sofridos pelo time", tieredDefensePenalty ? 0 : lineGoalsConceded, configurableColumnC ? settings.lineGoalConcededPoints : COLUMN_C_SCORING[role].conceded],
     ["defensiveCleanGames", "Faixa DEF · 0 gols sofridos", role === "DEF" ? amount(stats.defensiveCleanGames) : 0, configurableColumnC ? settings.defenderCleanSheetPoints : COLUMN_C_SCORING.DEF.cleanSheet],
     ["defensiveOneGoalGames", "Faixa DEF · 1 gol sofrido", role === "DEF" && scoringVersion >= 12 ? oneGoalGames : 0, tieredDefensePenalty ? settings.defenderOneGoalConcededPoints : COLUMN_C_SCORING.DEF.oneGoal],
-    ["defensiveTwoGoalGames", "Faixa DEF · 2 gols sofridos", tieredDefensePenalty ? twoGoalGames : 0, settings.defenderTwoGoalsConcededPoints],
+    ["defensiveTwoGoalGames", "Faixa DEF · blocos de 2 gols sofridos", tieredDefensePenalty ? twoGoalGames : 0, settings.defenderTwoGoalsConcededPoints],
     ["ownGoals", "Gols contra na linha", Math.max(0, amount(stats.ownGoals) - amount(stats.goalkeeperOwnGoals)), configurableColumnC ? settings.ownGoalPoints : COLUMN_C_SCORING[role].ownGoal],
   ];
 
