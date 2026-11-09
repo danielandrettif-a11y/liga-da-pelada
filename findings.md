@@ -180,3 +180,11 @@
 
 
 
+
+## 6. Sincronização e Operação correctFinishedGoalkeeper (09/11/2026)
+- **Descoberta:** A main introduziu a migration 354 com a RPC correct_finished_match_goalkeeper para permitir substituição retroativa de goleiro em partidas finalizadas, corrigindo atomicamente match_goalkeepers, match_goalkeeper_stints e match_events (gols sofridos atribuídos).
+- **Decisão Arquitetural:**
+  - Adicionado caso de uso correctFinishedGoalkeeper em ackend/src/contexts/matches/application/manage-matches.ts exigindo a confirmação estrita EDITAR.
+  - Repositório PostgreSQL invoca public.correct_finished_match_goalkeeper(, , ) sob transação com verificação de administrador.
+  - Gateway HTTP e Server Action em src/lib/actions/matches.ts com fallback gracioso para RPC legada quando a flag modular estiver desativada, seguido de revalidações de rotas (/partidas/[id], /rodadas/[id], /ranking, /cartola) e recálculo de estatísticas, Cartola e Overall.
+  - Auditoria atualizada com 269/269 operações no catálogo e 269/269 operações com paridade revisada (100%).

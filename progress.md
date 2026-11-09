@@ -2,6 +2,26 @@
 
 ---
 
+## Sincronização com origin/main e Operação correctFinishedGoalkeeper (09/11/2026)
+
+- [x] **Merge de Atualizações da main (25bff69, 4807f70, 908db63, 690d298):**
+  - Integração da migration 354_realtime_callups_overall_and_goalkeeper_corrections.sql.
+  - Resolução de conflitos em src/lib/actions/dashboard.ts e src/lib/actions/stats.ts.
+  - Tratamento defensivo em withLeagueRankingProfiles e compatibilidade com queries encadeadas de convocações.
+- [x] **Implementação Modular DDD da Nova Operação (correctFinishedGoalkeeper):**
+  - Backend: Interface MatchRepository, caso de uso com validação EDITAR, repositório PG transacional com checagem de ADM e rota POST /api/matches/leagues/:leagueId/:matchId/teams/:teamId/correct-goalkeeper.
+  - Frontend: Gateway HTTP com fallback e Server Action em src/lib/actions/matches.ts.
+  - Catálogo e Paridade: Atualizados application-operations.json, operation-migration-status.json e operation-parity-status.json.
+- [x] **Validação e Paridade Total:**
+  - npm run audit:migration: 269/269 operações migradas no frontend (100%) e 269/269 operações aceitas na revisão de paridade (100%).
+  - npm run audit:contexts: 15 contextos, 16 módulos, 58 páginas, 41 entradas, 269 funções exportadas catalogadas.
+  - Testes do Backend: 180 arquivos de teste passando (669 testes).
+  - Typecheck Frontend e Backend: 0 erros.
+  - Testes Unitários de Ações e Módulos: 100% de sucesso.
+  - Commit e Push: codex/architecture-reorganization-continued sincronizada com o repositório remoto.
+
+---
+
 ## Reorganização de Arquitetura: ciclo principal de partidas em 29/10/2026
 
 - A branch contém pontes para 150/267 operações (56,2%), mas o lote operacional novo ainda não foi homologado como paridade funcional.
