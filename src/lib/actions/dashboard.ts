@@ -1,7 +1,7 @@
 "use server";
 
 import { getActiveSeason } from "./seasons";
-import { hasCallupClosingMatch } from "../callup-lifecycle";
+import { isDashboardCallupVisible, readDashboardCallups } from "../dashboard-callups";
 import { getCurrentAccount } from "../auth";
 import { getEventWeather } from "../weather";
 
@@ -88,13 +88,7 @@ export async function getDashboardData() {
       .eq("id", season.league_id)
       .single();
 
-    const activeCallupsPromise = readModel ? Promise.resolve({ data: readModel.activeCallups }) : account.client
-      .from("callups")
-      .select("id, date, start_time, stadium_id, stadium_name, stadium_map_url, round_type, capacity, waitlist_capacity, callup_entries(player_id, status, position), round:round_id(id, status, matches(status, started_at))")
-      .eq("league_id", season.league_id)
-      .in("status", ["open", "locked", "converted"])
-      .order("date", { ascending: true })
-      .order("start_time", { ascending: true });
+    const activeCallupsPromise = readDashboardCallups(account.client, season.league_id);
 
     const [
       { data: nextRoundData },
@@ -113,12 +107,7 @@ export async function getDashboardData() {
     ]);
 
     // Convocacoes ligadas a rodadas iniciadas/finalizadas deixam de ser destaque.
-    const visibleCallups = (activeCallupsData || []).filter((callup: any) => {
-      if (!callup.round) return true;
-      const linkedRound: any = callup.round;
-      const hasStartedMatches = hasCallupClosingMatch(linkedRound.matches);
-      return !hasStartedMatches;
-    });
+    const visibleCallups = (activeCallupsData || []).filter((callup: any) => isDashboardCallupVisible(callup));
 
     const stadiumIds = [...new Set([
       nextRoundData?.stadium_id,
