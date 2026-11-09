@@ -42,5 +42,14 @@ export function supabaseGoalkeeperGateway(client: SupabaseClient): GoalkeeperGat
       if (error) throw new Error(error.message);
       return data as Record<string, unknown> | null;
     },
+    async correctFinishedGoalkeeper(matchId, teamId, playerId) {
+      const { data, error } = await client.rpc("correct_finished_match_goalkeeper", {
+        p_match_id: matchId,
+        p_team_id: teamId,
+        p_player_id: playerId,
+      });
+      if (error) throw new Error(error.message);
+      return data as Record<string, unknown> | null;
+    },
   };
 }

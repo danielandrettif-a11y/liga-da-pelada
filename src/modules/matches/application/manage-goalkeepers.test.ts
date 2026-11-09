@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { chooseFixedGoalkeeper, switchMatchGoalkeeper, type GoalkeeperGateway } from "./manage-goalkeepers";
+import { chooseFixedGoalkeeper, correctFinishedMatchGoalkeeper, switchMatchGoalkeeper, type GoalkeeperGateway } from "./manage-goalkeepers";
 
 function gateway(): GoalkeeperGateway & {
   findRoundTeam: ReturnType<typeof vi.fn>;
@@ -7,6 +7,7 @@ function gateway(): GoalkeeperGateway & {
   setFixedGoalkeeper: ReturnType<typeof vi.fn>;
   loadMatch: ReturnType<typeof vi.fn>;
   changeMatchGoalkeeper: ReturnType<typeof vi.fn>;
+  correctFinishedGoalkeeper: ReturnType<typeof vi.fn>;
 } {
   return {
     findRoundTeam: vi.fn().mockResolvedValue({ team: { roundId: "round-1" }, error: null }),
@@ -14,6 +15,7 @@ function gateway(): GoalkeeperGateway & {
     setFixedGoalkeeper: vi.fn().mockResolvedValue(undefined),
     loadMatch: vi.fn().mockResolvedValue({ roundId: "round-1", status: "live", teamAId: "team-1", teamBId: "team-2" }),
     changeMatchGoalkeeper: vi.fn().mockResolvedValue({ goalkeeper_player_id: "player-1" }),
+    correctFinishedGoalkeeper: vi.fn().mockResolvedValue({ player_id: "player-1" }),
   };
 }
 
@@ -74,5 +76,32 @@ describe("troca do goleiro durante a partida", () => {
     });
     expect(db.changeMatchGoalkeeper).toHaveBeenCalledWith("match-1", "team-1", "player-1", 12.8);
     expect(db.loadMatch.mock.invocationCallOrder[0]).toBeLessThan(db.changeMatchGoalkeeper.mock.invocationCallOrder[0]);
+  });
+});
+
+describe("correção do goleiro de partida finalizada", () => {
+  const input = {
+    matchId: "match-1", teamId: "team-1", playerId: "player-1", confirmation: "EDITAR",
+  };
+
+  it("exige confirmação e partida finalizada", async () => {
+    const db = gateway();
+    expect(await correctFinishedMatchGoalkeeper({ ...input, confirmation: "" }, db))
+      .toEqual({ success: false, error: "Digite EDITAR para liberar correções em partidas finalizadas." });
+    expect(db.loadMatch).not.toHaveBeenCalled();
+    expect(await correctFinishedMatchGoalkeeper(input, db))
+      .toEqual({ success: false, error: "A correção é exclusiva para uma partida finalizada." });
+    expect(db.correctFinishedGoalkeeper).not.toHaveBeenCalled();
+  });
+
+  it("corrige o goleiro do time e devolve a rodada para reprocessamento", async () => {
+    const db = gateway();
+    db.loadMatch.mockResolvedValueOnce({
+      roundId: "round-1", status: "finished", teamAId: "team-1", teamBId: "team-2",
+    });
+    expect(await correctFinishedMatchGoalkeeper(input, db)).toEqual({
+      success: true, roundId: "round-1", data: { player_id: "player-1" },
+    });
+    expect(db.correctFinishedGoalkeeper).toHaveBeenCalledWith("match-1", "team-1", "player-1");
   });
 });

@@ -106,7 +106,7 @@ export type RankingExperienceData = {
   } | null;
 };
 
-export type RankingFilter = "general" | "legacy" | "goals" | "assists" | "wins" | "winRate" | "awards" | "overall" | "overallDef" | "overallAlaMei" | "overallAta" | "overallGol";
+export type RankingFilter = "general" | "pointsDef" | "pointsAta" | "legacy" | "goals" | "assists" | "wins" | "winRate" | "awards" | "overall" | "overallDef" | "overallAlaMei" | "overallAta" | "overallGol";
 export type RankingView = "season" | "month" | "latest";
 
 export function roundRankingPoints(value: number) {

@@ -52,6 +52,7 @@ export type MatchHttpGateway = {
   correctFinishedGoalEvent(leagueId: string, eventId: string, playerId: string, assistPlayerId: string | null, confirmation: string): Promise<{ success: true; roundId: string; matchId: string; warning?: string; error?: undefined }>;
   addFinishedGoalEvent(leagueId: string, matchId: string, teamId: string, playerId: string, assistPlayerId: string | null, confirmation: string): Promise<{ success: true; roundId: string; matchId: string; warning?: string; error?: undefined }>;
   changeMatchGoalkeeper(leagueId: string, matchId: string, teamId: string, playerId: string, elapsedSeconds?: number): Promise<{ success: true; roundId: string; error?: undefined }>;
+  correctFinishedGoalkeeper(leagueId: string, matchId: string, teamId: string, playerId: string, confirmation: string): Promise<{ success: true; roundId: string; error?: undefined }>;
   setRoundTeamFixedGoalkeeper(leagueId: string, roundId: string, teamId: string, playerId: string | null): Promise<{ success: true; roundId: string; error?: undefined }>;
   substituteMatchPlayer(leagueId: string, input: any): Promise<{ success: true; roundId: string; substitutionId: string; error?: undefined }>;
   undoLastMatchSubstitution(leagueId: string, matchId: string, substitutionId: string): Promise<{ success: true; roundId: string; error?: undefined }>;
@@ -191,6 +192,17 @@ export function httpMatchGateway(backendUrl: string, accessToken?: string): Matc
         method: "PATCH",
         headers: authHeaders(true),
         body: JSON.stringify({ playerId, elapsedSeconds }),
+      });
+      if (!res.ok) await parseApiError(res);
+      const data = await res.json();
+      return { success: true, ...data };
+    },
+
+    async correctFinishedGoalkeeper(leagueId, matchId, teamId, playerId, confirmation) {
+      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/teams/${teamId}/correct-goalkeeper`, {
+        method: "POST",
+        headers: authHeaders(true),
+        body: JSON.stringify({ playerId, confirmation }),
       });
       if (!res.ok) await parseApiError(res);
       const data = await res.json();

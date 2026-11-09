@@ -22,7 +22,7 @@ import { getMatchState } from "@/modules/matches/infrastructure/match-scope";
 import { GoalWriteError, supabaseGoalGateway } from "@/modules/matches/infrastructure/supabase-goal-gateway";
 import { httpGoalGateway } from "@/modules/matches/infrastructure/http-goal-gateway";
 import { supabaseFinishMatchGateway } from "@/modules/matches/infrastructure/supabase-finish-match-gateway";
-import { chooseFixedGoalkeeper, switchMatchGoalkeeper } from "@/modules/matches/application/manage-goalkeepers";
+import { chooseFixedGoalkeeper, correctFinishedMatchGoalkeeper, switchMatchGoalkeeper } from "@/modules/matches/application/manage-goalkeepers";
 import { supabaseGoalkeeperGateway } from "@/modules/matches/infrastructure/supabase-goalkeeper-gateway";
 import { substitutePlayerInMatch } from "@/modules/matches/application/substitute-match-player";
 import { supabaseMatchSubstitutionGateway } from "@/modules/matches/infrastructure/supabase-match-substitution-gateway";
@@ -775,6 +775,80 @@ export async function changeMatchGoalkeeper(
   } catch (err: any) {
     console.error("Erro ao trocar goleiro:", err);
     return { success: false, error: err.message || "Não foi possível trocar o goleiro." };
+  }
+}
+
+export async function correctFinishedGoalkeeper(
+  matchId: string,
+  teamId: string,
+  playerId: string,
+  confirmation: string,
+) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false as const, error: ADMIN_ERROR };
+    const api = await matchApiFor(client);
+    if (api) {
+      const league = await getSelectedLeague();
+      if (!league) return { success: false as const, error: "Pelada não selecionada." };
+      const apiResult = await api.correctFinishedGoalkeeper(league.id, matchId, teamId, playerId, confirmation);
+      const warnings: string[] = [];
+      const stats = await calculateRoundStats(apiResult.roundId);
+      if (!stats.success) warnings.push(stats.error || "Não foi possível recalcular as estatísticas.");
+      const { data: fantasyRound, error: fantasyRoundError } = await client
+        .from("fantasy_rounds").select("id").eq("round_id", apiResult.roundId).maybeSingle();
+      if (fantasyRoundError) warnings.push("Não foi possível localizar a rodada do Cartola.");
+      if (fantasyRound) {
+        const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: apiResult.roundId });
+        if (fantasyError) warnings.push(`O Cartola precisa ser reprocessado: ${fantasyError.message}`);
+      }
+      const overall = await refreshFluidOverallSafely(`correção de goleiro na rodada ${apiResult.roundId}`);
+      if (!overall.success) warnings.push(overall.error || "Não foi possível atualizar o Overall.");
+
+      revalidatePath(`/partidas/${matchId}`);
+      revalidatePath(`/rodadas/${apiResult.roundId}`);
+      revalidatePath("/ranking");
+      revalidatePath("/cartola", "layout");
+      return { success: true as const, warning: warnings.join(" ") || undefined };
+    }
+  } catch (error: any) {
+    console.error("Erro ao corrigir goleiro da partida via API:", error);
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Não foi possível corrigir o goleiro.",
+    };
+  }
+
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false as const, error: ADMIN_ERROR };
+    const result = await correctFinishedMatchGoalkeeper(
+      { matchId, teamId, playerId, confirmation },
+      supabaseGoalkeeperGateway(client),
+    );
+    if (!result.success) return result;
+
+    const warnings: string[] = [];
+    const stats = await calculateRoundStats(result.roundId);
+    if (!stats.success) warnings.push(stats.error || "Não foi possível recalcular as estatísticas.");
+    const { data: fantasyRound, error: fantasyRoundError } = await client
+      .from("fantasy_rounds").select("id").eq("round_id", result.roundId).maybeSingle();
+    if (fantasyRoundError) warnings.push("Não foi possível localizar a rodada do Cartola.");
+    if (fantasyRound) {
+      const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: result.roundId });
+      if (fantasyError) warnings.push(`O Cartola precisa ser reprocessado: ${fantasyError.message}`);
+    }
+    const overall = await refreshFluidOverallSafely(`correção de goleiro na rodada ${result.roundId}`);
+    if (!overall.success) warnings.push(overall.error || "Não foi possível atualizar o Overall.");
+
+    revalidatePath(`/partidas/${matchId}`);
+    revalidatePath(`/rodadas/${result.roundId}`);
+    revalidatePath("/ranking");
+    revalidatePath("/cartola", "layout");
+    return { success: true as const, warning: warnings.join(" ") || undefined };
+  } catch (err: any) {
+    console.error("Erro ao corrigir goleiro da partida finalizada:", err);
+    return { success: false as const, error: err.message || "Não foi possível corrigir o goleiro." };
   }
 }
 

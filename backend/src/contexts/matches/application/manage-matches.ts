@@ -123,6 +123,7 @@ export interface MatchRepository {
   correctFinishedGoalEvent(eventId: string, playerId: string, assistPlayerId: string | null, confirmation: string, leagueId: string, actor: Actor): Promise<{ roundId: string; matchId: string; warning?: string }>;
   addFinishedGoalEvent(matchId: string, teamId: string, playerId: string, assistPlayerId: string | null, confirmation: string, leagueId: string, actor: Actor): Promise<{ roundId: string; matchId: string; warning?: string }>;
   changeMatchGoalkeeper(matchId: string, teamId: string, playerId: string, elapsedSeconds: number | undefined, leagueId: string, actor: Actor): Promise<{ roundId: string }>;
+  correctFinishedGoalkeeper(matchId: string, teamId: string, playerId: string, confirmation: string, leagueId: string, actor: Actor): Promise<{ roundId: string }>;
   setRoundTeamFixedGoalkeeper(roundId: string, teamId: string, playerId: string | null, leagueId: string, actor: Actor): Promise<{ roundId: string }>;
   substituteMatchPlayer(input: SubstituteMatchPlayerInput, leagueId: string, actor: Actor): Promise<{ roundId: string; substitutionId: string }>;
   undoLastMatchSubstitution(substitutionId: string, matchId: string, leagueId: string, actor: Actor): Promise<{ roundId: string }>;
@@ -240,6 +241,28 @@ export function changeMatchGoalkeeper(matchId: string, teamId: string, playerId:
     parseMatchUuid(teamId, "Time"),
     parseMatchUuid(playerId, "Goleiro"),
     normalizedElapsed,
+    parseMatchUuid(leagueId, "Pelada"),
+    actor,
+  );
+}
+
+export function correctFinishedGoalkeeper(
+  matchId: string,
+  teamId: string,
+  playerId: string,
+  confirmation: string,
+  leagueId: string,
+  actor: Actor,
+  repository: MatchRepository,
+) {
+  if (confirmation !== "EDITAR") {
+    throw new MatchValidationError("Digite EDITAR para liberar correções em partidas finalizadas.");
+  }
+  return repository.correctFinishedGoalkeeper(
+    parseMatchUuid(matchId, "Partida"),
+    parseMatchUuid(teamId, "Time"),
+    parseMatchUuid(playerId, "Jogador"),
+    confirmation,
     parseMatchUuid(leagueId, "Pelada"),
     actor,
   );

@@ -2084,6 +2084,21 @@
     {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
+      "name": "correctFinishedGoalkeeper",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/teams/:teamId/correct-goalkeeper",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
       "name": "createMatch",
       "state": "frontend-migrated",
       "target": "POST /api/matches/leagues/:leagueId",

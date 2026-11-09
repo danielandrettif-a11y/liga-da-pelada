@@ -44,6 +44,7 @@ import {
   changeMatchGoalkeeper,
   correctFinishedGoal,
   correctFinishedGoalEvent,
+  correctFinishedGoalkeeper,
   createMatch,
   deleteEvent,
   deleteMatch,
@@ -232,6 +233,15 @@ describe("matches actions via API gateway", () => {
     });
 
     const res = await changeMatchGoalkeeper(matchId, teamAId, playerBId, 60);
+    expect(res.success).toBe(true);
+  });
+
+  it("routes correctFinishedGoalkeeper to API gateway", async () => {
+    mocks.matchApi.mockResolvedValue({
+      correctFinishedGoalkeeper: vi.fn().mockResolvedValue({ success: true, roundId }),
+    });
+
+    const res = await correctFinishedGoalkeeper(matchId, teamAId, playerBId, "EDITAR");
     expect(res.success).toBe(true);
   });
 

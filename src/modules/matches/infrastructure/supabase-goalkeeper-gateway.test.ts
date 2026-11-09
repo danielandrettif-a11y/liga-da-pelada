@@ -53,6 +53,10 @@ describe("gateway de goleiros", () => {
     expect(db.rpc).toHaveBeenLastCalledWith("change_match_goalkeeper", {
       p_match_id: "match-1", p_team_id: "team-1", p_player_id: "player-1", p_elapsed_seconds: null,
     });
+    await gateway.correctFinishedGoalkeeper("match-1", "team-1", "player-1");
+    expect(db.rpc).toHaveBeenLastCalledWith("correct_finished_match_goalkeeper", {
+      p_match_id: "match-1", p_team_id: "team-1", p_player_id: "player-1",
+    });
   });
 
   it("propaga erro da RPC sem fingir que a troca ocorreu", async () => {

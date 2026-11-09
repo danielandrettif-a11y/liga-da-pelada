@@ -52,6 +52,13 @@ describe("stats server actions parity", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getSelectedLeague).mockResolvedValue({ id: leagueId, name: "Pelada Teste" } as any);
+    vi.mocked(createServerClient).mockResolvedValue({
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+      }),
+    } as any);
   });
 
   describe("getLatestPlayerCardOverallMap", () => {

@@ -660,6 +660,26 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
       });
     },
 
+    async correctFinishedGoalkeeper(
+      matchId: string,
+      teamId: string,
+      playerId: string,
+      confirmation: string,
+      leagueId: string,
+      actor: Actor,
+    ): Promise<{ roundId: string }> {
+      return authenticated(pool, actor, async (client) => {
+        await requireLeagueAdmin(client, leagueId);
+        const scope = await requireMatchInLeague(client, matchId, leagueId);
+        const res = await client.query<{ result: { round_id: string } }>(
+          "SELECT public.correct_finished_match_goalkeeper($1::uuid, $2::uuid, $3::uuid) as result",
+          [matchId, teamId, playerId],
+        );
+        const result = res.rows[0]?.result;
+        return { roundId: result?.round_id || scope.round_id };
+      });
+    },
+
     async setRoundTeamFixedGoalkeeper(roundId: string, teamId: string, playerId: string | null, leagueId: string, actor: Actor): Promise<{ roundId: string }> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);

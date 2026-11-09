@@ -47,7 +47,9 @@ export function PaymentObligationsPanel({ initialObligations, players, currentPl
     for (const obligation of obligations) map.set(obligation.player_id, [...(map.get(obligation.player_id) || []), obligation]);
     return map;
   }, [obligations]);
-  const visiblePlayers = canManage ? players : players.filter((player) => player.id === currentPlayerId);
+  // A situação da rodada é transparente para todos. A permissão de alterar
+  // continua limitada ao próprio pagamento ou ao administrador.
+  const visiblePlayers = players;
   const playerTotals = useMemo(() => new Map(visiblePlayers.map((player) => {
     const rows = rowsByPlayer.get(player.id) || [];
     return [player.id, {
@@ -58,7 +60,7 @@ export function PaymentObligationsPanel({ initialObligations, players, currentPl
   })), [rowsByPlayer, visiblePlayers]);
   const paidCount = visiblePlayers.filter((player) => playerTotals.get(player.id)?.complete).length;
   const allPaid = visiblePlayers.length > 0 && paidCount === visiblePlayers.length;
-  const visibleObligations = canManage ? obligations : obligations.filter((row) => row.player_id === currentPlayerId);
+  const visibleObligations = obligations;
   const totalDue = visibleObligations.reduce((sum, row) => sum + Number(row.amount_due || 0), 0);
   const currentTotal = currentPlayerId ? playerTotals.get(currentPlayerId)?.due : null;
   const recipients = [...new Map(visibleObligations.map((row) => [`${row.recipient_name}\u0000${row.recipient_pix}`, { name: row.recipient_name, pix: row.recipient_pix }])).values()];
@@ -154,7 +156,7 @@ export function PaymentObligationsPanel({ initialObligations, players, currentPl
       })}{!expenseItems.length && <p className="rounded-xl border border-border bg-background/50 p-3 text-xs text-muted">Nenhum item cadastrado na caixinha.</p>}<button type="button" disabled={pending} onClick={saveExpensePlan} className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-xs font-black text-background disabled:opacity-40"><Save className="h-4 w-4" /> Salvar itens</button></div>}
     </article>}
 
-    <div className="flex items-end justify-between"><div><h2 className="text-sm font-black text-foreground">Quem já pagou</h2><p className="text-[11px] text-muted">{paidCount} de {visiblePlayers.length} pagamentos confirmados</p></div>{!canManage && <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-muted"><LockKeyhole className="h-3 w-3" /> Seu pagamento</span>}</div>
+    <div className="flex items-end justify-between"><div><h2 className="text-sm font-black text-foreground">Quem já pagou</h2><p className="text-[11px] text-muted">{paidCount} de {visiblePlayers.length} pagamentos confirmados</p></div>{!canManage && <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-muted"><LockKeyhole className="h-3 w-3" /> Lista completa · edição individual</span>}</div>
     {message && <p role="status" className={`rounded-xl p-3 text-xs font-bold ${message.includes("Não") ? "bg-danger/10 text-danger" : "bg-accent/10 text-accent"}`}>{message}</p>}
 
     <div className="glass-card overflow-hidden">

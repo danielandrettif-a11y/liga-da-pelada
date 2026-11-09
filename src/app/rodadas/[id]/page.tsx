@@ -20,6 +20,7 @@ import { DeleteMatchButton } from "@/components/DeleteMatchButton";
 import { RoundLiveStats } from "@/components/RoundLiveStats";
 import { getSelectedLeague } from "@/lib/league-context";
 import { RoundMatchLauncher } from "@/components/RoundMatchLauncher";
+import { hasCallupClosingMatch } from "@/lib/callup-lifecycle";
 
 export const revalidate = 0;
 
@@ -65,6 +66,9 @@ export default async function RodadaDetalhePage({
     .sort((a: any, b: any) => a.name.localeCompare(b.name, "pt-BR"));
   const roundElapsedSeconds = (round.matches || []).reduce((total: number, match: any) => total + getMatchElapsedSeconds(match), 0);
   const liveMatch = (round.matches || []).find((match: any) => match.status === "live") || null;
+  const openCallup = round.status !== "finished" && !hasCallupClosingMatch(round.matches)
+    ? (round.callups || []).find((callup: any) => ["open", "locked", "converted"].includes(callup.status))
+    : null;
   const liveMatchTeamA = liveMatch
     ? (round.teams || []).find((team: any) => team.id === liveMatch.team_a_id)
     : null;
@@ -148,6 +152,12 @@ export default async function RodadaDetalhePage({
       </div>
 
       <StadiumLink name={(round.league as any)?.stadium_name} mapUrl={(round.league as any)?.stadium_map_url} />
+
+      {openCallup && (
+        <Link href={`/convocacao?callup=${openCallup.id}`} className="flex items-center justify-between rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm font-black text-accent">
+          Ver lista de convocação <span aria-hidden="true">→</span>
+        </Link>
+      )}
 
       {round.status !== "finished" && account.isAdmin && (
         <RoundMatchLauncher round={matchSetupRound} userId={account.user!.id} />

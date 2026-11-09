@@ -60,6 +60,12 @@ describe("Server Action: getDashboardData", () => {
       id: "season-1",
       league_id: "league-123",
     });
+    const callupsQuery: any = {
+      eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      then: (resolve: any) => Promise.resolve({ data: [] }).then(resolve),
+    };
     const client = {
       rpc: vi.fn().mockResolvedValue({
         data: {
@@ -70,9 +76,7 @@ describe("Server Action: getDashboardData", () => {
         error: null,
       }),
       from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          in: vi.fn().mockResolvedValue({ data: [] }),
-        }),
+        select: vi.fn().mockReturnValue(callupsQuery),
       }),
     };
     getCurrentAccountMock.mockResolvedValue({

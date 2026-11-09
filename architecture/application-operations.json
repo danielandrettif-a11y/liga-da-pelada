@@ -704,6 +704,11 @@
     {
       "context": "matches",
       "source": "src/lib/actions/matches.ts",
+      "name": "correctFinishedGoalkeeper"
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
       "name": "createMatch"
     },
     {

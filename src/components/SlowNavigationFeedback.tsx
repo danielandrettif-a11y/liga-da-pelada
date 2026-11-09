@@ -43,7 +43,11 @@ export function SlowNavigationFeedback() {
 
       // O Link do Next cancela a navegação nativa antes de iniciar a troca de
       // rota. Por isso não usamos defaultPrevented como sinal de cancelamento.
-      window.setTimeout(startFeedback, 0);
+      window.setTimeout(() => {
+        // A navegação pode ter terminado antes deste callback executar.
+        // Nesse caso, não deixe a tela escurecida até o tempo de segurança.
+        if (`${window.location.pathname}${window.location.search}` === current) startFeedback();
+      }, 0);
     }
 
     document.addEventListener("click", handleClick, true);

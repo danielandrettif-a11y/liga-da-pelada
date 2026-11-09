@@ -31,6 +31,7 @@ function createMockRepository(): MatchRepository {
     correctFinishedGoalEvent: vi.fn().mockResolvedValue({ roundId, matchId }),
     addFinishedGoalEvent: vi.fn().mockResolvedValue({ roundId, matchId }),
     changeMatchGoalkeeper: vi.fn().mockResolvedValue({ roundId }),
+    correctFinishedGoalkeeper: vi.fn().mockResolvedValue({ roundId }),
     setRoundTeamFixedGoalkeeper: vi.fn().mockResolvedValue({ roundId }),
     substituteMatchPlayer: vi.fn().mockResolvedValue({ roundId, substitutionId: subId }),
     undoLastMatchSubstitution: vi.fn().mockResolvedValue({ roundId }),
@@ -267,14 +268,21 @@ describe("matches presentation routes", () => {
         url: `/api/matches/leagues/${leagueId}/${matchId}/substitutions/${subId}`,
         headers,
       }),
+      app.inject({
+        method: "POST",
+        url: `/api/matches/leagues/${leagueId}/${matchId}/teams/${teamAId}/correct-goalkeeper`,
+        headers,
+        payload: { playerId: playerAId, confirmation: "EDITAR" },
+      }),
     ]);
     await app.close();
 
-    expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 201, 200, 200, 200]);
+    expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 201, 200, 200, 200, 200]);
     expect(repository.getFinishedMatchAudit).toHaveBeenCalledWith(matchId, leagueId, expect.anything());
     expect(repository.correctFinishedGoalEvent).toHaveBeenCalled();
     expect(repository.addFinishedGoalEvent).toHaveBeenCalled();
     expect(repository.changeMatchGoalkeeper).toHaveBeenCalled();
+    expect(repository.correctFinishedGoalkeeper).toHaveBeenCalled();
     expect(repository.setRoundTeamFixedGoalkeeper).toHaveBeenCalled();
     expect(repository.undoLastMatchSubstitution).toHaveBeenCalled();
   });

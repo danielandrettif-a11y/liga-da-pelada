@@ -7,6 +7,7 @@ import {
   changeMatchGoalkeeper,
   correctFinishedGoal,
   correctFinishedGoalEvent,
+  correctFinishedGoalkeeper,
   createMatch,
   deleteEvent,
   deleteMatch,
@@ -237,6 +238,29 @@ export function registerMatchRoutes(app: FastifyInstance, dependencies: {
           request.params.teamId,
           request.body.playerId,
           request.body.elapsedSeconds,
+          request.params.leagueId,
+          authentication.actor,
+          dependencies.repository,
+        );
+        return reply.code(200).send(result);
+      } catch (error) {
+        return sendFailure(error, request, reply);
+      }
+    },
+  );
+
+  // Correção de goleiro em partida encerrada
+  app.post<{ Params: { leagueId: string; matchId: string; teamId: string }; Body: { playerId: string; confirmation: string } }>(
+    "/api/matches/leagues/:leagueId/:matchId/teams/:teamId/correct-goalkeeper",
+    async (request, reply) => {
+      const authentication = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
+      try {
+        const result = await correctFinishedGoalkeeper(
+          request.params.matchId,
+          request.params.teamId,
+          String(request.body.playerId || ""),
+          String(request.body.confirmation || ""),
           request.params.leagueId,
           authentication.actor,
           dependencies.repository,

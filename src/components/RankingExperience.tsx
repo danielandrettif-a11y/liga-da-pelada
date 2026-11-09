@@ -39,10 +39,12 @@ type Props = {
 };
 
 const RANKING_VIEWS: readonly RankingView[] = ["season", "latest", "month"];
-const RANKING_FILTERS: readonly RankingFilter[] = ["general", "goals", "assists", "wins", "winRate", "awards", "overall", "overallDef", "overallAta", "overallGol"];
+const RANKING_FILTERS: readonly RankingFilter[] = ["general", "pointsDef", "pointsAta", "goals", "assists", "wins", "winRate", "awards", "overall", "overallDef", "overallAta", "overallGol"];
 
 const FILTERS: Array<{ key: RankingFilter; label: string }> = [
   { key: "general", label: "Geral" },
+  { key: "pointsDef", label: "Pontos · DEF/VOL" },
+  { key: "pointsAta", label: "Pontos · ATA/ALA" },
   { key: "goals", label: "Gols" },
   { key: "assists", label: "Assistências" },
   { key: "wins", label: "Vitórias" },
@@ -56,6 +58,8 @@ const FILTERS: Array<{ key: RankingFilter; label: string }> = [
 
 const FILTER_LABELS: Record<RankingFilter, string> = {
   general: "pontos",
+  pointsDef: "pontos",
+  pointsAta: "pontos",
   legacy: "pontos básicos",
   goals: "gols",
   assists: "assistências",
@@ -116,7 +120,7 @@ function metricDisplay(entry: RankingEntry, filter: RankingFilter) {
   if (value == null) return "—";
   if (filter === "winRate") return `${value}%`;
   if (filter.startsWith("overall")) return value.toFixed(1);
-  if (filter === "general" || filter === "legacy") return formatRankingPoints(value);
+  if (filter === "general" || filter === "pointsDef" || filter === "pointsAta" || filter === "legacy") return formatRankingPoints(value);
   return String(value);
 }
 
@@ -167,7 +171,11 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
     : view === "month" && data.monthly
       ? data.monthly.entries
       : data.general;
-  const ranking = useMemo(() => sortRanking(sourceEntries, filter), [sourceEntries, filter]);
+  const ranking = useMemo(() => sortRanking(sourceEntries.filter((entry) => {
+    if (filter === "pointsDef") return entry.player.player_profile === "defensive";
+    if (filter === "pointsAta") return entry.player.player_profile === "offensive";
+    return true;
+  }), filter), [sourceEntries, filter]);
   const podium = ranking.slice(0, 3);
   const podiumOrder = podium.length === 3 ? [podium[1], podium[0], podium[2]] : podium;
   const showPodium = podium.length >= 3;
@@ -336,7 +344,10 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
         </div>
       </details>
 
-      <div className="hide-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+      <details className="rounded-xl border border-border bg-surface p-3">
+        <summary className="cursor-pointer text-xs font-black text-foreground">Filtros · {FILTERS.find((item) => item.key === filter)?.label}</summary>
+        <p className="mt-2 text-[10px] text-muted">Pontos por posição usam a tag atual do jogador nesta pelada.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
         {FILTERS.map((item) => (
           <button
             key={item.key}
@@ -347,7 +358,8 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
             {item.label}
           </button>
         ))}
-      </div>
+        </div>
+      </details>
 
       {shareMessage && (
         <p className={`rounded-lg p-2.5 text-center text-xs font-bold ${shareMessage.includes("baixada") ? "bg-success/10 text-success" : "bg-danger/10 text-danger"}`}>

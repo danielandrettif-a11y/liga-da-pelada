@@ -103,7 +103,7 @@ export function inferOneGoalGames(games: number, cleanSheets: number, goalsConce
   return Math.max(0, Math.min(nonCleanGames, nonCleanGames * 2 - count(goalsConceded)));
 }
 
-/** Em partidas até dois gols: sofridos = jogos_de_1 + 2 × jogos_de_2. */
+/** Converte o total restante em blocos equivalentes de dois gols sofridos. */
 export function inferTwoGoalGames(goalsConceded: number, oneGoalGames: number) {
   return Math.max(0, (count(goalsConceded) - count(oneGoalGames)) / 2);
 }
