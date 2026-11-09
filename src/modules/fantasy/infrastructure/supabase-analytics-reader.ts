@@ -52,8 +52,27 @@ export async function readMyFantasyHistoryRows(
 }
 
 export async function readFantasyQuickHighlightPrices(client: SupabaseClient, fantasySeasonId: string) {
-  return client
-    .from("fantasy_player_prices")
-    .select("player_id, current_price, last_round_points, last_price_change, variation_rate, players(name, avatar_url)")
-    .eq("fantasy_season_id", fantasySeasonId);
+  const latest = await client.from("fantasy_player_price_history")
+    .select("fantasy_round_id")
+    .eq("fantasy_season_id", fantasySeasonId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latest.error) return { data: null, error: latest.error };
+  if (!latest.data) return { data: [], error: null };
+
+  const result = await client.from("fantasy_player_price_history")
+    .select("round_points, price_before, price_after, variation_rate, players(name, avatar_url)")
+    .eq("fantasy_season_id", fantasySeasonId)
+    .eq("fantasy_round_id", latest.data.fantasy_round_id);
+  if (result.error) return { data: null, error: result.error };
+  return {
+    data: (result.data || []).map((row) => ({
+      ...row,
+      current_price: row.price_after,
+      last_round_points: row.round_points,
+      last_price_change: Number(row.price_after) - Number(row.price_before),
+    })),
+    error: null,
+  };
 }

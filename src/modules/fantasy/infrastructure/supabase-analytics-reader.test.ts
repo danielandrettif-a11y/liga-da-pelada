@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   readFantasyPlayerDetailBase,
   readMyFantasyHistoryRows,
+  readFantasyQuickHighlightPrices,
 } from "./supabase-analytics-reader";
 
 function query(data: unknown = []) {
@@ -9,6 +10,7 @@ function query(data: unknown = []) {
     select: vi.fn(() => value),
     eq: vi.fn(() => value),
     order: vi.fn(() => value),
+    limit: vi.fn(() => value),
     maybeSingle: vi.fn().mockResolvedValue({ data, error: null }),
   };
   value.then = (resolve: (result: unknown) => unknown) =>
@@ -17,6 +19,15 @@ function query(data: unknown = []) {
 }
 
 describe("supabase fantasy analytics reader", () => {
+  it("busca destaques na última rodada do histórico da temporada", async () => {
+    const latest = query({ fantasy_round_id: "round-a" });
+    const rows = query([{ round_points: 8, price_before: 10, price_after: 12, variation_rate: 0.2, players: { name: "Ana" } }]);
+    const from = vi.fn().mockReturnValueOnce(latest).mockReturnValueOnce(rows);
+    const result = await readFantasyQuickHighlightPrices({ from } as any, "season-a");
+    expect(latest.eq).toHaveBeenCalledWith("fantasy_season_id", "season-a");
+    expect(rows.eq).toHaveBeenCalledWith("fantasy_round_id", "round-a");
+    expect(result.data?.[0]).toMatchObject({ last_round_points: 8, last_price_change: 2 });
+  });
   it("isola a ficha do atleta pela pelada e temporada ativas", async () => {
     const membership = query(null);
     const price = query(null);
