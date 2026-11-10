@@ -17,8 +17,15 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
   private async withClient<T>(callback: (client: any) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
     try {
+      await client.query("BEGIN");
       await client.query("SET LOCAL ROLE authenticated");
-      return await callback(client);
+      await client.query("SET LOCAL search_path = public, auth");
+      const result = await callback(client);
+      await client.query("COMMIT");
+      return result;
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw err;
     } finally {
       client.release();
     }

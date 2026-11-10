@@ -120,7 +120,7 @@ export function pgPlayerProfileRepository(pool: Pool): PlayerProfileRepository {
              player_profile, overall_traits, is_goalkeeper, member_category, is_selectable,
              registration_source, created_by_user_id
            ) VALUES (
-             $1::uuid, $2, $3, $4, $5, $6, $7, $8::text[], $9, $10, $11, 'admin', auth.uid()
+             $1::uuid, $2::text, $3::text, $4::text, $5::text, $6::text, $7::text, $8::text[], $9::boolean, $10::text, $11::boolean, 'admin', auth.uid()
            )`,
           values(command),
         );
@@ -128,7 +128,7 @@ export function pgPlayerProfileRepository(pool: Pool): PlayerProfileRepository {
           `INSERT INTO public.league_members (
              league_id, player_id, role, is_active, player_profile, initial_player_profile,
              overall_traits, overall_seed_mode
-           ) VALUES ($1::uuid, $2::uuid, 'player', true, $3, $3, $4::text[], 'observed')`,
+           ) VALUES ($1::uuid, $2::uuid, 'player', true, $3::text, $3::text, $4::text[], 'observed')`,
           [leagueId, command.playerId, command.playerProfile, command.overallTraits],
         );
         return;
@@ -136,16 +136,20 @@ export function pgPlayerProfileRepository(pool: Pool): PlayerProfileRepository {
 
       await client.query(
         `UPDATE public.players
-            SET name = $2, nickname = $3, profile_bio = $4, avatar_url = $5,
-                avatar_alternate_url = $6, is_goalkeeper = $9,
-                member_category = $10, is_selectable = $11
+            SET name = $2::text, nickname = $3::text, profile_bio = $4::text, avatar_url = $5::text,
+                avatar_alternate_url = $6::text, is_goalkeeper = $7::boolean,
+                member_category = $8::text, is_selectable = $9::boolean
           WHERE id = $1::uuid`,
-        values(command),
+        [
+          command.playerId, command.name, command.nickname, command.profileBio,
+          command.avatarUrl, command.avatarAlternateUrl, command.isGoalkeeper,
+          command.memberCategory, command.isSelectable,
+        ],
       );
       if (access.isLeagueAdmin) {
         await client.query(
           `UPDATE public.league_members
-              SET player_profile = $3, initial_player_profile = $3, overall_traits = $4::text[]
+              SET player_profile = $3::text, initial_player_profile = $3::text, overall_traits = $4::text[]
             WHERE league_id = $1::uuid AND player_id = $2::uuid AND is_active`,
           [leagueId, command.playerId, command.playerProfile, command.overallTraits],
         );

@@ -18,7 +18,7 @@ export async function withAuthenticatedTransaction<T>(
     inTransaction = true;
     await client.query("SET LOCAL ROLE authenticated");
     await client.query(
-      "SELECT set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claim.role', 'authenticated', true), set_config('request.jwt.claims', $2, true)",
+      "SELECT set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claim.role', 'authenticated', true), set_config('request.jwt.claims', $2, true), set_config('search_path', 'public, auth', true)",
       [actor.userId, JSON.stringify({ sub: actor.userId, role: "authenticated" })],
     );
     const result = await operation(client);
