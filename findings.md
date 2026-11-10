@@ -1,6 +1,21 @@
 # Descobertas e Decisões Técnicas: Pontuação BQ v5 e Sorteio por Velocidade
 
-## 0. Auditoria de Paridade do Lote Operacional (28/10/2026)
+## 0. Validações e Descobertas em Banco Real (10/11/2026)
+
+- **Search Path no Supabase PostgreSQL:**
+  - *Descoberta:* Em bancos Supabase/PostgreSQL com RLS e papéis restritos, o papel `authenticated` pode ter `search_path = ''` configurado por segurança contra injeção de schema. Quando queries são executadas sem o prefixo explícito `public.` (ex: `FROM rounds`), o Postgres retorna erro `relation "rounds" does not exist`.
+  - *Decisão Arquitetural:* A função `withAuthenticatedTransaction` foi atualizada para executar atomicamente `set_config('search_path', 'public, auth', true)` dentro do bloco da transação, garantindo visibilidade determinística de tabelas do schema `public` e `auth` durante toda a execução.
+- **Normalização de UUIDs Canônicos:**
+  - *Descoberta:* O regex RFC4122 estrito (`[1-5]` no 13º caractere e `[89ab]` no 17º caractere) rejeitava identificadores hexadecimais canônicos gerados pelo banco real (como `b0000000-0000-0000-0000-000000000001` da Pelada BQ).
+  - *Decisão Arquitetural:* Regex normalizado em `match.ts` para `/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i`, permitindo qualquer formato UUID válido do PostgreSQL.
+- **Prepared Statements com pg Driver:**
+  - *Descoberta:* O driver `pg` emite erro `could not determine data type of parameter $N` quando o array de parâmetros contém elementos que não são referenciados no SQL (ex: parâmetros nulos sobrando após refatoração de colunas).
+  - *Decisão Arquitetural:* Parâmetros do `UPDATE public.players` estritamente desacoplados e tipados com casts explícitos no SQL (`$2::text`, `$7::boolean`).
+- **Nomes de Tabelas e Fatias Piloto (Finance e Cards):**
+  - *Descoberta:* Na base real, a caixinha parcelada e despesas usam `public.league_expense_items`, `public.round_expense_installments`, `public.round_payment_charge_lines` e `public.round_payment_obligations`. Pacotes do Cartola utilizam `public.fantasy_round_packs` e ativações utilizam `public.fantasy_card_activations`.
+  - *Decisão Arquitetural:* As feature flags correspondentes (`ENABLE_FINANCE_API`, `ENABLE_CARDS_API`, `ENABLE_FANTASY_API`) permanecem desativadas por padrão, mantendo as Server Actions consolidadas em `src/lib/actions/` e seus leitores especializados executando o fluxo de produção sem qualquer risco de regressão.
+
+---
 
 - **Descoberta:** a existência de domínio, caso de uso, repositório, rota, gateway e teste mockado não comprova paridade. Os commits sincronizados marcaram 80 operações de convocações, rodadas e partidas como `frontend-migrated`, embora algumas implementações tenham omitido efeitos do fluxo legado ou estejam vazias.
 - **Evidências:** `shuffleRoundTeams` não altera estado; `finishRound` apenas muda o status da rodada e perde fechamento financeiro, consolidação de estatísticas e Cartola; `finishMatch` perde tempos de saída, recálculo, sugestão da próxima partida e notificações. Os testes unitários existentes validavam chamadas ao mock, não os efeitos no banco restaurado.

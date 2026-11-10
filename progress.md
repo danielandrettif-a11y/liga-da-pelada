@@ -2,6 +2,37 @@
 
 ---
 
+## Bateria de Validação no Banco Real Local (WSL Ubuntu - 10/11/2026)
+
+- [x] **Infraestrutura e Limpeza:**
+  - Repositório limpo: diretório e Dockerfile legados em `frontend/` removidos.
+  - Criado `Dockerfile` multi-stage na raiz do projeto e `docker-compose.yml` padronizado.
+  - Adicionado endpoint de monitoramento `GET /healthz` com status 200.
+  - Unificados todos os 15 módulos HTTP com fallback automático para `INTERNAL_BACKEND_URL` na rede interna Docker.
+- [x] **Homologação Ponta a Ponta contra Banco Real (`Pelada BQ` - 80 jogadores, 11 rodadas, 140 partidas):**
+  - **Identidade (`verify-local-identity.sh`):** Aprovado (criação de conta, login, troca de senha, roles, JWT).
+  - **Configuração de Liga & Estádios:** Aprovado (leitura, edição, CRUD completo de estádios e ordenação).
+  - **Temporadas & Ciclo da Liga:** Aprovado (temporada ativa, histórico de rodadas, rejeição segura de deleção).
+  - **Elenco (Roster):** 35/35 operações validadas (catálogo de 80 atletas, estatísticas, histórico, carreira, fitness, private balance, speed ratings e upload multipart de avatar).
+  - **Partidas & Correção de Goleiro:** Aprovado (rejeição sem permissão EDITAR com 400, substituição transacional via `correct_finished_match_goalkeeper` com retorno de `roundId` e restauração de integridade).
+  - **Convocações & Ranking:** Aprovado (agenda de 19 convocações reais, regras BQ v5 canônicas e classificação em tempo real).
+  - **Notificações:** Aprovado (preview de inbox com 10 notificações reais retornadas, preferências de notificação da liga).
+  - **Cosméticos:** Aprovado (dashboard cosmético e itens equipados retornando 200).
+  - **Coletiva:** Aprovado (resumo da sala coletiva retornando 200).
+  - **Operações & Saúde:** Aprovado (`GET /api/operations/performance-summary` e `GET /healthz` com 200).
+  - **Rodadas:** Aprovado (`GET /api/rounds/leagues/:id/prelists` com 1 pré-lista ativa e rodada ativa).
+- [x] **Correções e Estabilizações de Produção:**
+  - Flexibilização do regex de UUIDs em `match.ts` para suportar UUIDs canônicos gerados pelo banco real (`b0000000-0000-0000-0000-000000000001`).
+  - Desacoplamento de parâmetros não utilizados no prepared statement do UPDATE de perfis em `pg-player-profile-repository.ts`.
+  - Configuração atômica de `search_path = public, auth` dentro da transação autenticada (`authenticated-transaction.ts`) e encapsulamento em bloco transacional dos repositórios.
+  - Identificação de divergências de nomes de tabelas legadas nas fatias piloto de Finance (`league_expense_items`) e Cards (`fantasy_round_packs`), cujas feature flags permanecem desativadas em produção com execução segura pelas Server Actions.
+- [x] **Auditoria e Cobertura Geral:**
+  - `npm run audit:migration`: 269/269 operações aceitas (100%).
+  - Suíte completa de testes: 1.272 testes no frontend (247 arquivos) e 669 testes no backend (180 arquivos) — 1.941 testes passando com 100% de sucesso.
+  - Commits `0ca99a8` e `573a084` enviados com sucesso para `origin/codex/architecture-reorganization-continued`.
+
+---
+
 ## Sincronização com origin/main e Operação correctFinishedGoalkeeper (09/11/2026)
 
 - [x] **Merge de Atualizações da main (25bff69, 4807f70, 908db63, 690d298):**
