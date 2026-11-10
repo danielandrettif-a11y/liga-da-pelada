@@ -291,6 +291,7 @@ export function createApp(dependencies: {
     return reply.code(503).send({ code: "UNAVAILABLE", message: "Serviço indisponível." });
   });
   app.get("/health", async () => ({ status: "ok" }));
+  app.get("/healthz", async () => ({ status: "ok" }));
 
   if (dependencies.goalsEnabled) {
     registerGoalRoutes(app, { verifier: dependencies.verifier, repository: dependencies.repository });

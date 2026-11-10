@@ -13,7 +13,7 @@ type SessionClient = {
 
 export async function leagueApiFor(client: SessionClient): Promise<LeagueHttpGateway | null> {
   if (process.env.LEAGUE_API_ENABLED !== "true") return null;
-  const backendUrl = process.env.LEAGUE_BACKEND_URL;
+  const backendUrl = process.env.LEAGUE_BACKEND_URL || process.env.INTERNAL_BACKEND_URL || process.env.BACKEND_API_URL;
   if (!backendUrl) throw new LeagueApiError("API de peladas não configurada.");
   const { data: { session }, error } = await client.auth.getSession();
   if (error || !session?.access_token) {

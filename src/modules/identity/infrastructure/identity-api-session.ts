@@ -13,7 +13,7 @@ type SessionClient = {
 
 export async function identityApiFor(client: SessionClient): Promise<IdentityHttpGateway | null> {
   if (process.env.IDENTITY_API_ENABLED !== "true") return null;
-  const backendUrl = process.env.IDENTITY_BACKEND_URL;
+  const backendUrl = process.env.IDENTITY_BACKEND_URL || process.env.INTERNAL_BACKEND_URL || process.env.BACKEND_API_URL;
   if (!backendUrl) throw new IdentityApiError("API de identidade não configurada.");
   const { data: { session }, error } = await client.auth.getSession();
   if (error || !session?.access_token) throw new IdentityApiError("Sessão expirada. Entre novamente.");
@@ -22,7 +22,7 @@ export async function identityApiFor(client: SessionClient): Promise<IdentityHtt
 
 export function identityPublicApi(): IdentityHttpGateway | null {
   if (process.env.IDENTITY_API_ENABLED !== "true") return null;
-  const backendUrl = process.env.IDENTITY_BACKEND_URL;
+  const backendUrl = process.env.IDENTITY_BACKEND_URL || process.env.INTERNAL_BACKEND_URL || process.env.BACKEND_API_URL;
   if (!backendUrl) throw new IdentityApiError("API de identidade não configurada.");
   return httpIdentityGateway(backendUrl);
 }

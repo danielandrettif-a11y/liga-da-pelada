@@ -17,7 +17,7 @@ export async function roundApiFor(client?: SessionClient | null): Promise<RoundH
   const { data: { session } } = await client.auth.getSession();
   const accessToken = session?.access_token;
   if (!accessToken) return null;
-  const backendUrl = process.env.ROUNDS_BACKEND_URL;
+  const backendUrl = process.env.ROUNDS_BACKEND_URL || process.env.INTERNAL_BACKEND_URL || process.env.BACKEND_API_URL;
   if (!backendUrl) throw new RoundApiError("API de rodadas não configurada.");
   return httpRoundGateway(backendUrl, accessToken);
 }

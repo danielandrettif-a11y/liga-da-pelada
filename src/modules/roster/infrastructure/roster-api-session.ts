@@ -13,7 +13,7 @@ type SessionClient = {
 
 export async function rosterApiFor(client: SessionClient): Promise<RosterHttpGateway | null> {
   if (process.env.ROSTER_API_ENABLED !== "true") return null;
-  const backendUrl = process.env.ROSTER_BACKEND_URL;
+  const backendUrl = process.env.ROSTER_BACKEND_URL || process.env.INTERNAL_BACKEND_URL || process.env.BACKEND_API_URL;
   if (!backendUrl) throw new RosterApiError("API de elenco não configurada.");
   const { data: { session }, error } = await client.auth.getSession();
   if (error || !session?.access_token) throw new RosterApiError("Sessão expirada. Entre novamente.");

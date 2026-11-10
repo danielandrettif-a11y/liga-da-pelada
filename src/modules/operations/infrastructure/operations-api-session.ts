@@ -11,7 +11,7 @@ export async function operationsApi(): Promise<OperationsHttpGateway | null> {
     return null;
   }
 
-  const baseUrl = process.env.BACKEND_API_URL || "http://localhost:3001";
+  const baseUrl = process.env.INTERNAL_BACKEND_URL || process.env.BACKEND_API_URL || "http://localhost:3001";
   return httpOperationsGateway(baseUrl);
 }
 

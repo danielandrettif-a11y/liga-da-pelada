@@ -1,0 +1,106 @@
+name: liga-da-pelada
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: liga-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    environment:
+      - PORT=3001
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_INTERNAL_URL=${SUPABASE_INTERNAL_URL:-http://127.0.0.1:54321}
+      - SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_PUBLIC_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - APP_PUBLIC_URL=${APP_PUBLIC_URL:-http://localhost:3000}
+      # Ativação de todas as APIs modulares DDD
+      - ENABLE_GOAL_API=true
+      - ENABLE_LEAGUE_API=true
+      - ENABLE_IDENTITY_API=true
+      - ENABLE_ROSTER_API=true
+      - ENABLE_CALLUPS_API=true
+      - ENABLE_ROUNDS_API=true
+      - ENABLE_MATCHES_API=true
+      - ENABLE_NOTIFICATIONS_API=true
+      - ENABLE_STATISTICS_API=true
+      - ENABLE_FINANCE_API=true
+      - ENABLE_FANTASY_API=true
+      - ENABLE_CARDS_API=true
+      - ENABLE_COSMETICS_API=true
+      - ENABLE_COLLECTIVE_API=true
+      - ENABLE_INTEGRATIONS_API=true
+      - ENABLE_OPERATIONS_API=true
+      # Serviços opcionais (cronômetro, notificações push e emails)
+      - MATCH_TIMER_WEBHOOK_SECRET=${MATCH_TIMER_WEBHOOK_SECRET:-}
+      - QSTASH_TOKEN=${QSTASH_TOKEN:-}
+      - QSTASH_URL=${QSTASH_URL:-}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-}
+      - EMAIL_UNSUBSCRIBE_SECRET=${EMAIL_UNSUBSCRIBE_SECRET:-}
+    networks:
+      - liga-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    container_name: liga-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      # Comunicação de rede interna com o backend Fastify
+      - INTERNAL_BACKEND_URL=http://backend:3001
+      - BACKEND_API_URL=http://backend:3001
+      # Flags para consumo das APIs modulares pelo frontend
+      - CALLUPS_API_ENABLED=true
+      - CALLUPS_BACKEND_URL=http://backend:3001
+      - CARDS_API_ENABLED=true
+      - CARDS_BACKEND_URL=http://backend:3001
+      - COLLECTIVE_API_ENABLED=true
+      - COSMETICS_API_ENABLED=true
+      - FANTASY_API_ENABLED=true
+      - FANTASY_BACKEND_URL=http://backend:3001
+      - FINANCE_API_ENABLED=true
+      - FINANCE_BACKEND_URL=http://backend:3001
+      - IDENTITY_API_ENABLED=true
+      - IDENTITY_BACKEND_URL=http://backend:3001
+      - INTEGRATIONS_API_ENABLED=true
+      - LEAGUE_API_ENABLED=true
+      - LEAGUE_BACKEND_URL=http://backend:3001
+      - MATCHES_API_ENABLED=true
+      - MATCHES_BACKEND_URL=http://backend:3001
+      - MATCH_GOAL_BACKEND_URL=http://backend:3001
+      - NOTIFICATIONS_API_ENABLED=true
+      - NOTIFICATIONS_BACKEND_URL=http://backend:3001
+      - OPERATIONS_API_ENABLED=true
+      - ROSTER_API_ENABLED=true
+      - ROSTER_BACKEND_URL=http://backend:3001
+      - ROUNDS_API_ENABLED=true
+      - ROUNDS_BACKEND_URL=http://backend:3001
+      - STATISTICS_API_ENABLED=true
+      - STATISTICS_BACKEND_URL=http://backend:3001
+    networks:
+      - liga-network
+
+networks:
+  liga-network:
+    driver: bridge
+

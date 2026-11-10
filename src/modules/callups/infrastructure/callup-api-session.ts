@@ -17,7 +17,7 @@ export async function callupApiFor(client?: SessionClient | null): Promise<Callu
   const { data: { session } } = await client.auth.getSession();
   const accessToken = session?.access_token;
   if (!accessToken) return null;
-  const backendUrl = process.env.CALLUPS_BACKEND_URL;
+  const backendUrl = process.env.CALLUPS_BACKEND_URL || process.env.INTERNAL_BACKEND_URL || process.env.BACKEND_API_URL;
   if (!backendUrl) throw new CallupApiError("API de convocações não configurada.");
   return httpCallupGateway(backendUrl, accessToken);
 }
