@@ -6,7 +6,14 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
   const createMockPool = (queryHandler: (sql: string, params?: any[]) => Promise<any>): Pool => {
     const client = {
       query: vi.fn().mockImplementation((sql: string, params?: any[]) => {
-        if (sql.includes("SET LOCAL ROLE")) return Promise.resolve({});
+        if (
+          sql.includes("SET LOCAL ROLE") ||
+          sql.includes("BEGIN") ||
+          sql.includes("COMMIT") ||
+          sql.includes("SET LOCAL search_path")
+        ) {
+          return Promise.resolve({});
+        }
         return queryHandler(sql, params);
       }),
       release: vi.fn(),
@@ -18,8 +25,8 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
 
   it("checks admin status correctly", async () => {
     const pool = createMockPool(async (sql) => {
-      if (sql.includes("FROM league_members")) {
-        return { rows: [{ role: "admin" }] };
+      if (sql.includes("public.league_members")) {
+        return { rows: [{ is_admin: true }] };
       }
       return { rows: [] };
     });
@@ -31,25 +38,22 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
 
   it("returns dashboard data with players and calculated balance", async () => {
     const pool = createMockPool(async (sql) => {
-      if (sql.includes("FROM leagues")) {
+      if (sql.includes("public.leagues")) {
         return { rows: [{ feature_tier: "complete" }] };
       }
-      if (sql.includes("FROM seasons")) {
-        return { rows: [{ id: "season-1" }] };
-      }
-      if (sql.includes("FROM fantasy_settings")) {
+      if (sql.includes("public.fantasy_settings")) {
         return { rows: [{ initial_budget: 100 }] };
       }
-      if (sql.includes("FROM rounds")) {
-        return { rows: [{ id: "round-1", round_number: 1, status: "draft", market_status: "open" }] };
+      if (sql.includes("public.rounds")) {
+        return { rows: [{ id: "round-1", number: 1, status: "draft", market_status: "open" }] };
       }
-      if (sql.includes("FROM fantasy_lineups WHERE round_id = $1 AND user_id = $2")) {
+      if (sql.includes("public.fantasy_lineups") && sql.includes("user_id = $2")) {
         return { rows: [] };
       }
-      if (sql.includes("FROM players")) {
+      if (sql.includes("public.players")) {
         return { rows: [{ id: "p1", name: "Player 1", price: 8.5, isGoalkeeper: false, overall: 75 }] };
       }
-      if (sql.includes("COUNT(*)::int as count FROM fantasy_lineups")) {
+      if (sql.includes("COUNT(*)::int as count")) {
         return { rows: [{ count: 3 }] };
       }
       return { rows: [] };
@@ -70,7 +74,10 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
 
   it("saves lineup and returns lineupId", async () => {
     const pool = createMockPool(async (sql) => {
-      if (sql.includes("INSERT INTO fantasy_lineups")) {
+      if (sql.includes("save_fantasy_lineup_with_reserve")) {
+        return { rows: [{ lineup_id: "lineup-xyz" }] };
+      }
+      if (sql.includes("INSERT INTO public.fantasy_lineups")) {
         return { rows: [{ id: "lineup-xyz" }] };
       }
       return { rows: [] };
@@ -92,17 +99,16 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
 
   it("returns revealed lineups only when market is closed", async () => {
     const pool = createMockPool(async (sql) => {
-      if (sql.includes("FROM rounds")) {
+      if (sql.includes("public.rounds")) {
         return { rows: [{ status: "finished", market_status: "closed" }] };
       }
-      if (sql.includes("FROM fantasy_lineups")) {
+      if (sql.includes("public.fantasy_lineups")) {
         return {
           rows: [
             {
               id: "l1",
               user_id: "u1",
               captain_player_id: "p1",
-              slots: [],
               score: 45.5,
               total_cost: 95,
             },
@@ -122,7 +128,7 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
 
   it("blocks revealed lineups when market is open", async () => {
     const pool = createMockPool(async (sql) => {
-      if (sql.includes("FROM rounds")) {
+      if (sql.includes("public.rounds")) {
         return { rows: [{ status: "draft", market_status: "open" }] };
       }
       return { rows: [] };
@@ -135,4 +141,3 @@ describe("Infrastructure: PgFantasyMarketLineupRepository", () => {
     expect(result.error).toContain("após o fechamento do mercado");
   });
 });
-

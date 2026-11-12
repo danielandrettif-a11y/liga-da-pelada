@@ -14,15 +14,30 @@ const DEFAULT_DEFINITIONS: FantasyCardDefinition[] = [
   { slug: "maestro-do-meio", name: "Maestro do Meio", description: "Bônus para meia", rarity: "common", cost: 0, requiresTargetPlayer: true },
 ];
 
+function mapCardRarity(rarity: string | null | undefined): "common" | "rare" | "epic" | "legendary" {
+  const norm = (rarity || "").toLowerCase();
+  if (norm === "rare") return "rare";
+  if (norm === "epic") return "epic";
+  if (norm === "legendary") return "legendary";
+  return "common";
+}
+
 export class PgCardsRepository implements CardsRepository {
   constructor(private readonly pool: Pool) {}
 
-  private async withClient<T>(callback: (client: any) => Promise<T>): Promise<T> {
+  private async withClient<T>(callback: (client: any) => Promise<T>, userId?: string): Promise<T> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
       await client.query("SET LOCAL ROLE authenticated");
-      await client.query("SET LOCAL search_path = public, auth");
+      if (userId) {
+        await client.query(
+          "SELECT set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claim.role', 'authenticated', true), set_config('request.jwt.claims', $2, true), set_config('search_path', 'public, auth', true)",
+          [userId, JSON.stringify({ sub: userId, role: "authenticated" })],
+        );
+      } else {
+        await client.query("SET LOCAL search_path = public, auth");
+      }
       const result = await callback(client);
       await client.query("COMMIT");
       return result;
@@ -36,20 +51,25 @@ export class PgCardsRepository implements CardsRepository {
 
   async isLeagueAdmin(leagueId: string, userId: string): Promise<boolean> {
     return this.withClient(async (client) => {
-      const { rows } = await client.query(
-        `SELECT 1 FROM league_members
-         WHERE league_id = $1 AND user_id = $2 AND role IN ('admin', 'owner')
-         LIMIT 1`,
+      const res = await client.query(
+        `SELECT (
+           EXISTS (
+             SELECT 1 FROM public.league_members lm
+             WHERE lm.league_id = $1 AND lm.user_id = $2 AND lm.role IN ('admin', 'owner')
+           )
+           OR EXISTS (
+             SELECT 1 FROM public.account_profiles ap
+             WHERE ap.user_id = $2 AND ap.role = 'admin'
+           )
+           OR EXISTS (
+             SELECT 1 FROM public.leagues l
+             WHERE l.id = $1 AND l.owner_id = $2
+           )
+         ) AS is_admin`,
         [leagueId, userId]
       );
-      if (rows.length > 0) return true;
-
-      const leagueRes = await client.query(
-        `SELECT 1 FROM leagues WHERE id = $1 AND created_by = $2 LIMIT 1`,
-        [leagueId, userId]
-      );
-      return (leagueRes.rowCount ?? 0) > 0;
-    });
+      return Boolean(res.rows[0]?.is_admin);
+    }, userId);
   }
 
   async getMyPacks(leagueId: string, userId: string): Promise<{
@@ -58,23 +78,56 @@ export class PgCardsRepository implements CardsRepository {
     totalPacks: number;
   }> {
     return this.withClient(async (client) => {
-      const { rows } = await client.query(
-        `SELECT id, user_id, league_id, status, card_slug_offer_1, card_slug_offer_2, created_at
-         FROM fantasy_packs
-         WHERE league_id = $1 AND user_id = $2
-         ORDER BY created_at DESC`,
+      const packRes = await client.query(
+        `SELECT p.id, p.user_id, p.round_id, p.status, p.created_at, p.source, p.card_tier, p.opened_at, p.chosen_card_id,
+                COALESCE(r.league_id, fs.league_id, $1::uuid) as league_id
+         FROM public.fantasy_round_packs p
+         LEFT JOIN public.rounds r ON r.id = p.round_id
+         LEFT JOIN public.fantasy_season_pass_rewards fspr ON fspr.id = p.fantasy_season_pass_reward_id
+         LEFT JOIN public.fantasy_seasons fs ON fs.id = fspr.fantasy_season_id
+         WHERE p.user_id = $2
+           AND (r.league_id = $1::uuid OR fs.league_id = $1::uuid OR (p.round_id IS NULL AND p.fantasy_season_pass_reward_id IS NULL))
+         ORDER BY p.created_at DESC`,
         [leagueId, userId]
       );
 
-      const allPacks: FantasyPackDTO[] = rows.map((r: any) => ({
-        id: r.id,
-        userId: r.user_id,
-        leagueId: r.league_id,
-        status: r.status,
-        cardSlugOffer1: r.card_slug_offer_1,
-        cardSlugOffer2: r.card_slug_offer_2,
-        createdAt: r.created_at,
-      }));
+      const packIds = packRes.rows.map((r: any) => r.id);
+      const offersMap: Record<string, { offer1?: string; offer2?: string }> = {};
+
+      if (packIds.length > 0) {
+        const offersRes = await client.query(
+          `SELECT o.pack_id, o.slot, fc.slug
+           FROM public.fantasy_pack_offers o
+           JOIN public.fantasy_cards fc ON fc.id = o.card_id
+           WHERE o.pack_id = ANY($1::uuid[])
+           ORDER BY o.slot ASC`,
+          [packIds]
+        );
+        for (const row of offersRes.rows) {
+          if (!offersMap[row.pack_id]) offersMap[row.pack_id] = {};
+          if (row.slot === 1) offersMap[row.pack_id]!.offer1 = row.slug;
+          if (row.slot === 2) offersMap[row.pack_id]!.offer2 = row.slug;
+        }
+      }
+
+      const allPacks: FantasyPackDTO[] = packRes.rows.map((r: any) => {
+        let status: "unopened" | "opened" | "claimed" = "unopened";
+        if (r.status === "opened") status = "opened";
+        else if (r.status === "claimed") status = "claimed";
+        else status = "unopened";
+
+        const offers = offersMap[r.id] || {};
+
+        return {
+          id: r.id,
+          userId: r.user_id,
+          leagueId: r.league_id || leagueId,
+          status,
+          cardSlugOffer1: offers.offer1 || null,
+          cardSlugOffer2: offers.offer2 || null,
+          createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+        };
+      });
 
       const availablePacks = allPacks.filter((p) => p.status !== "claimed");
       const claimedCount = allPacks.filter((p) => p.status === "claimed").length;
@@ -89,12 +142,21 @@ export class PgCardsRepository implements CardsRepository {
 
   async restoreMyPassPacks(leagueId: string, userId: string, fantasySeasonId: string): Promise<{ success: boolean; error?: string }> {
     return this.withClient(async (client) => {
-      await client.query(
-        `INSERT INTO fantasy_packs (league_id, user_id, status, created_at)
-         VALUES ($1, $2, 'unopened', NOW())`,
-        [leagueId, userId]
-      );
-      return { success: true };
+      try {
+        await client.query(
+          `SELECT public.restore_my_pass_card_packs($1::uuid)`,
+          [fantasySeasonId]
+        );
+        return { success: true };
+      } catch {
+        // Fallback defensivo
+        await client.query(
+          `INSERT INTO public.fantasy_round_packs (user_id, status, source, created_at)
+           VALUES ($1, 'available', 'season_pass', NOW())`,
+          [userId]
+        );
+        return { success: true };
+      }
     });
   }
 
@@ -105,19 +167,90 @@ export class PgCardsRepository implements CardsRepository {
   }> {
     return this.withClient(async (client) => {
       const packRes = await client.query(
-        `SELECT id, status FROM fantasy_packs WHERE id = $1 AND user_id = $2 AND league_id = $3 LIMIT 1`,
-        [packId, userId, leagueId]
+        `SELECT id, status FROM public.fantasy_round_packs WHERE id = $1 AND user_id = $2 LIMIT 1`,
+        [packId, userId]
       );
       if (packRes.rows.length === 0) return { success: false, error: "Pacote não encontrado." };
 
-      const offer1 = DEFAULT_DEFINITIONS[0]!;
-      const offer2 = DEFAULT_DEFINITIONS[1]!;
+      // Se já existirem ofertas para este pacote, carregar
+      const existingOffers = await client.query(
+        `SELECT o.slot, fc.id, fc.slug, fc.name, fc.description, fc.rarity,
+                (fc.effect_config->>'requires_target_player')::boolean as requires_target
+         FROM public.fantasy_pack_offers o
+         JOIN public.fantasy_cards fc ON fc.id = o.card_id
+         WHERE o.pack_id = $1
+         ORDER BY o.slot ASC`,
+        [packId]
+      );
+
+      let offer1: FantasyCardDefinition;
+      let offer2: FantasyCardDefinition;
+
+      if (existingOffers.rows.length >= 2) {
+        const row1 = existingOffers.rows[0];
+        const row2 = existingOffers.rows[1];
+        offer1 = {
+          slug: row1.slug,
+          name: row1.name,
+          description: row1.description,
+          rarity: mapCardRarity(row1.rarity),
+          cost: 0,
+          requiresTargetPlayer: Boolean(row1.requires_target),
+        };
+        offer2 = {
+          slug: row2.slug,
+          name: row2.name,
+          description: row2.description,
+          rarity: mapCardRarity(row2.rarity),
+          cost: 0,
+          requiresTargetPlayer: Boolean(row2.requires_target),
+        };
+      } else {
+        // Buscar 2 cartas do banco de dados
+        const cardsRes = await client.query(
+          `SELECT id, slug, name, description, rarity, (effect_config->>'requires_target_player')::boolean as requires_target
+           FROM public.fantasy_cards
+           WHERE enabled = true
+           ORDER BY random()
+           LIMIT 2`
+        );
+
+        const cardRows = cardsRes.rows.length >= 2 ? cardsRes.rows : [
+          { id: "00000000-0000-0000-0000-000000000001", slug: DEFAULT_DEFINITIONS[0]!.slug, name: DEFAULT_DEFINITIONS[0]!.name, description: DEFAULT_DEFINITIONS[0]!.description, rarity: DEFAULT_DEFINITIONS[0]!.rarity, requires_target: DEFAULT_DEFINITIONS[0]!.requiresTargetPlayer },
+          { id: "00000000-0000-0000-0000-000000000002", slug: DEFAULT_DEFINITIONS[1]!.slug, name: DEFAULT_DEFINITIONS[1]!.name, description: DEFAULT_DEFINITIONS[1]!.description, rarity: DEFAULT_DEFINITIONS[1]!.rarity, requires_target: DEFAULT_DEFINITIONS[1]!.requiresTargetPlayer },
+        ];
+
+        offer1 = {
+          slug: cardRows[0].slug,
+          name: cardRows[0].name,
+          description: cardRows[0].description,
+          rarity: mapCardRarity(cardRows[0].rarity),
+          cost: 0,
+          requiresTargetPlayer: Boolean(cardRows[0].requires_target),
+        };
+        offer2 = {
+          slug: cardRows[1].slug,
+          name: cardRows[1].name,
+          description: cardRows[1].description,
+          rarity: mapCardRarity(cardRows[1].rarity),
+          cost: 0,
+          requiresTargetPlayer: Boolean(cardRows[1].requires_target),
+        };
+
+        // Gravar ofertas
+        await client.query(
+          `INSERT INTO public.fantasy_pack_offers (pack_id, slot, card_id)
+           VALUES ($1, 1, $2::uuid), ($1, 2, $3::uuid)
+           ON CONFLICT (pack_id, slot) DO NOTHING`,
+          [packId, cardRows[0].id, cardRows[1].id]
+        ).catch(() => {});
+      }
 
       await client.query(
-        `UPDATE fantasy_packs
-         SET status = 'opened', card_slug_offer_1 = $1, card_slug_offer_2 = $2, updated_at = NOW()
-         WHERE id = $3`,
-        [offer1.slug, offer2.slug, packId]
+        `UPDATE public.fantasy_round_packs
+         SET status = 'opened', opened_at = NOW()
+         WHERE id = $1`,
+        [packId]
       );
 
       return {
@@ -129,21 +262,46 @@ export class PgCardsRepository implements CardsRepository {
 
   async getPackById(leagueId: string, packId: string): Promise<FantasyPackDTO | null> {
     return this.withClient(async (client) => {
-      const { rows } = await client.query(
-        `SELECT id, user_id, league_id, status, card_slug_offer_1, card_slug_offer_2, created_at
-         FROM fantasy_packs WHERE id = $1 AND league_id = $2 LIMIT 1`,
-        [packId, leagueId]
+      const res = await client.query(
+        `SELECT p.id, p.user_id, p.status, p.created_at,
+                COALESCE(r.league_id, fs.league_id, $1::uuid) as league_id
+         FROM public.fantasy_round_packs p
+         LEFT JOIN public.rounds r ON r.id = p.round_id
+         LEFT JOIN public.fantasy_season_pass_rewards fspr ON fspr.id = p.fantasy_season_pass_reward_id
+         LEFT JOIN public.fantasy_seasons fs ON fs.id = fspr.fantasy_season_id
+         WHERE p.id = $2 LIMIT 1`,
+        [leagueId, packId]
       );
-      if (rows.length === 0) return null;
-      const r = rows[0];
+      if (res.rows.length === 0) return null;
+      const r = res.rows[0];
+
+      const offersRes = await client.query(
+        `SELECT o.slot, fc.slug
+         FROM public.fantasy_pack_offers o
+         JOIN public.fantasy_cards fc ON fc.id = o.card_id
+         WHERE o.pack_id = $1 ORDER BY o.slot ASC`,
+        [packId]
+      );
+
+      let offer1: string | null = null;
+      let offer2: string | null = null;
+      for (const row of offersRes.rows) {
+        if (row.slot === 1) offer1 = row.slug;
+        if (row.slot === 2) offer2 = row.slug;
+      }
+
+      let status: "unopened" | "opened" | "claimed" = "unopened";
+      if (r.status === "opened") status = "opened";
+      else if (r.status === "claimed") status = "claimed";
+
       return {
         id: r.id,
         userId: r.user_id,
-        leagueId: r.league_id,
-        status: r.status,
-        cardSlugOffer1: r.card_slug_offer_1,
-        cardSlugOffer2: r.card_slug_offer_2,
-        createdAt: r.created_at,
+        leagueId: r.league_id || leagueId,
+        status,
+        cardSlugOffer1: offer1,
+        cardSlugOffer2: offer2,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
       };
     });
   }
@@ -155,26 +313,49 @@ export class PgCardsRepository implements CardsRepository {
     chosenSlug: string
   ): Promise<{ success: boolean; error?: string; chosenCard?: FantasyCardDefinition }> {
     return this.withClient(async (client) => {
-      await client.query(
-        `UPDATE fantasy_packs SET status = 'claimed', updated_at = NOW() WHERE id = $1 AND league_id = $2`,
-        [packId, leagueId]
+      const cardRes = await client.query(
+        `SELECT id, slug, name, description, rarity, (effect_config->>'requires_target_player')::boolean as requires_target
+         FROM public.fantasy_cards
+         WHERE slug = $1 LIMIT 1`,
+        [chosenSlug]
       );
 
+      const cardRow = cardRes.rows[0];
+      const cardId = cardRow?.id || null;
+
       await client.query(
-        `INSERT INTO fantasy_user_cards (league_id, user_id, card_slug, status, acquired_at)
-         VALUES ($1, $2, $3, 'available', NOW())`,
-        [leagueId, userId, chosenSlug]
+        `UPDATE public.fantasy_round_packs
+         SET status = 'claimed', chosen_card_id = $1::uuid
+         WHERE id = $2`,
+        [cardId, packId]
       );
 
-      const card = DEFAULT_DEFINITIONS.find((d) => d.slug === chosenSlug) ?? {
-        slug: chosenSlug,
-        name: chosenSlug,
-        description: "",
-        rarity: "common",
-        cost: 0,
-      };
+      if (cardId) {
+        await client.query(
+          `INSERT INTO public.fantasy_user_cards (league_id, user_id, card_id, source_pack_id, status, acquired_at)
+           VALUES ($1, $2, $3, $4, 'OWNED', NOW())`,
+          [leagueId, userId, cardId, packId]
+        );
+      }
 
-      return { success: true, chosenCard: card };
+      const cardDef: FantasyCardDefinition = cardRow
+        ? {
+            slug: cardRow.slug,
+            name: cardRow.name,
+            description: cardRow.description,
+            rarity: mapCardRarity(cardRow.rarity),
+            cost: 0,
+            requiresTargetPlayer: Boolean(cardRow.requires_target),
+          }
+        : {
+            slug: chosenSlug,
+            name: chosenSlug,
+            description: "",
+            rarity: "common",
+            cost: 0,
+          };
+
+      return { success: true, chosenCard: cardDef };
     });
   }
 
@@ -184,35 +365,51 @@ export class PgCardsRepository implements CardsRepository {
   }> {
     return this.withClient(async (client) => {
       const { rows } = await client.query(
-        `SELECT id, user_id, card_slug, status, acquired_at
-         FROM fantasy_user_cards
-         WHERE league_id = $1 AND user_id = $2
-         ORDER BY acquired_at DESC`,
+        `SELECT uc.id, uc.user_id, uc.status, uc.acquired_at,
+                fc.slug, fc.name, fc.description, fc.rarity,
+                (fc.effect_config->>'requires_target_player')::boolean as requires_target
+         FROM public.fantasy_user_cards uc
+         JOIN public.fantasy_cards fc ON fc.id = uc.card_id
+         WHERE uc.league_id = $1 AND uc.user_id = $2
+         ORDER BY uc.acquired_at DESC`,
         [leagueId, userId]
       );
 
-      const cards: FantasyUserCardDTO[] = rows.map((r: any) => ({
-        id: r.id,
-        userId: r.user_id,
-        cardSlug: r.card_slug,
-        status: r.status,
-        acquiredAt: r.acquired_at,
-      }));
+      const cards: FantasyUserCardDTO[] = rows.map((r: any) => {
+        let status: "available" | "active" | "used" = "available";
+        if (r.status === "RESERVED" || r.status === "LOCKED") status = "active";
+        else if (r.status === "CONSUMED") status = "used";
+
+        return {
+          id: r.id,
+          userId: r.user_id,
+          cardSlug: r.slug,
+          status,
+          acquiredAt: r.acquired_at ? new Date(r.acquired_at).toISOString() : new Date().toISOString(),
+        };
+      });
 
       const groupedBySlug: Record<string, { count: number; card: FantasyCardDefinition; instances: FantasyUserCardDTO[] }> = {};
-      for (const card of cards) {
-        if (!groupedBySlug[card.cardSlug]) {
-          const def = DEFAULT_DEFINITIONS.find((d) => d.slug === card.cardSlug) ?? {
-            slug: card.cardSlug,
-            name: card.cardSlug,
-            description: "",
-            rarity: "common",
-            cost: 0,
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const cardDto = cards[i];
+        if (!cardDto) continue;
+        if (!groupedBySlug[row.slug]) {
+          groupedBySlug[row.slug] = {
+            count: 0,
+            card: {
+              slug: row.slug,
+              name: row.name,
+              description: row.description,
+              rarity: mapCardRarity(row.rarity),
+              cost: 0,
+              requiresTargetPlayer: Boolean(row.requires_target),
+            },
+            instances: [],
           };
-          groupedBySlug[card.cardSlug] = { count: 0, card: def, instances: [] };
         }
-        groupedBySlug[card.cardSlug]!.count += 1;
-        groupedBySlug[card.cardSlug]!.instances.push(card);
+        groupedBySlug[row.slug]!.count += 1;
+        groupedBySlug[row.slug]!.instances.push(cardDto);
       }
 
       return { cards, groupedBySlug };
@@ -222,7 +419,8 @@ export class PgCardsRepository implements CardsRepository {
   async getMyInventoryCount(leagueId: string, userId: string): Promise<number> {
     return this.withClient(async (client) => {
       const { rows } = await client.query(
-        `SELECT COUNT(*)::int as count FROM fantasy_user_cards WHERE league_id = $1 AND user_id = $2`,
+        `SELECT COUNT(*)::int as count FROM public.fantasy_user_cards
+         WHERE league_id = $1 AND user_id = $2 AND status = 'OWNED'`,
         [leagueId, userId]
       );
       return rows[0]?.count ?? 0;
@@ -232,40 +430,57 @@ export class PgCardsRepository implements CardsRepository {
   async getActiveCardForRound(leagueId: string, userId: string, roundId: string): Promise<FantasyActiveCardDTO | null> {
     return this.withClient(async (client) => {
       const { rows } = await client.query(
-        `SELECT id, user_id, round_id, card_slug, target_player_id, target_player_2_id, target_prediction, applied_at
-         FROM fantasy_active_cards
-         WHERE round_id = $1 AND user_id = $2 LIMIT 1`,
+        `SELECT fca.id, fca.user_id, fca.round_id, fca.target_snapshot, fca.reserved_at,
+                fc.slug as card_slug
+         FROM public.fantasy_card_activations fca
+         JOIN public.fantasy_cards fc ON fc.id = fca.card_id
+         WHERE fca.round_id = $1 AND fca.user_id = $2
+         LIMIT 1`,
         [roundId, userId]
       );
       if (rows.length === 0) return null;
       const r = rows[0];
+      const snapshot = r.target_snapshot || {};
       return {
         id: r.id,
         userId: r.user_id,
         roundId: r.round_id,
         cardSlug: r.card_slug,
-        targetPlayerId: r.target_player_id,
-        targetPlayer2Id: r.target_player_2_id,
-        targetPrediction: r.target_prediction,
-        appliedAt: r.applied_at,
+        targetPlayerId: snapshot.targetPlayerId || null,
+        targetPlayer2Id: snapshot.targetPlayer2Id || null,
+        targetPrediction: snapshot.targetPrediction || null,
+        appliedAt: r.reserved_at ? new Date(r.reserved_at).toISOString() : new Date().toISOString(),
       };
     });
   }
 
   async getCardDefinition(cardSlug: string): Promise<FantasyCardDefinition | null> {
-    return DEFAULT_DEFINITIONS.find((d) => d.slug === cardSlug) ?? {
-      slug: cardSlug,
-      name: cardSlug,
-      description: "",
-      rarity: "common",
-      cost: 0,
-    };
+    return this.withClient(async (client) => {
+      const { rows } = await client.query(
+        `SELECT slug, name, description, rarity, (effect_config->>'requires_target_player')::boolean as requires_target
+         FROM public.fantasy_cards
+         WHERE slug = $1 LIMIT 1`,
+        [cardSlug]
+      );
+      if (rows.length === 0) {
+        return DEFAULT_DEFINITIONS.find((d) => d.slug === cardSlug) ?? null;
+      }
+      const r = rows[0];
+      return {
+        slug: r.slug,
+        name: r.name,
+        description: r.description,
+        rarity: mapCardRarity(r.rarity),
+        cost: 0,
+        requiresTargetPlayer: Boolean(r.requires_target),
+      };
+    });
   }
 
   async isRoundOpen(leagueId: string, roundId: string): Promise<boolean> {
     return this.withClient(async (client) => {
       const { rows } = await client.query(
-        `SELECT status, market_status FROM rounds WHERE id = $1 AND league_id = $2 LIMIT 1`,
+        `SELECT status, market_status FROM public.rounds WHERE id = $1 AND league_id = $2 LIMIT 1`,
         [roundId, leagueId]
       );
       if (rows.length === 0) return false;
@@ -285,24 +500,44 @@ export class PgCardsRepository implements CardsRepository {
   }): Promise<{ success: boolean; error?: string }> {
     return this.withClient(async (client) => {
       const cardRes = await client.query(
-        `SELECT card_slug FROM fantasy_user_cards WHERE id = $1 AND user_id = $2 LIMIT 1`,
+        `SELECT uc.card_id, fc.slug
+         FROM public.fantasy_user_cards uc
+         JOIN public.fantasy_cards fc ON fc.id = uc.card_id
+         WHERE uc.id = $1 AND uc.user_id = $2 LIMIT 1`,
         [params.userCardId, params.userId]
       );
-      const cardSlug = cardRes.rows[0]?.card_slug ?? "carta";
+      if (cardRes.rows.length === 0) {
+        return { success: false, error: "Carta não encontrada no seu inventário." };
+      }
+
+      const cardId = cardRes.rows[0].card_id;
+      const snapshot = {
+        targetPlayerId: params.targetPlayerId || null,
+        targetPlayer2Id: params.targetPlayer2Id || null,
+        targetPrediction: params.targetPrediction || null,
+      };
 
       await client.query(
-        `INSERT INTO fantasy_active_cards (round_id, user_id, card_slug, target_player_id, target_player_2_id, target_prediction, applied_at)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        `INSERT INTO public.fantasy_card_activations (round_id, user_id, user_card_id, card_id, target_snapshot, status, reserved_at)
+         VALUES ($1, $2, $3, $4, $5, 'RESERVED', NOW())
          ON CONFLICT (round_id, user_id)
-         DO UPDATE SET card_slug = EXCLUDED.card_slug, target_player_id = EXCLUDED.target_player_id, applied_at = NOW()`,
+         DO UPDATE SET user_card_id = EXCLUDED.user_card_id,
+                       card_id = EXCLUDED.card_id,
+                       target_snapshot = EXCLUDED.target_snapshot,
+                       status = 'RESERVED',
+                       reserved_at = NOW()`,
         [
           params.roundId,
           params.userId,
-          cardSlug,
-          params.targetPlayerId ?? null,
-          params.targetPlayer2Id ?? null,
-          params.targetPrediction ?? null,
+          params.userCardId,
+          cardId,
+          JSON.stringify(snapshot),
         ]
+      );
+
+      await client.query(
+        `UPDATE public.fantasy_user_cards SET status = 'RESERVED' WHERE id = $1`,
+        [params.userCardId]
       );
 
       return { success: true };
@@ -311,10 +546,21 @@ export class PgCardsRepository implements CardsRepository {
 
   async removeActiveCardForRound(leagueId: string, userId: string, roundId: string): Promise<{ success: boolean; error?: string }> {
     return this.withClient(async (client) => {
-      await client.query(
-        `DELETE FROM fantasy_active_cards WHERE round_id = $1 AND user_id = $2`,
+      const actRes = await client.query(
+        `SELECT user_card_id FROM public.fantasy_card_activations WHERE round_id = $1 AND user_id = $2 LIMIT 1`,
         [roundId, userId]
       );
+      if (actRes.rows.length > 0) {
+        const userCardId = actRes.rows[0].user_card_id;
+        await client.query(
+          `DELETE FROM public.fantasy_card_activations WHERE round_id = $1 AND user_id = $2`,
+          [roundId, userId]
+        );
+        await client.query(
+          `UPDATE public.fantasy_user_cards SET status = 'OWNED' WHERE id = $1`,
+          [userCardId]
+        );
+      }
       return { success: true };
     });
   }
@@ -322,14 +568,18 @@ export class PgCardsRepository implements CardsRepository {
   async generatePacksForFinishedRound(leagueId: string, roundId: string): Promise<number> {
     return this.withClient(async (client) => {
       const { rows } = await client.query(
-        `SELECT DISTINCT user_id FROM fantasy_lineups WHERE round_id = $1`,
+        `SELECT DISTINCT fl.user_id
+         FROM public.fantasy_lineups fl
+         JOIN public.fantasy_rounds fr ON fr.id = fl.fantasy_round_id
+         WHERE fr.round_id = $1`,
         [roundId]
       );
       for (const row of rows) {
         await client.query(
-          `INSERT INTO fantasy_packs (league_id, user_id, status, created_at)
-           VALUES ($1, $2, 'unopened', NOW())`,
-          [leagueId, row.user_id]
+          `INSERT INTO public.fantasy_round_packs (round_id, user_id, status, source, created_at)
+           VALUES ($1, $2, 'available', 'round_reward', NOW())
+           ON CONFLICT DO NOTHING`,
+          [roundId, row.user_id]
         );
       }
       return rows.length;
@@ -338,10 +588,16 @@ export class PgCardsRepository implements CardsRepository {
 
   async giveMyAccountTestPack(leagueId: string, userId: string): Promise<{ success: boolean; error?: string }> {
     return this.withClient(async (client) => {
+      const rRes = await client.query(
+        `SELECT id FROM public.rounds WHERE league_id = $1 ORDER BY number DESC LIMIT 1`,
+        [leagueId]
+      );
+      const roundId = rRes.rows[0]?.id || null;
+
       await client.query(
-        `INSERT INTO fantasy_packs (league_id, user_id, status, created_at)
-         VALUES ($1, $2, 'unopened', NOW())`,
-        [leagueId, userId]
+        `INSERT INTO public.fantasy_round_packs (round_id, user_id, status, source, created_at)
+         VALUES ($1, $2, 'available', 'test', NOW())`,
+        [roundId, userId]
       );
       return { success: true };
     });
@@ -355,9 +611,14 @@ export class PgCardsRepository implements CardsRepository {
     error?: string;
   }> {
     return this.withClient(async (client) => {
-      const pRes = await client.query(`DELETE FROM fantasy_packs WHERE league_id = $1 AND user_id = $2`, [leagueId, userId]);
-      const cRes = await client.query(`DELETE FROM fantasy_user_cards WHERE league_id = $1 AND user_id = $2`, [leagueId, userId]);
-      const aRes = await client.query(`DELETE FROM fantasy_active_cards WHERE user_id = $1`, [userId]);
+      const aRes = await client.query(`DELETE FROM public.fantasy_card_activations WHERE user_id = $1`, [userId]);
+      const cRes = await client.query(`DELETE FROM public.fantasy_user_cards WHERE league_id = $1 AND user_id = $2`, [leagueId, userId]);
+      const pRes = await client.query(
+        `DELETE FROM public.fantasy_round_packs p
+         USING public.rounds r
+         WHERE p.user_id = $2 AND p.round_id = r.id AND r.league_id = $1`,
+        [leagueId, userId]
+      );
 
       return {
         success: true,
@@ -376,7 +637,7 @@ export class PgCardsRepository implements CardsRepository {
   }> {
     return this.withClient(async (client) => {
       const rRes = await client.query(
-        `SELECT id, round_number FROM rounds WHERE league_id = $1 ORDER BY round_number DESC LIMIT 1`,
+        `SELECT id, number FROM public.rounds WHERE league_id = $1 ORDER BY number DESC LIMIT 1`,
         [leagueId]
       );
       const round = rRes.rows[0];
@@ -386,7 +647,7 @@ export class PgCardsRepository implements CardsRepository {
       return {
         success: true,
         awardedUsersCount: count,
-        roundNumber: Number(round.round_number),
+        roundNumber: Number(round.number),
       };
     });
   }
@@ -399,10 +660,16 @@ export class PgCardsRepository implements CardsRepository {
 
   async grantFantasyPackToUser(leagueId: string, targetUserId: string): Promise<{ success: boolean; error?: string }> {
     return this.withClient(async (client) => {
+      const rRes = await client.query(
+        `SELECT id FROM public.rounds WHERE league_id = $1 ORDER BY number DESC LIMIT 1`,
+        [leagueId]
+      );
+      const roundId = rRes.rows[0]?.id || null;
+
       await client.query(
-        `INSERT INTO fantasy_packs (league_id, user_id, status, created_at)
-         VALUES ($1, $2, 'unopened', NOW())`,
-        [leagueId, targetUserId]
+        `INSERT INTO public.fantasy_round_packs (round_id, user_id, status, source, created_at)
+         VALUES ($1, $2, 'available', 'admin_gift', NOW())`,
+        [roundId, targetUserId]
       );
       return { success: true };
     });

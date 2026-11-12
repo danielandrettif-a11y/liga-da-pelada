@@ -1,6 +1,31 @@
 # Descobertas e Decisões Técnicas: Pontuação BQ v5 e Sorteio por Velocidade
 
-## 0. Validações e Descobertas em Banco Real (10/11/2026)
+## 0. Validações e Descobertas em Banco Real (11/11/2026)
+
+- **Row-Level Security (RLS) e Sessão de Autenticação (`auth.uid()`):**
+  - *Descoberta:* As tabelas `account_profiles`, `league_members` e `leagues` possuem `rowsecurity = true` no PostgreSQL. Quando uma conexão de serviço do backend executa `SET LOCAL ROLE authenticated` sem configurar a variável de sessão `request.jwt.claim.sub`, o PostgreSQL avalia `auth.uid()` como `NULL`. Em decorrência disso, políticas RLS como `USING (user_id = auth.uid())` filtram todas as linhas, fazendo com que checagens de administrador retornassem `false` (HTTP 403) mesmo para administradores cadastrados.
+  - *Decisão Arquitetural:* O método auxiliar `withClient` em todos os repositórios (`PgFantasyAdminRepository`, `PgCardsRepository`, `PgFinanceRepository`) foi expandido para receber opcionalmente `userId` e executar deterministicamente:
+    ```sql
+    SELECT set_config('request.jwt.claim.sub', $1, true),
+           set_config('request.jwt.claim.role', 'authenticated', true),
+           set_config('request.jwt.claims', $2, true),
+           set_config('search_path', 'public, auth', true)
+    ```
+    Isso assegura que o PostgreSQL RLS identifique perfeitamente o ator autenticado e retorne `is_admin = true` (HTTP 200).
+- **Mapeamento de Colunas do Banco Supabase Real:**
+  - *Descoberta:* O schema do Supabase em produção utiliza convenções específicas:
+    - `players`: a foto do atleta reside em `avatar_url` (e não `photo_url`); o apelido em `nickname` e o estilo em `player_profile`.
+    - `leagues`: o proprietário da liga reside em `owner_id` (e não `created_by`).
+    - `rounds`: o número sequencial da rodada é `number` (e não `round_number`).
+    - `fantasy_rounds`: a associação de escalações é feita por `fantasy_round_id` referenciando `fantasy_rounds.id` (que por sua vez aponta para `rounds.id`).
+  - *Decisão Arquitetural:* Repositórios de Cards, Fantasy e Finance alinhados 100% com as tabelas canônicas e validados diretamente contra a cópia real do banco no WSL com 9 de 9 rotas respondendo com HTTP 200.
+- **Compilação Standalone Next.js 16 Multi-stage em Docker:**
+  - *Descoberta:* O Next.js 16.4.3 gera a pasta `.next/standalone` com todos os pacotes resolvidos e servidor Node.js nativo `server.js`.
+  - *Decisão Arquitetural:* `docker-compose.yml` e `Dockerfile` configurados com multi-stage build, isolamento de usuário não-root `nextjs:nextjs`, porta 3000 exposta e comunicação interna com backend Fastify na porta 3001 via rede interna `liga-network`.
+
+---
+
+## 0.1 Validações e Descobertas em Banco Real (10/11/2026)
 
 - **Search Path no Supabase PostgreSQL:**
   - *Descoberta:* Em bancos Supabase/PostgreSQL com RLS e papéis restritos, o papel `authenticated` pode ter `search_path = ''` configurado por segurança contra injeção de schema. Quando queries são executadas sem o prefixo explícito `public.` (ex: `FROM rounds`), o Postgres retorna erro `relation "rounds" does not exist`.

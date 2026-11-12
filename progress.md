@@ -2,6 +2,46 @@
 
 ---
 
+## Alinhamento Real de Schemas (Finance, Cards e Fantasy) e Stack Docker Compose (11/11/2026)
+
+- [x] **Alinhamento de Schemas no PostgreSQL Real (`supabase-db`):**
+  - **Cards (`PgCardsRepository`):**
+    - Mapeamento completo para `public.fantasy_round_packs`, `public.fantasy_card_activations`, `public.fantasy_user_cards`, `public.fantasy_pack_offers`, `public.fantasy_cards`.
+    - Ajuste de colunas canônicas da liga: `leagues.owner_id` (em vez de `created_by`).
+    - 16/16 testes unitários aprovados em `src/contexts/cards/`.
+  - **Fantasy (`PgFantasyAdminRepository` e `PgMarketLineupRepository`):**
+    - Mapeamento para `public.fantasy_lineups`, `public.fantasy_rounds`, `r.number` (em vez de `round_number`).
+    - Coluna de avatar de atletas mapeada para `players.avatar_url` (em vez de `photo_url`).
+    - Validação de administrador com fallback tríplice: `league_members.role IN ('admin', 'owner')`, `account_profiles.role = 'admin'` e `leagues.owner_id = userId`.
+    - 31/31 testes unitários aprovados em `src/contexts/fantasy/`.
+  - **Finance (`PgFinanceRepository`):**
+    - Mapeamento para `public.league_expense_items`, `public.round_expense_installments`, `public.round_payment_charge_lines`, `public.round_payment_obligations`, `public.round_payments`, `public.round_payment_audit` e `public.payment_recipients`.
+    - Encapsulamento completo de todos os métodos via `this.withClient` em transação autenticada com `SET LOCAL ROLE authenticated` e `SET LOCAL search_path = public, auth`.
+    - 19/19 testes unitários aprovados em `src/contexts/finance/`.
+- [x] **Isolamento de RLS e Identidade de Sessão (`request.jwt.claim.sub`):**
+  - Identificada causa do HTTP 403 em verificações administrativas: as tabelas `league_members`, `account_profiles` e `leagues` possuem RLS ativado (`rowsecurity = true`). Quando a transação roda apenas com `SET LOCAL ROLE authenticated`, `auth.uid()` é avaliado como `NULL`.
+  - Solução arquitetural: `withClient` passa a receber opcionalmente `userId` e configurar atomicamente:
+    `SELECT set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claim.role', 'authenticated', true), set_config('request.jwt.claims', $2, true), set_config('search_path', 'public, auth', true)`.
+  - Com isso, todas as queries RLS no PostgreSQL reconhecem a identidade do ator autenticado.
+- [x] **Validação 100% Verde em Banco Real no WSL (`.tmp/verify-full-slices.sh`):**
+  - **9 de 9 rotas testadas retornando HTTP 200 com payload real:**
+    1. `GET /api/finance/leagues/:id/expenses` -> **HTTP 200** ✅
+    2. `GET /api/finance/leagues/:id/recipients` -> **HTTP 200** ✅
+    3. `GET /api/finance/leagues/:id/audit-log` -> **HTTP 200** ✅
+    4. `GET /api/cards/leagues/:id/packs` -> **HTTP 200** ✅
+    5. `GET /api/cards/leagues/:id/inventory` -> **HTTP 200** ✅
+    6. `GET /api/fantasy/leagues/:id/dashboard` -> **HTTP 200** ✅
+    7. `GET /api/fantasy/leagues/:id/ranking` -> **HTTP 200** ✅
+    8. `GET /api/fantasy/leagues/:id/admin-data` -> **HTTP 200** ✅
+    9. `GET /api/fantasy/leagues/:id/season-pass` -> **HTTP 200** ✅
+- [x] **Build e Validação da Stack Docker Compose Multi-Container:**
+  - Build da imagem `liga-frontend-local:latest` com Next.js 16.4.3 Turbopack standalone gerando todas as 29 rotas estáticas/dinâmicas com zero erros.
+  - Build da imagem `liga-backend-local:latest` com Fastify e compilado TypeScript com zero erros.
+  - Suíte completa de testes: 669 testes no backend (180 arquivos) e 1.272 testes no frontend (247 arquivos) — 1.941 testes 100% aprovados.
+  - Padronização do arquivo de configuração para VPS / Docker Compose (`.env.docker.example`).
+
+---
+
 ## Bateria de Validação no Banco Real Local (WSL Ubuntu - 10/11/2026)
 
 - [x] **Infraestrutura e Limpeza:**

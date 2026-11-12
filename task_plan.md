@@ -444,3 +444,40 @@ Implementar a refatoração modular DDD do contexto `Notifications` da aplicaç�
 
 ## 🏆 MARCO HISTÓRICO: 267 de 267 operações (100%) da Liga da Pelada migradas com paridade auditada e zero regressão!
 
+---
+
+## Fase Especial: Alinhamento de Finance, Cards e Fantasy com Schema Real do Banco
+
+### Objetivo
+Alinhar os repositórios PostgreSQL do backend Fastify (`PgFinanceRepository`, `PgCardsRepository`, `PgFantasyAdminRepository`, `PgMarketLineupRepository`) com os nomes e colunas reais do banco de dados PostgreSQL do Supabase, permitindo que todas as rotas desses contextos retornem HTTP 200 na cópia real do banco.
+
+### Checklist
+- [x] **Etapa 1: Inspeção Detalhada do Schema Real**
+  - Mapear colunas e relacionamentos de `league_expense_items`, `payment_recipients`, `round_expense_installments`, `round_payment_charge_lines`, `round_payment_obligations`.
+  - Mapear colunas de `fantasy_round_packs`, `fantasy_card_activations`, `fantasy_user_cards`, `fantasy_pack_offers`, `fantasy_cards`.
+  - Mapear colunas de `fantasy_lineups`, `fantasy_rounds`, `account_profiles`, `rounds.number`.
+- [x] **Etapa 2: Refatoração de `PgFinanceRepository`**
+  - Substituir tabelas protótipo por tabelas canônicas qualificadas (`public.league_expense_items`, `public.round_expense_installments`, etc.).
+  - Implementar verificação de administrador via `public.league_members.user_id`, `public.account_profiles` e `public.leagues.owner_id`.
+  - Envolver operações com bloco transacional autenticado, `search_path = public, auth` e repasse do `userId` (`request.jwt.claim.sub`).
+  - Atualizar testes unitários de `pg-finance-repository.test.ts` (19 testes de finance passando com 100%).
+- [x] **Etapa 3: Refatoração de `PgCardsRepository`**
+  - Substituir `fantasy_packs` por `public.fantasy_round_packs`.
+  - Substituir `fantasy_active_cards` por `public.fantasy_card_activations`.
+  - Conectar com `public.fantasy_user_cards` e `public.fantasy_cards`.
+  - Atualizar testes unitários de `pg-cards-repository.test.ts` (16 testes de cards passando com 100%).
+- [x] **Etapa 4: Refatoração de `PgFantasyAdminRepository` e `PgMarketLineupRepository`**
+  - Corrigir referências a `rounds.number` (em vez de `rounds.round_number`).
+  - Corrigir referências a `players.avatar_url` (em vez de `photo_url`) e `leagues.owner_id` (em vez de `created_by`).
+  - Corrigir relacionamentos de `fantasy_lineups` via `fantasy_rounds.id`.
+  - Resolver perfis de atletas via `account_profiles` e `players`.
+  - Atualizar testes unitários correspondentes (31 testes de fantasy passando com 100%).
+- [x] **Etapa 5: Validação em Banco Real Local (WSL Ubuntu)**
+  - Reconstruir imagem backend no WSL (`liga-backend-local:latest`).
+  - Executar suíte de integração contra a cópia real do banco PostgreSQL (`verify-full-slices.sh`): **9/9 rotas respondendo com HTTP 200** (Finance: Despesas, Destinatários, Auditoria; Cards: Pacotes, Inventário; Fantasy: Dashboard, Ranking, Admin Config, Season Pass).
+  - Executar suíte unitária completa: 669 testes no backend (180 arquivos) e 1.272 testes no frontend (247 arquivos) 100% verdes.
+- [x] **Etapa 6: Teste do `docker compose` Completo (Frontend + Backend)**
+  - Construir imagens (`liga-backend-local` e `liga-frontend-local` com Next.js 16.4.3 standalone).
+  - Subir a stack multi-container localmente com `docker compose` conectando à rede do Supabase.
+  - Validar prontidão e resposta HTTP da aplicação integrada (Frontend na porta 3000 e Backend na porta 3001).
+

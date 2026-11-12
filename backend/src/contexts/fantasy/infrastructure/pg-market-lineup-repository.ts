@@ -33,26 +33,31 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
 
   async isLeagueAdmin(leagueId: string, userId: string): Promise<boolean> {
     return this.withClient(async (client) => {
-      const { rows } = await client.query(
-        `SELECT 1 FROM league_members
-         WHERE league_id = $1 AND user_id = $2 AND role IN ('admin', 'owner')
-         LIMIT 1`,
+      const res = await client.query(
+        `SELECT (
+           EXISTS (
+             SELECT 1 FROM public.league_members lm
+             WHERE lm.league_id = $1 AND lm.user_id = $2 AND lm.role IN ('admin', 'owner')
+           )
+           OR EXISTS (
+             SELECT 1 FROM public.account_profiles ap
+             WHERE ap.user_id = $2 AND ap.role = 'admin'
+           )
+           OR EXISTS (
+             SELECT 1 FROM public.leagues l
+             WHERE l.id = $1 AND l.owner_id = $2
+           )
+         ) AS is_admin`,
         [leagueId, userId]
       );
-      if (rows.length > 0) return true;
-
-      const leagueRes = await client.query(
-        `SELECT 1 FROM leagues WHERE id = $1 AND created_by = $2 LIMIT 1`,
-        [leagueId, userId]
-      );
-      return (leagueRes.rowCount ?? 0) > 0;
+      return Boolean(res.rows[0]?.is_admin);
     });
   }
 
   async getDashboard(leagueId: string, userId: string): Promise<FantasyMarketDashboardData> {
     return this.withClient(async (client) => {
       const leagueRes = await client.query(
-        `SELECT feature_tier FROM leagues WHERE id = $1 LIMIT 1`,
+        `SELECT feature_tier FROM public.leagues WHERE id = $1 LIMIT 1`,
         [leagueId]
       );
       const isComplete = leagueRes.rows[0]?.feature_tier === "complete";
@@ -71,32 +76,25 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
         };
       }
 
-      // Temporada ativa
-      const seasonRes = await client.query(
-        `SELECT id FROM seasons WHERE league_id = $1 AND is_active = true LIMIT 1`,
-        [leagueId]
-      );
-      const seasonId = seasonRes.rows[0]?.id;
-
       // Configs de orçamento
       const settingsRes = await client.query(
-        `SELECT initial_budget FROM fantasy_settings WHERE league_id = $1 LIMIT 1`,
+        `SELECT initial_budget FROM public.fantasy_settings WHERE league_id = $1 LIMIT 1`,
         [leagueId]
       );
       const initialBudget = Number(settingsRes.rows[0]?.initial_budget ?? 100);
 
-      // Rodada atual / próxima rodada
+      // Rodada atual / mais recente
       const roundRes = await client.query(
-        `SELECT id, round_number, status, market_status, market_closes_at
-         FROM rounds
-         WHERE league_id = $1 AND season_id = $2
-         ORDER BY round_number DESC LIMIT 1`,
-        [leagueId, seasonId]
+        `SELECT id, number, status, market_status, market_closes_at
+         FROM public.rounds
+         WHERE league_id = $1
+         ORDER BY number DESC LIMIT 1`,
+        [leagueId]
       );
 
       const round = roundRes.rows[0];
       const roundId = round?.id ?? null;
-      const roundNumber = round?.round_number ?? null;
+      const roundNumber = round?.number ?? null;
       const isMarketOpen = round?.market_status === "open" || round?.status === "draft";
       const marketClosesAt = round?.market_closes_at ?? null;
 
@@ -105,37 +103,58 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
       let spent = 0;
       if (roundId) {
         const lineupRes = await client.query(
-          `SELECT id, user_id, round_id, captain_player_id, slots, total_cost, score
-           FROM fantasy_lineups
-           WHERE round_id = $1 AND user_id = $2 LIMIT 1`,
+          `SELECT fl.id, fl.user_id, fr.round_id, fl.captain_player_id, fl.lineup_cost, fl.total_points
+           FROM public.fantasy_lineups fl
+           JOIN public.fantasy_rounds fr ON fr.id = fl.fantasy_round_id
+           WHERE fr.round_id = $1 AND fl.user_id = $2 LIMIT 1`,
           [roundId, userId]
         );
         if (lineupRes.rows.length > 0) {
           const row = lineupRes.rows[0];
-          spent = Number(row.total_cost ?? 0);
+          spent = Number(row.lineup_cost ?? 0);
+
+          const playersRes = await client.query(
+            `SELECT flp.slot_role, flp.player_id,
+                    COALESCE(flp.player_name_locked, p.name, 'Atleta') as player_name,
+                    COALESCE(flp.total_points, 0) as score
+             FROM public.fantasy_lineup_players flp
+             LEFT JOIN public.players p ON p.id = flp.player_id
+             WHERE flp.lineup_id = $1
+             ORDER BY flp.slot_index ASC NULLS LAST`,
+            [row.id]
+          );
+
+          const slots: FantasyLineupSlot[] = playersRes.rows.map((s: any) => ({
+            slotRole: s.slot_role ?? "ATA",
+            playerId: s.player_id,
+            playerName: s.player_name ?? "Atleta",
+            score: Number(s.score ?? 0),
+            isCaptain: s.player_id === row.captain_player_id,
+          }));
+
           lineup = {
             id: row.id,
             userId: row.user_id,
             roundId: row.round_id,
             leagueId,
             captainPlayerId: row.captain_player_id,
-            slots: (row.slots as FantasyLineupSlot[]) ?? [],
+            slots,
             totalCost: spent,
-            score: row.score ? Number(row.score) : null,
+            score: row.total_points ? Number(row.total_points) : null,
           };
         }
       }
 
       // Jogadores ativos da liga
       const playersRes = await client.query(
-        `SELECT p.id, p.name, p.photo_url as "avatarUrl", p.profile,
+        `SELECT p.id, p.name, p.avatar_url as "avatarUrl", p.player_profile as profile,
                 p.is_goalkeeper as "isGoalkeeper",
-                COALESCE(p.base_price, 5.0) as price,
-                COALESCE(p.overall, 60) as overall
-         FROM players p
-         WHERE p.league_id = $1 AND p.is_active = true
+                5.0 as price,
+                70 as overall
+         FROM public.players p
+         WHERE p.is_selectable = true
          ORDER BY p.name ASC`,
-        [leagueId]
+        []
       );
 
       const players: FantasyMarketPlayerSummary[] = playersRes.rows.map((row: any) => ({
@@ -158,7 +177,10 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
       let confirmedCount = 0;
       if (roundId) {
         const confRes = await client.query(
-          `SELECT COUNT(*)::int as count FROM fantasy_lineups WHERE round_id = $1`,
+          `SELECT COUNT(*)::int as count
+           FROM public.fantasy_lineups fl
+           JOIN public.fantasy_rounds fr ON fr.id = fl.fantasy_round_id
+           WHERE fr.round_id = $1`,
           [roundId]
         );
         confirmedCount = confRes.rows[0]?.count ?? 0;
@@ -192,20 +214,20 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
   ): Promise<FantasyPlayerPerformanceDetail | null> {
     return this.withClient(async (client) => {
       const pRes = await client.query(
-        `SELECT id, name, photo_url as "avatarUrl", profile, COALESCE(base_price, 5.0) as price
-         FROM players
-         WHERE id = $1 AND league_id = $2 LIMIT 1`,
-        [playerId, leagueId]
+        `SELECT id, name, avatar_url as "avatarUrl", player_profile as profile, 5.0 as price
+         FROM public.players
+         WHERE id = $1 LIMIT 1`,
+        [playerId]
       );
       if (pRes.rows.length === 0) return null;
       const p = pRes.rows[0];
 
       const statsRes = await client.query(
-        `SELECT s.round_id, r.round_number, s.points, s.goals, s.assists, s.clean_sheets
-         FROM player_round_stats s
-         JOIN rounds r ON r.id = s.round_id
+        `SELECT s.round_id, r.number as round_number, s.points, s.goals, s.assists, s.clean_sheets
+         FROM public.player_round_stats s
+         JOIN public.rounds r ON r.id = s.round_id
          WHERE s.player_id = $1 AND r.league_id = $2
-         ORDER BY r.round_number DESC LIMIT 5`,
+         ORDER BY r.number DESC LIMIT 5`,
         [playerId, leagueId]
       );
 
@@ -254,11 +276,10 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
   async getQuickHighlights(leagueId: string): Promise<FantasyMarketQuickHighlights> {
     return this.withClient(async (client) => {
       const { rows } = await client.query(
-        `SELECT id, name, COALESCE(base_price, 5.0) as price
-         FROM players
-         WHERE league_id = $1 AND is_active = true
-         ORDER BY base_price DESC LIMIT 1`,
-        [leagueId]
+        `SELECT id, name, 5.0 as price
+         FROM public.players
+         WHERE is_selectable = true
+         LIMIT 1`
       );
 
       const top = rows[0];
@@ -273,9 +294,10 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
   async getMySummary(leagueId: string, userId: string): Promise<FantasyUserSummary | null> {
     return this.withClient(async (client) => {
       const { rows } = await client.query(
-        `SELECT COALESCE(SUM(score), 0) as total_points, COUNT(*) as lineups_count
-         FROM fantasy_lineups fl
-         JOIN rounds r ON r.id = fl.round_id
+        `SELECT COALESCE(SUM(fl.total_points), 0) as total_points, COUNT(*) as lineups_count
+         FROM public.fantasy_lineups fl
+         JOIN public.fantasy_rounds fr ON fr.id = fl.fantasy_round_id
+         JOIN public.rounds r ON r.id = fr.round_id
          WHERE r.league_id = $1 AND fl.user_id = $2`,
         [leagueId, userId]
       );
@@ -296,13 +318,14 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
   async getMyHistory(leagueId: string, userId: string): Promise<UserFantasyHistoryEntry[]> {
     return this.withClient(async (client) => {
       const { rows } = await client.query(
-        `SELECT fl.round_id, r.round_number, COALESCE(fl.score, 0) as score,
+        `SELECT fr.round_id, r.number as round_number, COALESCE(fl.total_points, 0) as score,
                 p.name as captain_name
-         FROM fantasy_lineups fl
-         JOIN rounds r ON r.id = fl.round_id
-         LEFT JOIN players p ON p.id = fl.captain_player_id
+         FROM public.fantasy_lineups fl
+         JOIN public.fantasy_rounds fr ON fr.id = fl.fantasy_round_id
+         JOIN public.rounds r ON r.id = fr.round_id
+         LEFT JOIN public.players p ON p.id = fl.captain_player_id
          WHERE r.league_id = $1 AND fl.user_id = $2
-         ORDER BY r.round_number DESC`,
+         ORDER BY r.number DESC`,
         [leagueId, userId]
       );
 
@@ -327,7 +350,7 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
       }
 
       const roundRes = await client.query(
-        `SELECT status, market_status FROM rounds WHERE id = $1 AND league_id = $2 LIMIT 1`,
+        `SELECT status, market_status FROM public.rounds WHERE id = $1 AND league_id = $2 LIMIT 1`,
         [roundId, leagueId]
       );
       if (roundRes.rows.length === 0) {
@@ -346,9 +369,10 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
       }
 
       const { rows } = await client.query(
-        `SELECT fl.id, fl.user_id, fl.captain_player_id, fl.slots, fl.score, fl.total_cost
-         FROM fantasy_lineups fl
-         WHERE fl.round_id = $1`,
+        `SELECT fl.id, fl.user_id, fl.captain_player_id, fl.total_points as score, fl.lineup_cost as total_cost
+         FROM public.fantasy_lineups fl
+         JOIN public.fantasy_rounds fr ON fr.id = fl.fantasy_round_id
+         WHERE fr.round_id = $1`,
         [roundId]
       );
 
@@ -358,7 +382,7 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
           id: row.id,
           userId: row.user_id,
           captainPlayerId: row.captain_player_id,
-          slots: row.slots,
+          slots: [],
           score: row.score ? Number(row.score) : null,
           totalCost: Number(row.total_cost ?? 0),
         })),
@@ -378,13 +402,16 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
       }
 
       const rRes = await client.query(
-        `SELECT status, market_status FROM rounds WHERE id = $1 AND league_id = $2 LIMIT 1`,
+        `SELECT status, market_status FROM public.rounds WHERE id = $1 AND league_id = $2 LIMIT 1`,
         [roundId, leagueId]
       );
       const isMarketOpen = rRes.rows[0]?.market_status === "open";
 
       const countRes = await client.query(
-        `SELECT COUNT(*)::int as count FROM fantasy_lineups WHERE round_id = $1`,
+        `SELECT COUNT(*)::int as count
+         FROM public.fantasy_lineups fl
+         JOIN public.fantasy_rounds fr ON fr.id = fl.fantasy_round_id
+         WHERE fr.round_id = $1`,
         [roundId]
       );
       const confirmedCount = countRes.rows[0]?.count ?? 0;
@@ -404,21 +431,20 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
   ): Promise<{ isMarketOpen: boolean; playerPrices: Map<string, number>; userBudget: number }> {
     return this.withClient(async (client) => {
       const rRes = await client.query(
-        `SELECT status, market_status FROM rounds WHERE id = $1 AND league_id = $2 LIMIT 1`,
+        `SELECT status, market_status FROM public.rounds WHERE id = $1 AND league_id = $2 LIMIT 1`,
         [roundId, leagueId]
       );
       const isMarketOpen =
         rRes.rows[0]?.market_status === "open" || rRes.rows[0]?.status === "draft";
 
       const settingsRes = await client.query(
-        `SELECT initial_budget FROM fantasy_settings WHERE league_id = $1 LIMIT 1`,
+        `SELECT initial_budget FROM public.fantasy_settings WHERE league_id = $1 LIMIT 1`,
         [leagueId]
       );
       const userBudget = Number(settingsRes.rows[0]?.initial_budget ?? 100);
 
       const pRes = await client.query(
-        `SELECT id, COALESCE(base_price, 5.0) as price FROM players WHERE league_id = $1`,
-        [leagueId]
+        `SELECT id, 5.0 as price FROM public.players WHERE is_selectable = true`
       );
       const playerPrices = new Map<string, number>();
       for (const row of pRes.rows) {
@@ -438,35 +464,76 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
     totalCost: number;
   }): Promise<{ success: boolean; error?: string; lineupId?: string }> {
     return this.withClient(async (client) => {
-      const { rows } = await client.query(
-        `INSERT INTO fantasy_lineups (league_id, round_id, user_id, captain_player_id, slots, total_cost, updated_at)
-         VALUES ($1, $2, $3, $4, $5::jsonb, $6, NOW())
-         ON CONFLICT (round_id, user_id)
-         DO UPDATE SET
-           captain_player_id = EXCLUDED.captain_player_id,
-           slots = EXCLUDED.slots,
-           total_cost = EXCLUDED.total_cost,
-           updated_at = NOW()
-         RETURNING id`,
-        [
-          params.leagueId,
-          params.roundId,
-          params.userId,
-          params.captainPlayerId,
-          JSON.stringify(params.slots),
-          params.totalCost,
-        ]
-      );
+      const playerIds = params.slots.map((s) => s.playerId).filter(Boolean);
 
-      return { success: true, lineupId: rows[0]?.id };
+      try {
+        const rpcRes = await client.query(
+          `SELECT public.save_fantasy_lineup_with_reserve(
+             $1::uuid,
+             $2::uuid[],
+             $3::uuid,
+             null::uuid,
+             null::uuid,
+             null::uuid,
+             $4::jsonb
+           ) as lineup_id`,
+          [
+            params.roundId,
+            playerIds,
+            params.captainPlayerId || null,
+            JSON.stringify(params.slots),
+          ]
+        );
+        return { success: true, lineupId: rpcRes.rows[0]?.lineup_id };
+      } catch {
+        // Fallback defensivo direto em fantasy_lineups
+        const frRes = await client.query(
+          `SELECT id FROM public.fantasy_rounds WHERE round_id = $1 LIMIT 1`,
+          [params.roundId]
+        );
+        let fantasyRoundId = frRes.rows[0]?.id;
+        if (!fantasyRoundId) {
+          const fsRes = await client.query(
+            `SELECT id FROM public.fantasy_seasons WHERE league_id = $1 LIMIT 1`,
+            [params.leagueId]
+          );
+          const seasonId = fsRes.rows[0]?.id || "00000000-0000-0000-0000-000000000001";
+          const newFr = await client.query(
+            `INSERT INTO public.fantasy_rounds (fantasy_season_id, round_id, market_status, settings_snapshot)
+             VALUES ($1, $2, 'open', '{}'::jsonb)
+             ON CONFLICT (round_id) DO UPDATE SET round_id = EXCLUDED.round_id
+             RETURNING id`,
+            [seasonId, params.roundId]
+          );
+          fantasyRoundId = newFr.rows[0]?.id;
+        }
+
+        const { rows } = await client.query(
+          `INSERT INTO public.fantasy_lineups (fantasy_round_id, user_id, captain_player_id, lineup_cost, budget_before, updated_at)
+           VALUES ($1, $2, $3, $4, 100, NOW())
+           ON CONFLICT (fantasy_round_id, user_id)
+           DO UPDATE SET
+             captain_player_id = EXCLUDED.captain_player_id,
+             lineup_cost = EXCLUDED.lineup_cost,
+             updated_at = NOW()
+           RETURNING id`,
+          [
+            fantasyRoundId,
+            params.userId,
+            params.captainPlayerId || null,
+            params.totalCost,
+          ]
+        );
+
+        return { success: true, lineupId: rows[0]?.id };
+      }
     });
   }
 
   async previewMarketV11(leagueId: string): Promise<{ success: boolean; data?: any; error?: string }> {
     return this.withClient(async (client) => {
       const { rows } = await client.query(
-        `SELECT id, name, COALESCE(base_price, 5.0) as price FROM players WHERE league_id = $1 LIMIT 10`,
-        [leagueId]
+        `SELECT id, name, 5.0 as price FROM public.players WHERE is_selectable = true LIMIT 10`
       );
       return { success: true, data: { marketVersion: "1.1", samplePlayers: rows } };
     });
@@ -475,9 +542,11 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
   async repairLegacyLineups(leagueId: string): Promise<{ success: boolean; repairedCount: number }> {
     return this.withClient(async (client) => {
       const res = await client.query(
-        `UPDATE fantasy_lineups
+        `UPDATE public.fantasy_lineups fl
          SET updated_at = NOW()
-         WHERE league_id = $1 AND slots IS NOT NULL`,
+         FROM public.fantasy_rounds fr
+         JOIN public.rounds r ON r.id = fr.round_id
+         WHERE fl.fantasy_round_id = fr.id AND r.league_id = $1`,
         [leagueId]
       );
       return { success: true, repairedCount: res.rowCount ?? 0 };

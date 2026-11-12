@@ -6,7 +6,9 @@ describe("Infrastructure: PgCardsRepository", () => {
   const createMockPool = (queryHandler: (sql: string, params?: any[]) => Promise<any>): Pool => {
     const client = {
       query: vi.fn().mockImplementation((sql: string, params?: any[]) => {
-        if (sql.includes("SET LOCAL ROLE")) return Promise.resolve({});
+        if (sql.includes("SET LOCAL ROLE") || sql.includes("BEGIN") || sql.includes("COMMIT") || sql.includes("SET LOCAL search_path")) {
+          return Promise.resolve({});
+        }
         return queryHandler(sql, params);
       }),
       release: vi.fn(),
@@ -18,13 +20,16 @@ describe("Infrastructure: PgCardsRepository", () => {
 
   it("retrieves user packs and separates available from claimed", async () => {
     const pool = createMockPool(async (sql) => {
-      if (sql.includes("FROM fantasy_packs")) {
+      if (sql.includes("FROM public.fantasy_round_packs")) {
         return {
           rows: [
-            { id: "p1", user_id: "u1", league_id: "l1", status: "unopened", created_at: "" },
+            { id: "p1", user_id: "u1", league_id: "l1", status: "available", created_at: "" },
             { id: "p2", user_id: "u1", league_id: "l1", status: "claimed", created_at: "" },
           ],
         };
+      }
+      if (sql.includes("FROM public.fantasy_pack_offers")) {
+        return { rows: [] };
       }
       return { rows: [] };
     });
@@ -39,8 +44,19 @@ describe("Infrastructure: PgCardsRepository", () => {
 
   it("opens pack and returns 2 card offers", async () => {
     const pool = createMockPool(async (sql) => {
-      if (sql.includes("SELECT id, status FROM fantasy_packs")) {
-        return { rows: [{ id: "p1", status: "unopened" }] };
+      if (sql.includes("SELECT id, status FROM public.fantasy_round_packs")) {
+        return { rows: [{ id: "p1", status: "available" }] };
+      }
+      if (sql.includes("FROM public.fantasy_pack_offers")) {
+        return { rows: [] };
+      }
+      if (sql.includes("FROM public.fantasy_cards")) {
+        return {
+          rows: [
+            { id: "c1", slug: "artilheiro-nato", name: "Artilheiro", description: "", rarity: "rare", requires_target: true },
+            { id: "c2", slug: "muralha-defensiva", name: "Muralha", description: "", rarity: "common", requires_target: false },
+          ],
+        };
       }
       return { rows: [] };
     });
@@ -56,7 +72,10 @@ describe("Infrastructure: PgCardsRepository", () => {
     let executedSql = "";
     const pool = createMockPool(async (sql) => {
       executedSql = sql;
-      return { rows: [{ card_slug: "luva-de-ouro" }] };
+      if (sql.includes("FROM public.fantasy_user_cards")) {
+        return { rows: [{ card_id: "c1", slug: "luva-de-ouro" }] };
+      }
+      return { rows: [] };
     });
 
     const repo = new PgCardsRepository(pool);
@@ -69,6 +88,6 @@ describe("Infrastructure: PgCardsRepository", () => {
     });
 
     expect(result.success).toBe(true);
-    expect(executedSql).toContain("INSERT INTO fantasy_active_cards");
+    expect(executedSql).toContain("UPDATE public.fantasy_user_cards SET status = 'RESERVED'");
   });
 });

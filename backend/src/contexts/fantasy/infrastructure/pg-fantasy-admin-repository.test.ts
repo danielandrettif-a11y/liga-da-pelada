@@ -6,7 +6,14 @@ describe("Infrastructure: PgFantasyAdminRepository", () => {
   const createMockPool = (queryHandler: (sql: string, params?: any[]) => Promise<any>): Pool => {
     const client = {
       query: vi.fn().mockImplementation((sql: string, params?: any[]) => {
-        if (sql.includes("SET LOCAL ROLE")) return Promise.resolve({});
+        if (
+          sql.includes("SET LOCAL ROLE") ||
+          sql.includes("BEGIN") ||
+          sql.includes("COMMIT") ||
+          sql.includes("SET LOCAL search_path")
+        ) {
+          return Promise.resolve({});
+        }
         return queryHandler(sql, params);
       }),
       release: vi.fn(),
@@ -18,7 +25,7 @@ describe("Infrastructure: PgFantasyAdminRepository", () => {
 
   it("retrieves raw ranking entries", async () => {
     const pool = createMockPool(async (sql) => {
-      if (sql.includes("FROM fantasy_lineups fl")) {
+      if (sql.includes("FROM public.fantasy_lineups fl")) {
         return {
           rows: [
             {
@@ -51,7 +58,7 @@ describe("Infrastructure: PgFantasyAdminRepository", () => {
     const repo = new PgFantasyAdminRepository(pool);
     const res = await repo.updateSettings("l1", { initialBudget: 120 });
     expect(res.success).toBe(true);
-    expect(executedSql).toContain("INSERT INTO fantasy_settings");
+    expect(executedSql).toContain("INSERT INTO public.fantasy_settings");
   });
 
   it("handles test session create and reset", async () => {
