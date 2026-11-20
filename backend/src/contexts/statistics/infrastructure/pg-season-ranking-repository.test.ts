@@ -170,6 +170,7 @@ describe("PgSeasonRankingRepository", () => {
     const enrichment = await repo.findEnrichmentData(mockActor, "league-1", "season-1", ["r1"], ["p1"]);
 
     expect(query).toHaveBeenCalledTimes(4);
+    expect(query.mock.calls.some(([sql]) => sql.includes("JOIN public.fantasy_cosmetics c"))).toBe(true);
     expect(enrichment.fitnessRows).toHaveLength(1);
     expect(enrichment.cosmeticsByPlayer.get("p1")?.titleName).toBe("Lenda");
     expect(enrichment.overallByPlayer.get("p1")?.overall).toBe(85);
@@ -194,6 +195,7 @@ describe("PgSeasonRankingRepository", () => {
     expect(player?.name).toBe("League Member");
 
     const cosmetics = await repo.findPlayerCosmetics(mockActor, "p1");
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("JOIN public.fantasy_cosmetics c"), ["p1"]);
     expect(cosmetics?.frameKey).toBe("gold_frame");
   });
 });

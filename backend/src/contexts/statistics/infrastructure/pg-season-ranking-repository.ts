@@ -241,7 +241,7 @@ export class PgSeasonRankingRepository implements SeasonRankingRepository {
                ('banner', loadout.banner_cosmetic_id),
                ('nameplate', loadout.nameplate_cosmetic_id)
              ) selected(slot, cosmetic_id)
-             JOIN public.cosmetics c ON c.id = selected.cosmetic_id
+             JOIN public.fantasy_cosmetics c ON c.id = selected.cosmetic_id
              WHERE profile.player_id IS NOT NULL
                AND ($3::uuid[] IS NULL OR profile.player_id = ANY($3::uuid[]))
            ) equipped) AS cosmetics,
@@ -387,7 +387,7 @@ export class PgSeasonRankingRepository implements SeasonRankingRepository {
              ('banner', loadout.banner_cosmetic_id),
              ('nameplate', loadout.nameplate_cosmetic_id)
            ) selected(slot, cosmetic_id)
-           JOIN public.cosmetics c ON c.id = selected.cosmetic_id
+           JOIN public.fantasy_cosmetics c ON c.id = selected.cosmetic_id
            WHERE profile.player_id = $1::uuid`,
           [playerId],
         );
