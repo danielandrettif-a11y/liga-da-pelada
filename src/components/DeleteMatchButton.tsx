@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { Trash2, X } from "@/components/icons";
 import { deleteMatch } from "@/lib/actions/matches";
 import { useDialogViewport } from "@/lib/useDialogViewport";
@@ -37,9 +38,9 @@ export function DeleteMatchButton({ matchId, matchNumber }: { matchId: string; m
       <Trash2 className="h-4 w-4" />
     </button>
 
-    {open && (
+    {open && typeof document !== "undefined" && createPortal(
       <div className="mobile-dialog-backdrop z-[99999] bg-black/85 p-4 backdrop-blur-md animate-fade-in" role="dialog" aria-modal="true" aria-labelledby="delete-match-title" onMouseDown={(event) => event.target === event.currentTarget && !isPending && setOpen(false)}>
-        <div className="w-full max-w-sm rounded-3xl border border-danger/30 bg-surface p-5 shadow-2xl animate-slide-up">
+        <div className="mobile-dialog-panel max-w-sm overflow-y-auto rounded-3xl border border-danger/30 bg-surface p-5 shadow-2xl animate-slide-up">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-danger">Excluir partida</p>
@@ -56,7 +57,7 @@ export function DeleteMatchButton({ matchId, matchNumber }: { matchId: string; m
             <button type="button" onClick={confirmDelete} disabled={isPending} className="rounded-xl bg-danger px-3 py-3 text-xs font-black uppercase tracking-wide text-white transition-opacity disabled:opacity-60">{isPending ? "Apagando..." : "Sim, apagar"}</button>
           </div>
         </div>
-      </div>
+      </div>, document.body
     )}
   </>;
 }

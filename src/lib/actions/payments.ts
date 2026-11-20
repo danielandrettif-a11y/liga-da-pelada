@@ -33,6 +33,7 @@ import {
 } from "@/modules/payments/infrastructure/supabase-payment-reader";
 import type {
   ExpenseItem,
+  AppFeeConfig,
   ExpenseItemInput,
   PaymentAuditLogEntry,
   PaymentChargeLine,
@@ -46,6 +47,7 @@ import type {
 } from "@/modules/payments/domain/payment";
 
 export type {
+  AppFeeConfig,
   ExpenseItem,
   PaymentAuditLogEntry,
   PaymentChargeLine,
@@ -55,6 +57,36 @@ export type {
   PaymentRound,
   RoundExpenseSelection,
 } from "@/modules/payments/domain/payment";
+
+export async function getAppFeeConfig(): Promise<AppFeeConfig> {
+  const account = await getCurrentAccount();
+  if (!account.user) return { amountPerPlayer: 0, recipientId: null };
+  const league = await getActiveLeague();
+  const { data } = await account.client.from("leagues")
+    .select("app_fee_per_player, app_fee_recipient_id").eq("id", league.id).maybeSingle();
+  return {
+    amountPerPlayer: Number(data?.app_fee_per_player || 0),
+    recipientId: data?.app_fee_recipient_id || null,
+  };
+}
+
+export async function saveAppFeeConfig(amountPerPlayer: number, recipientId: string | null) {
+  const client = await getAdminClient();
+  if (!client) return { success: false as const, error: "Somente administradores podem configurar o custo do app." };
+  const amount = Number(amountPerPlayer);
+  if (!Number.isFinite(amount) || amount < 0) return { success: false as const, error: "Informe um valor válido por jogador." };
+  if (amount > 0 && !recipientId) return { success: false as const, error: "Escolha o PIX que recebe o custo do app." };
+  const league = await getActiveLeague();
+  const { error } = await client.rpc("set_league_app_fee", {
+    p_league_id: league.id,
+    p_amount_per_player: Math.round(amount * 100) / 100,
+    p_recipient_id: amount > 0 ? recipientId : null,
+  });
+  if (error) return { success: false as const, error: error.message };
+  revalidateExpenseManagement();
+  revalidatePaymentManagement();
+  return { success: true as const };
+}
 
 function revalidateExpenseManagement() {
   revalidatePath("/mais/caixinha");

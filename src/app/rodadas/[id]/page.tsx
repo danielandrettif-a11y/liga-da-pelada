@@ -16,7 +16,7 @@ import { RoundHistoryTabs } from "@/components/RoundHistoryTabs";
 import { RoundAdminPlayerTools } from "@/components/RoundAdminPlayerTools";
 import { getPlayers } from "@/lib/actions/players";
 import { RoundTeamShuffleCard } from "@/components/RoundTeamShuffleCard";
-import { getExpenseItems, getPaymentRecipients } from "@/lib/actions/payments";
+import { getAppFeeConfig, getExpenseItems, getPaymentRecipients } from "@/lib/actions/payments";
 import { DeleteMatchButton } from "@/components/DeleteMatchButton";
 import { RoundLiveStats } from "@/components/RoundLiveStats";
 import { getSelectedLeague } from "@/lib/league-context";
@@ -25,10 +25,10 @@ import { hasCallupClosingMatch } from "@/lib/callup-lifecycle";
 
 export const revalidate = 0;
 
-async function DeferredFinishRound(props: Omit<ComponentProps<typeof FinishRoundButton>, "recipients" | "expenseItems">) {
+async function DeferredFinishRound(props: Omit<ComponentProps<typeof FinishRoundButton>, "recipients" | "expenseItems" | "appFee">) {
   if (!props.canManage || props.status === "finished") return <FinishRoundButton {...props} />;
-  const [recipients, expenseItems] = await Promise.all([getPaymentRecipients(), getExpenseItems()]);
-  return <FinishRoundButton {...props} recipients={recipients} expenseItems={expenseItems} />;
+  const [recipients, expenseItems, appFee] = await Promise.all([getPaymentRecipients(), getExpenseItems(), getAppFeeConfig()]);
+  return <FinishRoundButton {...props} recipients={recipients} expenseItems={expenseItems} appFee={appFee} />;
 }
 
 async function DeferredRoundAdminTools(props: Omit<ComponentProps<typeof RoundAdminPlayerTools>, "allPlayers">) {

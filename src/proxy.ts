@@ -67,14 +67,17 @@ export default async function proxy(request: NextRequest) {
   if (pathname === '/' && !user) return NextResponse.redirect(new URL('/inicio', origin))
 
   if (user) {
+    const needsMembershipContext = !isPublicRoute && !isLeagueSelectionRoute && pathname !== '/'
     const membershipStartedAt = performance.now()
-    const { data: memberships } = await supabase
-      .from('league_members')
-      .select('league_id, role, leagues(feature_tier)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
+    const { data: memberships } = needsMembershipContext
+      ? await supabase
+        .from('league_members')
+        .select('league_id, role, leagues(feature_tier)')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+      : { data: null }
     membershipDuration = performance.now() - membershipStartedAt
-    hasMembership = Boolean(memberships?.length)
+    hasMembership = needsMembershipContext ? Boolean(memberships?.length) : true
     const selectedLeagueId = request.cookies.get('active_league_id')?.value
     const selectedMembership = memberships?.find((item) => item.league_id === selectedLeagueId)
       || (memberships?.length === 1 ? memberships[0] : null)
@@ -126,10 +129,10 @@ export default async function proxy(request: NextRequest) {
   }
 
   if (!isPublicRoute && !user) return NextResponse.redirect(loginUrl)
-  if (!isPublicRoute && !isLeagueSelectionRoute && user && !hasMembership) {
+  if (pathname !== '/' && !isPublicRoute && !isLeagueSelectionRoute && user && !hasMembership) {
     return NextResponse.redirect(new URL('/lobby', origin))
   }
-  if (!isPublicRoute && !isLeagueSelectionRoute && user && needsLeagueChoice) {
+  if (pathname !== '/' && !isPublicRoute && !isLeagueSelectionRoute && user && needsLeagueChoice) {
     return NextResponse.redirect(new URL('/lobby', origin))
   }
   const isFullFeatureRoute = pathname.startsWith('/cartola') || pathname.startsWith('/bq-manager')

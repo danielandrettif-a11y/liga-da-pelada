@@ -183,7 +183,7 @@ describe("PgSeasonRankingRepository", () => {
       if (sql.includes("FROM public.players p")) {
         return { rows: [{ id: "p1", name: "League Member" }] };
       }
-      if (sql.includes("FROM public.player_equipped_cosmetics")) {
+      if (sql.includes("FROM public.account_profiles profile")) {
         return { rows: [{ slot: "frame", name: "Gold", asset_key: "gold_frame" }] };
       }
       return { rows: [] };

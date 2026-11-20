@@ -10,6 +10,7 @@ import { WeatherBadge } from "@/components/WeatherBadge";
 import { BQTheBestButton } from "@/components/BQTheBestButton";
 import { getEventWeather, type EventWeather } from "@/lib/weather";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getDashboardData, getHomeLastRound } from "@/lib/actions/dashboard";
 import { getLatestFinishedSeason } from "@/lib/actions/seasons";
 import { PreviousSeasonBanner } from "@/components/PreviousSeasonBanner";
@@ -136,6 +137,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     accountPromise,
     selectedLeaguePromise,
   ]);
+  if (account.user && (!account.memberships.length || !selectedLeague)) redirect("/lobby");
   if (!data) {
     return (
       <div className="space-y-6">

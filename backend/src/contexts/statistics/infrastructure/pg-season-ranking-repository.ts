@@ -231,10 +231,19 @@ export class PgSeasonRankingRepository implements SeasonRankingRepository {
                AND ($3::uuid[] IS NULL OR player_id = ANY($3::uuid[]))
            ) fitness) AS fitness,
            ARRAY(SELECT row_to_json(equipped) FROM (
-             SELECT pec.player_id, pec.slot, c.name, c.asset_key
-             FROM public.player_equipped_cosmetics pec
-             JOIN public.cosmetics c ON c.id = pec.cosmetic_id
-             WHERE $3::uuid[] IS NULL OR pec.player_id = ANY($3::uuid[])
+             SELECT profile.player_id, selected.slot, c.name, c.asset_key
+             FROM public.account_cosmetic_loadouts loadout
+             JOIN public.account_profiles profile ON profile.user_id = loadout.user_id
+             CROSS JOIN LATERAL (VALUES
+               ('frame', loadout.frame_cosmetic_id),
+               ('aura', loadout.aura_cosmetic_id),
+               ('title', loadout.title_cosmetic_id),
+               ('banner', loadout.banner_cosmetic_id),
+               ('nameplate', loadout.nameplate_cosmetic_id)
+             ) selected(slot, cosmetic_id)
+             JOIN public.cosmetics c ON c.id = selected.cosmetic_id
+             WHERE profile.player_id IS NOT NULL
+               AND ($3::uuid[] IS NULL OR profile.player_id = ANY($3::uuid[]))
            ) equipped) AS cosmetics,
            ARRAY(SELECT row_to_json(o) FROM public.get_latest_player_card_overalls_for_league($1::uuid) o) AS overalls,
            ARRAY(SELECT row_to_json(s) FROM public.get_public_player_speed_ratings_for_league($1::uuid) s) AS speeds,
@@ -368,10 +377,18 @@ export class PgSeasonRankingRepository implements SeasonRankingRepository {
           name: string;
           asset_key: string;
         }>(
-          `SELECT pec.slot, c.name, c.asset_key
-           FROM public.player_equipped_cosmetics pec
-           JOIN public.cosmetics c ON c.id = pec.cosmetic_id
-           WHERE pec.player_id = $1::uuid`,
+          `SELECT selected.slot, c.name, c.asset_key
+           FROM public.account_profiles profile
+           JOIN public.account_cosmetic_loadouts loadout ON loadout.user_id = profile.user_id
+           CROSS JOIN LATERAL (VALUES
+             ('frame', loadout.frame_cosmetic_id),
+             ('aura', loadout.aura_cosmetic_id),
+             ('title', loadout.title_cosmetic_id),
+             ('banner', loadout.banner_cosmetic_id),
+             ('nameplate', loadout.nameplate_cosmetic_id)
+           ) selected(slot, cosmetic_id)
+           JOIN public.cosmetics c ON c.id = selected.cosmetic_id
+           WHERE profile.player_id = $1::uuid`,
           [playerId],
         );
         const map = new Map(result.rows.map((r) => [r.slot, { name: r.name, asset_key: r.asset_key }]));
