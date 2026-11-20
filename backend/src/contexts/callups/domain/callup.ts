@@ -93,6 +93,22 @@ export class InvalidCallupError extends Error {
   }
 }
 
+export class CallupVersionConflict extends Error {
+  constructor() {
+    super("A convocação mudou enquanto você editava. Atualize a lista e tente novamente.");
+    this.name = "CallupVersionConflict";
+  }
+}
+
+export function parseCallupVersion(value?: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+    || !Number.isFinite(Date.parse(value))) {
+    throw new InvalidCallupError("Versão da convocação inválida.");
+  }
+  return value;
+}
+
 export function parseCallupUuid(value: string, label: string): string {
   const normalized = value.trim().toLowerCase();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(normalized)) {

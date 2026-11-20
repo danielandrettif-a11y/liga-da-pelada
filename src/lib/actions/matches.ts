@@ -90,7 +90,7 @@ export async function createMatch(input: CreateMatchInput) {
           }
         }
         revalidatePath(`/rodadas/${input.round_id}`);
-        revalidatePath("/", "layout");
+        revalidatePath("/");
         revalidatePath("/convocacao");
         revalidatePath("/mais");
       };
@@ -420,7 +420,7 @@ export async function createMatch(input: CreateMatchInput) {
       }
       revalidatePath(`/rodadas/${input.round_id}`);
       // O primeiro apito encerra a janela de desistência da convocação.
-      revalidatePath("/", "layout");
+      revalidatePath("/");
       revalidatePath("/convocacao");
       revalidatePath("/mais");
     });
@@ -1156,14 +1156,14 @@ export async function addFinishedGoalEvent(
   }
 }
 
-export async function finishMatch(matchId: string) {
+export async function finishMatch(matchId: string, expectedScore?: { a: number; b: number }) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false as const, error: ADMIN_ERROR };
     const league = await getSelectedLeague();
     const api = await matchApiFor(client);
     if (api && league) {
-      const res = await api.finishMatch(league.id, matchId);
+      const res = expectedScore ? await api.finishMatch(league.id, matchId, expectedScore) : await api.finishMatch(league.id, matchId);
       const warnings: string[] = [];
       try {
         const stats = await calculateRoundStats(res.roundId);

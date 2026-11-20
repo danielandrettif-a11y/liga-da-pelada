@@ -151,33 +151,17 @@ describe("PgSeasonRankingRepository", () => {
 
   it("findEnrichmentData queries fitness, cosmetics, and RPCs safely", async () => {
     const query = vi.fn().mockImplementation(async (sql: string) => {
-      if (sql.includes("SET LOCAL")) return { rows: [] };
       if (sql.includes("player_round_fitness")) {
-        return { rows: [{ player_id: "p1", distance_km: 6.0, average_speed_kmh: 9.5 }] };
-      }
-      if (sql.includes("player_equipped_cosmetics")) {
-        return { rows: [{ player_id: "p1", slot: "title", name: "Lenda", asset_key: "title_legend" }] };
-      }
-      if (sql.includes("get_latest_player_card_overalls_for_league")) {
-        return {
-          rows: [
-            {
-              player_id: "p1",
-              overall: 85,
-              trend: "rising",
-              def_overall: 70,
-              ala_mei_overall: 80,
-              ata_overall: 85,
-              gol_overall: 50,
-            },
-          ],
-        };
-      }
-      if (sql.includes("get_public_player_speed_ratings_for_league")) {
-        return { rows: [{ player_id: "p1", speed_rating: 3 }] };
-      }
-      if (sql.includes("get_league_achievement_belt_holders")) {
-        return { rows: [{ player_id: "p1", belts: [{ id: "b1", name: "Artilheiro Nato" }] }] };
+        return { rows: [{
+          fitness: [{ player_id: "p1", distance_km: 6, average_speed_kmh: 9.5 }],
+          cosmetics: [{ player_id: "p1", slot: "title", name: "Lenda", asset_key: "title_legend" }],
+          overalls: [{
+            player_id: "p1", overall: 85, trend: "rising",
+            def_overall: 70, ala_mei_overall: 80, ata_overall: 85, gol_overall: 50,
+          }],
+          speeds: [{ player_id: "p1", speed_rating: 3 }],
+          belts: [{ player_id: "p1", belts: [{ id: "b1", name: "Artilheiro Nato" }] }],
+        }] };
       }
       return { rows: [] };
     });
@@ -185,6 +169,7 @@ describe("PgSeasonRankingRepository", () => {
     const repo = new PgSeasonRankingRepository(createMockPool(query));
     const enrichment = await repo.findEnrichmentData(mockActor, "league-1", "season-1", ["r1"], ["p1"]);
 
+    expect(query).toHaveBeenCalledTimes(4);
     expect(enrichment.fitnessRows).toHaveLength(1);
     expect(enrichment.cosmeticsByPlayer.get("p1")?.titleName).toBe("Lenda");
     expect(enrichment.overallByPlayer.get("p1")?.overall).toBe(85);

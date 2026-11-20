@@ -306,7 +306,7 @@ export default async function RodadaDetalhePage({
       </section>
       
       <Suspense fallback={null}>
-        <DeferredFinishRound roundId={round.id} status={round.status} canManage={account.isAdmin} participantCount={participants.length} quickMode={selectedLeague?.featureTier === "quick"} />
+        <DeferredFinishRound roundId={round.id} roundVersion={round.updated_at || round.created_at} status={round.status} canManage={account.isAdmin} participantCount={participants.length} quickMode={selectedLeague?.featureTier === "quick"} />
       </Suspense>
 
       {account.isAdmin && <Suspense fallback={null}>

@@ -44,6 +44,7 @@ export function CallupAdminCard({
   const [matchRulesNotice, setMatchRulesNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [editVersion, setEditVersion] = useState<string | undefined>();
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [availableStadiums, setAvailableStadiums] = useState(stadiums);
@@ -123,7 +124,7 @@ export function CallupAdminCard({
   async function close() {
     if (!callup || !confirm("Fechar esta convocação? A lista deixará de aparecer para todos.")) return;
     setLoading(true);
-    const result = await closeCallup(callup.id);
+    const result = await closeCallup(callup.id, callup.updated_at);
     if (!result.success) setError(result.error || "Erro ao fechar convocação.");
     else router.refresh();
     setLoading(false);
@@ -133,7 +134,7 @@ export function CallupAdminCard({
     if (!callup) return;
     setLoading(true);
     setError("");
-    const result = await setCallupVisibility(callup.id, !callup.is_public);
+    const result = await setCallupVisibility(callup.id, !callup.is_public, callup.updated_at);
     if (!result.success) setError(result.error || "Erro ao atualizar a visibilidade.");
     else router.refresh();
     setLoading(false);
@@ -162,7 +163,7 @@ export function CallupAdminCard({
     setLoading(true);
     setError("");
     setMatchRulesNotice("");
-    const result = await setCallupMatchRules(callup.id, matchDurationDraft, goalsToFinishDraft);
+    const result = await setCallupMatchRules(callup.id, matchDurationDraft, goalsToFinishDraft, callup.updated_at);
     if (!result.success) setError(result.error || "Não foi possível salvar as regras das partidas.");
     else {
       setMatchRulesNotice("Configurações das partidas atualizadas.");
@@ -225,7 +226,7 @@ export function CallupAdminCard({
         <h2 className="text-xs font-bold uppercase tracking-wider text-muted">Convocação</h2>
         <div className="flex items-center gap-3">
           {callup && !editing && !showCreate && (
-            <button type="button" onClick={() => setEditing(true)} className="flex items-center gap-1 text-[10px] font-black uppercase text-muted hover:text-accent">
+            <button type="button" onClick={() => { setEditVersion(callup.updated_at); setEditing(true); }} className="flex items-center gap-1 text-[10px] font-black uppercase text-muted hover:text-accent">
               <PencilLine className="h-3 w-3" /> Editar
             </button>
           )}
@@ -419,6 +420,7 @@ export function CallupAdminCard({
             </div>
 
             <input type="hidden" name="callup_id" value={callup.id} />
+            <input type="hidden" name="expected_version" value={editVersion ?? ""} />
 
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <div className="w-full min-w-0">

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
@@ -30,16 +29,12 @@ import {
   X,
 } from "@/components/icons";
 import {
-  addRosterPlayersToCallup,
   adminRemoveCallupPlayer,
-  inviteGuestToCallup,
-  inviteGuestListToCallup,
   joinActiveCallup,
   leaveActiveCallup,
   removeCallupEntry,
   repairMyPlayerAccount,
   setCallupVisibility,
-  updateCallup,
   createCallupPrelist,
   type CallupWithEntries,
 } from "@/lib/actions/callups";
@@ -57,21 +52,15 @@ import Image from "next/image";
 import { cosmeticBackgroundPosition, cosmeticHighResolutionImage } from "@/lib/fantasy/cosmetics";
 import { useUrlState } from "@/lib/useUrlState";
 import { hasCallupClosingMatch, hasDrawnCallupTeams } from "@/lib/callup-lifecycle";
-import { WeatherBadge } from "./WeatherBadge";
-import type { EventWeather } from "@/lib/weather";
-import { setCallupFormat } from "@/lib/actions/rounds";
+import type { ReactNode } from "react";
 import { buildCallupInviteMessage, buildCallupInviteUrl, shareCallupInvite } from "@/lib/callup-invite";
-import {
-  MAX_CALLUP_GUEST_LIST_SIZE,
-  normalizeCallupGuestName,
-  parseWhatsAppGuestList,
-} from "@/modules/callups/domain/callup-guest-list";
+import { MAX_CALLUP_GUEST_LIST_SIZE, normalizeCallupGuestName } from "@/modules/callups/domain/callup-guest-list";
 import { RoundSetupSteps } from "./RoundSetupSteps";
 import { DelayedPitchLoadingOverlay } from "./DelayedPitchLoadingOverlay";
-import { saveStadium } from "@/lib/actions/stadiums";
 import { getCallupDrawMinimum, getPlayersMissingForCallupDraw } from "@/lib/callup-draw";
-import { supabase } from "@/lib/supabase";
-import { createCallupRealtimeRefresh } from "@/lib/callup-realtime-refresh";
+import { useCallupGuestInvite } from "@/modules/callups/presentation/use-callup-guest-invite";
+import { useCallupAdminConfig } from "@/modules/callups/presentation/use-callup-admin-config";
+import { useCallupPresence } from "@/modules/callups/presentation/use-callup-presence";
 
 type Props = {
   callup: CallupWithEntries;
@@ -89,8 +78,9 @@ type Props = {
   initialPlayerSetupOpen?: boolean;
   cartolaEnabled?: boolean;
   loginReturnTo?: string;
-  weather?: EventWeather | null;
+  weatherBadge?: ReactNode;
   soloMode?: boolean;
+  allowDirectRead?: boolean;
 };
 const CALLUP_LIST_TABS = ["confirmed", "waitlist"] as const;
 
@@ -110,112 +100,45 @@ export function CallupBoard({
   initialPlayerSetupOpen = false,
   cartolaEnabled = true,
   loginReturnTo = "/convocacao",
-  weather,
+  weatherBadge,
   soloMode = false,
+  allowDirectRead = false,
 }: Props) {
   const router = useRouter();
   const refreshRoute = router.refresh;
-  const [, startRealtimeRefresh] = useTransition();
-  const [loading, setLoading] = useState("");
-  const [error, setError] = useState("");
-  const [showCartolaPopup, setShowCartolaPopup] = useState(false);
-  const [showWaitlistPopup, setShowWaitlistPopup] = useState(false);
-  const [editingCallup, setEditingCallup] = useState(false);
-  const [editLoading, setEditLoading] = useState(false);
-  const [editError, setEditError] = useState("");
-  const [editableStadiums, setEditableStadiums] = useState(stadiums);
-  const [editStadiumId, setEditStadiumId] = useState(callup.stadium_id || stadiums[0]?.id || "");
-  const [showEditStadium, setShowEditStadium] = useState(stadiums.length === 0);
-  const [newEditStadiumName, setNewEditStadiumName] = useState("");
-  const [newEditStadiumAddress, setNewEditStadiumAddress] = useState("");
-  const [newEditStadiumMapUrl, setNewEditStadiumMapUrl] = useState("");
-  const [editStadiumLoading, setEditStadiumLoading] = useState(false);
-  const [editStadiumError, setEditStadiumError] = useState("");
-  const [formatPlayers, setFormatPlayers] = useState(callup.players_per_team || Math.round(callup.capacity / (callup.teams_per_round || 3)));
-  const [formatTeams, setFormatTeams] = useState(callup.teams_per_round || 3);
-  const [formatNotice, setFormatNotice] = useState("");
   const [activeTab, setActiveTab] = useUrlState({ key: "list", initialValue: initialListTab, defaultValue: "confirmed", allowedValues: CALLUP_LIST_TABS });
 
-  // Estado para Contratação de Amigo (Convidado)
-  const [isHireGuestOpen, setIsHireGuestOpen] = useState(initialPlayerSetupOpen);
-  const [guestName, setGuestName] = useState("");
-  const [guestProfile, setGuestProfile] = useState<PlayerProfile>("offensive");
-  const [isGuestGk, setIsGuestGk] = useState(false);
-  const [isGuestListOpen, setIsGuestListOpen] = useState(false);
-  const [guestListText, setGuestListText] = useState("");
-  const [guestListNotice, setGuestListNotice] = useState("");
-  const [selectedRosterIds, setSelectedRosterIds] = useState<Set<string>>(new Set());
-
-  useDialogViewport(editingCallup, () => !editLoading && setEditingCallup(false));
+  const {
+    entries, loading, setLoading, error, setError, showCartolaPopup, setShowCartolaPopup,
+    showWaitlistPopup, setShowWaitlistPopup, run,
+  } = useCallupPresence({ callup, refreshRoute, cartolaEnabled, allowDirectRead, setActiveTab });
   useDialogViewport(showWaitlistPopup, () => setShowWaitlistPopup(false));
 
-  useEffect(() => {
-    const scheduler = createCallupRealtimeRefresh({
-      refresh: () => startRealtimeRefresh(() => refreshRoute()),
-      isVisible: () => document.visibilityState === "visible" && window.location.pathname === "/convocacao",
-      now: () => Date.now(),
-      schedule: (callback, delay) => setTimeout(callback, delay),
-      cancel: (timer) => clearTimeout(timer),
-      // Espalha requisições dos clientes e agrupa alterações feitas em sequência.
-      delayMs: 500 + Math.random() * 1000,
-      minimumIntervalMs: 5000,
-    });
-    const refreshList = scheduler.request;
-    const channel = supabase
-      .channel(`callup-list-${callup.id}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "callup_entries",
-        filter: `callup_id=eq.${callup.id}`,
-      }, refreshList)
-      .on("postgres_changes", {
-        event: "UPDATE",
-        schema: "public",
-        table: "callups",
-        filter: `id=eq.${callup.id}`,
-      }, refreshList)
-      .subscribe();
+  const {
+    isHireGuestOpen, setIsHireGuestOpen, guestName, setGuestName, guestProfile, setGuestProfile, isGuestGk,
+    setIsGuestGk, isGuestListOpen, setIsGuestListOpen, guestListText, setGuestListText, guestListNotice,
+    setGuestListNotice, selectedRosterIds, setSelectedRosterIds, availablePlayers, readyGuestList,
+    existingGuestList, parsedGuestList, existingPlayerNameKeys, handleInviteGuest, handleInviteGuestList, handleInviteRosterPlayers,
+  } = useCallupGuestInvite({
+    callupId: callup.id, entries, selectablePlayers, initialPlayerSetupOpen, setLoading, setError, refresh: refreshRoute,
+  });
+  const {
+    editingCallup, setEditingCallup, openEditCallup, editLoading, editError, editableStadiums, editStadiumId, setEditStadiumId,
+    showEditStadium, setShowEditStadium, newEditStadiumName, setNewEditStadiumName, newEditStadiumAddress,
+    setNewEditStadiumAddress, newEditStadiumMapUrl, setNewEditStadiumMapUrl, editStadiumLoading,
+    editStadiumError, formatPlayers, setFormatPlayers, formatTeams, setFormatTeams,
+    formatNotice, handleEditCallup, createEditStadium, handleFormatChange,
+  } = useCallupAdminConfig({ callup, stadiums, setLoading, setError, refresh: refreshRoute });
 
-    const refreshOnReturn = () => {
-      if (document.visibilityState === "visible") refreshList();
-    };
-    window.addEventListener("focus", refreshOnReturn);
-    document.addEventListener("visibilitychange", refreshOnReturn);
-    return () => {
-      scheduler.dispose();
-      window.removeEventListener("focus", refreshOnReturn);
-      document.removeEventListener("visibilitychange", refreshOnReturn);
-      void supabase.removeChannel(channel);
-    };
-  }, [callup.id, refreshRoute]);
-
-  const confirmed = callup.entries.filter((entry) => entry.status === "confirmed");
-  const waitlist = callup.entries.filter((entry) => entry.status === "waitlist");
+  const confirmed = entries.filter((entry) => entry.status === "confirmed");
+  const waitlist = entries.filter((entry) => entry.status === "waitlist");
   const capacity = callup.capacity;
-  const myEntry = callup.entries.find((entry) => entry.player_id === currentPlayerId);
+  const myEntry = entries.find((entry) => entry.player_id === currentPlayerId);
   const myPosition = myEntry
     ? (myEntry.status === "confirmed"
         ? confirmed.findIndex((e) => e.id === myEntry.id) + 1
         : waitlist.findIndex((e) => e.id === myEntry.id) + 1)
     : null;
-
-  const availablePlayers = selectablePlayers.filter(
-    (player) => !callup.entries.some((entry) => entry.player_id === player.id)
-  );
-  const existingPlayerNameKeys = useMemo(() => new Set(
-    [...selectablePlayers, ...callup.entries.map((entry) => entry.player)]
-      .map((player) => normalizeCallupGuestName(player.name)),
-  ), [callup.entries, selectablePlayers]);
-  const parsedGuestList = useMemo(() => parseWhatsAppGuestList(guestListText), [guestListText]);
-  const readyGuestList = useMemo(
-    () => parsedGuestList.filter((guest) => !existingPlayerNameKeys.has(normalizeCallupGuestName(guest.name))),
-    [existingPlayerNameKeys, parsedGuestList],
-  );
-  const existingGuestList = useMemo(
-    () => parsedGuestList.filter((guest) => existingPlayerNameKeys.has(normalizeCallupGuestName(guest.name))),
-    [existingPlayerNameKeys, parsedGuestList],
-  );
 
   const startTime = callup.start_time ? callup.start_time.slice(0, 5) : "08:00";
   const formattedFullDate = new Intl.DateTimeFormat("pt-BR", {
@@ -243,124 +166,6 @@ export function CallupBoard({
   const canJoinCallup = callup.status === "open" || callup.status === "converted";
   const hasStartedMatch = hasCallupClosingMatch(callup.round?.matches);
   const canLeaveBeforeFirstMatch = (callup.status === "open" || callup.status === "converted") && !hasStartedMatch;
-
-  async function handleEditCallup(formData: FormData) {
-    setEditLoading(true);
-    setEditError("");
-    const result = await updateCallup(formData);
-    if (!result.success) {
-      setEditError(result.error || "Erro ao atualizar convocação.");
-      setEditLoading(false);
-    } else {
-      setEditingCallup(false);
-      setEditLoading(false);
-      router.refresh();
-    }
-  }
-
-  async function createEditStadium() {
-    setEditStadiumLoading(true);
-    setEditStadiumError("");
-    const formData = new FormData();
-    formData.set("name", newEditStadiumName);
-    formData.set("address", newEditStadiumAddress);
-    formData.set("google_maps_url", newEditStadiumMapUrl);
-    const result = await saveStadium(formData);
-    if (!result.success) {
-      setEditStadiumError(result.error || "Não foi possível cadastrar o campo.");
-    } else {
-      setEditableStadiums((current) => [...current, result.stadium]);
-      setEditStadiumId(result.stadium.id);
-      setShowEditStadium(false);
-      setNewEditStadiumName("");
-      setNewEditStadiumAddress("");
-      setNewEditStadiumMapUrl("");
-      router.refresh();
-    }
-    setEditStadiumLoading(false);
-  }
-
-  async function run(key: string, action: () => Promise<{ success: boolean; error?: string; status?: "confirmed" | "waitlist" }>) {
-    setLoading(key);
-    setError("");
-    const result = await action();
-    if (!result.success) {
-      setError(result.error || "Não foi possível atualizar a lista.");
-    } else {
-      if (cartolaEnabled && key === "join" && result.status === "confirmed") {
-        setShowCartolaPopup(true);
-      }
-      if (key === "join" && result.status === "waitlist" && callup.round_type === "official") {
-        setShowWaitlistPopup(true);
-        setActiveTab("waitlist");
-      }
-      router.refresh();
-    }
-    setLoading("");
-  }
-
-  async function handleInviteGuest(e: React.FormEvent) {
-    e.preventDefault();
-    if (!guestName.trim()) return;
-    setLoading("guest");
-    setError("");
-    const res = await inviteGuestToCallup({
-      callupId: callup.id,
-      name: guestName.trim(),
-      playerProfile: guestProfile,
-      isGoalkeeper: isGuestGk,
-    });
-    if (!res.success) {
-      setError(res.error || "Erro ao contratar amigo.");
-    } else {
-      setGuestName("");
-      setIsGuestGk(false);
-      router.refresh();
-    }
-    setLoading("");
-  }
-
-  async function handleInviteGuestList() {
-    if (readyGuestList.length === 0 || readyGuestList.length > MAX_CALLUP_GUEST_LIST_SIZE) return;
-    setLoading("guest-list");
-    setError("");
-    setGuestListNotice("");
-    const result = await inviteGuestListToCallup({
-      callupId: callup.id,
-      text: guestListText,
-      playerProfile: guestProfile,
-    });
-    if (!result.success) {
-      setError(result.error || "Não foi possível importar a lista.");
-    } else {
-      const summary = [
-        `${result.created} ${result.created === 1 ? "convidado criado" : "convidados criados"}`,
-        result.confirmed > 0 ? `${result.confirmed} na lista principal` : "",
-        result.waitlisted > 0 ? `${result.waitlisted} na fila` : "",
-        result.ignoredExisting.length > 0 ? `${result.ignoredExisting.length} já existiam no elenco` : "",
-        result.failed.length > 0 ? `${result.failed.length} não adicionados` : "",
-      ].filter(Boolean).join(" · ");
-      setGuestListNotice(summary);
-      setGuestListText(result.failed.map((item) => item.name).join("\n"));
-      router.refresh();
-    }
-    setLoading("");
-  }
-
-  async function handleInviteRosterPlayers() {
-    if (!selectedRosterIds.size) return;
-    const ids = [...selectedRosterIds];
-    setLoading("add-many");
-    setError("");
-    const result = await addRosterPlayersToCallup(callup.id, ids);
-    if (!result.success) setError(result.error || "Não foi possível adicionar os jogadores.");
-    else {
-      setSelectedRosterIds(new Set());
-      if (result.failed) setError(result.error || "Alguns jogadores não puderam ser adicionados.");
-      router.refresh();
-    }
-    setLoading("");
-  }
 
   async function continueToDraw() {
     setLoading("draw");
@@ -419,22 +224,6 @@ export function CallupBoard({
     setTimeout(() => setLoading(""), 1600);
   }
 
-  async function handleFormatChange() {
-    setLoading("format");
-    setError("");
-    setFormatNotice("");
-    const result = await setCallupFormat(callup.id, formatPlayers, formatTeams);
-    if (!result.success) {
-      setError(result.error || "Não foi possível alterar o formato da convocação.");
-    } else {
-      setFormatNotice(result.fantasySizePreserved
-        ? "Formato da pelada atualizado. Escalações já salvas no Cartola mantêm o formato anterior desta rodada."
-        : `Formato atualizado: ${formatTeams} times de ${formatPlayers} jogadores.`);
-      router.refresh();
-    }
-    setLoading("");
-  }
-
   return (
     <div className="min-w-0 space-y-4 overflow-x-clip pb-6">
       <DelayedPitchLoadingOverlay active={loading === "draw"} delayMs={250} title="Preparando o sorteio" description="Levando os jogadores confirmados para a divisão dos times…" />
@@ -480,7 +269,7 @@ export function CallupBoard({
             {isAdmin && !soloMode && (
               <button
                 type="button"
-                onClick={() => run("visibility", () => setCallupVisibility(callup.id, !callup.is_public))}
+                onClick={() => run("visibility", () => setCallupVisibility(callup.id, !callup.is_public, callup.updated_at))}
                 disabled={!!loading}
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-[10px] font-black uppercase transition-colors disabled:opacity-50 sm:w-auto sm:gap-1.5 sm:px-2.5 ${callup.is_public ? "border-accent/40 bg-accent/15 text-accent hover:bg-accent/25" : "border-warning/40 bg-warning/10 text-warning hover:bg-warning/20"}`}
                 title={callup.is_public ? "Fechar lista para convidados" : "Abrir lista para todos"}
@@ -493,12 +282,7 @@ export function CallupBoard({
             {isAdmin && (
               <button
                 type="button"
-                onClick={() => {
-                  setEditStadiumId(callup.stadium_id || editableStadiums[0]?.id || "");
-                  setShowEditStadium(editableStadiums.length === 0);
-                  setEditStadiumError("");
-                  setEditingCallup(true);
-                }}
+                onClick={openEditCallup}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-muted hover:text-accent hover:border-accent/40 transition-colors"
                 title="Editar convocação"
                 aria-label="Editar convocação"
@@ -552,7 +336,7 @@ export function CallupBoard({
               </span>
             )
           )}
-          <WeatherBadge weather={weather} locationName={stadiumName} />
+          {weatherBadge}
         </div>
 
         {hasDrawnTeams && callup.round_id && (

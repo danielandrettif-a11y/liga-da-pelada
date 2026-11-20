@@ -92,6 +92,7 @@ export type CreateRoundWithTeamsInput = {
 };
 
 export type FinishRoundInput = {
+  expectedVersion?: string;
   paymentPix: string;
   paymentTotal: number;
   recipientId?: string | null;
@@ -299,6 +300,13 @@ export function finishRound(roundId: string, leagueId: string, input: FinishRoun
   if (!input || typeof input.paymentPix !== "string" || !Array.isArray(input.expenseItemIds || [])) {
     throw new InvalidRoundError("Informe os dados financeiros da rodada.");
   }
+  const expectedVersion = input.expectedVersion;
+  if (expectedVersion !== undefined && (
+    typeof expectedVersion !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(expectedVersion)
+    || !Number.isFinite(Date.parse(expectedVersion))
+  )) {
+    throw new InvalidRoundError("Versão da rodada inválida.");
+  }
   const paymentTotal = Number(input.paymentTotal);
   const paymentPix = input.paymentPix.trim();
   if (!Number.isFinite(paymentTotal) || paymentTotal <= 0 || paymentTotal > 99_999_999.99) {
@@ -311,6 +319,7 @@ export function finishRound(roundId: string, leagueId: string, input: FinishRoun
     parseRoundUuid(roundId, "Rodada"),
     parseRoundUuid(leagueId, "Pelada"),
     {
+      ...(expectedVersion === undefined ? {} : { expectedVersion }),
       paymentPix,
       paymentTotal: Math.round(paymentTotal * 100) / 100,
       recipientId: input.recipientId ? parseRoundUuid(input.recipientId, "Destinatário") : null,

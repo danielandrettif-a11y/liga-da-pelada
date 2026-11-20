@@ -8,8 +8,9 @@ import { finishRound } from "@/lib/actions/rounds";
 import { useDialogViewport } from "@/lib/useDialogViewport";
 import type { ExpenseItem, PaymentRecipient } from "@/lib/actions/payments";
 
-export function FinishRoundButton({ roundId, status, canManage, recipients = [], expenseItems = [], participantCount = 0, quickMode = false }: { roundId: string; status: string; canManage: boolean; recipients?: PaymentRecipient[]; expenseItems?: ExpenseItem[]; participantCount?: number; quickMode?: boolean }) {
+export function FinishRoundButton({ roundId, roundVersion, status, canManage, recipients = [], expenseItems = [], participantCount = 0, quickMode = false }: { roundId: string; roundVersion?: string; status: string; canManage: boolean; recipients?: PaymentRecipient[]; expenseItems?: ExpenseItem[]; participantCount?: number; quickMode?: boolean }) {
   const router = useRouter();
+  const [expectedVersion, setExpectedVersion] = useState<string | undefined>();
   const [open, setOpen] = useState(false);
   const [pix, setPix] = useState("");
   const [paymentTotal, setPaymentTotal] = useState("");
@@ -52,7 +53,7 @@ export function FinishRoundButton({ roundId, status, canManage, recipients = [],
 
     setLoading(true);
     setError("");
-    const result = await finishRound(roundId, pix, total, { id: recipientId || null, name: recipientName || null }, { expenseItemIds: selectedExpenseIds });
+    const result = await finishRound(roundId, pix, total, { id: recipientId || null, name: recipientName || null }, { expenseItemIds: selectedExpenseIds, expectedVersion });
     if (!result.success) {
       setError(result.error || "Nao foi possivel encerrar a rodada.");
       setLoading(false);
@@ -67,7 +68,7 @@ export function FinishRoundButton({ roundId, status, canManage, recipients = [],
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => { setExpectedVersion(roundVersion); setOpen(true); }}
         className="w-full mt-6 bg-surface border border-danger/30 hover:bg-danger/10 text-danger font-bold py-4 rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
       >
         <CheckCircle2 className="w-5 h-5" />

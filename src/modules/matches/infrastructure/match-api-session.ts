@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createClient } from "@/lib/supabase/server";
 import { httpMatchGateway, MatchApiError, type MatchHttpGateway } from "./http-match-gateway";
 
 type SessionClient = {
@@ -13,8 +14,9 @@ type SessionClient = {
 
 export async function matchApiFor(client?: SessionClient | null): Promise<MatchHttpGateway | null> {
   if (process.env.MATCHES_API_ENABLED !== "true") return null;
-  if (!client) return null;
-  const { data: { session } } = await client.auth.getSession();
+  if (client === null) return null;
+  const sessionClient = client ?? await createClient();
+  const { data: { session } } = await sessionClient.auth.getSession();
   const accessToken = session?.access_token;
   if (!accessToken) return null;
   const backendUrl = process.env.MATCHES_BACKEND_URL || process.env.MATCH_GOAL_BACKEND_URL || process.env.INTERNAL_BACKEND_URL || process.env.BACKEND_API_URL;

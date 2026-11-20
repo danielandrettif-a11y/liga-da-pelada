@@ -24,7 +24,7 @@ describe("pgAccountAccessRepository", () => {
     }]);
     await expect(repository.setRole("00000000-0000-4000-8000-000000000001", "player", actor))
       .resolves.toBe("player");
-    expect(query).toHaveBeenCalledWith("SET LOCAL ROLE authenticated");
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("set_config('role', 'authenticated'"), expect.any(Array));
     expect(query).toHaveBeenCalledWith(
       "SELECT public.manage_account_admin_role($1::uuid, $2::boolean) AS role",
       ["00000000-0000-4000-8000-000000000001", false],

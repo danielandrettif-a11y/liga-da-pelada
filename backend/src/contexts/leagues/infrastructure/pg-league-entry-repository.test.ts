@@ -14,7 +14,7 @@ describe("pgLeagueEntryRepository", () => {
     const repository = pgLeagueEntryRepository(pool);
     await expect(repository.completeEntryFlow(1, actor)).resolves.toBeUndefined();
     await expect(repository.authorizeSelection(leagueId, "active", actor)).resolves.toBeUndefined();
-    expect(query).toHaveBeenCalledWith("SET LOCAL ROLE authenticated");
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("set_config('role', 'authenticated'"), expect.any(Array));
     expect(query).toHaveBeenCalledWith("SELECT public.complete_my_entry_flow($1::integer)", [1]);
   });
 

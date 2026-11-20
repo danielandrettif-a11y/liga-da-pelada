@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath, revalidateTag } from "next/cache";
+import { after } from "next/server";
 import { cache } from "react";
 import { getActiveSeason } from "./seasons";
 import { createClient as createServerClient } from "../supabase/server";
@@ -349,8 +350,10 @@ export async function setRoundPlayerAvailability(
 function refreshRoundManagement(roundId: string) {
   revalidatePath(`/rodadas/${roundId}`);
   revalidatePath(`/rodadas/${roundId}/nova-partida`);
-  revalidatePath("/rodadas");
-  revalidatePath("/", "layout");
+  after(() => {
+    revalidatePath("/rodadas");
+    revalidatePath("/");
+  });
 }
 
 export async function setRoundPlayerAttendance(roundId: string, playerId: string, present: boolean) {
@@ -752,7 +755,7 @@ export async function deleteRound(roundId: string, confirmation: string) {
         for (const path of ["/rodadas", "/ranking", "/pagamentos", "/cartola", "/cartola/ranking", "/cartola/historico", "/admin/cartola", "/admin/transfermarket", "/admin/prelistas", "/convocacao", "/mais"]) {
           revalidatePath(path);
         }
-        revalidatePath("/", "layout");
+        revalidatePath("/");
         return { success: true };
       }
     }
@@ -773,7 +776,7 @@ export async function deleteRound(roundId: string, confirmation: string) {
     for (const path of ["/rodadas", "/ranking", "/pagamentos", "/cartola", "/cartola/ranking", "/cartola/historico", "/admin/cartola", "/admin/transfermarket", "/admin/prelistas", "/convocacao", "/mais"]) {
       revalidatePath(path);
     }
-    revalidatePath("/", "layout");
+    revalidatePath("/");
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -817,7 +820,7 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
       revalidatePath("/rodadas");
       revalidatePath("/convocacao");
       revalidatePath("/cartola");
-      revalidatePath("/", "layout");
+      revalidatePath("/");
       return { success: true, roundId: res.roundId };
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.startTime)) {
@@ -919,7 +922,7 @@ export async function saveRoundPrelist(input: SaveRoundPrelistInput) {
     revalidatePath("/rodadas");
     revalidatePath("/convocacao");
     revalidatePath("/cartola");
-    revalidatePath("/", "layout");
+    revalidatePath("/");
     return { success: true, roundId: String(roundId) };
   } catch (err: any) {
     console.error("Erro ao salvar pre-lista:", err);
@@ -1018,7 +1021,7 @@ export async function createRoundWithTeams(
       revalidatePath("/rodadas");
       revalidatePath("/admin/prelistas");
       revalidatePath("/convocacao");
-      revalidatePath("/", "layout");
+      revalidatePath("/");
       revalidateTag("rounds", "max");
       return { success: true, roundId: res.roundId };
     }
@@ -1303,7 +1306,7 @@ export async function createRoundWithTeams(
     revalidatePath("/rodadas");
     revalidatePath("/admin/prelistas");
     revalidatePath("/convocacao");
-    revalidatePath("/", "layout");
+    revalidatePath("/");
     revalidateTag("rounds", "max");
     return { success: true, roundId: round.id };
 
@@ -1313,7 +1316,7 @@ export async function createRoundWithTeams(
   }
 }
 
-export async function finishRound(roundId: string, paymentPix: string, paymentTotal: number, recipient?: { id?: string | null; name?: string | null }, options?: { expenseItemIds?: string[] }) {
+export async function finishRound(roundId: string, paymentPix: string, paymentTotal: number, recipient?: { id?: string | null; name?: string | null }, options?: { expenseItemIds?: string[]; expectedVersion?: string }) {
   try {
     let pix = paymentPix.trim();
     const total = Number(paymentTotal);
@@ -1343,6 +1346,7 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
         recipientId: recipient?.id || null,
         recipientName: recipient?.name || null,
         expenseItemIds: options?.expenseItemIds || [],
+        ...(options?.expectedVersion ? { expectedVersion: options.expectedVersion } : {}),
       });
       if (result.shouldRefreshOverall) {
         await refreshFluidOverallSafely(`fechamento da rodada ${roundId}`);
@@ -1351,7 +1355,7 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
       revalidatePath(`/rodadas/${roundId}`);
       revalidatePath("/rodadas");
       revalidatePath("/convocacao");
-      revalidatePath("/", "layout");
+      revalidatePath("/");
       revalidatePath("/ranking");
       revalidatePath("/pagamentos");
       revalidatePath("/cartola", "layout");
@@ -1464,7 +1468,7 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     revalidatePath(`/rodadas/${roundId}`);
     revalidatePath("/rodadas");
     revalidatePath("/convocacao");
-    revalidatePath("/", "layout");
+    revalidatePath("/");
     revalidatePath("/ranking");
     revalidatePath("/pagamentos");
     revalidatePath("/cartola", "layout");

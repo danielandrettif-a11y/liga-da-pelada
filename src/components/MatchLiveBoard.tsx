@@ -924,7 +924,7 @@ export function MatchLiveBoard({ match, matchDuration, goalsToFinish, canManage,
     setLoading(true);
     setFinishing(true);
     try {
-      const res = await finishMatch(match.id);
+      const res = await finishMatch(match.id, displayScore);
       if (!res.success) {
         setError(res.error || "Erro ao finalizar a partida.");
         return;

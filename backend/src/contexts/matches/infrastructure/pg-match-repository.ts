@@ -11,6 +11,7 @@ import type {
   MatchTimerState,
   SubstituteMatchPlayerInput,
 } from "../application/manage-matches.js";
+import type { MatchScore } from "../application/manage-matches.js";
 import type { MatchTimerAction, MatchTimerThreshold } from "../domain/match.js";
 import {
   MatchLineupError,
@@ -215,7 +216,7 @@ async function releaseTimerThreshold(
   );
 }
 
-export function pgMatchRepository(pool: Pool): MatchRepository {
+export function pgMatchRepository(pool: Pool, now: () => number = Date.now): MatchRepository {
   return {
     async getMatch(matchId: string, leagueId: string, actor: Actor): Promise<MatchDetails | null> {
       return authenticated(pool, actor, async (client) => {
@@ -508,9 +509,21 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
       });
     },
 
-    async finishMatch(matchId: string, leagueId: string, actor: Actor) {
+    async finishMatch(matchId: string, leagueId: string, actor: Actor, expectedScore?: MatchScore) {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
+        const params = [matchId, leagueId, expectedScore?.a ?? null, expectedScore?.b ?? null];
+        const conflict = () => new MatchPersistenceError("O placar mudou ou a partida já foi encerrada. Atualize a página e confira o resultado.", 409);
+        if (expectedScore) {
+          const { rows } = await client.query<{ current: boolean }>(
+            `SELECT (m.score_a = $3::integer AND m.score_b = $4::integer AND m.status <> 'finished') AS current
+             FROM public.matches m JOIN public.rounds r ON r.id = m.round_id
+             WHERE m.id = $1::uuid AND r.league_id = $2::uuid`,
+            params,
+          );
+          if (!rows[0]) throw new MatchPersistenceError("Partida não encontrada na pelada selecionada.", 404);
+          if (!rows[0].current) throw conflict();
+        }
         const currentResult = await client.query<{
           id: string;
           round_id: string;
@@ -532,14 +545,20 @@ export function pgMatchRepository(pool: Pool): MatchRepository {
            JOIN public.teams team_a ON team_a.id = match_item.team_a_id
            JOIN public.teams team_b ON team_b.id = match_item.team_b_id
            WHERE match_item.id = $1::uuid AND round_item.league_id = $2::uuid
+             AND ($3::integer IS NULL OR (
+               match_item.score_a = $3::integer AND match_item.score_b = $4::integer AND match_item.status <> 'finished'
+             ))
            FOR UPDATE OF match_item`,
-          [matchId, leagueId],
+          params,
         );
         const current = currentResult.rows[0];
-        if (!current) throw new MatchPersistenceError("Partida não encontrada na pelada selecionada.", 404);
+        if (!current) {
+          if (expectedScore) throw conflict();
+          throw new MatchPersistenceError("Partida não encontrada na pelada selecionada.", 404);
+        }
         const alreadyFinished = current.status === "finished";
         const runningSeconds = !alreadyFinished && current.timer_started_at
-          ? Math.floor((Date.now() - new Date(current.timer_started_at).getTime()) / 1000)
+          ? Math.floor((now() - new Date(current.timer_started_at).getTime()) / 1000)
           : 0;
         const elapsedSeconds = Math.max(0, Number(current.timer_accumulated_seconds || 0) + runningSeconds);
         const officialElapsed = Number(current.eligibility_elapsed_offset_seconds || 0) + elapsedSeconds;

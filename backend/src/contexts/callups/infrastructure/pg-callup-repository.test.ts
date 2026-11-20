@@ -29,42 +29,11 @@ describe("pgCallupRepository", () => {
               round_id: roundId,
               created_at: new Date("2026-10-27T10:00:00Z"),
               updated_at: null,
+              round: { id: roundId, status: "draft", matches: [], teams: [] },
+              entries: [{ id: "entry-1", player_id: playerId, joined_by_name: "Organizador" }],
             },
           ],
         };
-      }
-      if (sql.includes("FROM public.rounds")) {
-        return { rows: [{ id: roundId, status: "draft" }] };
-      }
-      if (sql.includes("FROM public.matches")) {
-        return { rows: [] };
-      }
-      if (sql.includes("FROM public.teams")) {
-        return { rows: [] };
-      }
-      if (sql.includes("FROM public.callup_entries ce")) {
-        return {
-          rows: [
-            {
-              id: "entry-1",
-              callup_id: callupId,
-              player_id: playerId,
-              status: "confirmed",
-              position: 1,
-              created_at: new Date("2026-10-27T10:05:00Z"),
-              p_id: playerId,
-              p_name: "Jogador Teste",
-              p_nickname: "Teste",
-              p_avatar_url: null,
-              p_player_profile: "midfield",
-              p_is_goalkeeper: false,
-              p_member_category: "monthly",
-            },
-          ],
-        };
-      }
-      if (sql.includes("get_callup_entry_joiners")) {
-        return { rows: [{ callup_entry_id: "entry-1", joined_by_name: "Organizador" }] };
       }
       return { rows: [] };
     });
@@ -77,7 +46,8 @@ describe("pgCallupRepository", () => {
     expect(result[0]?.id).toBe(callupId);
     expect(result[0]?.entries).toHaveLength(1);
     expect(result[0]?.entries[0]?.joined_by_name).toBe("Organizador");
-    expect(query).toHaveBeenCalledWith("SET LOCAL ROLE authenticated");
+    expect(query).toHaveBeenCalledTimes(4);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("set_config('role', 'authenticated'"), expect.any(Array));
   });
 
   it("lists agenda callups for a league", async () => {
@@ -108,6 +78,22 @@ describe("pgCallupRepository", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]?.playersCount).toBe(14);
+  });
+
+  it.each(["stale", "concurrent"])("refuses the %s version before changing a callup", async (scenario) => {
+    const version = "2026-10-30T12:00:00.123456+00:00";
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("AS matches_version")) return { rows: [{ matches_version: scenario === "concurrent" }] };
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    await expect(pgCallupRepository(pool).setVisibility(leagueId, callupId, false, actor, version))
+      .rejects.toMatchObject({ name: "CallupVersionConflict" });
+    expect(query.mock.calls.some(([sql]) => sql.includes("FOR UPDATE"))).toBe(scenario === "concurrent");
+    expect(query.mock.calls.some(([sql]) => sql.startsWith("UPDATE public.callups"))).toBe(false);
+    expect(query.mock.lastCall).toEqual(["ROLLBACK"]);
   });
 
   it("creates a callup as admin", async () => {

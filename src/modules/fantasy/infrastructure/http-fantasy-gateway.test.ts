@@ -23,7 +23,7 @@ describe("httpFantasyGateway", () => {
       "https://api.pelada.test/api/fantasy/leagues/league-1/dashboard",
       expect.objectContaining({
         headers: expect.objectContaining({
-          Authorization: "Bearer mock-token",
+          authorization: "Bearer mock-token",
         }),
       })
     );
@@ -53,7 +53,7 @@ describe("httpFantasyGateway", () => {
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => [{ id: "m1" }] } as Response);
     const gateway = httpFantasyGateway(baseUrl, token);
     await expect(gateway.getLiveMatchSnapshots("league-1", "round-1")).resolves.toEqual([{ id: "m1" }]);
-    expect(globalThis.fetch).toHaveBeenCalledWith("https://api.pelada.test/api/fantasy/leagues/league-1/rounds/round-1/match-snapshots", expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer mock-token" }) }));
+    expect(globalThis.fetch).toHaveBeenCalledWith("https://api.pelada.test/api/fantasy/leagues/league-1/rounds/round-1/match-snapshots", expect.objectContaining({ headers: expect.objectContaining({ authorization: "Bearer mock-token" }) }));
   });
 
   it("loads the protected projection inputs", async () => {
@@ -61,7 +61,7 @@ describe("httpFantasyGateway", () => {
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => input } as Response);
     const gateway = httpFantasyGateway(baseUrl, token);
     await expect(gateway.getLiveProjectionInputs("league-1", "round-1")).resolves.toEqual(input);
-    expect(globalThis.fetch).toHaveBeenCalledWith("https://api.pelada.test/api/fantasy/leagues/league-1/rounds/round-1/projection-inputs", expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer mock-token" }) }));
+    expect(globalThis.fetch).toHaveBeenCalledWith("https://api.pelada.test/api/fantasy/leagues/league-1/rounds/round-1/projection-inputs", expect.objectContaining({ headers: expect.objectContaining({ authorization: "Bearer mock-token" }) }));
   });
 
   it("loads the detailed revealed inputs for a selected round", async () => {
@@ -77,14 +77,14 @@ describe("httpFantasyGateway", () => {
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => input } as Response);
     const gateway = httpFantasyGateway(baseUrl, token);
     await expect(gateway.getRankingPeriodInputs("league-1")).resolves.toEqual(input);
-    expect(globalThis.fetch).toHaveBeenCalledWith("https://api.pelada.test/api/fantasy/leagues/league-1/ranking-period-inputs", expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer mock-token" }) }));
+    expect(globalThis.fetch).toHaveBeenCalledWith("https://api.pelada.test/api/fantasy/leagues/league-1/ranking-period-inputs", expect.objectContaining({ headers: expect.objectContaining({ authorization: "Bearer mock-token" }) }));
   });
 
   it("loads the league-scoped market source", async () => {
     const source = { prices: [], stats: [], players: [], history: [] };
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => source } as Response);
     await expect(httpFantasyGateway(baseUrl, token).getMarketSource("league-1")).resolves.toEqual(source);
-    expect(globalThis.fetch).toHaveBeenCalledWith("https://api.pelada.test/api/fantasy/leagues/league-1/market-source", expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer mock-token" }) }));
+    expect(globalThis.fetch).toHaveBeenCalledWith("https://api.pelada.test/api/fantasy/leagues/league-1/market-source", expect.objectContaining({ headers: expect.objectContaining({ authorization: "Bearer mock-token" }) }));
   });
 
   it("loads the active season market context", async () => {

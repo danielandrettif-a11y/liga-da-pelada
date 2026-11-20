@@ -20,7 +20,7 @@ describe("pgLeagueLobbyRepository", () => {
     await expect(repository.joinOpen("league-1", actor)).resolves.toBe(true);
     await expect(repository.setFavorite("league-1", false, actor)).resolves.toBe(false);
     await expect(repository.requestByInvite("invite-1", actor)).resolves.toBe("league-1");
-    expect(query.mock.calls.filter(([sql]) => sql === "SET LOCAL ROLE authenticated")).toHaveLength(3);
+    expect(query.mock.calls.filter(([sql]) => sql.includes("set_config('role', 'authenticated'"))).toHaveLength(3);
     expect(query.mock.calls.filter(([sql]) => sql === "COMMIT")).toHaveLength(3);
     expect(query).toHaveBeenCalledWith(expect.stringContaining("SET is_favorite = $2::boolean"), ["league-1", false]);
   });

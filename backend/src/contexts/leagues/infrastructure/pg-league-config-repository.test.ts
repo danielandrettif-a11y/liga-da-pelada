@@ -30,7 +30,7 @@ describe("pgLeagueConfigRepository", () => {
       stadiumName: "Arena", stadiumMapUrl: "https://maps.example/arena", eventDurationMinutes: 150,
     }, actor)).resolves.toBeUndefined();
     await expect(repository.setPreseason(leagueId, true, actor)).resolves.toBeUndefined();
-    expect(query.mock.calls.filter(([sql]) => sql === "SET LOCAL ROLE authenticated")).toHaveLength(4);
+    expect(query.mock.calls.filter(([sql]) => sql.includes("set_config('role', 'authenticated'"))).toHaveLength(4);
     expect(query.mock.calls.filter(([sql]) => sql === "COMMIT")).toHaveLength(4);
   });
 

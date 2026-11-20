@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { cache } from "react";
 import { getCurrentAccount } from "@/lib/auth";
 import { areRoundParticipantsPaid } from "@/lib/paymentStatus";
@@ -1872,6 +1873,12 @@ export async function getFantasyDashboard() {
   };
 }
 
+function revalidateFantasyLineup() {
+  revalidatePath("/cartola");
+  revalidatePath("/");
+  revalidatePath("/notificacoes");
+}
+
 export async function saveFantasyLineup(input: FantasyLineupSubmission) {
   try {
     const account = await getCurrentAccount();
@@ -1888,36 +1895,16 @@ export async function saveFantasyLineup(input: FantasyLineupSubmission) {
         input
       );
       if (!res.success) return res;
-      try {
-        revalidatePath("/cartola");
-        revalidatePath("/");
-        revalidatePath("/notificacoes");
-        return res;
-      } catch (error) {
-        console.error("Escalação salva, mas a atualização das telas falhou:", error);
-        return {
-          ...res,
-          warning: "A escalação foi salva com sucesso, mas pode demorar alguns instantes para atualizar em todas as telas.",
-        };
-      }
+      after(revalidateFantasyLineup);
+      return res;
     }
     const result = await saveFantasyLineupForLeague(input, {
       id: league.id,
       playersPerTeam: league.players_per_team,
     }, supabaseFantasyLineupGateway(account.client));
     if (!result.success) return result;
-    try {
-      revalidatePath("/cartola");
-      revalidatePath("/");
-      revalidatePath("/notificacoes");
-      return result;
-    } catch (error) {
-      console.error("Escalação salva, mas a atualização das telas falhou:", error);
-      return {
-        ...result,
-        warning: [result.warning, "A tela não atualizou. Reabra o Cartola para ver o time."].filter(Boolean).join(" "),
-      };
-    }
+    after(revalidateFantasyLineup);
+    return result;
   } catch (error) {
     console.error("Erro inesperado ao salvar escalação do Cartola:", error);
     return {

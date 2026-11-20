@@ -100,7 +100,13 @@ if (matchesEnabled && !appPublicUrl) {
   throw new Error("ENABLE_MATCHES_API=true requer APP_PUBLIC_URL para os webhooks do cronômetro.");
 }
 
-const pool = new pg.Pool({ connectionString: databaseUrl, max: 10 });
+const pool = new pg.Pool({
+  connectionString: databaseUrl,
+  max: 25,
+  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: 30_000,
+  keepAlive: true,
+});
 const app = createApp({
   goalsEnabled,
   leaguesEnabled,

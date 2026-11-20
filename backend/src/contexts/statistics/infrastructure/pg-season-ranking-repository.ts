@@ -211,54 +211,52 @@ export class PgSeasonRankingRepository implements SeasonRankingRepository {
     playerIds?: string[],
   ): Promise<RankingRawEnrichmentData> {
     return withAuthenticatedTransaction(this.pool, actor, async (client) => {
-      // 1. Fitness
-      let fitnessRows: Array<{ player_id: string; distance_km: number; average_speed_kmh: number }> = [];
-      if (roundIds.length) {
-        const fitnessParams: any[] = [roundIds];
-        let fitnessSql = `SELECT player_id, distance_km, average_speed_kmh FROM public.player_round_fitness WHERE round_id = ANY($1::uuid[])`;
-        if (playerIds && playerIds.length) {
-          fitnessParams.push(playerIds);
-          fitnessSql += ` AND player_id = ANY($2::uuid[])`;
-        }
-        try {
-          const res = await client.query(fitnessSql, fitnessParams);
-          fitnessRows = res.rows;
-        } catch {
-          fitnessRows = [];
-        }
-      }
-
+      const result = await client.query<{
+        fitness: RankingRawEnrichmentData["fitnessRows"];
+        cosmetics: Array<{ player_id: string; slot: string; name: string; asset_key: string }>;
+        overalls: Array<{
+          player_id: string; overall: number; trend: string; def_overall: number; ala_mei_overall: number;
+          ata_overall: number; gol_overall: number; def_trend: string; ala_mei_trend: string;
+          ata_trend: string; gol_trend: string; goalkeeper_games: number; goalkeeper_rounds: number; rounds_played: number;
+        }>;
+        speeds: Array<{ player_id: string; speed_rating: number }>;
+        belts: Array<{ player_id: string; belts: unknown }>;
+      }>(
+        `SELECT
+           ARRAY(SELECT row_to_json(fitness) FROM (
+             SELECT player_id, distance_km, average_speed_kmh
+             FROM public.player_round_fitness
+             WHERE round_id = ANY($2::uuid[])
+               AND ($3::uuid[] IS NULL OR player_id = ANY($3::uuid[]))
+           ) fitness) AS fitness,
+           ARRAY(SELECT row_to_json(equipped) FROM (
+             SELECT pec.player_id, pec.slot, c.name, c.asset_key
+             FROM public.player_equipped_cosmetics pec
+             JOIN public.cosmetics c ON c.id = pec.cosmetic_id
+             WHERE $3::uuid[] IS NULL OR pec.player_id = ANY($3::uuid[])
+           ) equipped) AS cosmetics,
+           ARRAY(SELECT row_to_json(o) FROM public.get_latest_player_card_overalls_for_league($1::uuid) o) AS overalls,
+           ARRAY(SELECT row_to_json(s) FROM public.get_public_player_speed_ratings_for_league($1::uuid) s) AS speeds,
+           ARRAY(SELECT row_to_json(b) FROM public.get_league_achievement_belt_holders($1::uuid) b) AS belts`,
+        [leagueId, roundIds, playerIds?.length ? playerIds : null],
+      );
+      const data = result.rows[0]!;
       // 2. Cosméticos
       const cosmeticsByPlayer = new Map<string, PlayerEquippedCosmetics>();
-      try {
-        const cosParams: any[] = [];
-        let cosSql = `
-          SELECT pec.player_id, pec.slot, c.name, c.asset_key
-          FROM public.player_equipped_cosmetics pec
-          JOIN public.cosmetics c ON c.id = pec.cosmetic_id
-        `;
-        if (playerIds && playerIds.length) {
-          cosParams.push(playerIds);
-          cosSql += ` WHERE pec.player_id = ANY($1::uuid[])`;
-        }
-        const cosRes = await client.query(cosSql, cosParams);
-        const mapByPlayerAndSlot = new Map<string, Map<string, { name: string; asset_key: string }>>();
-        for (const row of cosRes.rows) {
-          const m = mapByPlayerAndSlot.get(row.player_id) || new Map();
-          m.set(row.slot, { name: row.name, asset_key: row.asset_key });
-          mapByPlayerAndSlot.set(row.player_id, m);
-        }
-        for (const [pid, slotMap] of mapByPlayerAndSlot.entries()) {
-          cosmeticsByPlayer.set(pid, {
-            frameKey: slotMap.get("frame")?.asset_key || null,
-            auraKey: slotMap.get("aura")?.asset_key || null,
-            titleName: slotMap.get("title")?.name || null,
-            bannerAssetKey: slotMap.get("banner")?.asset_key || null,
-            nameplateKey: slotMap.get("nameplate")?.asset_key || null,
-          });
-        }
-      } catch {
-        // Tolerância caso a tabela ainda não exista em algum ambiente de teste
+      const mapByPlayerAndSlot = new Map<string, Map<string, { name: string; asset_key: string }>>();
+      for (const row of data.cosmetics) {
+        const m = mapByPlayerAndSlot.get(row.player_id) || new Map();
+        m.set(row.slot, { name: row.name, asset_key: row.asset_key });
+        mapByPlayerAndSlot.set(row.player_id, m);
+      }
+      for (const [pid, slotMap] of mapByPlayerAndSlot.entries()) {
+        cosmeticsByPlayer.set(pid, {
+          frameKey: slotMap.get("frame")?.asset_key || null,
+          auraKey: slotMap.get("aura")?.asset_key || null,
+          titleName: slotMap.get("title")?.name || null,
+          bannerAssetKey: slotMap.get("banner")?.asset_key || null,
+          nameplateKey: slotMap.get("nameplate")?.asset_key || null,
+        });
       }
 
       // 3. Overalls (RPC)
@@ -274,84 +272,60 @@ export class PgSeasonRankingRepository implements SeasonRankingRepository {
           roundsPlayed: number;
         }
       >();
-      try {
-        const ovRes = await client.query(
-          `SELECT * FROM public.get_latest_player_card_overalls_for_league($1::uuid)`,
-          [leagueId],
-        );
-        for (const row of ovRes.rows) {
-          const overall = Number(row.overall);
-          const trend = overallTrend(row.trend);
-          const values = {
-            DEF: Number(row.def_overall),
-            ALA_MEI: Number(row.ala_mei_overall),
-            ATA: Number(row.ata_overall),
-            GOL: Number(row.gol_overall),
-          };
-          const positions = Object.values(values).every(Number.isFinite) ? values : null;
-          const positionTrends = {
-            DEF: overallTrend(row.def_trend),
-            ALA_MEI: overallTrend(row.ala_mei_trend),
-            ATA: overallTrend(row.ata_trend),
-            GOL: overallTrend(row.gol_trend),
-          };
-          if (Number.isFinite(overall)) {
-            overallByPlayer.set(row.player_id, {
-              overall,
-              trend,
-              positions,
-              positionTrends,
-              goalkeeperGames: Number(row.goalkeeper_games || 0),
-              goalkeeperRounds: Number(row.goalkeeper_rounds || 0),
-              roundsPlayed: Number(row.rounds_played || 0),
-            });
-          }
+      for (const row of data.overalls) {
+        const overall = Number(row.overall);
+        const trend = overallTrend(row.trend);
+        const values = {
+          DEF: Number(row.def_overall),
+          ALA_MEI: Number(row.ala_mei_overall),
+          ATA: Number(row.ata_overall),
+          GOL: Number(row.gol_overall),
+        };
+        const positions = Object.values(values).every(Number.isFinite) ? values : null;
+        const positionTrends = {
+          DEF: overallTrend(row.def_trend),
+          ALA_MEI: overallTrend(row.ala_mei_trend),
+          ATA: overallTrend(row.ata_trend),
+          GOL: overallTrend(row.gol_trend),
+        };
+        if (Number.isFinite(overall)) {
+          overallByPlayer.set(row.player_id, {
+            overall,
+            trend,
+            positions,
+            positionTrends,
+            goalkeeperGames: Number(row.goalkeeper_games || 0),
+            goalkeeperRounds: Number(row.goalkeeper_rounds || 0),
+            roundsPlayed: Number(row.rounds_played || 0),
+          });
         }
-      } catch {
-        // Fallback gracioso
       }
 
       // 4. Velocidade (RPC)
       const speedByPlayer = new Map<string, 1 | 2 | 3>();
-      try {
-        const spRes = await client.query(
-          `SELECT * FROM public.get_public_player_speed_ratings_for_league($1::uuid)`,
-          [leagueId],
-        );
-        for (const row of spRes.rows) {
-          const rating = Number(row.speed_rating);
-          if (rating === 1 || rating === 2 || rating === 3) {
-            speedByPlayer.set(row.player_id, rating as 1 | 2 | 3);
-          }
+      for (const row of data.speeds) {
+        const rating = Number(row.speed_rating);
+        if (rating === 1 || rating === 2 || rating === 3) {
+          speedByPlayer.set(row.player_id, rating as 1 | 2 | 3);
         }
-      } catch {
-        // Fallback gracioso
       }
 
       // 5. Cinturões (RPC)
       const achievementBeltsByPlayer = new Map<string, PlayerAchievementBelt[]>();
-      try {
-        const beltRes = await client.query(
-          `SELECT * FROM public.get_league_achievement_belt_holders($1::uuid)`,
-          [leagueId],
-        );
-        for (const row of beltRes.rows) {
-          const beltsRaw = Array.isArray(row.belts) ? row.belts : [];
-          const parsed = beltsRaw.map((b: any) => ({
-            beltId: String(b.beltId || b.id || ""),
-            name: String(b.name || ""),
-            category: String(b.category || "achievement"),
-            icon: b.icon || null,
-            awardedAt: b.awardedAt || null,
-          }));
-          achievementBeltsByPlayer.set(String(row.player_id), parsed);
-        }
-      } catch {
-        // Fallback gracioso
+      for (const row of data.belts) {
+        const beltsRaw = Array.isArray(row.belts) ? row.belts : [];
+        const parsed = beltsRaw.map((b: any) => ({
+          beltId: String(b.beltId || b.id || ""),
+          name: String(b.name || ""),
+          category: String(b.category || "achievement"),
+          icon: b.icon || null,
+          awardedAt: b.awardedAt || null,
+        }));
+        achievementBeltsByPlayer.set(String(row.player_id), parsed);
       }
 
       return {
-        fitnessRows,
+        fitnessRows: data.fitness,
         cosmeticsByPlayer,
         overallByPlayer,
         speedByPlayer,

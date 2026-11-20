@@ -20,7 +20,7 @@ describe("pgLeagueAdminRepository", () => {
     await expect(repository.setVisibility("league-1", "open", actor)).resolves.toBe(true);
     await expect(repository.upgradeToComplete("league-1", actor)).resolves.toBe(true);
     await expect(repository.deletePermanently("league-1", "Pelada BQ", actor)).resolves.toBe(true);
-    expect(query.mock.calls.filter(([sql]) => sql === "SET LOCAL ROLE authenticated")).toHaveLength(5);
+    expect(query.mock.calls.filter(([sql]) => sql.includes("set_config('role', 'authenticated'"))).toHaveLength(5);
     expect(query.mock.calls.filter(([sql]) => sql === "COMMIT")).toHaveLength(5);
   });
 });

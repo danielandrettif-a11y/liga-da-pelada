@@ -20,7 +20,7 @@ describe("pgLeagueMembershipRequestRepository", () => {
     const { repository, query } = fixture(true);
     await expect(repository.request("00000000-0000-4000-8000-000000000001", { userId: "verified-user" })).resolves.toBe(true);
     expect(query.mock.calls.map(([sql]) => sql)).toEqual([
-      "BEGIN", "SET LOCAL ROLE authenticated", expect.stringContaining("request.jwt.claim.sub"),
+      "BEGIN", expect.stringContaining("request.jwt.claim.sub"),
       expect.stringContaining("request_league_membership_by_id"), "COMMIT",
     ]);
   });

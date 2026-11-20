@@ -1,11 +1,6 @@
-type ApiErrorPayload = { message?: unknown };
-
-export class RoundApiError extends Error {
-  constructor(message: string, public readonly statusCode: number | null = null) {
-    super(message);
-    this.name = "RoundApiError";
-  }
-}
+import { ApiError } from "@/modules/shared/domain/api-error";
+import { apiClient } from "@/modules/shared/infrastructure/api-client";
+export class RoundApiError extends ApiError {}
 
 export type RoundHttpGateway = {
   getRounds(seasonId: string): Promise<any[]>;
@@ -15,6 +10,7 @@ export type RoundHttpGateway = {
   createRoundWithTeams(leagueId: string, input: any): Promise<{ roundId: string }>;
   deleteRound(leagueId: string, roundId: string): Promise<void>;
   finishRound(leagueId: string, roundId: string, input: {
+    expectedVersion?: string;
     paymentPix: string;
     paymentTotal: number;
     recipientId?: string | null;
@@ -71,358 +67,273 @@ export type RoundHttpGateway = {
   drawTeamsAdaptiveOnServer(leagueId: string, input: any): Promise<any>;
 };
 
-async function parseApiError(response: Response): Promise<never> {
-  const payload = (await response.json().catch(() => null)) as ApiErrorPayload | null;
-  const message = typeof payload?.message === "string" ? payload.message : "Erro na operação da rodada.";
-  throw new RoundApiError(message, response.status);
-}
-
 export function httpRoundGateway(backendUrl: string, accessToken?: string): RoundHttpGateway {
   const base = backendUrl.replace(/\/+$/, "");
 
-  const authHeaders = (hasBody = false) => {
-    const headers: Record<string, string> = {};
-    if (accessToken) headers.authorization = `Bearer ${accessToken}`;
-    if (hasBody) headers["content-type"] = "application/json";
-    return headers;
-  };
+  const request = apiClient({ accessToken, fallback: "Erro na operação da rodada.", ErrorClass: RoundApiError });
 
   return {
     async getRounds(seasonId: string) {
-      const res = await fetch(`${base}/api/rounds/seasons/${seasonId}`, {
-        headers: authHeaders(),
+      const res = await request(`${base}/api/rounds/seasons/${seasonId}`, {
         cache: "no-store",
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async getRound(leagueId: string, roundId: string) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}`, {
-        headers: authHeaders(),
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}`, {
         cache: "no-store",
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async getRoundMatchSetup(leagueId: string, roundId: string) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/match-setup`, {
-        headers: authHeaders(),
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/match-setup`, {
         cache: "no-store",
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async getActiveLeague(leagueId: string) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/active-league`, {
-        headers: authHeaders(),
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/active-league`, {
         cache: "no-store",
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async createRoundWithTeams(leagueId: string, input: any) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}`, {
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify(input),
+        json: input,
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async deleteRound(leagueId: string, roundId: string) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}`, {
         method: "DELETE",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async finishRound(leagueId, roundId, input) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/finish`, {
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/finish`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify(input),
+        json: input,
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async getAdminRoundPrelist(leagueId: string, roundId: string) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/prelist`, {
-        headers: authHeaders(),
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/prelist`, {
         cache: "no-store",
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async getAdminRoundPrelists(leagueId: string) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/prelists`, {
-        headers: authHeaders(),
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/prelists`, {
         cache: "no-store",
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async saveRoundPrelist(leagueId: string, input: any) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/prelist`, {
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/prelist`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify(input),
+        json: input,
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async setCallupFormat(leagueId, callupId, format) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/callups/${callupId}/format`, {
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/callups/${callupId}/format`, {
         method: "PATCH",
-        headers: authHeaders(true),
-        body: JSON.stringify(format),
+        json: format,
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async setCallupMatchSize(leagueId, callupId, size) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/callups/${callupId}/match-size`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/callups/${callupId}/match-size`, {
         method: "PATCH",
-        headers: authHeaders(true),
-        body: JSON.stringify(size),
+        json: size,
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async getNextTeamPresetOffset(leagueId: string, roundType = "official") {
       const query = new URLSearchParams({ roundType });
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/next-team-preset-offset?${query}`, {
-        headers: authHeaders(),
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/next-team-preset-offset?${query}`, {
         cache: "no-store",
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async markRoundTeamArrived(leagueId, roundId, teamId, arrived) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/teams/${teamId}/arrived`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/teams/${teamId}/arrived`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ arrived }),
+        json: { arrived },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async openCallupReplacementVacancy(leagueId, roundId, outPlayerId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/replacement-vacancy`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/replacement-vacancy`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ outPlayerId }),
+        json: { outPlayerId },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async previewRoundTeamShuffle(leagueId, roundId, mode) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/shuffle/preview`, {
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/shuffle/preview`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ mode }),
+        json: { mode },
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async applyRoundTeamShuffle(leagueId, roundId, input) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/shuffle/apply`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/shuffle/apply`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify(input),
+        json: input,
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async applyPermanentRoundTeamFormation(leagueId, roundId, input) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/permanent-formation`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/permanent-formation`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify(input),
+        json: input,
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async swapRoundTeamPlayers(leagueId, roundId, playerA, playerB) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/swap-players`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/swap-players`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ playerA, playerB }),
+        json: { playerA, playerB },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async setRoundAttendanceBulk(leagueId, roundId, playerIds) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/attendance/bulk`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/attendance/bulk`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ playerIds }),
+        json: { playerIds },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async setRoundPlayerAttendance(leagueId, roundId, playerId, present) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/attendance`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/attendance`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ playerId, present }),
+        json: { playerId, present },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async setRoundPlayerAvailability(leagueId, roundId, playerId, status) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/availability`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/availability`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ playerId, status }),
+        json: { playerId, status },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async setRoundTeamCaptain(leagueId, roundId, teamId, captainPlayerId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/teams/${teamId}/captain`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/teams/${teamId}/captain`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ captainPlayerId }),
+        json: { captainPlayerId },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async setRoundTeamVestColor(leagueId, roundId, teamId, color) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/teams/${teamId}/vest-color`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/teams/${teamId}/vest-color`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ color }),
+        json: { color },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async transferRoundPlayerIdentity(leagueId, roundId, sourcePlayerId, targetPlayerId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/transfer-player-identity`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/transfer-player-identity`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ sourcePlayerId, targetPlayerId }),
+        json: { sourcePlayerId, targetPlayerId },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async zeroPlayerRoundPoints(leagueId, roundId, playerId, reason) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/players/${playerId}/zero-points`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/players/${playerId}/zero-points`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ reason }),
+        json: { reason },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async addRoundEmergencySubstitute(leagueId, roundId, input) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/emergency-substitute`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/emergency-substitute`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify(input),
+        json: input,
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async createTeamDraft(leagueId, roundId, callupId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/draft`, {
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/draft`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ callupId }),
+        json: { callupId },
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async getDraftWorkspace(leagueId, callupId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/callups/${callupId}/draft-workspace`, {
-        headers: authHeaders(),
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/callups/${callupId}/draft-workspace`, {
         cache: "no-store",
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async getDraftWorkspaceByRound(leagueId, roundId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/${roundId}/draft-workspace`, {
-        headers: authHeaders(),
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/${roundId}/draft-workspace`, {
         cache: "no-store",
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async startTeamDraft(leagueId, draftId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/drafts/${draftId}/start`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/drafts/${draftId}/start`, {
         method: "POST",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async makeTeamDraftPick(leagueId, draftId, playerId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/drafts/${draftId}/pick`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/drafts/${draftId}/pick`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ playerId }),
+        json: { playerId },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async replaceTeamDraftCaptain(leagueId, draftId, teamSlot, newCaptainId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/drafts/${draftId}/replace-captain`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/drafts/${draftId}/replace-captain`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ teamSlot, newCaptainId }),
+        json: { teamSlot, newCaptainId },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async restartTeamDraft(leagueId, draftId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/drafts/${draftId}/restart`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/drafts/${draftId}/restart`, {
         method: "POST",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async finalizeTeamDraft(leagueId, draftId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/drafts/${draftId}/finalize`, {
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/drafts/${draftId}/finalize`, {
         method: "POST",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async applyDraftSwap(leagueId, draftId, playerAId, playerBId) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/drafts/${draftId}/swap`, {
+      await request(`${base}/api/rounds/leagues/${leagueId}/drafts/${draftId}/swap`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ playerAId, playerBId }),
+        json: { playerAId, playerBId },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async drawTeamsAdaptiveOnServer(leagueId, input) {
-      const res = await fetch(`${base}/api/rounds/leagues/${leagueId}/adaptive-draw`, {
+      const res = await request(`${base}/api/rounds/leagues/${leagueId}/adaptive-draw`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify(input),
+        json: input,
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
   };

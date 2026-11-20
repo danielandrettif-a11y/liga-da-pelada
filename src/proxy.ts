@@ -5,6 +5,9 @@ import { requestOrigin } from '@/lib/siteUrl'
 import { supabaseServerConfig } from '@/lib/supabase/server-config'
 
 export default async function proxy(request: NextRequest) {
+  // O Fastify valida a sessão e o PostgreSQL aplica o escopo da liga nesta leitura.
+  if (request.nextUrl.pathname === '/api/backend/callups/active') return NextResponse.next()
+
   let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,

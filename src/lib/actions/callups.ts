@@ -1,6 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { cache } from "react";
+import { cookies } from "next/headers";
 import { getAdminClient, getCurrentAccount } from "../auth";
 import type { Callup, CallupEntry, Player } from "../types";
 import { scheduleCartolaRoundReminders } from "../cartola-reminder-scheduler";
@@ -26,7 +29,8 @@ import {
   normalizeCallupGuestName,
   parseWhatsAppGuestList,
 } from "@/modules/callups/domain/callup-guest-list";
-import { getSelectedLeague } from "../league-context";
+import { ACTIVE_LEAGUE_COOKIE, getSelectedLeague } from "../league-context";
+import { createClient } from "../supabase/server";
 import { createServiceClient } from "../supabase/service";
 import { resolveCallupInvite } from "../callup-invite-server";
 import { callupApiFor } from "@/modules/callups/infrastructure/callup-api-session";
@@ -72,12 +76,27 @@ function normalizeCallup(data: any): CallupWithEntries | null {
   return { ...(data as Callup), entries };
 }
 
-function refreshCallups() {
-  revalidatePath("/", "layout");
-  revalidatePath("/convocacao");
-  revalidatePath("/mais");
-  revalidatePath("/admin/rodada");
-  revalidatePath("/admin/prelistas");
+function refreshCallups(roundId?: string | null) {
+  after(() => {
+    revalidatePath("/");
+    revalidatePath("/convocacao");
+    revalidatePath("/mais");
+    revalidatePath("/admin/rodada");
+    revalidatePath("/admin/prelistas");
+    if (roundId !== undefined) revalidatePath("/rodadas");
+    if (roundId) {
+      revalidatePath(`/rodadas/${roundId}`);
+      revalidatePath(`/rodadas/${roundId}/nova-partida`);
+    }
+  });
+}
+
+async function selectedCallupApi() {
+  if (process.env.CALLUPS_API_ENABLED !== "true") return null;
+  const leagueId = (await cookies()).get(ACTIVE_LEAGUE_COOKIE)?.value;
+  if (!leagueId) return null;
+  const api = await callupApiFor(await createClient());
+  return api ? { api, leagueId } : null;
 }
 
 async function selectedCallup(callupId: string, client: Awaited<ReturnType<typeof getCurrentAccount>>["client"]) {
@@ -100,7 +119,7 @@ async function selectedRosterPlayer(playerId: string, client: Awaited<ReturnType
   return player?.member_category === "guest";
 }
 
-export async function getActiveCallups(invite?: { callupId?: string; inviteToken?: string }): Promise<CallupWithEntries[]> {
+async function readActiveCallups(invite?: { callupId?: string; inviteToken?: string }): Promise<CallupWithEntries[]> {
   const account = await getCurrentAccount();
   const client = account.client;
   let readClient = client;
@@ -198,6 +217,12 @@ export async function getActiveCallups(invite?: { callupId?: string; inviteToken
       joined_by_name: joinerNameByEntryId.get(entry.id) || null,
     })),
   }));
+}
+
+const readSelectedLeagueCallups = cache(() => readActiveCallups());
+
+export async function getActiveCallups(invite?: { callupId?: string; inviteToken?: string }): Promise<CallupWithEntries[]> {
+  return invite?.inviteToken ? readActiveCallups(invite) : readSelectedLeagueCallups();
 }
 
 export async function getActiveCallup(): Promise<CallupWithEntries | null> {
@@ -302,6 +327,17 @@ export async function openCallup(formData: FormData) {
 }
 
 export async function joinActiveCallup(callupId: string) {
+  try {
+    const scoped = await selectedCallupApi();
+    if (scoped) {
+      const { status } = await scoped.api.joinCallup(scoped.leagueId, callupId);
+      refreshCallups();
+      return { success: true, status: status === "confirmed" ? "confirmed" as const : "waitlist" as const };
+    }
+  } catch (error: any) {
+    return { success: false, error: error?.message || "Não foi possível entrar na convocação." };
+  }
+
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre na sua conta para participar." };
   const callup = await selectedCallup(callupId, account.client);
@@ -326,6 +362,17 @@ export async function joinActiveCallup(callupId: string) {
 }
 
 export async function leaveActiveCallup(callupId: string) {
+  try {
+    const scoped = await selectedCallupApi();
+    if (scoped) {
+      const { roundId } = await scoped.api.leaveCallup(scoped.leagueId, callupId);
+      refreshCallups(roundId ?? null);
+      return { success: true };
+    }
+  } catch (error: any) {
+    return { success: false, error: error?.message || "Não foi possível sair da convocação." };
+  }
+
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre na sua conta para sair." };
   const callup = await selectedCallup(callupId, account.client);
@@ -335,12 +382,7 @@ export async function leaveActiveCallup(callupId: string) {
     const api = await callupApiFor(account.client);
     if (api) {
       const res = await api.leaveCallup(callup.league_id, callupId);
-      refreshCallups();
-      revalidatePath("/rodadas");
-      if (res.roundId) {
-        revalidatePath(`/rodadas/${res.roundId}`);
-        revalidatePath(`/rodadas/${res.roundId}/nova-partida`);
-      }
+      refreshCallups(res.roundId ?? null);
       return { success: true };
     }
   } catch (error: any) {
@@ -352,12 +394,7 @@ export async function leaveActiveCallup(callupId: string) {
     callupId, callup.league_id, account.user.id, supabaseCallupParticipationGateway(account.client),
   );
   if (!result.success) return result;
-  refreshCallups();
-  revalidatePath("/rodadas");
-  if (result.roundId) {
-    revalidatePath(`/rodadas/${result.roundId}`);
-    revalidatePath(`/rodadas/${result.roundId}/nova-partida`);
-  }
+  refreshCallups(result.roundId ?? null);
   return { success: true };
 }
 
@@ -781,7 +818,7 @@ async function prepareSelectedCallupPrelist(
   return { success: true as const, roundId: result.roundId };
 }
 
-export async function closeCallup(callupId: string) {
+export async function closeCallup(callupId: string, expectedVersion?: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem fechar convocacoes." };
   const callup = await selectedCallup(callupId, client);
@@ -790,7 +827,7 @@ export async function closeCallup(callupId: string) {
   try {
     const api = await callupApiFor(client);
     if (api) {
-      await api.closeCallup(callup.league_id, callupId);
+      await api.closeCallup(callup.league_id, callupId, expectedVersion);
       refreshCallups();
       return { success: true };
     }
@@ -804,7 +841,7 @@ export async function closeCallup(callupId: string) {
   return result;
 }
 
-export async function setCallupVisibility(callupId: string, isPublic: boolean) {
+export async function setCallupVisibility(callupId: string, isPublic: boolean, expectedVersion?: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem alterar a visibilidade da convocação." };
   const callup = await selectedCallup(callupId, client);
@@ -813,7 +850,7 @@ export async function setCallupVisibility(callupId: string, isPublic: boolean) {
   try {
     const api = await callupApiFor(client);
     if (api) {
-      await api.setVisibility(callup.league_id, callupId, isPublic);
+      await api.setVisibility(callup.league_id, callupId, isPublic, expectedVersion);
       refreshCallups();
       return { success: true };
     }
@@ -827,7 +864,7 @@ export async function setCallupVisibility(callupId: string, isPublic: boolean) {
   return result;
 }
 
-export async function setCallupMatchRules(callupId: string, matchDuration: number, goalsToFinish: number) {
+export async function setCallupMatchRules(callupId: string, matchDuration: number, goalsToFinish: number, expectedVersion?: string) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem alterar as regras das partidas." };
   if (!Number.isInteger(matchDuration) || matchDuration < 1 || matchDuration > 90) {
@@ -844,7 +881,7 @@ export async function setCallupMatchRules(callupId: string, matchDuration: numbe
   try {
     const api = await callupApiFor(client);
     if (api) {
-      await api.setMatchRules(callup.league_id, callupId, matchDuration, goalsToFinish);
+      await api.setMatchRules(callup.league_id, callupId, matchDuration, goalsToFinish, expectedVersion);
       refreshCallups();
       revalidatePath("/partidas/[id]", "page");
       return { success: true };
@@ -924,7 +961,7 @@ export async function updateCallup(formData: FormData) {
         startTime: request.startTime,
         stadiumId: request.stadiumId,
         roundType: request.roundType,
-      });
+      }, String(formData.get("expected_version") || "") || undefined);
       refreshCallups();
       return { success: true };
     }

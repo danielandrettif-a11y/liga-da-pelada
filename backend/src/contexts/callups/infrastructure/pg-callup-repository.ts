@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 import { withAuthenticatedTransaction } from "../../../infrastructure/authenticated-transaction.js";
 import type { Actor } from "../../../shared/actor.js";
+import { CallupVersionConflict } from "../domain/callup.js";
 import type {
   CallupGuestListResult,
   CallupInviteResult,
@@ -11,8 +12,6 @@ import type {
   Callup,
   CallupEntry,
   CallupEntryStatus,
-  CallupPlayer,
-  CallupRoundTeam,
   OpenCallupInput,
   UpdateCallupInput,
 } from "../domain/callup.js";
@@ -48,8 +47,28 @@ async function authenticated<T>(
   try {
     return await withAuthenticatedTransaction(pool, actor, operation);
   } catch (cause) {
+    if (cause instanceof CallupVersionConflict) throw cause;
     throw translateFailure(cause);
   }
+}
+
+async function guardCallupVersion(client: PoolClient, leagueId: string, callupId: string, expectedVersion?: string) {
+  if (expectedVersion === undefined) return;
+  const params = [leagueId, callupId, expectedVersion];
+  const scope = "id = $2::uuid AND league_id = $1::uuid";
+  const current = await client.query<{ matches_version: boolean }>(
+    `SELECT updated_at = $3::timestamptz AS matches_version FROM public.callups WHERE ${scope}`,
+    params,
+  );
+  if (!current.rows[0]) throw new CallupPersistenceError("Convocação fora da pelada selecionada.", 404);
+  if (!current.rows[0].matches_version) throw new CallupVersionConflict();
+
+  // Reavalia a versão ao adquirir o lock que protege a escrita ou RPC seguinte.
+  const locked = await client.query(
+    `SELECT id FROM public.callups WHERE ${scope} AND updated_at = $3::timestamptz FOR UPDATE`,
+    params,
+  );
+  if (!locked.rows.length) throw new CallupVersionConflict();
 }
 
 async function requireLeagueAdmin(client: PoolClient, leagueId: string): Promise<void> {
@@ -93,203 +112,95 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
           round_id: string | null;
           created_at: string | Date;
           updated_at: string | Date | null;
+          stadium_name: string | null;
+          stadium_map_url: string | null;
+          match_duration: number | null;
+          goals_to_finish: number | null;
+          waitlist_capacity: number;
+          invite_token: string;
+          created_by: string | null;
+          entries: CallupEntry[];
+          round: Callup["round"];
         }>(
-          `SELECT c.id, c.league_id, c.date, c.start_time, c.stadium_id, c.round_type,
-                  c.status, c.is_public, c.players_per_team, c.teams_per_round,
-                  c.capacity, c.round_id, c.created_at, c.updated_at
-           FROM public.callups c
-           ${whereClause}
+          `WITH selected_callups AS (
+             SELECT c.id, c.league_id, c.date, c.start_time, c.stadium_id, c.round_type,
+                    c.status, c.is_public, c.players_per_team, c.teams_per_round,
+                    c.capacity, c.round_id, c.created_at,
+                    to_json(c.updated_at) #>> '{}' AS updated_at,
+                    c.stadium_name, c.stadium_map_url, c.match_duration, c.goals_to_finish,
+                    c.waitlist_capacity, c.invite_token, c.created_by
+             FROM public.callups c
+             ${whereClause}
+             AND NOT EXISTS (
+               SELECT 1 FROM public.rounds r
+               WHERE r.id = c.round_id AND (
+                 r.status = 'finished' OR EXISTS (
+                   SELECT 1 FROM public.matches m
+                   WHERE m.round_id = r.id
+                     AND (m.started_at IS NOT NULL OR m.status IN ('live', 'finished', 'in_progress', 'completed'))
+                 )
+               )
+             )
+           ), joiners AS MATERIALIZED (
+             SELECT * FROM public.get_callup_entry_joiners(ARRAY(SELECT id FROM selected_callups))
+           )
+           SELECT c.*,
+             COALESCE((
+               SELECT jsonb_agg(jsonb_build_object(
+                 'id', ce.id, 'callup_id', ce.callup_id, 'player_id', ce.player_id,
+                 'status', CASE WHEN ce.status::text IN ('waitlist', 'waitlisted') THEN 'waitlisted' ELSE 'confirmed' END,
+                 'position', ce.position, 'created_at', ce.created_at, 'joined_by_name', j.joined_by_name,
+                 'player', jsonb_build_object(
+                   'id', p.id, 'name', p.name, 'nickname', p.nickname, 'avatar_url', p.avatar_url,
+                   'player_profile', p.player_profile, 'is_goalkeeper', COALESCE(p.is_goalkeeper, false),
+                   'member_category', p.member_category
+                 )
+               ) ORDER BY (ce.status::text IN ('waitlist', 'waitlisted')), ce.position)
+               FROM public.callup_entries ce
+               JOIN public.players p ON p.id = ce.player_id
+               LEFT JOIN joiners j ON j.callup_entry_id = ce.id
+               WHERE ce.callup_id = c.id
+             ), '[]'::jsonb) AS entries,
+             (
+               SELECT jsonb_build_object(
+                 'id', r.id, 'status', r.status,
+                 'matches', COALESCE((
+                   SELECT jsonb_agg(jsonb_build_object('id', m.id, 'status', m.status, 'started_at', m.started_at))
+                   FROM public.matches m WHERE m.round_id = r.id
+                 ), '[]'::jsonb),
+                 'teams', COALESCE((
+                   SELECT jsonb_agg(jsonb_build_object(
+                     'id', t.id, 'name', t.name, 'position', t.position, 'color', t.color, 'crest_url', t.crest_url,
+                     'team_players', COALESCE((
+                       SELECT jsonb_agg(jsonb_build_object('player_id', tp.player_id))
+                       FROM public.team_players tp WHERE tp.team_id = t.id
+                     ), '[]'::jsonb)
+                   ) ORDER BY t.position, t.id)
+                   FROM public.teams t WHERE t.round_id = r.id
+                 ), '[]'::jsonb)
+               )
+               FROM public.rounds r WHERE r.id = c.round_id
+             ) AS round
+           FROM selected_callups c
            ORDER BY c.date ASC, c.start_time ASC, c.created_at ASC`,
           params,
         );
 
-        if (!callupsResult.rows.length) return [];
-
-        const callupIds = callupsResult.rows.map((r) => r.id);
-        const roundIds = callupsResult.rows.map((r) => r.round_id).filter((id): id is string => Boolean(id));
-
-        // Busca partidas e times de rodadas vinculadas
-        const roundDataMap = new Map<
-          string,
-          {
-            id: string;
-            status: string;
-            matches: Array<{ id: string; status: string; started_at: string | null }>;
-            teams: CallupRoundTeam[];
-          }
-        >();
-
-        if (roundIds.length > 0) {
-          const roundsResult = await client.query<{
-            id: string;
-            status: string;
-          }>(
-            "SELECT id, status FROM public.rounds WHERE id = ANY($1::uuid[])",
-            [roundIds],
-          );
-          for (const round of roundsResult.rows) {
-            roundDataMap.set(round.id, {
-              id: round.id,
-              status: round.status,
-              matches: [],
-              teams: [],
-            });
-          }
-
-          const matchesResult = await client.query<{
-            id: string;
-            round_id: string;
-            status: string;
-            started_at: string | Date | null;
-          }>(
-            "SELECT id, round_id, status, started_at FROM public.matches WHERE round_id = ANY($1::uuid[])",
-            [roundIds],
-          );
-          for (const m of matchesResult.rows) {
-            const r = roundDataMap.get(m.round_id);
-            if (r) {
-              r.matches.push({
-                id: m.id,
-                status: m.status,
-                started_at: m.started_at instanceof Date ? m.started_at.toISOString() : m.started_at ? String(m.started_at) : null,
-              });
-            }
-          }
-
-          const teamsResult = await client.query<{
-            id: string;
-            round_id: string;
-            name: string;
-            position: number | null;
-            color: string;
-            crest_url: string | null;
-          }>(
-            "SELECT id, round_id, name, position, color, crest_url FROM public.teams WHERE round_id = ANY($1::uuid[])",
-            [roundIds],
-          );
-          const teamIds = teamsResult.rows.map((t) => t.id);
-
-          const teamPlayersMap = new Map<string, Array<{ player_id: string }>>();
-          if (teamIds.length > 0) {
-            const teamPlayersResult = await client.query<{
-              team_id: string;
-              player_id: string;
-            }>(
-              "SELECT team_id, player_id FROM public.team_players WHERE team_id = ANY($1::uuid[])",
-              [teamIds],
-            );
-            for (const tp of teamPlayersResult.rows) {
-              const list = teamPlayersMap.get(tp.team_id) || [];
-              list.push({ player_id: tp.player_id });
-              teamPlayersMap.set(tp.team_id, list);
-            }
-          }
-
-          for (const t of teamsResult.rows) {
-            const r = roundDataMap.get(t.round_id);
-            if (r) {
-              r.teams.push({
-                id: t.id,
-                name: t.name,
-                position: t.position,
-                color: t.color,
-                crest_url: t.crest_url,
-                team_players: teamPlayersMap.get(t.id) || [],
-              });
-            }
-          }
-        }
-
-        // Busca entries e jogadores
-        const entriesResult = await client.query<{
-          id: string;
-          callup_id: string;
-          player_id: string;
-          status: string;
-          position: number;
-          created_at: string | Date;
-          p_id: string;
-          p_name: string;
-          p_nickname: string | null;
-          p_avatar_url: string | null;
-          p_player_profile: string;
-          p_is_goalkeeper: boolean;
-          p_member_category: string;
-        }>(
-          `SELECT ce.id, ce.callup_id, ce.player_id, ce.status, ce.position, ce.created_at,
-                  p.id AS p_id, p.name AS p_name, p.nickname AS p_nickname,
-                  p.avatar_url AS p_avatar_url, p.player_profile AS p_player_profile,
-                  p.is_goalkeeper AS p_is_goalkeeper, p.member_category AS p_member_category
-           FROM public.callup_entries ce
-           JOIN public.players p ON p.id = ce.player_id
-           WHERE ce.callup_id = ANY($1::uuid[])
-           ORDER BY ce.position ASC`,
-          [callupIds],
-        );
-
-        const joinersResult = await client.query<{
-          callup_entry_id: string;
-          joined_by_name: string | null;
-        }>(
-          "SELECT callup_entry_id, joined_by_name FROM public.get_callup_entry_joiners($1::uuid[])",
-          [callupIds],
-        );
-        const joinerNameByEntryId = new Map(
-          joinersResult.rows.map((j) => [j.callup_entry_id, j.joined_by_name]),
-        );
-
-        const entriesByCallupId = new Map<string, CallupEntry[]>();
-        for (const row of entriesResult.rows) {
-          const player: CallupPlayer = {
-            id: row.p_id,
-            name: row.p_name,
-            nickname: row.p_nickname,
-            avatar_url: row.p_avatar_url,
-            player_profile: row.p_player_profile,
-            is_goalkeeper: Boolean(row.p_is_goalkeeper),
-            member_category: row.p_member_category,
-          };
-          const status: CallupEntryStatus = row.status === "waitlisted" || row.status === "waitlist"
-            ? "waitlisted"
-            : "confirmed";
-          const entry: CallupEntry = {
-            id: row.id,
-            callup_id: row.callup_id,
-            player_id: row.player_id,
-            status,
-            position: Number(row.position),
-            created_at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
-            joined_by_name: joinerNameByEntryId.get(row.id) ?? null,
-            player,
-          };
-          const list = entriesByCallupId.get(row.callup_id) || [];
-          list.push(entry);
-          entriesByCallupId.set(row.callup_id, list);
-        }
-
-        const callups: Callup[] = [];
-        for (const c of callupsResult.rows) {
-          const linkedRound = c.round_id ? roundDataMap.get(c.round_id) || null : null;
-          if (linkedRound) {
-            const hasStarted = (linkedRound.matches || []).some(
-              (m) => m.started_at !== null || m.status === "in_progress" || m.status === "completed",
-            );
-            if (hasStarted) continue;
-          }
-
-          const rawEntries = entriesByCallupId.get(c.id) || [];
-          const sortedEntries = rawEntries.sort((a, b) => {
-            if (a.status !== b.status) return a.status === "confirmed" ? -1 : 1;
-            return a.position - b.position;
-          });
-
+        return callupsResult.rows.map((c) => {
           const dateStr = c.date instanceof Date ? c.date.toISOString().slice(0, 10) : String(c.date).slice(0, 10);
-          callups.push({
+          return {
             id: c.id,
             league_id: c.league_id,
             date: dateStr,
             start_time: String(c.start_time).slice(0, 5),
             stadium_id: c.stadium_id,
+            stadium_name: c.stadium_name,
+            stadium_map_url: c.stadium_map_url,
+            match_duration: c.match_duration,
+            goals_to_finish: c.goals_to_finish,
+            waitlist_capacity: c.waitlist_capacity,
+            invite_token: c.invite_token,
+            created_by: c.created_by,
             round_type: c.round_type,
             status: c.status,
             is_public: Boolean(c.is_public),
@@ -299,12 +210,10 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
             round_id: c.round_id,
             created_at: c.created_at instanceof Date ? c.created_at.toISOString() : String(c.created_at),
             updated_at: c.updated_at instanceof Date ? c.updated_at.toISOString() : c.updated_at ? String(c.updated_at) : undefined,
-            entries: sortedEntries,
-            round: linkedRound,
-          });
-        }
-
-        return callups;
+            entries: c.entries,
+            round: c.round,
+          };
+        });
       });
     },
 
@@ -440,9 +349,11 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
         roundType: "friendly" | "official";
       },
       actor: Actor,
+      expectedVersion?: string,
     ): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
+        await guardCallupVersion(client, leagueId, callupId, expectedVersion);
 
         let stadiumName: string | null = null;
         let stadiumMapUrl: string | null = null;
@@ -477,7 +388,7 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
                stadium_name = $6::text,
                stadium_map_url = $7::text,
                round_type = $8::text,
-               updated_at = NOW()
+               updated_at = clock_timestamp()
            WHERE id = $2::uuid AND league_id = $1::uuid`,
           [
             leagueId,
@@ -503,8 +414,7 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
                stadium_id = $5::uuid,
                stadium_name = $6::text,
                stadium_map_url = $7::text,
-               round_type = $8::text,
-               updated_at = NOW()
+               round_type = $8::text
            WHERE id = (SELECT round_id FROM public.callups WHERE id = $2::uuid)
              AND league_id = $1::uuid
              AND status = 'draft'`,
@@ -522,11 +432,12 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
       });
     },
 
-    async closeCallup(leagueId: string, callupId: string, actor: Actor): Promise<void> {
+    async closeCallup(leagueId: string, callupId: string, actor: Actor, expectedVersion?: string): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
+        await guardCallupVersion(client, leagueId, callupId, expectedVersion);
         const result = await client.query(
-          "UPDATE public.callups SET status = 'closed', updated_at = NOW() WHERE id = $2::uuid AND league_id = $1::uuid",
+          "UPDATE public.callups SET status = 'closed', updated_at = clock_timestamp() WHERE id = $2::uuid AND league_id = $1::uuid",
           [leagueId, callupId],
         );
         if ((result.rowCount ?? 0) === 0) {
@@ -535,11 +446,12 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
       });
     },
 
-    async setVisibility(leagueId: string, callupId: string, isPublic: boolean, actor: Actor): Promise<void> {
+    async setVisibility(leagueId: string, callupId: string, isPublic: boolean, actor: Actor, expectedVersion?: string): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
+        await guardCallupVersion(client, leagueId, callupId, expectedVersion);
         const result = await client.query(
-          "UPDATE public.callups SET is_public = $3::boolean, updated_at = NOW() WHERE id = $2::uuid AND league_id = $1::uuid",
+          "UPDATE public.callups SET is_public = $3::boolean, updated_at = clock_timestamp() WHERE id = $2::uuid AND league_id = $1::uuid",
           [leagueId, callupId, isPublic],
         );
         if ((result.rowCount ?? 0) === 0) {
@@ -548,9 +460,10 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
       });
     },
 
-    async setMatchRules(leagueId: string, callupId: string, matchDuration: number, goalsToFinish: number, actor: Actor): Promise<void> {
+    async setMatchRules(leagueId: string, callupId: string, matchDuration: number, goalsToFinish: number, actor: Actor, expectedVersion?: string): Promise<void> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
+        await guardCallupVersion(client, leagueId, callupId, expectedVersion);
         const check = await client.query<{ id: string }>(
           "SELECT id FROM public.callups WHERE id = $2::uuid AND league_id = $1::uuid",
           [leagueId, callupId],

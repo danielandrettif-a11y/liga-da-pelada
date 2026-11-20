@@ -107,12 +107,14 @@ export type SubstituteMatchPlayerInput = {
   mark_injured?: boolean;
 };
 
+export type MatchScore = Readonly<{ a: number; b: number }>;
+
 export interface MatchRepository {
   getMatch(matchId: string, leagueId: string, actor: Actor): Promise<MatchDetails | null>;
   findLiveMatchForTeams(roundId: string, teamAId: string, teamBId: string, leagueId: string, actor: Actor): Promise<string | null>;
   getFinishedMatchAudit(matchId: string, leagueId: string, actor: Actor): Promise<MatchAdminAuditEntry[]>;
   createMatch(input: CreateMatchInput, leagueId: string, actor: Actor): Promise<{ matchId: string; idempotent: boolean; receipt?: any }>;
-  finishMatch(matchId: string, leagueId: string, actor: Actor): Promise<{
+  finishMatch(matchId: string, leagueId: string, actor: Actor, expectedScore?: MatchScore): Promise<{
     roundId: string;
     alreadyFinished?: boolean;
     match: FinishedMatchSummary;
@@ -190,8 +192,16 @@ export function createMatch(input: CreateMatchInput, leagueId: string, actor: Ac
   return repository.createMatch(normalized, parseMatchUuid(leagueId, "Pelada"), actor);
 }
 
-export function finishMatch(matchId: string, leagueId: string, actor: Actor, repository: MatchRepository) {
-  return repository.finishMatch(parseMatchUuid(matchId, "Partida"), parseMatchUuid(leagueId, "Pelada"), actor);
+export function finishMatch(matchId: string, leagueId: string, actor: Actor, repository: MatchRepository, expectedScore?: MatchScore) {
+  const id = parseMatchUuid(matchId, "Partida");
+  const league = parseMatchUuid(leagueId, "Pelada");
+  if (expectedScore === undefined) return repository.finishMatch(id, league, actor);
+  if (!expectedScore || ![expectedScore.a, expectedScore.b].every((score) =>
+    Number.isInteger(score) && score >= 0 && score <= 2_147_483_647
+  )) {
+    throw new MatchValidationError("Placar esperado inválido.");
+  }
+  return repository.finishMatch(id, league, actor, expectedScore);
 }
 
 export function deleteMatch(matchId: string, leagueId: string, actor: Actor, repository: MatchRepository) {

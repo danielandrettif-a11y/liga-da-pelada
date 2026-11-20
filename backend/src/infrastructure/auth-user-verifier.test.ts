@@ -33,4 +33,29 @@ describe("supabaseUserVerifier", () => {
     const verifier = supabaseUserVerifier("http://kong:8000", "public-key", fetcher);
     await expect(verifier.verifyAccessToken("token")).rejects.toThrow("Resposta de Auth inválida");
   });
+
+  it("coalesces concurrent checks and caps cache lifetime by both TTL and JWT expiry", async () => {
+    let time = 1000;
+    const fetcher = vi.fn().mockImplementation(async () => Response.json({ id: userId }));
+    const verifier = supabaseUserVerifier("http://kong:8000", "public-key", fetcher, () => time);
+    const token = (exp: number) => `header.${Buffer.from(JSON.stringify({ exp })).toString("base64url")}.signature`;
+    const longLived = token(100);
+    const shortLived = token(3);
+
+    await Promise.all([verifier.verifyAccessToken(longLived), verifier.verifyAccessToken(longLived)]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await verifier.verifyAccessToken(shortLived);
+    time = 2999;
+    await verifier.verifyAccessToken(shortLived);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    time = 3000;
+    fetcher.mockResolvedValueOnce(new Response(null, { status: 401 }));
+    await expect(verifier.verifyAccessToken(shortLived)).resolves.toBeNull();
+    time = 60_999;
+    await verifier.verifyAccessToken(longLived);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    time = 61_000;
+    await verifier.verifyAccessToken(longLived);
+    expect(fetcher).toHaveBeenCalledTimes(4);
+  });
 });

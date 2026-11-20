@@ -1,9 +1,6 @@
-export class MatchApiError extends Error {
-  constructor(message: string, public readonly status?: number) {
-    super(message);
-    this.name = "MatchApiError";
-  }
-}
+import { ApiError } from "@/modules/shared/domain/api-error";
+import { apiClient, readApiError } from "@/modules/shared/infrastructure/api-client";
+export class MatchApiError extends ApiError {}
 
 type ApiErrorPayload = {
   code?: string;
@@ -30,7 +27,7 @@ export type MatchHttpGateway = {
   findLiveMatchForTeams(leagueId: string, roundId: string, teamAId: string, teamBId: string): Promise<{ matchId: string | null }>;
   getFinishedMatchAudit(leagueId: string, matchId: string): Promise<any[]>;
   createMatch(leagueId: string, input: any): Promise<{ success: true; matchId: string; idempotent?: boolean; receipt?: any; error?: undefined; uncertain?: undefined }>;
-  finishMatch(leagueId: string, matchId: string): Promise<{
+  finishMatch(leagueId: string, matchId: string, expectedScore?: { a: number; b: number }): Promise<{
     success: true;
     roundId: string;
     alreadyFinished?: boolean;
@@ -65,29 +62,16 @@ export type MatchHttpGateway = {
   selectBestGoalkeeper(leagueId: string, roundId: string, playerId: string): Promise<{ success: true; error?: undefined }>;
 };
 
-async function parseApiError(response: Response): Promise<never> {
-  const payload = (await response.json().catch(() => null)) as ApiErrorPayload | null;
-  const message = typeof payload?.message === "string" ? payload.message : "Erro na operação da partida.";
-  throw new MatchApiError(message, response.status);
-}
-
 export function httpMatchGateway(backendUrl: string, accessToken?: string): MatchHttpGateway {
   const base = backendUrl.replace(/\/+$/, "");
 
-  const authHeaders = (hasBody = false) => {
-    const headers: Record<string, string> = {};
-    if (accessToken) headers.authorization = `Bearer ${accessToken}`;
-    if (hasBody) headers["content-type"] = "application/json";
-    return headers;
-  };
+  const request = apiClient({ accessToken, fallback: "Erro na operação da partida.", ErrorClass: MatchApiError });
 
   return {
     async getMatch(leagueId, matchId) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}`, {
-        headers: authHeaders(),
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/${matchId}`, {
         cache: "no-store",
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
@@ -96,221 +80,180 @@ export function httpMatchGateway(backendUrl: string, accessToken?: string): Matc
       url.searchParams.set("roundId", roundId);
       url.searchParams.set("teamAId", teamAId);
       url.searchParams.set("teamBId", teamBId);
-      const res = await fetch(url.toString(), {
-        headers: authHeaders(),
+      const res = await request(url.toString(), {
         cache: "no-store",
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async getFinishedMatchAudit(leagueId, matchId) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/audit`, {
-        headers: authHeaders(),
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/${matchId}/audit`, {
         cache: "no-store",
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async createMatch(leagueId, input) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify(input),
+        json: input,
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
-    async finishMatch(leagueId, matchId) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/finish`, {
+    async finishMatch(leagueId, matchId, expectedScore) {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/${matchId}/finish`, {
         method: "POST",
-        headers: authHeaders(),
+        json: expectedScore ? { expectedScore } : undefined,
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async deleteMatch(leagueId, matchId) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/${matchId}`, {
         method: "DELETE",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async deleteEvent(leagueId, matchId, eventId) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/events/${eventId}`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/${matchId}/events/${eventId}`, {
         method: "DELETE",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async correctFinishedGoal(leagueId, eventId, confirmation) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/events/${eventId}/correct-goal`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/events/${eventId}/correct-goal`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ confirmation }),
+        json: { confirmation },
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async correctFinishedGoalEvent(leagueId, eventId, playerId, assistPlayerId, confirmation) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/events/${eventId}/correct-goal-event`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/events/${eventId}/correct-goal-event`, {
         method: "PATCH",
-        headers: authHeaders(true),
-        body: JSON.stringify({ playerId, assistPlayerId, confirmation }),
+        json: { playerId, assistPlayerId, confirmation },
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async addFinishedGoalEvent(leagueId, matchId, teamId, playerId, assistPlayerId, confirmation) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/events/add-goal`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/${matchId}/events/add-goal`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ teamId, playerId, assistPlayerId, confirmation }),
+        json: { teamId, playerId, assistPlayerId, confirmation },
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async changeMatchGoalkeeper(leagueId, matchId, teamId, playerId, elapsedSeconds) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/teams/${teamId}/goalkeeper`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/${matchId}/teams/${teamId}/goalkeeper`, {
         method: "PATCH",
-        headers: authHeaders(true),
-        body: JSON.stringify({ playerId, elapsedSeconds }),
+        json: { playerId, elapsedSeconds },
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async correctFinishedGoalkeeper(leagueId, matchId, teamId, playerId, confirmation) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/teams/${teamId}/correct-goalkeeper`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/${matchId}/teams/${teamId}/correct-goalkeeper`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ playerId, confirmation }),
+        json: { playerId, confirmation },
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async setRoundTeamFixedGoalkeeper(leagueId, roundId, teamId, playerId) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/rounds/${roundId}/teams/${teamId}/fixed-goalkeeper`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/rounds/${roundId}/teams/${teamId}/fixed-goalkeeper`, {
         method: "PATCH",
-        headers: authHeaders(true),
-        body: JSON.stringify({ playerId }),
+        json: { playerId },
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async substituteMatchPlayer(leagueId, input) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/substitutions`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/substitutions`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify(input),
+        json: input,
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async undoLastMatchSubstitution(leagueId, matchId, substitutionId) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/substitutions/${substitutionId}`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/${matchId}/substitutions/${substitutionId}`, {
         method: "DELETE",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async updateMatchTimer(leagueId, matchId, action) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/timer`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/${matchId}/timer`, {
         method: "PATCH",
-        headers: authHeaders(true),
-        body: JSON.stringify({ action }),
+        json: { action },
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async resetMatchTimer(leagueId, matchId) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/timer/reset`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/${matchId}/timer/reset`, {
         method: "POST",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async addMatchExtraTime(leagueId, matchId, extraSeconds) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/timer/extra-time`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/${matchId}/timer/extra-time`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ extraSeconds }),
+        json: { extraSeconds },
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async notifyMatchTimerThreshold(leagueId, matchId, threshold) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/timer/notify`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/${matchId}/timer/notify`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ threshold }),
+        json: { threshold },
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async dispatchMatchTimerThreshold(leagueId, matchId, threshold) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/timer/dispatch`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/${matchId}/timer/dispatch`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ threshold }),
+        json: { threshold },
       });
-      if (!res.ok) await parseApiError(res);
       const data = await res.json();
       return { success: true, ...data };
     },
 
     async releaseMatchTimerThreshold(leagueId, matchId, threshold, claimedAt) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/timer/notify`, {
+      await request(`${base}/api/matches/leagues/${leagueId}/${matchId}/timer/notify`, {
         method: "DELETE",
-        headers: authHeaders(true),
-        body: JSON.stringify({ threshold, claimedAt }),
+        json: { threshold, claimedAt },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async selectBestGoalkeeper(leagueId, roundId, playerId) {
-      const res = await fetch(`${base}/api/matches/leagues/${leagueId}/rounds/${roundId}/goalkeeper/best`, {
+      const res = await request(`${base}/api/matches/leagues/${leagueId}/rounds/${roundId}/goalkeeper/best`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ playerId }),
+        json: { playerId },
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
   };
@@ -329,7 +272,10 @@ export async function dispatchSystemMatchTimerThreshold(
     body: JSON.stringify({ threshold }),
     cache: "no-store",
   });
-  if (!response.ok) await parseApiError(response);
+  if (!response.ok) {
+    const error = await readApiError(response, "Erro na operação da partida.");
+    throw new MatchApiError(error.message, error.statusCode, error.fieldErrors, error.code);
+  }
   return response.json();
 }
 
@@ -347,5 +293,8 @@ export async function releaseSystemMatchTimerThreshold(
     body: JSON.stringify({ threshold, claimedAt }),
     cache: "no-store",
   });
-  if (!response.ok) await parseApiError(response);
+  if (!response.ok) {
+    const error = await readApiError(response, "Erro na operação da partida.");
+    throw new MatchApiError(error.message, error.statusCode, error.fieldErrors, error.code);
+  }
 }

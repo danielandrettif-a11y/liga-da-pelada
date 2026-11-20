@@ -13,7 +13,7 @@ describe("pgAccountCareerRepository", () => {
       : { rows: [] });
     const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
     const rows = await pgAccountCareerRepository(pool).listForAccount({ userId: "verified-user" });
-    expect(query).toHaveBeenCalledWith("SET LOCAL ROLE authenticated");
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("set_config('role', 'authenticated'"), expect.any(Array));
     expect(query).toHaveBeenCalledWith("SELECT * FROM public.get_my_account_career_stats()");
     expect(rows[0]).toMatchObject({ rounds_count: 2, goals: 4, points: 6.5, play_seconds: 900 });
   });

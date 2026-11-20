@@ -1,13 +1,8 @@
+import { ApiError } from "@/modules/shared/domain/api-error";
+import { apiClient } from "@/modules/shared/infrastructure/api-client";
 import type { CallupWithEntries } from "@/lib/actions/callups";
 
-type ApiErrorPayload = { message?: unknown };
-
-export class CallupApiError extends Error {
-  constructor(message: string, public readonly statusCode: number | null = null) {
-    super(message);
-    this.name = "CallupApiError";
-  }
-}
+export class CallupApiError extends ApiError {}
 
 export type CallupInviteResult = {
   playerId: string;
@@ -58,10 +53,11 @@ export type CallupHttpGateway = {
       stadiumId?: string | null;
       roundType?: "friendly" | "official";
     },
+    expectedVersion?: string,
   ): Promise<void>;
-  closeCallup(leagueId: string, callupId: string): Promise<void>;
-  setVisibility(leagueId: string, callupId: string, isPublic: boolean): Promise<void>;
-  setMatchRules(leagueId: string, callupId: string, matchDuration: number, goalsToFinish: number): Promise<void>;
+  closeCallup(leagueId: string, callupId: string, expectedVersion?: string): Promise<void>;
+  setVisibility(leagueId: string, callupId: string, isPublic: boolean, expectedVersion?: string): Promise<void>;
+  setMatchRules(leagueId: string, callupId: string, matchDuration: number, goalsToFinish: number, expectedVersion?: string): Promise<void>;
   lockCallup(leagueId: string, callupId: string): Promise<void>;
   joinCallup(
     leagueId: string,
@@ -95,170 +91,140 @@ export type CallupHttpGateway = {
   repairMyPlayer(): Promise<{ playerId?: string }>;
 };
 
-async function parseApiError(response: Response): Promise<never> {
-  const payload = (await response.json().catch(() => null)) as ApiErrorPayload | null;
-  const message = typeof payload?.message === "string" ? payload.message : "Erro na operação da convocação.";
-  throw new CallupApiError(message, response.status);
-}
-
 export function httpCallupGateway(backendUrl: string, accessToken?: string): CallupHttpGateway {
   const base = backendUrl.replace(/\/+$/, "");
 
-  const authHeaders = (hasBody = false) => {
-    const headers: Record<string, string> = {};
-    if (accessToken) headers.authorization = `Bearer ${accessToken}`;
-    if (hasBody) headers["content-type"] = "application/json";
-    return headers;
-  };
+  const request = apiClient({ accessToken, fallback: "Erro na operação da convocação.", ErrorClass: CallupApiError });
 
   return {
     async listActive(leagueId: string, inviteCallupId?: string): Promise<CallupWithEntries[]> {
       const url = new URL(`${base}/api/callups/leagues/${leagueId}/active`);
       if (inviteCallupId) url.searchParams.set("inviteCallupId", inviteCallupId);
-      const res = await fetch(url.toString(), {
-        headers: authHeaders(),
+      const res = await request(url.toString(), {
         cache: "no-store",
       });
-      if (!res.ok) await parseApiError(res);
-      return res.json();
+      const callups: Array<Omit<CallupWithEntries, "entries"> & {
+        entries: Array<Omit<CallupWithEntries["entries"][number], "status"> & { status: "confirmed" | "waitlist" | "waitlisted" }>;
+      }> = await res.json();
+      return callups.map((callup) => ({
+        ...callup,
+        entries: callup.entries.map((entry) => ({
+          ...entry,
+          status: entry.status === "waitlisted" ? "waitlist" : entry.status,
+        })),
+      }));
     },
 
     async listAgenda(leagueId: string): Promise<AgendaCallupItem[]> {
-      const res = await fetch(`${base}/api/callups/leagues/${leagueId}/agenda`, {
-        headers: authHeaders(),
+      const res = await request(`${base}/api/callups/leagues/${leagueId}/agenda`, {
         cache: "no-store",
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async openCallup(leagueId, input) {
-      const res = await fetch(`${base}/api/callups/leagues/${leagueId}`, {
+      const res = await request(`${base}/api/callups/leagues/${leagueId}`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify(input),
+        json: input,
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
-    async updateCallup(leagueId, callupId, input) {
-      const res = await fetch(`${base}/api/callups/leagues/${leagueId}/${callupId}`, {
+    async updateCallup(leagueId, callupId, input, expectedVersion) {
+      await request(`${base}/api/callups/leagues/${leagueId}/${callupId}`, {
+        headers: expectedVersion ? { "x-expected-version": expectedVersion } : undefined,
         method: "PATCH",
-        headers: authHeaders(true),
-        body: JSON.stringify(input),
+        json: input,
       });
-      if (!res.ok) await parseApiError(res);
     },
 
-    async closeCallup(leagueId, callupId) {
-      const res = await fetch(`${base}/api/callups/leagues/${leagueId}/${callupId}/close`, {
+    async closeCallup(leagueId, callupId, expectedVersion) {
+      await request(`${base}/api/callups/leagues/${leagueId}/${callupId}/close`, {
+        headers: expectedVersion ? { "x-expected-version": expectedVersion } : undefined,
         method: "POST",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
     },
 
-    async setVisibility(leagueId, callupId, isPublic) {
-      const res = await fetch(`${base}/api/callups/leagues/${leagueId}/${callupId}/visibility`, {
+    async setVisibility(leagueId, callupId, isPublic, expectedVersion) {
+      await request(`${base}/api/callups/leagues/${leagueId}/${callupId}/visibility`, {
+        headers: expectedVersion ? { "x-expected-version": expectedVersion } : undefined,
         method: "PATCH",
-        headers: authHeaders(true),
-        body: JSON.stringify({ isPublic }),
+        json: { isPublic },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
-    async setMatchRules(leagueId, callupId, matchDuration, goalsToFinish) {
-      const res = await fetch(`${base}/api/callups/leagues/${leagueId}/${callupId}/match-rules`, {
+    async setMatchRules(leagueId, callupId, matchDuration, goalsToFinish, expectedVersion) {
+      await request(`${base}/api/callups/leagues/${leagueId}/${callupId}/match-rules`, {
+        headers: expectedVersion ? { "x-expected-version": expectedVersion } : undefined,
         method: "PUT",
-        headers: authHeaders(true),
-        body: JSON.stringify({ matchDuration, goalsToFinish }),
+        json: { matchDuration, goalsToFinish },
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async lockCallup(leagueId, callupId) {
-      const res = await fetch(`${base}/api/callups/leagues/${leagueId}/${callupId}/lock`, {
+      await request(`${base}/api/callups/leagues/${leagueId}/${callupId}/lock`, {
         method: "POST",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
     },
 
     async joinCallup(leagueId, callupId) {
-      const res = await fetch(`${base}/api/callups/leagues/${leagueId}/${callupId}/join`, {
+      const res = await request(`${base}/api/callups/leagues/${leagueId}/${callupId}/join`, {
         method: "POST",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async leaveCallup(leagueId, callupId) {
-      const res = await fetch(`${base}/api/callups/leagues/${leagueId}/${callupId}/leave`, {
+      const res = await request(`${base}/api/callups/leagues/${leagueId}/${callupId}/leave`, {
         method: "POST",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async addPlayer(leagueId, callupId, playerId, asAdmin) {
-      const res = await fetch(`${base}/api/callups/leagues/${leagueId}/${callupId}/players`, {
+      const res = await request(`${base}/api/callups/leagues/${leagueId}/${callupId}/players`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ playerId, asAdmin }),
+        json: { playerId, asAdmin },
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async removePlayer(leagueId, callupId, playerId, asAdmin) {
       const url = new URL(`${base}/api/callups/leagues/${leagueId}/${callupId}/players/${playerId}`);
       if (asAdmin) url.searchParams.set("asAdmin", "true");
-      const res = await fetch(url.toString(), {
+      const res = await request(url.toString(), {
         method: "DELETE",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async inviteGuest(leagueId, callupId, guest) {
-      const res = await fetch(`${base}/api/callups/leagues/${leagueId}/${callupId}/guests`, {
+      const res = await request(`${base}/api/callups/leagues/${leagueId}/${callupId}/guests`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify(guest),
+        json: guest,
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async inviteGuestList(leagueId, callupId, guests, playerProfile) {
-      const res = await fetch(`${base}/api/callups/leagues/${leagueId}/${callupId}/guest-list`, {
+      const res = await request(`${base}/api/callups/leagues/${leagueId}/${callupId}/guest-list`, {
         method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify({ guests, playerProfile }),
+        json: { guests, playerProfile },
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async createPrelist(leagueId, callupId) {
-      const res = await fetch(`${base}/api/callups/leagues/${leagueId}/${callupId}/prelist`, {
+      const res = await request(`${base}/api/callups/leagues/${leagueId}/${callupId}/prelist`, {
         method: "POST",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
 
     async repairMyPlayer() {
-      const res = await fetch(`${base}/api/callups/repair-player`, {
+      const res = await request(`${base}/api/callups/repair-player`, {
         method: "POST",
-        headers: authHeaders(),
       });
-      if (!res.ok) await parseApiError(res);
       return res.json();
     },
   };

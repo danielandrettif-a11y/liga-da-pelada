@@ -7,7 +7,7 @@ describe("pgIdentityProfileRepository", () => {
     const query = vi.fn().mockResolvedValue({ rows: [] });
     const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
     await pgIdentityProfileRepository(pool).ensureProfile({ userId: "verified-user" });
-    expect(query).toHaveBeenCalledWith("SET LOCAL ROLE authenticated");
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("set_config('role', 'authenticated'"), expect.any(Array));
     expect(query).toHaveBeenCalledWith("SELECT public.ensure_my_player_account()");
   });
 

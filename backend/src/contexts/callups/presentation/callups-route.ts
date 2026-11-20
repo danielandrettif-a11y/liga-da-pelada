@@ -20,7 +20,7 @@ import {
   updateCallup,
   type CallupRepository,
 } from "../application/manage-callups.js";
-import { InvalidCallupError } from "../domain/callup.js";
+import { InvalidCallupError, CallupVersionConflict } from "../domain/callup.js";
 import { CallupPersistenceError } from "../infrastructure/pg-callup-repository.js";
 
 const leagueParams = {
@@ -38,7 +38,15 @@ const callupParams = {
   },
 } as const;
 
+function expectedCallupVersion(request: FastifyRequest): string | undefined {
+  const version = request.headers["x-expected-version"];
+  return Array.isArray(version) ? version.join(",") : version;
+}
+
 function sendFailure(error: unknown, request: FastifyRequest, reply: FastifyReply) {
+  if (error instanceof CallupVersionConflict) {
+    return reply.code(409).send({ code: "CALLUP_VERSION_CONFLICT", message: error.message });
+  }
   if (error instanceof InvalidCallupError) {
     return reply.code(400).send({ code: "INVALID_CALLUP_REQUEST", message: error.message });
   }
@@ -132,7 +140,7 @@ export function registerCallupRoutes(app: FastifyInstance, dependencies: {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        await updateCallup(request.params.leagueId, request.params.callupId, request.body, authentication.actor, dependencies.repository);
+        await updateCallup(request.params.leagueId, request.params.callupId, request.body, authentication.actor, dependencies.repository, expectedCallupVersion(request));
         return reply.code(200).send({ success: true });
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -148,7 +156,7 @@ export function registerCallupRoutes(app: FastifyInstance, dependencies: {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        await closeCallup(request.params.leagueId, request.params.callupId, authentication.actor, dependencies.repository);
+        await closeCallup(request.params.leagueId, request.params.callupId, authentication.actor, dependencies.repository, expectedCallupVersion(request));
         return reply.code(200).send({ success: true });
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -164,7 +172,7 @@ export function registerCallupRoutes(app: FastifyInstance, dependencies: {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        await setCallupVisibility(request.params.leagueId, request.params.callupId, Boolean(request.body.isPublic), authentication.actor, dependencies.repository);
+        await setCallupVisibility(request.params.leagueId, request.params.callupId, Boolean(request.body.isPublic), authentication.actor, dependencies.repository, expectedCallupVersion(request));
         return reply.code(200).send({ success: true });
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -187,6 +195,7 @@ export function registerCallupRoutes(app: FastifyInstance, dependencies: {
           Number(request.body.goalsToFinish),
           authentication.actor,
           dependencies.repository,
+          expectedCallupVersion(request),
         );
         return reply.code(200).send({ success: true });
       } catch (error) {

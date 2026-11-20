@@ -18,7 +18,7 @@ describe("pgStadiumRepository", () => {
     await expect(pgStadiumRepository(pool).list(leagueId, actor)).resolves.toEqual([
       expect.objectContaining({ id: stadiumId, created_at: "2026-01-01T00:00:00.000Z" }),
     ]);
-    expect(query).toHaveBeenCalledWith("SET LOCAL ROLE authenticated");
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("set_config('role', 'authenticated'"), expect.any(Array));
   });
 
   it("serializes creation and reorders atomically for the verified admin", async () => {

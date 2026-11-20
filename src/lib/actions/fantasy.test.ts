@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/server", () => ({ after: (callback: () => void) => callback() }));
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
   unstable_cache: (fn: any) => fn,

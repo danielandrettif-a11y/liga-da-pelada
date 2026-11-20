@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
+vi.mock("next/server", () => ({ after: (callback: () => void) => callback() }));
 vi.mock("../auth", () => ({
   getCurrentAccount: mocks.account,
   getAdminClient: mocks.adminClient,
@@ -157,13 +158,13 @@ describe("callups actions via API gateway", () => {
     });
 
     await expect(closeCallup(callupId)).resolves.toEqual({ success: true });
-    expect(closeCallupMock).toHaveBeenCalledWith(leagueId, callupId);
+    expect(closeCallupMock).toHaveBeenCalledWith(leagueId, callupId, undefined);
 
     await expect(lockCallupForRound(callupId)).resolves.toEqual({ success: true });
     expect(lockCallupMock).toHaveBeenCalledWith(leagueId, callupId);
 
     await expect(setCallupVisibility(callupId, false)).resolves.toEqual({ success: true });
-    expect(setVisibilityMock).toHaveBeenCalledWith(leagueId, callupId, false);
+    expect(setVisibilityMock).toHaveBeenCalledWith(leagueId, callupId, false, undefined);
   });
 
   it("routes repairMyPlayerAccount via API when available", async () => {
@@ -180,6 +181,6 @@ describe("callups actions via API gateway", () => {
     mocks.callupApi.mockResolvedValue({ setMatchRules: setMatchRulesMock });
 
     await expect(setCallupMatchRules(callupId, 10, 3)).resolves.toEqual({ success: true });
-    expect(setMatchRulesMock).toHaveBeenCalledWith(leagueId, callupId, 10, 3);
+    expect(setMatchRulesMock).toHaveBeenCalledWith(leagueId, callupId, 10, 3, undefined);
   });
 });

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/server", () => ({ after: (callback: () => void) => callback() }));
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
   revalidateTag: mocks.revalidateTag,

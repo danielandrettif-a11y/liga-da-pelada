@@ -1,13 +1,15 @@
+import { ApiError } from "@/modules/shared/domain/api-error";
+import { apiClient } from "@/modules/shared/infrastructure/api-client";
 import type { FantasyLineupSubmission } from "../domain/lineup-submission";
 
-export class FantasyApiError extends Error {
+export class FantasyApiError extends ApiError {
   constructor(
     message: string,
     public readonly status: number = 500,
-    public readonly code?: string
+    code?: string,
+    fieldErrors?: Readonly<Record<string, unknown>>
   ) {
-    super(message);
-    this.name = "FantasyApiError";
+    super(message, status, fieldErrors, code);
   }
 }
 
@@ -45,36 +47,22 @@ export type FantasyHttpGateway = {
 export function httpFantasyGateway(baseUrl: string, accessToken: string): FantasyHttpGateway {
   const cleanBase = baseUrl.replace(/\/+$/, "");
 
-  async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = `${cleanBase}${endpoint}`;
-    const headers = {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    };
+  const send = apiClient({ accessToken, fallback: "Erro na API de Fantasy." });
 
-    let res: Response;
+  async function request<T>(endpoint: string, options: RequestInit & { json?: unknown } = {}): Promise<T> {
+    let response: Response;
     try {
-      res = await fetch(url, { ...options, headers });
-    } catch (err) {
-      throw new FantasyApiError(`Falha de conexão com a API de Fantasy: ${(err as Error).message}`, 503);
-    }
-
-    if (!res.ok) {
-      let errorBody: any = null;
-      try {
-        errorBody = await res.json();
-      } catch {
-        // payload não json
+      response = await send(`${cleanBase}${endpoint}`, options);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw new FantasyApiError(error.message, error.statusCode ?? 500, error.code, error.fieldErrors);
       }
-      const message = errorBody?.message || `Erro HTTP ${res.status} na API de Fantasy.`;
-      throw new FantasyApiError(message, res.status, errorBody?.code);
+      throw new FantasyApiError("Falha de conexão com a API de Fantasy.", 503);
     }
-
-    return res.json() as Promise<T>;
+    return response.json();
   }
 
-  async function command(endpoint: string, options: RequestInit = {}) {
+  async function command(endpoint: string, options: RequestInit & { json?: unknown } = {}) {
     try {
       return await request(endpoint, options);
     } catch (error) {
@@ -137,7 +125,7 @@ export function httpFantasyGateway(baseUrl: string, accessToken: string): Fantas
       try {
         return await request(`/api/fantasy/leagues/${encodeURIComponent(leagueId)}/rounds/${encodeURIComponent(roundId)}/lineup`, {
           method: "POST",
-          body: JSON.stringify(input),
+          json: input,
         });
       } catch (error) {
         if (error instanceof FantasyApiError && error.status === 400) return { success: false, error: error.message };
@@ -178,13 +166,13 @@ export function httpFantasyGateway(baseUrl: string, accessToken: string): Fantas
     updateSettings(leagueId, settings) {
       return command(`/api/fantasy/leagues/${encodeURIComponent(leagueId)}/settings`, {
         method: "POST",
-        body: JSON.stringify(settings),
+        json: settings,
       });
     },
     reprocessRound(leagueId, roundId, useCurrentRules = false) {
       return command(`/api/fantasy/leagues/${encodeURIComponent(leagueId)}/rounds/${encodeURIComponent(roundId)}/reprocess`, {
         method: "POST",
-        body: JSON.stringify({ useCurrentRules }),
+        json: { useCurrentRules },
       });
     },
     createTestSession(leagueId, roundId) {

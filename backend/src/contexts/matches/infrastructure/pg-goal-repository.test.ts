@@ -26,11 +26,11 @@ describe("pgGoalRepository", () => {
     const { repository, query, release } = fixture(receipt);
     await expect(repository.registerGoal(command, { userId: "verified-user" })).resolves.toEqual(receipt);
     expect(query.mock.calls.map(([sql]) => sql)).toEqual([
-      "BEGIN", "SET LOCAL ROLE authenticated",
+      "BEGIN",
       expect.stringContaining("request.jwt.claim.sub"),
       expect.stringContaining("public.register_goal"), "COMMIT",
     ]);
-    expect(query.mock.calls[2]?.[1]).toEqual([
+    expect(query.mock.calls[1]?.[1]).toEqual([
       "verified-user", JSON.stringify({ sub: "verified-user", role: "authenticated" }),
     ]);
     expect(release).toHaveBeenCalledOnce();

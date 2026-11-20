@@ -22,7 +22,7 @@ describe("pgSeasonRepository", () => {
     await expect(repository.getActive(leagueId, actor)).resolves.toMatchObject({ id: "season-1", started_at: "2026-01-01T00:00:00.000Z" });
     await expect(repository.getActiveRoundIds(leagueId, "official", actor)).resolves.toEqual(["round-1"]);
     await expect(repository.getLatestFinishedSummary(leagueId, actor)).resolves.toMatchObject({ seasonId: "old" });
-    expect(query.mock.calls.filter(([sql]) => sql === "SET LOCAL ROLE authenticated")).toHaveLength(3);
+    expect(query.mock.calls.filter(([sql]) => sql.includes("set_config('role', 'authenticated'"))).toHaveLength(3);
   });
 
   it("builds and commits the snapshot in the same authenticated transaction", async () => {

@@ -120,13 +120,16 @@ export function registerMatchRoutes(app: FastifyInstance, dependencies: {
   );
 
   // Encerramento de partida
-  app.post<{ Params: { leagueId: string; matchId: string } }>(
+  app.post<{ Params: { leagueId: string; matchId: string }; Body: { expectedScore?: Parameters<typeof finishMatch>[4] } }>(
     "/api/matches/leagues/:leagueId/:matchId/finish",
     async (request, reply) => {
       const authentication = await authenticateBearer(request, dependencies.verifier);
       if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
       try {
-        const result = await finishMatch(request.params.matchId, request.params.leagueId, authentication.actor, dependencies.repository);
+        const result = await finishMatch(
+          request.params.matchId, request.params.leagueId, authentication.actor, dependencies.repository,
+          request.body?.expectedScore,
+        );
         return reply.code(200).send(result);
       } catch (error) {
         return sendFailure(error, request, reply);

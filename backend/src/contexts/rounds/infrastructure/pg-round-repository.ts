@@ -801,6 +801,15 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
     async finishRound(roundId: string, leagueId: string, input: FinishRoundInput, actor: Actor): Promise<FinishRoundResult> {
       return authenticated(pool, actor, async (client) => {
         await requireLeagueAdmin(client, leagueId);
+        if (input.expectedVersion !== undefined) {
+          const { rows } = await client.query<{ current: boolean }>(
+            `SELECT (COALESCE((to_jsonb(r)->>'updated_at')::timestamptz, r.created_at) = $3::timestamptz AND status <> 'finished') AS current
+             FROM public.rounds r WHERE r.id = $1::uuid AND r.league_id = $2::uuid`,
+            [roundId, leagueId, input.expectedVersion],
+          );
+          if (!rows[0]) throw new RoundPersistenceError("Rodada não encontrada na pelada selecionada.", 404);
+          if (!rows[0].current) throw new RoundPersistenceError("A rodada mudou. Atualize a página antes de encerrá-la.", 409);
+        }
         const roundResult = await client.query<{
           status: string;
           round_type: string;
@@ -812,11 +821,15 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
            FROM public.rounds r
            JOIN public.leagues league ON league.id = r.league_id
            WHERE r.id = $1::uuid AND r.league_id = $2::uuid
+             AND ($3::timestamptz IS NULL OR (COALESCE((to_jsonb(r)->>'updated_at')::timestamptz, r.created_at) = $3::timestamptz AND r.status <> 'finished'))
            FOR UPDATE OF r`,
-          [roundId, leagueId],
+          [roundId, leagueId, input.expectedVersion ?? null],
         );
         const round = roundResult.rows[0];
         if (!round) {
+          if (input.expectedVersion !== undefined) {
+            throw new RoundPersistenceError("A rodada mudou. Atualize a página antes de encerrá-la.", 409);
+          }
           throw new RoundPersistenceError("Rodada não encontrada na pelada selecionada.", 404);
         }
 

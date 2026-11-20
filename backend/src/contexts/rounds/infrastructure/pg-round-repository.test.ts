@@ -65,7 +65,7 @@ describe("pgRoundRepository", () => {
     expect(result[0]?.matchesCount).toBe(5);
     expect(result[0]?.round_players).toEqual([{ count: 24 }]);
     expect(result[0]?.matches).toEqual([{ count: 5 }]);
-    expect(query).toHaveBeenCalledWith("SET LOCAL ROLE authenticated");
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("set_config('role', 'authenticated'"), expect.any(Array));
   });
 
   it("returns the complete round detail read model in chronological order", async () => {

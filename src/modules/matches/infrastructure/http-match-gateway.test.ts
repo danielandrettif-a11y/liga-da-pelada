@@ -59,7 +59,7 @@ describe("httpMatchGateway", () => {
       .resolves.toEqual({ success: true, roundId });
     expect(fetchMock).toHaveBeenCalledWith(
       `${backendUrl}/api/matches/leagues/${leagueId}/${matchId}/finish`,
-      { method: "POST", headers: { authorization: "Bearer test-token" } },
+      expect.objectContaining({ method: "POST", headers: { authorization: "Bearer test-token" }, body: undefined }),
     );
   });
 

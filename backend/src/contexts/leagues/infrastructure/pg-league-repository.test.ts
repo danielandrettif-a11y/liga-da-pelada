@@ -19,10 +19,10 @@ describe("pgLeagueRepository", () => {
     await expect(repository.create({ name: "Pelada BQ", tier: "quick", visibility: "private" }, { userId: "verified-user" }))
       .resolves.toBe("league-1");
     expect(query.mock.calls.map(([sql]) => sql)).toEqual([
-      "BEGIN", "SET LOCAL ROLE authenticated", expect.stringContaining("request.jwt.claim.sub"),
+      "BEGIN", expect.stringContaining("request.jwt.claim.sub"),
       expect.stringContaining("public.create_league_for_user"), "COMMIT",
     ]);
-    expect(query.mock.calls[2]?.[1]).toEqual([
+    expect(query.mock.calls[1]?.[1]).toEqual([
       "verified-user", JSON.stringify({ sub: "verified-user", role: "authenticated" }),
     ]);
     expect(release).toHaveBeenCalledOnce();

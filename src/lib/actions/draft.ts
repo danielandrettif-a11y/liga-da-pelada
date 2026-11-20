@@ -211,6 +211,14 @@ async function getDraftWorkspaceBy(column: "callup_id" | "round_id", value: stri
   };
 }
 
+export async function hasCallupDraft(callupId: string): Promise<boolean> {
+  const [account, league] = await Promise.all([getCurrentAccount(), getSelectedLeague()]);
+  if (!account.user || !league) return false;
+  const { data } = await account.client.from("team_drafts").select("id")
+    .eq("callup_id", callupId).eq("league_id", league.id).limit(1).maybeSingle();
+  return Boolean(data);
+}
+
 export async function getDraftWorkspace(callupId: string) {
   const account = await getCurrentAccount();
   const league = await getSelectedLeague();
