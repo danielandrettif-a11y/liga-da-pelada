@@ -28,4 +28,15 @@ describe("ManageSeasonOperationsUseCase", () => {
     await useCase.executeReprocessSeason(actor, leagueId);
     for (const method of Object.values(repository)) expect(method).toHaveBeenCalledWith(actor, leagueId);
   });
+
+  it("accepts legacy PostgreSQL league identifiers", async () => {
+    const repository = {
+      findPlayerCardOveralls: vi.fn().mockResolvedValue({}),
+      findTeamStandings: vi.fn(), previewReprocess: vi.fn(), executeReprocess: vi.fn(),
+    };
+    const useCase = new ManageSeasonOperationsUseCase(repository);
+    const legacyLeague = "b0000000-0000-0000-0000-000000000001";
+    await useCase.getPlayerCardOveralls(actor, legacyLeague);
+    expect(repository.findPlayerCardOveralls).toHaveBeenCalledWith(actor, legacyLeague);
+  });
 });
