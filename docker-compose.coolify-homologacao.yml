@@ -111,6 +111,8 @@ services:
       - ROUNDS_API_ENABLED=true
       - ROUNDS_BACKEND_URL=http://liga-coolify-homologacao-api:3001
       - STATISTICS_API_ENABLED=true
+      # O endpoint de dashboard ainda não está registrado no backend.
+      - DASHBOARD_API_ENABLED=false
       - STATISTICS_BACKEND_URL=http://liga-coolify-homologacao-api:3001
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/',{redirect:'manual'}).then(r=>{if(r.status>=500)process.exit(1)}).catch(()=>process.exit(1))"]

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -29,6 +29,7 @@ describe("Server Action: getDashboardData", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+  afterEach(() => vi.unstubAllEnvs());
 
   it("delegates to statistics gateway when api session is enabled", async () => {
     const mockGateway = {
@@ -55,7 +56,8 @@ describe("Server Action: getDashboardData", () => {
   });
 
   it("falls back to legacy supabase flow when api session is disabled", async () => {
-    getStatisticsApiSessionMock.mockResolvedValue(null);
+    vi.stubEnv("DASHBOARD_API_ENABLED", "false");
+    getStatisticsApiSessionMock.mockRejectedValue(new Error("dashboard API should not be called"));
     getActiveSeasonMock.mockResolvedValue({
       id: "season-1",
       league_id: "league-123",
@@ -87,6 +89,7 @@ describe("Server Action: getDashboardData", () => {
 
     const result = await getDashboardData();
     expect(result.success).toBe(true);
+    expect(getStatisticsApiSessionMock).not.toHaveBeenCalled();
     expect(client.rpc).toHaveBeenCalledWith("get_home_read_model", {
       p_season_id: "season-1",
       p_league_id: "league-123",

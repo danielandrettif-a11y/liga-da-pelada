@@ -56,16 +56,26 @@ function IncompleteProfileBanner() {
   );
 }
 
+async function HomeSeasonPass({ pass }: { pass: Promise<Awaited<ReturnType<typeof getSeasonPassDashboard>> | null> }) {
+  const data = await pass;
+  return <SeasonPassBanner pass={data || undefined} compact />;
+}
+
+async function HomePreviousSeason({ season }: { season: ReturnType<typeof getLatestFinishedSeason> }) {
+  const summary = await season;
+  return summary ? <PreviousSeasonBanner summary={summary} /> : null;
+}
+
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ inviteError?: string }> }) {
   const query = await searchParams;
   const accountPromise = getCurrentAccount();
   const selectedLeaguePromise = getSelectedLeague();
-  const [{ data }, previousSeason, account, identity, seasonPass, monthlyAwards, selectedLeague] = await Promise.all([
+  const previousSeasonPromise = getLatestFinishedSeason().catch(() => null);
+  const seasonPassPromise = selectedLeaguePromise.then((league) => league?.featureTier === "complete" ? getSeasonPassDashboard() : null).catch(() => null);
+  const [{ data }, account, identity, monthlyAwards, selectedLeague] = await Promise.all([
     getDashboardData(),
-    getLatestFinishedSeason(),
     accountPromise,
     getCurrentAccountIdentity(),
-    selectedLeaguePromise.then((league) => league?.featureTier === "complete" ? getSeasonPassDashboard() : null),
     getPreviousMonthAwardWinners(),
     selectedLeaguePromise,
   ]);
@@ -168,9 +178,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         })()}
       </section>
 
-      {selectedLeague?.featureTier === "complete" && <SeasonPassBanner pass={seasonPass || undefined} compact />}
+      {selectedLeague?.featureTier === "complete" && <Suspense fallback={null}><HomeSeasonPass pass={seasonPassPromise} /></Suspense>}
 
-      {previousSeason && selectedLeague?.featureTier !== "quick" && <PreviousSeasonBanner summary={previousSeason} />}
+      {selectedLeague?.featureTier !== "quick" && <Suspense fallback={null}><HomePreviousSeason season={previousSeasonPromise} /></Suspense>}
 
       {selectedLeague?.featureTier !== "quick" && <Suspense fallback={<HomeRankingPreviewFallback />}>
         <HomeRankingPreview />

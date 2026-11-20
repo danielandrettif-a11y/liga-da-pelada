@@ -8,10 +8,13 @@ import { getEventWeather } from "../weather";
 
 export async function getDashboardData() {
   try {
-    const session = await getStatisticsApiSession();
+    const [session, account, season] = await Promise.all([
+      process.env.DASHBOARD_API_ENABLED === "false" ? null : getStatisticsApiSession(),
+      getCurrentAccount(),
+      getActiveSeason(),
+    ]);
+    if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
     if (session) {
-      const season = await getActiveSeason();
-      if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
       try {
         return await session.gateway.getDashboardData(season.league_id);
       } catch (error) {
@@ -20,14 +23,13 @@ export async function getDashboardData() {
         if (!(error instanceof Error && "statusCode" in error && error.statusCode === 404)) throw error;
       }
     }
-    const account = await getCurrentAccount();
-    const season = await getActiveSeason();
-    if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
-
-    const { data: readModelData, error: readModelError } = await account.client.rpc("get_home_read_model", {
-      p_season_id: season.id,
-      p_league_id: season.league_id,
-    });
+    const [{ data: readModelData, error: readModelError }, { data: activeCallupsData }] = await Promise.all([
+      account.client.rpc("get_home_read_model", {
+        p_season_id: season.id,
+        p_league_id: season.league_id,
+      }),
+      readDashboardCallups(account.client, season.league_id),
+    ]);
     const readModel = !readModelError && readModelData && typeof readModelData === "object"
       ? readModelData as any
       : null;
@@ -101,22 +103,18 @@ export async function getDashboardData() {
       .eq("id", season.league_id)
       .single();
 
-    const activeCallupsPromise = readDashboardCallups(account.client, season.league_id);
-
     const [
       { data: nextRoundData },
       { data: nextFriendlyData },
       { data: lastRoundData },
       { data: liveMatchData },
       { data: leagueData },
-      { data: activeCallupsData },
     ] = await Promise.all([
       nextRoundPromise,
       nextFriendlyPromise,
       lastRoundPromise,
       liveMatchPromise,
       leaguePromise,
-      activeCallupsPromise,
     ]);
 
     // Convocacoes ligadas a rodadas iniciadas/finalizadas deixam de ser destaque.
