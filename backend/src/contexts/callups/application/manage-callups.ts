@@ -1,5 +1,6 @@
 import type { Actor } from "../../../shared/actor.js";
 import {
+  InvalidCallupError,
   parseCallupUuid,
   parseCallupVersion,
   validateCallupMatchRulesInput,
@@ -40,6 +41,7 @@ export interface CallupCommandRepository {
   joinCallup(leagueId: string, callupId: string, actor: Actor): Promise<{ status: CallupEntryStatus; position: number }>;
   leaveCallup(leagueId: string, callupId: string, actor: Actor): Promise<{ roundId?: string | null }>;
   addPlayer(leagueId: string, callupId: string, playerId: string, asAdmin: boolean, actor: Actor): Promise<{ status: CallupEntryStatus; position: number }>;
+  addPlayers(leagueId: string, callupId: string, playerIds: string[], actor: Actor): Promise<{ added: number; failures: Array<{ playerId: string; error: string }> }>;
   removePlayer(leagueId: string, callupId: string, playerId: string, asAdmin: boolean, actor: Actor): Promise<{ revalidateRoundId?: string | null }>;
   inviteGuest(leagueId: string, callupId: string, guest: { name: string; playerProfile?: string; isGoalkeeper?: boolean }, actor: Actor): Promise<CallupInviteResult>;
   inviteGuestList(leagueId: string, callupId: string, guests: Array<{ name: string; isGoalkeeper?: boolean }>, playerProfile: string, actor: Actor): Promise<CallupGuestListResult>;
@@ -164,6 +166,23 @@ export function leaveCallup(
   repository: CallupCommandRepository,
 ): Promise<{ roundId?: string | null }> {
   return repository.leaveCallup(parseCallupUuid(leagueId, "Pelada"), parseCallupUuid(callupId, "Convocação"), actor);
+}
+
+export function addPlayersToCallup(
+  leagueId: string,
+  callupId: string,
+  input: unknown,
+  actor: Actor,
+  repository: CallupCommandRepository,
+) {
+  if (!Array.isArray(input) || input.length < 1 || input.length > 50 ||
+    !input.every((value) => typeof value === "string")) {
+    throw new InvalidCallupError("Selecione de 1 a 50 jogadores.");
+  }
+  const playerIds = [...new Set(input.map((value) => parseCallupUuid(value, "Jogador")))];
+  return repository.addPlayers(
+    parseCallupUuid(leagueId, "Pelada"), parseCallupUuid(callupId, "Convocação"), playerIds, actor,
+  );
 }
 
 export function addPlayerToCallup(

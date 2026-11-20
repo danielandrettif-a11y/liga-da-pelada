@@ -220,18 +220,12 @@ export function pgMatchRepository(pool: Pool, now: () => number = Date.now): Mat
   return {
     async getMatch(matchId: string, leagueId: string, actor: Actor): Promise<MatchDetails | null> {
       return authenticated(pool, actor, async (client) => {
-        const matchRes = await client.query<MatchDetails>(
-          `SELECT m.*
+        const result = await client.query<{ details: MatchDetails }>(
+          `SELECT projection.details
            FROM public.matches m
            JOIN public.rounds r ON r.id = m.round_id
-           WHERE m.id = $1::uuid AND r.league_id = $2::uuid
-           LIMIT 1`,
-          [matchId, leagueId],
-        );
-        const match = matchRes.rows[0];
-        if (!match) return null;
-
-        const teamQuery = `SELECT team.*, COALESCE(jsonb_agg(jsonb_build_object(
+           CROSS JOIN LATERAL (
+             WITH teams AS (SELECT team.*, COALESCE(jsonb_agg(jsonb_build_object(
               'player_id', team_player.player_id,
               'goalkeeper_order', team_player.goalkeeper_order,
               'players', CASE WHEN player.id IS NULL THEN NULL ELSE jsonb_build_object(
@@ -243,45 +237,41 @@ export function pgMatchRepository(pool: Pool, now: () => number = Date.now): Mat
            FROM public.teams team
            LEFT JOIN public.team_players team_player ON team_player.team_id = team.id
            LEFT JOIN public.players player ON player.id = team_player.player_id
-           WHERE team.id = $1::uuid
-           GROUP BY team.id`;
-        const [teamARes, teamBRes, playersRes, eventsRes, stintsRes, subsRes, roundRes] = await Promise.all([
-          client.query(teamQuery, [match.team_a_id]),
-          client.query(teamQuery, [match.team_b_id]),
-          client.query(
-            `SELECT mp.*, row_to_json(p) AS player, row_to_json(original_team) AS original_team
+           WHERE team.id IN (m.team_a_id, m.team_b_id)
+           GROUP BY team.id), players AS (SELECT mp.*, row_to_json(p) AS player, row_to_json(original_team) AS original_team
              FROM public.match_players mp
              LEFT JOIN public.players p ON p.id = mp.player_id
              LEFT JOIN public.teams original_team ON original_team.id = mp.original_team_id
-             WHERE mp.match_id = $1::uuid`,
-            [matchId],
-          ),
-          client.query(
-            `SELECT me.*, row_to_json(p) as player, row_to_json(ap) as assist_player
+             WHERE mp.match_id = m.id)
+             SELECT to_jsonb(m) || jsonb_build_object(
+             'team_a', (SELECT to_jsonb(team) FROM teams team WHERE team.id = m.team_a_id),
+             'team_b', (SELECT to_jsonb(team) FROM teams team WHERE team.id = m.team_b_id),
+             'match_players', COALESCE((SELECT jsonb_agg(to_jsonb(player)) FROM players player), '[]'::jsonb),
+             'match_events', COALESCE((
+               SELECT jsonb_agg(to_jsonb(event) ORDER BY event.created_at DESC)
+               FROM (SELECT me.*, row_to_json(p) as player, row_to_json(ap) as assist_player
              FROM public.match_events me
              LEFT JOIN public.players p ON p.id = me.player_id
              LEFT JOIN public.players ap ON ap.id = me.assist_player_id
-             WHERE me.match_id = $1::uuid
-             ORDER BY me.created_at DESC`,
-            [matchId],
-          ),
-          client.query(
-            "SELECT * FROM public.match_goalkeeper_stints WHERE match_id = $1::uuid ORDER BY selected_at ASC",
-            [matchId],
-          ),
-          client.query(
-            `SELECT ms.*, row_to_json(p_out) AS player_out, row_to_json(p_in) AS player_in,
+             WHERE me.match_id = m.id
+             ORDER BY me.created_at DESC) event
+             ), '[]'::jsonb),
+             'match_goalkeeper_stints', COALESCE((
+               SELECT jsonb_agg(to_jsonb(stint) ORDER BY stint.selected_at)
+               FROM public.match_goalkeeper_stints stint WHERE stint.match_id = m.id
+             ), '[]'::jsonb),
+             'match_substitutions', COALESCE((
+               SELECT jsonb_agg(to_jsonb(substitution) ORDER BY substitution.created_at DESC)
+               FROM (SELECT ms.*, row_to_json(p_out) AS player_out, row_to_json(p_in) AS player_in,
                     row_to_json(original_team) AS player_in_original_team
              FROM public.match_substitutions ms
              LEFT JOIN public.players p_out ON p_out.id = ms.player_out_id
              LEFT JOIN public.players p_in ON p_in.id = ms.player_in_id
              LEFT JOIN public.teams original_team ON original_team.id = ms.player_in_original_team_id
-             WHERE ms.match_id = $1::uuid
-             ORDER BY ms.created_at DESC`,
-            [matchId],
-          ),
-          client.query(
-            `SELECT round_item.*,
+             WHERE ms.match_id = m.id
+             ORDER BY ms.created_at DESC) substitution
+             ), '[]'::jsonb),
+             'round', (SELECT to_jsonb(round_details) FROM (SELECT round_item.*,
                     COALESCE((SELECT jsonb_agg(jsonb_build_object(
                       'player_id', round_player.player_id,
                       'availability_status', round_player.availability_status,
@@ -299,49 +289,24 @@ export function pgMatchRepository(pool: Pool, now: () => number = Date.now): Mat
                       )) FROM public.team_players team_player WHERE team_player.team_id = team.id), '[]'::jsonb)
                     )) FROM public.teams team WHERE team.round_id = round_item.id), '[]'::jsonb) AS teams
              FROM public.rounds round_item
-             WHERE round_item.id = $1::uuid`,
-            [match.round_id],
-          ),
-        ]);
-
-        const playerIds = playersRes.rows.map((entry: { player_id?: string }) => entry.player_id).filter(Boolean) as string[];
-        const cosmeticsRes = playerIds.length > 0
-          ? await client.query<{
-              player_id: string;
-              banner_asset_key: string | null;
-              frame_asset_key: string | null;
-              aura_asset_key: string | null;
-            }>(
-              `SELECT profile.player_id,
-                      banner.asset_key AS banner_asset_key,
-                      frame.asset_key AS frame_asset_key,
-                      aura.asset_key AS aura_asset_key
+             WHERE round_item.id = m.round_id) round_details),
+             'player_cosmetics', COALESCE((
+               SELECT jsonb_object_agg(profile.player_id, jsonb_build_object(
+                 'bannerAssetKey', banner.asset_key, 'frameKey', frame.asset_key, 'auraAssetKey', aura.asset_key
+               ))
                FROM public.account_profiles profile
                JOIN public.account_cosmetic_loadouts loadout ON loadout.user_id = profile.user_id
                LEFT JOIN public.fantasy_cosmetics banner ON banner.id = loadout.banner_cosmetic_id
                LEFT JOIN public.fantasy_cosmetics frame ON frame.id = loadout.frame_cosmetic_id
                LEFT JOIN public.fantasy_cosmetics aura ON aura.id = loadout.aura_cosmetic_id
-               WHERE profile.player_id = ANY($1::uuid[])`,
-              [playerIds],
-            )
-          : { rows: [] };
-        const playerCosmetics = Object.fromEntries(cosmeticsRes.rows.map((entry) => [entry.player_id, {
-          bannerAssetKey: entry.banner_asset_key,
-          frameKey: entry.frame_asset_key,
-          auraKey: entry.aura_asset_key,
-        }]));
-
-        return {
-          ...match,
-          team_a: teamARes.rows[0] || null,
-          team_b: teamBRes.rows[0] || null,
-          match_players: playersRes.rows,
-          match_events: eventsRes.rows,
-          match_goalkeeper_stints: stintsRes.rows,
-          match_substitutions: subsRes.rows,
-          round: roundRes.rows[0] || null,
-          player_cosmetics: playerCosmetics,
-        };
+               WHERE profile.player_id IN (SELECT player_id FROM players)
+             ), '{}'::jsonb)
+           ) AS details
+           ) projection
+           WHERE m.id = $1::uuid AND r.league_id = $2::uuid`,
+          [matchId, leagueId],
+        );
+        return result.rows[0]?.details ?? null;
       });
     },
 

@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 import type { Actor } from "../shared/actor.js";
+import { requestTiming } from "./request-timing.js";
 
 /**
  * Executa uma operação PostgreSQL sob os claims verificados pelo Auth local.
@@ -10,7 +11,14 @@ export async function withAuthenticatedTransaction<T>(
   actor: Actor,
   operation: (client: PoolClient) => Promise<T>,
 ): Promise<T> {
+  const timing = requestTiming.getStore();
+  const waitStarted = timing ? performance.now() : 0;
   const client = await pool.connect();
+  const transactionStarted = timing ? performance.now() : 0;
+  if (timing) {
+    timing.poolWaitMs += transactionStarted - waitStarted;
+    timing.transactions++;
+  }
   let inTransaction = false;
   let discardConnection = false;
   try {
@@ -30,6 +38,7 @@ export async function withAuthenticatedTransaction<T>(
     }
     throw error;
   } finally {
+    if (timing) timing.transactionMs += performance.now() - transactionStarted;
     client.release(discardConnection);
   }
 }

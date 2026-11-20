@@ -357,7 +357,7 @@ describe("pgRoundRepository", () => {
     });
     const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
 
-    await expect(pgRoundRepository(pool).finishRound(roundId, leagueId, {
+    await expect(pgRoundRepository(pool, vi.fn().mockResolvedValue(undefined)).finishRound(roundId, leagueId, {
       paymentPix: "pix@example.com",
       paymentTotal: 150,
       expenseItemIds: [],
@@ -378,7 +378,7 @@ describe("pgRoundRepository", () => {
       return { rows: [], rowCount: 1 };
     });
     const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
-    await expect(pgRoundRepository(pool).finishRound(roundId, leagueId, {
+    await expect(pgRoundRepository(pool, vi.fn().mockResolvedValue(undefined)).finishRound(roundId, leagueId, {
       paymentPix: "pix@example.com", paymentTotal: 150, expenseItemIds: [],
     }, actor)).resolves.toEqual({ archived: false, shouldRefreshOverall: !hasTest });
     expect(query.mock.calls.some(([sql]) => sql.includes("SELECT public.process_fantasy_test_round"))).toBe(hasTest);
@@ -392,10 +392,27 @@ describe("pgRoundRepository", () => {
       return { rows: [] };
     });
     const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
-    await expect(pgRoundRepository(pool).finishRound(roundId, leagueId, {
+    await expect(pgRoundRepository(pool, vi.fn().mockResolvedValue(undefined)).finishRound(roundId, leagueId, {
       paymentPix: "pix@example.com", paymentTotal: 150, expenseItemIds: [],
     }, actor)).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining("Cartola") });
     expect(query.mock.calls.some(([sql]) => sql.includes("finalize_round_financials"))).toBe(false);
+  });
+
+  it("rejects a stale round before recalculating its statistics", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("AS current")) return { rows: [{ current: false }] };
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+    const recalculateStats = vi.fn();
+    await expect(pgRoundRepository(pool, recalculateStats).finishRound(roundId, leagueId, {
+      paymentPix: "pix@example.com",
+      paymentTotal: 150,
+      expectedVersion: "2026-10-01T12:00:00Z",
+    }, actor)).rejects.toMatchObject({ statusCode: 409 });
+    expect(recalculateStats).not.toHaveBeenCalled();
+    expect(query).toHaveBeenLastCalledWith("ROLLBACK");
   });
 
   it("saves a round prelist via RPC", async () => {

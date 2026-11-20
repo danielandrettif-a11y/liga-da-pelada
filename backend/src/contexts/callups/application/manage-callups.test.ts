@@ -29,6 +29,7 @@ function repository(): CallupRepository {
     lockCallup: vi.fn().mockResolvedValue(undefined),
     joinCallup: vi.fn().mockResolvedValue({ status: "confirmed", position: 1 }),
     leaveCallup: vi.fn().mockResolvedValue({ roundId: null }),
+    addPlayers: vi.fn().mockResolvedValue({ added: 2, failures: [] }),
     addPlayer: vi.fn().mockResolvedValue({ status: "confirmed", position: 2 }),
     removePlayer: vi.fn().mockResolvedValue({ revalidateRoundId: null }),
     inviteGuest: vi.fn().mockResolvedValue({ playerId: "guest-1", status: "confirmed", position: 3 }),

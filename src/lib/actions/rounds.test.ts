@@ -203,7 +203,7 @@ describe("rounds actions via API gateway", () => {
 
     const result = await finishRound(roundId, "pix@example.com", 100);
     expect(result).toEqual({ success: true, archived: false });
-    expect(mocks.calculateRoundStats).toHaveBeenCalledWith(roundId);
+    expect(mocks.calculateRoundStats).not.toHaveBeenCalled();
     expect(finishRoundMock).toHaveBeenCalledWith(leagueId, roundId, {
       paymentPix: "pix@example.com",
       paymentTotal: 100,

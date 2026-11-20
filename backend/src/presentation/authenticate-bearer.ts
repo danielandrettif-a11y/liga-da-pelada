@@ -1,6 +1,7 @@
 import type { FastifyRequest } from "fastify";
 import type { Actor } from "../shared/actor.js";
 import type { UserVerifier } from "../infrastructure/auth-user-verifier.js";
+import { requestTiming } from "../infrastructure/request-timing.js";
 
 type AuthFailure = { statusCode: 401 | 503; code: string; message: string };
 export type AuthResult = { actor: Actor } | { error: AuthFailure };
@@ -10,6 +11,8 @@ export async function authenticateBearer(request: FastifyRequest, verifier: User
   if (!authorization?.startsWith("Bearer ") || authorization.length <= 7) {
     return { error: { statusCode: 401, code: "UNAUTHENTICATED", message: "Sessão ausente." } };
   }
+  const timing = requestTiming.getStore();
+  const started = timing ? performance.now() : 0;
   try {
     const actor = await verifier.verifyAccessToken(authorization.slice(7));
     if (!actor) return { error: { statusCode: 401, code: "UNAUTHENTICATED", message: "Sessão inválida." } };
@@ -17,5 +20,7 @@ export async function authenticateBearer(request: FastifyRequest, verifier: User
   } catch (error) {
     request.log.error({ err: error }, "auth verification failed");
     return { error: { statusCode: 503, code: "AUTH_UNAVAILABLE", message: "Autenticação indisponível." } };
+  } finally {
+    if (timing) timing.authMs += performance.now() - started;
   }
 }

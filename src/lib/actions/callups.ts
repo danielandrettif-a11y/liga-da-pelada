@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
+import { measureMatchStep } from "../match-performance";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { getAdminClient, getCurrentAccount } from "../auth";
@@ -330,7 +331,7 @@ export async function joinActiveCallup(callupId: string) {
   try {
     const scoped = await selectedCallupApi();
     if (scoped) {
-      const { status } = await scoped.api.joinCallup(scoped.leagueId, callupId);
+      const { status } = await measureMatchStep("join_callup", "backend_write", () => scoped.api.joinCallup(scoped.leagueId, callupId));
       refreshCallups();
       return { success: true, status: status === "confirmed" ? "confirmed" as const : "waitlist" as const };
     }
@@ -346,7 +347,7 @@ export async function joinActiveCallup(callupId: string) {
   try {
     const api = await callupApiFor(account.client);
     if (api) {
-      const res = await api.joinCallup(callup.league_id, callupId);
+      const res = await measureMatchStep("join_callup", "backend_write", () => api.joinCallup(callup.league_id, callupId));
       refreshCallups();
       const status: "confirmed" | "waitlist" = res.status === "confirmed" ? "confirmed" : "waitlist";
       return { success: true, status };
@@ -365,7 +366,7 @@ export async function leaveActiveCallup(callupId: string) {
   try {
     const scoped = await selectedCallupApi();
     if (scoped) {
-      const { roundId } = await scoped.api.leaveCallup(scoped.leagueId, callupId);
+      const { roundId } = await measureMatchStep("leave_callup", "backend_write", () => scoped.api.leaveCallup(scoped.leagueId, callupId));
       refreshCallups(roundId ?? null);
       return { success: true };
     }
@@ -381,7 +382,7 @@ export async function leaveActiveCallup(callupId: string) {
   try {
     const api = await callupApiFor(account.client);
     if (api) {
-      const res = await api.leaveCallup(callup.league_id, callupId);
+      const res = await measureMatchStep("leave_callup", "backend_write", () => api.leaveCallup(callup.league_id, callupId));
       refreshCallups(res.roundId ?? null);
       return { success: true };
     }
@@ -489,6 +490,27 @@ export async function addRosterPlayersToCallup(callupId: string, playerIds: stri
   const normalizedIds = [...new Set(playerIds.filter((id) => /^[0-9a-f-]{36}$/i.test(id)))].slice(0, 50);
   if (!normalizedIds.length) return { success: false as const, error: "Selecione pelo menos um jogador." };
 
+  try {
+    const api = await callupApiFor(account.client);
+    if (api) {
+      const { added, failures } = await measureMatchStep("add_callup_players", "backend_write", () =>
+        api.addPlayers(callup.league_id, callupId, normalizedIds),
+      );
+      if (!added) {
+        return { success: false as const, error: failures[0]?.error || "Não foi possível adicionar os jogadores." };
+      }
+      refreshCallups();
+      return {
+        success: true as const,
+        added,
+        failed: failures.length,
+        error: failures.length ? `${failures.length} jogador(es) não puderam ser adicionados.` : undefined,
+      };
+    }
+  } catch (error) {
+    return { success: false as const, error: error instanceof Error ? error.message : "Não foi possível adicionar os jogadores." };
+  }
+
   const { data: memberships, error: membershipError } = await account.client
     .from("league_members")
     .select("player_id")
@@ -509,33 +531,6 @@ export async function addRosterPlayersToCallup(callupId: string, playerIds: stri
   }
   if (allowedIds.length !== normalizedIds.length) {
     return { success: false as const, error: "Um ou mais jogadores não pertencem ao elenco desta pelada." };
-  }
-
-  try {
-    const api = await callupApiFor(account.client);
-    if (api) {
-      const results = await Promise.all(allowedIds.map(async (playerId): Promise<{ success: true; error?: undefined } | { success: false; error: string }> => {
-        try {
-          await api.addPlayer(callup.league_id, callupId, playerId, false);
-          return { success: true };
-        } catch (err: any) {
-          return { success: false, error: err?.message || "Erro ao adicionar jogador." };
-        }
-      }));
-      const failed = results.filter((r): r is { success: false; error: string } => !r.success);
-      if (failed.length === results.length) {
-        return { success: false as const, error: failed[0]?.error || "Não foi possível adicionar os jogadores." };
-      }
-      refreshCallups();
-      return {
-        success: true as const,
-        added: results.length - failed.length,
-        failed: failed.length,
-        error: failed.length ? `${failed.length} jogador(es) não puderam ser adicionados.` : undefined,
-      };
-    }
-  } catch (error: any) {
-    console.error("Erro ao adicionar jogadores em lote via API:", error);
   }
 
   const gateway = supabaseCallupPlayersGateway(account.client);

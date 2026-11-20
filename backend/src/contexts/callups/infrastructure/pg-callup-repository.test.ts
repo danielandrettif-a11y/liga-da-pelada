@@ -9,6 +9,28 @@ const roundId = "00000000-0000-4000-8000-000000000004";
 const actor = { userId: "user-123" };
 
 describe("pgCallupRepository", () => {
+  it("keeps successful members when another player is rejected inside the batch", async () => {
+    const rejectedId = "00000000-0000-4000-8000-000000000005";
+    const query = vi.fn(async (sql: string, params?: unknown[]) => {
+      if (sql.includes("FROM unnest")) return { rows: [{ allowed: true }] };
+      if (sql.includes("public.add_player_to_callup") && params?.[1] === rejectedId) {
+        throw Object.assign(new Error("A lista de espera está cheia."), { code: "P0001" });
+      }
+      return { rows: [] };
+    });
+    const connect = vi.fn().mockResolvedValue({ query, release: vi.fn() });
+    const pool = { connect } as unknown as Pool;
+    const result = await pgCallupRepository(pool).addPlayers(leagueId, callupId, [playerId, rejectedId], actor);
+
+    expect(result).toEqual({
+      added: 1,
+      failures: [{ playerId: rejectedId, error: "A lista de espera está cheia." }],
+    });
+    expect(connect).toHaveBeenCalledOnce();
+    expect(query).toHaveBeenCalledWith("ROLLBACK TO SAVEPOINT add_callup_player");
+    expect(query).toHaveBeenLastCalledWith("COMMIT");
+  });
+
   it("lists active callups with entries and linked round details", async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes("FROM public.callups c")) {

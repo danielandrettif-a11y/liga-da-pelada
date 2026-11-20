@@ -13,32 +13,15 @@ describe("pgMatchRepository", () => {
   it("getMatch returns structured match details", async () => {
     const playerId = "00000000-0000-4000-8000-000000000006";
     const query = vi.fn(async (sql: string) => {
-      if (sql.includes("FROM public.matches m")) {
-        return {
-          rows: [
-            {
-              id: matchId,
-              round_id: roundId,
-              team_a_id: teamAId,
-              team_b_id: teamBId,
-              status: "live",
-              score_a: 1,
-              score_b: 0,
-            },
-          ],
-        };
-      }
-      if (sql.includes("FROM public.teams team") && sql.includes("GROUP BY team.id")) {
-        return { rows: [{ id: teamAId, name: "Time A" }] };
-      }
-      if (sql.includes("FROM public.rounds round_item") && sql.includes("round_players")) {
-        return { rows: [{ id: roundId, league_id: leagueId }] };
-      }
-      if (sql.includes("FROM public.match_players mp")) {
-        return { rows: [{ player_id: playerId, team_id: teamAId, player: { id: playerId, name: "Ana" } }] };
-      }
-      if (sql.includes("account_cosmetic_loadouts")) {
-        return { rows: [{ player_id: playerId, banner_asset_key: "banner-a", frame_asset_key: null, aura_asset_key: "aura-a" }] };
+      if (sql.includes("SELECT projection.details")) {
+        return { rows: [{ details: {
+          id: matchId, round_id: roundId, team_a_id: teamAId, team_b_id: teamBId,
+          status: "live", score_a: 1, score_b: 0,
+          team_a: { id: teamAId, name: "Time A" },
+          round: { id: roundId, league_id: leagueId },
+          match_players: [{ player_id: playerId, team_id: teamAId, player: { id: playerId, name: "Ana" } }],
+          player_cosmetics: { [playerId]: { bannerAssetKey: "banner-a" } },
+        } }] };
       }
       return { rows: [] };
     });
@@ -47,6 +30,7 @@ describe("pgMatchRepository", () => {
     const repo = pgMatchRepository(pool);
     const result = await repo.getMatch(matchId, leagueId, actor);
 
+    expect(query).toHaveBeenCalledTimes(4);
     expect(result?.id).toBe(matchId);
     expect(result?.team_a?.name).toBe("Time A");
     expect(result?.match_players?.[0]?.player.name).toBe("Ana");

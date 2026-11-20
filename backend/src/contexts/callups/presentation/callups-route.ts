@@ -3,6 +3,7 @@ import type { UserVerifier } from "../../../infrastructure/auth-user-verifier.js
 import { authenticateBearer } from "../../../presentation/authenticate-bearer.js";
 import {
   addPlayerToCallup,
+  addPlayersToCallup,
   closeCallup,
   createCallupPrelist,
   inviteGuestListToCallup,
@@ -272,6 +273,23 @@ export function registerCallupRoutes(app: FastifyInstance, dependencies: {
           dependencies.repository,
         );
         return reply.code(200).send({ success: true, ...result });
+      } catch (error) {
+        return sendFailure(error, request, reply);
+      }
+    },
+  );
+
+  app.post<{ Params: { leagueId: string; callupId: string }; Body: { playerIds?: unknown } }>(
+    "/api/callups/leagues/:leagueId/:callupId/players/batch",
+    { schema: { params: callupParams } },
+    async (request, reply) => {
+      const authentication = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
+      try {
+        const { leagueId, callupId } = request.params;
+        return await addPlayersToCallup(
+          leagueId, callupId, request.body?.playerIds, authentication.actor, dependencies.repository,
+        );
       } catch (error) {
         return sendFailure(error, request, reply);
       }

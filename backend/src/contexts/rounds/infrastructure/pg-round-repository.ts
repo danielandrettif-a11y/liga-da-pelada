@@ -1,3 +1,4 @@
+import { persistRoundStatistics } from "../../statistics/infrastructure/pg-round-statistics-repository.js";
 import type { Pool, PoolClient } from "pg";
 import { withAuthenticatedTransaction } from "../../../infrastructure/authenticated-transaction.js";
 import type { Actor } from "../../../shared/actor.js";
@@ -245,7 +246,7 @@ async function readDraftWorkspace(
   };
 }
 
-export function pgRoundRepository(pool: Pool): RoundRepository {
+export function pgRoundRepository(pool: Pool, recalculateStats = persistRoundStatistics): RoundRepository {
   return {
     async getRounds(seasonId: string, actor: Actor): Promise<RoundWithCounts[]> {
       return authenticated(pool, actor, async (client) => {
@@ -866,6 +867,8 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
             throw new RoundPersistenceError("O Cartola desta rodada não foi criado. Corrija antes de encerrá-la.", 400);
           }
         }
+
+        await recalculateStats(client, leagueId, roundId);
 
         await client.query(
           `SELECT public.finalize_round_financials(

@@ -52,6 +52,7 @@ function fixture(enabled: boolean) {
     lockCallup: vi.fn().mockResolvedValue(undefined),
     joinCallup: vi.fn().mockResolvedValue({ status: "confirmed", position: 1 }),
     leaveCallup: vi.fn().mockResolvedValue({ roundId: null }),
+    addPlayers: vi.fn().mockResolvedValue({ added: 2, failures: [] }),
     addPlayer: vi.fn().mockResolvedValue({ status: "confirmed", position: 2 }),
     removePlayer: vi.fn().mockResolvedValue({ revalidateRoundId: null }),
     inviteGuest: vi.fn().mockResolvedValue({ playerId, status: "confirmed", position: 3 }),

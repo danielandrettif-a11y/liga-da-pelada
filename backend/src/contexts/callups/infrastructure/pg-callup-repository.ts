@@ -610,6 +610,52 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
       });
     },
 
+    async addPlayers(leagueId, callupId, playerIds, actor) {
+      return authenticated(pool, actor, async (client) => {
+        const eligible = await client.query<{ allowed: boolean }>(
+          `SELECT NOT EXISTS (
+             SELECT 1
+             FROM unnest($3::uuid[]) AS requested(player_id)
+             WHERE NOT EXISTS (
+               SELECT 1 FROM public.league_members member
+               JOIN public.players player ON player.id = member.player_id
+               WHERE member.league_id = league.id AND member.is_active
+                 AND member.player_id = requested.player_id
+                 AND (league.feature_tier <> 'quick' OR player.member_category = 'guest')
+             )
+           ) AND public.is_league_member(league.id) AS allowed
+           FROM public.callups callup
+           JOIN public.leagues league ON league.id = callup.league_id
+           WHERE callup.id = $1::uuid AND league.id = $2::uuid`,
+          [callupId, leagueId, playerIds],
+        );
+        if (!eligible.rows[0]) {
+          throw new CallupPersistenceError("Convocação fora da pelada selecionada.", 404);
+        }
+        if (!eligible.rows[0].allowed) {
+          throw new CallupPersistenceError("Um ou mais jogadores não pertencem ao elenco desta pelada.", 403);
+        }
+
+        const failures: Array<{ playerId: string; error: string }> = [];
+        for (const playerId of playerIds) {
+          await client.query("SAVEPOINT add_callup_player");
+          try {
+            await client.query(
+              "SELECT public.add_player_to_callup($1::uuid, $2::uuid, false)",
+              [callupId, playerId],
+            );
+          } catch (error) {
+            const code = (error as { code?: string }).code;
+            if (code !== "P0001") throw error;
+            await client.query("ROLLBACK TO SAVEPOINT add_callup_player");
+            failures.push({ playerId, error: translateFailure(error).message });
+          }
+          await client.query("RELEASE SAVEPOINT add_callup_player");
+        }
+        return { added: playerIds.length - failures.length, failures };
+      });
+    },
+
     async removePlayer(
       leagueId: string,
       callupId: string,

@@ -2,6 +2,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
+import { measureMatchStep } from "../match-performance";
 import { cache } from "react";
 import { getActiveSeason } from "./seasons";
 import { createClient as createServerClient } from "../supabase/server";
@@ -1335,19 +1336,14 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
 
     const api = await roundApiFor(client);
     if (api) {
-      const { calculateRoundStats } = await import("./stats");
-      const statsResult = await calculateRoundStats(roundId);
-      if (!statsResult.success) {
-        throw new Error(`Não foi possível consolidar as estatísticas da rodada: ${statsResult.error || "erro desconhecido"}`);
-      }
-      const result = await api.finishRound(selectedLeague.id, roundId, {
+      const result = await measureMatchStep("finish_round", "backend_finish", () => api.finishRound(selectedLeague.id, roundId, {
         paymentPix: pix,
         paymentTotal: total,
         recipientId: recipient?.id || null,
         recipientName: recipient?.name || null,
         expenseItemIds: options?.expenseItemIds || [],
         ...(options?.expectedVersion ? { expectedVersion: options.expectedVersion } : {}),
-      });
+      }));
       if (result.shouldRefreshOverall) {
         await refreshFluidOverallSafely(`fechamento da rodada ${roundId}`);
       }

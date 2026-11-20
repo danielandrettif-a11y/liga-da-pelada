@@ -1,3 +1,4 @@
+import { requestTiming } from "../infrastructure/request-timing.js";
 import Fastify, { type FastifyInstance } from "fastify";
 import multipart from "@fastify/multipart";
 import type { GoalRepository } from "../contexts/matches/application/register-goal.js";
@@ -275,6 +276,25 @@ export function createApp(dependencies: {
     throw new Error("Dependências de estatísticas são obrigatórias quando ENABLE_STATISTICS_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
+  if (process.env.MATCH_PERF_DIAGNOSTICS === "1") {
+    app.addHook("onRequest", (_request, _reply, done) => {
+      const timing = { authMs: 0, poolWaitMs: 0, transactionMs: 0, transactions: 0 };
+      requestTiming.run(timing, done);
+    });
+    app.addHook("onSend", (request, reply, payload, done) => {
+      const timing = requestTiming.getStore();
+      if (timing) {
+        request.log.info({ event: "backend_timing", route: request.routeOptions.url, ...timing });
+        reply.header("x-backend-request-id", request.id);
+        reply.header("server-timing", [
+          `auth;dur=${timing.authMs.toFixed(1)}`,
+          `pool;dur=${timing.poolWaitMs.toFixed(1)}`,
+          `transaction;dur=${timing.transactionMs.toFixed(1)}`,
+        ].join(", "));
+      }
+      done(null, payload);
+    });
+  }
   void app.register(multipart);
   app.setErrorHandler((error, request, reply) => {
     if (error && typeof error === "object" && "validation" in error && error.validation) {

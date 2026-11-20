@@ -70,6 +70,7 @@ export type CallupHttpGateway = {
     playerId: string,
     asAdmin: boolean,
   ): Promise<{ status: "confirmed" | "waitlist" | "waitlisted"; position: number }>;
+  addPlayers(leagueId: string, callupId: string, playerIds: string[]): Promise<{ added: number; failures: Array<{ playerId: string; error: string }> }>;
   removePlayer(
     leagueId: string,
     callupId: string,
@@ -185,6 +186,14 @@ export function httpCallupGateway(backendUrl: string, accessToken?: string): Cal
       const res = await request(`${base}/api/callups/leagues/${leagueId}/${callupId}/players`, {
         method: "POST",
         json: { playerId, asAdmin },
+      });
+      return res.json();
+    },
+
+    async addPlayers(leagueId, callupId, playerIds) {
+      const res = await request(`${base}/api/callups/leagues/${leagueId}/${callupId}/players/batch`, {
+        method: "POST",
+        json: { playerIds },
       });
       return res.json();
     },

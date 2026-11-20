@@ -13,27 +13,31 @@ export type AccountProfile = {
   updated_at: string;
 };
 
+export function readAccountMemberships(client: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  return client
+    .from("league_members")
+    .select("league_id, role, is_favorite, leagues(id, name, slug, is_active, feature_tier, visibility, logo_url, cover_url, accent_color, archived_at, quick_purge_at)")
+    .eq("user_id", userId)
+    .eq("is_active", true);
+}
+
 export const getCurrentAccount = cache(async function getCurrentAccount() {
   const client = await createClient();
   const { data: { user } } = await client.auth.getUser();
 
   if (!user) {
-    return { client, user: null, profile: null, memberships: [], isAdmin: false };
+    return { client, user: null, profile: null, memberships: [], membershipError: null, isAdmin: false };
   }
 
   // Perfil, vínculos e cookie não dependem uns dos outros. Executá-los em
   // paralelo evita duas esperas de rede consecutivas em toda navegação.
-  const [{ data: profile }, { data: memberships }, cookieStore] = await Promise.all([
+  const [{ data: profile }, { data: memberships, error: membershipError }, cookieStore] = await Promise.all([
     client
       .from("account_profiles")
       .select("*")
       .eq("user_id", user.id)
       .maybeSingle(),
-    client
-      .from("league_members")
-      .select("league_id, role")
-      .eq("user_id", user.id)
-      .eq("is_active", true),
+    readAccountMemberships(client, user.id),
     cookies(),
   ]);
   const selectedLeagueId = cookieStore.get("active_league_id")?.value;
@@ -45,6 +49,7 @@ export const getCurrentAccount = cache(async function getCurrentAccount() {
     user,
     profile: profile as AccountProfile | null,
     memberships: memberships || [],
+    membershipError,
     isAdmin: selectedMembership?.role === "admin",
   };
 });

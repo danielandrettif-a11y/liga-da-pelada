@@ -205,17 +205,21 @@ async function upsertRows(client: PoolClient, rows: ReturnType<typeof calculateR
   ]);
 }
 
+export async function persistRoundStatistics(client: PoolClient, leagueId: string, roundId: string) {
+  const context = await loadCalculationContext(client, leagueId, roundId);
+  await upsertRows(client, calculateRoundStatRows(context));
+  if (context.round.status === "finished" && context.round.round_type === "official") {
+    await client.query("SELECT public.reconcile_fantasy_round_totals($1::uuid)", [roundId]);
+  }
+}
+
 export function pgRoundStatisticsRepository(pool: Pool): RoundStatisticsRepository {
   return {
     async recalculateRoundStats(actor: Actor, leagueId: string, roundId: string) {
       try {
         await withAuthenticatedTransaction(pool, actor, async (client) => {
           await requireLeagueAdmin(client, leagueId);
-          const context = await loadCalculationContext(client, leagueId, roundId);
-          await upsertRows(client, calculateRoundStatRows(context));
-          if (context.round.status === "finished" && context.round.round_type === "official") {
-            await client.query("SELECT public.reconcile_fantasy_round_totals($1::uuid)", [roundId]);
-          }
+          await persistRoundStatistics(client, leagueId, roundId);
         });
       } catch (error) {
         if (error instanceof RoundStatisticsPersistenceError) throw error;

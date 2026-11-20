@@ -1163,19 +1163,26 @@ export async function finishMatch(matchId: string, expectedScore?: { a: number; 
     const league = await getSelectedLeague();
     const api = await matchApiFor(client);
     if (api && league) {
-      const res = expectedScore ? await api.finishMatch(league.id, matchId, expectedScore) : await api.finishMatch(league.id, matchId);
+      const res = await measureMatchStep("finish_match", "backend_finish", () =>
+        expectedScore ? api.finishMatch(league.id, matchId, expectedScore) : api.finishMatch(league.id, matchId),
+      );
       const warnings: string[] = [];
-      try {
-        const stats = await calculateRoundStats(res.roundId);
-        if (!stats.success) warnings.push(stats.error || "Erro ao recalcular estatísticas.");
-      } catch (error) {
-        warnings.push(error instanceof Error ? error.message : "Erro ao recalcular estatísticas.");
+      const [statsResult, quickStartResult] = await Promise.allSettled([
+        measureMatchStep("finish_match", "recalculate_stats", () => calculateRoundStats(res.roundId)),
+        measureMatchStep("finish_match", "build_quick_start", () =>
+          supabaseFinishMatchGateway(client).buildQuickStart(res.roundId, matchId),
+        ),
+      ]);
+      if (statsResult.status === "rejected") {
+        warnings.push(statsResult.reason instanceof Error ? statsResult.reason.message : "Erro ao recalcular estatísticas.");
+      } else if (!statsResult.value.success) {
+        warnings.push(statsResult.value.error || "Erro ao recalcular estatísticas.");
       }
       let quickStart = null;
-      try {
-        quickStart = await supabaseFinishMatchGateway(client).buildQuickStart(res.roundId, matchId);
-      } catch (error) {
-        warnings.push(error instanceof Error ? error.message : "Não foi possível preparar a próxima partida.");
+      if (quickStartResult.status === "fulfilled") {
+        quickStart = quickStartResult.value;
+      } else {
+        warnings.push(quickStartResult.reason instanceof Error ? quickStartResult.reason.message : "Não foi possível preparar a próxima partida.");
       }
       if (!res.alreadyFinished && res.match) {
         try {
