@@ -376,30 +376,35 @@ export async function getFantasyDashboard() {
     };
   }
 
+  const hasMarketContext = modularContext?.seasonId === season.id;
+  const marketVersionRequest = hasMarketContext
+    ? Promise.resolve({ data: modularContext.marketVersion })
+    : Promise.resolve(account.client.rpc("get_fantasy_market_cache_version", {
+      p_fantasy_season_id: fantasySeason.id,
+    }));
+  const marketReadRequest = Promise.all([
+    marketVersionRequest,
+    fantasyApiFor(account.client, "market-source"),
+  ]).then(async ([{ data: version }, api]) => api
+    ? { data: await api.getMarketSource(league.id), error: null }
+    : getCachedFantasyMarketReadModel(fantasySeason.id, String(version || "missing-version")));
+
   const [
     { data: fantasyRoundRows },
     { data: marketHealthRow, error: marketHealthError },
-    { data: marketCacheVersion },
-  ] = modularContext?.seasonId === season.id
-    ? [{ data: modularContext.fantasyRounds }, { data: modularContext.marketHealth, error: null }, { data: modularContext.marketVersion }]
-    : await Promise.all([
-    account.client
+    cachedMarket,
+  ] = await Promise.all([
+    hasMarketContext ? Promise.resolve({ data: modularContext.fantasyRounds }) : account.client
       .from("fantasy_rounds")
       .select(
         "*, round:round_id(id, number, date, start_time, status, round_type, preparation_stage, suppress_goalkeeper_rewards, callups(id, status), round_players(player_id), round_payments(player_id, paid), teams(id, name, position, color, crest_url, team_players(player_id, goalkeeper_order, loan_order, players(id, name, nickname, avatar_url, player_profile, is_goalkeeper))), matches(id, status))"
       )
       .eq("fantasy_season_id", fantasySeason.id),
-    account.client.rpc("get_fantasy_market_v11_public_health", {
+    hasMarketContext ? Promise.resolve({ data: modularContext.marketHealth, error: null }) : account.client.rpc("get_fantasy_market_v11_public_health", {
       p_fantasy_season_id: fantasySeason.id,
     }),
-    account.client.rpc("get_fantasy_market_cache_version", {
-      p_fantasy_season_id: fantasySeason.id,
-    }),
+    marketReadRequest,
     ]);
-  const marketApi = await fantasyApiFor(account.client, "market-source");
-  const cachedMarket = marketApi
-    ? { data: await marketApi.getMarketSource(league.id), error: null }
-    : await getCachedFantasyMarketReadModel(fantasySeason.id, String(marketCacheVersion || "missing-version"));
   // Ambientes locais sem service role e falhas temporárias no cache não podem
   // deixar o mercado vazio. A leitura autenticada continua sendo o fallback.
   const fallbackMarket = cachedMarket.error
