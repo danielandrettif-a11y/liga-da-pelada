@@ -1,6 +1,5 @@
 import type { Actor } from "../../../shared/actor.js";
 import {
-  validateCardActivation,
   validatePackClaim,
   type FantasyActiveCardDTO,
   type FantasyCardDefinition,
@@ -15,13 +14,13 @@ export interface CardsRepository {
     claimedCount: number;
     totalPacks: number;
   }>;
-  restoreMyPassPacks(leagueId: string, userId: string, fantasySeasonId: string): Promise<{ success: boolean; error?: string }>;
+  restoreMyPassPacks(leagueId: string, userId: string, fantasySeasonId: string): Promise<{ success: boolean; restored?: number; error?: string }>;
   openPack(leagueId: string, userId: string, packId: string): Promise<{
     success: boolean;
     offers?: [FantasyCardDefinition, FantasyCardDefinition];
     error?: string;
   }>;
-  getPackById(leagueId: string, packId: string): Promise<FantasyPackDTO | null>;
+  getPackById(leagueId: string, packId: string, userId: string): Promise<FantasyPackDTO | null>;
   claimPackCard(
     leagueId: string,
     userId: string,
@@ -46,7 +45,7 @@ export interface CardsRepository {
     targetPrediction?: string | null;
   }): Promise<{ success: boolean; error?: string }>;
   removeActiveCardForRound(leagueId: string, userId: string, roundId: string): Promise<{ success: boolean; error?: string }>;
-  generatePacksForFinishedRound(leagueId: string, roundId: string): Promise<number>;
+  generatePacksForFinishedRound(leagueId: string, roundId: string, userId: string): Promise<number>;
   giveMyAccountTestPack(leagueId: string, userId: string): Promise<{ success: boolean; error?: string }>;
   resetMyAccountCards(leagueId: string, userId: string): Promise<{
     success: boolean;
@@ -55,14 +54,14 @@ export interface CardsRepository {
     deletedPacksCount?: number;
     error?: string;
   }>;
-  distributePackToAllLineupUsers(leagueId: string): Promise<{
+  distributePackToAllLineupUsers(leagueId: string, userId: string): Promise<{
     success: boolean;
     awardedUsersCount?: number;
     roundNumber?: number;
     error?: string;
   }>;
-  auditAndRepairCurrentSeasonPacks(leagueId: string): Promise<{ success: boolean; error?: string }>;
-  grantFantasyPackToUser(leagueId: string, targetUserId: string): Promise<{ success: boolean; error?: string }>;
+  auditAndRepairCurrentSeasonPacks(leagueId: string, userId: string): Promise<{ success: boolean; rounds?: unknown[]; error?: string }>;
+  grantFantasyPackToUser(leagueId: string, targetUserId: string, userId: string): Promise<{ success: boolean; error?: string }>;
 }
 
 export class ManageCardsUseCase {
@@ -83,8 +82,11 @@ export class ManageCardsUseCase {
   }
 
   async claimPackCard(actor: Actor, leagueId: string, packId: string, chosenSlug: string) {
-    const pack = await this.repo.getPackById(leagueId, packId);
+    const pack = await this.repo.getPackById(leagueId, packId, actor.userId);
     if (!pack) return { success: false, error: "Pacote não encontrado." };
+    if (pack.userId !== actor.userId || pack.leagueId !== leagueId) {
+      return { success: false, error: "Pacote não pertence à sua conta ou pelada." };
+    }
 
     const validation = validatePackClaim({ pack, chosenSlug });
     if (!validation.valid) return { success: false, error: validation.error };
@@ -116,17 +118,6 @@ export class ManageCardsUseCase {
       targetPrediction?: string | null;
     }
   ) {
-    const isRoundOpen = await this.repo.isRoundOpen(leagueId, params.roundId);
-    const cardDef = await this.repo.getCardDefinition(params.cardSlug);
-    if (!cardDef) return { success: false, error: "Definição de carta não encontrada." };
-
-    const validation = validateCardActivation({
-      cardDefinition: cardDef,
-      targetPlayerId: params.targetPlayerId,
-      isRoundOpen,
-    });
-    if (!validation.valid) return { success: false, error: validation.error };
-
     return this.repo.activateCardForRound({
       leagueId,
       userId: actor.userId,
@@ -145,10 +136,12 @@ export class ManageCardsUseCase {
   async generatePacksForFinishedRound(actor: Actor, leagueId: string, roundId: string) {
     const isAdmin = await this.repo.isLeagueAdmin(leagueId, actor.userId);
     if (!isAdmin) return 0;
-    return this.repo.generatePacksForFinishedRound(leagueId, roundId);
+    return this.repo.generatePacksForFinishedRound(leagueId, roundId, actor.userId);
   }
 
   async giveMyAccountTestPack(actor: Actor, leagueId: string) {
+    const isAdmin = await this.repo.isLeagueAdmin(leagueId, actor.userId);
+    if (!isAdmin) return { success: false, error: "Apenas administradores podem gerar pacotes de teste." };
     return this.repo.giveMyAccountTestPack(leagueId, actor.userId);
   }
 
@@ -159,18 +152,18 @@ export class ManageCardsUseCase {
   async distributePackToAllLineupUsers(actor: Actor, leagueId: string) {
     const isAdmin = await this.repo.isLeagueAdmin(leagueId, actor.userId);
     if (!isAdmin) return { success: false, error: "Apenas administradores." };
-    return this.repo.distributePackToAllLineupUsers(leagueId);
+    return this.repo.distributePackToAllLineupUsers(leagueId, actor.userId);
   }
 
   async auditAndRepairCurrentSeasonPacks(actor: Actor, leagueId: string) {
     const isAdmin = await this.repo.isLeagueAdmin(leagueId, actor.userId);
     if (!isAdmin) return { success: false, error: "Apenas administradores." };
-    return this.repo.auditAndRepairCurrentSeasonPacks(leagueId);
+    return this.repo.auditAndRepairCurrentSeasonPacks(leagueId, actor.userId);
   }
 
   async grantFantasyPackToUser(actor: Actor, leagueId: string, targetUserId: string) {
     const isAdmin = await this.repo.isLeagueAdmin(leagueId, actor.userId);
     if (!isAdmin) return { success: false, error: "Apenas administradores." };
-    return this.repo.grantFantasyPackToUser(leagueId, targetUserId);
+    return this.repo.grantFantasyPackToUser(leagueId, targetUserId, actor.userId);
   }
 }

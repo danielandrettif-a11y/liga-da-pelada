@@ -22,19 +22,18 @@ export function registerCosmeticsRoutes(
   const useCase = new ManageCosmeticsUseCase(options.repository);
 
   // 1. Dashboard
-  app.get<{ Querystring: { leagueId?: string; seasonId?: string; isAdmin?: string } }>(
+  app.get<{ Querystring: { leagueId?: string; seasonId?: string } }>(
     "/api/cosmetics/dashboard",
     async (request, reply) => {
       const auth = await authenticateBearer(request, options.userVerifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
 
-      const { leagueId = "", seasonId = null, isAdmin = "false" } = request.query;
+      const { leagueId = "", seasonId = null } = request.query;
       try {
         const dashboard = await useCase.getDashboard({
           userId: auth.actor.userId,
           leagueId,
           seasonId,
-          isAdmin: isAdmin === "true",
         });
         return reply.code(200).send(dashboard);
       } catch (err) {
@@ -119,7 +118,7 @@ export function registerCosmeticsRoutes(
 
       const { playerId } = request.params;
       try {
-        const equipped = await useCase.getPlayerEquipped(playerId);
+        const equipped = await useCase.getPlayerEquipped(auth.actor.userId, playerId);
         return reply.code(200).send(equipped);
       } catch (err) {
         return sendFailure(err, request, reply);
@@ -136,7 +135,7 @@ export function registerCosmeticsRoutes(
 
       const { playerIds } = request.body || {};
       try {
-        const map = await useCase.getAllPlayersMap(playerIds);
+        const map = await useCase.getAllPlayersMap(auth.actor.userId, playerIds);
         return reply.code(200).send(map);
       } catch (err) {
         return sendFailure(err, request, reply);
@@ -145,20 +144,15 @@ export function registerCosmeticsRoutes(
   );
 
   // 8. Admin Preview
-  app.post<{ Body: { playerId: string; requested: any; ownPlayerId?: string | null; isAdmin?: boolean } }>(
+  app.post<{ Body: { leagueId: string; playerId: string; requested: any } }>(
     "/api/cosmetics/admin-preview",
     async (request, reply) => {
       const auth = await authenticateBearer(request, options.userVerifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
 
-      const { playerId, requested, ownPlayerId = null, isAdmin = true } = request.body || {};
+      const { leagueId, playerId, requested } = request.body || {};
       try {
-        const preview = await useCase.resolveAdminPreview({
-          isAdmin: Boolean(isAdmin),
-          ownPlayerId: ownPlayerId || auth.actor.userId,
-          playerId,
-          requested,
-        });
+        const preview = await useCase.resolveAdminPreview({ userId: auth.actor.userId, leagueId, playerId, requested });
         return reply.code(200).send(preview);
       } catch (err) {
         return sendFailure(err, request, reply);
@@ -173,15 +167,10 @@ export function registerCosmeticsRoutes(
       const auth = await authenticateBearer(request, options.userVerifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
 
-      const token = request.headers.authorization?.slice(7) || "";
-      if (request.headers["x-is-admin"] !== "true" && token !== "admin-token" && !token.startsWith("admin")) {
-        return reply.code(403).send({ success: false, error: "Apenas administradores." });
-      }
-
       const { fantasySeasonId = null } = request.body || {};
       try {
-        const res = await useCase.cleanupLegacyPreview(fantasySeasonId);
-        return reply.code(200).send(res);
+        const res = await useCase.cleanupLegacyPreview(auth.actor.userId, fantasySeasonId);
+        return reply.code(res.success ? 200 : 400).send(res);
       } catch (err) {
         return sendFailure(err, request, reply);
       }
@@ -197,8 +186,8 @@ export function registerCosmeticsRoutes(
 
       const { fantasySeasonId = null } = request.body || {};
       try {
-        const res = await useCase.dismissBronzePack(fantasySeasonId);
-        return reply.code(200).send(res);
+        const res = await useCase.dismissBronzePack(auth.actor.userId, fantasySeasonId);
+        return reply.code(res.success ? 200 : 400).send(res);
       } catch (err) {
         return sendFailure(err, request, reply);
       }
@@ -214,8 +203,8 @@ export function registerCosmeticsRoutes(
 
       const { fantasySeasonId, selectedFantasySeasonId = null } = request.body || {};
       try {
-        const res = await useCase.resetTestClaims({ fantasySeasonId, selectedFantasySeasonId });
-        return reply.code(200).send(res);
+        const res = await useCase.resetTestClaims({ userId: auth.actor.userId, fantasySeasonId, selectedFantasySeasonId });
+        return reply.code(res.success ? 200 : 400).send(res);
       } catch (err) {
         return sendFailure(err, request, reply);
       }

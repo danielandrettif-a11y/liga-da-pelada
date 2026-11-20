@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { ENTRY_FLOW_DONE_COOKIE, ENTRY_FLOW_PENDING_COOKIE, ENTRY_FLOW_VERSION, isEntryFlowScreen } from '@/lib/entry-flow'
 import { requestOrigin } from '@/lib/siteUrl'
+import { supabaseServerConfig } from '@/lib/supabase/server-config'
 
 export default async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -10,10 +11,12 @@ export default async function proxy(request: NextRequest) {
     },
   })
 
+  const config = supabaseServerConfig(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_INTERNAL_URL)
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    config.url,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: { name: config.cookieName },
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -59,7 +62,7 @@ export default async function proxy(request: NextRequest) {
   if (user) {
     const { data: memberships } = await supabase
       .from('league_members')
-      .select('league_id, role')
+      .select('league_id, role, leagues(feature_tier)')
       .eq('user_id', user.id)
       .eq('is_active', true)
     hasMembership = Boolean(memberships?.length)
@@ -69,7 +72,9 @@ export default async function proxy(request: NextRequest) {
     needsLeagueChoice = Boolean((memberships?.length || 0) > 1 && !selectedMembership)
     isAdmin = selectedMembership?.role === 'admin'
     if (selectedMembership) {
-      const { data: league } = await supabase.from('leagues').select('feature_tier').eq('id', selectedMembership.league_id).maybeSingle()
+      const league = Array.isArray(selectedMembership.leagues)
+        ? selectedMembership.leagues[0]
+        : selectedMembership.leagues
       isBasicLeague = league?.feature_tier === 'basic'
       isQuickLeague = league?.feature_tier === 'quick'
     }

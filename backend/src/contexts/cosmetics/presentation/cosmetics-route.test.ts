@@ -46,7 +46,6 @@ describe("Cosmetics Routes", () => {
       userId: "u1",
       leagueId: "l1",
       seasonId: "s1",
-      isAdmin: false,
     });
   });
 
@@ -59,14 +58,14 @@ describe("Cosmetics Routes", () => {
       method: "POST",
       url: "/api/cosmetics/equip",
       headers: { authorization: "Bearer valid-token" },
-      payload: { slot: "border", cosmeticId: "c1" },
+      payload: { slot: "frame", cosmeticId: "c1" },
     });
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).success).toBe(true);
     expect(repo.equipCosmetic).toHaveBeenCalledWith({
       userId: "u1",
-      slot: "border",
+      slot: "frame",
       cosmeticId: "c1",
     });
   });
@@ -86,19 +85,30 @@ describe("Cosmetics Routes", () => {
     expect(repo.getMyEquippedCosmetics).toHaveBeenCalledWith("u1");
   });
 
-  it("admin routes enforce admin permission", async () => {
+  it("passes the verified identity to each cleanup regardless of client admin headers", async () => {
     const app = Fastify();
     const repo = createMockRepo();
     registerCosmeticsRoutes(app, { repository: repo, userVerifier: createMockVerifier(false) });
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/cosmetics/admin/cleanup-legacy",
-      headers: { authorization: "Bearer non-admin-token" },
-      payload: { fantasySeasonId: "fs1" },
-    });
+    vi.mocked(repo.cleanupLegacyCosmeticsPreview).mockResolvedValue({ success: false, error: "Somente ADM" });
+    const res = await app.inject({ method: "POST", url: "/api/cosmetics/admin/cleanup-legacy",
+      headers: { authorization: "Bearer non-admin-token", "x-is-admin": "true" }, payload: { fantasySeasonId: "fs1" } });
+    expect(res.statusCode).toBe(400);
+    expect(repo.cleanupLegacyCosmeticsPreview).toHaveBeenCalledWith("u1", "fs1");
+    await app.inject({ method: "POST", url: "/api/cosmetics/admin/dismiss-bronze-pack", headers: { authorization: "Bearer valid-token" }, payload: { fantasySeasonId: "fs1" } });
+    expect(repo.dismissUnopenedBronzePassPack).toHaveBeenCalledWith("u1", "fs1");
+    await app.inject({ method: "POST", url: "/api/cosmetics/admin/reset-test-claims", headers: { authorization: "Bearer valid-token" }, payload: { fantasySeasonId: "fs1", selectedFantasySeasonId: "fs1" } });
+    expect(repo.resetTestPassRewardClaims).toHaveBeenCalledWith({ userId: "u1", fantasySeasonId: "fs1", selectedFantasySeasonId: "fs1" });
+  });
 
-    expect(res.statusCode).toBe(403);
-    expect(repo.cleanupLegacyCosmeticsPreview).not.toHaveBeenCalled();
+  it("does not trust a forged administrator or player id for preview", async () => {
+    const app = Fastify();
+    const repo = createMockRepo();
+    registerCosmeticsRoutes(app, { repository: repo, userVerifier: createMockVerifier(false) });
+    const response = await app.inject({ method: "POST", url: "/api/cosmetics/admin-preview",
+      headers: { authorization: "Bearer valid-token" }, payload: { isAdmin: true, ownPlayerId: "p1", playerId: "p1", requested: { frame: "c1" } } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toBeNull();
+    expect(repo.resolveAdminCosmeticsPreview).toHaveBeenCalledWith({ userId: "u1", leagueId: undefined, playerId: "p1", requested: { frame: "c1" } });
   });
 });

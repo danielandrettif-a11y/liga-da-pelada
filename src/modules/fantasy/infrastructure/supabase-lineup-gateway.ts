@@ -7,7 +7,18 @@ export function supabaseFantasyLineupGateway(client: SupabaseClient): FantasyLin
       const { data, error } = await client.from("fantasy_rounds")
         .select("settings_snapshot, round:round_id(league_id)")
         .eq("round_id", roundId).maybeSingle();
-      if (error || !data) return null;
+      if (error) throw new Error(`Não foi possível verificar a rodada do Cartola: ${error.message}`);
+      if (!data) {
+        const test = await client.from("fantasy_test_sessions")
+          .select("league_id, settings_snapshot")
+          .eq("round_id", roundId).maybeSingle();
+        if (test.error) throw new Error(`Não foi possível verificar a rodada de testes: ${test.error.message}`);
+        if (!test.data) return null;
+        return {
+          leagueId: test.data.league_id as string | null,
+          playersPerTeam: (test.data.settings_snapshot as Record<string, unknown> | null)?.players_per_team as number | null ?? null,
+        };
+      }
       return {
         leagueId: (data.round as { league_id?: string } | null)?.league_id ?? null,
         playersPerTeam: (data.settings_snapshot as Record<string, unknown> | null)?.players_per_team as number | null ?? null,

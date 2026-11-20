@@ -8,12 +8,12 @@ import {
 
 describe("Cosmetics Domain", () => {
   it("validates cosmetic slots correctly", () => {
-    expect(isValidCosmeticSlot("border")).toBe(true);
-    expect(isValidCosmeticSlot("avatar")).toBe(true);
-    expect(isValidCosmeticSlot("card_theme")).toBe(true);
-    expect(isValidCosmeticSlot("goal_effect")).toBe(true);
+    expect(isValidCosmeticSlot("banner")).toBe(true);
+    expect(isValidCosmeticSlot("frame")).toBe(true);
+    expect(isValidCosmeticSlot("pitch")).toBe(true);
+    expect(isValidCosmeticSlot("border")).toBe(false);
     expect(isValidCosmeticSlot("invalid_slot")).toBe(false);
-    expect(VALID_COSMETIC_SLOTS).toHaveLength(4);
+    expect(VALID_COSMETIC_SLOTS).toHaveLength(8);
   });
 
   it("sanitizes user equipped cosmetics", () => {

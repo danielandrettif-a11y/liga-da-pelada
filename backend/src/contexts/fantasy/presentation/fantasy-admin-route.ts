@@ -23,6 +23,18 @@ export function registerFantasyAdminRoutes(
 ): void {
   const useCase = new ManageFantasyAdminUseCase(dependencies.repository);
 
+  app.get<{ Params: { leagueId: string } }>("/api/fantasy/leagues/:leagueId/ranking-period-inputs", async (request, reply) => {
+    const auth = await authenticateBearer(request, dependencies.verifier);
+    if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
+    try {
+      const result = await useCase.getRankingPeriodInputs(auth.actor, request.params.leagueId);
+      if (!result) return reply.code(403).send({ code: "FORBIDDEN", message: "Pelada indisponível ou acesso não autorizado." });
+      return reply.code(200).send(result);
+    } catch (error) {
+      return sendFailure(error, request, reply);
+    }
+  });
+
   // 1. Ranking do Fantasy
   app.get<{
     Params: { leagueId: string };
@@ -109,7 +121,7 @@ export function registerFantasyAdminRoutes(
   );
 
   // 6. Atualizar Configurações do Cartola
-  app.post<{ Params: { leagueId: string }; Body: { initialBudget?: number } }>(
+  app.post<{ Params: { leagueId: string }; Body: Record<string, unknown> }>(
     "/api/fantasy/leagues/:leagueId/settings",
     async (request, reply) => {
       const auth = await authenticateBearer(request, dependencies.verifier);

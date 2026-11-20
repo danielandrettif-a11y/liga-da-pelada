@@ -29,7 +29,7 @@ export type CollectivePage = {
   firstUnreadMessageId: string | null;
 };
 
-type RawCollectivePage = {
+export type RawCollectivePage = {
   messages?: Array<Record<string, unknown>>;
   has_more?: boolean;
   next_cursor?: { created_at?: string; id?: string } | null;
@@ -41,16 +41,14 @@ export async function readCollectivePage(
   client: SupabaseClient,
   userId: string,
   callupIds: string[],
-  cursor: CollectivePageCursor | null = null,
-  limit = 60,
+  cursor: CollectivePageCursor | null,
+  limit: number,
+  fetchPage: () => Promise<RawCollectivePage>,
 ): Promise<CollectivePage | null> {
   if (!callupIds.length) return null;
-  const { data, error } = await client.rpc("get_collective_page", {
-    p_callup_ids: callupIds,
-    p_before_created_at: cursor?.createdAt || null,
-    p_before_id: cursor?.id || null,
-    p_limit: limit,
-  });
+  const { data, error } = await fetchPage()
+    .then((data) => ({ data, error: null }))
+    .catch(() => ({ data: null, error: true }));
   if (error || !data || typeof data !== "object") return null;
 
   const page = data as RawCollectivePage;

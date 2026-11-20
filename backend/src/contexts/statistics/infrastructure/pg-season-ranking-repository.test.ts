@@ -90,6 +90,9 @@ describe("PgSeasonRankingRepository", () => {
   it("findPlayerRoundStats parses and formats player stats rows", async () => {
     const query = vi.fn().mockImplementation(async (sql: string) => {
       if (sql.includes("SET LOCAL")) return { rows: [] };
+      if (sql.includes("FROM public.players player")) {
+        return { rows: [{ player: { id: "p1", name: "Player 1" } }] };
+      }
       if (sql.includes("FROM public.player_round_stats")) {
         return {
           rows: [
@@ -122,6 +125,28 @@ describe("PgSeasonRankingRepository", () => {
     expect(stats[0].goals).toBe(2);
     expect(stats[0].ranking_points).toBe(12.5);
     expect(stats[0].player.name).toBe("Player 1");
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("FROM public.players player"), [["p1"]]);
+  });
+
+  it("reuses the complete profile across a player's round history", async () => {
+    const profile = { id: "p1", name: "Player 1", profile_bio: "História", avatar_url: "foto" };
+    const query = vi.fn().mockImplementation(async (sql: string) => {
+      if (sql.includes("FROM public.player_round_stats")) {
+        return { rows: [
+          { player_id: "p1", round_id: "r1", ranking_points: 10 },
+          { player_id: "p1", round_id: "r2", ranking_points: 20 },
+        ] };
+      }
+      if (sql.includes("FROM public.players player")) return { rows: [{ player: profile }] };
+      return { rows: [] };
+    });
+    const repo = new PgSeasonRankingRepository(createMockPool(query));
+
+    const stats = await repo.findPlayerRoundStats(mockActor, ["r1", "r2"]);
+
+    expect(stats.map((row) => row.player)).toEqual([profile, profile]);
+    expect(stats.map((row) => row.ranking_points)).toEqual([10, 20]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("FROM public.players player"), [["p1"]]);
   });
 
   it("findEnrichmentData queries fitness, cosmetics, and RPCs safely", async () => {

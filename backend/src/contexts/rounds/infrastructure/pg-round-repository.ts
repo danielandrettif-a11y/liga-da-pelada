@@ -61,6 +61,9 @@ function translateFailure(cause: unknown): RoundPersistenceError {
   if (cause instanceof RoundPersistenceError) return cause;
   const error = cause as Error & { code?: string };
   const message = error.message || "";
+  if (/Somente ADM desta pelada pode processar o Cartola/i.test(message)) {
+    return new RoundPersistenceError("Somente ADM desta pelada pode processar o Cartola. Confira também se as migrations estão atualizadas.", 403);
+  }
   if (/ROUND_FORBIDDEN|Somente administradores|Acesso restrito|permission denied|row-level security/i.test(message)) {
     return new RoundPersistenceError("Somente administradores podem realizar esta operação.", 403);
   }
@@ -701,8 +704,7 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
           await client.query(
             `UPDATE public.rounds SET start_time = $2::time, stadium_id = COALESCE($3::uuid, stadium_id),
                stadium_name = COALESCE($4::text, stadium_name), stadium_map_url = COALESCE($5::text, stadium_map_url),
-               target_players_per_team = $6::int, target_teams_per_round = $7::int,
-               updated_at = NOW()
+               target_players_per_team = $6::int, target_teams_per_round = $7::int
              WHERE id = $1::uuid`,
             [roundId, input.startTime || "08:00", stadiumId, stadiumName, stadiumMapUrl, input.playersPerTeam, configuredTeamsPerRound],
           );
@@ -763,7 +765,7 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
 
         await client.query(
           `UPDATE public.rounds SET preparation_stage = 'teams_ready', formation_mode = $2::text,
-             arrival_order_enabled = $3::boolean, updated_at = NOW()
+             arrival_order_enabled = $3::boolean
            WHERE id = $1::uuid`,
           [roundId, formationMode, attendanceOrder.length > 0],
         );
@@ -801,11 +803,12 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
         await requireLeagueAdmin(client, leagueId);
         const roundResult = await client.query<{
           status: string;
+          round_type: string;
           created_at: string | Date;
           feature_tier: string;
           full_enabled_at: string | Date | null;
         }>(
-          `SELECT r.status, r.created_at, league.feature_tier, league.full_enabled_at
+          `SELECT r.status, r.round_type, r.created_at, league.feature_tier, league.full_enabled_at
            FROM public.rounds r
            JOIN public.leagues league ON league.id = r.league_id
            WHERE r.id = $1::uuid AND r.league_id = $2::uuid
@@ -843,7 +846,7 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
           [roundId],
         );
         const fantasyRound = fantasyResult.rows[0] || null;
-        if (round.feature_tier === "complete" && !fantasyRound) {
+        if (round.feature_tier === "complete" && round.round_type === "official" && !fantasyRound) {
           const createdAt = new Date(round.created_at).getTime();
           const fullEnabledAt = round.full_enabled_at ? new Date(round.full_enabled_at).getTime() : null;
           if (fullEnabledAt === null || createdAt >= fullEnabledAt) {
@@ -867,13 +870,12 @@ export function pgRoundRepository(pool: Pool): RoundRepository {
           ],
         );
 
-        let fantasyTest = false;
-        if (fantasyRound) {
-          const testResult = await client.query<{ found: boolean }>(
-            "SELECT EXISTS (SELECT 1 FROM public.fantasy_test_sessions WHERE round_id = $1::uuid) AS found",
-            [roundId],
-          );
-          fantasyTest = testResult.rows[0]?.found === true;
+        const testResult = await client.query<{ found: boolean }>(
+          "SELECT EXISTS (SELECT 1 FROM public.fantasy_test_sessions WHERE round_id = $1::uuid) AS found",
+          [roundId],
+        );
+        const fantasyTest = testResult.rows[0]?.found === true;
+        if (fantasyRound || fantasyTest) {
           await client.query(
             fantasyTest
               ? "SELECT public.process_fantasy_test_round($1::uuid)"

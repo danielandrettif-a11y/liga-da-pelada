@@ -137,6 +137,7 @@ export function registerFinanceRoutes(
       const auth = await authenticateBearer(request, dependencies.verifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
+        if (typeof request.body?.active !== "boolean") return reply.code(400).send({ success: false, error: "Informe se o PIX está ativo." });
         const result = await service.setPaymentRecipientActive(
           auth.actor,
           request.params.leagueId,
@@ -232,11 +233,12 @@ export function registerFinanceRoutes(
       const auth = await authenticateBearer(request, dependencies.verifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
+        if (typeof request.body?.amountPaid !== "number" || !Number.isFinite(request.body.amountPaid)) return reply.code(400).send({ success: false, error: "Informe um valor pago válido." });
         const result = await service.setPaymentObligationPaid(
           auth.actor,
           request.params.leagueId,
           request.params.id,
-          Number(request.body?.amountPaid || 0),
+          request.body.amountPaid,
         );
         return reply.code(result.success ? 200 : 400).send(result);
       } catch (err) {
@@ -252,6 +254,7 @@ export function registerFinanceRoutes(
       const auth = await authenticateBearer(request, dependencies.verifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
+        if (typeof request.body?.paid !== "boolean") return reply.code(400).send({ success: false, error: "Informe a situação do pagamento." });
         const result = await service.setPlayerPayment(
           auth.actor,
           request.params.leagueId,
@@ -308,6 +311,7 @@ export function registerFinanceRoutes(
       const auth = await authenticateBearer(request, dependencies.verifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
+        if (!request.body || request.body.roundId !== request.params.roundId) return reply.code(400).send({ success: false, error: "A rodada informada não corresponde à URL." });
         const result = await service.updateRoundPaymentDetails(
           auth.actor,
           request.params.leagueId,

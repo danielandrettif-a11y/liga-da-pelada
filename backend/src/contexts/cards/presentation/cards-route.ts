@@ -169,7 +169,7 @@ export function registerCardsRoutes(
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
         const res = await useCase.removeActiveCardForRound(auth.actor, request.params.leagueId, request.params.roundId);
-        return reply.code(200).send(res);
+        return reply.code(res.success ? 200 : 400).send(res);
       } catch (error) {
         return sendFailure(error, request, reply);
       }

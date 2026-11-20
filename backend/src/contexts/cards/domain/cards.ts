@@ -13,18 +13,31 @@ export type FantasyPackDTO = {
   id: string;
   userId: string;
   leagueId: string;
-  status: "unopened" | "opened" | "claimed";
+  status: "unopened" | "available" | "opened" | "claimed" | "dismissed";
   cardSlugOffer1?: string | null;
   cardSlugOffer2?: string | null;
   createdAt: string;
+  roundId?: string | null;
+  roundNumber?: number;
+  source?: string;
+  cardTier?: "bronze" | "gold" | null;
+  openedAt?: string | null;
+  chosenCardId?: string | null;
 };
 
 export type FantasyUserCardDTO = {
   id: string;
-  userId: string;
-  cardSlug: string;
-  status: "available" | "active" | "used";
+  cardId: string;
+  slug: string;
+  name: string;
+  description: string;
+  rarity: string;
+  effectType: string;
+  effectConfig: Record<string, unknown>;
+  status: "OWNED" | "RESERVED" | "LOCKED" | "CONSUMED";
   acquiredAt: string;
+  consumedAt: string | null;
+  icon: string;
 };
 
 export type FantasyActiveCardDTO = {
@@ -36,6 +49,12 @@ export type FantasyActiveCardDTO = {
   targetPlayer2Id?: string | null;
   targetPrediction?: string | null;
   appliedAt: string;
+  userCardId?: string;
+  status?: string;
+  targetPlayerName?: string | null;
+  targetPlayer2Name?: string | null;
+  resultBonus?: number | null;
+  resultDetails?: unknown;
 };
 
 export function validateCardActivation(params: {

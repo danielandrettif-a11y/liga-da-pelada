@@ -2,6 +2,7 @@ import {
   type CosmeticSlot,
   type UserEquippedCosmetics,
   type CosmeticPreviewLoadout,
+  type CosmeticPreviewSummary,
   type EquippedCosmeticsSummary,
   isValidCosmeticSlot,
   sanitizeEquippedCosmetics,
@@ -12,7 +13,6 @@ export interface CosmeticsRepository {
     userId: string;
     leagueId: string;
     seasonId: string | null;
-    isAdmin: boolean;
   }): Promise<any>;
 
   equipCosmetic(params: {
@@ -34,24 +34,25 @@ export interface CosmeticsRepository {
     fantasySeasonId: string;
   }): Promise<{ success: boolean; error?: string }>;
 
-  getMyEquippedCosmetics(userId: string): Promise<EquippedCosmeticsSummary | null>;
+  getMyEquippedCosmetics(userId: string): Promise<CosmeticPreviewSummary | null>;
 
-  getPlayerEquippedCosmetics(playerId: string): Promise<EquippedCosmeticsSummary | null>;
+  getPlayerEquippedCosmetics(userId: string, playerId: string): Promise<CosmeticPreviewSummary | null>;
 
-  getAllPlayersEquippedCosmeticsMap(playerIds?: string[]): Promise<Record<string, EquippedCosmeticsSummary>>;
+  getAllPlayersEquippedCosmeticsMap(userId: string, playerIds?: string[]): Promise<Record<string, CosmeticPreviewSummary>>;
 
   resolveAdminCosmeticsPreview(params: {
-    isAdmin: boolean;
-    ownPlayerId: string | null;
+    userId: string;
+    leagueId: string;
     playerId: string;
     requested: CosmeticPreviewLoadout;
-  }): Promise<EquippedCosmeticsSummary | null>;
+  }): Promise<CosmeticPreviewSummary | null>;
 
-  cleanupLegacyCosmeticsPreview(fantasySeasonId: string | null): Promise<{ success: boolean; error?: string }>;
+  cleanupLegacyCosmeticsPreview(userId: string, fantasySeasonId: string | null): Promise<{ success: boolean; removed?: number; error?: string }>;
 
-  dismissUnopenedBronzePassPack(fantasySeasonId: string | null): Promise<{ success: boolean; error?: string }>;
+  dismissUnopenedBronzePassPack(userId: string, fantasySeasonId: string | null): Promise<{ success: boolean; dismissed?: number; error?: string }>;
 
   resetTestPassRewardClaims(params: {
+    userId: string;
     fantasySeasonId: string;
     selectedFantasySeasonId: string | null;
   }): Promise<{ success: boolean; error?: string }>;
@@ -64,7 +65,6 @@ export class ManageCosmeticsUseCase {
     userId: string;
     leagueId: string;
     seasonId: string | null;
-    isAdmin: boolean;
   }) {
     return this.repository.getCosmeticsDashboard(params);
   }
@@ -111,32 +111,33 @@ export class ManageCosmeticsUseCase {
     return this.repository.getMyEquippedCosmetics(userId);
   }
 
-  async getPlayerEquipped(playerId: string) {
-    return this.repository.getPlayerEquippedCosmetics(playerId);
+  async getPlayerEquipped(userId: string, playerId: string) {
+    return this.repository.getPlayerEquippedCosmetics(userId, playerId);
   }
 
-  async getAllPlayersMap(playerIds?: string[]) {
-    return this.repository.getAllPlayersEquippedCosmeticsMap(playerIds);
+  async getAllPlayersMap(userId: string, playerIds?: string[]) {
+    return this.repository.getAllPlayersEquippedCosmeticsMap(userId, playerIds);
   }
 
   async resolveAdminPreview(params: {
-    isAdmin: boolean;
-    ownPlayerId: string | null;
+    userId: string;
+    leagueId: string;
     playerId: string;
     requested: CosmeticPreviewLoadout;
   }) {
     return this.repository.resolveAdminCosmeticsPreview(params);
   }
 
-  async cleanupLegacyPreview(fantasySeasonId: string | null) {
-    return this.repository.cleanupLegacyCosmeticsPreview(fantasySeasonId);
+  async cleanupLegacyPreview(userId: string, fantasySeasonId: string | null) {
+    return this.repository.cleanupLegacyCosmeticsPreview(userId, fantasySeasonId);
   }
 
-  async dismissBronzePack(fantasySeasonId: string | null) {
-    return this.repository.dismissUnopenedBronzePassPack(fantasySeasonId);
+  async dismissBronzePack(userId: string, fantasySeasonId: string | null) {
+    return this.repository.dismissUnopenedBronzePassPack(userId, fantasySeasonId);
   }
 
   async resetTestClaims(params: {
+    userId: string;
     fantasySeasonId: string;
     selectedFantasySeasonId: string | null;
   }) {

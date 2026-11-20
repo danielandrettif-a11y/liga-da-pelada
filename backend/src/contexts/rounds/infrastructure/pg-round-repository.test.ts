@@ -8,6 +8,17 @@ const roundId = "00000000-0000-4000-8000-000000000003";
 const actor = { userId: "user-123" };
 
 describe("pgRoundRepository", () => {
+  it("reports the Cartola permission requirement as forbidden", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("FROM public.rounds r")) throw new Error("Somente ADM desta pelada pode processar o Cartola.");
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+    await expect(pgRoundRepository(pool).getRounds(seasonId, actor)).rejects.toMatchObject({
+      statusCode: 403,
+      message: expect.stringContaining("ADM desta pelada"),
+    });
+  });
   it("queries member-visible rounds for a season", async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes("FROM public.rounds r")) {
@@ -338,7 +349,7 @@ describe("pgRoundRepository", () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
       if (sql.includes("SELECT r.status")) {
-        return { rows: [{ status: "active", created_at: "2026-10-01T12:00:00Z", feature_tier: "complete", full_enabled_at: "2026-09-01T12:00:00Z" }] };
+        return { rows: [{ status: "active", round_type: "official", created_at: "2026-10-01T12:00:00Z", feature_tier: "complete", full_enabled_at: "2026-09-01T12:00:00Z" }] };
       }
       if (sql.includes("FROM public.fantasy_rounds")) return { rows: [{ id: "fantasy-1" }] };
       if (sql.includes("fantasy_test_sessions")) return { rows: [{ found: false }] };
@@ -357,6 +368,34 @@ describe("pgRoundRepository", () => {
     expect(statements.some((sql) => sql.includes("process_fantasy_round"))).toBe(true);
     expect(statements.some((sql) => sql.includes("ensure_fantasy_round_reward_packs"))).toBe(true);
     expect(statements.at(-1)).toBe("COMMIT");
+  });
+
+  it.each([true, false])("finishes a friendly round with test session=%s and no official fantasy round", async (hasTest) => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("SELECT r.status")) return { rows: [{ status: "active", round_type: "friendly", created_at: "2026-10-01T12:00:00Z", feature_tier: "complete", full_enabled_at: null }] };
+      if (sql.includes("fantasy_test_sessions")) return { rows: [{ found: hasTest }] };
+      return { rows: [], rowCount: 1 };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+    await expect(pgRoundRepository(pool).finishRound(roundId, leagueId, {
+      paymentPix: "pix@example.com", paymentTotal: 150, expenseItemIds: [],
+    }, actor)).resolves.toEqual({ archived: false, shouldRefreshOverall: !hasTest });
+    expect(query.mock.calls.some(([sql]) => sql.includes("SELECT public.process_fantasy_test_round"))).toBe(hasTest);
+    expect(query.mock.calls.some(([sql]) => sql.includes("SELECT public.process_fantasy_round("))).toBe(false);
+  });
+
+  it("rejects a new official round without a fantasy round", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("SELECT r.status")) return { rows: [{ status: "active", round_type: "official", created_at: "2026-10-01T12:00:00Z", feature_tier: "complete", full_enabled_at: null }] };
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+    await expect(pgRoundRepository(pool).finishRound(roundId, leagueId, {
+      paymentPix: "pix@example.com", paymentTotal: 150, expenseItemIds: [],
+    }, actor)).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining("Cartola") });
+    expect(query.mock.calls.some(([sql]) => sql.includes("finalize_round_financials"))).toBe(false);
   });
 
   it("saves a round prelist via RPC", async () => {

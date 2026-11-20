@@ -48,6 +48,21 @@ describe("httpMatchGateway", () => {
     );
   });
 
+  it("finishes a match with an authenticated POST and no JSON body", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ roundId }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(httpMatchGateway(backendUrl, "test-token").finishMatch(leagueId, matchId))
+      .resolves.toEqual({ success: true, roundId });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${backendUrl}/api/matches/leagues/${leagueId}/${matchId}/finish`,
+      { method: "POST", headers: { authorization: "Bearer test-token" } },
+    );
+  });
+
   it("handles errors from API", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,

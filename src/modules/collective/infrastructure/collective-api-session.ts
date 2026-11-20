@@ -18,7 +18,8 @@ type SessionClient = {
 };
 
 export async function collectiveApiFor(
-  client?: SessionClient | null
+  client?: SessionClient | null,
+  capability: "page" | "candidates" | "previous-id" | "edit" | "delete" | "read" | "send" = "page",
 ): Promise<CollectiveHttpGateway | null> {
   if (process.env.COLLECTIVE_API_ENABLED !== "true") {
     return null;

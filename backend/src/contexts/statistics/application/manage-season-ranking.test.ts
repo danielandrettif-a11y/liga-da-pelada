@@ -14,6 +14,20 @@ import type {
 const mockActor: Actor = { userId: "user-test" };
 
 describe("ManageSeasonRankingUseCase", () => {
+  it("starts loading the previous season while the active season is pending", async () => {
+    let resolveActiveSeason!: (value: null) => void;
+    const activeSeason = new Promise<null>((resolve) => { resolveActiveSeason = resolve; });
+    const repo = {
+      findActiveSeason: vi.fn().mockReturnValue(activeSeason),
+      findVisibleSeasons: vi.fn().mockResolvedValue([]),
+    } as unknown as SeasonRankingRepository;
+
+    const result = new ManageSeasonRankingUseCase(repo).getSeasonRankingExperience(mockActor, "league-1");
+    expect(repo.findVisibleSeasons).toHaveBeenCalledWith(mockActor, "league-1");
+    resolveActiveSeason(null);
+    expect((await result).general).toEqual([]);
+  });
+
   it("returns empty experience when no active season exists", async () => {
     const repo: SeasonRankingRepository = {
       findActiveSeason: vi.fn().mockResolvedValue(null),

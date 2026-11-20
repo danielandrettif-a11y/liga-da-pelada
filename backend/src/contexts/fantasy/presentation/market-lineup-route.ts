@@ -23,6 +23,87 @@ export function registerMarketLineupRoutes(
 ): void {
   const useCase = new ManageFantasyMarketLineupUseCase(dependencies.repository);
 
+  app.get<{ Params: { leagueId: string } }>("/api/fantasy/leagues/:leagueId/market-source", async (request, reply) => {
+    const auth = await authenticateBearer(request, dependencies.verifier);
+    if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
+    try {
+      const data = await useCase.getMarketSource(auth.actor, request.params.leagueId);
+      if (!data) return reply.code(403).send({ code: "FORBIDDEN", message: "Mercado indisponível ou acesso não autorizado." });
+      return reply.code(200).send(data);
+    } catch (error) {
+      return sendFailure(error, request, reply);
+    }
+  });
+
+  app.get<{ Params: { leagueId: string } }>("/api/fantasy/leagues/:leagueId/market-context", async (request, reply) => {
+    const auth = await authenticateBearer(request, dependencies.verifier);
+    if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
+    try {
+      const data = await useCase.getMarketContext(auth.actor, request.params.leagueId);
+      if (!data) return reply.code(403).send({ code: "FORBIDDEN", message: "Temporada indisponível ou acesso não autorizado." });
+      return reply.code(200).send(data);
+    } catch (error) {
+      return sendFailure(error, request, reply);
+    }
+  });
+
+  app.get<{ Params: { leagueId: string }; Querystring: { activeRoundId?: string; latestRoundId?: string; testSessionId?: string } }>("/api/fantasy/leagues/:leagueId/personal-market-inputs", async (request, reply) => {
+    const auth = await authenticateBearer(request, dependencies.verifier);
+    if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
+    try {
+      const data = await useCase.getPersonalMarketInputs(auth.actor, request.params.leagueId, request.query.activeRoundId, request.query.latestRoundId, request.query.testSessionId);
+      if (!data) return reply.code(403).send({ code: "FORBIDDEN", message: "Temporada ou rodada indisponível para esta pelada." });
+      return reply.code(200).send(data);
+    } catch (error) {
+      return sendFailure(error, request, reply);
+    }
+  });
+
+  app.get<{ Params: { leagueId: string; roundId: string } }>(
+    "/api/fantasy/leagues/:leagueId/rounds/:roundId/match-snapshots",
+    async (request, reply) => {
+      const auth = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
+      try {
+        const matches = await useCase.getLiveMatchSnapshots(auth.actor, request.params.leagueId, request.params.roundId);
+        if (matches === null) return reply.code(403).send({ code: "FORBIDDEN", message: "Rodada fora da pelada ou acesso não autorizado." });
+        return reply.code(200).send(matches);
+      } catch (error) {
+        return sendFailure(error, request, reply);
+      }
+    },
+  );
+
+  app.get<{ Params: { leagueId: string; roundId: string } }>(
+    "/api/fantasy/leagues/:leagueId/rounds/:roundId/projection-inputs",
+    async (request, reply) => {
+      const auth = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
+      try {
+        const data = await useCase.getLiveProjectionInputs(auth.actor, request.params.leagueId, request.params.roundId);
+        if (!data) return reply.code(403).send({ code: "FORBIDDEN", message: "Rodada indisponível ou mercado ainda aberto." });
+        return reply.code(200).send(data);
+      } catch (error) {
+        return sendFailure(error, request, reply);
+      }
+    },
+  );
+
+  app.get<{ Params: { leagueId: string; roundId: string } }>(
+    "/api/fantasy/leagues/:leagueId/rounds/:roundId/revealed-inputs",
+    async (request, reply) => {
+      const auth = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
+      try {
+        const data = await useCase.getRevealedInputs(auth.actor, request.params.leagueId, request.params.roundId);
+        if (!data) return reply.code(403).send({ code: "FORBIDDEN", message: "Rodada indisponível ou mercado ainda aberto." });
+        return reply.code(200).send(data);
+      } catch (error) {
+        return sendFailure(error, request, reply);
+      }
+    },
+  );
+
   // 1. Dashboard
   app.get<{ Params: { leagueId: string } }>(
     "/api/fantasy/leagues/:leagueId/dashboard",
@@ -69,6 +150,7 @@ export function registerMarketLineupRoutes(
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
       try {
         const highlights = await useCase.getQuickHighlights(auth.actor, request.params.leagueId);
+        if (highlights === null) return reply.type("application/json").code(200).send("null");
         return reply.code(200).send(highlights);
       } catch (error) {
         return sendFailure(error, request, reply);
@@ -147,7 +229,7 @@ export function registerMarketLineupRoutes(
   // 8. Salvar Escalação
   app.post<{
     Params: { leagueId: string; roundId: string };
-    Body: { slots: any[]; captainPlayerId: string };
+    Body: import("../domain/market-lineup.js").FantasyLineupSubmission;
   }>("/api/fantasy/leagues/:leagueId/rounds/:roundId/lineup", async (request, reply) => {
     const auth = await authenticateBearer(request, dependencies.verifier);
     if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
@@ -156,8 +238,7 @@ export function registerMarketLineupRoutes(
         auth.actor,
         request.params.leagueId,
         request.params.roundId,
-        request.body.slots,
-        request.body.captainPlayerId
+        request.body
       );
       if (!result.success) {
         return reply.code(400).send({ code: "INVALID_LINEUP", message: result.error });

@@ -16,6 +16,24 @@ import {
   type VisibleSeasonMeta,
 } from "../domain/season-ranking.js";
 
+async function measureRankingStage<T>(stage: string, operation: () => Promise<T>): Promise<T> {
+  if (process.env.STATS_QUERY_DIAGNOSTICS !== "1") return operation();
+  const startedAt = performance.now();
+  let failed = true;
+  try {
+    const result = await operation();
+    failed = false;
+    return result;
+  } finally {
+    console.info(JSON.stringify({
+      event: "ranking_stage",
+      stage,
+      durationMs: Math.round(performance.now() - startedAt),
+      failed,
+    }));
+  }
+}
+
 export type RankingRawEnrichmentData = {
   fitnessRows: Array<{ player_id: string; distance_km: number; average_speed_kmh: number }>;
   cosmeticsByPlayer: Map<string, PlayerEquippedCosmetics>;
@@ -37,7 +55,7 @@ export type RankingRawEnrichmentData = {
 
 export interface SeasonRankingRepository {
   findActiveSeason(actor: Actor, leagueId: string): Promise<VisibleSeasonMeta | null>;
-  findVisibleSeasons(actor: Actor, leagueId: string, currentSeasonId: string): Promise<VisibleSeasonMeta[]>;
+  findVisibleSeasons(actor: Actor, leagueId: string): Promise<VisibleSeasonMeta[]>;
   findFinishedOfficialRounds(actor: Actor, seasonIds: string[]): Promise<OfficialRoundMeta[]>;
   findPlayerRoundStats(actor: Actor, roundIds: string[]): Promise<RankingDetailStatsRow[]>;
   findEnrichmentData(
@@ -67,20 +85,26 @@ export class ManageSeasonRankingUseCase {
       latestRound: null,
     };
 
-    const activeSeason = await this.repository.findActiveSeason(actor, leagueId);
+    const [activeSeasonResult, previousSeasonsResult] = await Promise.allSettled([
+      measureRankingStage("active_season", () => this.repository.findActiveSeason(actor, leagueId)),
+      measureRankingStage("previous_season", () => this.repository.findVisibleSeasons(actor, leagueId)),
+    ]);
+    if (activeSeasonResult.status === "rejected") throw activeSeasonResult.reason;
+    const activeSeason = activeSeasonResult.value;
     if (!activeSeason) return emptyData;
+    if (previousSeasonsResult.status === "rejected") throw previousSeasonsResult.reason;
 
     const seasonYear = activeSeason.startedAt ? new Date(activeSeason.startedAt).getFullYear() : new Date().getFullYear();
     const seasonLabel = `Temporada ${activeSeason.number} · ${seasonYear}`;
 
-    const previousSeasons = await this.repository.findVisibleSeasons(actor, leagueId, activeSeason.id);
+    const previousSeasons = previousSeasonsResult.value;
     const visibleSeasons = [activeSeason, ...previousSeasons];
     const visibleSeasonsMap = new Map(visibleSeasons.map((s) => [s.id, s]));
 
-    const rounds = await this.repository.findFinishedOfficialRounds(
+    const rounds = await measureRankingStage("rounds", () => this.repository.findFinishedOfficialRounds(
       actor,
       visibleSeasons.map((s) => s.id),
-    );
+    ));
 
     const currentRounds = rounds.filter((r) => r.seasonId === activeSeason.id);
     const latestRound = currentRounds[0];
@@ -89,7 +113,7 @@ export class ManageSeasonRankingUseCase {
     }
 
     const roundIds = rounds.map((r) => r.id);
-    const rawStats = await this.repository.findPlayerRoundStats(actor, roundIds);
+    const rawStats = await measureRankingStage("round_stats", () => this.repository.findPlayerRoundStats(actor, roundIds));
 
     const currentRoundIds = new Set(currentRounds.map((r) => r.id));
     const eligibleCurrentStats = rawStats.filter(
@@ -136,12 +160,12 @@ export class ManageSeasonRankingUseCase {
 
     const includeEnrichment = options.includeEnrichment !== false;
     const enrichment = includeEnrichment
-      ? await this.repository.findEnrichmentData(
+      ? await measureRankingStage("enrichment", () => this.repository.findEnrichmentData(
           actor,
           leagueId,
           activeSeason.id,
           currentRounds.map((r) => r.id),
-        )
+        ))
       : {
           fitnessRows: [],
           cosmeticsByPlayer: new Map(),

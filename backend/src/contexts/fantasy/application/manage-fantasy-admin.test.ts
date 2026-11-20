@@ -12,6 +12,7 @@ describe("Application: ManageFantasyAdminUseCase", () => {
 
   const createMockRepo = (overrides: Partial<FantasyAdminRepository> = {}): FantasyAdminRepository => ({
     isLeagueAdmin: vi.fn().mockImplementation(async (_lId, uId) => uId === "admin-1"),
+    getRankingPeriodInputs: vi.fn().mockResolvedValue(null),
     getRankingRawEntries: vi.fn().mockResolvedValue([
       { userId: "u1", userName: "Alice", userAvatarUrl: null, totalPoints: 100, patrimony: 100, lastRoundPoints: 10, lineupsCount: 2 },
       { userId: "u2", userName: "Bob", userAvatarUrl: null, totalPoints: 150, patrimony: 110, lastRoundPoints: 20, lineupsCount: 2 },
@@ -74,18 +75,18 @@ describe("Application: ManageFantasyAdminUseCase", () => {
 
     const result = await useCase.reprocessRound(adminActor, leagueId, "r1", true);
     expect(result.success).toBe(true);
-    expect(result.reprocessedLineupsCount).toBe(8);
+    expect(repo.reprocessRound).toHaveBeenCalledWith(leagueId, "r1", adminActor.userId, true);
   });
 
   it("validates and updates settings for admin", async () => {
     const repo = createMockRepo();
     const useCase = new ManageFantasyAdminUseCase(repo);
 
-    const invalid = await useCase.updateSettings(adminActor, leagueId, { initialBudget: 10 });
+    const invalid = await useCase.updateSettings(adminActor, leagueId, {});
     expect(invalid.success).toBe(false);
 
-    const valid = await useCase.updateSettings(adminActor, leagueId, { initialBudget: 120 });
+    const valid = await useCase.updateSettings(adminActor, leagueId, { initial_budget: 120, min_player_price: 2 });
     expect(valid.success).toBe(true);
-    expect(repo.updateSettings).toHaveBeenCalledWith(leagueId, { initialBudget: 120 });
+    expect(repo.updateSettings).toHaveBeenCalledWith(leagueId, { initial_budget: 120, min_player_price: 2 }, adminActor.userId);
   });
 });

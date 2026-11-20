@@ -31,21 +31,25 @@ export type SeasonPassDashboardData = {
   authenticated: boolean;
   available: boolean;
   progress: number;
-  maxProgress: number;
-  currentLevel: number;
-  rewards: Array<{
-    level: number;
-    title: string;
-    unlocked: boolean;
-    claimed: boolean;
-  }>;
+  maxProgress: 40;
+  mode: "athlete" | "community";
+  participations: number;
+  activeWeeks: number;
+  validLineups: number;
+  shopCycleRemainder: number;
+  shopBonusPoints: number;
+  nextMilestone: number | null;
+  playerName: string | null;
+  playerAvatarUrl: string | null;
+  events: Array<{ id: string; eventType: "valid_lineup"; houses: number; roundId: string | null; roundNumber: number | null; roundDate: string | null; createdAt: string }>;
 };
 
 export type FantasyAdminConfigData = {
-  initialBudget: number;
-  marketOpenDelayMinutes: number;
-  isTestSessionActive: boolean;
-  testSessionRoundId: string | null;
+  settings: Record<string, unknown> | null;
+  rounds: Array<Record<string, unknown>>;
+  testSession: Record<string, unknown> | null;
+  friendlyRounds: Array<Record<string, unknown>>;
+  marketStatus: unknown | null;
 };
 
 export function validateFantasySettingsUpdate(values: {

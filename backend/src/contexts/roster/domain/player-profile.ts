@@ -53,6 +53,16 @@ export type SavePlayerProfileCommand = {
   isSelectable: boolean;
 };
 
+/**
+ * An existing guest may be promoted in place so every relationship that uses
+ * the player id (matches, goals and statistics) remains attached to it.
+ */
+export function canLeagueAdminAssignOfficialCategory(
+  currentCategory: MemberCategory | null | undefined,
+): boolean {
+  return currentCategory === "player" || currentCategory === "guest";
+}
+
 function text(value: unknown, label: string, maximum: number, required = false): string | null {
   if (typeof value !== "string") {
     if (!required && (value === undefined || value === null)) return null;
@@ -150,7 +160,7 @@ export function resolvePlayerProfileCommand(
     throw new InvalidPlayerManagementError("Você só pode editar o seu próprio perfil.");
   }
   if (access.isLeagueAdmin && input.memberCategory === "player"
-    && (creating || access.current?.memberCategory !== "player")) {
+    && (creating || !canLeagueAdminAssignOfficialCategory(access.current?.memberCategory))) {
     throw new InvalidPlayerManagementError("Jogadores oficiais precisam criar o próprio perfil ao entrar no app.");
   }
 

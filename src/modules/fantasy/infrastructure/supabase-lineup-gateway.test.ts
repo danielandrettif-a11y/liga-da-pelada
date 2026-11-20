@@ -58,6 +58,14 @@ describe("gateway de escalação do Cartola", () => {
     });
   });
 
+  it("encontra a rodada amistosa pela sessão de teste quando não existe Cartola oficial", async () => {
+    const { gateway, roundQuery, testQuery } = setup();
+    roundQuery.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+    testQuery.maybeSingle.mockResolvedValueOnce({ data: { league_id: "league-1", settings_snapshot: { players_per_team: 5 } }, error: null });
+    expect(await gateway.loadRound("round-1")).toEqual({ leagueId: "league-1", playersPerTeam: 5 });
+    expect(testQuery.eq).toHaveBeenCalledWith("round_id", "round-1");
+  });
+
   it("não faz leitura separada depois da RPC e preserva erros de gravação", async () => {
     const { gateway, db } = setup();
     db.rpc.mockResolvedValueOnce({ data: null, error: { message: "Mercado fechado" } });

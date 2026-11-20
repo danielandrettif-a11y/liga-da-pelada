@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { pgRoundStatisticsRepository } from "../../statistics/infrastructure/pg-round-statistics-repository.js";
 import type { FantasyAdminRepository } from "../application/manage-fantasy-admin.js";
 import type {
   FantasyAdminConfigData,
@@ -38,23 +39,36 @@ export class PgFantasyAdminRepository implements FantasyAdminRepository {
   async isLeagueAdmin(leagueId: string, userId: string): Promise<boolean> {
     return this.withClient(async (client) => {
       const res = await client.query(
-        `SELECT (
-           EXISTS (
-             SELECT 1 FROM public.league_members lm
-             WHERE lm.league_id = $1 AND lm.user_id = $2 AND lm.role IN ('admin', 'owner')
-           )
-           OR EXISTS (
-             SELECT 1 FROM public.account_profiles ap
-             WHERE ap.user_id = $2 AND ap.role = 'admin'
-           )
-           OR EXISTS (
-             SELECT 1 FROM public.leagues l
-             WHERE l.id = $1 AND l.owner_id = $2
-           )
-         ) AS is_admin`,
-        [leagueId, userId]
+        `SELECT public.is_league_admin($1::uuid) AS is_admin`,
+        [leagueId]
       );
       return Boolean(res.rows[0]?.is_admin);
+    }, userId);
+  }
+
+  async getRankingPeriodInputs(leagueId: string, userId: string): Promise<{ accounts: any[]; rounds: any[]; lineups: any[] } | null> {
+    return this.withClient(async (client) => {
+      const access = await client.query("SELECT public.is_league_member($1::uuid) AS allowed", [leagueId]);
+      if (!access.rows[0]?.allowed) return null;
+      const season = await client.query(`SELECT fs.id FROM public.fantasy_seasons fs
+        JOIN public.seasons s ON s.id=fs.season_id AND s.league_id=fs.league_id
+        WHERE fs.league_id=$1::uuid AND s.status='active' LIMIT 1`, [leagueId]);
+      if (!season.rows[0]) return { accounts: [], rounds: [], lineups: [] };
+      const fantasySeasonId = season.rows[0].id;
+      const accounts = await client.query(`SELECT id,user_id,total_points::float8,current_budget::float8,rounds_played,best_round_points::float8
+        FROM public.fantasy_accounts WHERE fantasy_season_id=$1::uuid`, [fantasySeasonId]);
+      const rounds = await client.query(`SELECT fr.id,fr.round_id,fr.market_status,
+        jsonb_build_object('date',r.date,'status',r.status) AS round FROM public.fantasy_rounds fr
+        JOIN public.rounds r ON r.id=fr.round_id WHERE fr.fantasy_season_id=$1::uuid AND r.league_id=$2::uuid`, [fantasySeasonId, leagueId]);
+      const lineups = await client.query(`SELECT l.fantasy_round_id,l.user_id,l.total_points::float8,
+        COALESCE((SELECT jsonb_agg(jsonb_build_object('total_points',p.total_points,'captain_bonus',p.captain_bonus,
+          'slot_role',p.slot_role,'player_profile_locked',p.player_profile_locked))
+          FROM public.fantasy_lineup_players p WHERE p.lineup_id=l.id),'[]'::jsonb) AS fantasy_lineup_players
+        FROM public.fantasy_lineups l JOIN public.fantasy_rounds fr ON fr.id=l.fantasy_round_id
+        JOIN public.rounds r ON r.id=fr.round_id
+        WHERE fr.fantasy_season_id=$1::uuid AND r.league_id=$2::uuid AND l.status='scored'
+          AND (fr.market_status <> 'open' OR r.status='finished')`, [fantasySeasonId, leagueId]);
+      return { accounts: accounts.rows, rounds: rounds.rows, lineups: lineups.rows };
     }, userId);
   }
 
@@ -184,101 +198,143 @@ export class PgFantasyAdminRepository implements FantasyAdminRepository {
 
   async getSeasonPassDashboard(leagueId: string, userId: string): Promise<SeasonPassDashboardData> {
     return this.withClient(async (client) => {
+      const empty: SeasonPassDashboardData = { authenticated: true, available: false, progress: 0, maxProgress: 40,
+        mode: "athlete", participations: 0, activeWeeks: 0, validLineups: 0, shopCycleRemainder: 0,
+        shopBonusPoints: 0, nextMilestone: 1, playerName: null, playerAvatarUrl: null, events: [] };
+      const context = await client.query(`SELECT fs.id AS fantasy_season_id, player.name, player.avatar_url, player.member_category
+        FROM public.account_profiles profile
+        JOIN public.players player ON player.id=profile.player_id
+        JOIN public.seasons s ON s.league_id=$1::uuid AND s.status='active'
+        JOIN public.fantasy_seasons fs ON fs.season_id=s.id AND fs.league_id=$1::uuid
+        WHERE profile.user_id=$2::uuid AND public.is_league_member($1::uuid) LIMIT 1`, [leagueId, userId]);
+      const current = context.rows[0];
+      if (!current) return empty;
+      const passResult = await client.query(`SELECT progress, progression_mode, participations, active_weeks, valid_lineups,
+        goals_assists_remainder, shop_bonus_points FROM public.fantasy_season_passes
+        WHERE fantasy_season_id=$1::uuid AND user_id=$2::uuid`, [current.fantasy_season_id, userId]);
+      const eventResult = await client.query(`SELECT e.id, e.event_type, e.houses, e.source_round_id, e.created_at,
+        r.number AS round_number, r.date AS round_date
+        FROM public.fantasy_season_pass_events e LEFT JOIN public.rounds r ON r.id=e.source_round_id
+        WHERE e.fantasy_season_id=$1::uuid AND e.user_id=$2::uuid ORDER BY e.created_at DESC LIMIT 8`, [current.fantasy_season_id, userId]);
+      const pass = passResult.rows[0];
+      const progress = Number(pass?.progress || 0);
       return {
-        authenticated: true,
-        available: true,
-        progress: 100,
-        maxProgress: 500,
-        currentLevel: 1,
-        rewards: [
-          { level: 1, title: "Badge Fundador", unlocked: true, claimed: true },
-          { level: 2, title: "Pacote Bronze", unlocked: false, claimed: false },
-        ],
+        authenticated: true, available: true, progress, maxProgress: 40,
+        mode: pass?.progression_mode === "community" || ["wag", "supporter"].includes(current.member_category) ? "community" : "athlete",
+        participations: Number(pass?.participations || 0), activeWeeks: Number(pass?.active_weeks || 0),
+        validLineups: Number(pass?.valid_lineups || 0), shopCycleRemainder: Number(pass?.goals_assists_remainder || 0),
+        shopBonusPoints: Number(pass?.shop_bonus_points || 0),
+        nextMilestone: [1, 5, 10, 18, 25, 32, 40].find(m => m > progress) ?? null,
+        playerName: current.name || null, playerAvatarUrl: current.avatar_url || null,
+        events: eventResult.rows.map((row: any) => ({ id: row.id, eventType: row.event_type, houses: Number(row.houses),
+          roundId: row.source_round_id || null, roundNumber: row.round_number ?? null,
+          roundDate: row.round_date ?? null, createdAt: row.created_at })),
       };
-    });
+    }, userId);
   }
 
-  async getAdminData(leagueId: string): Promise<FantasyAdminConfigData> {
+  async getAdminData(leagueId: string, userId: string): Promise<FantasyAdminConfigData> {
     return this.withClient(async (client) => {
-      const sRes = await client.query(
-        `SELECT initial_budget FROM public.fantasy_settings WHERE league_id = $1 LIMIT 1`,
-        [leagueId]
-      );
-      const initialBudget = Number(sRes.rows[0]?.initial_budget ?? 100);
-
-      const tRes = await client.query(
-        `SELECT round_id FROM public.fantasy_test_sessions WHERE league_id = $1 LIMIT 1`,
-        [leagueId]
-      ).catch(() => ({ rows: [] }));
-      const testSessionRoundId = tRes.rows[0]?.round_id ?? null;
-
-      return {
-        initialBudget,
-        marketOpenDelayMinutes: 0,
-        isTestSessionActive: Boolean(testSessionRoundId),
-        testSessionRoundId,
-      };
-    });
+      const guard = await client.query("SELECT public.is_league_admin($1::uuid) AS allowed", [leagueId]);
+      if (!guard.rows[0]?.allowed) throw new Error("Acesso restrito a administradores da liga.");
+      const settings = await client.query("SELECT to_jsonb(s) AS value FROM public.fantasy_settings s WHERE s.league_id=$1::uuid", [leagueId]);
+      const season = await client.query(`SELECT fs.id, s.id AS season_id FROM public.seasons s
+        LEFT JOIN public.fantasy_seasons fs ON fs.season_id=s.id AND fs.league_id=s.league_id
+        WHERE s.league_id=$1::uuid AND s.status='active' LIMIT 1`, [leagueId]);
+      const fantasySeasonId = season.rows[0]?.id ?? null;
+      const seasonId = season.rows[0]?.season_id ?? null;
+      const rounds = await client.query(`SELECT fr.id, fr.market_status, fr.processed_at, fr.rules_version, fr.scoring_version,
+        json_build_object('id',r.id,'number',r.number,'date',r.date,'status',r.status,'round_type',r.round_type) AS round
+        FROM public.fantasy_rounds fr JOIN public.rounds r ON r.id=fr.round_id
+        WHERE fr.fantasy_season_id=$1::uuid AND r.league_id=$2::uuid ORDER BY fr.created_at DESC LIMIT 20`, [fantasySeasonId, leagueId]);
+      const roundDetail = `jsonb_build_object('id',r.id,'number',r.number,'date',r.date,'start_time',r.start_time,'status',r.status,'round_type',r.round_type,
+        'round_players',jsonb_build_array(jsonb_build_object('count',(SELECT count(*) FROM public.round_players rp WHERE rp.round_id=r.id))),
+        'matches',COALESCE((SELECT jsonb_agg(jsonb_build_object('id',m.id,'status',m.status,'started_at',m.started_at)) FROM public.matches m WHERE m.round_id=r.id),'[]'::jsonb))`;
+      const session = await client.query(`SELECT to_jsonb(ts) || jsonb_build_object('round', ${roundDetail}) AS value
+        FROM public.fantasy_test_sessions ts JOIN public.rounds r ON r.id=ts.round_id AND r.league_id=ts.league_id
+        WHERE ts.league_id=$1::uuid LIMIT 1`, [leagueId]);
+      const friendly = await client.query(`SELECT ${roundDetail} AS value FROM public.rounds r
+        WHERE r.league_id=$1::uuid AND r.season_id=$2::uuid AND r.round_type='friendly'
+        ORDER BY r.date DESC LIMIT 12`, [leagueId, seasonId]);
+      let marketStatus: unknown = null;
+      if (fantasySeasonId) {
+        await client.query("SAVEPOINT fantasy_market_status");
+        try {
+          const result = await client.query("SELECT public.get_fantasy_market_v11_status($1::uuid) AS value", [fantasySeasonId]);
+          marketStatus = result.rows[0]?.value ?? null;
+          await client.query("RELEASE SAVEPOINT fantasy_market_status");
+        } catch {
+          await client.query("ROLLBACK TO SAVEPOINT fantasy_market_status");
+          await client.query("RELEASE SAVEPOINT fantasy_market_status");
+        }
+      }
+      return { settings: settings.rows[0]?.value ?? null, rounds: rounds.rows,
+        testSession: session.rows[0]?.value ?? null, friendlyRounds: friendly.rows.map((row: any) => row.value), marketStatus };
+    }, userId);
   }
 
   async updateSettings(
     leagueId: string,
-    settings: { initialBudget?: number }
-  ): Promise<{ success: boolean }> {
-    return this.withClient(async (client) => {
-      if (settings.initialBudget !== undefined) {
-        await client.query(
-          `INSERT INTO public.fantasy_settings (league_id, initial_budget, updated_at)
-           VALUES ($1, $2, NOW())
-           ON CONFLICT (league_id)
-           DO UPDATE SET initial_budget = EXCLUDED.initial_budget, updated_at = NOW()`,
-          [leagueId, settings.initialBudget]
-        );
-      }
-      return { success: true };
-    });
+    settings: Record<string, unknown>,
+    userId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      return await this.withClient(async (client) => {
+        const result = await client.query("SELECT public.update_fantasy_settings_for_league($1::uuid, $2::jsonb) AS result", [leagueId, JSON.stringify(settings)]);
+        if (result.rows[0]?.result !== true) throw new Error("O banco não confirmou a atualização.");
+        return { success: true };
+      }, userId);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
   }
 
   async reprocessRound(
     leagueId: string,
     roundId: string,
+    userId: string,
     useCurrentRules?: boolean
-  ): Promise<{ success: boolean; reprocessedLineupsCount: number }> {
-    return this.withClient(async (client) => {
-      const res = await client.query(
-        `UPDATE public.fantasy_lineups fl
-         SET updated_at = NOW()
-         FROM public.fantasy_rounds fr
-         WHERE fl.fantasy_round_id = fr.id AND fr.round_id = $1`,
-        [roundId]
-      );
-      return { success: true, reprocessedLineupsCount: res.rowCount ?? 0 };
-    });
+  ): Promise<{ success: boolean; affectedRounds?: number; error?: string }> {
+    try {
+      await pgRoundStatisticsRepository(this.pool).recalculateRoundStats({ userId }, leagueId, roundId);
+      return await this.withClient(async (client) => {
+        const scoped = await client.query("SELECT 1 FROM public.rounds WHERE id=$1::uuid AND league_id=$2::uuid AND public.is_league_admin(league_id)", [roundId, leagueId]);
+        if (!scoped.rowCount) return { success: false, error: "Rodada fora da pelada selecionada." };
+        const command = useCurrentRules ? "reprocess_fantasy_with_current_rules" : "reprocess_fantasy_from_round";
+        const result = await client.query(`SELECT public.${command}($1::uuid) AS result`, [roundId]);
+        const value = result.rows[0]?.result;
+        if (value == null || value === false) throw new Error("O banco não confirmou o reprocessamento.");
+        return useCurrentRules ? { success: true, affectedRounds: Number(value.affected_finished_rounds ?? 0) } : { success: true };
+      }, userId);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
   }
 
-  async createTestSession(leagueId: string, roundId: string): Promise<{ success: boolean }> {
-    return this.withClient(async (client) => {
-      await client.query(
-        `INSERT INTO public.fantasy_test_sessions (league_id, round_id, created_at)
-         VALUES ($1, $2, NOW())
-         ON CONFLICT (league_id)
-         DO UPDATE SET round_id = EXCLUDED.round_id, created_at = NOW()`,
-        [leagueId, roundId]
-      ).catch(() => {});
-      return { success: true };
-    });
+  private async changeTestSession(leagueId: string, roundId: string, userId: string, operation: "create" | "process" | "reset"): Promise<{ success: boolean; error?: string }> {
+    const commands = { create: "create_fantasy_test_session", process: "process_fantasy_test_round", reset: "reset_fantasy_test_session" } as const;
+    try {
+      return await this.withClient(async (client) => {
+        const scoped = await client.query("SELECT 1 FROM public.rounds WHERE id=$1::uuid AND league_id=$2::uuid AND public.is_league_admin(league_id)", [roundId, leagueId]);
+        if (!scoped.rowCount) return { success: false, error: "Rodada fora da pelada selecionada." };
+        const result = await client.query(`SELECT public.${commands[operation]}($1::uuid) AS result`, [roundId]);
+        if (result.rows[0]?.result == null || result.rows[0].result === false) throw new Error("O banco não confirmou a operação.");
+        return { success: true };
+      }, userId);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
   }
 
-  async processTestSession(leagueId: string, roundId: string): Promise<{ success: boolean }> {
-    return this.withClient(async (client) => {
-      return { success: true };
-    });
+  async createTestSession(leagueId: string, roundId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+    return this.changeTestSession(leagueId, roundId, userId, "create");
   }
 
-  async resetTestSession(leagueId: string, roundId: string): Promise<{ success: boolean }> {
-    return this.withClient(async (client) => {
-      await client.query(`DELETE FROM public.fantasy_test_sessions WHERE league_id = $1`, [leagueId]).catch(() => {});
-      return { success: true };
-    });
+  async processTestSession(leagueId: string, roundId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+    return this.changeTestSession(leagueId, roundId, userId, "process");
+  }
+
+  async resetTestSession(leagueId: string, roundId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+    return this.changeTestSession(leagueId, roundId, userId, "reset");
   }
 }

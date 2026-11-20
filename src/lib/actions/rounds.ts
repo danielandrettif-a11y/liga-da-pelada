@@ -1379,7 +1379,7 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
 
     const { data: originalRound, error: originalRoundError } = await client
       .from("rounds")
-      .select("status, created_at, payment_pix, payment_total, payment_recipient_id, payment_recipient_name")
+      .select("status, round_type, created_at, payment_pix, payment_total, payment_recipient_id, payment_recipient_name")
       .eq("id", roundId)
       .single();
     if (originalRoundError || !originalRound) {
@@ -1387,7 +1387,7 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
     }
     const { data: fantasyRoundForClose } = await client.from("fantasy_rounds")
       .select("id").eq("round_id", roundId).maybeSingle();
-    if (selectedLeague.featureTier === "complete" && !fantasyRoundForClose) {
+    if (selectedLeague.featureTier === "complete" && originalRound.round_type === "official" && !fantasyRoundForClose) {
       const { data: leagueMode } = await client.from("leagues").select("full_enabled_at")
         .eq("id", selectedLeague.id).single();
       const createdAfterUpgrade = !leagueMode?.full_enabled_at
@@ -1416,10 +1416,8 @@ export async function finishRound(roundId: string, paymentPix: string, paymentTo
       throw new Error(`Não foi possível encerrar a cobrança da rodada: ${financialError?.message || "estado financeiro indisponível"}`);
     }
 
-    const { data: fantasyTest } = fantasyRoundForClose
-      ? await client.from("fantasy_test_sessions").select("id").eq("round_id", roundId).maybeSingle()
-      : { data: null };
-    const { error: fantasyError } = fantasyRoundForClose
+    const { data: fantasyTest } = await client.from("fantasy_test_sessions").select("id").eq("round_id", roundId).maybeSingle();
+    const { error: fantasyError } = fantasyRoundForClose || fantasyTest
       ? await client.rpc(fantasyTest ? "process_fantasy_test_round" : "process_fantasy_round", { p_round_id: roundId })
       : { error: null };
     if (fantasyError) {

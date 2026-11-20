@@ -12,6 +12,7 @@ import { PlayerAvatar } from "./PlayerAvatar";
 import { PLAYER_PROFILE_OPTIONS } from "@/lib/playerProfiles";
 import { cosmeticImage, cosmeticVisual } from "@/lib/fantasy/cosmetics";
 import { CosmeticNameplate } from "@/components/fantasy/CosmeticNameplate";
+import { canAdminAssignOfficialCategory } from "@/lib/player-member-category";
 
 const MAX_SOURCE_SIZE = 20 * 1024 * 1024;
 type AvatarSlot = "active" | "alternate";
@@ -411,14 +412,15 @@ export function PlayerForm({
         <div className="space-y-1.5">
           <label htmlFor="member_category" className="text-xs font-bold uppercase tracking-wider text-muted">Categoria no elenco</label>
           <select id="member_category" name="member_category" value={memberCategory} onChange={(event) => setMemberCategory(event.target.value as MemberCategory)} className="w-full rounded-xl border border-border bg-surface-hover px-4 py-3 text-sm text-foreground outline-none focus:border-accent">
-            {player?.member_category === "player" && <option value="player">Jogador oficial</option>}
+            {canAdminAssignOfficialCategory(player?.id, player?.member_category) && <option value="player">Jogador oficial</option>}
             <option value="guest">Convidado</option>
             <option value="wag">WAG</option>
             <option value="supporter">Torcedor</option>
           </select>
-          <p className="text-pretty text-[10px] leading-4 text-muted">O ADM cria convidados, WAGs e torcedores. Jogadores oficiais criam o próprio perfil ao entrar com a conta pessoal.</p>
+          <p className="text-pretty text-[10px] leading-4 text-muted">O ADM cria convidados, WAGs e torcedores. Novos jogadores oficiais criam o próprio perfil ao entrar com a conta pessoal; convidados existentes podem ser promovidos pelo ADM.</p>
           <p className="text-[10px] text-muted">WAGs e torcedores aparecem no Elenco, mas nunca entram em convocações, sorteios ou partidas. Se já houver estatísticas, elas serão preservadas e ficarão ocultas.</p>
           {memberCategory === "guest" && <p className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-[11px] leading-4 text-muted">Convidados permanecem ativos no elenco e disponíveis para futuras rodadas.</p>}
+          {player?.member_category === "guest" && memberCategory === "player" && <p className="rounded-xl border border-accent/25 bg-accent/5 px-4 py-3 text-[11px] leading-4 text-accent">Ao salvar, este convidado se tornará jogador oficial sem perder partidas, gols ou demais estatísticas.</p>}
         </div>
       )}
 

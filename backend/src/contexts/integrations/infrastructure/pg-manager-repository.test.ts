@@ -1,38 +1,14 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PgManagerRepository } from "./pg-manager-repository.js";
 import type { Actor } from "../../../shared/actor.js";
 
 describe("PgManagerRepository", () => {
-  const actor: Actor = { userId: "user-1", email: "user1@test.com", name: "User 1" };
-
-  it("creates a new club and returns initial save", async () => {
-    const mockPool: any = {
-      query: vi.fn().mockResolvedValue({ rows: [{ id: "c1", state: {} }] }),
-    };
-
-    const repo = new PgManagerRepository(mockPool);
-    const res = await repo.createClub(actor, {
-      name: "Goytacaz",
-      abbreviation: "GOY",
-      color: "#0000ff",
-    });
-
-    expect(res.ok).toBe(true);
-    expect(res.save?.version).toBe(1);
-    expect(mockPool.query).toHaveBeenCalled();
-  });
-
-  it("runs command against existing club", async () => {
-    const mockPool: any = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [{ state: { coins: 100 } }] })
-        .mockResolvedValueOnce({ rowCount: 1 }),
-    };
-
-    const repo = new PgManagerRepository(mockPool);
-    const res = await repo.runCommand(actor, { type: "open-pack", packId: "p1" }, 1);
-
-    expect(res.ok).toBe(true);
-    expect(res.save?.version).toBe(2);
+  it("refuses operations instead of reporting uncommitted commands as successful", async () => {
+    const pool = { query: vi.fn() };
+    const repository = new PgManagerRepository(pool as never);
+    const actor: Actor = { userId: "user-1", email: "user@test.com", name: "User" };
+    expect((await repository.createClub(actor, { name: "Clube", abbreviation: "CLB", color: "#000000" })).ok).toBe(false);
+    expect((await repository.runCommand(actor, { type: "open-pack", packId: "p1" }, 1)).ok).toBe(false);
+    expect(pool.query).not.toHaveBeenCalled();
   });
 });

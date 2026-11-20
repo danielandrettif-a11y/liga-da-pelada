@@ -92,5 +92,26 @@ describe("Server Action: getDashboardData", () => {
       p_league_id: "league-123",
     });
   });
+
+  it("uses the authenticated reader when the dashboard endpoint is unavailable", async () => {
+    const error = Object.assign(new Error("Route not found"), { statusCode: 404 });
+    getStatisticsApiSessionMock.mockResolvedValue({ gateway: { getDashboardData: vi.fn().mockRejectedValue(error) } });
+    getActiveSeasonMock.mockResolvedValue({ id: "season-1", league_id: "league-123" });
+    const query: any = {
+      eq: vi.fn().mockReturnThis(), in: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
+      then: (resolve: any) => Promise.resolve({ data: [] }).then(resolve),
+    };
+    const client = {
+      rpc: vi.fn().mockResolvedValue({ data: { league: { match_duration: 7 }, activeCallups: [] }, error: null }),
+      from: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue(query) }),
+    };
+    getCurrentAccountMock.mockResolvedValue({ user: { id: "u1" }, client });
+    getEventWeatherMock.mockResolvedValue(null);
+
+    expect(await getDashboardData()).toMatchObject({ success: true });
+    expect(client.rpc).toHaveBeenCalledWith("get_home_read_model", {
+      p_season_id: "season-1", p_league_id: "league-123",
+    });
+  });
 });
 

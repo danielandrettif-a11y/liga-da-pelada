@@ -35,7 +35,7 @@ describe("fantasyApiSession", () => {
       },
     };
 
-    const gateway = await fantasyApiFor(mockClient as any);
+    const gateway = await fantasyApiFor(mockClient as any, "lineup");
     expect(gateway).not.toBeNull();
   });
 
@@ -54,6 +54,13 @@ describe("fantasyApiSession", () => {
       },
     };
 
-    await expect(fantasyApiFor(mockClient as any)).rejects.toThrow("API de Fantasy não configurada.");
+    await expect(fantasyApiFor(mockClient as any, "lineup")).rejects.toThrow("API de Fantasy não configurada.");
+  });
+
+  it("keeps pending operations on the existing path even when the API is enabled", async () => {
+    process.env.FANTASY_API_ENABLED = "true";
+    const getSession = vi.fn();
+    expect(await fantasyApiFor({ auth: { getSession } } as any)).toBeNull();
+    expect(getSession).not.toHaveBeenCalled();
   });
 });

@@ -90,6 +90,13 @@ describe("Application: ManageCardsUseCase", () => {
     expect(repo.activateCardForRound).toHaveBeenCalled();
   });
 
+  it("rejects a pack owned by another user before claiming it", async () => {
+    const repo = createMockRepo();
+    const result = await new ManageCardsUseCase(repo).claimPackCard({ userId: "someone-else" }, leagueId, "pack-1", "c1");
+    expect(result.success).toBe(false);
+    expect(repo.claimPackCard).not.toHaveBeenCalled();
+  });
+
   it("blocks distributePackToAllLineupUsers for non-admin", async () => {
     const repo = createMockRepo();
     const useCase = new ManageCardsUseCase(repo);

@@ -1,6 +1,6 @@
-export type CosmeticSlot = "border" | "avatar" | "card_theme" | "goal_effect";
+export type CosmeticSlot = "banner" | "frame" | "title" | "aura" | "nameplate" | "background" | "showcase" | "pitch" | "border" | "avatar" | "card_theme" | "goal_effect";
 
-export const VALID_COSMETIC_SLOTS: CosmeticSlot[] = ["border", "avatar", "card_theme", "goal_effect"];
+export const VALID_COSMETIC_SLOTS: CosmeticSlot[] = ["banner", "frame", "title", "aura", "nameplate", "background", "showcase", "pitch"];
 
 export interface CosmeticItem {
   id: string;
@@ -20,12 +20,12 @@ export interface UserEquippedCosmetics {
   goal_effect?: string | null;
 }
 
-export interface CosmeticPreviewLoadout {
-  border?: string | null;
-  avatar?: string | null;
-  card_theme?: string | null;
-  goal_effect?: string | null;
-}
+export type CosmeticPreviewLoadout = Partial<Record<CosmeticSlot, string | null>>;
+
+export type CosmeticPreviewSummary = {
+  frameKey: string | null; auraKey: string | null; titleName: string | null; bannerAssetKey: string | null;
+  nameplateKey: string | null; backgroundAssetKey: string | null; showcaseAssetKey: string | null; pitchAssetKey: string | null;
+};
 
 export interface EquippedCosmeticsSummary {
   border: { id: string; name?: string; assetUrl?: string } | null;

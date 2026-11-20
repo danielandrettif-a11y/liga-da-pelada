@@ -107,12 +107,14 @@ describe("Finance Domain", () => {
   });
 
   it("checks if round participants are paid", () => {
+    expect(areRoundParticipantsPaid([], [])).toBe(false);
     const participants = [
       { id: "p1", is_monthly_payer: true },
       { id: "p2", is_monthly_payer: false },
     ];
     expect(areRoundParticipantsPaid(participants, [{ player_id: "p2", paid: false }])).toBe(false);
-    expect(areRoundParticipantsPaid(participants, [{ player_id: "p2", paid: true }])).toBe(true);
+    expect(areRoundParticipantsPaid(participants, [{ player_id: "p2", paid: true }])).toBe(false);
+    expect(areRoundParticipantsPaid(participants, [{ player_id: "p1", paid: true }, { player_id: "p2", paid: true }])).toBe(true);
   });
 });
 

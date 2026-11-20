@@ -1,6 +1,6 @@
 import type { Actor } from "../../../shared/actor.js";
 import {
-  validateLineupSubmission,
+  type FantasyLineupSubmission,
   type FantasyLineupSlot,
   type FantasyMarketDashboardData,
   type FantasyMarketPlayerSummary,
@@ -10,37 +10,39 @@ import {
   type FantasyUserSummary,
   type SavedFantasyLineup,
   type UserFantasyHistoryEntry,
+  type MyFantasyHistoryRow,
 } from "../domain/market-lineup.js";
 
 export interface FantasyMarketLineupRepository {
   isLeagueAdmin(leagueId: string, userId: string): Promise<boolean>;
   getDashboard(leagueId: string, userId: string): Promise<FantasyMarketDashboardData>;
+  getMarketSource(leagueId: string, userId: string): Promise<unknown | null>;
+  getMarketContext(leagueId: string, userId: string): Promise<{ seasonId: string; settings: any; testSession: any; fantasySeason: any; fantasyRounds: any[]; marketHealth: any; marketVersion: string | null } | null>;
+  getPersonalMarketInputs(leagueId: string, userId: string, activeRoundId?: string, latestRoundId?: string, testSessionId?: string): Promise<any | null>;
   getPlayerDetail(
     leagueId: string,
     playerId: string,
     fantasyRoundId?: string
   ): Promise<FantasyPlayerPerformanceDetail | null>;
-  getQuickHighlights(leagueId: string): Promise<FantasyMarketQuickHighlights>;
+  getQuickHighlights(leagueId: string, userId: string): Promise<FantasyMarketQuickHighlights>;
   getMySummary(leagueId: string, userId: string): Promise<FantasyUserSummary | null>;
-  getMyHistory(leagueId: string, userId: string): Promise<UserFantasyHistoryEntry[]>;
+  getMyHistory(leagueId: string, userId: string): Promise<MyFantasyHistoryRow[]>;
+  getLiveMatchSnapshots(leagueId: string, roundId: string, userId: string): Promise<any[] | null>;
+  getLiveProjectionInputs(leagueId: string, roundId: string, userId: string): Promise<{ settings: any; lineups: any[]; players: any[] } | null>;
+  getRevealedInputs(leagueId: string, roundId: string, userId: string): Promise<{ lineups: any[]; players: any[]; reserves: any[]; prices: any[]; profiles: any[]; predictions: any[]; activations: any[] } | null>;
   getRevealedLineups(
     leagueId: string,
+    userId: string,
     roundId?: string
   ): Promise<{ allowed: boolean; error?: string; lineups: any[] }>;
   getRoundLineupOverview(leagueId: string, roundId?: string): Promise<FantasyRoundOverview>;
-  getMarketRoundInfo(
-    leagueId: string,
-    roundId: string
-  ): Promise<{ isMarketOpen: boolean; playerPrices: Map<string, number>; userBudget: number }>;
   saveLineup(params: {
     leagueId: string;
     roundId: string;
     userId: string;
-    captainPlayerId: string;
-    slots: FantasyLineupSlot[];
-    totalCost: number;
-  }): Promise<{ success: boolean; error?: string; lineupId?: string }>;
-  previewMarketV11(leagueId: string): Promise<{ success: boolean; data?: any; error?: string }>;
+    input: FantasyLineupSubmission;
+  }): Promise<{ success: boolean; error?: string; lineupId?: string; confirmed?: boolean }>;
+  previewMarketV11(leagueId: string, userId: string): Promise<{ success: boolean; preview?: unknown; error?: string }>;
   repairLegacyLineups(leagueId: string): Promise<{ success: boolean; repairedCount: number }>;
 }
 
@@ -49,6 +51,18 @@ export class ManageFantasyMarketLineupUseCase {
 
   async getDashboard(actor: Actor, leagueId: string): Promise<FantasyMarketDashboardData> {
     return this.repo.getDashboard(leagueId, actor.userId);
+  }
+
+  async getMarketSource(actor: Actor, leagueId: string): Promise<unknown | null> {
+    return this.repo.getMarketSource(leagueId, actor.userId);
+  }
+
+  async getMarketContext(actor: Actor, leagueId: string) {
+    return this.repo.getMarketContext(leagueId, actor.userId);
+  }
+
+  async getPersonalMarketInputs(actor: Actor, leagueId: string, activeRoundId?: string, latestRoundId?: string, testSessionId?: string) {
+    return this.repo.getPersonalMarketInputs(leagueId, actor.userId, activeRoundId, latestRoundId, testSessionId);
   }
 
   async getPlayerDetail(
@@ -61,15 +75,27 @@ export class ManageFantasyMarketLineupUseCase {
   }
 
   async getQuickHighlights(actor: Actor, leagueId: string): Promise<FantasyMarketQuickHighlights> {
-    return this.repo.getQuickHighlights(leagueId);
+    return this.repo.getQuickHighlights(leagueId, actor.userId);
   }
 
   async getMySummary(actor: Actor, leagueId: string): Promise<FantasyUserSummary | null> {
     return this.repo.getMySummary(leagueId, actor.userId);
   }
 
-  async getMyHistory(actor: Actor, leagueId: string): Promise<UserFantasyHistoryEntry[]> {
+  async getMyHistory(actor: Actor, leagueId: string): Promise<MyFantasyHistoryRow[]> {
     return this.repo.getMyHistory(leagueId, actor.userId);
+  }
+
+  async getLiveMatchSnapshots(actor: Actor, leagueId: string, roundId: string): Promise<any[] | null> {
+    return this.repo.getLiveMatchSnapshots(leagueId, roundId, actor.userId);
+  }
+
+  async getLiveProjectionInputs(actor: Actor, leagueId: string, roundId: string) {
+    return this.repo.getLiveProjectionInputs(leagueId, roundId, actor.userId);
+  }
+
+  async getRevealedInputs(actor: Actor, leagueId: string, roundId: string) {
+    return this.repo.getRevealedInputs(leagueId, roundId, actor.userId);
   }
 
   async getRevealedLineups(
@@ -77,7 +103,7 @@ export class ManageFantasyMarketLineupUseCase {
     leagueId: string,
     roundId?: string
   ): Promise<{ allowed: boolean; error?: string; lineups: any[] }> {
-    return this.repo.getRevealedLineups(leagueId, roundId);
+    return this.repo.getRevealedLineups(leagueId, actor.userId, roundId);
   }
 
   async getRoundLineupOverview(
@@ -92,42 +118,26 @@ export class ManageFantasyMarketLineupUseCase {
     actor: Actor,
     leagueId: string,
     roundId: string,
-    slots: FantasyLineupSlot[],
-    captainPlayerId: string
-  ): Promise<{ success: boolean; error?: string; lineupId?: string }> {
-    const marketInfo = await this.repo.getMarketRoundInfo(leagueId, roundId);
-
-    const validation = validateLineupSubmission({
-      slots,
-      captainPlayerId,
-      availableBudget: marketInfo.userBudget,
-      playerPrices: marketInfo.playerPrices,
-      isMarketOpen: marketInfo.isMarketOpen,
-    });
-
-    if (!validation.valid) {
-      return { success: false, error: validation.error };
-    }
-
+    input: FantasyLineupSubmission,
+  ): Promise<{ success: boolean; error?: string; lineupId?: string; confirmed?: boolean }> {
+    if (!input || !Array.isArray(input.playerIds) || !Array.isArray(input.slotAssignments)) return { success: false, error: "Escalação inválida." };
     return this.repo.saveLineup({
       leagueId,
       roundId,
       userId: actor.userId,
-      captainPlayerId,
-      slots,
-      totalCost: validation.totalCost,
+      input,
     });
   }
 
   async previewMarketV11(
     actor: Actor,
     leagueId: string
-  ): Promise<{ success: boolean; data?: any; error?: string }> {
+  ): Promise<{ success: boolean; preview?: unknown; error?: string }> {
     const isAdmin = await this.repo.isLeagueAdmin(leagueId, actor.userId);
     if (!isAdmin) {
       return { success: false, error: "Acesso restrito a administradores da liga." };
     }
-    return this.repo.previewMarketV11(leagueId);
+    return this.repo.previewMarketV11(leagueId, actor.userId);
   }
 
   async repairLegacyLineups(

@@ -1,3 +1,5 @@
+import { getCardBySlug } from "@/lib/fantasy/cards/catalog";
+
 export class CardsApiError extends Error {
   constructor(
     message: string,
@@ -62,16 +64,30 @@ export function httpCardsGateway(baseUrl: string, accessToken: string): CardsHtt
       } catch {
         // payload não json
       }
-      const message = errorBody?.message || `Erro HTTP ${res.status} na API de cartas.`;
+      const message = errorBody?.message || errorBody?.error || `Erro HTTP ${res.status} na API de cartas.`;
       throw new CardsApiError(message, res.status, errorBody?.code);
     }
 
     return res.json() as Promise<T>;
   }
 
+  function cardForSlug(slug: string) {
+    const card = getCardBySlug(slug);
+    if (!card) throw new CardsApiError("Carta recebida não consta no catálogo deste aplicativo.", 502);
+    return card;
+  }
+
   return {
-    getMyPacks(leagueId) {
-      return request(`/api/cards/leagues/${encodeURIComponent(leagueId)}/packs`);
+    async getMyPacks(leagueId) {
+      const result = await request<any>(`/api/cards/leagues/${encodeURIComponent(leagueId)}/packs`);
+      return {
+        ...result,
+        availablePacks: result.availablePacks.map((pack: any) => ({
+          ...pack,
+          offers: [pack.cardSlugOffer1, pack.cardSlugOffer2].flatMap((slug, index) =>
+            slug ? [{ slot: index + 1, card: cardForSlug(slug) }] : []),
+        })),
+      };
     },
     restoreMyPassPacks(leagueId, fantasySeasonId) {
       return request(`/api/cards/leagues/${encodeURIComponent(leagueId)}/packs/restore`, {
@@ -79,36 +95,55 @@ export function httpCardsGateway(baseUrl: string, accessToken: string): CardsHtt
         body: JSON.stringify({ fantasySeasonId }),
       });
     },
-    openPack(leagueId, packId) {
-      return request(`/api/cards/leagues/${encodeURIComponent(leagueId)}/packs/${encodeURIComponent(packId)}/open`, {
+    async openPack(leagueId, packId) {
+      const result = await request<any>(`/api/cards/leagues/${encodeURIComponent(leagueId)}/packs/${encodeURIComponent(packId)}/open`, {
         method: "POST",
       });
+      return { ...result, offers: result.offers?.map((card: { slug: string }) => cardForSlug(card.slug)) };
     },
-    claimPackCard(leagueId, packId, chosenSlug) {
-      return request(`/api/cards/leagues/${encodeURIComponent(leagueId)}/packs/${encodeURIComponent(packId)}/claim`, {
+    async claimPackCard(leagueId, packId, chosenSlug) {
+      const result = await request<any>(`/api/cards/leagues/${encodeURIComponent(leagueId)}/packs/${encodeURIComponent(packId)}/claim`, {
         method: "POST",
         body: JSON.stringify({ chosenSlug }),
       });
+      return { ...result, chosenCard: result.chosenCard ? cardForSlug(result.chosenCard.slug) : undefined };
     },
-    getMyInventory(leagueId) {
-      return request(`/api/cards/leagues/${encodeURIComponent(leagueId)}/inventory`);
+    async getMyInventory(leagueId) {
+      const result = await request<any>(`/api/cards/leagues/${encodeURIComponent(leagueId)}/inventory`);
+      const cards = result.cards.map((card: any) => ({ ...card, icon: cardForSlug(card.slug).icon }));
+      const groupedBySlug: Record<string, { count: number; card: ReturnType<typeof cardForSlug>; instances: typeof cards }> = {};
+      for (const card of cards) {
+        const group = groupedBySlug[card.slug] ||= { count: 0, card: cardForSlug(card.slug), instances: [] };
+        if (card.status === "OWNED") group.count += 1;
+        group.instances.push(card);
+      }
+      return { cards, groupedBySlug, availableCount: cards.filter((card: any) => card.status === "OWNED").length };
     },
     getMyInventoryCount(leagueId) {
       return request(`/api/cards/leagues/${encodeURIComponent(leagueId)}/inventory/count`);
     },
-    getActiveCardForRound(leagueId, roundId) {
-      return request(`/api/cards/leagues/${encodeURIComponent(leagueId)}/rounds/${encodeURIComponent(roundId)}/active`);
+    async getActiveCardForRound(leagueId, roundId) {
+      const result = await request<any>(`/api/cards/leagues/${encodeURIComponent(leagueId)}/rounds/${encodeURIComponent(roundId)}/active`);
+      return result ? { ...result, card: cardForSlug(result.cardSlug) } : null;
     },
-    activateCardForRound(leagueId, roundId, params) {
-      return request(`/api/cards/leagues/${encodeURIComponent(leagueId)}/rounds/${encodeURIComponent(roundId)}/activate`, {
-        method: "POST",
-        body: JSON.stringify(params),
-      });
+    async activateCardForRound(leagueId, roundId, params) {
+      try {
+        return await request(`/api/cards/leagues/${encodeURIComponent(leagueId)}/rounds/${encodeURIComponent(roundId)}/activate`, {
+          method: "POST",
+          body: JSON.stringify(params),
+        });
+      } catch (error) {
+        if (error instanceof CardsApiError && error.status === 400) return { success: false, error: error.message };
+        throw error;
+      }
     },
-    removeActiveCardForRound(leagueId, roundId) {
-      return request(`/api/cards/leagues/${encodeURIComponent(leagueId)}/rounds/${encodeURIComponent(roundId)}/active`, {
-        method: "DELETE",
-      });
+    async removeActiveCardForRound(leagueId, roundId) {
+      try {
+        return await request(`/api/cards/leagues/${encodeURIComponent(leagueId)}/rounds/${encodeURIComponent(roundId)}/active`, { method: "DELETE" });
+      } catch (error) {
+        if (error instanceof CardsApiError && error.status === 400) return { success: false, error: error.message };
+        throw error;
+      }
     },
     generatePacksForFinishedRound(leagueId, roundId) {
       return request(`/api/cards/leagues/${encodeURIComponent(leagueId)}/rounds/${encodeURIComponent(roundId)}/generate-packs`, {

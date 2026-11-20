@@ -18,9 +18,11 @@ type SessionClient = {
 };
 
 export async function fantasyApiFor(
-  client?: SessionClient | null
+  client?: SessionClient | null,
+  capability: "pending" | "lineup" | "settings" | "reprocess" | "test-session" | "my-history" | "quick-highlights" | "season-pass" | "preview" | "admin-data" | "live-matches" | "revealed-inputs" | "ranking-period" | "market-source" | "market-context" | "personal-market" = "pending",
 ): Promise<FantasyHttpGateway | null> {
-  if (process.env.FANTASY_API_ENABLED !== "true") {
+  // Consultas e operações ainda sem paridade continuam no caminho existente.
+  if (capability === "pending" || process.env.FANTASY_API_ENABLED !== "true") {
     return null;
   }
   if (!client) return null;

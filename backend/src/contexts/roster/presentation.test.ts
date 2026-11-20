@@ -383,6 +383,42 @@ describe("roster HTTP routes", () => {
     );
   });
 
+  it("promotes a guest through the multipart profile route without replacing its identity", async () => {
+    const { app, playerProfileRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    playerProfileRepository.getSaveAccess.mockResolvedValue({
+      isLeagueAdmin: true,
+      isOwner: false,
+      current: {
+        profileBio: null, avatarUrl: null, avatarAlternateUrl: null, memberCategory: "guest",
+        isSelectable: true, playerProfile: "offensive", overallTraits: ["offensive"], isGoalkeeper: false,
+      },
+    });
+    const boundary = "guest-promotion-boundary";
+    const payload = Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="name"\r\n\r\nConvidado promovido\r\n`
+      + `--${boundary}\r\nContent-Disposition: form-data; name="member_category"\r\n\r\nplayer\r\n`
+      + `--${boundary}--\r\n`,
+    );
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/api/roster/leagues/${leagueId}/players/${playerId}/profile`,
+      headers: {
+        authorization: "Bearer valid-token", "content-type": `multipart/form-data; boundary=${boundary}`,
+      },
+      payload,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ playerId });
+    expect(playerProfileRepository.saveProfile).toHaveBeenCalledWith(
+      leagueId,
+      expect.objectContaining({ playerId, memberCategory: "player" }),
+      false,
+      { userId: "verified-user" },
+    );
+  });
+
   it("lists league registration history and merge candidates for verified admins", async () => {
     const { app, rosterRegistrationRepository } = fixture(true);
     const leagueId = "00000000-0000-4000-8000-000000000010";

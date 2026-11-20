@@ -22,6 +22,17 @@ export type FantasyLineupSlot = {
   isCaptain?: boolean;
 };
 
+export type FantasyLineupSubmission = {
+  playerIds: string[];
+  slotAssignments: Array<{ playerId: string; slotIndex: number; slotRole: "GOL" | "DEF" | "ATA" }>;
+  captainId: string | null;
+  scorerId: string | null;
+  assistId: string | null;
+  challengeId: string | null;
+  reservePlayerId: string | null;
+  reserveRole: "GOL" | "DEF" | "ATA" | null;
+};
+
 export type SavedFantasyLineup = {
   id?: string;
   userId: string;
@@ -72,10 +83,10 @@ export type FantasyPlayerPerformanceDetail = {
 };
 
 export type FantasyMarketQuickHighlights = {
-  topValuedPlayer: { id: string; name: string; price: number; variation: number } | null;
-  topScorerPlayer: { id: string; name: string; averagePoints: number } | null;
-  bestCostBenefitPlayer: { id: string; name: string; scorePerCoin: number } | null;
-};
+  topScorer: { name: string; avatarUrl: string | null; points: number } | null;
+  topGain: { name: string; avatarUrl: string | null; variation: number; priceChange: number } | null;
+  topDrop: { name: string; avatarUrl: string | null; variation: number; priceChange: number } | null;
+} | null;
 
 export type FantasyRoundOverview = {
   roundId: string;
@@ -99,6 +110,16 @@ export type UserFantasyHistoryEntry = {
   rankInRound: number;
   patrimonyAfter: number;
   captainName: string | null;
+};
+
+export type MyFantasyHistoryRow = {
+  id: string;
+  status: string;
+  total_points: number;
+  budget_before: number;
+  budget_after: number | null;
+  created_at: string;
+  fantasy_rounds: { round_id: string; market_status: string; fantasy_season_id: string; rounds: { number: number; date: string } };
 };
 
 export function validateLineupSubmission(params: {

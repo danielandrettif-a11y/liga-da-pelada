@@ -127,7 +127,7 @@ export function httpMatchGateway(backendUrl: string, accessToken?: string): Matc
     async finishMatch(leagueId, matchId) {
       const res = await fetch(`${base}/api/matches/leagues/${leagueId}/${matchId}/finish`, {
         method: "POST",
-        headers: authHeaders(true),
+        headers: authHeaders(),
       });
       if (!res.ok) await parseApiError(res);
       const data = await res.json();

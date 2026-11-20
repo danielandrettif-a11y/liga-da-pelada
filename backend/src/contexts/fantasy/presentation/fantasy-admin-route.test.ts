@@ -11,6 +11,7 @@ describe("Presentation: FantasyAdminRoute", () => {
 
   const createMockRepo = (overrides: Partial<FantasyAdminRepository> = {}): FantasyAdminRepository => ({
     isLeagueAdmin: vi.fn().mockResolvedValue(true),
+    getRankingPeriodInputs: vi.fn().mockResolvedValue(null),
     getRankingRawEntries: vi.fn().mockResolvedValue([
       { userId: "u1", userName: "Alice", userAvatarUrl: null, totalPoints: 100, patrimony: 100, lastRoundPoints: 10, lineupsCount: 2 },
     ]),
@@ -25,21 +26,15 @@ describe("Presentation: FantasyAdminRoute", () => {
       slots: [],
     }),
     getSeasonPassDashboard: vi.fn().mockResolvedValue({
-      authenticated: true,
-      available: true,
-      progress: 50,
-      maxProgress: 100,
-      currentLevel: 2,
-      rewards: [],
+      authenticated: true, available: true, progress: 5, maxProgress: 40, mode: "athlete",
+      participations: 0, activeWeeks: 0, validLineups: 0, shopCycleRemainder: 0, shopBonusPoints: 0,
+      nextMilestone: 10, playerName: null, playerAvatarUrl: null, events: [],
     }),
     getAdminData: vi.fn().mockResolvedValue({
-      initialBudget: 100,
-      marketOpenDelayMinutes: 0,
-      isTestSessionActive: false,
-      testSessionRoundId: null,
+      settings: { initial_budget: 100 }, rounds: [], testSession: null, friendlyRounds: [], marketStatus: null,
     }),
     updateSettings: vi.fn().mockResolvedValue({ success: true }),
-    reprocessRound: vi.fn().mockResolvedValue({ success: true, reprocessedLineupsCount: 8 }),
+    reprocessRound: vi.fn().mockResolvedValue({ success: true, affectedRounds: 2 }),
     createTestSession: vi.fn().mockResolvedValue({ success: true }),
     processTestSession: vi.fn().mockResolvedValue({ success: true }),
     resetTestSession: vi.fn().mockResolvedValue({ success: true }),
@@ -79,7 +74,7 @@ describe("Presentation: FantasyAdminRoute", () => {
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.payload);
     expect(body.authenticated).toBe(true);
-    expect(body.currentLevel).toBe(2);
+    expect(body.maxProgress).toBe(40);
   });
 
   it("POST /api/fantasy/leagues/:leagueId/rounds/:roundId/reprocess returns 200 for admin", async () => {
@@ -95,6 +90,18 @@ describe("Presentation: FantasyAdminRoute", () => {
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.payload);
     expect(body.success).toBe(true);
-    expect(body.reprocessedLineupsCount).toBe(8);
+    expect(body.affectedRounds).toBe(2);
+  });
+
+  it("scopes ranking period data to the authenticated actor", async () => {
+    const inputs = { accounts: [], rounds: [], lineups: [] };
+    const repo = createMockRepo({ getRankingPeriodInputs: vi.fn().mockResolvedValueOnce(inputs).mockResolvedValueOnce(null) });
+    const app = await buildApp(repo);
+    const request = { method: "GET" as const, url: "/api/fantasy/leagues/l1/ranking-period-inputs", headers: { authorization: "Bearer valid-token" } };
+    const allowed = await app.inject(request);
+    expect(allowed.statusCode).toBe(200);
+    expect(allowed.json()).toEqual(inputs);
+    expect(repo.getRankingPeriodInputs).toHaveBeenCalledWith("l1", "u1");
+    expect((await app.inject(request)).statusCode).toBe(403);
   });
 });

@@ -2,20 +2,20 @@ import { describe, it, expect, vi } from "vitest";
 import { httpCollectiveGateway, CollectiveApiError } from "./http-collective-gateway";
 
 describe("httpCollectiveGateway", () => {
-  it("fetches active summary and room data", async () => {
+  it("fetches candidates and a paginated read model", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ callupId: "c1", unreadCount: 1 }),
+      json: () => Promise.resolve({ messages: [], unread_count: 1 }),
     });
 
     const gateway = httpCollectiveGateway("http://localhost:3001", "test-token", mockFetch as any);
-    const summary = await gateway.getActiveCollectiveSummary("league-1");
+    const page = await gateway.getPage("league-1", ["callup-1"], null, 60);
 
     expect(mockFetch).toHaveBeenCalledWith(
-      "http://localhost:3001/api/collective/leagues/league-1/summary",
-      expect.objectContaining({ headers: expect.any(Headers) })
+      "http://localhost:3001/api/collective/leagues/league-1/page",
+      expect.objectContaining({ method: "POST", headers: expect.any(Headers) })
     );
-    expect(summary?.callupId).toBe("c1");
+    expect(page.unread_count).toBe(1);
   });
 
   it("sends message and handles mutations", async () => {
@@ -25,7 +25,10 @@ describe("httpCollectiveGateway", () => {
     });
 
     const gateway = httpCollectiveGateway("http://localhost:3001", "test-token", mockFetch as any);
-    const sendRes = await gateway.sendCollectiveMessage("league-1", { callupId: "c1", body: "Olá" });
+    const sendRes = await gateway.sendCollectiveMessage("league-1", {
+      callupId: "c1", body: "Olá", kind: "text", mediaPath: null, mediaMime: null,
+      mediaSize: null, duration: null, replyToMessageId: null,
+    });
     expect(sendRes.success).toBe(true);
 
     const editRes = await gateway.editCollectiveMessage("league-1", "m1", "Texto editado");
@@ -35,7 +38,7 @@ describe("httpCollectiveGateway", () => {
     expect(deleteRes.success).toBe(true);
   });
 
-  it("throws CollectiveApiError on server failure", async () => {
+  it("returns message validation errors without throwing", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 400,
@@ -43,6 +46,18 @@ describe("httpCollectiveGateway", () => {
     });
 
     const gateway = httpCollectiveGateway("http://localhost:3001", "test-token", mockFetch as any);
-    await expect(gateway.editCollectiveMessage("league-1", "m1", "")).rejects.toThrow(CollectiveApiError);
+    await expect(gateway.editCollectiveMessage("league-1", "m1", "")).resolves.toEqual({ success: false, error: "Mensagem vazia." });
+  });
+
+  it("throws on an infrastructure failure", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({ error: "Indisponível" }) });
+    const gateway = httpCollectiveGateway("http://localhost:3001", "test-token", mockFetch as any);
+    await expect(gateway.editCollectiveMessage("league-1", "m1", "ok")).rejects.toThrow(CollectiveApiError);
+  });
+
+  it("returns false when no read target is permitted", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ success: false }) });
+    const gateway = httpCollectiveGateway("http://localhost:3001", "test-token", mockFetch as any);
+    await expect(gateway.markCollectiveRead("league-1", [{ callupId: "c1", messageId: "m1" }])).resolves.toEqual({ success: false });
   });
 });

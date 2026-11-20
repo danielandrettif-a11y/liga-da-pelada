@@ -65,7 +65,6 @@ export class PgSeasonRankingRepository implements SeasonRankingRepository {
   async findVisibleSeasons(
     actor: Actor,
     leagueId: string,
-    currentSeasonId: string,
   ): Promise<VisibleSeasonMeta[]> {
     return withAuthenticatedTransaction(this.pool, actor, async (client) => {
       const result = await client.query<{
@@ -76,10 +75,10 @@ export class PgSeasonRankingRepository implements SeasonRankingRepository {
       }>(
         `SELECT id, number, status, started_at
          FROM public.seasons
-         WHERE league_id = $1::uuid AND status = 'finished' AND id != $2::uuid
+         WHERE league_id = $1::uuid AND status = 'finished'
          ORDER BY number DESC
          LIMIT 1`,
-        [leagueId, currentSeasonId],
+        [leagueId],
       );
       return result.rows.map((r) => ({
         id: r.id,
@@ -151,13 +150,22 @@ export class PgSeasonRankingRepository implements SeasonRankingRepository {
           prs.profile_decision_source,
           prs.profile_appearance_number,
           prs.profile_def_overall,
-          prs.profile_ata_overall,
-          row_to_json(p) as player
+          prs.profile_ata_overall
         FROM public.player_round_stats prs
         JOIN public.players p ON p.id = prs.player_id
         WHERE prs.round_id = ANY($1::uuid[])`,
         [roundIds],
       );
+
+      const playerIds = [...new Set(result.rows.map((row) => row.player_id as string))];
+      if (!playerIds.length) return [];
+      const playersResult = await client.query<{ player: RankingPlayer }>(
+        `SELECT row_to_json(player) AS player
+         FROM public.players player
+         WHERE player.id = ANY($1::uuid[])`,
+        [playerIds],
+      );
+      const playersById = new Map(playersResult.rows.map(({ player }) => [player.id, player]));
 
       return result.rows.map((row) => ({
         player_id: row.player_id,
@@ -190,8 +198,8 @@ export class PgSeasonRankingRepository implements SeasonRankingRepository {
           row.profile_appearance_number !== null ? Number(row.profile_appearance_number) : null,
         profile_def_overall: row.profile_def_overall !== null ? Number(row.profile_def_overall) : null,
         profile_ata_overall: row.profile_ata_overall !== null ? Number(row.profile_ata_overall) : null,
-        player: row.player as RankingPlayer,
-      }));
+        player: playersById.get(row.player_id),
+      })).filter((row): row is RankingDetailStatsRow => Boolean(row.player));
     });
   }
 

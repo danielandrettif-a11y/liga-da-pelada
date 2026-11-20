@@ -110,5 +110,15 @@ describe("Finance Presentation: finance-route", () => {
     const body = JSON.parse(response.body);
     expect(body.success).toBe(true);
   });
+
+  it.each([
+    { method: "POST" as const, url: "/api/finance/leagues/l1/rounds/r1/payments", payload: { playerId: "p1", paid: "false" } },
+    { method: "PATCH" as const, url: "/api/finance/leagues/l1/recipients/p1/active", payload: { active: "false" } },
+    { method: "PATCH" as const, url: "/api/finance/leagues/l1/obligations/o1/paid", payload: {} },
+    { method: "PUT" as const, url: "/api/finance/leagues/l1/rounds/r1/details", payload: { roundId: "r2" } },
+  ])("rejects malformed mutation $url", async ({ method, url, payload }) => {
+    const response = await buildApp().inject({ method, url, payload, headers: { authorization: "Bearer valid-token" } });
+    expect(response.statusCode).toBe(400);
+  });
 });
 

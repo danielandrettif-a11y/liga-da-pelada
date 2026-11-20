@@ -30,6 +30,7 @@ import type {
   PlayerClubGoals,
   PlayerPlaytime,
 } from "@/modules/roster/domain/player-profile-performance";
+import { canAdminAssignOfficialCategory } from "../player-member-category";
 
 export type { PlayerClubGoals, PlayerPlaytime } from "@/modules/roster/domain/player-profile-performance";
 
@@ -887,7 +888,8 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     currentIsGoalkeeper = Boolean(currentPlayer.is_goalkeeper);
   }
 
-  if (isLeagueAdmin && requestedCategory === "player" && (!playerId || currentCategory !== "player")) {
+  if (isLeagueAdmin && requestedCategory === "player"
+    && !canAdminAssignOfficialCategory(playerId, currentCategory)) {
     return { success: false, error: "Jogadores oficiais precisam criar o próprio perfil ao entrar no app." };
   }
 

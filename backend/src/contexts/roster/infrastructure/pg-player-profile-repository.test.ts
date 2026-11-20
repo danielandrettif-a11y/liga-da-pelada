@@ -40,6 +40,19 @@ describe("pgPlayerProfileRepository", () => {
     expect(query.mock.calls.some(([sql]) => String(sql).includes("UPDATE public.league_members"))).toBe(false);
   });
 
+  it("promotes a guest by updating the existing player row", async () => {
+    const query = vi.fn(async (sql: string) => sql.includes("is_league_admin")
+      ? { rows: [{ allowed: true }] }
+      : sql.includes("FROM public.league_members member") ? { rows: [accessRow] }
+        : { rows: [] });
+    await pgPlayerProfileRepository(poolWith(query)).saveProfile(
+      leagueId, { ...command, memberCategory: "player" }, false, actor,
+    );
+    const playerUpdate = query.mock.calls.find(([sql]) => String(sql).includes("UPDATE public.players"));
+    expect(playerUpdate?.[1]).toEqual(expect.arrayContaining([playerId, "player"]));
+    expect(query.mock.calls.some(([sql]) => String(sql).includes("INSERT INTO public.players"))).toBe(false);
+  });
+
   it("rejects deletion before reading the target when the actor is not a league admin", async () => {
     const query = vi.fn(async (sql: string) => sql.includes("is_league_admin")
       ? { rows: [{ allowed: false }] } : { rows: [] });

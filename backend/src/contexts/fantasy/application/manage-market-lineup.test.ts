@@ -23,6 +23,9 @@ describe("Application: ManageFantasyMarketLineupUseCase", () => {
       confirmedCount: 0,
       totalPlayersCount: 0,
     }),
+    getMarketSource: vi.fn().mockResolvedValue(null),
+    getMarketContext: vi.fn().mockResolvedValue(null),
+    getPersonalMarketInputs: vi.fn().mockResolvedValue(null),
     getPlayerDetail: vi.fn().mockResolvedValue({
       playerId: "p1",
       name: "Player One",
@@ -41,17 +44,15 @@ describe("Application: ManageFantasyMarketLineupUseCase", () => {
       lineupsCount: 5,
     }),
     getMyHistory: vi.fn().mockResolvedValue([]),
+    getLiveMatchSnapshots: vi.fn().mockResolvedValue([]),
+    getLiveProjectionInputs: vi.fn().mockResolvedValue(null),
+    getRevealedInputs: vi.fn().mockResolvedValue(null),
     getRevealedLineups: vi.fn().mockResolvedValue({ allowed: true, lineups: [] }),
     getRoundLineupOverview: vi.fn().mockResolvedValue({
       roundId: "r1",
       isRoundOpen: true,
       confirmedCount: 4,
       revealedLineupsCount: 0,
-    }),
-    getMarketRoundInfo: vi.fn().mockResolvedValue({
-      isMarketOpen: true,
-      playerPrices: new Map([["p1", 10.0], ["p2", 8.0]]),
-      userBudget: 100.0,
     }),
     saveLineup: vi.fn().mockResolvedValue({ success: true, lineupId: "lineup-1" }),
     previewMarketV11: vi.fn().mockResolvedValue({ success: true, data: { status: "ok" } }),
@@ -81,13 +82,8 @@ describe("Application: ManageFantasyMarketLineupUseCase", () => {
     const repo = createMockRepo();
     const useCase = new ManageFantasyMarketLineupUseCase(repo);
 
-    const result = await useCase.saveLineup(
-      actor,
-      leagueId,
-      "round-1",
-      [{ slotRole: "ATA", playerId: "p1" }],
-      "p1"
-    );
+    const input = { playerIds: ["p1"], slotAssignments: [{ slotRole: "ATA" as const, slotIndex: 0, playerId: "p1" }], captainId: "p1", scorerId: "p1", assistId: null, challengeId: null, reservePlayerId: "p2", reserveRole: "ATA" as const };
+    const result = await useCase.saveLineup(actor, leagueId, "round-1", input);
 
     expect(result.success).toBe(true);
     expect(result.lineupId).toBe("lineup-1");
@@ -95,9 +91,7 @@ describe("Application: ManageFantasyMarketLineupUseCase", () => {
       leagueId,
       roundId: "round-1",
       userId: actor.userId,
-      captainPlayerId: "p1",
-      slots: [{ slotRole: "ATA", playerId: "p1" }],
-      totalCost: 10.0,
+      input,
     });
   });
 

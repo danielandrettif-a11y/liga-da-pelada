@@ -4,6 +4,7 @@ import { authenticateBearer } from "../../../presentation/authenticate-bearer.js
 import {
   ManageCollectiveUseCase,
   type CollectiveRepository,
+  type SendCollectiveMessageInput,
 } from "../application/manage-collective.js";
 
 function sendFailure(error: unknown, request: FastifyRequest, reply: FastifyReply) {
@@ -21,68 +22,46 @@ export function registerCollectiveRoutes(
 ) {
   const useCase = new ManageCollectiveUseCase(options.repository);
 
-  // 1. Resumo Ativo
-  app.get<{ Params: { leagueId: string } }>(
-    "/api/collective/leagues/:leagueId/summary",
-    async (request, reply) => {
+  app.get<{ Params: { leagueId: string } }>("/api/collective/leagues/:leagueId/previous-id", async (request, reply) => {
+    const auth = await authenticateBearer(request, options.userVerifier);
+    if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
+    try {
+      const result = await useCase.getPreviousCallupId(auth.actor, request.params.leagueId);
+      if (!result) return reply.code(403).send({ success: false, error: "Apenas administradores da pelada." });
+      return reply.code(200).send(result);
+    } catch (error) { return sendFailure(error, request, reply); }
+  });
+
+  app.get<{ Params: { leagueId: string } }>("/api/collective/leagues/:leagueId/candidates", async (request, reply) => {
+    const auth = await authenticateBearer(request, options.userVerifier);
+    if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
+    try {
+      const candidates = await useCase.getCandidates(auth.actor, request.params.leagueId);
+      if (!candidates) return reply.code(403).send({ success: false, error: "Pelada indisponível para esta conta." });
+      return reply.code(200).send(candidates);
+    } catch (error) { return sendFailure(error, request, reply); }
+  });
+
+  app.post<{ Params: { leagueId: string }; Body: { callupIds: string[]; cursor?: { createdAt: string; id: string } | null; limit?: number } }>(
+    "/api/collective/leagues/:leagueId/page", async (request, reply) => {
       const auth = await authenticateBearer(request, options.userVerifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
-
       try {
-        const summary = await useCase.getActiveSummary(auth.actor, request.params.leagueId);
-        return reply.code(200).send(summary);
-      } catch (err) {
-        return sendFailure(err, request, reply);
-      }
-    }
+        const page = await useCase.getPage(auth.actor, request.params.leagueId, request.body?.callupIds, request.body?.cursor ?? null, request.body?.limit ?? 60);
+        if (!page) return reply.code(403).send({ success: false, error: "Coletiva indisponível para esta conta." });
+        return reply.code(200).send(page);
+      } catch (error) { return sendFailure(error, request, reply); }
+    },
   );
 
-  // 2. Sala da Coletiva
-  app.get<{ Params: { leagueId: string }; Querystring: { callupId?: string } }>(
-    "/api/collective/leagues/:leagueId/room",
-    async (request, reply) => {
-      const auth = await authenticateBearer(request, options.userVerifier);
-      if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
-
-      try {
-        const room = await useCase.getRoom(auth.actor, request.params.leagueId, request.query.callupId);
-        return reply.code(200).send(room);
-      } catch (err) {
-        return sendFailure(err, request, reply);
-      }
-    }
-  );
-
-  // 3. Mensagens Anteriores
-  app.post<{ Params: { leagueId: string; callupId: string }; Body: { cursor: any } }>(
-    "/api/collective/leagues/:leagueId/callups/:callupId/messages",
-    async (request, reply) => {
-      const auth = await authenticateBearer(request, options.userVerifier);
-      if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
-
-      try {
-        const res = await useCase.getOlderMessages(
-          auth.actor,
-          request.params.leagueId,
-          request.params.callupId,
-          request.body?.cursor
-        );
-        return reply.code(res.success ? 200 : 400).send(res);
-      } catch (err) {
-        return sendFailure(err, request, reply);
-      }
-    }
-  );
-
-  // 4. Enviar Mensagem
-  app.post<{ Params: { leagueId: string }; Body: any }>(
+  app.post<{ Params: { leagueId: string }; Body: SendCollectiveMessageInput }>(
     "/api/collective/leagues/:leagueId/messages",
     async (request, reply) => {
       const auth = await authenticateBearer(request, options.userVerifier);
       if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
 
       try {
-        const payload = (request.body || {}) as any;
+        const payload = request.body || {} as SendCollectiveMessageInput;
         const res = await useCase.sendMessage(auth.actor, request.params.leagueId, payload);
         return reply.code(res.success ? 200 : 400).send(res);
       } catch (err) {
@@ -91,7 +70,6 @@ export function registerCollectiveRoutes(
     }
   );
 
-  // 5. Editar Mensagem
   app.patch<{ Params: { leagueId: string; messageId: string }; Body: { body: string } }>(
     "/api/collective/leagues/:leagueId/messages/:messageId",
     async (request, reply) => {
@@ -112,7 +90,6 @@ export function registerCollectiveRoutes(
     }
   );
 
-  // 6. Apagar Mensagem
   app.delete<{ Params: { leagueId: string; messageId: string } }>(
     "/api/collective/leagues/:leagueId/messages/:messageId",
     async (request, reply) => {
@@ -132,7 +109,6 @@ export function registerCollectiveRoutes(
     }
   );
 
-  // 7. Marcar como Lida
   app.post<{ Params: { leagueId: string }; Body: { targets: Array<{ callupId: string; messageId: string }> } }>(
     "/api/collective/leagues/:leagueId/reads",
     async (request, reply) => {
@@ -145,26 +121,11 @@ export function registerCollectiveRoutes(
           request.params.leagueId,
           request.body?.targets || []
         );
-        return reply.code(200).send(res);
+        return reply.code(res.success ? 200 : 400).send(res);
       } catch (err) {
         return sendFailure(err, request, reply);
       }
     }
   );
 
-  // 8. Coletiva Anterior (Admin)
-  app.get<{ Params: { leagueId: string } }>(
-    "/api/collective/leagues/:leagueId/admin-previous",
-    async (request, reply) => {
-      const auth = await authenticateBearer(request, options.userVerifier);
-      if ("error" in auth) return reply.code(auth.error.statusCode).send(auth.error);
-
-      try {
-        const res = await useCase.getAdminPreviousCollective(auth.actor, request.params.leagueId);
-        return reply.code(200).send(res);
-      } catch (err) {
-        return sendFailure(err, request, reply);
-      }
-    }
-  );
 }

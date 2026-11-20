@@ -1,5 +1,5 @@
-export type StatsQueryOperation = "season_ranking" | "roster_totals" | "ranking_history" | "player_history";
-export type StatsQuerySource = "season_view" | "round_stats";
+export type StatsQueryOperation = "season_ranking" | "roster_totals" | "ranking_history" | "player_history" | "ranking_page";
+export type StatsQuerySource = "season_view" | "round_stats" | "essential" | "profiles";
 
 type StatsQuerySample = {
   durationMs: number;

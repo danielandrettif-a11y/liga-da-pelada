@@ -2,6 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 import { httpCosmeticsGateway, CosmeticsApiError } from "./http-cosmetics-gateway";
 
 describe("httpCosmeticsGateway", () => {
+  it("sends the league and selected cosmetic without claiming administrator status", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, json: async () => null });
+    const gateway = httpCosmeticsGateway("http://localhost:3001", "test-token", mockFetch as any);
+    await gateway.getAdminCosmeticsPreview("league-1", "p1", { frame: "c1" });
+    expect(mockFetch).toHaveBeenCalledWith("http://localhost:3001/api/cosmetics/admin-preview", expect.objectContaining({
+      body: JSON.stringify({ leagueId: "league-1", playerId: "p1", requested: { frame: "c1" } }),
+    }));
+  });
   it("fetches dashboard with query parameters", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -9,10 +17,10 @@ describe("httpCosmeticsGateway", () => {
     });
 
     const gateway = httpCosmeticsGateway("http://localhost:3001", "test-token", mockFetch as any);
-    const res = await gateway.getCosmeticsDashboard("league-1", "season-1", true);
+    const res = await gateway.getCosmeticsDashboard("league-1", "season-1");
 
     expect(mockFetch).toHaveBeenCalledWith(
-      "http://localhost:3001/api/cosmetics/dashboard?leagueId=league-1&seasonId=season-1&isAdmin=true",
+      "http://localhost:3001/api/cosmetics/dashboard?leagueId=league-1&seasonId=season-1",
       expect.objectContaining({
         headers: expect.any(Headers),
       })
@@ -48,7 +56,7 @@ describe("httpCosmeticsGateway", () => {
     expect(map.get("p1")?.frameKey).toBe("f1");
   });
 
-  it("throws CosmeticsApiError on server failure", async () => {
+  it("returns expected validation failures to the action", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 400,
@@ -56,6 +64,12 @@ describe("httpCosmeticsGateway", () => {
     });
 
     const gateway = httpCosmeticsGateway("http://localhost:3001", "test-token", mockFetch as any);
-    await expect(gateway.purchaseSeasonPassShopItem("bad-item", "fs1")).rejects.toThrow(CosmeticsApiError);
+    await expect(gateway.purchaseSeasonPassShopItem("bad-item", "fs1")).resolves.toEqual({ success: false, error: "Item inválido." });
+  });
+
+  it("still throws on infrastructure failure", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({ error: "Indisponível" }) });
+    const gateway = httpCosmeticsGateway("http://localhost:3001", "test-token", mockFetch as any);
+    await expect(gateway.equipCosmetic("frame", "c1")).rejects.toThrow(CosmeticsApiError);
   });
 });

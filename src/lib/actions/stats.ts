@@ -1109,15 +1109,29 @@ async function getRankingExperienceDataUncached(includeEnrichment = true): Promi
 const getRankingExperienceDataCached = cache(getRankingExperienceDataUncached);
 const getRankingEssentialDataCached = cache(() => getRankingExperienceDataUncached(false));
 
-async function withLeagueRankingProfiles(data: RankingExperienceData): Promise<RankingExperienceData> {
-  const league = await getSelectedLeague();
-  if (!league) return data;
-  const client = await createServerClient();
-  if (!client) return data;
-  const { data: profiles, error } = await client.from("league_members")
-    .select("player_id, player_profile").eq("league_id", league.id);
-  if (error) console.error("Erro ao buscar posições da pelada para o ranking:", error);
-  const positions = new Map((profiles || []).map((item) => [item.player_id, item.player_profile]));
+async function withLeagueRankingProfiles(dataPromise: Promise<RankingExperienceData>): Promise<RankingExperienceData> {
+  const profilesPromise = (async () => {
+    const startedAt = performance.now();
+    let failed = true;
+    let count = 0;
+    try {
+      const league = await getSelectedLeague();
+      if (!league) return null;
+      const client = await createServerClient();
+      if (!client) return null;
+      const { data: profiles, error } = await client.from("league_members")
+        .select("player_id, player_profile").eq("league_id", league.id);
+      if (error) console.error("Erro ao buscar posições da pelada para o ranking:", error);
+      failed = Boolean(error);
+      count = profiles?.length || 0;
+      return profiles || [];
+    } finally {
+      logStatsQuery("ranking_page", "profiles", startedAt, count, failed);
+    }
+  })();
+  const [data, profiles] = await Promise.all([dataPromise, profilesPromise]);
+  if (!profiles) return data;
+  const positions = new Map(profiles.map((item) => [item.player_id, item.player_profile]));
   const apply = (entries: RankingEntry[]) => entries.map((entry) => ({
     ...entry, player: { ...entry.player, player_profile: positions.get(entry.player.id) ?? null },
   }));
@@ -1130,14 +1144,21 @@ async function withLeagueRankingProfiles(data: RankingExperienceData): Promise<R
 }
 
 export async function getRankingEssentialData(): Promise<RankingExperienceData> {
-  const session = await getStatisticsApiSession();
-  if (session) {
-    const league = await getSelectedLeague();
-    if (league) {
-      return withLeagueRankingProfiles(await session.gateway.getRankingExperience(league.id, { includeEnrichment: false }));
-    }
+  const startedAt = performance.now();
+  let failed = true;
+  let count = 0;
+  try {
+    const [session, league] = await Promise.all([getStatisticsApiSession(), getSelectedLeague()]);
+    const dataPromise = session && league
+      ? session.gateway.getRankingExperience(league.id, { includeEnrichment: false })
+      : getRankingEssentialDataCached();
+    const result = await withLeagueRankingProfiles(dataPromise);
+    failed = false;
+    count = result.general.length;
+    return result;
+  } finally {
+    logStatsQuery("ranking_page", "essential", startedAt, count, failed);
   }
-  return withLeagueRankingProfiles(await getRankingEssentialDataCached());
 }
 
 type RankingEnrichment = Pick<RankingEntry,
@@ -1220,7 +1241,7 @@ export async function getRankingExperienceData(): Promise<RankingExperienceData>
   // React.cache compartilha o resultado somente dentro da requisição atual.
   // Pelada e sessão continuam resolvidas pelo contexto autenticado dessa
   // requisição; nenhum dado é persistido entre usuários.
-  return withLeagueRankingProfiles(await getRankingExperienceDataCached());
+  return withLeagueRankingProfiles(getRankingExperienceDataCached());
 }
 
 export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: RankingEntry; position: number } | null> {

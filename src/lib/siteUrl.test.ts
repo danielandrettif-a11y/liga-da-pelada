@@ -21,4 +21,10 @@ describe("requestOrigin", () => {
     vi.stubEnv("E2E_LOCAL_ORIGIN", "http://127.0.0.1:3100");
     expect(requestOrigin({ url: "http://localhost:3000/rodadas" })).toBe("http://127.0.0.1:3100");
   });
+
+  it("usa a origem configurada para o ambiente sem confiar na URL recebida", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("APP_PUBLIC_URL", "https://homologacao.example.com/");
+    expect(requestOrigin({ url: "http://attacker.example/rodadas" })).toBe("https://homologacao.example.com");
+  });
 });

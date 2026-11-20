@@ -40,6 +40,24 @@ describe("pgRosterRegistrationRepository", () => {
     expect(query).toHaveBeenCalledWith(expect.stringContaining("player.member_category IN"), [leagueId, guestId]);
   });
 
+  it("preserves the active match conflict returned by the merge function", async () => {
+    const registeredId = "00000000-0000-4000-8000-000000000002";
+    const message = "Encerre a partida ativa antes de unir os perfis.";
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("can_merge_profiles_in_league")) return { rows: [{ can_merge: true }] };
+      if (sql.includes("merge_selectable_player_profiles")) {
+        throw Object.assign(new Error(message), { code: "P0001" });
+      }
+      return { rows: [] };
+    });
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+
+    await expect(pgRosterRegistrationRepository(pool).mergePlayers(leagueId, guestId, registeredId, actor))
+      .rejects.toMatchObject({ statusCode: 409, message });
+    expect(query).toHaveBeenCalledWith("ROLLBACK");
+  });
+
   it("merges player profiles atomically when league permission and scope check succeed", async () => {
     const registeredId = "00000000-0000-4000-8000-000000000002";
     const query = vi.fn(async (sql: string) => {

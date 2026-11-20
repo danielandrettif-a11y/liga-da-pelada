@@ -7,6 +7,7 @@ import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
 import type { CosmeticSlot } from "@/lib/fantasy/cosmetics";
 import { claimSeasonPassCosmetic, purchaseSeasonPassItem } from "@/modules/cosmetics/application/mutate-season-pass";
+import { claimPassError, purchasePassError } from "@/modules/cosmetics/domain/pass-mutation";
 import { supabaseSeasonPassMutationGateway } from "@/modules/cosmetics/infrastructure/supabase-season-pass-gateway";
 import { equipAccountCosmetic } from "@/modules/cosmetics/application/equip-account-cosmetic";
 import { supabaseAccountCosmeticEquipmentGateway } from "@/modules/cosmetics/infrastructure/supabase-equipment-gateway";
@@ -40,7 +41,8 @@ export async function getMyCosmeticsDashboard(): Promise<CosmeticsDashboard> {
   if (cosmeticsApi) {
     const league = await getActiveLeague();
     const season = await getActiveSeason(league.id);
-    return cosmeticsApi.getCosmeticsDashboard(league.id, season?.id || null, account.isAdmin);
+    const rows = await cosmeticsApi.getCosmeticsDashboard(league.id, season?.id || null);
+    return rows ? buildCosmeticsDashboard(rows) : emptyCosmeticsDashboard;
   }
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
@@ -129,7 +131,7 @@ export async function claimPassCosmetic(rewardId: string, cosmeticId: string) {
   const cosmeticsApi = await cosmeticsApiFor(account.client);
   if (cosmeticsApi) {
     const result = await cosmeticsApi.claimPassCosmetic(rewardId, cosmeticId, fantasySeasonId);
-    if (!result.success) return result;
+    if (!result.success) return { ...result, error: result.error === "Recompensa não pertence à pelada selecionada." ? result.error : claimPassError(result.error || "") };
     revalidatePath("/jogadores"); revalidatePath("/meu-perfil");
     return result;
   }
@@ -149,7 +151,7 @@ export async function purchaseSeasonPassShopItem(shopItemId: string) {
   const cosmeticsApi = await cosmeticsApiFor(account.client);
   if (cosmeticsApi) {
     const result = await cosmeticsApi.purchaseSeasonPassShopItem(shopItemId, fantasySeasonId);
-    if (!result.success) return result;
+    if (!result.success) return { ...result, error: result.error === "Item não pertence à pelada selecionada." ? result.error : purchasePassError(result.error || "") };
     revalidatePath("/jogadores");
     revalidatePath("/meu-perfil");
     revalidatePath("/ranking");
@@ -197,7 +199,9 @@ export async function getAdminCosmeticsPreview(playerId: string, requested: Cosm
   const account = await getCurrentAccount();
   const cosmeticsApi = await cosmeticsApiFor(account.client);
   if (cosmeticsApi) {
-    return cosmeticsApi.getAdminCosmeticsPreview(playerId, requested, account.profile?.player_id || null, account.isAdmin);
+    if (!account.user || !account.isAdmin || account.profile?.player_id !== playerId) return null;
+    const league = await getActiveLeague();
+    return cosmeticsApi.getAdminCosmeticsPreview(league.id, playerId, requested);
   }
   return resolveAdminCosmeticsPreview({
     isAdmin: account.isAdmin,

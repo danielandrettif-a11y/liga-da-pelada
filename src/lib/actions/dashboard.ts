@@ -12,7 +12,13 @@ export async function getDashboardData() {
     if (session) {
       const season = await getActiveSeason();
       if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
-      return session.gateway.getDashboardData(season.league_id);
+      try {
+        return await session.gateway.getDashboardData(season.league_id);
+      } catch (error) {
+        // The dashboard endpoint is not registered in the current backend.
+        // Keep the authenticated Supabase reader until that endpoint is ready.
+        if (!(error instanceof Error && "statusCode" in error && error.statusCode === 404)) throw error;
+      }
     }
     const account = await getCurrentAccount();
     const season = await getActiveSeason();

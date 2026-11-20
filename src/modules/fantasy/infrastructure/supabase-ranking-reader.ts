@@ -1,5 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+export async function readLeagueFantasyParticipants(client: SupabaseClient, leagueId: string) {
+  return client.from("league_members")
+    .select("user_id, players(name, avatar_url)")
+    .eq("league_id", leagueId)
+    .eq("is_active", true)
+    .not("user_id", "is", null)
+    .not("player_id", "is", null);
+}
+
 export async function readFantasySeasonId(client: SupabaseClient, seasonId: string) {
   return client.from("fantasy_seasons").select("id").eq("season_id", seasonId).maybeSingle();
 }

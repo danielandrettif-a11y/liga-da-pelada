@@ -7,7 +7,7 @@ vi.mock("next/cache", () => ({
 }));
 
 const mockCosmeticsApi = {
-  getCosmeticsDashboard: vi.fn().mockResolvedValue({ catalog: [], unlockedIds: [] }),
+  getCosmeticsDashboard: vi.fn().mockResolvedValue({ fantasySeasonId: "fs-123", isAdmin: true, owned: [], catalog: [], rewards: [], choices: [], loadout: null, pass: null, shop: [] }),
   cleanupLegacyCosmeticsPreview: vi.fn().mockResolvedValue({ success: true }),
   dismissUnopenedBronzePassPack: vi.fn().mockResolvedValue({ success: true }),
   resetTestPassRewardClaims: vi.fn().mockResolvedValue({ success: true }),
@@ -67,8 +67,8 @@ describe("Server Actions: Cosmetics Bridging (11 operations)", () => {
 
   it("delegates dashboard and equipped query operations to cosmeticsApi", async () => {
     const dashboard = await getMyCosmeticsDashboard();
-    expect(mockCosmeticsApi.getCosmeticsDashboard).toHaveBeenCalledWith("league-123", "season-123", true);
-    expect(dashboard).toEqual({ catalog: [], unlockedIds: [] });
+    expect(mockCosmeticsApi.getCosmeticsDashboard).toHaveBeenCalledWith("league-123", "season-123");
+    expect(dashboard).toMatchObject({ available: true, seasonId: "fs-123", canPreviewAll: true, cosmetics: [], rewards: [] });
 
     await getMyEquippedCosmetics();
     expect(mockCosmeticsApi.getMyEquippedCosmetics).toHaveBeenCalled();
@@ -94,9 +94,16 @@ describe("Server Actions: Cosmetics Bridging (11 operations)", () => {
     expect(purchaseRes.success).toBe(true);
   });
 
+  it("keeps the existing user-facing messages for locked rewards and insufficient points", async () => {
+    mockCosmeticsApi.claimPassCosmetic.mockResolvedValueOnce({ success: false, error: "Recompensa ainda nao desbloqueada" });
+    mockCosmeticsApi.purchaseSeasonPassShopItem.mockResolvedValueOnce({ success: false, error: "Pontos extras insuficientes" });
+    expect(await claimPassCosmetic("r-1", "c-1")).toEqual({ success: false, error: "Esta recompensa ainda não foi desbloqueada." });
+    expect(await purchaseSeasonPassShopItem("item-1")).toEqual({ success: false, error: "Você ainda não tem pontos extras suficientes." });
+  });
+
   it("delegates admin preview and cleanup operations to cosmeticsApi", async () => {
     await getAdminCosmeticsPreview("player-123", { frame: "f-1" });
-    expect(mockCosmeticsApi.getAdminCosmeticsPreview).toHaveBeenCalledWith("player-123", { frame: "f-1" }, "player-123", true);
+    expect(mockCosmeticsApi.getAdminCosmeticsPreview).toHaveBeenCalledWith("league-123", "player-123", { frame: "f-1" });
 
     const cleanupRes = await cleanupMyLegacyCosmeticsPreview();
     expect(mockCosmeticsApi.cleanupLegacyCosmeticsPreview).toHaveBeenCalledWith("fs-123");

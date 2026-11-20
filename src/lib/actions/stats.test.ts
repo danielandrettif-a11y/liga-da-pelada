@@ -99,6 +99,34 @@ describe("stats server actions parity", () => {
   });
 
   describe("getRankingEssentialData", () => {
+    it("loads league profiles while the ranking request is pending", async () => {
+      let resolveRanking!: (value: any) => void;
+      const ranking = new Promise((resolve) => { resolveRanking = resolve; });
+      const profilesRead = vi.fn().mockResolvedValue({
+        data: [{ player_id: playerId, player_profile: "defensive" }],
+        error: null,
+      });
+      vi.mocked(createServerClient).mockResolvedValue({
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({ eq: profilesRead }),
+        }),
+      } as any);
+      vi.mocked(getStatisticsApiSession).mockResolvedValue({
+        gateway: { getRankingExperience: vi.fn().mockReturnValue(ranking) },
+      } as any);
+
+      const resultPromise = getRankingEssentialData();
+      await vi.waitFor(() => expect(profilesRead).toHaveBeenCalledOnce());
+      resolveRanking({
+        seasonLabel: "Temporada 1",
+        general: [{ player: { id: playerId }, points: 30 }],
+        monthly: null,
+        latestRound: null,
+      });
+      const result = await resultPromise;
+      expect(result.general[0].player.player_profile).toBe("defensive");
+    });
+
     it("routes to gateway with includeEnrichment=false when session is active", async () => {
       const mockExperience = {
         seasonLabel: "Temporada 1 · 2026",

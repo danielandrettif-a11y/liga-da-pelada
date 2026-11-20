@@ -17,6 +17,9 @@ const supabaseImageSource = (() => {
 const nextConfig: NextConfig = {
   output: "standalone",
   images: {
+    // In local Docker setups the browser can reach localhost, but the Next.js
+    // image optimizer runs in another container and cannot reach that address.
+    unoptimized: supabaseImageSource?.hostname === "localhost" || supabaseImageSource?.hostname === "127.0.0.1",
     // Cartas, escudos e avatares são servidos em vários tamanhos no celular.
     // Deixar o Next gerar WebP/AVIF evita baixar a arte original em cada miniatura.
     formats: ["image/avif", "image/webp"],

@@ -25,15 +25,21 @@ export const getMyLeagues = cache(async (): Promise<MyLeague[]> => {
   const { client, user } = await getCurrentAccount();
   if (!user) return [];
 
-  // Funciona como rede de segurança caso o projeto não tenha pg_cron ativo:
-  // qualquer abertura do app remove sessões descartáveis cujo prazo venceu.
-  await client.rpc("cleanup_expired_quick_leagues").then(() => undefined, () => undefined);
-
-  const { data: memberships, error } = await client
+  const readMemberships = () => client
     .from("league_members")
     .select("league_id, role, is_favorite, leagues!inner(id, name, slug, is_active, feature_tier, visibility, logo_url, cover_url, accent_color, archived_at, quick_purge_at)")
     .eq("user_id", user.id)
     .eq("is_active", true);
+
+  // A limpeza continua sendo uma rede de segurança quando não há pg_cron.
+  // Caso remova alguma pelada, releia os vínculos depois da transação.
+  const [cleanup, initialMemberships] = await Promise.all([
+    client.rpc("cleanup_expired_quick_leagues").then((result) => result, () => null),
+    readMemberships(),
+  ]);
+  const { data: memberships, error } = Number(cleanup?.data || 0) > 0
+    ? await readMemberships()
+    : initialMemberships;
   if (error) throw new Error(`Não foi possível carregar suas peladas: ${error.message}`);
 
   return (memberships || []).flatMap((membership) => {

@@ -47,6 +47,21 @@ describe("save player profile application", () => {
     expect(repository.delete).toHaveBeenCalledWith(leagueId, expect.any(String), actor);
   });
 
+  it("promotes a guest using the same player identity", async () => {
+    const { repository, storage } = fixture();
+    await expect(savePlayerProfile(leagueId, playerId, {
+      name: "Convidado promovido", member_category: "player",
+      player_profile: "offensive", overall_traits: ["offensive"],
+    }, actor, "token", repository, storage)).resolves.toBe(playerId);
+    expect(repository.saveProfile).toHaveBeenCalledWith(
+      leagueId,
+      expect.objectContaining({ playerId, memberCategory: "player" }),
+      false,
+      actor,
+    );
+    expect(repository.delete).not.toHaveBeenCalled();
+  });
+
   it("deletes persistence first and performs bounded best-effort storage cleanup", async () => {
     const { repository, storage } = fixture();
     await expect(deletePlayerProfile(leagueId, playerId, actor, "token", repository, storage))

@@ -25,9 +25,9 @@ describe("ManageCosmeticsUseCase", () => {
     expect(invalidRes.error).toContain("Slot de cosmético inválido");
     expect(repo.equipCosmetic).not.toHaveBeenCalled();
 
-    const validRes = await useCase.equip({ userId: "u1", slot: "border", cosmeticId: "c1" });
+    const validRes = await useCase.equip({ userId: "u1", slot: "frame", cosmeticId: "c1" });
     expect(validRes.success).toBe(true);
-    expect(repo.equipCosmetic).toHaveBeenCalledWith({ userId: "u1", slot: "border", cosmeticId: "c1" });
+    expect(repo.equipCosmetic).toHaveBeenCalledWith({ userId: "u1", slot: "frame", cosmeticId: "c1" });
   });
 
   it("validates claim params before delegating to repository", async () => {
@@ -47,8 +47,8 @@ describe("ManageCosmeticsUseCase", () => {
     const repo = createMockRepo();
     const useCase = new ManageCosmeticsUseCase(repo);
 
-    await useCase.getDashboard({ userId: "u1", leagueId: "l1", seasonId: "s1", isAdmin: true });
-    expect(repo.getCosmeticsDashboard).toHaveBeenCalledWith({ userId: "u1", leagueId: "l1", seasonId: "s1", isAdmin: true });
+    await useCase.getDashboard({ userId: "u1", leagueId: "l1", seasonId: "s1" });
+    expect(repo.getCosmeticsDashboard).toHaveBeenCalledWith({ userId: "u1", leagueId: "l1", seasonId: "s1" });
 
     await useCase.purchaseShopItem({ userId: "u1", shopItemId: "item-1", fantasySeasonId: "fs1" });
     expect(repo.purchaseSeasonPassShopItem).toHaveBeenCalledWith({ userId: "u1", shopItemId: "item-1", fantasySeasonId: "fs1" });
@@ -56,27 +56,27 @@ describe("ManageCosmeticsUseCase", () => {
     await useCase.getMyEquipped("u1");
     expect(repo.getMyEquippedCosmetics).toHaveBeenCalledWith("u1");
 
-    await useCase.getPlayerEquipped("p1");
-    expect(repo.getPlayerEquippedCosmetics).toHaveBeenCalledWith("p1");
+    await useCase.getPlayerEquipped("u1", "p1");
+    expect(repo.getPlayerEquippedCosmetics).toHaveBeenCalledWith("u1", "p1");
 
-    await useCase.getAllPlayersMap(["p1", "p2"]);
-    expect(repo.getAllPlayersEquippedCosmeticsMap).toHaveBeenCalledWith(["p1", "p2"]);
+    await useCase.getAllPlayersMap("u1", ["p1", "p2"]);
+    expect(repo.getAllPlayersEquippedCosmeticsMap).toHaveBeenCalledWith("u1", ["p1", "p2"]);
   });
 
   it("delegates admin preview and cleanup operations to repository", async () => {
     const repo = createMockRepo();
     const useCase = new ManageCosmeticsUseCase(repo);
 
-    await useCase.resolveAdminPreview({ isAdmin: true, ownPlayerId: "p1", playerId: "p1", requested: {} });
+    await useCase.resolveAdminPreview({ userId: "u1", leagueId: "l1", playerId: "p1", requested: {} });
     expect(repo.resolveAdminCosmeticsPreview).toHaveBeenCalled();
 
-    await useCase.cleanupLegacyPreview("fs1");
-    expect(repo.cleanupLegacyCosmeticsPreview).toHaveBeenCalledWith("fs1");
+    await useCase.cleanupLegacyPreview("u1", "fs1");
+    expect(repo.cleanupLegacyCosmeticsPreview).toHaveBeenCalledWith("u1", "fs1");
 
-    await useCase.dismissBronzePack("fs1");
-    expect(repo.dismissUnopenedBronzePassPack).toHaveBeenCalledWith("fs1");
+    await useCase.dismissBronzePack("u1", "fs1");
+    expect(repo.dismissUnopenedBronzePassPack).toHaveBeenCalledWith("u1", "fs1");
 
-    await useCase.resetTestClaims({ fantasySeasonId: "fs1", selectedFantasySeasonId: "fs1" });
-    expect(repo.resetTestPassRewardClaims).toHaveBeenCalledWith({ fantasySeasonId: "fs1", selectedFantasySeasonId: "fs1" });
+    await useCase.resetTestClaims({ userId: "u1", fantasySeasonId: "fs1", selectedFantasySeasonId: "fs1" });
+    expect(repo.resetTestPassRewardClaims).toHaveBeenCalledWith({ userId: "u1", fantasySeasonId: "fs1", selectedFantasySeasonId: "fs1" });
   });
 });

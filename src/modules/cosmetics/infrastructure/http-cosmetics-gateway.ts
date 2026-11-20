@@ -1,5 +1,5 @@
 import type { CosmeticSlot } from "@/lib/fantasy/cosmetics";
-import type { CosmeticsDashboard } from "@/lib/actions/cosmetics";
+import type { CosmeticsDashboardRows } from "@/modules/cosmetics/domain/dashboard-types";
 import type { CosmeticPreviewLoadout, EquippedCosmeticsSummary } from "@/modules/cosmetics/domain/equipped-summary";
 
 export class CosmeticsApiError extends Error {
@@ -14,14 +14,14 @@ export class CosmeticsApiError extends Error {
 }
 
 export type CosmeticsHttpGateway = {
-  getCosmeticsDashboard(leagueId: string, seasonId: string | null, isAdmin: boolean): Promise<CosmeticsDashboard>;
+  getCosmeticsDashboard(leagueId: string, seasonId: string | null): Promise<CosmeticsDashboardRows | null>;
   cleanupLegacyCosmeticsPreview(fantasySeasonId: string | null): Promise<{ success: boolean; removed?: number; error?: string }>;
   dismissUnopenedBronzePassPack(fantasySeasonId: string | null): Promise<{ success: boolean; dismissed?: number; error?: string }>;
   resetTestPassRewardClaims(fantasySeasonId: string, selectedFantasySeasonId: string | null): Promise<{ success: boolean; removed?: number; error?: string }>;
   claimPassCosmetic(rewardId: string, cosmeticId: string, fantasySeasonId: string): Promise<{ success: boolean; error?: string }>;
   purchaseSeasonPassShopItem(shopItemId: string, fantasySeasonId: string): Promise<{ success: boolean; error?: string }>;
   equipCosmetic(slot: CosmeticSlot, cosmeticId: string | null): Promise<{ success: boolean; error?: string }>;
-  getAdminCosmeticsPreview(playerId: string, requested: CosmeticPreviewLoadout, ownPlayerId: string | null, isAdmin: boolean): Promise<EquippedCosmeticsSummary | null>;
+  getAdminCosmeticsPreview(leagueId: string, playerId: string, requested: CosmeticPreviewLoadout): Promise<EquippedCosmeticsSummary | null>;
   getMyEquippedCosmetics(): Promise<EquippedCosmeticsSummary | null>;
   getPlayerEquippedCosmetics(playerId: string): Promise<EquippedCosmeticsSummary | null>;
   getAllPlayersEquippedCosmeticsMap(playerIds?: string[]): Promise<Map<string, EquippedCosmeticsSummary>>;
@@ -59,61 +59,51 @@ export function httpCosmeticsGateway(
     return res.json() as Promise<T>;
   }
 
+  async function mutation<T extends { success: boolean; error?: string }>(path: string, body: unknown): Promise<T> {
+    try {
+      return await request<T>(path, { method: "POST", body: JSON.stringify(body) });
+    } catch (error) {
+      if (error instanceof CosmeticsApiError && error.status === 400) return { success: false, error: error.message } as T;
+      throw error;
+    }
+  }
+
   return {
-    async getCosmeticsDashboard(leagueId, seasonId, isAdmin) {
+    async getCosmeticsDashboard(leagueId, seasonId) {
       const q = new URLSearchParams();
       if (leagueId) q.set("leagueId", leagueId);
       if (seasonId) q.set("seasonId", seasonId);
-      if (isAdmin) q.set("isAdmin", "true");
-      return request<CosmeticsDashboard>(`/api/cosmetics/dashboard?${q.toString()}`);
+      return request<CosmeticsDashboardRows | null>(`/api/cosmetics/dashboard?${q.toString()}`);
     },
 
     async cleanupLegacyCosmeticsPreview(fantasySeasonId) {
-      return request<{ success: boolean; removed?: number; error?: string }>("/api/cosmetics/admin/cleanup-legacy", {
-        method: "POST",
-        body: JSON.stringify({ fantasySeasonId }),
-      });
+      return mutation<{ success: boolean; removed?: number; error?: string }>("/api/cosmetics/admin/cleanup-legacy", { fantasySeasonId });
     },
 
     async dismissUnopenedBronzePassPack(fantasySeasonId) {
-      return request<{ success: boolean; dismissed?: number; error?: string }>("/api/cosmetics/admin/dismiss-bronze-pack", {
-        method: "POST",
-        body: JSON.stringify({ fantasySeasonId }),
-      });
+      return mutation<{ success: boolean; dismissed?: number; error?: string }>("/api/cosmetics/admin/dismiss-bronze-pack", { fantasySeasonId });
     },
 
     async resetTestPassRewardClaims(fantasySeasonId, selectedFantasySeasonId) {
-      return request<{ success: boolean; removed?: number; error?: string }>("/api/cosmetics/admin/reset-test-claims", {
-        method: "POST",
-        body: JSON.stringify({ fantasySeasonId, selectedFantasySeasonId }),
-      });
+      return mutation<{ success: boolean; removed?: number; error?: string }>("/api/cosmetics/admin/reset-test-claims", { fantasySeasonId, selectedFantasySeasonId });
     },
 
     async claimPassCosmetic(rewardId, cosmeticId, fantasySeasonId) {
-      return request<{ success: boolean; error?: string }>("/api/cosmetics/claim-pass", {
-        method: "POST",
-        body: JSON.stringify({ rewardId, cosmeticId, fantasySeasonId }),
-      });
+      return mutation<{ success: boolean; error?: string }>("/api/cosmetics/claim-pass", { rewardId, cosmeticId, fantasySeasonId });
     },
 
     async purchaseSeasonPassShopItem(shopItemId, fantasySeasonId) {
-      return request<{ success: boolean; error?: string }>("/api/cosmetics/purchase-shop", {
-        method: "POST",
-        body: JSON.stringify({ shopItemId, fantasySeasonId }),
-      });
+      return mutation<{ success: boolean; error?: string }>("/api/cosmetics/purchase-shop", { shopItemId, fantasySeasonId });
     },
 
     async equipCosmetic(slot, cosmeticId) {
-      return request<{ success: boolean; error?: string }>("/api/cosmetics/equip", {
-        method: "POST",
-        body: JSON.stringify({ slot, cosmeticId }),
-      });
+      return mutation<{ success: boolean; error?: string }>("/api/cosmetics/equip", { slot, cosmeticId });
     },
 
-    async getAdminCosmeticsPreview(playerId, requested, ownPlayerId, isAdmin) {
+    async getAdminCosmeticsPreview(leagueId, playerId, requested) {
       return request<EquippedCosmeticsSummary | null>("/api/cosmetics/admin-preview", {
         method: "POST",
-        body: JSON.stringify({ playerId, requested, ownPlayerId, isAdmin }),
+        body: JSON.stringify({ leagueId, playerId, requested }),
       });
     },
 

@@ -31,9 +31,19 @@ describe("collectiveApiFor", () => {
       },
     };
 
-    const api = await collectiveApiFor(mockClient);
+    const api = await collectiveApiFor(mockClient, "page");
     expect(api).not.toBeNull();
-    expect(typeof api?.getActiveCollectiveSummary).toBe("function");
+    expect(typeof api?.getPage).toBe("function");
     expect(typeof api?.sendCollectiveMessage).toBe("function");
+  });
+
+  it.each(["previous-id", "edit", "delete", "read", "send"] as const)("allows the validated %s capability", async (capability) => {
+    const client: any = { auth: { getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: "token" } } }) } };
+    expect(await collectiveApiFor(client, capability)).not.toBeNull();
+  });
+
+  it("uses page as the default verified capability", async () => {
+    const client: any = { auth: { getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: "token" } } }) } };
+    expect(await collectiveApiFor(client)).not.toBeNull();
   });
 });

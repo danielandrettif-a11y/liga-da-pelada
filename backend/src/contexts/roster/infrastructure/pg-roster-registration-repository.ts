@@ -27,6 +27,22 @@ function translateFailure(cause: unknown): RosterRegistrationPersistenceError {
   if (/ROSTER_REGISTRATION_FORBIDDEN|Acesso restrito|permission denied|row-level security/i.test(message)) {
     return new RosterRegistrationPersistenceError("Somente administradores da pelada podem acessar cadastros.", 403);
   }
+  if (cause instanceof Error && "code" in cause && cause.code === "P0001") {
+    if (message === "A uniao exige ADM e dois perfis exclusivos da mesma pelada.") {
+      return new RosterRegistrationPersistenceError("A união exige um administrador global e dois perfis exclusivos da mesma pelada.", 403);
+    }
+    if ([
+      "Encerre a partida ativa antes de unir os perfis.",
+      "Os perfis têm registros de goleiro em times diferentes na mesma partida.",
+      "Os dois perfis possuem contas diferentes vinculadas.",
+      "Os dois perfis têm cobranças para o mesmo destinatário na mesma rodada.",
+    ].includes(message)) {
+      return new RosterRegistrationPersistenceError(message, 409);
+    }
+    if (message === "Um dos perfis possui historico em outra pelada; a uniao global foi bloqueada.") {
+      return new RosterRegistrationPersistenceError("Um dos perfis possui histórico em outra pelada.", 409);
+    }
+  }
   return new RosterRegistrationPersistenceError("Não foi possível carregar os cadastros do elenco.", 503);
 }
 

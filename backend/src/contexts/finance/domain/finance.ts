@@ -168,10 +168,10 @@ export function areRoundParticipantsPaid(
   participants: Array<{ id: string; is_monthly_payer?: boolean }>,
   payments: Array<{ player_id: string; paid: boolean }>,
 ): boolean {
-  if (!participants.length) return true;
+  if (!participants.length) return false;
   const paidSet = new Set(
     payments.filter((p) => p.paid).map((p) => p.player_id),
   );
-  return participants.every((p) => p.is_monthly_payer || paidSet.has(p.id));
+  return participants.every((p) => paidSet.has(p.id));
 }
 

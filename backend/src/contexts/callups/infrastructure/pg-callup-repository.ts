@@ -614,7 +614,7 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
         const result = await client.query<{
           join_callup: { status?: "confirmed" | "waitlist" | "waitlisted"; position?: number } | string;
         }>(
-          "SELECT public.join_callup($1::uuid)",
+          "SELECT row_to_json(public.join_callup($1::uuid)) AS join_callup",
           [callupId],
         );
 
@@ -669,7 +669,7 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
           const result = await client.query<{
             admin_add_callup_player: { status?: "confirmed" | "waitlist" | "waitlisted"; position?: number } | string;
           }>(
-            "SELECT public.admin_add_callup_player($1::uuid, $2::uuid)",
+            "SELECT row_to_json(public.admin_add_callup_player($1::uuid, $2::uuid)) AS admin_add_callup_player",
             [callupId, playerId],
           );
           const data = result.rows[0]?.admin_add_callup_player;
