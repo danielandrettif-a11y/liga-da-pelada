@@ -37,8 +37,12 @@ export default async function proxy(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
   const pathname = request.nextUrl.pathname
+  const measureHome = pathname === '/' && process.env.MATCH_PERF_DIAGNOSTICS === '1'
+  const authStartedAt = performance.now()
+  const { data: { user } } = await supabase.auth.getUser()
+  const authDuration = performance.now() - authStartedAt
+  let membershipDuration = 0
   const origin = requestOrigin(request)
   const isAdminRoute =
     pathname.startsWith('/admin') ||
@@ -63,11 +67,13 @@ export default async function proxy(request: NextRequest) {
   if (pathname === '/' && !user) return NextResponse.redirect(new URL('/inicio', origin))
 
   if (user) {
+    const membershipStartedAt = performance.now()
     const { data: memberships } = await supabase
       .from('league_members')
       .select('league_id, role, leagues(feature_tier)')
       .eq('user_id', user.id)
       .eq('is_active', true)
+    membershipDuration = performance.now() - membershipStartedAt
     hasMembership = Boolean(memberships?.length)
     const selectedLeagueId = request.cookies.get('active_league_id')?.value
     const selectedMembership = memberships?.find((item) => item.league_id === selectedLeagueId)
@@ -152,6 +158,10 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/lobby', origin))
   }
 
+  if (measureHome && user) {
+    supabaseResponse.headers.append('Server-Timing',
+      `home_auth;dur=${authDuration.toFixed(1)}, home_membership;dur=${membershipDuration.toFixed(1)}`)
+  }
   return supabaseResponse
 }
 

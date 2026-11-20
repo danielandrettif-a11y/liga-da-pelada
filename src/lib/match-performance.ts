@@ -1,6 +1,6 @@
 import { reportServerEvent } from "@/lib/observability";
 
-export type MatchOperation = "create_match" | "register_goal" | "finish_match" | "finish_round" | "join_callup" | "leave_callup" | "add_callup_players";
+export type MatchOperation = "create_match" | "register_goal" | "finish_match" | "finish_round" | "join_callup" | "leave_callup" | "add_callup_players" | "load_home";
 
 type MatchStepSample = { durationMs: number; failed: boolean };
 export type MatchStepSummary = {

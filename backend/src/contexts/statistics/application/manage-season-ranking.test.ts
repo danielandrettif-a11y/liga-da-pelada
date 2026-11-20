@@ -42,6 +42,7 @@ describe("ManageSeasonRankingUseCase", () => {
         achievementBeltsByPlayer: new Map(),
       }),
       findLeaguePlayer: vi.fn().mockResolvedValue(null),
+      findPlayerOverall: vi.fn().mockResolvedValue(null),
       findPlayerCosmetics: vi.fn().mockResolvedValue(null),
       findActiveLeaguePlayerIds: vi.fn(async (_actor, _leagueId, ids) => ids),
     };
@@ -185,6 +186,7 @@ describe("ManageSeasonRankingUseCase", () => {
       findPlayerRoundStats: vi.fn().mockResolvedValue(stats),
       findEnrichmentData: vi.fn().mockResolvedValue(enrichment),
       findLeaguePlayer: vi.fn().mockResolvedValue(null),
+      findPlayerOverall: vi.fn().mockResolvedValue(null),
       findPlayerCosmetics: vi.fn().mockResolvedValue(null),
       findActiveLeaguePlayerIds: vi.fn(async (_actor, _leagueId, ids) => ids),
     };
@@ -271,6 +273,7 @@ describe("ManageSeasonRankingUseCase", () => {
         if (id === "p-unranked") return { id: "p-unranked", name: "Unranked Player" };
         return null;
       }),
+      findPlayerOverall: vi.fn().mockResolvedValue({ overall: 76.4, trend: "steady", goalkeeperGames: 0, goalkeeperRounds: 0 }),
       findPlayerCosmetics: vi.fn().mockResolvedValue(null),
       findActiveLeaguePlayerIds: vi.fn(async (_actor, _leagueId, ids) => ids),
     };
@@ -286,6 +289,8 @@ describe("ManageSeasonRankingUseCase", () => {
     const resUnranked = await useCase.getPlayerRankingEntry(mockActor, "league-1", "p-unranked");
     expect(resUnranked?.position).toBe(2);
     expect(resUnranked?.entry.points).toBe(0);
+    expect(resUnranked?.entry.overall).toBe(76.4);
+    expect(repo.findPlayerOverall).toHaveBeenCalledWith(mockActor, "league-1", "p-unranked");
 
     // Atleta desconhecido
     const resNotFound = await useCase.getPlayerRankingEntry(mockActor, "league-1", "p-unknown");
@@ -320,6 +325,7 @@ describe("ManageSeasonRankingUseCase", () => {
         achievementBeltsByPlayer: new Map(),
       }),
       findLeaguePlayer: vi.fn().mockResolvedValue(null),
+      findPlayerOverall: vi.fn().mockResolvedValue(null),
       findPlayerCosmetics: vi.fn().mockResolvedValue(null),
       findActiveLeaguePlayerIds: vi.fn(async (_actor, _leagueId, ids) => ids),
     };
@@ -347,6 +353,7 @@ describe("ManageSeasonRankingUseCase", () => {
         speedByPlayer: new Map(), achievementBeltsByPlayer: new Map(),
       }),
       findLeaguePlayer: vi.fn().mockResolvedValue(null),
+      findPlayerOverall: vi.fn().mockResolvedValue(null),
       findPlayerCosmetics: vi.fn().mockResolvedValue(null),
       findActiveLeaguePlayerIds: vi.fn().mockResolvedValue([member]),
     };

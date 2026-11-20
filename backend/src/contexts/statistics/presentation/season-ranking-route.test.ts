@@ -26,6 +26,7 @@ function buildApp(repoOverrides: Partial<SeasonRankingRepository> = {}) {
       achievementBeltsByPlayer: new Map(),
     }),
     findLeaguePlayer: vi.fn().mockResolvedValue(null),
+    findPlayerOverall: vi.fn().mockResolvedValue(null),
     findPlayerCosmetics: vi.fn().mockResolvedValue(null),
     findActiveLeaguePlayerIds: vi.fn(async (_actor, _leagueId, ids) => ids),
     ...repoOverrides,

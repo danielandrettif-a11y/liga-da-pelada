@@ -5,7 +5,10 @@ import {
   LogIn,
   TrendingUp,
 } from "@/components/icons";
-import { Suspense } from "react";
+import { cache, Suspense } from "react";
+import { WeatherBadge } from "@/components/WeatherBadge";
+import { BQTheBestButton } from "@/components/BQTheBestButton";
+import { getEventWeather, type EventWeather } from "@/lib/weather";
 import Link from "next/link";
 import { getDashboardData } from "@/lib/actions/dashboard";
 import { getLatestFinishedSeason } from "@/lib/actions/seasons";
@@ -66,34 +69,73 @@ async function HomePreviousSeason({ season }: { season: ReturnType<typeof getLat
   return summary ? <PreviousSeasonBanner summary={summary} /> : null;
 }
 
+type HomeWeatherEvent = {
+  stadiumId?: string | null;
+  date?: string | null;
+  time?: string | null;
+};
+
+const getHomeStadium = cache(async (stadiumId: string) => {
+  const { client } = await getCurrentAccount();
+  const { data } = await client.from("stadiums").select("latitude, longitude").eq("id", stadiumId).maybeSingle();
+  return data;
+});
+
+async function readHomeWeather(event: HomeWeatherEvent | null, durationMinutes: number) {
+  if (!event?.stadiumId || !event.date || !event.time) return null;
+  const stadium = await getHomeStadium(event.stadiumId);
+  return getEventWeather({
+    latitude: stadium?.latitude,
+    longitude: stadium?.longitude,
+    date: event.date,
+    startTime: event.time,
+    durationMinutes,
+  });
+}
+
+async function HomeWeather({ events, duration, location, initial }: {
+  events: Array<HomeWeatherEvent | null>;
+  duration: number;
+  location?: string | null;
+  initial?: EventWeather | null;
+}) {
+  let weather = initial;
+  for (const event of events) {
+    if (weather) break;
+    weather = await readHomeWeather(event, duration).catch(() => null);
+  }
+  return <WeatherBadge weather={weather} locationName={location} />;
+}
+
+async function HomeMonthlyAwards() {
+  const { periodStart, winners } = await getPreviousMonthAwardWinners();
+  return <BQTheBestButton periodStart={periodStart} winners={winners} />;
+}
+
+async function HomeProfileReminder() {
+  const account = await getCurrentAccount();
+  if (!account.user || !account.profile?.player_id) return null;
+  const { avatarUrl } = await getCurrentAccountIdentity();
+  const inherited = [account.user.user_metadata?.avatar_url, account.user.user_metadata?.picture];
+  return avatarUrl === null || inherited.includes(avatarUrl) ? <IncompleteProfileBanner /> : null;
+}
+
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ inviteError?: string }> }) {
   const query = await searchParams;
   const accountPromise = getCurrentAccount();
   const selectedLeaguePromise = getSelectedLeague();
   const previousSeasonPromise = getLatestFinishedSeason().catch(() => null);
   const seasonPassPromise = selectedLeaguePromise.then((league) => league?.featureTier === "complete" ? getSeasonPassDashboard() : null).catch(() => null);
-  const [{ data }, account, identity, monthlyAwards, selectedLeague] = await Promise.all([
+  const [{ data }, account, selectedLeague] = await Promise.all([
     getDashboardData(),
     accountPromise,
-    getCurrentAccountIdentity(),
-    getPreviousMonthAwardWinners(),
     selectedLeaguePromise,
   ]);
-  const inheritedGoogleAvatars = [
-    account.user?.user_metadata?.avatar_url,
-    account.user?.user_metadata?.picture,
-  ].filter(Boolean);
-  const hasIncompleteProfile = Boolean(
-    account.user
-      && account.profile?.player_id
-      && (identity.avatarUrl === null || inheritedGoogleAvatars.includes(identity.avatarUrl)),
-  );
-  
   if (!data) {
     return (
       <div className="space-y-6">
         {!account.user && <JoinSelectionButton />}
-        {hasIncompleteProfile && <IncompleteProfileBanner />}
+        <Suspense fallback={null}><HomeProfileReminder /></Suspense>
         <div className="flex flex-col items-center justify-center p-8 text-center animate-fade-in">
           <div className="w-16 h-16 rounded-full bg-surface-hover flex items-center justify-center mb-4">
             <TrendingUp className="w-8 h-8 text-muted" />
@@ -112,12 +154,19 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   const { nextRound, activeCallups = [], liveMatch, matchDuration, venue, nextRoundWeather, eventDurationMinutes, lastRound } = data;
 
+  const matchingCallup = activeCallups.find((callup: any) =>
+    callup.roundType === "official" && (callup.roundId === nextRound?.id || callup.date === nextRound?.date),
+  );
+  const weatherForCallup = (callup: any): HomeWeatherEvent | null => callup
+    ? { stadiumId: callup.stadiumId, date: callup.date, time: callup.startTime }
+    : null;
+
   const currentPlayerId = account.profile?.player_id || null;
 
   return (
     <div className="space-y-5 pt-1 sm:pt-0">
       {!account.user && <JoinSelectionButton />}
-      {hasIncompleteProfile && <IncompleteProfileBanner />}
+      <Suspense fallback={null}><HomeProfileReminder /></Suspense>
       {selectedLeague?.featureTier === "quick" && <section className="rounded-2xl border border-accent/30 bg-accent/[.07] p-4"><p className="text-[10px] font-black uppercase tracking-[.18em] text-accent">Pelada descartável</p><h1 className="mt-1 font-athletic text-2xl font-black uppercase text-white">Você está no controle</h1><p className="mt-2 text-xs leading-5 text-muted">Cadastre apenas os convidados, monte os times e use o placar ao vivo. Esta sessão não gera ranking.</p><div className="mt-3 grid grid-cols-2 gap-2"><Link href="/rodadas" className="rounded-xl bg-accent px-3 py-2.5 text-center text-xs font-black text-background">Partidas e histórico</Link><Link href="/pagamentos" className="rounded-xl border border-accent/35 px-3 py-2.5 text-center text-xs font-black text-accent">Transfermarket</Link></div></section>}
 
       <LiveMatchBanner
@@ -140,7 +189,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               : null;
             return {
               userEntry,
-              slide: <OpenCallupBanner key={callup.id} callup={callup} userEntry={userEntry} />,
+              slide: <OpenCallupBanner key={callup.id} callup={callup} userEntry={userEntry} weatherBadge={
+                <Suspense fallback={null}>
+                  <HomeWeather events={[weatherForCallup(callup)]} duration={eventDurationMinutes} location={callup.stadiumName} initial={callup.weather} />
+                </Suspense>
+              } />,
             };
           });
 
@@ -151,9 +204,17 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               isAdmin={account.isAdmin}
               venue={venue}
               eventDurationMinutes={eventDurationMinutes}
-              weather={nextRoundWeather}
-              awardsPeriodStart={monthlyAwards.periodStart}
-              awardWinners={monthlyAwards.winners}
+              weatherBadge={nextRound && (
+                <Suspense fallback={null}>
+                  <HomeWeather
+                    events={[weatherForCallup(matchingCallup), { stadiumId: nextRound.stadium_id, date: nextRound.date, time: nextRound.start_time }]}
+                    duration={eventDurationMinutes}
+                    location={venue?.name}
+                    initial={nextRoundWeather}
+                  />
+                </Suspense>
+              )}
+              awards={<Suspense fallback={null}><HomeMonthlyAwards /></Suspense>}
             />
           );
 

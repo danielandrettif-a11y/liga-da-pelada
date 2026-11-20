@@ -71,7 +71,7 @@ describe("Server Action: getDashboardData", () => {
     const client = {
       rpc: vi.fn().mockResolvedValue({
         data: {
-          nextRound: { id: "r1", number: 1 },
+          nextRound: { id: "r1", number: 1, stadium_id: "stadium", date: "2026-11-21", start_time: "08:00" },
           league: { match_duration: 7 },
           activeCallups: [],
         },
@@ -90,6 +90,7 @@ describe("Server Action: getDashboardData", () => {
     const result = await getDashboardData();
     expect(result.success).toBe(true);
     expect(getStatisticsApiSessionMock).not.toHaveBeenCalled();
+    expect(getEventWeatherMock).not.toHaveBeenCalled();
     expect(client.rpc).toHaveBeenCalledWith("get_home_read_model", {
       p_season_id: "season-1",
       p_league_id: "league-123",

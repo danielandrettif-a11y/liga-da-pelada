@@ -529,7 +529,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
 
       {selected && (
         <RankingPlayerCardModal
-          entry={selected.entry}
+          entry={sourceEntries.find((entry) => entry.player.id === selected.entry.player.id) ?? selected.entry}
           position={selected.position}
           scoringMode={filter === "legacy" ? "legacy" : "official"}
           onClose={() => setSelected(null)}

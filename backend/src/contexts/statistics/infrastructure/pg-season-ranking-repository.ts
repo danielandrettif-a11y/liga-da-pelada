@@ -1,3 +1,4 @@
+import { buildPlayerCardOverallMap } from "../domain/season-operations.js";
 import type { Pool, PoolClient } from "pg";
 import { withAuthenticatedTransaction } from "../../../infrastructure/authenticated-transaction.js";
 import type { Actor } from "../../../shared/actor.js";
@@ -346,6 +347,16 @@ export class PgSeasonRankingRepository implements SeasonRankingRepository {
       );
       if (!result.rows[0]) return null;
       return result.rows[0] as RankingPlayer;
+    });
+  }
+
+  async findPlayerOverall(actor: Actor, leagueId: string, playerId: string) {
+    return withAuthenticatedTransaction(this.pool, actor, async (client) => {
+      const result = await client.query<Record<string, unknown>>(
+        "SELECT * FROM public.get_latest_player_card_overalls_for_league($1::uuid) WHERE player_id = $2::uuid",
+        [leagueId, playerId],
+      );
+      return buildPlayerCardOverallMap(result.rows, new Set([playerId]))[playerId] ?? null;
     });
   }
 

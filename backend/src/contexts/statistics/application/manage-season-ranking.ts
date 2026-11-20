@@ -1,3 +1,4 @@
+import type { PlayerCardOverall } from "../domain/season-operations.js";
 import type { Actor } from "../../../shared/actor.js";
 import {
   aggregateRankingRows,
@@ -66,6 +67,7 @@ export interface SeasonRankingRepository {
     playerIds?: string[],
   ): Promise<RankingRawEnrichmentData>;
   findLeaguePlayer(actor: Actor, leagueId: string, playerId: string): Promise<RankingPlayer | null>;
+  findPlayerOverall(actor: Actor, leagueId: string, playerId: string): Promise<PlayerCardOverall | null>;
   findPlayerCosmetics(actor: Actor, playerId: string): Promise<PlayerEquippedCosmetics | null>;
   findActiveLeaguePlayerIds(actor: Actor, leagueId: string, playerIds: string[]): Promise<string[]>;
 }
@@ -292,7 +294,10 @@ export class ManageSeasonRankingUseCase {
     const player = await this.repository.findLeaguePlayer(actor, leagueId, playerId);
     if (!player) return null;
 
-    const cosmetics = await this.repository.findPlayerCosmetics(actor, playerId);
+    const [cosmetics, overall] = await Promise.all([
+      this.repository.findPlayerCosmetics(actor, playerId),
+      this.repository.findPlayerOverall(actor, leagueId, playerId),
+    ]);
 
     const emptyEntry: RankingEntry = {
       player,
@@ -305,12 +310,12 @@ export class ManageSeasonRankingUseCase {
       points: 0,
       legacyPoints: 0,
       positionBonus: 0,
-      overall: null,
-      overallTrend: null,
-      overallPositions: null,
-      overallPositionTrends: null,
-      overallGoalkeeperGames: 0,
-      overallGoalkeeperRounds: 0,
+      overall: overall?.overall ?? null,
+      overallTrend: overall?.trend ?? null,
+      overallPositions: overall?.positions ?? null,
+      overallPositionTrends: overall?.positionTrends ?? null,
+      overallGoalkeeperGames: overall?.goalkeeperGames ?? 0,
+      overallGoalkeeperRounds: overall?.goalkeeperRounds ?? 0,
       speedRating: null,
       winRate: 0,
       awards: { roundMvp: 0, topScorer: 0, topAssister: 0, kingOfWins: 0 },

@@ -4,14 +4,14 @@ import { getActiveSeason } from "./seasons";
 import { getStatisticsApiSession } from "@/modules/statistics/infrastructure/statistics-api-session";
 import { isDashboardCallupVisible, readDashboardCallups } from "../dashboard-callups";
 import { getCurrentAccount } from "../auth";
-import { getEventWeather } from "../weather";
+import { measureMatchStep } from "../match-performance";
 
 export async function getDashboardData() {
   try {
     const [session, account, season] = await Promise.all([
       process.env.DASHBOARD_API_ENABLED === "false" ? null : getStatisticsApiSession(),
-      getCurrentAccount(),
-      getActiveSeason(),
+      measureMatchStep("load_home", "account_context", getCurrentAccount),
+      measureMatchStep("load_home", "active_season", () => getActiveSeason()),
     ]);
     if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
     if (session) {
@@ -24,11 +24,13 @@ export async function getDashboardData() {
       }
     }
     const [{ data: readModelData, error: readModelError }, { data: activeCallupsData }] = await Promise.all([
-      account.client.rpc("get_home_read_model", {
-        p_season_id: season.id,
-        p_league_id: season.league_id,
-      }),
-      readDashboardCallups(account.client, season.league_id),
+      measureMatchStep("load_home", "dashboard_sql", async () =>
+        account.client.rpc("get_home_read_model", {
+          p_season_id: season.id,
+          p_league_id: season.league_id,
+        }),
+      ),
+      measureMatchStep("load_home", "active_callups", () => readDashboardCallups(account.client, season.league_id)),
     ]);
     const readModel = !readModelError && readModelData && typeof readModelData === "object"
       ? readModelData as any
@@ -120,37 +122,9 @@ export async function getDashboardData() {
     // Convocacoes ligadas a rodadas iniciadas/finalizadas deixam de ser destaque.
     const visibleCallups = (activeCallupsData || []).filter((callup: any) => isDashboardCallupVisible(callup));
 
-    const stadiumIds = [...new Set([
-      nextRoundData?.stadium_id,
-      ...visibleCallups.map((callup: any) => callup.stadium_id),
-    ].filter(Boolean))];
-    const { data: stadiumRows } = stadiumIds.length
-      ? await account.client.from("stadiums").select("id, latitude, longitude").in("id", stadiumIds)
-      : { data: [] };
-    const stadiumsById = new Map((stadiumRows || []).map((stadium: any) => [stadium.id, stadium]));
     const eventDurationMinutes = leagueData?.event_duration_minutes || 120;
-    const roundStadium: any = stadiumsById.get(nextRoundData?.stadium_id);
-    const [roundWeather, ...callupWeather] = await Promise.all([
-      getEventWeather({
-        latitude: roundStadium?.latitude,
-        longitude: roundStadium?.longitude,
-        date: nextRoundData?.date,
-        startTime: nextRoundData?.start_time,
-        durationMinutes: eventDurationMinutes,
-      }),
-      ...visibleCallups.map((callup: any) => {
-        const stadium: any = stadiumsById.get(callup.stadium_id);
-        return getEventWeather({
-          latitude: stadium?.latitude,
-          longitude: stadium?.longitude,
-          date: callup.date,
-          startTime: callup.start_time || "08:00",
-          durationMinutes: eventDurationMinutes,
-        });
-      }),
-    ]);
 
-    const mappedCallups = visibleCallups.map((callup: any, index: number) => ({
+    const mappedCallups = visibleCallups.map((callup: any) => ({
       id: callup.id,
       roundId: callup.round?.id || null,
       date: callup.date,
@@ -162,7 +136,7 @@ export async function getDashboardData() {
       waitlistCapacity: callup.waitlist_capacity,
       confirmed: (callup.callup_entries || []).filter((entry: any) => entry.status === "confirmed").length,
       waiting: (callup.callup_entries || []).filter((entry: any) => entry.status === "waitlist").length,
-      weather: callupWeather[index],
+      stadiumId: callup.stadium_id,
       entries: (callup.callup_entries || []).map((entry: any) => ({
         playerId: entry.player_id,
         status: entry.status as "confirmed" | "waitlist",
@@ -231,7 +205,7 @@ export async function getDashboardData() {
           name: nextRoundData?.stadium_name || leagueData?.stadium_name || null,
           mapUrl: nextRoundData?.stadium_map_url || leagueData?.stadium_map_url || null,
         },
-        nextRoundWeather: matchingOfficialCallup?.weather || roundWeather,
+        nextRoundWeather: null,
         eventDurationMinutes,
         preseasonEnabled: leagueData?.preseason_enabled === true,
         activeCallup: mappedCallups[0] || null,
