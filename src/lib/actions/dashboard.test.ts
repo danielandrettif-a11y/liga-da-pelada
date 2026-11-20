@@ -55,7 +55,7 @@ describe("Server Action: getDashboardData", () => {
     expect(mockGateway.getDashboardData).toHaveBeenCalledWith("league-123");
   });
 
-  it("falls back to legacy supabase flow when api session is disabled", async () => {
+  it.each([false, true])("serves the home agenda before and after migration 366 (available: %s)", async (agendaAvailable) => {
     vi.stubEnv("DASHBOARD_API_ENABLED", "false");
     getStatisticsApiSessionMock.mockRejectedValue(new Error("dashboard API should not be called"));
     getActiveSeasonMock.mockResolvedValue({
@@ -76,7 +76,9 @@ describe("Server Action: getDashboardData", () => {
           activeCallups: [],
         },
         error: null,
-      }),
+      }).mockResolvedValueOnce(agendaAvailable
+        ? { data: { nextRound: { id: "r1" }, league: { match_duration: 7 } }, error: null }
+        : { data: null, error: { code: "PGRST202" } }),
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue(callupsQuery),
       }),
@@ -87,13 +89,18 @@ describe("Server Action: getDashboardData", () => {
     });
     getEventWeatherMock.mockResolvedValue(null);
 
-    const result = await getDashboardData();
-    expect(result.success).toBe(true);
+    const result = await getDashboardData({ agendaOnly: true });
+    expect(result).toMatchObject({ success: true, data: { nextRound: { id: "r1" } } });
+    expect(result.data?.lastRound).toBe(agendaAvailable ? undefined : null);
     expect(getStatisticsApiSessionMock).not.toHaveBeenCalled();
     expect(getEventWeatherMock).not.toHaveBeenCalled();
-    expect(client.rpc).toHaveBeenCalledWith("get_home_read_model", {
+    expect(client.rpc).toHaveBeenCalledWith("get_home_agenda_read_model", {
       p_season_id: "season-1",
       p_league_id: "league-123",
+    });
+    expect(client.rpc).toHaveBeenCalledTimes(agendaAvailable ? 1 : 2);
+    if (!agendaAvailable) expect(client.rpc).toHaveBeenNthCalledWith(2, "get_home_read_model", {
+      p_season_id: "season-1", p_league_id: "league-123",
     });
   });
 

@@ -10,7 +10,7 @@ import { WeatherBadge } from "@/components/WeatherBadge";
 import { BQTheBestButton } from "@/components/BQTheBestButton";
 import { getEventWeather, type EventWeather } from "@/lib/weather";
 import Link from "next/link";
-import { getDashboardData } from "@/lib/actions/dashboard";
+import { getDashboardData, getHomeLastRound } from "@/lib/actions/dashboard";
 import { getLatestFinishedSeason } from "@/lib/actions/seasons";
 import { PreviousSeasonBanner } from "@/components/PreviousSeasonBanner";
 import { LiveMatchBanner, type HomeLiveMatch } from "@/components/LiveMatchBanner";
@@ -67,6 +67,11 @@ async function HomeSeasonPass({ pass }: { pass: Promise<Awaited<ReturnType<typeo
 async function HomePreviousSeason({ season }: { season: ReturnType<typeof getLatestFinishedSeason> }) {
   const summary = await season;
   return summary ? <PreviousSeasonBanner summary={summary} /> : null;
+}
+
+async function HomeLastRound() {
+  const round = await getHomeLastRound().catch(() => null);
+  return round ? <HomeLastRoundSummary round={round} /> : null;
 }
 
 type HomeWeatherEvent = {
@@ -127,7 +132,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const previousSeasonPromise = getLatestFinishedSeason().catch(() => null);
   const seasonPassPromise = selectedLeaguePromise.then((league) => league?.featureTier === "complete" ? getSeasonPassDashboard() : null).catch(() => null);
   const [{ data }, account, selectedLeague] = await Promise.all([
-    getDashboardData(),
+    getDashboardData({ agendaOnly: true }),
     accountPromise,
     selectedLeaguePromise,
   ]);
@@ -247,7 +252,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <HomeRankingPreview />
       </Suspense>}
 
-      {lastRound && <HomeLastRoundSummary round={lastRound} />}
+      {lastRound === undefined ? (
+        <Suspense fallback={null}><HomeLastRound /></Suspense>
+      ) : lastRound && <HomeLastRoundSummary round={lastRound} />}
     </div>
   );
 }

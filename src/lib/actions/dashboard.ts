@@ -6,7 +6,45 @@ import { isDashboardCallupVisible, readDashboardCallups } from "../dashboard-cal
 import { getCurrentAccount } from "../auth";
 import { measureMatchStep } from "../match-performance";
 
-export async function getDashboardData() {
+type DashboardClient = Awaited<ReturnType<typeof getCurrentAccount>>["client"];
+
+function readLastRound(client: DashboardClient, seasonId: string) {
+  return client.from("rounds")
+    .select(`*, matches(*, match_events(*, player:player_id (id, name, avatar_url),
+      assist_player:assist_player_id (id, name, avatar_url))), teams(*)`)
+    .eq("status", "finished")
+    .eq("season_id", seasonId)
+    .eq("round_type", "official")
+    .order("date", { ascending: false })
+    .order("number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+}
+
+function formatLastRound(round: any) {
+  if (!round) return null;
+  const teamsById = new Map(round.teams.map((team: any) => [team.id, team]));
+  const matches = round.matches.map((match: any) => ({
+    ...match,
+    teamA: teamsById.get(match.team_a_id),
+    teamB: teamsById.get(match.team_b_id),
+    match_events: [...(match.match_events || [])].sort((a, b) =>
+      String(a.created_at).localeCompare(String(b.created_at))),
+  })).sort((a: any, b: any) => (a.match_order || 0) - (b.match_order || 0));
+  return { ...round, matches };
+}
+
+export async function getHomeLastRound() {
+  return measureMatchStep("load_home", "last_round", async () => {
+    const [account, season] = await Promise.all([getCurrentAccount(), getActiveSeason()]);
+    if (!season) return null;
+    const { data, error } = await readLastRound(account.client, season.id);
+    if (error) throw error;
+    return formatLastRound(data);
+  });
+}
+
+export async function getDashboardData({ agendaOnly = false }: { agendaOnly?: boolean } = {}) {
   try {
     const [session, account, season] = await Promise.all([
       process.env.DASHBOARD_API_ENABLED === "false" ? null : getStatisticsApiSession(),
@@ -23,15 +61,19 @@ export async function getDashboardData() {
         if (!(error instanceof Error && "statusCode" in error && error.statusCode === 404)) throw error;
       }
     }
-    const [{ data: readModelData, error: readModelError }, { data: activeCallupsData }] = await Promise.all([
-      measureMatchStep("load_home", "dashboard_sql", async () =>
-        account.client.rpc("get_home_read_model", {
-          p_season_id: season.id,
-          p_league_id: season.league_id,
-        }),
-      ),
+    const params = { p_season_id: season.id, p_league_id: season.league_id };
+    const [{ model, historyDeferred }, { data: activeCallupsData }] = await Promise.all([
+      measureMatchStep("load_home", "dashboard_sql", async () => {
+        if (agendaOnly) {
+          const agenda = await account.client.rpc("get_home_agenda_read_model", params);
+          if (!agenda.error && agenda.data) return { model: agenda, historyDeferred: true };
+        }
+        const model = await account.client.rpc("get_home_read_model", params);
+        return { model, historyDeferred: false };
+      }),
       measureMatchStep("load_home", "active_callups", () => readDashboardCallups(account.client, season.league_id)),
     ]);
+    const { data: readModelData, error: readModelError } = model;
     const readModel = !readModelError && readModelData && typeof readModelData === "object"
       ? readModelData as any
       : null;
@@ -49,26 +91,7 @@ export async function getDashboardData() {
       .single();
 
     // 2. Última Rodada (finished) com partidas e times
-    const lastRoundPromise = readModel ? Promise.resolve({ data: readModel.lastRound }) : account.client
-      .from("rounds")
-      .select(`
-        *,
-        matches(
-          *,
-          match_events(
-            *,
-            player:player_id (id, name, avatar_url),
-            assist_player:assist_player_id (id, name, avatar_url)
-          )
-        ),
-        teams(*)
-      `)
-      .eq("status", "finished")
-      .eq("season_id", season.id)
-      .eq("round_type", "official")
-      .order("date", { ascending: false })
-      .limit(1)
-      .single();
+    const lastRoundPromise = readModel ? Promise.resolve({ data: readModel.lastRound }) : readLastRound(account.client, season.id);
 
     const nextFriendlyPromise = readModel ? Promise.resolve({ data: readModel.nextFriendly }) : account.client
       .from("rounds")
@@ -158,24 +181,6 @@ export async function getDashboardData() {
       };
     }
     
-    // Processamento da Última Rodada (mapear os times nas partidas)
-    let processedLastRound = null;
-    if (lastRoundData) {
-      const formattedMatches = lastRoundData.matches.map((m: any) => {
-        const teamA = lastRoundData.teams.find((t: any) => t.id === m.team_a_id);
-        const teamB = lastRoundData.teams.find((t: any) => t.id === m.team_b_id);
-        return {
-          ...m,
-          teamA,
-          teamB
-        };
-      });
-      processedLastRound = {
-        ...lastRoundData,
-        matches: formattedMatches.sort((a: any, b: any) => (a.match_order || 0) - (b.match_order || 0))
-      };
-    }
-
     const matchingOfficialCallup = mappedCallups.find((callup: any) =>
       callup.roundType === "official" && (callup.roundId === nextRoundData?.id || callup.date === nextRoundData?.date),
     );
@@ -210,7 +215,7 @@ export async function getDashboardData() {
         preseasonEnabled: leagueData?.preseason_enabled === true,
         activeCallup: mappedCallups[0] || null,
         activeCallups: mappedCallups,
-        lastRound: processedLastRound,
+        lastRound: historyDeferred ? undefined : formatLastRound(lastRoundData),
       }
     };
   } catch (err: any) {
