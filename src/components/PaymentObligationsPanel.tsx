@@ -63,6 +63,7 @@ export function PaymentObligationsPanel({ initialObligations, players, currentPl
   const visibleObligations = obligations;
   const totalDue = visibleObligations.reduce((sum, row) => sum + Number(row.amount_due || 0), 0);
   const currentTotal = currentPlayerId ? playerTotals.get(currentPlayerId)?.due : null;
+  const currentChargeLines = currentPlayerId ? chargeLines.filter((line) => line.player_id === currentPlayerId) : [];
   const recipients = [...new Map(visibleObligations.map((row) => [`${row.recipient_name}\u0000${row.recipient_pix}`, { name: row.recipient_name, pix: row.recipient_pix }])).values()];
   const selectedSet = new Set(selectedExpenseIds);
   const installmentByItem = new Map(initialExpenseSelections.map((item) => [item.expense_item_id, item.installment_number]));
@@ -141,6 +142,7 @@ export function PaymentObligationsPanel({ initialObligations, players, currentPl
         <div><p className="text-[9px] font-black uppercase tracking-widest text-accent">Resumo da cobrança</p><p className="mt-1 text-lg font-black text-foreground">{currency.format(totalDue)}</p>{currentTotal != null && <p className="mt-1 text-[10px] font-bold text-muted">Seu total: <span className="text-accent">{currency.format(currentTotal)}</span></p>}</div>
         {canManage && <button type="button" onClick={copyPaymentList} className="flex shrink-0 items-center gap-1.5 rounded-xl border border-accent/35 bg-background/60 px-3 py-2 text-[10px] font-black text-accent">{copied === "list" ? <Check className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}{copied === "list" ? "Lista copiada" : "Copiar para WhatsApp"}</button>}
       </div>
+      {currentTotal != null && currentChargeLines.length > 0 && <p className="mt-2 text-[10px] leading-4 text-muted">{currentChargeLines.map((line) => `${line.label}: ${currency.format(line.amount)}`).join(" + ")}</p>}
       <div className="mt-3 space-y-2 border-t border-accent/20 pt-3">
         {recipients.map((recipient, index) => <div key={`${recipient.name}-${recipient.pix}`} className="flex items-center gap-2 rounded-xl bg-background/50 px-3 py-2"><div className="min-w-0 flex-1"><p className="truncate text-[10px] font-black text-foreground">PIX de {recipient.name}</p><p className="truncate text-[10px] text-muted">{recipient.pix}</p></div><button type="button" onClick={() => copyText(recipient.pix, `pix-${index}`)} className="rounded-lg bg-accent p-2 text-background" aria-label={`Copiar PIX de ${recipient.name}`}>{copied === `pix-${index}` ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</button></div>)}
       </div>
